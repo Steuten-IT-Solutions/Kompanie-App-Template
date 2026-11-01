@@ -238,7 +238,7 @@ function PollPage({ id, onToast }: { id: number; onToast: (msg: string) => void 
 
 /** #/umfragen: laufende und beendete Umfragen (beendete mit Ergebnis, soweit sichtbar). */
 function PollList() {
-  const { data, error, loading, reload } = useAsync(() => api.polls(), [], 'polls');
+  const { data, error, loading, reload } = useAsync(sources.polls.load, sources.polls.deps, sources.polls.key);
   if (!data && loading) return <Loading />;
   if (!data) return <ErrorBox message={error ?? 'Fehler'} onRetry={reload} />;
   const running = data.filter((p) => p.status === 'running');
@@ -488,7 +488,7 @@ function ManagedPoll({ poll, onChanged, onToast }: { poll: Poll; onChanged: () =
 
 /** #/umfragen/verwalten (manage_polls): anlegen, ändern, beenden, löschen; alle Umfragen mit Ergebnissen. */
 function PollAdmin({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(() => api.polls(), [], 'polls');
+  const { data, error, loading, reload } = useAsync(sources.polls.load, sources.polls.deps, sources.polls.key);
   return (
     <div className="poll-admin">
       <PollForm
@@ -499,7 +499,7 @@ function PollAdmin({ onToast }: { onToast: (msg: string) => void }) {
         }}
       />
       {!data && loading ? (
-        <Loading />
+        <Loading shape="text" />
       ) : !data ? (
         <ErrorBox message={error ?? 'Fehler'} onRetry={reload} />
       ) : data.length === 0 ? (

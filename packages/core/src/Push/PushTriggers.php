@@ -137,7 +137,7 @@ final class PushTriggers
         $midnight = $this->app->time()->today()->modify('+1 day')->getTimestamp();
         return $this->push->notifyAudience(
             PushService::TYPE_BIRTHDAYS,
-            PushService::message($title, $body, 'termine/geburtstage', 'geburtstag-' . $userId),
+            PushService::message($title, $body, 'termine', 'geburtstag-' . $userId),
             static fn (int $uid): bool => $uid !== $userId,
             'normal',
             $midnight - $this->app->time()->timestamp(),

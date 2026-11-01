@@ -17,8 +17,8 @@ use KompanieApp\Core\Storage\BirthdayRepository;
  *   Mitgliedern zeigen“ (visible, Standard an) und „Alter anzeigen“ (show_age, Standard aus). Dazu wählt es, wem der
  *   Geburtstag auf seiner Seite in der Mitgliederliste erscheint (profile: none, members, public; Standard members,
  *   unabhängig von visible): mit show_age und Jahr das ganze Datum und das Alter, sonst nur Tag und Monat.
- * - Wer Mitglieder anlegen darf (create_users), trägt das Datum anderer ein oder entfernt es; die beiden Schalter
- *   bleiben dabei, wie die Person sie gesetzt hat.
+ * - Wer persönliche Angaben pflegt (manage_personal), trägt das Datum anderer ein oder entfernt es (beim Anlegen auch,
+ *   wer Mitglieder anlegen darf); die beiden Schalter bleiben dabei, wie die Person sie gesetzt hat.
  * - Sehen und erscheinen: nur Konten mit Mitgliederbereich (Recht member). Gäste und Anwärter sehen keine Geburtstage
  *   und erscheinen auch nicht. Ohne visible weder in der Liste noch in der Benachrichtigung. Das Alter nur mit show_age
  *   und Jahr; das Geburtsjahr gibt /birthdays nie aus.
@@ -28,6 +28,8 @@ use KompanieApp\Core\Storage\BirthdayRepository;
  *   Ortszeit, Standard 7 Uhr): an alle Mitglieder außer dem Geburtstagskind; je Geburtstag und Tag höchstens einmal
  *   (last_notified, atomar beansprucht). Admins können sie ausschalten (birthday_notify) und die Stunde wählen
  *   (birthday_notify_hour).
+ * - Anstehende Geburtstage bei den Terminen: heute und die nächsten N Tage; N stellen Admins ein (birthday_upcoming_days,
+ *   0–30, Standard 7). Die App bekommt N mit /config.
  *
  * @phpstan-import-type Birthday from BirthdayRepository
  */
@@ -40,8 +42,10 @@ final class BirthdayService
     public const NOTIFY_HOUR_SETTING = 'birthday_notify_hour';
     public const NOTIFY_HOUR_DEFAULT = 7;
     public const MIN_YEAR = 1900;
-    /** Anstehend: heute und die nächsten 7 Tage (App, „Anstehende Geburtstage“). */
+    /** Anstehend: heute und die nächsten N Tage (App, „Anstehende Geburtstage“); Einstellung der Admins. */
+    public const UPCOMING_DAYS_SETTING = 'birthday_upcoming_days';
     public const UPCOMING_DAYS = 7;
+    public const UPCOMING_DAYS_MAX = 30;
 
     private ?BirthdayRepository $repo = null;
 
@@ -160,7 +164,7 @@ final class BirthdayService
     }
 
     /**
-     * Datum eines anderen Mitglieds (PUT /members/{id}/birthday, create_users): nur Tag, Monat und Jahr; visible,
+     * Datum eines anderen Mitglieds (PUT /members/{id}/birthday, manage_personal): nur Tag, Monat und Jahr; visible,
      * show_age und profile bleiben, wie die Person sie gesetzt hat (mitgeschickte Schalter werden nicht übernommen).
      *
      * @param array<string, mixed> $in month, day, year
@@ -379,5 +383,31 @@ final class BirthdayService
         if ($hour !== null) {
             $this->app->settings->set(self::NOTIFY_HOUR_SETTING, (int) $hour);
         }
+    }
+
+    /* ---------------------------------------------------------------- */
+    /* Anstehende Geburtstage                                           */
+    /* ---------------------------------------------------------------- */
+
+    /** Wie viele Tage im Voraus die App einen Geburtstag als anstehend zeigt (0 = nur heute). */
+    public function upcomingDays(): int
+    {
+        $d = $this->app->settings->get(self::UPCOMING_DAYS_SETTING, self::UPCOMING_DAYS);
+        return is_numeric($d) && (int) $d >= 0 && (int) $d <= self::UPCOMING_DAYS_MAX ? (int) $d : self::UPCOMING_DAYS;
+    }
+
+    /** Vorlauf ändern (PATCH /admin/birthdays: upcoming_days); ganze Tage von 0 bis 30. */
+    public function setUpcomingDays(mixed $days): void
+    {
+        if (!is_numeric($days) || (string) (int) $days !== (string) $days || (int) $days < 0 || (int) $days > self::UPCOMING_DAYS_MAX) {
+            throw ApiError::invalid(sprintf('Bitte eine ganze Zahl von 0 bis %d Tagen angeben.', self::UPCOMING_DAYS_MAX));
+        }
+        $this->app->settings->set(self::UPCOMING_DAYS_SETTING, (int) $days);
+    }
+
+    /** @return array{upcoming_days: int} Einstellungen der Geburtstage (GET /admin/birthdays) */
+    public function settings(): array
+    {
+        return ['upcoming_days' => $this->upcomingDays()];
     }
 }

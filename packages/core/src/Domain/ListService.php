@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
+use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Storage\ListRepository;
@@ -17,10 +18,12 @@ use KompanieApp\Core\Storage\ListRepository;
  *   Alle mit manage_lists sehen und bearbeiten dieselben Listen.
  * - Spalten: Datenspalten (field) mit Werten aus der App oder leere Spalten (blank) zum Ausfüllen auf Papier, auch als
  *   Kästchen. Die Werte werden beim Lesen ermittelt, nie gespeichert, und nur, soweit die ansehende Person sie in der
- *   App ohnehin sehen darf (available).
+ *   App ohnehin sehen darf (available). Adresse, Handynummer und E-Mail nur mit view_personal (wie in der Verwaltung).
+ *   Geburtstage als Tag, Monat und (nur mit view_personal) Jahr; die App schreibt sie aus („12. März 1990“).
  * - Zeilen: Mitgliedszeilen (Konto) oder freie Zeilen (freier Name oder leer). Mitgliedszeilen legt nur syncMembers()
- *   an („Mitglieder aktualisieren“); es löscht auch die Zeilen von Konten, die es nicht mehr gibt oder die kein Mitglied
- *   mehr sind. Mitglied heißt: Recht member (wie MemberService::list(false)), also ohne Gäste und Anwärter.
+ *   an („Mitglieder aktualisieren“); es löscht auch die Zeilen von Konten, die es nicht mehr gibt oder die nicht mehr
+ *   zu den Personen der Liste gehören. Wer dazugehört, wählt die Liste (groups): members (Recht member, wie
+ *   MemberService::list(false)) und Rollen ohne Mitgliederbereich (außer Gast), z. B. Anwärter. Vorgabe: nur members.
  * - Wird ein Konto gelöscht, bleibt seine Zeile ohne Verknüpfung stehen (UserData::purge), bis die Liste aktualisiert wird.
  *
  * @phpstan-import-type ListRow from ListRepository
@@ -40,8 +43,14 @@ final class ListService
     public const ROW_MEMBER = 'member';
     public const ROW_FREE = 'free';
     /** Datenspalten in der Reihenfolge der Auswahl. nr zählt die Zeilen (macht die App). */
-    public const FIELDS = ['nr', 'name', 'first_name', 'last_name', 'role', 'rank', 'titles', 'birthday', 'points', 'penalties'];
-    public const WIDTHS = ['narrow', 'normal', 'wide'];
+    public const FIELDS = ['nr', 'name', 'first_name', 'last_name', 'role', 'rank', 'titles', 'birthday', 'address', 'street', 'postal_code', 'city', 'country', 'phone', 'email', 'points', 'penalties'];
+    /** Persönliche Angaben (Recht view_personal): die ganze Adresse, ihre Teile einzeln (für Serienbriefe aus der CSV), Handynummer, E-Mail */
+    public const PERSONAL_FIELDS = ['address', 'street', 'postal_code', 'city', 'country', 'phone', 'email'];
+    /** auto: so breit wie der längste Inhalt (misst die App) */
+    public const WIDTHS = ['narrow', 'normal', 'wide', 'auto'];
+    /** Personen der Liste: alle mit Mitgliederbereich; die anderen Gruppen sind Schlüssel von Rollen (groupOptions). */
+    public const GROUP_MEMBERS = 'members';
+    public const GROUPS_MAX = 20;
     public const ORIENTATIONS = ['portrait', 'landscape'];
 
     private ?ListRepository $repo = null;
@@ -88,8 +97,9 @@ final class ListService
         }
         $userIds = array_values(array_unique(array_filter(array_column($rows, 'user_id'), static fn (?int $id): bool => $id !== null)));
         $users = $userIds === [] ? [] : $this->app->users->findMany($userIds);
-        $values = $this->values(array_keys($wanted), $users);
+        $values = $this->values(array_keys($wanted), $users, $viewer->can(Capability::ViewPersonal));
         $names = (new UserNames($this->app->users))->prime([$list['created_by'], $list['updated_by']]);
+        $options = $this->groupOptions();
 
         return [
             'id' => $list['id'],
@@ -97,6 +107,8 @@ final class ListService
             'subtitle' => $list['subtitle'] === '' ? null : $list['subtitle'],
             'date' => $list['list_date'],
             'orientation' => $list['orientation'],
+            'groups' => self::groups($list['people'], $options),
+            'group_options' => array_map(static fn (string $key, string $label): array => ['key' => $key, 'label' => $label], array_keys($options), $options),
             'created_by_name' => $names->name($list['created_by']),
             'created_at' => Time::utcToIso($list['created_at']),
             'updated_by_name' => $names->name($list['updated_by']),
@@ -137,6 +149,7 @@ final class ListService
                 ['kind' => self::KIND_BLANK, 'label' => 'Unterschrift', 'width' => 'wide'],
             ],
             'rows' => [],
+            'groups' => [self::GROUP_MEMBERS],
         ];
         $data = $this->validate($in, []);
         $now = $this->app->time()->nowUtc();
@@ -190,6 +203,7 @@ final class ListService
                 'subtitle' => $list['subtitle'],
                 'list_date' => $list['list_date'],
                 'orientation' => $list['orientation'],
+                'people' => $list['people'],
                 'created_by' => $actor->id, 'created_at' => $now, 'updated_by' => $actor->id, 'updated_at' => $now,
             ]);
             $repo->replaceColumns($newId, $repo->columns($id));
@@ -206,20 +220,21 @@ final class ListService
     }
 
     /**
-     * „Mitglieder aktualisieren“: Zeilen für alle Mitglieder ohne Zeile anlegen und die Zeilen von Konten löschen, die es
-     * nicht mehr gibt oder die kein Mitglied mehr sind. Freie Zeilen bleiben. Neue Zeilen werden nach Nachname zwischen
+     * „Mitglieder aktualisieren“: Zeilen für alle Personen der Liste (groups) ohne Zeile anlegen und die Zeilen von Konten
+     * löschen, die es nicht mehr gibt oder die nicht mehr dazugehören. Freie Zeilen bleiben. Neue Zeilen werden nach Nachname zwischen
      * die vorhandenen Mitgliedszeilen eingeordnet; gibt es keine, kommen sie an den Anfang. Ohne $apply nur die Übersicht.
      *
      * @return array{added: list<array{user_id: int, name: string}>, removed: list<array{user_id: int|null, name: string|null}>, applied: bool, list: array<string, mixed>|null}
      */
     public function syncMembers(User $actor, int $id, bool $apply): array
     {
-        $this->find($id);
+        $list = $this->find($id);
         $repo = $this->repository();
         $rows = $repo->rows($id);
+        $groups = self::groups($list['people'], $this->groupOptions());
         $members = [];
         foreach ($this->app->users->list(false) as $u) {
-            if ($u->isMember()) {
+            if (self::inGroups($u, $groups)) {
                 $members[$u->id] = $u;
             }
         }
@@ -281,6 +296,8 @@ final class ListService
             'titles' => $f->enabled('titles') && ($directory || $viewer->can(Capability::ManageTitles)),
             // Geburtstage sehen nur Mitglieder, und nur die, die die Person freigegeben hat (Issue #1).
             'birthday' => $f->enabled('birthdays') && BirthdayService::canSee($viewer),
+            // Persönliche Angaben anderer nur mit view_personal (wie auf der Seite der Person in der Verwaltung).
+            ...array_fill_keys(self::PERSONAL_FIELDS, $viewer->can(Capability::ViewPersonal)),
             'points' => $f->enabled('points') && $viewer->can(Capability::ManagePoints),
             'penalties' => $f->enabled('penalties') && $viewer->can(Capability::ManagePenalties),
         ];
@@ -291,9 +308,10 @@ final class ListService
      *
      * @param list<string> $fields
      * @param array<int, User> $users
+     * @param bool $withYear Geburtsjahr dazu (ganzes Geburtsdatum nur mit view_personal)
      * @return array<int, array<string, mixed>>
      */
-    private function values(array $fields, array $users): array
+    private function values(array $fields, array $users, bool $withYear): array
     {
         if ($users === []) {
             return [];
@@ -302,14 +320,18 @@ final class ListService
         $ranks = isset($want['rank']) ? $this->app->ranks()->titles() : [];
         $titles = isset($want['titles']) ? $this->app->titles()->byUser() : [];
         $totals = isset($want['points']) || isset($want['penalties']) ? $this->app->scores()->totalsByUser() : [];
+        $contacts = array_intersect_key($want, array_flip(['address', 'street', 'postal_code', 'city', 'country', 'phone'])) !== []
+            ? $this->app->memberContacts()->all() : [];
+        $emails = isset($want['email']) ? $this->app->users->emails(array_keys($users)) : [];
         $birthdays = [];
         if (isset($want['birthday'])) {
             foreach ($this->app->birthdays()->repository()->visible() as $b) {
-                $birthdays[$b['user_id']] = sprintf('%02d.%02d.', $b['day'], $b['month']);
+                $birthdays[$b['user_id']] = ['day' => $b['day'], 'month' => $b['month'], 'year' => $withYear ? $b['year'] : null];
             }
         }
         $out = [];
         foreach ($users as $id => $u) {
+            $address = $contacts[$id]['address'] ?? null;
             $v = [];
             foreach ($fields as $field) {
                 $v[$field] = match ($field) {
@@ -322,6 +344,13 @@ final class ListService
                     'titles' => array_map(static fn (array $t): string => $t['title'], $titles[$id] ?? []),
                     // Geburtstage nur von Mitgliedern (BirthdayService::list)
                     'birthday' => BirthdayService::isMember($u) ? ($birthdays[$id] ?? null) : null,
+                    'address' => $address !== null ? Address::oneLine($address) : null,
+                    'street' => $address !== null ? Address::streetLine($address) : null,
+                    'postal_code' => $address['postal_code'] ?? null,
+                    'city' => $address['city'] ?? null,
+                    'country' => $address !== null ? Address::countryName($address) : null,
+                    'phone' => ($contacts[$id]['phone'] ?? '') !== '' ? $contacts[$id]['phone'] : null,
+                    'email' => ($emails[$id] ?? '') !== '' ? $emails[$id] : null,
                     'points' => $totals[$id]['points'] ?? 0,
                     'penalties' => $totals[$id]['open_cents'] ?? 0,
                     default => null,
@@ -336,10 +365,11 @@ final class ListService
     /**
      * @param array<string, mixed> $in
      * @param list<Row> $current Zeilen der Liste vor dem Speichern
-     * @return array{list: array{title: string, subtitle: string, list_date: string|null, orientation: string}, columns: list<Column>, rows: list<Row>}
+     * @return array{list: array{title: string, subtitle: string, list_date: string|null, orientation: string, people: string}, columns: list<Column>, rows: list<Row>}
      */
     private function validate(array $in, array $current): array
     {
+        $groups = $this->validGroups($in['groups'] ?? [self::GROUP_MEMBERS]);
         $title = Text::line($in['title'] ?? '', self::TITLE_MAX);
         if ($title === '') {
             throw ApiError::invalid('Bitte einen Titel angeben.');
@@ -356,9 +386,9 @@ final class ListService
             throw ApiError::invalid('Ausrichtung: Hochformat (portrait) oder Querformat (landscape).');
         }
         return [
-            'list' => ['title' => $title, 'subtitle' => Text::line($in['subtitle'] ?? '', self::SUBTITLE_MAX), 'list_date' => $date, 'orientation' => $orientation],
+            'list' => ['title' => $title, 'subtitle' => Text::line($in['subtitle'] ?? '', self::SUBTITLE_MAX), 'list_date' => $date, 'orientation' => $orientation, 'people' => implode(',', $groups)],
             'columns' => self::validColumns($in['columns'] ?? null),
-            'rows' => $this->validRows($in['rows'] ?? null, $current),
+            'rows' => $this->validRows($in['rows'] ?? null, $current, $groups),
         ];
     }
 
@@ -389,7 +419,7 @@ final class ListService
             }
             $width = $c['width'] ?? 'normal';
             if (!in_array($width, self::WIDTHS, true)) {
-                throw ApiError::invalid('Breite einer Spalte: narrow, normal oder wide.');
+                throw ApiError::invalid('Breite einer Spalte: narrow, normal, wide oder auto.');
             }
             $out[] = [
                 'kind' => $kind,
@@ -404,13 +434,14 @@ final class ListService
     }
 
     /**
-     * Mitgliedszeilen: nur Konten, die schon in der Liste stehen (z. B. beim Umsortieren), oder Mitglieder; jedes Konto
-     * höchstens einmal. user_id null steht für ein gelöschtes Konto.
+     * Mitgliedszeilen: nur Konten, die schon in der Liste stehen (z. B. beim Umsortieren), oder Personen der Liste
+     * ($groups); jedes Konto höchstens einmal. user_id null steht für ein gelöschtes Konto.
      *
      * @param list<Row> $current
+     * @param list<string> $groups
      * @return list<Row>
      */
-    private function validRows(mixed $raw, array $current): array
+    private function validRows(mixed $raw, array $current, array $groups): array
     {
         if (!is_array($raw) || !array_is_list($raw)) {
             throw ApiError::invalid('Ungültige Zeilen.');
@@ -436,7 +467,7 @@ final class ListService
         if ($new !== []) {
             $found = $this->app->users->findMany($new);
             foreach ($new as $id) {
-                if (!isset($found[$id]) || !$found[$id]->isMember()) {
+                if (!isset($found[$id]) || !self::inGroups($found[$id], $groups)) {
                     throw ApiError::invalid('Mitglieder kommen über „Mitglieder aktualisieren“ in die Liste.');
                 }
             }
@@ -529,6 +560,62 @@ final class ListService
             'í' => 'i', 'ì' => 'i', 'î' => 'i', 'ï' => 'i', 'ñ' => 'n', 'ö' => 'o', 'ó' => 'o', 'ò' => 'o', 'ô' => 'o', 'õ' => 'o',
             'ú' => 'u', 'ù' => 'u', 'û' => 'u', 'ü' => 'u', 'ý' => 'y', 'ÿ' => 'y', 'ß' => 'ss',
         ]);
+    }
+
+    /**
+     * Gruppen, aus denen eine Liste ihre Personen wählt: members, dann die Rollen ohne Mitgliederbereich in der
+     * Reihenfolge der Rollen, ohne Gast (z. B. Anwärter oder eine Jugendgruppe).
+     *
+     * @return array<string, string> Schlüssel => Bezeichnung
+     */
+    public function groupOptions(): array
+    {
+        $out = [self::GROUP_MEMBERS => 'Mitglieder'];
+        $roles = $this->app->roles();
+        foreach ($roles->all() as $key => $role) {
+            if ($key !== Roles::GUEST && $key !== self::GROUP_MEMBERS && !in_array(Capability::Member, $roles->capabilities($key), true)) {
+                $out[$key] = $role['label'];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Gespeicherte Gruppen, soweit es sie noch gibt (eine Rolle kann inzwischen gelöscht sein oder den
+     * Mitgliederbereich bekommen haben); leer wie früher: nur members.
+     *
+     * @param array<string, string> $options
+     * @return list<string>
+     */
+    private static function groups(string $people, array $options): array
+    {
+        $groups = array_values(array_filter(explode(',', $people), static fn (string $g): bool => isset($options[$g])));
+        return $groups === [] ? [self::GROUP_MEMBERS] : $groups;
+    }
+
+    /** @return list<string> in der Reihenfolge der Auswahl */
+    private function validGroups(mixed $raw): array
+    {
+        if (!is_array($raw) || !array_is_list($raw) || $raw === [] || count($raw) > self::GROUPS_MAX) {
+            throw ApiError::invalid('Bitte mindestens eine Gruppe für die Personen der Liste wählen.');
+        }
+        $options = $this->groupOptions();
+        foreach ($raw as $g) {
+            if (!is_string($g) || !isset($options[$g])) {
+                throw ApiError::invalid('Unbekannte Gruppe: ' . (is_scalar($g) ? (string) $g : '?') . '.');
+            }
+        }
+        return array_values(array_filter(array_keys($options), static fn (string $key): bool => in_array($key, $raw, true)));
+    }
+
+    /**
+     * Gehört zu den Personen der Liste: mit Mitgliederbereich (members) oder mit einer gewählten Rolle ohne ihn.
+     *
+     * @param list<string> $groups
+     */
+    private static function inGroups(User $u, array $groups): bool
+    {
+        return $u->isMember() ? in_array(self::GROUP_MEMBERS, $groups, true) : $u->role !== Roles::GUEST && in_array($u->role, $groups, true);
     }
 
     /** @return ListRow */

@@ -5,16 +5,21 @@
  *   Speicher; unveränderte Dateien übernimmt er aus dem der vorigen Version, statt sie neu zu laden. Beim Aktivieren
  *   werden die Speicher der alten Versionen gelöscht.
  * - App-Seite → beim Installieren gespeichert (passt so nach einem Update zu den neuen Programmdateien und ist schon
- *   nach dem ersten Besuch offline da); beim Öffnen zuerst aus dem Netz, aber höchstens NAVIGATION_TIMEOUT_MS warten,
- *   wenn eine gespeicherte Fassung da ist (schlechtes Mobilnetz); ohne Netz die gespeicherte. Nur HTML gilt als
- *   App-Seite (nicht z. B. ein direkt geöffnetes Foto).
+ *   nach dem ersten Besuch offline da). Beim Öffnen sofort die gespeicherte Fassung, ohne auf den Server zu warten
+ *   (appPage); die aktuelle holt der Service Worker im Hintergrund und meldet dem neuen Fenster, was sich an der
+ *   Konfiguration geändert hat ({type: 'kompanie-page', ...}, siehe pageChange; die App übernimmt neue Tokens und lädt
+ *   neu, wenn sich mehr geändert hat). Aus dem Netz (höchstens NAVIGATION_TIMEOUT_MS warten, wenn eine gespeicherte
+ *   Fassung da ist, schlechtes Mobilnetz) kommt sie kurz nach einer eigenen Änderung (z. B. Anmeldung), mit Parametern
+ *   in der Adresse und wenn die Seite von außerhalb der App aufgerufen wird (z. B. Rückkehr von der Anmeldeseite von
+ *   WordPress); ohne Netz die gespeicherte. Nur HTML gilt als App-Seite (nicht z. B. ein direkt geöffnetes Foto).
  * - API-Antworten → zuerst aus dem Netz; ohne Netz die letzte Version (höchstens DATA_MAX Einträge, die ältesten
  *   fallen zuerst heraus; die App-Seite zählt nicht mit).
  *   Mit dem Header X-Kompanie-Stale-Ok (setzt die App bei GET, Issue #108): Ist eine Version für dieselbe Person
  *   gespeichert (X-Kompanie-User, beim Speichern an der Antwort vermerkt), kommt sie sofort; die Antwort aus dem Netz
  *   holt der Service Worker im Hintergrund. So sieht nach einem Wechsel des Kontos niemand die Daten der Person davor.
  *   Ist die Antwort anders (oder ein Fehler), meldet er das den Fenstern der App ({type: 'kompanie-data', url}), die
- *   die Ansicht dann neu lädt: Dieses Neuladen (bis FRESH_MS danach) kommt aus dem Speicher, ohne zweite Anfrage; nach
+ *   die Ansicht dann neu lädt: Dieses Neuladen (bis FRESH_MS danach, nur in den gemeldeten Fenstern) kommt aus dem
+ *   Speicher, ohne zweite Anfrage; nach
  *   einem Fehler geht es direkt ans Netz, damit die App ihn sieht. Jede eigene Änderung (API-Anfrage außer GET; nicht
  *   die Abfrage des Push-Status beim Start) beendet das sofort, und was vor ihr gespeichert wurde, kommt erst wieder
  *   sofort, wenn es danach einmal aus dem Netz kam (Zeitpunkt der Änderung bleibt gespeichert, auch über ein Neuladen
@@ -24,6 +29,12 @@
  *   aktuelle Fassung. Direkt aufgerufen (nicht über fetch) nie als App-Seite speichern.
  * - Abzeichen der Dienstgrade (<App>/abzeichen/<id>?v=<Fassung>&s=<Größe>, Issue #17) → zuerst aus dem Speicher,
  *   ebenso versioniert; je Dienstgrad und Größe nur die aktuelle Fassung. Einmal geladen, sind sie offline da.
+ * - Bilder der Galerie, die über die App kommen (<App>/foto/<id>/<thumb|large>?v=<Fassung>: interne und noch nicht
+ *   aufbereitete) → zuerst aus dem Speicher. Interne Bilder prüft der Server bei jedem Abruf (Anmeldung, Recht) und
+ *   startet dafür die ganze App, unter WordPress das ganze WordPress; gespeichert erscheinen sie sofort, auch offline.
+ *   Nur fertige Bilder (200, kein Platzhalter), nur mit Fassung in der Adresse; je Bild und Größe nur die aktuelle
+ *   Fassung, höchstens PHOTOS_MAX Vorschaubilder und PHOTOS_LARGE_MAX große, die ältesten fallen heraus. Wer gerade
+ *   dasselbe Bild lädt (Vorladen und Ansicht), wartet auf diese eine Anfrage. Beim Abmelden gelöscht wie alles.
  * - Bildschirmfotos des Handbuchs (<Programmdateien>/handbuch/bilder/<name>.jpg?v=<Version>) → zuerst aus dem Speicher;
  *   je Foto nur die Fassung der aktuellen Version. Vorab geladen wird nichts (die App bliebe sonst nicht klein); was
  *   einmal in der Hilfe angesehen wurde, ist offline da.
@@ -32,7 +43,8 @@
  * - Vorschau „App als Rolle ansehen“ (Issue #63): Anfragen mit dem Header X-Kompanie-Preview (API) oder dem Parameter
  *   vorschau (Bilder, Dokumente, Abzeichen) → durchreichen, nie speichern und nie aus dem Speicher beantworten: Sie
  *   gelten nur für diese Ansicht und dürfen sich nicht mit den Daten des Admins mischen.
- * - Verwaltung für Admins (/admin/…, z. B. die Datensicherung) → nie speichern. (Ein no-store der
+ * - Verwaltung für Admins (/admin/…, z. B. die Datensicherung) und Auskunft über die eigenen Daten (/me/data,
+ *   /members/<id>/data) → nie speichern. (Ein no-store der
  *   Server gilt hier nicht: Es soll Zwischenspeicher im Netz verhindern; für den Offline-Betrieb
  *   speichert die App ihre Daten bewusst selbst und löscht sie beim Abmelden.)
  * Wo API und Programmdateien liegen, steht in den Parametern ?api=…&assets=…
@@ -47,6 +59,9 @@ const DATA_CACHE = 'kompanie-data-v2';
 const DOCS_CACHE = 'kompanie-docs-v1';
 const BADGES_CACHE = 'kompanie-badges-v1';
 const HELP_IMAGES_CACHE = 'kompanie-hilfebilder-v1';
+const PHOTOS_CACHE = 'kompanie-fotos-v1';
+const PHOTOS_MAX = 600;
+const PHOTOS_LARGE_MAX = 80;
 // Gerüste der Seiten, von der App selbst gespeichert (src/skeleton.tsx); bleiben bei einem Update.
 const VIEWS_CACHE = 'kompanie-ansicht-';
 const params = new URL(self.location.href).searchParams;
@@ -55,7 +70,8 @@ const ASSETS = params.get('assets') || '';
 const NAVIGATION_TIMEOUT_MS = 2500;
 const DATA_MAX = 100;
 const FRESH_MS = 10000;
-/** Gemeldete Adressen (neue Daten oder Fehler im Hintergrund): Adresse → { at, ok }, für das Neuladen danach. */
+/** Gemeldete Adressen (neue Daten oder Fehler im Hintergrund): Adresse → { at, ok, clients }, für das Neuladen danach
+ * in den gemeldeten Fenstern. */
 const announced = new Map();
 /**
  * Laufende Abfragen im Hintergrund je Adresse: keine zweite gleichzeitig; wer währenddessen fragt, bekommt danach eine
@@ -129,7 +145,9 @@ self.addEventListener('activate', (event) => {
         Promise.all(
           keys
             .filter(
-              (k) => ![STATIC_CACHE, DATA_CACHE, DOCS_CACHE, BADGES_CACHE, HELP_IMAGES_CACHE].includes(k) && !k.startsWith(VIEWS_CACHE),
+              (k) =>
+                ![STATIC_CACHE, DATA_CACHE, DOCS_CACHE, BADGES_CACHE, HELP_IMAGES_CACHE, PHOTOS_CACHE].includes(k) &&
+                !k.startsWith(VIEWS_CACHE),
             )
             .map((k) => caches.delete(k)),
         ),
@@ -151,17 +169,29 @@ function isApi(url) {
   return API !== '' && url.href.startsWith(API);
 }
 
-/** Adresse dekodiert: Pfade auch in der Form index.php?r=/api/v1/… (ggf. kodiert) erkennen. */
+/**
+ * Adresse dekodiert: Pfade auch in der Form index.php?r=/api/v1/… (ggf. kodiert) erkennen. Ist sie irgendwo ungültig
+ * kodiert (z. B. ein einzelnes %E0), wird jede Stelle für sich dekodiert: Sonst ließe sich %2Fme%2Fdata daneben an der
+ * Prüfung vorbeischleusen, während der Server es dekodiert und beantwortet.
+ */
 function decodedHref(url) {
   try {
     return decodeURIComponent(url.href);
   } catch {
-    return url.href; // unvollständig kodiert: wie angegeben prüfen
+    return url.href.replace(/%[0-9a-f]{2}/gi, (m) => {
+      try {
+        return decodeURIComponent(m);
+      } catch {
+        return m;
+      }
+    });
   }
 }
 
 function isAdmin(url) {
-  return decodedHref(url).includes('/admin/');
+  // Ohne Unterschied in Groß- und Kleinschreibung (WordPress nimmt REST-Pfade so an), auch mit Schrägstrich am Ende
+  const href = decodedHref(url).toLowerCase();
+  return href.includes('/admin/') || /\/(?:me|members\/\d+)\/data\/*(?:[?&#]|$)/.test(href);
 }
 
 /** Rückkehr von Google nach „Mit Google verbinden“: <App>/google/callback oder ?r=/google/callback */
@@ -246,6 +276,51 @@ async function badgeFirst(request, key) {
   return res;
 }
 
+/**
+ * Bild der Galerie über die App, mit Fassung: Kennung und Größe (<App>/foto/<id>/<größe>, ?kompanie_app=foto/<id>/<größe>
+ * oder ?r=/foto/<id>/<größe>), sonst null. Originalauflösung und Videos nicht (groß bzw. in Ausschnitten).
+ */
+function photoKey(url) {
+  if (!url.searchParams.get('v')) return null;
+  const scope = new URL(self.registration.scope);
+  const path = url.pathname.startsWith(scope.pathname) ? url.pathname.slice(scope.pathname.length) : '';
+  const param = (url.searchParams.get('kompanie_app') || url.searchParams.get('r') || '').replace(/^\//, '');
+  const m = path.match(/^foto\/(\d+)\/(thumb|large)$/) || param.match(/^foto\/(\d+)\/(thumb|large)$/);
+  return m ? { id: m[1], size: m[2] } : null;
+}
+
+/** Laufende Abrufe von Bildern (Adresse → Antwort), damit Vorladen und Ansicht dasselbe Bild nur einmal holen. */
+const photoRequests = new Map();
+
+/** Bilder der Galerie über die App: gespeicherte Fassung, sonst laden, ältere Fassungen ersetzen, Anzahl begrenzen. */
+async function photoFirst(request, key) {
+  const cache = await caches.open(PHOTOS_CACHE);
+  const cached = await cache.match(request, MATCH);
+  if (cached) return cached;
+  let running = photoRequests.get(request.url);
+  if (!running) {
+    running = (async () => {
+      const res = await fetch(request.url, { credentials: 'same-origin' });
+      // Nur das fertige Bild: 202 ist ein Platzhalter, solange es noch aufbereitet wird.
+      if (cacheable(res) && res.status === 200) {
+        const keys = await cache.keys();
+        const same = (k) => {
+          const other = photoKey(new URL(k.url));
+          return other !== null && other.id === key.id && other.size === key.size;
+        };
+        await Promise.all(keys.filter(same).map((k) => cache.delete(k)));
+        await cache.put(request.url, res.clone());
+        const ofSize = (await cache.keys()).filter((k) => photoKey(new URL(k.url))?.size === key.size);
+        const max = key.size === 'large' ? PHOTOS_LARGE_MAX : PHOTOS_MAX;
+        await Promise.all(ofSize.slice(0, Math.max(0, ofSize.length - max)).map((k) => cache.delete(k)));
+      }
+      return res;
+    })().finally(() => photoRequests.delete(request.url));
+    photoRequests.set(request.url, running);
+  }
+  return (await running).clone();
+}
+
 function isHelpImage(url) {
   return ASSETS !== '' && url.href.startsWith(ASSETS + 'handbuch/bilder/') && url.pathname.endsWith('.jpg');
 }
@@ -300,19 +375,24 @@ async function store(key, res) {
  * Zuerst aus dem Netz. Mit timeoutMs: Ist eine gespeicherte Fassung da und antwortet das Netz nicht
  * rechtzeitig, kommt die gespeicherte; die Antwort aus dem Netz aktualisiert den Speicher danach trotzdem.
  */
-/** Antwort mit der Person, für die sie gilt (Header der App), zum Speichern. */
-function tagged(res, request) {
+/**
+ * Antwort mit der Person, für die sie gilt (Header der App), zum Speichern. Als Zeitpunkt zählt der Beginn der Anfrage,
+ * nicht das Speichern: Eine Antwort auf eine Anfrage, die vor einer eigenen Änderung begann (z. B. Vorabladen im
+ * Hintergrund), zeigt den Stand davor und darf danach nicht sofort aus dem Speicher kommen.
+ */
+function tagged(res, request, startedAt) {
   const headers = new Headers(res.headers);
   headers.set(USER_HEADER, request.headers.get(USER_HEADER) || '');
-  headers.set(STORED_AT_HEADER, String(Date.now()));
+  headers.set(STORED_AT_HEADER, String(startedAt));
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 }
 
 async function networkFirst(request, fallbackUrl, timeoutMs, event) {
   const key = fallbackUrl || request;
+  const startedAt = Date.now();
   const network = fetch(request).then((res) => {
     if (fallbackUrl ? isPage(res) : cacheable(res)) {
-      const saving = store(key, fallbackUrl ? res.clone() : tagged(res.clone(), request));
+      const saving = store(key, fallbackUrl ? res.clone() : tagged(res.clone(), request, startedAt));
       try {
         if (event) event.waitUntil(saving);
       } catch {
@@ -339,6 +419,98 @@ async function networkFirst(request, fallbackUrl, timeoutMs, event) {
 }
 
 /**
+ * App-Seite: sofort die gespeicherte, wenn sie sicher passt, sonst aus dem Netz (siehe oben). Kurz nach einer Änderung
+ * (z. B. Anmeldung) auf das Netz warten: Die gespeicherte Seite enthält evtl. die Konfiguration der Person davor, und mit
+ * ihr gäbe es deren gespeicherte Daten.
+ */
+async function appPage(request, url, event) {
+  const scope = self.registration.scope;
+  const changed = Date.now() - (await lastChange()) < CHANGE_WAIT_MS;
+  if (!changed && url.search === '' && !fromOutside(request)) {
+    const cached = await caches.match(scope, MATCH);
+    if (cached) {
+      const refresh = refreshPage(request, cached.clone(), event.resultingClientId).catch(() => undefined);
+      try {
+        event.waitUntil(refresh);
+      } catch {
+        // Ereignis schon beendet: Die Abfrage läuft trotzdem weiter.
+      }
+      return cached;
+    }
+  }
+  return networkFirst(request, scope, changed ? 0 : NAVIGATION_TIMEOUT_MS, event);
+}
+
+/**
+ * Aufruf von einer Seite außerhalb der App (z. B. Rückkehr von wp-login.php nach der Anmeldung oder ein Link auf der
+ * Webseite): Die Anmeldung kann sich dort geändert haben, ohne dass der Service Worker es sah.
+ */
+function fromOutside(request) {
+  const referrer = request.referrer || '';
+  return referrer !== '' && referrer !== 'about:client' && !referrer.startsWith(self.registration.scope);
+}
+
+/** Aktuelle App-Seite im Hintergrund holen, speichern und dem neuen Fenster melden, was sich geändert hat. */
+async function refreshPage(request, shown, clientId) {
+  const res = await fetch(request);
+  if (!isPage(res)) return;
+  const [before, after] = await Promise.all([shown.text(), res.clone().text()]);
+  await store(self.registration.scope, res);
+  const change = pageChange(before, after);
+  if (change) await tellClient(clientId, { type: 'kompanie-page', ...change });
+}
+
+const CONFIG_PATTERN = /window\.KOMPANIE_CONFIG=(\{.*?\});<\/script>/s;
+const ENTRY_PATTERN = /<script type="module"[^>]*\ssrc="([^"]+)"/;
+
+/**
+ * Unterschied zwischen gezeigter und aktueller App-Seite: null, wenn gleich. Sonst die Werte, die sich mit jeder Seite
+ * ändern und die die App ohne Neuladen übernimmt (CSRF-Token, Adresse zum Abmelden mit Token von WordPress), und
+ * reload: ob sich mehr geändert hat (Rechte, Bereiche, Version, Programmdateien …).
+ */
+function pageChange(before, after) {
+  const parse = (html) => {
+    const m = html.match(CONFIG_PATTERN);
+    let config = null;
+    try {
+      config = m ? JSON.parse(m[1]) : null;
+    } catch {
+      config = null;
+    }
+    const entry = (html.match(ENTRY_PATTERN) || [])[1] || '';
+    return { config, entry };
+  };
+  const a = parse(before);
+  const b = parse(after);
+  if (!b.config) return null;
+  const tokens = { csrf: b.config.csrf, auth: b.config.auth };
+  const rest = (c) => JSON.stringify({ ...c, csrf: { ...c.csrf, token: '' }, auth: { ...c.auth, logoutUrl: '' } });
+  const reload = !a.config || a.entry !== b.entry || rest(a.config) !== rest(b.config);
+  if (
+    !reload &&
+    JSON.stringify(a.config.csrf) === JSON.stringify(tokens.csrf) &&
+    JSON.stringify(a.config.auth) === JSON.stringify(tokens.auth)
+  ) {
+    return null;
+  }
+  return { reload, ...tokens };
+}
+
+/** Nachricht an das Fenster, das die Seite geöffnet hat (entsteht evtl. erst kurz danach); sonst an alle der App. */
+async function tellClient(clientId, message) {
+  for (let i = 0; clientId && i < 30; i++) {
+    const client = await self.clients.get(clientId);
+    if (client) {
+      client.postMessage(message);
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  const windows = await self.clients.matchAll({ type: 'window' });
+  for (const w of windows) w.postMessage(message);
+}
+
+/**
  * API mit X-Kompanie-Stale-Ok: gespeicherte Version sofort, aus dem Netz im Hintergrund (siehe oben). Ohne gespeicherte
  * Version oder nach einem Fehler eben im Hintergrund wie networkFirst.
  */
@@ -351,9 +523,16 @@ async function staleWhileRevalidate(request, event) {
     found && user !== '' && found.headers.get(USER_HEADER) === user && Number(found.headers.get(STORED_AT_HEADER)) > (await lastChange())
       ? found
       : undefined;
+  // Nur das Fenster, das die Meldung bekommen hat, lädt danach aus dem Speicher, und nur einmal. Eine neu geladene Seite
+  // (anderes Fenster) fragt wie sonst im Hintergrund: Sonst bekäme sie bis FRESH_MS den Stand von vor einer Änderung,
+  // die erst nach der Meldung kam, falls die alte Seite die Meldung nicht mehr verarbeitet hat.
   const last = announced.get(key);
-  const recent = last && Date.now() - last.at < FRESH_MS;
-  if (recent) announced.delete(key); // nur für das eine Neuladen nach der Meldung
+  const client = event.clientId || '';
+  const recent = last && Date.now() - last.at < FRESH_MS && last.clients.has(client);
+  if (recent) {
+    last.clients.delete(client);
+    if (last.clients.size === 0) announced.delete(key);
+  }
   if (!stored || (recent && !last.ok)) return networkFirst(request, undefined, 0, event);
   if (recent) return stored;
   let running = revalidating.get(key);
@@ -388,6 +567,7 @@ async function revalidateUntilCurrent(request, key, stored, running) {
 
 async function revalidate(request, key, before) {
   let res;
+  const startedAt = Date.now();
   try {
     res = await fetch(request);
   } catch {
@@ -396,11 +576,11 @@ async function revalidate(request, key, before) {
   const ok = cacheable(res);
   if (ok) {
     const text = await res.clone().text();
-    await store(key, tagged(res, request));
+    await store(key, tagged(res, request, startedAt));
     if (text === before) return;
   }
-  announced.set(key, { at: Date.now(), ok });
   const windows = await self.clients.matchAll({ type: 'window' });
+  announced.set(key, { at: Date.now(), ok, clients: new Set(windows.map((w) => w.id || '')) });
   for (const w of windows) w.postMessage({ type: 'kompanie-data', url: key });
 }
 
@@ -425,7 +605,10 @@ self.addEventListener('fetch', (event) => {
 
   const doc = documentId(url);
   const badge = doc === null ? badgeKey(url) : null;
-  if (badge !== null) {
+  const photo = doc === null && badge === null ? photoKey(url) : null;
+  if (photo !== null) {
+    if (request.mode !== 'navigate') event.respondWith(photoFirst(request, photo));
+  } else if (badge !== null) {
     if (request.mode !== 'navigate') event.respondWith(badgeFirst(request, badge));
   } else if (doc !== null) {
     // Direkt aufgerufen (neuer Tab, Download-Link): durchreichen, nicht als App-Seite speichern.
@@ -435,10 +618,7 @@ self.addEventListener('fetch', (event) => {
   } else if (isStatic(url)) {
     event.respondWith(cacheFirst(request));
   } else if (request.mode === 'navigate' && url.pathname.startsWith(new URL(self.registration.scope).pathname)) {
-    // Kurz nach einer Änderung (z. B. Anmeldung) auf das Netz warten: Die gespeicherte Seite enthält evtl. die
-    // Konfiguration der Person davor, und mit ihr gäbe es deren gespeicherte Daten.
-    const wait = changedAt !== null && Date.now() - changedAt < CHANGE_WAIT_MS ? 0 : NAVIGATION_TIMEOUT_MS;
-    event.respondWith(networkFirst(request, self.registration.scope, wait, event));
+    event.respondWith(appPage(request, url, event));
   } else if (isApi(url) && !isAdmin(url)) {
     event.respondWith(
       request.headers.get('X-Kompanie-Stale-Ok') === '1'

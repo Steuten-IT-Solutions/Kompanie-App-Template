@@ -725,6 +725,24 @@ $c->ok((bool) preg_match('#kompanie_app=dokument(/|%2F)7&v=abc$#', $env->documen
 $c->ok((bool) preg_match('#kompanie_app=abzeichen(/|%2F)7&v=abc&s=64$#', $env->badgeUrl(7, 'abc', 64)), 'Einfache Permalinks: Abzeichen-Adresse mit &v= und &s=');
 $c->ok((bool) preg_match('#kompanie_app=mitgliedsfoto(/|%2F)7&v=abc&s=128$#', $env->memberPhotoUrl(7, 'abc', 128)), 'Einfache Permalinks: Foto-Adresse mit &v= und &s=');
 $c->ok((bool) preg_match('#kompanie_app=bild(/|%2F)0123456789abcdef0123456789abcdef$#', $env->richImageUrl('0123456789abcdef0123456789abcdef')), 'Einfache Permalinks: Bild in formatiertem Inhalt');
+// Bilder der Galerie schon auf init (AppPage::earlyPhoto): Pfad aus der Adresse
+$uri = $_SERVER['REQUEST_URI'] ?? null;
+$_SERVER['REQUEST_URI'] = '/app/foto/3/thumb';
+$c->ok(KompanieApp\WordPress\AppPage::earlyPath() === null, 'Einfache Permalinks: /app/… ist kein Pfad der App');
+$_GET['kompanie_app'] = 'foto/3/thumb';
+$c->ok(KompanieApp\WordPress\AppPage::earlyPath() === 'foto/3/thumb', 'Einfache Permalinks: Pfad aus ?kompanie_app=');
+unset($_GET['kompanie_app']);
+update_option('permalink_structure', '/%postname%/');
+$home = (string) wp_parse_url(home_url('/'), PHP_URL_PATH);
+$_SERVER['REQUEST_URI'] = rtrim($home, '/') . '/app/foto/3/large?v=abc';
+$c->ok(KompanieApp\WordPress\AppPage::earlyPath() === 'foto/3/large', 'Permalinks: Pfad aus /app/foto/…, ohne Parameter');
+$_SERVER['REQUEST_URI'] = '/anderswo/app/foto/3/large';
+$c->ok(KompanieApp\WordPress\AppPage::earlyPath() === null, 'Permalinks: /app/ nur direkt unter der Startseite');
+if ($uri === null) {
+    unset($_SERVER['REQUEST_URI']);
+} else {
+    $_SERVER['REQUEST_URI'] = $uri;
+}
 update_option('permalink_structure', $structure);
 $c->ok(str_ends_with($env->appUrl('csrf'), '/app/csrf'), 'Schöne Permalinks: /app/csrf');
 $c->ok(str_ends_with($env->documentUrl(7, 'abc'), '/app/dokument/7?v=abc'), 'Schöne Permalinks: /app/dokument/7?v=…');

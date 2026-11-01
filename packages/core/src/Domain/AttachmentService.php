@@ -307,12 +307,6 @@ final class AttachmentService
         return $row === null ? null : self::typed($row);
     }
 
-    /** Gesamtgröße in Bytes. */
-    public static function totalBytes(array $rows): int
-    {
-        return array_sum(array_map(static fn (array $r): int => (int) $r['bytes'], $rows));
-    }
-
     public static function mimeOf(string $name): string
     {
         return self::MIME_TYPES[strtolower(pathinfo($name, PATHINFO_EXTENSION))] ?? 'application/octet-stream';

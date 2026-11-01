@@ -126,6 +126,14 @@ export default defineConfig({
     thirdPartyLicenses({ root: fileURLToPath(new URL('../..', import.meta.url)) }),
   ],
   css: { postcss: { plugins: [themeOverride()] } },
+  // jsPDF (Listen als PDF) lädt diese nur für Funktionen, die die App nicht nutzt (src/jspdfUnused.ts).
+  resolve: {
+    alias: {
+      html2canvas: fileURLToPath(new URL('./src/jspdfUnused.ts', import.meta.url)),
+      canvg: fileURLToPath(new URL('./src/jspdfUnused.ts', import.meta.url)),
+      'fast-png': fileURLToPath(new URL('./src/jspdfUnused.ts', import.meta.url)),
+    },
+  },
   define: { __PDFJS_DIR__: JSON.stringify(PDFJS_DIR) },
   build: {
     outDir: 'dist',

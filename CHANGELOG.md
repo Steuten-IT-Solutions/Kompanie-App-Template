@@ -15,6 +15,146 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.5.0] – 2026-11-01
+
+### Neu
+
+- **Fortschritt beim Update**: Während ein Update läuft, zeigt *Einstellungen → Updates* einen Fortschrittsbalken mit
+  dem aktuellen Schritt (Paket laden, Daten sichern, Sicherung in Google Drive, einspielen), beim Sichern und Hochladen
+  auch in MB. Die Größe der Sicherung ist dabei aus der letzten geschätzt („ca.“). Läuft beim Öffnen der Seite
+  schon ein Update (z. B. das automatische), wird es ebenso angezeigt.
+- **Adresse**: Jedes Mitglied trägt seine Postanschrift (Land, Straße, Hausnummer, Zusatz, PLZ, Ort) unter
+  *Meins → Konto* selbst ein und ändert sie dort. Die App prüft die Eingabe wie bei E-Mail und Handynummer: Die
+  Postleitzahl muss zum gewählten Land passen (z. B. fünf Ziffern in Deutschland, „1234 AB“ in den Niederlanden), die
+  Hausnummer rückt aus der Straße in ihr Feld, und Hinweise wie „Hausnummer vergessen?“ stehen direkt am Feld.
+- **Rechte „Persönliche Angaben sehen“ und „Persönliche Angaben pflegen“**: Adresse, Handynummer, E-Mail-Adresse und
+  Geburtsdatum anderer stehen in der Verwaltung auf der Seite der Person unter **Persönliche Angaben**, sichtbar nur mit
+  diesem Recht; ändern lassen sie sich mit „Persönliche Angaben pflegen“.
+- **Beim Anlegen alles eintragen**: Beim Anlegen einzelner und mehrerer Mitglieder und beim Import lassen sich jetzt
+  auch Handynummer und Adresse eintragen (im Import mit den Spalten Handynummer, Straße, Hausnummer, Adresszusatz, PLZ,
+  Ort und Land).
+- **Adresse, Handynummer und E-Mail in Listen**: Unter *Verwaltung → Listen* gibt es die Datenspalten Adresse (die ganze
+  Anschrift in einer Spalte), Straße und Nr., PLZ, Ort, Land, Handynummer und E-Mail, auch im CSV-Export. Mit den
+  einzelnen Spalten lassen sich aus der CSV Serienbriefe und Adressetiketten erstellen. Die Werte sieht nur, wer das
+  Recht „Persönliche Angaben sehen“ hat. Die Handynummer steht in der CSV als „0049 …“, damit Excel sie unverändert
+  übernimmt.
+- **Vorlauf der anstehenden Geburtstage einstellbar**: Unter *Einstellungen → Geburtstage* legen Admins fest, wie viele
+  Tage vorher ein Geburtstag oben bei den Terminen unter „Anstehende Geburtstage“ erscheint (nur am Tag selbst bis 30
+  Tage vorher, anfangs wie bisher 7 Tage).
+- **Verschlüsselte Sicherungen**: Unter *Einstellungen → Datensicherung* lässt sich ein **Passwort für Sicherungen**
+  einrichten. Heruntergeladene Sicherungen und alle Sicherungen in Google Drive sind damit verschlüsselt; wer die Datei
+  findet, kann ohne das Passwort nichts darin lesen. Die App speichert das Passwort nicht: **Ist es verloren, lässt
+  sich keine verschlüsselte Sicherung mehr wiederherstellen.** Beim Wiederherstellen fragt die App danach.
+- **Meine Daten herunterladen (Auskunft nach DSGVO)**: Unter *Konto → Meine Daten* lädt jede Person alles herunter,
+  was die App über sie gespeichert hat. Wer jeden darin enthaltenen Bereich auch in der App sehen darf (in der Regel
+  Admins), kann das auch für eine Person tun (*Verwaltung → Mitglied → Daten exportieren (Auskunft)*), dann ohne
+  Antworten in anonymen Umfragen.
+- **Aufbewahrungsfrist für Ehemalige**: Admins können unter *Verwaltung → Ehemalige* einstellen, nach wie vielen Jahren
+  seit dem Ausscheiden die App die persönlichen Angaben von Ehemaligen löscht (Kontaktdaten, Anmeldung, Geburtstag,
+  Strafen, Anwesenheiten u. a.). Für die Chronik bleiben Name, Ämter, Punkte, Dienstgrad, Titel, Foto und Eintrittsjahr.
+  Voreingestellt ist aus; eine Vorschau zeigt, wen es trifft.
+- **Listen als PDF-Datei**: *Verwaltung → Listen → PDF herunterladen* speichert die Liste direkt als PDF, ohne
+  Druckdialog. *Drucken* gibt es weiterhin als eigenen Knopf.
+- **Listen: Breite „automatisch“**: Eine Spalte kann so breit sein wie ihr längster Inhalt bzw. ihre Überschrift; die
+  übrigen Spalten teilen sich den Rest.
+- **Listen: Sortieren nach jeder Spalte**: Unter *Zeilen* sortiert **Sortieren nach** die Liste nach dem Namen oder einer
+  beliebigen Datenspalte, auf- oder absteigend (Geburtstage nach Tag im Jahr). Zeilen ohne Wert kommen ans Ende.
+- **Listen: weitere Personen**: Unter *Zeilen → In die Liste kommen* wählst du neben den Mitgliedern auch Rollen ohne
+  Mitgliederbereich (z. B. Anwärter oder eine Jugendgruppe). „Mitglieder aktualisieren“ holt dann auch sie in die Liste.
+
+### Geändert
+
+- **Interne Bilder der Galerie schneller**: Interne Bilder bleiben geschützt (der Server prüft bei jedem Abruf, ob
+  jemand angemeldet ist und sie sehen darf), erscheinen aber nach dem ersten Laden sofort, auch offline: Die App
+  speichert sie auf dem Gerät und löscht sie beim Abmelden. Beim Antippen eines Albums lädt sie die ersten
+  Vorschaubilder schon vorab. Unter WordPress antwortet die App auf Bildabrufe, bevor Theme und andere Plugins starten.
+- **Ladeanzeige in Galeriebildern**: Solange ein Bild der Galerie noch lädt oder aufbereitet wird, dreht sich darin ein
+  kleiner Ring (in der Übersicht, im Album und in der Großansicht). Ist das Bild schon auf dem Gerät, erscheint er nicht.
+- **Wischen in der Großansicht der Galerie**: Beim Wischen folgt das Bild dem Finger, daneben steht schon das nächste
+  bzw. vorherige, und beim Loslassen gleitet es weiter, wie auf den Seiten der Mitglieder. Zu kurz gezogen schnappt es
+  zurück. Auch **‹**, **›** und die Pfeiltasten blättern mit dieser Bewegung. Das gilt auch auf Videos; nur in den
+  Leisten des Players (Zeitleiste, Ton, Vollbild) bedient Wischen weiter das Video. Tippen auf das Video spielt es ab
+  bzw. hält es an.
+- **Videos der Galerie starten schneller**: Der Server reicht ein Video jetzt weiter, während es aus Google Drive kommt,
+  statt jedes Stück erst ganz zu laden. Unter WordPress antwortet die App auf Videoabrufe wie bei Bildern, bevor Theme
+  und andere Plugins starten. In der Großansicht lädt ein Video schon beim Öffnen, nicht erst beim Tippen auf ▶.
+  Anmeldung und Rechte prüft der Server wie bisher vor jedem Abruf. Tipp für Admins: „Fürs Web optimiert“
+  gespeicherte Videos starten noch schneller (siehe Handbuch, Galerie einrichten).
+- **Gerüst statt Ladeschnecke**: Auch beim ersten Öffnen einer Seite (und nach jedem Update) erscheint beim Laden
+  ein graues Gerüst in der Form der Seite (Liste, News, Galerie, Formular, Beitrag) statt „Lädt …“ mit sich drehendem
+  Kreis. Ab dem zweiten Öffnen zeigt es wie bisher genau den Aufbau, den die Seite beim letzten Mal hatte. Ebenso
+  zeigt das vergrößerte Foto einer Person beim Laden eine Fläche in seiner Größe.
+- **Schnellerer Start**: Die App erscheint beim Öffnen sofort mit dem zuletzt geladenen Stand, statt zuerst auf den
+  Webserver zu warten (bisher bis zu 2,5 Sekunden, je nach Hoster). Die aktuelle Fassung holt sie im Hintergrund; hat
+  sich etwas Wichtiges geändert (z. B. Rechte, Bereiche oder eine neue Version), lädt sie sich kurz nach dem Start
+  einmal neu. Nach dem Anmelden und beim Aufruf über einen Link von der Webseite wartet sie wie bisher auf den Server.
+- **Seiten öffnen schneller**: Sobald *Meins*, die Startseite der *Verwaltung* (auch *Einrichtungen*) oder die
+  *Einstellungen* zu sehen sind, lädt die App die Daten der Seiten dahinter im Hintergrund vor, ebenso die Seite
+  *Öffentliche Termine verwalten* für alle, die Termine pflegen. Diese Seiten erscheinen dann schon beim ersten Öffnen
+  ohne Warten auf den Server.
+- **Karte** bei einem Termin öffnet den Ort jetzt wie die Adresse eines Mitglieds in der Karten-App des Geräts: Auf
+  Android wählt man die App aus (z. B. Google Maps oder Waze), auf iPhone, iPad und Mac öffnet sich Apple Karten, am
+  PC weiter Google Maps.
+- Handynummer und Geburtsdatum anderer sieht und ändert nicht mehr jeder, der Mitglieder anlegen darf, sondern nur,
+  wer die neuen Rechte für persönliche Angaben hat. Rollen, die bisher „Mitglieder anlegen“ hatten, bekommen beide
+  Rechte beim Update automatisch; wer sie nicht braucht, dem nimmt der Admin sie unter *Einstellungen → Rollen* weg.
+- Auf der Seite eines Mitglieds in der Verwaltung steht der Geburtstag jetzt bei **Persönliche Angaben** (ohne das Recht
+  dazu weiter bei Eintritt und Austritt), und **Persönliche Angaben** stehen unter den Ämtern, über *Konto und Rolle*.
+  Antippen der Adresse zeigt den Ort in der Karten-App: auf Android mit Auswahl der App, auf iPhone und Mac in Apple
+  Karten, am PC in Google Maps.
+- **Sicherungen in Google Drive verschlüsselt**, sobald unter *Einstellungen → Datensicherung* ein Passwort für
+  Sicherungen eingerichtet ist (ohne Passwort wie bisher unverschlüsselt). Ältere, unverschlüsselte Sicherungen im Ordner
+  löscht die App, sobald die erste verschlüsselte dort liegt und das Passwort einmal mit *Passwort prüfen* (oder einer
+  Wiederherstellung) bestätigt ist.
+- **Galerie**: Zurück aus einem Album (mit **‹ Alle Alben** oder der Zurück-Taste) führt wieder an die Stelle der
+  Übersicht, an der man das Album geöffnet hat, statt an den Anfang. Nach dem Schließen der Großansicht steht das
+  zuletzt gezeigte Bild im Album im Blick, auch wenn man weit geblättert hat.
+  Die Zurück-Taste (oder -Geste) bei offener Großansicht schließt nur das Bild, statt das Album zu verlassen.
+- **Listen: Geburtstag in langer Form**: Die Spalte Geburtstag zeigt das Datum ausgeschrieben („9. März“), mit dem
+  Recht „Persönliche Angaben sehen“ samt Geburtsjahr („9. März 1990“), auch in CSV und PDF.
+
+### Behoben
+
+- **Gerüst passt zur Seite**: Das graue Gerüst beim Laden ragte auf manchen Seiten über den Rand (z. B.
+  *Datensicherung*, *Benachrichtigungen*), zeigte unter *Einstellungen* die Zeile „‹ Verwaltung“ doppelt und stellte
+  manche Knöpfe und Schalter anders dar als die fertige Seite.
+- Direkt nach einer eigenen Änderung konnte eine Seite den Stand von vorher zeigen, wenn die App ihre Daten gerade im
+  Hintergrund lud und die Antwort erst nach der Änderung ankam. Solche Antworten gelten jetzt als veraltet.
+- **Neu laden zeigt Änderungen anderer**: Hatte jemand anderes gerade etwas geändert (z. B. eine Nachricht am Brett)
+  und lud man die Seite kurz nach einer vorigen Aktualisierung neu, blieb bis zu zehn Sekunden der alte Stand stehen.
+  Die App fragt jetzt auch dann im Hintergrund nach und zeigt die Änderung.
+- **Logo im Hinweis „App aufs Handy holen“**: Ist das Logo nicht quadratisch, wurde es im Hinweis oben auf der
+  Seite in die Breite gezogen. Es erscheint jetzt im richtigen Seitenverhältnis, wie in der Kopfzeile.
+- **Update-Knopf nach langer Sicherung wieder aktiv**: Brach die Verbindung während eines langen Updates ab (z. B. durch
+  ein Zeitlimit des Hosters), gab die App den Knopf wieder frei, obwohl das Update auf dem Server weiterlief; ein zweiter
+  Klick meldete dann „Gerade läuft schon ein Update“. Jetzt wartet die App, bis das Update fertig ist, und lädt danach
+  die neue Version.
+- **Update mit Passwort für Sicherungen und Google Drive**: Ist ein Passwort für Sicherungen eingerichtet, scheiterte
+  das Update bei einer großen Sicherung mit einem kritischen Fehler (zu wenig Arbeitsspeicher beim Verschlüsseln der
+  Sicherung für Google Drive). Die Sicherung wird jetzt in kleinen Stücken verschlüsselt. Das wirkt bei Updates, die
+  von dieser Version aus eingespielt werden.
+- **WordPress mit SQLite**: Auf WordPress-Seiten, die statt MySQL die SQLite-Integration nutzen, brach das Aktivieren
+  oder Aktualisieren des Plugins seit Version 0.3.0 mit einem Datenbankfehler ab (`SUBSTRING_INDEX` beim Umbau des
+  Schwarzen Bretts). Der Umbau kommt jetzt ohne diese MySQL-Funktion aus; auf MySQL und MariaDB ändert sich nichts.
+
+### Entfernt
+
+- **Liste aller Geburtstage**: Die Seite „Alle Geburtstage“ gibt es nicht mehr. Die Karte „Anstehende Geburtstage“ bei
+  den Terminen bleibt; die Benachrichtigung am Geburtstag öffnet jetzt die Termine.
+
+### Sicherheit
+
+- **Mitgliederfotos folgen den Rechten von Gast**: Hat ein Admin unter *Einstellungen → Rollen* der Rolle **Gast** die
+  Mitgliederliste bzw. die Ehemaligen weggenommen, waren die Fotos darin trotzdem ohne Anmeldung abrufbar. Jetzt sind
+  sie nur noch öffentlich, wenn Gast die Liste sehen darf. Die Originalauflösung gibt es nur noch nach der Anmeldung.
+- **HTTPS (eigenständige Version)**: Über HTTPS schickt die App jetzt HSTS mit (der Browser öffnet sie danach nur noch
+  verschlüsselt), wenn sie im Hauptverzeichnis ihrer Adresse liegt; in einem Unterordner nur mit `'hsts' => true` in
+  `config.php`, weil es sonst auch für die übrigen Seiten unter derselben Adresse gälte. Läuft die App über `http://`, warnen der Installer und *Einstellungen → Zustand und Updates*.
+- **WordPress**: Die App-Seite lässt sich nicht mehr in fremde Seiten einbetten (Schutz vor Clickjacking).
+- **Keine E-Mail-Adressen im Fehlerprotokoll des Servers**, wenn eine Mail nicht zugestellt werden kann.
+- **Cronjob**: Der Schlüssel lässt sich jetzt auch im Header `X-Kompanie-Cron-Key` senden, dann steht er nicht im
+  Zugriffsprotokoll des Webservers. Die bisherige Adresse mit `key=` funktioniert weiter.
+
 ## [0.4.0] – 2026-10-27
 
 ### Neu

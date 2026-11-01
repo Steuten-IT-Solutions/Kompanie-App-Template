@@ -4,6 +4,7 @@ import { canManagePolls, canPostBoard } from './board';
 import brand from './generated/brand';
 import { navigate } from './router';
 import { usePromotionsDue } from './promotionsDue';
+import { menuSources, prefetchOnTap, usePrefetchMenu } from './viewData';
 
 const sec = brand.labels.sections;
 const canPoints = (): boolean => !!config?.features.points && can('manage_points');
@@ -18,7 +19,16 @@ const canMail = (): boolean => !!config?.features.mail && can('send_mail');
 /** Mitgliederliste: für alle, die Punkte oder Strafen vergeben, Dienstgrade, Titel oder Anwesenheit pflegen, Mitglieder
  * anlegen oder Rollen vergeben. */
 export function memberListAllowed(): boolean {
-  return canPoints() || canPenalties() || canRanks() || canTitles() || canAttendance() || can('create_users') || can('promote_users');
+  return (
+    canPoints() ||
+    canPenalties() ||
+    canRanks() ||
+    canTitles() ||
+    canAttendance() ||
+    can('view_personal') ||
+    can('create_users') ||
+    can('promote_users')
+  );
 }
 
 type AdminTab = { id: string; label: string; on: boolean; route?: string; group?: string };
@@ -244,6 +254,11 @@ export function AdminIcon({ id }: { id: string }) {
 /** Startseite der Verwaltung: je Bereich ein Knopf mit Symbol; mit group die Bereiche unter „Einrichtungen“. */
 export function AdminMenu({ group }: { group?: string }) {
   const due = usePromotionsDue();
+  // Daten der Bereiche hinter den Knöpfen im Leerlauf vorab laden (auch die unter „Einrichtungen“), beim Antippen sofort.
+  usePrefetchMenu(
+    'verwaltung',
+    (group ? setupTabs() : adminTabs()).map((t) => t.id),
+  );
   return (
     <nav aria-label={group ? 'Einrichtungen' : 'Verwaltung'}>
       <ul className="admin-tiles">
@@ -256,6 +271,7 @@ export function AdminMenu({ group }: { group?: string }) {
                 t.id === 'befoerderungen' && due ? `${due} ${due === 1 ? 'Mitglied' : 'Mitglieder'} zur Beförderung bereit` : undefined
               }
               onClick={() => navigate(t.route ?? `verwaltung/${t.id}`)}
+              {...prefetchOnTap(...menuSources('verwaltung', t.id))}
             >
               <AdminIcon id={t.id} />
               <span>{t.label}</span>

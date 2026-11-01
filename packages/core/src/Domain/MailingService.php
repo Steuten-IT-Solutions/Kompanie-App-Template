@@ -10,6 +10,7 @@ use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Mail\Mail;
+use KompanieApp\Core\Mail\MailResult;
 use KompanieApp\Core\Port\Mailer;
 
 /**
@@ -276,7 +277,8 @@ final class MailingService
                 $final = $result->permanent || $attempts >= BoardMailService::MAX_ATTEMPTS;
                 $this->mark((int) $row['id'], $final ? BoardMailService::FAILED : BoardMailService::PENDING, $attempts, $result->error);
                 $stats['failed'] += $final ? 1 : 0;
-                error_log('Kompanie-App: E-Mail an ' . $row['email'] . ' nicht gesendet: ' . $result->error);
+                // Ohne Adresse: das Protokoll des Servers soll keine personenbezogenen Daten sammeln.
+                error_log('Kompanie-App: E-Mail (Versand ' . $mid . ', Empfänger ' . $row['id'] . ') nicht gesendet: ' . MailResult::redactAddresses($result->error));
             }
         }
         return $stats;

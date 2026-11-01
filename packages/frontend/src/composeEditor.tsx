@@ -1,28 +1,22 @@
 // Editor zum Schreiben formatierter Texte mit „Signatur einfügen“: am Schwarzen Brett und für E-Mails aus der Verwaltung
 // derselbe Editor (TipTap, RichTextEditor), erst geladen, wenn jemand schreibt.
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense } from 'react';
 import { api } from './api';
 import { SIGNATURE_RETURN_KEY } from './board';
 import { navigate } from './router';
-import { lazyView, Loading } from './ui';
+import { lazyView, Loading, useAsync } from './ui';
 
 const RichTextEditor = lazyView(() => import('./richtext/RichTextEditor'));
 
-/** Eigene Signatur (für „Signatur einfügen“); undefined, solange sie lädt. */
+/**
+ * Eigene Signatur (für „Signatur einfügen“); undefined, solange sie lädt. Über useAsync: Kommt sie zuerst aus dem Speicher
+ * des Service Workers (z. B. noch ohne die eben eingerichtete Signatur), lädt sie mit der Antwort aus dem Netz neu.
+ */
 function useSignature(): string | null | undefined {
-  const [html, setHtml] = useState<string | null | undefined>(undefined);
-  useEffect(() => {
-    let alive = true;
-    api
-      .signature()
-      .then((r) => alive && setHtml(r.signature?.content ?? null))
-      .catch(() => alive && setHtml(null));
-    return () => {
-      alive = false;
-    };
-  }, []);
-  return html;
+  const { data, error } = useAsync(() => api.signature(), [], 'me/signature');
+  if (error) return null;
+  return data === null ? undefined : (data.signature?.content ?? null);
 }
 
 /** Zur Einrichtung der Signatur (Konto); von dort führt ein Knopf zurück zu `returnTo`, wo der gesicherte Entwurf wartet. */
@@ -48,7 +42,7 @@ export function ComposeEditor(props: {
 }) {
   const signature = useSignature();
   return (
-    <Suspense fallback={<Loading />}>
+    <Suspense fallback={<Loading shape="text" chunk />}>
       <RichTextEditor
         value={props.value}
         onChange={props.onChange}

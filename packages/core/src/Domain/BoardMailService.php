@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Mail\Mail;
+use KompanieApp\Core\Mail\MailResult;
 use KompanieApp\Core\Port\Mailer;
 use KompanieApp\Core\Storage\UserSettings;
 
@@ -206,7 +207,8 @@ final class BoardMailService
                 $final = $result->permanent || $attempts >= self::MAX_ATTEMPTS;
                 $this->mark((int) $row['id'], $final ? self::FAILED : self::PENDING, $attempts, $result->error);
                 $stats['failed'] += $final ? 1 : 0;
-                error_log('Kompanie-App: Mail vom Schwarzen Brett an ' . $row['email'] . ' nicht gesendet: ' . $result->error);
+                // Ohne Adresse: das Protokoll des Servers soll keine personenbezogenen Daten sammeln.
+                error_log('Kompanie-App: Mail vom Schwarzen Brett (Eintrag ' . $row['id'] . ') nicht gesendet: ' . MailResult::redactAddresses($result->error));
             }
         }
         return $stats;

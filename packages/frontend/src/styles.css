@@ -237,8 +237,11 @@ select {
   border-bottom: 1px solid var(--line-strong);
 }
 .install-hint-logo {
-  width: 38px;
+  /* Nur die Höhe festlegen, damit nicht-quadratische Logos nicht gestaucht werden */
   height: 38px;
+  width: auto;
+  max-width: 56px;
+  object-fit: contain;
   flex: none;
 }
 .install-hint-text {
@@ -541,10 +544,7 @@ select {
   background: #d8ead9;
   color: #1d5a31;
 }
-.badge-role,
-.badge-level-organizer,
-.badge-level-manager,
-.badge-level-admin {
+.badge-role {
   background: var(--accent);
   color: var(--on-accent);
   margin-left: 6px;
@@ -649,27 +649,6 @@ select {
   margin: 14px 0;
 }
 
-.loading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  justify-content: center;
-  padding: 48px;
-  color: var(--muted);
-}
-.spinner {
-  width: 20px;
-  height: 20px;
-  border: 3px solid var(--line);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 /* Gerüst der Seite beim Laden (skeleton.tsx): ohne eigene Box, damit es im Raster bzw. Flex des Bereichs genauso
  * steht wie der echte Inhalt; Text als graue Balken, alles entfärbt und nicht bedienbar. */
 .skeleton,
@@ -681,6 +660,9 @@ select {
   opacity: 0.6;
   pointer-events: none;
   user-select: none;
+  /* Ragt ein Platzhalter über seinen Bereich (Textbalken in einem schmalen Knopf), nicht seitlich scrollen. */
+  max-width: 100%;
+  overflow-x: clip;
 }
 @media (prefers-reduced-motion: no-preference) {
   .skeleton-parts > * {
@@ -700,6 +682,13 @@ select {
   background: currentColor;
   opacity: 0.2;
   vertical-align: middle;
+}
+/* Text in einem Flex-Element (z. B. ein Knopf in einer Reihe): darf schmaler werden als seine Balken, statt
+ * hinauszuragen. */
+.skeleton-line {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 .skeleton-box {
   display: inline-block;
@@ -1144,7 +1133,8 @@ button.member-date {
   left: calc(100% + 32px);
 }
 @media (prefers-reduced-motion: reduce) {
-  .member-track {
+  .member-track,
+  .lb-track {
     transition: none;
   }
 }
@@ -1689,6 +1679,49 @@ code {
   object-fit: cover;
   display: block;
 }
+/* Ladeschnecke über einem Bild, das noch lädt oder aufbereitet wird (LoadingImage in Galerie.tsx). Erscheint erst nach
+ * 0,25 s, damit Bilder aus dem Speicher nicht aufblinken; ohne Bewegung (prefers-reduced-motion) steht der Ring still. */
+.album-cover {
+  position: relative;
+  display: block;
+}
+.img-loading {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  border: 3px solid color-mix(in srgb, var(--muted) 30%, transparent);
+  border-top-color: var(--accent);
+  pointer-events: none;
+  opacity: 0;
+  animation: img-loading-show 0s linear 0.25s forwards;
+}
+.lightbox .img-loading {
+  width: 40px;
+  height: 40px;
+  border-color: rgb(255 255 255 / 30%);
+  border-top-color: #fff;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .img-loading {
+    animation:
+      img-loading-show 0s linear 0.25s forwards,
+      img-loading-spin 0.8s linear infinite;
+  }
+}
+@keyframes img-loading-show {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes img-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 /* Video: ▶ in der Mitte, Dauer unten links; ohne Vorschaubild nur die Fläche */
 .photo-video {
   cursor: pointer;
@@ -1743,6 +1776,36 @@ code {
   justify-content: center;
   /* Wischen und Zoomen mit zwei Fingern übernimmt die App (nicht der Browser für die ganze Seite) */
   touch-action: none;
+  overflow: hidden;
+}
+/* Spur mit dem Bild; beim Wischen setzt swipe.ts den Versatz, beim Loslassen gleitet sie (wie .member-track). */
+.lb-track {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.22s ease-out;
+}
+.lb-track.peeking {
+  will-change: transform;
+}
+/* Vorheriges und nächstes Bild neben dem Bild, Abstand wie PEEK_GAP in swipe.ts */
+.lb-peek {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.lb-peek-prev {
+  right: calc(100% + 32px);
+}
+.lb-peek-next {
+  left: calc(100% + 32px);
 }
 .lightbox img {
   max-width: calc(100vw / var(--kompanie-zoom, 1));
@@ -1753,7 +1816,16 @@ code {
 .lightbox img.zoomed {
   transition: none;
 }
-/* Videos (Issue #182): Player des Browsers; Wischen darauf bedient den Player, nicht das Blättern (Galerie.tsx) */
+/* Videos (Issue #182): Player des Browsers; Wischen auf dem Bild des Videos blättert (.lb-video-hit), in den Leisten
+   bedient es den Player */
+.lb-video {
+  position: relative;
+  display: flex;
+}
+.lb-video-hit {
+  position: absolute;
+  inset: min(48px, 25%) 0 min(64px, 33%) 0;
+}
 .lightbox video {
   max-width: calc(100vw / var(--kompanie-zoom, 1));
   max-height: calc(80vh / var(--kompanie-zoom, 1));
@@ -2753,20 +2825,18 @@ fieldset.rights-tree legend {
   max-height: calc(78vh / var(--kompanie-zoom, 1));
   object-fit: contain;
 }
-/* Platzhalter in Größe des Fotos, solange es lädt: Die Bildunterschrift springt nicht, und die Schnecke steht mittig. */
+/* Platzhalter in Größe des Fotos, solange es lädt (wie das Gerüst der Seiten): Die Bildunterschrift springt nicht. */
 .member-photo-zoom-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   width: min(480px, calc((100vw - 32px) / var(--kompanie-zoom, 1)));
   height: min(480px, calc((100vw - 32px) / var(--kompanie-zoom, 1)), calc(78vh / var(--kompanie-zoom, 1)));
+  border-radius: 8px;
+  background: rgb(255 255 255 / 15%);
 }
-.member-photo-zoom-loading .spinner {
-  width: 40px;
-  height: 40px;
-  border-width: 4px;
-  border-color: rgb(255 255 255 / 25%);
-  border-top-color: #fff;
+@media (prefers-reduced-motion: no-preference) {
+  .member-photo-zoom-loading {
+    animation: skeleton-pulse 1.6s ease-in-out infinite;
+  }
 }
 .member-photo-zoom-error {
   margin: 0;
@@ -3820,13 +3890,12 @@ fieldset.rights-tree legend {
   }
 }
 
-/* Geburtstage (Issue #1): Karte „Anstehende Geburtstage“, Liste nach Monaten, Eingabe Tag/Monat/Jahr */
+/* Geburtstage (Issue #1): Karte „Anstehende Geburtstage“, Eingabe Tag/Monat/Jahr */
 .birthdays-upcoming {
-  padding: 14px 14px 6px;
+  padding: 14px 14px 10px;
   margin-bottom: 18px;
 }
-.birthdays-title,
-.birthdays-page-title {
+.birthdays-title {
   margin: 0 0 10px;
   font-family: var(--font-head);
   font-weight: 600;
@@ -3868,10 +3937,6 @@ fieldset.rights-tree legend {
 .birthday-badge {
   background: var(--accent);
   color: var(--on-accent);
-}
-.birthdays-all {
-  display: block;
-  margin: 2px 0 6px auto;
 }
 .birthday-fields .birthday-day {
   flex: 0 0 84px;
@@ -4870,21 +4935,41 @@ button.spotlight-person:focus-visible {
   align-items: center;
   margin-top: 8px;
 }
-.list-columns .field.narrow {
-  flex-basis: 124px;
+.list-columns .field.narrow,
+.list-sort .field.narrow {
+  /* Platz für „automatisch“ bzw. „absteigend“ */
+  flex: 0 0 150px;
 }
 .list-columns .toggle {
   margin: 0 8px 0 2px;
 }
-.list-add-column {
+.list-add-column,
+.list-sort {
   align-items: flex-end;
 }
-.list-add-column .btn {
+.list-sort {
+  margin-top: 12px;
+}
+.list-add-column .btn,
+.list-sort .btn {
   flex: none;
   min-height: 46px;
 }
 .list-rows {
   gap: 6px;
+}
+.list-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+.list-groups legend {
+  padding: 0;
+  margin-bottom: 4px;
+  font-weight: 600;
 }
 .list-row-nr {
   flex: none;
@@ -5451,8 +5536,8 @@ button.spotlight-person:focus-visible {
     padding: 4px var(--content-pad-r) 4px 16px;
   }
   .install-hint-logo {
-    width: 28px;
     height: 28px;
+    max-width: 42px;
   }
   .install-hint-text span {
     display: none;
@@ -5562,4 +5647,38 @@ button.spotlight-person:focus-visible {
     max-width: 760px;
     margin-inline: auto;
   }
+}
+
+/* Postanschrift (AddressFields): Straße und Nr., PLZ und Ort nebeneinander; Nr. und PLZ schmal */
+.address-fields .field {
+  margin-bottom: 8px;
+}
+.address-row {
+  display: flex;
+  gap: 8px;
+}
+.address-row > .field {
+  flex: 1;
+  min-width: 0;
+}
+.address-row > .address-house-number {
+  flex: 0 0 5.5em;
+}
+.address-row > .address-postal-code {
+  flex: 0 0 7em;
+}
+.address-lines {
+  margin: 0;
+  white-space: pre-line;
+}
+.address-fields {
+  margin: 0 0 12px;
+  min-width: 0;
+}
+.bulk-address {
+  margin: 0 0 12px;
+}
+.bulk-address summary {
+  cursor: pointer;
+  padding: 4px 0;
 }

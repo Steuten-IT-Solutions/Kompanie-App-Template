@@ -18,6 +18,8 @@ use KompanieApp\Core\Http\ApiError;
  * - status: Mitglied (auch leer), eine andere Rolle, die sich beim Anlegen wählen lässt (nach ihrer Bezeichnung, z. B.
  *   Anwärter), oder ehemalig. Ehemalige werden wie beim Import der Ehemaligen angelegt (FormerMemberService::createImported:
  *   Konto ohne Anmeldung); die anderen bekommen ein Startpasswort, das nur in der Antwort von apply steht.
+ * - Handynummer und Adresse (Straße, Hausnummer, Zusatz, PLZ, Ort, Land; Land als Name oder ISO-Code, leer =
+ *   Deutschland) werden wie beim Anlegen geprüft (MemberService::prepare).
  * - Geburtstag, Eintritt, Punkte, Dienstgrad und Titel nur mit dem Bereich (und für Punkte, Dienstgrad und Titel mit dem
  *   Recht, sie zu verwalten); sonst wird die Spalte mit Hinweis übergangen. Punkte, Dienstgrad und Titel nur für Rollen mit
  *   Mitgliederbereich.
@@ -42,6 +44,13 @@ final class MemberImportService
         'status' => ['status', 'rolle', 'mitgliedschaft'],
         'username' => ['benutzername', 'benutzer', 'login', 'username'],
         'email' => ['email', 'mail', 'emailadresse'],
+        'phone' => ['handynummer', 'handy', 'mobil', 'mobilnummer', 'mobiltelefon'],
+        'street' => ['straße', 'strasse', 'street'],
+        'house_number' => ['hausnummer', 'hausnr', 'nr'],
+        'extra' => ['adresszusatz', 'zusatz'],
+        'postal_code' => ['plz', 'postleitzahl'],
+        'city' => ['ort', 'wohnort', 'stadt'],
+        'country' => ['land'],
         'birthday' => ['geburtstag', 'geburtsdatum', 'geboren'],
         'joined' => ['eintritt', 'eintrittsdatum', 'eintrittsjahr', 'mitgliedseit'],
         'points' => ['punkte', 'anfangspunkte'],
@@ -259,7 +268,7 @@ final class MemberImportService
      * @param \Closure(string): string $get Zelle der Spalte
      * @param array{ranks: array<string, int>, titles: array<string, array{id: int, title: string}>, linked: array<int, mixed>, levels: array<string, string>} $context
      * @param array<string, true> $taken
-     * @return array{status: string, prepared: array<string, string>, out: array<string, mixed>, initial: array<string, mixed>|null, title_ids: list<int>, birthday: array{month: int, day: int, year: int|null}|null, joined: string, former: array{reason: string, joined_on: string, founder: bool, left_on: string}|null}
+     * @return array{status: string, prepared: array<string, mixed>, out: array<string, mixed>, initial: array<string, mixed>|null, title_ids: list<int>, birthday: array{month: int, day: int, year: int|null}|null, joined: string, former: array{reason: string, joined_on: string, founder: bool, left_on: string}|null}
      */
     private function row(User $actor, \Closure $get, array $context, array &$taken): array
     {
@@ -335,10 +344,14 @@ final class MemberImportService
             'last_name' => $get('last_name'),
             'username' => $get('username'),
             'email' => $get('email'),
+            'phone' => $get('phone'),
+            'address' => $this->address($get),
             'level' => $level,
         ], $taken, $actor);
         $out['username'] = $status === self::STATUS_FORMER ? '' : $prepared['login'];
         $out['email'] = $prepared['email'];
+        $out['phone'] = $prepared['phone'];
+        $out['address'] = $prepared['address'];
 
         return ['status' => $status, 'prepared' => $prepared, 'out' => $out, 'initial' => $initial, 'title_ids' => array_values($titleIds), 'birthday' => $birthday, 'joined' => $joined, 'former' => $former];
     }
@@ -392,6 +405,29 @@ final class MemberImportService
             }
         }
         return $missing;
+    }
+
+    /**
+     * Adresse aus den Spalten für Address::parse; das Land als ISO-Code (DE) oder Name (Deutschland), sonst als anderes
+     * Land mit seinem Namen.
+     *
+     * @param \Closure(string): string $get
+     * @return array<string, string>
+     */
+    private function address(\Closure $get): array
+    {
+        $land = Text::line($get('country'));
+        $country = Address::DEFAULT_COUNTRY;
+        if ($land !== '') {
+            $country = isset(Address::COUNTRIES[strtoupper($land)]) ? strtoupper($land) : Address::OTHER;
+            foreach (Address::COUNTRIES as $code => [$name]) {
+                if (mb_strtolower($name) === mb_strtolower($land)) {
+                    $country = $code;
+                }
+            }
+        }
+        $a = ['street' => $get('street'), 'house_number' => $get('house_number'), 'extra' => $get('extra'), 'postal_code' => $get('postal_code'), 'city' => $get('city'), 'country' => $country];
+        return $a + ['country_name' => $country === Address::OTHER ? $land : ''];
     }
 
     /**

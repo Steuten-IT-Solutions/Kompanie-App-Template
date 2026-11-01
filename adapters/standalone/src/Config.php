@@ -94,6 +94,13 @@ final class Config
         return $url === '' ? '' : rtrim($url, '/') . '/';
     }
 
+    /** 'hsts' in config.php: true/false erzwingt bzw. schaltet den HSTS-Header ab; null = Vorgabe (Kernel). */
+    public function hsts(): ?bool
+    {
+        $v = $this->data['hsts'] ?? null;
+        return is_bool($v) ? $v : null;
+    }
+
     public function timezone(): string
     {
         $tz = (string) ($this->data['timezone'] ?? 'Europe/Berlin');

@@ -52,8 +52,8 @@ final class BirthdayServiceTest extends TestCase
         $this->m3 = $this->users->add('dritte', Roles::MEMBER);
         $this->cand = $this->users->add('anwaerter', TestApp::candidateRole($this->app));
         $this->guest = $this->users->add('gast', Roles::GUEST);
-        // Eigene Rolle mit „Mitglieder anlegen“
-        $role = $this->app->roles()->create(['label' => 'Anleger', 'capabilities' => TestApp::caps(['member', 'create_users'])]);
+        // Eigene Rolle mit „Mitglieder anlegen“ und den persönlichen Angaben (Geburtsdatum anderer; ohne sie: PersonalInfoTest)
+        $role = $this->app->roles()->create(['label' => 'Anleger', 'capabilities' => TestApp::caps(['member', 'create_users', 'view_personal', 'manage_personal'])]);
         $this->creator = $this->users->add('anleger', $role['key']);
         $this->users->current = $this->admin;
     }
@@ -268,6 +268,36 @@ final class BirthdayServiceTest extends TestCase
         $this->assertSame(['Mitglied'], array_keys($this->listed(0)), 'days=0: nur heute');
     }
 
+    public function testAdminsChooseHowManyDaysAheadBirthdaysAreUpcoming(): void
+    {
+        $this->setUpApp();
+        $config = fn (): mixed => $this->as($this->m)->call('GET', '/config')->data['birthdays'];
+        $res = $this->as($this->admin)->call('GET', '/admin/birthdays');
+        $this->assertSame(['upcoming_days' => 7], $res->data, 'Standard: 7 Tage');
+        $this->assertSame(['upcomingDays' => 7], $config());
+        $this->assertSame(403, $this->as($this->m)->call('PATCH', '/admin/birthdays', ['upcoming_days' => 3])->status, 'nur Admins');
+        $this->assertSame(403, $this->as($this->m)->call('GET', '/admin/birthdays')->status);
+
+        // Ungültig: 400, nichts gespeichert.
+        foreach ([['upcoming_days' => 31], ['upcoming_days' => -1], ['upcoming_days' => 2.5], ['upcoming_days' => 'drei'], ['upcoming_days' => ''], []] as $body) {
+            $this->assertSame(400, $this->as($this->admin)->call('PATCH', '/admin/birthdays', $body)->status, (string) json_encode($body));
+        }
+        $this->assertSame(7, $this->app->birthdays()->upcomingDays());
+
+        $res = $this->as($this->admin)->call('PATCH', '/admin/birthdays', ['upcoming_days' => 14]);
+        $this->assertSame(['upcoming_days' => 14], $res->data);
+        $this->assertSame(['upcomingDays' => 14], $config(), 'die App bekommt den Vorlauf mit /config');
+        $this->as($this->admin)->call('PATCH', '/admin/birthdays', ['upcoming_days' => '0']);
+        $this->assertSame(0, $this->app->birthdays()->upcomingDays(), 'auch als Text aus Formularen; 0 = nur heute');
+        $this->as($this->admin)->call('PATCH', '/admin/birthdays', ['upcoming_days' => 30]);
+        $this->assertSame(30, $this->app->birthdays()->upcomingDays());
+
+        // Ohne den Bereich: keine Angabe in /config, die Einstellung nicht erreichbar.
+        $this->app->features()->update(['birthdays' => false]);
+        $this->assertNull($config());
+        $this->assertSame(403, $this->as($this->admin)->call('GET', '/admin/birthdays')->status);
+    }
+
     public function testYearChange(): void
     {
         $this->setUpApp(['birthdays' => true], '2026-12-28 10:00:00');
@@ -398,7 +428,7 @@ final class BirthdayServiceTest extends TestCase
         $this->app->runTask(BirthdayService::TASK);
         $q = $this->queued();
         $this->assertSame(['m2', 'admin'], array_column($q, 'device'), 'alle Mitglieder außer dem Geburtstagskind, nur mit der Art');
-        $this->assertSame(['Geburtstage', 'Heute hat Max Mustermann Geburtstag (wird 45)', 'termine/geburtstage'], [$q[0]['title'], $q[0]['body'], $q[0]['route']]);
+        $this->assertSame(['Geburtstage', 'Heute hat Max Mustermann Geburtstag (wird 45)', 'termine'], [$q[0]['title'], $q[0]['body'], $q[0]['route']]);
         $this->assertSame(16 * 3600 + 55 * 60, $q[0]['ttl'], 'zustellbar bis Mitternacht');
         $this->assertSame('2026-10-20', $this->app->birthdays()->repository()->find($this->m)['last_notified'] ?? null);
 

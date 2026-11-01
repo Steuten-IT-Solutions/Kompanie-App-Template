@@ -40,6 +40,67 @@ final class AppPage
             return $vars;
         });
         add_action('template_redirect', static fn () => self::dispatch(Plugin::app()), 0);
+        // Bilder der Galerie früher beantworten (nach dem Update der App auf init mit Priorität 1).
+        add_action('init', [self::class, 'earlyPhoto'], 2);
+    }
+
+    /**
+     * Bilder der Galerie, die über die App kommen (interne und noch nicht aufbereitete), und Videos schon auf init statt
+     * erst auf template_redirect: Ein Album zeigt viele Bilder, ein Video kommt in vielen Ausschnitten, und jedes ist ein
+     * eigener Aufruf von WordPress. So entfallen je Aufruf die init-Aufgaben der anderen Plugins (Priorität 10), das
+     * Auswerten der Adresse und die Abfrage der Beiträge. Anmeldung und Recht prüft der Kern wie sonst (WordPress kennt
+     * die Person ab hier über das Anmelde-Cookie). Was hier nicht eindeutig ein Bild oder Video ist (andere Permalinks,
+     * z. B. mit index.php oder einer Sprache davor), läuft wie bisher über dispatch.
+     */
+    public static function earlyPhoto(): void
+    {
+        $method = isset($_SERVER['REQUEST_METHOD']) && is_string($_SERVER['REQUEST_METHOD']) ? strtoupper($_SERVER['REQUEST_METHOD']) : '';
+        if ($method !== 'GET' && $method !== 'HEAD') {
+            return;
+        }
+        $path = self::earlyPath();
+        if ($path === null || !preg_match('#^foto/(\d+)/(thumb|large|original|video/?)$#', $path, $m)) {
+            return;
+        }
+        $app = Plugin::app();
+        self::beginPreview($app);
+        if (str_starts_with($m[2], 'video')) {
+            self::sendVideo($app, (int) $m[1]);
+        } else {
+            self::sendPhoto($app, (int) $m[1], $m[2]);
+        }
+        exit;
+    }
+
+    /** Pfad in der App aus der Adresse (wie die Regeln in RULES bzw. ?kompanie_app=…), sonst null. */
+    public static function earlyPath(): ?string
+    {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- nur lesend
+        if (isset($_GET[self::QUERY_VAR]) && is_string($_GET[self::QUERY_VAR])) {
+            return sanitize_text_field(wp_unslash($_GET[self::QUERY_VAR]));
+        }
+        if (!WpEnvironment::prettyPermalinks() || !isset($_SERVER['REQUEST_URI']) || !is_string($_SERVER['REQUEST_URI'])) {
+            return null;
+        }
+        $path = (string) wp_parse_url(wp_unslash($_SERVER['REQUEST_URI']), PHP_URL_PATH);
+        $home = (string) wp_parse_url(home_url('/'), PHP_URL_PATH);
+        $home = $home === '' ? '/' : $home;
+        if (!str_starts_with($path, $home)) {
+            return null;
+        }
+        return preg_match('#^app/(.+)$#', substr($path, strlen($home)), $m) ? rawurldecode($m[1]) : null;
+    }
+
+    /**
+     * Vorschau „App als Rolle ansehen“ (Issue #63): Bilder, Dokumente und Abzeichen lädt der Browser ohne den Header
+     * der App, ihre Adressen tragen deshalb ?vorschau=… (der Kern prüft, ob die Person Admin ist).
+     */
+    private static function beginPreview(App $app): void
+    {
+        $header = isset($_SERVER['HTTP_X_KOMPANIE_PREVIEW']) && is_string($_SERVER['HTTP_X_KOMPANIE_PREVIEW']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_X_KOMPANIE_PREVIEW'])) : null;
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- nur lesend, schränkt Rechte nur ein
+        $query = isset($_GET[Preview::QUERY]) && is_string($_GET[Preview::QUERY]) ? sanitize_text_field(wp_unslash($_GET[Preview::QUERY])) : null;
+        $app->preview()->begin(Preview::valueFrom($header, $query));
     }
 
     public const RULES = ['^app/?$' => 'index', '^app/(.+)$' => '$matches[1]'];
@@ -72,12 +133,7 @@ final class AppPage
             return;
         }
         if (preg_match('#^(foto|dokument|abzeichen|mitgliedsfoto|bild)/#', $path)) {
-            // Vorschau „App als Rolle ansehen“ (Issue #63): Bilder, Dokumente und Abzeichen lädt der Browser ohne den Header
-            // der App, ihre Adressen tragen deshalb ?vorschau=… (der Kern prüft, ob die Person Admin ist).
-            $header = isset($_SERVER['HTTP_X_KOMPANIE_PREVIEW']) && is_string($_SERVER['HTTP_X_KOMPANIE_PREVIEW']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_X_KOMPANIE_PREVIEW'])) : null;
-            // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- nur lesend, schränkt Rechte nur ein
-            $query = isset($_GET[Preview::QUERY]) && is_string($_GET[Preview::QUERY]) ? sanitize_text_field(wp_unslash($_GET[Preview::QUERY])) : null;
-            $app->preview()->begin(Preview::valueFrom($header, $query));
+            self::beginPreview($app);
         }
         if ($path === 'manifest.webmanifest') {
             self::sendManifest($app);
@@ -98,7 +154,7 @@ final class AppPage
         } elseif (preg_match('#^bild/([a-f0-9]{32})/?$#', $path, $m)) {
             self::sendBody($app->richImages()->forDelivery($app->authContext->currentUser(), $m[1]));
         } elseif ($path === 'sicherung') {
-            self::sendBody($app->backupDownload()->forDelivery($app->authContext->currentUser()));
+            self::sendBody($app->backupDownload()->forDelivery($app->authContext->currentUser(), ($_GET['verschluesselt'] ?? '') === '1'));
         } elseif (preg_match('#^anhang/([a-f0-9]{32})/?$#', $path, $m)) {
             self::sendBody($app->attachments()->forDelivery($app->authContext->currentUser(), $m[1]));
         } else {
@@ -217,40 +273,66 @@ final class AppPage
             nocache_headers();
             return;
         }
-        $res = self::videoResponse($app, $id);
+        // Die Daten aus Drive gleich weitergeben (nicht komprimieren, sonst wartet der Browser).
+        @ini_set('zlib.output_compression', '0'); // phpcs:ignore WordPress.PHP.IniSet.Risky, WordPress.PHP.NoSilencedErrors.Discouraged
+        $res = self::videoResponse(
+            $app,
+            $id,
+            static function (array $head) use ($app): void {
+                status_header(206);
+                header('X-Content-Type-Options: nosniff');
+                header('Accept-Ranges: bytes');
+                header('Content-Range: ' . $head['contentRange']);
+                header('Cache-Control: ' . $app->preview()->cacheControl($head['intern'] ? 'private, max-age=86400' : 'public, max-age=3600'));
+                header('ETag: ' . $head['etag']);
+                header('Content-Type: ' . $head['mime']);
+                header('Content-Length: ' . $head['length']);
+                header('X-Accel-Buffering: no');
+                flush();
+            },
+            static function (string $chunk): bool {
+                echo $chunk; // phpcs:ignore WordPress.Security.EscapeOutput -- Videodaten aus Drive
+                flush();
+                return connection_aborted() === 0;
+            },
+        );
+        if (!empty($res['sent'])) {
+            return;
+        }
         status_header($res['status']);
         header('X-Content-Type-Options: nosniff');
         header('Accept-Ranges: bytes');
         if (isset($res['contentRange'])) {
             header('Content-Range: ' . $res['contentRange']);
         }
-        if ($res['status'] !== 206 || !isset($res['body'])) {
-            nocache_headers();
-            if (isset($res['retryAfter'])) {
-                header('Retry-After: ' . (int) $res['retryAfter']);
-            }
-            return;
+        nocache_headers();
+        if (isset($res['retryAfter'])) {
+            header('Retry-After: ' . (int) $res['retryAfter']);
         }
-        header('Cache-Control: ' . $app->preview()->cacheControl($res['intern'] ? 'private, max-age=86400' : 'public, max-age=3600'));
-        header('ETag: ' . $res['etag']);
-        header('Content-Type: ' . $res['mime']);
-        header('Content-Length: ' . strlen($res['body']));
-        echo $res['body']; // phpcs:ignore WordPress.Security.EscapeOutput -- Videodaten aus Drive
     }
 
     /**
-     * Galerievideo: Rechte und Ausschnitt aus dem Kern (Konto nur bei internen Videos).
+     * Galerievideo: Rechte und Ausschnitt aus dem Kern (Konto nur bei internen Videos). Mit $begin und $write gehen
+     * die Daten weiter, während sie aus Drive kommen (siehe GalleryService::deliverVideo), sonst stehen sie in body.
      *
-     * @return array{status: int, body?: string, contentRange?: string, mime?: string, etag?: string, intern?: bool, retryAfter?: int}
+     * @param (\Closure(array): void)|null $begin
+     * @param (\Closure(string): bool)|null $write
+     * @return array{status: int, body?: string, sent?: bool, length?: int, contentRange?: string, mime?: string, etag?: string, intern?: bool, retryAfter?: int}
      */
-    public static function videoResponse(App $app, int $id): array
+    public static function videoResponse(App $app, int $id, ?\Closure $begin = null, ?\Closure $write = null): array
     {
         // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- nur „bytes=a-b“, der Kern prüft das Format
         $range = isset($_SERVER['HTTP_RANGE']) && is_string($_SERVER['HTTP_RANGE']) ? wp_unslash($_SERVER['HTTP_RANGE']) : null;
-        return $app->gallery()->deliverVideo($id, $range, static function () use ($app): array {
-            $user = $app->authContext->currentUser();
-            return [$app->can(\KompanieApp\Core\Auth\Capability::ViewGalleryInternal), $user !== null];
-        });
+        return $app->gallery()->deliverVideo(
+            $id,
+            $range,
+            static function () use ($app): array {
+                $user = $app->authContext->currentUser();
+                return [$app->can(\KompanieApp\Core\Auth\Capability::ViewGalleryInternal), $user !== null];
+            },
+            $begin,
+            $write,
+        );
     }
 
     /**
@@ -456,6 +538,26 @@ final class AppPage
         $pos = strpos($html, '<head>');
         $html = $pos === false ? $head . $html : substr_replace($html, $head, $pos + strlen('<head>'), 0);
         header('Content-Type: text/html; charset=utf-8');
+        self::securityHeaders();
         echo $html; // phpcs:ignore WordPress.Security.EscapeOutput
+    }
+
+    /**
+     * Wie die eigenständige Version: nicht in fremde Seiten einbetten (Klickbetrug, „Clickjacking“), Typ nicht raten,
+     * Adresse nur gekürzt weitergeben. HSTS bleibt Sache von WordPress bzw. des Hosters (gilt für die ganze Seite).
+     */
+    private static function securityHeaders(): void
+    {
+        header('X-Content-Type-Options: nosniff');
+        // Ein strengeres DENY der Webseite oder eines Plugins nicht überschreiben, und in der CSP ebenso streng bleiben:
+        // Browser richten sich nach frame-ancestors vor X-Frame-Options.
+        $frame = array_values(array_filter(headers_list(), static fn (string $h): bool => stripos($h, 'X-Frame-Options:') === 0));
+        $deny = $frame !== [] && stripos($frame[0], 'deny') !== false;
+        if ($frame === []) {
+            header('X-Frame-Options: SAMEORIGIN');
+        }
+        // Zusätzlich (false): Eine CSP der Webseite oder eines Sicherheits-Plugins bleibt; Browser beachten beide.
+        header('Content-Security-Policy: frame-ancestors ' . ($deny ? "'none'" : "'self'"), false);
+        header('Referrer-Policy: strict-origin-when-cross-origin');
     }
 }

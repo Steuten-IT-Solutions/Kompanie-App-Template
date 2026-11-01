@@ -7,11 +7,15 @@ import { OwnBirthdayCard, ownBirthday } from '../birthdays';
 import { OwnJoinYearCard, profileChoice } from '../joinYear';
 import { navigate, useRoute } from '../router';
 import RichTextView from '../richtext/RichTextView';
-import { EmailField, ErrorBox, lazyView, Loading, PhoneField, useAsync } from '../ui';
+import { AddressFields, EmailField, ErrorBox, lazyView, Loading, PhoneField, useAsync } from '../ui';
 import { normalizeEmail } from '../email';
 import { normalizePhone } from '../phone';
+import { addressInput, EMPTY_ADDRESS, formatAddress } from '../address';
 import { MemberAvatar } from '../memberPhoto';
+import { downloadPersonalData } from '../personalData';
+import { previewRole } from '../preview';
 import { saveTheme, THEME_LABELS, useTheme, type ThemeChoice } from '../theme';
+import { sources } from '../viewData';
 
 const MIN_LENGTH = 8;
 
@@ -116,10 +120,10 @@ function SignatureCard({ onToast }: { onToast: (msg: string) => void }) {
         Nachrichten nicht.
       </p>
       {saved === undefined && !error ? (
-        <Loading />
+        <Loading shape="text" />
       ) : draft !== null ? (
         <>
-          <Suspense fallback={<Loading />}>
+          <Suspense fallback={<Loading shape="text" chunk />}>
             <RichTextEditor value={draft} onChange={setDraft} label="Signatur" id="signature-text" />
           </Suspense>
           <div className="button-row">
@@ -247,6 +251,9 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
 
       {signatureAllowed() && <SignatureCard onToast={onToast} />}
 
+      {/* In der Vorschau gibt es keinen Export (der Server lehnt ihn ab) */}
+      {!previewRole() && <MyDataCard />}
+
       <div className="card account-card">
         <h3>Darstellung</h3>
         <p className="muted small">
@@ -317,15 +324,50 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
   );
 }
 
-/** Eigene E-Mail-Adresse und Handynummer ansehen und ändern; eine neue E-Mail-Adresse nur mit dem aktuellen Passwort. */
+/** Auskunft nach Art. 15 DSGVO: alle gespeicherten Daten der Person als JSON-Datei. */
+function MyDataCard() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="card account-card">
+      <h3>Meine Daten</h3>
+      <p className="muted small">
+        Alles, was die App über dich gespeichert hat, als Datei (JSON) zum Herunterladen, z. B. für eine Auskunft nach der DSGVO.
+      </p>
+      <button
+        className="btn btn-secondary btn-block"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true);
+          setError(null);
+          downloadPersonalData()
+            .catch((err: Error) => setError(err.message))
+            .finally(() => setBusy(false));
+        }}
+      >
+        {busy ? 'Wird zusammengestellt …' : 'Meine Daten herunterladen'}
+      </button>
+      {error && (
+        <p className="form-error small" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Eigene E-Mail-Adresse, Handynummer und Adresse ansehen und ändern; eine neue E-Mail-Adresse nur mit dem aktuellen
+ * Passwort. Andere sehen sie nur mit dem Recht „Persönliche Angaben sehen“.
+ */
 function ContactCard({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(api.ownAccount, [], 'me/account');
+  const { data, error, loading, reload, setData } = useAsync(sources.ownAccount.load, sources.ownAccount.deps, sources.ownAccount.key);
   const [editing, setEditing] = useState<OwnAccount | null>(null);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const account = data!;
   const emailChanged = editing !== null && normalizeEmail(editing.email).toLowerCase() !== account.email.toLowerCase();
@@ -341,6 +383,7 @@ function ContactCard({ onToast }: { onToast: (msg: string) => void }) {
         await api.updateOwnAccount({
           email: normalizeEmail(editing.email),
           phone: normalizePhone(editing.phone),
+          address: addressInput(editing.address),
           ...(emailChanged ? { current_password: password } : {}),
         }),
       );
@@ -370,6 +413,12 @@ function ContactCard({ onToast }: { onToast: (msg: string) => void }) {
         onChange={(email) => setEditing({ ...editing, email })}
       />
       <PhoneField label="Handynummer" autoComplete="tel" value={editing.phone} onChange={(phone) => setEditing({ ...editing, phone })} />
+      <AddressFields
+        label="Adresse"
+        own
+        value={editing.address ?? EMPTY_ADDRESS}
+        onChange={(address) => setEditing({ ...editing, address })}
+      />
       {emailChanged && (
         <label className="field">
           <span>Aktuelles Passwort (zur Bestätigung der neuen E-Mail-Adresse)</span>
@@ -398,7 +447,10 @@ function ContactCard({ onToast }: { onToast: (msg: string) => void }) {
         <dd>{account.email || <span className="muted">nicht hinterlegt</span>}</dd>
         <dt>Handynummer</dt>
         <dd>{account.phone || <span className="muted">nicht hinterlegt</span>}</dd>
+        <dt>Adresse</dt>
+        <dd className="address-lines">{formatAddress(account.address).join('\n') || <span className="muted">nicht hinterlegt</span>}</dd>
       </dl>
+      <p className="muted small">Sehen können das nur du und wer in der Verwaltung persönliche Angaben sehen darf.</p>
       <button className="btn btn-secondary btn-block" onClick={() => setEditing(account)}>
         Ändern
       </button>

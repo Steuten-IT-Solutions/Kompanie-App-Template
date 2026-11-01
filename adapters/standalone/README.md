@@ -49,7 +49,9 @@ php bin/kompanie.php create-admin --name="Vorname Nachname" --login=vorname
 SQLite muss mindestens Version 3.24 haben (seit 2018 überall vorhanden).
 Ohne `--password` erzeugt `create-admin` ein Startpasswort und zeigt es einmal an.
 
-Weitere Befehle: `status`, `cron`, `reset-password --login=…`, `export [--out=datei.json]`, `import datei.json`.
+Weitere Befehle: `status`, `cron`, `reset-password --login=…`, `export [--out=datei.json] [--encrypt]`, `import datei.json [--passphrase-file=…]`.
+Mit `--encrypt` (nur zusammen mit `--out=…`) ist die Sicherung mit dem Passwort für Sicherungen verschlüsselt (in der App
+unter Einstellungen → Datensicherung eingerichtet); `import` fragt bei verschlüsselten Dateien nach dem Passwort.
 Die Sicherung enthält alle Daten, Benutzer (mit Passwort-Hashes) und Einstellungen; Galeriebilder werden
 nach dem Wiederherstellen neu aus Google Drive erzeugt. `import` sichert vorher den bisherigen Stand in das
 Datenverzeichnis (`vor-import-….json`).

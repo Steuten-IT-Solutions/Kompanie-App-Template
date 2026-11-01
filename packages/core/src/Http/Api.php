@@ -19,6 +19,7 @@ use KompanieApp\Core\Domain\SignatureService;
 use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Text;
 use KompanieApp\Core\Push\PushService;
+use KompanieApp\Core\Storage\BackupCrypto;
 use KompanieApp\Core\Storage\Sql\DatabaseException;
 use KompanieApp\Core\Telemetry\Code;
 use KompanieApp\Core\Telemetry\Detail;
@@ -45,7 +46,7 @@ final class Api
      * Zählen nicht als Nutzung (Issue #175): ruft die App von selbst auf (Konfiguration, Abgleich der Benachrichtigungen,
      * Formular zum Fehlermelden). Die Anmeldung erfasst ihre Route selbst (Aktion login), die Abmeldung gar nicht.
      */
-    private const NOT_TRACKED = ['/config', '/auth/csrf', '/auth/login', '/auth/logout', '/push/key', '/push/status', '/me/push/status', '/reports/form'];
+    private const NOT_TRACKED = ['/config', '/auth/csrf', '/auth/login', '/auth/logout', '/push/status', '/me/push/status', '/reports/form'];
 
     /** @var Route[]|null */
     private ?array $routes = null;
@@ -232,7 +233,7 @@ final class Api
                 $this->app->ranks()->applyInitial($this->user(), (int) $created['id'], $initial);
             } catch (\Throwable $e) {
                 error_log('Kompanie-App: Anfangsstand nicht übernommen: ' . $e->getMessage());
-                $created['warning'] = 'Angelegt, aber Anfangspunkte bzw. Dienstgrad fehlen noch. Bitte in den Mitgliedsdetails nachtragen.';
+                $created['warning'] = trim(($created['warning'] ?? '') . ' Anfangspunkte bzw. Dienstgrad fehlen noch. Bitte in den Mitgliedsdetails nachtragen.');
             }
             $this->storeBirthday((int) $created['id'], $birthday, $created);
             $this->storePhoto((int) $created['id'], $photo, $created);
@@ -354,6 +355,16 @@ final class Api
         return $this->app->features()->enabled('ranks') && $this->can(Cap::ManageRanks);
     }
 
+    /** Auskunft als Datei (meine-daten-… bzw. daten-<id>-…), nie zwischengespeichert. */
+    private function personalData(int $userId): Response
+    {
+        $a = $this->app;
+        $data = $a->personalData()->export($this->user(), $userId);
+        $date = $a->time()->format($a->time()->timestamp(), 'Y-m-d');
+        $name = $this->user()->id === $userId ? 'meine-daten-' . $date . '.json' : 'daten-' . $userId . '-' . $date . '.json';
+        return Response::attachment($data, $name);
+    }
+
     /** Titel in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
     private function showTitles(): bool
     {
@@ -462,6 +473,8 @@ final class Api
             'backupUrl' => $a->backup !== null && $this->can(Cap::ManageSettings) && !$a->preview()->active() ? $a->env->backupUrl() : null,
             // Vorschau „App als Rolle ansehen“ (Issue #63): {role, label}, null ohne (gültige) Vorschau
             'preview' => $a->preview()->info(),
+            // Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen; null ohne den Bereich
+            'birthdays' => ($features['birthdays'] ?? false) ? ['upcomingDays' => $a->birthdays()->upcomingDays()] : null,
         ];
     }
 
@@ -497,6 +510,7 @@ final class Api
         $denyBoard = 'Das Schwarze Brett darfst du nicht sehen.';
         $denyPolls = 'An Umfragen darfst du nicht teilnehmen.';
         $denyBirthdays = 'Geburtstage sind nur für Mitglieder.';
+        $denyPersonal = 'Persönliche Angaben anderer pflegt nur, wer das Recht dazu hat.';
         // Mitgliederliste: wer Punkte oder Strafen vergibt, Dienstgrade, Titel oder die Anwesenheit pflegt, Mitglieder anlegt oder Rollen vergibt
         // (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, siehe MemberService)
         $manage = Cap::memberList();
@@ -523,6 +537,7 @@ final class Api
             // Eigene Daten
             // Punkte und offene Strafen einmal (me()); vom Dienstgrad nur die Bezeichnung, ohne die Buchungen für den
             // Fortschritt erneut zu lesen (der steht unter /me/rank).
+            new Route('GET', '/me/data', $L, fn () => $this->personalData($this->user()->id)),
             new Route('GET', '/me', $L, fn () => $a->members()->me($this->user())
                 + ($a->features()->enabled('ranks') && $this->user()->isMember() && $this->can(Cap::ViewOwnRank) ? ['rank' => $a->ranks()->current($this->user()->id)] : [])
                 + ($a->features()->enabled('titles') && $this->user()->isMember() && $this->can(Cap::ViewOwnRank) ? ['titles' => $a->titles()->of($this->user()->id)] : [])),
@@ -557,7 +572,6 @@ final class Api
             // Fehlermeldungen (Issue #64): auch ohne Anmeldung; Zeitfalle, Honeypot und Begrenzung im Dienst
             new Route('GET', '/reports/form', $P, fn () => $a->bugReports()->form($a->authContext->currentUser())),
             new Route('POST', '/reports', $P, fn (Request $r) => Response::created($a->bugReports()->submit($a->authContext->currentUser(), $r->body, $r->client))),
-            new Route('GET', '/push/key', $P, fn () => ['supported' => $a->push()->supported(), 'publicKey' => $a->push()->publicKey()]),
             new Route('POST', '/me/push/status', $L, fn (Request $r) => $this->pushStatus($r, $this->user())),
             new Route('POST', '/push/status', $P, fn (Request $r) => $this->pushStatus($r, null)),
             new Route('POST', '/me/push', $L, fn (Request $r) => PushService::formatSubscription($a->push()->subscribe(
@@ -832,11 +846,12 @@ final class Api
                 }
                 return $a->birthdays()->list($days);
             }, 'birthdays', $denyView),
-            new Route('PUT', '/members/{id}/birthday', Cap::CreateUsers, fn (Request $r) => ['birthday' => $a->birthdays()->saveFor($this->user(), $r->id(), $r->body)], 'birthdays', $denyRights),
-            new Route('DELETE', '/members/{id}/birthday', Cap::CreateUsers, function (Request $r) use ($a) {
+            // Geburtsdatum anderer: gehört zu den persönlichen Angaben (manage_personal)
+            new Route('PUT', '/members/{id}/birthday', Cap::ManagePersonal, fn (Request $r) => ['birthday' => $a->birthdays()->saveFor($this->user(), $r->id(), $r->body)], 'birthdays', $denyPersonal),
+            new Route('DELETE', '/members/{id}/birthday', Cap::ManagePersonal, function (Request $r) use ($a) {
                 $a->birthdays()->removeFor($r->id());
                 return ['birthday' => null];
-            }, 'birthdays', $denyRights),
+            }, 'birthdays', $denyPersonal),
             new Route('PUT', '/members/{id}/join-year', Cap::CreateUsers, fn (Request $r) => ['join_year' => $a->joinYears()->saveFor($this->user(), $r->id(), $r->body)], null, $denyRights),
             new Route('DELETE', '/members/{id}/join-year', Cap::CreateUsers, function (Request $r) use ($a) {
                 $a->joinYears()->removeFor($r->id());
@@ -918,9 +933,10 @@ final class Api
                 + ['photo_url' => $a->memberPhotos()->url($r->id()), 'photo_editable' => $a->memberPhotos()->canEdit($this->user(), $r->id())]
                 + $this->memberRank($r->id())
                 + ($this->showTitles() ? ['titles' => $a->titles()->of($r->id())] : [])
-                // Geburtstag mit Jahr und Schaltern (Issue #1), nur für alle, die ihn pflegen dürfen (create_users): Wer etwa
-                // nur Punkte verwaltet, sieht kein Geburtsdatum, auch kein verborgenes
-                + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::CreateUsers) ? ['birthday' => $a->birthdays()->of($r->id())] : [])
+                // Persönliche Angaben (E-Mail, Handynummer, Adresse) und Geburtstag mit Jahr und Schaltern (Issue #1) nur mit
+                // view_personal: Wer etwa nur Punkte verwaltet oder Konten anlegt, sieht kein Geburtsdatum, auch kein verborgenes
+                + ($this->user()->can(Cap::ViewPersonal) ? ['personal' => $a->members()->personal($r->id())] : [])
+                + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::ViewPersonal) ? ['birthday' => $a->birthdays()->of($r->id())] : [])
                 // Eintrittsjahr mit Anzeige, ebenso nur für create_users
                 + ($this->user()->can(Cap::CreateUsers) ? ['join_year' => $a->joinYears()->of($r->id())] : [])
                 // Ehemalig: Grund, Eintritt, Ausscheiden (sonst null)
@@ -957,6 +973,10 @@ final class Api
             // Konten verwalten (Issue #24): Angaben ändern, löschen mit allen eigenen Daten
             new Route('GET', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->profile($r->id(), $this->user()), null, $denyUsers),
             new Route('PATCH', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->updateProfile($this->user(), $r->id(), $r->body), null, $denyUsers),
+            // Auskunft nach Art. 15 DSGVO (Domain\PersonalDataExport): alle Daten der Person als JSON-Datei
+            new Route('GET', '/members/{id}/data', Cap::CreateUsers, fn (Request $r) => $this->personalData($r->id()), null, $denyUsers),
+            // Persönliche Angaben anderer: E-Mail, Handynummer, Adresse (Geburtstag unter /members/{id}/birthday)
+            new Route('PUT', '/members/{id}/personal', Cap::ManagePersonal, fn (Request $r) => $a->members()->updatePersonal($this->user(), $r->id(), $r->body), null, $denyPersonal),
             new Route('DELETE', '/members/{id}', Cap::CreateUsers, function (Request $r) use ($a) {
                 $a->members()->removeAccount($this->user(), $r->id());
                 $a->userDeleted($r->id());
@@ -979,7 +999,7 @@ final class Api
                     $a->ranks()->applyInitial($this->user(), (int) $created['id'], $initial);
                 } catch (\Throwable $e) {
                     error_log('Kompanie-App: Anfangsstand nicht übernommen: ' . $e->getMessage());
-                    $created['warning'] = 'Das Konto ist angelegt, aber Anfangspunkte bzw. Dienstgrad konnten nicht übernommen werden. Bitte in den Mitgliedsdetails nachtragen.';
+                    $created['warning'] = trim(($created['warning'] ?? '') . ' Anfangspunkte bzw. Dienstgrad konnten nicht übernommen werden. Bitte in den Mitgliedsdetails nachtragen.');
                 }
                 $this->storeBirthday((int) $created['id'], $birthday, $created);
                 $this->storePhoto((int) $created['id'], $photo, $created);
@@ -1007,6 +1027,12 @@ final class Api
                 }
                 return $a->push()->adminStatus();
             }, null, $denySettings),
+            // Geburtstage (Issue #1): wie viele Tage im Voraus die Karte „Anstehende Geburtstage“ einen Geburtstag zeigt
+            new Route('GET', '/admin/birthdays', Cap::ManageSettings, fn () => $a->birthdays()->settings(), 'birthdays', $denySettings),
+            new Route('PATCH', '/admin/birthdays', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->birthdays()->setUpcomingDays($r->input('upcoming_days'));
+                return $a->birthdays()->settings();
+            }, 'birthdays', $denySettings),
             new Route('PATCH', '/admin/settings', Cap::ManageSettings, fn (Request $r) => $a->settingsService()->update($r->body), null, $denySettings),
             // E-Mail (Issue #172): Kompanieadresse und SMTP, Verbindung prüfen, Testmail
             new Route('GET', '/admin/mail', Cap::ManageSettings, fn () => $a->mail()->describe(), null, $denySettings),
@@ -1085,6 +1111,8 @@ final class Api
                 $a->updates()->rollback(is_string($r->input('version')) ? $r->input('version') : '', Input::bool($r->input('without_drive')));
                 return ['installed' => $r->input('version')];
             }, null, $denySettings),
+            // Leichter Abruf für die Fortschrittsanzeige während eines Updates (running, progress).
+            new Route('GET', '/admin/update', Cap::ManageSettings, fn () => $a->updates()->status(), null, $denySettings),
             new Route('PATCH', '/admin/update', Cap::ManageSettings, function (Request $r) use ($a) {
                 if ($r->has('auto')) {
                     $a->updates()->setAuto(Input::bool($r->input('auto')));
@@ -1108,23 +1136,43 @@ final class Api
                 $data = $backup->export();
                 $a->settings->set(StatusService::BACKUP_SETTING, $a->time()->timestamp());
                 $name = 'sicherung-' . $a->time()->format($a->time()->timestamp(), 'Y-m-d') . '.json';
-                return new Response($data, 200, ['Content-Disposition' => 'attachment; filename="' . $name . '"', 'Cache-Control' => 'no-store']);
+                return Response::attachment($data, $name);
             }, null, $denySettings),
             new Route('POST', '/admin/backup', Cap::ManageSettings, function (Request $r) use ($a) {
                 $backup = $a->backup ?? throw new ApiError(404, 'not_available', 'Die Datensicherung gibt es in dieser Installation nicht.');
                 if (!$backup->canImport()) {
                     throw new ApiError(404, 'not_available', 'Eine Sicherung lässt sich hier nicht wiederherstellen.');
                 }
-                if (!Input::bool($r->input('confirm')) || !is_string($r->input('backup'))) {
+                // Als Text (JSON wie bisher) oder als Base64 (verschlüsselte Sicherung, mit passphrase).
+                $base64 = $r->input('backup_base64');
+                $data = is_string($base64) ? $base64 : $r->input('backup');
+                if (!Input::bool($r->input('confirm')) || !is_string($data)) {
                     throw ApiError::invalid('Bitte die Sicherung auswählen und das Ersetzen aller Daten bestätigen.');
                 }
+                if (is_string($base64)) {
+                    $data = $a->backupEncryption()->readUpload($base64, $r->input('passphrase'));
+                } elseif (BackupCrypto::isEncrypted($data)) {
+                    // Als Text gelesen ist eine verschlüsselte Datei nicht mehr lesbar (Zeichensatz); die App sendet sie als Base64.
+                    throw ApiError::invalid('Verschlüsselte Sicherungen bitte als Datei hochladen (backup_base64).');
+                }
+                // Hintergrundaufgaben (abhängig von den wiederhergestellten Einstellungen, z. B. Mail oder Updates) plant der
+                // nächste Aufruf neu: Der Import löscht tasks_planned (App::upgrade). Nicht hier: Die Einstellungen dieser
+                // Anfrage sind noch die alten. Die Aufbewahrungsfrist kommt nie aus einer Sicherung (Backup::LOCAL_SETTINGS).
                 try {
-                    $backup->import($r->input('backup'));
+                    $backup->import($data);
                 } catch (\RuntimeException $e) {
                     throw $e instanceof ApiError ? $e : ApiError::invalid($e->getMessage());
                 }
                 return ['restored' => true];
             }, null, $denySettings),
+            // Passwort für Sicherungen (verschlüsselte Sicherungen, auch in Google Drive)
+            new Route('GET', '/admin/backup/encryption', Cap::ManageSettings, fn () => $a->backupEncryption()->status(), null, $denySettings),
+            new Route('PUT', '/admin/backup/encryption', Cap::ManageSettings, fn (Request $r) => $a->backupEncryption()->set($r->input('passphrase'), $r->input('passphrase_confirm')), null, $denySettings),
+            new Route('DELETE', '/admin/backup/encryption', Cap::ManageSettings, fn () => $a->backupEncryption()->remove(), null, $denySettings),
+            new Route('POST', '/admin/backup/encryption/verify', Cap::ManageSettings, fn (Request $r) => ['ok' => $a->backupEncryption()->verify($r->input('passphrase'))], null, $denySettings),
+            // Aufbewahrungsfrist für Ehemalige (Standard aus): Stand mit Vorschau, einstellen
+            new Route('GET', '/admin/former/retention', Cap::ManageSettings, fn () => $a->formerMembers()->retentionStatus(), null, $denySettings),
+            new Route('PUT', '/admin/former/retention', Cap::ManageSettings, fn (Request $r) => $a->formerMembers()->setRetention($r->body, Input::bool($r->input('preview'))), null, $denySettings),
             new Route('GET', '/admin/backup/drive', Cap::ManageSettings, fn () => $a->backupUpload()->status(), null, $denySettings),
             new Route('PUT', '/admin/backup/drive', Cap::ManageSettings, function (Request $r) use ($a) {
                 $status = $a->backupUpload()->setEnabled(Input::bool($r->input('enabled')));

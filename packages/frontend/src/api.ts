@@ -1,6 +1,8 @@
 // Zugriff auf die API der Kompanie-App (siehe api/openapi.yaml), unabhängig davon,
 // ob sie von WordPress oder der eigenständigen Version kommt.
 
+import type { Address } from './address';
+import { readBase64 } from './backupFile';
 import { dataCache } from './dataCache';
 import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
@@ -43,6 +45,8 @@ export type Capability =
   | 'manage_offices'
   | 'manage_lists'
   | 'send_mail'
+  | 'view_personal'
+  | 'manage_personal'
   | 'create_users'
   | 'promote_users'
   | 'view_activity'
@@ -109,6 +113,8 @@ export interface AppConfig {
   maintenance?: MaintenanceInfo;
   /** Vorschau „App als Rolle ansehen“ (Issue #63): vom Server bestätigt; role ist der Schlüssel oder @public */
   preview?: { role: string; label: string } | null;
+  /** Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen; null ohne den Bereich, fehlt bei älteren Servern */
+  birthdays?: { upcomingDays: number } | null;
 }
 
 export interface MaintenanceInfo {
@@ -181,6 +187,13 @@ export const CONFIG_CHANGED = 'kompanie-config-changed';
 export function applyFeatures(list: FeatureInfo[]): void {
   if (!config) return;
   for (const f of list) config.features[f.key] = f.enabled && f.configured !== false;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/** Übernimmt den Vorlauf der anstehenden Geburtstage in die geladene Konfiguration (nach dem Speichern). */
+export function applyBirthdayUpcomingDays(days: number): void {
+  if (!config) return;
+  config.birthdays = { upcomingDays: days };
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -320,11 +333,16 @@ export interface OpenPenalty extends Penalty {
   user_name: string | null;
 }
 
-/** Eigene Kontaktangaben (Meins → Konto) */
-export interface OwnAccount {
+/** Persönliche Angaben: eigene (Meins → Konto) und in der Verwaltung mit view_personal */
+export interface PersonalInfo {
   email: string;
   phone: string;
+  /** null, wenn keine hinterlegt ist; fehlt bei älteren Servern */
+  address?: Address | null;
 }
+
+/** Eigene Kontaktangaben (Meins → Konto) */
+export type OwnAccount = PersonalInfo;
 
 export interface CalendarEvent {
   id: string;
@@ -429,7 +447,7 @@ export interface MemberSummary {
   level: Level;
   /** Zusatzrollen (Issue #66), in der Reihenfolge der Rollen */
   extra_roles?: Level[];
-  /** Mit Mitgliederbereich; false bei Anwärtern, Rollen nur mit Kalender und Gästen */
+  /** Recht „Gehört zur Kompanie“; false bei Anwärtern, Rollen nur mit Kalender und Gästen */
   member: boolean;
   /** Gruppe im Zähler wie in der Anwesenheit (Einstellungen → Rollen); null bei Gästen, fehlt bei älteren Servern */
   group?: Level | null;
@@ -508,8 +526,10 @@ export interface MemberDetail extends MemberSummary {
   /** Dienstgrad und Verlauf (nur mit Bereich und Recht „Dienstgrade verwalten“) */
   rank?: RankStatus;
   rank_history?: RankHistoryEntry[];
-  /** Geburtstag mit Jahr und Schaltern (nur mit Bereich Geburtstage; null ohne Eintrag) */
+  /** Geburtstag mit Jahr und Schaltern (nur mit Bereich Geburtstage und view_personal; null ohne Eintrag) */
   birthday?: Birthday | null;
+  /** E-Mail-Adresse, Handynummer und Adresse (nur mit view_personal) */
+  personal?: PersonalInfo;
   /** Eintritt mit Anzeige (nur für create_users; null ohne Eintrag) */
   join_year?: JoinYear | null;
   /** Ausnahmen bei den Rechten; null für Admins, Gäste, sich selbst und wer sie nicht ändern darf */
@@ -532,6 +552,8 @@ export interface FormerInfo {
   left_on: string;
   /** Grundrolle vor dem Ausscheiden (für „Wieder aufnehmen“) */
   previous_level: Level;
+  /** Persönliche Angaben nach Ablauf der Aufbewahrungsfrist gelöscht (eigenständige Version: auch Benutzername und E-Mail-Adresse) */
+  personal_deleted: boolean;
 }
 
 /** Vorschau zu „Als ehemalig eintragen“: laufende Ämter, die mit dem Ausscheiden enden (Issue #181). */
@@ -614,6 +636,8 @@ export interface MemberImportRow {
   /** leer bei Ehemaligen (sie melden sich nicht an) */
   username?: string;
   email?: string;
+  phone?: string;
+  address?: Address | null;
   /** JJJJ-MM-TT oder MM-TT */
   birthday?: string;
   /** JJJJ-MM-TT oder JJJJ */
@@ -732,6 +756,12 @@ export interface BirthdayEntry {
   today: boolean;
   /** Alter an diesem Geburtstag, nur wenn freigegeben */
   age: number | null;
+}
+
+/** Einstellungen der Geburtstage (Einstellungen → Geburtstage). */
+export interface BirthdaySettings {
+  /** Anstehend: heute und die nächsten N Tage (0–30) */
+  upcoming_days: number;
 }
 
 export interface BirthdayInput {
@@ -1100,14 +1130,7 @@ export type EncodedFile = { name: string; data: string };
 
 /** Datei als { name, data (Base64) } für die API (beide Adapter nehmen nur JSON an). */
 export async function encodeFile(file: File): Promise<EncodedFile> {
-  const data = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    // Nur der Base64-Teil (ohne „data:…;base64,“): spart auf dem Server eine Kopie der Datei.
-    reader.onload = () => resolve(String(reader.result).replace(/^data:[^,]*,/, ''));
-    reader.onerror = () => reject(new Error('Die Datei konnte nicht gelesen werden.'));
-    reader.readAsDataURL(file);
-  });
-  return { name: file.name, data };
+  return { name: file.name, data: await readBase64(file) };
 }
 
 export type AttendanceStatus = 'present' | 'excused' | 'absent';
@@ -1143,7 +1166,7 @@ export interface AttendancePerson {
   role: Level;
   /** Rolle, als die die Person im Zähler zählt */
   group: Level;
-  /** Mit Mitgliederbereich: Punkte und Strafen möglich */
+  /** Recht „Gehört zur Kompanie“: Punkte und Strafen möglich */
   member: boolean;
   status: AttendanceStatus | null;
   /** Hat für diese Liste schon Punkte */
@@ -1274,8 +1297,26 @@ export interface OfficeImportResult {
 }
 
 /** Listen (Issue #121): Datenspalten; nr zählt die Zeilen. */
-export type ListField = 'nr' | 'name' | 'first_name' | 'last_name' | 'role' | 'rank' | 'titles' | 'birthday' | 'points' | 'penalties';
-export type ListColumnWidth = 'narrow' | 'normal' | 'wide';
+export type ListField =
+  | 'nr'
+  | 'name'
+  | 'first_name'
+  | 'last_name'
+  | 'role'
+  | 'rank'
+  | 'titles'
+  | 'birthday'
+  | 'address'
+  | 'street'
+  | 'postal_code'
+  | 'city'
+  | 'country'
+  | 'phone'
+  | 'email'
+  | 'points'
+  | 'penalties';
+/** auto: so breit wie der längste Inhalt */
+export type ListColumnWidth = 'narrow' | 'normal' | 'wide' | 'auto';
 
 export interface ListColumn {
   /** field: Wert aus der App, blank: leer zum Ausfüllen auf Papier */
@@ -1298,8 +1339,18 @@ export interface ListValues {
   role?: string;
   rank?: string | null;
   titles?: string[];
-  /** „TT.MM.“ oder null (nicht freigegeben) */
-  birthday?: string | null;
+  /** Tag und Monat, das Jahr nur mit view_personal (sonst null); null: nicht freigegeben */
+  birthday?: { day: number; month: number; year: number | null } | null;
+  /** Persönliche Angaben (nur mit view_personal); null ohne Eintrag. address: die ganze Adresse in einer Zeile */
+  address?: string | null;
+  /** Straße mit Hausnummer */
+  street?: string | null;
+  postal_code?: string | null;
+  city?: string | null;
+  /** Name des Landes, auch Deutschland */
+  country?: string | null;
+  phone?: string | null;
+  email?: string | null;
   points?: number;
   /** Offene Strafen in Cent */
   penalties?: number;
@@ -1325,6 +1376,10 @@ export interface PrintList {
   subtitle: string | null;
   date: string | null;
   orientation: 'portrait' | 'landscape';
+  /** Wer mit „Mitglieder aktualisieren“ in die Liste kommt: members (alle mit Mitgliederbereich) und Rollen ohne ihn */
+  groups: string[];
+  /** Zur Auswahl: members, dann die Rollen ohne Mitgliederbereich (ohne Gast) */
+  group_options: { key: string; label: string }[];
   created_by_name: string | null;
   created_at: string;
   updated_by_name: string | null;
@@ -1339,6 +1394,7 @@ export interface PrintListInput {
   subtitle?: string;
   date?: string | null;
   orientation?: 'portrait' | 'landscape';
+  groups?: string[];
   columns?: Omit<ListColumn, 'available'>[];
   rows?: ({ kind: 'member'; user_id: number | null } | { kind: 'free'; name: string })[];
   /** Beim Speichern: geladener Stand; hat jemand die Liste inzwischen geändert, antwortet der Server mit 409 conflict. */
@@ -1416,6 +1472,8 @@ export interface PersonName {
 export interface NewPerson extends PersonName {
   username?: string;
   email?: string;
+  phone?: string;
+  address?: Address | null;
   initial_points?: number;
   initial_points_date?: string;
   rank_id?: number;
@@ -1429,10 +1487,12 @@ export interface AccountProfile extends PersonName {
   name: string;
   login: string;
   email: string;
-  /** Handynummer oder '' */
+  /** Handynummer oder '' (nur mit view_personal, sonst '') */
   phone: string;
   /** WordPress: Benutzernamen lassen sich nicht ändern */
   can_change_login: boolean;
+  /** Auskunft (Daten exportieren) erlaubt: der Server prüft die Rechte aller enthaltenen Bereiche */
+  can_export: boolean;
 }
 
 export class ApiError extends Error {
@@ -1446,6 +1506,17 @@ export class ApiError extends Error {
 }
 
 let csrfToken = config?.csrf.token ?? '';
+
+/**
+ * Tokens aus der aktuellen App-Seite übernehmen (pageUpdate.ts): Der Service Worker zeigt beim Start die gespeicherte
+ * Seite, deren CSRF-Token und Adresse zum Abmelden (WordPress: mit Token) veraltet sein können.
+ */
+export function takeTokens(csrf: AppConfig['csrf'], auth: AppConfig['auth']): void {
+  if (!config || !csrf?.token) return;
+  config.csrf = csrf;
+  config.auth = auth;
+  csrfToken = csrf.token;
+}
 
 /** Zur Anmeldung: Weiterleitung (WordPress) oder Anmeldeformular in der App. */
 export function toLogin(): void {
@@ -1552,8 +1623,10 @@ async function requestFull<T>(
     throw new ApiError('Keine Verbindung. Bitte später erneut versuchen.', 0);
   }
   // Eigene Änderung (auch eine abgelehnte könnte etwas geändert haben): zwischengespeicherte Daten verwerfen.
-  // Ausnahme: die Abfrage des Push-Status beim Start, ein POST ohne Änderung an den angezeigten Daten.
-  if (method !== 'GET' && !path.endsWith('/push/status')) dataCache.clear();
+  // Ausnahmen ohne Änderung an den angezeigten Daten: die Abfrage des Push-Status beim Start und Vorschauen ({preview: true},
+  // z. B. die Frist für Ehemalige vor dem Speichern).
+  const readOnly = path.endsWith('/push/status') || (body as { preview?: unknown } | undefined)?.preview === true;
+  if (method !== 'GET' && !readOnly) dataCache.clear();
 
   const data = await res.json().catch(() => null);
 
@@ -1665,10 +1738,13 @@ export const api = {
   },
   createUsers: (level: Level, people: NewPerson[]) => request<BulkResult[]>('POST', '/users/bulk', { level, people }),
   account: (id: number) => request<AccountProfile>('GET', `/members/${id}/account`),
-  /** Eigene E-Mail-Adresse und Handynummer; eine neue E-Mail-Adresse nur mit dem aktuellen Passwort. */
+  /** Eigene E-Mail-Adresse, Handynummer und Adresse; eine neue E-Mail-Adresse nur mit dem aktuellen Passwort. */
   ownAccount: () => request<OwnAccount>('GET', '/me/account'),
-  updateOwnAccount: (data: { email: string; phone: string; current_password?: string }) =>
+  updateOwnAccount: (data: { email: string; phone: string; address: Address | null; current_password?: string }) =>
     request<OwnAccount>('PATCH', '/me/account', data),
+  /** Persönliche Angaben einer anderen Person ändern (manage_personal); was fehlt, bleibt. */
+  updatePersonal: (id: number, data: { email?: string; phone?: string; address?: Address | null; current_password?: string }) =>
+    request<PersonalInfo>('PUT', `/members/${id}/personal`, data),
   updateAccount: (
     id: number,
     data: Partial<PersonName> & { email?: string; phone?: string; username?: string; current_password?: string },
@@ -1688,6 +1764,8 @@ export const api = {
     data: PersonName & {
       username?: string;
       email?: string;
+      phone?: string;
+      address?: Address | null;
       level?: Level;
       initial_points?: number;
       initial_points_date?: string;
@@ -1747,7 +1825,6 @@ export const api = {
   uploadAttachment: async (file: File) => request<Attachment>('POST', '/attachments', { file: await encodeFile(file) }),
   mails: () => request<{ items: MailListItem[]; keep_days: number }>('GET', '/mails'),
   mail: (id: number) => request<MailDetail>('GET', `/mails/${id}`),
-  mailGroups: () => request<MailGroup[]>('GET', '/mails/groups'),
   createMailGroup: (input: MailGroupInput) => request<MailGroup[]>('POST', '/mails/groups', input),
   updateMailGroup: (key: string, input: MailGroupInput) => request<MailGroup[]>('PATCH', `/mails/groups/${encodeURIComponent(key)}`, input),
   deleteMailGroup: (key: string) => request<MailGroup[]>('DELETE', `/mails/groups/${encodeURIComponent(key)}`),
@@ -1920,6 +1997,7 @@ export const api = {
   retryGallery: () => request<{ retried: number; pending: number }>('POST', '/admin/gallery/retry', {}),
 
   status: () => request<AdminStatus>('GET', '/admin/status'),
+  updateStatus: () => request<UpdateStatus>('GET', '/admin/update'),
   checkUpdates: () => request<UpdateStatus>('POST', '/admin/update/check'),
   installUpdate: (version: string, major = false, withoutDrive = false) =>
     request<{ installed: string }>('POST', '/admin/update/install', { version, major, without_drive: withoutDrive }),
@@ -1930,7 +2008,21 @@ export const api = {
   updateOptions: (data: { auto?: boolean; channel?: 'stable' | 'early'; status_reports?: boolean }) =>
     request<UpdateStatus>('PATCH', '/admin/update', data),
   backup: () => request<Record<string, unknown>>('GET', '/admin/backup'),
-  restoreBackup: (backup: string) => request<{ restored: boolean }>('POST', '/admin/backup', { backup, confirm: true }),
+  /** Auskunft nach Art. 15 DSGVO: alle eigenen Daten bzw. die einer Person (create_users), als JSON */
+  myData: () => request<unknown>('GET', '/me/data'),
+  memberData: (id: number) => request<unknown>('GET', `/members/${id}/data`),
+  /** Aufbewahrungsfrist für Ehemalige (nur Admins) */
+  formerRetention: () => request<FormerRetention>('GET', '/admin/former/retention'),
+  /** preview: nur zeigen, wen die Frist beim nächsten Lauf löscht, ohne zu speichern */
+  setFormerRetention: (data: { years: number; preview?: boolean }) => request<FormerRetention>('PUT', '/admin/former/retention', data),
+  /** Inhalt aus filePayload() (backupFile.ts); verschlüsselte Sicherungen mit dem Passwort für Sicherungen */
+  restoreBackup: (payload: { backup: string } | { backup_base64: string }, passphrase?: string) =>
+    request<{ restored: boolean }>('POST', '/admin/backup', { ...payload, ...(passphrase ? { passphrase } : {}), confirm: true }),
+  backupEncryption: () => request<BackupEncryptionStatus>('GET', '/admin/backup/encryption'),
+  setBackupEncryption: (passphrase: string, passphrase_confirm: string) =>
+    request<BackupEncryptionStatus>('PUT', '/admin/backup/encryption', { passphrase, passphrase_confirm }),
+  removeBackupEncryption: () => request<BackupEncryptionStatus>('DELETE', '/admin/backup/encryption'),
+  verifyBackupEncryption: (passphrase: string) => request<{ ok: boolean }>('POST', '/admin/backup/encryption/verify', { passphrase }),
   backupDrive: () => request<BackupDriveStatus>('GET', '/admin/backup/drive'),
   setBackupDrive: (enabled: boolean) => request<BackupDriveStatus>('PUT', '/admin/backup/drive', { enabled }),
   uploadBackupDrive: () => request<BackupDriveStatus>('POST', '/admin/backup/drive/upload', {}),
@@ -1965,6 +2057,8 @@ export const api = {
     request<{ sent: boolean }>('POST', pushPath('/test'), { endpoint: device.endpoint, auth: guestAuth(device) }),
   pushAdmin: () => request<PushAdmin>('GET', '/admin/push'),
   setPushReminderHour: (reminder_hour: number) => request<PushAdmin>('PATCH', '/admin/push', { reminder_hour }),
+  birthdaySettings: () => request<BirthdaySettings>('GET', '/admin/birthdays'),
+  setBirthdayUpcomingDays: (upcoming_days: number) => request<BirthdaySettings>('PATCH', '/admin/birthdays', { upcoming_days }),
   setBirthdayNotify: (change: { birthday_notify?: boolean; birthday_hour?: number }) => request<PushAdmin>('PATCH', '/admin/push', change),
 
   // Fehlermeldungen an die Betreuer der App (Issue #64), auch ohne Anmeldung
@@ -2041,6 +2135,8 @@ export interface BackupDriveStatus {
   /** Google hat erlaubt, eigene Dateien anzulegen (drive.file) */
   access: boolean;
   enabled: boolean;
+  /** mit Passwort für Sicherungen verschlüsselt */
+  encrypted: boolean;
   email: string;
   folder_url: string | null;
   last_ok: number | null;
@@ -2048,6 +2144,28 @@ export interface BackupDriveStatus {
   error: string | null;
   every_days: number;
   keep: number;
+}
+
+/** Aufbewahrungsfrist für Ehemalige: 0 = aus; due wird beim nächsten Lauf gelöscht, soon in den nächsten 30 Tagen fällig */
+export interface FormerRetention {
+  years: number;
+  due: { id: number; name: string; left_on: string }[];
+  soon: { id: number; name: string; left_on: string }[];
+}
+
+/** Passwort für Sicherungen (Einstellungen → Datensicherung) */
+export interface BackupEncryptionStatus {
+  /** PHP hat sodium */
+  available: boolean;
+  configured: boolean;
+  /** Eingerichtet, auch ohne sodium (dann nur entfernen) */
+  stored: boolean;
+  /** Seit dem Einrichten einmal richtig geprüft; erst dann löscht Drive alte unverschlüsselte Sicherungen */
+  verified: boolean;
+  /** Fingerabdruck des Schlüssels, z. B. „3f2a 9c41 07be d5e0“ */
+  fingerprint: string | null;
+  set_at: number | null;
+  min_length: number;
 }
 
 export interface UpdateStatus {
@@ -2073,6 +2191,24 @@ export interface UpdateStatus {
   last: { from: string; to: string; kind: string; at: number; ok: boolean; error: string } | null;
   /** Automatisches Update, zurückgestellt, weil die Sicherung in Google Drive scheiterte. */
   held: { version: string; kind: 'auto' | 'withdrawn'; at: number; error: string } | null;
+  /** Gerade läuft ein Update (auch eines, dessen Anfrage durch ein Zeitlimit abgebrochen ist). */
+  running: boolean;
+  /** Nur während running: Schritt des laufenden Updates für die Fortschrittsanzeige */
+  progress: UpdateProgress | null;
+}
+
+export type UpdateStep = 'download' | 'backup' | 'drive' | 'install';
+export interface UpdateProgress {
+  version: string;
+  step: UpdateStep;
+  steps: UpdateStep[];
+  at: number;
+  /** Bytes: geschrieben (backup) oder hochgeladen (drive); sonst null */
+  done: number | null;
+  /** Größe in Bytes; null: unbekannt */
+  total: number | null;
+  /** total ist geschätzt (Größe der letzten Sicherung) */
+  estimate: boolean;
 }
 
 export interface AdminStatus {

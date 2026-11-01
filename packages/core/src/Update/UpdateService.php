@@ -42,6 +42,8 @@ final class UpdateService
     /** Zurückgestelltes automatisches Update: {version, kind, at, error} */
     public const HELD = 'update_held';
     public const DRIVE_FAILED = 'drive_backup_failed';
+    /** Laufendes Update für die Fortschrittsanzeige: {version, step, steps, at, done?, total?, estimate?, file?} */
+    private const PROGRESS = 'update_progress';
     private const MAX_BACKUPS = 5;
 
     /**
@@ -166,7 +168,20 @@ final class UpdateService
             'versions' => [],
             'last' => $this->settings->get(self::LAST),
             'held' => $this->held(),
+            'running' => $this->running(),
+            'progress' => null,
         ];
+        if ($out['running'] && is_array($p = $this->settings->get(self::PROGRESS))) {
+            $out['progress'] = ['version' => (string) ($p['version'] ?? ''), 'step' => (string) ($p['step'] ?? ''), 'steps' => array_values((array) ($p['steps'] ?? [])), 'at' => (int) ($p['at'] ?? 0),
+                'done' => isset($p['done']) ? (int) $p['done'] : null, 'total' => !empty($p['total']) ? (int) $p['total'] : null, 'estimate' => (bool) ($p['estimate'] ?? false)];
+            // Sicherung: Ihre Größe steht erst am Ende fest; geschrieben ist, was schon in der Datei steht.
+            $file = (string) ($p['file'] ?? '');
+            if ($file !== '' && $file === basename($file)) {
+                $path = dirname($this->lockPath()) . '/' . $file;
+                clearstatcache(true, $path);
+                $out['progress']['done'] = is_file($path) ? (int) filesize($path) : null;
+            }
+        }
         if (!is_array($state['list'] ?? null) || !$this->configured()) {
             return $out;
         }
@@ -267,10 +282,13 @@ final class UpdateService
         if (function_exists('set_time_limit')) {
             @set_time_limit(300);
         }
+        // Bricht die Verbindung ab (Zeitlimit des Hosters vor PHP, Handy wechselt das Netz), läuft das Update weiter;
+        // die App fragt dann status()['running'] ab, bis es fertig ist.
+        ignore_user_abort(true);
         // Nur ein Update zur selben Zeit (täglicher Abgleich, zwei Admins, erneuter Klick nach einer
         // Zeitüberschreitung). flock gibt die Sperre auch frei, wenn der Prozess abbricht.
         // Kann das Dateisystem keine Sperren (manche Netzlaufwerke), geht es ohne weiter.
-        $lock = @fopen($this->files->path('sicherungen/update.lock', false), 'c');
+        $lock = @fopen($this->lockPath(), 'c');
         if ($lock === false) {
             throw new ApiError(500, 'update_lock', 'Die Sperrdatei für Updates lässt sich nicht anlegen (Schreibrechte im Datenverzeichnis?).');
         }
@@ -287,17 +305,26 @@ final class UpdateService
         class_exists(Detail::class);
         class_exists(StatusReporter::class); // für Telemetry::record (Zustimmung) nach dem Austausch
         $record = ['from' => $this->currentVersion, 'to' => $version, 'kind' => $kind, 'at' => $this->time->timestamp(), 'ok' => false, 'error' => ''];
+        // Schritte für die Fortschrittsanzeige (status()['progress']), solange die Sperre gehalten wird.
+        $steps = ['download', ...($this->backup !== null ? ['backup'] : []), ...(!$withoutDrive && $this->backup !== null && $this->offsite?->active() ? ['drive'] : []), 'install'];
+        $progress = function (string $step, array $extra = []) use ($version, $steps): void {
+            $this->settings->set(self::PROGRESS, $extra + ['version' => $version, 'step' => $step, 'steps' => $steps, 'at' => $this->time->timestamp()]);
+        };
         $step = 'download';
         try {
+            $progress($step);
             $zip = $this->download($file);
             try {
                 $step = 'backup';
-                $local = $this->backupBefore();
+                // Größe der letzten Sicherung als Schätzung; geschrieben ist, was schon in der Datei steht (status()).
+                $local = $this->backupBefore(static fn (string $tmp, int $estimate) => $progress('backup', ['file' => basename($tmp), 'total' => $estimate, 'estimate' => true]));
                 if ($local !== null && !$withoutDrive && $this->offsite?->active()) {
                     $step = 'drive';
-                    $this->backupOffsite($local);
+                    $at = $this->time->timestamp();
+                    $this->backupOffsite($local, static fn (int $done, int $total) => $progress('drive', ['done' => $done, 'total' => $total, 'at' => $at]));
                 }
                 $step = 'install';
+                $progress($step);
                 // Danach neu einplanen (App::upgrade). Auch beim Zurückrollen auf eine ältere Version, die
                 // diese Einstellung nicht kennt: Kommt später wieder diese Version, plant sie neu ein.
                 $this->settings->delete(App::PLAN_SETTING);
@@ -306,6 +333,7 @@ final class UpdateService
                 @unlink($zip);
             }
         } catch (\RuntimeException $e) {
+            $this->settings->delete(self::PROGRESS);
             $lock && flock($lock, LOCK_UN);
             $record['error'] = $e->getMessage();
             $this->settings->set(self::LAST, $record);
@@ -316,6 +344,7 @@ final class UpdateService
             $this->telemetry?->record(Code::UpdateFailed, Detail::of($step, Detail::fromMessage($e->getMessage())), $this->currentVersion . ' → ' . $version . ': ' . $e->getMessage());
             throw $e instanceof ApiError ? $e : ApiError::upstream('Das Update hat nicht geklappt; die bisherige Version läuft weiter. ' . $e->getMessage());
         }
+        $this->settings->delete(self::PROGRESS);
         $lock && flock($lock, LOCK_UN);
         $record['ok'] = true;
         $this->settings->set(self::LAST, $record);
@@ -328,6 +357,25 @@ final class UpdateService
         } elseif (Version::compare($version, $this->currentVersion) > 0) {
             $this->settings->delete(self::SKIP);
         }
+    }
+
+    /** Ob gerade ein Update läuft (ein anderer Prozess hält die Sperre von install()). */
+    public function running(): bool
+    {
+        $path = $this->lockPath();
+        $lock = is_file($path) ? @fopen($path, 'r') : false;
+        if ($lock === false) {
+            return false;
+        }
+        $free = flock($lock, LOCK_SH | LOCK_NB, $wouldBlock);
+        $free && flock($lock, LOCK_UN);
+        fclose($lock);
+        return !$free && (bool) $wouldBlock;
+    }
+
+    private function lockPath(): string
+    {
+        return $this->files->path('sicherungen/update.lock', false);
     }
 
     /** Zurück auf eine ältere Version derselben Hauptversion; die jetzige wird danach übersprungen. */
@@ -406,9 +454,10 @@ final class UpdateService
     /**
      * Vor jedem Update automatisch sichern (geschützter Bereich, die letzten 5).
      *
+     * @param (callable(string, int): void)|null $started mit der vorläufigen Datei und der Größe der letzten Sicherung (0: keine)
      * @return string|null Pfad der Sicherung (null: keine Datensicherung hier)
      */
-    private function backupBefore(): ?string
+    private function backupBefore(?callable $started = null): ?string
     {
         if ($this->backup === null) {
             return null;
@@ -441,6 +490,10 @@ final class UpdateService
             throw new \RuntimeException('Die Sicherung vor dem Update ließ sich nicht schreiben (Schreibrechte?). Das Update wurde nicht eingespielt.');
         }
         @chmod($tmp, 0600);
+        if ($started !== null) {
+            sort($numbered);
+            $started($tmp, $numbered ? (int) @filesize(end($numbered)) : 0);
+        }
         try {
             $this->backup->exportTo($out);
             if (!fflush($out)) {
@@ -466,15 +519,20 @@ final class UpdateService
         return $path;
     }
 
-    /** Die Sicherung vom Server zusätzlich in Google Drive. @throws ApiError 409 DRIVE_FAILED */
-    private function backupOffsite(string $path): void
+    /**
+     * Die Sicherung vom Server zusätzlich in Google Drive.
+     *
+     * @param (callable(int, int): void)|null $onProgress hochgeladene Bytes, Größe
+     * @throws ApiError 409 DRIVE_FAILED
+     */
+    private function backupOffsite(string $path, ?callable $onProgress = null): void
     {
         // Hochladen großer Sicherungen dauert: Zeitlimit neu beginnen.
         if (function_exists('set_time_limit')) {
             @set_time_limit(300);
         }
         try {
-            $this->offsite?->storeBeforeUpdate($path, $this->currentVersion);
+            $this->offsite?->storeBeforeUpdate($path, $this->currentVersion, $onProgress);
         } catch (\RuntimeException $e) {
             throw new ApiError(409, self::DRIVE_FAILED, 'Die Sicherung in Google Drive vor dem Update hat nicht geklappt: ' . rtrim($e->getMessage(), '.')
                 . '. Das Update wurde nicht eingespielt; die Sicherung auf dem Server ist da.');

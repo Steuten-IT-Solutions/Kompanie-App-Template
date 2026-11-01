@@ -67,7 +67,15 @@ function response(body, type = 'application/javascript', status = 200) {
  * Lädt sw.js mit eingesetzter Liste (wie der Build) und gibt Hilfen zum Auslösen der Ereignisse zurück.
  * `net` beantwortet fetch(): Adresse → Antwort; fehlt sie, gibt es einen Netzfehler.
  */
-function load({ build = 'b2', precache = [], net = {}, storage = new FakeCacheStorage(), now = () => 0 } = {}) {
+function load({
+  build = 'b2',
+  precache = [],
+  net = {},
+  storage = new FakeCacheStorage(),
+  now = () => 0,
+  clientIds = [],
+  windowId = '',
+} = {}) {
   const listeners = {};
   const fetched = [];
   /** Optionen des letzten fetch() je Adresse (z. B. cache). */
@@ -81,7 +89,12 @@ function load({ build = 'b2', precache = [], net = {}, storage = new FakeCacheSt
   const self = {
     location: { href: `${ORIGIN}/app/sw.js?api=${encodeURIComponent(API)}&assets=${encodeURIComponent(ASSETS)}`, origin: ORIGIN },
     registration: { scope: SCOPE },
-    clients: { claim: async () => undefined, matchAll: async () => [{ postMessage: (m) => messages.push(m) }] },
+    clients: {
+      claim: async () => undefined,
+      matchAll: async () => [{ id: windowId, postMessage: (m) => messages.push(m) }],
+      // Fenster mit Kennung (neu geöffnete App-Seite): Nachrichten mit Empfänger
+      get: async (id) => (clientIds.includes(id) ? { postMessage: (m) => messages.push({ to: id, ...m }) } : undefined),
+    },
     skipWaiting: async () => undefined,
     addEventListener: (type, fn) => (listeners[type] = fn),
   };
@@ -121,11 +134,19 @@ function load({ build = 'b2', precache = [], net = {}, storage = new FakeCacheSt
   }
 
   /** fetch-Ereignis; gibt die Antwort des Service Workers zurück (undefined: durchgereicht). */
-  async function request(u, mode = 'cors', headers = {}, method = 'GET') {
+  async function request(
+    u,
+    mode = 'cors',
+    headers = {},
+    method = 'GET',
+    { referrer = '', resultingClientId = '', clientId = windowId } = {},
+  ) {
     let answer;
     const waits = [];
     listeners.fetch({
-      request: { url: u, method, mode, headers: new Headers(headers) },
+      request: { url: u, method, mode, headers: new Headers(headers), referrer },
+      clientId,
+      resultingClientId,
       respondWith: (p) => (answer = p),
       waitUntil: (p) => waits.push(p),
     });
@@ -134,7 +155,27 @@ function load({ build = 'b2', precache = [], net = {}, storage = new FakeCacheSt
     return res;
   }
 
-  return { storage, fetched, fetchOptions, messages, lifecycle, request };
+  /** Wie request, aber die Antwort für sich: { answer, done } (done: auch alles im Hintergrund erledigt). */
+  function requestSplit(
+    u,
+    mode = 'cors',
+    headers = {},
+    method = 'GET',
+    { referrer = '', resultingClientId = '', clientId = windowId } = {},
+  ) {
+    let answer;
+    const waits = [];
+    listeners.fetch({
+      request: { url: u, method, mode, headers: new Headers(headers), referrer },
+      clientId,
+      resultingClientId,
+      respondWith: (p) => (answer = p),
+      waitUntil: (p) => waits.push(p),
+    });
+    return { answer, done: Promise.resolve(answer).then(() => Promise.all(waits)) };
+  }
+
+  return { storage, fetched, fetchOptions, messages, lifecycle, request, requestSplit };
 }
 
 test('Installieren: Programmdateien, Icons und App-Seite vorab gespeichert, unveränderte Dateien übernommen', async () => {
@@ -226,6 +267,24 @@ test('App-Seite ohne Netz aus dem Speicher; Daten-Speicher begrenzt, die App-Sei
 test('Verwaltung (/admin/) wird nie gespeichert', async () => {
   const sw = load({ net: { [`${API}admin/backup`]: () => response('{"geheim":1}', 'application/json') } });
   assert.equal(await sw.request(`${API}admin/backup`), undefined);
+  assert.equal((await (await sw.storage.open('kompanie-data-v2')).keys()).length, 0);
+});
+
+test('Auskunft über die eigenen Daten wird nie gespeichert', async () => {
+  const sw = load({
+    net: {
+      [`${API}me/data`]: () => response('{"person":1}', 'application/json'),
+      [`${API}members/7/data`]: () => response('{"person":7}', 'application/json'),
+      [`${API}me/data/`]: () => response('{"person":1}', 'application/json'),
+      [`${API}ME/DATA`]: () => response('{"person":1}', 'application/json'),
+      [`${API}%6De%2Fdata?x=%E0`]: () => response('{"person":1}', 'application/json'),
+    },
+  });
+  assert.equal(await sw.request(`${API}me/data`), undefined);
+  assert.equal(await sw.request(`${API}members/7/data`, 'cors', STALE_OK), undefined);
+  assert.equal(await sw.request(`${API}me/data/`), undefined, 'auch mit Schrägstrich am Ende');
+  assert.equal(await sw.request(`${API}ME/DATA`), undefined, 'auch in Großbuchstaben (WordPress)');
+  assert.equal(await sw.request(`${API}%6De%2Fdata?x=%E0`), undefined, 'auch kodiert neben einer ungültigen Stelle');
   assert.equal((await (await sw.storage.open('kompanie-data-v2')).keys()).length, 0);
 });
 
@@ -337,6 +396,27 @@ test('Mit X-Kompanie-Stale-Ok: Läuft die Abfrage im Hintergrund schon, fragt er
   assert.equal(await (await sw.request(`${API}board`, 'cors', STALE_OK)).text(), '["neu"]');
 });
 
+test('Mit X-Kompanie-Stale-Ok: Nach der Meldung fragt eine neu geladene Seite wieder im Hintergrund', async () => {
+  let t = 0;
+  const net = { [`${API}board`]: json('["a"]') };
+  const sw = load({ net, now: () => t, windowId: 'alt' });
+  await sw.request(`${API}board`, 'cors', STALE_OK);
+  // Geändert, die alte Seite bekommt die Meldung …
+  net[`${API}board`] = json('["b"]');
+  t = 20_000;
+  await sw.request(`${API}board`, 'cors', STALE_OK);
+  assert.equal(sw.messages.length, 1);
+  assert.equal(sw.fetched.length, 2);
+  // … wird aber neu geladen, bevor sie neu fragt; inzwischen wurde wieder geändert. Die neue Seite bekommt den
+  // gespeicherten Stand und fragt im Hintergrund, statt bis FRESH_MS beim Stand der Meldung zu bleiben.
+  net[`${API}board`] = json('["c"]');
+  t = 21_000;
+  assert.equal(await (await sw.request(`${API}board`, 'cors', STALE_OK, 'GET', { clientId: 'neu' })).text(), '["b"]');
+  assert.equal(sw.fetched.length, 3, 'im Hintergrund aus dem Netz');
+  assert.equal(sw.messages.length, 2);
+  assert.equal(await (await sw.request(`${API}board`, 'cors', STALE_OK, 'GET', { clientId: 'neu' })).text(), '["c"]');
+});
+
 test('Mit X-Kompanie-Stale-Ok: Fehler im Hintergrund wird gemeldet, dann aus dem Netz; ohne Netz bleibt der Stand', async () => {
   let t = 0;
   const net = { [`${API}events`]: json('["a"]') };
@@ -412,17 +492,208 @@ test('Nach einer eigenen Änderung: vorher Gespeichertes erst aus dem Netz, auch
   assert.equal(again.fetched.length, before + 2, 'im Hintergrund aus dem Netz');
 });
 
-test('Kurz nach einer Änderung (z. B. Anmeldung) kommt die App-Seite aus dem Netz, nicht nach dem Zeitlimit aus dem Speicher', async () => {
+/** App-Seite wie von den Adaptern: Konfiguration im Kopf, Programmdatei mit Hash. */
+function appPage({ user = 1, token = 't1', logout = 'n1', entry = 'index-a.js', features = { news: true } } = {}) {
+  const config = {
+    version: '1.0.0',
+    csrf: { header: 'X-WP-Nonce', token, refreshUrl: '/app/csrf' },
+    auth: { mode: 'redirect', loginUrl: '/wp-login.php', logoutUrl: `/wp-login.php?action=logout&_wpnonce=${logout}` },
+    features,
+    user: user === null ? null : { id: user, name: 'A</script>'.replace('<', '\\u003C') },
+  };
+  return response(
+    `<!doctype html><html><head><link rel="manifest" href="/m"><script nonce="x">window.KOMPANIE_CONFIG=${JSON.stringify(config)};</script>` +
+      `<script type="module" crossorigin src="${ASSETS}assets/${entry}"></script></head><body></body></html>`,
+    'text/html; charset=utf-8',
+  );
+}
+
+test('App-Seite sofort aus dem Speicher, die aktuelle im Hintergrund; neue Tokens werden dem neuen Fenster gemeldet', async () => {
+  let release;
+  const net = { [SCOPE]: () => appPage() };
+  const sw = load({ net, clientIds: ['neu'] });
+  await sw.request(SCOPE, 'navigate'); // gespeichert
+  net[SCOPE] = () => new Promise((resolve) => (release = () => resolve(appPage({ token: 't2', logout: 'n2' }))));
+  const { answer, done } = sw.requestSplit(SCOPE, 'navigate', {}, 'GET', { resultingClientId: 'neu' });
+  // Die Antwort wartet nicht auf den Server.
+  const res = await answer;
+  assert.equal(sw.messages.length, 0, 'noch keine Meldung');
+  release();
+  await done;
+  assert.match(await res.text(), /"token":"t1"/, 'die gespeicherte Seite');
+  // Über JSON: Die Objekte stammen aus dem Kontext des Service Workers.
+  assert.deepEqual(JSON.parse(JSON.stringify(sw.messages)), [
+    {
+      to: 'neu',
+      type: 'kompanie-page',
+      reload: false,
+      csrf: { header: 'X-WP-Nonce', token: 't2', refreshUrl: '/app/csrf' },
+      auth: { mode: 'redirect', loginUrl: '/wp-login.php', logoutUrl: '/wp-login.php?action=logout&_wpnonce=n2' },
+    },
+  ]);
+  const stored = await (await sw.storage.open('kompanie-data-v2')).match(SCOPE);
+  assert.match(await stored.text(), /"token":"t2"/, 'die aktuelle Seite gespeichert');
+});
+
+test('App-Seite: unverändert keine Meldung; andere Rechte, Bereiche, Person oder Programmdatei → neu laden', async () => {
+  const net = { [SCOPE]: () => appPage() };
+  const sw = load({ net, clientIds: ['f'] });
+  await sw.request(SCOPE, 'navigate');
+  await sw.request(SCOPE, 'navigate', {}, 'GET', { resultingClientId: 'f' });
+  assert.deepEqual(sw.messages, [], 'gleiche Seite: nichts zu melden');
+  for (const changed of [{ features: { news: false } }, { user: null }, { user: 2 }, { entry: 'index-b.js' }]) {
+    sw.messages.length = 0;
+    net[SCOPE] = () => appPage();
+    await sw.request(SCOPE, 'navigate'); // Ausgangsstand speichern (Hintergrund)
+    net[SCOPE] = () => appPage(changed);
+    await sw.request(SCOPE, 'navigate', {}, 'GET', { resultingClientId: 'f' });
+    const msgs = sw.messages.filter((m) => m.to === 'f');
+    assert.equal(msgs.at(-1)?.reload, true, JSON.stringify(changed));
+  }
+});
+
+test('App-Seite: Meldung an alle Fenster, wenn das neue Fenster nicht zu finden ist; Fehler im Hintergrund ändern nichts', async () => {
+  const net = { [SCOPE]: () => appPage() };
+  const sw = load({ net });
+  await sw.request(SCOPE, 'navigate');
+  net[SCOPE] = () => appPage({ features: { news: false } });
+  await sw.request(SCOPE, 'navigate');
+  assert.equal(sw.messages.length, 1);
+  assert.equal(sw.messages[0].reload, true);
+  assert.equal(sw.messages[0].to, undefined, 'an alle Fenster');
+  // Server antwortet mit einem Fehler bzw. gar nicht: gespeicherte Seite bleibt, keine Meldung.
+  sw.messages.length = 0;
+  net[SCOPE] = () => response('kaputt', 'text/html', 500);
+  assert.match(await (await sw.request(SCOPE, 'navigate')).text(), /"news":false/);
+  delete net[SCOPE];
+  assert.match(await (await sw.request(SCOPE, 'navigate')).text(), /"news":false/);
+  assert.deepEqual(sw.messages, []);
+});
+
+test('App-Seite aus dem Netz: kurz nach einer Änderung (z. B. Anmeldung), mit Parametern, von außerhalb der App', async () => {
   let release;
   const net = { [SCOPE]: () => response('<html>alt</html>', 'text/html') };
   const sw = load({ net });
   await sw.request(SCOPE, 'navigate');
-  net[SCOPE] = () => new Promise((resolve) => (release = () => resolve(response('<html>neu</html>', 'text/html'))));
-  // Ohne Änderung: nach dem Zeitlimit die gespeicherte Seite (schlechtes Netz).
-  assert.equal(await (await sw.request(SCOPE, 'navigate')).text(), '<html>alt</html>');
+  const slow = () => new Promise((resolve) => (release = () => resolve(response('<html>neu</html>', 'text/html'))));
+  // Von außerhalb (Rückkehr von wp-login.php): auf das Netz warten, nach dem Zeitlimit die gespeicherte (schlechtes Netz).
+  net[SCOPE] = slow;
+  const outside = { referrer: `${ORIGIN}/wp-login.php` };
+  assert.equal(await (await sw.request(SCOPE, 'navigate', {}, 'GET', outside)).text(), '<html>alt</html>', 'nach dem Zeitlimit');
+  release();
+  net[SCOPE] = () => response('<html>neu</html>', 'text/html');
+  assert.equal(await (await sw.request(SCOPE, 'navigate', {}, 'GET', outside)).text(), '<html>neu</html>', 'aus dem Netz');
+  // Innerhalb der App (z. B. Neuladen) bzw. ohne Referrer (Start vom Home-Bildschirm): sofort die gespeicherte.
+  net[SCOPE] = () => response('<html>neuer</html>', 'text/html');
+  assert.equal(await (await sw.request(SCOPE, 'navigate', {}, 'GET', { referrer: `${SCOPE}#/termine` })).text(), '<html>neu</html>');
+  assert.equal(await (await sw.request(SCOPE, 'navigate')).text(), '<html>neuer</html>', 'im Hintergrund gespeichert');
+  // Mit Parametern (z. B. Rückkehr von Google): aus dem Netz.
+  net[`${SCOPE}?google=1`] = () => response('<html>google</html>', 'text/html');
+  assert.equal(await (await sw.request(`${SCOPE}?google=1`, 'navigate')).text(), '<html>google</html>');
+  // Nach einer eigenen Änderung (Anmeldung): auch nach dem Zeitlimit nicht die gespeicherte.
   await sw.request(`${API}auth/login`, 'cors', {}, 'POST');
+  net[SCOPE] = slow;
   const page = sw.request(SCOPE, 'navigate');
   await new Promise((r) => setTimeout(r, 2700)); // länger als NAVIGATION_TIMEOUT_MS
   release();
   assert.equal(await (await page).text(), '<html>neu</html>');
+});
+
+test('Antwort auf eine Anfrage, die vor einer eigenen Änderung begann, kommt danach nicht sofort aus dem Speicher', async () => {
+  let t = 1000;
+  let release;
+  const url = `${API}promotions`;
+  const net = { [url]: () => new Promise((resolve) => (release = () => resolve(response('["vorher"]', 'application/json')))) };
+  const sw = load({ net, now: () => t });
+  const headers = { 'X-Kompanie-Stale-Ok': '1', 'X-Kompanie-User': '1' };
+  // Vorabladen im Hintergrund beginnt, dann speichert die Person etwas, dann kommt die (alte) Antwort.
+  const early = sw.requestSplit(url, 'cors', headers);
+  await new Promise((r) => setTimeout(r, 5));
+  t = 2000;
+  await sw.request(`${API}points`, 'cors', {}, 'POST');
+  t = 3000;
+  release();
+  await early.done;
+  net[url] = () => response('["nachher"]', 'application/json');
+  t = 4000;
+  assert.equal(await (await sw.request(url, 'cors', headers)).text(), '["nachher"]', 'aus dem Netz, nicht der alte Stand');
+});
+
+const image =
+  (body, status = 200) =>
+  () =>
+    response(body, 'image/jpeg', status);
+
+test('Bilder der Galerie über die App: zuerst aus dem Speicher, auch offline; ohne Fassung oder Original durchgereicht', async () => {
+  const thumb = `${SCOPE}foto/3/thumb?v=abc`;
+  const net = {
+    [thumb]: image('t1'),
+    [`${SCOPE}foto/3/thumb`]: image('ohne'),
+    [`${SCOPE}foto/3/original?v=abc`]: image('orig'),
+  };
+  const sw = load({ net });
+  assert.equal(await (await sw.request(thumb)).text(), 't1');
+  delete net[thumb]; // offline
+  assert.equal(await (await sw.request(thumb)).text(), 't1', 'aus dem Speicher');
+  assert.equal(sw.fetched.filter((u) => u === thumb).length, 1);
+  assert.equal(await sw.request(`${SCOPE}foto/3/thumb`), undefined, 'ohne Fassung: durchgereicht');
+  assert.equal(await sw.request(`${SCOPE}foto/3/original?v=abc`), undefined, 'Original: durchgereicht');
+  assert.equal(await sw.request(thumb, 'navigate'), undefined, 'direkt geöffnet: durchgereicht');
+  const keys = (await (await sw.storage.open('kompanie-fotos-v1')).keys()).map((r) => r.url);
+  assert.deepEqual(keys, [thumb]);
+});
+
+test('Bilder der Galerie: auch als ?kompanie_app= und ?r= erkannt; Platzhalter (202) nie gespeichert', async () => {
+  const wp = `${ORIGIN}/?kompanie_app=foto/4/large&v=x1`;
+  const sa = `${ORIGIN}/index.php?r=/foto/5/thumb&v=y1`;
+  let ready = false;
+  const net = {
+    [wp]: () => (ready ? response('fertig', 'image/jpeg') : response('<svg/>', 'image/svg+xml', 202)),
+    [sa]: image('s'),
+  };
+  const sw = load({ net });
+  assert.equal((await sw.request(wp)).status, 202);
+  ready = true;
+  assert.equal(await (await sw.request(wp)).text(), 'fertig', 'nach dem Platzhalter aus dem Netz');
+  assert.equal(await (await sw.request(sa)).text(), 's');
+  const keys = (await (await sw.storage.open('kompanie-fotos-v1')).keys()).map((r) => r.url).sort();
+  assert.deepEqual(keys, [wp, sa].sort());
+});
+
+test('Bilder der Galerie: neue Fassung ersetzt die alte; dasselbe Bild nur einmal gleichzeitig geladen', async () => {
+  const v1 = `${SCOPE}foto/3/thumb?v=a`;
+  const v2 = `${SCOPE}foto/3/thumb?v=b`;
+  const other = `${SCOPE}foto/3/large?v=a`;
+  const net = { [v1]: image('1'), [v2]: image('2'), [other]: image('L') };
+  const sw = load({ net });
+  await sw.request(v1);
+  await sw.request(other);
+  const a = sw.requestSplit(v2);
+  const b = sw.requestSplit(v2);
+  assert.equal(await (await a.answer).text(), '2');
+  assert.equal(await (await b.answer).text(), '2');
+  await Promise.all([a.done, b.done]);
+  assert.equal(sw.fetched.filter((u) => u === v2).length, 1, 'nur ein Abruf');
+  const keys = (await (await sw.storage.open('kompanie-fotos-v1')).keys()).map((r) => r.url).sort();
+  assert.deepEqual(keys, [other, v2].sort(), 'alte Fassung entfernt, andere Größe bleibt');
+});
+
+test('Bilder der Galerie: Vorschau „App als Rolle ansehen“ weder gespeichert noch aus dem Speicher', async () => {
+  const thumb = `${SCOPE}foto/3/thumb?v=abc`;
+  const net = { [thumb]: image('admin'), [`${thumb}&vorschau=member`]: image('vorschau') };
+  const sw = load({ net });
+  await sw.request(thumb);
+  assert.equal(await sw.request(`${thumb}&vorschau=member`), undefined);
+  assert.equal(await sw.request(thumb, 'cors', { 'X-Kompanie-Preview': 'member' }), undefined);
+});
+
+test('Bilder der Galerie: höchstens PHOTOS_MAX Vorschaubilder, die ältesten fallen heraus', async () => {
+  const net = {};
+  const max = Number(SOURCE.match(/const PHOTOS_MAX = (\d+);/)[1]);
+  for (let i = 1; i <= max + 2; i++) net[`${SCOPE}foto/${i}/thumb?v=a`] = image(String(i));
+  const sw = load({ net });
+  for (let i = 1; i <= max + 2; i++) await sw.request(`${SCOPE}foto/${i}/thumb?v=a`);
+  const keys = (await (await sw.storage.open('kompanie-fotos-v1')).keys()).map((r) => r.url);
+  assert.equal(keys.length, max);
+  assert.ok(!keys.includes(`${SCOPE}foto/1/thumb?v=a`) && !keys.includes(`${SCOPE}foto/2/thumb?v=a`));
 });

@@ -20,7 +20,8 @@ use KompanieApp\Core\Storage\GalleryRepository;
  *                                          └ intern → Bilder und Videos nur für Mitglieder
  *
  * Videos (MP4 und WebM, Issue #182) werden nicht kopiert: Die App reicht sie beim Abspielen in Ausschnitten aus Drive
- * durch (deliverVideo, Range), interne erst nach Prüfung der Mitgliedschaft. Der Ordner in Drive bleibt privat.
+ * durch (deliverVideo, Range; die Daten gehen weiter, während sie ankommen), interne erst nach Prüfung der
+ * Mitgliedschaft. Der Ordner in Drive bleibt privat.
  * Aufbereitet wird nur ihr Vorschaubild (Drives thumbnailLink). Andere Videoformate stehen für Admins in der Liste der
  * fehlgeschlagenen Bilder („nicht unterstützt“).
  *
@@ -649,14 +650,28 @@ final class GalleryService
         return '.original-' . $photo['file_key'] . '.merker';
     }
 
-    /** Öffentliche fertige Bilder direkt als Datei, sonst über die App (das Original erst, wenn es erzeugt ist). */
+    /**
+     * Öffentliche fertige Bilder direkt als Datei, sonst über die App (das Original erst, wenn es erzeugt ist). Über die
+     * App mit Fassung (?v=, aus der Prüfsumme in Drive): Ein geändertes Bild hat so eine neue Adresse, und der Service
+     * Worker kann interne Bilder auf dem Gerät behalten, ohne je eine alte Fassung zu zeigen.
+     */
     public function url(array $photo, string $size): string
     {
         if (!(int) $photo['is_intern'] && $photo['status'] === GalleryRepository::READY
             && ($size !== self::ORIGINAL || is_file($this->path($photo, $size)))) {
             return $this->files->publicUrl(self::relativePath($photo, $size));
         }
-        return $this->env->photoUrl((int) $photo['id'], $size);
+        return self::withVersion($this->env->photoUrl((int) $photo['id'], $size), $photo);
+    }
+
+    /** Fassung eines Bilds an seiner Adresse (ohne bekannte Prüfsumme unverändert). */
+    private static function withVersion(string $url, array $photo): string
+    {
+        $md5 = (string) ($photo['md5'] ?? '');
+        if ($md5 === '') {
+            return $url;
+        }
+        return $url . (str_contains($url, '?') ? '&' : '?') . 'v=' . rawurlencode(substr($md5, 0, 12));
     }
 
     /**
@@ -741,11 +756,18 @@ final class GalleryService
      * Mitglieder, Rechte wie bei deliverPhoto. Antwort immer 206 mit höchstens VIDEO_CHUNK Bytes (auch ohne Range: dann
      * ab dem Anfang); der Browser fordert den Rest mit Range nach. 416, wenn der Ausschnitt hinter dem Ende beginnt.
      *
+     * Mit $begin und $write (Adapter) gehen die Daten weiter, während sie aus Drive kommen: $begin bekommt die
+     * Kopfdaten (status 206, contentRange, length, mime, etag, intern), sobald Drive den Bereich bestätigt, danach
+     * $write die Daten in Stücken (false: der Browser hat aufgelegt, dann wird abgebrochen). Die Antwort hat dann
+     * sent: true und keinen body. Ohne die beiden steht der Ausschnitt in body. Rechte werden vorher geprüft.
+     *
      * @param string|null $range Wert der Kopfzeile Range („bytes=0-“)
      * @param \Closure(): array{0: bool, 1: bool} $access [Mitglied, angemeldet]
-     * @return array{status: int, body?: string, contentRange?: string, mime?: string, etag?: string, intern?: bool, retryAfter?: int}
+     * @param (\Closure(array{status: int, contentRange: string, length: int, mime: string, etag: string, intern: bool}): void)|null $begin
+     * @param (\Closure(string): bool)|null $write
+     * @return array{status: int, body?: string, sent?: bool, length?: int, contentRange?: string, mime?: string, etag?: string, intern?: bool, retryAfter?: int}
      */
-    public function deliverVideo(int $id, ?string $range, \Closure $access): array
+    public function deliverVideo(int $id, ?string $range, \Closure $access, ?\Closure $begin = null, ?\Closure $write = null): array
     {
         $photo = $this->repo->photo($id);
         if (!$photo || !self::isVideoRow($photo) || $photo['status'] === GalleryRepository::FAILED) {
@@ -769,21 +791,39 @@ final class GalleryService
         if ($slot === null) {
             return ['status' => 503, 'retryAfter' => 1];
         }
+        $streaming = $begin !== null && $write !== null;
+        $head = null;
+        $body = '';
+        $onStart = static function (int $from, int $to, int $size) use (&$head, $photo, $intern, $begin, $streaming): void {
+            $head = [
+                'status' => 206,
+                'contentRange' => 'bytes ' . $from . '-' . $to . '/' . $size,
+                'length' => $to - $from + 1,
+                'mime' => (string) $photo['mime'],
+                'etag' => '"v' . md5((string) $photo['md5']) . '"',
+                'intern' => $intern,
+            ];
+            if ($streaming) {
+                $begin($head);
+            }
+        };
+        $onData = $streaming ? $write : static function (string $chunk) use (&$body): bool {
+            $body .= $chunk;
+            return true;
+        };
         try {
-            $part = $this->drive->downloadRange((string) $photo['drive_file_id'], $start, $end);
+            $this->drive->streamRange((string) $photo['drive_file_id'], $start, $end, $onStart, $onData);
         } catch (\RuntimeException) {
-            return ['status' => 502];
+            if ($head === null) {
+                return ['status' => 502];
+            }
         } finally {
             self::unlock($slot);
         }
-        return [
-            'status' => 206,
-            'body' => $part['body'],
-            'contentRange' => 'bytes ' . $part['start'] . '-' . $part['end'] . '/' . $part['total'],
-            'mime' => (string) $photo['mime'],
-            'etag' => '"v' . md5((string) $photo['md5']) . '"',
-            'intern' => $intern,
-        ];
+        if ($head === null) {
+            return ['status' => 502];
+        }
+        return $streaming ? $head + ['sent' => true] : $head + ['body' => $body];
     }
 
     /**
@@ -1015,7 +1055,7 @@ final class GalleryService
         // Eine Abfrage für alle Alben samt Titelbild (keine je Album).
         foreach ($this->repo->albumSummaries($member) as $r) {
             $cover = $r['cover_id'] !== null
-                ? ['id' => (int) $r['cover_id'], 'file_key' => (string) $r['cover_file_key'], 'is_intern' => (int) $r['cover_is_intern'], 'album_id' => (int) $r['cover_album_id'], 'status' => (string) $r['cover_status'], 'media' => (string) $r['cover_media']]
+                ? ['id' => (int) $r['cover_id'], 'file_key' => (string) $r['cover_file_key'], 'is_intern' => (int) $r['cover_is_intern'], 'album_id' => (int) $r['cover_album_id'], 'status' => (string) $r['cover_status'], 'media' => (string) $r['cover_media'], 'md5' => (string) ($r['cover_md5'] ?? '')]
                 : null;
             $years[(string) $r['year']][] = [
                 'id' => (int) $r['id'],

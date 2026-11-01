@@ -9,12 +9,16 @@ import { capture, type DomNode, type Part } from './skeletonCapture';
  *
  * Gemerkt wird nur der Aufbau: Elemente, ihre Klassen, ungefähre Textlängen (in Stufen) und die Größe von Bildern und
  * Eingabefeldern – kein Text, keine Bilder, keine Adressen. Jedes Loading merkt sich, was nach dem Laden an seine
- * Stelle getreten ist (Schlüssel: Seite und Stelle im DOM, placeOf). Gibt es noch kein Gerüst, bleibt es bei „Lädt …“.
+ * Stelle getreten ist (Schlüssel: Seite und Stelle im DOM, placeOf). Gibt es noch kein Gerüst (erstes Öffnen auf dem
+ * Gerät, Vorschau), zeigt es ein allgemeines Gerüst in der Form der Seite (shape: Liste, News, Kacheln, Formular, Text).
  * Die Gerüste liegen im Speicher und auf dem Gerät (deviceStore, Bereich wie bei den Daten); in der Vorschau
  * „App als Rolle ansehen“ wird nichts gemerkt und nichts gezeigt.
  */
 
 const LINE = 40;
+
+/** Gerüst nicht bedienbar (Knöpfe und Links darin sind nur Form): weder antippen noch mit Tab erreichen. */
+const inert = (el: HTMLElement | null) => el?.setAttribute('inert', '');
 
 function render(part: Part, key: number): ReactNode {
   if (typeof part === 'number') {
@@ -23,7 +27,11 @@ function render(part: Part, key: number): ReactNode {
     for (let rest = part, i = 0; rest > 0; rest -= LINE, i++) {
       bars.push(<span key={i} className="skeleton-text" style={{ width: `${Math.min(rest, LINE)}ch` }} />, ' ');
     }
-    return <span key={key}>{bars}</span>;
+    return (
+      <span key={key} className="skeleton-line">
+        {bars}
+      </span>
+    );
   }
   if ('b' in part) {
     const [width, height] = part.b;
@@ -103,35 +111,200 @@ function placeOf(el: Element): string {
   return `${chain.join('>')}#${index}`;
 }
 
-export function Loading() {
+/** Form des allgemeinen Gerüsts, solange die App das der Stelle noch nicht kennt. */
+export type LoadingShape = 'list' | 'events' | 'people' | 'stat' | 'overview' | 'news' | 'grid' | 'form' | 'detail' | 'text';
+
+const text = (width: string) => <span className="skeleton-text" style={{ width }} />;
+const times = (n: number, f: (i: number) => ReactNode) => Array.from({ length: n }, (_, i) => f(i));
+// Leicht unterschiedliche Längen, damit es nach Inhalt aussieht und nicht nach Raster.
+const WIDTHS = ['14ch', '20ch', '11ch', '17ch'];
+
+/**
+ * Allgemeine Gerüste, mit denselben Klassen wie die echten Seiten (Abstände und Größen kommen so aus styles.css):
+ * list – Karten untereinander (Titel und Unterzeile; die meisten Seiten), events – Monat und Termine mit Datum,
+ * people – Suche und Personen mit Foto, stat – Kachel mit Zahl über einer Liste (Punkte, Kasse), overview – Name,
+ * zwei Kacheln und Zeilen (Übersicht unter „Meins“), news – News-Karten, grid – Kacheln
+ * der Galerie, form – Karte mit Hinweis und Feldern (Einstellungen, Formulare), detail – „Zurück“, Überschrift und
+ * Text (ein Beitrag, ein Album, ein Dokument), text – zwei Zeilen (Teil einer Seite, z. B. unter einer Überschrift).
+ */
+function shapeParts(shape: LoadingShape): ReactNode {
+  switch (shape) {
+    case 'news':
+      return (
+        <ul className="card-list news-list">
+          {times(3, (i) => (
+            <li key={i} className="card news-card">
+              <div className="news-body">
+                <div className="news-date">{text('9ch')}</div>
+                <h2 className="news-title">{text(WIDTHS[i])}</h2>
+                <p className="news-excerpt">
+                  {text('100%')} {text('70%')}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      );
+    case 'events':
+      return (
+        <section className="month">
+          <h2 className="month-title">{text('12ch')}</h2>
+          <ul className="card-list">
+            {times(3, (i) => (
+              <li key={i} className="card event">
+                <div className="event-head">
+                  <div className="date-badge">
+                    <span className="day">{text('2ch')}</span>
+                    <span className="mon">{text('3ch')}</span>
+                  </div>
+                  <div className="event-main">
+                    <div className="event-title">{text(WIDTHS[i])}</div>
+                    <div className="event-when">{text('22ch')}</div>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      );
+    case 'people':
+      return (
+        <>
+          <span className="skeleton-box" style={{ display: 'block', width: '100%', height: 40, marginBottom: 12 }} />
+          <ul className="card-list">
+            {times(4, (i) => (
+              <li key={i} className="card row member-row">
+                <span className="skeleton-box" style={{ width: 44, height: 44, borderRadius: '50%', flex: 'none' }} />
+                <div className="row-main">
+                  <div className="row-title">{text(WIDTHS[i])}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      );
+    case 'stat':
+    case 'overview':
+      return (
+        <div className={shape === 'overview' ? 'my-overview' : undefined}>
+          {shape === 'overview' && <h2 className="member-name member-name-centered">{text('12ch')}</h2>}
+          <div className={shape === 'overview' ? 'stats member-stats' : undefined}>
+            {times(shape === 'overview' ? 2 : 1, (i) => (
+              <div key={i} className="stat stat-neutral">
+                <div className="stat-value">{text('3ch')}</div>
+                <div className="stat-label">{text('10ch')}</div>
+              </div>
+            ))}
+          </div>
+          {shape === 'stat' && <h2 className="section-title">{text('7ch')}</h2>}
+          <ul className="card-list">
+            {times(3, (i) => (
+              <li key={i} className="card row">
+                <div className="row-main">
+                  <div className="row-title">{text(WIDTHS[i])}</div>
+                  <div className="row-sub">{text(WIDTHS[(i + 2) % 4])}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      );
+    case 'grid':
+      return (
+        <section>
+          <h2 className="section-title">{text('5ch')}</h2>
+          <ul className="album-grid">
+            {times(4, (i) => (
+              <li key={i}>
+                <span className="album-card">
+                  <span className="album-placeholder" />
+                  <span className="album-title">{text(WIDTHS[i])}</span>
+                  <span className="album-count">{text('8ch')}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      );
+    case 'form':
+      return (
+        <section className="card settings-section">
+          <p className="small muted">
+            {text('100%')} {text('45%')}
+          </p>
+          {times(2, (i) => (
+            <div key={i} className="field">
+              <span>{text(WIDTHS[i])}</span>
+              <span className="skeleton-box" style={{ display: 'block', width: '100%', height: 40 }} />
+            </div>
+          ))}
+        </section>
+      );
+    case 'detail':
+      return (
+        <div>
+          <p className="back">{text('8ch')}</p>
+          <h2 className="member-name">{text('18ch')}</h2>
+          <p>
+            {text('100%')} {text('100%')} {text('55%')}
+          </p>
+        </div>
+      );
+    case 'text':
+      return (
+        <p>
+          {text('100%')} {text('60%')}
+        </p>
+      );
+    default:
+      return (
+        <ul className="card-list">
+          {times(4, (i) => (
+            <li key={i} className="card row">
+              <div className="row-main">
+                <div className="row-title">{text(WIDTHS[i])}</div>
+                <div className="row-sub">{text(WIDTHS[(i + 2) % 4])}</div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      );
+  }
+}
+
+/**
+ * Platzhalter, solange Daten laden. shape: Form des Gerüsts beim ersten Öffnen (siehe shapeParts); danach zeigt die
+ * Stelle den Aufbau, den sie zuletzt hatte. chunk: Platzhalter, solange ein Programmteil lädt (Suspense). Er steht an
+ * derselben Stelle wie das Loading der Ansicht danach, sieht aber die ganze Ansicht (auch „‹ Zurück“ und Überschriften,
+ * die beim Loading der Ansicht schon echt dastehen); daher ein eigener Schlüssel, sonst stünden sie doppelt da.
+ */
+export function Loading({ shape = 'list', chunk = false }: { shape?: LoadingShape; chunk?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const [parts, setParts] = useState<Part[] | undefined>();
 
-  // Vor dem ersten Zeichnen: Die Stelle steht erst im DOM fest; mit Gerüst wird „Lädt …“ so nie sichtbar.
+  // Vor dem ersten Zeichnen: Die Stelle steht erst im DOM fest; mit gemerktem Gerüst wird das allgemeine so nie sichtbar.
   useLayoutEffect(() => {
     const el = ref.current;
     const parent = el?.parentElement;
     if (!el || !parent || !enabled) return;
     const route = currentRoute();
-    const key = `${route}|${placeOf(el)}`;
-    setParts(skeletons.get(key));
+    const place = `${route}|${placeOf(el)}`;
+    const key = chunk ? `${place}|chunk` : place;
+    // Hat die Ansicht noch kein eigenes (ihre Daten kamen bisher vorab, ihr Loading erschien nie) und steht sie allein
+    // da, passt das Gerüst vom Laden ihres Programmteils: Es zeigt genau diese Ansicht, und nichts steht doppelt.
+    const alone = !el.previousElementSibling && !el.nextElementSibling;
+    setParts(skeletons.get(key) ?? (!chunk && alone ? skeletons.get(`${place}|chunk`) : undefined));
     // Was schon neben dem Loading steht (z. B. Navigation der Verwaltung), gehört nicht zum Gerüst.
     const before = new Set(Array.from(parent.childNodes).filter((n) => n !== el));
     return () => learn(parent, before, key, route);
   }, []);
 
-  if (!parts) {
-    return (
-      <div ref={ref} className="loading" role="status" aria-live="polite" data-loading="">
-        <span className="spinner" aria-hidden="true" /> Lädt …
-      </div>
-    );
-  }
   return (
-    <div ref={ref} className="skeleton" role="status" data-loading="">
+    // data-shape: allgemeines Gerüst (die Stelle ist noch nicht gemerkt)
+    <div ref={ref} className="skeleton" role="status" data-loading="" data-shape={parts ? undefined : shape}>
       <span className="visually-hidden">Lädt …</span>
-      <div className="skeleton-parts" aria-hidden="true">
-        {parts.map(render)}
+      <div className="skeleton-parts" aria-hidden="true" ref={inert}>
+        {parts ? parts.map(render) : shapeParts(shape)}
       </div>
     </div>
   );

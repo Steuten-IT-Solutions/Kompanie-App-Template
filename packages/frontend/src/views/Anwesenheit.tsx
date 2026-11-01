@@ -7,9 +7,7 @@ import {
   config,
   type AttendanceCounts,
   type AttendanceDetail,
-  type AttendanceEvent,
   type AttendanceStatus,
-  type AttendanceSummary,
 } from '../api';
 import { caps, formatDate, formatEventWhen, roleCount, todayYmd } from '../format';
 import brand from '../generated/brand';
@@ -28,15 +26,13 @@ export default function Anwesenheit({ id, onToast }: { id?: number; onToast: (ms
 
 /* ------------------------------------------------------------------ */
 
-async function loadOverview(): Promise<[AttendanceEvent[] | string, AttendanceSummary[]]> {
-  // Ohne erreichbaren Kalender bleiben freie Termine und die letzten Listen nutzbar.
-  const events = config?.features.calendar ? api.attendanceEvents().catch((e: Error) => e.message) : Promise.resolve([]);
-  return Promise.all([events, api.attendanceLists()]);
-}
-
 function Overview({ onToast }: { onToast: (msg: string) => void }) {
   // Mit Schlüssel: Beim Zurückkehren aus einer Liste steht die Übersicht sofort da (statt „Lädt …“).
-  const { data, error, loading, reload } = useAsync(loadOverview, [], 'attendance-overview');
+  const { data, error, loading, reload } = useAsync(
+    sources.attendanceOverview.load,
+    sources.attendanceOverview.deps,
+    sources.attendanceOverview.key,
+  );
   const [showAll, setShowAll] = useState(false);
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(todayYmd());
@@ -161,7 +157,7 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
 function ListView({ id, onToast }: { id: number; onToast: (msg: string) => void }) {
   const s = sources.attendance(id);
   const { data, error, loading, reload, setData } = useAsync(s.load, s.deps, s.key);
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   return <Editor key={data!.updated_at} list={data!} onSaved={setData} onToast={onToast} />;
 }

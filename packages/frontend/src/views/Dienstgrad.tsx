@@ -1,16 +1,17 @@
-import { api, config, type RankHistoryEntry } from '../api';
+import { config, type RankHistoryEntry } from '../api';
 import brand from '../generated/brand';
 import { formatDate, formatUtcDate } from '../format';
 import { RankBadge, RankLabel } from '../RankBadge';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { sources } from '../viewData';
 
 const rank = brand.labels.rank;
 const sec = brand.labels.sections;
 
 /** „Meins“ → Dienstgrad: eigener Dienstgrad, mit Punkten der Weg zum nächsten, die Liste und der eigene Verlauf. */
 export default function Dienstgrad() {
-  const { data, error, loading, reload } = useAsync(api.myRank, [], 'me/rank');
-  if (loading && !data) return <Loading />;
+  const { data, error, loading, reload } = useAsync(sources.myRank.load, sources.myRank.deps, sources.myRank.key);
+  if (loading && !data) return <Loading shape="stat" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const d = data!;
   const withPoints = !!config?.features.points && d.points !== undefined;

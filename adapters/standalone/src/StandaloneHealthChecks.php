@@ -13,6 +13,7 @@ use KompanieApp\Core\Port\Settings;
  * Prüfungen der eigenständigen Version für die Statusseite:
  * - Sind config.php und die Datenbank von außen abrufbar? (Webserver ohne .htaccess, z. B. nginx)
  * - Läuft ein Cronjob oder nur der Pseudo-Cron, und klappt der Selbstaufruf?
+ * - Läuft die App über HTTPS (verschlüsselte Verbindung)?
  */
 final class StandaloneHealthChecks implements HealthChecks
 {
@@ -27,7 +28,34 @@ final class StandaloneHealthChecks implements HealthChecks
 
     public function checks(): array
     {
-        return [$this->dataProtection(), $this->cron()];
+        return array_values(array_filter([$this->dataProtection(), $this->https(), $this->cron()]));
+    }
+
+    /**
+     * Über HTTP gehen Passwörter, Sitzungen und alle Daten der Mitglieder unverschlüsselt durchs Netz. Geprüft wird die
+     * fest eingetragene Adresse (ohne sie die der Anfrage); localhost zählt nicht (Test auf dem eigenen Rechner).
+     *
+     * @return array{key: string, label: string, level: string, text: string}|null
+     */
+    public function https(): ?array
+    {
+        // Ohne fest eingetragene Adresse die der Anfrage (über die die Statusseite gerade geöffnet ist).
+        $base = $this->config->baseUrl();
+        if ($base === '' && $this->kernel->requestPath() === '/cron') {
+            return null; // Cronjob des Hosters: sagt nichts darüber, wie Mitglieder die App öffnen
+        }
+        $https = $base !== '' ? strtolower((string) parse_url($base, PHP_URL_SCHEME)) === 'https' : $this->kernel->http()->isHttps();
+        $host = strtolower((string) ($base !== '' ? parse_url($base, PHP_URL_HOST) : parse_url($this->kernel->http()->baseUrl(), PHP_URL_HOST)));
+        if (in_array($host, ['', 'localhost', '127.0.0.1', '::1', '[::1]'], true)) {
+            return null;
+        }
+        $item = static fn (string $level, string $text): array => ['key' => 'https', 'label' => 'Verschlüsselte Verbindung', 'level' => $level, 'text' => $text];
+        if ($https) {
+            return $item('ok', 'Die App läuft über HTTPS; Passwörter und Daten gehen verschlüsselt durchs Netz.');
+        }
+        return $item('warn', 'Die App läuft über HTTP: Passwörter und Daten der Mitglieder gehen unverschlüsselt durchs Netz. '
+            . 'Bitte beim Hoster ein Zertifikat einrichten lassen (oft kostenlos über Let’s Encrypt) und die Adresse der App '
+            . 'auf https:// umstellen (Eintrag base_url in config.php).');
     }
 
     /**
@@ -52,7 +80,8 @@ final class StandaloneHealthChecks implements HealthChecks
             return $item('off', 'Zurzeit sind keine Hintergrundaufgaben eingeplant.');
         }
         $advice = ' Bitte beim Hoster einen Cronjob einrichten, der alle 15 Minuten diese Adresse aufruft: '
-            . $this->kernel->cronUrl() . ' (oder auf dem Server „php bin/kompanie.php cron“ ausführt).';
+            . $this->kernel->cronUrl() . ' (oder auf dem Server „php bin/kompanie.php cron“ ausführt; mit curl besser den Schlüssel'
+            . ' im Header X-Kompanie-Cron-Key statt in der Adresse senden, dann steht er nicht im Protokoll des Webservers).';
         if (Kernel::canFinishResponse()) {
             return $item('ok', 'Die Hintergrundaufgaben laufen nach Seitenaufrufen'
                 . (isset($runs['request']) ? ' (zuletzt ' . $date($runs['request']) . ')' : '') . '. Wird die App selten aufgerufen, bleiben sie liegen.'

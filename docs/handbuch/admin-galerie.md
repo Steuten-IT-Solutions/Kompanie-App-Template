@@ -39,6 +39,7 @@ Lege in Google Drive einen Galerie-Ordner an. Darin kommt je Jahr ein Ordner und
 - Was beim Abgleich nicht fertig wird, bereitet die App stündlich im Hintergrund weiter auf. Neue Bilder in Google Drive kommen ebenso stündlich dazu.
 - Videos zeigt die {bereich.gallery} als MP4 oder WebM. Andere Formate (z. B. MOV vom iPhone, AVI) stehen in der Liste als „Videoformat nicht unterstützt“. Abhilfe: das Video als MP4 speichern (viele Handys bieten das beim Teilen oder Exportieren an) und in denselben Ordner legen.
 - Die App speichert Videos nicht auf dem Server, sie spielt sie beim Ansehen aus Google Drive ab. Nur ihr Vorschaubild kommt von Google und liegt neben den Bildern.
+- Videos starten schneller, wenn sie „fürs Web optimiert“ gespeichert sind. Viele Handys legen das Inhaltsverzeichnis eines Videos ans Ende der Datei; dann muss der Browser vor dem Start erst dorthin springen. Abhilfe: das Video vor dem Hochladen mit einem Programm wie HandBrake (Häkchen „Web Optimized“) neu speichern. Kurze Videos und eine kleinere Auflösung (z. B. 1080p statt 4K) laden ebenfalls schneller.
 - Kann der Server ein Format nicht lesen (z. B. RAW, TIFF, HEIC), nimmt die App das in RAW-Dateien eingebettete JPEG oder das Vorschaubild von Google. In der Liste bleiben vor allem beschädigte Dateien.
 - Die {bereich.gallery} erscheint für die anderen erst, wenn der Bereich an und ein Ordner eingetragen ist (siehe [Bereiche](seite:admin-bereiche)).
 - Wie der Abgleich zuletzt lief, zeigt auch die Ampel unter [Zustand und Updates](seite:admin-zustand).

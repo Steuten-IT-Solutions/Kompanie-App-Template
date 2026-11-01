@@ -23,6 +23,7 @@ import { navigate, redirect as redirectTo } from '../router';
 import { neighbors, usePrefetchChain, useSwipeDrag } from '../swipe';
 import { AdminBack, AdminMenu, adminTabs, setupTabs } from '../adminNav';
 import {
+  AddressFields,
   DateRow,
   emptyName,
   EmailField,
@@ -32,12 +33,16 @@ import {
   Loading,
   MemberPicker,
   NameFields,
+  PhoneField,
   Sheet,
   StatCard,
   trimName,
   useAsync,
 } from '../ui';
 import { normalizeEmail } from '../email';
+import { normalizePhone } from '../phone';
+import { addressInput, EMPTY_ADDRESS } from '../address';
+import { PersonalPanel } from '../personal';
 import { cacheKey, dataCache, prefetch } from '../dataCache';
 import { prefetchOnTap, sources } from '../viewData';
 import { PersonName, PersonSkeleton } from '../skeleton';
@@ -69,7 +74,16 @@ import {
   type MemberOrder,
   type MemberSort,
 } from '../memberSort';
-import { BirthdayFields, birthdayString, canSetBirthdays, emptyBirthday, formatBirthday, MemberBirthday, readBirthday } from '../birthdays';
+import {
+  BirthdayFields,
+  birthdayString,
+  canEnterBirthdays,
+  canSetBirthdays,
+  emptyBirthday,
+  formatBirthday,
+  MemberBirthday,
+  readBirthday,
+} from '../birthdays';
 import { joinText, MemberJoinYear } from '../joinYear';
 import { hasOverrides, MemberRightsPanel } from './Rechte';
 import { MemberAvatar, PhotoPicker, preloadAvatar, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
@@ -328,7 +342,7 @@ function Members() {
     navigate(`verwaltung/mitglied/${id}`);
   }
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="people" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
 
   return (
@@ -610,7 +624,8 @@ let sheetOpenedHere = false;
 
 /**
  * Mitglied in der Verwaltung, alles auf einer Seite: Name, Dienstgradabzeichen und Foto, Rolle, Kacheln für Punkte,
- * Offen und Titel, Ämter, Geburtstag, Eintritt und Austritt, ganz unten „Konto und Rolle“ zum Aufklappen. Bearbeitet
+ * Offen und Titel, Eintritt und Austritt, Ämter, persönliche Angaben mit dem Geburtstag (ohne view_personal steht er bei
+ * Eintritt und Austritt), ganz unten „Konto und Rolle“ zum Aufklappen. Bearbeitet
  * wird durch Antippen: Es öffnet sich ein Fenster (verwaltung/mitglied/<id>/<fenster>; ältere Links auf die früheren
  * Unterseiten öffnen so das passende Fenster). Ehemalige haben dieselbe Seite unter verwaltung/ehemalige/<id>; steht
  * eine Person unter der falschen Adresse (alter Link, gerade als ehemalig eingetragen oder wieder aufgenommen), leitet
@@ -790,6 +805,8 @@ function MemberDetailView({
   // Ämter (Issue #112): Konten in Amtszeiten sieht, wer Ämter pflegt, sonst nur bei öffentlicher Mitgliederliste.
   const officesOn = !!config?.features.offices && (!!config.features.directory || can('manage_offices'));
   const birthdayOn = m.birthday !== undefined && (m.member || m.birthday !== null || canSetBirthdays());
+  // Der Geburtstag steht bei den persönlichen Angaben, soweit es sie gibt (view_personal), sonst bei Eintritt und Austritt.
+  const birthdayPersonal = birthdayOn && !!m.personal;
   // Eintritt aktiver Mitglieder (create_users); Ehemalige haben ihren Eintritt bei den Angaben zum Ausscheiden, Gäste keinen.
   const joinOn = m.join_year !== undefined && !m.former && m.level !== 'guest';
   // Als ehemalig eintragen bzw. die Angaben ändern; m.former fehlt bei älteren Servern (dann nicht).
@@ -876,9 +893,9 @@ function MemberDetailView({
         </button>
       )}
 
-      {(birthdayOn || joinOn || !!m.former || formerEditable) && (
+      {((birthdayOn && !birthdayPersonal) || joinOn || !!m.former || formerEditable) && (
         <ul className="card member-dates">
-          {birthdayOn && (
+          {birthdayOn && !birthdayPersonal && (
             <DateRow label="Geburtstag" onOpen={() => openSheet('geburtstag')}>
               {m.birthday ? formatBirthday(m.birthday) : null}
             </DateRow>
@@ -908,6 +925,19 @@ function MemberDetailView({
           <h3 className="section-title">{sec.offices}</h3>
           <PersonOffices userId={m.id} empty={`Keine ${sec.offices} eingetragen.`} to={(other) => `verwaltung/mitglied/${other}`} />
         </section>
+      )}
+
+      {m.personal && (
+        <PersonalPanel
+          id={m.id}
+          personal={m.personal}
+          self={self}
+          birthday={
+            birthdayPersonal ? { text: m.birthday ? formatBirthday(m.birthday) : null, onOpen: () => openSheet('geburtstag') } : undefined
+          }
+          onChanged={reload}
+          onToast={onToast}
+        />
       )}
 
       <FoldSection
@@ -948,7 +978,7 @@ function MemberDetailView({
         {!m.former && <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />}
         {/* Gäste gehören nicht zur Kompanie. */}
         {formerEditable && formerPanel(false)}
-        {/* Das eigene Konto ohne Löschen; E-Mail und Handynummer auch unter Meins → Konto. */}
+        {/* Das eigene Konto ohne Löschen; E-Mail auch unter Meins → Konto. */}
         {can('create_users') && (
           <AccountPanel id={m.id} level={m.level} former={!!m.former} self={self} onChanged={reload} onToast={onToast} />
         )}
@@ -1102,7 +1132,7 @@ function PenaltyEntries({ entries, busy, run }: { entries: Penalty[]; busy: bool
 /**
  * Wer Rollen vergeben darf, legt hier die Grundrolle und die Zusatzrollen fest (Issue #66): genau eine Grundrolle,
  * dazu beliebig viele eigene Rollen zum Ankreuzen; die Rechte sind die aller Rollen zusammen. Zusatzrollen gibt es nur
- * zu einer Grundrolle mit Mitgliederbereich und nicht für Admins.
+ * zu einer Grundrolle mit „Gehört zur Kompanie“ und nicht für Admins.
  */
 function RoleControl({
   id,
@@ -1270,6 +1300,8 @@ function NewMember() {
   const rankOptions = (ranks.data ?? []).filter((r) => !ranksUsePoints() || r.min_points === null || r.min_points <= pointsNum);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState(EMPTY_ADDRESS);
   const [birthday, setBirthday] = useState(emptyBirthday());
   const [photo, setPhoto] = useState<PreparedPhoto | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1280,7 +1312,7 @@ function NewMember() {
     e.preventDefault();
     setFormError(null);
     if (!name.first_name.trim()) return setFormError('Bitte einen Vornamen angeben.');
-    const bday = canSetBirthdays() ? readBirthday(birthday) : null;
+    const bday = canEnterBirthdays() ? readBirthday(birthday) : null;
     if (typeof bday === 'string') return setFormError(bday);
     setBusy(true);
     try {
@@ -1289,6 +1321,8 @@ function NewMember() {
           ...trimName(name),
           ...(username.trim() ? { username: username.trim() } : {}),
           ...(normalizeEmail(email) ? { email: normalizeEmail(email) } : {}),
+          ...(normalizePhone(phone) ? { phone: normalizePhone(phone) } : {}),
+          ...(addressInput(address) ? { address: addressInput(address) } : {}),
           level,
           ...(extras && canPoints() && pointsNum > 0 ? { initial_points: pointsNum, initial_points_date: initialDate } : {}),
           ...(extras && canRanks() && rankOptions.some((r) => String(r.id) === rankId) ? { rank_id: Number(rankId) } : {}),
@@ -1315,6 +1349,8 @@ function NewMember() {
             setName(emptyName());
             setUsername('');
             setEmail('');
+            setPhone('');
+            setAddress(EMPTY_ADDRESS);
             setInitialPoints('');
             setRankId('');
             setBirthday(emptyBirthday());
@@ -1327,7 +1363,7 @@ function NewMember() {
     );
   }
   // Erst mit den Dienstgraden zeigen: Sonst taucht das Feld dafür später auf und schiebt den Rest des Formulars nach unten.
-  if (canRanks() && ranks.loading && !ranks.data) return <Loading />;
+  if (canRanks() && ranks.loading && !ranks.data) return <Loading shape="form" />;
 
   return (
     <form className="form" onSubmit={submit}>
@@ -1353,6 +1389,8 @@ function NewMember() {
         />
       </label>
       <EmailField value={email} onChange={setEmail} />
+      <PhoneField value={phone} onChange={setPhone} />
+      <AddressFields value={address} onChange={setAddress} />
       <NewAccountRole label="Rolle" value={level} onChange={setLevel} />
       {extras && canPoints() && (
         <>
@@ -1384,7 +1422,7 @@ function NewMember() {
           Für die Übernahme bestehender Mitglieder: aktuellen Stand an {sec.points} und {brand.labels.rank} eintragen.
         </p>
       )}
-      {canSetBirthdays() && (
+      {canEnterBirthdays() && (
         <fieldset className="fieldset new-member-birthday">
           <legend>Geburtstag (optional)</legend>
           <BirthdayFields value={birthday} onChange={setBirthday} />
@@ -1412,14 +1450,14 @@ function NewMember() {
 /* ------------------------------------------------------------------ */
 
 function useMembersAndCatalog() {
-  return useAsync(() => Promise.all([api.members(), api.catalog()]), [], 'members-catalog');
+  return useAsync(sources.membersAndCatalog.load, sources.membersAndCatalog.deps, sources.membersAndCatalog.key);
 }
 
 /** Aus einer Anwesenheitsliste: Liste laden, dann das Formular mit den Anwesenden bzw. Fehlenden. */
 function FromAttendance({ listId, kind, onToast }: { listId: number; kind: 'punkte' | 'strafe'; onToast: (msg: string) => void }) {
   const s = sources.attendance(listId);
   const { data, error, loading, reload } = useAsync(s.load, s.deps, s.key);
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="detail" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const list = data!;
   const back = () => navigate(`verwaltung/anwesenheit/${list.id}`);
@@ -1469,7 +1507,7 @@ function GivePoints({
   const [formError, setFormError] = useState<string | null>(null);
   const [applyFactor, setApplyFactor] = useState(true);
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const [members, catalog] = data as [MemberSummary[], CatalogItem[]];
   // Punktefaktor der Rollen (z. B. 0,5 für junge Mitglieder; bei Zusatzrollen der kleinste): gilt beim Buchen, lässt
@@ -1628,7 +1666,7 @@ function GivePenalty({
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  if ((loading && !data) || (total.loading && !total.data && !noTotal)) return <Loading />;
+  if ((loading && !data) || (total.loading && !total.data && !noTotal)) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const totalOpen = total.data?.filter((m) => m.level !== 'guest').reduce((s, m) => s + (m.open_cents ?? 0), 0);
 
@@ -1714,7 +1752,7 @@ function OpenPenalties({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload } = useAsync(() => Promise.all([api.openPenalties(), api.members(false, true)]));
   const [busy, setBusy] = useState(false);
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="detail" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const [penalties, members] = data!;
   const names = new Map(members.filter((m) => m.level !== 'guest').map((m) => [m.id, m.name]));
@@ -1779,7 +1817,7 @@ function OpenPenalties({ onToast }: { onToast: (msg: string) => void }) {
 /* ------------------------------------------------------------------ */
 
 function Catalog({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.catalog(true), [], 'catalog-all');
+  const { data, error, loading, reload, setData } = useAsync(sources.catalogAll.load, sources.catalogAll.deps, sources.catalogAll.key);
   const [title, setTitle] = useState('');
   const [points, setPoints] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1828,7 +1866,7 @@ function Catalog({ onToast }: { onToast: (msg: string) => void }) {
     }
   }
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
 
   return (

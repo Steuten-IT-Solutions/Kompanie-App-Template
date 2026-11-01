@@ -30,7 +30,7 @@ Einen Empfänger nimmst du mit dem **×** an seinem Kärtchen wieder heraus. Was
 
 ### Mailgruppen einrichten
 Mailgruppen wählst du beim Schreiben wie eine Rolle aus. Zwei Gruppen gibt es immer:
-- **Alle Mitglieder**: alle, deren Rolle den Mitgliederbereich hat, also auch {rolle.admin}s und eigene Rollen wie ein Spieß, aber keine Anwärter.
+- **Alle Mitglieder**: alle, deren Rolle das Recht **Gehört zur Kompanie** hat, also auch {rolle.admin}s und eigene Rollen wie ein Spieß, aber keine Anwärter.
 - **Alle Konten**: alle mit einem Konto außer Gästen, auch Anwärter.
 
 Wer dazugehört, ermittelt die App beim Senden; du musst diese beiden Gruppen nie pflegen und kannst sie nur umbenennen. Eigene Gruppen, z. B. für den Vorstand, legst du so an:

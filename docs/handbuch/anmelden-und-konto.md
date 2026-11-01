@@ -3,7 +3,7 @@ titel: Mein Konto
 reihenfolge: 20
 rechte: []
 ---
-In deinem Konto stehen dein Name, deine Rolle, deine E-Mail-Adresse und deine Handynummer. Hier stellst du die Benachrichtigungen und die Darstellung ein, änderst dein Passwort und meldest dich ab. Als {rolle.member} trägst du hier auch deinen Geburtstag und deinen Eintritt ein.
+In deinem Konto stehen dein Name, deine Rolle, deine E-Mail-Adresse, deine Handynummer und deine Adresse. Hier stellst du die Benachrichtigungen und die Darstellung ein, änderst dein Passwort und meldest dich ab. Als {rolle.member} trägst du hier auch deinen Geburtstag und deinen Eintritt ein.
 
 ![Mein Konto mit Name, Rolle und der Karte Geburtstag](bild:anmelden-und-konto)
 
@@ -14,7 +14,7 @@ Tippe unten auf **Meins** und wähle oben im Menü **Konto**. Gibt es unter **Me
 
 ## Was du hier siehst
 - **Name und Rolle**: dein Name und deine Rolle, z. B. {rolle.member}, und dein Foto, wenn jemand eines hochgeladen hat. Ändern kann das Foto, wer Mitglieder anlegen darf.
-- **Kontakt**: deine E-Mail-Adresse und Handynummer, wie die {kompanie.name} sie hat.
+- **Kontakt**: deine E-Mail-Adresse, Handynummer und Adresse, wie die {kompanie.name} sie hat.
 - **Geburtstag** (nur für {rolle.member}, wenn die {kompanie.name} {bereich.birthdays} nutzt): dein Geburtstag und wer ihn sieht.
 - **Eintritt** (nur für {rolle.member}, wenn die {kompanie.name} die Liste {bereich.directory} nutzt): wann du eingetreten bist und wer das auf deiner Seite in der Liste sieht.
 - **Benachrichtigungen einstellen**: worüber dich die App auf diesem Gerät benachrichtigt. Darunter, wenn die {kompanie.name} den Mailversand eingerichtet hat, der Schalter für Nachrichten vom Brett per E-Mail (anfangs an).
@@ -25,13 +25,14 @@ Tippe unten auf **Meins** und wähle oben im Menü **Konto**. Gibt es unter **Me
 - **Abmelden**: dich auf diesem Gerät abmelden.
 
 ## So gehst du vor
-### E-Mail-Adresse und Handynummer ändern
+### E-Mail-Adresse, Handynummer und Adresse ändern
 1. Tippe in der Karte **Kontakt** auf **Ändern**.
 2. Trage die neue **E-Mail-Adresse** bzw. **Handynummer** ein. Für die Handynummer wählst du links das Land (vorgegeben 🇩🇪 +49) und tippst die Nummer wie gewohnt, z. B. 0171 1234567. Ein leeres Feld entfernt die Angabe.
-3. Hast du die E-Mail-Adresse geändert, gib zur Bestätigung dein **Aktuelles Passwort** ein.
-4. Tippe auf **Speichern**.
+3. Für die **Adresse** wählst du das **Land** (vorgegeben 🇩🇪 Deutschland) und trägst **Straße**, **Nr.**, bei Bedarf einen **Adresszusatz** (z. B. c/o), **PLZ** und **Ort** ein. Sind alle Felder leer, ist keine Adresse hinterlegt.
+4. Hast du die E-Mail-Adresse geändert, gib zur Bestätigung dein **Aktuelles Passwort** ein. Für Handynummer und Adresse brauchst du kein Passwort.
+5. Tippe auf **Speichern**.
 
-Die App bringt beides selbst in die richtige Form: Leerzeichen in der E-Mail-Adresse fallen weg, die Handynummer wird einheitlich gespeichert, z. B. +49 171 1234567. Stimmt etwas nicht, steht es direkt unter dem Feld; bei einem vertippten Anbieter wie „gmial.com“ schlägt die App die richtige Adresse zum Antippen vor. Sehen können beides nur du und wer Mitglieder anlegen darf.
+Die App bringt alles selbst in die richtige Form: Leerzeichen in der E-Mail-Adresse fallen weg, die Handynummer wird einheitlich gespeichert, z. B. +49 171 1234567. Bei der Adresse rückt die Hausnummer in ihr Feld, wenn du sie mit in die Straße schreibst („Hauptstraße 5a“), und die Postleitzahl wird geschrieben, wie im Land üblich (z. B. „1234 AB“ in den Niederlanden). Stimmt etwas nicht, steht es direkt unter dem Feld, etwa wenn die Postleitzahl nicht zum Land passt; bei einem vertippten Anbieter wie „gmial.com“ schlägt die App die richtige Adresse zum Antippen vor. Sehen können diese Angaben nur du und wer das Recht **Persönliche Angaben sehen** hat.
 
 ### Deinen Geburtstag eintragen
 1. Wähle in der Karte **Geburtstag** **Tag** und **Monat**; das **Jahr** ist freiwillig.
@@ -61,6 +62,10 @@ Die Wahl gilt nur auf diesem Gerät und bleibt auch nach dem Abmelden erhalten. 
 ![Karte „Passwort ändern“ mit den drei Feldern](bild:anmelden-und-konto-passwort)
 
 Das neue Passwort muss mindestens 8 Zeichen lang sein, sich vom bisherigen unterscheiden und darf nicht mit einem Leerzeichen beginnen oder enden. Du bleibst auf diesem Gerät angemeldet; auf allen anderen Geräten musst du dich neu anmelden.
+
+### Deine Daten herunterladen
+1. Tippe in der Karte **Meine Daten** auf **Meine Daten herunterladen**.
+2. Der Browser speichert eine Datei `meine-daten-<Datum>.json` mit allem, was die App über dich gespeichert hat: Konto, Rollen, Geburtstag, Foto und deine Einträge (z. B. {bereich.points}, Anwesenheit, Antworten in Umfragen). Das ist deine Auskunft nach der DSGVO (Art. 15).
 
 ### Dich abmelden
 1. Tippe ganz unten auf **Abmelden**.
