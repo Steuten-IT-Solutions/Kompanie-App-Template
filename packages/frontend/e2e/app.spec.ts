@@ -2968,6 +2968,12 @@ test('Galerie: Video mit ▶ im Album, spielt in der Großansicht aus Drive (Ran
   // Zurück zum Video und mit der Pfeiltaste wieder zum Bild
   await lightboxSwipe(page, 200);
   await expect(page.locator('.lightbox video')).toHaveCount(1);
+  // Nach dem Wischen startet schon das erste Tippen das Video (gemeldet: erst das zweite, weil der Browser dafür kein
+  // click liefert).
+  await page.locator('.lb-video-hit').tap();
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
+  await page.locator('.lb-video-hit').tap();
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('.lightbox video')).toHaveCount(0);
   await expect(page.locator('.lb-track > img')).toBeVisible();
