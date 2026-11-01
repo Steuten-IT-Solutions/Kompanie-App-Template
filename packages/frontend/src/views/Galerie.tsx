@@ -413,7 +413,8 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
           unplayable === p.id ? (
             <p className="lb-error">Dieses Video kann dein Browser nicht abspielen.</p>
           ) : (
-            // key: Beim Blättern hält das alte Video an, das neue lädt von vorn.
+            // key: Beim Blättern hält das alte Video an, das neue lädt von vorn. preload auto: Es lädt schon beim Öffnen,
+            // nicht erst beim Tippen auf Abspielen (nur ein Hinweis an den Browser, er darf z. B. zum Datensparen weniger laden).
             <div className="lb-video" key={p.id}>
               <video
                 ref={videoRef}
@@ -421,7 +422,7 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
                 poster={p.large || undefined}
                 controls
                 playsInline
-                preload="metadata"
+                preload="auto"
                 onError={() => setUnplayable(p.id)}
               />
               {/* Fläche über dem Bild des Videos (nicht über den Leisten oben und unten): Der Player des Browsers gibt

@@ -45,12 +45,12 @@ final class AppPage
     }
 
     /**
-     * Bilder der Galerie, die über die App kommen (interne und noch nicht aufbereitete), schon auf init statt erst auf
-     * template_redirect: Ein Album zeigt viele davon, und jedes ist ein eigener Aufruf von WordPress. So entfallen je
-     * Bild die init-Aufgaben der anderen Plugins (Priorität 10), das Auswerten der Adresse und die Abfrage der Beiträge.
-     * Anmeldung und Recht prüft der Kern wie sonst (WordPress kennt die Person ab hier über das Anmelde-Cookie). Was
-     * hier nicht eindeutig ein Bild ist (andere Permalinks, z. B. mit index.php oder einer Sprache davor), läuft wie
-     * bisher über dispatch.
+     * Bilder der Galerie, die über die App kommen (interne und noch nicht aufbereitete), und Videos schon auf init statt
+     * erst auf template_redirect: Ein Album zeigt viele Bilder, ein Video kommt in vielen Ausschnitten, und jedes ist ein
+     * eigener Aufruf von WordPress. So entfallen je Aufruf die init-Aufgaben der anderen Plugins (Priorität 10), das
+     * Auswerten der Adresse und die Abfrage der Beiträge. Anmeldung und Recht prüft der Kern wie sonst (WordPress kennt
+     * die Person ab hier über das Anmelde-Cookie). Was hier nicht eindeutig ein Bild oder Video ist (andere Permalinks,
+     * z. B. mit index.php oder einer Sprache davor), läuft wie bisher über dispatch.
      */
     public static function earlyPhoto(): void
     {
@@ -59,12 +59,16 @@ final class AppPage
             return;
         }
         $path = self::earlyPath();
-        if ($path === null || !preg_match('#^foto/(\d+)/(thumb|large|original)$#', $path, $m)) {
+        if ($path === null || !preg_match('#^foto/(\d+)/(thumb|large|original|video/?)$#', $path, $m)) {
             return;
         }
         $app = Plugin::app();
         self::beginPreview($app);
-        self::sendPhoto($app, (int) $m[1], $m[2]);
+        if (str_starts_with($m[2], 'video')) {
+            self::sendVideo($app, (int) $m[1]);
+        } else {
+            self::sendPhoto($app, (int) $m[1], $m[2]);
+        }
         exit;
     }
 
@@ -269,40 +273,66 @@ final class AppPage
             nocache_headers();
             return;
         }
-        $res = self::videoResponse($app, $id);
+        // Die Daten aus Drive gleich weitergeben (nicht komprimieren, sonst wartet der Browser).
+        @ini_set('zlib.output_compression', '0'); // phpcs:ignore WordPress.PHP.IniSet.Risky, WordPress.PHP.NoSilencedErrors.Discouraged
+        $res = self::videoResponse(
+            $app,
+            $id,
+            static function (array $head) use ($app): void {
+                status_header(206);
+                header('X-Content-Type-Options: nosniff');
+                header('Accept-Ranges: bytes');
+                header('Content-Range: ' . $head['contentRange']);
+                header('Cache-Control: ' . $app->preview()->cacheControl($head['intern'] ? 'private, max-age=86400' : 'public, max-age=3600'));
+                header('ETag: ' . $head['etag']);
+                header('Content-Type: ' . $head['mime']);
+                header('Content-Length: ' . $head['length']);
+                header('X-Accel-Buffering: no');
+                flush();
+            },
+            static function (string $chunk): bool {
+                echo $chunk; // phpcs:ignore WordPress.Security.EscapeOutput -- Videodaten aus Drive
+                flush();
+                return connection_aborted() === 0;
+            },
+        );
+        if (!empty($res['sent'])) {
+            return;
+        }
         status_header($res['status']);
         header('X-Content-Type-Options: nosniff');
         header('Accept-Ranges: bytes');
         if (isset($res['contentRange'])) {
             header('Content-Range: ' . $res['contentRange']);
         }
-        if ($res['status'] !== 206 || !isset($res['body'])) {
-            nocache_headers();
-            if (isset($res['retryAfter'])) {
-                header('Retry-After: ' . (int) $res['retryAfter']);
-            }
-            return;
+        nocache_headers();
+        if (isset($res['retryAfter'])) {
+            header('Retry-After: ' . (int) $res['retryAfter']);
         }
-        header('Cache-Control: ' . $app->preview()->cacheControl($res['intern'] ? 'private, max-age=86400' : 'public, max-age=3600'));
-        header('ETag: ' . $res['etag']);
-        header('Content-Type: ' . $res['mime']);
-        header('Content-Length: ' . strlen($res['body']));
-        echo $res['body']; // phpcs:ignore WordPress.Security.EscapeOutput -- Videodaten aus Drive
     }
 
     /**
-     * Galerievideo: Rechte und Ausschnitt aus dem Kern (Konto nur bei internen Videos).
+     * Galerievideo: Rechte und Ausschnitt aus dem Kern (Konto nur bei internen Videos). Mit $begin und $write gehen
+     * die Daten weiter, während sie aus Drive kommen (siehe GalleryService::deliverVideo), sonst stehen sie in body.
      *
-     * @return array{status: int, body?: string, contentRange?: string, mime?: string, etag?: string, intern?: bool, retryAfter?: int}
+     * @param (\Closure(array): void)|null $begin
+     * @param (\Closure(string): bool)|null $write
+     * @return array{status: int, body?: string, sent?: bool, length?: int, contentRange?: string, mime?: string, etag?: string, intern?: bool, retryAfter?: int}
      */
-    public static function videoResponse(App $app, int $id): array
+    public static function videoResponse(App $app, int $id, ?\Closure $begin = null, ?\Closure $write = null): array
     {
         // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- nur „bytes=a-b“, der Kern prüft das Format
         $range = isset($_SERVER['HTTP_RANGE']) && is_string($_SERVER['HTTP_RANGE']) ? wp_unslash($_SERVER['HTTP_RANGE']) : null;
-        return $app->gallery()->deliverVideo($id, $range, static function () use ($app): array {
-            $user = $app->authContext->currentUser();
-            return [$app->can(\KompanieApp\Core\Auth\Capability::ViewGalleryInternal), $user !== null];
-        });
+        return $app->gallery()->deliverVideo(
+            $id,
+            $range,
+            static function () use ($app): array {
+                $user = $app->authContext->currentUser();
+                return [$app->can(\KompanieApp\Core\Auth\Capability::ViewGalleryInternal), $user !== null];
+            },
+            $begin,
+            $write,
+        );
     }
 
     /**

@@ -11,6 +11,7 @@ use KompanieApp\Core\Http\FileCache;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Storage\GalleryRepository;
 use KompanieApp\Core\Storage\Sql\PdoConnection;
+use KompanieApp\Core\Tests\Support\ChunkedHttpClient;
 use KompanieApp\Core\Tests\Support\CountingPdo;
 use KompanieApp\Core\Tests\Support\DriveMock;
 use KompanieApp\Core\Tests\Support\FakeUsers;
@@ -644,6 +645,89 @@ final class GalleryTest extends TestCase
         $gallery->retryFailedNow();
         $gallery->processPending(60);
         $this->assertSame([GalleryRepository::FAILED, GalleryService::UNSUPPORTED_VIDEO], [$row('VID3')['status'], $row('VID3')['error']]);
+    }
+
+    /** Videos gehen weiter, während sie aus Drive kommen (StreamingHttpClient): Kopf zuerst, dann die Daten in Stücken. */
+    public function testVideoIsPassedOnWhileItArrivesFromDrive(): void
+    {
+        $http = new ChunkedHttpClient($this->drive->http(), 1000);
+        $app = TestApp::create(TestApp::connection(), $this->users, [], $http, $this->dir);
+        $gallery = $app->gallery();
+        $gallery->waitSeconds = 0;
+        $app->drive()->saveServiceAccount($this->drive->serviceAccountJson());
+        $gallery->setRoot('ROOT');
+        $film = str_repeat('0123456789', 1000); // 10 000 Bytes
+        $this->drive->tree['A3'][] = ['id' => 'VID1', 'name' => 'film.mp4', 'mimeType' => 'video/mp4', 'md5Checksum' => 'v1', 'size' => (string) strlen($film)];
+        $this->drive->tree['A3'][] = ['id' => 'I3', 'name' => 'intern', 'mimeType' => \KompanieApp\Core\Domain\DriveClient::FOLDER_MIME];
+        $this->drive->tree['I3'] = [['id' => 'VID2', 'name' => 'clip.webm', 'mimeType' => 'video/webm', 'md5Checksum' => 'v2', 'size' => '5000']];
+        $this->drive->contents = ['VID1' => $film, 'VID2' => str_repeat('x', 5000)];
+        $gallery->sync();
+        $db = $app->db;
+        $id = static fn (string $drive): int => (int) $db->selectOne('SELECT id FROM {photos} WHERE drive_file_id = ?', [$drive])['id'];
+
+        $log = [];
+        $begin = static function (array $head) use (&$log): void {
+            $log[] = $head;
+        };
+        $write = static function (string $chunk) use (&$log): bool {
+            $log[] = $chunk;
+            return true;
+        };
+        $guest = static fn (): array => [false, false];
+        $res = $gallery->deliverVideo($id('VID1'), 'bytes=500-', $guest, $begin, $write);
+        $this->assertSame([206, true, 'bytes 500-9999/10000', 9500], [$res['status'], $res['sent'], $res['contentRange'], $res['length']]);
+        $this->assertArrayNotHasKey('body', $res, 'nichts im Arbeitsspeicher gesammelt');
+        $this->assertSame(['status' => 206, 'contentRange' => 'bytes 500-9999/10000', 'length' => 9500, 'mime' => 'video/mp4', 'etag' => '"v' . md5('v1') . '"', 'intern' => false], $log[0], 'Kopf vor den Daten');
+        $this->assertCount(11, $log, 'Kopf und zehn Stücke');
+        $this->assertSame(substr($film, 500), implode('', array_slice($log, 1)));
+
+        // Der Browser legt auf: kein weiteres Stück.
+        $log = [];
+        $http->chunks = 0;
+        $res = $gallery->deliverVideo($id('VID1'), 'bytes=0-', $guest, $begin, static function (string $chunk) use (&$log): bool {
+            $log[] = $chunk;
+            return false;
+        });
+        $this->assertSame([206, true, 1], [$res['status'], $res['sent'], $http->chunks]);
+
+        // Rechte vor dem Abruf aus Drive: kein Kopf, keine Daten, kein Abruf.
+        $log = [];
+        $ranges = count($this->drive->ranges);
+        $this->assertSame(401, $gallery->deliverVideo($id('VID2'), 'bytes=0-', $guest, $begin, $write)['status']);
+        $this->assertSame(403, $gallery->deliverVideo($id('VID2'), 'bytes=0-', static fn (): array => [false, true], $begin, $write)['status']);
+        $this->assertSame([[], $ranges], [$log, count($this->drive->ranges)]);
+        $res = $gallery->deliverVideo($id('VID2'), 'bytes=0-', static fn (): array => [true, true], $begin, $write);
+        $this->assertSame([206, true, 'bytes 0-4999/5000'], [$res['status'], $res['intern'], $res['contentRange']]);
+
+        // Ohne $begin/$write wie bisher im Ganzen; Fehler bei Google vor dem Kopf: 502, nichts gesendet.
+        $res = $gallery->deliverVideo($id('VID1'), 'bytes=0-99', $guest);
+        $this->assertSame([206, substr($film, 0, 100)], [$res['status'], $res['body']]);
+        $this->drive->contents['VID1'] = '';
+        $log = [];
+        $this->assertSame(['status' => 502], $gallery->deliverVideo($id('VID1'), 'bytes=0-', $guest, $begin, $write));
+        $this->assertSame([], $log);
+    }
+
+    /** DriveClient::streamRange: liefert Drive die ganze Datei (200), geht nur der angefragte Teil weiter. */
+    public function testStreamRangePassesOnOnlyTheRequestedPart(): void
+    {
+        $inner = new \KompanieApp\Core\Tests\Support\FakeHttpClient(static fn (string $method, string $url): array => str_starts_with($url, \KompanieApp\Core\Domain\DriveClient::TOKEN_URI)
+            ? ['status' => 200, 'body' => '{"access_token":"T","expires_in":3600}']
+            : ['status' => 200, 'headers' => ['content-length' => '5000'], 'body' => str_repeat('a', 5000)]);
+        $http = new ChunkedHttpClient($inner, 1000);
+        $app = TestApp::create(TestApp::connection(), $this->users, [], $http, $this->dir);
+        $app->drive()->saveServiceAccount($this->drive->serviceAccountJson());
+        $start = null;
+        $out = '';
+        $complete = $app->drive()->streamRange('F', 0, 2499, static function (int $a, int $b, int $t) use (&$start): void {
+            $start = [$a, $b, $t];
+        }, static function (string $chunk) use (&$out): bool {
+            $out .= $chunk;
+            return true;
+        });
+        $this->assertSame([true, [0, 2499, 5000], 2500, 3], [$complete, $start, strlen($out), $http->chunks], 'nach dem dritten Stück Schluss');
+        $this->expectException(\RuntimeException::class);
+        $app->drive()->streamRange('F', 10, 20, static function (): void {}, static fn (): bool => true); // 200 mitten in der Datei
     }
 
     /** Update einer bestehenden Datenbank (SQLite und MySQL): vorhandene Bilder bleiben Bilder, Videos kommen dazu. */
