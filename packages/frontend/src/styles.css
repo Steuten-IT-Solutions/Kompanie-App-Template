@@ -1678,6 +1678,49 @@ code {
   object-fit: cover;
   display: block;
 }
+/* Ladeschnecke über einem Bild, das noch lädt oder aufbereitet wird (LoadingImage in Galerie.tsx). Erscheint erst nach
+ * 0,25 s, damit Bilder aus dem Speicher nicht aufblinken; ohne Bewegung (prefers-reduced-motion) steht der Ring still. */
+.album-cover {
+  position: relative;
+  display: block;
+}
+.img-loading {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 28px;
+  height: 28px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  border: 3px solid color-mix(in srgb, var(--muted) 30%, transparent);
+  border-top-color: var(--accent);
+  pointer-events: none;
+  opacity: 0;
+  animation: img-loading-show 0s linear 0.25s forwards;
+}
+.lightbox .img-loading {
+  width: 40px;
+  height: 40px;
+  border-color: rgb(255 255 255 / 30%);
+  border-top-color: #fff;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .img-loading {
+    animation:
+      img-loading-show 0s linear 0.25s forwards,
+      img-loading-spin 0.8s linear infinite;
+  }
+}
+@keyframes img-loading-show {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes img-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 /* Video: ▶ in der Mitte, Dauer unten links; ohne Vorschaubild nur die Fläche */
 .photo-video {
   cursor: pointer;

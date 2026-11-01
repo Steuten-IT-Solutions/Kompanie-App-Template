@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type TouchEvent, type TouchList } from 'react';
+import { useCallback, type CSSProperties, useEffect, useLayoutEffect, useRef, useState, type TouchEvent, type TouchList } from 'react';
 import { type GalleryPhoto } from '../api';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
@@ -6,6 +6,50 @@ import { prefetchAlbumOnTap, sources } from '../viewData';
 
 export default function Galerie({ albumId }: { albumId?: number }) {
   return albumId ? <Album id={albumId} /> : <Overview />;
+}
+
+/**
+ * Bild mit Ladeschnecke, solange es lädt oder (busy) noch aufbereitet wird. Die Schnecke liegt als Geschwister über dem
+ * Bild (der Container braucht position: relative) und erscheint erst nach kurzer Zeit (CSS), damit Bilder aus dem
+ * Speicher nicht aufblinken. Ein Fehler beendet sie ebenfalls.
+ */
+function LoadingImage({
+  src,
+  busy = false,
+  className,
+  style,
+  lazy = false,
+}: {
+  src: string;
+  busy?: boolean;
+  className?: string;
+  style?: CSSProperties;
+  lazy?: boolean;
+}) {
+  const [done, setDone] = useState<string | null>(null);
+  // Schon fertig (z. B. aus dem Speicher, bevor React onLoad anhängen konnte)
+  const ref = useCallback(
+    (el: HTMLImageElement | null) => {
+      if (el?.complete) setDone(src);
+    },
+    [src],
+  );
+  const finish = () => setDone(src);
+  return (
+    <>
+      <img
+        ref={ref}
+        src={src}
+        alt=""
+        loading={lazy ? 'lazy' : undefined}
+        className={className}
+        style={style}
+        onLoad={finish}
+        onError={finish}
+      />
+      {(busy || done !== src) && <span className="img-loading" aria-hidden="true" data-testid="img-loading" />}
+    </>
+  );
 }
 
 /**
@@ -45,7 +89,13 @@ function Overview() {
                   }}
                   {...prefetchAlbumOnTap(a.id)}
                 >
-                  {a.cover ? <img src={a.cover} alt="" loading="lazy" /> : <span className="album-placeholder" />}
+                  {a.cover ? (
+                    <span className="album-cover">
+                      <LoadingImage src={a.cover} lazy />
+                    </span>
+                  ) : (
+                    <span className="album-placeholder" />
+                  )}
                   <span className="album-title">{a.title}</span>
                   <span className="album-count">
                     {mediaCount(a.count, a.video_count ?? 0)}
@@ -95,6 +145,8 @@ function Album({ id }: { id: number }) {
   const tiles = useRef<(HTMLButtonElement | null)[]>([]);
   const [retry, setRetry] = useState(0);
   const pending = !!data?.photos.some((p) => !p.ready);
+  // Solange die App noch nachsieht, drehen sich in den Platzhaltern die Ladeschnecken.
+  const preparing = retry < PENDING_RETRIES;
 
   // Bilder entstehen beim Abruf (höchstens wenige gleichzeitig) oder im Hintergrund: nachsehen, bis alle fertig sind.
   useEffect(() => {
@@ -148,7 +200,7 @@ function Album({ id }: { id: number }) {
               data-intern={p.intern ? '' : undefined}
               aria-label={`${isVideo(p) ? 'Video' : 'Bild'} ${i + 1} öffnen${p.intern ? ' (nur für Mitglieder)' : ''}`}
             >
-              {p.thumb && <img src={p.thumb} alt="" loading="lazy" />}
+              {p.thumb && <LoadingImage src={p.thumb} busy={!p.ready && preparing} lazy />}
               {isVideo(p) && (
                 <>
                   <span className="photo-play" aria-hidden="true">
@@ -343,10 +395,9 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
           />
         )
       ) : (
-        <img
+        <LoadingImage
           key={p.id}
           src={p.original && originals.has(p.id) ? p.original : p.large}
-          alt=""
           className={zoom.scale > 1 ? 'zoomed' : undefined}
           style={zoom.scale > 1 ? { transform: `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.scale})` } : undefined}
         />

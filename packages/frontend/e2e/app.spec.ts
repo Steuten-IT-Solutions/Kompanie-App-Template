@@ -2803,10 +2803,17 @@ test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne'
   await login(page, 'mitglied1');
   await page.getByRole('button', { name: 'Galerie' }).click();
   await expect(page.locator('.album-card', { hasText: 'Vereinsabend' })).toBeVisible();
+  await expect(page.locator('.album-card .img-loading')).toHaveCount(0);
   await shot(page, '16-galerie-alben');
   await page.locator('.album-card', { hasText: 'Sommerfest' }).click();
   await expect(page.locator('.photo')).toHaveCount(3);
   await expect(page.locator('.photo[data-intern]')).toHaveCount(1);
+  // Geladen: keine Ladeschnecke mehr, weder im Raster noch in der Übersicht oder der Großansicht.
+  await expect(page.locator('.photo .img-loading')).toHaveCount(0);
+  await page.locator('.photo[data-intern]').click();
+  await expect(page.locator('.lightbox img')).toBeVisible();
+  await expect(page.locator('.lightbox .img-loading')).toHaveCount(0);
+  await page.keyboard.press('Escape');
   const internSrc = await page.locator('.photo[data-intern] img').getAttribute('src');
   expect(internSrc).toContain('/app/foto/');
   const asMember = await page.request.get(internSrc!);
