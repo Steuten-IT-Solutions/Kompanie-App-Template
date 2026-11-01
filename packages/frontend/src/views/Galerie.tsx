@@ -1,4 +1,14 @@
-import { useCallback, type CSSProperties, useEffect, useLayoutEffect, useRef, useState, type TouchEvent, type TouchList } from 'react';
+import {
+  useCallback,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type TouchEvent,
+  type TouchList,
+} from 'react';
 import { type GalleryPhoto } from '../api';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
@@ -231,6 +241,9 @@ function isLightboxEntry(): boolean {
 type Zoom = { scale: number; x: number; y: number };
 const NO_ZOOM: Zoom = { scale: 1, x: 0, y: 0 };
 const MAX_ZOOM = 4;
+/** Tippen auf ein Video: kürzer als TAP_TIME Millisekunden und weniger als TAP_DISTANCE Pixel bewegt. */
+const TAP_TIME = 600;
+const TAP_DISTANCE = 10;
 
 /** Abstand und Mittelpunkt zweier Finger. */
 function pinch(t: TouchList): { dist: number; cx: number; cy: number } {
@@ -384,6 +397,18 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
     if (v.paused) void v.play().catch(() => {});
     else v.pause();
   };
+  // Tippen selbst erkennen statt über click: Gleich nach einem Wisch liefert der Browser für das erste Tippen kein click
+  // (in Chromium nachgestellt), dann startete das Video erst beim zweiten.
+  const videoTap = useRef<{ id: number; x: number; y: number; t: number } | null>(null);
+  const onVideoPointerDown = (e: ReactPointerEvent) => {
+    videoTap.current = { id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp };
+  };
+  const onVideoPointerUp = (e: ReactPointerEvent) => {
+    const tap = videoTap.current;
+    videoTap.current = null;
+    if (!tap || tap.id !== e.pointerId || e.timeStamp - tap.t > TAP_TIME) return;
+    if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < TAP_DISTANCE) togglePlay();
+  };
   // Nachbarn neben dem Bild, solange gewischt wird oder es weitergleitet; Videos mit ihrem Vorschaubild.
   const peek = (n: number, side: 'prev' | 'next') => {
     if (!swipe.peeking || !many) return null;
@@ -427,7 +452,13 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
               />
               {/* Fläche über dem Bild des Videos (nicht über den Leisten oben und unten): Der Player des Browsers gibt
                   das Aufsetzen des Fingers nicht an die Seite weiter (so in Chromium), hier kommt es zum Wischen an. Tippen spielt ab bzw. hält an. */}
-              <div className="lb-video-hit" aria-hidden="true" onClick={togglePlay} />
+              <div
+                className="lb-video-hit"
+                aria-hidden="true"
+                onPointerDown={onVideoPointerDown}
+                onPointerUp={onVideoPointerUp}
+                onPointerCancel={() => (videoTap.current = null)}
+              />
             </div>
           )
         ) : (
