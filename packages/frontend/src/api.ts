@@ -1727,6 +1727,8 @@ export const api = {
   setExtraRoles: (id: number, extra_roles: Level[]) =>
     request<{ id: number; level: Level; extra_roles: Level[] }>('PATCH', `/members/${id}/role`, { extra_roles }),
   member: (id: number) => request<MemberDetail>('GET', `/members/${id}`),
+  /** Mehrere Personen auf einmal (höchstens 25, Vorladen beim Blättern); unbekannte fehlen in der Antwort. */
+  memberDetails: (ids: number[]) => request<MemberDetail[]>('GET', '/members/details', undefined, { ids: ids.join(',') }),
   /** Rechte einer Person zusätzlich zur Rolle geben bzw. entziehen; leere Listen: wie die Rolle. */
   setRights: (id: number, grant: Capability[], revoke: Capability[]) =>
     request<MemberRights>('PUT', `/members/${id}/rights`, { grant, revoke }),

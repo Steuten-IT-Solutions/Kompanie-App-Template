@@ -75,6 +75,20 @@ export function prefetchOrder<T>(order: readonly T[], index: number, wrap = fals
 }
 
 /**
+ * Was mit `item` zusammen in einer Anfrage geladen wird: `item` selbst, dahinter die nächsten noch nicht geladenen
+ * Einträge der Vorlade-Reihenfolge `queue` (prefetchOrder), zusammen höchstens `max`.
+ */
+export function batchFrom<T>(queue: readonly T[], item: T, loaded: (t: T) => boolean, max: number): T[] {
+  const out = [item];
+  const start = queue.indexOf(item);
+  if (start < 0) return out;
+  for (let i = start + 1; i < queue.length && out.length < max; i++) {
+    if (queue[i] !== item && !loaded(queue[i])) out.push(queue[i]);
+  }
+  return out;
+}
+
+/**
  * Alle Einträge der Reihenfolge nacheinander vorladen, von der aktuellen Stelle nach außen (prefetchOrder): Erst wenn
  * einer fertig ist, kommt der nächste, damit immer nur eine Anfrage läuft und die Nachbarn zuerst da sind. Wechselt
  * die Stelle oder `restart` (z. B. nach dem Laden der eigenen Daten, denn eigene Änderungen leeren den Speicher),

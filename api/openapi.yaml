@@ -3173,6 +3173,30 @@ paths:
                 items: { $ref: '#/components/schemas/MemberSummary' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /members/details:
+    get:
+      tags: [Verwaltung]
+      summary: Mehrere Mitglieder auf einmal (Vorladen beim Blättern)
+      description: |
+        Je Person dasselbe wie `GET /members/{id}`, in der Reihenfolge von `ids`; doppelte Ids zählen einmal, unbekannte
+        fehlen in der Antwort. Höchstens 25 Ids, sonst oder ohne gültige Ids 400.
+      x-capability: 'wie GET /members/{id}'
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          description: Ids mit Kommas, z. B. `3,7,12`
+          schema: { type: string, example: '3,7,12' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MemberDetail' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /members/{id}:
     parameters:
       - $ref: '#/components/parameters/Id'

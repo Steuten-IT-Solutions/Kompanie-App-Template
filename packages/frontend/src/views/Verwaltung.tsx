@@ -3,6 +3,7 @@ import {
   api,
   can,
   config,
+  inBackground,
   levelLabel,
   personFactor,
   roleInfo,
@@ -20,7 +21,7 @@ import {
 import brand from '../generated/brand';
 import { formatDate, formatEuro, formatPoints, formatYearOrDate, parseEuroToCents, groupCounts as countLabels, todayYmd } from '../format';
 import { navigate, redirect as redirectTo } from '../router';
-import { neighbors, usePrefetchChain, useSwipeDrag } from '../swipe';
+import { batchFrom, neighbors, prefetchOrder, usePrefetchChain, useSwipeDrag } from '../swipe';
 import { AdminBack, AdminMenu, adminTabs, setupTabs } from '../adminNav';
 import {
   AddressFields,
@@ -584,6 +585,30 @@ function MemberPreviewHead({ p }: { p: MemberPreview }) {
 /** Fotos und Abzeichen der vorgeladenen Personen (siehe MemberDetailView). */
 const personImages = createImageQueue();
 
+/** Personen je Anfrage beim Vorladen (der Server nimmt bis zu 25). */
+const MEMBER_BATCH = 12;
+
+/**
+ * Daten von `id` laden und die übrigen aus `batch` gleich mit (eine Anfrage, GET /members/details): Diese legt die
+ * Funktion selbst im Speicher ab (wie prefetch: nur, wenn seitdem nichts geändert wurde und noch nichts da ist). Klappt
+ * der Sammelabruf nicht (z. B. kurz nach einem Update noch ein älterer Server), still nur diese eine Person.
+ */
+async function loadMemberBatch(id: number, batch: number[]): Promise<MemberDetail> {
+  if (batch.length < 2) return api.member(id);
+  const since = dataCache.generation();
+  let list: MemberDetail[];
+  try {
+    list = await inBackground(() => api.memberDetails(batch));
+  } catch {
+    return api.member(id);
+  }
+  for (const d of list) {
+    const key = cacheKey('member', [d.id]);
+    if (d.id !== id && !dataCache.has(key)) dataCache.set(key, d, since);
+  }
+  return list.find((d) => d.id === id) ?? api.member(id);
+}
+
 /**
  * Nachbar beim Wischen: oberer Teil seiner Seite (Navigation, Name, Abzeichen, Foto, Rolle, Kacheln) aus den
  * vorgeladenen Daten, so wie er gleich erscheint. Nur zum Ansehen: inert und aria-hidden, und eigene Klasse für den
@@ -742,13 +767,16 @@ function MemberDetailView({
   // Daten der weiter entfernten Personen nicht auf sie warten. Erst nach den eigenen Daten und erneut nach jedem Laden, denn eigene
   // Änderungen leeren den Speicher. Steht ein direkter Nachbar bereit, neu zeichnen (seine Vorschau beim Wischen).
   const [, setPrefetched] = useState(0);
+  const queue = useMemo(() => prefetchOrder(ids, index, true), [ids, index]);
   usePrefetchChain(
     ids,
     index,
     async (n: number) => {
       const src = sources.member(n);
-      await prefetch(src.key, src.deps, src.load);
       const key = cacheKey(src.key, src.deps);
+      // Nicht einzeln: n mit den nächsten noch fehlenden Personen der Reihenfolge in einer Anfrage.
+      const batch = dataCache.has(key) ? [n] : batchFrom(queue, n, (o) => dataCache.has(cacheKey('member', [o])), MEMBER_BATCH);
+      await prefetch(src.key, src.deps, () => loadMemberBatch(n, batch));
       if (!dataCache.has(key)) return;
       const other = dataCache.get<MemberDetail>(key);
       const near = n === prev || n === next;

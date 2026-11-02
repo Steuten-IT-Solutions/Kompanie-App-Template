@@ -515,22 +515,32 @@ test('Wischen auch bei Ehemaligen und ohne vorher geöffnete Liste (Link, Neusta
   await expect(page.locator('.member-name')).toHaveText('Mitglied2');
 });
 
-/** Anfragen nach den Daten einer Person (members/<id>), nicht nach Unterseiten wie members/<id>/points. */
-const MEMBER_DETAIL = /members\/(\d+)(?![\w/])/;
+/**
+ * Anfragen nach den Daten von Personen: einzeln (members/<id>, nicht Unterseiten wie members/<id>/points) oder mehrere
+ * auf einmal beim Vorladen (members/details?ids=…).
+ */
+const MEMBER_DETAIL = /members\/(?:\d+(?![\w/])|details(?![\w/]))/;
 
-test('Mitglied: Alle der Liste werden nacheinander vorgeladen, nicht nur die Nachbarn', async ({ page }) => {
+/** Ids, nach denen eine solche Anfrage fragt. */
+function memberIds(url: string): string[] {
+  const single = /members\/(\d+)(?![\w/])/.exec(url);
+  if (single) return [single[1]];
+  if (!MEMBER_DETAIL.test(url)) return [];
+  return (new URL(url).searchParams.get('ids') ?? '').split(',').filter(Boolean);
+}
+
+test('Mitglied: Alle der Liste werden vorgeladen, nicht nur die Nachbarn', async ({ page }) => {
   await login(page, 'verwalter');
   const requested = new Set<string>();
   page.on('request', (r) => {
-    const m = MEMBER_DETAIL.exec(r.url());
-    if (m && r.method() === 'GET') requested.add(m[1]);
+    if (r.method() === 'GET') for (const id of memberIds(r.url())) requested.add(id);
   });
   await adminMenu(page, 'Mitglieder');
   await page.locator('.member-row').first().click();
   const step = (await page.locator('.member-step .muted').textContent()) ?? '';
   const total = Number(/\/ (\d+)/.exec(step)?.[1]);
   expect(total).toBeGreaterThan(2);
-  // Die Person selbst und alle anderen der Liste, eine nach der anderen
+  // Die Person selbst und alle anderen der Liste (mehrere je Anfrage)
   await expect.poll(() => requested.size, { timeout: 20_000 }).toBe(total);
 });
 

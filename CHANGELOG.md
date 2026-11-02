@@ -19,8 +19,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 - **Seite eines Mitglieds erscheint schneller**: Öffnest du in der Verwaltung eine Person oder blätterst weiter, stehen
   Dienstgrad, Foto, Rolle, Punkte und Offen sofort da (aus der Mitgliederliste); der Rest der Seite folgt, sobald ihre
-  Daten geladen sind. Beim Vorladen der übrigen Personen warten die Daten nicht mehr auf Fotos und Abzeichen, so sind
-  auch weiter entfernte Seiten früher bereit.
+  Daten geladen sind. Die übrigen Personen lädt die App jetzt zu zwölft in einer Anfrage vor statt einzeln, und ohne
+  dabei auf Fotos und Abzeichen zu warten; so sind auch weiter entfernte Seiten deutlich früher bereit.
 
 ## [0.5.0] – 2026-11-01
 
