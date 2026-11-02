@@ -15,6 +15,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Geändert
+
+- **Seite eines Mitglieds erscheint schneller**: Öffnest du in der Verwaltung eine Person oder blätterst weiter, stehen
+  Dienstgrad, Foto, Rolle, Punkte und Offen sofort da (aus der Mitgliederliste); der Rest der Seite folgt, sobald ihre
+  Daten geladen sind. Beim Vorladen der übrigen Personen warten die Daten nicht mehr auf Fotos und Abzeichen, so sind
+  auch weiter entfernte Seiten früher bereit.
+
 ## [0.5.0] – 2026-11-01
 
 ### Neu

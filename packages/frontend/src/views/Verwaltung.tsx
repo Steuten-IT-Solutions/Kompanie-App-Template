@@ -46,6 +46,8 @@ import { PersonalPanel } from '../personal';
 import { cacheKey, dataCache, prefetch } from '../dataCache';
 import { prefetchOnTap, sources } from '../viewData';
 import { PersonName, PersonSkeleton } from '../skeleton';
+import { memberPreview, type MemberPreview } from '../memberPreview';
+import { createImageQueue } from '../imageQueue';
 import Anwesenheit from './Anwesenheit';
 import { preloadBadge, RankBadge, RankStack } from '../RankBadge';
 import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
@@ -519,6 +521,70 @@ function roleLine(m: MemberDetail): string {
 }
 
 /**
+ * Person aus den Listen im Speicher (Mitglieder mit und ohne Gäste, Ehemalige; zuerst die Liste, aus der geblättert
+ * wird): Kopf ihrer Seite, solange ihre eigenen Daten noch laden.
+ */
+function previewFromLists(id: number, former: boolean): MemberPreview | null {
+  const members = [cacheKey('members', [false]), cacheKey('members', [true])];
+  const formers = [cacheKey('former-members', [])];
+  const keys = former ? [...formers, ...members] : [...members, ...formers];
+  return memberPreview(
+    keys.map((k) => (dataCache.has(k) ? dataCache.get<Array<MemberSummary | FormerMember>>(k) : null)),
+    id,
+  );
+}
+
+/** Rollenzeile aus der Liste (ohne den Hinweis auf Ausnahmen bei den Rechten, den kennt erst die Seite). */
+function previewRoleLine(p: MemberPreview): string {
+  if (p.previous_level) return `Ehemalig (zuvor ${levelLabel(p.previous_level)})`;
+  if (!p.level) return '';
+  return p.extra_roles.length > 0
+    ? `Rollen: ${roleLabels({ level: p.level, extra_roles: p.extra_roles })}`
+    : `Rolle: ${levelLabel(p.level)}`;
+}
+
+/**
+ * Kopf der Seite aus der Liste (Abzeichen, Foto, Rolle, Kacheln), solange die eigenen Daten laden: zum Ansehen, Antippen
+ * geht erst mit den Daten. Ohne Abzeichen und Foto in der Liste der runde Platzhalter wie im Gerüst, denn die Seite
+ * kann dort noch „Kein Dienstgrad“ oder das Feld fürs Foto zeigen.
+ */
+function MemberPreviewHead({ p }: { p: MemberPreview }) {
+  const none = () => {};
+  const role = previewRoleLine(p);
+  return (
+    <>
+      <div className="member-rank-line">
+        {p.rank_title && (
+          <span className="member-rank-badge">
+            <RankBadge url={p.rank_badge_url} title={p.rank_title} size="large" />
+            <span>{p.rank_title}</span>
+          </span>
+        )}
+        {p.photo_url ? (
+          <span className="member-photo-open">
+            <MemberAvatar url={p.photo_url} name={p.name} size="large" />
+          </span>
+        ) : (
+          !p.rank_title && <span className="skeleton-box" style={{ width: 96, height: 96, borderRadius: '50%' }} />
+        )}
+      </div>
+      <p className="muted small member-level">{role || <span className="skeleton-text" style={{ width: '16ch' }} />}</p>
+      {(canPoints() || canPenalties()) && (
+        <div className="stats member-stats">
+          {canPoints() && <StatCard label={sec.points} value={(p.points ?? 0).toLocaleString('de-DE')} tone="good" onClick={none} />}
+          {canPenalties() && (
+            <StatCard label="Offen" value={formatEuro(p.open_cents ?? 0)} tone={(p.open_cents ?? 0) > 0 ? 'warn' : 'good'} onClick={none} />
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Fotos und Abzeichen der vorgeladenen Personen (siehe MemberDetailView). */
+const personImages = createImageQueue();
+
+/**
  * Nachbar beim Wischen: oberer Teil seiner Seite (Navigation, Name, Abzeichen, Foto, Rolle, Kacheln) aus den
  * vorgeladenen Daten, so wie er gleich erscheint. Nur zum Ansehen: inert und aria-hidden, und eigene Klasse für den
  * Namen, damit ihn niemand mit der echten Seite verwechselt. Sind die Daten noch nicht da, der Name aus der Liste und
@@ -541,6 +607,7 @@ function MemberPeek({
 }) {
   const key = cacheKey('member', [id]);
   const m = dataCache.has(key) ? dataCache.get<MemberDetail>(key) : null;
+  const preview = m ? null : previewFromLists(id, former);
   const rankOn = !!m && rankEditable(m);
   const avatar = !!m && (!!m.photo_url || !!m.photo_editable);
   const none = () => {};
@@ -604,6 +671,11 @@ function MemberPeek({
             </div>
           )}
         </>
+      ) : preview ? (
+        <>
+          <h2 className="member-peek-name member-name-centered with-rank">{preview.name}</h2>
+          <MemberPreviewHead p={preview} />
+        </>
       ) : (
         <>
           <h2 className="member-peek-name member-name-centered with-rank">
@@ -666,7 +738,8 @@ function MemberDetailView({
     onCommit: (step) => show(step === 1 ? next : prev),
   });
   // Alle Personen der Reihenfolge vorladen (Daten, Foto, Abzeichen), nacheinander von hier nach außen: Nach dem Wechsel
-  // steht ihre Seite sofort, ohne Gerüst. Erst nach den eigenen Daten und erneut nach jedem Laden, denn eigene
+  // steht ihre Seite sofort, ohne Gerüst. Fotos und Abzeichen laden in einer eigenen Schlange (personImages), damit die
+  // Daten der weiter entfernten Personen nicht auf sie warten. Erst nach den eigenen Daten und erneut nach jedem Laden, denn eigene
   // Änderungen leeren den Speicher. Steht ein direkter Nachbar bereit, neu zeichnen (seine Vorschau beim Wischen).
   const [, setPrefetched] = useState(0);
   usePrefetchChain(
@@ -678,8 +751,15 @@ function MemberDetailView({
       const key = cacheKey(src.key, src.deps);
       if (!dataCache.has(key)) return;
       const other = dataCache.get<MemberDetail>(key);
-      if (n === prev || n === next) setPrefetched((t) => t + 1);
-      await Promise.all([preloadAvatar(other.photo_url), preloadBadge(other.rank_badge_url)]);
+      const near = n === prev || n === next;
+      if (near) setPrefetched((t) => t + 1);
+      // Bilder neben den Daten her: Die Kette wartet nur auf die der direkten Nachbarn (ihre Vorschau beim Wischen).
+      const images = personImages.add(
+        `${other.photo_url ?? ''}|${other.rank_badge_url ?? ''}`,
+        () => Promise.all([preloadAvatar(other.photo_url), preloadBadge(other.rank_badge_url)]),
+        near,
+      );
+      if (near) await images;
     },
     data,
     true,
@@ -787,12 +867,21 @@ function MemberDetailView({
   );
 
   if (loading && !data) {
+    // Steht die Person in einer Liste im Speicher, ihr Kopf schon aus der Liste; der Rest der Seite kommt mit den Daten.
+    const preview = previewFromLists(id, base === 'ehemalige');
     return frame(
       base === 'ehemalige',
-      <h2 className="member-name member-name-centered with-rank">
-        <PersonName name={nameOf(id)} />
-      </h2>,
-      <PersonSkeleton />,
+      <h2 className="member-name member-name-centered with-rank">{preview ? preview.name : <PersonName name={nameOf(id)} />}</h2>,
+      preview ? (
+        <>
+          <MemberPreviewHead p={preview} />
+          <div role="status" data-loading="">
+            <span className="visually-hidden">Lädt …</span>
+          </div>
+        </>
+      ) : (
+        <PersonSkeleton />
+      ),
     );
   }
   if (error) return frame(base === 'ehemalige', null, <ErrorBox message={error} onRetry={reload} />);

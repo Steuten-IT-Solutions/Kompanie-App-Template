@@ -554,6 +554,9 @@ test.describe('ohne Service Worker, Daten zurückgehalten', () => {
     await expect(page.locator('[data-loading]')).not.toHaveCount(0);
     await expect(page.locator('.member-name')).toHaveText('Mitglied1');
     await expect(page.locator('.member-step')).toContainText('1 / 2');
+    // Kopf schon aus der Mitgliederliste (Rolle, Kacheln), obwohl die Daten der Person noch zurückgehalten werden
+    await expect(page.locator('.member-level')).toContainText('Rolle');
+    await expect(page.locator('.member-stats')).toBeVisible();
     await swipe(page, -200);
     await expect(page.locator('.member-name')).toHaveText('Mitglied2');
     await expect(page.locator('.member-step')).toContainText('2 / 2');
