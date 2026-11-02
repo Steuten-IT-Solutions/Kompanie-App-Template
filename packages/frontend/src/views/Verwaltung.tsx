@@ -545,12 +545,12 @@ function previewRoleLine(p: MemberPreview): string {
 }
 
 /**
- * Kopf der Seite aus der Liste (Abzeichen, Foto, Rolle, Kacheln), solange die eigenen Daten laden: zum Ansehen, Antippen
- * geht erst mit den Daten. Ohne Abzeichen und Foto in der Liste der runde Platzhalter wie im Gerüst, denn die Seite
+ * Kopf der Seite aus der Liste (Abzeichen, Foto, Rolle, Kacheln), solange die eigenen Daten laden. Die Kacheln öffnen
+ * mit `onOpen` schon ihr Fenster (es erscheint, sobald die Daten da sind); ohne (Vorschau beim Wischen) nichts. Ohne Abzeichen und Foto in der Liste der runde Platzhalter wie im Gerüst, denn die Seite
  * kann dort noch „Kein Dienstgrad“ oder das Feld fürs Foto zeigen.
  */
-function MemberPreviewHead({ p }: { p: MemberPreview }) {
-  const none = () => {};
+function MemberPreviewHead({ p, onOpen }: { p: MemberPreview; onOpen?: (sheet: 'punkte' | 'strafen') => void }) {
+  const open = (sheet: 'punkte' | 'strafen') => () => onOpen?.(sheet);
   const role = previewRoleLine(p);
   return (
     <>
@@ -572,9 +572,16 @@ function MemberPreviewHead({ p }: { p: MemberPreview }) {
       <p className="muted small member-level">{role || <span className="skeleton-text" style={{ width: '16ch' }} />}</p>
       {(canPoints() || canPenalties()) && (
         <div className="stats member-stats">
-          {canPoints() && <StatCard label={sec.points} value={(p.points ?? 0).toLocaleString('de-DE')} tone="good" onClick={none} />}
+          {canPoints() && (
+            <StatCard label={sec.points} value={(p.points ?? 0).toLocaleString('de-DE')} tone="good" onClick={open('punkte')} />
+          )}
           {canPenalties() && (
-            <StatCard label="Offen" value={formatEuro(p.open_cents ?? 0)} tone={(p.open_cents ?? 0) > 0 ? 'warn' : 'good'} onClick={none} />
+            <StatCard
+              label="Offen"
+              value={formatEuro(p.open_cents ?? 0)}
+              tone={(p.open_cents ?? 0) > 0 ? 'warn' : 'good'}
+              onClick={open('strafen')}
+            />
           )}
         </div>
       )}
@@ -902,7 +909,7 @@ function MemberDetailView({
       <h2 className="member-name member-name-centered with-rank">{preview ? preview.name : <PersonName name={nameOf(id)} />}</h2>,
       preview ? (
         <>
-          <MemberPreviewHead p={preview} />
+          <MemberPreviewHead p={preview} onOpen={openSheet} />
           <div role="status" data-loading="">
             <span className="visually-hidden">Lädt …</span>
           </div>
