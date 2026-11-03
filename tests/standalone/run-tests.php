@@ -528,16 +528,36 @@ try {
         $c->ok($pdo->writes() === [], 'Normale Anfrage schreibt nichts (Aufgaben werden nicht bei jeder Anfrage eingeplant)' . ($pdo->writes() ? ': ' . implode(' | ', $pdo->writes()) : ''));
         $c->ok(!preg_grep('/\{?tasks\}?/', $pdo->log), 'Normale Anfrage liest die Aufgaben nicht (nächster Lauf steht in den Einstellungen)');
 
-        // Fällige Aufgabe ohne PHP-FPM: Selbstaufruf, ohne auf die Antwort zu warten.
+        // Fällige Aufgabe ohne PHP-FPM: Selbstaufruf, ohne auf die Antwort zu warten. Gemessen an einem Empfänger, der erst
+        // nach SLOW_MS antwortet und nichts in die Datenbank schreibt: Wartete der Selbstaufruf auf die Antwort, dauerte er
+        // mindestens so lange. (Gegen den echten Testserver schwankte die Zeit: Dessen Cron-Lauf schreibt gleichzeitig in
+        // dieselbe SQLite-Datei, und eine feste Grenze von 150 ms schlug auf CI gelegentlich fehl, Issue #216.)
+        $slowMs = 2000;
+        $slowPort = $port + 2;
+        $slowRouter = $data . '-langsam.php';
+        file_put_contents($slowRouter, '<?php usleep(' . ($slowMs * 1000) . '); echo "ok";');
+        $slow = proc_open([PHP_BINARY, '-S', "127.0.0.1:$slowPort", $slowRouter], [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $sp);
+        for ($i = 0; $i < 50 && !@fsockopen('127.0.0.1', $slowPort); $i++) {
+            usleep(100000);
+        }
         $kernel->db()->insert('tasks', ['name' => 'testaufgabe', 'interval_seconds' => 3600, 'next_run' => time() - 10]);
         $kernel->scheduler()->refresh();
         $kernel->app()->settings->delete(Kernel::CRON_SPAWN_SETTING);
-        [$k] = $counted();
+        [$k] = $counted(new Config($data, ['base_url' => "http://127.0.0.1:$slowPort/"] + Config::load($data)->toArray()));
         $k->upgrade();
         $t = microtime(true);
         $afterResponse($k);
         $elapsed = microtime(true) - $t;
-        $c->ok($elapsed < 0.15, sprintf('Selbstaufruf wartet nicht auf die Aufgaben (%.0f ms)', $elapsed * 1000));
+        $c->ok($elapsed < $slowMs / 2000, sprintf('Selbstaufruf wartet nicht auf die Antwort (%.0f ms, Empfänger antwortet nach %d ms)', $elapsed * 1000, $slowMs));
+        proc_terminate($slow);
+        proc_close($slow);
+        @unlink($slowRouter);
+
+        // Gegen den echten Testserver: Die Aufgabe läuft im aufgerufenen Prozess.
+        $kernel->app()->settings->delete(Kernel::CRON_SPAWN_SETTING);
+        [$k] = $counted();
+        $k->upgrade();
+        $afterResponse($k);
         $ran = false;
         for ($i = 0; $i < 30 && !$ran; $i++) {
             usleep(100000);
