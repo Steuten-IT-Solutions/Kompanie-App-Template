@@ -14,6 +14,7 @@ import {
   type FeatureInfo,
   type MailSettings,
   type NewsSourceType,
+  type PushAdmin,
 } from '../api';
 import { EmailField, ErrorBox, Loading, useAsync } from '../ui';
 import { normalizeEmail } from '../email';
@@ -139,14 +140,37 @@ function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie'
   return s.news ? <News key={revision} {...props} /> : null;
 }
 
-/** „Zuletzt am Geburtstag benachrichtigt: …“ – Zeitpunkt, Geburtstage und Geräte (0 Geräte: niemand hat die Art abonniert). */
-function birthdayLastText(last: { at: string; birthdays: number; devices: number }): string {
-  const birthdays = last.birthdays === 1 ? '1 Geburtstag' : `${last.birthdays} Geburtstage`;
-  const devices =
-    last.devices === 0
-      ? 'kein Gerät hat diese Benachrichtigung eingeschaltet'
-      : `für ${last.devices === 1 ? '1 Gerät' : `${last.devices} Geräte`} in den Versand gegeben`;
-  return `Zuletzt am Geburtstag benachrichtigt: ${formatUntil(last.at)} (${birthdays}, ${devices}).`;
+const devicesText = (n: number): string => (n === 0 ? 'an kein Gerät' : n === 1 ? 'an 1 Gerät' : `an ${n} Geräte`);
+
+/** Zuletzt verschickt je Art, dazu zuletzt vom Push-Dienst angenommen bzw. abgelehnt; nichts, solange noch nichts verschickt wurde. */
+function PushLog({ log }: { log: PushAdmin['log'] }) {
+  if (log.types.length === 0 && !log.accepted && !log.rejected) return null;
+  return (
+    <div className="push-log">
+      <h4>Zuletzt verschickt</h4>
+      {log.types.length > 0 && (
+        <ul className="small muted">
+          {log.types.map((t) => (
+            <li key={t.type}>
+              {t.label} – {formatUntil(t.at)}, {devicesText(t.devices)}
+            </li>
+          ))}
+        </ul>
+      )}
+      {log.accepted && (
+        <p className="small muted">
+          Zuletzt vom Push-Dienst angenommen: {formatUntil(log.accepted.at)} (
+          {log.accepted.count === 1 ? '1 Nachricht' : `${log.accepted.count} Nachrichten`}).
+        </p>
+      )}
+      {log.rejected && (
+        <p className="small muted">
+          Zuletzt vom Push-Dienst abgelehnt: {formatUntil(log.rejected.at)} (
+          {log.rejected.count === 1 ? '1 Nachricht' : `${log.rejected.count} Nachrichten`}, {log.rejected.reason}).
+        </p>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -218,9 +242,9 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
               </select>
             </label>
           )}
-          {p.birthdays.last && <p className="small muted birthday-last">{birthdayLastText(p.birthdays.last)}</p>}
         </>
       )}
+      <PushLog log={p.log} />
       {saveError && (
         <p className="form-error" role="alert">
           {saveError}

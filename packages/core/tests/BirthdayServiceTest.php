@@ -454,25 +454,25 @@ final class BirthdayServiceTest extends TestCase
         $this->setUpPush('2026-10-20 07:30:00');
         $this->setOwn($this->m, ['month' => 10, 'day' => 20, 'year' => 1981]);
         $res = $this->as($this->admin)->call('GET', '/admin/push');
-        $this->assertSame(['enabled' => true, 'hour' => 7, 'last' => null], $res->data['birthdays'], 'Standard: an, ab 7 Uhr, noch keine verschickt');
+        $this->assertSame(['enabled' => true, 'hour' => 7], $res->data['birthdays'], 'Standard: an, ab 7 Uhr');
         $this->assertSame(403, $this->as($this->m)->call('PATCH', '/admin/push', ['birthday_notify' => false])->status, 'nur Admins');
 
         // Ungültige Angaben: 400, nichts gespeichert (auch nicht der gültige Teil).
         foreach ([['birthday_hour' => 24], ['birthday_hour' => -1], ['birthday_hour' => 7.5], ['birthday_hour' => 'acht'], ['birthday_notify' => 'nein'], ['birthday_notify' => false, 'birthday_hour' => 24]] as $body) {
             $this->assertSame(400, $this->as($this->admin)->call('PATCH', '/admin/push', $body)->status, (string) json_encode($body));
         }
-        $this->assertSame(['enabled' => true, 'hour' => 7, 'last' => null], $this->app->birthdays()->notifySettings());
+        $this->assertSame(['enabled' => true, 'hour' => 7], $this->app->birthdays()->notifySettings());
 
         // Aus: kein Versand, nichts beansprucht.
         $res = $this->as($this->admin)->call('PATCH', '/admin/push', ['birthday_notify' => false]);
-        $this->assertSame(['enabled' => false, 'hour' => 7, 'last' => null], $res->data['birthdays']);
+        $this->assertSame(['enabled' => false, 'hour' => 7], $res->data['birthdays']);
         $this->app->runTask(BirthdayService::TASK);
         $this->assertSame([], $this->queued());
         $this->assertNull($this->app->birthdays()->repository()->find($this->m)['last_notified'] ?? null);
 
         // Wieder an, aber erst ab 9 Uhr: um 07:30 nichts, ab 09:00 einmal.
         $res = $this->as($this->admin)->call('PATCH', '/admin/push', ['birthday_notify' => true, 'birthday_hour' => 9]);
-        $this->assertSame(['enabled' => true, 'hour' => 9, 'last' => null], $res->data['birthdays']);
+        $this->assertSame(['enabled' => true, 'hour' => 9], $res->data['birthdays']);
         $this->app->runTask(BirthdayService::TASK);
         $this->assertSame([], $this->queued());
         $this->at('2026-10-20 09:00:00');
@@ -488,34 +488,6 @@ final class BirthdayServiceTest extends TestCase
         // Ohne den Bereich Geburtstage keine Angaben dazu.
         $this->app->features()->update(['birthdays' => false]);
         $this->assertNull($this->as($this->admin)->call('GET', '/admin/push')->data['birthdays']);
-    }
-
-    public function testAdminsSeeTheLastNotification(): void
-    {
-        $this->setUpPush('2026-10-20 06:30:00');
-        $this->setOwn($this->m, ['month' => 10, 'day' => 20]);
-        $this->app->runTask(BirthdayService::TASK);
-        $this->assertNull($this->app->birthdays()->lastNotified(), 'vor der Stunde: noch nichts');
-
-        $this->at('2026-10-20 07:10:40');
-        $this->app->runTask(BirthdayService::TASK);
-        $res = $this->as($this->admin)->call('GET', '/admin/push');
-        $this->assertSame(['at' => '2026-10-20T07:10:40+02:00', 'birthdays' => 1, 'devices' => 2], $res->data['birthdays']['last'], 'Zeitpunkt in der Zeitzone der Kompanie, Geräte ohne das Geburtstagskind');
-
-        // Läufe ohne neuen Geburtstag ändern nichts; ein später eingetragener zählt zum selben Tag dazu.
-        $this->at('2026-10-20 08:10:00');
-        $this->app->runTask(BirthdayService::TASK);
-        $this->assertSame('2026-10-20T07:10:40+02:00', $this->app->birthdays()->lastNotified()['at'] ?? null);
-        $this->setOwn($this->m2, ['month' => 10, 'day' => 20]);
-        $this->app->runTask(BirthdayService::TASK);
-        $this->assertSame(['at' => '2026-10-20T08:10:00+02:00', 'birthdays' => 2, 'devices' => 4], $this->app->birthdays()->lastNotified());
-
-        // Am nächsten Tag neu gezählt; ohne Gerät mit der Art: 0 Geräte (Geburtstag trotzdem erledigt).
-        $this->app->db->execute('DELETE FROM {push_subscriptions}');
-        $this->setOwn($this->m3, ['month' => 10, 'day' => 21]);
-        $this->at('2026-10-21 07:30:00');
-        $this->app->runTask(BirthdayService::TASK);
-        $this->assertSame(['at' => '2026-10-21T07:30:00+02:00', 'birthdays' => 1, 'devices' => 0], $this->app->birthdays()->lastNotified());
     }
 
     public function testPushOnlyForVisibleAndAgeOnlyIfReleased(): void

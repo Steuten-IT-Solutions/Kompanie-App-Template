@@ -2121,12 +2121,13 @@ export interface PushAdmin {
   queued: number;
   reminderHour: number;
   /** Benachrichtigung am Geburtstag; null ohne den Bereich Geburtstage */
-  birthdays: {
-    enabled: boolean;
-    hour: number;
-    /** Letzte Benachrichtigung (je Tag zusammengezählt): Zeitpunkt, Zahl der Geburtstage und der Geräte; null = noch keine */
-    last: { at: string; birthdays: number; devices: number } | null;
-  } | null;
+  birthdays: { enabled: boolean; hour: number } | null;
+  /** Protokoll: je Art der letzte Versand, zuletzt vom Push-Dienst angenommen bzw. abgelehnt (null = noch nie) */
+  log: {
+    types: { type: string; label: string; at: string; devices: number }[];
+    accepted: { at: string; count: number } | null;
+    rejected: { at: string; count: number; reason: string } | null;
+  };
 }
 
 const pushPath = (suffix: string): string => (config?.user ? '/me/push' : '/push') + suffix;

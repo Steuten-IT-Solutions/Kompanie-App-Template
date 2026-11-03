@@ -5333,7 +5333,7 @@ components:
         application/json:
           schema:
             type: object
-            required: [supported, missing, devices, accounts, guests, queued, reminderHour, birthdays]
+            required: [supported, missing, devices, accounts, guests, queued, reminderHour, birthdays, log]
             properties:
               supported: { type: boolean }
               missing: { type: array, items: { type: string }, description: Fehlende PHP-Voraussetzungen }
@@ -5345,20 +5345,41 @@ components:
               birthdays:
                 type: [object, 'null']
                 description: Benachrichtigung am Geburtstag; null ohne den Bereich Geburtstage
-                required: [enabled, hour, last]
+                required: [enabled, hour]
                 properties:
                   enabled: { type: boolean }
                   hour: { type: integer, minimum: 0, maximum: 23 }
-                  last:
+              log:
+                type: object
+                description: >-
+                  Protokoll des Versands. Zeitpunkte als ISO 8601 in der Zeitzone der Kompanie. types: je angebotener Art der
+                  letzte Versand (devices = Geräte, für die die Nachricht in die Warteschlange ging; 0 = niemand hat die Art
+                  abonniert). accepted/rejected: zuletzt vom Push-Dienst angenommen bzw. endgültig abgelehnt (null = noch nie).
+                required: [types, accepted, rejected]
+                properties:
+                  types:
+                    type: array
+                    items:
+                      type: object
+                      required: [type, label, at, devices]
+                      properties:
+                        type: { type: string }
+                        label: { type: string }
+                        at: { type: string, format: date-time }
+                        devices: { type: integer }
+                  accepted:
                     type: [object, 'null']
-                    description: >-
-                      Letzte Benachrichtigung am Geburtstag (je Tag zusammengezählt); null, solange noch keine verschickt wurde.
-                      devices = Geräte, für die sie in die Warteschlange ging (0 = kein Gerät hat die Art abonniert).
-                    required: [at, birthdays, devices]
+                    required: [at, count]
                     properties:
-                      at: { type: string, format: date-time, description: Letzter Lauf mit Geburtstag, Zeitzone der Kompanie }
-                      birthdays: { type: integer }
-                      devices: { type: integer }
+                      at: { type: string, format: date-time }
+                      count: { type: integer, description: Zahl der Nachrichten in diesem Lauf }
+                  rejected:
+                    type: [object, 'null']
+                    required: [at, count, reason]
+                    properties:
+                      at: { type: string, format: date-time }
+                      count: { type: integer, description: Zahl der Nachrichten in diesem Lauf }
+                      reason: { type: string, description: 'Letzter Grund, z. B. „HTTP 403“' }
     Error:
       description: Fehler
       content:
