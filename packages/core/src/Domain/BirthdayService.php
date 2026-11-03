@@ -41,6 +41,12 @@ final class BirthdayService
     /** Ab dieser Stunde (0–23, Zeitzone der Kompanie) wird benachrichtigt; Einstellung der Admins. */
     public const NOTIFY_HOUR_SETTING = 'birthday_notify_hour';
     public const NOTIFY_HOUR_DEFAULT = 7;
+    /**
+     * Letzte Benachrichtigung (für Admins unter Einstellungen → Benachrichtigungen): ['date' => Tag in der Zeitzone der
+     * Kompanie, 'at' => Unix-Zeit des letzten Laufs mit Geburtstag, 'birthdays' => Zahl, 'devices' => eingereihte Geräte],
+     * je Tag zusammengezählt. Gehört zur Installation (Backup::LOCAL_SETTINGS).
+     */
+    public const LAST_SETTING = 'birthday_notify_last';
     public const MIN_YEAR = 1900;
     /** Anstehend: heute und die nächsten N Tage (App, „Anstehende Geburtstage“); Einstellung der Admins. */
     public const UPCOMING_DAYS_SETTING = 'birthday_upcoming_days';
@@ -333,6 +339,7 @@ final class BirthdayService
         $date = $today->format('Y-m-d');
         $year = (int) $today->format('Y');
         $count = 0;
+        $birthdays = 0;
         foreach ($this->repository()->visible() as $b) {
             if (self::inYear($b['month'], $b['day'], $year, $today->getTimezone())->format('Y-m-d') !== $date) {
                 continue;
@@ -341,15 +348,53 @@ final class BirthdayService
             if ($user === null || !$user->isMember() || $b['last_notified'] === $date || !$this->repository()->claim($b['user_id'], $date)) {
                 continue;
             }
+            $birthdays++;
             $count += $this->app->pushTriggers()->birthday($b['user_id'], $user->name, self::publicAge($b, $year));
+        }
+        if ($birthdays > 0) {
+            $this->noteLast($date, $time->timestamp(), $birthdays, $count);
         }
         return $count;
     }
 
-    /** @return array{enabled: bool, hour: int} Einstellungen der Benachrichtigung (GET /admin/push) */
+    /** Lauf mit Geburtstagen merken; am selben Tag zusammenzählen (z. B. ein später eingetragener Geburtstag). */
+    private function noteLast(string $date, int $at, int $birthdays, int $devices): void
+    {
+        $last = $this->app->settings->get(self::LAST_SETTING);
+        if (is_array($last) && ($last['date'] ?? null) === $date) {
+            $birthdays += (int) ($last['birthdays'] ?? 0);
+            $devices += (int) ($last['devices'] ?? 0);
+        }
+        $this->app->settings->set(self::LAST_SETTING, ['date' => $date, 'at' => $at, 'birthdays' => $birthdays, 'devices' => $devices]);
+    }
+
+    /**
+     * Letzte Benachrichtigung für die Einstellungen: Zeitpunkt (ISO 8601 in der Zeitzone der Kompanie), Zahl der
+     * Geburtstage und der Geräte, für die sie in den Versand gingen; null, solange noch keine verschickt wurde.
+     *
+     * @return array{at: string, birthdays: int, devices: int}|null
+     */
+    public function lastNotified(): ?array
+    {
+        $last = $this->app->settings->get(self::LAST_SETTING);
+        if (!is_array($last) || !is_numeric($last['at'] ?? null)) {
+            return null;
+        }
+        return [
+            'at' => $this->app->time()->format((int) $last['at'], 'c'),
+            'birthdays' => (int) ($last['birthdays'] ?? 0),
+            'devices' => (int) ($last['devices'] ?? 0),
+        ];
+    }
+
+    /**
+     * Einstellungen der Benachrichtigung und letzter Versand (GET /admin/push).
+     *
+     * @return array{enabled: bool, hour: int, last: array{at: string, birthdays: int, devices: int}|null}
+     */
     public function notifySettings(): array
     {
-        return ['enabled' => $this->notifyEnabled(), 'hour' => $this->notifyHour()];
+        return ['enabled' => $this->notifyEnabled(), 'hour' => $this->notifyHour(), 'last' => $this->lastNotified()];
     }
 
     public function notifyEnabled(): bool
