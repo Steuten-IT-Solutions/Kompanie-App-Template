@@ -17,9 +17,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
-- **Letzte Benachrichtigung am Geburtstag sichtbar**: Unter *Einstellungen → Benachrichtigungen* steht jetzt, wann
-  die App zuletzt über einen Geburtstag benachrichtigt hat und für wie viele Geräte. So siehst du ohne Blick in die
-  Datenbank, ob die Benachrichtigung verschickt wurde oder ob niemand sie eingeschaltet hat.
+- **Nachvollziehen, was an Benachrichtigungen verschickt wurde**: Unter *Einstellungen → Benachrichtigungen* steht
+  jetzt für jede Art, wann sie zuletzt verschickt wurde und an wie viele Geräte, dazu wann der Push-Dienst zuletzt eine
+  Nachricht angenommen oder abgelehnt hat (mit Grund). So siehst du ohne Blick in die Datenbank, ob eine Benachrichtigung
+  verschickt wurde oder ob niemand sie eingeschaltet hatte.
 
 ### Geändert
 

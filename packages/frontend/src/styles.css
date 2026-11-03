@@ -3169,6 +3169,22 @@ fieldset.rights-tree legend {
 .attendance-group-form h4 {
   margin: 0;
 }
+/* Einstellungen → Benachrichtigungen: zuletzt verschickt je Art, angenommen bzw. abgelehnt vom Push-Dienst. */
+.push-log {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.push-log h4 {
+  margin: 0 0 6px;
+}
+.push-log ul {
+  margin: 0 0 8px;
+  padding-left: 18px;
+}
+.push-log p {
+  margin: 4px 0 0;
+}
 .field-inline {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);

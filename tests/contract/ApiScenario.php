@@ -1775,7 +1775,7 @@ final class ApiScenario
             $before = $d['birthdays'];
             $c->ok($this->req('PATCH', '/admin/push', ['birthday_hour' => 24])[0] === 400, 'Ungültige Stunde am Geburtstag → 400');
             [$s, $d] = $this->req('PATCH', '/admin/push', ['birthday_notify' => false, 'birthday_hour' => 9]);
-            $c->ok($s === 200 && ($d['birthdays']['enabled'] ?? null) === false && ($d['birthdays']['hour'] ?? null) === 9 && array_key_exists('last', $d['birthdays']), 'Benachrichtigung am Geburtstag ausschalten und Stunde ändern');
+            $c->ok($s === 200 && $d['birthdays'] === ['enabled' => false, 'hour' => 9], 'Benachrichtigung am Geburtstag ausschalten und Stunde ändern');
             $this->req('PATCH', '/admin/push', ['birthday_notify' => $before['enabled'], 'birthday_hour' => $before['hour']]);
         }
     }
