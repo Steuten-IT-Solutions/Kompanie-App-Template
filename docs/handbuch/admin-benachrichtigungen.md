@@ -15,6 +15,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Benachricht
 - **Erinnerung an Termine am nächsten Tag ab**: die Uhrzeit, ab der die Erinnerung an die Termine des Folgetags verschickt wird (anfangs 18:00 Uhr).
 - **Am Geburtstag eines Mitglieds alle anderen benachrichtigen**: Schalter für die Benachrichtigung am Geburtstag (nur, wenn {bereich.birthdays} an ist).
 - **Benachrichtigung am Geburtstag ab**: die Uhrzeit dafür (anfangs 07:00 Uhr). Sie erscheint nur, wenn der Schalter darüber an ist.
+- **Zuletzt am Geburtstag benachrichtigt**: wann die App zuletzt über einen Geburtstag benachrichtigt hat, über wie viele Geburtstage und für wie viele Geräte. Steht dort „kein Gerät hat diese Benachrichtigung eingeschaltet“, hat niemand außer dem Geburtstagskind sie auf seinem Gerät an. Die Zeile erscheint erst nach der ersten Benachrichtigung.
 
 ## So gehst du vor
 ### Die Uhrzeit der Erinnerung ändern
@@ -27,6 +28,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Benachricht
 
 ## Gut zu wissen
 - Worüber eine Person benachrichtigt wird, wählt sie selbst auf ihrem Gerät (**Meins → Konto → Benachrichtigungen**, siehe [Benachrichtigungen](seite:benachrichtigungen)).
+- Kommt eine Benachrichtigung am Geburtstag auf einem Gerät nicht an, obwohl hier ein Versand steht und keine Nachrichten mehr warten, hat der Server sie in aller Regel an den Push-Dienst des Geräts (z. B. von Google oder Apple) übergeben. Dann liegt es meist am Gerät: Prüfe dort, ob {bereich.birthdays}: am Tag selbst eingeschaltet ist und ob das Handy Benachrichtigungen des Browsers zurückhält (z. B. im Energiesparmodus).
 - Kann der Server keine Benachrichtigungen senden, steht statt der Zahl der Geräte, was ihm fehlt. Das kann euer Hoster einschalten.
 
 > **Für Fortgeschrittene:** Was fehlt, betrifft die Verschlüsselung in PHP, der Programmiersprache, in der die App auf dem Server läuft (z. B. die PHP-Erweiterung OpenSSL). Der Hoster schaltet sie in den PHP-Einstellungen eures Webspace ein.

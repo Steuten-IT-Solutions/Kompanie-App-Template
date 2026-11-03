@@ -23,7 +23,7 @@ import Wartung from './Wartung';
 import Nutzung from './Nutzung';
 import { MaintenanceCard } from '../maintenance';
 import { navigate } from '../router';
-import { formatBytes } from '../format';
+import { formatBytes, formatUntil } from '../format';
 import { menuSources, prefetchOnTap, sources, usePrefetchMenu } from '../viewData';
 
 const sec = brand.labels.sections;
@@ -139,6 +139,16 @@ function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie'
   return s.news ? <News key={revision} {...props} /> : null;
 }
 
+/** „Zuletzt am Geburtstag benachrichtigt: …“ – Zeitpunkt, Geburtstage und Geräte (0 Geräte: niemand hat die Art abonniert). */
+function birthdayLastText(last: { at: string; birthdays: number; devices: number }): string {
+  const birthdays = last.birthdays === 1 ? '1 Geburtstag' : `${last.birthdays} Geburtstage`;
+  const devices =
+    last.devices === 0
+      ? 'kein Gerät hat diese Benachrichtigung eingeschaltet'
+      : `für ${last.devices === 1 ? '1 Gerät' : `${last.devices} Geräte`} in den Versand gegeben`;
+  return `Zuletzt am Geburtstag benachrichtigt: ${formatUntil(last.at)} (${birthdays}, ${devices}).`;
+}
+
 /**
  * Benachrichtigungen: wie viele Geräte angemeldet sind, wann die Erinnerung an Termine am nächsten Tag kommt und ob und ab
  * wann am Geburtstag benachrichtigt wird.
@@ -208,6 +218,7 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
               </select>
             </label>
           )}
+          {p.birthdays.last && <p className="small muted birthday-last">{birthdayLastText(p.birthdays.last)}</p>}
         </>
       )}
       {saveError && (

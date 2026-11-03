@@ -824,7 +824,7 @@ final class PushService
     /**
      * birthdays: Benachrichtigung am Geburtstag (an/aus, ab welcher Stunde); null ohne den Bereich Geburtstage.
      *
-     * @return array{supported: bool, missing: string[], devices: int, accounts: int, guests: int, queued: int, reminderHour: int, birthdays: array{enabled: bool, hour: int}|null}
+     * @return array{supported: bool, missing: string[], devices: int, accounts: int, guests: int, queued: int, reminderHour: int, birthdays: array{enabled: bool, hour: int, last: array{at: string, birthdays: int, devices: int}|null}|null}
      */
     public function adminStatus(): array
     {

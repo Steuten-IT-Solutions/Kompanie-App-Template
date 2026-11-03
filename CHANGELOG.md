@@ -15,6 +15,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Neu
+
+- **Letzte Benachrichtigung am Geburtstag sichtbar**: Unter *Einstellungen → Benachrichtigungen* steht jetzt, wann
+  die App zuletzt über einen Geburtstag benachrichtigt hat und für wie viele Geräte. So siehst du ohne Blick in die
+  Datenbank, ob die Benachrichtigung verschickt wurde oder ob niemand sie eingeschaltet hat.
+
 ### Geändert
 
 - **Seite eines Mitglieds erscheint schneller**: Öffnest du in der Verwaltung eine Person oder blätterst weiter, stehen

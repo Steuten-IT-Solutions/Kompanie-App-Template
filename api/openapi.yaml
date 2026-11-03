@@ -5345,10 +5345,20 @@ components:
               birthdays:
                 type: [object, 'null']
                 description: Benachrichtigung am Geburtstag; null ohne den Bereich Geburtstage
-                required: [enabled, hour]
+                required: [enabled, hour, last]
                 properties:
                   enabled: { type: boolean }
                   hour: { type: integer, minimum: 0, maximum: 23 }
+                  last:
+                    type: [object, 'null']
+                    description: >-
+                      Letzte Benachrichtigung am Geburtstag (je Tag zusammengezählt); null, solange noch keine verschickt wurde.
+                      devices = Geräte, für die sie in die Warteschlange ging (0 = kein Gerät hat die Art abonniert).
+                    required: [at, birthdays, devices]
+                    properties:
+                      at: { type: string, format: date-time, description: Letzter Lauf mit Geburtstag, Zeitzone der Kompanie }
+                      birthdays: { type: integer }
+                      devices: { type: integer }
     Error:
       description: Fehler
       content:
