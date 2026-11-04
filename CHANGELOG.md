@@ -17,6 +17,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Impressum und Datenschutz**: Unter *Einstellungen → Impressum und Datenschutz* (und im Einrichtungsassistenten) trägst
+  du die Links auf euer Impressum und eure Datenschutzerklärung ein, z. B. auf eurer Webseite. Die App zeigt sie allen,
+  auch ohne Anmeldung: auf der Anmeldeseite, unten im Konto und unten in der Hilfe. Solange einer fehlt, ist die Zeile
+  *Impressum und Datenschutz* unter *Zustand und Updates* gelb. Die Hilfe listet, welche Daten die App verarbeitet, als
+  Hilfe für eure Datenschutzerklärung.
 - **Nachvollziehen, was an Benachrichtigungen verschickt wurde**: Unter *Einstellungen → Benachrichtigungen* steht
   jetzt für jede Art, wann sie zuletzt verschickt wurde und an wie viele Geräte, dazu wann der Push-Dienst zuletzt eine
   Nachricht angenommen oder abgelehnt hat (mit Grund). So siehst du ohne Blick in die Datenbank, ob eine Benachrichtigung

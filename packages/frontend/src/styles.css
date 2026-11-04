@@ -2586,6 +2586,12 @@ fieldset.rights-tree legend {
   margin-top: 18px;
 }
 
+/* Links auf Impressum und Datenschutz (Einstellungen → Impressum und Datenschutz) */
+.account-legal {
+  margin-top: 18px;
+  text-align: center;
+}
+
 /* Lizenzen (Issue #173) */
 .hilfe-text .lizenz-liste {
   list-style: none;

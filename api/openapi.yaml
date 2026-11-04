@@ -4483,6 +4483,8 @@ paths:
                 gallery_root: { type: string, description: Link oder ID des Galerie-Ordners in Google Drive }
                 news_source: { type: string, enum: [none, wordpress, rss], description: Nur eigenständige Version }
                 news_url: { type: string, description: Nur eigenständige Version }
+                legal_imprint_url: { type: string, description: 'Link auf das Impressum (http:// oder https://, höchstens 255 Zeichen); leer entfernt ihn' }
+                legal_privacy_url: { type: string, description: 'Link auf die Datenschutzerklärung (http:// oder https://, höchstens 255 Zeichen); leer entfernt ihn' }
       responses:
         '200':
           description: Neuer Stand
@@ -6008,6 +6010,13 @@ components:
         news:
           type: [object, 'null']
           description: null, wenn die Neuigkeiten aus den Beiträgen der WordPress-Seite kommen.
+        legal:
+          type: object
+          description: 'Links auf Impressum und Datenschutzerklärung (Einstellungen → Impressum und Datenschutz); leer, solange keiner eingetragen ist'
+          required: [imprint_url, privacy_url]
+          properties:
+            imprint_url: { type: string }
+            privacy_url: { type: string }
           properties:
             source: { type: string, enum: [none, wordpress, rss] }
             url: { type: string }
@@ -6169,6 +6178,13 @@ components:
         variant: { type: string, enum: [wordpress, standalone], description: Art der Installation }
         siteUrl: { type: [string, 'null'], description: Startseite der Webseite, falls vorhanden }
         handbookUrl: { type: [string, 'null'], description: 'Handbuch der Kompanie auf ihrer GitHub-Pages-Seite (…/handbuch/), aus der Adresse der Update-Liste abgeleitet; sonst null' }
+        legal:
+          type: object
+          description: 'Links auf Impressum und Datenschutzerklärung der Kompanie, für alle (auch ohne Anmeldung); null, solange keiner eingetragen ist'
+          required: [imprint, privacy]
+          properties:
+            imprint: { type: [string, 'null'] }
+            privacy: { type: [string, 'null'] }
         reports: { type: boolean, description: 'Fehlermeldungen an die Betreuer möglich (reportUrl in update.json, Issue #64); sonst kein Knopf „Fehler melden“' }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
         backupUrl: { type: [string, 'null'], description: 'Nur für Admins (nicht in der Vorschau): Adresse zum Herunterladen der Datensicherung als Datei (<App>/sicherung), Stück für Stück erzeugt; sonst null' }

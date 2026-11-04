@@ -11,6 +11,7 @@ import { AddressFields, EmailField, ErrorBox, lazyView, Loading, PhoneField, use
 import { normalizeEmail } from '../email';
 import { normalizePhone } from '../phone';
 import { addressInput, EMPTY_ADDRESS, formatAddress } from '../address';
+import { LegalLinks } from '../legal';
 import { MemberAvatar } from '../memberPhoto';
 import { downloadPersonalData } from '../personalData';
 import { previewRole } from '../preview';
@@ -320,6 +321,7 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
       <button className="btn btn-danger btn-block logout" onClick={onLogout}>
         Abmelden
       </button>
+      <LegalLinks className="account-legal" />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { can, config, levelLabel, type Capability, type Feature } from '../api';
 import brand from '../generated/brand';
 import handbuch from '../generated/handbuch.json';
+import { LegalLinks } from '../legal';
 import { navigate } from '../router';
 import { Empty, lazyView } from '../ui';
 import FehlerMelden, { ReportButton } from './FehlerMelden';
@@ -183,6 +184,7 @@ export default function Hilfe({ slug }: { slug?: string }) {
       <p className="small muted hilfe-web">
         <a href="#/hilfe/lizenzen">Lizenzen</a> der App und der enthaltenen Bausteine anderer Anbieter
       </p>
+      <LegalLinks className="hilfe-web" />
     </div>
   );
 }

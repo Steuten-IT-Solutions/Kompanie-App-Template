@@ -17,6 +17,7 @@ Eine Ampel mit einer Zeile je Thema. Jede Zeile sagt in einem kurzen Text, was l
 - **{bereich.gallery}**: wann der letzte Abgleich mit Google Drive war, ob er geklappt hat und ob Bilder noch aufbereitet werden oder sich nicht laden ließen.
 - **Kalender**: ob und wie der Kalender eingerichtet ist und ob die Verbindung mit Google ihn lesen darf.
 - **Datensicherung**: wann zuletzt eine Sicherung heruntergeladen bzw. in Google Drive abgelegt wurde.
+- **Impressum und Datenschutz**: gelb, solange der Link auf das Impressum oder die Datenschutzerklärung fehlt. Siehe [Impressum und Datenschutz](seite:admin-rechtliches).
 - **Server**: welche PHP-Version und Datenbank laufen; gelb, wenn auf dem Webspace weniger als 200 MB frei sind.
 - **Push-Benachrichtigungen**: wie viele Geräte angemeldet sind, oder was dem Server fehlt, um Benachrichtigungen zu senden.
 - Nur ohne WordPress: **Schutz der Daten** (ob Datenbank und Zugangsdaten aus dem Internet abrufbar wären; ist die Zeile rot, lass das sofort beim Hoster beheben), **Verschlüsselte Verbindung** (gelb, wenn die App über `http://` statt `https://` läuft; dann gehen Passwörter und Daten unverschlüsselt durchs Netz) und **Hintergrundaufgaben** (ob ein Cronjob beim Hoster die Aufgaben erledigt, mit der Adresse dafür).
