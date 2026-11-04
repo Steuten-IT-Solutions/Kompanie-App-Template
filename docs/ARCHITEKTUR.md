@@ -2,7 +2,7 @@
 
 Dieses Repo ist der **gemeinsame Kern** der Kompanie-App. Jede Kompanie bekommt in unserer GitHub-Organisation ein eigenes, kleines Repo. Darin stehen nur Name, Logo, Farben und ein paar Texte. Alles andere passiert automatisch: Build, Icons, Prüfungen, Releases und Updates auf den Servern der Kompanien.
 
-Die erste Umsetzung war eine App für eine einzelne Kompanie (Repo `Marinekompanie-Lank-App`). Ihre Funktionen werden hier herausgelöst, **neutral gestaltet** und von WordPress getrennt. Die Umstellung dieser Kompanie wird getrennt geplant (siehe [Abschnitt 15](#15-umstellung-der-ersten-kompanie-lank)).
+Die erste Umsetzung war eine App für eine einzelne Kompanie (Repo `Marinekompanie-Lank-App`). Ihre Funktionen werden hier herausgelöst, **neutral gestaltet** und von WordPress getrennt. Diese Kompanie ist inzwischen auf den Kern umgestellt (siehe [Abschnitt 15](#15-umstellung-der-ersten-kompanie-lank)).
 
 ## 1. Leitlinien
 
@@ -27,7 +27,7 @@ Die erste Umsetzung war eine App für eine einzelne Kompanie (Repo `Marinekompan
 | Handbuch | Eine Quelle in `docs/handbuch/`: in der App hinter „?“ (offline, passend zu Version, Rechten und Bereichen) und je Kompanie auf GitHub Pages unter `/handbuch/`, jeweils mit ihren Bezeichnungen. |
 | Statusmeldungen an uns | **Nur mit Zustimmung** der Kompanie. |
 | Galerie (Google Drive) | „Mit Google verbinden“ mit dem eigenen OAuth-Client der Installation (`drive.readonly`, `calendar.readonly`), alternativ Ordnerfreigabe an ein Dienstkonto; siehe Abschnitt 9. |
-| Erste Kompanie (Lank) | Wird umgestellt, aber in einem eigenen, später geplanten Schritt. |
+| Erste Kompanie (Lank) | Umgestellt: läuft auf dem WordPress-Plugin des Kerns, Kompanie-Repo `marinekompanie-app` (Issue #25). |
 
 Technische Rahmenbedingungen:
 
@@ -358,7 +358,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - **Ändern:** `PATCH` mit `quantity` (absolut) oder `adjust` (z. B. ±1 von den Knöpfen −/+; addiert in der Transaktion, gleichzeitige Klicks gehen nicht verloren). `location` im PATCH berichtigt nur den Ort, ohne Zusammenführen.
 - **Umlagern** (`POST /inventory/{id}/move`, eine Transaktion; MySQL sperrt Quelle und Ziel mit `FOR UPDATE`, SQLite mit `BEGIN IMMEDIATE`): Gibt es am Zielort einen Eintrag mit derselben Bezeichnung und Einheit (ohne Unterschied in Groß- und Kleinschreibung), kommt die Menge dazu; sonst entsteht ein neuer Eintrag (Kategorie und Notiz übernommen). Wird alles umgelagert, verschwindet die Quelle (beim Zusammenführen weich gelöscht), ohne passendes Ziel ändert sich nur ihr Ort. Mehr als vorhanden, 0 oder derselbe Ort → 400 ohne jede Änderung. Verlauf: Quelle und Ziel bekommen je einen Eintrag `move` mit demselben `changes.move = {from, to, quantity, source_id, target_id}` und ihrer eigenen Mengenänderung (`quantity {old, new}`, beim neuen Ziel `old: null`; ganz geleerte Quelle `new: 0` und `move.source_removed`); alles ohne Ziel ist ein einziger Eintrag mit `location {old, new}`.
 - App: kein eigener Tab; Einstieg über *Meins → Konto* → *Inventar öffnen* (`#/inventar`, wie Schwarzes Brett und Umfragen). Die Liste ist **nach Material gruppiert** (Entscheidung im Issue): Schlüssel ist die Bezeichnung ohne Unterschied in Groß- und Kleinschreibung, je Gruppe die Summe über alle Orte, je Einheit getrennt („12 Stück · 3 kg“). Aufgeklappt die Einträge je Ort mit −/+, *Umlagern*, *Bearbeiten*, *Verlauf* und *Löschen* (fragt nach einem Grund); Suche über Bezeichnung, Ort, Kategorie und Notiz. Verlauf je Eintrag (`#/inventar/verlauf/<id>`) und gesamt (`#/inventar/verlauf`); je 100 Einträge, „Ältere Einträge laden“ holt die nächste Seite über `before`.
-- Offen: Die Übernahme der Lanker Inventardaten (Lank #44) gehört wie die übrigen Daten ins Übernahme-Plugin (Abschnitt 15).
+- Die Lanker Inventardaten (Lank #44) sind wie die übrigen Daten übernommen (Stand 04.11.2026, Abschnitt 15).
 
 ### Mitgliederliste für alle
 
@@ -784,7 +784,7 @@ Die Schritte 2–5 lassen sich überspringen und später unter *Einstellungen* n
 
 ## 15. Umstellung der ersten Kompanie (Lank)
 
-Geplant in Issue #25. Lank läuft danach auf dem WordPress-Plugin des Kerns; ihr Design kommt aus ihrem Kompanie-Repo.
+**Abgeschlossen** (Issue #25, Stand 04.11.2026): Lank läuft vollständig auf dem WordPress-Plugin des Kerns; ihr Design kommt aus ihrem Kompanie-Repo `marinekompanie-app`. Der folgende Text beschreibt, wie die Umstellung angelegt war.
 
 **Grundsatz: kopieren, nicht zerstören.** Ein eigenes **Übernahme-Plugin** im bisherigen Lank-Repo (Ordner `uebernahme/`) kopiert die Daten des alten Plugins in die Tabellen und Einstellungen des Kerns. Die alten Tabellen, Optionen und User-Meta bleiben unverändert; so lässt sich in den ersten Tagen auf das alte Plugin zurückschalten. Lank-spezifischer Code gehört nicht in den Kern (Neutralitätsprüfung); er wird nach der Aufräumfrist mit dem Übernahme-Plugin gelöscht.
 
@@ -826,7 +826,7 @@ Ablauf, Probelauf, Bericht und Rückfallplan beschreibt das Übernahme-Plugin in
 | 5 | **Installer, Assistent, Updates:** automatische Updates, Ein-Klick-Update, Zurückrollen, Sicherung, Statusseite | Installation und Pflege ohne Handarbeit |
 | 6 | **Für uns:** Formulare „Neue Kompanie“/„Kompanie ändern“, „Kompanien abgleichen“, Empfang und Übersicht der Statusmeldungen (im Cockpit, Repo `project-cockpit`; Format in [STATUSMELDUNGEN.md](STATUSMELDUNGEN.md)); offen: automatischer Demo-Test mit Befördern (braucht die Demo-Installation) | neue Kompanie nur durch Eintragen |
 | später | Hoster-Anleitungen erweitern, `/embed/termine`, Multisite | |
-| – | Umstellung Lank | eigener Plan |
+| ✓ | Umstellung Lank (Issue #25) | abgeschlossen, siehe Abschnitt 15 |
 
 ### Was wir dafür in der Organisation brauchen
 
