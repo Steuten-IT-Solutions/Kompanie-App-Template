@@ -2,7 +2,7 @@
 
 Dieses Repo ist der **gemeinsame Kern** der Kompanie-App. Jede Kompanie bekommt in unserer GitHub-Organisation ein eigenes, kleines Repo. Darin stehen nur Name, Logo, Farben und ein paar Texte. Alles andere passiert automatisch: Build, Icons, Prüfungen, Releases und Updates auf den Servern der Kompanien.
 
-Die erste Umsetzung war eine App für eine einzelne Kompanie (Repo `Marinekompanie-Lank-App`). Ihre Funktionen werden hier herausgelöst, **neutral gestaltet** und von WordPress getrennt. Die Umstellung dieser Kompanie wird getrennt geplant (siehe [Abschnitt 15](#15-umstellung-der-ersten-kompanie-lank)).
+Die erste Umsetzung war eine App für eine einzelne Kompanie (Repo `Marinekompanie-Lank-App`). Ihre Funktionen werden hier herausgelöst, **neutral gestaltet** und von WordPress getrennt. Diese Kompanie ist inzwischen auf den Kern umgestellt (siehe [Abschnitt 15](#15-umstellung-der-ersten-kompanie-lank)).
 
 ## 1. Leitlinien
 
@@ -27,7 +27,7 @@ Die erste Umsetzung war eine App für eine einzelne Kompanie (Repo `Marinekompan
 | Handbuch | Eine Quelle in `docs/handbuch/`: in der App hinter „?“ (offline, passend zu Version, Rechten und Bereichen) und je Kompanie auf GitHub Pages unter `/handbuch/`, jeweils mit ihren Bezeichnungen. |
 | Statusmeldungen an uns | **Nur mit Zustimmung** der Kompanie. |
 | Galerie (Google Drive) | „Mit Google verbinden“ mit dem eigenen OAuth-Client der Installation (`drive.readonly`, `calendar.readonly`), alternativ Ordnerfreigabe an ein Dienstkonto; siehe Abschnitt 9. |
-| Erste Kompanie (Lank) | Wird umgestellt, aber in einem eigenen, später geplanten Schritt. |
+| Erste Kompanie (Lank) | Umgestellt: läuft auf dem WordPress-Plugin des Kerns, Kompanie-Repo `marinekompanie-app` (Issue #25). |
 
 Technische Rahmenbedingungen:
 
@@ -784,7 +784,7 @@ Die Schritte 2–5 lassen sich überspringen und später unter *Einstellungen* n
 
 ## 15. Umstellung der ersten Kompanie (Lank)
 
-Geplant in Issue #25. Lank läuft danach auf dem WordPress-Plugin des Kerns; ihr Design kommt aus ihrem Kompanie-Repo.
+**Abgeschlossen** (Issue #25, Stand 04.11.2026): Lank läuft vollständig auf dem WordPress-Plugin des Kerns; ihr Design kommt aus ihrem Kompanie-Repo `marinekompanie-app`. Der folgende Text beschreibt, wie die Umstellung angelegt war.
 
 **Grundsatz: kopieren, nicht zerstören.** Ein eigenes **Übernahme-Plugin** im bisherigen Lank-Repo (Ordner `uebernahme/`) kopiert die Daten des alten Plugins in die Tabellen und Einstellungen des Kerns. Die alten Tabellen, Optionen und User-Meta bleiben unverändert; so lässt sich in den ersten Tagen auf das alte Plugin zurückschalten. Lank-spezifischer Code gehört nicht in den Kern (Neutralitätsprüfung); er wird nach der Aufräumfrist mit dem Übernahme-Plugin gelöscht.
 
@@ -826,7 +826,7 @@ Ablauf, Probelauf, Bericht und Rückfallplan beschreibt das Übernahme-Plugin in
 | 5 | **Installer, Assistent, Updates:** automatische Updates, Ein-Klick-Update, Zurückrollen, Sicherung, Statusseite | Installation und Pflege ohne Handarbeit |
 | 6 | **Für uns:** Formulare „Neue Kompanie“/„Kompanie ändern“, „Kompanien abgleichen“, Empfang und Übersicht der Statusmeldungen (im Cockpit, Repo `project-cockpit`; Format in [STATUSMELDUNGEN.md](STATUSMELDUNGEN.md)); offen: automatischer Demo-Test mit Befördern (braucht die Demo-Installation) | neue Kompanie nur durch Eintragen |
 | später | Hoster-Anleitungen erweitern, `/embed/termine`, Multisite | |
-| – | Umstellung Lank | eigener Plan |
+| ✓ | Umstellung Lank (Issue #25) | abgeschlossen, siehe Abschnitt 15 |
 
 ### Was wir dafür in der Organisation brauchen
 
