@@ -74,6 +74,7 @@ export const sources = {
   inventory: source('inventory', api.inventory),
   inventoryLocations: source('inventory-locations', api.inventoryLocations),
   lists: source('lists', api.lists),
+  list: (id: number) => source('list', () => api.list(id), [id]),
   events: source('events', api.events),
   // Einstellungen (/admin/…: nur im Speicher der App, nie im Service Worker)
   settings: source('settings', () => api.settings()),

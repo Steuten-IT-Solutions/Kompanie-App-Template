@@ -28,6 +28,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Dienstgrad, Foto, Rolle, Punkte und Offen sofort da (aus der Mitgliederliste); der Rest der Seite folgt, sobald ihre
   Daten geladen sind. Die übrigen Personen lädt die App jetzt zu zwölft in einer Anfrage vor statt einzeln, und ohne
   dabei auf Fotos und Abzeichen zu warten; so sind auch weiter entfernte Seiten deutlich früher bereit.
+- **Listen öffnen schneller**: Öffnest du unter *Verwaltung → Listen* eine Liste erneut, steht sie sofort da und wird im
+  Hintergrund aktualisiert, wie die übrigen Seiten der App. Hat jemand sie inzwischen geändert, zeigt die App gleich
+  danach den neuen Stand.
 
 ## [0.5.0] – 2026-11-01
 
