@@ -97,6 +97,8 @@ export interface AppConfig {
   features: Record<Feature, boolean>;
   /** Handbuch auf der Webseite der Kompanie (GitHub Pages); null ohne Update-Adresse */
   handbookUrl?: string | null;
+  /** Links auf Impressum und Datenschutzerklärung der Kompanie (Einstellungen → Impressum und Datenschutz); null ohne */
+  legal?: { imprint: string | null; privacy: string | null };
   /** „Fehler melden“ möglich (Issue #64): Die App hat einen Empfänger für Fehlermeldungen */
   reports?: boolean;
   /** Rollen der Installation (Einstellungen → Rollen): Bezeichnung und Punktefaktor */
@@ -2285,6 +2287,8 @@ export interface AdminSettings {
     status: { albums?: number; photos?: number; pending?: number; failed?: number; last_sync?: number; error?: string };
   };
   news: { source: NewsSourceType; url: string } | null;
+  /** Links auf Impressum und Datenschutzerklärung; leer, solange keiner eingetragen ist (fehlt bei älteren Servern) */
+  legal?: { imprint_url: string; privacy_url: string };
 }
 
 /** Bild der Galerie, das sich nicht aufbereiten ließ (Einstellungen → Galerie). */
@@ -2311,4 +2315,6 @@ export interface AdminSettingsInput {
   gallery_root?: string;
   news_source?: NewsSourceType;
   news_url?: string;
+  legal_imprint_url?: string;
+  legal_privacy_url?: string;
 }

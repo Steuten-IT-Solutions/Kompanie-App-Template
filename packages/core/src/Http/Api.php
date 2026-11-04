@@ -506,6 +506,8 @@ final class Api
             'features' => $features,
             // Fehlermeldungen an die Betreuer der App (Issue #64): ohne Empfänger kein Knopf „Fehler melden“
             'reports' => $a->bugReports()->available(),
+            // Impressum und Datenschutzerklärung der Kompanie (Einstellungen → Impressum und Datenschutz): für alle, auch Gäste
+            'legal' => self::legalLinks($a->settingsService()->legal()),
             // Handbuch auf GitHub Pages der Kompanie: neben updates.json (Issue #12)
             'handbookUrl' => self::handbookUrl((string) ($a->packageConfig['updatesUrl'] ?? '')),
             // Bezeichnungen und Punktefaktor der Rollen (vom Admin in der App festgelegt)
@@ -534,6 +536,18 @@ final class Api
     private static function maintenanceInfo(array $state): array
     {
         return ['on' => $state['on'], 'reason' => $state['reason'], 'since' => $state['since']];
+    }
+
+    /**
+     * @param array{imprint_url: string, privacy_url: string} $legal
+     * @return array{imprint: string|null, privacy: string|null}
+     */
+    private static function legalLinks(array $legal): array
+    {
+        return [
+            'imprint' => $legal['imprint_url'] !== '' ? $legal['imprint_url'] : null,
+            'privacy' => $legal['privacy_url'] !== '' ? $legal['privacy_url'] : null,
+        ];
     }
 
     /** https://…/updates.json → https://…/handbuch/ (dort liegt die Seite der Kompanie); sonst null. */

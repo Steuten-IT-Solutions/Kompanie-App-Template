@@ -110,6 +110,13 @@ const gruppe: Gruppe = async (f) => {
   await f.foto('admin-zustand');
   await ausschnitt('admin-zustand-fehlerprotokoll', 'section[aria-labelledby=errorlog-title]');
 
+  // Impressum und Datenschutz (Beispieladressen, nicht gespeichert)
+  await f.oeffnen('einstellungen/rechtliches');
+  const rechtliches = page.locator('#einstellungen-rechtliches');
+  await rechtliches.getByLabel('Impressum').fill('https://www.beispiel.de/impressum');
+  await rechtliches.getByLabel('Datenschutzerklärung').fill('https://www.beispiel.de/datenschutz');
+  await f.foto('admin-rechtliches');
+
   // Datensicherung
   await f.oeffnen('einstellungen/datensicherung');
   await f.foto('admin-updates-und-sicherung');
@@ -129,6 +136,8 @@ const gruppe: Gruppe = async (f) => {
   await f.foto('admin-einrichtung-galerie');
   await knopf('Weiter').click(); // → Neuigkeiten
   await expect(page.locator('#einstellungen-news')).toBeVisible();
+  await knopf('Weiter').click(); // → Impressum und Datenschutz
+  await expect(page.locator('#einstellungen-rechtliches')).toBeVisible();
   await knopf('Weiter').click(); // → Mitglieder übernehmen
   await expect(page.getByRole('heading', { name: 'Mitglieder übernehmen' })).toBeVisible();
   // Nur der Abschnitt: Der Google-Zugang aus dem Schritt davor bleibt in der App derzeit stehen (gleicher key).

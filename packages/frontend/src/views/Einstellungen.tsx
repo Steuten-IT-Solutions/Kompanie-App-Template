@@ -40,6 +40,7 @@ const PAGES = [
   { id: 'galerie', title: sec.gallery, text: 'Fotoalben aus einem Ordner in Google Drive.' },
   { id: 'kalender', title: 'Kalender', text: 'Kalender für Mitglieder aus Google Kalender oder per iCal.' },
   { id: 'news', title: newsTitle(), text: `Woher die ${newsTitle()} kommen.` },
+  { id: 'rechtliches', title: 'Impressum und Datenschutz', text: 'Links auf Impressum und Datenschutzerklärung, für alle sichtbar.' },
   { id: 'nutzung', title: 'Nutzung', text: 'Wer die App wann nutzt und welche Bereiche.' },
   { id: 'zustand', title: 'Zustand und Updates', text: 'Ampel je Bereich, installierte Version und Updates.' },
   { id: 'datensicherung', title: 'Datensicherung', text: 'Sicherung herunterladen oder einspielen.' },
@@ -76,7 +77,7 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
       {page.id === 'wartung' && <MaintenanceCard onToast={onToast} />}
       {page.id === 'datensicherung' && <Wartung part="datensicherung" onToast={onToast} />}
       {page.id === 'neuerungen' && <Neuerungen />}
-      {(page.id === 'google' || page.id === 'kalender' || page.id === 'galerie' || page.id === 'news') && (
+      {(page.id === 'google' || page.id === 'kalender' || page.id === 'galerie' || page.id === 'news' || page.id === 'rechtliches') && (
         <Verbindung page={page.id} onToast={onToast} />
       )}
     </div>
@@ -126,8 +127,14 @@ function Overview() {
   );
 }
 
-/** Google-Zugang, Kalender, Galerie oder Neuigkeiten: alle aus den gemeinsamen Einstellungen (/admin/settings). */
-function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie' | 'news'; onToast: (msg: string) => void }) {
+/** Google-Zugang, Kalender, Galerie, Neuigkeiten oder Rechtliches: alle aus den gemeinsamen Einstellungen (/admin/settings). */
+function Verbindung({
+  page,
+  onToast,
+}: {
+  page: 'google' | 'kalender' | 'galerie' | 'news' | 'rechtliches';
+  onToast: (msg: string) => void;
+}) {
   const { data, error, loading, reload, setData, revision } = useAsync(sources.settings.load, sources.settings.deps, sources.settings.key);
   if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -137,6 +144,7 @@ function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie'
   if (page === 'google') return <GoogleAccess key={revision} {...props} />;
   if (page === 'kalender') return <Calendar key={revision} {...props} />;
   if (page === 'galerie') return <Gallery key={revision} {...props} />;
+  if (page === 'rechtliches') return <Legal key={revision} {...props} />;
   return s.news ? <News key={revision} {...props} /> : null;
 }
 
@@ -1311,6 +1319,62 @@ export function News({ settings, onSaved, onToast }: SectionProps) {
           {result}
         </p>
       )}
+    </Section>
+  );
+}
+
+/**
+ * Links auf Impressum und Datenschutzerklärung (z. B. die Seiten auf der Webseite der Kompanie). Die App zeigt sie allen,
+ * auch ohne Anmeldung: auf der Anmeldeseite, im Konto und in der Hilfe. Ohne einen der Links ist die Statusseite gelb.
+ */
+export function Legal({ settings, onSaved, onToast }: SectionProps) {
+  const saved = settings.legal ?? { imprint_url: '', privacy_url: '' };
+  const [imprint, setImprint] = useState(saved.imprint_url);
+  const [privacy, setPrivacy] = useState(saved.privacy_url);
+  // Gleich sichtbar machen (Anmeldeseite, Konto, Hilfe), ohne die App neu zu laden.
+  const { busy, error, save } = useSave((s) => {
+    if (config && s.legal) config.legal = { imprint: s.legal.imprint_url || null, privacy: s.legal.privacy_url || null };
+    onSaved(s);
+  }, onToast);
+  return (
+    <Section
+      id="rechtliches"
+      title="Impressum und Datenschutz"
+      busy={busy}
+      error={error}
+      onSubmit={(e) => {
+        e.preventDefault();
+        save({ legal_imprint_url: imprint.trim(), legal_privacy_url: privacy.trim() });
+      }}
+    >
+      <p className="muted small">
+        Trage die Adressen eures Impressums und eurer Datenschutzerklärung ein, z. B. die Seiten auf eurer Webseite. Die App zeigt die Links
+        allen, auch ohne Anmeldung: auf der Anmeldeseite, im Konto und in der Hilfe.
+      </p>
+      <label className="field">
+        <span>Impressum</span>
+        <input
+          type="url"
+          inputMode="url"
+          placeholder="https://www.beispiel.de/impressum"
+          value={imprint}
+          onChange={(e) => setImprint(e.target.value)}
+        />
+      </label>
+      <label className="field">
+        <span>Datenschutzerklärung</span>
+        <input
+          type="url"
+          inputMode="url"
+          placeholder="https://www.beispiel.de/datenschutz"
+          value={privacy}
+          onChange={(e) => setPrivacy(e.target.value)}
+        />
+      </label>
+      <p className="muted small">
+        Was die App an Daten verarbeitet (für eure Datenschutzerklärung), steht in der Hilfe unter „Impressum und Datenschutz“. Ein leeres
+        Feld entfernt den Link.
+      </p>
     </Section>
   );
 }

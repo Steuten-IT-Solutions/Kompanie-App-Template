@@ -3189,6 +3189,59 @@ test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ 
   await shot(page, '19-wartung');
 });
 
+test('Impressum und Datenschutz: Admin trägt die Links ein, alle sehen sie (Anmeldung, Hilfe, Konto), Ampel wird grün', async ({
+  page,
+  browser,
+}) => {
+  const imprint = 'https://www.beispiel.de/impressum';
+  const privacy = 'https://www.beispiel.de/datenschutz';
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/einstellungen/zustand');
+  const status = page.locator('.settings-section', { hasText: 'Zustand der App' });
+  await expect(status.locator('.status-item.status-warn', { hasText: 'Impressum und Datenschutz' })).toBeVisible();
+
+  await page.goto('/app/#/einstellungen/rechtliches');
+  const form = page.locator('.settings-section', { hasText: 'Impressum und Datenschutz' });
+  // Ungültige Adresse: Der Server lehnt sie ab, nichts wird gespeichert.
+  await form.getByLabel('Impressum').fill('javascript:alert(1)');
+  await form.getByLabel('Impressum').evaluate((el) => el.setAttribute('type', 'text'));
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(form.locator('.form-error')).toContainText('Adresse des Impressums');
+  await form.getByLabel('Impressum').fill(imprint);
+  await form.getByLabel('Datenschutzerklärung').fill(privacy);
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  // Gleich im Konto sichtbar, ohne neu zu laden.
+  await openKonto(page);
+  const konto = page.locator('.account-legal');
+  await expect(konto.getByRole('link', { name: 'Impressum' })).toHaveAttribute('href', imprint);
+  await expect(konto.getByRole('link', { name: 'Datenschutz' })).toHaveAttribute('href', privacy);
+  await page.goto('/app/#/einstellungen/zustand');
+  await page.reload();
+  await expect(status.locator('.status-item.status-ok', { hasText: 'Impressum und Datenschutz' })).toBeVisible();
+
+  // Ohne Anmeldung: in der Hilfe und (eigenständig) auf der Anmeldeseite, in einem neuen Fenster.
+  const guest = await browser.newPage();
+  await guest.goto('/app/#/hilfe');
+  const hilfe = guest.locator('.legal-links');
+  await expect(hilfe.getByRole('link', { name: 'Impressum' })).toHaveAttribute('href', imprint);
+  await expect(hilfe.getByRole('link', { name: 'Datenschutz' })).toHaveAttribute('target', '_blank');
+  if (STANDALONE) {
+    await guest.goto('/app/#/anmelden');
+    await expect(guest.locator('form.login').getByRole('link', { name: 'Datenschutz' })).toHaveAttribute('href', privacy);
+  }
+  await guest.close();
+
+  // Aufräumen: Links entfernen, die Ampel ist wieder gelb.
+  await page.goto('/app/#/einstellungen/rechtliches');
+  await form.getByLabel('Impressum').fill('');
+  await form.getByLabel('Datenschutzerklärung').fill('');
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  await openKonto(page);
+  await expect(page.locator('.account-legal')).toHaveCount(0);
+});
+
 test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nicht', async ({ page }) => {
   // So, wie scripts/changelog.php es beim Bauen in die App gelegt hat.
   const changelog = JSON.parse(readFileSync(new URL('../src/generated/changelog.json', import.meta.url), 'utf8')) as {
