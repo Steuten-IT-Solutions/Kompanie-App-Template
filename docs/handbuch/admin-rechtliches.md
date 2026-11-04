@@ -5,6 +5,8 @@ rechte: [manage_settings]
 ---
 Hier trägst du die Links auf das Impressum und die Datenschutzerklärung eurer Kompanie ein. Die App zeigt sie dann allen, auch ohne Anmeldung.
 
+![Die Seite Impressum und Datenschutz mit den beiden Links](bild:admin-rechtliches)
+
 ## So öffnest du die Seite
 Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Impressum und Datenschutz**. Im [Einrichtungsassistenten](seite:admin-einrichtung) gibt es dafür einen eigenen Schritt.
 
