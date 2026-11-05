@@ -45,6 +45,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Download-Seite mit langem Namen auf dem Handy**: Ein langer Kompaniename lief im Kopf der Download- und
   Installationsseite über den Bildschirmrand, die Seite wurde breiter als das Handy. Der Name bricht jetzt um, Logo und
   Überschrift sind auf schmalen Bildschirmen etwas kleiner.
+- **Download-Seite: Abstand unter dem Kopf**: Zwischen dem Kopf der Download- und Installationsseite und der ersten Karte
+  fehlte der Abstand, ebenso unten unter dem Fußtext.
 
 ## [0.5.0] – 2026-11-01
 
