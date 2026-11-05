@@ -2793,7 +2793,8 @@ test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne'
   // Wischen: Das Bild folgt dem Finger, daneben steht schon das nächste; zu kurz gezogen schnappt es zurück.
   const lb = await lightboxSwipe(page, -30, true);
   await expect(page.locator('.lb-peek-next img')).toBeVisible();
-  expect(await page.locator('.lb-track').evaluate((el) => el.style.transform)).toBe('translateX(-30px)');
+  // Touch-Bewegungen kommen erst mit dem nächsten Bild an, daher warten statt sofort lesen.
+  await expect.poll(() => page.locator('.lb-track').evaluate((el) => el.style.transform)).toBe('translateX(-30px)');
   await lb.release();
   await expect(page.locator('.lb-peek')).toHaveCount(0);
   await expect(page.locator('.lb-count')).toHaveText('1 / 2');
