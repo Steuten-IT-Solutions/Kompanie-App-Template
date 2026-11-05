@@ -4269,6 +4269,18 @@ async function boardCard(page: Page, title: string): Promise<Locator> {
   return page.locator(`.board-card[data-focus-id="${id}"]`);
 }
 
+/**
+ * Geänderte Nachricht speichern und warten, bis der Server die Änderung bestätigt hat. Nur auf den Hinweis „Nachricht
+ * geändert“ zu warten reicht nicht: Der von der vorigen Änderung steht evtl. noch da (3,5 s, gleicher Text), und ein
+ * anderes Gerät, das gleich danach lädt, bekäme sonst noch den Stand davor.
+ */
+async function saveBoardCard(page: Page, card: Locator) {
+  const saved = page.waitForResponse((r) => r.request().method() === 'PATCH' && decodeURIComponent(r.url()).includes('/board/'));
+  await card.getByRole('button', { name: 'Speichern' }).click();
+  expect((await saved).ok()).toBe(true);
+  await expect(page.locator('.toast')).toHaveText('Nachricht geändert');
+}
+
 /** Neue Nachricht am Brett schreiben (Titel, Text im Editor) und veröffentlichen; der Bestätigungsdialog wird angenommen. */
 async function postBoard(page: Page, title: string, text: string) {
   const form = page.locator('.board-form');
@@ -4378,8 +4390,7 @@ test('Schwarzes Brett: Banner mit Titel auf allen Seiten, ausblenden, „+1 weit
     .fill(
       `${later.getFullYear()}-${pad(later.getMonth() + 1)}-${pad(later.getDate())}T${pad(later.getHours())}:${pad(later.getMinutes())}`,
     );
-  await firstCard.getByRole('button', { name: 'Speichern' }).click();
-  await expect(admin.locator('.toast')).toHaveText('Nachricht geändert');
+  await saveBoardCard(admin, firstCard);
   await expect(admin.locator('.board-card', { hasText: first }).locator('.board-last-edit')).toContainText(/Zuletzt geändert von admin/i);
   await page.goto('/app/#/termine');
   await page.reload();
@@ -4390,8 +4401,7 @@ test('Schwarzes Brett: Banner mit Titel auf allen Seiten, ausblenden, „+1 weit
   const card2 = await boardCard(admin, first);
   await card2.getByRole('button', { name: 'Bearbeiten' }).click();
   await card2.getByLabel('Titel').fill(`${first} – fällt aus`);
-  await card2.getByRole('button', { name: 'Speichern' }).click();
-  await expect(admin.locator('.toast')).toHaveText('Nachricht geändert');
+  await saveBoardCard(admin, card2);
   // Nach dem Neuladen kommt zuerst der gespeicherte Stand (Issue #108), die geänderte Fassung folgt, sobald das Netz
   // antwortet: Dann ist die ausgeblendete Nachricht wieder da („+1 weitere“).
   await page.goto('/app/#/termine');
