@@ -5217,8 +5217,11 @@ paths:
       tags: [Website]
       summary: Create a page with its first translation (an empty draft)
       description: |
-        `path` without language prefix, lower case letters, digits and hyphens, segments separated by `/`; a sub page's
-        path starts with its parent's path in that language. 409 `path_taken` if the language already has the path.
+        `path` without language prefix: one or two segments of lower case letters, digits and hyphens. It is independent
+        of the page tree (the editor suggests the parent's path as prefix), so moving a page never changes an address.
+        409 `path_taken` if the language already has the path. 400 `path_reserved` for addresses the server needs itself:
+        in the default language a first segment that is a language code (`en`) or the name of the program folder
+        (`app`), and in every language `index.php` and paths starting with a dot.
       x-capability: manage_website
       x-status: planned
       requestBody:
@@ -5295,7 +5298,8 @@ paths:
       tags: [Website]
       summary: Change page settings (only the fields sent)
       description: |
-        `is_home: true` makes this page the home page (path `''` in every language) and takes it from the previous one.
+        `is_home: true` makes this page the home page and takes it from the previous one. Paths stay as they are: the
+        home page is served at `/` (`/en/`), and its own path redirects there (301), so no address has to be rewritten.
         `allow_person_indexing: true` lets search engines index the page even if it shows people (member and office
         blocks); the editor shows a consent hint before it is switched on.
       x-capability: manage_website
@@ -5364,7 +5368,8 @@ paths:
       tags: [Website]
       summary: Save the draft (creates the translation if the page does not have this language yet)
       description: |
-        Each save adds a revision and makes it the draft; the published version stays until `…/publish`. With
+        Each save adds a revision and makes it the draft; the published version stays until `…/publish`. `path` is
+        required when the translation is new (400 otherwise) and rules as in `POST /admin/site/pages`. With
         `base_revision_id` (the draft that was loaded) only if nobody saved since, otherwise 409 `conflict`. Rich text is
         cleaned like everywhere else (RichText allowlist); unknown block types or invalid fields → 400 with the index of
         the block. Images are rich images (`POST /rich-images`) and belong to the page once saved.
@@ -5543,7 +5548,7 @@ paths:
       summary: Replace both menus
       description: |
         At most two levels. An entry links a page (`page_id`) or an address (`url`, `https://`, `mailto:` or a path
-        starting with `/`), never both. For a page an empty label uses the page title of that language; entries whose page
+        starting with `/`), never both (400). For a page an empty label uses the published title in that language; entries whose page
         has no published translation in a language are left out there. Imprint and privacy policy are always linked in the
         footer, whether listed or not.
       x-capability: manage_website
@@ -5626,7 +5631,8 @@ paths:
       summary: Render blocks as the website would show them (preview in the editor)
       description: |
         Returns the HTML of the content area, rendered with the same renderers as the website and the WordPress blocks,
-        with guest rights. Nothing is saved.
+        with guest rights. Nothing is saved. The editor shows it in a sandboxed iframe (`sandbox` without
+        `allow-scripts` and `allow-same-origin`), so preview HTML never runs in the Verwaltung.
       x-capability: manage_website
       x-status: planned
       requestBody:
@@ -7776,9 +7782,9 @@ components:
 
     SitePath:
       type: string
-      description: Path without language prefix and without leading slash; `''` only for the home page.
+      description: 'Path without language prefix and without leading slash, e.g. `ueber-uns` or `verein/vorstand`. The home page is served at `/` whatever its path.'
       maxLength: 180
-      pattern: '^$|^[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)?$'
+      pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)?$'
 
     SiteTranslationState:
       type: object
@@ -7845,7 +7851,7 @@ components:
           properties:
             page_id: { type: integer }
             url: { type: string, description: Public address of the translation (also while it is a draft) }
-            draft_revision_id: { type: integer }
+            draft_revision_id: { type: integer, description: "Always set in answers (the column allows NULL only so the translation row can be written before its first revision)" }
             published_revision_id: { type: [integer, 'null'] }
             draft: { $ref: '#/components/schemas/SiteContent' }
 

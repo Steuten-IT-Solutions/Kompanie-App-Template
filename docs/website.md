@@ -32,12 +32,15 @@ site_pages ─┬─< site_page_translations ─┬─< site_page_revisions
 ```
 
 - **`site_pages`**: the page itself, independent of language. `parent_id` allows two levels. `is_home` marks the home
-  page (path `''`). `allow_person_indexing` defaults to `0`: a page with blocks that show people (members, offices) is
+  page; it is served at `/` (`/en/`) and its own path redirects there, so changing the home page rewrites no address.
+  `allow_person_indexing` defaults to `0`: a page with blocks that show people (members, offices) is
   `noindex` unless an editor switches this on.
 - **`site_page_translations`**: one row per page and language (`UNIQUE (page_id, lang)`). `path` is the full path
   without language prefix and unique per language (`UNIQUE (lang, path)`), e.g. `de` + `ueber-uns` → `/ueber-uns`,
-  `en` + `about-us` → `/en/about-us`. The default language has no prefix. `path` is `varchar(180)` so the unique key
-  stays below 767 bytes in utf8mb4.
+  `en` + `about-us` → `/en/about-us`. The default language has no prefix. Paths are independent of the page tree, so
+  moving a page never breaks a link. Reserved: in the default language a first segment that is a language code or the
+  program folder (`app`), and `index.php` and dot paths everywhere. `path` is `varchar(180)` so the unique key stays
+  below 767 bytes in utf8mb4.
 - **`site_page_revisions`**: immutable snapshots of one translation: title, meta description, header picture (a rich
   image uid) and the blocks as JSON. Saving the draft adds a revision and moves `draft_revision_id`; publishing moves
   `published_revision_id`. Restoring an old revision copies it as a new draft. Retention: the published revision, the
@@ -45,7 +48,8 @@ site_pages ─┬─< site_page_translations ─┬─< site_page_revisions
 - **`site_menu_items`**: entries of the `main` and `footer` menus, two levels in `main`. An entry links either a page or
   an address. `labels` is a JSON object per language; an empty label for a page uses the page title.
 
-Images in blocks are rich images (`rich_images`, `owner_type = 'site_page'`). All four tables are in
+Images in blocks are rich images (`rich_images`, `owner_type = 'site_page'`). An image is deleted only when no kept
+revision of the page uses it any more (checked when old revisions are pruned or the page is deleted). All four tables are in
 `Backup::CORE_TABLES`. None has a `user_id` column; `created_by`, `updated_by` and `published_by` name editors like
 elsewhere, so they are not personal data of the person in the sense of `UserData`.
 
@@ -83,6 +87,7 @@ only `/admin/site/blocks` and `/admin/site/preview` are needed. News on WordPres
 
 - Right `manage_website` in `Capability` (needs `member`, like the other management rights) and the switches
   `website` and `app` in `Features`.
+- Pick up the name of a renamed program folder for the reserved paths (today the default `app`).
 - `POST /rich-images` for `manage_website`, and serving images of published pages without login.
 - Repository and service for the tables, the routes, the server-side renderer and the entry file with its status check.
 - News written in the Verwaltung for the standalone version (source `local`, de/en).

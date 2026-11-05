@@ -1442,7 +1442,8 @@ WHERE title IS NULL",
             // revisions as a JSON list of blocks; a translation points to its current draft and to the revision that
             // is published (both NULL-able: a new translation has no published revision yet). Each save of the draft
             // adds a revision, publishing only moves published_revision_id. path is the full path without the language
-            // prefix ('' for the home page, 'verein/vorstand'), unique per language. allow_person_indexing: pages with
+            // prefix ('verein/vorstand'), unique per language and independent of the tree; the home page (is_home) is
+            // served at / whatever its path. allow_person_indexing: pages with
             // blocks that show people (members, offices) are noindex unless this is 1. Images in blocks are rich_images
             // with owner_type 'site_page'. No user_id columns: created_by/updated_by name who edited, like elsewhere.
             // Menu labels are a JSON object per language ({"de": "…", "en": "…"}); empty for a page uses its title.
