@@ -269,4 +269,46 @@ final class NewsAndSettingsTest extends TestCase
         $this->assertSame('none', $r->data['calendar']['source']);
         $this->assertFalse($app->api()->config()['features']['news']);
     }
+    public function testLegalLinks(): void
+    {
+        $users = new FakeUsers();
+        $app = $this->app(new FakeHttpClient(static fn () => ['status' => 404, 'body' => '']), new MemorySettings(), $users);
+        $admin = $users->add('a', Roles::ADMIN);
+        $member = $users->add('m', Roles::MEMBER);
+        $h = static fn (string $method, string $path, array $body = []) => $app->api()->handle(new Request($method, $path, [], $body));
+        $legalItem = static fn (): array => array_values(array_filter($app->status()->report()['items'], static fn (array $i): bool => $i['key'] === 'legal'))[0];
+
+        // Ohne Links: nichts in der Konfiguration, Ampel gelb mit beiden fehlenden Links.
+        $users->current = null;
+        $this->assertSame(['imprint' => null, 'privacy' => null], $app->api()->config()['legal']);
+        $this->assertSame('warn', $legalItem()['level']);
+        $this->assertStringContainsString('das Impressum und die Datenschutzerklärung', $legalItem()['text']);
+
+        // Nur Admins dürfen sie ändern.
+        $users->current = $member;
+        $this->assertSame(403, $h('PATCH', '/admin/settings', ['legal_imprint_url' => 'https://v.example/impressum'])->status);
+
+        $users->current = $admin;
+        foreach (['javascript:alert(1)', 'ftp://v.example/x', 'https://v.example/"x', 'https://' . str_repeat('a', 260) . '.de'] as $bad) {
+            $this->assertSame(400, $h('PATCH', '/admin/settings', ['legal_imprint_url' => $bad])->status, $bad);
+        }
+        $this->assertSame(400, $h('PATCH', '/admin/settings', ['legal_privacy_url' => ['x']])->status);
+        $r = $h('PATCH', '/admin/settings', ['legal_imprint_url' => ' https://v.example/impressum ']);
+        $this->assertSame(200, $r->status);
+        $this->assertSame(['imprint_url' => 'https://v.example/impressum', 'privacy_url' => ''], $r->data['legal']);
+        $this->assertSame('warn', $legalItem()['level']);
+        $this->assertStringContainsString('die Datenschutzerklärung', $legalItem()['text']);
+        $this->assertStringNotContainsString('das Impressum', $legalItem()['text']);
+
+        $h('PATCH', '/admin/settings', ['legal_privacy_url' => 'https://v.example/datenschutz']);
+        $this->assertSame('ok', $legalItem()['level']);
+        // Für alle sichtbar, auch für Gäste.
+        $users->current = null;
+        $this->assertSame(['imprint' => 'https://v.example/impressum', 'privacy' => 'https://v.example/datenschutz'], $app->api()->config()['legal']);
+
+        // Ein leerer Text entfernt den Link wieder.
+        $users->current = $admin;
+        $this->assertSame('', $h('PATCH', '/admin/settings', ['legal_imprint_url' => ''])->data['legal']['imprint_url']);
+        $this->assertNull($app->api()->config()['legal']['imprint']);
+    }
 }

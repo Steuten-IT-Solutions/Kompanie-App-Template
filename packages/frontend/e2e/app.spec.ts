@@ -274,12 +274,15 @@ test('Benachrichtigung führt zum Eintrag: Termin und Punkte (Issue #190)', asyn
 
   // Unbekannter Termin (gelöscht oder vorbei): einfach die Liste
   await page.goto('/app/#/termine/termin/gibtesnicht');
+  // Erst fertig geladen: Das Gerüst beim Laden hat dieselben Klassen (li.event, li.row), aber keine Kennung.
+  await expect(page.locator('main [data-loading]')).toHaveCount(0);
   await expect(page.locator('li.event').first()).toBeVisible();
   await expect(page.locator('li.event.focused, li.event.open')).toHaveCount(0);
 
   // Punkte: meins/punkte/<id>
   await page.setViewportSize(devices['iPhone 13'].viewport);
   await page.goto('/app/#/meins/punkte');
+  await expect(page.locator('main [data-loading]')).toHaveCount(0);
   const row = page.locator('.card-list > li.row').last();
   await expect(row).toBeVisible();
   const pointId = await row.getAttribute('data-focus-id');
@@ -556,22 +559,32 @@ test('Wischen auch bei Ehemaligen und ohne vorher geöffnete Liste (Link, Neusta
   await expect(page.locator('.member-name')).toHaveText('Mitglied2');
 });
 
-/** Anfragen nach den Daten einer Person (members/<id>), nicht nach Unterseiten wie members/<id>/points. */
-const MEMBER_DETAIL = /members\/(\d+)(?![\w/])/;
+/**
+ * Anfragen nach den Daten von Personen: einzeln (members/<id>, nicht Unterseiten wie members/<id>/points) oder mehrere
+ * auf einmal beim Vorladen (members/details?ids=…).
+ */
+const MEMBER_DETAIL = /members\/(?:\d+(?![\w/])|details(?![\w/]))/;
 
-test('Mitglied: Alle der Liste werden nacheinander vorgeladen, nicht nur die Nachbarn', async ({ page }) => {
+/** Ids, nach denen eine solche Anfrage fragt. */
+function memberIds(url: string): string[] {
+  const single = /members\/(\d+)(?![\w/])/.exec(url);
+  if (single) return [single[1]];
+  if (!MEMBER_DETAIL.test(url)) return [];
+  return (new URL(url).searchParams.get('ids') ?? '').split(',').filter(Boolean);
+}
+
+test('Mitglied: Alle der Liste werden vorgeladen, nicht nur die Nachbarn', async ({ page }) => {
   await login(page, 'verwalter');
   const requested = new Set<string>();
   page.on('request', (r) => {
-    const m = MEMBER_DETAIL.exec(r.url());
-    if (m && r.method() === 'GET') requested.add(m[1]);
+    if (r.method() === 'GET') for (const id of memberIds(r.url())) requested.add(id);
   });
   await adminMenu(page, 'Mitglieder');
   await page.locator('.member-row').first().click();
   const step = (await page.locator('.member-step .muted').textContent()) ?? '';
   const total = Number(/\/ (\d+)/.exec(step)?.[1]);
   expect(total).toBeGreaterThan(2);
-  // Die Person selbst und alle anderen der Liste, eine nach der anderen
+  // Die Person selbst und alle anderen der Liste (mehrere je Anfrage)
   await expect.poll(() => requested.size, { timeout: 20_000 }).toBe(total);
 });
 
@@ -595,6 +608,9 @@ test.describe('ohne Service Worker, Daten zurückgehalten', () => {
     await expect(page.locator('[data-loading]')).not.toHaveCount(0);
     await expect(page.locator('.member-name')).toHaveText('Mitglied1');
     await expect(page.locator('.member-step')).toContainText('1 / 2');
+    // Kopf schon aus der Mitgliederliste (Rolle, Kacheln), obwohl die Daten der Person noch zurückgehalten werden
+    await expect(page.locator('.member-level')).toContainText('Rolle');
+    await expect(page.locator('.member-stats')).toBeVisible();
     await swipe(page, -200);
     await expect(page.locator('.member-name')).toHaveText('Mitglied2');
     await expect(page.locator('.member-step')).toContainText('2 / 2');
@@ -1603,7 +1619,8 @@ test('Querformat: Navigation links, Listen und Formulare zweispaltig, nichts scr
       return !!bar && bar.x === 0 && bar.width < 120 && bar.height > 300;
     })
     .toBe(true);
-  // Mitgliederliste in zwei Spalten
+  // Mitgliederliste in zwei Spalten (erst nach dem Gerüst: Es trägt dieselben Klassen und wird gleich ersetzt)
+  await expect(page.locator('main [data-loading]')).toHaveCount(0);
   const rows = page.locator('.card-list .member-row');
   await expect(rows.nth(1)).toBeVisible();
   const [a, b] = [await rows.nth(0).boundingBox(), await rows.nth(1).boundingBox()];
@@ -1803,6 +1820,31 @@ test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, C
   expect(csv.startsWith(String.fromCharCode(0xfeff) + 'Name;Vorname;Unterschrift;Bezahlt;Anzahl Kinder\r\n')).toBe(true);
   expect(csv).toContain(';Mitglied1;;;\r\n');
   expect(csv).toContain('\r\nNachbarverein;Gast vom;;;\r\n');
+
+  // PDF direkt als Datei, ohne Druckdialog
+  const [pdf] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'PDF herunterladen' }).click()]);
+  expect(pdf.suggestedFilename()).toBe(`${title}.pdf`);
+  const pdfData = readFileSync((await pdf.path())!);
+  expect(pdfData.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+  expect(pdfData.toString('latin1')).toContain(`/Title (${title})`);
+  await expect(page.locator('.list-editor .form-error')).toHaveCount(0);
+
+  // Sortieren: nach Namen, nach einer Spalte (Vorname absteigend, Zeilen ohne Wert am Ende) und wieder nach Namen
+  const sortBy = async (label: string, dir: 'asc' | 'desc') => {
+    await page.getByLabel('Sortieren nach').selectOption({ label });
+    await page.getByLabel('Richtung').selectOption(dir);
+    await page.getByRole('button', { name: 'Sortieren', exact: true }).click();
+  };
+  const rowTexts = () => page.locator('.list-row').allInnerTexts();
+  await sortBy('Name (Nachname, Vorname)', 'asc');
+  const byName = await rowTexts();
+  await sortBy('Vorname', 'desc');
+  const firstNames = await preview.locator('tbody tr td:nth-child(2)').allInnerTexts();
+  const filled = firstNames.filter((n) => n.trim() !== '');
+  expect(filled).toEqual([...filled].sort((a, b) => b.localeCompare(a, 'de', { sensitivity: 'base', numeric: true })));
+  expect(firstNames.slice(filled.length).every((n) => n.trim() === '')).toBe(true);
+  await sortBy('Name (Nachname, Vorname)', 'asc');
+  expect(await rowTexts()).toEqual(byName);
 
   // Druck: nur die Liste, ohne Kopf- und Tab-Leiste der App
   await page.emulateMedia({ media: 'print' });
@@ -2278,6 +2320,29 @@ test('Tab-Wechsel zeigt sofort die zuletzt geladenen Daten', async ({ page }) =>
   }
 });
 
+test('Beim ersten Öffnen ohne gemerktes Gerüst steht ein allgemeines in der Form der Seite, keine Ladeschnecke', async ({ page }) => {
+  await page.goto('/app/#/news');
+  await expect(page.locator('.tabbar')).toBeVisible();
+  await expect(page.locator('main [data-loading]')).toHaveCount(0);
+  // Gemerkte Gerüste löschen, erst danach (ohne weiteres Laden) neu laden: wie das erste Öffnen auf einem Gerät
+  await page.context().route(/news/, async (route) => {
+    await new Promise((r) => setTimeout(r, 8000));
+    await route.continue().catch(() => undefined);
+  });
+  try {
+    await page.evaluate(async () => {
+      await caches.delete('kompanie-ansicht-geruest-v1');
+      await caches.delete('kompanie-data-v2');
+    });
+    await page.reload();
+    await expect(page.locator('.skeleton[data-shape="news"] .news-card').first()).toBeVisible({ timeout: 1500 });
+    await expect(page.getByRole('status').filter({ hasText: 'Lädt …' })).toHaveCount(1);
+    await expect(page.locator('.spinner')).toHaveCount(0);
+  } finally {
+    await page.context().unrouteAll({ behavior: 'ignoreErrors' });
+  }
+});
+
 test('Ohne gespeicherte Daten zeigt eine Seite beim Laden ihr Gerüst statt „Lädt …“', async ({ page }) => {
   await page.context().clearCookies();
   // Laufende Abrufe der News, auch die des Service Workers (die sieht nur der Kontext, nicht die Seite).
@@ -2324,8 +2389,9 @@ test('Ohne gespeicherte Daten zeigt eine Seite beim Laden ihr Gerüst statt „L
       .toBe(false);
     await page.goto('/app/#/news');
     await page.reload();
-    await expect(page.locator('.skeleton .news-card').first()).toBeVisible({ timeout: 1500 });
-    await expect(page.locator('.loading')).toHaveCount(0);
+    // Das gemerkte Gerüst (ohne data-shape), nicht das allgemeine
+    await expect(page.locator('.skeleton:not([data-shape]) .news-card').first()).toBeVisible({ timeout: 1500 });
+    await expect(page.locator('.skeleton[data-shape]')).toHaveCount(0);
     await shot(page, 'geruest-news');
     await expect(page.locator('.news-card:not(.skeleton .news-card)').first()).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.skeleton')).toHaveCount(0);
@@ -2737,6 +2803,27 @@ test('Vorschau: Admin sieht die App als Mitglied und ohne Anmeldung, nur zum Ans
   await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
 });
 
+/**
+ * In der Großansicht der Galerie waagerecht wischen (Touch über CDP, wie ein Finger), um die Mitte des Bildschirms oder
+ * um die Stelle at. hold: Finger liegen lassen; release() hebt ihn ab.
+ */
+async function lightboxSwipe(page: Page, dx: number, hold = false, at?: { x: number; y: number }) {
+  const cdp = await page.context().newCDPSession(page);
+  const { width, height } = page.viewportSize()!;
+  const x = (at?.x ?? width / 2) - dx / 2;
+  const y = at?.y ?? height / 2;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (const f of [0.25, 0.5, 0.75, 1]) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx * f, y }] });
+  }
+  const release = async () => {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await cdp.detach();
+  };
+  if (!hold) await release();
+  return { release };
+}
+
 test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/#/galerie');
@@ -2746,6 +2833,20 @@ test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne'
   await expect(page.locator('.photo')).toHaveCount(2);
   await expect(page.locator('.photo[data-intern]')).toHaveCount(0);
   await page.locator('.photo').first().click();
+  await expect(page.locator('.lb-count')).toHaveText('1 / 2');
+  // Wischen: Das Bild folgt dem Finger, daneben steht schon das nächste; zu kurz gezogen schnappt es zurück.
+  const lb = await lightboxSwipe(page, -30, true);
+  await expect(page.locator('.lb-peek-next img')).toBeVisible();
+  // Touch-Bewegungen kommen erst mit dem nächsten Bild an, daher warten statt sofort lesen.
+  await expect.poll(() => page.locator('.lb-track').evaluate((el) => el.style.transform)).toBe('translateX(-30px)');
+  await lb.release();
+  await expect(page.locator('.lb-peek')).toHaveCount(0);
+  await expect(page.locator('.lb-count')).toHaveText('1 / 2');
+  await lightboxSwipe(page, -200);
+  await expect(page.locator('.lb-count')).toHaveText('2 / 2');
+  await expect(page.locator('.lb-peek')).toHaveCount(0);
+  expect(await page.locator('.lb-track').evaluate((el) => el.style.transform)).toBe('');
+  await lightboxSwipe(page, 200);
   await expect(page.locator('.lb-count')).toHaveText('1 / 2');
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('.lb-count')).toHaveText('2 / 2');
@@ -2778,13 +2879,17 @@ test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne'
     [100, 300],
     [250, 300],
   ]);
-  await expect(page.locator('.lightbox img')).toHaveClass(/zoomed/);
+  await expect(page.locator('.lb-track > img')).toHaveClass(/zoomed/);
   await touch('touchstart', [[200, 300]]);
   await touch('touchmove', [[100, 300]]);
   await touch('touchend', [[100, 300]]);
   await expect(page.locator('.lb-count')).toHaveText('2 / 2');
+  // Auch ein echter Finger (mit Pointer-Ereignissen) blättert vergrößert nicht.
+  await lightboxSwipe(page, -200);
+  await expect(page.locator('.lb-count')).toHaveText('2 / 2');
+  await expect(page.locator('.lb-peek')).toHaveCount(0);
   await page.keyboard.press('ArrowLeft');
-  await expect(page.locator('.lightbox img')).not.toHaveClass(/zoomed/);
+  await expect(page.locator('.lb-track > img')).not.toHaveClass(/zoomed/);
   await expect(page.locator('.lb-count')).toHaveText('1 / 2');
   await page.keyboard.press('ArrowRight');
   await shot(page, '15-galerie-lightbox');
@@ -2794,10 +2899,17 @@ test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne'
   await login(page, 'mitglied1');
   await page.getByRole('button', { name: 'Galerie' }).click();
   await expect(page.locator('.album-card', { hasText: 'Vereinsabend' })).toBeVisible();
+  await expect(page.locator('.album-card .img-loading')).toHaveCount(0);
   await shot(page, '16-galerie-alben');
   await page.locator('.album-card', { hasText: 'Sommerfest' }).click();
   await expect(page.locator('.photo')).toHaveCount(3);
   await expect(page.locator('.photo[data-intern]')).toHaveCount(1);
+  // Geladen: keine Ladeschnecke mehr, weder im Raster noch in der Übersicht oder der Großansicht.
+  await expect(page.locator('.photo .img-loading')).toHaveCount(0);
+  await page.locator('.photo[data-intern]').click();
+  await expect(page.locator('.lb-track > img')).toBeVisible();
+  await expect(page.locator('.lightbox .img-loading')).toHaveCount(0);
+  await page.keyboard.press('Escape');
   const internSrc = await page.locator('.photo[data-intern] img').getAttribute('src');
   expect(internSrc).toContain('/app/foto/');
   const asMember = await page.request.get(internSrc!);
@@ -2808,6 +2920,67 @@ test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne'
   await page.context().clearCookies();
   const asGuest = await page.request.get(internSrc!);
   expect(asGuest.status()).toBe(401);
+});
+
+test('Galerie: Zurück führt an die Stelle der Übersicht, Schließen der Großansicht zum zuletzt gezeigten Bild', async ({ page }) => {
+  await login(page, 'mitglied1');
+  // Niedrig, damit die Übersicht mit drei Alben scrollt.
+  await page.setViewportSize({ width: 390, height: 260 });
+  await page.locator('.tabbar').getByRole('button', { name: 'Galerie' }).click();
+  const card = page.locator('.album-card', { hasText: 'Vereinsabend' });
+  await expect(card).toBeVisible();
+  const scrollY = () => page.evaluate(() => window.scrollY);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const bottom = await scrollY();
+  expect(bottom).toBeGreaterThan(50);
+  const near = (y: number) => async () => Math.abs((await scrollY()) - y) < 2;
+
+  // Zurück im Browser
+  await card.click();
+  await expect(page.locator('.photo')).toHaveCount(1);
+  await page.goBack();
+  await expect(card).toBeVisible();
+  await expect.poll(near(bottom)).toBe(true);
+
+  // „‹ Alle Alben“
+  await card.click();
+  await expect(page.locator('.photo')).toHaveCount(1);
+  expect(await scrollY()).toBe(0);
+  await page.getByRole('button', { name: '‹ Alle Alben' }).click();
+  await expect(card).toBeVisible();
+  await expect.poll(near(bottom)).toBe(true);
+
+  // Neu über die Tableiste geöffnet beginnt die Übersicht oben.
+  await page.locator('.tabbar').getByRole('button', { name: 'Termine' }).click();
+  await page.locator('.tabbar').getByRole('button', { name: 'Galerie' }).click();
+  await expect(card).toBeVisible();
+  expect(await scrollY()).toBe(0);
+
+  // In der Großansicht weitergeblättert: Nach dem Schließen hat das zuletzt gezeigte Bild den Fokus.
+  await page.locator('.album-card', { hasText: 'Sommerfest' }).click();
+  await expect(page.locator('.photo')).toHaveCount(3);
+  await page.locator('.photo').first().click();
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.lb-count')).toHaveText(/^3 \/ 3/);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.lightbox')).toHaveCount(0);
+  await expect(page.locator('.photo').nth(2)).toBeFocused();
+  await expect(page.locator('.photo').nth(2)).toBeInViewport();
+
+  // Zurück bei offener Großansicht schließt nur sie, das Album bleibt.
+  const albumUrl = page.url();
+  await page.locator('.photo').nth(1).click();
+  await expect(page.locator('.lb-count')).toHaveText('2 / 3');
+  await page.goBack();
+  await expect(page.locator('.lightbox')).toHaveCount(0);
+  await expect(page.locator('.photo')).toHaveCount(3);
+  expect(page.url()).toBe(albumUrl);
+  await expect(page.locator('.photo').nth(1)).toBeFocused();
+  // Nach dem Schließen (oben mit Escape, hier mit Zurück) bleibt kein Eintrag übrig: Zurück führt zur Übersicht.
+  await page.goBack();
+  await expect(page.locator('.album-card', { hasText: 'Sommerfest' })).toBeVisible();
+  await page.setViewportSize(devices['iPhone 13'].viewport);
 });
 
 test('Galerie: Video mit ▶ im Album, spielt in der Großansicht aus Drive (Range)', async ({ page }) => {
@@ -2832,10 +3005,36 @@ test('Galerie: Video mit ▶ im Album, spielt in der Großansicht aus Drive (Ran
   expect(res.headers()['content-range']).toMatch(/^bytes 0-\d+\/\d+$/);
   await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState)).toBeGreaterThanOrEqual(1);
   expect(await video.evaluate((v: HTMLVideoElement) => Math.round(v.duration))).toBe(2);
-  // Blättern zum Bild: das Video verschwindet.
+  // Tippen auf das Bild des Videos spielt ab und hält an.
+  await page.locator('.lb-video-hit').tap();
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
+  await page.locator('.lb-video-hit').tap();
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  // In der Leiste unten bedient Wischen den Player, auf dem Video blättert es (wie bei Bildern, mit dem Bild daneben).
+  // Das Testvideo ist klein (160 × 90): kurze Wege, die auf dem Video bleiben.
+  const box = (await video.boundingBox())!;
+  const mid = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await lightboxSwipe(page, -120, false, { x: mid.x, y: box.y + box.height - 8 });
+  await expect(page.locator('.lb-peek')).toHaveCount(0);
+  await expect(video).toHaveCount(1);
+  const drag = await lightboxSwipe(page, -30, true, mid);
+  await expect(page.locator('.lb-peek-next img')).toBeVisible();
+  await drag.release();
+  await lightboxSwipe(page, -120, false, mid);
+  await expect(page.locator('.lightbox video')).toHaveCount(0);
+  await expect(page.locator('.lb-track > img')).toBeVisible();
+  // Zurück zum Video und mit der Pfeiltaste wieder zum Bild
+  await lightboxSwipe(page, 200);
+  await expect(page.locator('.lightbox video')).toHaveCount(1);
+  // Nach dem Wischen startet schon das erste Tippen das Video (gemeldet: erst das zweite, weil der Browser dafür kein
+  // click liefert).
+  await page.locator('.lb-video-hit').tap();
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
+  await page.locator('.lb-video-hit').tap();
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('.lightbox video')).toHaveCount(0);
-  await expect(page.locator('.lightbox img')).toBeVisible();
+  await expect(page.locator('.lb-track > img')).toBeVisible();
   await page.keyboard.press('Escape');
 });
 
@@ -3027,9 +3226,65 @@ test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ 
   await expect.poll(async () => (await cachedUrls()).some((u) => u.startsWith(decodeURIComponent(apiBase)))).toBe(true);
   expect((await cachedUrls()).filter((u) => u.includes('/admin/') || /[/=]sicherung\/?$/.test(u))).toEqual([]);
   // Vorher gelb (noch nie gesichert), nach dem Herunterladen grün.
+  // Neu geladen: Die Seite fragt den Server (Verwaltung kommt nie aus dem Speicher des Service Workers), nicht den
+  // Stand im Speicher der App von vor dem Herunterladen.
   await page.goto('/app/#/einstellungen/zustand');
+  await page.reload();
   await expect(status.locator('.status-item.status-ok', { hasText: 'Datensicherung' })).toBeVisible();
   await shot(page, '19-wartung');
+});
+
+test('Impressum und Datenschutz: Admin trägt die Links ein, alle sehen sie (Anmeldung, Hilfe, Konto), Ampel wird grün', async ({
+  page,
+  browser,
+}) => {
+  const imprint = 'https://www.beispiel.de/impressum';
+  const privacy = 'https://www.beispiel.de/datenschutz';
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/einstellungen/zustand');
+  const status = page.locator('.settings-section', { hasText: 'Zustand der App' });
+  await expect(status.locator('.status-item.status-warn', { hasText: 'Impressum und Datenschutz' })).toBeVisible();
+
+  await page.goto('/app/#/einstellungen/rechtliches');
+  const form = page.locator('.settings-section', { hasText: 'Impressum und Datenschutz' });
+  // Ungültige Adresse: Der Server lehnt sie ab, nichts wird gespeichert.
+  await form.getByLabel('Impressum').fill('javascript:alert(1)');
+  await form.getByLabel('Impressum').evaluate((el) => el.setAttribute('type', 'text'));
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(form.locator('.form-error')).toContainText('Adresse des Impressums');
+  await form.getByLabel('Impressum').fill(imprint);
+  await form.getByLabel('Datenschutzerklärung').fill(privacy);
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  // Gleich im Konto sichtbar, ohne neu zu laden.
+  await openKonto(page);
+  const konto = page.locator('.account-legal');
+  await expect(konto.getByRole('link', { name: 'Impressum' })).toHaveAttribute('href', imprint);
+  await expect(konto.getByRole('link', { name: 'Datenschutz' })).toHaveAttribute('href', privacy);
+  await page.goto('/app/#/einstellungen/zustand');
+  await page.reload();
+  await expect(status.locator('.status-item.status-ok', { hasText: 'Impressum und Datenschutz' })).toBeVisible();
+
+  // Ohne Anmeldung: in der Hilfe und (eigenständig) auf der Anmeldeseite, in einem neuen Fenster.
+  const guest = await browser.newPage();
+  await guest.goto('/app/#/hilfe');
+  const hilfe = guest.locator('.legal-links');
+  await expect(hilfe.getByRole('link', { name: 'Impressum' })).toHaveAttribute('href', imprint);
+  await expect(hilfe.getByRole('link', { name: 'Datenschutz' })).toHaveAttribute('target', '_blank');
+  if (STANDALONE) {
+    await guest.goto('/app/#/anmelden');
+    await expect(guest.locator('form.login').getByRole('link', { name: 'Datenschutz' })).toHaveAttribute('href', privacy);
+  }
+  await guest.close();
+
+  // Aufräumen: Links entfernen, die Ampel ist wieder gelb.
+  await page.goto('/app/#/einstellungen/rechtliches');
+  await form.getByLabel('Impressum').fill('');
+  await form.getByLabel('Datenschutzerklärung').fill('');
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  await openKonto(page);
+  await expect(page.locator('.account-legal')).toHaveCount(0);
 });
 
 test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nicht', async ({ page }) => {
@@ -3142,7 +3397,7 @@ test('Service Worker: nach einem Update alte Speicher gelöscht, alle Programmte
     await page.context().setOffline(false);
   }
 
-  // Langsames Netz: Die gespeicherte App-Seite erscheint nach höchstens 3 Sekunden (der Service Worker wartet 2,5 s).
+  // Langsames Netz: Die gespeicherte App-Seite erscheint sofort (der Service Worker wartet nicht auf den Server).
   await page.goto('/app/');
   await expect(page.getByText('Tag der offenen Tür')).toBeVisible();
   await page.context().route(/\/app\/?$/, async (route) => {
@@ -4260,6 +4515,10 @@ test('Schwarzes Brett: Signatur einrichten (Sprung ins Konto, Entwurf bleibt), e
   // Ausgangslage: keine Signatur
   await openKonto(page);
   const signatureCard = page.locator('.signature-card');
+  // Erst wenn die Signatur geladen ist, steht fest, ob es eine gibt (sonst bliebe eine aus einem früheren Lauf stehen).
+  await expect(
+    signatureCard.getByRole('button', { name: 'Löschen' }).or(signatureCard.getByRole('button', { name: 'Signatur einrichten' })),
+  ).toBeVisible();
   if (await signatureCard.getByRole('button', { name: 'Löschen' }).count()) {
     await signatureCard.getByRole('button', { name: 'Löschen' }).click();
     await expect(signatureCard.getByRole('button', { name: 'Signatur einrichten' })).toBeVisible();

@@ -201,7 +201,7 @@ function ImageView({ doc }: { doc: DocumentInfo }) {
     };
   }, [doc]);
   if (error) return <p className="error">{error}</p>;
-  if (!src) return <Loading />;
+  if (!src) return <Loading shape="text" />;
   return <img className="pdf-page" src={src} alt={doc.title} />;
 }
 
@@ -259,7 +259,7 @@ export default function Dokumente({ docId, onToast }: { docId?: number; onToast:
         <h2 className="member-name">{open.title}</h2>
         <p className="muted small doc-stand">Stand: {formatDate(open.date)}</p>
         {open.kind === 'pdf' ? (
-          <Suspense fallback={<Loading />}>
+          <Suspense fallback={<Loading shape="text" chunk />}>
             <PdfViewer url={open.url} title={open.title} />
           </Suspense>
         ) : open.kind === 'image' ? (

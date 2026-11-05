@@ -11,10 +11,12 @@ import { AddressFields, EmailField, ErrorBox, lazyView, Loading, PhoneField, use
 import { normalizeEmail } from '../email';
 import { normalizePhone } from '../phone';
 import { addressInput, EMPTY_ADDRESS, formatAddress } from '../address';
+import { LegalLinks } from '../legal';
 import { MemberAvatar } from '../memberPhoto';
 import { downloadPersonalData } from '../personalData';
 import { previewRole } from '../preview';
 import { saveTheme, THEME_LABELS, useTheme, type ThemeChoice } from '../theme';
+import { sources } from '../viewData';
 
 const MIN_LENGTH = 8;
 
@@ -119,10 +121,10 @@ function SignatureCard({ onToast }: { onToast: (msg: string) => void }) {
         Nachrichten nicht.
       </p>
       {saved === undefined && !error ? (
-        <Loading />
+        <Loading shape="text" />
       ) : draft !== null ? (
         <>
-          <Suspense fallback={<Loading />}>
+          <Suspense fallback={<Loading shape="text" chunk />}>
             <RichTextEditor value={draft} onChange={setDraft} label="Signatur" id="signature-text" />
           </Suspense>
           <div className="button-row">
@@ -319,6 +321,7 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
       <button className="btn btn-danger btn-block logout" onClick={onLogout}>
         Abmelden
       </button>
+      <LegalLinks className="account-legal" />
     </div>
   );
 }
@@ -360,13 +363,13 @@ function MyDataCard() {
  * Passwort. Andere sehen sie nur mit dem Recht „Persönliche Angaben sehen“.
  */
 function ContactCard({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(api.ownAccount, [], 'me/account');
+  const { data, error, loading, reload, setData } = useAsync(sources.ownAccount.load, sources.ownAccount.deps, sources.ownAccount.key);
   const [editing, setEditing] = useState<OwnAccount | null>(null);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const account = data!;
   const emailChanged = editing !== null && normalizeEmail(editing.email).toLowerCase() !== account.email.toLowerCase();

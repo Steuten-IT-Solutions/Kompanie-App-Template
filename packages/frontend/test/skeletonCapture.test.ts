@@ -22,6 +22,7 @@ test('Merkt Elemente, Klassen und Textlängen in Stufen – keinen Text und kein
       el('li', 'card row', [
         el('div', 'row-title', [text('Strafe für Max Mustermann')]),
         el('a', 'link', [text('Details')]),
+        el('details', 'fold', [el('summary', '', [text('Mehr')])]),
         el('img', 'avatar', [], [40, 40]),
       ]),
     ]),
@@ -38,7 +39,9 @@ test('Merkt Elemente, Klassen und Textlängen in Stufen – keinen Text und kein
           c: 'card row',
           k: [
             { t: 'div', c: 'row-title', k: [28] },
-            { t: 'span', c: 'link', k: [8] },
+            // Mit Tag (Regeln wie button.member-tile), aber ohne Adresse; details als span (zeigte sonst nur summary)
+            { t: 'a', c: 'link', k: [8] },
+            { t: 'span', c: 'fold', k: [{ t: 'span', k: [4] }] },
             { b: [40, 40], c: 'avatar' },
           ],
         },

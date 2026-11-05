@@ -385,6 +385,11 @@ final class ApiScenario
         $c->ok($this->req('POST', '/penalties', ['user_ids' => []])[0] === 400 && $this->req('POST', '/points', ['user_ids' => []])[0] === 403 && $this->req('POST', '/catalog', ['title' => ''])[0] === 403, '„Strafen verwalten“: Strafen ja, Punkte und Katalog nein');
         $detail = $this->req('GET', '/members/' . $this->m1)[1];
         $c->ok(array_key_exists('points', (array) $detail) && $detail['points'] === null && ($detail['point_list'] ?? [1]) === [] && is_array($detail['penalties'] ?? null), '„Strafen verwalten“ sieht keine Punkte');
+        // Mehrere Personen auf einmal (Vorladen beim Blättern): je Person dasselbe wie GET /members/{id}
+        [$s, $many] = $this->req('GET', '/members/details', [], ['ids' => $this->m1 . ',999999,' . $this->m1]);
+        $c->ok($s === 200 && is_array($many) && count($many) === 1 && ($many[0] ?? null) == $detail, 'GET /members/details wie GET /members/{id}; unbekannte fehlen, doppelte einmal');
+        $c->ok($this->req('GET', '/members/details', [], ['ids' => 'x'])[0] === 400 && $this->req('GET', '/members/details')[0] === 400
+            && $this->req('GET', '/members/details', [], ['ids' => implode(',', range(1, 26))])[0] === 400, 'GET /members/details ohne gültige ids oder mit mehr als 25 → 400');
 
         $this->d->actAs($gast);
         [, $d] = $this->req('GET', '/me');
@@ -688,6 +693,7 @@ final class ApiScenario
         foreach (['/me/points', '/me/penalties', '/members', "/members/{$this->m1}"] as $path) {
             $c->ok($this->req('GET', $path)[0] === 403, "Anwärter: GET $path → 403");
         }
+        $c->ok($this->req('GET', '/members/details', [], ['ids' => (string) $this->m1])[0] === 403, 'Anwärter: GET /members/details → 403');
         $types = array_column((array) ($this->req('POST', '/me/push/status')[1]['types'] ?? []), 'key');
         $c->ok(in_array('events', $types, true) && !array_intersect(['points', 'penalties'], $types), 'Anwärter: Benachrichtigungen zu Terminen, nicht zu Punkten oder Strafen');
         [, $cfg] = $this->req('GET', '/config');

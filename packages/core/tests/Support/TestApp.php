@@ -12,6 +12,7 @@ use KompanieApp\Core\Infra\GdImageResizer;
 use KompanieApp\Core\Infra\LocalFileStorage;
 use KompanieApp\Core\Infra\NullNewsSource;
 use KompanieApp\Core\Port\BackupProvider;
+use KompanieApp\Core\Port\HttpClient;
 use KompanieApp\Core\Port\Mailer;
 use KompanieApp\Core\Port\NewsSource;
 use KompanieApp\Core\Storage\Sql\Connection;
@@ -50,7 +51,7 @@ final class TestApp
         Connection $db,
         FakeUsers $users = new FakeUsers(),
         array $config = [],
-        ?FakeHttpClient $http = null,
+        ?HttpClient $http = null,
         ?string $filesDir = null,
         ?MemorySettings $settings = null,
         ?FixedClock $clock = null,

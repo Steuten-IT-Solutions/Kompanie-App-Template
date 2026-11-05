@@ -196,7 +196,7 @@ export default function PdfViewer({ url, title }: { url: string; title: string }
           {error}
         </p>
       )}
-      {!error && count === 0 && <Loading />}
+      {!error && count === 0 && <Loading shape="text" />}
       {pages.map((p, i) =>
         p.src ? (
           <img key={i} className="pdf-page" src={p.src} width={p.width} height={p.height} alt={`${title}, Seite ${i + 1} von ${count}`} />

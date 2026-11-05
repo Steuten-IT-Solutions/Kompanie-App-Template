@@ -97,6 +97,8 @@ export interface AppConfig {
   features: Record<Feature, boolean>;
   /** Handbuch auf der Webseite der Kompanie (GitHub Pages); null ohne Update-Adresse */
   handbookUrl?: string | null;
+  /** Links auf Impressum und Datenschutzerklärung der Kompanie (Einstellungen → Impressum und Datenschutz); null ohne */
+  legal?: { imprint: string | null; privacy: string | null };
   /** „Fehler melden“ möglich (Issue #64): Die App hat einen Empfänger für Fehlermeldungen */
   reports?: boolean;
   /** Rollen der Installation (Einstellungen → Rollen): Bezeichnung und Punktefaktor */
@@ -1315,7 +1317,8 @@ export type ListField =
   | 'email'
   | 'points'
   | 'penalties';
-export type ListColumnWidth = 'narrow' | 'normal' | 'wide';
+/** auto: so breit wie der längste Inhalt */
+export type ListColumnWidth = 'narrow' | 'normal' | 'wide' | 'auto';
 
 export interface ListColumn {
   /** field: Wert aus der App, blank: leer zum Ausfüllen auf Papier */
@@ -1338,8 +1341,8 @@ export interface ListValues {
   role?: string;
   rank?: string | null;
   titles?: string[];
-  /** „TT.MM.“ oder null (nicht freigegeben) */
-  birthday?: string | null;
+  /** Tag und Monat, das Jahr nur mit view_personal (sonst null); null: nicht freigegeben */
+  birthday?: { day: number; month: number; year: number | null } | null;
   /** Persönliche Angaben (nur mit view_personal); null ohne Eintrag. address: die ganze Adresse in einer Zeile */
   address?: string | null;
   /** Straße mit Hausnummer */
@@ -1375,6 +1378,10 @@ export interface PrintList {
   subtitle: string | null;
   date: string | null;
   orientation: 'portrait' | 'landscape';
+  /** Wer mit „Mitglieder aktualisieren“ in die Liste kommt: members (alle mit Mitgliederbereich) und Rollen ohne ihn */
+  groups: string[];
+  /** Zur Auswahl: members, dann die Rollen ohne Mitgliederbereich (ohne Gast) */
+  group_options: { key: string; label: string }[];
   created_by_name: string | null;
   created_at: string;
   updated_by_name: string | null;
@@ -1389,6 +1396,7 @@ export interface PrintListInput {
   subtitle?: string;
   date?: string | null;
   orientation?: 'portrait' | 'landscape';
+  groups?: string[];
   columns?: Omit<ListColumn, 'available'>[];
   rows?: ({ kind: 'member'; user_id: number | null } | { kind: 'free'; name: string })[];
   /** Beim Speichern: geladener Stand; hat jemand die Liste inzwischen geändert, antwortet der Server mit 409 conflict. */
@@ -1500,6 +1508,17 @@ export class ApiError extends Error {
 }
 
 let csrfToken = config?.csrf.token ?? '';
+
+/**
+ * Tokens aus der aktuellen App-Seite übernehmen (pageUpdate.ts): Der Service Worker zeigt beim Start die gespeicherte
+ * Seite, deren CSRF-Token und Adresse zum Abmelden (WordPress: mit Token) veraltet sein können.
+ */
+export function takeTokens(csrf: AppConfig['csrf'], auth: AppConfig['auth']): void {
+  if (!config || !csrf?.token) return;
+  config.csrf = csrf;
+  config.auth = auth;
+  csrfToken = csrf.token;
+}
 
 /** Zur Anmeldung: Weiterleitung (WordPress) oder Anmeldeformular in der App. */
 export function toLogin(): void {
@@ -1710,6 +1729,8 @@ export const api = {
   setExtraRoles: (id: number, extra_roles: Level[]) =>
     request<{ id: number; level: Level; extra_roles: Level[] }>('PATCH', `/members/${id}/role`, { extra_roles }),
   member: (id: number) => request<MemberDetail>('GET', `/members/${id}`),
+  /** Mehrere Personen auf einmal (höchstens 25, Vorladen beim Blättern); unbekannte fehlen in der Antwort. */
+  memberDetails: (ids: number[]) => request<MemberDetail[]>('GET', '/members/details', undefined, { ids: ids.join(',') }),
   /** Rechte einer Person zusätzlich zur Rolle geben bzw. entziehen; leere Listen: wie die Rolle. */
   setRights: (id: number, grant: Capability[], revoke: Capability[]) =>
     request<MemberRights>('PUT', `/members/${id}/rights`, { grant, revoke }),
@@ -2103,6 +2124,12 @@ export interface PushAdmin {
   reminderHour: number;
   /** Benachrichtigung am Geburtstag; null ohne den Bereich Geburtstage */
   birthdays: { enabled: boolean; hour: number } | null;
+  /** Protokoll: je Art der letzte Versand, zuletzt vom Push-Dienst angenommen bzw. abgelehnt (null = noch nie) */
+  log: {
+    types: { type: string; label: string; at: string; devices: number }[];
+    accepted: { at: string; count: number } | null;
+    rejected: { at: string; count: number; reason: string } | null;
+  };
 }
 
 const pushPath = (suffix: string): string => (config?.user ? '/me/push' : '/push') + suffix;
@@ -2260,6 +2287,8 @@ export interface AdminSettings {
     status: { albums?: number; photos?: number; pending?: number; failed?: number; last_sync?: number; error?: string };
   };
   news: { source: NewsSourceType; url: string } | null;
+  /** Links auf Impressum und Datenschutzerklärung; leer, solange keiner eingetragen ist (fehlt bei älteren Servern) */
+  legal?: { imprint_url: string; privacy_url: string };
 }
 
 /** Bild der Galerie, das sich nicht aufbereiten ließ (Einstellungen → Galerie). */
@@ -2286,4 +2315,6 @@ export interface AdminSettingsInput {
   gallery_root?: string;
   news_source?: NewsSourceType;
   news_url?: string;
+  legal_imprint_url?: string;
+  legal_privacy_url?: string;
 }

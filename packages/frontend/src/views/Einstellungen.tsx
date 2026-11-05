@@ -14,6 +14,7 @@ import {
   type FeatureInfo,
   type MailSettings,
   type NewsSourceType,
+  type PushAdmin,
 } from '../api';
 import { EmailField, ErrorBox, Loading, useAsync } from '../ui';
 import { normalizeEmail } from '../email';
@@ -23,7 +24,8 @@ import Wartung from './Wartung';
 import Nutzung from './Nutzung';
 import { MaintenanceCard } from '../maintenance';
 import { goBack, navigate, redirect } from '../router';
-import { formatBytes } from '../format';
+import { formatBytes, formatUntil } from '../format';
+import { menuSources, prefetchOnTap, sources, usePrefetchMenu } from '../viewData';
 
 const sec = brand.labels.sections;
 
@@ -38,6 +40,7 @@ const PAGES = [
   { id: 'galerie', title: sec.gallery, text: 'Fotoalben aus einem Ordner in Google Drive.' },
   { id: 'kalender', title: 'Kalender', text: 'Kalender für Mitglieder aus Google Kalender oder per iCal.' },
   { id: 'news', title: newsTitle(), text: `Woher die ${newsTitle()} kommen.` },
+  { id: 'rechtliches', title: 'Impressum und Datenschutz', text: 'Links auf Impressum und Datenschutzerklärung, für alle sichtbar.' },
   { id: 'nutzung', title: 'Nutzung', text: 'Wer die App wann nutzt und welche Bereiche.' },
   { id: 'zustand', title: 'Zustand und Updates', text: 'Ampel je Bereich, installierte Version und Updates.' },
   { id: 'datensicherung', title: 'Datensicherung', text: 'Sicherung herunterladen oder einspielen.' },
@@ -57,7 +60,7 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
     if (fromGoogle) redirect('einstellungen/google');
   }, [fromGoogle]);
   const page = PAGES.find((p) => p.id === path[0]);
-  if (fromGoogle && !page) return <Loading />;
+  if (fromGoogle && !page) return <Loading shape="form" />;
   if (!page) return <Overview />;
   return (
     <div className="settings">
@@ -74,7 +77,7 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
       {page.id === 'wartung' && <MaintenanceCard onToast={onToast} />}
       {page.id === 'datensicherung' && <Wartung part="datensicherung" onToast={onToast} />}
       {page.id === 'neuerungen' && <Neuerungen />}
-      {(page.id === 'google' || page.id === 'kalender' || page.id === 'galerie' || page.id === 'news') && (
+      {(page.id === 'google' || page.id === 'kalender' || page.id === 'galerie' || page.id === 'news' || page.id === 'rechtliches') && (
         <Verbindung page={page.id} onToast={onToast} />
       )}
     </div>
@@ -88,19 +91,28 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
 function Overview() {
   // Erst nach dem Laden zeigen (beim nächsten Öffnen sofort aus dem Speicher): Sonst rückt „Neuigkeiten“ nachträglich
   // ein und schiebt die Zeilen darunter weg.
-  const { data, loading } = useAsync(() => api.settings(), [], 'settings');
-  if (loading && !data) return <Loading />;
+  const { data, loading } = useAsync(sources.settings.load, sources.settings.deps, sources.settings.key);
   const pages = PAGES.filter(
     (p) =>
       (p.id !== 'news' || !!data?.news) &&
       (p.id !== 'nutzung' || can('view_activity')) &&
       (p.id !== 'geburtstage' || !!config?.features.birthdays),
   );
+  usePrefetchMenu(
+    'einstellungen',
+    pages.map((p) => p.id),
+  );
+  if (loading && !data) return <Loading />;
   return (
     <ul className="card-list settings-overview">
       {pages.map((p) => (
         <li key={p.id}>
-          <button type="button" className="card row clickable settings-link" onClick={() => navigate(`einstellungen/${p.id}`)}>
+          <button
+            type="button"
+            className="card row clickable settings-link"
+            onClick={() => navigate(`einstellungen/${p.id}`)}
+            {...prefetchOnTap(...menuSources('einstellungen', p.id))}
+          >
             <span className="row-main">
               <span className="row-title">{p.title}</span>
               <span className="row-sub">{p.text}</span>
@@ -115,10 +127,16 @@ function Overview() {
   );
 }
 
-/** Google-Zugang, Kalender, Galerie oder Neuigkeiten: alle aus den gemeinsamen Einstellungen (/admin/settings). */
-function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie' | 'news'; onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData, revision } = useAsync(() => api.settings(), [], 'settings');
-  if (loading && !data) return <Loading />;
+/** Google-Zugang, Kalender, Galerie, Neuigkeiten oder Rechtliches: alle aus den gemeinsamen Einstellungen (/admin/settings). */
+function Verbindung({
+  page,
+  onToast,
+}: {
+  page: 'google' | 'kalender' | 'galerie' | 'news' | 'rechtliches';
+  onToast: (msg: string) => void;
+}) {
+  const { data, error, loading, reload, setData, revision } = useAsync(sources.settings.load, sources.settings.deps, sources.settings.key);
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const s = data!;
   // key: Die Formulare übernehmen ihre Felder einmal; weicht der frische Stand vom gespeicherten ab, neu aufbauen.
@@ -126,7 +144,41 @@ function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie'
   if (page === 'google') return <GoogleAccess key={revision} {...props} />;
   if (page === 'kalender') return <Calendar key={revision} {...props} />;
   if (page === 'galerie') return <Gallery key={revision} {...props} />;
+  if (page === 'rechtliches') return <Legal key={revision} {...props} />;
   return s.news ? <News key={revision} {...props} /> : null;
+}
+
+const devicesText = (n: number): string => (n === 0 ? 'an kein Gerät' : n === 1 ? 'an 1 Gerät' : `an ${n} Geräte`);
+
+/** Zuletzt verschickt je Art, dazu zuletzt vom Push-Dienst angenommen bzw. abgelehnt; nichts, solange noch nichts verschickt wurde. */
+function PushLog({ log }: { log: PushAdmin['log'] }) {
+  if (log.types.length === 0 && !log.accepted && !log.rejected) return null;
+  return (
+    <div className="push-log">
+      <h4>Zuletzt verschickt</h4>
+      {log.types.length > 0 && (
+        <ul className="small muted">
+          {log.types.map((t) => (
+            <li key={t.type}>
+              {t.label} – {formatUntil(t.at)}, {devicesText(t.devices)}
+            </li>
+          ))}
+        </ul>
+      )}
+      {log.accepted && (
+        <p className="small muted">
+          Zuletzt vom Push-Dienst angenommen: {formatUntil(log.accepted.at)} (
+          {log.accepted.count === 1 ? '1 Nachricht' : `${log.accepted.count} Nachrichten`}).
+        </p>
+      )}
+      {log.rejected && (
+        <p className="small muted">
+          Zuletzt vom Push-Dienst abgelehnt: {formatUntil(log.rejected.at)} (
+          {log.rejected.count === 1 ? '1 Nachricht' : `${log.rejected.count} Nachrichten`}, {log.rejected.reason}).
+        </p>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -137,7 +189,7 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.pushAdmin(), [], 'admin/push');
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const p = data!;
 
@@ -200,6 +252,7 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
           )}
         </>
       )}
+      <PushLog log={p.log} />
       {saveError && (
         <p className="form-error" role="alert">
           {saveError}
@@ -221,7 +274,7 @@ function BirthdaySettingsSection({ onToast }: { onToast: (msg: string) => void }
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   if (!config?.features.birthdays) return <p className="muted">Der Bereich {sec.birthdays} ist ausgeschaltet.</p>;
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
 
   async function save(days: number) {
@@ -271,7 +324,7 @@ function BirthdaySettingsSection({ onToast }: { onToast: (msg: string) => void }
  */
 function MailSection({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.mailSettings(), [], 'admin/mail');
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   return <MailForm key={JSON.stringify(data)} settings={data!} onSaved={setData} onToast={onToast} />;
 }
@@ -550,7 +603,7 @@ function Bereiche({ onToast }: { onToast: (msg: string) => void }) {
   );
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const list = data!;
   const value = Object.fromEntries(list.map((f) => [f.key, f.enabled])) as Record<Feature, boolean>;
@@ -1151,7 +1204,7 @@ function FailedPhotos({ count, disabled, onRetry }: { count: number; disabled: b
           {error}
         </p>
       )}
-      {open && !list && !error && <Loading />}
+      {open && !list && !error && <Loading shape="text" />}
       {list && (
         <>
           <ul className="gallery-failed-list">
@@ -1267,6 +1320,62 @@ export function News({ settings, onSaved, onToast }: SectionProps) {
           {result}
         </p>
       )}
+    </Section>
+  );
+}
+
+/**
+ * Links auf Impressum und Datenschutzerklärung (z. B. die Seiten auf der Webseite der Kompanie). Die App zeigt sie allen,
+ * auch ohne Anmeldung: auf der Anmeldeseite, im Konto und in der Hilfe. Ohne einen der Links ist die Statusseite gelb.
+ */
+export function Legal({ settings, onSaved, onToast }: SectionProps) {
+  const saved = settings.legal ?? { imprint_url: '', privacy_url: '' };
+  const [imprint, setImprint] = useState(saved.imprint_url);
+  const [privacy, setPrivacy] = useState(saved.privacy_url);
+  // Gleich sichtbar machen (Anmeldeseite, Konto, Hilfe), ohne die App neu zu laden.
+  const { busy, error, save } = useSave((s) => {
+    if (config && s.legal) config.legal = { imprint: s.legal.imprint_url || null, privacy: s.legal.privacy_url || null };
+    onSaved(s);
+  }, onToast);
+  return (
+    <Section
+      id="rechtliches"
+      title="Impressum und Datenschutz"
+      busy={busy}
+      error={error}
+      onSubmit={(e) => {
+        e.preventDefault();
+        save({ legal_imprint_url: imprint.trim(), legal_privacy_url: privacy.trim() });
+      }}
+    >
+      <p className="muted small">
+        Trage die Adressen eures Impressums und eurer Datenschutzerklärung ein, z. B. die Seiten auf eurer Webseite. Die App zeigt die Links
+        allen, auch ohne Anmeldung: auf der Anmeldeseite, im Konto und in der Hilfe.
+      </p>
+      <label className="field">
+        <span>Impressum</span>
+        <input
+          type="url"
+          inputMode="url"
+          placeholder="https://www.beispiel.de/impressum"
+          value={imprint}
+          onChange={(e) => setImprint(e.target.value)}
+        />
+      </label>
+      <label className="field">
+        <span>Datenschutzerklärung</span>
+        <input
+          type="url"
+          inputMode="url"
+          placeholder="https://www.beispiel.de/datenschutz"
+          value={privacy}
+          onChange={(e) => setPrivacy(e.target.value)}
+        />
+      </label>
+      <p className="muted small">
+        Was die App an Daten verarbeitet (für eure Datenschutzerklärung), steht in der Hilfe unter „Impressum und Datenschutz“. Ein leeres
+        Feld entfernt den Link.
+      </p>
     </Section>
   );
 }

@@ -32,6 +32,7 @@ import {
   type MemberOrder,
   type MemberSort,
 } from '../memberSort';
+import { sources } from '../viewData';
 
 const sec = brand.labels.sections;
 
@@ -58,7 +59,7 @@ export function formerSummary(f: Pick<FormerInfo, 'reason' | 'joined_on' | 'foun
  * Antippen öffnet die Seite der Person wie in der Mitgliederliste.
  */
 export function FormerList() {
-  const { data, error, loading, reload } = useAsync(() => api.formerMembers(), [], 'former-members');
+  const { data, error, loading, reload } = useAsync(sources.formerMembers.load, sources.formerMembers.deps, sources.formerMembers.key);
   // Suche und Filter: beim Zurückkommen aus einer Person wie verlassen, wie in der Mitgliederliste.
   const [query, setQuery] = useEntryState('former-admin-query', '');
   const [reason, setReason] = useEntryState<FormerReason | ''>('former-admin-reason', '');
@@ -87,7 +88,7 @@ export function FormerList() {
     navigate(`verwaltung/ehemalige/${id}`);
   }
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="people" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const count = (r: FormerReason) => (data ?? []).filter((f) => f.reason === r).length;
 
@@ -210,7 +211,7 @@ function RetentionCard({ onChanged }: { onChanged: () => void }) {
   const [form, setForm] = useState<{ years: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const r = data!;
   const f = form ?? { years: r.years > 0 ? String(r.years) : '' };

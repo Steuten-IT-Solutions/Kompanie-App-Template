@@ -15,6 +15,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Benachricht
 - **Erinnerung an Termine am nächsten Tag ab**: die Uhrzeit, ab der die Erinnerung an die Termine des Folgetags verschickt wird (anfangs 18:00 Uhr).
 - **Am Geburtstag eines Mitglieds alle anderen benachrichtigen**: Schalter für die Benachrichtigung am Geburtstag (nur, wenn {bereich.birthdays} an ist).
 - **Benachrichtigung am Geburtstag ab**: die Uhrzeit dafür (anfangs 07:00 Uhr). Sie erscheint nur, wenn der Schalter darüber an ist.
+- **Zuletzt verschickt**: für jede Art von Benachrichtigung, wann die App sie zuletzt verschickt hat und an wie viele Geräte. „an kein Gerät“ heißt: Niemand, für den sie gedacht war, hat diese Art auf seinem Gerät eingeschaltet. Darunter steht, wann der Push-Dienst (z. B. von Google oder Apple) zuletzt eine Nachricht angenommen hat und, falls es vorkam, wann er zuletzt eine abgelehnt hat und warum. Der Abschnitt erscheint erst, wenn etwas verschickt wurde.
 
 ## So gehst du vor
 ### Die Uhrzeit der Erinnerung ändern
@@ -27,6 +28,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Benachricht
 
 ## Gut zu wissen
 - Worüber eine Person benachrichtigt wird, wählt sie selbst auf ihrem Gerät (**Meins → Konto → Benachrichtigungen**, siehe [Benachrichtigungen](seite:benachrichtigungen)).
+- Kommt eine Benachrichtigung auf einem Gerät nicht an, obwohl sie unter **Zuletzt verschickt** steht, der Push-Dienst sie danach angenommen hat und keine Nachrichten mehr warten, hat der Server seinen Teil erledigt. Dann liegt es meist am Gerät: Prüfe dort, ob die Art eingeschaltet ist und ob das Handy Benachrichtigungen des Browsers zurückhält (z. B. im Energiesparmodus).
 - Kann der Server keine Benachrichtigungen senden, steht statt der Zahl der Geräte, was ihm fehlt. Das kann euer Hoster einschalten.
 
 > **Für Fortgeschrittene:** Was fehlt, betrifft die Verschlüsselung in PHP, der Programmiersprache, in der die App auf dem Server läuft (z. B. die PHP-Erweiterung OpenSSL). Der Hoster schaltet sie in den PHP-Einstellungen eures Webspace ein.

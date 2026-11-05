@@ -22,8 +22,14 @@ const KEEP = new Set(
     ' ',
   ),
 );
-/** Elemente mit eigenem Text bzw. Inhalt: werden zu einem span mit denselben Klassen. */
-const INLINE = new Set(['span', 'a', 'button', 'label', 'summary', 'details', 'form', 'fieldset', 'legend', 'blockquote', 'pre', 'code']);
+/**
+ * Elemente mit eigenem Text bzw. Inhalt, mit ihrem Tag übernommen: Manche Regeln in styles.css hängen am Tag (z. B.
+ * `button.member-tile`, `fieldset.feature-list`), und form, fieldset, blockquote und pre sind von sich aus Blöcke. Als
+ * span stünden sie anders da als die echte Seite. Bedienbar sind sie im Gerüst nicht (inert, skeleton.tsx).
+ */
+const TAGGED = new Set(['a', 'button', 'label', 'form', 'fieldset', 'legend', 'blockquote', 'pre', 'code']);
+/** Werden zu einem span (details zeigte zugeklappt nur seine summary) bzw. bleiben einer. */
+const INLINE = new Set(['span', 'summary', 'details']);
 /** Ersetzte Elemente: nur ihre Fläche. */
 const BOX = new Set(['img', 'svg', 'canvas', 'video', 'picture', 'iframe', 'input', 'select', 'textarea', 'progress', 'meter']);
 const MAX_ELEMENTS = 300;
@@ -52,14 +58,14 @@ export function capture(nodes: ArrayLike<DomNode>): Part[] {
       if (r.width < 1 || r.height < 1) return null;
       return { b: [Math.round(r.width), Math.round(r.height)], ...(c && { c }) };
     }
-    if (!KEEP.has(tag) && !INLINE.has(tag)) return null;
+    if (!KEEP.has(tag) && !TAGGED.has(tag) && !INLINE.has(tag)) return null;
     const k: Part[] = [];
     const children = node.childNodes ?? [];
     for (let i = 0; i < children.length && k.length < MAX_CHILDREN; i++) {
       const part = walk(children[i]);
       if (part !== null) k.push(part);
     }
-    return { t: KEEP.has(tag) ? tag : 'span', ...(c && { c }), ...(k.length > 0 && { k }) };
+    return { t: KEEP.has(tag) || TAGGED.has(tag) ? tag : 'span', ...(c && { c }), ...(k.length > 0 && { k }) };
   }
 
   const out: Part[] = [];

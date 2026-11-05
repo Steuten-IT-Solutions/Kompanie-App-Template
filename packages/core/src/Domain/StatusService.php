@@ -23,7 +23,7 @@ final class StatusService
     /** @return array{items: array<int, array<string, string>>, support: string} */
     public function report(): array
     {
-        $items = [$this->updates(), $this->gallery(), $this->calendar(), $this->backup(), $this->server(), $this->push()];
+        $items = [$this->updates(), $this->gallery(), $this->calendar(), $this->backup(), $this->legal(), $this->server(), $this->push()];
         foreach ($this->app->healthChecks?->checks() ?? [] as $check) {
             $items[] = $check;
         }
@@ -164,6 +164,23 @@ final class StatusService
             return $this->item('backup', 'Datensicherung', 'warn', $text . ' Bitte unter Einstellungen → Datensicherung eine Sicherung herunterladen und aufbewahren oder Sicherungen in Google Drive einschalten.' . $hint);
         }
         return $this->item('backup', 'Datensicherung', $hint !== '' ? 'warn' : 'ok', $text . $hint);
+    }
+
+    /** Impressum und Datenschutzerklärung: gelb, solange ein Link fehlt (Einstellungen → Impressum und Datenschutz). */
+    private function legal(): array
+    {
+        $legal = $this->app->settingsService()->legal();
+        $missing = array_keys(array_filter([
+            'Impressum' => $legal['imprint_url'] === '',
+            'Datenschutzerklärung' => $legal['privacy_url'] === '',
+        ]));
+        if ($missing !== []) {
+            return $this->item('legal', 'Impressum und Datenschutz', 'warn', 'Es fehlt der Link auf ' . implode(' und ', array_map(
+                static fn (string $m): string => $m === 'Impressum' ? 'das Impressum' : 'die Datenschutzerklärung',
+                $missing,
+            )) . '. Bitte unter Einstellungen → Impressum und Datenschutz eintragen; die App zeigt die Links dann allen, auch ohne Anmeldung.');
+        }
+        return $this->item('legal', 'Impressum und Datenschutz', 'ok', 'Die Links auf Impressum und Datenschutzerklärung sind eingetragen und für alle sichtbar.');
     }
 
     private function push(): array

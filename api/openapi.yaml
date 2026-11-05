@@ -1251,8 +1251,9 @@ paths:
       tags: [Listen]
       summary: „Mitglieder aktualisieren“
       description: |
-        Legt Zeilen für alle Mitglieder (Recht `member`, ohne Gäste und Anwärter) an, die noch keine haben, und löscht die
-        Zeilen von Konten, die es nicht mehr gibt oder die kein Mitglied mehr sind. Freie Zeilen bleiben. Neue Zeilen
+        Legt Zeilen für alle Personen der Liste (`groups`: Mitglieder mit Recht `member` und auf Wunsch Rollen ohne
+        Mitgliederbereich wie Anwärter; nie Gäste) an, die noch keine haben, und löscht die Zeilen von Konten, die es nicht
+        mehr gibt oder die nicht mehr dazugehören. Freie Zeilen bleiben. Neue Zeilen
         werden nach Nachname vor die erste Mitgliedszeile eingeordnet, die nach Namen später kommt (sonst hinter die
         letzte; ohne Mitgliedszeilen an den Anfang). Ohne `apply` nur die Übersicht, was sich ändern würde.
       x-capability: manage_lists
@@ -3172,6 +3173,30 @@ paths:
                 items: { $ref: '#/components/schemas/MemberSummary' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /members/details:
+    get:
+      tags: [Verwaltung]
+      summary: Mehrere Mitglieder auf einmal (Vorladen beim Blättern)
+      description: |
+        Je Person dasselbe wie `GET /members/{id}`, in der Reihenfolge von `ids`; doppelte Ids zählen einmal, unbekannte
+        fehlen in der Antwort. Höchstens 25 Ids, sonst oder ohne gültige Ids 400.
+      x-capability: 'wie GET /members/{id}'
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          description: Ids mit Kommas, z. B. `3,7,12`
+          schema: { type: string, example: '3,7,12' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MemberDetail' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /members/{id}:
     parameters:
       - $ref: '#/components/parameters/Id'
@@ -4458,6 +4483,8 @@ paths:
                 gallery_root: { type: string, description: Link oder ID des Galerie-Ordners in Google Drive }
                 news_source: { type: string, enum: [none, wordpress, rss], description: Nur eigenständige Version }
                 news_url: { type: string, description: Nur eigenständige Version }
+                legal_imprint_url: { type: string, description: 'Link auf das Impressum (http:// oder https://, höchstens 255 Zeichen); leer entfernt ihn' }
+                legal_privacy_url: { type: string, description: 'Link auf die Datenschutzerklärung (http:// oder https://, höchstens 255 Zeichen); leer entfernt ihn' }
       responses:
         '200':
           description: Neuer Stand
@@ -5308,7 +5335,7 @@ components:
         application/json:
           schema:
             type: object
-            required: [supported, missing, devices, accounts, guests, queued, reminderHour, birthdays]
+            required: [supported, missing, devices, accounts, guests, queued, reminderHour, birthdays, log]
             properties:
               supported: { type: boolean }
               missing: { type: array, items: { type: string }, description: Fehlende PHP-Voraussetzungen }
@@ -5324,6 +5351,37 @@ components:
                 properties:
                   enabled: { type: boolean }
                   hour: { type: integer, minimum: 0, maximum: 23 }
+              log:
+                type: object
+                description: >-
+                  Protokoll des Versands. Zeitpunkte als ISO 8601 in der Zeitzone der Kompanie. types: je angebotener Art der
+                  letzte Versand (devices = Geräte, für die die Nachricht in die Warteschlange ging; 0 = niemand hat die Art
+                  abonniert). accepted/rejected: zuletzt vom Push-Dienst angenommen bzw. endgültig abgelehnt (null = noch nie).
+                required: [types, accepted, rejected]
+                properties:
+                  types:
+                    type: array
+                    items:
+                      type: object
+                      required: [type, label, at, devices]
+                      properties:
+                        type: { type: string }
+                        label: { type: string }
+                        at: { type: string, format: date-time }
+                        devices: { type: integer }
+                  accepted:
+                    type: [object, 'null']
+                    required: [at, count]
+                    properties:
+                      at: { type: string, format: date-time }
+                      count: { type: integer, description: Zahl der Nachrichten in diesem Lauf }
+                  rejected:
+                    type: [object, 'null']
+                    required: [at, count, reason]
+                    properties:
+                      at: { type: string, format: date-time }
+                      count: { type: integer, description: Zahl der Nachrichten in diesem Lauf }
+                      reason: { type: string, description: 'Letzter Grund, z. B. „HTTP 403“' }
     Error:
       description: Fehler
       content:
@@ -5952,6 +6010,13 @@ components:
         news:
           type: [object, 'null']
           description: null, wenn die Neuigkeiten aus den Beiträgen der WordPress-Seite kommen.
+        legal:
+          type: object
+          description: 'Links auf Impressum und Datenschutzerklärung (Einstellungen → Impressum und Datenschutz); leer, solange keiner eingetragen ist'
+          required: [imprint_url, privacy_url]
+          properties:
+            imprint_url: { type: string }
+            privacy_url: { type: string }
           properties:
             source: { type: string, enum: [none, wordpress, rss] }
             url: { type: string }
@@ -6113,6 +6178,13 @@ components:
         variant: { type: string, enum: [wordpress, standalone], description: Art der Installation }
         siteUrl: { type: [string, 'null'], description: Startseite der Webseite, falls vorhanden }
         handbookUrl: { type: [string, 'null'], description: 'Handbuch der Kompanie auf ihrer GitHub-Pages-Seite (…/handbuch/), aus der Adresse der Update-Liste abgeleitet; sonst null' }
+        legal:
+          type: object
+          description: 'Links auf Impressum und Datenschutzerklärung der Kompanie, für alle (auch ohne Anmeldung); null, solange keiner eingetragen ist'
+          required: [imprint, privacy]
+          properties:
+            imprint: { type: [string, 'null'] }
+            privacy: { type: [string, 'null'] }
         reports: { type: boolean, description: 'Fehlermeldungen an die Betreuer möglich (reportUrl in update.json, Issue #64); sonst kein Knopf „Fehler melden“' }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
         backupUrl: { type: [string, 'null'], description: 'Nur für Admins (nicht in der Vorschau): Adresse zum Herunterladen der Datensicherung als Datei (<App>/sicherung), Stück für Stück erzeugt; sonst null' }
@@ -6831,7 +6903,7 @@ components:
           enum: [nr, name, first_name, last_name, role, rank, titles, birthday, address, street, postal_code, city, country, phone, email, points, penalties, null]
           description: 'Nur bei field; nr zählt die Zeilen (macht die App)'
         label: { type: string, maxLength: 60, description: 'Überschrift; leer: die App nimmt die Standardbezeichnung' }
-        width: { type: string, enum: [narrow, normal, wide], default: normal }
+        width: { type: string, enum: [narrow, normal, wide, auto], default: normal, description: 'auto: so breit wie der längste Inhalt (misst die App)' }
         checkbox: { type: boolean, description: Kästchen zum Abhaken (nur bei blank) }
         available: { type: boolean, description: 'Nur in Antworten: ob die anfragende Person die Werte sieht (blank immer)' }
 
@@ -6849,7 +6921,7 @@ components:
             deleted: { type: boolean }
             values:
               type: object
-              description: 'Werte der sichtbaren Datenspalten der Liste: name, first_name, last_name, role (Bezeichnung), rank (oder null), titles (Liste), birthday („TT.MM.“ oder null), mit view_personal address (ganze Adresse in einer Zeile, das Land nur außerhalb Deutschlands), street (Straße und Nr.), postal_code, city, country (Name des Landes), phone, email (je null ohne Eintrag), points (Zahl), penalties (offene Cent)'
+              description: 'Werte der sichtbaren Datenspalten der Liste: name, first_name, last_name, role (Bezeichnung), rank (oder null), titles (Liste), birthday (Objekt mit day, month und year – year nur mit view_personal, sonst null – oder null), mit view_personal address (ganze Adresse in einer Zeile, das Land nur außerhalb Deutschlands), street (Straße und Nr.), postal_code, city, country (Name des Landes), phone, email (je null ohne Eintrag), points (Zahl), penalties (offene Cent)'
               additionalProperties: true
         - type: object
           description: Freie Zeile
@@ -6860,13 +6932,25 @@ components:
 
     PrintList:
       type: object
-      required: [id, title, subtitle, date, orientation, created_by_name, created_at, updated_by_name, updated_at, columns, rows, fields]
+      required: [id, title, subtitle, date, orientation, groups, group_options, created_by_name, created_at, updated_by_name, updated_at, columns, rows, fields]
       properties:
         id: { type: integer }
         title: { type: string, maxLength: 120 }
         subtitle: { type: [string, 'null'], maxLength: 200 }
         date: { type: [string, 'null'], format: date }
         orientation: { type: string, enum: [portrait, landscape] }
+        groups:
+          type: array
+          description: 'Wer mit „Mitglieder aktualisieren“ in die Liste kommt: members (alle mit Mitgliederbereich) und Schlüssel von Rollen ohne Mitgliederbereich'
+          items: { type: string }
+        group_options:
+          type: array
+          description: 'Zur Auswahl: members, dann die Rollen ohne Mitgliederbereich (ohne Gast) in der Reihenfolge der Rollen'
+          items:
+            type: object
+            properties:
+              key: { type: string }
+              label: { type: string }
         created_by_name: { type: [string, 'null'] }
         created_at: { type: string, format: date-time }
         updated_by_name: { type: [string, 'null'] }
@@ -6894,6 +6978,12 @@ components:
         subtitle: { type: string, maxLength: 200 }
         date: { type: [string, 'null'], format: date }
         orientation: { type: string, enum: [portrait, landscape], default: portrait }
+        groups:
+          type: array
+          minItems: 1
+          maxItems: 20
+          description: 'Personen der Liste (siehe PrintList.groups); Vorgabe: [members]'
+          items: { type: string }
         columns:
           type: array
           minItems: 1

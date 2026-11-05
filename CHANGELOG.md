@@ -17,6 +17,30 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Impressum und Datenschutz**: Unter *Einstellungen → Impressum und Datenschutz* (und im Einrichtungsassistenten) trägst
+  du die Links auf euer Impressum und eure Datenschutzerklärung ein, z. B. auf eurer Webseite. Die App zeigt sie allen,
+  auch ohne Anmeldung: auf der Anmeldeseite, unten im Konto und unten in der Hilfe. Solange einer fehlt, ist die Zeile
+  *Impressum und Datenschutz* unter *Zustand und Updates* gelb. Die Hilfe listet, welche Daten die App verarbeitet, als
+  Hilfe für eure Datenschutzerklärung.
+- **Nachvollziehen, was an Benachrichtigungen verschickt wurde**: Unter *Einstellungen → Benachrichtigungen* steht
+  jetzt für jede Art, wann sie zuletzt verschickt wurde und an wie viele Geräte, dazu wann der Push-Dienst zuletzt eine
+  Nachricht angenommen oder abgelehnt hat (mit Grund). So siehst du ohne Blick in die Datenbank, ob eine Benachrichtigung
+  verschickt wurde oder ob niemand sie eingeschaltet hatte.
+
+### Geändert
+
+- **Seite eines Mitglieds erscheint schneller**: Öffnest du in der Verwaltung eine Person oder blätterst weiter, stehen
+  Dienstgrad, Foto, Rolle, Punkte und Offen sofort da (aus der Mitgliederliste); der Rest der Seite folgt, sobald ihre
+  Daten geladen sind. Die übrigen Personen lädt die App jetzt zu zwölft in einer Anfrage vor statt einzeln, und ohne
+  dabei auf Fotos und Abzeichen zu warten; so sind auch weiter entfernte Seiten deutlich früher bereit.
+- **Listen öffnen schneller**: Öffnest du unter *Verwaltung → Listen* eine Liste erneut, steht sie sofort da und wird im
+  Hintergrund aktualisiert, wie die übrigen Seiten der App. Hat jemand sie inzwischen geändert, zeigt die App gleich
+  danach den neuen Stand.
+
+## [0.5.0] – 2026-11-01
+
+### Neu
+
 - **Fortschritt beim Update**: Während ein Update läuft, zeigt *Einstellungen → Updates* einen Fortschrittsbalken mit
   dem aktuellen Schritt (Paket laden, Daten sichern, Sicherung in Google Drive, einspielen), beim Sichern und Hochladen
   auch in MB. Die Größe der Sicherung ist dabei aus der letzten geschätzt („ca.“). Läuft beim Öffnen der Seite
@@ -51,9 +75,45 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   seit dem Ausscheiden die App die persönlichen Angaben von Ehemaligen löscht (Kontaktdaten, Anmeldung, Geburtstag,
   Strafen, Anwesenheiten u. a.). Für die Chronik bleiben Name, Ämter, Punkte, Dienstgrad, Titel, Foto und Eintrittsjahr.
   Voreingestellt ist aus; eine Vorschau zeigt, wen es trifft.
+- **Listen als PDF-Datei**: *Verwaltung → Listen → PDF herunterladen* speichert die Liste direkt als PDF, ohne
+  Druckdialog. *Drucken* gibt es weiterhin als eigenen Knopf.
+- **Listen: Breite „automatisch“**: Eine Spalte kann so breit sein wie ihr längster Inhalt bzw. ihre Überschrift; die
+  übrigen Spalten teilen sich den Rest.
+- **Listen: Sortieren nach jeder Spalte**: Unter *Zeilen* sortiert **Sortieren nach** die Liste nach dem Namen oder einer
+  beliebigen Datenspalte, auf- oder absteigend (Geburtstage nach Tag im Jahr). Zeilen ohne Wert kommen ans Ende.
+- **Listen: weitere Personen**: Unter *Zeilen → In die Liste kommen* wählst du neben den Mitgliedern auch Rollen ohne
+  Mitgliederbereich (z. B. Anwärter oder eine Jugendgruppe). „Mitglieder aktualisieren“ holt dann auch sie in die Liste.
 
 ### Geändert
 
+- **Interne Bilder der Galerie schneller**: Interne Bilder bleiben geschützt (der Server prüft bei jedem Abruf, ob
+  jemand angemeldet ist und sie sehen darf), erscheinen aber nach dem ersten Laden sofort, auch offline: Die App
+  speichert sie auf dem Gerät und löscht sie beim Abmelden. Beim Antippen eines Albums lädt sie die ersten
+  Vorschaubilder schon vorab. Unter WordPress antwortet die App auf Bildabrufe, bevor Theme und andere Plugins starten.
+- **Ladeanzeige in Galeriebildern**: Solange ein Bild der Galerie noch lädt oder aufbereitet wird, dreht sich darin ein
+  kleiner Ring (in der Übersicht, im Album und in der Großansicht). Ist das Bild schon auf dem Gerät, erscheint er nicht.
+- **Wischen in der Großansicht der Galerie**: Beim Wischen folgt das Bild dem Finger, daneben steht schon das nächste
+  bzw. vorherige, und beim Loslassen gleitet es weiter, wie auf den Seiten der Mitglieder. Zu kurz gezogen schnappt es
+  zurück. Auch **‹**, **›** und die Pfeiltasten blättern mit dieser Bewegung. Das gilt auch auf Videos; nur in den
+  Leisten des Players (Zeitleiste, Ton, Vollbild) bedient Wischen weiter das Video. Tippen auf das Video spielt es ab
+  bzw. hält es an.
+- **Videos der Galerie starten schneller**: Der Server reicht ein Video jetzt weiter, während es aus Google Drive kommt,
+  statt jedes Stück erst ganz zu laden. Unter WordPress antwortet die App auf Videoabrufe wie bei Bildern, bevor Theme
+  und andere Plugins starten. In der Großansicht lädt ein Video schon beim Öffnen, nicht erst beim Tippen auf ▶.
+  Anmeldung und Rechte prüft der Server wie bisher vor jedem Abruf. Tipp für Admins: „Fürs Web optimiert“
+  gespeicherte Videos starten noch schneller (siehe Handbuch, Galerie einrichten).
+- **Gerüst statt Ladeschnecke**: Auch beim ersten Öffnen einer Seite (und nach jedem Update) erscheint beim Laden
+  ein graues Gerüst in der Form der Seite (Liste, News, Galerie, Formular, Beitrag) statt „Lädt …“ mit sich drehendem
+  Kreis. Ab dem zweiten Öffnen zeigt es wie bisher genau den Aufbau, den die Seite beim letzten Mal hatte. Ebenso
+  zeigt das vergrößerte Foto einer Person beim Laden eine Fläche in seiner Größe.
+- **Schnellerer Start**: Die App erscheint beim Öffnen sofort mit dem zuletzt geladenen Stand, statt zuerst auf den
+  Webserver zu warten (bisher bis zu 2,5 Sekunden, je nach Hoster). Die aktuelle Fassung holt sie im Hintergrund; hat
+  sich etwas Wichtiges geändert (z. B. Rechte, Bereiche oder eine neue Version), lädt sie sich kurz nach dem Start
+  einmal neu. Nach dem Anmelden und beim Aufruf über einen Link von der Webseite wartet sie wie bisher auf den Server.
+- **Seiten öffnen schneller**: Sobald *Meins*, die Startseite der *Verwaltung* (auch *Einrichtungen*) oder die
+  *Einstellungen* zu sehen sind, lädt die App die Daten der Seiten dahinter im Hintergrund vor, ebenso die Seite
+  *Öffentliche Termine verwalten* für alle, die Termine pflegen. Diese Seiten erscheinen dann schon beim ersten Öffnen
+  ohne Warten auf den Server.
 - **Karte** bei einem Termin öffnet den Ort jetzt wie die Adresse eines Mitglieds in der Karten-App des Geräts: Auf
   Android wählt man die App aus (z. B. Google Maps oder Waze), auf iPhone, iPad und Mac öffnet sich Apple Karten, am
   PC weiter Google Maps.
@@ -68,9 +128,25 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Sicherungen eingerichtet ist (ohne Passwort wie bisher unverschlüsselt). Ältere, unverschlüsselte Sicherungen im Ordner
   löscht die App, sobald die erste verschlüsselte dort liegt und das Passwort einmal mit *Passwort prüfen* (oder einer
   Wiederherstellung) bestätigt ist.
+- **Galerie**: Zurück aus einem Album (mit **‹ Alle Alben** oder der Zurück-Taste) führt wieder an die Stelle der
+  Übersicht, an der man das Album geöffnet hat, statt an den Anfang. Nach dem Schließen der Großansicht steht das
+  zuletzt gezeigte Bild im Album im Blick, auch wenn man weit geblättert hat.
+  Die Zurück-Taste (oder -Geste) bei offener Großansicht schließt nur das Bild, statt das Album zu verlassen.
+- **Listen: Geburtstag in langer Form**: Die Spalte Geburtstag zeigt das Datum ausgeschrieben („9. März“), mit dem
+  Recht „Persönliche Angaben sehen“ samt Geburtsjahr („9. März 1990“), auch in CSV und PDF.
 
 ### Behoben
 
+- **Gerüst passt zur Seite**: Das graue Gerüst beim Laden ragte auf manchen Seiten über den Rand (z. B.
+  *Datensicherung*, *Benachrichtigungen*), zeigte unter *Einstellungen* die Zeile „‹ Verwaltung“ doppelt und stellte
+  manche Knöpfe und Schalter anders dar als die fertige Seite.
+- Direkt nach einer eigenen Änderung konnte eine Seite den Stand von vorher zeigen, wenn die App ihre Daten gerade im
+  Hintergrund lud und die Antwort erst nach der Änderung ankam. Solche Antworten gelten jetzt als veraltet.
+- **Neu laden zeigt Änderungen anderer**: Hatte jemand anderes gerade etwas geändert (z. B. eine Nachricht am Brett)
+  und lud man die Seite kurz nach einer vorigen Aktualisierung neu, blieb bis zu zehn Sekunden der alte Stand stehen.
+  Die App fragt jetzt auch dann im Hintergrund nach und zeigt die Änderung.
+- **Logo im Hinweis „App aufs Handy holen“**: Ist das Logo nicht quadratisch, wurde es im Hinweis oben auf der
+  Seite in die Breite gezogen. Es erscheint jetzt im richtigen Seitenverhältnis, wie in der Kopfzeile.
 - **Zurück an dieselbe Stelle**: Ging man in der App zurück, z. B. aus einem Album der Galerie, stand die Seite davor
   wieder ganz oben. Jetzt steht sie an der Stelle, an der man sie verlassen hat, in allen Bereichen und egal, ob mit
   einem Knopf wie „‹ Alle Alben“, der Zurück-Taste oder der Zurück-Geste des Handys. Nachgeladene Beiträge („Ältere

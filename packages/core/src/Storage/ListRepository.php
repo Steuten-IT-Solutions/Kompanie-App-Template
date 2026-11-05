@@ -9,7 +9,7 @@ use KompanieApp\Core\Storage\Sql\Connection;
 /**
  * Listen (Issue #121): Listen mit ihren Spalten und Zeilen. Spalten und Zeilen werden immer als Ganzes ersetzt.
  *
- * @phpstan-type ListRow array{id: int, title: string, subtitle: string, list_date: string|null, orientation: string, created_by: int, created_at: string, updated_by: int, updated_at: string}
+ * @phpstan-type ListRow array{id: int, title: string, subtitle: string, list_date: string|null, orientation: string, people: string, created_by: int, created_at: string, updated_by: int, updated_at: string}
  * @phpstan-type Column array{kind: string, field: string|null, label: string, width: string, checkbox: bool}
  * @phpstan-type Row array{kind: string, user_id: int|null, name: string}
  */
@@ -121,6 +121,7 @@ final class ListRepository
             'subtitle' => (string) $r['subtitle'],
             'list_date' => $r['list_date'] === null || $r['list_date'] === '' ? null : substr((string) $r['list_date'], 0, 10),
             'orientation' => (string) $r['orientation'],
+            'people' => (string) ($r['people'] ?? ''),
             'created_by' => (int) $r['created_by'],
             'created_at' => (string) $r['created_at'],
             'updated_by' => (int) $r['updated_by'],

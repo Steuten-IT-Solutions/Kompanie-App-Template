@@ -321,6 +321,55 @@ final class Api
             + ($status !== null ? ['rank' => $status, 'rank_history' => $this->app->ranks()->history($userId)] : []);
     }
 
+    /** Höchstzahl Personen je GET /members/details. */
+    public const MEMBER_DETAILS_MAX = 25;
+
+    /**
+     * Seite eines Mitglieds in der Verwaltung (GET /members/{id}, auch je Person in GET /members/details).
+     *
+     * @return array<string, mixed>
+     */
+    private function memberDetail(int $id): array
+    {
+        $a = $this->app;
+        return $a->members()->detail($id, $this->user())
+            // Foto: sehen alle hier; ändern nur, wer das Konto verwalten darf
+            + ['photo_url' => $a->memberPhotos()->url($id), 'photo_editable' => $a->memberPhotos()->canEdit($this->user(), $id)]
+            + $this->memberRank($id)
+            + ($this->showTitles() ? ['titles' => $a->titles()->of($id)] : [])
+            // Persönliche Angaben (E-Mail, Handynummer, Adresse) und Geburtstag mit Jahr und Schaltern (Issue #1) nur mit
+            // view_personal: Wer etwa nur Punkte verwaltet oder Konten anlegt, sieht kein Geburtsdatum, auch kein verborgenes
+            + ($this->user()->can(Cap::ViewPersonal) ? ['personal' => $a->members()->personal($id)] : [])
+            + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::ViewPersonal) ? ['birthday' => $a->birthdays()->of($id)] : [])
+            // Eintrittsjahr mit Anzeige, ebenso nur für create_users
+            + ($this->user()->can(Cap::CreateUsers) ? ['join_year' => $a->joinYears()->of($id)] : [])
+            // Ehemalig: Grund, Eintritt, Ausscheiden (sonst null)
+            + ['former' => $a->formerMembers()->of($id)];
+    }
+
+    /**
+     * Ids aus der Adresse („1,2,3“ oder als Liste): nur positive ganze Zahlen, jede einmal, in der angegebenen
+     * Reihenfolge; anderes Format ergibt eine leere Liste.
+     *
+     * @return list<int>
+     */
+    private static function idList(mixed $raw): array
+    {
+        $parts = is_array($raw) ? $raw : (is_string($raw) ? explode(',', $raw) : []);
+        $ids = [];
+        foreach ($parts as $p) {
+            if (!is_string($p) && !is_int($p)) {
+                return [];
+            }
+            $p = trim((string) $p);
+            if (!ctype_digit($p) || (int) $p <= 0) {
+                return [];
+            }
+            $ids[(int) $p] = true;
+        }
+        return array_keys($ids);
+    }
+
     /**
      * Mitgliederliste für alle (auch ohne Anmeldung): Namen und Fotos der Mitglieder und Anwärter, mit den Bereichen auch
      * Dienstgrad (mit Abzeichen) und Titel, bei Anwärtern der Name ihrer Rolle (candidate_role). Sonst keine Rollen,
@@ -457,6 +506,8 @@ final class Api
             'features' => $features,
             // Fehlermeldungen an die Betreuer der App (Issue #64): ohne Empfänger kein Knopf „Fehler melden“
             'reports' => $a->bugReports()->available(),
+            // Impressum und Datenschutzerklärung der Kompanie (Einstellungen → Impressum und Datenschutz): für alle, auch Gäste
+            'legal' => self::legalLinks($a->settingsService()->legal()),
             // Handbuch auf GitHub Pages der Kompanie: neben updates.json (Issue #12)
             'handbookUrl' => self::handbookUrl((string) ($a->packageConfig['updatesUrl'] ?? '')),
             // Bezeichnungen und Punktefaktor der Rollen (vom Admin in der App festgelegt)
@@ -485,6 +536,18 @@ final class Api
     private static function maintenanceInfo(array $state): array
     {
         return ['on' => $state['on'], 'reason' => $state['reason'], 'since' => $state['since']];
+    }
+
+    /**
+     * @param array{imprint_url: string, privacy_url: string} $legal
+     * @return array{imprint: string|null, privacy: string|null}
+     */
+    private static function legalLinks(array $legal): array
+    {
+        return [
+            'imprint' => $legal['imprint_url'] !== '' ? $legal['imprint_url'] : null,
+            'privacy' => $legal['privacy_url'] !== '' ? $legal['privacy_url'] : null,
+        ];
     }
 
     /** https://…/updates.json → https://…/handbuch/ (dort liegt die Seite der Kompanie); sonst null. */
@@ -928,19 +991,26 @@ final class Api
                 }
                 return $list;
             }, null, $denyManage),
-            new Route('GET', '/members/{id}', $manage, fn (Request $r) => $a->members()->detail($r->id(), $this->user())
-                // Foto: sehen alle hier; ändern nur, wer das Konto verwalten darf
-                + ['photo_url' => $a->memberPhotos()->url($r->id()), 'photo_editable' => $a->memberPhotos()->canEdit($this->user(), $r->id())]
-                + $this->memberRank($r->id())
-                + ($this->showTitles() ? ['titles' => $a->titles()->of($r->id())] : [])
-                // Persönliche Angaben (E-Mail, Handynummer, Adresse) und Geburtstag mit Jahr und Schaltern (Issue #1) nur mit
-                // view_personal: Wer etwa nur Punkte verwaltet oder Konten anlegt, sieht kein Geburtsdatum, auch kein verborgenes
-                + ($this->user()->can(Cap::ViewPersonal) ? ['personal' => $a->members()->personal($r->id())] : [])
-                + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::ViewPersonal) ? ['birthday' => $a->birthdays()->of($r->id())] : [])
-                // Eintrittsjahr mit Anzeige, ebenso nur für create_users
-                + ($this->user()->can(Cap::CreateUsers) ? ['join_year' => $a->joinYears()->of($r->id())] : [])
-                // Ehemalig: Grund, Eintritt, Ausscheiden (sonst null)
-                + ['former' => $a->formerMembers()->of($r->id())], null, $denyManage),
+            new Route('GET', '/members/{id}', $manage, fn (Request $r) => $this->memberDetail($r->id()), null, $denyManage),
+            // Mehrere Personen auf einmal (Vorladen beim Blättern in der App): eine Anfrage statt einer je Person. Ids als
+            // Liste mit Kommas, höchstens MEMBER_DETAILS_MAX; unbekannte fehlen in der Antwort.
+            new Route('GET', '/members/details', $manage, function (Request $r): array {
+                $ids = self::idList($r->query['ids'] ?? null);
+                if ($ids === [] || count($ids) > self::MEMBER_DETAILS_MAX) {
+                    throw ApiError::invalid('Bitte 1 bis ' . self::MEMBER_DETAILS_MAX . ' Mitglieder angeben (ids=1,2,3).');
+                }
+                $out = [];
+                foreach ($ids as $id) {
+                    try {
+                        $out[] = $this->memberDetail($id);
+                    } catch (ApiError $e) {
+                        if ($e->status !== 404) {
+                            throw $e;
+                        }
+                    }
+                }
+                return $out;
+            }, null, $denyManage),
             // Ehemalige Mitglieder: Liste, eintragen (Konto stilllegen, Daten bleiben), ändern, wieder aufnehmen, Import
             new Route('GET', '/members/former', Cap::CreateUsers, function () use ($a) {
                 $photos = $a->memberPhotos()->urls();

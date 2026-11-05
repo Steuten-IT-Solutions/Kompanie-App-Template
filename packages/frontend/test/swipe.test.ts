@@ -2,7 +2,7 @@
 // als Karussell (wrap) geht es nach dem Ende wieder von vorn los.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { dragOffset, neighbors, prefetchOrder, releaseStep } from '../src/swipe.ts';
+import { batchFrom, dragOffset, neighbors, prefetchOrder, releaseStep } from '../src/swipe.ts';
 
 test('weit genug gezogen: nach links weiter, nach rechts zurück', () => {
   // Breite 400: ab einem Viertel (100 px)
@@ -70,4 +70,27 @@ test('Karussell: Vorladen nach außen über das Ende hinaus, jeder Eintrag einma
   assert.deepEqual(prefetchOrder([1, 2], 1, true), [1]);
   assert.deepEqual(prefetchOrder([1], 0, true), []);
   assert.deepEqual(prefetchOrder([1, 2], -1, true), []);
+});
+
+test('batchFrom: der Eintrag selbst, dahinter die nächsten noch nicht geladenen der Reihenfolge, höchstens max', () => {
+  const queue = [5, 3, 6, 2, 7, 1];
+  const loaded = new Set([6, 7]);
+  assert.deepEqual(
+    batchFrom(queue, 5, (x) => loaded.has(x), 3),
+    [5, 3, 2],
+  );
+  assert.deepEqual(
+    batchFrom(queue, 2, (x) => loaded.has(x), 10),
+    [2, 1],
+  );
+  // Nicht in der Reihenfolge: nur er selbst
+  assert.deepEqual(
+    batchFrom(queue, 9, () => false, 5),
+    [9],
+  );
+  // max 1: einzeln
+  assert.deepEqual(
+    batchFrom(queue, 5, () => false, 1),
+    [5],
+  );
 });

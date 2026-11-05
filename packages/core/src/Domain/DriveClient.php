@@ -8,6 +8,7 @@ use KompanieApp\Core\Port\Cache;
 use KompanieApp\Core\Port\ExtendedHttpClient;
 use KompanieApp\Core\Port\FileStorage;
 use KompanieApp\Core\Port\HttpClient;
+use KompanieApp\Core\Port\StreamingHttpClient;
 use KompanieApp\Core\Port\Settings;
 
 /**
@@ -718,6 +719,64 @@ final class DriveClient
             return ['body' => substr($res['body'], 0, $end + 1), 'start' => 0, 'end' => $end, 'total' => $total];
         }
         throw new \RuntimeException('Download fehlgeschlagen: HTTP ' . $res['status']);
+    }
+
+    /**
+     * Wie downloadRange, aber die Daten gehen weiter, während sie aus Drive kommen (StreamingHttpClient; sonst in
+     * einem Stück). $onStart bekommt den Bereich, den Drive liefert (Anfang, Ende, Größe der Datei), bevor Daten an
+     * $onData gehen; false von $onData bricht ab (z. B. der Browser hat aufgelegt).
+     *
+     * @param \Closure(int, int, int): void $onStart
+     * @param \Closure(string): bool $onData
+     * @return bool true, wenn der ganze Bereich weitergegeben wurde
+     * @throws \RuntimeException wenn Drive den Ausschnitt nicht liefert ($onStart wurde dann nicht aufgerufen)
+     */
+    public function streamRange(string $fileId, int $start, int $end, \Closure $onStart, \Closure $onData): bool
+    {
+        if (!$this->http instanceof StreamingHttpClient) {
+            $part = $this->downloadRange($fileId, $start, $end);
+            $onStart($part['start'], $part['end'], $part['total']);
+            return $part['body'] === '' || $onData($part['body']);
+        }
+        $url = self::FILES_URL . '/' . rawurlencode($fileId) . '?alt=media&supportsAllDrives=true';
+        $status = 0;
+        $started = false;
+        $left = 0; // Bytes, die noch weitergegeben werden (bei 200 statt 206 nur der angefragte Teil)
+        $onHead = static function (int $code, array $headers) use (&$status, &$started, &$left, $start, $end, $onStart): bool {
+            $status = $code;
+            $started = true;
+            if ($code === 206 && preg_match('#^bytes (\d+)-(\d+)/(\d+)$#', trim((string) ($headers['content-range'] ?? '')), $m)) {
+                $last = min((int) $m[2], max($end, (int) $m[1])); // nicht mehr als angefragt
+                $left = $last - (int) $m[1] + 1;
+                $onStart((int) $m[1], $last, (int) $m[3]);
+                return true;
+            }
+            if ($code === 200 && $start === 0 && isset($headers['content-length']) && ctype_digit((string) $headers['content-length'])) {
+                // Ganze Datei statt Ausschnitt (kleine Datei): nur den angefragten Teil weitergeben.
+                $total = (int) $headers['content-length'];
+                $last = min($end, $total - 1);
+                if ($last >= 0) {
+                    $left = $last + 1;
+                    $onStart(0, $last, $total);
+                    return true;
+                }
+            }
+            $started = false;
+            return false;
+        };
+        $sink = static function (string $chunk) use (&$left, $onData): bool {
+            if ($left <= 0) {
+                return false;
+            }
+            $piece = strlen($chunk) > $left ? substr($chunk, 0, $left) : $chunk;
+            $left -= strlen($piece);
+            return $onData($piece) && $left > 0;
+        };
+        $this->http->stream($url, ['Authorization' => 'Bearer ' . $this->accessToken(), 'Range' => 'bytes=' . $start . '-' . $end], $onHead, $sink);
+        if (!$started) {
+            throw new \RuntimeException('Download fehlgeschlagen: HTTP ' . $status);
+        }
+        return $left === 0;
     }
 
     public function thumbnail(string $fileId, int $maxEdge): string

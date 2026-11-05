@@ -451,7 +451,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
       <div className="app">
         <PreviewBanner />
         <ErrorBoundary>
-          <Suspense fallback={<Loading />}>
+          <Suspense fallback={<Loading chunk />}>
             <MaintenancePage reason={maintenance.reason} />
           </Suspense>
         </ErrorBoundary>
@@ -537,7 +537,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
 
       <main className="content">
         <ErrorBoundary key={`${viewKey(path)}#${restart}`}>
-          <Suspense fallback={<Loading />}>
+          <Suspense fallback={<Loading chunk />}>
             {config.setupPending && tab !== 'einrichtung' && (
               <div className="card setup-hint">
                 <p>

@@ -461,7 +461,7 @@ function Detail({ id }: { id: number }) {
       {error ? (
         <ErrorBox message={error} onRetry={load} />
       ) : !data ? (
-        <Loading />
+        <Loading shape="text" />
       ) : (
         <article className="card board-card mail-detail">
           <span className="board-meta">

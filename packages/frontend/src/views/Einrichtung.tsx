@@ -2,16 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { api, applyFeatures, config, refreshRoles, type AdminSettings, type Feature } from '../api';
 import { navigate } from '../router';
 import { ErrorBox, Loading, useAsync } from '../ui';
-import { Calendar, FeatureSwitches, Gallery, GoogleAccess, News } from './Einstellungen';
+import { Calendar, FeatureSwitches, Gallery, GoogleAccess, Legal, News } from './Einstellungen';
 import { MemberImport } from './MitgliederImport';
 
-type Step = 'bereiche' | 'kalender' | 'galerie' | 'news' | 'mitglieder' | 'fertig';
+type Step = 'bereiche' | 'kalender' | 'galerie' | 'news' | 'rechtliches' | 'mitglieder' | 'fertig';
 
 /**
  * Einrichtungsassistent beim ersten Öffnen durch einen Admin. Erster Schritt: die Bereiche wählen
  * (neue Installationen haben keine; der Schritt lässt sich nicht überspringen). Danach Kalender,
- * Galerie und Neuigkeiten, aber nur für die gewählten Bereiche (diese Schritte lassen sich
- * überspringen), am Ende Statusmeldungen (nur mit Zustimmung). Alles lässt sich später unter
+ * Galerie und Neuigkeiten, aber nur für die gewählten Bereiche, Impressum und Datenschutz und Mitglieder (diese Schritte
+ * lassen sich überspringen), am Ende Statusmeldungen (nur mit Zustimmung). Alles lässt sich später unter
  * Einstellungen ändern.
  */
 export default function Einrichtung({ onToast }: { onToast: (msg: string) => void }) {
@@ -30,7 +30,7 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
     if (index > 0) stepRef.current?.focus();
   }, [index]);
 
-  if ((settings.loading && !settings.data) || (features.loading && !features.data)) return <Loading />;
+  if ((settings.loading && !settings.data) || (features.loading && !features.data)) return <Loading shape="form" />;
   if (settings.error) return <ErrorBox message={settings.error} onRetry={settings.reload} />;
   if (features.error) return <ErrorBox message={features.error} onRetry={features.reload} />;
   const s = settings.data!;
@@ -43,7 +43,7 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
   if (value.calendar) steps.push('kalender');
   if (value.gallery) steps.push('galerie');
   if (value.news && s.news) steps.push('news');
-  steps.push('mitglieder', 'fertig');
+  steps.push('rechtliches', 'mitglieder', 'fertig');
   const step = steps[Math.min(index, steps.length - 1)];
   const next = () => setIndex(index + 1);
   const onSaved = (n: AdminSettings) => settings.setData(n);
@@ -118,6 +118,7 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
       {step === 'kalender' && <Calendar key={settings.revision} settings={s} onSaved={onSaved} onToast={onToast} />}
       {step === 'galerie' && <Gallery key={settings.revision} settings={s} onSaved={onSaved} onToast={onToast} />}
       {step === 'news' && <News key={settings.revision} settings={s} onSaved={onSaved} onToast={onToast} />}
+      {step === 'rechtliches' && <Legal key={settings.revision} settings={s} onSaved={onSaved} onToast={onToast} />}
       {step === 'mitglieder' && (
         <section className="card settings-section">
           <h3>Mitglieder übernehmen</h3>

@@ -9,6 +9,7 @@ import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { RankHistory } from './Dienstgrad';
 import { isDue } from '../promotionCheck';
 import { notePromotions } from '../promotionsDue';
+import { sources } from '../viewData';
 
 const rank = brand.labels.rank;
 const sec = brand.labels.sections;
@@ -84,7 +85,7 @@ function BadgePreview({ rank: r }: { rank: Rank }) {
  * Die Liste läuft vom niedrigsten zum höchsten Dienstgrad.
  */
 export function RankList({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.ranks(true), [], 'ranks-all');
+  const { data, error, loading, reload, setData } = useAsync(sources.ranksAll.load, sources.ranksAll.deps, sources.ranksAll.key);
   const [title, setTitle] = useState('');
   const [min, setMin] = useState('');
   const [editing, setEditing] = useState<number | null>(null);
@@ -358,7 +359,7 @@ function RankForm({
  * zum Degradieren, Issue #178), dann erreichte Schwellen, dann nach fehlenden Punkten.
  */
 export function Promotions() {
-  const { data, error, loading, reload } = useAsync(api.promotions, [], 'promotions');
+  const { data, error, loading, reload } = useAsync(sources.promotions.load, sources.promotions.deps, sources.promotions.key);
   // Zahl an der Kachel „Beförderungen“ gleich mit aktualisieren.
   useEffect(() => {
     if (data) notePromotions(data);
@@ -440,7 +441,7 @@ export function MemberRank({
   focus?: boolean;
 }) {
   // Alle, auch inaktive: Position und Schwelle des aktuellen Dienstgrads zählen auch, wenn er deaktiviert ist.
-  const ranks = useAsync(() => api.ranks(true), [], 'ranks-all');
+  const ranks = useAsync(sources.ranksAll.load, sources.ranksAll.deps, sources.ranksAll.key);
   const [target, setTarget] = useState('');
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);

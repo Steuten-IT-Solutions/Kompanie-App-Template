@@ -51,7 +51,7 @@ export default function FehlerMelden() {
   if (!config?.reports) {
     return <ErrorBox message="Fehlermeldungen sind in dieser App nicht eingerichtet." />;
   }
-  if (form.loading && !form.data) return <Loading />;
+  if (form.loading && !form.data) return <Loading shape="form" />;
   if (form.error || !form.data)
     return <ErrorBox message={form.error ?? 'Das Formular konnte nicht geladen werden.'} onRetry={form.reload} />;
   const f = form.data;

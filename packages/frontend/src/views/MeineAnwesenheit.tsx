@@ -1,10 +1,11 @@
-import { api, ATTENDANCE_LABELS, countsText } from '../api';
+import { ATTENDANCE_LABELS, countsText } from '../api';
 import { formatDate } from '../format';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { sources } from '../viewData';
 
 /** Meins → Anwesenheit: eigene Einträge, die jüngsten Termine zuerst. */
 export default function MeineAnwesenheit() {
-  const { data, error, loading, reload } = useAsync(api.myAttendance, [], 'my-attendance');
+  const { data, error, loading, reload } = useAsync(sources.myAttendance.load, sources.myAttendance.deps, sources.myAttendance.key);
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const { entries, counts } = data!;

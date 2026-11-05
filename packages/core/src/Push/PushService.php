@@ -56,6 +56,11 @@ final class PushService
     /** Ebenso für die Art „Geburtstage“ (Issue #1). */
     public const BIRTHDAYS_OFFERED_SETTING = 'push_birthdays_offered';
     public const REMINDER_DATE_SETTING = 'push_reminder_date';
+    /**
+     * Protokoll für die Einstellungen (Admins): je Art der letzte Versand (Unix-Zeit, Zahl der Geräte, auch 0), dazu die
+     * letzte vom Push-Dienst angenommene und die letzte abgelehnte Nachricht (mit Grund). Gehört zur Installation.
+     */
+    public const LOG_SETTING = 'push_log';
     /** Uhrzeit der Erinnerung (Stunde 0–23, Zeitzone der Kompanie); Einstellung der Admins. */
     public const REMINDER_HOUR_SETTING = 'push_reminder_hour';
     public const REMINDER_HOUR_DEFAULT = 18;
@@ -486,7 +491,7 @@ final class PushService
                 }
             }
         }
-        return $this->enqueue($items);
+        return $this->enqueue($type, $items);
     }
 
     /**
@@ -526,7 +531,7 @@ final class PushService
             }
             $items[] = ['subscription_id' => $sub['id'], 'payload' => $json];
         }
-        return $this->enqueue($items);
+        return $this->enqueue($type, $items);
     }
 
     /**
@@ -568,7 +573,7 @@ final class PushService
                 $items[] = ['subscription_id' => $sub['id'], 'payload' => $json];
             }
         }
-        return $this->enqueue($items, $urgency, min($maxTtl, self::MAX_TTL, $ttl));
+        return $this->enqueue($type, $items, $urgency, min($maxTtl, self::MAX_TTL, $ttl));
     }
 
     /** @param string $audience all oder der Wert des Rechts, das die Empfänger brauchen (types()) */
@@ -618,8 +623,13 @@ final class PushService
     }
 
     /** @param list<array{subscription_id: int, payload: string}> $items */
-    private function enqueue(array $items, string $urgency = 'normal', int $ttl = self::TTL): int
+    private function enqueue(string $type, array $items, string $urgency = 'normal', int $ttl = self::TTL): int
     {
+        $now = $this->app->time()->timestamp();
+        $this->log(static function (array $log) use ($type, $items, $now): array {
+            $log['types'][$type] = ['at' => $now, 'devices' => count($items)];
+            return $log;
+        });
         if ($items === []) {
             return 0;
         }
@@ -660,6 +670,8 @@ final class PushService
         $keys = $this->vapid();
         $sent = 0;
         $tokens = []; // VAPID-Token je Push-Dienst, einmal je Lauf signiert
+        $rejected = 0;
+        $reason = '';
         // In Teilen senden und jeden Teil gleich abschließen: Bricht der Lauf ab, kommt höchstens ein Teil doppelt.
         foreach (array_chunk($rows, $parallel ? 25 : 5) as $chunk) {
             $done = [];
@@ -697,14 +709,29 @@ final class PushService
                     $delivered[] = $row['subscription_id'];
                 } elseif ($status === 'gone') {
                     $repo->delete($row['subscription_id']);
+                    $rejected++;
+                    $reason = self::reason($responses[$row['id']] ?? null, true);
                 } elseif ($status === 'retry' && $row['attempts'] < self::MAX_ATTEMPTS) {
                     $repo->retry($row['id'], gmdate('Y-m-d H:i:s', $ts + 300 * $row['attempts']));
                 } else {
                     $done[] = $row['id'];
+                    $rejected++;
+                    $reason = self::reason($responses[$row['id']] ?? null, false);
                 }
             }
             $repo->markSentMany($delivered, $now);
             $repo->dequeue($done);
+        }
+        if ($sent > 0 || $rejected > 0) {
+            $this->log(static function (array $log) use ($sent, $rejected, $reason, $ts): array {
+                if ($sent > 0) {
+                    $log['accepted'] = ['at' => $ts, 'count' => $sent];
+                }
+                if ($rejected > 0) {
+                    $log['rejected'] = ['at' => $ts, 'count' => $rejected, 'reason' => $reason];
+                }
+                return $log;
+            });
         }
         // Noch mehr fällig (größer als ein Durchgang): gleich weitermachen.
         $next = $repo->nextDue();
@@ -811,6 +838,60 @@ final class PushService
         };
     }
 
+    /** Grund einer Ablehnung für die Einstellungen, z. B. „HTTP 403“ oder „Gerät abgemeldet (HTTP 410)“. */
+    private static function reason(array|\RuntimeException|null $res, bool $gone): string
+    {
+        $code = is_array($res) ? 'HTTP ' . (int) $res['status'] : 'keine Verbindung';
+        return $gone ? 'Gerät beim Push-Dienst abgemeldet (' . $code . ')' : $code;
+    }
+
+    /**
+     * Protokoll ändern (LOG_SETTING). Fehler beim Speichern dürfen den Versand nicht stören.
+     *
+     * @param \Closure(array<string, mixed>): array<string, mixed> $change
+     */
+    private function log(\Closure $change): void
+    {
+        try {
+            $log = $this->app->settings->get(self::LOG_SETTING);
+            $log = is_array($log) ? $log : [];
+            $log['types'] = is_array($log['types'] ?? null) ? $log['types'] : [];
+            $this->app->settings->set(self::LOG_SETTING, $change($log));
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Protokoll der Benachrichtigungen nicht gespeichert: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Protokoll für die Einstellungen: je angebotener Art (in der Reihenfolge von types()) der letzte Versand, dazu die
+     * letzte angenommene und die letzte abgelehnte Nachricht; Zeitpunkte als ISO 8601 in der Zeitzone der Kompanie.
+     *
+     * @return array{types: list<array{type: string, label: string, at: string, devices: int}>, accepted: array{at: string, count: int}|null, rejected: array{at: string, count: int, reason: string}|null}
+     */
+    public function logStatus(): array
+    {
+        $log = $this->app->settings->get(self::LOG_SETTING);
+        $log = is_array($log) ? $log : [];
+        $time = $this->app->time();
+        $iso = static fn (mixed $at): string => $time->format((int) $at, 'c');
+        $types = [];
+        foreach ($this->types() as $key => $type) {
+            $entry = $log['types'][$key] ?? null;
+            if (is_array($entry) && is_numeric($entry['at'] ?? null) && $this->anyEnabled($type['features'])) {
+                $types[] = ['type' => $key, 'label' => $type['label'], 'at' => $iso($entry['at']), 'devices' => (int) ($entry['devices'] ?? 0)];
+            }
+        }
+        $accepted = $log['accepted'] ?? null;
+        $rejected = $log['rejected'] ?? null;
+        return [
+            'types' => $types,
+            'accepted' => is_array($accepted) && is_numeric($accepted['at'] ?? null) ? ['at' => $iso($accepted['at']), 'count' => (int) ($accepted['count'] ?? 0)] : null,
+            'rejected' => is_array($rejected) && is_numeric($rejected['at'] ?? null)
+                ? ['at' => $iso($rejected['at']), 'count' => (int) ($rejected['count'] ?? 0), 'reason' => (string) ($rejected['reason'] ?? '')]
+                : null,
+        ];
+    }
+
     /** Kontakt für die Push-Dienste: die Support-Adresse, sonst die Adresse der App. */
     private function subject(): string
     {
@@ -824,13 +905,16 @@ final class PushService
     /**
      * birthdays: Benachrichtigung am Geburtstag (an/aus, ab welcher Stunde); null ohne den Bereich Geburtstage.
      *
-     * @return array{supported: bool, missing: string[], devices: int, accounts: int, guests: int, queued: int, reminderHour: int, birthdays: array{enabled: bool, hour: int}|null}
+     * log: zuletzt verschickt je Art und zuletzt angenommen bzw. abgelehnt (logStatus).
+     *
+     * @return array{supported: bool, missing: string[], devices: int, accounts: int, guests: int, queued: int, reminderHour: int, birthdays: array{enabled: bool, hour: int}|null, log: array{types: list<array{type: string, label: string, at: string, devices: int}>, accepted: array{at: string, count: int}|null, rejected: array{at: string, count: int, reason: string}|null}}
      */
     public function adminStatus(): array
     {
         return ['supported' => $this->supported(), 'missing' => $this->requirements()] + $this->repository()->counts() + [
             'reminderHour' => $this->reminderHour(),
             'birthdays' => $this->app->features()->enabled('birthdays') ? $this->app->birthdays()->notifySettings() : null,
+            'log' => $this->logStatus(),
         ];
     }
 

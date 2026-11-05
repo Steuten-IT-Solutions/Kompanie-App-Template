@@ -56,7 +56,7 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
   }
   const sort = useDragSort(list, reorder, editing !== null);
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const roles = list;
 
@@ -183,7 +183,7 @@ function AttendanceGroups({ roles, onToast }: { roles: RoleAdmin[]; onToast: (ms
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const groups = data!;
   const current = draft ?? Object.fromEntries(groups.map((g) => [g.key, g.counts_as ?? '']));

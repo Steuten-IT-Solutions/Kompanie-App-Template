@@ -210,14 +210,14 @@ final class GalleryRepository
      * Zeile, die Spalten des Titelbilds aus einem Join darauf.
      *
      * @return array<int, array<string, mixed>> mit cover_id, cover_file_key, cover_is_intern,
-     *         cover_album_id, cover_status, cover_media (NULL ohne Titelbild)
+     *         cover_album_id, cover_status, cover_media, cover_md5 (NULL ohne Titelbild)
      */
     public function albumSummaries(bool $member): array
     {
         $vis = $member ? '' : ' AND p.is_intern = 0';
         $coverVis = $member ? '' : ' AND c.is_intern = 0';
         return $this->db->select(
-            "SELECT s.*, ph.file_key AS cover_file_key, ph.is_intern AS cover_is_intern, ph.album_id AS cover_album_id, ph.status AS cover_status, ph.media AS cover_media
+            "SELECT s.*, ph.file_key AS cover_file_key, ph.is_intern AS cover_is_intern, ph.album_id AS cover_album_id, ph.status AS cover_status, ph.media AS cover_media, ph.md5 AS cover_md5
              FROM (
                 SELECT a.id, a.year, a.title, a.sort_date, COUNT(p.id) AS cnt, SUM(p.is_intern) AS intern_cnt,
                     SUM(CASE WHEN p.media = 'video' THEN 1 ELSE 0 END) AS video_cnt,

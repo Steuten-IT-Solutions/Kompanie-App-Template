@@ -3,6 +3,7 @@ import { api, applyMaintenance, config, toLogin, type MaintenanceState } from '.
 import brand from './generated/brand';
 import logoUrl from './generated/logo-small.webp';
 import { ErrorBox, Loading, useAsync } from './ui';
+import { sources } from './viewData';
 
 /** Höchstlänge der Begründung (wie MaintenanceService::REASON_MAX im Kern). */
 export const REASON_MAX = 500;
@@ -85,11 +86,11 @@ export function MaintenanceBanner({ reason, onToast }: { reason: string; onToast
 
 /** Schalter unter Einstellungen → Wartungsmodus: ein- und ausschalten, Begründung bearbeiten, Protokoll. */
 export function MaintenanceCard({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.maintenance(), [], 'admin/maintenance');
+  const { data, error, loading, reload, setData } = useAsync(sources.maintenance.load, sources.maintenance.deps, sources.maintenance.key);
   const [reason, setReason] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  if (loading && !data) return <Loading />;
+  if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const m = data!;
   const text = reason ?? m.reason;
