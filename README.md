@@ -23,6 +23,7 @@ Jede Kompanie hat in unserer Organisation ein eigenes, öffentliches Repo. Darin
 - [Changelog](CHANGELOG.md): was sich je Version ändert; Admins sehen es in der App unter *Einstellungen → Was ist neu*
 - [Architektur, Abläufe und Fahrplan](docs/ARCHITEKTUR.md)
 - [Planung der offenen Punkte](docs/OFFENE-PUNKTE.md)
+- [Konzept: eigene Seiten und Bruderschaft](docs/KONZEPT-BRUDERSCHAFT.md)
 - [Veröffentlichen und Updates](docs/RELEASE.md)
 - [Neue Kompanie anlegen](docs/NEUE-KOMPANIE.md): Schritt-für-Schritt-Anleitung vom Formular bis zur Installation
 - [Handbuch](docs/handbuch/) für Mitglieder und Admins: in der App hinter „?“ und je Kompanie auf GitHub Pages unter `/handbuch/`
