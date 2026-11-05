@@ -1437,6 +1437,120 @@ WHERE title IS NULL",
                 'mysql' => ["ALTER TABLE {lists} ADD COLUMN people varchar(255) NOT NULL DEFAULT ''"],
                 'sqlite' => ["ALTER TABLE {lists} ADD COLUMN people TEXT NOT NULL DEFAULT ''"],
             ],
+            // Website (docs/website.md): pages with one translation per language, immutable revisions of each
+            // translation and the menus. The page tree has at most two levels (parent_id). Content lives in the
+            // revisions as a JSON list of blocks; a translation points to its current draft and to the revision that
+            // is published (both NULL-able: a new translation has no published revision yet). Each save of the draft
+            // adds a revision, publishing only moves published_revision_id. path is the full path without the language
+            // prefix ('' for the home page, 'verein/vorstand'), unique per language. allow_person_indexing: pages with
+            // blocks that show people (members, offices) are noindex unless this is 1. Images in blocks are rich_images
+            // with owner_type 'site_page'. No user_id columns: created_by/updated_by name who edited, like elsewhere.
+            // Menu labels are a JSON object per language ({"de": "…", "en": "…"}); empty for a page uses its title.
+            // path is varchar(180): with lang the unique key stays below 767 bytes in utf8mb4 (older InnoDB row formats).
+            38 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {site_pages} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  parent_id bigint(20) unsigned DEFAULT NULL,
+  sort int(11) NOT NULL DEFAULT 0,
+  is_home tinyint(1) NOT NULL DEFAULT 0,
+  allow_person_indexing tinyint(1) NOT NULL DEFAULT 0,
+  created_by bigint(20) unsigned NOT NULL,
+  created_at datetime NOT NULL,
+  updated_by bigint(20) unsigned NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  KEY parent (parent_id, sort)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {site_page_translations} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  page_id bigint(20) unsigned NOT NULL,
+  lang varchar(8) NOT NULL,
+  path varchar(180) NOT NULL,
+  draft_revision_id bigint(20) unsigned DEFAULT NULL,
+  published_revision_id bigint(20) unsigned DEFAULT NULL,
+  published_at datetime DEFAULT NULL,
+  published_by bigint(20) unsigned DEFAULT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY page_lang (page_id, lang),
+  UNIQUE KEY lang_path (lang, path)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {site_page_revisions} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  translation_id bigint(20) unsigned NOT NULL,
+  title varchar(200) NOT NULL,
+  description varchar(300) NOT NULL DEFAULT \'\',
+  hero_image varchar(32) NOT NULL DEFAULT \'\',
+  blocks longtext NOT NULL,
+  created_by bigint(20) unsigned NOT NULL,
+  created_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  KEY translation_id (translation_id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {site_menu_items} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  menu varchar(20) NOT NULL,
+  parent_id bigint(20) unsigned DEFAULT NULL,
+  sort int(11) NOT NULL DEFAULT 0,
+  page_id bigint(20) unsigned DEFAULT NULL,
+  url varchar(500) NOT NULL DEFAULT \'\',
+  labels text NOT NULL,
+  PRIMARY KEY (id),
+  KEY menu (menu, parent_id, sort),
+  KEY page_id (page_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {site_pages} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  parent_id INTEGER DEFAULT NULL,
+  sort INTEGER NOT NULL DEFAULT 0,
+  is_home INTEGER NOT NULL DEFAULT 0,
+  allow_person_indexing INTEGER NOT NULL DEFAULT 0,
+  created_by INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_by INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {site_pages}_parent ON {site_pages} (parent_id, sort)',
+                    'CREATE TABLE IF NOT EXISTS {site_page_translations} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  page_id INTEGER NOT NULL,
+  lang TEXT NOT NULL,
+  path TEXT NOT NULL,
+  draft_revision_id INTEGER DEFAULT NULL,
+  published_revision_id INTEGER DEFAULT NULL,
+  published_at TEXT DEFAULT NULL,
+  published_by INTEGER DEFAULT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {site_page_translations}_page_lang ON {site_page_translations} (page_id, lang)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {site_page_translations}_lang_path ON {site_page_translations} (lang, path)',
+                    'CREATE TABLE IF NOT EXISTS {site_page_revisions} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  translation_id INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT \'\',
+  hero_image TEXT NOT NULL DEFAULT \'\',
+  blocks TEXT NOT NULL,
+  created_by INTEGER NOT NULL,
+  created_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {site_page_revisions}_translation_id ON {site_page_revisions} (translation_id)',
+                    'CREATE TABLE IF NOT EXISTS {site_menu_items} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  menu TEXT NOT NULL,
+  parent_id INTEGER DEFAULT NULL,
+  sort INTEGER NOT NULL DEFAULT 0,
+  page_id INTEGER DEFAULT NULL,
+  url TEXT NOT NULL DEFAULT \'\',
+  labels TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {site_menu_items}_menu ON {site_menu_items} (menu, parent_id, sort)',
+                    'CREATE INDEX IF NOT EXISTS {site_menu_items}_page_id ON {site_menu_items} (page_id)',
+                ],
+            ],
         ];
     }
 

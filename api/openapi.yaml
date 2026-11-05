@@ -58,6 +58,7 @@ tags:
   - name: Einstellungen
   - name: Wartung
   - name: Fehlermeldungen
+  - name: Website
 
 paths:
   /config:
@@ -5191,6 +5192,467 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  # Website (docs/website.md). Planned: these routes are the contract for the website editor in the Verwaltung and are
+  # not implemented yet (`x-status: planned`). Visitors never use this API: the server renders the published pages as
+  # HTML. All routes need the feature `website` (otherwise 403 `feature_disabled`) and the right `manage_website`.
+  # In the WordPress plugin, WordPress manages pages and menus itself; there only `/admin/site/blocks` and
+  # `/admin/site/preview` exist (for the Gutenberg blocks).
+  /admin/site/pages:
+    get:
+      tags: [Website]
+      summary: All pages with their translations (tree order, without content)
+      x-capability: manage_website
+      x-status: planned
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SitePageSummary' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Website]
+      summary: Create a page with its first translation (an empty draft)
+      description: |
+        `path` without language prefix, lower case letters, digits and hyphens, segments separated by `/`; a sub page's
+        path starts with its parent's path in that language. 409 `path_taken` if the language already has the path.
+      x-capability: manage_website
+      x-status: planned
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SitePageCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SitePage' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /admin/site/pages/order:
+    put:
+      tags: [Website]
+      summary: Move and reorder pages
+      description: |
+        `pages`: every page exactly once, in the new order, each with its parent (`null` for the top level). Only two
+        levels: a parent must itself be on the top level (otherwise 400). Paths of moved pages do not change by themselves.
+      x-capability: manage_website
+      x-status: planned
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pages]
+              properties:
+                pages:
+                  type: array
+                  items:
+                    type: object
+                    required: [id, parent_id]
+                    properties:
+                      id: { type: integer }
+                      parent_id: { type: [integer, 'null'] }
+      responses:
+        '200':
+          description: New state
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SitePageSummary' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/site/pages/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Website]
+      summary: Page settings and the state of each translation
+      x-capability: manage_website
+      x-status: planned
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SitePage' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Website]
+      summary: Change page settings (only the fields sent)
+      description: |
+        `is_home: true` makes this page the home page (path `''` in every language) and takes it from the previous one.
+        `allow_person_indexing: true` lets search engines index the page even if it shows people (member and office
+        blocks); the editor shows a consent hint before it is switched on.
+      x-capability: manage_website
+      x-status: planned
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                is_home: { type: boolean }
+                allow_person_indexing: { type: boolean }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SitePage' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Website]
+      summary: Delete a page with all translations and revisions
+      description: |
+        Not the home page and not the page set as imprint or privacy policy (400 `page_required`), and not a page with sub
+        pages (409 `has_children`). Menu entries that point to the page are removed.
+      x-capability: manage_website
+      x-status: planned
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /admin/site/pages/{id}/translations/{lang}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/SiteLang'
+    get:
+      tags: [Website]
+      summary: Draft and published state of one translation
+      x-capability: manage_website
+      x-status: planned
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteTranslation' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Website]
+      summary: Save the draft (creates the translation if the page does not have this language yet)
+      description: |
+        Each save adds a revision and makes it the draft; the published version stays until `…/publish`. With
+        `base_revision_id` (the draft that was loaded) only if nobody saved since, otherwise 409 `conflict`. Rich text is
+        cleaned like everywhere else (RichText allowlist); unknown block types or invalid fields → 400 with the index of
+        the block. Images are rich images (`POST /rich-images`) and belong to the page once saved.
+      x-capability: manage_website
+      x-status: planned
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SiteDraftInput' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteTranslation' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Website]
+      summary: Delete one translation with its revisions
+      description: Not the last translation of a page (400; delete the page instead).
+      x-capability: manage_website
+      x-status: planned
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/site/pages/{id}/translations/{lang}/publish:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/SiteLang'
+    post:
+      tags: [Website]
+      summary: Publish the current draft
+      description: |
+        With `revision_id` (the draft the editor shows) only if it is still the draft, otherwise 409 `conflict`. Nothing is
+        published while the website has no published imprint in this language (409 `imprint_missing`, § 5 DDG); the
+        imprint page itself can always be published. Clears the page cache.
+      x-capability: manage_website
+      x-status: planned
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision_id]
+              properties:
+                revision_id: { type: integer }
+      responses:
+        '200':
+          description: Published
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteTranslation' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /admin/site/pages/{id}/translations/{lang}/unpublish:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/SiteLang'
+    post:
+      tags: [Website]
+      summary: Take the translation offline (visitors get 404); the draft stays
+      description: Not the published imprint or privacy policy while other pages in this language are published (400 `page_required`).
+      x-capability: manage_website
+      x-status: planned
+      responses:
+        '200':
+          description: Offline
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteTranslation' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/site/pages/{id}/translations/{lang}/revisions:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/SiteLang'
+    get:
+      tags: [Website]
+      summary: Revisions of a translation, newest first (without content)
+      description: |
+        The server keeps the published revision, the draft and the 50 newest others; older ones are deleted when a draft
+        is saved.
+      x-capability: manage_website
+      x-status: planned
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SiteRevisionSummary' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/site/pages/{id}/translations/{lang}/revisions/{revision}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/SiteLang'
+      - { name: revision, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Website]
+      summary: One revision with its content
+      x-capability: manage_website
+      x-status: planned
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteRevision' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/site/pages/{id}/translations/{lang}/revisions/{revision}/restore:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - $ref: '#/components/parameters/SiteLang'
+      - { name: revision, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Website]
+      summary: Make an older revision the draft again (as a new revision; nothing is published)
+      x-capability: manage_website
+      x-status: planned
+      responses:
+        '200':
+          description: New draft
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteTranslation' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/site/menu:
+    get:
+      tags: [Website]
+      summary: Main menu and footer menu
+      x-capability: manage_website
+      x-status: planned
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteMenus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Website]
+      summary: Replace both menus
+      description: |
+        At most two levels. An entry links a page (`page_id`) or an address (`url`, `https://`, `mailto:` or a path
+        starting with `/`), never both. For a page an empty label uses the page title of that language; entries whose page
+        has no published translation in a language are left out there. Imprint and privacy policy are always linked in the
+        footer, whether listed or not.
+      x-capability: manage_website
+      x-status: planned
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SiteMenus' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteMenus' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/site/settings:
+    get:
+      tags: [Website]
+      summary: Website settings (languages, imprint and privacy pages, design options)
+      x-capability: manage_website
+      x-status: planned
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteSettings' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Website]
+      summary: Change website settings (only the fields sent)
+      description: |
+        `languages` must contain `default_language`. Removing a language keeps its translations but stops serving them.
+        The entry file in the domain root is not part of the settings; `/admin/status` checks it.
+      x-capability: manage_website
+      x-status: planned
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SiteSettings' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteSettings' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/site/blocks:
+    get:
+      tags: [Website]
+      summary: Block types the editor may offer
+      description: |
+        Only blocks whose feature is on (events, news, gallery, directory, offices). Blocks that show data from the App also
+        show on the website only what a guest may see (like the shortcodes today).
+      x-capability: manage_website
+      x-status: planned
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SiteBlockType' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/site/preview:
+    post:
+      tags: [Website]
+      summary: Render blocks as the website would show them (preview in the editor)
+      description: |
+        Returns the HTML of the content area, rendered with the same renderers as the website and the WordPress blocks,
+        with guest rights. Nothing is saved.
+      x-capability: manage_website
+      x-status: planned
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lang, blocks]
+              properties:
+                lang: { $ref: '#/components/schemas/SiteLanguage' }
+                blocks: { type: array, items: { $ref: '#/components/schemas/SiteBlock' } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [html]
+                properties:
+                  html: { type: string }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
 security:
   - session: []
 
@@ -5228,6 +5690,13 @@ components:
       required: false
       description: Nur Einträge mit kleinerer ID (nächste Seite).
       schema: { type: integer, minimum: 1 }
+
+    SiteLang:
+      name: lang
+      in: path
+      required: true
+      description: Language of the translation (website, docs/website.md).
+      schema: { $ref: '#/components/schemas/SiteLanguage' }
 
   responses:
     PreviewReadonly:
@@ -7298,3 +7767,237 @@ components:
         warning: { type: string, description: 'Konto angelegt, aber Anfangspunkte, Dienstgrad, Geburtstag bzw. Foto nicht übernommen' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
         password: { type: string, description: Startpasswort; steht nur in dieser Antwort }
+
+    # Website (docs/website.md), planned.
+    SiteLanguage:
+      type: string
+      description: Language of the website content; for now `de` or `en`. The default language has no prefix in addresses (`/ueber-uns`), every other one has its code (`/en/about-us`).
+      enum: [de, en]
+
+    SitePath:
+      type: string
+      description: Path without language prefix and without leading slash; `''` only for the home page.
+      maxLength: 180
+      pattern: '^$|^[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)?$'
+
+    SiteTranslationState:
+      type: object
+      required: [lang, path, title, status, published_at, has_unpublished_changes]
+      properties:
+        lang: { $ref: '#/components/schemas/SiteLanguage' }
+        path: { $ref: '#/components/schemas/SitePath' }
+        title: { type: string, description: Title of the draft }
+        status: { type: string, enum: [draft, published], description: '`published` while a revision is online' }
+        published_at: { type: [string, 'null'], description: 'UTC, YYYY-MM-DD HH:MM:SS' }
+        has_unpublished_changes: { type: boolean, description: The draft differs from the published revision }
+
+    SitePageSummary:
+      type: object
+      required: [id, parent_id, is_home, has_person_blocks, translations]
+      properties:
+        id: { type: integer }
+        parent_id: { type: [integer, 'null'] }
+        is_home: { type: boolean }
+        has_person_blocks: { type: boolean, description: 'A translation shows people (member or office blocks); the page is noindex unless `allow_person_indexing`' }
+        translations: { type: array, items: { $ref: '#/components/schemas/SiteTranslationState' } }
+
+    SitePage:
+      allOf:
+        - $ref: '#/components/schemas/SitePageSummary'
+        - type: object
+          required: [allow_person_indexing, updated_at, updated_by_name]
+          properties:
+            allow_person_indexing: { type: boolean }
+            updated_at: { type: string, description: 'UTC, YYYY-MM-DD HH:MM:SS' }
+            updated_by_name: { type: [string, 'null'] }
+
+    SitePageCreate:
+      type: object
+      required: [lang, path, title]
+      properties:
+        parent_id: { type: [integer, 'null'] }
+        lang: { $ref: '#/components/schemas/SiteLanguage' }
+        path: { $ref: '#/components/schemas/SitePath' }
+        title: { type: string, minLength: 1, maxLength: 200 }
+
+    SiteContent:
+      type: object
+      required: [title, description, hero_image, blocks]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: string, maxLength: 300, description: For search engines and link previews (meta description) }
+        hero_image: { type: string, description: "Rich image uid for the header picture ('' without)", pattern: '^$|^[a-f0-9]{32}$' }
+        blocks: { type: array, maxItems: 200, items: { $ref: '#/components/schemas/SiteBlock' } }
+
+    SiteDraftInput:
+      allOf:
+        - $ref: '#/components/schemas/SiteContent'
+        - type: object
+          properties:
+            path: { $ref: '#/components/schemas/SitePath' }
+            base_revision_id: { type: [integer, 'null'], description: 'Draft that was loaded; null for a new translation' }
+
+    SiteTranslation:
+      allOf:
+        - $ref: '#/components/schemas/SiteTranslationState'
+        - type: object
+          required: [page_id, url, draft_revision_id, published_revision_id, draft]
+          properties:
+            page_id: { type: integer }
+            url: { type: string, description: Public address of the translation (also while it is a draft) }
+            draft_revision_id: { type: integer }
+            published_revision_id: { type: [integer, 'null'] }
+            draft: { $ref: '#/components/schemas/SiteContent' }
+
+    SiteRevisionSummary:
+      type: object
+      required: [id, title, created_at, created_by_name, published]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        created_at: { type: string, description: 'UTC, YYYY-MM-DD HH:MM:SS' }
+        created_by_name: { type: [string, 'null'] }
+        published: { type: boolean, description: This revision is the one online }
+
+    SiteRevision:
+      allOf:
+        - $ref: '#/components/schemas/SiteRevisionSummary'
+        - $ref: '#/components/schemas/SiteContent'
+
+    SiteBlock:
+      description: |
+        One content block, stored as JSON in the revision. Each block has an `id` the editor assigns (stable while
+        reordering). Blocks with data from the App render only what a guest may see and nothing if their feature is off.
+      oneOf:
+        - $ref: '#/components/schemas/SiteBlockText'
+        - $ref: '#/components/schemas/SiteBlockImage'
+        - $ref: '#/components/schemas/SiteBlockEvents'
+        - $ref: '#/components/schemas/SiteBlockNews'
+        - $ref: '#/components/schemas/SiteBlockGallery'
+        - $ref: '#/components/schemas/SiteBlockMembers'
+        - $ref: '#/components/schemas/SiteBlockOffices'
+      discriminator:
+        propertyName: type
+        mapping:
+          text: '#/components/schemas/SiteBlockText'
+          image: '#/components/schemas/SiteBlockImage'
+          events: '#/components/schemas/SiteBlockEvents'
+          news: '#/components/schemas/SiteBlockNews'
+          gallery: '#/components/schemas/SiteBlockGallery'
+          members: '#/components/schemas/SiteBlockMembers'
+          offices: '#/components/schemas/SiteBlockOffices'
+
+    SiteBlockId:
+      type: string
+      pattern: '^[a-z0-9]{8,32}$'
+
+    SiteBlockText:
+      type: object
+      required: [type, id, html]
+      properties:
+        type: { const: text }
+        id: { $ref: '#/components/schemas/SiteBlockId' }
+        html: { type: string, description: 'Rich text (TipTap), cleaned with the RichText allowlist; images as `<img data-image="uid">`' }
+
+    SiteBlockImage:
+      type: object
+      required: [type, id, image, alt]
+      properties:
+        type: { const: image }
+        id: { $ref: '#/components/schemas/SiteBlockId' }
+        image: { type: string, pattern: '^[a-f0-9]{32}$', description: Rich image uid }
+        alt: { type: string, maxLength: 300 }
+        caption: { type: string, maxLength: 300 }
+
+    SiteBlockEvents:
+      type: object
+      required: [type, id]
+      properties:
+        type: { const: events }
+        id: { $ref: '#/components/schemas/SiteBlockId' }
+        limit: { type: integer, minimum: 1, maximum: 100, default: 10, description: 'Upcoming public events (like `[kompanie_termine anzahl=…]`)' }
+
+    SiteBlockNews:
+      type: object
+      required: [type, id]
+      properties:
+        type: { const: news }
+        id: { $ref: '#/components/schemas/SiteBlockId' }
+        limit: { type: integer, minimum: 1, maximum: 50, default: 5 }
+
+    SiteBlockGallery:
+      type: object
+      required: [type, id]
+      properties:
+        type: { const: gallery }
+        id: { $ref: '#/components/schemas/SiteBlockId' }
+
+    SiteBlockMembers:
+      type: object
+      description: Shows people; see `allow_person_indexing`.
+      required: [type, id]
+      properties:
+        type: { const: members }
+        id: { $ref: '#/components/schemas/SiteBlockId' }
+
+    SiteBlockOffices:
+      type: object
+      description: 'Shows people; see `allow_person_indexing`. Filters like `[kompanie_aemter gruppe=… amt=…]`.'
+      required: [type, id]
+      properties:
+        type: { const: offices }
+        id: { $ref: '#/components/schemas/SiteBlockId' }
+        group: { type: string, maxLength: 100, description: "Office group name ('' for all)" }
+        office: { type: string, maxLength: 100, description: "Office name ('' for all)" }
+
+    SiteBlockType:
+      type: object
+      required: [type, label, shows_people]
+      properties:
+        type: { type: string, enum: [text, image, events, news, gallery, members, offices] }
+        label: { type: string, description: Name in the editor (German) }
+        shows_people: { type: boolean }
+
+    SiteMenuItem:
+      type: object
+      required: [labels]
+      properties:
+        id: { type: integer, readOnly: true }
+        page_id: { type: [integer, 'null'] }
+        url: { type: string, maxLength: 500 }
+        labels:
+          type: object
+          description: Label per language; missing or '' for a page means its title
+          propertyNames: { $ref: '#/components/schemas/SiteLanguage' }
+          additionalProperties: { type: string, maxLength: 100 }
+        children:
+          type: array
+          description: Second level (only in `main`)
+          items:
+            type: object
+            required: [labels]
+            properties:
+              id: { type: integer, readOnly: true }
+              page_id: { type: [integer, 'null'] }
+              url: { type: string, maxLength: 500 }
+              labels:
+                type: object
+                propertyNames: { $ref: '#/components/schemas/SiteLanguage' }
+                additionalProperties: { type: string, maxLength: 100 }
+
+    SiteMenus:
+      type: object
+      required: [main, footer]
+      properties:
+        main: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/SiteMenuItem' } }
+        footer: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/SiteMenuItem' } }
+
+    SiteSettings:
+      type: object
+      properties:
+        languages: { type: array, minItems: 1, uniqueItems: true, items: { $ref: '#/components/schemas/SiteLanguage' } }
+        default_language: { $ref: '#/components/schemas/SiteLanguage' }
+        imprint_page_id: { type: [integer, 'null'], description: 'Required before anything else can be published. While `legal_imprint_url` (`/admin/settings`) is empty, the App links to this page.' }
+        privacy_page_id: { type: [integer, 'null'], description: 'While `legal_privacy_url` is empty, the App links to this page.' }
+        menu_layout: { type: string, enum: [top, side], default: top }
+        show_hero: { type: boolean, default: true, description: Show the header picture of a page if it has one }
