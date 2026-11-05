@@ -3,7 +3,6 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
   type TouchEvent,
@@ -63,22 +62,8 @@ function LoadingImage({
   );
 }
 
-/**
- * Scrollposition der Übersicht beim Öffnen eines Albums: Zurück (im Browser, per Wischen oder mit „‹ Alle Alben“) führt
- * wieder dorthin statt an den Anfang. Der Router scrollt bei jedem Wechsel nach oben; die Übersicht stellt die Stelle
- * wieder her, sobald ihre Alben dastehen (die Kacheln haben feste Seitenverhältnisse, die Höhe stimmt also schon vor den
- * Bildern).
- */
-let overviewScroll: number | null = null;
-
 function Overview() {
   const { data, error, loading, reload } = useAsync(sources.gallery.load, sources.gallery.deps, sources.gallery.key);
-  const ready = !!data;
-  useLayoutEffect(() => {
-    if (!ready || overviewScroll === null) return;
-    window.scrollTo(0, overviewScroll);
-    overviewScroll = null;
-  }, [ready]);
   if (loading && !data) return <Loading shape="grid" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const years = data?.years ?? [];
@@ -94,10 +79,8 @@ function Overview() {
               <li key={a.id}>
                 <button
                   className="album-card"
-                  onClick={() => {
-                    overviewScroll = window.scrollY;
-                    navigate(`galerie/${a.id}`);
-                  }}
+                  // Zurück (im Browser, per Wischen oder mit „‹ Alle Alben“) führt wieder an diese Stelle (router.ts).
+                  onClick={() => navigate(`galerie/${a.id}`)}
                   {...prefetchAlbumOnTap(a.id)}
                 >
                   {a.cover ? (
