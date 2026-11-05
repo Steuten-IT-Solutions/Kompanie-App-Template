@@ -1,6 +1,6 @@
 # Konzept: Eigene Seiten und Bruderschaft
 
-Stand: 05.11.2026. Noch nicht umgesetzt; je Schritt gibt es ein Issue (siehe [Phasen](#phasen)).
+Stand: 05.11.2026. Noch nicht umgesetzt; je Schritt gibt es ein Issue (Sammel-Issue #276, siehe [Phasen](#phasen)).
 
 ## Kurzfassung
 
@@ -267,37 +267,37 @@ Sechs Phasen (0 bis 5), sortiert nach Nutzen für die Bruderschaft und steigende
 
 | Schritt | Inhalt | Aufwand |
 | --- | --- | --- |
-| 1.1 | Navigation einrichtbar: Hauptpunkte und Untermenüs, „Meins“ und „Verwaltung“ fest, ohne Einstellung wie heute | mittel |
+| 1.1 (#277) | Navigation einrichtbar: Hauptpunkte und Untermenüs, „Meins“ und „Verwaltung“ fest, ohne Einstellung wie heute | mittel |
 
 **Phase 2: Kompanien und Sponsoren**
 
 | Schritt | Inhalt | Aufwand |
 | --- | --- | --- |
-| 2.1 | Grundlage: einmalige Migration für neue Sehrechte | klein |
-| 2.2 | Sponsoren mit Logo und Link, sortierbar | klein |
-| 2.3 | Kompanieliste mit optionaler Zuordnung zu mehreren Kompanien | klein bis mittel |
+| 2.1 (#278) | Grundlage: einmalige Migration für neue Sehrechte | klein |
+| 2.2 (#279) | Sponsoren mit Logo und Link, sortierbar | klein |
+| 2.3 (#280) | Kompanieliste mit optionaler Zuordnung zu mehreren Kompanien | klein bis mittel |
 
 **Phase 3: Königshaus**
 
 | Schritt | Inhalt | Aufwand |
 | --- | --- | --- |
-| 3.1 | Grundlage: öffentliche Auslieferung von `rich_images` je Besitzer und Sehrecht, Verkleinern großer Fotos | klein bis mittel |
-| 3.2 | Gemeinsame Amtszeiten einer Gruppe mit Gruppenbild | mittel |
-| 3.3 | Fotos für Personen ohne Konto | klein |
+| 3.1 (#281) | Grundlage: öffentliche Auslieferung von `rich_images` je Besitzer und Sehrecht, Verkleinern großer Fotos | klein bis mittel |
+| 3.2 (#282) | Gemeinsame Amtszeiten einer Gruppe mit Gruppenbild | mittel |
+| 3.3 (#283) | Fotos für Personen ohne Konto | klein |
 
 **Phase 4: Galerie** (entschieden am 05.11.2026: vor den eigenen Seiten)
 
 | Schritt | Inhalt | Aufwand |
 | --- | --- | --- |
-| 4.1 | Schnittstellen `GallerySource` und `MediaStore` einziehen, Drive als erste Umsetzung, ohne sichtbare Änderung | mittel |
-| 4.2 | Quelle „eigener Server“: App-Alben, Galerie ohne Drive, Uploads in der Sicherung | mittel |
-| 4.3 | Bilder einreichen und freigeben, Rechte, Benachrichtigungen | mittel bis groß |
+| 4.1 (#284) | Schnittstellen `GallerySource` und `MediaStore` einziehen, Drive als erste Umsetzung, ohne sichtbare Änderung | mittel |
+| 4.2 (#285) | Quelle „eigener Server“: App-Alben, Galerie ohne Drive, Uploads in der Sicherung | mittel |
+| 4.3 (#286) | Bilder einreichen und freigeben, Rechte, Benachrichtigungen | mittel bis groß |
 
 **Phase 5: Eigene Seiten**
 
 | Schritt | Inhalt | Aufwand |
 | --- | --- | --- |
-| 5.1 | Eigene Seiten in der App (nutzt 3.1 für Bilder auf öffentlichen Seiten) | mittel |
+| 5.1 (#287) | Eigene Seiten in der App (nutzt 3.1 für Bilder auf öffentlichen Seiten) | mittel |
 
 Warum diese Reihenfolge: Die Navigation kommt zuerst, damit jeder neue Bereich gleich an der gewünschten Stelle eingehängt werden kann; ein vorläufiges Menü „Mehr“ entfällt. Kompanien und Sponsoren sind klein und sofort sichtbar. Das Königshaus baut auf vorhandenem Code auf und liefert die öffentliche Bildauslieferung, die auch die eigenen Seiten brauchen. Die Galerie kommt auf Wunsch vor den eigenen Seiten. Sie ist am größten und berührt die Drive-Galerie, die bestehende Installationen heute nutzen; 4.1 ändert deshalb zuerst nur den Aufbau.
 
