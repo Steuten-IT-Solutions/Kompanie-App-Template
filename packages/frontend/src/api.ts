@@ -8,6 +8,7 @@ import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
 import { noteError } from './lastError';
 import { rememberRoute } from './share';
+import type { NavigationSetting } from './navigation';
 
 /** Schlüssel einer Rolle: guest, member, admin, früher fest (organizer, manager, candidate) oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
@@ -113,10 +114,22 @@ export interface AppConfig {
   backupUrl?: string | null;
   /** Wartungsmodus (Issue #42): an, Begründung (Klartext), seit (Unix-Zeit) */
   maintenance?: MaintenanceInfo;
+  /** Einrichtbare Navigation (Issue #277): null bzw. fehlt = Standardnavigation */
+  navigation?: NavigationSetting | null;
   /** Vorschau „App als Rolle ansehen“ (Issue #63): vom Server bestätigt; role ist der Schlüssel oder @public */
   preview?: { role: string; label: string } | null;
   /** Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen; null ohne den Bereich, fehlt bei älteren Servern */
   birthdays?: { upcomingDays: number } | null;
+}
+
+/** Einstellungen → Navigation (Issue #277): gespeicherte Navigation und was der Server erlaubt. */
+export interface NavigationAdmin {
+  navigation: NavigationSetting | null;
+  targets: string[];
+  icons: string[];
+  max_main: number;
+  max_menu_items: number;
+  label_max: number;
 }
 
 export interface MaintenanceInfo {
@@ -196,6 +209,13 @@ export function applyFeatures(list: FeatureInfo[]): void {
 export function applyBirthdayUpcomingDays(days: number): void {
   if (!config) return;
   config.birthdays = { upcomingDays: days };
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/** Übernimmt die gespeicherte Navigation in die geladene Konfiguration und baut die Tab-Leiste neu. */
+export function applyNavigation(navigation: NavigationSetting | null): void {
+  if (!config) return;
+  config.navigation = navigation;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -1971,6 +1991,8 @@ export const api = {
     }),
   setActivityPersonal: (personal: boolean) => request<{ personal: boolean }>('PUT', '/admin/activity/settings', { personal }),
   maintenance: () => request<MaintenanceState>('GET', '/admin/maintenance'),
+  navigation: () => request<NavigationAdmin>('GET', '/admin/navigation'),
+  saveNavigation: (navigation: NavigationSetting | null) => request<NavigationAdmin>('PUT', '/admin/navigation', { navigation }),
   setMaintenance: (on: boolean, reason?: string) =>
     request<MaintenanceState>('POST', '/admin/maintenance', reason === undefined ? { on } : { on, reason }),
   /** Laufzeit-Konfiguration neu laden (z. B. „Erneut versuchen“ auf der Wartungsseite). */

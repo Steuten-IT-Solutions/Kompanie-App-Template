@@ -19,6 +19,7 @@ import {
 import { EmailField, ErrorBox, Loading, useAsync } from '../ui';
 import { normalizeEmail } from '../email';
 import Neuerungen from './Neuerungen';
+import NavigationEinstellen from './NavigationEinstellen';
 import Rollen from './Rollen';
 import Wartung from './Wartung';
 import Nutzung from './Nutzung';
@@ -32,6 +33,7 @@ const sec = brand.labels.sections;
 /** Seiten der Einstellungen: Adresse (#/einstellungen/<id>), Titel und ein Satz für die Übersicht. */
 const PAGES = [
   { id: 'bereiche', title: 'Bereiche', text: 'Welche Bereiche die App für alle hat.' },
+  { id: 'navigation', title: 'Navigation', text: 'Welche Bereiche unten in der Leiste stehen, auch in Untermenüs.' },
   { id: 'rollen', title: 'Rollen', text: 'Wer was in der App darf.' },
   { id: 'benachrichtigungen', title: 'Benachrichtigungen', text: 'Angemeldete Geräte und Uhrzeit der Erinnerung.' },
   { id: 'geburtstage', title: sec.birthdays, text: `Wie lange vorher anstehende ${sec.birthdays} bei den ${sec.events} erscheinen.` },
@@ -68,6 +70,7 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
         ‹ Einstellungen
       </button>
       {page.id === 'bereiche' && <Bereiche onToast={onToast} />}
+      {page.id === 'navigation' && <NavigationEinstellen onToast={onToast} />}
       {page.id === 'rollen' && <Rollen onToast={onToast} />}
       {page.id === 'benachrichtigungen' && <PushSettings onToast={onToast} />}
       {page.id === 'geburtstage' && <BirthdaySettingsSection onToast={onToast} />}

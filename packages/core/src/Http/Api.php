@@ -519,6 +519,8 @@ final class Api
             'guestCapabilities' => array_map(static fn (Cap $c): string => $c->value, $a->roles()->guestCapabilities()),
             // Nur für Admins: Einrichtungsassistent beim ersten Öffnen anbieten.
             'maintenance' => self::maintenanceInfo($a->maintenance()->state()),
+            // Einrichtbare Navigation (Issue #277): null = Standardnavigation; nur Darstellung, die Rechte prüfen die Routen
+            'navigation' => $a->navigation()->get(),
             'setupPending' => $this->can(Cap::ManageSettings) && !(bool) $a->settings->get(self::SETUP_SETTING, false),
             // Datensicherung als Datei herunterladen (Domain\BackupDownload); nur für Admins, nicht in der Vorschau
             'backupUrl' => $a->backup !== null && $this->can(Cap::ManageSettings) && !$a->preview()->active() ? $a->env->backupUrl() : null,
@@ -1085,6 +1087,13 @@ final class Api
             new Route('PUT', '/admin/activity/settings', Cap::ManageSettings, fn (Request $r) => ['personal' => $a->activity()->setPersonal($r->input('personal'))], null, $denySettings),
             new Route('GET', '/admin/maintenance', Cap::ManageSettings, fn () => $a->maintenance()->state() + ['log' => $a->maintenance()->log()], null, $denySettings),
             new Route('POST', '/admin/maintenance', Cap::ManageSettings, fn (Request $r) => $a->maintenance()->set($r->input('on'), $r->body['reason'] ?? null, $this->user()) + ['log' => $a->maintenance()->log()], null, $denySettings),
+            new Route('GET', '/admin/navigation', Cap::ManageSettings, fn () => $a->navigation()->describe(), null, $denySettings),
+            new Route('PUT', '/admin/navigation', Cap::ManageSettings, function (Request $r) use ($a) {
+                if (!array_key_exists('navigation', $r->body)) {
+                    throw ApiError::invalid('Bitte die Navigation angeben (null für die Standardnavigation).');
+                }
+                return $a->navigation()->set($r->body['navigation']);
+            }, null, $denySettings),
             new Route('GET', '/admin/settings', Cap::ManageSettings, fn () => $a->settingsService()->get(), null, $denySettings),
             // Push (Issue #19): Voraussetzungen, Zahl der Abos, Uhrzeit der Erinnerung; Benachrichtigung am Geburtstag
             new Route('GET', '/admin/push', Cap::ManageSettings, fn () => $a->push()->adminStatus(), null, $denySettings),

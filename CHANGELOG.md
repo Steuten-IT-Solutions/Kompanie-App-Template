@@ -17,6 +17,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Navigation einrichten**: Unter *Einstellungen → Navigation* legst du fest, welche Bereiche unten in der Leiste
+  stehen und in welcher Reihenfolge, fasst Bereiche zu Untermenüs mit eigenem Namen und Symbol zusammen (wie *Intern*)
+  oder blendest sie aus. *Verwaltung* und *Meins* stehen immer ganz rechts. Jede Person sieht weiter nur, was sie sehen
+  darf. Solange du nichts speicherst, bleibt die Navigation wie bisher; *Standardnavigation wiederherstellen* führt
+  jederzeit dorthin zurück.
 - **Impressum und Datenschutz**: Unter *Einstellungen → Impressum und Datenschutz* (und im Einrichtungsassistenten) trägst
   du die Links auf euer Impressum und eure Datenschutzerklärung ein, z. B. auf eurer Webseite. Die App zeigt sie allen,
   auch ohne Anmeldung: auf der Anmeldeseite, unten im Konto und unten in der Hilfe. Solange einer fehlt, ist die Zeile

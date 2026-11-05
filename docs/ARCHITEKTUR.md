@@ -405,7 +405,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 |---|---|
 | `member` | gehört zur Kompanie: bekommt Punkte, Strafen, Dienstgrade und Titel, steht in Listen, Anwesenheit und mit Geburtstag; schließt **nichts** ein (bis zur Aufteilung: alles Sehen) |
 | `calendar` | interner Kalender (allein z. B. für Anwärter) |
-| `view_intern` | Navigation: die Knöpfe unter „Intern“ gesammelt unter einem Knopf statt Mitglieder und Dokumente als eigene Tabs; regelt nicht, was die Person sieht |
+| `view_intern` | Navigation: die Knöpfe unter „Intern“ gesammelt unter einem Knopf statt Mitglieder und Dokumente als eigene Tabs; regelt nicht, was die Person sieht. Gilt nur für die Standardnavigation; mit einer eingerichteten Navigation (Einstellung `navigation`, `NavigationService`, `navigation.ts`, Issue #277) legt der Admin Hauptpunkte und Untermenüs (`#/menue/<n>`) selbst fest |
 | `view_events`, `view_news`, `view_gallery` | Tabs: öffentliche Termine, News, öffentliche Alben (`GET /events`, `/news`, `/gallery`) |
 | `view_gallery_internal` | interne Bilder und Videos der Galerie (dann auch die öffentlichen Alben) |
 | `view_own_points`, `view_own_penalties`, `view_own_rank`, `view_own_attendance` | eigene Daten in „Meins“ (`/me/points`, `/me/penalties`, `/me/rank` und Rang/Titel in `/me`, `/me/attendance`); nur mit `member` |

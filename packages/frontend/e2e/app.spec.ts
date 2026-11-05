@@ -1104,6 +1104,80 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   await expect(page.locator('.meins-menu')).toBeVisible();
 });
 
+/** Navigation per API zurücksetzen (null = Standardnavigation), falls ein Test mittendrin scheitert. */
+async function resetNavigation(page: Page) {
+  await page.evaluate(async () => {
+    const cfg = window.KOMPANIE_CONFIG!;
+    await fetch(cfg.apiBase + 'admin/navigation', {
+      method: 'PUT',
+      headers: { [cfg.csrf.header]: cfg.csrf.token, 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ navigation: null }),
+    });
+  });
+}
+
+test('Navigation einrichten (Issue #277): Untermenü umbenennen, Termine hineinschieben, für Mitglieder sichtbar, Standard wiederherstellen', async ({
+  page,
+}) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  try {
+    await adminMenu(page, 'Einstellungen');
+    await page
+      .locator('.settings-link')
+      .filter({ has: page.getByText('Navigation', { exact: true }) })
+      .click();
+    const card = page.locator('#einstellungen-navigation');
+    await expect(card.getByText('Zurzeit gilt die Standardnavigation', { exact: false })).toBeVisible();
+    // Der Entwurf beginnt mit der Standardnavigation: Termine, News, Galerie und das Untermenü Intern.
+    await expect(card.getByLabel('Name des Untermenüs')).toHaveValue('Intern');
+    await card.getByLabel('Name des Untermenüs').fill('Verein');
+    await card.getByLabel('Platz von Termine').selectOption({ label: 'Im Untermenü „Verein“' });
+    await card.getByLabel('Platz von Punktekatalog').selectOption({ label: 'Nicht in der Navigation' });
+    await expect(card.getByRole('heading', { name: 'Nicht in der Navigation' })).toBeVisible();
+    await card.getByRole('button', { name: 'Navigation speichern' }).click();
+    await expect(page.getByText('Navigation gespeichert')).toBeVisible();
+    await expect(card.getByText('Zurzeit gilt eure eigene Navigation.')).toBeVisible();
+
+    const tabbar = page.locator('.tabbar');
+    await expect(tabbar.getByRole('button', { name: 'Verein' })).toBeVisible();
+    await expect(tabbar.getByRole('button', { name: 'Intern' })).toHaveCount(0);
+    await expect(tabbar.getByRole('button', { name: 'Termine' })).toHaveCount(0);
+
+    // Mitglied: dieselbe Leiste, nur was es sehen darf; Termine im Untermenü, „‹ Verein“ führt zurück.
+    await login(page, 'mitglied1');
+    await expect(tabbar.getByRole('button', { name: 'Termine' })).toHaveCount(0);
+    await tabbar.getByRole('button', { name: 'Verein' }).click();
+    await expect(page).toHaveURL(/#\/menue\/1$/);
+    await expect(page.locator('.topbar-title')).toHaveText('Verein');
+    const tiles = page.getByRole('navigation', { name: 'Verein' });
+    await expect(tiles.getByRole('button', { name: 'Punktekatalog', exact: true })).toHaveCount(0);
+    await tiles.getByRole('button', { name: 'Termine', exact: true }).click();
+    await expect(page).toHaveURL(/#\/termine$/);
+    await expect(page.getByText('Vereinsabend')).toBeVisible();
+    await expect(tabbar.getByRole('button', { name: 'Verein' })).toHaveAttribute('aria-current', 'page');
+    await page.getByRole('button', { name: '‹ Verein' }).click();
+    await expect(page).toHaveURL(/#\/menue\/1$/);
+    await shot(page, '40-navigation-untermenue');
+
+    // Admin stellt die Standardnavigation wieder her.
+    await login(page, 'admin', ADMIN_PASSWORD);
+    await adminMenu(page, 'Einstellungen');
+    await page
+      .locator('.settings-link')
+      .filter({ has: page.getByText('Navigation', { exact: true }) })
+      .click();
+    page.once('dialog', (d) => d.accept());
+    await card.getByRole('button', { name: 'Standardnavigation wiederherstellen' }).click();
+    await expect(page.getByText('Standardnavigation wiederhergestellt')).toBeVisible();
+    await expect(tabbar.getByRole('button', { name: 'Intern' })).toBeVisible();
+    await expect(tabbar.getByRole('button', { name: 'Termine' })).toBeVisible();
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD).catch(() => undefined);
+    await resetNavigation(page).catch(() => undefined);
+  }
+});
+
 test('Intern: Knöpfe für Mitglieder, Dokumente, Brett, Dienstgrade und Punktekatalog, „‹ Intern“ führt zurück; ohne Anmeldung Mitglieder als eigener Tab', async ({
   page,
 }) => {

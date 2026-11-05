@@ -33,6 +33,9 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
       return id ? 'galerie-album' : 'galerie';
     case 'intern':
       return 'intern';
+    case 'menue':
+      // Untermenü aus Einstellungen → Navigation (Issue #277)
+      return 'untermenue';
     case 'dokumente':
       return sub === 'verwalten' ? 'dokumente-pflegen' : id ? 'dokument-ansehen' : 'dokumente';
     case 'dienstgrade':
@@ -77,6 +80,7 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
       return (
         {
           bereiche: 'admin-bereiche',
+          navigation: 'admin-navigation',
           rollen: 'admin-rollen-und-mitglieder',
           benachrichtigungen: 'admin-benachrichtigungen',
           geburtstage: 'admin-geburtstage',

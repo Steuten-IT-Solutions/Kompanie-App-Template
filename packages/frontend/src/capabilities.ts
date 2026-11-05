@@ -72,7 +72,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
   {
     key: 'intern',
     label: 'Intern',
-    hint: 'Je Knopf unter „Intern“ (ohne „Intern“ stehen Mitglieder und Dokumente unten als eigene Knöpfe).',
+    hint: 'Je Knopf unter „Intern“ (in der Standardnavigation; ohne „Intern“ stehen Mitglieder und Dokumente unten als eigene Knöpfe).',
     items: [
       { key: 'view_directory', label: sec.directory, short: sec.directory, features: ['directory'] },
       { key: 'view_offices', label: sec.offices, short: sec.offices, features: ['offices'] },
