@@ -24,7 +24,8 @@ use KompanieApp\Core\Storage\PushRepository;
  *   letzten Stand (beim ersten Lauf nur merken), Erinnerung an die Termine von morgen ab der eingestellten Uhrzeit,
  *   einmal am Tag. Was er einreiht, geht im selben Lauf raus (App::runTask).
  *
- * - Schwarzes Brett (Issue #5): an alle Empfänger außer dem Verfasser, mit Urgency high und einer TTL höchstens bis zum
+ * - Alle Nachrichten mit Urgency high (URGENCY).
+ * - Schwarzes Brett (Issue #5): an alle Empfänger außer dem Verfasser, mit einer TTL höchstens bis zum
  *   Ablauf der Nachricht.
  * - Umfragen (Issue #4): neue Umfrage an alle Mitglieder außer dem, der sie angelegt hat; Erinnerung 24 Stunden vor dem
  *   Ende an alle Mitglieder ohne Antwort; TTL höchstens bis zum Ende.
@@ -41,6 +42,13 @@ use KompanieApp\Core\Storage\PushRepository;
 final class PushService
 {
     public const TASK_SEND = 'push_send';
+    /**
+     * Dringlichkeit (Web Push „Urgency“) für alle Benachrichtigungen: high. Jede Nachricht der App zeigt eine
+     * Benachrichtigung an; Google empfiehlt dafür hohe Priorität, weil Android Nachrichten mit normaler Priorität im
+     * Ruhezustand (Doze) zurückhalten kann. Anlass: Geburtstagsnachrichten mit „normal“ nahm der Push-Dienst an, auf
+     * einem Android-Gerät erschienen sie aber nicht, während die Testnachricht (high) ankam.
+     */
+    public const URGENCY = 'high';
     public const TASK_WATCH = 'push_watch';
     public const WATCH_INTERVAL = 900;
 
@@ -555,7 +563,7 @@ final class PushService
      * @param int $ttl Sekunden, höchstens $maxTtl; 0 oder weniger: nichts
      * @param int $maxTtl Obergrenze (Standard TTL, höchstens MAX_TTL)
      */
-    public function notifyAudience(string $type, array $message, \Closure $include, string $urgency = 'normal', int $ttl = self::TTL, int $maxTtl = self::TTL): int
+    public function notifyAudience(string $type, array $message, \Closure $include, string $urgency = self::URGENCY, int $ttl = self::TTL, int $maxTtl = self::TTL): int
     {
         if (!$this->typeEnabled($type) || $ttl <= 0) {
             return 0;
@@ -623,7 +631,7 @@ final class PushService
     }
 
     /** @param list<array{subscription_id: int, payload: string}> $items */
-    private function enqueue(string $type, array $items, string $urgency = 'normal', int $ttl = self::TTL): int
+    private function enqueue(string $type, array $items, string $urgency = self::URGENCY, int $ttl = self::TTL): int
     {
         $now = $this->app->time()->timestamp();
         $this->log(static function (array $log) use ($type, $items, $now): array {
@@ -750,7 +758,7 @@ final class PushService
     {
         $keys = $this->vapid() ?? throw new ApiError(501, 'push_unsupported', 'Push-Benachrichtigungen werden auf diesem Server nicht unterstützt.');
         $row = ['id' => 0, 'subscription_id' => $sub['id'], 'payload' => self::json(self::message($this->app->config->name(), 'Benachrichtigungen funktionieren.', 'benachrichtigungen', 'test')),
-            'urgency' => 'high', 'ttl' => 300, 'attempts' => 0, 'created_at' => '', 'endpoint' => $sub['endpoint'], 'p256dh' => $sub['p256dh'], 'auth' => $sub['auth']];
+            'urgency' => self::URGENCY, 'ttl' => 300, 'attempts' => 0, 'created_at' => '', 'endpoint' => $sub['endpoint'], 'p256dh' => $sub['p256dh'], 'auth' => $sub['auth']];
         $tokens = [];
         $res = $this->sendAll([0 => $this->request($row, $keys, $tokens)])[0] ?? new \RuntimeException('keine Antwort');
         $status = self::classify($res, $sub['endpoint']);

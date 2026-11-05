@@ -36,6 +36,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Listen öffnen schneller**: Öffnest du unter *Verwaltung → Listen* eine Liste erneut, steht sie sofort da und wird im
   Hintergrund aktualisiert, wie die übrigen Seiten der App. Hat jemand sie inzwischen geändert, zeigt die App gleich
   danach den neuen Stand.
+- **Benachrichtigungen mit hoher Dringlichkeit**: Alle Benachrichtigungen gehen jetzt mit hoher Dringlichkeit an den
+  Push-Dienst, wie Google es für sichtbare Benachrichtigungen empfiehlt. Mit normaler Dringlichkeit kann Android sie im
+  Ruhezustand zurückhalten, z. B. die Benachrichtigung am Geburtstag am frühen Morgen.
 
 ## [0.5.0] – 2026-11-01
 

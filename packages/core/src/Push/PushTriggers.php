@@ -101,7 +101,7 @@ final class PushTriggers
             PushService::TYPE_POLLS,
             PushService::message($title, $body, 'umfragen/' . $poll['id'], 'umfrage-' . $poll['id']),
             static fn (int $uid): bool => $uid !== $creatorId,
-            'normal',
+            'high',
             $this->ttlUntil($poll['ends_at']),
         );
     }
@@ -121,7 +121,7 @@ final class PushTriggers
             PushService::TYPE_POLLS,
             PushService::message($title, $body, 'umfragen/' . $poll['id'], 'umfrage-' . $poll['id']),
             static fn (int $uid): bool => !isset($voted[$uid]),
-            'normal',
+            'high',
             $this->ttlUntil($poll['ends_at']),
         );
     }
@@ -139,7 +139,7 @@ final class PushTriggers
             PushService::TYPE_BIRTHDAYS,
             PushService::message($title, $body, 'termine', 'geburtstag-' . $userId),
             static fn (int $uid): bool => $uid !== $userId,
-            'normal',
+            'high',
             $midnight - $this->app->time()->timestamp(),
         );
     }
