@@ -5420,8 +5420,9 @@ paths:
       summary: Publish the current draft
       description: |
         With `revision_id` (the draft the editor shows) only if it is still the draft, otherwise 409 `conflict`. Nothing is
-        published while the website has no published imprint in this language (409 `imprint_missing`, § 5 DDG); the
-        imprint page itself can always be published. Clears the page cache.
+        published while the website has no published imprint (409 `imprint_missing`, § 5 DDG) or no published privacy
+        policy (409 `privacy_missing`, Art. 13 GDPR: web hosts usually log IP addresses) in this language; the imprint and
+        privacy pages themselves can always be published. Clears the page cache.
       x-capability: manage_website
       x-status: planned
       requestBody:
@@ -8004,6 +8005,6 @@ components:
         languages: { type: array, minItems: 1, uniqueItems: true, items: { $ref: '#/components/schemas/SiteLanguage' } }
         default_language: { $ref: '#/components/schemas/SiteLanguage' }
         imprint_page_id: { type: [integer, 'null'], description: 'Required before anything else can be published. While `legal_imprint_url` (`/admin/settings`) is empty, the App links to this page.' }
-        privacy_page_id: { type: [integer, 'null'], description: 'While `legal_privacy_url` is empty, the App links to this page.' }
+        privacy_page_id: { type: [integer, 'null'], description: 'Required before anything else can be published. While `legal_privacy_url` is empty, the App links to this page.' }
         menu_layout: { type: string, enum: [top, side], default: top }
         show_hero: { type: boolean, default: true, description: Show the header picture of a page if it has one }

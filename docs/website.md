@@ -66,8 +66,9 @@ website, the editor preview and the Gutenberg blocks share them.
 
 ## Publishing rules
 
-- Nothing is published in a language until that language has a published imprint (§ 5 DDG); the imprint page itself can
-  always be published (`409 imprint_missing`).
+- Nothing is published in a language until that language has a published imprint (§ 5 DDG, `409 imprint_missing`) and
+  a published privacy policy (Art. 13 GDPR, because web hosts usually log IP addresses; `409 privacy_missing`). The
+  imprint and privacy pages themselves can always be published.
 - Imprint and privacy policy are always linked in the footer and cannot be deleted or taken offline while other pages
   are online.
 - The App already has links to imprint and privacy policy (*Einstellungen → Impressum und Datenschutz*, settings
