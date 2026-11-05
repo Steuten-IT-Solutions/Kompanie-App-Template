@@ -15,7 +15,7 @@ import {
 import { formatBytes, formatDate } from '../format';
 import { detectPlatform } from '../install';
 import { pruneDocumentCache, whenControlled } from '../offline';
-import { navigate } from '../router';
+import { goBack, navigate, useEntryState } from '../router';
 import { Empty, ErrorBox, FoldSection, lazyView, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 
@@ -60,9 +60,9 @@ export function useDocSort() {
   return [sort, change] as const;
 }
 
-/** Aufgeklappte Kategorien. Beim Öffnen des Bereichs sind alle zu; gespeichert wird das nicht. */
+/** Aufgeklappte Kategorien. Beim Öffnen des Bereichs sind alle zu, beim Zurückkommen wie verlassen (nicht auf dem Gerät gespeichert). */
 export function useOpenGroups() {
-  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set());
+  const [open, setOpen] = useEntryState<ReadonlySet<string>>('document-groups', () => new Set());
   const toggle = useCallback(
     (key: string) =>
       setOpen((o) => {
@@ -253,7 +253,7 @@ export default function Dokumente({ docId, onToast }: { docId?: number; onToast:
     if (!open) return <Empty>Dieses Dokument gibt es nicht (mehr).</Empty>;
     return (
       <div>
-        <button className="btn btn-link back" onClick={() => navigate('dokumente')}>
+        <button className="btn btn-link back" onClick={() => goBack('dokumente')}>
           ‹ Alle {brand.labels.sections.documents}
         </button>
         <h2 className="member-name">{open.title}</h2>

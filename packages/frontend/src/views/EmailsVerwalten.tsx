@@ -14,7 +14,7 @@ import { AttachmentList, AttachmentsField } from '../attachments';
 import { ComposeEditor } from '../composeEditor';
 import { formatShortTime } from '../format';
 import RichTextView from '../richtext/RichTextView';
-import { navigate } from '../router';
+import { goBack, navigate } from '../router';
 import { ErrorBox, Loading } from '../ui';
 
 /** Entwurf der E-Mail (auf diesem Gerät): geht beim Sprung zur Signatur-Einrichtung und beim Verlassen nicht verloren. */
@@ -455,7 +455,7 @@ function Detail({ id }: { id: number }) {
   useEffect(load, [id]);
   return (
     <div>
-      <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/mail')}>
+      <button type="button" className="btn btn-link back" onClick={() => goBack('verwaltung/mail')}>
         ‹ E-Mails
       </button>
       {error ? (
@@ -593,7 +593,7 @@ function Groups({ onToast }: { onToast: (msg: string) => void }) {
   };
 
   const back = (
-    <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/mail')}>
+    <button type="button" className="btn btn-link back" onClick={() => goBack('verwaltung/mail')}>
       ‹ E-Mails
     </button>
   );

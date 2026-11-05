@@ -23,7 +23,7 @@ import {
   type MemberOrder,
   type MemberSort,
 } from '../memberSort';
-import { navigate, redirect } from '../router';
+import { navigate, redirect, useEntryState } from '../router';
 import { PersonName } from '../skeleton';
 import { neighbors, usePrefetchChain, useSwipeDrag } from '../swipe';
 import { OfficesView, PersonOffices, useOffices } from './Aemter';
@@ -376,7 +376,7 @@ function MemberList({ former = false }: { former?: boolean }) {
     [],
     former ? undefined : sources.directoryCounts.key,
   );
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useEntryState(former ? 'former-query' : 'directory-query', '');
   const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
   // Gemerkt ist vielleicht die Sortierung nach Punkten aus der Verwaltung: hier dann nach Nachname.
   const sorts = former ? FORMER_SORTS : SORTS;

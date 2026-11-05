@@ -147,6 +147,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Die App fragt jetzt auch dann im Hintergrund nach und zeigt die Änderung.
 - **Logo im Hinweis „App aufs Handy holen“**: Ist das Logo nicht quadratisch, wurde es im Hinweis oben auf der
   Seite in die Breite gezogen. Es erscheint jetzt im richtigen Seitenverhältnis, wie in der Kopfzeile.
+- **Zurück an dieselbe Stelle, überall**: Wie in der Galerie steht jetzt in allen Bereichen eine Seite nach dem
+  Zurückgehen (z. B. aus einem Beitrag der News, einem Dokument oder einer Person) wieder an der Stelle, an der man sie
+  verlassen hat, egal ob mit einem Knopf wie „‹ Alle Neuigkeiten“, der Zurück-Taste oder der Zurück-Geste des Handys. Nachgeladene Beiträge („Ältere
+  Beiträge“), Suchbegriffe und aufgeklappte Abschnitte bleiben dabei erhalten. Über die Leiste unten öffnet ein Bereich
+  dagegen immer mit seiner Startseite, oben; auch ein Tippen auf den schon offenen Bereich führt dorthin zurück.
 - **Update-Knopf nach langer Sicherung wieder aktiv**: Brach die Verbindung während eines langen Updates ab (z. B. durch
   ein Zeitlimit des Hosters), gab die App den Knopf wieder frei, obwohl das Update auf dem Server weiterlief; ein zweiter
   Klick meldete dann „Gerade läuft schon ein Update“. Jetzt wartet die App, bis das Update fertig ist, und lädt danach

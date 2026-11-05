@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { api, config, type EventInput, type PublicEvent } from '../api';
 import { formatEventWhen } from '../format';
-import { navigate } from '../router';
+import { goBack } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 
@@ -82,7 +82,7 @@ export default function TermineVerwalten({ onToast }: { onToast: (msg: string) =
 
   return (
     <div>
-      <button className="btn btn-link back" onClick={() => navigate('termine')}>
+      <button className="btn btn-link back" onClick={() => goBack('termine')}>
         ‹ Zu den Terminen
       </button>
       <p className="muted small">

@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { can, config } from '../api';
 import GuestPushButton from '../GuestPushButton';
 import { birthdaysVisible, UpcomingBirthdays, UpcomingBirthdaysCard, useUpcomingBirthdays } from '../upcomingBirthdays';
-import { navigate } from '../router';
+import { navigate, useEntryState } from '../router';
 import { eventEnd, eventStart, formatEventWhen, formatMonth, shortMonth } from '../format';
 import { downloadIcs } from '../ics';
 import { mapLinkTarget, mapPlatform, mapSearchUrl } from '../address';
@@ -24,7 +24,7 @@ function EventList({ focus }: { focus?: string }) {
   const showBirthdays = birthdaysVisible();
   const upcoming = useUpcomingBirthdays(showBirthdays);
   const birthdays = showBirthdays ? <UpcomingBirthdaysCard state={upcoming} /> : null;
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useEntryState<string | null>('events-open', null);
 
   const groups = useMemo(() => {
     const now = new Date();

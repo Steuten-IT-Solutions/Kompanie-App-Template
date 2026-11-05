@@ -11,7 +11,7 @@ import {
 } from '../api';
 import { caps, formatDate, formatEventWhen, roleCount, todayYmd } from '../format';
 import brand from '../generated/brand';
-import { navigate } from '../router';
+import { goBack, navigate, useEntryState } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { prefetchOnTap, sources } from '../viewData';
 
@@ -33,7 +33,7 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
     sources.attendanceOverview.deps,
     sources.attendanceOverview.key,
   );
-  const [showAll, setShowAll] = useState(false);
+  const [showAll, setShowAll] = useEntryState('attendance-all', false);
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(todayYmd());
   const [busy, setBusy] = useState(false);
@@ -232,7 +232,7 @@ function Editor({
 
   return (
     <div className="attendance">
-      <button className="btn btn-link back" onClick={() => navigate('verwaltung/anwesenheit')}>
+      <button className="btn btn-link back" onClick={() => goBack('verwaltung/anwesenheit')}>
         ‹ {sec.attendance}
       </button>
       {free ? (
