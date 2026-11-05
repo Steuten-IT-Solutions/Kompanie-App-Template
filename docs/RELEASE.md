@@ -74,6 +74,8 @@ Wer den Signaturschlüssel hat, kann Code auf **allen** Installationen ausführe
 
 ## Neue Kompanie, Kompanie ändern
 
+Schritt für Schritt (Angaben, Formular, Installation): [Neue Kompanie anlegen](NEUE-KOMPANIE.md).
+
 Im Kern-Repo *Issues → New issue*:
 
 - **„Neue Kompanie“**: Name, Repo-Name, Farben, Texte, Logo (ins Feld ziehen). Welche Bereiche die App hat,
