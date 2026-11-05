@@ -4320,6 +4320,49 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+  /admin/navigation:
+    get:
+      tags: [Einstellungen]
+      summary: Einrichtbare Navigation mit den erlaubten Bereichen und Symbolen
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NavigationAdmin' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Einstellungen]
+      summary: Navigation speichern oder die Standardnavigation wiederherstellen
+      description: |
+        Issue #277. Nur Darstellung: Die App zeigt jedem nur die Bereiche, die er sehen darf; die Routen prüfen wie bisher.
+        „Verwaltung“ und „Meins“ stehen immer am Ende und sind nicht einstellbar. Jeder Bereich darf höchstens einmal
+        vorkommen (Hauptpunkt, in einem Untermenü oder unter hidden). Bereiche, die nirgends stehen, hängt die App hinten an.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [navigation]
+              properties:
+                navigation:
+                  description: null stellt die Standardnavigation wieder her
+                  oneOf:
+                    - $ref: '#/components/schemas/Navigation'
+                    - type: 'null'
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NavigationAdmin' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /admin/maintenance:
     get:
       tags: [Einstellungen]
@@ -5917,6 +5960,46 @@ components:
         label: { type: string }
         action: { type: string, enum: [view, create, update, delete, vote, login] }
         at: { type: integer, description: Unix-Zeit }
+    Navigation:
+      type: object
+      description: 'Einrichtbare Navigation (Issue #277): Hauptpunkte der Tab-Leiste und ausgeblendete Bereiche'
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 5
+          description: 'Hauptpunkte in ihrer Reihenfolge (ohne Verwaltung und Meins): ein Bereich oder ein Untermenü (eine Ebene)'
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/NavigationTarget'
+              - type: object
+                required: [label, icon, items]
+                properties:
+                  label: { type: string, minLength: 1, maxLength: 24, description: Name des Untermenüs (Klartext) }
+                  icon: { type: string, enum: [ordner, termine, news, galerie, mitglieder, dokumente, brett, dienstgrade, punktekatalog, stern] }
+                  items: { type: array, minItems: 1, maxItems: 12, items: { $ref: '#/components/schemas/NavigationTarget' } }
+        hidden:
+          type: array
+          description: Bereiche, die nicht in der Navigation stehen
+          items: { $ref: '#/components/schemas/NavigationTarget' }
+    NavigationTarget:
+      type: string
+      description: Bereich der App, der in der Navigation stehen kann
+      enum: [termine, news, galerie, mitglieder, dokumente, brett, dienstgrade, punktekatalog]
+    NavigationAdmin:
+      type: object
+      required: [navigation, targets, icons, max_main, max_menu_items, label_max]
+      properties:
+        navigation:
+          description: Gespeicherte Navigation; null = Standardnavigation
+          oneOf:
+            - $ref: '#/components/schemas/Navigation'
+            - type: 'null'
+        targets: { type: array, items: { $ref: '#/components/schemas/NavigationTarget' } }
+        icons: { type: array, items: { type: string } }
+        max_main: { type: integer }
+        max_menu_items: { type: integer }
+        label_max: { type: integer }
     Maintenance:
       allOf:
         - $ref: '#/components/schemas/MaintenanceInfo'
@@ -6189,6 +6272,11 @@ components:
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
         backupUrl: { type: [string, 'null'], description: 'Nur für Admins (nicht in der Vorschau): Adresse zum Herunterladen der Datensicherung als Datei (<App>/sicherung), Stück für Stück erzeugt; sonst null' }
         maintenance: { $ref: '#/components/schemas/MaintenanceInfo' }
+        navigation:
+          description: 'Einrichtbare Navigation (Issue #277, Einstellungen → Navigation), für alle; null = Standardnavigation'
+          oneOf:
+            - $ref: '#/components/schemas/Navigation'
+            - type: 'null'
         birthdays:
           type: [object, 'null']
           description: 'Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen (Einstellungen → Geburtstage); null ohne den Bereich'

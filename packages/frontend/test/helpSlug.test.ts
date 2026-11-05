@@ -62,6 +62,7 @@ const PATHS = [
   ['galerie'],
   ['galerie', '3'],
   ['intern'],
+  ['menue', '1'],
   ['dokumente'],
   ['dokumente', '5'],
   ['dokumente', 'verwalten'],
@@ -128,6 +129,7 @@ const PATHS = [
   ['einstellungen'],
   ...[
     'bereiche',
+    'navigation',
     'rollen',
     'google',
     'kalender',

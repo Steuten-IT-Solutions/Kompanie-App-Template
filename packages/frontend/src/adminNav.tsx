@@ -147,6 +147,26 @@ export function MenuNav({
 
 /** Symbole der Verwaltung und von „Intern“ (24 × 24, Linien in Textfarbe). */
 const ADMIN_ICONS: Record<string, ReactNode> = {
+  // Termine, News und Galerie: als Knopf in einem Untermenü der Navigation (Einstellungen → Navigation, Issue #277)
+  termine: (
+    <>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+    </>
+  ),
+  news: (
+    <>
+      <path d="M4 5h12v14a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z" />
+      <path d="M16 9h3a1 1 0 0 1 1 1v9a2 2 0 0 1-4 0M7 9h6M7 13h6M7 17h4" />
+    </>
+  ),
+  galerie: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="8.5" cy="10" r="1.5" />
+      <path d="M21 16l-5-5-8 8" />
+    </>
+  ),
   mitglieder: (
     <>
       <circle cx="9" cy="8" r="3.5" />

@@ -13,14 +13,16 @@ import { endPreview, previewRole, PUBLIC_PREVIEW, stopPreview } from './preview'
 import { navigate, useRoute, viewKey } from './router';
 import { focusId } from './focus';
 import { AdminBack, adminTabs } from './adminNav';
-import { InternBack, InternMenu, type InternTab } from './internNav';
+import { MenuBack, InternMenu } from './internNav';
+import { targetLabels } from './navLabels';
+import { buildNav, menuOf, type NavEntry, type NavTarget } from './navigation';
 import { helpSlug } from './helpSlug';
 import { setReportOrigin } from './lastError';
 import { shareLink, shareUrl } from './share';
 import { toggleTheme, useTheme } from './theme';
 import News from './views/News';
 import Termine from './views/Termine';
-import { hasEvents, prefetcher, tabSources } from './viewData';
+import { hasEvents, prefetcher, tabSources, type TabId } from './viewData';
 import { whenIdle } from './prefetch';
 
 // Erst bei Bedarf laden: Der App-Start braucht nur die Ansichten, mit denen Gäste meist beginnen (Termine, News).
@@ -47,32 +49,27 @@ const Dienstgrade = lazyView(() => import('./views/Dienstgrade'));
 const Punktekatalog = lazyView(() => import('./views/Punktekatalog'));
 
 // Programmteile der Tabs, die erst bei Bedarf geladen werden: vorab anstoßen (Issue #104).
+// Untermenüs (Intern oder eingerichtet) laden die Teile ihrer Bereiche (preloadEntry).
 const tabViews: Partial<Record<string, { preload: () => void }>> = {
   galerie: Galerie,
   dokumente: Dokumente,
   mitglieder: Mitglieder,
-  intern: {
-    preload: () => {
-      Dokumente.preload();
-      Mitglieder.preload();
-      Brett.preload();
-      Dienstgrade.preload();
-      Punktekatalog.preload();
-    },
-  },
+  brett: Brett,
+  dienstgrade: Dienstgrade,
+  punktekatalog: Punktekatalog,
   meins: Meins,
   verwaltung: Verwaltung,
 };
 
-/** Bereiche unter „Intern“ (Knöpfe auf seiner Startseite), in dieser Reihenfolge. Ohne das Recht view_intern stehen
- * Mitglieder und Dokumente unten als eigene Tabs (z. B. Mitglieder für Gäste); Schwarzes Brett, Dienstgrade und
- * Punktekatalog gibt es nur unter „Intern“ (Mitglieder haben das Recht immer; das Brett erreicht man sonst über das Banner). */
+/** Bereiche unter „Intern“ (Knöpfe auf seiner Startseite) bzw. in Untermenüs der einrichtbaren Navigation
+ * (navigation.ts, Issue #277). In der Standardnavigation stehen ohne das Recht view_intern Mitglieder und Dokumente unten
+ * als eigene Tabs (z. B. Mitglieder für Gäste); Schwarzes Brett, Dienstgrade und Punktekatalog gibt es dort nur unter
+ * „Intern“ (Mitglieder haben das Recht immer; das Brett erreicht man sonst über das Banner). */
 type InternView = 'mitglieder' | 'dokumente' | 'brett' | 'dienstgrade' | 'punktekatalog';
-const INTERN: InternView[] = ['mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog'];
-const OWN_TABS: InternView[] = ['mitglieder', 'dokumente'];
 type Tab = 'termine' | 'news' | 'galerie' | 'intern' | InternView | 'meins' | 'verwaltung';
 type View =
   | Tab
+  | 'menue'
   | 'brett'
   | 'umfragen'
   | 'inventar'
@@ -88,6 +85,7 @@ const VIEWS: View[] = [
   'news',
   'galerie',
   'intern',
+  'menue',
   'dokumente',
   'mitglieder',
   'dienstgrade',
@@ -117,11 +115,13 @@ const ALIASES: Record<string, string[]> = {
 const features = config?.features;
 const sec = brand.labels.sections;
 
-const tabLabels = (): Record<Tab, string> => ({
+const tabLabels = (): Record<Tab | 'menue', string> => ({
   termine: sec.events,
   news: sec.news,
   galerie: sec.gallery,
   intern: 'Intern',
+  // Untermenü der einrichtbaren Navigation: Titel ist sein Name (App)
+  menue: 'Menü',
   ...internLabels(),
   meins: 'Meins',
   verwaltung: 'Verwaltung',
@@ -136,6 +136,11 @@ function internLabels(): Record<InternView, string> {
     dienstgrade: sec.ranks,
     punktekatalog: `${sec.points}katalog`,
   };
+}
+
+/** Programmteile eines Tabs vorab laden; bei einem Untermenü die seiner Bereiche. */
+function preloadEntry(e: NavEntry) {
+  (e.children ?? [e.key]).forEach((k) => tabViews[k]?.preload());
 }
 
 const titles = (): Record<View, string> => ({
@@ -172,8 +177,8 @@ function ThemeButton() {
   );
 }
 
-function Icon({ name }: { name: Tab }) {
-  const paths: Record<Tab, string> = {
+function Icon({ name }: { name: string }) {
+  const paths: Record<string, string> = {
     termine: 'M7 2v2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zm-2 7h14v10H5V9z',
     news: 'M4 4h13v14a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2V4zm15 4h1a1 1 0 0 1 1 1v9a2 2 0 0 1-4 0V8h2zM7 7v4h7V7H7zm0 6v1.5h7V13H7zm0 3v1.5h7V16H7z',
     galerie:
@@ -190,9 +195,12 @@ function Icon({ name }: { name: Tab }) {
     verwaltung:
       'M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3zm0 5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zm-4 9.5c.8-1.6 2.3-2.5 4-2.5s3.2.9 4 2.5',
   };
+  // Symbole der Untermenüs (Einstellungen → Navigation): Ordner wie „Intern“, Stern wie „Meins“
+  paths.ordner = paths.intern;
+  paths.stern = paths.meins;
   return (
     <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-      <path d={paths[name]} fill="currentColor" />
+      <path d={paths[name] ?? paths.intern} fill="currentColor" />
     </svg>
   );
 }
@@ -331,9 +339,9 @@ export default function App({ notice = null }: { notice?: string | null }) {
     mitglieder: membersAllowed,
     dienstgrade: ranksAllowed,
     punktekatalog: catalogAllowed,
-    // Intern: Startseite mit je einem Knopf für Mitglieder, Dokumente, Brett, Dienstgrade und Punktekatalog, mit dem Recht
-    // view_intern
-    intern: can('view_intern') && (docsAllowed || membersAllowed || boardVisible() || ranksAllowed || catalogAllowed),
+    // Intern bzw. ein Untermenü: unten aus der Navigation bestimmt
+    intern: false,
+    menue: false,
     // Eigene Daten (Mitglieder) und das Konto (alle Angemeldeten)
     meins: !!user,
     // Verwaltung: Mitgliederliste und Pflege (Punkte, Strafen, Dienstgrade …), dazu Schwarzes Brett, Umfragen und Inventar.
@@ -351,36 +359,44 @@ export default function App({ notice = null }: { notice?: string | null }) {
     einrichtung: can('manage_settings'),
     hilfe: true,
   };
-  // Das Brett zum Lesen (view_board); wer schreibt, hat es außerdem in der Verwaltung.
-  const internTabs: InternTab[] = INTERN.filter((v) => (v === 'brett' ? boardVisible() : allowed[v])).map((v) => ({
-    id: v,
-    label: internLabels()[v],
-  }));
+  // Tab-Leiste: eingerichtet (Einstellungen → Navigation, Issue #277) oder die Standardnavigation; nur, was die Person
+  // sehen darf. Das Brett zum Lesen (view_board); wer schreibt, hat es außerdem in der Verwaltung.
+  const navEntries = buildNav(config?.navigation, {
+    visible: (t: NavTarget) => (t === 'brett' ? boardVisible() : allowed[t]),
+    intern: can('view_intern'),
+    label: (t: NavTarget) => targetLabels()[t],
+  });
+  allowed.intern = navEntries.some((e) => e.key === 'intern');
   // „Meins“ ganz rechts, die Verwaltung davor.
-  // Mitglieder und Dokumente: mit dem Recht „Intern“ dort gesammelt, sonst je ein eigener Tab (z. B. Mitglieder für Gäste).
-  const tabs = (['termine', 'news', 'galerie', ...(allowed.intern ? ['intern'] : OWN_TABS), 'verwaltung', 'meins'] as Tab[]).filter(
-    (t) => allowed[t],
-  );
+  const fixed: NavEntry[] = (['verwaltung', 'meins'] as const)
+    .filter((t) => allowed[t])
+    .map((t) => ({ key: t, label: tabLabels()[t], icon: t, children: null }));
+  const tabs: NavEntry[] = [...navEntries, ...fixed];
   const requested = path[0] as View;
+  allowed.menue = requested === 'menue' && navEntries.some((e) => e.key === `menue/${path[1]}`);
   // Neue Installation ohne Bereiche: Der Admin landet direkt in der Einrichtung.
-  const start: View = tabs[0] ?? (config?.setupPending && allowed.einrichtung ? 'einrichtung' : 'installieren');
-  const tab: View = VIEWS.includes(requested) && allowed[requested] ? requested : start;
+  const start: string = tabs[0]?.key ?? (config?.setupPending && allowed.einrichtung ? 'einrichtung' : 'installieren');
+  const valid = VIEWS.includes(requested) && allowed[requested];
+  const tab: View = valid ? requested : (start.split('/')[0] as View);
+  // Untermenü (Intern oder eingerichtet), das gerade offen ist bzw. in dem der Bereich steht
+  const menuKey = valid ? (tab === 'intern' ? 'intern' : `menue/${path[1]}`) : start;
+  const openMenu = tab === 'intern' || tab === 'menue' ? navEntries.find((e) => e.key === menuKey) : undefined;
   // Schwarzes Brett, Umfragen, Inventar und Einstellungen gehören für alle, die sie pflegen, zur Verwaltung (Knopf dort, Tab unten).
   const adminView = ['brett', 'umfragen', 'inventar', 'einstellungen'].includes(tab) && adminTabs().some((t) => t.id === tab) ? tab : null;
   // „‹ Verwaltung“ nur auf der Seite, zu der der Knopf führt; Unterseiten haben ihren eigenen Rückweg.
   // brett/<id> (Ziel einer Benachrichtigung) ist dieselbe Seite wie brett.
   const adminStart = !!adminView && adminTabs().find((t) => t.id === adminView)?.route === (tab === 'brett' ? 'brett' : path.join('/'));
-  // Die Bereiche von „Intern“ gehören zu diesem Tab unten, wenn es ihn gibt; „‹ Intern“ auf ihrer ersten Seite,
-  // Unterseiten (ein Dokument, eine Person, Dokumente verwalten) haben ihren eigenen Rückweg. Wer am Brett schreibt,
-  // hat es in der Verwaltung (adminView), auch wenn er es über „Intern“ öffnet.
-  const internView = allowed.intern && !adminView && (INTERN as View[]).includes(tab);
-  const internStart =
+  // Die Bereiche eines Untermenüs („Intern“ oder eingerichtet) gehören zu diesem Tab unten; „‹ Intern“ bzw. „‹ <Name>“
+  // auf ihrer ersten Seite, Unterseiten (ein Dokument, eine Person, Dokumente verwalten) haben ihren eigenen Rückweg.
+  // Wer am Brett schreibt, hat es in der Verwaltung (adminView), auch wenn er es über das Untermenü öffnet.
+  const parentMenu = adminView ? undefined : menuOf(navEntries, tab);
+  const menuStart =
     tab === 'brett' ||
     tab === 'dienstgrade' ||
     tab === 'punktekatalog' ||
-    (tab === 'dokumente' && !path[1]) ||
+    (['termine', 'news', 'galerie', 'dokumente'].includes(tab) && !path[1]) ||
     (tab === 'mitglieder' && !/^\d+$/.test(path[1] ?? '') && !path[2]);
-  const activeTab: View = adminView ? 'verwaltung' : internView ? 'intern' : tab;
+  const activeTab: string = adminView ? 'verwaltung' : (parentMenu?.key ?? openMenu?.key ?? tab);
   // Gast öffnet einen geteilten Link auf eine Seite für Angemeldete: Hinweis; nach der Anmeldung geht sie auf (share.ts).
   const canLogin = config?.auth.mode === 'form' || !!config?.auth.loginUrl;
   const loginFirst = !user && canLogin && VIEWS.includes(requested) && requested !== 'anmelden' && !allowed[requested];
@@ -397,24 +413,24 @@ export default function App({ notice = null }: { notice?: string | null }) {
   }, []);
 
   // Daten eines Tabs; „Intern“ zeigt zuerst nur seine Knöpfe, geladen werden die Bereiche dahinter.
-  const sourcesOf = (t: Tab) => (t === 'intern' ? internTabs.flatMap((v) => tabSources(v.id as InternView)) : tabSources(t));
+  const sourcesOf = (t: NavEntry) => (t.children ? t.children.flatMap((v) => tabSources(v)) : tabSources(t.key as TabId));
   // Nach dem Start im Leerlauf die Daten der übrigen Tabs vorab laden (Issue #104), damit sie schon beim ersten Öffnen
   // ohne „Lädt …“ erscheinen. Nur einmal, in der Reihenfolge der Tab-Leiste; Bedingungen in viewData.ts und prefetch.ts.
   const idleStarted = useRef(false);
   useEffect(() => {
     if (idleStarted.current || !config) return;
     idleStarted.current = true;
-    const others = tabs.filter((t) => t !== activeTab);
+    const others = tabs.filter((t) => t.key !== activeTab);
     void prefetcher.idle(others.flatMap(sourcesOf));
     // Programmteile nur, wenn der Service Worker sie schon gespeichert hat (kein zusätzlicher Download im Leerlauf).
-    if (navigator.serviceWorker?.controller) void whenIdle().then(() => others.forEach((t) => tabViews[t]?.preload()));
+    if (navigator.serviceWorker?.controller) void whenIdle().then(() => others.forEach(preloadEntry));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // Beim Antippen eines Tabs (pointerdown, etwa 100–300 ms vor dem click) bzw. Fokus per Tastatur.
-  const prefetchTab = (t: Tab) => {
-    if (t === activeTab || prefetcher.blocked()) return;
+  const prefetchTab = (t: NavEntry) => {
+    if (t.key === activeTab || prefetcher.blocked()) return;
     void prefetcher.tap(sourcesOf(t));
-    tabViews[t]?.preload();
+    preloadEntry(t);
   };
 
   useEffect(() => {
@@ -461,18 +477,20 @@ export default function App({ notice = null }: { notice?: string | null }) {
   const docId = tab === 'dokumente' && /^\d+$/.test(path[1] ?? '') ? Number(path[1]) : undefined;
   const newsId = tab === 'news' && /^[A-Za-z0-9_-]+$/.test(path[1] ?? '') ? path[1] : undefined;
 
-  const pageUrl = shareUrl(config.appUrl, tab, requested, path);
+  const title = tab === 'menue' ? (openMenu?.label ?? titles().menue) : titles()[tab];
+  // Ist der Start ein Untermenü (menue/<n>), gehört seine Nummer in den Link.
+  const pageUrl = shareUrl(config.appUrl, valid ? tab : start, requested, path);
   const head = (
     <header className="topbar">
       <img src={logoUrl} alt="" className="logo" />
       <div className="topbar-text">
-        <div className="topbar-title">{caps(titles()[tab])}</div>
+        <div className="topbar-title">{caps(title)}</div>
         <div className="topbar-sub">{user ? greeting(user.name) : brand.name}</div>
       </div>
       {!['anmelden', 'einrichtung'].includes(tab) && (
         <button
           className="btn btn-link topbar-share"
-          onClick={() => void shareLink(pageUrl, `${brand.shortName}: ${caps(titles()[tab])}`, showToast)}
+          onClick={() => void shareLink(pageUrl, `${brand.shortName}: ${caps(title)}`, showToast)}
           aria-label="Link zu dieser Seite teilen"
           title="Link zu dieser Seite teilen"
         >
@@ -555,7 +573,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
                 </button>
               </div>
             )}
-            {!user && brand.guestWelcome && activeTab === tabs[0] && <p className="guest-welcome card">{brand.guestWelcome}</p>}
+            {!user && brand.guestWelcome && activeTab === tabs[0]?.key && <p className="guest-welcome card">{brand.guestWelcome}</p>}
             {tab === 'termine' &&
               (path[1] === 'verwalten' && features?.events && can('manage_events') ? (
                 <TermineVerwalten onToast={showToast} />
@@ -564,8 +582,10 @@ export default function App({ notice = null }: { notice?: string | null }) {
               ))}
             {tab === 'news' && <News id={newsId} />}
             {tab === 'galerie' && <Galerie albumId={albumId} />}
-            {tab === 'intern' && <InternMenu tabs={internTabs} />}
-            {internView && internStart && <InternBack />}
+            {openMenu?.children && (
+              <InternMenu label={openMenu.label} tabs={openMenu.children.map((v) => ({ id: v, label: targetLabels()[v] }))} />
+            )}
+            {parentMenu && menuStart && <MenuBack to={parentMenu.key} label={parentMenu.label} />}
             {tab === 'dokumente' &&
               (path[1] === 'verwalten' && can('manage_documents') ? (
                 <DokumenteVerwalten onToast={showToast} />
@@ -601,16 +621,16 @@ export default function App({ notice = null }: { notice?: string | null }) {
         <nav className="tabbar" aria-label="Hauptnavigation">
           {tabs.map((t) => (
             <button
-              key={t}
-              className={activeTab === t ? 'active' : ''}
-              aria-label={tabLabels()[t]}
-              onClick={() => navigate(t)}
+              key={t.key}
+              className={activeTab === t.key ? 'active' : ''}
+              aria-label={t.label}
+              onClick={() => navigate(t.key)}
               onPointerDown={() => prefetchTab(t)}
               onFocus={() => prefetchTab(t)}
-              aria-current={activeTab === t ? 'page' : undefined}
+              aria-current={activeTab === t.key ? 'page' : undefined}
             >
-              <Icon name={t} />
-              <span>{caps(tabLabels()[t])}</span>
+              <Icon name={t.icon} />
+              <span>{caps(t.label)}</span>
             </button>
           ))}
         </nav>
