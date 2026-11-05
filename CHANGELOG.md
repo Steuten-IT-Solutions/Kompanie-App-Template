@@ -40,6 +40,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Push-Dienst, wie Google es für sichtbare Benachrichtigungen empfiehlt. Mit normaler Dringlichkeit kann Android sie im
   Ruhezustand zurückhalten, z. B. die Benachrichtigung am Geburtstag am frühen Morgen.
 
+### Behoben
+
+- **Download-Seite mit langem Namen auf dem Handy**: Ein langer Kompaniename lief im Kopf der Download- und
+  Installationsseite über den Bildschirmrand, die Seite wurde breiter als das Handy. Der Name bricht jetzt um, Logo und
+  Überschrift sind auf schmalen Bildschirmen etwas kleiner.
+
 ## [0.5.0] – 2026-11-01
 
 ### Neu
