@@ -333,6 +333,7 @@ final class PushServiceTest extends TestCase
         $this->assertCount(1, $sent);
         $this->assertSame('aes128gcm', $sent[0]['headers']['Content-Encoding']);
         $this->assertSame('86400', $sent[0]['headers']['TTL']);
+        $this->assertSame('high', $sent[0]['headers']['Urgency'], 'jede Nachricht zeigt eine Benachrichtigung: hohe Priorität');
         $this->assertMatchesRegularExpression('/^vapid t=[^.]+\.[^.]+\.[^,]+, k=[A-Za-z0-9_-]{87}$/', $sent[0]['headers']['Authorization']);
         $msg = self::decrypt((string) $sent[0]['body'], $a);
         $this->assertSame('meins/strafen/7', $msg['route'], 'führt zum Eintrag (Issue #190)');
