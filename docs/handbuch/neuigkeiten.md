@@ -15,6 +15,7 @@ Tippe unten auf **{bereich.news}**.
 - **Beitrag**: Bild (falls vorhanden), Datum, Titel und eine kurze Vorschau des Textes.
 - **Ältere Beiträge** (unten): lädt weitere, ältere Beiträge nach. Der Knopf fehlt, wenn alle Beiträge zu sehen sind.
 - **Bei neuen Beiträgen benachrichtigen** (unten, nur ohne Anmeldung): führt zu den Benachrichtigungen.
+- **Neuer Beitrag** (oben): nur, wenn die {bereich.news} in der App geschrieben werden und du das Recht dazu hast (Hilfeseite „{bereich.news} schreiben“).
 
 ## So gehst du vor
 ### Einen Beitrag lesen
@@ -28,7 +29,7 @@ Tippe unten auf **{bereich.news}**.
 Bist du angemeldet, stellst du das unter **Meins** → **Konto** → **Benachrichtigungen einstellen** ein. Mehr dazu unter [Benachrichtigungen](seite:benachrichtigungen).
 
 ## Gut zu wissen
-- Die Beiträge kommen von einer Quelle, die ein {rolle.admin} festlegt, z. B. von der Webseite der {kompanie.name}.
+- Die Beiträge kommen von einer Quelle, die ein {rolle.admin} festlegt: von der Webseite der {kompanie.name}, aus einem Feed oder direkt aus der App.
 - Gibt es noch keine Beiträge, steht dort „Noch keine Neuigkeiten.“
 
 ## Siehe auch

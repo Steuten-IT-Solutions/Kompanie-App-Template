@@ -703,7 +703,7 @@ try {
     $c->ok($d->request('PATCH', '/admin/settings', ['calendar_ics_url' => 'ftp://x'])[0] === 400, 'Ungültige iCal-Adresse → 400');
     [$s, $set] = $d->request('PATCH', '/admin/settings', ['calendar_ics_url' => 'webcal://calendar.example.org/geheim/basic.ics', 'news_source' => 'rss', 'news_url' => 'https://example.org/feed']);
     $c->ok($s === 200 && $set['calendar']['ics_url_set'] === true && !str_contains((string) json_encode($set), 'geheim'), 'Geheime iCal-Adresse gespeichert, aber nicht zurückgegeben');
-    $c->ok($set['news'] === ['source' => 'rss', 'url' => 'https://example.org/feed'], 'Quelle der Neuigkeiten einstellbar');
+    $c->ok($set['news'] === ['source' => 'rss', 'url' => 'https://example.org/feed', 'sources' => ['none', 'wordpress', 'rss', 'app']], 'Quelle der Neuigkeiten einstellbar');
     $c->ok(json_decode((string) $kernel->db()->scalar("SELECT value FROM {settings} WHERE name = 'calendar_ics_url'")) === 'https://calendar.example.org/geheim/basic.ics', 'webcal:// wird als https:// gespeichert');
     $c->ok($d->request('PATCH', '/admin/settings', ['news_source' => 'none', 'calendar_ics_url' => ''])[1]['calendar']['source'] === 'none', 'Einstellungen lassen sich wieder leeren');
     $c->ok($d->request('POST', '/admin/gallery/sync')[0] === 503, 'Abgleich ohne Galerie → 503 not_configured');

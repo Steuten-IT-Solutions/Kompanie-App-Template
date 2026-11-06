@@ -4,7 +4,7 @@ reihenfolge: 100
 rechte: [manage_settings]
 variante: wordpress
 ---
-Läuft eure Webseite mit WordPress, installierst du die App als Plugin, also als Erweiterung von WordPress. Die App wird dann ein Teil der Webseite: Benutzer, Anmeldung und {bereich.news} kommen aus WordPress.
+Läuft eure Webseite mit WordPress, installierst du die App als Plugin, also als Erweiterung von WordPress. Die App wird dann ein Teil der Webseite: Benutzer, Anmeldung und anfangs auch die {bereich.news} kommen aus WordPress.
 
 ## Was du brauchst
 - WordPress ab Version 6.2 und PHP ab Version 8.1. PHP ist die Programmiersprache, in der WordPress und die App auf dem Server laufen; die Version lässt sich meist im Kundenmenü des Hosters umstellen.
@@ -36,7 +36,7 @@ In `[kompanie_mitglieder]` stehen bei Personen ohne Foto ihre Anfangsbuchstaben.
 - **Einstellungen:** Die Einstellungen der App findest du in der App unter **Verwaltung → Einstellungen**. Zusätzlich gibt es im WordPress-Backend unter *Einstellungen* eine Seite der App mit Wartungsmodus, Bereichen, Google-Zugang, {bereich.calendar}, {bereich.gallery} und dem Platzhalterbild. Sie hilft, wenn die App selbst nicht erreichbar ist.
 - **{rolle.admin}s:** {rolle.admin} in der App ist, wer in WordPress Administrator ist. Diese Rolle vergibst du nur in WordPress. Die Rolle anderer Personen wählst du in der App oder im WordPress-Benutzerprofil unter **Rolle in der App** (siehe [Rollen](seite:admin-rollen-und-mitglieder)). Wer in WordPress Benutzer anlegen darf (z. B. weil ein Plugin das einer Redakteursrolle gibt), darf das auch in der App und sieht damit E-Mail und Telefon der Mitglieder.
 - **Adresse:** Ohne „schöne“ Permalinks (die lesbaren Adressen von WordPress) läuft die App unter einer längeren Adresse; WordPress zeigt sie dann oben im Backend an. Für die kurze Adresse `/app/` wählst du unter **Einstellungen → Permalinks** z. B. „Beitragsname“.
-- **{bereich.news}:** Sie kommen immer aus den Beiträgen der Webseite; dafür gibt es nichts einzustellen.
+- **{bereich.news}:** Sie kommen aus den Beiträgen der Webseite; dafür gibt es nichts einzustellen. Wollt ihr sie lieber in der App schreiben, wählt das unter [{bereich.news} einrichten](seite:admin-neuigkeiten).
 
 - **HTTPS:** Die Webseite sollte nur über `https://` laufen, sonst gehen Passwörter und Daten der Mitglieder unverschlüsselt durchs Netz. Das Zertifikat (und HSTS) richten WordPress bzw. der Hoster für die ganze Webseite ein.
 

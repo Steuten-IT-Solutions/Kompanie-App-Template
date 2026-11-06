@@ -621,7 +621,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
               ) : (
                 <Termine focus={path[1] === 'termin' ? focusId(path[2]) : undefined} />
               ))}
-            {tab === 'news' && <News id={newsId} />}
+            {tab === 'news' && <News id={newsId} onToast={showToast} />}
             {tab === 'galerie' &&
               (path[1] === 'einreichen' && can('submit_gallery') ? (
                 <GalerieEinreichungen mode="einreichen" onToast={showToast} />

@@ -846,17 +846,46 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/NewsItem' }
+    post:
+      tags: [News]
+      summary: Beitrag in der App schreiben (nur mit der Quelle app)
+      description: |
+        Nur wenn die News in der App geschrieben werden (Einstellung `news_source` = `app`, siehe `/admin/settings`),
+        sonst 409 `not_in_app`. Der Text ist formatiert (RichText wie bei den Seiten, Bilder über `/rich-images`); das erste
+        Bild ist das Vorschaubild (`image`). Datum ist der Zeitpunkt des Anlegens. Danach prüft der Server gleich, ob es
+        Benachrichtigungen „News: neue Beiträge“ gibt.
+      x-capability: manage_news
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, maxLength: 150 }
+                body: { type: string, description: Formatierter Text (wird bereinigt) }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NewsItem' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
 
   /news/{id}:
     parameters:
       - name: id
         in: path
         required: true
-        description: Kennung aus der News-Quelle (bei WordPress die Beitrags-ID).
+        description: Kennung aus der News-Quelle (bei WordPress die Beitrags-ID, bei Beiträgen der App deren Nummer).
         schema: { type: string, pattern: '^[A-Za-z0-9_-]+$' }
     get:
       tags: [News]
       summary: Einzelne Neuigkeit mit Inhalt (HTML)
+      description: 'Mit der Quelle app bekommt, wer manage_news hat, zusätzlich updated_at und updated_by_name.'
       security: []
       responses:
         '200':
@@ -865,6 +894,40 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/NewsItem' }
         '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [News]
+      summary: Beitrag der App ändern (Titel, Text)
+      description: 'Nur mit der Quelle app (sonst 409 `not_in_app`); id ist eine Zahl. Mit updated_at (Stand, den die App geladen hat): 409 `conflict`, wenn jemand dazwischen gespeichert hat. Bilder, die nicht mehr im Text stehen, werden gelöscht. Das Datum bleibt.'
+      x-capability: manage_news
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string, maxLength: 150 }
+                body: { type: string }
+                updated_at: { type: string, format: date-time }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NewsItem' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [News]
+      summary: Beitrag der App samt Bildern löschen
+      x-capability: manage_news
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
 
   /gallery:
     get:
@@ -5230,7 +5293,7 @@ paths:
                 gallery_source: { type: string, enum: [drive, server], description: 'Quelle der Galerie: Google Drive oder eigener Server (nur Alben der App und hochgeladene Bilder). Der Wechsel zu server entfernt Alben und Bilder aus Drive aus der App; hochgeladene bleiben.' }
                 gallery_store: { type: string, enum: [server], description: Ablageort für hochgeladene Bilder (heute nur der eigene Server) }
                 gallery_downloads: { type: string, enum: ['0', '1'], description: 'Knöpfe zum Herunterladen in der Galerie zeigen (1) oder nicht (0, Vorgabe): je Bild in der Großansicht und je Album als ZIP' }
-                news_source: { type: string, enum: [none, wordpress, rss], description: Nur eigenständige Version }
+                news_source: { type: string, enum: [none, wordpress, rss, site, app], description: 'Quelle der News, erlaubt sind die Werte aus news.sources: WordPress-Plugin site (Beiträge der eigenen Seite) oder app (in der App geschrieben); eigenständige Version none, wordpress, rss oder app. Beim Wechsel bleiben die Beiträge der anderen Quelle gespeichert; mit app entsteht die Standardrolle „News verwalten“ (member, manage_news), beim Wechsel weg verschwindet sie, wenn niemand sie hat.' }
                 news_url: { type: string, description: Nur eigenständige Version }
                 legal_imprint_url: { type: string, description: 'Link auf das Impressum (http:// oder https://, höchstens 255 Zeichen); leer entfernt ihn' }
                 legal_privacy_url: { type: string, description: 'Link auf die Datenschutzerklärung (http:// oder https://, höchstens 255 Zeichen); leer entfernt ihn' }
@@ -5275,7 +5338,7 @@ paths:
   /admin/news/test:
     post:
       tags: [Einstellungen]
-      summary: Quelle der Neuigkeiten ohne Zwischenspeicher abrufen (nur eigenständige Version)
+      summary: Quelle der Neuigkeiten ohne Zwischenspeicher abrufen (Webseite, Feed oder Beiträge der App)
       x-capability: manage_settings
       responses:
         '200':
@@ -6989,8 +7052,16 @@ components:
               type: object
               description: Stand des letzten Abgleichs (albums, photos, new, pending, last_sync, error)
         news:
-          type: [object, 'null']
-          description: null, wenn die Neuigkeiten aus den Beiträgen der WordPress-Seite kommen.
+          type: object
+          description: 'Quelle der News. Ältere WordPress-Fassungen lieferten null.'
+          required: [source, url, sources]
+          properties:
+            source: { type: string, enum: [none, wordpress, rss, site, app] }
+            url: { type: string, description: 'Adresse von Webseite oder Feed (nur eigenständige Version, sonst leer)' }
+            sources:
+              type: array
+              description: 'Mögliche Quellen dieser Installation: WordPress site, app; eigenständig none, wordpress, rss, app'
+              items: { type: string, enum: [none, wordpress, rss, site, app] }
         legal:
           type: object
           description: 'Links auf Impressum und Datenschutzerklärung (Einstellungen → Impressum und Datenschutz); leer, solange keiner eingetragen ist'
@@ -6998,9 +7069,6 @@ components:
           properties:
             imprint_url: { type: string }
             privacy_url: { type: string }
-          properties:
-            source: { type: string, enum: [none, wordpress, rss] }
-            url: { type: string }
 
     Level:
       type: string
@@ -7039,7 +7107,7 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, view_personal, manage_personal, create_users, promote_users, view_activity, manage_settings] }
+              items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, view_activity, manage_settings] }
               description: 'Rechte der Rolle, jedes für sich (member schließt nichts ein); bei admin alle; vergebbar sind alle außer view_activity und manage_settings. Rechte zum Verwalten und view_own_* nur zusammen mit member. guest gilt auch ohne Anmeldung.'
             users: { type: integer, description: 'Anzahl der Personen mit dieser Rolle, als Grundrolle oder als Zusatzrolle' }
             extra_users: { type: integer, description: Davon als Zusatzrolle }
@@ -7052,7 +7120,7 @@ components:
         label: { type: string, maxLength: 30 }
         capabilities:
           type: array
-          items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, view_personal, manage_personal, create_users, promote_users] }
+          items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users] }
           description: 'Jedes Recht für sich. Rechte zum Verwalten und view_own_* nur zusammen mit member; die übrigen Rechte zum Sehen gehen auch allein (wie bei Anwärtern). guest: nur Rechte zum Sehen ohne member; member: immer member, sonst nur Rechte zum Sehen; admin: nicht änderbar.'
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
         new_accounts: { type: boolean, description: 'Nur eigene Rollen: beim Anlegen von Konten wählbar' }
@@ -7072,7 +7140,7 @@ components:
           type: array
           items:
             type: string
-            enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, view_personal, manage_personal, create_users, promote_users, view_activity, manage_settings]
+            enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, view_activity, manage_settings]
           description: 'Wirksame Rechte aller Rollen zusammen (Grundrolle und Zusatzrollen); member bringt calendar mit.'
 
     ErrorLog:
@@ -7175,6 +7243,9 @@ components:
           oneOf:
             - $ref: '#/components/schemas/Navigation'
             - type: 'null'
+        newsInApp:
+          type: boolean
+          description: 'News werden in der App geschrieben (Quelle app, Bereich news an); wer manage_news hat, sieht die Knöpfe dazu'
         pages:
           type: array
           description: 'Eigene Seiten (Issue #287), die die Person lesen darf, in ihrer Reihenfolge (Kacheln unter Seiten); leer mit Bereich pages aus'
@@ -7358,8 +7429,10 @@ components:
         date: { type: string, description: 'ISO 8601 (UTC); leer, wenn die Quelle kein lesbares Datum liefert' }
         excerpt: { type: string }
         image: { type: [string, 'null'] }
-        link: { type: string }
+        link: { type: string, description: Adresse auf der Webseite; leer bei Beiträgen der App }
         content: { type: string, description: Nur bei der Einzelansicht }
+        updated_at: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app, mit manage_news: Stand für PATCH' }
+        updated_by_name: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app, mit manage_news' }
 
     GalleryAlbumSummary:
       type: object
@@ -7743,7 +7816,7 @@ components:
     GrantableCapability:
       type: string
       description: Recht, das sich einer Rolle oder einer Person geben lässt (alle außer `manage_settings`).
-      enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, view_personal, manage_personal, create_users, promote_users]
+      enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users]
 
     MemberRights:
       type: object

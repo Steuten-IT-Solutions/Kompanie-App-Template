@@ -21,6 +21,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Einzahl bekommen (z. B. „Königshaus“). Über einer einzelnen gemeinsamen Amtszeit steht dann „Königshaus 2026–2028“
   statt „Königshäuser 2026–2028“. Einzutragen in der Verwaltung der Ämter unter *Gruppen → Bearbeiten*; ohne Einzahl
   bleibt es wie bisher.
+- **News direkt in der App schreiben**: Unter *Einstellungen → Neuigkeiten* gibt es die Quelle *In der App schreiben*,
+  mit WordPress und ohne. Dann steht unter News der Knopf *Neuer Beitrag*: Titel und formatierter Text mit Bildern,
+  das erste Bild erscheint auch in der Liste. Beiträge lassen sich später bearbeiten und löschen; wer News abonniert
+  hat, bekommt bei einem neuen Beitrag eine Benachrichtigung. Schreiben darf, wer das neue Recht *News schreiben* hat;
+  mit der Quelle legt die App die Rolle „News verwalten“ an. Es gilt immer eine Quelle, Beiträge der Webseite oder
+  eines Feeds und der App werden nicht gemischt; beim Wechsel bleibt alles gespeichert. Wer die News von der Webseite
+  oder aus einem Feed bezieht, merkt nichts davon.
 
 ### Geändert
 

@@ -95,6 +95,8 @@ enum Capability: string
     case SubmitGallery = 'submit_gallery';
     /** Einreichungen sehen, freigeben (öffentlich oder intern), ablehnen und freigegebene wieder entfernen (Issue #286). */
     case ReviewGallery = 'review_gallery';
+    /** News in der App schreiben, bearbeiten und löschen (nur mit der Quelle „In der App“, NewsService). */
+    case ManageNews = 'manage_news';
     /** Eigene Seiten anlegen, bearbeiten, sortieren und löschen (Bereich Seiten, Issue #287). */
     case ManagePages = 'manage_pages';
     /**
