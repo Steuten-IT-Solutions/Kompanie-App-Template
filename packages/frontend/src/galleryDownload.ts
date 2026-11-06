@@ -1,25 +1,39 @@
 import type { GalleryAlbum, GalleryPhoto } from './api';
-import { albumFileName, downloadablePhotos, fetchPhoto, photoFileName, uniqueNames } from './downloadFiles';
+import {
+  albumFileName,
+  downloadablePhotos,
+  fetchMedia,
+  isVideoEntry,
+  mediaFileName,
+  storedZip,
+  uniqueNames,
+  ZIP_MAX_BYTES,
+} from './downloadFiles';
 import { saveFile } from './saveFile';
 
 /**
- * Herunterladen aus der Galerie (Einstellung „Knöpfe zum Herunterladen zeigen“): ein Bild aus der Großansicht oder ein
- * ganzes Album als ZIP. Geladen wird die Originalauflösung (die App liefert sie als JPEG), sonst die 1600er. Videos
- * liegen nicht auf dem Server (sie kommen beim Abspielen aus Google Drive) und fehlen deshalb. Das ZIP entsteht im
- * Browser, damit kein langer Lauf auf dem Webspace nötig ist; die Bilder werden dabei nicht noch einmal gepackt.
+ * Herunterladen aus der Galerie (Einstellung „Knöpfe zum Herunterladen zeigen“): ein Bild oder Video aus der Großansicht
+ * oder ein ganzes Album als ZIP. Bilder kommen in Originalauflösung (die App liefert sie als JPEG), sonst als 1600er;
+ * Videos unverändert aus der Quelle, Stück für Stück über die App (downloadFiles.ts). Das ZIP entsteht im Browser, damit
+ * kein langer Lauf auf dem Webspace nötig ist; die Dateien werden dabei nicht noch einmal gepackt.
  */
 
-export async function downloadPhoto(photo: GalleryPhoto, index: number): Promise<void> {
-  const blob = await fetchPhoto(photo);
-  await saveFile(blob, photoFileName(photo, index), { mime: 'image/jpeg' });
+export async function downloadMedia(
+  photo: GalleryPhoto,
+  index: number,
+  onProgress?: (loaded: number, total: number) => void,
+): Promise<void> {
+  const blob = await fetchMedia(photo, undefined, onProgress);
+  const video = isVideoEntry(photo);
+  await saveFile(blob, mediaFileName(photo, index), { mime: video ? photo.mime || 'video/mp4' : 'image/jpeg' });
 }
 
-/** Höchstens so viele Bilder gleichzeitig laden (der Server erzeugt Originale nur in wenigen Anfragen zugleich). */
+/** Höchstens so viele Dateien gleichzeitig laden (der Server erzeugt Originale nur in wenigen Anfragen zugleich). */
 const PARALLEL = 2;
 
 /**
- * Alle Bilder eines Albums als ZIP. onProgress bekommt die Zahl der geladenen Bilder. Bilder, die gerade nicht zu laden
- * sind, fehlen; ihre Zahl steht im Ergebnis. Ist gar keines zu laden, ein Fehler.
+ * Alle Bilder und Videos eines Albums als ZIP. onProgress bekommt die Zahl der geladenen Dateien. Was gerade nicht zu
+ * laden ist, fehlt; die Zahl steht im Ergebnis. Ist gar nichts zu laden, ein Fehler. Über 4 GB bricht es ab.
  */
 export async function downloadAlbum(
   album: GalleryAlbum,
@@ -27,47 +41,30 @@ export async function downloadAlbum(
   signal?: AbortSignal,
 ): Promise<{ saved: number; missing: number }> {
   const photos = downloadablePhotos(album.photos);
-  const names = uniqueNames(photos.map((p, i) => photoFileName(p, i)));
+  const names = uniqueNames(photos.map((p, i) => mediaFileName(p, i)));
   const blobs: (Blob | null)[] = new Array(photos.length).fill(null);
   let next = 0;
   let done = 0;
+  let bytes = 0;
+  const tooBig = new Error('Das Album ist zu groß für ein ZIP (über 4 GB). Lade die Videos einzeln in der Großansicht herunter.');
   onProgress(0, photos.length);
   const worker = async () => {
     while (next < photos.length) {
       const i = next++;
       try {
-        blobs[i] = await fetchPhoto(photos[i], signal);
+        const blob = await fetchMedia(photos[i], signal);
+        bytes += blob.size;
+        if (bytes > ZIP_MAX_BYTES) throw tooBig;
+        blobs[i] = blob;
       } catch (e) {
-        if ((e as Error).name === 'AbortError') throw e;
+        if ((e as Error).name === 'AbortError' || e === tooBig) throw e;
       }
       onProgress(++done, photos.length);
     }
   };
   await Promise.all(Array.from({ length: Math.min(PARALLEL, photos.length) }, worker));
-  const saved = blobs.filter((b) => b !== null).length;
-  if (saved === 0) throw new Error('Die Bilder lassen sich gerade nicht laden. Bitte später erneut versuchen.');
-
-  // Gespeichert, nicht gepackt (JPEG ist schon gepackt): schnell und ohne Rechenlast auf dem Handy.
-  const { Zip, ZipPassThrough } = await import('fflate');
-  const chunks: Uint8Array[] = [];
-  const zip = new Zip();
-  const finished = new Promise<void>((resolve, reject) => {
-    zip.ondata = (err, chunk, final) => {
-      if (err) return reject(err);
-      chunks.push(chunk);
-      if (final) resolve();
-    };
-  });
-  for (let i = 0; i < photos.length; i++) {
-    const blob = blobs[i];
-    if (!blob) continue;
-    const entry = new ZipPassThrough(names[i]);
-    zip.add(entry);
-    entry.push(new Uint8Array(await blob.arrayBuffer()), true);
-    blobs[i] = null;
-  }
-  zip.end();
-  await finished;
-  await saveFile(new Blob(chunks as BlobPart[], { type: 'application/zip' }), albumFileName(album), { title: album.title });
-  return { saved, missing: photos.length - saved };
+  const files = photos.flatMap((_, i) => (blobs[i] ? [{ name: names[i], blob: blobs[i]! }] : []));
+  if (files.length === 0) throw new Error('Die Dateien lassen sich gerade nicht laden. Bitte später erneut versuchen.');
+  await saveFile(await storedZip(files), albumFileName(album), { title: album.title });
+  return { saved: files.length, missing: photos.length - files.length };
 }

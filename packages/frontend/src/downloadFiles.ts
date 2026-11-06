@@ -18,6 +18,23 @@ export function photoFileName(photo: Pick<GalleryPhoto, 'name'>, index: number):
   return `${safeFileName(base, `Bild ${index + 1}`)}.jpg`;
 }
 
+/** Dateiname eines Videos: der Name aus der Galerie mit seiner Endung (das Video kommt unverändert aus der Quelle). */
+export function videoFileName(photo: Pick<GalleryPhoto, 'name' | 'mime'>, index: number): string {
+  const name = safeFileName(photo.name ?? '', '');
+  if (/\.[A-Za-z0-9]{1,5}$/.test(name)) return name;
+  const ext = photo.mime === 'video/webm' ? '.webm' : '.mp4';
+  return `${name || `Video ${index + 1}`}${ext}`;
+}
+
+/** Dateiname eines Eintrags der Galerie (Bild oder Video). */
+export function mediaFileName(photo: GalleryPhoto, index: number): string {
+  return isVideoEntry(photo) ? videoFileName(photo, index) : photoFileName(photo, index);
+}
+
+export function isVideoEntry(photo: Pick<GalleryPhoto, 'type' | 'video'>): boolean {
+  return photo.type === 'video' && !!photo.video;
+}
+
 /** Name des ZIP: „Titel Jahr.zip“. */
 export function albumFileName(album: Pick<GalleryAlbum, 'title' | 'year'>): string {
   return `${safeFileName(`${album.title} ${album.year}`, 'Album')}.zip`;
@@ -36,9 +53,9 @@ export function uniqueNames(names: string[]): string[] {
   });
 }
 
-/** Bilder eines Albums, die sich herunterladen lassen (ohne Videos). */
+/** Bilder und Videos eines Albums, die sich herunterladen lassen. */
 export function downloadablePhotos(photos: GalleryPhoto[]): GalleryPhoto[] {
-  return photos.filter((p) => p.type !== 'video' && !!(p.original || p.large));
+  return photos.filter((p) => (p.type === 'video' ? !!p.video : !!(p.original || p.large)));
 }
 
 /**
@@ -58,4 +75,149 @@ export async function fetchPhoto(photo: GalleryPhoto, signal?: AbortSignal): Pro
     if (res.status === 200 && (res.headers.get('content-type') ?? '').startsWith('image/')) return res.blob();
   }
   throw new Error('Das Bild lässt sich gerade nicht laden. Ist es noch nicht fertig aufbereitet, später erneut versuchen.');
+}
+
+const wait = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener('abort', () => {
+      clearTimeout(t);
+      reject(new DOMException('Abgebrochen', 'AbortError'));
+    });
+  });
+
+/** So oft fragt die App einen Ausschnitt erneut an (Server gerade ausgelastet: 503, oder die Verbindung riss ab). */
+const VIDEO_RETRIES = 5;
+
+/**
+ * Ein Video als Datei. Der Server reicht Videos in Ausschnitten (höchstens 4 MB, Antwort 206 mit Content-Range) aus der
+ * Quelle durch und speichert sie nicht; die App fragt deshalb Stück für Stück an, bis das Video vollständig ist.
+ * onProgress bekommt geladene und gesamte Bytes.
+ */
+export async function fetchVideo(
+  photo: GalleryPhoto,
+  onProgress?: (loaded: number, total: number) => void,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  const url = photo.video;
+  const failed = () => new Error('Das Video lässt sich gerade nicht laden. Bitte später erneut versuchen.');
+  if (!url) throw failed();
+  const parts: Blob[] = [];
+  let from = 0;
+  let total = -1;
+  let retries = 0;
+  while (total < 0 || from < total) {
+    let res: Response;
+    try {
+      res = await fetch(url, { credentials: 'same-origin', signal, headers: { Range: `bytes=${from}-` } });
+    } catch (e) {
+      if ((e as Error).name === 'AbortError' || ++retries > VIDEO_RETRIES) throw (e as Error).name === 'AbortError' ? e : failed();
+      await wait(1000, signal);
+      continue;
+    }
+    if ((res.status === 503 || res.status === 502) && ++retries <= VIDEO_RETRIES) {
+      await wait(1000, signal);
+      continue;
+    }
+    if (res.status === 200) return res.blob(); // ganz auf einmal (z. B. ein Server ohne Ausschnitte)
+    const size = /\/(\d+)\s*$/.exec(res.headers.get('content-range') ?? '');
+    if (res.status !== 206 || !size) throw failed();
+    const part = await res.blob();
+    if (part.size === 0) throw failed();
+    total = Number(size[1]);
+    parts.push(part);
+    from += part.size;
+    retries = 0;
+    onProgress?.(from, total);
+  }
+  return new Blob(parts, { type: photo.mime || 'video/mp4' });
+}
+
+/** Bild oder Video als Datei. */
+export function fetchMedia(photo: GalleryPhoto, signal?: AbortSignal, onProgress?: (loaded: number, total: number) => void): Promise<Blob> {
+  return isVideoEntry(photo) ? fetchVideo(photo, onProgress, signal) : fetchPhoto(photo, signal);
+}
+
+let crcTable: Uint32Array | null = null;
+
+/** CRC-32 (wie in ZIP), über die Datei in Stücken gelesen. */
+export async function crc32(blob: Blob): Promise<number> {
+  if (!crcTable) {
+    crcTable = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      crcTable[n] = c >>> 0;
+    }
+  }
+  const table = crcTable;
+  let crc = 0xffffffff;
+  const reader = blob.stream().getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    for (let i = 0; i < value.length; i++) crc = table[(crc ^ value[i]) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+/** Größte Größe eines ZIP ohne die Erweiterung ZIP64 (4 GB); größere Alben lädt man in Teilen. */
+export const ZIP_MAX_BYTES = 0xffffffff;
+
+/**
+ * ZIP ohne Packen („stored“: Bilder und Videos sind schon gepackt). Die Dateien werden nicht kopiert: Das Ergebnis setzt
+ * sich aus den Kopfdaten und den Dateien selbst zusammen, so braucht auch ein großes Album kaum zusätzlichen Speicher.
+ */
+export async function storedZip(files: { name: string; blob: Blob }[], date = new Date()): Promise<Blob> {
+  const enc = new TextEncoder();
+  const time = (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2);
+  const day = ((Math.max(1980, date.getFullYear()) - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate();
+  const parts: BlobPart[] = [];
+  const central: BlobPart[] = [];
+  let offset = 0;
+  let cdSize = 0;
+  if (files.length > 0xffff) throw new Error('Zu viele Dateien für ein ZIP.');
+  for (const f of files) {
+    const name = enc.encode(f.name);
+    const crc = await crc32(f.blob);
+    const size = f.blob.size;
+    if (offset + 30 + name.length + size > ZIP_MAX_BYTES) throw new Error('Das Album ist zu groß für ein ZIP (über 4 GB).');
+    const local = new DataView(new ArrayBuffer(30));
+    local.setUint32(0, 0x04034b50, true);
+    local.setUint16(4, 20, true);
+    local.setUint16(6, 0x0800, true); // Namen in UTF-8
+    local.setUint16(8, 0, true);
+    local.setUint16(10, time, true);
+    local.setUint16(12, day, true);
+    local.setUint32(14, crc, true);
+    local.setUint32(18, size, true);
+    local.setUint32(22, size, true);
+    local.setUint16(26, name.length, true);
+    local.setUint16(28, 0, true);
+    parts.push(local.buffer, name as Uint8Array<ArrayBuffer>, f.blob);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true);
+    c.setUint16(4, 20, true);
+    c.setUint16(6, 20, true);
+    c.setUint16(8, 0x0800, true);
+    c.setUint16(10, 0, true);
+    c.setUint16(12, time, true);
+    c.setUint16(14, day, true);
+    c.setUint32(16, crc, true);
+    c.setUint32(20, size, true);
+    c.setUint32(24, size, true);
+    c.setUint16(28, name.length, true);
+    c.setUint32(42, offset, true);
+    central.push(c.buffer, name as Uint8Array<ArrayBuffer>);
+    offset += 30 + name.length + size;
+    cdSize += 46 + name.length;
+  }
+  if (offset + cdSize + 22 > ZIP_MAX_BYTES) throw new Error('Das Album ist zu groß für ein ZIP (über 4 GB).');
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true);
+  end.setUint16(8, files.length, true);
+  end.setUint16(10, files.length, true);
+  end.setUint32(12, cdSize, true);
+  end.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, end.buffer], { type: 'application/zip' });
 }

@@ -19,7 +19,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **{bereich.ga
 - **Letzter Abgleich: …**: erscheint, wenn beim letzten Abgleich etwas schiefging, mit der Meldung.
 - **Jetzt abgleichen**: liest den Ordner sofort ein (erscheint, sobald ein Ordner eingetragen ist).
 - **… Bilder ließen sich nicht laden – anzeigen**: erscheint nur, wenn Bilder nicht geladen werden konnten.
-- **Knöpfe zum Herunterladen zeigen**: Ist der Haken gesetzt, kann jeder, der die {bereich.gallery} sieht, Bilder herunterladen: jedes Bild in der Großansicht und jedes Album als ZIP. Ohne Haken (Vorgabe) gibt es diese Knöpfe nicht.
+- **Knöpfe zum Herunterladen zeigen**: Ist der Haken gesetzt, kann jeder, der die {bereich.gallery} sieht, Bilder und Videos herunterladen: jedes einzeln in der Großansicht und jedes Album als ZIP. Ohne Haken (Vorgabe) gibt es diese Knöpfe nicht.
 - **Speichern**: übernimmt Quelle, Link und den Haken für die Knöpfe zum Herunterladen.
 - **Alben und eigene Bilder**: alle Alben mit der Zahl der Bilder aus Drive und der hochgeladenen, darunter **Neues Album in der App** mit **Titel**, **Jahr** und **Album anlegen**.
 
@@ -49,7 +49,7 @@ Bei einem Album der App änderst du darunter **Titel des Albums** und **Jahr des
 
 ### Herunterladen erlauben
 1. Setze den Haken **Knöpfe zum Herunterladen zeigen** und tippe auf **Speichern**.
-2. In jedem Album steht dann **Album herunterladen (… Bilder, ZIP)**, in der Großansicht oben rechts neben **✕** ein Knopf mit Pfeil nach unten.
+2. In jedem Album steht dann **Album herunterladen (… Bilder · … Videos, ZIP)**, in der Großansicht oben rechts neben **✕** ein Knopf mit Pfeil nach unten.
 3. Zum Abschalten nimmst du den Haken wieder heraus und tippst auf **Speichern**.
 
 ### Bilder ansehen, die sich nicht laden ließen
@@ -67,7 +67,7 @@ Bei einem Album der App änderst du darunter **Titel des Albums** und **Jahr des
 - Die App speichert Videos nicht auf dem Server, sie spielt sie beim Ansehen aus Google Drive ab. Nur ihr Vorschaubild kommt von Google und liegt neben den Bildern.
 - Videos starten schneller, wenn sie „fürs Web optimiert“ gespeichert sind. Viele Handys legen das Inhaltsverzeichnis eines Videos ans Ende der Datei; dann muss der Browser vor dem Start erst dorthin springen. Abhilfe: das Video vor dem Hochladen mit einem Programm wie HandBrake (Häkchen „Web Optimized“) neu speichern. Kurze Videos und eine kleinere Auflösung (z. B. 1080p statt 4K) laden ebenfalls schneller.
 - Kann der Server ein Format nicht lesen (z. B. RAW, TIFF, HEIC), nimmt die App das in RAW-Dateien eingebettete JPEG oder das Vorschaubild von Google. In der Liste bleiben vor allem beschädigte Dateien.
-- Heruntergeladen wird jedes Bild als JPG in voller Auflösung (höchstens 8192 Pixel), ohne Metadaten wie den Aufnahmeort. Videos sind nicht dabei, weil sie nicht auf dem Server liegen. Interne Bilder laden nur {rolle.member} herunter, so wie nur sie sie sehen. Wer ein Bild heruntergeladen hat, kann es weitergeben; schalte die Knöpfe nur ein, wenn das für eure Bilder in Ordnung ist.
+- Heruntergeladen wird jedes Bild als JPG in voller Auflösung (höchstens 8192 Pixel), ohne Metadaten wie den Aufnahmeort. Videos kommen unverändert aus Google Drive; die App reicht sie dabei Stück für Stück durch, wie beim Abspielen, und speichert sie nicht. Ein ZIP darf höchstens 4 GB groß werden. Interne Bilder und Videos laden nur {rolle.member} herunter, so wie nur sie sie sehen. Wer eine Datei heruntergeladen hat, kann es weitergeben; schalte die Knöpfe nur ein, wenn das für eure Bilder in Ordnung ist.
 - Die {bereich.gallery} erscheint für die anderen erst, wenn der Bereich an ist und ein Ordner eingetragen oder die Quelle **Eigener Server** gewählt ist (siehe [Bereiche](seite:admin-bereiche)).
 - Wie der Abgleich zuletzt lief, zeigt auch die Ampel unter [Zustand und Updates](seite:admin-zustand).
 - Mit WordPress gibt es dieselbe Einstellung auch im WordPress-Backend auf der Seite der App (Feld „Galerie-Ordner“, Knopf **Galerie speichern**).

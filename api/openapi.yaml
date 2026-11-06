@@ -7429,7 +7429,7 @@ components:
           type: boolean
           description: |
             Knöpfe zum Herunterladen zeigen (Einstellung `gallery_downloads`): je Bild in der Großansicht und das Album als ZIP.
-            Die App lädt dafür `original` (sonst `large`) und packt das ZIP selbst; Videos sind nicht dabei.
+            Die App lädt dafür bei Bildern `original` (sonst `large`), bei Videos `video` in Ausschnitten mit Range, und packt das ZIP selbst.
         photos:
           type: array
           items: { $ref: '#/components/schemas/GalleryPhoto' }
