@@ -15,6 +15,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.6.0] – 2026-11-06
+
 ### Neu
 
 - **Bilder aus der Galerie herunterladen**: Unter *Einstellungen → Galerie* schaltest du mit *Knöpfe zum
