@@ -5,7 +5,17 @@
  */
 
 /** Bereiche, die in der Navigation stehen können (wie NavigationService::TARGETS im Kern), in der Standardreihenfolge. */
-export const NAV_TARGETS = ['termine', 'news', 'galerie', 'mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog'] as const;
+export const NAV_TARGETS = [
+  'termine',
+  'news',
+  'galerie',
+  'sponsoren',
+  'mitglieder',
+  'dokumente',
+  'brett',
+  'dienstgrade',
+  'punktekatalog',
+] as const;
 export type NavTarget = (typeof NAV_TARGETS)[number];
 
 /** Symbole für Untermenüs (wie NavigationService::ICONS). */
@@ -14,6 +24,7 @@ export const NAV_ICONS = [
   'termine',
   'news',
   'galerie',
+  'sponsoren',
   'mitglieder',
   'dokumente',
   'brett',
@@ -57,7 +68,7 @@ export function buildNav(setting: NavigationSetting | null | undefined, ctx: Nav
   const view = (t: NavTarget): NavEntry => ({ key: t, label: ctx.label(t), icon: t, children: null });
   if (!setting) {
     // Standard: Mitglieder und Dokumente mit dem Recht „Intern“ dort gesammelt, sonst je ein eigener Tab.
-    const main: NavEntry[] = (['termine', 'news', 'galerie'] as NavTarget[]).filter(ctx.visible).map(view);
+    const main: NavEntry[] = (['termine', 'news', 'galerie', 'sponsoren'] as NavTarget[]).filter(ctx.visible).map(view);
     const intern = INTERN_TARGETS.filter(ctx.visible);
     if (ctx.intern && intern.length > 0) main.push({ key: 'intern', label: 'Intern', icon: 'intern', children: intern });
     else main.push(...OWN_TABS.filter(ctx.visible).map(view));
@@ -87,11 +98,16 @@ export function menuOf(entries: NavEntry[], target: string): NavEntry | undefine
   return entries.find((e) => e.children?.includes(target as NavTarget));
 }
 
-/** Entwurf für die Seite Einstellungen → Navigation: die gespeicherte Einstellung oder die Standardnavigation. */
-export function draftOf(setting: NavigationSetting | null | undefined): NavigationSetting {
+/**
+ * Entwurf für die Seite Einstellungen → Navigation: die gespeicherte Einstellung oder die Standardnavigation. Ist der
+ * Bereich Sponsoren aus (on), fehlt er im Entwurf, damit er keinen der Hauptpunkte belegt; wird er später
+ * eingeschaltet, erscheint er hinten in der Leiste wie jeder Bereich, den die Einstellung nicht kennt.
+ */
+export function draftOf(setting: NavigationSetting | null | undefined, on: (t: NavTarget) => boolean = () => true): NavigationSetting {
   if (setting)
     return { items: setting.items.map((i) => (typeof i === 'string' ? i : { ...i, items: [...i.items] })), hidden: [...setting.hidden] };
-  return { items: ['termine', 'news', 'galerie', { label: 'Intern', icon: 'ordner', items: [...INTERN_TARGETS] }], hidden: [] };
+  const main: NavTarget[] = ['termine', 'news', 'galerie', ...(on('sponsoren') ? (['sponsoren'] as NavTarget[]) : [])];
+  return { items: [...main, { label: 'Intern', icon: 'ordner', items: [...INTERN_TARGETS] }], hidden: [] };
 }
 
 /** Bereiche, die im Entwurf nirgends stehen (neu dazugekommen): Sie erscheinen hinten in der Leiste. */

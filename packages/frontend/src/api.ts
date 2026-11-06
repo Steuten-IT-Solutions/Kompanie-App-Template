@@ -48,6 +48,7 @@ export type Capability =
   | 'manage_offices'
   | 'manage_lists'
   | 'send_mail'
+  | 'manage_sponsors'
   | 'view_personal'
   | 'manage_personal'
   | 'create_users'
@@ -72,7 +73,8 @@ export type Feature =
   | 'directory'
   | 'offices'
   | 'lists'
-  | 'mail';
+  | 'mail'
+  | 'sponsors';
 
 export interface AppUser {
   id: number;
@@ -1223,6 +1225,16 @@ export interface AttendanceGroup {
   counts_as: Level | null;
 }
 
+/** Sponsor (Issue #279): Name (auch Alternativtext), Link (nur https, leer ohne), Logo. */
+export interface Sponsor {
+  id: number;
+  name: string;
+  url: string;
+  /** Adresse des Logos (wechselt mit jedem Logo); null ohne */
+  logo_url: string | null;
+  logo_type: 'png' | 'svg' | null;
+}
+
 export interface Title {
   id: number;
   title: string;
@@ -1925,6 +1937,15 @@ export const api = {
 
   // Ämter (Issue #112): Zeitstrahl öffentlich, Pflege mit manage_offices
   offices: () => request<OfficesOverview>('GET', '/offices'),
+
+  // Sponsoren (Issue #279)
+  sponsors: () => request<Sponsor[]>('GET', '/sponsors'),
+  createSponsor: (data: { name: string; url: string }) => request<Sponsor>('POST', '/sponsors', data),
+  updateSponsor: (id: number, data: { name?: string; url?: string }) => request<Sponsor>('PATCH', `/sponsors/${id}`, data),
+  deleteSponsor: (id: number) => request<{ deleted: boolean }>('DELETE', `/sponsors/${id}`),
+  reorderSponsors: (ids: number[]) => request<Sponsor[]>('PUT', '/sponsors/order', { ids }),
+  uploadSponsorLogo: async (id: number, file: File) => request<Sponsor>('POST', `/sponsors/${id}/logo`, { file: await encodeFile(file) }),
+  removeSponsorLogo: (id: number) => request<Sponsor>('DELETE', `/sponsors/${id}/logo`),
   createOfficeGroup: (title: string) => request<OfficeGroup>('POST', '/office-groups', { title }),
   updateOfficeGroup: (id: number, title: string) => request<OfficeGroup>('PATCH', `/office-groups/${id}`, { title }),
   deleteOfficeGroup: (id: number) => request<{ deleted: boolean }>('DELETE', `/office-groups/${id}`),

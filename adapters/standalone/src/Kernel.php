@@ -39,6 +39,7 @@ use KompanieApp\Core\Storage\Sql\PdoConnection;
  *   /dokument/<id>?v=…       Dokument         (index.php?r=/dokument/…&v=…)
  *   /abzeichen/<id>?v=…&s=…  Abzeichen        (index.php?r=/abzeichen/…&v=…&s=…)
  *   /mitgliedsfoto/<id>?v=…&s=… Foto eines Mitglieds (index.php?r=/mitgliedsfoto/…&v=…&s=…)
+ *   /sponsorlogo/<id>?v=…    Logo eines Sponsors (index.php?r=/sponsorlogo/…&v=…)
  *   /bild/<kennung>          Bild in formatiertem Inhalt (index.php?r=/bild/…)
  *   /anhang/<kennung>        Dateianhang (index.php?r=/anhang/…), immer als Download
  *   /sicherung               Datensicherung herunterladen, nur Admins (index.php?r=/sicherung)
@@ -346,6 +347,10 @@ final class Kernel
         } elseif (preg_match('#^/mitgliedsfoto/(\d+)$#', $path, $m)) {
             $this->beginPreview();
             $this->sendMemberPhoto((int) $m[1]);
+        } elseif (preg_match('#^/sponsorlogo/(\d+)$#', $path, $m)) {
+            $this->beginPreview();
+            $app = $this->app();
+            $this->sendBody($app->sponsors()->logoForDelivery($app->authContext->currentUser(), (int) $m[1], is_string($_GET['v'] ?? null) ? $_GET['v'] : null));
         } elseif (preg_match('#^/bild/([a-f0-9]{32})$#', $path, $m)) {
             $this->beginPreview();
             $app = $this->app();

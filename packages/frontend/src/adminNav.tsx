@@ -15,6 +15,7 @@ const canAttendance = (): boolean => !!config?.features.attendance && can('manag
 const canOffices = (): boolean => !!config?.features.offices && can('manage_offices');
 const canLists = (): boolean => !!config?.features.lists && can('manage_lists');
 const canMail = (): boolean => !!config?.features.mail && can('send_mail');
+const canSponsors = (): boolean => !!config?.features.sponsors && can('manage_sponsors');
 
 /** Mitgliederliste: für alle, die Punkte oder Strafen vergeben, Dienstgrade, Titel oder Anwesenheit pflegen, Mitglieder
  * anlegen oder Rollen vergeben. */
@@ -50,6 +51,7 @@ export function adminTabs(): AdminTab[] {
       { id: 'befoerderungen', label: 'Beförderungen', on: canRanks() && !!config?.features.points },
       { id: 'titel', label: sec.titles, on: canTitles(), group: SETUP },
       { id: 'aemter', label: sec.offices, on: canOffices(), group: SETUP },
+      { id: 'sponsoren', label: sec.sponsors, on: canSponsors(), group: SETUP },
       { id: 'anwesenheit', label: sec.attendance, on: canAttendance() },
       { id: 'brett', label: sec.board, on: canPostBoard(), route: 'brett' },
       { id: 'umfragen', label: sec.polls, on: canManagePolls(), route: 'umfragen/verwalten' },
@@ -166,6 +168,10 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
       <circle cx="8.5" cy="10" r="1.5" />
       <path d="M21 16l-5-5-8 8" />
     </>
+  ),
+  // Sponsoren: als Bereich in einem Untermenü und als Knopf der Verwaltung
+  sponsoren: (
+    <path d="M12 20.5l-1.3-1.2C5.9 15 3 12.2 3 8.8 3 6.1 5.1 4 7.7 4c1.6 0 3.2.8 4.3 2 1.1-1.2 2.7-2 4.3-2C18.9 4 21 6.1 21 8.8c0 3.4-2.9 6.2-7.7 10.5z" />
   ),
   mitglieder: (
     <>

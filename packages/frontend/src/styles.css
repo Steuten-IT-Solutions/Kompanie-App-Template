@@ -5704,3 +5704,75 @@ button.spotlight-person:focus-visible {
   cursor: pointer;
   padding: 4px 0;
 }
+
+/* Sponsoren (Issue #279): Logos auf hellen Kacheln, damit dunkle Logos auch im dunklen Modus lesbar bleiben. */
+.sponsor-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+.sponsor-card {
+  background: #fff;
+  color: #1d1d1f;
+  aspect-ratio: 3 / 2;
+  display: flex;
+  overflow: hidden;
+}
+.sponsor-card > a,
+.sponsor-card > .sponsor-logo,
+.sponsor-card > .sponsor-name {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.sponsor-card .sponsor-logo {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.sponsor-card > a > .sponsor-logo {
+  width: 100%;
+  height: 100%;
+}
+.sponsor-name {
+  font-weight: 600;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.sponsor-card > img.sponsor-logo {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}
+.sponsor-admin-logo {
+  flex: 0 0 72px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  color: #1d1d1f;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  font-size: 0.75rem;
+  overflow: hidden;
+}
+.sponsor-admin-logo .sponsor-logo {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.sponsor-admin-logo .sponsor-name {
+  padding: 2px 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -46,6 +46,7 @@ tags:
   - name: Termine
   - name: News
   - name: Galerie
+  - name: Sponsoren
   - name: Verwaltung
   - name: Schwarzes Brett
   - name: Umfragen
@@ -2531,6 +2532,153 @@ paths:
       x-capability: manage_attendance
       responses:
         '200': { $ref: '#/components/responses/Deleted' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /sponsors:
+    get:
+      tags: [Sponsoren]
+      summary: Sponsoren in ihrer Reihenfolge (Issue #279)
+      description: Bereich `sponsors` aus → 403 `feature_disabled`. Ohne Anmeldung die Rechte der Rolle guest.
+      x-capability: 'view_sponsors oder manage_sponsors'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Sponsor' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Sponsoren]
+      summary: Sponsor anlegen (kommt ans Ende der Liste)
+      x-capability: manage_sponsors
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 100, description: 'Mehrfache Leerzeichen werden zu einem' }
+                url: { type: string, maxLength: 255, description: 'Nur https://…, leer ohne Link' }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sponsor' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /sponsors/order:
+    put:
+      tags: [Sponsoren]
+      summary: Reihenfolge der Sponsoren
+      x-capability: manage_sponsors
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, items: { type: integer }, description: Alle IDs in der gewünschten Reihenfolge }
+      responses:
+        '200':
+          description: Neue Liste
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Sponsor' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /sponsors/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Sponsoren]
+      summary: Name oder Link ändern
+      x-capability: manage_sponsors
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 100 }
+                url: { type: string, maxLength: 255 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sponsor' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Sponsoren]
+      summary: Sponsor samt Logo löschen
+      x-capability: manage_sponsors
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /sponsors/{id}/logo:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Sponsoren]
+      summary: Logo hochladen oder ersetzen
+      description: |
+        PNG, JPG, WebP oder SVG, höchstens 2 MB, Base64 im JSON. Geprüft werden Endung und Signatur (Rasterbilder
+        höchstens 4096 × 4096 Pixel). Rasterbilder werden zu einem PNG mit höchstens 512 Pixeln an der längeren Kante
+        (nie vergrößert, Transparenz bleibt). SVGs werden bereinigt gespeichert (keine Skripte, keine Verweise nach
+        außen). Das Logo liegt in der Datenbank und ist Teil der Datensicherung; die Fassung in `logo_url` ändert sich.
+      x-capability: manage_sponsors
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: object
+                  required: [name, data]
+                  properties:
+                    name: { type: string, description: 'Dateiname; die Endung (.png, .jpg, .jpeg, .webp, .svg) bestimmt das Format' }
+                    data: { type: string, description: 'Inhalt Base64-kodiert (auch als data:-Adresse)' }
+      responses:
+        '200':
+          description: Der Sponsor mit Logo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sponsor' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Sponsoren]
+      summary: Logo entfernen
+      x-capability: manage_sponsors
+      responses:
+        '200':
+          description: Der Sponsor ohne Logo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sponsor' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
@@ -5869,7 +6017,7 @@ components:
       properties:
         key:
           type: string
-          enum: [events, calendar, news, gallery, points, penalties, ranks, titles, attendance, documents, board, polls, birthdays, inventory, directory, offices, lists, mail]
+          enum: [events, calendar, news, gallery, points, penalties, ranks, titles, attendance, documents, board, polls, birthdays, inventory, directory, offices, lists, mail, sponsors]
         label: { type: string, description: Bezeichnung (aus kompanie.json oder Standard) }
         description: { type: string, description: Ein Satz, wofür der Bereich da ist }
         enabled: { type: boolean }
@@ -5976,7 +6124,7 @@ components:
                 required: [label, icon, items]
                 properties:
                   label: { type: string, minLength: 1, maxLength: 24, description: Name des Untermenüs (Klartext) }
-                  icon: { type: string, enum: [ordner, termine, news, galerie, mitglieder, dokumente, brett, dienstgrade, punktekatalog, stern] }
+                  icon: { type: string, enum: [ordner, termine, news, galerie, sponsoren, mitglieder, dokumente, brett, dienstgrade, punktekatalog, stern] }
                   items: { type: array, minItems: 1, maxItems: 12, items: { $ref: '#/components/schemas/NavigationTarget' } }
         hidden:
           type: array
@@ -5985,7 +6133,7 @@ components:
     NavigationTarget:
       type: string
       description: Bereich der App, der in der Navigation stehen kann
-      enum: [termine, news, galerie, mitglieder, dokumente, brett, dienstgrade, punktekatalog]
+      enum: [termine, news, galerie, sponsoren, mitglieder, dokumente, brett, dienstgrade, punktekatalog]
     NavigationAdmin:
       type: object
       required: [navigation, targets, icons, max_main, max_menu_items, label_max]
@@ -6141,7 +6289,7 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, view_personal, manage_personal, create_users, promote_users, view_activity, manage_settings] }
+              items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, view_personal, manage_personal, create_users, promote_users, view_activity, manage_settings] }
               description: 'Rechte der Rolle, jedes für sich (member schließt nichts ein); bei admin alle; vergebbar sind alle außer view_activity und manage_settings. Rechte zum Verwalten und view_own_* nur zusammen mit member. guest gilt auch ohne Anmeldung.'
             users: { type: integer, description: 'Anzahl der Personen mit dieser Rolle, als Grundrolle oder als Zusatzrolle' }
             extra_users: { type: integer, description: Davon als Zusatzrolle }
@@ -6154,7 +6302,7 @@ components:
         label: { type: string, maxLength: 30 }
         capabilities:
           type: array
-          items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, view_personal, manage_personal, create_users, promote_users] }
+          items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, view_personal, manage_personal, create_users, promote_users] }
           description: 'Jedes Recht für sich. Rechte zum Verwalten und view_own_* nur zusammen mit member; die übrigen Rechte zum Sehen gehen auch allein (wie bei Anwärtern). guest: nur Rechte zum Sehen ohne member; member: immer member, sonst nur Rechte zum Sehen; admin: nicht änderbar.'
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
         new_accounts: { type: boolean, description: 'Nur eigene Rollen: beim Anlegen von Konten wählbar' }
@@ -6174,7 +6322,7 @@ components:
           type: array
           items:
             type: string
-            enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, view_personal, manage_personal, create_users, promote_users, view_activity, manage_settings]
+            enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, view_personal, manage_personal, create_users, promote_users, view_activity, manage_settings]
           description: 'Wirksame Rechte aller Rollen zusammen (Grundrolle und Zusatzrollen); member bringt calendar mit.'
 
     ErrorLog:
@@ -6336,6 +6484,7 @@ components:
             offices: { type: boolean }
             lists: { type: boolean }
             mail: { type: boolean }
+            sponsors: { type: boolean }
         user:
           oneOf:
             - $ref: '#/components/schemas/AppUser'
@@ -6820,7 +6969,7 @@ components:
     GrantableCapability:
       type: string
       description: Recht, das sich einer Rolle oder einer Person geben lässt (alle außer `manage_settings`).
-      enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, view_personal, manage_personal, create_users, promote_users]
+      enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, view_personal, manage_personal, create_users, promote_users]
 
     MemberRights:
       type: object
@@ -7210,6 +7359,18 @@ components:
         offices_new: { type: integer }
         terms_new: { type: integer }
         applied: { type: boolean }
+
+    Sponsor:
+      type: object
+      required: [id, name, url, logo_url, logo_type]
+      properties:
+        id: { type: integer }
+        name: { type: string, maxLength: 100, description: 'Name, zugleich Alternativtext des Logos' }
+        url: { type: string, maxLength: 255, description: 'Link zur Seite des Sponsors (nur https), leer ohne' }
+        logo_url:
+          type: [string, 'null']
+          description: 'Adresse des Logos (`/sponsorlogo/<id>?v=<Fassung>`, öffentlich und lange zwischengespeichert, solange Gäste `view_sponsors` haben); null ohne Logo'
+        logo_type: { type: [string, 'null'], enum: [png, svg, null] }
 
     Title:
       type: object

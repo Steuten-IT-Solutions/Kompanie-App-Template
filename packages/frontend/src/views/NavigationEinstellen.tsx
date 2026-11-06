@@ -24,6 +24,7 @@ const FEATURES: Record<NavTarget, Feature[]> = {
   termine: ['events', 'calendar', 'birthdays'],
   news: ['news'],
   galerie: ['gallery'],
+  sponsoren: ['sponsors'],
   mitglieder: ['directory', 'offices'],
   dokumente: ['documents'],
   brett: ['board'],
@@ -36,6 +37,7 @@ const ICON_LABELS: Record<string, string> = {
   termine: 'Kalender',
   news: 'Zeitung',
   galerie: 'Bild',
+  sponsoren: 'Herz',
   mitglieder: 'Personen',
   dokumente: 'Dokument',
   brett: 'Brett',
@@ -67,7 +69,7 @@ function Editor({
   onSaved: (d: NavigationAdmin) => void;
   onToast: (msg: string) => void;
 }) {
-  const [draft, setDraft] = useState<NavigationSetting>(() => draftOf(data.navigation));
+  const [draft, setDraft] = useState<NavigationSetting>(() => draftOf(data.navigation, isOn));
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const labels = targetLabels();

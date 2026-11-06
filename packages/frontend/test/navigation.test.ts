@@ -22,16 +22,16 @@ const ctx = (visible: NavTarget[], intern = false): NavContext => ({
 });
 const keys = (e: { key: string }[]) => e.map((x) => x.key);
 
-test('Standard mit dem Recht Intern: Termine, News, Galerie und Intern mit seinen Bereichen', () => {
+test('Standard mit dem Recht Intern: Termine, News, Galerie, Sponsoren und Intern mit seinen Bereichen', () => {
   const nav = buildNav(null, ctx([...NAV_TARGETS], true));
-  assert.deepEqual(keys(nav), ['termine', 'news', 'galerie', 'intern']);
-  assert.deepEqual(nav[3].children, ['mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog']);
+  assert.deepEqual(keys(nav), ['termine', 'news', 'galerie', 'sponsoren', 'intern']);
+  assert.deepEqual(nav[4].children, ['mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog']);
   assert.equal(menuOf(nav, 'dokumente')?.key, 'intern');
   assert.equal(menuOf(nav, 'termine'), undefined);
 });
 
 test('Standard ohne das Recht Intern: Mitglieder und Dokumente als eigene Tabs, der Rest nicht', () => {
-  assert.deepEqual(keys(buildNav(null, ctx([...NAV_TARGETS]))), ['termine', 'news', 'galerie', 'mitglieder', 'dokumente']);
+  assert.deepEqual(keys(buildNav(null, ctx([...NAV_TARGETS]))), ['termine', 'news', 'galerie', 'sponsoren', 'mitglieder', 'dokumente']);
   assert.deepEqual(keys(buildNav(undefined, ctx(['mitglieder', 'brett']))), ['mitglieder'], 'nur Sichtbares');
   assert.deepEqual(keys(buildNav(null, ctx(['termine'], true))), ['termine'], 'Intern ohne sichtbaren Bereich entfällt');
 });
@@ -55,8 +55,11 @@ test('Eigene Navigation: Reihenfolge, Untermenüs, ausgeblendete und neue Bereic
 });
 
 test('Entwurf: Standard als Ausgangspunkt, verschieben, Untermenü entfernen, prüfen', () => {
-  let d = draftOf(null);
-  assert.deepEqual(unplaced(d), []);
+  assert.deepEqual(draftOf(null).items.slice(0, 4), ['termine', 'news', 'galerie', 'sponsoren']);
+  assert.deepEqual(unplaced(draftOf(null)), []);
+  // Sponsoren aus: nicht im Entwurf, belegt keinen Hauptpunkt
+  let d = draftOf(null, (t) => t !== 'sponsoren');
+  assert.deepEqual(unplaced(d), ['sponsoren']);
   assert.equal(placeOf(d, 'dokumente'), 0);
   d = moveTo(d, 'dokumente', 'main');
   assert.equal(placeOf(d, 'dokumente'), 'main');

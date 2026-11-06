@@ -80,6 +80,12 @@ final class WpEnvironment implements Environment
         return $url . (str_contains($url, '?') ? '&' : '?') . 'v=' . rawurlencode($version) . '&s=' . $size;
     }
 
+    public function sponsorLogoUrl(int $id, string $version): string
+    {
+        $url = $this->appUrl('sponsorlogo/' . $id);
+        return $url . (str_contains($url, '?') ? '&' : '?') . 'v=' . rawurlencode($version);
+    }
+
     public function memberPhotoUrl(int $userId, string $version, int $size): string
     {
         $url = $this->appUrl('mitgliedsfoto/' . $userId);

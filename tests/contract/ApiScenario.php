@@ -56,6 +56,7 @@ final class ApiScenario
             $this->offices();
             $this->lists();
             $this->mails();
+            $this->sponsors();
             $this->activity();
             $this->accounts();
             $this->formerMembers();
@@ -109,7 +110,7 @@ final class ApiScenario
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Ausgeschalteter Bereich → 403 feature_disabled');
 
         $this->d->actAs($admin);
-        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true, 'directory' => true, 'offices' => true, 'lists' => true, 'mail' => true];
+        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true, 'directory' => true, 'offices' => true, 'lists' => true, 'mail' => true, 'sponsors' => true];
         [$s, $d] = $this->req('PUT', '/admin/features', $all);
         $c->ok($s === 200 && !in_array(false, array_column((array) $d, 'enabled', 'key'), true), 'Alle Bereiche einschalten');
 
@@ -1375,6 +1376,49 @@ final class ApiScenario
         [$s, $d] = $this->req('GET', '/mails/options');
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
         $this->req('PUT', '/admin/features', ['mail' => true]);
+    }
+
+    /**
+     * Sponsoren (Issue #279): Liste für alle mit view_sponsors (anfangs auch ohne Anmeldung), Pflege mit manage_sponsors,
+     * Logo als PNG (verkleinert) mit eigener Adresse, Reihenfolge, Links nur mit https.
+     */
+    private function sponsors(): void
+    {
+        $c = $this->c;
+        $c->section('Sponsoren');
+        $admin = $this->user('kptest_sponsor_admin', 'admin');
+        $m = $this->user('kptest_sponsor_m', 'member');
+        $this->d->actAs($m);
+        $c->ok($this->req('GET', '/sponsors')[0] === 200, 'Mitglied sieht die Sponsoren');
+        $c->ok($this->req('POST', '/sponsors', ['name' => 'Kptest'])[0] === 403, 'Ohne manage_sponsors → 403');
+        $this->d->actAs(null);
+        $c->ok($this->req('GET', '/sponsors')[0] === 200, 'Auch ohne Anmeldung sichtbar');
+        $c->ok($this->req('POST', '/sponsors', ['name' => 'Kptest'])[0] === 401, 'Pflegen ohne Anmeldung → 401');
+
+        $this->d->actAs($admin);
+        [$s, $a] = $this->req('POST', '/sponsors', ['name' => 'Kptest Bäckerei', 'url' => 'https://example.org/']);
+        $c->ok($s === 201 && ($a['url'] ?? '') === 'https://example.org/' && array_key_exists('logo_url', (array) $a) && $a['logo_url'] === null, 'Sponsor anlegen');
+        [, $b] = $this->req('POST', '/sponsors', ['name' => 'Kptest Autohaus']);
+        $c->ok($this->req('POST', '/sponsors', ['name' => 'Kptest', 'url' => 'http://example.org/'])[0] === 400, 'Link ohne https → 400');
+        $ids = array_column((array) $this->req('GET', '/sponsors')[1], 'id');
+        $mine = [(int) ($a['id'] ?? 0), (int) ($b['id'] ?? 0)];
+        $others = array_values(array_diff($ids, $mine));
+        [$s, $d] = $this->req('PUT', '/sponsors/order', ['ids' => [...$others, $mine[1], $mine[0]]]);
+        $c->ok($s === 200 && array_slice(array_column((array) $d, 'id'), -2) === [$mine[1], $mine[0]], 'Reihenfolge ändern');
+        [$s, $d] = $this->req('POST', "/sponsors/{$mine[0]}/logo", ['file' => ['name' => 'logo.png', 'data' => self::pngBase64()]]);
+        $c->ok($s === 200 && ($d['logo_type'] ?? '') === 'png' && str_contains((string) ($d['logo_url'] ?? ''), 'sponsorlogo/' . $mine[0]), 'Logo (PNG) hochladen');
+        $c->ok($this->req('POST', "/sponsors/{$mine[0]}/logo", ['file' => ['name' => 'logo.gif', 'data' => base64_encode('GIF89a')]])[0] === 400, 'Falsches Format → 400');
+        [$s, $d] = $this->req('PATCH', "/sponsors/{$mine[1]}", ['url' => 'https://example.com/']);
+        $c->ok($s === 200 && ($d['name'] ?? '') === 'Kptest Autohaus' && ($d['url'] ?? '') === 'https://example.com/', 'Link ändern, Name bleibt');
+        [, $roles] = $this->req('GET', '/admin/roles');
+        $c->ok((array_column((array) $roles, 'capabilities', 'key')['sponsors'] ?? null) === self::caps(['member', 'manage_sponsors']), 'Standardrolle „Sponsoren verwalten“');
+        $this->req('PUT', '/admin/features', ['sponsors' => false]);
+        [$s, $d] = $this->req('GET', '/sponsors');
+        $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
+        $this->req('PUT', '/admin/features', ['sponsors' => true]);
+        [$s, $d] = $this->req('DELETE', "/sponsors/{$mine[0]}/logo");
+        $c->ok($s === 200 && array_key_exists('logo_url', (array) $d) && $d['logo_url'] === null, 'Logo entfernen');
+        $c->ok($this->req('DELETE', "/sponsors/{$mine[0]}")[0] === 200 && $this->req('DELETE', "/sponsors/{$mine[1]}")[0] === 200 && $this->req('PATCH', "/sponsors/{$mine[0]}", ['name' => 'x'])[0] === 404, 'Aufräumen: Sponsoren löschen');
     }
 
     /**

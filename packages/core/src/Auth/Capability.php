@@ -87,6 +87,8 @@ enum Capability: string
     case ManageLists = 'manage_lists';
     /** E-Mails aus der Verwaltung schreiben und versenden, Verlauf mit Versandprotokoll sehen (Bereich E-Mails). */
     case SendMail = 'send_mail';
+    /** Sponsoren pflegen: anlegen, ändern, Logo hochladen, sortieren, löschen (Bereich Sponsoren, Issue #279). */
+    case ManageSponsors = 'manage_sponsors';
     /**
      * Persönliche Angaben anderer sehen: Adresse, Handynummer, E-Mail-Adresse und das ganze Geburtsdatum (in der
      * Verwaltung auf der Seite der Person). Die eigenen sieht jede Person unter Meins → Konto.

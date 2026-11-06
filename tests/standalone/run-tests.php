@@ -354,6 +354,21 @@ try {
     $doc = $d->send('GET', $base . 'index.php?r=/dokument/1&v=x', [], null);
     $c->ok(in_array($doc[0], [401, 404], true) && ($doc[2]['x-content-type-options'] ?? '') === 'nosniff', 'Dokument ohne Anmeldung → kein Inhalt');
 
+    $c->section('Logos der Sponsoren (Auslieferung, Issue #279)');
+    $d->actAs($anna);
+    $d->request('PUT', '/admin/features', ['sponsors' => true]);
+    [, $sponsor] = $d->request('POST', '/sponsors', ['name' => 'Kpsa Sponsor']);
+    $svgLogo = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 10"><script>alert(1)</script><rect width="20" height="10"/></svg>';
+    [$s, $sponsor] = $d->request('POST', '/sponsors/' . ($sponsor['id'] ?? 0) . '/logo', ['file' => ['name' => 'logo.svg', 'data' => base64_encode($svgLogo)]]);
+    $logoUrl = (string) ($sponsor['logo_url'] ?? '');
+    $c->ok($s === 200 && str_starts_with($logoUrl, $base . 'index.php?r=/sponsorlogo/' . ($sponsor['id'] ?? 0) . '&v='), 'Logo hochgeladen, Adresse im Bereich der App');
+    $anon = $d->send('GET', $logoUrl, [], null);
+    $c->ok($anon[0] === 200 && ($anon[2]['content-type'] ?? '') === 'image/svg+xml' && str_starts_with((string) ($anon[2]['cache-control'] ?? ''), 'public')
+        && ($anon[2]['content-security-policy'] ?? '') === "default-src 'none'; style-src 'unsafe-inline'; sandbox", 'Logo ohne Anmeldung: öffentlich, SVG mit strenger CSP');
+    $c->ok(!str_contains((string) file_get_contents($logoUrl), 'script'), 'Ausgeliefert wird das bereinigte SVG');
+    $c->ok($d->send('GET', $base . 'index.php?r=/sponsorlogo/999999', [], null)[0] === 404, 'Unbekanntes Logo → 404');
+    $d->request('DELETE', '/sponsors/' . ($sponsor['id'] ?? 0));
+
     $c->section('Abzeichen der Dienstgrade (Auslieferung)');
     $d->actAs($anna);
     [, $badgeRank] = $d->request('POST', '/ranks', ['title' => 'Kpsa Abzeichen ' . bin2hex(random_bytes(2))]);

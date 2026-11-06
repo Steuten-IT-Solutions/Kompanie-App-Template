@@ -15,7 +15,7 @@ const SHOTS = process.env.KOMPANIE_SCREENSHOT_DIR;
 const MANAGER = 'Verwaltung';
 
 /** Bereiche, die unter „Einrichtungen“ stehen, sobald es davon mindestens zwei gibt. */
-const SETUP = ['Punktekatalog', 'Dienstgrade', 'Titel', 'Ämter'];
+const SETUP = ['Punktekatalog', 'Dienstgrade', 'Titel', 'Ämter', 'Sponsoren'];
 
 /** Startseite der Verwaltung (Tab unten) öffnen und dort den Knopf eines Bereichs wählen (ggf. über „Einrichtungen“). */
 async function adminMenu(page: Page, name: string) {
@@ -3965,6 +3965,55 @@ test('Punktekatalog und Dienstgrade per Ziehen am Griff umsortieren, Schwellen w
   for (const title of ranks) {
     page.once('dialog', (d) => void d.accept());
     await page.locator('.card-list .row', { hasText: title }).getByRole('button', { name: 'Löschen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  }
+});
+
+test('Sponsoren (Issue #279): anlegen mit Link und Logo, Gast sieht sie ohne Anmeldung, löschen', async ({ page }) => {
+  // 64 × 32 Pixel, transparenter Hintergrund mit rotem Rechteck
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAYAAACinX6EAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAR0lEQVRo3u3SMQ0AIAxFwYKQ6sD/hA6MgIgODL0T0OS/NAIA6GpUD+zM+3PAOqe0YXb/AAEEEEAAAQQQQAABBBBAAAEAADp5dzgEIAd9ksQAAAAASUVORK5CYII=',
+    'base64',
+  );
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Sponsoren');
+  const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neuer Sponsor' }) });
+  await form.getByLabel('Name').fill('Bäckerei Test');
+  await form.getByLabel('Link (optional)').fill('http://baeckerei.example/');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.getByRole('alert')).toContainText('https://');
+  await form.getByLabel('Link (optional)').fill('https://baeckerei.example/');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Sponsor angelegt');
+  const row = page.locator('.row', { has: page.getByText('Bäckerei Test', { exact: true }) });
+  await expect(row).toContainText('https://baeckerei.example/');
+  const chooser = page.waitForEvent('filechooser');
+  await row.getByRole('button', { name: 'Logo hochladen' }).click();
+  await (await chooser).setFiles({ name: 'logo.png', mimeType: 'image/png', buffer: png });
+  await expect(page.locator('.toast')).toHaveText('Logo gespeichert');
+  await expect(row.locator('img[alt="Bäckerei Test"]')).toBeVisible();
+  await shot(page, 'sponsoren-verwalten');
+
+  try {
+    // Neu laden ohne Anmeldung (ein Sprung nur im Anker # lädt die Seite nicht neu)
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
+    await page.locator('.tabbar').getByRole('button', { name: 'Sponsoren' }).click();
+    const link = page.locator('.sponsor-grid a', { has: page.locator('img[alt="Bäckerei Test"]') });
+    await expect(link).toHaveAttribute('href', 'https://baeckerei.example/');
+    await expect(link).toHaveAttribute('rel', 'sponsored noopener noreferrer');
+    await expect.poll(() => page.evaluate(() => document.querySelector<HTMLImageElement>('.sponsor-grid img')?.naturalWidth ?? 0)).toBe(64);
+    await expect(page.locator('.tabbar').getByRole('button', { name: 'Sponsoren' })).toHaveAttribute('aria-current', 'page');
+    await shot(page, 'sponsoren');
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD);
+    await adminMenu(page, 'Sponsoren');
+    page.once('dialog', (d) => d.accept());
+    await page
+      .locator('.row', { has: page.getByText('Bäckerei Test', { exact: true }) })
+      .getByRole('button', { name: 'Löschen' })
+      .click();
     await expect(page.locator('.toast')).toHaveText('Gelöscht');
   }
 });
