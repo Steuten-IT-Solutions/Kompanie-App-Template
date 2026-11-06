@@ -160,7 +160,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 | `Scheduler` | wiederkehrende Aufgaben | WP-Cron | Pseudo-Cron, optional Cronjob |
 | `NewsSource` | Neuigkeiten | eigene Beiträge | fremde WordPress-Seite, RSS oder keine |
 
-Unabhängig vom Adapter kann der Admin als Quelle „In der App schreiben“ wählen (`news_source` = `app`, `Domain\NewsService`, Tabelle `app_news` ab Migration 45, Bilder in `rich_images` mit Besitzer `news`). Dann liest die App aus `AppNewsSource` statt aus dem `NewsSource` des Adapters; es gilt immer genau eine Quelle (kein Mischen). Schreiben mit `manage_news`, Standardrolle „News verwalten“ (`member`, `manage_news`) entsteht beim Wechsel auf `app`.
+Unabhängig vom Adapter kann der Admin als Quelle „In der App schreiben“ wählen (`news_source` = `app`, `Domain\NewsService`, Tabelle `app_news` ab Migration 46, Bilder in `rich_images` mit Besitzer `news`). Dann liest die App aus `AppNewsSource` statt aus dem `NewsSource` des Adapters; es gilt immer genau eine Quelle (kein Mischen). Schreiben mit `manage_news`, Standardrolle „News verwalten“ (`member`, `manage_news`) entsteht beim Wechsel auf `app`.
 | `Clock` | Zeit und Zeitzone | `wp_timezone` | Europe/Berlin |
 | `Mailer` | Mails über SMTP (Issue #172) | PHPMailer von WordPress | mitgeliefertes PHPMailer |
 

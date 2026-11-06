@@ -1336,7 +1336,10 @@ export interface TitleRef {
 /** Ämter (Issue #112): Gruppe der Anzeige */
 export interface OfficeGroup {
   id: number;
+  /** Mehrzahl, Überschrift der Gruppe („Königshäuser“) */
   title: string;
+  /** Einzahl für eine einzelne gemeinsame Amtszeit („Königshaus 2026–2028“); leer: wie title. Fehlt bei älteren Servern. */
+  singular?: string;
   /** Gemeinsame Amtszeiten (Issue #282): Die App zeigt die Gruppe als Chronik der gemeinsamen Amtszeiten */
   joint_terms?: boolean;
 }
@@ -2083,8 +2086,9 @@ export const api = {
   setCompanyMembers: (id: number, user_ids: number[]) => request<Company>('PUT', `/companies/${id}/members`, { user_ids }),
   setMemberCompanies: (id: number, company_ids: number[]) =>
     request<{ companies: CompanyRef[] }>('PUT', `/members/${id}/companies`, { company_ids }),
-  createOfficeGroup: (title: string) => request<OfficeGroup>('POST', '/office-groups', { title }),
-  updateOfficeGroup: (id: number, title: string) => request<OfficeGroup>('PATCH', `/office-groups/${id}`, { title }),
+  createOfficeGroup: (title: string, singular = '') => request<OfficeGroup>('POST', '/office-groups', { title, singular }),
+  updateOfficeGroup: (id: number, title: string, singular: string) =>
+    request<OfficeGroup>('PATCH', `/office-groups/${id}`, { title, singular }),
   setOfficeGroupJoint: (id: number, joint_terms: boolean) => request<OfficeGroup>('PATCH', `/office-groups/${id}`, { joint_terms }),
   createOfficeGroupTerm: (groupId: number, input: OfficeGroupTermInput) =>
     request<OfficeGroupTerm>('POST', `/office-groups/${groupId}/terms`, input),

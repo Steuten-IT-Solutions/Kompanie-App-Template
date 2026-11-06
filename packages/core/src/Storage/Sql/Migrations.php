@@ -1656,8 +1656,14 @@ WHERE title IS NULL",
 )',
                 ],
             ],
-            // News in der App (Quelle „app“, NewsService): Text als RichText, Bilder in rich_images (Besitzer news).
+            // Ämter: eigene Einzahl einer Gruppe („Königshaus“ zu „Königshäuser“) für eine einzelne gemeinsame Amtszeit und den
+            // Zeitstrahl einer Person; leer: wie bisher die Bezeichnung.
             45 => [
+                'mysql' => ["ALTER TABLE {office_groups} ADD COLUMN singular varchar(60) NOT NULL DEFAULT ''"],
+                'sqlite' => ["ALTER TABLE {office_groups} ADD COLUMN singular TEXT NOT NULL DEFAULT ''"],
+            ],
+            // News in der App (Quelle „app“, NewsService): Text als RichText, Bilder in rich_images (Besitzer news).
+            46 => [
                 'mysql' => [
                     'CREATE TABLE IF NOT EXISTS {app_news} (
   id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
