@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Domain;
 use KompanieApp\Core\Port\Cache;
 use KompanieApp\Core\Port\ExtendedHttpClient;
 use KompanieApp\Core\Port\FileStorage;
+use KompanieApp\Core\Port\GallerySource;
 use KompanieApp\Core\Port\HttpClient;
 use KompanieApp\Core\Port\StreamingHttpClient;
 use KompanieApp\Core\Port\Settings;
@@ -30,7 +31,7 @@ use KompanieApp\Core\Port\Settings;
  *
  * Fehler werden als \RuntimeException mit verständlicher Meldung geworfen.
  */
-final class DriveClient
+final class DriveClient implements GallerySource
 {
     public const SETTING = 'drive_service_account';
     /** uploadFile(): Größe der Stücke (Vielfaches von 256 KB). */
@@ -845,6 +846,12 @@ final class DriveClient
     public static function isPlayableVideo(string $mime): bool
     {
         return in_array(strtolower($mime), self::PLAYABLE_VIDEO, true);
+    }
+
+    /** Ansicht der Datei in Google Drive. */
+    public function fileUrl(string $fileId): string
+    {
+        return 'https://drive.google.com/file/d/' . rawurlencode($fileId) . '/view';
     }
 
     /** Ordner-ID aus einem Drive-Link oder direkt. */

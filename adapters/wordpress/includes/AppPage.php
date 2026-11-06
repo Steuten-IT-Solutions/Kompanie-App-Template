@@ -20,6 +20,8 @@ use KompanieApp\Core\Http\ManifestIcons;
  * /app/dokument/<id>?v=…     → Dokument (nur für Mitglieder, die es sehen dürfen)
  * /app/abzeichen/<id>?v=…&s=… → Abzeichen eines Dienstgrads (angemeldet mit Mitgliederbereich oder Kalender)
  * /app/mitgliedsfoto/<id>?v=…&s=… → Foto eines Mitglieds (die Person selbst und wer Mitglieder verwaltet)
+ * /app/sponsorlogo/<id>?v=…  → Logo eines Sponsors (wer die Sponsoren sehen darf, anfangs auch ohne Anmeldung)
+ * /app/kompanielogo/<id>?v=… → Logo einer Kompanie (wer die Kompanien sehen darf, anfangs auch ohne Anmeldung)
  * /app/bild/<kennung>        → Bild in formatiertem Inhalt (Signatur, Schwarzes Brett; wer den Inhalt sehen darf)
  * /app/anhang/<kennung>      → Dateianhang (Schwarzes Brett, E-Mails; wer den Inhalt sehen darf), immer als Download
  * /app/sicherung             → Datensicherung herunterladen (nur Admins), Stück für Stück geschrieben
@@ -132,7 +134,7 @@ final class AppPage
         if ($path === '') {
             return;
         }
-        if (preg_match('#^(foto|dokument|abzeichen|mitgliedsfoto|bild)/#', $path)) {
+        if (preg_match('#^(foto|dokument|abzeichen|mitgliedsfoto|sponsorlogo|kompanielogo|bild)/#', $path)) {
             self::beginPreview($app);
         }
         if ($path === 'manifest.webmanifest') {
@@ -151,6 +153,10 @@ final class AppPage
             self::sendBadge($app, (int) $m[1]);
         } elseif (preg_match('#^mitgliedsfoto/(\d+)/?$#', $path, $m)) {
             self::sendMemberPhoto($app, (int) $m[1]);
+        } elseif (preg_match('#^sponsorlogo/(\d+)/?$#', $path, $m)) {
+            self::sendBody(self::sponsorLogoResponse($app, (int) $m[1]));
+        } elseif (preg_match('#^kompanielogo/(\d+)/?$#', $path, $m)) {
+            self::sendBody(self::companyLogoResponse($app, (int) $m[1]));
         } elseif (preg_match('#^bild/([a-f0-9]{32})/?$#', $path, $m)) {
             self::sendBody($app->richImages()->forDelivery($app->authContext->currentUser(), $m[1]));
         } elseif ($path === 'sicherung') {
@@ -460,6 +466,30 @@ final class AppPage
         return $app->memberPhotos()->forDelivery($app->authContext->currentUser(), $id, $v, $s);
     }
 
+    /**
+     * Logo eines Sponsors (Issue #279): Status, Header und Inhalt wie im Kern festgelegt (SVG mit strenger CSP).
+     *
+     * @return array{status: int, headers: array<string, string>, body?: string}
+     */
+    public static function sponsorLogoResponse(App $app, int $id): array
+    {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- nur lesend, Rechte prüft der Kern
+        $v = isset($_GET['v']) && is_string($_GET['v']) ? $_GET['v'] : null;
+        return $app->sponsors()->logoForDelivery($app->authContext->currentUser(), $id, $v);
+    }
+
+    /**
+     * Logo einer Kompanie (Issue #280), wie sponsorLogoResponse.
+     *
+     * @return array{status: int, headers: array<string, string>, body?: string}
+     */
+    public static function companyLogoResponse(App $app, int $id): array
+    {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- nur lesend, Rechte prüft der Kern
+        $v = isset($_GET['v']) && is_string($_GET['v']) ? $_GET['v'] : null;
+        return $app->companies()->logoForDelivery($app->authContext->currentUser(), $id, $v);
+    }
+
     private static function sendMemberPhoto(App $app, int $id): void
     {
         self::sendBody(self::memberPhotoResponse($app, $id));
@@ -488,7 +518,7 @@ final class AppPage
         }
         if ($res['status'] === 200 && isset($res['body'])) {
             header('Content-Length: ' . strlen($res['body']));
-            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JPEG bzw. PNG, vom Kern neu erzeugt
+            // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JPEG, PNG bzw. bereinigtes SVG, vom Kern erzeugt
             echo $res['body'];
         } elseif ($res['status'] === 200 && isset($res['path'])) {
             // Dateianhang: immer als Download (Content-Disposition attachment, nosniff, CSP sandbox; AttachmentService)

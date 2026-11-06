@@ -15,6 +15,92 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.6.0] – 2026-11-06
+
+### Neu
+
+- **Bilder aus der Galerie herunterladen**: Unter *Einstellungen → Galerie* schaltest du mit *Knöpfe zum
+  Herunterladen zeigen* ein, dass alle, die die Galerie sehen, jedes Bild in der Großansicht und jedes Album als
+  ZIP-Datei herunterladen können, in voller Auflösung. Videos sind nicht dabei. Vorgabe: aus.
+- **Eigene Seiten**: Mit dem neuen Bereich *Seiten* (unter *Einstellungen → Bereiche*) legt ihr unter *Verwaltung →
+  Einrichtungen → Seiten* freie Seiten wie Geschichte, Festprogramm oder Anfahrt an, mit formatiertem Text und
+  Bildern. Je Seite wählst du, ob sie alle sehen, auch ohne Anmeldung, oder nur Mitglieder. Jede Seite ist ein eigener
+  Punkt der Navigation, den du unter *Einstellungen → Navigation* in die Leiste oder ein Untermenü schiebst; ohne eigene
+  Navigation stehen die Seiten in der Reihenfolge, die du per Ziehen festlegst, nach den Bereichen. Speichert jemand
+  dazwischen, überschreibt die App seine Fassung nicht. Mit dem Bereich gibt es die Rolle *Seiten verwalten*.
+- **Bilder für die Galerie einreichen**: Mitglieder mit dem neuen Recht *Bilder einreichen* schlagen unter *Galerie →
+  Bilder einreichen* Bilder für ein Album vor und bestätigen, dass sie die Rechte haben und die erkennbaren Personen
+  einverstanden sind. Wer *Einreichungen prüfen* hat, bekommt eine Benachrichtigung und gibt sie unter *Galerie →
+  Einreichungen prüfen* öffentlich oder nur für Mitglieder frei oder lehnt sie mit Grund ab; die Person erfährt das
+  Ergebnis. Abgelehnte Bilder löscht der Server sofort. Mit der Galerie gibt es die neue Rolle *Galerie verwalten*
+  (mit dem Recht zum Prüfen), auch bei Installationen mit schon eingeschalteter Galerie.
+- **Galerie ohne Google Drive und eigene Bilder**: Unter *Einstellungen → Galerie* wählst du als Quelle *Google
+  Drive* oder *eigener Server*. Mit beiden Quellen legst du dort Alben nur in der App an und lädst Bilder (JPG, PNG,
+  WebP) in jedes Album hoch, auch in eines aus Drive, öffentlich oder nur für Mitglieder. Der Server entfernt beim
+  Hochladen Metadaten wie den Aufnahmeort. Der Abgleich mit Drive lässt hochgeladene Bilder in Ruhe, und die Sicherung
+  enthält sie. Mit *eigener Server* braucht die Galerie keinen Google-Zugang.
+
+- **Fotos für Personen ohne Konto in den Ämtern**: Unter *Verwaltung → Einrichtungen → Ämter* lädst du bei einer
+  Amtszeit für Personen ohne Profil (z. B. frühere Mitglieder oder Hofdamen) ein Foto hoch. Steht derselbe Name schon
+  mit Foto in einer früheren Amtszeit, bietet die App an, es zu übernehmen. Die Fotos sind wie die Ämter für alle
+  sichtbar; bei Mitgliedern bleibt das Foto ihres Profils maßgeblich.
+- **Gemeinsame Amtszeiten mit Gruppenbild**: Haben alle Ämter einer Gruppe dieselben Jahre, z. B. ein Königshaus oder
+  ein Vorstand, schaltest du unter *Verwaltung → Einrichtungen → Ämter* bei der Gruppe *Amtszeiten gemeinsam* ein.
+  Dann trägst du Jahre, Gruppenbild und die Personen aller Ämter in einem Formular ein; vorhandene Amtszeiten mit
+  denselben Jahren fasst die App beim Einschalten zusammen. Unter *Ämter* steht je gemeinsame Amtszeit eine Karte mit
+  dem Bild und wer welches Amt hatte, für alle sichtbar wie die Ämter. Ausschalten behält alle Daten.
+- **Kompanien**: Der neue Bereich *Kompanien* (unter *Einstellungen → Bereiche* einschalten) zeigt eure Kompanien mit
+  Logo in eurer Reihenfolge, für alle, auch ohne Anmeldung. Jede Karte klappt auf und zeigt Beschreibung (auch mit
+  Bildern), Gründungsjahr, Links zur Webseite und zur App der Kompanie, die laufenden Ämter einer verknüpften Gruppe der Ämter
+  und die Mitglieder (die nur, wer die Mitgliederliste sieht). Aufgelöste Kompanien stehen unten als „ehemalig“.
+  Gepflegt werden sie unter *Verwaltung → Einrichtungen → Kompanien*; Mitglieder ordnest du dort oder auf der Seite
+  der Person in der Verwaltung zu, auch zu mehreren Kompanien. In der Mitgliederliste stehen die Kompanien auf der
+  Seite der Person, und die Liste lässt sich nach Kompanie filtern. Dazu kommt die Rolle *Kompanien verwalten*. Passen
+  in der Standardnavigation nicht alle Punkte in die Leiste, stehen Kompanien und Sponsoren unter *Intern*.
+- **Sponsoren**: Der neue Bereich *Sponsoren* (unter *Einstellungen → Bereiche* einschalten) zeigt eure Sponsoren mit
+  Logo und Link in eurer Reihenfolge, für alle, auch ohne Anmeldung. Gepflegt werden sie unter *Verwaltung →
+  Einrichtungen → Sponsoren*: anlegen, Link und Logo (PNG, JPG, WebP oder SVG) hinzufügen, per Ziehen ordnen. Dazu kommt
+  die Rolle *Sponsoren verwalten*. Wer die Sponsoren sieht, legst du unter *Einstellungen → Rollen* mit dem Haken
+  *Sponsoren* fest.
+- **Navigation einrichten**: Unter *Einstellungen → Navigation* legst du fest, welche Bereiche unten in der Leiste
+  stehen und in welcher Reihenfolge, fasst Bereiche zu Untermenüs mit eigenem Namen und Symbol zusammen (wie *Intern*)
+  oder blendest sie aus. *Verwaltung* und *Meins* stehen immer ganz rechts. Jede Person sieht weiter nur, was sie sehen
+  darf. Solange du nichts speicherst, bleibt die Navigation wie bisher; *Standardnavigation wiederherstellen* führt
+  jederzeit dorthin zurück.
+- **Impressum und Datenschutz**: Unter *Einstellungen → Impressum und Datenschutz* (und im Einrichtungsassistenten) trägst
+  du die Links auf euer Impressum und eure Datenschutzerklärung ein, z. B. auf eurer Webseite. Die App zeigt sie allen,
+  auch ohne Anmeldung: auf der Anmeldeseite, unten im Konto und unten in der Hilfe. Solange einer fehlt, ist die Zeile
+  *Impressum und Datenschutz* unter *Zustand und Updates* gelb. Die Hilfe listet, welche Daten die App verarbeitet, als
+  Hilfe für eure Datenschutzerklärung.
+- **Nachvollziehen, was an Benachrichtigungen verschickt wurde**: Unter *Einstellungen → Benachrichtigungen* steht
+  jetzt für jede Art, wann sie zuletzt verschickt wurde und an wie viele Geräte, dazu wann der Push-Dienst zuletzt eine
+  Nachricht angenommen oder abgelehnt hat (mit Grund). So siehst du ohne Blick in die Datenbank, ob eine Benachrichtigung
+  verschickt wurde oder ob niemand sie eingeschaltet hatte.
+
+### Geändert
+
+- **Bilder in formatierten Texten** (Schwarzes Brett, E-Mails, Signatur, Beschreibung der Kompanien) werden beim
+  Hochladen auf höchstens 2048 Pixel an der längeren Kante verkleinert, damit Datenbank und Sicherungen nicht unnötig
+  wachsen. Kleinere Bilder bleiben, wie sie sind.
+- **Seite eines Mitglieds erscheint schneller**: Öffnest du in der Verwaltung eine Person oder blätterst weiter, stehen
+  Dienstgrad, Foto, Rolle, Punkte und Offen sofort da (aus der Mitgliederliste); der Rest der Seite folgt, sobald ihre
+  Daten geladen sind. Die übrigen Personen lädt die App jetzt zu zwölft in einer Anfrage vor statt einzeln, und ohne
+  dabei auf Fotos und Abzeichen zu warten; so sind auch weiter entfernte Seiten deutlich früher bereit.
+- **Listen öffnen schneller**: Öffnest du unter *Verwaltung → Listen* eine Liste erneut, steht sie sofort da und wird im
+  Hintergrund aktualisiert, wie die übrigen Seiten der App. Hat jemand sie inzwischen geändert, zeigt die App gleich
+  danach den neuen Stand.
+- **Benachrichtigungen mit hoher Dringlichkeit**: Alle Benachrichtigungen gehen jetzt mit hoher Dringlichkeit an den
+  Push-Dienst, wie Google es für sichtbare Benachrichtigungen empfiehlt. Mit normaler Dringlichkeit kann Android sie im
+  Ruhezustand zurückhalten, z. B. die Benachrichtigung am Geburtstag am frühen Morgen.
+
+### Behoben
+
+- **Download-Seite mit langem Namen auf dem Handy**: Ein langer Kompaniename lief im Kopf der Download- und
+  Installationsseite über den Bildschirmrand, die Seite wurde breiter als das Handy. Der Name bricht jetzt um, Logo und
+  Überschrift sind auf schmalen Bildschirmen etwas kleiner.
+- **Download-Seite: Abstand unter dem Kopf**: Zwischen dem Kopf der Download- und Installationsseite und der ersten Karte
+  fehlte der Abstand, ebenso unten unter dem Fußtext.
+
 ## [0.5.0] – 2026-11-01
 
 ### Neu

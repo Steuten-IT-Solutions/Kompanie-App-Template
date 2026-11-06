@@ -41,10 +41,11 @@ $organizer = $d->createUser('kpwp_verwalter', 'events'); // Standardrolle „Ter
 $manager = $d->createUser('kpwp_leitung', 'points');      // Standardrolle „Punkte verwalten“
 $admin = $d->createUser('kpwp_admin', 'admin');
 $caps = static fn (int $id): array => array_map(static fn (KompanieApp\Core\Auth\Capability $x): string => $x->value, $app->users->find($id)?->capabilities ?? []);
-// Rechte, wie sie früher gemeint waren (member schloss das Sehen ein), in der gespeicherten Reihenfolge.
+// Rechte, wie sie früher gemeint waren (member schloss das Sehen ein), mit den später dazugekommenen Rechten zum Sehen
+// (Roles::ADDED_VIEW), in der gespeicherten Reihenfolge.
 $legacyCaps = static fn (array $l): array => array_values(array_filter(
     array_map(static fn (KompanieApp\Core\Auth\Capability $x): string => $x->value, KompanieApp\Core\Auth\Roles::GRANTABLE),
-    static fn (string $v): bool => in_array($v, KompanieApp\Core\Auth\Roles::expandLegacy($l), true),
+    static fn (string $v): bool => in_array($v, [...KompanieApp\Core\Auth\Roles::expandLegacy($l), ...KompanieApp\Core\Auth\Roles::ADDED_VIEW], true),
 ));
 $c->ok($caps($member) === $legacyCaps(['member']), 'Mitglied: Mitgliedschaft und Rechte zum Sehen');
 $c->ok($caps($organizer) === $legacyCaps(['member', 'manage_events']), 'Termine verwalten: Termine und Mitglied, keine Punkte/Strafen');

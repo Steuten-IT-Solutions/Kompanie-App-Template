@@ -19,14 +19,15 @@ final class ApiScenario
     }
 
     /**
-     * Rechte einer Rolle, wie sie früher gemeint waren (member schloss das Sehen ein), in der gespeicherten Reihenfolge.
+     * Rechte einer Rolle, wie sie früher gemeint waren (member schloss das Sehen ein), mit den später dazugekommenen
+     * Rechten zum Sehen (Roles::ADDED_VIEW), in der gespeicherten Reihenfolge.
      *
      * @param string[] $caps
      * @return string[]
      */
     private static function caps(array $caps): array
     {
-        $all = \KompanieApp\Core\Auth\Roles::expandLegacy($caps);
+        $all = [...\KompanieApp\Core\Auth\Roles::expandLegacy($caps), ...\KompanieApp\Core\Auth\Roles::ADDED_VIEW];
         return array_values(array_filter(array_map(static fn (\KompanieApp\Core\Auth\Capability $c): string => $c->value, \KompanieApp\Core\Auth\Roles::GRANTABLE), static fn (string $v): bool => in_array($v, $all, true)));
     }
 
@@ -55,6 +56,9 @@ final class ApiScenario
             $this->offices();
             $this->lists();
             $this->mails();
+            $this->companies();
+            $this->sponsors();
+            $this->pages();
             $this->activity();
             $this->accounts();
             $this->formerMembers();
@@ -108,7 +112,7 @@ final class ApiScenario
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Ausgeschalteter Bereich → 403 feature_disabled');
 
         $this->d->actAs($admin);
-        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true, 'directory' => true, 'offices' => true, 'lists' => true, 'mail' => true];
+        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true, 'directory' => true, 'offices' => true, 'lists' => true, 'mail' => true, 'companies' => true, 'sponsors' => true, 'pages' => true];
         [$s, $d] = $this->req('PUT', '/admin/features', $all);
         $c->ok($s === 200 && !in_array(false, array_column((array) $d, 'enabled', 'key'), true), 'Alle Bereiche einschalten');
 
@@ -385,6 +389,11 @@ final class ApiScenario
         $c->ok($this->req('POST', '/penalties', ['user_ids' => []])[0] === 400 && $this->req('POST', '/points', ['user_ids' => []])[0] === 403 && $this->req('POST', '/catalog', ['title' => ''])[0] === 403, '„Strafen verwalten“: Strafen ja, Punkte und Katalog nein');
         $detail = $this->req('GET', '/members/' . $this->m1)[1];
         $c->ok(array_key_exists('points', (array) $detail) && $detail['points'] === null && ($detail['point_list'] ?? [1]) === [] && is_array($detail['penalties'] ?? null), '„Strafen verwalten“ sieht keine Punkte');
+        // Mehrere Personen auf einmal (Vorladen beim Blättern): je Person dasselbe wie GET /members/{id}
+        [$s, $many] = $this->req('GET', '/members/details', [], ['ids' => $this->m1 . ',999999,' . $this->m1]);
+        $c->ok($s === 200 && is_array($many) && count($many) === 1 && ($many[0] ?? null) == $detail, 'GET /members/details wie GET /members/{id}; unbekannte fehlen, doppelte einmal');
+        $c->ok($this->req('GET', '/members/details', [], ['ids' => 'x'])[0] === 400 && $this->req('GET', '/members/details')[0] === 400
+            && $this->req('GET', '/members/details', [], ['ids' => implode(',', range(1, 26))])[0] === 400, 'GET /members/details ohne gültige ids oder mit mehr als 25 → 400');
 
         $this->d->actAs($gast);
         [, $d] = $this->req('GET', '/me');
@@ -566,7 +575,7 @@ final class ApiScenario
         sort($caps);
         $c->ok($s === 200 && ($d['preview']['role'] ?? '') === 'member' && is_string($d['preview']['label'] ?? null), '/config meldet die Vorschau mit Bezeichnung');
         $c->ok(($d['user']['id'] ?? 0) === $admin && ($d['user']['level'] ?? '') === 'member' && ($d['user']['extra_roles'] ?? null) === [], 'Vorschau: dieselbe Person mit der Rolle, ohne Zusatzrollen');
-        $expected = \KompanieApp\Core\Auth\Roles::MEMBER_DEFAULTS;
+        $expected = \KompanieApp\Core\Auth\Roles::TEMPLATES[\KompanieApp\Core\Auth\Roles::MEMBER];
         sort($expected);
         $c->ok($caps === $expected, 'Vorschau: genau die Rechte der Rolle');
         $c->ok(($d['setupPending'] ?? null) === false, 'Vorschau: kein Einrichtungsassistent');
@@ -688,6 +697,7 @@ final class ApiScenario
         foreach (['/me/points', '/me/penalties', '/members', "/members/{$this->m1}"] as $path) {
             $c->ok($this->req('GET', $path)[0] === 403, "Anwärter: GET $path → 403");
         }
+        $c->ok($this->req('GET', '/members/details', [], ['ids' => (string) $this->m1])[0] === 403, 'Anwärter: GET /members/details → 403');
         $types = array_column((array) ($this->req('POST', '/me/push/status')[1]['types'] ?? []), 'key');
         $c->ok(in_array('events', $types, true) && !array_intersect(['points', 'penalties'], $types), 'Anwärter: Benachrichtigungen zu Terminen, nicht zu Punkten oder Strafen');
         [, $cfg] = $this->req('GET', '/config');
@@ -1368,6 +1378,135 @@ final class ApiScenario
         [$s, $d] = $this->req('GET', '/mails/options');
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
         $this->req('PUT', '/admin/features', ['mail' => true]);
+    }
+
+    /**
+     * Kompanien (Issue #280): Liste für alle mit view_companies, Pflege und Zuordnung mit manage_companies, Logo mit eigener
+     * Adresse, Mitglieder einer Kompanie nur mit Mitgliederliste, Kompanien je Person in der Mitgliederliste.
+     */
+    private function companies(): void
+    {
+        $c = $this->c;
+        $c->section('Kompanien');
+        $admin = $this->user('kptest_company_admin', 'admin');
+        $m = $this->user('kptest_company_m', 'member');
+        $this->d->actAs($m);
+        $c->ok($this->req('GET', '/companies')[0] === 200, 'Mitglied sieht die Kompanien');
+        $c->ok($this->req('POST', '/companies', ['name' => 'Kptest'])[0] === 403, 'Ohne manage_companies → 403');
+        $this->d->actAs(null);
+        $c->ok($this->req('GET', '/companies')[0] === 200, 'Auch ohne Anmeldung sichtbar');
+        $c->ok($this->req('POST', '/companies', ['name' => 'Kptest'])[0] === 401, 'Pflegen ohne Anmeldung → 401');
+
+        $this->d->actAs($admin);
+        [$s, $a] = $this->req('POST', '/companies', ['name' => 'Kptest Erste', 'short_name' => 'KT1', 'founded_year' => 1900, 'description' => '<p>Text<script>x</script></p>', 'website_url' => 'https://example.org/']);
+        $c->ok($s === 201 && ($a['description'] ?? '') === '<p>Text</p>' && ($a['founded_year'] ?? null) === 1900 && array_key_exists('logo_url', (array) $a) && $a['logo_url'] === null, 'Kompanie anlegen, Beschreibung bereinigt');
+        [, $b] = $this->req('POST', '/companies', ['name' => 'Kptest Zweite']);
+        $c->ok($this->req('POST', '/companies', ['name' => 'Kptest', 'app_url' => 'http://example.org/'])[0] === 400, 'Link ohne https → 400');
+        $mine = [(int) ($a['id'] ?? 0), (int) ($b['id'] ?? 0)];
+        $others = array_values(array_diff(array_column((array) $this->req('GET', '/companies')[1], 'id'), $mine));
+        [$s, $d] = $this->req('PUT', '/companies/order', ['ids' => [...$others, $mine[1], $mine[0]]]);
+        $c->ok($s === 200 && array_slice(array_column((array) $d, 'id'), -2) === [$mine[1], $mine[0]], 'Reihenfolge ändern');
+        [$s, $d] = $this->req('POST', "/companies/{$mine[0]}/logo", ['file' => ['name' => 'logo.png', 'data' => self::pngBase64()]]);
+        $c->ok($s === 200 && ($d['logo_type'] ?? '') === 'png' && str_contains((string) ($d['logo_url'] ?? ''), 'kompanielogo/' . $mine[0]), 'Logo (PNG) hochladen');
+        [$s, $d] = $this->req('PUT', "/members/$m/companies", ['company_ids' => $mine]);
+        $c->ok($s === 200 && array_column((array) ($d['companies'] ?? []), 'id') === [$mine[1], $mine[0]], 'Person zwei Kompanien zuordnen (Reihenfolge der Liste)');
+        [$s, $d] = $this->req('PATCH', "/companies/{$mine[1]}", ['active' => false]);
+        $c->ok($s === 200 && ($d['active'] ?? null) === false && ($d['member_ids'] ?? null) === [$m], 'Als aufgelöst markieren, Zuordnung bleibt');
+        $dir = array_column((array) $this->req('GET', '/directory')[1], null, 'id');
+        $c->ok(array_column((array) ($dir[$m]['companies'] ?? []), 'id') === [$mine[1], $mine[0]], 'Kompanien in der Mitgliederliste');
+        [, $roles] = $this->req('GET', '/admin/roles');
+        $c->ok((array_column((array) $roles, 'capabilities', 'key')['companies'] ?? null) === self::caps(['member', 'manage_companies']), 'Standardrolle „Kompanien verwalten“');
+        $this->req('PUT', '/admin/features', ['companies' => false]);
+        [$s, $d] = $this->req('GET', '/companies');
+        $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
+        $this->req('PUT', '/admin/features', ['companies' => true]);
+        $c->ok($this->req('DELETE', "/companies/{$mine[0]}")[0] === 200 && $this->req('DELETE', "/companies/{$mine[1]}")[0] === 200 && $this->req('PATCH', "/companies/{$mine[0]}", ['name' => 'x'])[0] === 404, 'Aufräumen: Kompanien löschen');
+    }
+
+    /**
+     * Sponsoren (Issue #279): Liste für alle mit view_sponsors (anfangs auch ohne Anmeldung), Pflege mit manage_sponsors,
+     * Logo als PNG (verkleinert) mit eigener Adresse, Reihenfolge, Links nur mit https.
+     */
+    private function sponsors(): void
+    {
+        $c = $this->c;
+        $c->section('Sponsoren');
+        $admin = $this->user('kptest_sponsor_admin', 'admin');
+        $m = $this->user('kptest_sponsor_m', 'member');
+        $this->d->actAs($m);
+        $c->ok($this->req('GET', '/sponsors')[0] === 200, 'Mitglied sieht die Sponsoren');
+        $c->ok($this->req('POST', '/sponsors', ['name' => 'Kptest'])[0] === 403, 'Ohne manage_sponsors → 403');
+        $this->d->actAs(null);
+        $c->ok($this->req('GET', '/sponsors')[0] === 200, 'Auch ohne Anmeldung sichtbar');
+        $c->ok($this->req('POST', '/sponsors', ['name' => 'Kptest'])[0] === 401, 'Pflegen ohne Anmeldung → 401');
+
+        $this->d->actAs($admin);
+        [$s, $a] = $this->req('POST', '/sponsors', ['name' => 'Kptest Bäckerei', 'url' => 'https://example.org/']);
+        $c->ok($s === 201 && ($a['url'] ?? '') === 'https://example.org/' && array_key_exists('logo_url', (array) $a) && $a['logo_url'] === null, 'Sponsor anlegen');
+        [, $b] = $this->req('POST', '/sponsors', ['name' => 'Kptest Autohaus']);
+        $c->ok($this->req('POST', '/sponsors', ['name' => 'Kptest', 'url' => 'http://example.org/'])[0] === 400, 'Link ohne https → 400');
+        $ids = array_column((array) $this->req('GET', '/sponsors')[1], 'id');
+        $mine = [(int) ($a['id'] ?? 0), (int) ($b['id'] ?? 0)];
+        $others = array_values(array_diff($ids, $mine));
+        [$s, $d] = $this->req('PUT', '/sponsors/order', ['ids' => [...$others, $mine[1], $mine[0]]]);
+        $c->ok($s === 200 && array_slice(array_column((array) $d, 'id'), -2) === [$mine[1], $mine[0]], 'Reihenfolge ändern');
+        [$s, $d] = $this->req('POST', "/sponsors/{$mine[0]}/logo", ['file' => ['name' => 'logo.png', 'data' => self::pngBase64()]]);
+        $c->ok($s === 200 && ($d['logo_type'] ?? '') === 'png' && str_contains((string) ($d['logo_url'] ?? ''), 'sponsorlogo/' . $mine[0]), 'Logo (PNG) hochladen');
+        $c->ok($this->req('POST', "/sponsors/{$mine[0]}/logo", ['file' => ['name' => 'logo.gif', 'data' => base64_encode('GIF89a')]])[0] === 400, 'Falsches Format → 400');
+        [$s, $d] = $this->req('PATCH', "/sponsors/{$mine[1]}", ['url' => 'https://example.com/']);
+        $c->ok($s === 200 && ($d['name'] ?? '') === 'Kptest Autohaus' && ($d['url'] ?? '') === 'https://example.com/', 'Link ändern, Name bleibt');
+        [, $roles] = $this->req('GET', '/admin/roles');
+        $c->ok((array_column((array) $roles, 'capabilities', 'key')['sponsors'] ?? null) === self::caps(['member', 'manage_sponsors']), 'Standardrolle „Sponsoren verwalten“');
+        $this->req('PUT', '/admin/features', ['sponsors' => false]);
+        [$s, $d] = $this->req('GET', '/sponsors');
+        $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
+        $this->req('PUT', '/admin/features', ['sponsors' => true]);
+        [$s, $d] = $this->req('DELETE', "/sponsors/{$mine[0]}/logo");
+        $c->ok($s === 200 && array_key_exists('logo_url', (array) $d) && $d['logo_url'] === null, 'Logo entfernen');
+        $c->ok($this->req('DELETE', "/sponsors/{$mine[0]}")[0] === 200 && $this->req('DELETE', "/sponsors/{$mine[1]}")[0] === 200 && $this->req('PATCH', "/sponsors/{$mine[0]}", ['name' => 'x'])[0] === 404, 'Aufräumen: Sponsoren löschen');
+    }
+
+    /** Eigene Seiten (Issue #287): Lesen nach Zielgruppe, Pflege mit manage_pages, Konflikt beim Speichern, Reihenfolge. */
+    private function pages(): void
+    {
+        $c = $this->c;
+        $c->section('Eigene Seiten');
+        $admin = $this->user('kptest_pages_admin', 'admin');
+        $m = $this->user('kptest_pages_m', 'member');
+        $this->d->actAs($admin);
+        $this->req('PUT', '/admin/features', ['pages' => true]);
+        [$s, $pub] = $this->req('POST', '/pages', ['title' => 'Kptest Anfahrt', 'audience' => 'public', 'body' => '<p>Über die <b>Brücke</b></p><script>alert(1)</script>']);
+        $c->ok($s === 201 && !str_contains((string) ($pub['body'] ?? ''), 'script') && str_contains((string) ($pub['body'] ?? ''), '<b>Brücke</b>'), 'Seite anlegen, Text bereinigt');
+        [$s, $mem] = $this->req('POST', '/pages', ['title' => 'Kptest Uniform', 'body' => '<p>Intern</p>']);
+        $c->ok($s === 201 && ($mem['audience'] ?? '') === 'members', 'Vorgabe: nur Mitglieder');
+        $c->ok($this->req('POST', '/pages', ['title' => ''])[0] === 400, 'Ohne Titel → 400');
+        $titles = fn (): array => array_column((array) ($this->req('GET', '/pages')[1]['pages'] ?? []), 'title');
+        $this->d->actAs(null);
+        $c->ok(in_array('Kptest Anfahrt', $titles(), true) && !in_array('Kptest Uniform', $titles(), true), 'Ohne Anmeldung nur die öffentliche');
+        $c->ok($this->req('GET', '/pages/' . ($mem['id'] ?? 0))[0] === 404, 'Seite nur für Mitglieder ohne Anmeldung → 404');
+        $this->d->actAs($m);
+        $c->ok(in_array('Kptest Uniform', $titles(), true), 'Mitglied sieht die Seite für Mitglieder');
+        $c->ok($this->req('PATCH', '/pages/' . ($pub['id'] ?? 0), ['title' => 'X'])[0] === 403, 'Ohne manage_pages → 403');
+        $this->d->actAs($admin);
+        $loaded = (string) ($this->req('GET', '/pages/' . ($pub['id'] ?? 0))[1]['updated_at'] ?? '');
+        [$s, $d] = $this->req('PATCH', '/pages/' . ($pub['id'] ?? 0), ['title' => 'Kptest Anfahrt und Parken', 'updated_at' => $loaded]);
+        $c->ok($s === 200 && ($d['title'] ?? '') === 'Kptest Anfahrt und Parken', 'Mit aktuellem Stand speichern');
+        [$s, $d] = $this->req('PATCH', '/pages/' . ($pub['id'] ?? 0), ['title' => 'Zu spät', 'updated_at' => '2000-01-01T00:00:00Z']);
+        $c->ok($s === 409 && ($d['code'] ?? '') === 'conflict', 'Veralteter Stand → 409 conflict');
+        $ids = array_column((array) ($this->req('GET', '/pages')[1]['pages'] ?? []), 'id');
+        [$s, $d] = $this->req('PUT', '/pages/order', ['ids' => array_reverse($ids)]);
+        $c->ok($s === 200 && array_column((array) ($d['pages'] ?? []), 'id') === array_reverse($ids), 'Reihenfolge ändern');
+        [, $config] = $this->req('GET', '/config');
+        $c->ok(in_array('Kptest Uniform', array_column((array) ($config['pages'] ?? []), 'title'), true), '/config nennt die Seiten');
+        $nav = ['items' => ['termine', ['label' => 'Infos', 'icon' => 'seiten', 'items' => ['seiten/' . ($pub['id'] ?? 0), 'seiten/' . ($mem['id'] ?? 0)]]], 'hidden' => []];
+        [$s, $d] = $this->req('PUT', '/admin/navigation', ['navigation' => $nav]);
+        $c->ok($s === 200 && ($d['navigation'] ?? null) === $nav, 'Jede Seite als eigener Punkt der Navigation');
+        $c->ok($this->req('PUT', '/admin/navigation', ['navigation' => ['items' => ['seiten'], 'hidden' => []]])[0] === 400, 'Ohne Nummer kein Punkt der Navigation → 400');
+        $this->req('DELETE', '/pages/' . ($mem['id'] ?? 0));
+        [, $d] = $this->req('GET', '/admin/navigation');
+        $c->ok(($d['navigation']['items'][1]['items'] ?? null) === ['seiten/' . ($pub['id'] ?? 0)], 'Gelöschte Seite fällt aus der Navigation');
+        $this->req('PUT', '/admin/navigation', ['navigation' => null]);
+        $c->ok($this->req('DELETE', '/pages/' . ($pub['id'] ?? 0))[0] === 200 && $this->req('GET', '/pages/' . ($mem['id'] ?? 0))[0] === 404, 'Aufräumen: Seiten löschen');
     }
 
     /**

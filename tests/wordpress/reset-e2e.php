@@ -12,7 +12,7 @@ if (!defined('ABSPATH')) {
 require_once ABSPATH . 'wp-admin/includes/user.php';
 
 $db = KompanieApp\WordPress\Plugin::app()->db;
-foreach (['points', 'penalties', 'point_catalog', 'events', 'rank_history', 'member_ranks', 'ranks', 'member_titles', 'titles', 'member_roles', 'attendance_entries', 'attendance_lists', 'documents', 'doc_categories', 'board_messages', 'poll_answers', 'poll_votes', 'poll_options', 'polls', 'birthdays', 'join_years', 'member_photos', 'inventory_log', 'inventory_items', 'office_holders', 'office_terms', 'offices', 'office_groups', 'former_members', 'list_rows', 'list_columns', 'lists', 'member_contacts', 'mailing_recipients', 'mailings', 'attachments'] as $table) {
+foreach (['points', 'penalties', 'point_catalog', 'events', 'rank_history', 'member_ranks', 'ranks', 'member_titles', 'titles', 'member_roles', 'attendance_entries', 'attendance_lists', 'documents', 'doc_categories', 'board_messages', 'poll_answers', 'poll_votes', 'poll_options', 'polls', 'birthdays', 'join_years', 'member_photos', 'inventory_log', 'inventory_items', 'office_holders', 'office_terms', 'office_group_terms', 'offices', 'office_groups', 'former_members', 'list_rows', 'list_columns', 'lists', 'member_contacts', 'mailing_recipients', 'mailings', 'attachments', 'sponsors', 'member_companies', 'companies', 'gallery_submissions', 'app_pages'] as $table) {
     $db->execute('DELETE FROM {' . $table . '}');
 }
 foreach (get_users(['search' => 'neue.testperson*', 'search_columns' => ['user_login']]) as $u) {
@@ -22,7 +22,7 @@ foreach (get_users(['search' => 'neue.testperson*', 'search_columns' => ['user_l
 $roles = KompanieApp\WordPress\Plugin::app()->roles();
 $spiess = array_search('Spieß', array_column($roles->all(), 'label', 'key'), true);
 if ($spiess === false) {
-    $spiess = $roles->create(['label' => 'Spieß', 'capabilities' => KompanieApp\Core\Auth\Roles::expandLegacy(['member', 'manage_points', 'manage_penalties', 'manage_events'])])['key'];
+    $spiess = $roles->create(['label' => 'Spieß', 'capabilities' => [...KompanieApp\Core\Auth\Roles::expandLegacy(['member', 'manage_points', 'manage_penalties', 'manage_events']), ...KompanieApp\Core\Auth\Roles::ADDED_VIEW]])['key'];
 }
 foreach (['verwalter' => (string) $spiess, 'mitglied1' => 'member', 'mitglied2' => 'member'] as $login => $level) {
     $u = get_user_by('login', $login);

@@ -220,6 +220,27 @@
               "minLength": 1,
               "maxLength": 30,
               "pattern": "\\S"
+            },
+            "sponsors": {
+              "type": "string",
+              "default": "Sponsoren",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
+            },
+            "companies": {
+              "type": "string",
+              "default": "Kompanien",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
+            },
+            "pages": {
+              "type": "string",
+              "default": "Seiten",
+              "minLength": 1,
+              "maxLength": 30,
+              "pattern": "\\S"
             }
           }
         },

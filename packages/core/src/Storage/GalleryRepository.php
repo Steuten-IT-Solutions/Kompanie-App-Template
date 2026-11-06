@@ -18,14 +18,14 @@ final class GalleryRepository
     }
 
     /**
-     * Alle Alben mit einer Abfrage, für den Abgleich.
+     * Alle Alben aus Drive mit einer Abfrage, für den Abgleich (ohne Alben der App).
      *
      * @return array<string, array<string, mixed>> Drive-ID => Zeile
      */
     public function albumsByDriveId(): array
     {
         $out = [];
-        foreach ($this->db->select('SELECT * FROM {albums}') as $row) {
+        foreach ($this->db->select("SELECT * FROM {albums} WHERE source = 'drive'") as $row) {
             $out[(string) $row['drive_id']] = $row;
         }
         return $out;
@@ -121,15 +121,15 @@ final class GalleryRepository
 
     /**
      * @param int[] $keep
-     * @return array<int, array<string, mixed>> Bilder, die nicht in $keep sind
+     * @return array<int, array<string, mixed>> Bilder aus Drive, die nicht in $keep sind (hochgeladene nie)
      */
     public function photosExcept(array $keep): array
     {
         if ($keep === []) {
-            return $this->db->select('SELECT * FROM {photos}');
+            return $this->db->select("SELECT * FROM {photos} WHERE source = 'drive'");
         }
         $in = implode(', ', array_map('intval', $keep));
-        return $this->db->select("SELECT * FROM {photos} WHERE id NOT IN ($in)");
+        return $this->db->select("SELECT * FROM {photos} WHERE source = 'drive' AND id NOT IN ($in)");
     }
 
     public function deletePhoto(int $id): void
@@ -137,12 +137,67 @@ final class GalleryRepository
         $this->db->execute('DELETE FROM {photos} WHERE id = ?', [$id]);
     }
 
-    /** @param int[] $ids Alben, die es in Drive nicht mehr gibt */
+    /**
+     * Alben, die es in Drive nicht mehr gibt; Alben der App und Alben mit hochgeladenen Bildern bleiben.
+     *
+     * @param int[] $ids
+     */
     public function deleteAlbums(array $ids): void
     {
         if ($ids !== []) {
-            $this->db->execute('DELETE FROM {albums} WHERE id IN (' . implode(', ', array_map('intval', $ids)) . ')');
+            $this->db->execute(
+                "DELETE FROM {albums} WHERE id IN (" . implode(', ', array_map('intval', $ids)) . ") AND source = 'drive'
+                 AND NOT EXISTS (SELECT 1 FROM {photos} p WHERE p.album_id = {albums}.id AND p.source = 'upload')
+                 AND NOT EXISTS (SELECT 1 FROM {gallery_submissions} s WHERE s.album_id = {albums}.id AND s.status = 'pending')",
+            );
         }
+    }
+
+    /**
+     * Alle Alben für die Pflege (Einstellungen → Galerie), neueste zuerst, mit Zahl der Bilder aus Drive und der
+     * hochgeladenen.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function adminAlbums(): array
+    {
+        return $this->db->select(
+            "SELECT a.id, a.year, a.title, a.source, a.sort_date,
+                SUM(CASE WHEN p.source = 'upload' THEN 1 ELSE 0 END) AS upload_cnt,
+                SUM(CASE WHEN p.source = 'drive' THEN 1 ELSE 0 END) AS drive_cnt
+             FROM {albums} a LEFT JOIN {photos} p ON p.album_id = a.id
+             GROUP BY a.id, a.year, a.title, a.source, a.sort_date
+             ORDER BY a.year DESC, a.sort_date DESC, a.id DESC",
+        );
+    }
+
+    /** @param array<string, mixed> $data */
+    public function insertAlbum(array $data): int
+    {
+        return $this->db->insert('albums', $data);
+    }
+
+    /** @param array<string, mixed> $data */
+    public function updateAlbum(int $id, array $data): void
+    {
+        $this->db->update('albums', $data, ['id' => $id]);
+    }
+
+    public function deleteAlbum(int $id): void
+    {
+        $this->db->execute('DELETE FROM {albums} WHERE id = ?', [$id]);
+    }
+
+    /** @return array<int, array<string, mixed>> hochgeladene Bilder eines Albums */
+    public function uploads(int $albumId): array
+    {
+        return $this->db->select("SELECT * FROM {photos} WHERE album_id = ? AND source = 'upload' ORDER BY id ASC", [$albumId]);
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function photosOfAlbum(int $albumId): array
+    {
+        return $this->db->select('SELECT * FROM {photos} WHERE album_id = ?', [$albumId]);
     }
 
     /** Wie viele fehlgeschlagene Bilder retryFailed erneut vormerken würde. */
@@ -250,15 +305,17 @@ final class GalleryRepository
         );
     }
 
-    /** @return array<int, array<string, mixed>> */
-    public function allPhotos(): array
+    /** @return array<int, array<string, mixed>> Bilder aus Drive */
+    public function drivePhotos(): array
     {
-        return $this->db->select('SELECT * FROM {photos}');
+        return $this->db->select("SELECT * FROM {photos} WHERE source = 'drive'");
     }
 
-    public function clear(): void
+    /** Alles aus Drive entfernen (Wechsel des Ordners); Alben der App und hochgeladene Bilder bleiben. */
+    public function clearDrive(): void
     {
-        $this->db->execute('DELETE FROM {photos}');
-        $this->db->execute('DELETE FROM {albums}');
+        $this->db->execute("DELETE FROM {photos} WHERE source = 'drive'");
+        $this->db->execute("DELETE FROM {albums} WHERE source = 'drive' AND NOT EXISTS (SELECT 1 FROM {photos} p WHERE p.album_id = {albums}.id)
+            AND NOT EXISTS (SELECT 1 FROM {gallery_submissions} s WHERE s.album_id = {albums}.id AND s.status = 'pending')");
     }
 }

@@ -26,6 +26,10 @@ enum Capability: string
     case ViewNews = 'view_news';
     /** Öffentliche Alben der Galerie. */
     case ViewGallery = 'view_gallery';
+    /** Liste der Kompanien (Bereich Kompanien, Issue #280). */
+    case ViewCompanies = 'view_companies';
+    /** Sponsoren (Bereich Sponsoren, Issue #279). */
+    case ViewSponsors = 'view_sponsors';
     /** Interne Bilder und Videos der Galerie (Ordner „intern“). */
     case ViewGalleryInternal = 'view_gallery_internal';
     /** Eigene Punkte in „Meins“. */
@@ -83,6 +87,16 @@ enum Capability: string
     case ManageLists = 'manage_lists';
     /** E-Mails aus der Verwaltung schreiben und versenden, Verlauf mit Versandprotokoll sehen (Bereich E-Mails). */
     case SendMail = 'send_mail';
+    /** Sponsoren pflegen: anlegen, ändern, Logo hochladen, sortieren, löschen (Bereich Sponsoren, Issue #279). */
+    case ManageSponsors = 'manage_sponsors';
+    /** Kompanieliste pflegen und Mitglieder zuordnen (Bereich Kompanien, Issue #280). */
+    case ManageCompanies = 'manage_companies';
+    /** Bilder für die Galerie einreichen, eigene Einreichungen sehen und zurückziehen (Issue #286). */
+    case SubmitGallery = 'submit_gallery';
+    /** Einreichungen sehen, freigeben (öffentlich oder intern), ablehnen und freigegebene wieder entfernen (Issue #286). */
+    case ReviewGallery = 'review_gallery';
+    /** Eigene Seiten anlegen, bearbeiten, sortieren und löschen (Bereich Seiten, Issue #287). */
+    case ManagePages = 'manage_pages';
     /**
      * Persönliche Angaben anderer sehen: Adresse, Handynummer, E-Mail-Adresse und das ganze Geburtsdatum (in der
      * Verwaltung auf der Seite der Person). Die eigenen sieht jede Person unter Meins → Konto.
@@ -126,7 +140,8 @@ enum Capability: string
     public function isView(): bool
     {
         return in_array($this, [
-            self::Calendar, self::ViewIntern, self::ViewEvents, self::ViewNews, self::ViewGallery, self::ViewGalleryInternal,
+            self::Calendar, self::ViewIntern, self::ViewEvents, self::ViewNews, self::ViewGallery, self::ViewCompanies,
+            self::ViewSponsors, self::ViewGalleryInternal,
             self::ViewOwnPoints, self::ViewOwnPenalties, self::ViewOwnRank, self::ViewOwnAttendance, self::ViewBirthdays,
             self::VotePolls, self::ViewDirectory, self::ViewOffices, self::ViewFormer, self::ViewDocuments, self::ViewBoard,
             self::ViewRanks, self::ViewCatalog,
@@ -145,7 +160,7 @@ enum Capability: string
 
     /**
      * Wer die Mitgliederliste der Verwaltung sieht: wer Punkte oder Strafen vergibt, Dienstgrade, Titel oder die
-     * Anwesenheit pflegt, persönliche Angaben sieht, Mitglieder anlegt oder Rollen vergibt (wie memberListAllowed() in
+     * Anwesenheit pflegt, Mitglieder Kompanien zuordnet (Issue #280), persönliche Angaben sieht, Mitglieder anlegt oder Rollen vergibt (wie memberListAllowed() in
      * adminNav.tsx). Punkte und Strafen der Mitglieder zeigt sie nur mit dem jeweiligen Recht
      * (MemberService::visibleParts).
      *
@@ -153,6 +168,6 @@ enum Capability: string
      */
     public static function memberList(): array
     {
-        return [self::ManagePoints, self::ManagePenalties, self::ManageRanks, self::ManageTitles, self::ManageAttendance, self::ViewPersonal, self::CreateUsers, self::PromoteUsers];
+        return [self::ManagePoints, self::ManagePenalties, self::ManageRanks, self::ManageTitles, self::ManageAttendance, self::ManageCompanies, self::ViewPersonal, self::CreateUsers, self::PromoteUsers];
     }
 }

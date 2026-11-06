@@ -26,6 +26,8 @@ const ALL_FEATURES = [
   'offices',
   'lists',
   'mail',
+  'sponsors',
+  'companies',
 ];
 /** Admin mit allen Rechten und allen Bereichen. */
 const admin: HelpContext = { boardWriter: true, can: () => true, features: Object.fromEntries(ALL_FEATURES.map((f) => [f, true])) };
@@ -61,7 +63,10 @@ const PATHS = [
   ['news', 'abc'],
   ['galerie'],
   ['galerie', '3'],
+  ['sponsoren'],
+  ['kompanien'],
   ['intern'],
+  ['menue', '1'],
   ['dokumente'],
   ['dokumente', '5'],
   ['dokumente', 'verwalten'],
@@ -128,6 +133,7 @@ const PATHS = [
   ['einstellungen'],
   ...[
     'bereiche',
+    'navigation',
     'rollen',
     'google',
     'kalender',
@@ -175,6 +181,10 @@ test('Eine eigene Seite je Bildschirm', () => {
   const cases: [string[], string][] = [
     [['news', 'abc'], 'neuigkeiten-beitrag'],
     [['galerie', '3'], 'galerie-album'],
+    [['sponsoren'], 'sponsoren'],
+    [['verwaltung', 'sponsoren'], 'sponsoren-verwalten'],
+    [['kompanien'], 'kompanien'],
+    [['verwaltung', 'kompanien'], 'kompanien-verwalten'],
     [['intern'], 'intern'],
     [['dienstgrade'], 'dienstgrade'],
     [['punktekatalog'], 'punktekatalog-ansehen'],

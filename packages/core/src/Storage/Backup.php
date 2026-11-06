@@ -63,21 +63,24 @@ final class Backup
         // Mailversand (Issue #172): gemerktes Limit des Mailservers und Pause zwischen den Portionen.
         'mail_server_size', 'board_mail_next',
         'push_calendar_seen', 'push_news_seen', 'push_reminder_date', 'push_board_offered', 'push_polls_offered', 'push_birthdays_offered',
+        // Protokoll der Benachrichtigungen (PushService::LOG_SETTING): Stand dieser Installation.
+        'push_log',
     ];
     /** Tabellen des Kerns, in einer Reihenfolge, die beim Einfügen passt. */
-    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'member_photos', 'member_contacts', 'office_groups', 'offices', 'office_terms', 'office_holders', 'former_members', 'lists', 'list_columns', 'list_rows', 'mailings', 'attachments', 'push_subscriptions'];
+    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'member_photos', 'member_contacts', 'office_groups', 'offices', 'office_terms', 'office_holders', 'office_group_terms', 'former_members', 'lists', 'list_columns', 'list_rows', 'mailings', 'attachments', 'sponsors', 'companies', 'member_companies', 'gallery_submissions', 'app_pages', 'push_subscriptions'];
     /**
      * Tabellen, die beim Wiederherstellen nur geleert werden, wenn die Sicherung sie enthält: Push-Abos waren früher nicht
      * in Sicherungen; eine ältere Sicherung soll die Geräte nicht abmelden (der Schlüssel bleibt dann ebenfalls).
      */
     public const KEEP_IF_MISSING = ['push_subscriptions'];
     /** Ordner der geschützten Dateiablage mit Dateien, die zur Sicherung gehören: Dokumente, Abzeichen der Dienstgrade, Anhänge. */
-    public const FILE_DIRS = ['dokumente', 'abzeichen', 'anhaenge'];
+    /** einreichungen: hochgeladene Bilder der Galerie (Issue #285), lassen sich nicht aus Drive neu erzeugen */
+    public const FILE_DIRS = ['dokumente', 'abzeichen', 'anhaenge', 'einreichungen'];
     /** JSON-Optionen der Sicherung (wie beim Herunterladen, Hochladen nach Drive und vor einem Update). */
     public const JSON_FLAGS = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE;
     /** write(): Zeilen je Abfrage; Tabellen mit großen Zeilen (Fotos und Bilder als Base64) zeilenweise. */
     private const CHUNK_ROWS = 200;
-    private const HEAVY_TABLES = ['member_photos', 'rich_images'];
+    private const HEAVY_TABLES = ['member_photos', 'rich_images', 'sponsors', 'companies', 'gallery_submissions'];
     /** write(): Block einer Datei (Vielfaches von 3, damit die Base64-Teile aneinanderpassen). */
     private const FILE_BLOCK = 3 * 1024 * 1024;
 
@@ -183,13 +186,25 @@ final class Backup
             'abzeichen' => array_values(array_filter(array_map('strval', array_column($tables['ranks'] ?? [], 'badge_file')))),
             // Anhänge gespeicherter Nachrichten und Mails, keine Entwürfe
             'anhaenge' => array_map('strval', array_column(array_filter($tables['attachments'] ?? [], static fn (mixed $r): bool => is_array($r) && ($r['owner_type'] ?? '') !== 'draft'), 'file')),
+            // Hochgeladene Bilder der Galerie (Issue #285): photos.drive_file_id „upload:einreichungen/<Datei>“
+            // und offene Einreichungen (Issue #286): gallery_submissions.file_key „einreichungen/<Datei>“
+            'einreichungen' => array_values(array_filter([
+                ...array_map(
+                    static fn (mixed $r): string => is_array($r) && str_starts_with((string) ($r['drive_file_id'] ?? ''), 'upload:einreichungen/') ? substr((string) $r['drive_file_id'], strlen('upload:einreichungen/')) : '',
+                    $tables['photos'] ?? [],
+                ),
+                ...array_map(
+                    static fn (mixed $r): string => is_array($r) && ($r['status'] ?? '') === 'pending' && str_starts_with((string) ($r['file_key'] ?? ''), 'einreichungen/') ? substr((string) $r['file_key'], strlen('einreichungen/')) : '',
+                    $tables['gallery_submissions'] ?? [],
+                ),
+            ])),
         ];
         $out = [];
         foreach (self::FILE_DIRS as $dir) {
             $base = dirname($files->path($dir . '/x', false));
             foreach (glob($base . '/*') ?: [] as $file) {
                 $name = basename($file);
-                $referenced = $dir === 'dokumente' || $dir === 'anhaenge'
+                $referenced = $dir !== 'abzeichen'
                     ? in_array($name, $wanted[$dir], true)
                     : array_filter($wanted['abzeichen'], static fn (string $b): bool => str_starts_with($name, $b . '-') || str_starts_with($name, $b . '.')) !== [];
                 if (!$referenced || !is_file($file) || !self::validFileName($name)) {
@@ -248,6 +263,10 @@ final class Backup
                     $first = false;
                     if ($table === 'documents' || $table === 'ranks' || $table === 'attachments') {
                         $refs[$table][] = array_intersect_key($row, ['file' => 1, 'badge_file' => 1, 'owner_type' => 1]);
+                    } elseif ($table === 'photos' && str_starts_with((string) ($row['drive_file_id'] ?? ''), 'upload:')) {
+                        $refs[$table][] = ['drive_file_id' => $row['drive_file_id']];
+                    } elseif ($table === 'gallery_submissions' && ($row['status'] ?? '') === 'pending') {
+                        $refs[$table][] = ['status' => 'pending', 'file_key' => $row['file_key']];
                     }
                 }
                 if (count($rows) < $size) {

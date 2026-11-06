@@ -3,7 +3,7 @@ titel: Einrichtungsassistent
 reihenfolge: 105
 rechte: [manage_settings]
 ---
-Der Einrichtungsassistent führt dich nach der Installation Schritt für Schritt durch das Wichtigste: Bereiche wählen, Kalender, {bereich.gallery} und {bereich.news} verbinden, Mitglieder übernehmen. Alles, was du hier einstellst, kannst du später unter **Einstellungen** ändern.
+Der Einrichtungsassistent führt dich nach der Installation Schritt für Schritt durch das Wichtigste: Bereiche wählen, Kalender, {bereich.gallery} und {bereich.news} verbinden, Impressum und Datenschutz eintragen, Mitglieder übernehmen. Alles, was du hier einstellst, kannst du später unter **Einstellungen** ändern.
 
 ![Der erste Schritt des Assistenten: die Bereiche wählen](bild:admin-einrichtung)
 
@@ -32,6 +32,9 @@ Für jeden gewählten Bereich, der eine Verbindung braucht, folgt ein eigener Sc
 2. Tippe auf **Weiter**. Willst du das später erledigen, tippe gleich auf **Weiter**.
 
 ![Der Schritt mit Google-Zugang und {bereich.gallery}](bild:admin-einrichtung-galerie)
+
+### Impressum und Datenschutz
+Hier trägst du die Links auf euer Impressum und eure Datenschutzerklärung ein, z. B. auf eurer Webseite, und tippst auf **Speichern**. Die App zeigt sie allen, auch ohne Anmeldung. Mehr dazu: [Impressum und Datenschutz](seite:admin-rechtliches).
 
 ### Mitglieder übernehmen
 Habt ihr eine Mitgliederliste in Excel oder als CSV, legst du hier alle Mitglieder auf einmal an, auf Wunsch auch Ehemalige. Wie das geht, steht unter [Mitglieder aus einer Datei übernehmen](seite:mitglieder-import). Nach dem Übernehmen tippst du auf **Weiter zum letzten Schritt**. Ohne Liste tippst du einfach auf **Weiter**.

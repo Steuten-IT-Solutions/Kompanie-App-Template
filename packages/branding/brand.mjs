@@ -69,6 +69,9 @@ const DEFAULTS = {
     offices: 'Ämter',
     lists: 'Listen',
     mail: 'E-Mails',
+    sponsors: 'Sponsoren',
+    companies: 'Kompanien',
+    pages: 'Seiten',
   },
   rank: 'Dienstgrad',
 };

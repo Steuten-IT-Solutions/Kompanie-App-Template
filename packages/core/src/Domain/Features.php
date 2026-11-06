@@ -36,7 +36,7 @@ final class Features
         'events' => ['label' => 'Termine', 'description' => 'Öffentliche Termine, die auch Gäste ohne Anmeldung sehen.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_events']],
         'calendar' => ['label' => 'Kalender', 'description' => 'Alle Termine aus Google Kalender für angemeldete Mitglieder.', 'requires' => [], 'setup' => 'kalender', 'role' => null],
         'news' => ['label' => 'News', 'description' => 'Neuigkeiten der Kompanie, z. B. aus den Beiträgen der Webseite.', 'requires' => [], 'setup' => 'news', 'role' => null],
-        'gallery' => ['label' => 'Galerie', 'description' => 'Fotoalben aus Google Drive, mit internen Bildern nur für Mitglieder.', 'requires' => [], 'setup' => 'galerie', 'role' => null],
+        'gallery' => ['label' => 'Galerie', 'description' => 'Fotoalben aus Google Drive oder nur in der App, mit internen Bildern nur für Mitglieder; auf Wunsch reichen Mitglieder Bilder zur Freigabe ein.', 'requires' => [], 'setup' => 'galerie', 'role' => ['member', 'review_gallery']],
         'points' => ['label' => 'Punkte', 'description' => 'Punkte für Mitglieder, mit Katalog und Verlauf.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_points']],
         'penalties' => ['label' => 'Strafen', 'description' => 'Strafen der Mitglieder, offen oder bezahlt.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_penalties']],
         'ranks' => ['label' => 'Dienstgrade', 'description' => 'Dienstgrade der Mitglieder mit Verlauf; zusammen mit Punkten mit Punkteschwellen und Beförderungsübersicht.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_ranks']],
@@ -58,6 +58,11 @@ final class Features
         'lists' => ['label' => 'Listen', 'description' => 'Listen zum Ausdrucken oder als CSV, z. B. Unterschriften- oder Teilnehmerlisten, mit eigenen Spalten und den Mitgliedern als Zeilen; nur für alle, die sie verwalten.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_lists']],
         // E-Mails: in der Verwaltung schreiben und versenden (An, Cc, Bcc); braucht den Mailversand (Einstellungen → E-Mail).
         'mail' => ['label' => 'E-Mails', 'description' => 'E-Mails aus der App an Rollen, einzelne Mitglieder und beliebige Adressen schreiben, mit An, Cc und Bcc und Versandprotokoll; nur für alle, die sie versenden dürfen.', 'requires' => [], 'setup' => 'email', 'role' => ['member', 'send_mail']],
+        // Sponsoren (Issue #279): Logos mit Link, öffentlich (view_sponsors, anfangs auch Gast).
+        'companies' => ['label' => 'Kompanien', 'description' => 'Liste eurer Kompanien mit Logo, Beschreibung und Links; Mitglieder lassen sich ihnen zuordnen. Für alle sichtbar, auch ohne Anmeldung.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_companies']],
+        'sponsors' => ['label' => 'Sponsoren', 'description' => 'Eure Sponsoren mit Logo und Link, in eurer Reihenfolge, für alle sichtbar, auch ohne Anmeldung.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_sponsors']],
+        // Eigene Seiten (Issue #287): freie Texte mit Bildern, öffentlich oder für Mitglieder.
+        'pages' => ['label' => 'Seiten', 'description' => 'Eigene Seiten mit formatiertem Text und Bildern, z. B. Geschichte, Festprogramm oder Anfahrt; je Seite für alle oder nur für Mitglieder.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_pages']],
     ];
 
     /** @var array<string, bool>|null */
@@ -188,7 +193,8 @@ final class Features
         }
         // Schwarzes Brett (Issue #5), Umfragen (Issue #4) und Geburtstage (Issue #1): Beim ersten Einschalten bekommen
         // bestehende Abos die neue Art dazu (einmalig je Art, siehe PushService::offerTypeToExisting).
-        foreach (['board' => PushService::TYPE_BOARD, 'polls' => PushService::TYPE_POLLS, 'birthdays' => PushService::TYPE_BIRTHDAYS] as $feature => $type) {
+        // Ebenso die Galerie mit Einreichungen (Issue #286).
+        foreach ([['board', PushService::TYPE_BOARD], ['polls', PushService::TYPE_POLLS], ['birthdays', PushService::TYPE_BIRTHDAYS], ['gallery', PushService::TYPE_GALLERY_REVIEW], ['gallery', PushService::TYPE_GALLERY_SUBMISSIONS]] as [$feature, $type]) {
             if ($next[$feature] && !($before[$feature] ?? false)) {
                 try {
                     $this->app->push()->offerTypeToExisting($type);
@@ -219,8 +225,8 @@ final class Features
         $state = [];
         foreach (self::keys() as $key) {
             // Dienstgrade, Titel, Anwesenheit, Dokumente, das Schwarze Brett, Umfragen, Geburtstage, Inventar, die
-            // Mitgliederliste, Ämter und Listen gab es in den alten Versionen nicht: nie aus kompanie.json einschalten.
-            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices', 'lists'], true) && $this->app->config->legacyFeature($key);
+            // Mitgliederliste, Ämter, Listen, E-Mails und Sponsoren gab es in den alten Versionen nicht: nie aus kompanie.json einschalten.
+            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices', 'lists', 'mail', 'sponsors', 'companies', 'pages'], true) && $this->app->config->legacyFeature($key);
         }
         $this->save($state);
     }

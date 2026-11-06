@@ -1437,6 +1437,225 @@ WHERE title IS NULL",
                 'mysql' => ["ALTER TABLE {lists} ADD COLUMN people varchar(255) NOT NULL DEFAULT ''"],
                 'sqlite' => ["ALTER TABLE {lists} ADD COLUMN people TEXT NOT NULL DEFAULT ''"],
             ],
+            // Sponsoren (Issue #279): Name (Pflicht, auch Alternativtext des Logos), Link (nur https, leer ohne), Reihenfolge.
+            // Das Logo steht wie die Fotos der Mitglieder in der Datenbank (so enthält es die Sicherung): logo_type png
+            // (Base64, höchstens 512 Pixel) oder svg (bereinigt, Klartext), leer ohne Logo; logo_version wechselt mit jedem
+            // Logo (Adresse). updated_at in UTC.
+            38 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {sponsors} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  name varchar(100) NOT NULL,
+  url varchar(255) NOT NULL DEFAULT \'\',
+  sort int(11) NOT NULL DEFAULT 0,
+  logo_type varchar(4) NOT NULL DEFAULT \'\',
+  logo_version varchar(32) NOT NULL DEFAULT \'\',
+  logo mediumtext DEFAULT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {sponsors} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  url TEXT NOT NULL DEFAULT \'\',
+  sort INTEGER NOT NULL DEFAULT 0,
+  logo_type TEXT NOT NULL DEFAULT \'\',
+  logo_version TEXT NOT NULL DEFAULT \'\',
+  logo TEXT DEFAULT NULL,
+  updated_at TEXT NOT NULL
+)',
+                ],
+            ],
+            // Kompanieliste (Issue #280): Kompanien mit Logo, Beschreibung und Links; Mitglieder optional zugeordnet
+            // (mehrere je Person möglich, eindeutig ist das Paar).
+            39 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {companies} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  name varchar(100) NOT NULL,
+  short_name varchar(30) NOT NULL DEFAULT \'\',
+  founded_year smallint(5) unsigned DEFAULT NULL,
+  description mediumtext DEFAULT NULL,
+  website_url varchar(255) NOT NULL DEFAULT \'\',
+  app_url varchar(255) NOT NULL DEFAULT \'\',
+  office_group_id bigint(20) unsigned DEFAULT NULL,
+  sort int(11) NOT NULL DEFAULT 0,
+  active tinyint(1) NOT NULL DEFAULT 1,
+  logo_type varchar(4) NOT NULL DEFAULT \'\',
+  logo_version varchar(32) NOT NULL DEFAULT \'\',
+  logo mediumtext DEFAULT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {member_companies} (
+  user_id bigint(20) unsigned NOT NULL,
+  company_id bigint(20) unsigned NOT NULL,
+  assigned_at datetime NOT NULL,
+  PRIMARY KEY (user_id, company_id),
+  KEY company_id (company_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {companies} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  short_name TEXT NOT NULL DEFAULT \'\',
+  founded_year INTEGER DEFAULT NULL,
+  description TEXT DEFAULT NULL,
+  website_url TEXT NOT NULL DEFAULT \'\',
+  app_url TEXT NOT NULL DEFAULT \'\',
+  office_group_id INTEGER DEFAULT NULL,
+  sort INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1,
+  logo_type TEXT NOT NULL DEFAULT \'\',
+  logo_version TEXT NOT NULL DEFAULT \'\',
+  logo TEXT DEFAULT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE TABLE IF NOT EXISTS {member_companies} (
+  user_id INTEGER NOT NULL,
+  company_id INTEGER NOT NULL,
+  assigned_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, company_id)
+)',
+                    'CREATE INDEX IF NOT EXISTS {member_companies}_company_id ON {member_companies} (company_id)',
+                ],
+            ],
+            // Gemeinsame Amtszeiten einer Gruppe der Ämter (Issue #282), z. B. „Königshaus 2025–2026“ mit Gruppenbild:
+            // office_groups.joint_terms schaltet sie je Gruppe ein; office_group_terms hält Jahre, Zusatz und Bild
+            // (image_uid in rich_images). Je Amt bleibt eine normale Zeile in office_terms mit denselben Jahren
+            // (group_term_id), damit Chronik, Jahre, Zeitstrahl, Titel und ein Zurückrollen weiter funktionieren.
+            40 => [
+                'mysql' => [
+                    'ALTER TABLE {office_groups} ADD COLUMN joint_terms tinyint(1) NOT NULL DEFAULT 0',
+                    // Spalte und Index in einer Anweisung: wiederholt ausgeführt überspringt der Migrator beides
+                    'ALTER TABLE {office_terms} ADD COLUMN group_term_id bigint(20) unsigned DEFAULT NULL, ADD KEY group_term_id (group_term_id)',
+                    'CREATE TABLE IF NOT EXISTS {office_group_terms} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  group_id bigint(20) unsigned NOT NULL,
+  kind varchar(10) NOT NULL DEFAULT \'period\',
+  start_year int(11) NOT NULL,
+  end_year int(11) DEFAULT NULL,
+  note varchar(100) NOT NULL DEFAULT \'\',
+  image_uid varchar(32) DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY group_id (group_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'ALTER TABLE {office_groups} ADD COLUMN joint_terms INTEGER NOT NULL DEFAULT 0',
+                    'ALTER TABLE {office_terms} ADD COLUMN group_term_id INTEGER DEFAULT NULL',
+                    'CREATE INDEX IF NOT EXISTS {office_terms}_group_term_id ON {office_terms} (group_term_id)',
+                    'CREATE TABLE IF NOT EXISTS {office_group_terms} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_id INTEGER NOT NULL,
+  kind TEXT NOT NULL DEFAULT \'period\',
+  start_year INTEGER NOT NULL,
+  end_year INTEGER DEFAULT NULL,
+  note TEXT NOT NULL DEFAULT \'\',
+  image_uid TEXT DEFAULT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {office_group_terms}_group_id ON {office_group_terms} (group_id)',
+                ],
+            ],
+            // Fotos für Amtsinhaber ohne Konto (Issue #283): Bild in rich_images (Besitzer office_holder), je Eintrag einer
+            // Amtszeit; bei Konten bleibt das Foto des Kontos maßgeblich.
+            41 => [
+                'mysql' => ['ALTER TABLE {office_holders} ADD COLUMN image_uid varchar(32) DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {office_holders} ADD COLUMN image_uid TEXT DEFAULT NULL'],
+            ],
+            // Galerie-Quelle „eigener Server“ (Issue #285): Herkunft je Bild (drive aus dem Abgleich, upload in der App
+            // hochgeladen; drive_file_id dann „upload:<Schlüssel>“) und je Album (drive, app: nur in der App, drive_id
+            // „app:<Kennung>“). Der Abgleich mit Drive ändert und löscht nur, was aus Drive kommt.
+            42 => [
+                'mysql' => [
+                    "ALTER TABLE {photos} ADD COLUMN source varchar(10) NOT NULL DEFAULT 'drive'",
+                    "ALTER TABLE {albums} ADD COLUMN source varchar(10) NOT NULL DEFAULT 'drive'",
+                ],
+                'sqlite' => [
+                    "ALTER TABLE {photos} ADD COLUMN source TEXT NOT NULL DEFAULT 'drive'",
+                    "ALTER TABLE {albums} ADD COLUMN source TEXT NOT NULL DEFAULT 'drive'",
+                ],
+            ],
+            // Eingereichte Bilder der Galerie (Issue #286): Datei im MediaStore (file_key), kleine Vorschau als Base64,
+            // Status pending, approved (photo_id zeigt auf das Bild) oder rejected (Datei schon gelöscht, Grund bleibt).
+            43 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {gallery_submissions} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  user_id bigint(20) unsigned NOT NULL,
+  album_id bigint(20) unsigned NOT NULL,
+  file_key varchar(100) NOT NULL DEFAULT \'\',
+  name varchar(255) NOT NULL DEFAULT \'\',
+  width int(11) NOT NULL DEFAULT 0,
+  height int(11) NOT NULL DEFAULT 0,
+  bytes bigint(20) unsigned NOT NULL DEFAULT 0,
+  md5 varchar(32) NOT NULL DEFAULT \'\',
+  thumb mediumtext DEFAULT NULL,
+  status varchar(10) NOT NULL DEFAULT \'pending\',
+  consent_at datetime NOT NULL,
+  created_at datetime NOT NULL,
+  reviewed_by bigint(20) unsigned DEFAULT NULL,
+  reviewed_at datetime DEFAULT NULL,
+  reason varchar(255) NOT NULL DEFAULT \'\',
+  photo_id bigint(20) unsigned DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY user_id (user_id),
+  KEY status (status)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {gallery_submissions} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  album_id INTEGER NOT NULL,
+  file_key TEXT NOT NULL DEFAULT \'\',
+  name TEXT NOT NULL DEFAULT \'\',
+  width INTEGER NOT NULL DEFAULT 0,
+  height INTEGER NOT NULL DEFAULT 0,
+  bytes INTEGER NOT NULL DEFAULT 0,
+  md5 TEXT NOT NULL DEFAULT \'\',
+  thumb TEXT DEFAULT NULL,
+  status TEXT NOT NULL DEFAULT \'pending\',
+  consent_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  reviewed_by INTEGER DEFAULT NULL,
+  reviewed_at TEXT DEFAULT NULL,
+  reason TEXT NOT NULL DEFAULT \'\',
+  photo_id INTEGER DEFAULT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {gallery_submissions}_user_id ON {gallery_submissions} (user_id)',
+                    'CREATE INDEX IF NOT EXISTS {gallery_submissions}_status ON {gallery_submissions} (status)',
+                ],
+            ],
+            // Eigene Seiten (Issue #287): Text als RichText, Bilder in rich_images (Besitzer page), audience public oder members.
+            44 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {app_pages} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  title varchar(100) NOT NULL,
+  body mediumtext DEFAULT NULL,
+  audience varchar(10) NOT NULL DEFAULT \'members\',
+  sort int(11) NOT NULL DEFAULT 0,
+  updated_by bigint(20) unsigned DEFAULT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {app_pages} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  body TEXT DEFAULT NULL,
+  audience TEXT NOT NULL DEFAULT \'members\',
+  sort INTEGER NOT NULL DEFAULT 0,
+  updated_by INTEGER DEFAULT NULL,
+  updated_at TEXT NOT NULL
+)',
+                ],
+            ],
         ];
     }
 

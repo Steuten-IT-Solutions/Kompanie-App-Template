@@ -38,7 +38,7 @@ final class TestApp
         if ($db->driver() !== 'mysql') {
             return;
         }
-        foreach (['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'push_subscriptions', 'push_queue', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'bug_reports', 'member_photos', 'office_groups', 'offices', 'office_terms', 'office_holders', 'former_members', 'lists', 'list_columns', 'list_rows', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'board_mails', 'activity', 'activity_last', 'activity_seen', 'activity_daily', 'member_contacts', 'mailings', 'mailing_recipients', 'attachments'] as $t) {
+        foreach (['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'push_subscriptions', 'push_queue', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'bug_reports', 'member_photos', 'office_groups', 'offices', 'office_terms', 'office_holders', 'office_group_terms', 'former_members', 'lists', 'list_columns', 'list_rows', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'board_mails', 'activity', 'activity_last', 'activity_seen', 'activity_daily', 'member_contacts', 'mailings', 'mailing_recipients', 'attachments', 'sponsors', 'companies', 'member_companies', 'gallery_submissions', 'app_pages'] as $t) {
             $db->execute('DROP TABLE IF EXISTS ' . $db->table($t));
         }
     }
@@ -91,15 +91,16 @@ final class TestApp
     }
 
     /**
-     * Rechte, wie sie vor dem Aufteilen gemeint waren (member schloss das Sehen ein, Roles::expandLegacy), in der
-     * Reihenfolge, in der sie gespeichert werden.
+     * Rechte, wie sie vor dem Aufteilen gemeint waren (member schloss das Sehen ein, Roles::expandLegacy), mit den
+     * später dazugekommenen Rechten zum Sehen (Roles::ADDED_VIEW, wie nach dem Update), in der Reihenfolge, in der sie
+     * gespeichert werden.
      *
      * @param string[] $legacy
      * @return string[]
      */
     public static function caps(array $legacy): array
     {
-        $all = \KompanieApp\Core\Auth\Roles::expandLegacy($legacy);
+        $all = [...\KompanieApp\Core\Auth\Roles::expandLegacy($legacy), ...\KompanieApp\Core\Auth\Roles::ADDED_VIEW];
         return array_values(array_filter(
             array_map(static fn (\KompanieApp\Core\Auth\Capability $c): string => $c->value, \KompanieApp\Core\Auth\Roles::GRANTABLE),
             static fn (string $v): bool => in_array($v, $all, true),

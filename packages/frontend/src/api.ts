@@ -8,6 +8,7 @@ import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
 import { noteError } from './lastError';
 import { rememberRoute } from './share';
+import type { NavigationSetting } from './navigation';
 
 /** Schlüssel einer Rolle: guest, member, admin, früher fest (organizer, manager, candidate) oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
@@ -18,6 +19,8 @@ export type Capability =
   | 'view_events'
   | 'view_news'
   | 'view_gallery'
+  | 'view_companies'
+  | 'view_sponsors'
   | 'view_gallery_internal'
   | 'view_own_points'
   | 'view_own_penalties'
@@ -45,6 +48,11 @@ export type Capability =
   | 'manage_offices'
   | 'manage_lists'
   | 'send_mail'
+  | 'manage_sponsors'
+  | 'manage_companies'
+  | 'submit_gallery'
+  | 'review_gallery'
+  | 'manage_pages'
   | 'view_personal'
   | 'manage_personal'
   | 'create_users'
@@ -69,7 +77,10 @@ export type Feature =
   | 'directory'
   | 'offices'
   | 'lists'
-  | 'mail';
+  | 'mail'
+  | 'sponsors'
+  | 'companies'
+  | 'pages';
 
 export interface AppUser {
   id: number;
@@ -97,6 +108,8 @@ export interface AppConfig {
   features: Record<Feature, boolean>;
   /** Handbuch auf der Webseite der Kompanie (GitHub Pages); null ohne Update-Adresse */
   handbookUrl?: string | null;
+  /** Links auf Impressum und Datenschutzerklärung der Kompanie (Einstellungen → Impressum und Datenschutz); null ohne */
+  legal?: { imprint: string | null; privacy: string | null };
   /** „Fehler melden“ möglich (Issue #64): Die App hat einen Empfänger für Fehlermeldungen */
   reports?: boolean;
   /** Rollen der Installation (Einstellungen → Rollen): Bezeichnung und Punktefaktor */
@@ -111,10 +124,39 @@ export interface AppConfig {
   backupUrl?: string | null;
   /** Wartungsmodus (Issue #42): an, Begründung (Klartext), seit (Unix-Zeit) */
   maintenance?: MaintenanceInfo;
+  /** Einrichtbare Navigation (Issue #277): null bzw. fehlt = Standardnavigation */
+  navigation?: NavigationSetting | null;
+  /** Eigene Seiten (Issue #287), die die Person lesen darf, in ihrer Reihenfolge; fehlt bei älteren Servern */
+  pages?: { id: number; title: string }[];
   /** Vorschau „App als Rolle ansehen“ (Issue #63): vom Server bestätigt; role ist der Schlüssel oder @public */
   preview?: { role: string; label: string } | null;
   /** Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen; null ohne den Bereich, fehlt bei älteren Servern */
   birthdays?: { upcomingDays: number } | null;
+}
+
+/** Eigene Seite (Issue #287): public für alle, members nur für Mitglieder; Stand nur für die Pflege (manage_pages). */
+export type PageAudience = 'public' | 'members';
+export interface PageSummary {
+  id: number;
+  title: string;
+  audience: PageAudience;
+  updated_at?: string;
+  updated_by_name?: string | null;
+}
+export interface PageDetail extends PageSummary {
+  /** Formatierter Text (bereinigt), Bilder als Adressen */
+  body: string;
+}
+export type PageInput = { title?: string; audience?: PageAudience; body?: string; updated_at?: string };
+
+/** Einstellungen → Navigation (Issue #277): gespeicherte Navigation und was der Server erlaubt. */
+export interface NavigationAdmin {
+  navigation: NavigationSetting | null;
+  targets: string[];
+  icons: string[];
+  max_main: number;
+  max_menu_items: number;
+  label_max: number;
 }
 
 export interface MaintenanceInfo {
@@ -194,6 +236,13 @@ export function applyFeatures(list: FeatureInfo[]): void {
 export function applyBirthdayUpcomingDays(days: number): void {
   if (!config) return;
   config.birthdays = { upcomingDays: days };
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/** Übernimmt die gespeicherte Navigation in die geladene Konfiguration und baut die Tab-Leiste neu. */
+export function applyNavigation(navigation: NavigationSetting | null): void {
+  if (!config) return;
+  config.navigation = navigation;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -433,6 +482,8 @@ export interface GalleryAlbum {
   id: number;
   title: string;
   year: string;
+  /** Knöpfe zum Herunterladen zeigen (je Bild in der Großansicht, das Album als ZIP); fehlt bei älteren Servern */
+  downloads?: boolean;
   photos: GalleryPhoto[];
 }
 
@@ -481,6 +532,8 @@ export interface DirectoryEntry {
   rank_badge_url?: string | null;
   /** Titel (fehlen ohne Bereich Titel) */
   titles?: TitleRef[];
+  /** Kompanien der Person (fehlen ohne Bereich Kompanien oder ohne view_companies) */
+  companies?: CompanyRef[];
   /** Geburtstag, soweit die Person ihn dem Betrachter zeigt (fehlt ohne Bereich Geburtstage und bei Ehemaligen) */
   birthday?: DirectoryBirthday | null;
   /** Eintrittsjahr, soweit die Person es dem Betrachter zeigt (fehlt bei Ehemaligen: Sie haben joined_year) */
@@ -521,6 +574,8 @@ export interface DirectoryFormerEntry extends DirectoryEntry {
 }
 
 export interface MemberDetail extends MemberSummary {
+  /** Kompanien der Person (nur mit Bereich und Recht „Kompanien verwalten“) */
+  companies?: CompanyRef[];
   point_list: PointEntry[];
   penalties: Penalty[];
   /** Dienstgrad und Verlauf (nur mit Bereich und Recht „Dienstgrade verwalten“) */
@@ -1199,6 +1254,54 @@ export interface AttendanceGroup {
   counts_as: Level | null;
 }
 
+/** Kompanie einer Person (Issue #280), in der Reihenfolge der Kompanieliste. */
+export interface CompanyRef {
+  id: number;
+  name: string;
+  short_name: string;
+  /** false: aufgelöst („ehemalig“) */
+  active: boolean;
+}
+
+/** Kompanie der Kompanieliste (Issue #280). */
+export interface Company extends CompanyRef {
+  founded_year: number | null;
+  /** Bereinigtes HTML, leer ohne */
+  description: string;
+  website_url: string;
+  app_url: string;
+  logo_url: string | null;
+  logo_type: 'png' | 'svg' | null;
+  /** Verknüpfte Gruppe der Ämter; shown: Bereich Ämter an (dann zeigt die App deren laufende Amtszeiten) */
+  office_group: { id: number; title: string; shown: boolean } | null;
+  /** Zugeordnete Personen, nur soweit die Mitgliederliste sichtbar ist (fehlt sonst) */
+  members?: { id: number; name: string }[];
+  member_count?: number;
+  /** Nur für die Pflege: alle Zugeordneten */
+  member_ids?: number[];
+}
+
+export interface CompanyInput {
+  name?: string;
+  short_name?: string;
+  founded_year?: number | null;
+  description?: string;
+  website_url?: string;
+  app_url?: string;
+  office_group_id?: number | null;
+  active?: boolean;
+}
+
+/** Sponsor (Issue #279): Name (auch Alternativtext), Link (nur https, leer ohne), Logo. */
+export interface Sponsor {
+  id: number;
+  name: string;
+  url: string;
+  /** Adresse des Logos (wechselt mit jedem Logo); null ohne */
+  logo_url: string | null;
+  logo_type: 'png' | 'svg' | null;
+}
+
 export interface Title {
   id: number;
   title: string;
@@ -1220,13 +1323,43 @@ export interface TitleRef {
 export interface OfficeGroup {
   id: number;
   title: string;
+  /** Gemeinsame Amtszeiten (Issue #282): Die App zeigt die Gruppe als Chronik der gemeinsamen Amtszeiten */
+  joint_terms?: boolean;
+}
+
+/** Gemeinsame Amtszeit einer Gruppe (Issue #282), z. B. „Königshaus 2025–2026“; die Personen stehen in den Amtszeiten der Ämter (group_term_id). */
+export interface OfficeGroupTerm {
+  id: number;
+  group_id: number;
+  kind: OfficeTermKind;
+  start_year: number;
+  end_year: number | null;
+  note: string;
+  current: boolean;
+  image_url: string | null;
+  /** Nur für die Pflege */
+  image_uid?: string | null;
+}
+
+export interface OfficeGroupTermInput {
+  kind?: OfficeTermKind;
+  start_year?: number;
+  end_year?: number | null;
+  note?: string;
+  /** Kennung aus POST /rich-images, null entfernt das Bild */
+  image_uid?: string | null;
+  /** Je Amt der Gruppe die Personen (leer: keine Amtszeit für dieses Amt) */
+  offices?: { office_id: number; holders: OfficeTermInput['holders'] }[];
 }
 
 /** Inhaber einer Amtszeit: user_id und Foto nur bei Personen der Mitgliederliste (bzw. für die Pflege) */
 export interface OfficeHolder {
   name: string;
   user_id?: number | null;
+  /** Foto des Kontos bzw. bei freien Namen das eigene Foto (Issue #283) */
   photo_url?: string | null;
+  /** Nur für die Pflege: Kennung des Fotos eines freien Namens */
+  image_uid?: string | null;
 }
 
 export type OfficeTermKind = 'period' | 'point';
@@ -1242,6 +1375,8 @@ export interface OfficeTerm {
   honor: boolean;
   /** Zeitraum ohne Ende */
   current: boolean;
+  /** Teil einer gemeinsamen Amtszeit der Gruppe (Issue #282), sonst null */
+  group_term_id?: number | null;
   holders: OfficeHolder[];
 }
 
@@ -1263,6 +1398,8 @@ export interface Office {
 export interface OfficesOverview {
   groups: OfficeGroup[];
   offices: Office[];
+  /** Gemeinsame Amtszeiten aller Gruppen, laufende zuerst, dann nach Beginn absteigend (fehlt bei älteren Servern) */
+  group_terms?: OfficeGroupTerm[];
 }
 
 export interface OfficeTermInput {
@@ -1271,7 +1408,8 @@ export interface OfficeTermInput {
   end_year: number | null;
   note: string;
   honor: boolean;
-  holders: ({ user_id: number } | { name: string })[];
+  /** Konto oder freier Name, dieser mit optionalem Foto (Kennung aus POST /rich-images) */
+  holders: ({ user_id: number } | { name: string; image_uid?: string | null })[];
 }
 
 export interface OfficeImportRow {
@@ -1727,6 +1865,8 @@ export const api = {
   setExtraRoles: (id: number, extra_roles: Level[]) =>
     request<{ id: number; level: Level; extra_roles: Level[] }>('PATCH', `/members/${id}/role`, { extra_roles }),
   member: (id: number) => request<MemberDetail>('GET', `/members/${id}`),
+  /** Mehrere Personen auf einmal (höchstens 25, Vorladen beim Blättern); unbekannte fehlen in der Antwort. */
+  memberDetails: (ids: number[]) => request<MemberDetail[]>('GET', '/members/details', undefined, { ids: ids.join(',') }),
   /** Rechte einer Person zusätzlich zur Rolle geben bzw. entziehen; leere Listen: wie die Rolle. */
   setRights: (id: number, grant: Capability[], revoke: Capability[]) =>
     request<MemberRights>('PUT', `/members/${id}/rights`, { grant, revoke }),
@@ -1899,8 +2039,40 @@ export const api = {
 
   // Ämter (Issue #112): Zeitstrahl öffentlich, Pflege mit manage_offices
   offices: () => request<OfficesOverview>('GET', '/offices'),
+
+  // Eigene Seiten (Issue #287)
+  pages: () => request<{ pages: PageSummary[] }>('GET', '/pages').then((r) => r.pages),
+  page: (id: number) => request<PageDetail>('GET', `/pages/${id}`),
+  createPage: (data: PageInput) => request<PageDetail>('POST', '/pages', data),
+  updatePage: (id: number, data: PageInput) => request<PageDetail>('PATCH', `/pages/${id}`, data),
+  deletePage: (id: number) => request<{ deleted: boolean }>('DELETE', `/pages/${id}`),
+  reorderPages: (ids: number[]) => request<{ pages: PageSummary[] }>('PUT', '/pages/order', { ids }).then((r) => r.pages),
+  // Sponsoren (Issue #279)
+  sponsors: () => request<Sponsor[]>('GET', '/sponsors'),
+  createSponsor: (data: { name: string; url: string }) => request<Sponsor>('POST', '/sponsors', data),
+  updateSponsor: (id: number, data: { name?: string; url?: string }) => request<Sponsor>('PATCH', `/sponsors/${id}`, data),
+  deleteSponsor: (id: number) => request<{ deleted: boolean }>('DELETE', `/sponsors/${id}`),
+  reorderSponsors: (ids: number[]) => request<Sponsor[]>('PUT', '/sponsors/order', { ids }),
+  uploadSponsorLogo: async (id: number, file: File) => request<Sponsor>('POST', `/sponsors/${id}/logo`, { file: await encodeFile(file) }),
+  removeSponsorLogo: (id: number) => request<Sponsor>('DELETE', `/sponsors/${id}/logo`),
+  // Kompanien (Issue #280)
+  companies: () => request<Company[]>('GET', '/companies'),
+  createCompany: (data: CompanyInput) => request<Company>('POST', '/companies', data),
+  updateCompany: (id: number, data: CompanyInput) => request<Company>('PATCH', `/companies/${id}`, data),
+  deleteCompany: (id: number) => request<{ deleted: boolean }>('DELETE', `/companies/${id}`),
+  reorderCompanies: (ids: number[]) => request<Company[]>('PUT', '/companies/order', { ids }),
+  uploadCompanyLogo: async (id: number, file: File) => request<Company>('POST', `/companies/${id}/logo`, { file: await encodeFile(file) }),
+  removeCompanyLogo: (id: number) => request<Company>('DELETE', `/companies/${id}/logo`),
+  setCompanyMembers: (id: number, user_ids: number[]) => request<Company>('PUT', `/companies/${id}/members`, { user_ids }),
+  setMemberCompanies: (id: number, company_ids: number[]) =>
+    request<{ companies: CompanyRef[] }>('PUT', `/members/${id}/companies`, { company_ids }),
   createOfficeGroup: (title: string) => request<OfficeGroup>('POST', '/office-groups', { title }),
   updateOfficeGroup: (id: number, title: string) => request<OfficeGroup>('PATCH', `/office-groups/${id}`, { title }),
+  setOfficeGroupJoint: (id: number, joint_terms: boolean) => request<OfficeGroup>('PATCH', `/office-groups/${id}`, { joint_terms }),
+  createOfficeGroupTerm: (groupId: number, input: OfficeGroupTermInput) =>
+    request<OfficeGroupTerm>('POST', `/office-groups/${groupId}/terms`, input),
+  updateOfficeGroupTerm: (id: number, input: OfficeGroupTermInput) => request<OfficeGroupTerm>('PATCH', `/office-group-terms/${id}`, input),
+  deleteOfficeGroupTerm: (id: number) => request<{ deleted: boolean }>('DELETE', `/office-group-terms/${id}`),
   deleteOfficeGroup: (id: number) => request<{ deleted: boolean }>('DELETE', `/office-groups/${id}`),
   reorderOfficeGroups: (ids: number[]) => request<OfficeGroup[]>('PUT', '/office-groups/order', { ids }),
   createOffice: (data: { title: string; group_id: number | null }) => request<Office>('POST', '/offices', data),
@@ -1967,6 +2139,8 @@ export const api = {
     }),
   setActivityPersonal: (personal: boolean) => request<{ personal: boolean }>('PUT', '/admin/activity/settings', { personal }),
   maintenance: () => request<MaintenanceState>('GET', '/admin/maintenance'),
+  navigation: () => request<NavigationAdmin>('GET', '/admin/navigation'),
+  saveNavigation: (navigation: NavigationSetting | null) => request<NavigationAdmin>('PUT', '/admin/navigation', { navigation }),
   setMaintenance: (on: boolean, reason?: string) =>
     request<MaintenanceState>('POST', '/admin/maintenance', reason === undefined ? { on } : { on, reason }),
   /** Laufzeit-Konfiguration neu laden (z. B. „Erneut versuchen“ auf der Wartungsseite). */
@@ -1994,6 +2168,26 @@ export const api = {
       { only_process: onlyProcess },
     ),
   galleryFailed: () => request<{ photos: FailedPhoto[]; total: number }>('GET', '/admin/gallery/failed'),
+  // Alben der App und hochgeladene Bilder (Issue #285)
+  galleryAlbums: () => request<{ albums: GalleryAdminAlbum[] }>('GET', '/admin/gallery/albums'),
+  galleryAdminAlbum: (id: number) => request<GalleryAdminAlbumDetail>('GET', `/admin/gallery/albums/${id}`),
+  createGalleryAlbum: (input: { title: string; year: number }) => request<GalleryAdminAlbumDetail>('POST', '/admin/gallery/albums', input),
+  updateGalleryAlbum: (id: number, input: { title?: string; year?: number }) =>
+    request<GalleryAdminAlbumDetail>('PATCH', `/admin/gallery/albums/${id}`, input),
+  deleteGalleryAlbum: (id: number) => request<{ deleted: boolean }>('DELETE', `/admin/gallery/albums/${id}`),
+  uploadGalleryPhoto: async (albumId: number, file: File, intern: boolean) =>
+    request<GalleryAdminAlbumDetail>('POST', `/admin/gallery/albums/${albumId}/photos`, { file: await encodeFile(file), intern }),
+  deleteGalleryPhoto: (id: number) => request<{ deleted: boolean }>('DELETE', `/admin/gallery/photos/${id}`),
+  // Einreichungen (Issue #286)
+  gallerySubmissions: () => request<GallerySubmissionsOwn>('GET', '/gallery/submissions'),
+  submitGalleryPhoto: async (albumId: number, file: File) =>
+    request<GallerySubmission>('POST', '/gallery/submissions', { album_id: albumId, file: await encodeFile(file), consent: true }),
+  withdrawGallerySubmission: (id: number) => request<{ deleted: boolean }>('DELETE', `/gallery/submissions/${id}`),
+  galleryReview: () => request<GalleryReview>('GET', '/gallery/review'),
+  approveGallerySubmission: (id: number, intern: boolean) =>
+    request<GallerySubmission>('POST', `/gallery/review/${id}/approve`, { intern }),
+  rejectGallerySubmission: (id: number, reason: string) => request<GallerySubmission>('POST', `/gallery/review/${id}/reject`, { reason }),
+  removeGallerySubmission: (id: number, reason = '') => request<{ removed: boolean }>('POST', `/gallery/review/${id}/remove`, { reason }),
   retryGallery: () => request<{ retried: number; pending: number }>('POST', '/admin/gallery/retry', {}),
 
   status: () => request<AdminStatus>('GET', '/admin/status'),
@@ -2090,7 +2284,19 @@ export interface ReportInput {
   website?: string;
 }
 
-export type PushType = 'board' | 'polls' | 'birthdays' | 'penalties' | 'points' | 'ranks' | 'titles' | 'events' | 'reminder' | 'news';
+export type PushType =
+  | 'board'
+  | 'polls'
+  | 'birthdays'
+  | 'gallery_review'
+  | 'gallery_submissions'
+  | 'penalties'
+  | 'points'
+  | 'ranks'
+  | 'titles'
+  | 'events'
+  | 'reminder'
+  | 'news';
 
 /** Angaben des Browsers zu seinem Push-Abo (PushSubscription.toJSON()). */
 export interface PushDevice {
@@ -2120,6 +2326,12 @@ export interface PushAdmin {
   reminderHour: number;
   /** Benachrichtigung am Geburtstag; null ohne den Bereich Geburtstage */
   birthdays: { enabled: boolean; hour: number } | null;
+  /** Protokoll: je Art der letzte Versand, zuletzt vom Push-Dienst angenommen bzw. abgelehnt (null = noch nie) */
+  log: {
+    types: { type: string; label: string; at: string; devices: number }[];
+    accepted: { at: string; count: number } | null;
+    rejected: { at: string; count: number; reason: string } | null;
+  };
 }
 
 const pushPath = (suffix: string): string => (config?.user ? '/me/push' : '/push') + suffix;
@@ -2269,6 +2481,14 @@ export interface AdminSettings {
   gallery: {
     configured: boolean;
     root: string;
+    /** Quelle (Issue #285): Google Drive (dazu Alben der App) oder nur der eigene Server; fehlt bei älteren Servern */
+    source?: GallerySourceType;
+    /** Ablageort hochgeladener Bilder (vorerst nur der eigene Server) */
+    store?: 'server';
+    /** Belegter Platz der hochgeladenen Bilder in Bytes */
+    media_bytes?: number;
+    /** Knöpfe zum Herunterladen in der Galerie; fehlt bei älteren Servern */
+    downloads?: boolean;
     service_account_email: string;
     oauth_connected: boolean;
     oauth_email: string;
@@ -2277,9 +2497,57 @@ export interface AdminSettings {
     status: { albums?: number; photos?: number; pending?: number; failed?: number; last_sync?: number; error?: string };
   };
   news: { source: NewsSourceType; url: string } | null;
+  /** Links auf Impressum und Datenschutzerklärung; leer, solange keiner eingetragen ist (fehlt bei älteren Servern) */
+  legal?: { imprint_url: string; privacy_url: string };
 }
 
 /** Bild der Galerie, das sich nicht aufbereiten ließ (Einstellungen → Galerie). */
+export type GallerySourceType = 'drive' | 'server';
+
+/** Eingereichtes Bild (Issue #286); user_id und user_name nur beim Prüfen */
+export interface GallerySubmission {
+  id: number;
+  album_id: number;
+  album: string;
+  name: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reason: string;
+  created_at: string;
+  reviewed_at: string | null;
+  thumb: string | null;
+  photo_id: number | null;
+  user_id?: number;
+  user_name?: string;
+}
+
+export interface GallerySubmissionsOwn {
+  albums: { id: number; title: string; year: string }[];
+  submissions: GallerySubmission[];
+}
+
+export interface GalleryReview {
+  pending: GallerySubmission[];
+  approved: GallerySubmission[];
+}
+
+/** Album in Einstellungen → Galerie: aus Drive oder nur in der App, mit Zahl der hochgeladenen Bilder */
+export interface GalleryAdminAlbum {
+  id: number;
+  title: string;
+  year: string;
+  source: 'drive' | 'app';
+  uploads: number;
+  drive_photos: number;
+}
+
+export interface GalleryAdminAlbumDetail {
+  id: number;
+  title: string;
+  year: string;
+  source: 'drive' | 'app';
+  uploads: { id: number; name: string; intern: boolean; thumb: string; status: string; error: string }[];
+}
+
 export interface FailedPhoto {
   id: number;
   name: string;
@@ -2301,6 +2569,11 @@ export interface AdminSettingsInput {
   drive_service_account?: string;
   drive_oauth?: '';
   gallery_root?: string;
+  gallery_source?: GallerySourceType;
+  gallery_store?: 'server';
+  gallery_downloads?: '0' | '1';
   news_source?: NewsSourceType;
   news_url?: string;
+  legal_imprint_url?: string;
+  legal_privacy_url?: string;
 }

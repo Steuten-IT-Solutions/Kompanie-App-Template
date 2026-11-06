@@ -216,10 +216,13 @@ function ListOverview({ onToast }: { onToast: Toast }) {
 }
 
 function ListEditorLoader({ id, onToast }: { id: number; onToast: Toast }) {
-  const { data, error, loading, reload, setData } = useAsync(() => api.list(id), [id]);
+  const s = sources.list(id);
+  const { data, error, loading, reload, setData, revision } = useAsync(s.load, s.deps, s.key);
   if (loading && !data) return <Loading shape="form" />;
   if (error && !data) return <ErrorBox message={error} onRetry={reload} />;
-  return <ListEditor list={data!} onSaved={setData} onToast={onToast} />;
+  // Der Editor übernimmt die Liste einmal in seinen Entwurf (samt Stand für die Konfliktprüfung): Weicht der frische
+  // Stand vom gespeicherten ab, mit `revision` neu aufbauen.
+  return <ListEditor key={revision} list={data!} onSaved={setData} onToast={onToast} />;
 }
 
 interface Draft {

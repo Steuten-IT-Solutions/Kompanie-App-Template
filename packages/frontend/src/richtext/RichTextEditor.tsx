@@ -20,7 +20,7 @@ import { Indent } from './indent';
 import { cleanPastedHtml, isOfficeHtml, rtfImages } from './wordPaste';
 
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
-/** Anfangsbreite eingefügter Bilder (nur die Anzeige; gespeichert wird das Bild in Originalgröße, die Breite ist änderbar). */
+/** Anfangsbreite eingefügter Bilder (nur die Anzeige; gespeichert wird das Bild mit höchstens 2048 Pixeln an der längeren Kante, die Breite ist änderbar). */
 const IMAGE_WIDTH = 480;
 
 /** Bild mit der Kennung aus dem Bildspeicher (data-image); nur solche Bilder behält der Server. */
@@ -88,6 +88,8 @@ interface Props {
   signature?: SignatureAction;
   /** Kennung für Tests und Verweise */
   id?: string;
+  /** false: ohne Bilder (z. B. Beschreibung einer Kompanie, Issue #280: öffentlich ohne Bildauslieferung) */
+  images?: boolean;
 }
 
 function Button({
@@ -123,7 +125,7 @@ function Button({
   );
 }
 
-function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: () => void; signature?: SignatureAction }) {
+function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() => void) | null; signature?: SignatureAction }) {
   const style = editor.getAttributes('textStyle') as { fontFamily?: string; fontSize?: string; color?: string; backgroundColor?: string };
   const inTable = editor.isActive('table');
   const setLink = () => {
@@ -277,9 +279,11 @@ function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: () =
         <Button editor={editor} label="Link" active={editor.isActive('link')} onClick={setLink}>
           🔗
         </Button>
-        <Button editor={editor} label="Bild einfügen" onClick={onImage}>
-          🖼
-        </Button>
+        {onImage && (
+          <Button editor={editor} label="Bild einfügen" onClick={onImage}>
+            🖼
+          </Button>
+        )}
         <Button editor={editor} label="Trennlinie" onClick={(e) => e.chain().focus().setHorizontalRule().run()}>
           ―
         </Button>
@@ -353,7 +357,7 @@ function toHex(color: string | undefined): string | null {
   return '#' + [m[1], m[2], m[3]].map((n) => Number(n).toString(16).padStart(2, '0')).join('');
 }
 
-export default function RichTextEditor({ value, onChange, label, signature, id }: Props) {
+export default function RichTextEditor({ value, onChange, label, signature, id, images = true }: Props) {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(0);
   /** Größte Bilddatei, die der Server annimmt (nach dem ersten Hochladen bekannt, zur Anzeige) */
@@ -365,6 +369,10 @@ export default function RichTextEditor({ value, onChange, label, signature, id }
 
   /** Bilder hochladen und einfügen; meldet technische Grenzen des Servers verständlich. */
   async function upload(files: File[], pos?: number): Promise<{ uid: string; url: string; width: number }[]> {
+    if (!images) {
+      setNotice('Bilder sind hier nicht möglich.');
+      return [];
+    }
     const ok = files.filter((f) => IMAGE_TYPES.includes(f.type));
     if (ok.length < files.length) setNotice('Erlaubt sind Bilder als JPG, PNG oder WebP.');
     const out: { uid: string; url: string; width: number }[] = [];
@@ -490,7 +498,7 @@ export default function RichTextEditor({ value, onChange, label, signature, id }
   if (!editor) return null;
   return (
     <div className="rich-editor" data-testid={id ? `${id}-editor` : undefined}>
-      <Toolbar editor={editor} onImage={() => fileInput.current?.click()} signature={signature} />
+      <Toolbar editor={editor} onImage={images ? () => fileInput.current?.click() : null} signature={signature} />
       <EditorContent editor={editor} />
       <input
         ref={fileInput}

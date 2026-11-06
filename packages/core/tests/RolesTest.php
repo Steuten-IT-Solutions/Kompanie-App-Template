@@ -21,7 +21,7 @@ final class RolesTest extends TestCase
         $app = TestApp::create(TestApp::connection(), features: false);
         $this->assertSame([Roles::GUEST, Roles::MEMBER, Roles::ADMIN], array_keys($app->roles()->all()), 'Anwärter legt der Admin selbst an');
         $this->assertSame(TestApp::capabilities(['member']), $app->roles()->capabilities(Roles::MEMBER), 'Mitglied sieht, was der frühere Mitgliederbereich einschloss');
-        $this->assertSame(Roles::from(Roles::PUBLIC_DEFAULTS), $app->roles()->capabilities(Roles::GUEST), 'Gast sieht das Öffentliche');
+        $this->assertSame(Roles::from(TestApp::caps([])), $app->roles()->capabilities(Roles::GUEST), 'Gast sieht das Öffentliche');
         $this->assertSame([], $app->roles()->capabilities(Roles::ORGANIZER), 'frühere Vorlage gibt es nicht');
     }
 

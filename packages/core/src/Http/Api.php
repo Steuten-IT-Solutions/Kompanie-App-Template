@@ -321,6 +321,56 @@ final class Api
             + ($status !== null ? ['rank' => $status, 'rank_history' => $this->app->ranks()->history($userId)] : []);
     }
 
+    /** Höchstzahl Personen je GET /members/details. */
+    public const MEMBER_DETAILS_MAX = 25;
+
+    /**
+     * Seite eines Mitglieds in der Verwaltung (GET /members/{id}, auch je Person in GET /members/details).
+     *
+     * @return array<string, mixed>
+     */
+    private function memberDetail(int $id): array
+    {
+        $a = $this->app;
+        return $a->members()->detail($id, $this->user())
+            // Foto: sehen alle hier; ändern nur, wer das Konto verwalten darf
+            + ['photo_url' => $a->memberPhotos()->url($id), 'photo_editable' => $a->memberPhotos()->canEdit($this->user(), $id)]
+            + $this->memberRank($id)
+            + ($this->showTitles() ? ['titles' => $a->titles()->of($id)] : [])
+            + ($this->showCompanies() ? ['companies' => $a->companies()->of($id)] : [])
+            // Persönliche Angaben (E-Mail, Handynummer, Adresse) und Geburtstag mit Jahr und Schaltern (Issue #1) nur mit
+            // view_personal: Wer etwa nur Punkte verwaltet oder Konten anlegt, sieht kein Geburtsdatum, auch kein verborgenes
+            + ($this->user()->can(Cap::ViewPersonal) ? ['personal' => $a->members()->personal($id)] : [])
+            + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::ViewPersonal) ? ['birthday' => $a->birthdays()->of($id)] : [])
+            // Eintrittsjahr mit Anzeige, ebenso nur für create_users
+            + ($this->user()->can(Cap::CreateUsers) ? ['join_year' => $a->joinYears()->of($id)] : [])
+            // Ehemalig: Grund, Eintritt, Ausscheiden (sonst null)
+            + ['former' => $a->formerMembers()->of($id)];
+    }
+
+    /**
+     * Ids aus der Adresse („1,2,3“ oder als Liste): nur positive ganze Zahlen, jede einmal, in der angegebenen
+     * Reihenfolge; anderes Format ergibt eine leere Liste.
+     *
+     * @return list<int>
+     */
+    private static function idList(mixed $raw): array
+    {
+        $parts = is_array($raw) ? $raw : (is_string($raw) ? explode(',', $raw) : []);
+        $ids = [];
+        foreach ($parts as $p) {
+            if (!is_string($p) && !is_int($p)) {
+                return [];
+            }
+            $p = trim((string) $p);
+            if (!ctype_digit($p) || (int) $p <= 0) {
+                return [];
+            }
+            $ids[(int) $p] = true;
+        }
+        return array_keys($ids);
+    }
+
     /**
      * Mitgliederliste für alle (auch ohne Anmeldung): Namen und Fotos der Mitglieder und Anwärter, mit den Bereichen auch
      * Dienstgrad (mit Abzeichen) und Titel, bei Anwärtern der Name ihrer Rolle (candidate_role). Sonst keine Rollen,
@@ -339,12 +389,15 @@ final class Api
         $ranks = $a->features()->enabled('ranks') ? $a->ranks()->assigned() : null;
         $titles = $a->features()->enabled('titles') ? $a->titles()->byUser() : null;
         $viewer = $a->authContext->currentUser();
+        // Kompanien (Issue #280): mit dem Bereich und dem Recht, sie zu sehen; zum Filtern in der Mitgliederliste
+        $companies = $a->features()->enabled('companies') && ($viewer ?? $a->anonymous())->can(Cap::ViewCompanies) ? $a->companies()->byUser() : null;
         $birthdays = $entries === null && $a->features()->enabled('birthdays') ? $a->birthdays()->shownTo($viewer) : null;
         $joined = $entries === null ? $a->joinYears()->shownTo($viewer) : null;
         return array_map(static fn (array $m): array => $m
             + ['photo_url' => $photos[$m['id']] ?? null]
             + ($ranks !== null ? ['rank_title' => $ranks[$m['id']]['title'] ?? null, 'rank_badge_url' => $ranks[$m['id']]['badge_url'] ?? null] : [])
             + ($titles !== null ? ['titles' => $titles[$m['id']] ?? []] : [])
+            + ($companies !== null ? ['companies' => $companies[$m['id']] ?? []] : [])
             + ($birthdays !== null ? ['birthday' => $birthdays[$m['id']] ?? null] : [])
             + ($joined !== null ? ['join_year' => $joined[$m['id']]['year'] ?? null, 'join_date' => $joined[$m['id']]['date'] ?? null] : []), $entries ?? $a->members()->directory());
     }
@@ -363,6 +416,12 @@ final class Api
         $date = $a->time()->format($a->time()->timestamp(), 'Y-m-d');
         $name = $this->user()->id === $userId ? 'meine-daten-' . $date . '.json' : 'daten-' . $userId . '-' . $date . '.json';
         return Response::attachment($data, $name);
+    }
+
+    /** Kompanien in den Mitgliedsdetails der Verwaltung: Bereich an und Recht, sie zu verwalten (Issue #280). */
+    private function showCompanies(): bool
+    {
+        return $this->app->features()->enabled('companies') && $this->can(Cap::ManageCompanies);
     }
 
     /** Titel in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
@@ -457,6 +516,8 @@ final class Api
             'features' => $features,
             // Fehlermeldungen an die Betreuer der App (Issue #64): ohne Empfänger kein Knopf „Fehler melden“
             'reports' => $a->bugReports()->available(),
+            // Impressum und Datenschutzerklärung der Kompanie (Einstellungen → Impressum und Datenschutz): für alle, auch Gäste
+            'legal' => self::legalLinks($a->settingsService()->legal()),
             // Handbuch auf GitHub Pages der Kompanie: neben updates.json (Issue #12)
             'handbookUrl' => self::handbookUrl((string) ($a->packageConfig['updatesUrl'] ?? '')),
             // Bezeichnungen und Punktefaktor der Rollen (vom Admin in der App festgelegt)
@@ -468,6 +529,10 @@ final class Api
             'guestCapabilities' => array_map(static fn (Cap $c): string => $c->value, $a->roles()->guestCapabilities()),
             // Nur für Admins: Einrichtungsassistent beim ersten Öffnen anbieten.
             'maintenance' => self::maintenanceInfo($a->maintenance()->state()),
+            // Einrichtbare Navigation (Issue #277): null = Standardnavigation; nur Darstellung, die Rechte prüfen die Routen
+            'navigation' => $a->navigation()->get(),
+            // Eigene Seiten (Issue #287), die die Person lesen darf: für die Kacheln unter „Seiten“ (ohne Text)
+            'pages' => array_map(static fn (array $p): array => ['id' => $p['id'], 'title' => $p['title']], $a->pages()->list($user)),
             'setupPending' => $this->can(Cap::ManageSettings) && !(bool) $a->settings->get(self::SETUP_SETTING, false),
             // Datensicherung als Datei herunterladen (Domain\BackupDownload); nur für Admins, nicht in der Vorschau
             'backupUrl' => $a->backup !== null && $this->can(Cap::ManageSettings) && !$a->preview()->active() ? $a->env->backupUrl() : null,
@@ -485,6 +550,18 @@ final class Api
     private static function maintenanceInfo(array $state): array
     {
         return ['on' => $state['on'], 'reason' => $state['reason'], 'since' => $state['since']];
+    }
+
+    /**
+     * @param array{imprint_url: string, privacy_url: string} $legal
+     * @return array{imprint: string|null, privacy: string|null}
+     */
+    private static function legalLinks(array $legal): array
+    {
+        return [
+            'imprint' => $legal['imprint_url'] !== '' ? $legal['imprint_url'] : null,
+            'privacy' => $legal['privacy_url'] !== '' ? $legal['privacy_url'] : null,
+        ];
     }
 
     /** https://…/updates.json → https://…/handbuch/ (dort liegt die Seite der Kompanie); sonst null. */
@@ -617,6 +694,20 @@ final class Api
             new Route('GET', '/gallery', [Cap::ViewGallery, Cap::ViewGalleryInternal], fn () => ['years' => $a->gallery()->overview($this->can(Cap::ViewGalleryInternal))], 'gallery', $denyView),
             new Route('GET', '/gallery/{id}', [Cap::ViewGallery, Cap::ViewGalleryInternal], fn (Request $r) => $a->gallery()->album($r->id(), $this->can(Cap::ViewGalleryInternal))
                 ?? throw ApiError::notFound('Album nicht gefunden.'), 'gallery', $denyView),
+            // Einreichungen (Issue #286): einreichen und eigene sehen mit submit_gallery, prüfen mit review_gallery
+            new Route('GET', '/gallery/submissions', Cap::SubmitGallery, fn () => $a->gallerySubmissions()->own($this->user()), 'gallery'),
+            new Route('POST', '/gallery/submissions', Cap::SubmitGallery, fn (Request $r) => Response::created($a->gallerySubmissions()->submit($this->user(), $r->input('album_id'), $r->input('file'), $r->input('consent'))), 'gallery'),
+            new Route('DELETE', '/gallery/submissions/{id}', Cap::SubmitGallery, function (Request $r) use ($a) {
+                $a->gallerySubmissions()->withdraw($this->user(), $r->id());
+                return ['deleted' => true];
+            }, 'gallery'),
+            new Route('GET', '/gallery/review', Cap::ReviewGallery, fn () => $a->gallerySubmissions()->review(), 'gallery'),
+            new Route('POST', '/gallery/review/{id}/approve', Cap::ReviewGallery, fn (Request $r) => $a->gallerySubmissions()->approve($this->user(), $r->id(), Input::bool($r->input('intern'))), 'gallery'),
+            new Route('POST', '/gallery/review/{id}/reject', Cap::ReviewGallery, fn (Request $r) => $a->gallerySubmissions()->reject($this->user(), $r->id(), $r->input('reason')), 'gallery'),
+            new Route('POST', '/gallery/review/{id}/remove', Cap::ReviewGallery, function (Request $r) use ($a) {
+                $a->gallerySubmissions()->remove($this->user(), $r->id(), $r->input('reason'));
+                return ['removed' => true];
+            }, 'gallery'),
 
             // Neuigkeiten
             new Route('GET', '/news', Cap::ViewNews, function (Request $r) use ($a) {
@@ -663,7 +754,14 @@ final class Api
             new Route('GET', '/offices', Cap::ViewOffices, fn () => $a->offices()->overview($a->authContext->currentUser()), 'offices', $denyView),
             new Route('POST', '/office-groups', Cap::ManageOffices, fn (Request $r) => Response::created($a->offices()->createGroup($r->input('title'))), 'offices', $denyRights),
             new Route('PUT', '/office-groups/order', Cap::ManageOffices, fn (Request $r) => $a->offices()->reorderGroups($r->input('ids')), 'offices', $denyRights),
-            new Route('PATCH', '/office-groups/{id}', Cap::ManageOffices, fn (Request $r) => $a->offices()->updateGroup($r->id(), $r->input('title')), 'offices', $denyRights),
+            new Route('PATCH', '/office-groups/{id}', Cap::ManageOffices, fn (Request $r) => $a->offices()->updateGroup($r->id(), $r->body), 'offices', $denyRights),
+            // Gemeinsame Amtszeiten einer Gruppe (Issue #282)
+            new Route('POST', '/office-groups/{id}/terms', Cap::ManageOffices, fn (Request $r) => Response::created($a->offices()->createGroupTerm($r->id(), $r->body, $this->user())), 'offices', $denyRights),
+            new Route('PATCH', '/office-group-terms/{id}', Cap::ManageOffices, fn (Request $r) => $a->offices()->updateGroupTerm($r->id(), $r->body, $this->user()), 'offices', $denyRights),
+            new Route('DELETE', '/office-group-terms/{id}', Cap::ManageOffices, function (Request $r) use ($a) {
+                $a->offices()->deleteGroupTerm($r->id());
+                return ['deleted' => true];
+            }, 'offices', $denyRights),
             new Route('DELETE', '/office-groups/{id}', Cap::ManageOffices, function (Request $r) use ($a) {
                 $a->offices()->deleteGroup($r->id());
                 return ['deleted' => true];
@@ -682,12 +780,50 @@ final class Api
                 return ['deleted' => true];
             }, 'offices', $denyRights),
             new Route('GET', '/offices/{id}/title-preview', Cap::ManageOffices, fn (Request $r) => $a->offices()->linkPreview($r->id(), $r->query['title_id'] ?? null), 'offices', $denyRights),
-            new Route('POST', '/offices/{id}/terms', Cap::ManageOffices, fn (Request $r) => Response::created($a->offices()->createTerm($r->id(), $r->body)), 'offices', $denyRights),
-            new Route('PATCH', '/office-terms/{id}', Cap::ManageOffices, fn (Request $r) => $a->offices()->updateTerm($r->id(), $r->body), 'offices', $denyRights),
+            new Route('POST', '/offices/{id}/terms', Cap::ManageOffices, fn (Request $r) => Response::created($a->offices()->createTerm($r->id(), $r->body, $this->user())), 'offices', $denyRights),
+            new Route('PATCH', '/office-terms/{id}', Cap::ManageOffices, fn (Request $r) => $a->offices()->updateTerm($r->id(), $r->body, $this->user()), 'offices', $denyRights),
             new Route('DELETE', '/office-terms/{id}', Cap::ManageOffices, function (Request $r) use ($a) {
                 $a->offices()->deleteTerm($r->id());
                 return ['deleted' => true];
             }, 'offices', $denyRights),
+
+            // Sponsoren (Issue #279): öffentlich mit view_sponsors (anfangs auch Gast), Pflege mit manage_sponsors;
+            // Logo als Datei Base64 im JSON
+            // Eigene Seiten (Issue #287): lesen nach audience (public für alle, members für Mitglieder), pflegen mit manage_pages
+            new Route('GET', '/pages', $P, fn () => ['pages' => $a->pages()->list($a->authContext->currentUser())], 'pages'),
+            new Route('GET', '/pages/{id}', $P, fn (Request $r) => $a->pages()->get($r->id(), $a->authContext->currentUser()), 'pages'),
+            new Route('POST', '/pages', Cap::ManagePages, fn (Request $r) => Response::created($a->pages()->create((array) $r->body, $this->user())), 'pages', $denyRights),
+            new Route('PUT', '/pages/order', Cap::ManagePages, fn (Request $r) => ['pages' => $a->pages()->reorder($r->input('ids'), $this->user())], 'pages', $denyRights),
+            new Route('PATCH', '/pages/{id}', Cap::ManagePages, fn (Request $r) => $a->pages()->update($r->id(), (array) $r->body, $this->user()), 'pages', $denyRights),
+            new Route('DELETE', '/pages/{id}', Cap::ManagePages, function (Request $r) use ($a) {
+                $a->pages()->delete($r->id());
+                return ['deleted' => true];
+            }, 'pages', $denyRights),
+            new Route('GET', '/sponsors', [Cap::ViewSponsors, Cap::ManageSponsors], fn () => $a->sponsors()->list(), 'sponsors', $denyView),
+            new Route('POST', '/sponsors', Cap::ManageSponsors, fn (Request $r) => Response::created($a->sponsors()->create($r->body)), 'sponsors', $denyRights),
+            new Route('PUT', '/sponsors/order', Cap::ManageSponsors, fn (Request $r) => $a->sponsors()->reorder($r->input('ids')), 'sponsors', $denyRights),
+            new Route('PATCH', '/sponsors/{id}', Cap::ManageSponsors, fn (Request $r) => $a->sponsors()->update($r->id(), $r->body), 'sponsors', $denyRights),
+            new Route('DELETE', '/sponsors/{id}', Cap::ManageSponsors, function (Request $r) use ($a) {
+                $a->sponsors()->delete($r->id());
+                return ['deleted' => true];
+            }, 'sponsors', $denyRights),
+            new Route('POST', '/sponsors/{id}/logo', Cap::ManageSponsors, fn (Request $r) => $a->sponsors()->uploadLogo($r->id(), $r->input('file')), 'sponsors', $denyRights),
+            new Route('DELETE', '/sponsors/{id}/logo', Cap::ManageSponsors, fn (Request $r) => $a->sponsors()->removeLogo($r->id()), 'sponsors', $denyRights),
+
+            // Kompanien (Issue #280): öffentlich mit view_companies (anfangs auch Gast), Pflege und Zuordnung mit
+            // manage_companies; Mitglieder einer Kompanie nur, soweit die Mitgliederliste sichtbar ist
+            new Route('GET', '/companies', [Cap::ViewCompanies, Cap::ManageCompanies], fn () => $a->companies()->list($a->authContext->currentUser()), 'companies', $denyView),
+            new Route('POST', '/companies', Cap::ManageCompanies, fn (Request $r) => Response::created($a->companies()->create($r->body, $this->user())), 'companies', $denyRights),
+            new Route('PUT', '/companies/order', Cap::ManageCompanies, fn (Request $r) => $a->companies()->reorder($r->input('ids'), $this->user()), 'companies', $denyRights),
+            new Route('PATCH', '/companies/{id}', Cap::ManageCompanies, fn (Request $r) => $a->companies()->update($r->id(), $r->body, $this->user()), 'companies', $denyRights),
+            new Route('DELETE', '/companies/{id}', Cap::ManageCompanies, function (Request $r) use ($a) {
+                $a->companies()->delete($r->id());
+                return ['deleted' => true];
+            }, 'companies', $denyRights),
+            new Route('POST', '/companies/{id}/logo', Cap::ManageCompanies, fn (Request $r) => $a->companies()->uploadLogo($r->id(), $r->input('file'), $this->user()), 'companies', $denyRights),
+            new Route('DELETE', '/companies/{id}/logo', Cap::ManageCompanies, fn (Request $r) => $a->companies()->removeLogo($r->id(), $this->user()), 'companies', $denyRights),
+            new Route('PUT', '/companies/{id}/members', Cap::ManageCompanies, fn (Request $r) => $a->companies()->assignMembers($r->id(), $r->input('user_ids'), $this->user()), 'companies', $denyRights),
+            new Route('PUT', '/members/{id}/companies', Cap::ManageCompanies, fn (Request $r) => ['companies' => $a->companies()->assignToUser($r->id(), $r->input('company_ids'))], 'companies', $denyRights),
 
             // Listen (Issue #121): nur mit manage_lists; Werte der Mitglieder nur, soweit die Person sie ohnehin sieht
             new Route('GET', '/lists', Cap::ManageLists, fn () => $a->lists()->overview(), 'lists', $denyRights),
@@ -928,19 +1064,26 @@ final class Api
                 }
                 return $list;
             }, null, $denyManage),
-            new Route('GET', '/members/{id}', $manage, fn (Request $r) => $a->members()->detail($r->id(), $this->user())
-                // Foto: sehen alle hier; ändern nur, wer das Konto verwalten darf
-                + ['photo_url' => $a->memberPhotos()->url($r->id()), 'photo_editable' => $a->memberPhotos()->canEdit($this->user(), $r->id())]
-                + $this->memberRank($r->id())
-                + ($this->showTitles() ? ['titles' => $a->titles()->of($r->id())] : [])
-                // Persönliche Angaben (E-Mail, Handynummer, Adresse) und Geburtstag mit Jahr und Schaltern (Issue #1) nur mit
-                // view_personal: Wer etwa nur Punkte verwaltet oder Konten anlegt, sieht kein Geburtsdatum, auch kein verborgenes
-                + ($this->user()->can(Cap::ViewPersonal) ? ['personal' => $a->members()->personal($r->id())] : [])
-                + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::ViewPersonal) ? ['birthday' => $a->birthdays()->of($r->id())] : [])
-                // Eintrittsjahr mit Anzeige, ebenso nur für create_users
-                + ($this->user()->can(Cap::CreateUsers) ? ['join_year' => $a->joinYears()->of($r->id())] : [])
-                // Ehemalig: Grund, Eintritt, Ausscheiden (sonst null)
-                + ['former' => $a->formerMembers()->of($r->id())], null, $denyManage),
+            new Route('GET', '/members/{id}', $manage, fn (Request $r) => $this->memberDetail($r->id()), null, $denyManage),
+            // Mehrere Personen auf einmal (Vorladen beim Blättern in der App): eine Anfrage statt einer je Person. Ids als
+            // Liste mit Kommas, höchstens MEMBER_DETAILS_MAX; unbekannte fehlen in der Antwort.
+            new Route('GET', '/members/details', $manage, function (Request $r): array {
+                $ids = self::idList($r->query['ids'] ?? null);
+                if ($ids === [] || count($ids) > self::MEMBER_DETAILS_MAX) {
+                    throw ApiError::invalid('Bitte 1 bis ' . self::MEMBER_DETAILS_MAX . ' Mitglieder angeben (ids=1,2,3).');
+                }
+                $out = [];
+                foreach ($ids as $id) {
+                    try {
+                        $out[] = $this->memberDetail($id);
+                    } catch (ApiError $e) {
+                        if ($e->status !== 404) {
+                            throw $e;
+                        }
+                    }
+                }
+                return $out;
+            }, null, $denyManage),
             // Ehemalige Mitglieder: Liste, eintragen (Konto stilllegen, Daten bleiben), ändern, wieder aufnehmen, Import
             new Route('GET', '/members/former', Cap::CreateUsers, function () use ($a) {
                 $photos = $a->memberPhotos()->urls();
@@ -1015,6 +1158,13 @@ final class Api
             new Route('PUT', '/admin/activity/settings', Cap::ManageSettings, fn (Request $r) => ['personal' => $a->activity()->setPersonal($r->input('personal'))], null, $denySettings),
             new Route('GET', '/admin/maintenance', Cap::ManageSettings, fn () => $a->maintenance()->state() + ['log' => $a->maintenance()->log()], null, $denySettings),
             new Route('POST', '/admin/maintenance', Cap::ManageSettings, fn (Request $r) => $a->maintenance()->set($r->input('on'), $r->body['reason'] ?? null, $this->user()) + ['log' => $a->maintenance()->log()], null, $denySettings),
+            new Route('GET', '/admin/navigation', Cap::ManageSettings, fn () => $a->navigation()->describe(), null, $denySettings),
+            new Route('PUT', '/admin/navigation', Cap::ManageSettings, function (Request $r) use ($a) {
+                if (!array_key_exists('navigation', $r->body)) {
+                    throw ApiError::invalid('Bitte die Navigation angeben (null für die Standardnavigation).');
+                }
+                return $a->navigation()->set($r->body['navigation']);
+            }, null, $denySettings),
             new Route('GET', '/admin/settings', Cap::ManageSettings, fn () => $a->settingsService()->get(), null, $denySettings),
             // Push (Issue #19): Voraussetzungen, Zahl der Abos, Uhrzeit der Erinnerung; Benachrichtigung am Geburtstag
             new Route('GET', '/admin/push', Cap::ManageSettings, fn () => $a->push()->adminStatus(), null, $denySettings),
@@ -1076,6 +1226,20 @@ final class Api
             new Route('GET', '/admin/gallery/failed', Cap::ManageSettings, fn () => ['photos' => $a->gallery()->failedPhotos(), 'total' => $a->gallery()->countFailed()], null, $denySettings),
             new Route('POST', '/admin/gallery/retry', Cap::ManageSettings, fn () => ['retried' => $a->gallery()->retryFailedNow(), 'pending' => $a->gallery()->countPending()], null, $denySettings),
             new Route('POST', '/admin/gallery/sync', Cap::ManageSettings, fn (Request $r) => $a->settingsService()->syncGallery(Input::bool($r->input('only_process'))), null, $denySettings),
+            // Alben der App und hochgeladene Bilder (Issue #285)
+            new Route('GET', '/admin/gallery/albums', Cap::ManageSettings, fn () => ['albums' => $a->galleryUploads()->albums()], null, $denySettings),
+            new Route('POST', '/admin/gallery/albums', Cap::ManageSettings, fn (Request $r) => Response::created($a->galleryUploads()->createAlbum($r->body)), null, $denySettings),
+            new Route('GET', '/admin/gallery/albums/{id}', Cap::ManageSettings, fn (Request $r) => $a->galleryUploads()->album($r->id()), null, $denySettings),
+            new Route('PATCH', '/admin/gallery/albums/{id}', Cap::ManageSettings, fn (Request $r) => $a->galleryUploads()->updateAlbum($r->id(), $r->body), null, $denySettings),
+            new Route('DELETE', '/admin/gallery/albums/{id}', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->galleryUploads()->deleteAlbum($r->id());
+                return ['deleted' => true];
+            }, null, $denySettings),
+            new Route('POST', '/admin/gallery/albums/{id}/photos', Cap::ManageSettings, fn (Request $r) => Response::created($a->galleryUploads()->upload($r->id(), $r->input('file'), Input::bool($r->input('intern')))), null, $denySettings),
+            new Route('DELETE', '/admin/gallery/photos/{id}', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->galleryUploads()->deletePhoto($r->id(), $this->user());
+                return ['deleted' => true];
+            }, null, $denySettings),
 
             // Status, Updates, Datensicherung, Einrichtung (Admins)
             new Route('GET', '/admin/status', Cap::ManageSettings, fn () => $a->status()->report() + [

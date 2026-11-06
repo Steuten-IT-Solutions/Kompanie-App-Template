@@ -122,10 +122,13 @@ header { background: linear-gradient(180deg, var(--primary), var(--primary-deep)
 .wrap { max-width: 920px; margin: 0 auto; padding: 0 16px; }
 header .wrap { display: flex; gap: 18px; align-items: center; padding-top: 28px; padding-bottom: 28px; }
 header img { width: 84px; height: 84px; object-fit: contain; flex: none; }
-h1 { margin: 0; font-family: var(--font-head); font-size: 1.9rem; line-height: 1.15; }
+/* min-width: 0, damit lange Namen im Flex-Kopf umbrechen statt die Seite zu verbreitern */
+header .wrap > div { min-width: 0; }
+h1 { margin: 0; font-family: var(--font-head); font-size: 1.9rem; line-height: 1.15; overflow-wrap: break-word; hyphens: auto; }
 header p { margin: 4px 0 0; color: var(--on-primary-soft); }
-main { padding: 28px 0 40px; }
-.cards { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+/* main.wrap/footer.wrap: sonst überschreibt .wrap (Klasse) den Abstand oben und unten */
+main.wrap { padding-top: 28px; padding-bottom: 40px; }
+.cards { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px; }
 .card h2 { margin: 0 0 6px; font-family: var(--font-head); color: var(--primary-text); font-size: 1.3rem; }
 .card ol { padding-left: 1.3em; margin: 12px 0 18px; }
@@ -136,7 +139,12 @@ main { padding: 28px 0 40px; }
 code { background: var(--line); padding: 1px 6px; border-radius: 5px; font-size: 0.9em; overflow-wrap: anywhere; }
 .shots { display: flex; gap: 14px; overflow-x: auto; padding: 22px 0 6px; }
 .shots img { height: 420px; width: auto; border-radius: 18px; border: 1px solid var(--line); flex: none; }
-footer { color: var(--muted); font-size: 0.85rem; padding-bottom: 32px; }
+footer.wrap { color: var(--muted); font-size: 0.85rem; padding-bottom: 32px; }
+@media (max-width: 560px) {
+  header .wrap { gap: 14px; padding-top: 20px; padding-bottom: 20px; }
+  header img { width: 56px; height: 56px; }
+  h1 { font-size: 1.45rem; }
+}
 </style>
 </head>
 <body>

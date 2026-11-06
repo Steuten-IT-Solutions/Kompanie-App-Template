@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { can, config, levelLabel, type Capability, type Feature } from '../api';
 import brand from '../generated/brand';
 import handbuch from '../generated/handbuch.json';
+import { LegalLinks } from '../legal';
 import { navigate } from '../router';
 import { Empty, lazyView } from '../ui';
 import FehlerMelden, { ReportButton } from './FehlerMelden';
@@ -57,6 +58,9 @@ function labels(): Record<string, string> {
     'bereich.offices': sec.offices,
     'bereich.lists': sec.lists,
     'bereich.mail': sec.mail,
+    'bereich.sponsors': sec.sponsors,
+    'bereich.companies': sec.companies,
+    'bereich.pages': sec.pages,
     'begriff.rank': brand.labels.rank,
     'rolle.guest': levelLabel('guest'),
     'rolle.member': levelLabel('member'),
@@ -183,6 +187,7 @@ export default function Hilfe({ slug }: { slug?: string }) {
       <p className="small muted hilfe-web">
         <a href="#/hilfe/lizenzen">Lizenzen</a> der App und der enthaltenen Bausteine anderer Anbieter
       </p>
+      <LegalLinks className="hilfe-web" />
     </div>
   );
 }

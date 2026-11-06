@@ -1851,6 +1851,25 @@ code {
   top: calc(14px + env(safe-area-inset-top));
   right: 14px;
 }
+.lb-download {
+  top: calc(14px + env(safe-area-inset-top));
+  right: 70px;
+  display: grid;
+  place-items: center;
+}
+.lightbox .lb-download-busy {
+  width: 22px;
+  height: 22px;
+}
+.lb-save-error {
+  position: absolute;
+  top: calc(70px + env(safe-area-inset-top));
+  left: 14px;
+  right: 14px;
+  margin: 0;
+  text-align: center;
+  color: #fff;
+}
 .lb-prev {
   left: 10px;
 }
@@ -2586,6 +2605,12 @@ fieldset.rights-tree legend {
   margin-top: 18px;
 }
 
+/* Links auf Impressum und Datenschutz (Einstellungen → Impressum und Datenschutz) */
+.account-legal {
+  margin-top: 18px;
+  text-align: center;
+}
+
 /* Lizenzen (Issue #173) */
 .hilfe-text .lizenz-liste {
   list-style: none;
@@ -3168,6 +3193,22 @@ fieldset.rights-tree legend {
 }
 .attendance-group-form h4 {
   margin: 0;
+}
+/* Einstellungen → Benachrichtigungen: zuletzt verschickt je Art, angenommen bzw. abgelehnt vom Push-Dienst. */
+.push-log {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.push-log h4 {
+  margin: 0 0 6px;
+}
+.push-log ul {
+  margin: 0 0 8px;
+  padding-left: 18px;
+}
+.push-log p {
+  margin: 4px 0 0;
 }
 .field-inline {
   display: grid;
@@ -5681,4 +5722,361 @@ button.spotlight-person:focus-visible {
 .bulk-address summary {
   cursor: pointer;
   padding: 4px 0;
+}
+
+/* Sponsoren (Issue #279): Logos auf hellen Kacheln, damit dunkle Logos auch im dunklen Modus lesbar bleiben. */
+.sponsor-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+.sponsor-card {
+  background: #fff;
+  color: #1d1d1f;
+  aspect-ratio: 3 / 2;
+  display: flex;
+  overflow: hidden;
+}
+.sponsor-card > a,
+.sponsor-card > .sponsor-logo,
+.sponsor-card > .sponsor-name {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.sponsor-card .sponsor-logo {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.sponsor-card > a > .sponsor-logo {
+  width: 100%;
+  height: 100%;
+}
+.sponsor-name {
+  font-weight: 600;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.sponsor-card > img.sponsor-logo {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}
+.sponsor-admin-logo {
+  flex: 0 0 72px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  color: #1d1d1f;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  font-size: 0.75rem;
+  overflow: hidden;
+}
+.sponsor-admin-logo .sponsor-logo {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.sponsor-admin-logo .sponsor-name {
+  padding: 2px 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Kompanien (Issue #280): aufklappbare Karten mit Logo; Logos auf hellem Grund wie bei den Sponsoren. */
+.company-card {
+  padding: 0;
+}
+.company-card.inactive {
+  opacity: 0.75;
+}
+.company-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  list-style: none;
+}
+.company-summary::-webkit-details-marker {
+  display: none;
+}
+.company-summary::after {
+  content: '›';
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 1.3rem;
+  transition: transform 0.15s;
+}
+.company-card details[open] > .company-summary::after {
+  transform: rotate(90deg);
+}
+.company-logo-box,
+.company-admin-logo {
+  flex: 0 0 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  color: #1d1d1f;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.company-admin-logo {
+  flex-basis: 48px;
+  height: 48px;
+}
+.company-logo {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.company-logo-empty {
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-align: center;
+  padding: 2px;
+  overflow: hidden;
+}
+.company-head {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.company-head .row-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.company-body {
+  padding: 0 14px 14px;
+}
+.company-offices {
+  margin: 8px 0;
+  display: grid;
+  gap: 4px;
+}
+.company-offices > div {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.company-offices dt {
+  font-weight: 600;
+}
+.company-offices dd {
+  margin: 0;
+}
+.company-links {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.company-members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.company-member-options {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+/* Gemeinsame Amtszeiten einer Ämtergruppe (Vorstand mit Gruppenbild) */
+.joint-terms {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.joint-term {
+  padding: 0;
+  overflow: hidden;
+}
+.joint-term.current {
+  border-color: var(--accent);
+}
+.joint-term-image {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: cover;
+  background: var(--line);
+}
+.joint-term-body {
+  padding: 12px 14px;
+}
+.joint-term-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+}
+.joint-term-offices {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.joint-term-offices > div {
+  display: grid;
+  grid-template-columns: minmax(110px, 40%) 1fr;
+  gap: 8px;
+}
+.joint-term-offices dt {
+  color: var(--muted);
+}
+.joint-term-offices dd {
+  margin: 0;
+}
+.joint-admin {
+  margin: 8px 0 16px;
+}
+.joint-admin-image {
+  flex: 0 0 64px;
+  width: 64px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.joint-term-form-image {
+  display: block;
+  max-width: 100%;
+  max-height: 220px;
+  margin: 6px 0;
+  border-radius: 8px;
+}
+
+/* Foto eines freien Namens in einer Amtszeit (Issue #283) */
+.office-holder-photo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Alben und eigene Bilder in Einstellungen → Galerie (Issue #285) */
+.gallery-album-list,
+.gallery-upload-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+.gallery-album-item {
+  border-top: 1px solid var(--line);
+}
+.gallery-album-head {
+  display: block;
+  width: 100%;
+  padding: 10px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.gallery-album-body {
+  display: grid;
+  gap: 10px;
+  padding: 0 0 12px;
+}
+.gallery-upload {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+.gallery-upload img {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--line);
+}
+.gallery-upload .small {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Einreichungen der Galerie (Issue #286) */
+.gallery-actions {
+  margin-bottom: 12px;
+}
+.album-download {
+  margin-bottom: 12px;
+}
+.gallery-review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.gallery-review-item img {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+/* Eigene Seiten (Issue #287): Kacheln je Seite, darunter die Seite mit ihrem Text */
+.page-tiles {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+.page-tile {
+  width: 100%;
+  min-height: 88px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.page-tile .badge {
+  margin-left: 0;
+}
+.page-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 0;
+}
+.page-meta .badge {
+  margin-left: 0;
 }

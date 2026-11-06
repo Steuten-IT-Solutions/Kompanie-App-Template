@@ -35,8 +35,16 @@ final class Roles
     public const PUBLIC_DEFAULTS = ['view_events', 'view_news', 'view_gallery', 'view_directory', 'view_offices', 'view_former'];
 
     /**
-     * Was der frühere Mitgliederbereich (Recht member) alles einschloss, dazu das Öffentliche: die Vorgabe für Mitglied
-     * und die Rollen, die die Bereiche mitbringen.
+     * Rechte zum Sehen, die erst später dazukamen (Bereiche Kompanien und Sponsoren, Issue #278): Bei der Ersteinrichtung
+     * haben sie Gast, Mitglied und die früheren festen Rollen; beim Update bekommt sie jede Rolle außer Admin einmal
+     * (RoleService::migrateAddedViewRights), damit nach dem Einschalten des Bereichs jemand etwas sieht. Der Bereich selbst
+     * ist anfangs aus. Ein neues Recht dieser Art kommt hier hinten dazu.
+     */
+    public const ADDED_VIEW = ['view_companies', 'view_sponsors'];
+
+    /**
+     * Was der frühere Mitgliederbereich (Recht member) alles einschloss, dazu das Öffentliche: mit ADDED_VIEW die Vorgabe
+     * für Mitglied und die Rollen, die die Bereiche mitbringen; ohne sie, was beim Update für member galt (expandLegacy).
      */
     public const MEMBER_DEFAULTS = [
         'member', 'calendar', 'view_intern', ...self::PUBLIC_DEFAULTS, 'view_gallery_internal', 'view_own_points',
@@ -52,8 +60,8 @@ final class Roles
      * @var array<string, string[]>
      */
     public const TEMPLATES = [
-        self::GUEST => self::PUBLIC_DEFAULTS,
-        self::MEMBER => self::MEMBER_DEFAULTS,
+        self::GUEST => [...self::PUBLIC_DEFAULTS, ...self::ADDED_VIEW],
+        self::MEMBER => [...self::MEMBER_DEFAULTS, ...self::ADDED_VIEW],
         self::ADMIN => [],
     ];
 
@@ -64,12 +72,12 @@ final class Roles
      * @var array<string, string[]>
      */
     public const LEGACY = [
-        self::ORGANIZER => [...self::MEMBER_DEFAULTS, 'manage_events', 'manage_documents'],
-        self::MANAGER => [...self::MEMBER_DEFAULTS, 'manage_events', 'manage_documents', 'manage_points', 'manage_penalties'],
+        self::ORGANIZER => [...self::MEMBER_DEFAULTS, ...self::ADDED_VIEW, 'manage_events', 'manage_documents'],
+        self::MANAGER => [...self::MEMBER_DEFAULTS, ...self::ADDED_VIEW, 'manage_events', 'manage_documents', 'manage_points', 'manage_penalties'],
     ];
 
     /** Frühere feste Rolle „Anwärter“: interner Kalender und das Brett (wie damals mit dem Kalender), dazu das Öffentliche. */
-    public const CANDIDATE_DEFAULTS = ['calendar', 'view_board', ...self::PUBLIC_DEFAULTS];
+    public const CANDIDATE_DEFAULTS = ['calendar', 'view_board', ...self::PUBLIC_DEFAULTS, ...self::ADDED_VIEW];
 
     /**
      * Rechte, die der Admin einer Rolle geben kann, in der Reihenfolge der Anzeige (Gruppen in capabilities.ts).
@@ -81,6 +89,8 @@ final class Roles
         Capability::ViewEvents,
         Capability::ViewNews,
         Capability::ViewGallery,
+        Capability::ViewCompanies,
+        Capability::ViewSponsors,
         Capability::ViewIntern,
         // Mitgliederbereich
         Capability::Member,
@@ -107,6 +117,11 @@ final class Roles
         Capability::ManagePolls,
         Capability::ManageLists,
         Capability::SendMail,
+        Capability::ManageSponsors,
+        Capability::ManageCompanies,
+        Capability::SubmitGallery,
+        Capability::ReviewGallery,
+        Capability::ManagePages,
         // Kompanie verwalten
         Capability::ManagePoints,
         Capability::ManagePenalties,

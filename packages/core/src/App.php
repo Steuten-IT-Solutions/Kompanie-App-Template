@@ -22,8 +22,12 @@ use KompanieApp\Core\Domain\DocumentService;
 use KompanieApp\Core\Domain\DriveClient;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Features;
+use KompanieApp\Core\Domain\FileMediaStore;
 use KompanieApp\Core\Domain\FormerMemberService;
 use KompanieApp\Core\Domain\GalleryService;
+use KompanieApp\Core\Domain\GallerySubmissionService;
+use KompanieApp\Core\Domain\PageService;
+use KompanieApp\Core\Domain\GalleryUploadService;
 use KompanieApp\Core\Domain\GoogleConnect;
 use KompanieApp\Core\Domain\JoinYearService;
 use KompanieApp\Core\Domain\MemberImportService;
@@ -37,9 +41,12 @@ use KompanieApp\Core\Domain\TitleService;
 use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Time;
 use KompanieApp\Core\Domain\MaintenanceService;
+use KompanieApp\Core\Domain\NavigationService;
 use KompanieApp\Core\Domain\MemberPhotoService;
 use KompanieApp\Core\Domain\InventoryService;
 use KompanieApp\Core\Domain\OfficeService;
+use KompanieApp\Core\Domain\CompanyService;
+use KompanieApp\Core\Domain\SponsorService;
 use KompanieApp\Core\Domain\ListService;
 use KompanieApp\Core\Domain\MailGroupService;
 use KompanieApp\Core\Domain\MailingService;
@@ -64,6 +71,7 @@ use KompanieApp\Core\Port\FileStorage;
 use KompanieApp\Core\Port\HttpClient;
 use KompanieApp\Core\Port\ImageResizer;
 use KompanieApp\Core\Port\Mailer;
+use KompanieApp\Core\Port\MediaStore;
 use KompanieApp\Core\Port\NewsSource;
 use KompanieApp\Core\Port\Scheduler;
 use KompanieApp\Core\Port\Settings;
@@ -211,6 +219,12 @@ final class App
         }
         $this->features()->initialize($existing);
         $this->roles()->initialize($existing);
+        // Einreichungen der Galerie (Issue #286): Standardrolle und Benachrichtigungen bei eingeschalteter Galerie
+        try {
+            $this->gallerySubmissions()->initialize($existing);
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Einreichungen der Galerie nicht eingerichtet: ' . $e->getMessage());
+        }
         // Die laufende Version festhalten: Fehlt später die Datei VERSION, weiß der Installer trotzdem,
         // welche Hauptversion installiert ist (auch nach einem abgebrochenen oder händischen Wechsel).
         // Reine Hilfsinformation: Ein Fehler beim Schreiben darf keinen Aufruf scheitern lassen.
@@ -307,6 +321,7 @@ final class App
                 }
             } elseif ($task === GalleryService::PROCESS_TASK && $this->features()->enabled('gallery')) {
                 $this->gallery()->runProcessTask(25);
+                $this->gallerySubmissions()->pruneOrphans();
             } elseif ($task === CalendarService::TASK && $this->features()->enabled('calendar')) {
                 $error = $this->calendar()->refreshIfStale();
                 if ($error !== null) {
@@ -443,6 +458,12 @@ final class App
     public function userDeleted(int $userId, bool $keepChronicle = false): bool
     {
         // $keepChronicle: nur die persönlichen Angaben (Aufbewahrungsfrist für Ehemalige, UserData::CHRONICLE bleibt).
+        // Dateien offener Einreichungen der Galerie (Issue #286); die Zeilen löscht UserData::purge.
+        try {
+            $this->gallerySubmissions()->userDeleted($userId);
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Einreichungen der Galerie nicht gelöscht: ' . $e->getMessage());
+        }
         $ok = UserData::purge($this->db, $userId, PollService::existingSecret($this->settings), $keepChronicle);
         // Noch nicht gespeicherte Dateianhänge samt Dateien (Anhänge gespeicherter Nachrichten und Mails bleiben bei ihnen).
         try {
@@ -630,6 +651,18 @@ final class App
         return $this->service(OfficeService::class, fn () => new OfficeService($this));
     }
 
+    /** Sponsoren (Issue #279, Bereich sponsors) */
+    public function sponsors(): SponsorService
+    {
+        return $this->service(SponsorService::class, fn () => new SponsorService($this));
+    }
+
+    /** Kompanieliste (Issue #280, Bereich companies) */
+    public function companies(): CompanyService
+    {
+        return $this->service(CompanyService::class, fn () => new CompanyService($this));
+    }
+
     public function lists(): ListService
     {
         return $this->service(ListService::class, fn () => new ListService($this));
@@ -689,6 +722,11 @@ final class App
     public function maintenance(): MaintenanceService
     {
         return $this->service(MaintenanceService::class, fn () => new MaintenanceService($this));
+    }
+
+    public function navigation(): NavigationService
+    {
+        return $this->service(NavigationService::class, fn () => new NavigationService($this->settings));
     }
 
     public function settingsService(): SettingsService
@@ -758,7 +796,30 @@ final class App
             $this->time(),
             $this->scheduler,
             $this->cache,
+            $this->mediaStore(),
         ));
+    }
+
+    /** Alben der App und hochgeladene Bilder (Issue #285) */
+    public function galleryUploads(): GalleryUploadService
+    {
+        return $this->service(GalleryUploadService::class, fn () => new GalleryUploadService($this));
+    }
+
+    public function pages(): PageService
+    {
+        return $this->service(PageService::class, fn () => new PageService($this));
+    }
+
+    public function gallerySubmissions(): GallerySubmissionService
+    {
+        return $this->service(GallerySubmissionService::class, fn () => new GallerySubmissionService($this));
+    }
+
+    /** Eigene Originale der Galerie auf dem Server (Issue #284) */
+    public function mediaStore(): MediaStore
+    {
+        return $this->service(MediaStore::class, fn () => new FileMediaStore($this->files));
     }
 
     /**

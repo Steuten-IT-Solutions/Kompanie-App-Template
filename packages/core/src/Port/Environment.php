@@ -68,6 +68,18 @@ interface Environment
      */
     public function attachmentUrl(string $uid): string;
 
+    /**
+     * Adresse des Logos eines Sponsors (Issue #279), ausgeliefert nach Prüfung der Rechte (view_sponsors, ohne Anmeldung
+     * die von Gast): <App>/sponsorlogo/<id>?v=<Fassung>. Die Adresse wechselt mit jedem Logo.
+     */
+    public function sponsorLogoUrl(int $id, string $version): string;
+
+    /**
+     * Adresse des Logos einer Kompanie (Issue #280), ausgeliefert nach Prüfung der Rechte (view_companies, ohne Anmeldung
+     * die von Gast): <App>/kompanielogo/<id>?v=<Fassung>. Die Adresse wechselt mit jedem Logo.
+     */
+    public function companyLogoUrl(int $id, string $version): string;
+
     /** Adresse zum Herunterladen der Datensicherung (nur Admins, Domain\BackupDownload): <App>/sicherung. */
     public function backupUrl(): string;
 }

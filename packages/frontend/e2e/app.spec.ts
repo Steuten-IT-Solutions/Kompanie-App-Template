@@ -15,7 +15,7 @@ const SHOTS = process.env.KOMPANIE_SCREENSHOT_DIR;
 const MANAGER = 'Verwaltung';
 
 /** Bereiche, die unter „Einrichtungen“ stehen, sobald es davon mindestens zwei gibt. */
-const SETUP = ['Punktekatalog', 'Dienstgrade', 'Titel', 'Ämter'];
+const SETUP = ['Punktekatalog', 'Dienstgrade', 'Titel', 'Ämter', 'Kompanien', 'Sponsoren', 'Seiten'];
 
 /** Startseite der Verwaltung (Tab unten) öffnen und dort den Knopf eines Bereichs wählen (ggf. über „Einrichtungen“). */
 async function adminMenu(page: Page, name: string) {
@@ -515,22 +515,32 @@ test('Wischen auch bei Ehemaligen und ohne vorher geöffnete Liste (Link, Neusta
   await expect(page.locator('.member-name')).toHaveText('Mitglied2');
 });
 
-/** Anfragen nach den Daten einer Person (members/<id>), nicht nach Unterseiten wie members/<id>/points. */
-const MEMBER_DETAIL = /members\/(\d+)(?![\w/])/;
+/**
+ * Anfragen nach den Daten von Personen: einzeln (members/<id>, nicht Unterseiten wie members/<id>/points) oder mehrere
+ * auf einmal beim Vorladen (members/details?ids=…).
+ */
+const MEMBER_DETAIL = /members\/(?:\d+(?![\w/])|details(?![\w/]))/;
 
-test('Mitglied: Alle der Liste werden nacheinander vorgeladen, nicht nur die Nachbarn', async ({ page }) => {
+/** Ids, nach denen eine solche Anfrage fragt. */
+function memberIds(url: string): string[] {
+  const single = /members\/(\d+)(?![\w/])/.exec(url);
+  if (single) return [single[1]];
+  if (!MEMBER_DETAIL.test(url)) return [];
+  return (new URL(url).searchParams.get('ids') ?? '').split(',').filter(Boolean);
+}
+
+test('Mitglied: Alle der Liste werden vorgeladen, nicht nur die Nachbarn', async ({ page }) => {
   await login(page, 'verwalter');
   const requested = new Set<string>();
   page.on('request', (r) => {
-    const m = MEMBER_DETAIL.exec(r.url());
-    if (m && r.method() === 'GET') requested.add(m[1]);
+    if (r.method() === 'GET') for (const id of memberIds(r.url())) requested.add(id);
   });
   await adminMenu(page, 'Mitglieder');
   await page.locator('.member-row').first().click();
   const step = (await page.locator('.member-step .muted').textContent()) ?? '';
   const total = Number(/\/ (\d+)/.exec(step)?.[1]);
   expect(total).toBeGreaterThan(2);
-  // Die Person selbst und alle anderen der Liste, eine nach der anderen
+  // Die Person selbst und alle anderen der Liste (mehrere je Anfrage)
   await expect.poll(() => requested.size, { timeout: 20_000 }).toBe(total);
 });
 
@@ -554,6 +564,9 @@ test.describe('ohne Service Worker, Daten zurückgehalten', () => {
     await expect(page.locator('[data-loading]')).not.toHaveCount(0);
     await expect(page.locator('.member-name')).toHaveText('Mitglied1');
     await expect(page.locator('.member-step')).toContainText('1 / 2');
+    // Kopf schon aus der Mitgliederliste (Rolle, Kacheln), obwohl die Daten der Person noch zurückgehalten werden
+    await expect(page.locator('.member-level')).toContainText('Rolle');
+    await expect(page.locator('.member-stats')).toBeVisible();
     await swipe(page, -200);
     await expect(page.locator('.member-name')).toHaveText('Mitglied2');
     await expect(page.locator('.member-step')).toContainText('2 / 2');
@@ -1091,6 +1104,80 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   await expect(page.locator('.meins-menu')).toBeVisible();
 });
 
+/** Navigation per API zurücksetzen (null = Standardnavigation), falls ein Test mittendrin scheitert. */
+async function resetNavigation(page: Page) {
+  await page.evaluate(async () => {
+    const cfg = window.KOMPANIE_CONFIG!;
+    await fetch(cfg.apiBase + 'admin/navigation', {
+      method: 'PUT',
+      headers: { [cfg.csrf.header]: cfg.csrf.token, 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ navigation: null }),
+    });
+  });
+}
+
+test('Navigation einrichten (Issue #277): Untermenü umbenennen, Termine hineinschieben, für Mitglieder sichtbar, Standard wiederherstellen', async ({
+  page,
+}) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  try {
+    await adminMenu(page, 'Einstellungen');
+    await page
+      .locator('.settings-link')
+      .filter({ has: page.getByText('Navigation', { exact: true }) })
+      .click();
+    const card = page.locator('#einstellungen-navigation');
+    await expect(card.getByText('Zurzeit gilt die Standardnavigation', { exact: false })).toBeVisible();
+    // Der Entwurf beginnt mit der Standardnavigation: Termine, News, Galerie und das Untermenü Intern.
+    await expect(card.getByLabel('Name des Untermenüs')).toHaveValue('Intern');
+    await card.getByLabel('Name des Untermenüs').fill('Verein');
+    await card.getByLabel('Platz von Termine').selectOption({ label: 'Im Untermenü „Verein“' });
+    await card.getByLabel('Platz von Punktekatalog').selectOption({ label: 'Nicht in der Navigation' });
+    await expect(card.getByRole('heading', { name: 'Nicht in der Navigation' })).toBeVisible();
+    await card.getByRole('button', { name: 'Navigation speichern' }).click();
+    await expect(page.getByText('Navigation gespeichert')).toBeVisible();
+    await expect(card.getByText('Zurzeit gilt eure eigene Navigation.')).toBeVisible();
+
+    const tabbar = page.locator('.tabbar');
+    await expect(tabbar.getByRole('button', { name: 'Verein' })).toBeVisible();
+    await expect(tabbar.getByRole('button', { name: 'Intern' })).toHaveCount(0);
+    await expect(tabbar.getByRole('button', { name: 'Termine' })).toHaveCount(0);
+
+    // Mitglied: dieselbe Leiste, nur was es sehen darf; Termine im Untermenü, „‹ Verein“ führt zurück.
+    await login(page, 'mitglied1');
+    await expect(tabbar.getByRole('button', { name: 'Termine' })).toHaveCount(0);
+    await tabbar.getByRole('button', { name: 'Verein' }).click();
+    await expect(page).toHaveURL(/#\/menue\/1$/);
+    await expect(page.locator('.topbar-title')).toHaveText('Verein');
+    const tiles = page.getByRole('navigation', { name: 'Verein' });
+    await expect(tiles.getByRole('button', { name: 'Punktekatalog', exact: true })).toHaveCount(0);
+    await tiles.getByRole('button', { name: 'Termine', exact: true }).click();
+    await expect(page).toHaveURL(/#\/termine$/);
+    await expect(page.getByText('Vereinsabend')).toBeVisible();
+    await expect(tabbar.getByRole('button', { name: 'Verein' })).toHaveAttribute('aria-current', 'page');
+    await page.getByRole('button', { name: '‹ Verein' }).click();
+    await expect(page).toHaveURL(/#\/menue\/1$/);
+    await shot(page, '40-navigation-untermenue');
+
+    // Admin stellt die Standardnavigation wieder her.
+    await login(page, 'admin', ADMIN_PASSWORD);
+    await adminMenu(page, 'Einstellungen');
+    await page
+      .locator('.settings-link')
+      .filter({ has: page.getByText('Navigation', { exact: true }) })
+      .click();
+    page.once('dialog', (d) => d.accept());
+    await card.getByRole('button', { name: 'Standardnavigation wiederherstellen' }).click();
+    await expect(page.getByText('Standardnavigation wiederhergestellt')).toBeVisible();
+    await expect(tabbar.getByRole('button', { name: 'Intern' })).toBeVisible();
+    await expect(tabbar.getByRole('button', { name: 'Termine' })).toBeVisible();
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD).catch(() => undefined);
+    await resetNavigation(page).catch(() => undefined);
+  }
+});
+
 test('Intern: Knöpfe für Mitglieder, Dokumente, Brett, Dienstgrade und Punktekatalog, „‹ Intern“ führt zurück; ohne Anmeldung Mitglieder als eigener Tab', async ({
   page,
 }) => {
@@ -1102,7 +1189,15 @@ test('Intern: Knöpfe für Mitglieder, Dokumente, Brett, Dienstgrade und Punktek
   await expect(page).toHaveURL(/#\/intern$/);
   await expect(page.locator('.topbar-title')).toHaveText('Intern');
   const tiles = page.getByRole('navigation', { name: 'Intern' });
-  await expect(tiles.getByRole('button')).toHaveText(['Mitglieder', 'Dokumente', 'Schwarzes Brett', 'Dienstgrade', 'Punktekatalog']);
+  // Unten höchstens fünf Punkte (mit Intern): Sponsoren passen nicht mehr und stehen vorn unter Intern.
+  await expect(tiles.getByRole('button')).toHaveText([
+    'Sponsoren',
+    'Mitglieder',
+    'Dokumente',
+    'Schwarzes Brett',
+    'Dienstgrade',
+    'Punktekatalog',
+  ]);
 
   await tiles.getByRole('button', { name: 'Dokumente', exact: true }).click();
   await expect(page).toHaveURL(/#\/dokumente$/);
@@ -1420,6 +1515,275 @@ test('Ämter: Haken „Ehrung“ an der Amtszeit, einzelnes Jahr ohne Ehrung (Is
   page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Amt löschen' }).click();
   await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
+});
+
+test('Ämter: gemeinsame Amtszeiten einer Gruppe mit Gruppenbild, öffentlich als Karte (Issue #282)', async ({ page }) => {
+  const n = Date.now() % 1000000;
+  const group = `Königshaus ${n}`;
+  const offices = [`Majestät ${n}`, `Adjutant ${n}`];
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Ämter');
+  await page.getByLabel('Neue Gruppe').fill(group);
+  await page.getByRole('button', { name: 'Gruppe anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gruppe angelegt');
+  const newOffice = page.locator('form', { hasText: 'Neues Amt' });
+  for (const office of offices) {
+    await newOffice.getByLabel('Bezeichnung').fill(office);
+    await newOffice.getByLabel('Gruppe').selectOption({ label: group });
+    await newOffice.getByRole('button', { name: 'Anlegen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Amt angelegt');
+  }
+  const groupRow = page.locator('li.card', { hasText: group }).filter({ has: page.getByRole('button', { name: 'Umbenennen' }) });
+  // Gesteuert: der Haken steht erst, wenn der Server die Änderung bestätigt hat
+  await groupRow.getByLabel('Amtszeiten gemeinsam').click();
+  await expect(page.locator('.toast')).toHaveText('Gemeinsame Amtszeiten an');
+  await expect(groupRow.getByLabel('Amtszeiten gemeinsam')).toBeChecked();
+
+  const admin = page.locator('.office-admin-group', { hasText: group }).locator('.joint-admin');
+  await expect(admin).toContainText('Noch keine gemeinsamen Amtszeiten.');
+  await admin.getByRole('button', { name: 'Neue gemeinsame Amtszeit' }).click();
+  const form = admin.locator('form.joint-term-form');
+  await form.getByLabel('Von (Jahr)', { exact: true }).fill('2023');
+  await form.locator('input[type=file]').setInputFiles(PNG);
+  await expect(form.locator('img.joint-term-form-image')).toBeVisible();
+  const holders = [`Anna ${n}`, `Bernd ${n}`];
+  for (const [i, office] of offices.entries()) {
+    const set = form.locator('fieldset', { hasText: office });
+    await set.getByRole('button', { name: 'Person hinzufügen' }).click();
+    await set.getByLabel('Name', { exact: true }).fill(holders[i]);
+  }
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gemeinsame Amtszeit angelegt');
+  await expect(admin.locator('li.card')).toContainText(`${offices[0]}: ${holders[0]}`);
+  await expect(admin.locator('li.card')).toContainText(`${offices[1]}: ${holders[1]}`);
+
+  // Öffentlich: eine Karte je gemeinsame Amtszeit mit Bild und den Personen je Amt
+  await page.goto('/app/#/mitglieder/aemter');
+  const card = page.locator('.joint-term', { hasText: group });
+  await expect(card.locator('.joint-term-title')).toContainText('aktuell');
+  await expect(card.locator('img.joint-term-image')).toBeVisible();
+  expect(await card.locator('img.joint-term-image').evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  await expect(card.locator('.joint-term-offices > div', { hasText: offices[0] }).locator('dd')).toContainText(holders[0]);
+  await expect(card.locator('.joint-term-offices > div', { hasText: offices[1] }).locator('dd')).toContainText(holders[1]);
+
+  // Aufräumen: gemeinsame Amtszeit, Ämter und Gruppe löschen
+  await page.goto('/app/#/verwaltung/aemter');
+  page.once('dialog', (d) => d.accept());
+  await page.locator('.office-admin-group', { hasText: group }).locator('.joint-admin').getByRole('button', { name: 'Löschen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  for (const office of offices) {
+    await page.getByRole('button', { name: office, exact: true }).click();
+    page.once('dialog', (d) => d.accept());
+    await page.getByRole('button', { name: 'Amt löschen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
+  }
+  page.once('dialog', (d) => d.accept());
+  await page.locator('li.card', { hasText: group }).getByRole('button', { name: 'Löschen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gelöscht');
+});
+
+test('Ämter: Foto für eine Person ohne Profil, öffentlich im Zeitstrahl, Übernahme in eine spätere Amtszeit (Issue #283)', async ({
+  page,
+}) => {
+  const n = Date.now() % 1000000;
+  const office = `Hofdamen ${n}`;
+  const name = `Erika ${n}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Ämter');
+  const newOffice = page.locator('form', { hasText: 'Neues Amt' });
+  await newOffice.getByLabel('Bezeichnung').fill(office);
+  await newOffice.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amt angelegt');
+  await page.getByRole('button', { name: office, exact: true }).click();
+
+  await page.getByRole('button', { name: 'Amtszeit eintragen' }).click();
+  let form = page.locator('form', { hasText: 'Neue Amtszeit' });
+  await form.getByLabel('Von (Jahr)', { exact: true }).fill('2010');
+  await form.getByLabel('Bis (leer: bis heute)').fill('2012');
+  await form.getByLabel('Name', { exact: true }).fill(name);
+  await expect(form.getByRole('button', { name: 'Foto von früher übernehmen' })).toHaveCount(0);
+  await form.getByLabel(`Foto von ${name}`).setInputFiles(PNG);
+  await expect(form.locator('.office-holder-photo img')).toBeVisible();
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amtszeit eingetragen');
+
+  // Spätere Amtszeit mit demselben Namen: Foto von früher übernehmen
+  await page.getByRole('button', { name: 'Amtszeit eintragen' }).click();
+  form = page.locator('form', { hasText: 'Neue Amtszeit' });
+  await form.getByLabel('Von (Jahr)', { exact: true }).fill('2020');
+  await form.getByLabel('Name', { exact: true }).fill(name.toUpperCase());
+  await form.getByRole('button', { name: 'Foto von früher übernehmen' }).click();
+  await expect(form.locator('.office-holder-photo img')).toBeVisible();
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amtszeit eingetragen');
+
+  // Zeitstrahl: das Foto bei beiden Amtszeiten (ohne Anmeldung prüft OfficeHolderPhotoTest)
+  await page.goto('/app/#/mitglieder/aemter');
+  const card = page.locator('.office-card', { hasText: office });
+  await card.locator('.office-head').click();
+  const photos = card.locator('.spotlight-avatar img, .holder-chip .member-avatar img');
+  await expect(photos).toHaveCount(2);
+  expect(await photos.first().evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
+
+  await page.goto('/app/#/verwaltung/aemter');
+  await page.getByRole('button', { name: office, exact: true }).click();
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Amt löschen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
+});
+
+test('Galerie: Album nur in der App anlegen, Bilder hochladen, ändern und löschen (Issue #285)', async ({ page }) => {
+  const n = Date.now() % 1000000;
+  const title = `Sommerfest ${n}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/einstellungen/galerie');
+  const section = page.locator('#einstellungen-galerie-alben');
+  await expect(page.getByLabel('Quelle')).toHaveValue('drive');
+  const form = section.locator('form', { hasText: 'Neues Album in der App' });
+  await form.getByLabel('Titel').fill(title);
+  await form.getByLabel('Jahr').fill('2026');
+  await form.getByRole('button', { name: 'Album anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Album angelegt');
+  const item = section.locator('.gallery-album-item', { hasText: title });
+  await expect(item).toContainText('nur in der App · 0 hochgeladen');
+
+  // Zwei Bilder auf einmal, eines davon später löschen
+  await item.getByLabel(`Bilder in ${title} hochladen`).setInputFiles([PNG, { ...PNG, name: 'zweites.png' }]);
+  await expect(page.locator('.toast')).toHaveText('2 Bilder hochgeladen');
+  await expect(item.locator('.gallery-upload')).toHaveCount(2);
+  await expect(item).toContainText('2 hochgeladen');
+  await expect(item.locator('.gallery-upload', { hasText: 'foto.jpg' })).toBeVisible();
+  page.once('dialog', (d) => void d.accept());
+  await item.locator('.gallery-upload', { hasText: 'zweites.jpg' }).getByRole('button', { name: 'Löschen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Bild gelöscht');
+  await expect(item.locator('.gallery-upload')).toHaveCount(1);
+
+  await item.getByLabel('Titel des Albums').fill(`${title} neu`);
+  await item.getByRole('button', { name: 'Album speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  await expect(section.locator('.gallery-album-head', { hasText: `${title} neu` })).toBeVisible();
+
+  page.once('dialog', (d) => void d.accept());
+  await item.getByRole('button', { name: 'Album löschen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Album gelöscht');
+  await expect(section.locator('.gallery-album-item', { hasText: title })).toHaveCount(0);
+});
+
+test('Galerie: Knöpfe zum Herunterladen für ein Bild und das Album als ZIP, nur wenn eingeschaltet', async ({ page }) => {
+  const n = Date.now() % 1000000;
+  const title = `Download ${n}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json()) as { id?: number } };
+      },
+      [path, method, body] as const,
+    );
+  const albumId = (await api('admin/gallery/albums', 'POST', { title, year: 2026 })).data.id!;
+  const upload = await api(`admin/gallery/albums/${albumId}/photos`, 'POST', {
+    file: { name: 'foto.png', data: PNG.buffer.toString('base64') },
+  });
+  expect(upload.status).toBe(201);
+  try {
+    // Aus (Vorgabe): keine Knöpfe
+    await page.goto(`/app/#/galerie/${albumId}`);
+    await expect(page.locator('.photo-grid .photo')).toHaveCount(1);
+    await expect(page.getByRole('button', { name: /Album herunterladen/ })).toHaveCount(0);
+
+    // Einschalten unter Einstellungen → Galerie
+    await page.goto('/app/#/einstellungen/galerie');
+    const toggle = page.getByLabel(/Knöpfe zum Herunterladen zeigen/);
+    await expect(toggle).not.toBeChecked();
+    await toggle.check();
+    await page.locator('#einstellungen-galerie').getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
+
+    await page.goto(`/app/#/galerie/${albumId}`);
+    const zipButton = page.getByRole('button', { name: 'Album herunterladen (1 Bild, ZIP)' });
+    const [zip] = await Promise.all([page.waitForEvent('download'), zipButton.click()]);
+    expect(zip.suggestedFilename()).toBe(`${title} 2026.zip`);
+    const bytes = readFileSync((await zip.path())!);
+    expect(bytes.subarray(0, 4).toString('latin1')).toBe('PK\x03\x04');
+    expect(bytes.includes(Buffer.from('foto.jpg'))).toBe(true);
+    await expect(page.locator('.album-download [role=status]')).toHaveText('1 Bild gespeichert.');
+
+    await page.locator('.photo-grid .photo').first().click();
+    const [single] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Bild herunterladen' }).click()]);
+    expect(single.suggestedFilename()).toBe('foto.jpg');
+    const jpeg = readFileSync((await single.path())!);
+    expect(jpeg.subarray(0, 2).toString('hex')).toBe('ffd8');
+  } finally {
+    expect((await api('admin/settings', 'PATCH', { gallery_downloads: '0' })).status).toBe(200);
+    expect((await api(`admin/gallery/albums/${albumId}`, 'DELETE')).status).toBe(200);
+  }
+});
+
+test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)', async ({ page }) => {
+  const n = Date.now() % 1000000;
+  const title = `Einreichung ${n}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const albumId = await page.evaluate(async (title) => {
+    const cfg = window.KOMPANIE_CONFIG!;
+    const res = await fetch(cfg.apiBase + 'admin/gallery/albums', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+      body: JSON.stringify({ title, year: 2026 }),
+    });
+    return ((await res.json()) as { id: number }).id;
+  }, title);
+  expect(albumId).toBeGreaterThan(0);
+
+  await page.goto('/app/#/galerie');
+  await page.getByRole('button', { name: 'Bilder einreichen' }).click();
+  const form = page.locator('form', { hasText: 'Bilder einreichen' });
+  await form.getByLabel('Album').selectOption({ label: `2026 · ${title}` });
+  await form.getByLabel('Bilder (JPG, PNG oder WebP)').setInputFiles([PNG, { ...PNG, name: 'zweites.png' }]);
+  await expect(form.getByRole('button', { name: 'Einreichen' })).toBeDisabled();
+  await form.getByLabel('Ich habe die Rechte an den Bildern, und die erkennbaren Personen sind einverstanden.').check();
+  await form.getByRole('button', { name: 'Einreichen' }).click();
+  await expect(page.locator('.toast')).toHaveText('2 Bilder eingereicht');
+  const mine = page.locator('.gallery-upload', { hasText: title });
+  await expect(mine).toHaveCount(2);
+  await expect(mine.first()).toContainText('wartet auf Freigabe');
+
+  // Prüfen: eines öffentlich freigeben, eines mit Grund ablehnen
+  await page.getByRole('button', { name: '‹ Alle Alben' }).click();
+  await page.getByRole('button', { name: 'Einreichungen prüfen' }).click();
+  const items = page.locator('.gallery-review-item', { hasText: title });
+  await expect(items).toHaveCount(2);
+  await items.filter({ hasText: 'foto.jpg' }).getByRole('button', { name: 'Öffentlich freigeben' }).click();
+  await expect(page.locator('.toast')).toHaveText('Freigegeben');
+  page.once('dialog', (d) => void d.accept('Unscharf'));
+  await items.filter({ hasText: 'zweites.jpg' }).getByRole('button', { name: 'Ablehnen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Abgelehnt');
+  await expect(items).toHaveCount(0);
+  await expect(page.locator('.gallery-upload', { hasText: title })).toHaveCount(1);
+
+  await page.goto('/app/#/galerie/einreichen');
+  await expect(page.locator('.gallery-upload', { hasText: 'zweites.jpg' })).toContainText('nicht freigegeben: Unscharf');
+  await expect(page.locator('.gallery-upload', { hasText: 'foto.jpg' }).filter({ hasText: title })).toContainText('freigegeben');
+
+  // Aufräumen: das Album mit dem freigegebenen Bild löschen
+  const status = await page.evaluate(async (id) => {
+    const cfg = window.KOMPANIE_CONFIG!;
+    return (
+      await fetch(cfg.apiBase + `admin/gallery/albums/${id}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+        headers: { [cfg.csrf.header]: cfg.csrf.token },
+      })
+    ).status;
+  }, albumId);
+  expect(status).toBe(200);
 });
 
 test('Ehemalig eintragen: Vorschau der endenden Ämter, danach enden sie mit dem Austrittsjahr (Issue #181)', async ({ page }) => {
@@ -2780,7 +3144,8 @@ test('Galerie: Gäste sehen öffentliche Bilder, Mitglieder zusätzlich interne'
   // Wischen: Das Bild folgt dem Finger, daneben steht schon das nächste; zu kurz gezogen schnappt es zurück.
   const lb = await lightboxSwipe(page, -30, true);
   await expect(page.locator('.lb-peek-next img')).toBeVisible();
-  expect(await page.locator('.lb-track').evaluate((el) => el.style.transform)).toBe('translateX(-30px)');
+  // Touch-Bewegungen kommen erst mit dem nächsten Bild an, daher warten statt sofort lesen.
+  await expect.poll(() => page.locator('.lb-track').evaluate((el) => el.style.transform)).toBe('translateX(-30px)');
   await lb.release();
   await expect(page.locator('.lb-peek')).toHaveCount(0);
   await expect(page.locator('.lb-count')).toHaveText('1 / 2');
@@ -3075,7 +3440,7 @@ test('Admin wird durch die Einrichtung geführt', async ({ page }) => {
   let importStep = false;
   while ((await page.getByRole('heading', { name: 'Fast fertig' }).count()) === 0) {
     importStep ||= (await page.getByRole('heading', { name: 'Mitglieder übernehmen' }).count()) > 0;
-    await expect(page.getByRole('heading', { name: 'Galerie aus Google Drive' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Galerie', exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Weiter', exact: true }).click();
   }
   expect(importStep).toBe(true);
@@ -3174,6 +3539,59 @@ test('Admin sieht Zustand, Updates und lädt eine Sicherung herunter', async ({ 
   await page.reload();
   await expect(status.locator('.status-item.status-ok', { hasText: 'Datensicherung' })).toBeVisible();
   await shot(page, '19-wartung');
+});
+
+test('Impressum und Datenschutz: Admin trägt die Links ein, alle sehen sie (Anmeldung, Hilfe, Konto), Ampel wird grün', async ({
+  page,
+  browser,
+}) => {
+  const imprint = 'https://www.beispiel.de/impressum';
+  const privacy = 'https://www.beispiel.de/datenschutz';
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/einstellungen/zustand');
+  const status = page.locator('.settings-section', { hasText: 'Zustand der App' });
+  await expect(status.locator('.status-item.status-warn', { hasText: 'Impressum und Datenschutz' })).toBeVisible();
+
+  await page.goto('/app/#/einstellungen/rechtliches');
+  const form = page.locator('.settings-section', { hasText: 'Impressum und Datenschutz' });
+  // Ungültige Adresse: Der Server lehnt sie ab, nichts wird gespeichert.
+  await form.getByLabel('Impressum').fill('javascript:alert(1)');
+  await form.getByLabel('Impressum').evaluate((el) => el.setAttribute('type', 'text'));
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(form.locator('.form-error')).toContainText('Adresse des Impressums');
+  await form.getByLabel('Impressum').fill(imprint);
+  await form.getByLabel('Datenschutzerklärung').fill(privacy);
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  // Gleich im Konto sichtbar, ohne neu zu laden.
+  await openKonto(page);
+  const konto = page.locator('.account-legal');
+  await expect(konto.getByRole('link', { name: 'Impressum' })).toHaveAttribute('href', imprint);
+  await expect(konto.getByRole('link', { name: 'Datenschutz' })).toHaveAttribute('href', privacy);
+  await page.goto('/app/#/einstellungen/zustand');
+  await page.reload();
+  await expect(status.locator('.status-item.status-ok', { hasText: 'Impressum und Datenschutz' })).toBeVisible();
+
+  // Ohne Anmeldung: in der Hilfe und (eigenständig) auf der Anmeldeseite, in einem neuen Fenster.
+  const guest = await browser.newPage();
+  await guest.goto('/app/#/hilfe');
+  const hilfe = guest.locator('.legal-links');
+  await expect(hilfe.getByRole('link', { name: 'Impressum' })).toHaveAttribute('href', imprint);
+  await expect(hilfe.getByRole('link', { name: 'Datenschutz' })).toHaveAttribute('target', '_blank');
+  if (STANDALONE) {
+    await guest.goto('/app/#/anmelden');
+    await expect(guest.locator('form.login').getByRole('link', { name: 'Datenschutz' })).toHaveAttribute('href', privacy);
+  }
+  await guest.close();
+
+  // Aufräumen: Links entfernen, die Ampel ist wieder gelb.
+  await page.goto('/app/#/einstellungen/rechtliches');
+  await form.getByLabel('Impressum').fill('');
+  await form.getByLabel('Datenschutzerklärung').fill('');
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  await openKonto(page);
+  await expect(page.locator('.account-legal')).toHaveCount(0);
 });
 
 test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nicht', async ({ page }) => {
@@ -3544,7 +3962,7 @@ test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ 
   await expect(cal.locator('.form-error')).toBeVisible();
 
   await open('Galerie');
-  const gallery = page.locator('.settings-section', { hasText: 'Galerie aus Google Drive' });
+  const gallery = page.locator('.settings-section', { has: page.getByRole('heading', { name: 'Galerie', exact: true }) });
   await expect(gallery.getByText('test@example.iam.gserviceaccount.com')).toBeVisible();
   await gallery.getByRole('button', { name: 'Jetzt abgleichen' }).click();
   await expect(gallery.getByText('Fertig: 3 Alben, 6 Bilder und Videos.')).toBeVisible();
@@ -3596,7 +4014,7 @@ test('Admin verbindet die App mit Google (Google simuliert) und trennt wieder', 
   await expect(google.getByText('Es darf auch den Kalender lesen.')).toBeVisible();
   expect(page.url()).not.toContain('google=1'); // Hinweis nur einmal
   await page.goto('/app/#/einstellungen/galerie');
-  await expect(page.locator('.settings-section', { hasText: 'Galerie aus Google Drive' })).toContainText(
+  await expect(page.locator('.settings-section', { has: page.getByRole('heading', { name: 'Galerie', exact: true }) })).toContainText(
     'die Verbindung mit Google (kompanie@example.org)',
   );
   await page.goto('/app/#/einstellungen/google');
@@ -3825,6 +4243,187 @@ test('Punktekatalog und Dienstgrade per Ziehen am Griff umsortieren, Schwellen w
     page.once('dialog', (d) => void d.accept());
     await page.locator('.card-list .row', { hasText: title }).getByRole('button', { name: 'Löschen' }).click();
     await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  }
+});
+
+test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast sieht Karte mit Beschreibung und Mitgliedern, Filter, löschen', async ({
+  page,
+}) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Kompanien');
+  const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neue Kompanie' }) });
+  await form.getByLabel('Name', { exact: true }).fill('Testkompanie');
+  await form.getByLabel(/^Kurzname/).fill('TK');
+  await form.getByLabel(/^Gründungsjahr/).fill('1905');
+  await form.getByLabel(/^Webseite/).fill('http://kompanie.example/');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.getByRole('alert')).toContainText('https://');
+  await form.getByLabel(/^Webseite/).fill('https://kompanie.example/');
+  await form.getByRole('textbox', { name: 'Beschreibung (optional)' }).fill('Gegründet zum Schützenfest.');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Kompanie angelegt');
+  const row = page.locator('.row', { has: page.getByText('Testkompanie', { exact: true }) });
+  await expect(row).toContainText('TK · gegründet 1905 · 0 Mitglieder');
+  await row.getByRole('button', { name: 'Mitglieder' }).click();
+  await page.locator('.company-member-form').getByLabel('Mitglied1', { exact: true }).check();
+  await page.locator('.company-member-form').getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Mitglieder gespeichert');
+  await expect(row).toContainText('1 Mitglieder');
+  await shot(page, 'kompanien-verwalten');
+
+  try {
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
+    await page.locator('.tabbar').getByRole('button', { name: 'Kompanien' }).click();
+    const card = page.locator('.company-card', { hasText: 'Testkompanie' });
+    await expect(card).toContainText('TK · gegründet 1905 · 1 Mitglieder');
+    await card.locator('summary').click();
+    await expect(card).toContainText('Gegründet zum Schützenfest.');
+    await expect(card.getByRole('link', { name: 'Webseite' })).toHaveAttribute('href', 'https://kompanie.example/');
+    await shot(page, 'kompanien');
+    await card.getByRole('button', { name: 'Mitglied1' }).click();
+    await expect(page.locator('.member-page-companies')).toHaveText('Testkompanie');
+    // Filter in der Mitgliederliste
+    await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
+    await page.locator('.member-company-filter select').selectOption({ label: 'Testkompanie' });
+    await expect(page.locator('.directory .member-row')).toHaveCount(1);
+    await expect(page.locator('.directory .member-row')).toContainText('Mitglied1');
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD);
+    await adminMenu(page, 'Kompanien');
+    page.once('dialog', (d) => d.accept());
+    await page
+      .locator('.row', { has: page.getByText('Testkompanie', { exact: true }) })
+      .getByRole('button', { name: 'Löschen' })
+      .click();
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  }
+});
+
+test('Sponsoren (Issue #279): anlegen mit Link und Logo, Gast sieht sie ohne Anmeldung, löschen', async ({ page }) => {
+  // 64 × 32 Pixel, transparenter Hintergrund mit rotem Rechteck
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAYAAACinX6EAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAR0lEQVRo3u3SMQ0AIAxFwYKQ6sD/hA6MgIgODL0T0OS/NAIA6GpUD+zM+3PAOqe0YXb/AAEEEEAAAQQQQAABBBBAAAEAADp5dzgEIAd9ksQAAAAASUVORK5CYII=',
+    'base64',
+  );
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Sponsoren');
+  const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neuer Sponsor' }) });
+  await form.getByLabel('Name').fill('Bäckerei Test');
+  await form.getByLabel('Link (optional)').fill('http://baeckerei.example/');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.getByRole('alert')).toContainText('https://');
+  await form.getByLabel('Link (optional)').fill('https://baeckerei.example/');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Sponsor angelegt');
+  const row = page.locator('.row', { has: page.getByText('Bäckerei Test', { exact: true }) });
+  await expect(row).toContainText('https://baeckerei.example/');
+  const chooser = page.waitForEvent('filechooser');
+  await row.getByRole('button', { name: 'Logo hochladen' }).click();
+  await (await chooser).setFiles({ name: 'logo.png', mimeType: 'image/png', buffer: png });
+  await expect(page.locator('.toast')).toHaveText('Logo gespeichert');
+  await expect(row.locator('img[alt="Bäckerei Test"]')).toBeVisible();
+  await shot(page, 'sponsoren-verwalten');
+
+  try {
+    // Neu laden ohne Anmeldung (ein Sprung nur im Anker # lädt die Seite nicht neu)
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
+    await page.locator('.tabbar').getByRole('button', { name: 'Sponsoren' }).click();
+    const link = page.locator('.sponsor-grid a', { has: page.locator('img[alt="Bäckerei Test"]') });
+    await expect(link).toHaveAttribute('href', 'https://baeckerei.example/');
+    await expect(link).toHaveAttribute('rel', 'sponsored noopener noreferrer');
+    await expect.poll(() => page.evaluate(() => document.querySelector<HTMLImageElement>('.sponsor-grid img')?.naturalWidth ?? 0)).toBe(64);
+    await expect(page.locator('.tabbar').getByRole('button', { name: 'Sponsoren' })).toHaveAttribute('aria-current', 'page');
+    await shot(page, 'sponsoren');
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD);
+    await adminMenu(page, 'Sponsoren');
+    page.once('dialog', (d) => d.accept());
+    await page
+      .locator('.row', { has: page.getByText('Bäckerei Test', { exact: true }) })
+      .getByRole('button', { name: 'Löschen' })
+      .click();
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  }
+});
+
+test('Eigene Seiten (Issue #287): anlegen öffentlich und nur für Mitglieder, je Seite ein Punkt der Navigation, Gast sieht nur die öffentliche, löschen', async ({
+  page,
+}) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Seiten');
+  const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neue Seite' }) });
+  await form.getByLabel('Titel').fill('Anfahrt');
+  await form.getByLabel('Für wen?').selectOption({ label: 'Alle, auch ohne Anmeldung' });
+  await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Über die Brücke und dann links.');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Seite angelegt');
+  await form.getByLabel('Titel').fill('Uniform');
+  await expect(form.getByLabel('Für wen?')).toHaveValue('members');
+  await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Nur intern.');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Seite angelegt');
+  const row = (title: string) =>
+    page.locator('.page-admin-list .row', { has: page.locator('.row-title', { hasText: new RegExp(`^${title}\\s*(nur Mitglieder)?$`) }) });
+  await expect(row('Uniform')).toContainText('nur Mitglieder');
+  await expect(row('Anfahrt')).not.toContainText('nur Mitglieder');
+  await expect(row('Anfahrt')).toContainText('Zuletzt geändert');
+  // Bearbeiten: Titel ändern
+  await row('Anfahrt').getByRole('button', { name: 'Bearbeiten' }).click();
+  const edit = page.locator('.page-admin-list form');
+  await expect(edit.getByRole('textbox', { name: 'Text', exact: true })).toContainText('Über die Brücke');
+  await edit.getByLabel('Titel').fill('Anfahrt und Parken');
+  await edit.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  await expect(row('Anfahrt und Parken')).toBeVisible();
+  await shot(page, 'seiten-verwalten');
+
+  try {
+    // Neu laden ohne Anmeldung: nur die öffentliche Seite, als eigener Punkt der Leiste mit ihrem Titel
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
+    const tabbar = page.locator('.tabbar');
+    await expect(tabbar.getByRole('button', { name: 'Uniform' })).toHaveCount(0);
+    await tabbar.getByRole('button', { name: 'Anfahrt und Parken' }).click();
+    await expect(page).toHaveURL(/#\/seiten\/\d+$/);
+    await expect(page.locator('.topbar-title')).toHaveText('Anfahrt und Parken');
+    await expect(page.locator('.page-article')).toContainText('Über die Brücke und dann links.');
+    await expect(tabbar.getByRole('button', { name: 'Anfahrt und Parken' })).toHaveAttribute('aria-current', 'page');
+    await shot(page, 'seiten');
+
+    // Mitglied (mit „Intern“): unten kein Platz mehr, beide Seiten vorne unter „Intern“
+    await login(page, 'mitglied1');
+    await tabbar.getByRole('button', { name: 'Intern' }).click();
+    const intern = page.getByRole('navigation', { name: 'Intern' });
+    await intern.getByRole('button', { name: 'Uniform', exact: true }).click();
+    await expect(page.locator('.page-article')).toContainText('Nur intern.');
+    await expect(tabbar.getByRole('button', { name: 'Intern' })).toHaveAttribute('aria-current', 'page');
+    await page.getByRole('button', { name: '‹ Intern' }).click();
+    await expect(intern.getByRole('button', { name: 'Anfahrt und Parken', exact: true })).toBeVisible();
+
+    // Admin: in Einstellungen → Navigation hat jede Seite einen eigenen Platz
+    await login(page, 'admin', ADMIN_PASSWORD);
+    await adminMenu(page, 'Einstellungen');
+    await page
+      .locator('.settings-link')
+      .filter({ has: page.getByText('Navigation', { exact: true }) })
+      .click();
+    const card = page.locator('#einstellungen-navigation');
+    await expect(card.getByLabel('Platz von Uniform')).toHaveValue('0');
+    await expect(card.getByLabel('Platz von Anfahrt und Parken')).toHaveValue('0');
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD);
+    await adminMenu(page, 'Seiten');
+    for (const title of ['Anfahrt und Parken', 'Uniform']) {
+      page.once('dialog', (d) => d.accept());
+      await row(title).getByRole('button', { name: 'Löschen' }).click();
+      await expect(page.locator('.toast')).toHaveText('Gelöscht');
+      await expect(row(title)).toHaveCount(0);
+    }
   }
 });
 
@@ -4202,6 +4801,18 @@ async function boardCard(page: Page, title: string): Promise<Locator> {
   return page.locator(`.board-card[data-focus-id="${id}"]`);
 }
 
+/**
+ * Geänderte Nachricht speichern und warten, bis der Server die Änderung bestätigt hat. Nur auf den Hinweis „Nachricht
+ * geändert“ zu warten reicht nicht: Der von der vorigen Änderung steht evtl. noch da (3,5 s, gleicher Text), und ein
+ * anderes Gerät, das gleich danach lädt, bekäme sonst noch den Stand davor.
+ */
+async function saveBoardCard(page: Page, card: Locator) {
+  const saved = page.waitForResponse((r) => r.request().method() === 'PATCH' && decodeURIComponent(r.url()).includes('/board/'));
+  await card.getByRole('button', { name: 'Speichern' }).click();
+  expect((await saved).ok()).toBe(true);
+  await expect(page.locator('.toast')).toHaveText('Nachricht geändert');
+}
+
 /** Neue Nachricht am Brett schreiben (Titel, Text im Editor) und veröffentlichen; der Bestätigungsdialog wird angenommen. */
 async function postBoard(page: Page, title: string, text: string) {
   const form = page.locator('.board-form');
@@ -4311,8 +4922,7 @@ test('Schwarzes Brett: Banner mit Titel auf allen Seiten, ausblenden, „+1 weit
     .fill(
       `${later.getFullYear()}-${pad(later.getMonth() + 1)}-${pad(later.getDate())}T${pad(later.getHours())}:${pad(later.getMinutes())}`,
     );
-  await firstCard.getByRole('button', { name: 'Speichern' }).click();
-  await expect(admin.locator('.toast')).toHaveText('Nachricht geändert');
+  await saveBoardCard(admin, firstCard);
   await expect(admin.locator('.board-card', { hasText: first }).locator('.board-last-edit')).toContainText(/Zuletzt geändert von admin/i);
   await page.goto('/app/#/termine');
   await page.reload();
@@ -4323,8 +4933,7 @@ test('Schwarzes Brett: Banner mit Titel auf allen Seiten, ausblenden, „+1 weit
   const card2 = await boardCard(admin, first);
   await card2.getByRole('button', { name: 'Bearbeiten' }).click();
   await card2.getByLabel('Titel').fill(`${first} – fällt aus`);
-  await card2.getByRole('button', { name: 'Speichern' }).click();
-  await expect(admin.locator('.toast')).toHaveText('Nachricht geändert');
+  await saveBoardCard(admin, card2);
   // Nach dem Neuladen kommt zuerst der gespeicherte Stand (Issue #108), die geänderte Fassung folgt, sobald das Netz
   // antwortet: Dann ist die ausgeblendete Nachricht wieder da („+1 weitere“).
   await page.goto('/app/#/termine');

@@ -13,9 +13,10 @@ import {
   type DocSort,
 } from '../documents';
 import { formatBytes, formatDate } from '../format';
-import { detectPlatform } from '../install';
 import { pruneDocumentCache, whenControlled } from '../offline';
 import { navigate } from '../router';
+import { safeFileName } from '../downloadFiles';
+import { saveFile } from '../saveFile';
 import { Empty, ErrorBox, FoldSection, lazyView, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 
@@ -161,25 +162,7 @@ async function isCached(doc: DocumentInfo): Promise<boolean> {
 /** iPhone: über „Teilen“ in Dateien sichern; sonst normaler Download. */
 async function download(doc: DocumentInfo): Promise<void> {
   const blob = await fetchFile(doc);
-  const name = `${doc.title.replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'Dokument'}.${doc.ext}`;
-  const file = new File([blob], name, { type: doc.mime });
-  if (detectPlatform() === 'ios' && navigator.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file], title: doc.title });
-      return;
-    } catch (e) {
-      if ((e as Error).name === 'AbortError') return;
-      // Teilen nicht erlaubt → normaler Download.
-    }
-  }
-  const href = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = href;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(href), 60_000);
+  await saveFile(blob, `${safeFileName(doc.title, 'Dokument')}.${doc.ext}`, { title: doc.title, mime: doc.mime });
 }
 
 /** Bild in der App anzeigen (über fetch, damit es offline verfügbar wird). */

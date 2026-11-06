@@ -30,9 +30,18 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
     case 'news':
       return sub ? 'neuigkeiten-beitrag' : 'neuigkeiten';
     case 'galerie':
-      return id ? 'galerie-album' : 'galerie';
+      return id ? 'galerie-album' : sub === 'einreichen' ? 'galerie-einreichen' : sub === 'pruefen' ? 'galerie-pruefen' : 'galerie';
+    case 'kompanien':
+      return 'kompanien';
+    case 'sponsoren':
+      return 'sponsoren';
+    case 'seiten':
+      return 'seiten';
     case 'intern':
       return 'intern';
+    case 'menue':
+      // Untermenü aus Einstellungen → Navigation (Issue #277)
+      return 'untermenue';
     case 'dokumente':
       return sub === 'verwalten' ? 'dokumente-pflegen' : id ? 'dokument-ansehen' : 'dokumente';
     case 'dienstgrade':
@@ -77,6 +86,7 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
       return (
         {
           bereiche: 'admin-bereiche',
+          navigation: 'admin-navigation',
           rollen: 'admin-rollen-und-mitglieder',
           benachrichtigungen: 'admin-benachrichtigungen',
           geburtstage: 'admin-geburtstage',
@@ -111,6 +121,9 @@ function adminSlug([sub, arg, page]: string[], ctx: HelpContext): string | null 
     befoerderungen: 'befoerderungen',
     titel: 'titel-verwalten',
     aemter: 'aemter-verwalten',
+    sponsoren: 'sponsoren-verwalten',
+    seiten: 'seiten-verwalten',
+    kompanien: 'kompanien-verwalten',
     neu: 'mitglieder-anlegen',
     'neu-mehrere': 'mitglieder-mehrere-anlegen',
     import: 'mitglieder-import',

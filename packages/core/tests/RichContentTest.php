@@ -187,9 +187,17 @@ final class RichContentTest extends TestCase
         $bytes = $this->app->richImages()->bytes($jpeg['uid'])['bytes'] ?? '';
         $this->assertStringStartsWith("\xFF\xD8", $bytes);
         $this->assertStringNotContainsString('GPSLatitude', $bytes, 'ohne Metadaten neu kodiert');
-        // Größer als die Grenzen der Mitgliederfotos (5000 Pixel): keine eigene Grenze der App
+        // Größer als die Grenzen der Mitgliederfotos (5000 Pixel): angenommen, aber auf 2048 Pixel verkleinert (Issue #281)
         $big = $this->upload(self::png(5000, 20, false));
-        $this->assertSame(5000, $big['width']);
+        $this->assertSame([RichImageService::MAX_EDGE, 8], [$big['width'], $big['height']]);
+        $this->assertSame([2048, 8], array_slice((array) getimagesizefromstring($this->app->richImages()->bytes($big['uid'])['bytes'] ?? ''), 0, 2));
+        $img = imagecreatetruecolor(10, 3000);
+        ob_start();
+        imagejpeg($img);
+        $tall = $this->upload((string) ob_get_clean(), 'hoch.jpg');
+        $this->assertSame([7, 2048], [$tall['width'], $tall['height']], 'auch hochkant, auch JPEG');
+        $small = $this->upload(self::png(30, 20));
+        $this->assertSame([30, 20], [$small['width'], $small['height']], 'nie vergrößert');
 
         foreach ([['x.gif', 'GIF89a'], ['x.png', 'kein Bild'], ['x.png', '']] as [$name, $data]) {
             $this->assertSame(400, $this->call('POST', '/rich-images', ['file' => ['name' => $name, 'data' => base64_encode($data)]])->status, $name);
@@ -205,6 +213,7 @@ final class RichContentTest extends TestCase
         $this->assertSame(200, $d($this->m, $draft), 'eigener Entwurf');
         $this->assertSame(403, $d($this->admin, $draft), 'fremder Entwurf');
         $this->assertSame(401, $d(null, $draft));
+        $this->assertSame(401, $d(null, str_repeat('0', 32)), 'ohne Anmeldung auch bei unbekannten Bildern 401');
         $this->assertSame(404, $d($this->m, str_repeat('0', 32)));
         $this->assertSame(404, $d($this->m, '../etc'));
 

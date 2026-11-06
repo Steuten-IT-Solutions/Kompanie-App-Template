@@ -46,6 +46,9 @@ tags:
   - name: Termine
   - name: News
   - name: Galerie
+  - name: Kompanien
+  - name: Sponsoren
+  - name: Seiten
   - name: Verwaltung
   - name: Schwarzes Brett
   - name: Umfragen
@@ -896,6 +899,178 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/GalleryAlbum' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /gallery/submissions:
+    get:
+      tags: [Galerie]
+      summary: Alben zur Auswahl und die eigenen Einreichungen (Issue #286)
+      x-capability: submit_gallery
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [albums, submissions]
+                properties:
+                  albums:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, title, year]
+                      properties:
+                        id: { type: integer }
+                        title: { type: string }
+                        year: { type: string }
+                  submissions:
+                    type: array
+                    items: { $ref: '#/components/schemas/GallerySubmission' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Galerie]
+      summary: Ein Bild einreichen
+      description: 'JPG, PNG oder WebP; neu kodiert als JPEG ohne Metadaten (auch ohne Aufnahmeort). Alle mit review_gallery bekommen eine Benachrichtigung (je Person und Schub höchstens eine in zehn Minuten).'
+      x-capability: submit_gallery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [album_id, file, consent]
+              properties:
+                album_id: { type: integer }
+                file:
+                  type: object
+                  required: [name, data]
+                  properties:
+                    name: { type: string }
+                    data: { type: string, description: 'Inhalt als Base64, auch als data:-Adresse' }
+                consent: { type: boolean, description: 'Muss true sein: Rechte an den Bildern und Einverständnis der erkennbaren Personen' }
+      responses:
+        '201':
+          description: Eingereicht
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GallerySubmission' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /gallery/submissions/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    delete:
+      tags: [Galerie]
+      summary: Eigene offene Einreichung zurückziehen
+      x-capability: submit_gallery
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /gallery/review:
+    get:
+      tags: [Galerie]
+      summary: Offene Einreichungen (älteste zuerst) und die zuletzt freigegebenen
+      x-capability: review_gallery
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pending, approved]
+                properties:
+                  pending:
+                    type: array
+                    items: { $ref: '#/components/schemas/GallerySubmission' }
+                  approved:
+                    type: array
+                    items: { $ref: '#/components/schemas/GallerySubmission' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /gallery/review/{id}/approve:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Galerie]
+      summary: Einreichung freigeben (öffentlich oder intern)
+      description: Das Bild kommt ins Album und wird aufbereitet wie hochgeladene Bilder; die einreichende Person wird benachrichtigt.
+      x-capability: review_gallery
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                intern: { type: boolean, description: Nur für Mitglieder }
+      responses:
+        '200':
+          description: Freigegeben
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GallerySubmission' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /gallery/review/{id}/reject:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Galerie]
+      summary: Einreichung ablehnen
+      description: Die Datei wird sofort gelöscht; der Grund bleibt für die einreichende Person sichtbar, sie wird benachrichtigt.
+      x-capability: review_gallery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 255 }
+      responses:
+        '200':
+          description: Abgelehnt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GallerySubmission' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /gallery/review/{id}/remove:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Galerie]
+      summary: Freigegebene Einreichung wieder aus der Galerie entfernen
+      description: Das Bild verschwindet; die Einreichung gilt danach als nicht freigegeben (Grund optional).
+      x-capability: review_gallery
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 255 }
+      responses:
+        '200':
+          description: Entfernt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  removed: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
   /me/rank:
@@ -1946,10 +2121,10 @@ paths:
   /rich-images:
     post:
       tags: [Eigene Daten]
-      summary: Bild für einen formatierten Inhalt hochladen (Signatur, Schwarzes Brett; Issue #172)
+      summary: Bild für einen formatierten Inhalt hochladen (Signatur, Schwarzes Brett, E-Mails, Kompanien; Issue #172, #281)
       description: |
         Für Mitglieder, Anwärter und alle mit `post_board` oder `send_mail`. JPG, PNG oder WebP; gespeichert wird eine neu kodierte Fassung
-        ohne Metadaten in Originalgröße (PNG bleibt PNG). Keine eigene Grenze für Größe oder Pixel; die technischen Grenzen
+        ohne Metadaten mit höchstens 2048 Pixeln an der längeren Kante (nie vergrößert; PNG bleibt PNG). Sonst keine eigene Grenze; die technischen Grenzen
         des Servers (`GET /rich-images/limits`) werden verständlich gemeldet. Das Bild ist zunächst ein Entwurf des Kontos;
         im Inhalt steht es als `<img data-image="uid">`. Nie gespeicherte Entwürfe werden nach 7 Tagen gelöscht.
       x-capability: 'member, calendar, post_board oder send_mail'
@@ -1977,7 +2152,7 @@ paths:
                 required: [uid, url, width, height]
                 properties:
                   uid: { type: string, pattern: '^[a-f0-9]{32}$' }
-                  url: { type: string, description: '<App>/bild/<uid>, ausgeliefert nach Prüfung der Anmeldung und der Rechte' }
+                  url: { type: string, description: '<App>/bild/<uid>, ausgeliefert nach Prüfung der Rechte; ohne Anmeldung nur Bilder öffentlicher Inhalte (Beschreibung einer Kompanie, wenn Gäste view_companies haben; sonst 401)' }
                   width: { type: integer }
                   height: { type: integer }
         '400': { $ref: '#/components/responses/Error' }
@@ -2531,6 +2706,470 @@ paths:
       x-capability: manage_attendance
       responses:
         '200': { $ref: '#/components/responses/Deleted' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /companies:
+    get:
+      tags: [Kompanien]
+      summary: Kompanien in ihrer Reihenfolge (Issue #280)
+      description: |
+        Bereich `companies` aus → 403 `feature_disabled`. Ohne Anmeldung die Rechte der Rolle guest. `members` und
+        `member_count` nur mit Bereich Mitgliederliste und Recht view_directory, `member_ids` nur mit manage_companies.
+      x-capability: 'view_companies oder manage_companies'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Company' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Kompanien]
+      summary: Kompanie anlegen (kommt ans Ende der Liste)
+      x-capability: manage_companies
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/CompanyInput'
+                - required: [name]
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Company' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /companies/order:
+    put:
+      tags: [Kompanien]
+      summary: Reihenfolge der Kompanien
+      x-capability: manage_companies
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, items: { type: integer }, description: Alle IDs in der gewünschten Reihenfolge }
+      responses:
+        '200':
+          description: Neue Liste
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Company' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /companies/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Kompanien]
+      summary: Angaben ändern (nur die übergebenen Felder)
+      x-capability: manage_companies
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompanyInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Company' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Kompanien]
+      summary: Kompanie samt Logo und Zuordnungen löschen
+      x-capability: manage_companies
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /companies/{id}/logo:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Kompanien]
+      summary: Logo hochladen oder ersetzen
+      description: Wie beim Logo eines Sponsors (`POST /sponsors/{id}/logo`).
+      x-capability: manage_companies
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: object
+                  required: [name, data]
+                  properties:
+                    name: { type: string, description: 'Dateiname; die Endung (.png, .jpg, .jpeg, .webp, .svg) bestimmt das Format' }
+                    data: { type: string, description: 'Inhalt Base64-kodiert (auch als data:-Adresse)' }
+      responses:
+        '200':
+          description: Die Kompanie mit Logo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Company' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Kompanien]
+      summary: Logo entfernen
+      x-capability: manage_companies
+      responses:
+        '200':
+          description: Die Kompanie ohne Logo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Company' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /companies/{id}/members:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Kompanien]
+      summary: Personen der Kompanie ersetzen
+      description: Neu zuordnen lassen sich nur Mitglieder (Recht member); bestehende Zuordnungen behalten ihr Datum.
+      x-capability: manage_companies
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_ids]
+              properties:
+                user_ids: { type: array, items: { type: integer } }
+      responses:
+        '200':
+          description: Die Kompanie
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Company' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /members/{id}/companies:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Kompanien]
+      summary: Kompanien einer Person ersetzen
+      description: Neue Zuordnungen nur für Mitglieder (Recht member); eine Person kann zu mehreren gehören.
+      x-capability: manage_companies
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [company_ids]
+              properties:
+                company_ids: { type: array, items: { type: integer } }
+      responses:
+        '200':
+          description: Die Kompanien der Person in der Reihenfolge der Liste
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [companies]
+                properties:
+                  companies:
+                    type: array
+                    items: { $ref: '#/components/schemas/CompanyRef' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /pages:
+    get:
+      tags: [Seiten]
+      summary: Eigene Seiten, die die Person lesen darf, in ihrer Reihenfolge (Issue #287)
+      description: 'Ohne Text. public für alle, auch ohne Anmeldung; members mit view_board; mit manage_pages alle. Bereich `pages` aus → 403 `feature_disabled`.'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pages]
+                properties:
+                  pages: { type: array, items: { $ref: '#/components/schemas/PageSummary' } }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Seiten]
+      summary: Seite anlegen (kommt ans Ende)
+      x-capability: manage_pages
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, maxLength: 100 }
+                audience: { type: string, enum: [public, members], default: members }
+                body: { type: string, description: 'Formatierter Text (wird bereinigt, höchstens 200000 Bytes); Bilder aus POST /rich-images als <img data-image="<uid>">' }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageDetail' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /pages/order:
+    put:
+      tags: [Seiten]
+      summary: Reihenfolge der Seiten
+      x-capability: manage_pages
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, items: { type: integer }, description: Alle IDs in der gewünschten Reihenfolge }
+      responses:
+        '200':
+          description: Neue Liste
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pages]
+                properties:
+                  pages: { type: array, items: { $ref: '#/components/schemas/PageSummary' } }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /pages/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Seiten]
+      summary: Eine Seite mit Text
+      description: 'Wer die Seite nicht lesen darf, bekommt 404 (verrät nicht, dass es sie gibt).'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageDetail' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Seiten]
+      summary: Titel, Zielgruppe oder Text ändern
+      description: 'Mit updated_at (Stand, den die App geladen hat): 409 `conflict`, wenn jemand dazwischen gespeichert hat. Bilder, die nicht mehr im Text stehen, werden gelöscht.'
+      x-capability: manage_pages
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string, maxLength: 100 }
+                audience: { type: string, enum: [public, members] }
+                body: { type: string }
+                updated_at: { type: string, format: date-time }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageDetail' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Seiten]
+      summary: Seite samt Bildern löschen
+      x-capability: manage_pages
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /sponsors:
+    get:
+      tags: [Sponsoren]
+      summary: Sponsoren in ihrer Reihenfolge (Issue #279)
+      description: Bereich `sponsors` aus → 403 `feature_disabled`. Ohne Anmeldung die Rechte der Rolle guest.
+      x-capability: 'view_sponsors oder manage_sponsors'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Sponsor' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Sponsoren]
+      summary: Sponsor anlegen (kommt ans Ende der Liste)
+      x-capability: manage_sponsors
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 100, description: 'Mehrfache Leerzeichen werden zu einem' }
+                url: { type: string, maxLength: 255, description: 'Nur https://…, leer ohne Link' }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sponsor' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /sponsors/order:
+    put:
+      tags: [Sponsoren]
+      summary: Reihenfolge der Sponsoren
+      x-capability: manage_sponsors
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, items: { type: integer }, description: Alle IDs in der gewünschten Reihenfolge }
+      responses:
+        '200':
+          description: Neue Liste
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Sponsor' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /sponsors/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Sponsoren]
+      summary: Name oder Link ändern
+      x-capability: manage_sponsors
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 100 }
+                url: { type: string, maxLength: 255 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sponsor' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Sponsoren]
+      summary: Sponsor samt Logo löschen
+      x-capability: manage_sponsors
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /sponsors/{id}/logo:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Sponsoren]
+      summary: Logo hochladen oder ersetzen
+      description: |
+        PNG, JPG, WebP oder SVG, höchstens 2 MB, Base64 im JSON. Geprüft werden Endung und Signatur (Rasterbilder
+        höchstens 4096 × 4096 Pixel). Rasterbilder werden zu einem PNG mit höchstens 512 Pixeln an der längeren Kante
+        (nie vergrößert, Transparenz bleibt). SVGs werden bereinigt gespeichert (keine Skripte, keine Verweise nach
+        außen). Das Logo liegt in der Datenbank und ist Teil der Datensicherung; die Fassung in `logo_url` ändert sich.
+      x-capability: manage_sponsors
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: object
+                  required: [name, data]
+                  properties:
+                    name: { type: string, description: 'Dateiname; die Endung (.png, .jpg, .jpeg, .webp, .svg) bestimmt das Format' }
+                    data: { type: string, description: 'Inhalt Base64-kodiert (auch als data:-Adresse)' }
+      responses:
+        '200':
+          description: Der Sponsor mit Logo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sponsor' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Sponsoren]
+      summary: Logo entfernen
+      x-capability: manage_sponsors
+      responses:
+        '200':
+          description: Der Sponsor ohne Logo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sponsor' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
@@ -3106,12 +3745,74 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /office-groups/{id}/terms:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Ämter]
+      summary: Gemeinsame Amtszeit der Gruppe anlegen (nur mit joint_terms)
+      description: Legt je Amt mit Personen eine Amtszeit mit denselben Jahren an. Mindestens ein Amt braucht Personen.
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OfficeGroupTermInput' }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfficeGroupTerm' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /office-group-terms/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    patch:
+      tags: [Ämter]
+      summary: Gemeinsame Amtszeit ändern (fehlende Felder bleiben)
+      description: Die Jahre gelten für alle Ämter darin. Mit offices werden die Personen je genanntem Amt ersetzt; leere holders entfernen die Amtszeit dieses Amts.
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OfficeGroupTermInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfficeGroupTerm' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Ämter]
+      summary: Gemeinsame Amtszeit mit allen Amtszeiten darin und dem Gruppenbild löschen
+      x-capability: manage_offices
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /office-groups/{id}:
     parameters:
       - { name: id, in: path, required: true, schema: { type: integer } }
     patch:
       tags: [Ämter]
-      summary: Gruppe umbenennen
+      summary: Gruppe umbenennen oder gemeinsame Amtszeiten ein-/ausschalten (fehlende Felder bleiben)
+      description: Beim Einschalten von joint_terms werden vorhandene Amtszeiten der Ämter mit denselben Jahren (ohne Ehrungen) zu gemeinsamen Amtszeiten gebündelt. Ausschalten behält alle Daten.
       x-capability: manage_offices
       requestBody:
         required: true
@@ -3119,9 +3820,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [title]
               properties:
                 title: { type: string, maxLength: 60 }
+                joint_terms: { type: boolean }
       responses:
         '200':
           description: OK
@@ -3173,6 +3874,30 @@ paths:
                 items: { $ref: '#/components/schemas/MemberSummary' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /members/details:
+    get:
+      tags: [Verwaltung]
+      summary: Mehrere Mitglieder auf einmal (Vorladen beim Blättern)
+      description: |
+        Je Person dasselbe wie `GET /members/{id}`, in der Reihenfolge von `ids`; doppelte Ids zählen einmal, unbekannte
+        fehlen in der Antwort. Höchstens 25 Ids, sonst oder ohne gültige Ids 400.
+      x-capability: 'wie GET /members/{id}'
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          description: Ids mit Kommas, z. B. `3,7,12`
+          schema: { type: string, example: '3,7,12' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MemberDetail' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /members/{id}:
     parameters:
       - $ref: '#/components/parameters/Id'
@@ -4296,6 +5021,49 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+  /admin/navigation:
+    get:
+      tags: [Einstellungen]
+      summary: Einrichtbare Navigation mit den erlaubten Bereichen und Symbolen
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NavigationAdmin' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Einstellungen]
+      summary: Navigation speichern oder die Standardnavigation wiederherstellen
+      description: |
+        Issue #277. Nur Darstellung: Die App zeigt jedem nur die Bereiche, die er sehen darf; die Routen prüfen wie bisher.
+        „Verwaltung“ und „Meins“ stehen immer am Ende und sind nicht einstellbar. Jeder Bereich darf höchstens einmal
+        vorkommen (Hauptpunkt, in einem Untermenü oder unter hidden). Bereiche, die nirgends stehen, hängt die App hinten an.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [navigation]
+              properties:
+                navigation:
+                  description: null stellt die Standardnavigation wieder her
+                  oneOf:
+                    - $ref: '#/components/schemas/Navigation'
+                    - type: 'null'
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NavigationAdmin' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /admin/maintenance:
     get:
       tags: [Einstellungen]
@@ -4457,8 +5225,13 @@ paths:
                 drive_service_account: { type: string, description: JSON-Schlüssel des Dienstkontos }
                 drive_oauth: { type: string, enum: [''], description: 'Leer trennt die OAuth-Verbindung zu Google wie POST /admin/google/disconnect (Widerruf bei Google, der Client bleibt gespeichert)' }
                 gallery_root: { type: string, description: Link oder ID des Galerie-Ordners in Google Drive }
+                gallery_source: { type: string, enum: [drive, server], description: 'Quelle der Galerie: Google Drive oder eigener Server (nur Alben der App und hochgeladene Bilder). Der Wechsel zu server entfernt Alben und Bilder aus Drive aus der App; hochgeladene bleiben.' }
+                gallery_store: { type: string, enum: [server], description: Ablageort für hochgeladene Bilder (heute nur der eigene Server) }
+                gallery_downloads: { type: string, enum: ['0', '1'], description: 'Knöpfe zum Herunterladen in der Galerie zeigen (1) oder nicht (0, Vorgabe): je Bild in der Großansicht und je Album als ZIP' }
                 news_source: { type: string, enum: [none, wordpress, rss], description: Nur eigenständige Version }
                 news_url: { type: string, description: Nur eigenständige Version }
+                legal_imprint_url: { type: string, description: 'Link auf das Impressum (http:// oder https://, höchstens 255 Zeichen); leer entfernt ihn' }
+                legal_privacy_url: { type: string, description: 'Link auf die Datenschutzerklärung (http:// oder https://, höchstens 255 Zeichen); leer entfernt ihn' }
       responses:
         '200':
           description: Neuer Stand
@@ -4659,6 +5432,141 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
+
+  /admin/gallery/albums:
+    get:
+      tags: [Einstellungen]
+      summary: Alle Alben mit Herkunft und Anzahl der Bilder
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [albums]
+                properties:
+                  albums:
+                    type: array
+                    items: { $ref: '#/components/schemas/GalleryAdminAlbum' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Einstellungen]
+      summary: Album nur in der App anlegen
+      description: Der Abgleich mit Google Drive lässt Alben der App in Ruhe.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GalleryAlbumInput' }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GalleryAdminAlbumDetail' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/gallery/albums/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Einstellungen]
+      summary: Album mit seinen hochgeladenen Bildern
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GalleryAdminAlbumDetail' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Einstellungen]
+      summary: Titel oder Jahr eines Albums der App ändern
+      description: Alben aus Google Drive ändert man in Drive (400).
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GalleryAlbumInput' }
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GalleryAdminAlbumDetail' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Einstellungen]
+      summary: Album der App mit allen Bildern darin löschen
+      description: Alben aus Google Drive lassen sich hier nicht löschen (400).
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/gallery/albums/{id}/photos:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Einstellungen]
+      summary: Ein Bild in ein Album hochladen (auch in eines aus Google Drive)
+      description: 'JPG, PNG oder WebP. Der Server prüft Format, Größe und Arbeitsspeicher, kodiert das Bild neu als JPEG ohne Metadaten (auch ohne Aufnahmeort) und bereitet es danach wie Bilder aus Drive auf.'
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: object
+                  required: [name, data]
+                  properties:
+                    name: { type: string, description: Dateiname mit Endung .jpg, .jpeg, .png oder .webp }
+                    data: { type: string, description: 'Inhalt als Base64, auch als data:-Adresse' }
+                intern: { type: boolean, description: Nur für Mitglieder sichtbar }
+      responses:
+        '201':
+          description: Album mit seinen hochgeladenen Bildern
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GalleryAdminAlbumDetail' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/gallery/photos/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    delete:
+      tags: [Einstellungen]
+      summary: Ein hochgeladenes Bild löschen
+      description: Nur hochgeladene Bilder (Bilder aus Drive kämen beim nächsten Abgleich wieder; sonst 404).
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
 
   /admin/push:
     get:
@@ -5309,7 +6217,7 @@ components:
         application/json:
           schema:
             type: object
-            required: [supported, missing, devices, accounts, guests, queued, reminderHour, birthdays]
+            required: [supported, missing, devices, accounts, guests, queued, reminderHour, birthdays, log]
             properties:
               supported: { type: boolean }
               missing: { type: array, items: { type: string }, description: Fehlende PHP-Voraussetzungen }
@@ -5325,6 +6233,37 @@ components:
                 properties:
                   enabled: { type: boolean }
                   hour: { type: integer, minimum: 0, maximum: 23 }
+              log:
+                type: object
+                description: >-
+                  Protokoll des Versands. Zeitpunkte als ISO 8601 in der Zeitzone der Kompanie. types: je angebotener Art der
+                  letzte Versand (devices = Geräte, für die die Nachricht in die Warteschlange ging; 0 = niemand hat die Art
+                  abonniert). accepted/rejected: zuletzt vom Push-Dienst angenommen bzw. endgültig abgelehnt (null = noch nie).
+                required: [types, accepted, rejected]
+                properties:
+                  types:
+                    type: array
+                    items:
+                      type: object
+                      required: [type, label, at, devices]
+                      properties:
+                        type: { type: string }
+                        label: { type: string }
+                        at: { type: string, format: date-time }
+                        devices: { type: integer }
+                  accepted:
+                    type: [object, 'null']
+                    required: [at, count]
+                    properties:
+                      at: { type: string, format: date-time }
+                      count: { type: integer, description: Zahl der Nachrichten in diesem Lauf }
+                  rejected:
+                    type: [object, 'null']
+                    required: [at, count, reason]
+                    properties:
+                      at: { type: string, format: date-time }
+                      count: { type: integer, description: Zahl der Nachrichten in diesem Lauf }
+                      reason: { type: string, description: 'Letzter Grund, z. B. „HTTP 403“' }
     Error:
       description: Fehler
       content:
@@ -5741,7 +6680,7 @@ components:
                   name: { type: string, description: Nur bei namentlichen Umfragen }
     PushType:
       type: string
-      enum: [board, polls, birthdays, penalties, points, ranks, titles, events, reminder, news]
+      enum: [board, polls, birthdays, gallery_review, gallery_submissions, penalties, points, ranks, titles, events, reminder, news]
       description: '`board` (Schwarzes Brett, Issue #5) nur für Mitglieder und Anwärter; dringend (Urgency high), TTL höchstens bis zum Ablauf der Nachricht. `polls` (Umfragen, Issue #4) nur für Mitglieder: neue Umfrage und Erinnerung 24 Stunden vor dem Ende an alle ohne Antwort. `birthdays` (Geburtstage, Issue #1) nur für Mitglieder: am Tag selbst ab 7 Uhr (Zeitzone der Kompanie), nicht an das Geburtstagskind, nur für sichtbare Geburtstage; TTL bis Mitternacht.'
     PushSubscribe:
       type: object
@@ -5769,7 +6708,7 @@ components:
       properties:
         key:
           type: string
-          enum: [events, calendar, news, gallery, points, penalties, ranks, titles, attendance, documents, board, polls, birthdays, inventory, directory, offices, lists, mail]
+          enum: [events, calendar, news, gallery, points, penalties, ranks, titles, attendance, documents, board, polls, birthdays, inventory, directory, offices, lists, mail, companies, sponsors, pages]
         label: { type: string, description: Bezeichnung (aus kompanie.json oder Standard) }
         description: { type: string, description: Ein Satz, wofür der Bereich da ist }
         enabled: { type: boolean }
@@ -5860,6 +6799,48 @@ components:
         label: { type: string }
         action: { type: string, enum: [view, create, update, delete, vote, login] }
         at: { type: integer, description: Unix-Zeit }
+    Navigation:
+      type: object
+      description: 'Einrichtbare Navigation (Issue #277): Hauptpunkte der Tab-Leiste und ausgeblendete Bereiche'
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 5
+          description: 'Hauptpunkte in ihrer Reihenfolge (ohne Verwaltung und Meins): ein Bereich oder ein Untermenü (eine Ebene)'
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/NavigationTarget'
+              - type: object
+                required: [label, icon, items]
+                properties:
+                  label: { type: string, minLength: 1, maxLength: 24, description: Name des Untermenüs (Klartext) }
+                  icon: { type: string, enum: [ordner, termine, news, galerie, kompanien, sponsoren, mitglieder, dokumente, brett, dienstgrade, punktekatalog, stern] }
+                  items: { type: array, minItems: 1, maxItems: 12, items: { $ref: '#/components/schemas/NavigationTarget' } }
+        hidden:
+          type: array
+          description: Bereiche, die nicht in der Navigation stehen
+          items: { $ref: '#/components/schemas/NavigationTarget' }
+    NavigationTarget:
+      type: string
+      description: 'Bereich der App, der in der Navigation stehen kann: einer der festen (`targets` in GET /admin/navigation) oder eine eigene Seite als `seiten/<id>` (Issue #287)'
+      anyOf:
+        - enum: [termine, news, galerie, kompanien, sponsoren, mitglieder, dokumente, brett, dienstgrade, punktekatalog]
+        - pattern: '^seiten/[1-9][0-9]{0,9}$'
+    NavigationAdmin:
+      type: object
+      required: [navigation, targets, icons, max_main, max_menu_items, label_max]
+      properties:
+        navigation:
+          description: Gespeicherte Navigation; null = Standardnavigation
+          oneOf:
+            - $ref: '#/components/schemas/Navigation'
+            - type: 'null'
+        targets: { type: array, items: { $ref: '#/components/schemas/NavigationTarget' } }
+        icons: { type: array, items: { type: string } }
+        max_main: { type: integer }
+        max_menu_items: { type: integer }
+        label_max: { type: integer }
     Maintenance:
       allOf:
         - $ref: '#/components/schemas/MaintenanceInfo'
@@ -5898,6 +6879,57 @@ components:
             Nur WordPress: `use_login_page` (400).
         message: { type: string, description: Für Menschen lesbar, in der Sprache der Kompanie }
 
+    GallerySubmission:
+      type: object
+      required: [id, album_id, album, name, status, reason, created_at, reviewed_at, thumb, photo_id]
+      properties:
+        id: { type: integer }
+        album_id: { type: integer }
+        album: { type: string, description: '„Jahr · Album“' }
+        name: { type: string }
+        status: { type: string, enum: [pending, approved, rejected] }
+        reason: { type: string, description: Grund der Ablehnung oder des Entfernens }
+        created_at: { type: string }
+        reviewed_at: { type: [string, 'null'] }
+        thumb: { type: [string, 'null'], description: 'Vorschau als data:-Adresse (JPEG); null, sobald die Datei gelöscht ist' }
+        photo_id: { type: [integer, 'null'] }
+        user_id: { type: integer, description: Nur beim Prüfen }
+        user_name: { type: string, description: Nur beim Prüfen }
+    GalleryAlbumInput:
+      type: object
+      properties:
+        title: { type: string, maxLength: 120 }
+        year: { type: integer, minimum: 1800, description: höchstens das nächste Jahr }
+    GalleryAdminAlbum:
+      type: object
+      required: [id, title, year, source, uploads, drive_photos]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        year: { type: string }
+        source: { type: string, enum: [app, drive], description: 'app: nur in der App; drive: aus Google Drive' }
+        uploads: { type: integer, description: Anzahl hochgeladener Bilder }
+        drive_photos: { type: integer, description: Anzahl Bilder aus Drive }
+    GalleryAdminAlbumDetail:
+      type: object
+      required: [id, title, year, source, uploads]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        year: { type: string }
+        source: { type: string, enum: [app, drive] }
+        uploads:
+          type: array
+          items:
+            type: object
+            required: [id, name, intern, thumb, status, error]
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              intern: { type: boolean }
+              thumb: { type: string, description: Adresse des Vorschaubilds }
+              status: { type: string, enum: [pending, ready, error] }
+              error: { type: string }
     AdminSettings:
       type: object
       required: [google, calendar, gallery, news]
@@ -5941,8 +6973,12 @@ components:
         gallery:
           type: object
           properties:
-            configured: { type: boolean }
+            configured: { type: boolean, description: 'Quelle server immer, Quelle drive mit Zugang und Ordner' }
             root: { type: string }
+            source: { type: string, enum: [drive, server] }
+            store: { type: string, enum: [server] }
+            media_bytes: { type: integer, description: Belegter Platz der hochgeladenen Bilder in Bytes }
+            downloads: { type: boolean, description: 'Knöpfe zum Herunterladen in der Galerie (Einstellung gallery_downloads)' }
             service_account_email: { type: string, description: wie google.service_account_email (für ältere Fassungen der App) }
             oauth_connected: { type: boolean, description: 'wie google.connected: OAuth-Verbindung zu Google (geht dem Dienstkonto vor)' }
             oauth_email: { type: string, description: Google-Konto der OAuth-Verbindung, leer wenn unbekannt }
@@ -5953,6 +6989,13 @@ components:
         news:
           type: [object, 'null']
           description: null, wenn die Neuigkeiten aus den Beiträgen der WordPress-Seite kommen.
+        legal:
+          type: object
+          description: 'Links auf Impressum und Datenschutzerklärung (Einstellungen → Impressum und Datenschutz); leer, solange keiner eingetragen ist'
+          required: [imprint_url, privacy_url]
+          properties:
+            imprint_url: { type: string }
+            privacy_url: { type: string }
           properties:
             source: { type: string, enum: [none, wordpress, rss] }
             url: { type: string }
@@ -5994,7 +7037,7 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, view_personal, manage_personal, create_users, promote_users, view_activity, manage_settings] }
+              items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, view_personal, manage_personal, create_users, promote_users, view_activity, manage_settings] }
               description: 'Rechte der Rolle, jedes für sich (member schließt nichts ein); bei admin alle; vergebbar sind alle außer view_activity und manage_settings. Rechte zum Verwalten und view_own_* nur zusammen mit member. guest gilt auch ohne Anmeldung.'
             users: { type: integer, description: 'Anzahl der Personen mit dieser Rolle, als Grundrolle oder als Zusatzrolle' }
             extra_users: { type: integer, description: Davon als Zusatzrolle }
@@ -6007,7 +7050,7 @@ components:
         label: { type: string, maxLength: 30 }
         capabilities:
           type: array
-          items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, view_personal, manage_personal, create_users, promote_users] }
+          items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, view_personal, manage_personal, create_users, promote_users] }
           description: 'Jedes Recht für sich. Rechte zum Verwalten und view_own_* nur zusammen mit member; die übrigen Rechte zum Sehen gehen auch allein (wie bei Anwärtern). guest: nur Rechte zum Sehen ohne member; member: immer member, sonst nur Rechte zum Sehen; admin: nicht änderbar.'
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
         new_accounts: { type: boolean, description: 'Nur eigene Rollen: beim Anlegen von Konten wählbar' }
@@ -6027,7 +7070,7 @@ components:
           type: array
           items:
             type: string
-            enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, view_personal, manage_personal, create_users, promote_users, view_activity, manage_settings]
+            enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, view_personal, manage_personal, create_users, promote_users, view_activity, manage_settings]
           description: 'Wirksame Rechte aller Rollen zusammen (Grundrolle und Zusatzrollen); member bringt calendar mit.'
 
     ErrorLog:
@@ -6114,10 +7157,31 @@ components:
         variant: { type: string, enum: [wordpress, standalone], description: Art der Installation }
         siteUrl: { type: [string, 'null'], description: Startseite der Webseite, falls vorhanden }
         handbookUrl: { type: [string, 'null'], description: 'Handbuch der Kompanie auf ihrer GitHub-Pages-Seite (…/handbuch/), aus der Adresse der Update-Liste abgeleitet; sonst null' }
+        legal:
+          type: object
+          description: 'Links auf Impressum und Datenschutzerklärung der Kompanie, für alle (auch ohne Anmeldung); null, solange keiner eingetragen ist'
+          required: [imprint, privacy]
+          properties:
+            imprint: { type: [string, 'null'] }
+            privacy: { type: [string, 'null'] }
         reports: { type: boolean, description: 'Fehlermeldungen an die Betreuer möglich (reportUrl in update.json, Issue #64); sonst kein Knopf „Fehler melden“' }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
         backupUrl: { type: [string, 'null'], description: 'Nur für Admins (nicht in der Vorschau): Adresse zum Herunterladen der Datensicherung als Datei (<App>/sicherung), Stück für Stück erzeugt; sonst null' }
         maintenance: { $ref: '#/components/schemas/MaintenanceInfo' }
+        navigation:
+          description: 'Einrichtbare Navigation (Issue #277, Einstellungen → Navigation), für alle; null = Standardnavigation'
+          oneOf:
+            - $ref: '#/components/schemas/Navigation'
+            - type: 'null'
+        pages:
+          type: array
+          description: 'Eigene Seiten (Issue #287), die die Person lesen darf, in ihrer Reihenfolge (Kacheln unter Seiten); leer mit Bereich pages aus'
+          items:
+            type: object
+            required: [id, title]
+            properties:
+              id: { type: integer }
+              title: { type: string }
         birthdays:
           type: [object, 'null']
           description: 'Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen (Einstellungen → Geburtstage); null ohne den Bereich'
@@ -6177,6 +7241,9 @@ components:
             offices: { type: boolean }
             lists: { type: boolean }
             mail: { type: boolean }
+            companies: { type: boolean }
+            sponsors: { type: boolean }
+            pages: { type: boolean }
         user:
           oneOf:
             - $ref: '#/components/schemas/AppUser'
@@ -6358,6 +7425,11 @@ components:
         id: { type: integer }
         title: { type: string }
         year: { type: string }
+        downloads:
+          type: boolean
+          description: |
+            Knöpfe zum Herunterladen zeigen (Einstellung `gallery_downloads`): je Bild in der Großansicht und das Album als ZIP.
+            Die App lädt dafür `original` (sonst `large`) und packt das ZIP selbst; Videos sind nicht dabei.
         photos:
           type: array
           items: { $ref: '#/components/schemas/GalleryPhoto' }
@@ -6406,6 +7478,10 @@ components:
           description: Titel in der Reihenfolge der Titelliste (nur mit Bereich Titel)
           type: array
           items: { $ref: '#/components/schemas/TitleRef' }
+        companies:
+          description: Kompanien in der Reihenfolge der Liste (nur mit Bereich Kompanien und view_companies des Betrachters)
+          type: array
+          items: { $ref: '#/components/schemas/CompanyRef' }
         birthday:
           description: |
             Geburtstag, soweit die Person ihn dem Betrachter zeigt (`profile` members: angemeldete Mitglieder, public: alle),
@@ -6485,6 +7561,10 @@ components:
               description: Titel (nur mit Bereich Titel und Recht manage_titles)
               type: array
               items: { $ref: '#/components/schemas/TitleRef' }
+            companies:
+              description: Kompanien (nur mit Bereich Kompanien und Recht manage_companies)
+              type: array
+              items: { $ref: '#/components/schemas/CompanyRef' }
             birthday:
               description: Geburtstag mit Jahr und Schaltern (nur mit Bereich Geburtstage und Recht view_personal; null ohne Eintrag)
               oneOf:
@@ -6661,7 +7741,7 @@ components:
     GrantableCapability:
       type: string
       description: Recht, das sich einer Rolle oder einer Person geben lässt (alle außer `manage_settings`).
-      enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, view_personal, manage_personal, create_users, promote_users]
+      enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, view_personal, manage_personal, create_users, promote_users]
 
     MemberRights:
       type: object
@@ -6932,10 +8012,51 @@ components:
 
     OfficeGroup:
       type: object
-      required: [id, title]
+      required: [id, title, joint_terms]
       properties:
         id: { type: integer }
         title: { type: string, maxLength: 60 }
+        joint_terms: { type: boolean, description: 'Gemeinsame Amtszeiten mit Gruppenbild (z. B. ein Königshaus)' }
+
+    OfficeGroupTerm:
+      type: object
+      required: [id, group_id, kind, start_year, end_year, note, current, image_url]
+      properties:
+        id: { type: integer }
+        group_id: { type: integer }
+        kind: { type: string, enum: [period, point] }
+        start_year: { type: integer }
+        end_year: { type: [integer, 'null'] }
+        note: { type: string, maxLength: 100 }
+        current: { type: boolean, description: Zeitraum ohne Ende }
+        image_url: { type: [string, 'null'], description: 'Gruppenbild; öffentlich, solange der Bereich offices sichtbar ist' }
+        image_uid: { type: [string, 'null'], description: Nur mit manage_offices }
+
+    OfficeGroupTermInput:
+      type: object
+      properties:
+        kind: { type: string, enum: [period, point], default: period }
+        start_year: { type: integer, minimum: 1800 }
+        end_year: { type: [integer, 'null'] }
+        note: { type: string, maxLength: 100 }
+        image_uid: { type: [string, 'null'], description: 'Hochgeladenes Bild (POST /rich-images); null entfernt das Gruppenbild' }
+        offices:
+          type: array
+          description: Personen je Amt der Gruppe (beim Anlegen Pflicht); jedes Amt höchstens einmal
+          items:
+            type: object
+            required: [office_id, holders]
+            properties:
+              office_id: { type: integer }
+              holders:
+                type: array
+                maxItems: 20
+                items:
+                  type: object
+                  properties:
+                    user_id: { type: integer }
+                    name: { type: string, maxLength: 100 }
+                    image_uid: { type: [string, 'null'], description: Nur bei freien Namen }
 
     OfficeRef:
       type: object
@@ -6954,6 +8075,7 @@ components:
         name: { type: string, description: 'Anzeigename des Kontos, sonst der gespeicherte Name (auch nach dem Löschen des Kontos)' }
         user_id: { type: integer, description: 'Nur bei Personen der Mitgliederliste, für manage_offices und das eigene Konto' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
+        image_uid: { type: [string, 'null'], description: 'Nur freie Namen mit Foto, nur mit manage_offices (Issue #283); photo_url ist dann das öffentliche Foto' }
 
     OfficeTerm:
       type: object
@@ -6966,6 +8088,7 @@ components:
         note: { type: string, maxLength: 100 }
         honor: { type: boolean, description: 'Ehrung (Stern und Abzeichen im Zeitstrahl), bei jeder Art; vergibt keinen Titel' }
         current: { type: boolean, description: Zeitraum ohne Ende }
+        group_term_id: { type: [integer, 'null'], description: Gehört zu dieser gemeinsamen Amtszeit der Gruppe }
         office_id: { type: integer, description: Nur in Antworten der Pflege }
         holders:
           type: array
@@ -6989,6 +8112,7 @@ components:
             properties:
               user_id: { type: integer }
               name: { type: string, maxLength: 100 }
+              image_uid: { type: [string, 'null'], description: 'Nur bei freien Namen: Foto (Kennung aus POST /rich-images), öffentlich wie die Ämter; bei Konten ignoriert' }
 
     Office:
       allOf:
@@ -7014,6 +8138,10 @@ components:
         offices:
           type: array
           items: { $ref: '#/components/schemas/Office' }
+        group_terms:
+          type: array
+          description: Gemeinsame Amtszeiten aller Gruppen, laufende und neueste zuerst; angezeigt werden sie nur bei Gruppen mit joint_terms
+          items: { $ref: '#/components/schemas/OfficeGroupTerm' }
 
     OfficeTitleChange:
       type: object
@@ -7051,6 +8179,92 @@ components:
         offices_new: { type: integer }
         terms_new: { type: integer }
         applied: { type: boolean }
+
+    CompanyRef:
+      type: object
+      required: [id, name, short_name, active]
+      properties:
+        id: { type: integer }
+        name: { type: string, maxLength: 100 }
+        short_name: { type: string, maxLength: 30, description: Leer ohne }
+        active: { type: boolean, description: 'false: aufgelöst (die App zeigt „ehemalig“)' }
+
+    Company:
+      allOf:
+        - $ref: '#/components/schemas/CompanyRef'
+        - type: object
+          required: [founded_year, description, website_url, app_url, logo_url, logo_type, office_group]
+          properties:
+            founded_year: { type: [integer, 'null'] }
+            description: { type: string, description: 'Bereinigtes HTML (ohne Bilder), leer ohne' }
+            website_url: { type: string, description: 'Nur https, leer ohne' }
+            app_url: { type: string, description: 'Nur https, leer ohne' }
+            logo_url:
+              type: [string, 'null']
+              description: 'Adresse des Logos (`/kompanielogo/<id>?v=<Fassung>`, öffentlich und lange zwischengespeichert, solange Gäste `view_companies` haben); null ohne Logo'
+            logo_type: { type: [string, 'null'], enum: [png, svg, null] }
+            office_group:
+              description: 'Verknüpfte Gruppe der Ämter; shown: Bereich Ämter an (die App zeigt dann deren laufende Amtszeiten)'
+              oneOf:
+                - type: object
+                  required: [id, title, shown]
+                  properties:
+                    id: { type: integer }
+                    title: { type: string }
+                    shown: { type: boolean }
+                - type: 'null'
+            members:
+              description: Zugeordnete Personen in der Reihenfolge der Mitgliederliste (nur mit Bereich Mitgliederliste und view_directory)
+              type: array
+              items:
+                type: object
+                required: [id, name]
+                properties:
+                  id: { type: integer }
+                  name: { type: string }
+            member_count: { type: integer, description: Nur zusammen mit members }
+            member_ids: { type: array, items: { type: integer }, description: 'Nur mit manage_companies: alle Zugeordneten' }
+
+    CompanyInput:
+      type: object
+      properties:
+        name: { type: string, maxLength: 100, description: 'Mehrfache Leerzeichen werden zu einem' }
+        short_name: { type: string, maxLength: 30 }
+        founded_year: { type: [integer, 'null'], description: 'Von 1800 bis zum laufenden Jahr' }
+        description: { type: string, maxLength: 20000, description: 'HTML wie bei News, wird bereinigt; Bilder werden entfernt' }
+        website_url: { type: string, maxLength: 255, description: 'Nur https://…, leer ohne' }
+        app_url: { type: string, maxLength: 255, description: 'Nur https://…, leer ohne' }
+        office_group_id: { type: [integer, 'null'], description: 'Gruppe der Ämter, null ohne' }
+        active: { type: boolean, description: 'false: aufgelöst' }
+
+    Sponsor:
+      type: object
+      required: [id, name, url, logo_url, logo_type]
+      properties:
+        id: { type: integer }
+        name: { type: string, maxLength: 100, description: 'Name, zugleich Alternativtext des Logos' }
+        url: { type: string, maxLength: 255, description: 'Link zur Seite des Sponsors (nur https), leer ohne' }
+        logo_url:
+          type: [string, 'null']
+          description: 'Adresse des Logos (`/sponsorlogo/<id>?v=<Fassung>`, öffentlich und lange zwischengespeichert, solange Gäste `view_sponsors` haben); null ohne Logo'
+        logo_type: { type: [string, 'null'], enum: [png, svg, null] }
+
+    PageSummary:
+      type: object
+      required: [id, title, audience]
+      properties:
+        id: { type: integer }
+        title: { type: string, maxLength: 100 }
+        audience: { type: string, enum: [public, members], description: 'public: alle, auch ohne Anmeldung; members: wer das Schwarze Brett liest (view_board)' }
+        updated_at: { type: string, format: date-time, description: 'Nur mit manage_pages: Stand der Seite (für PATCH mitschicken)' }
+        updated_by_name: { type: [string, 'null'], description: 'Nur mit manage_pages: wer zuletzt gespeichert hat' }
+    PageDetail:
+      allOf:
+        - $ref: '#/components/schemas/PageSummary'
+        - type: object
+          required: [body]
+          properties:
+            body: { type: string, description: 'Formatierter Text (bereinigt wie RichText), Bilder mit Adresse (`<App>/bild/<uid>`); leer ohne Text' }
 
     Title:
       type: object

@@ -10,20 +10,24 @@ import {
   refreshRoles,
   type AdminSettings,
   type FailedPhoto,
+  type GallerySourceType,
   type Feature,
   type FeatureInfo,
   type MailSettings,
   type NewsSourceType,
+  type PushAdmin,
 } from '../api';
 import { EmailField, ErrorBox, Loading, useAsync } from '../ui';
 import { normalizeEmail } from '../email';
 import Neuerungen from './Neuerungen';
+import NavigationEinstellen from './NavigationEinstellen';
 import Rollen from './Rollen';
 import Wartung from './Wartung';
 import Nutzung from './Nutzung';
+import GalleryAlbums from './GalerieAlben';
 import { MaintenanceCard } from '../maintenance';
 import { navigate } from '../router';
-import { formatBytes } from '../format';
+import { formatBytes, formatUntil } from '../format';
 import { menuSources, prefetchOnTap, sources, usePrefetchMenu } from '../viewData';
 
 const sec = brand.labels.sections;
@@ -31,6 +35,7 @@ const sec = brand.labels.sections;
 /** Seiten der Einstellungen: Adresse (#/einstellungen/<id>), Titel und ein Satz für die Übersicht. */
 const PAGES = [
   { id: 'bereiche', title: 'Bereiche', text: 'Welche Bereiche die App für alle hat.' },
+  { id: 'navigation', title: 'Navigation', text: 'Welche Bereiche unten in der Leiste stehen, auch in Untermenüs.' },
   { id: 'rollen', title: 'Rollen', text: 'Wer was in der App darf.' },
   { id: 'benachrichtigungen', title: 'Benachrichtigungen', text: 'Angemeldete Geräte und Uhrzeit der Erinnerung.' },
   { id: 'geburtstage', title: sec.birthdays, text: `Wie lange vorher anstehende ${sec.birthdays} bei den ${sec.events} erscheinen.` },
@@ -39,6 +44,7 @@ const PAGES = [
   { id: 'galerie', title: sec.gallery, text: 'Fotoalben aus einem Ordner in Google Drive.' },
   { id: 'kalender', title: 'Kalender', text: 'Kalender für Mitglieder aus Google Kalender oder per iCal.' },
   { id: 'news', title: newsTitle(), text: `Woher die ${newsTitle()} kommen.` },
+  { id: 'rechtliches', title: 'Impressum und Datenschutz', text: 'Links auf Impressum und Datenschutzerklärung, für alle sichtbar.' },
   { id: 'nutzung', title: 'Nutzung', text: 'Wer die App wann nutzt und welche Bereiche.' },
   { id: 'zustand', title: 'Zustand und Updates', text: 'Ampel je Bereich, installierte Version und Updates.' },
   { id: 'datensicherung', title: 'Datensicherung', text: 'Sicherung herunterladen oder einspielen.' },
@@ -66,6 +72,7 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
         ‹ Einstellungen
       </button>
       {page.id === 'bereiche' && <Bereiche onToast={onToast} />}
+      {page.id === 'navigation' && <NavigationEinstellen onToast={onToast} />}
       {page.id === 'rollen' && <Rollen onToast={onToast} />}
       {page.id === 'benachrichtigungen' && <PushSettings onToast={onToast} />}
       {page.id === 'geburtstage' && <BirthdaySettingsSection onToast={onToast} />}
@@ -75,7 +82,7 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
       {page.id === 'wartung' && <MaintenanceCard onToast={onToast} />}
       {page.id === 'datensicherung' && <Wartung part="datensicherung" onToast={onToast} />}
       {page.id === 'neuerungen' && <Neuerungen />}
-      {(page.id === 'google' || page.id === 'kalender' || page.id === 'galerie' || page.id === 'news') && (
+      {(page.id === 'google' || page.id === 'kalender' || page.id === 'galerie' || page.id === 'news' || page.id === 'rechtliches') && (
         <Verbindung page={page.id} onToast={onToast} />
       )}
     </div>
@@ -125,8 +132,14 @@ function Overview() {
   );
 }
 
-/** Google-Zugang, Kalender, Galerie oder Neuigkeiten: alle aus den gemeinsamen Einstellungen (/admin/settings). */
-function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie' | 'news'; onToast: (msg: string) => void }) {
+/** Google-Zugang, Kalender, Galerie, Neuigkeiten oder Rechtliches: alle aus den gemeinsamen Einstellungen (/admin/settings). */
+function Verbindung({
+  page,
+  onToast,
+}: {
+  page: 'google' | 'kalender' | 'galerie' | 'news' | 'rechtliches';
+  onToast: (msg: string) => void;
+}) {
   const { data, error, loading, reload, setData, revision } = useAsync(sources.settings.load, sources.settings.deps, sources.settings.key);
   if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -135,8 +148,48 @@ function Verbindung({ page, onToast }: { page: 'google' | 'kalender' | 'galerie'
   const props = { settings: s, onSaved: setData, onToast };
   if (page === 'google') return <GoogleAccess key={revision} {...props} />;
   if (page === 'kalender') return <Calendar key={revision} {...props} />;
-  if (page === 'galerie') return <Gallery key={revision} {...props} />;
+  if (page === 'galerie')
+    return (
+      <>
+        <Gallery key={revision} {...props} />
+        {s.gallery.source !== undefined && <GalleryAlbums onToast={onToast} />}
+      </>
+    );
+  if (page === 'rechtliches') return <Legal key={revision} {...props} />;
   return s.news ? <News key={revision} {...props} /> : null;
+}
+
+const devicesText = (n: number): string => (n === 0 ? 'an kein Gerät' : n === 1 ? 'an 1 Gerät' : `an ${n} Geräte`);
+
+/** Zuletzt verschickt je Art, dazu zuletzt vom Push-Dienst angenommen bzw. abgelehnt; nichts, solange noch nichts verschickt wurde. */
+function PushLog({ log }: { log: PushAdmin['log'] }) {
+  if (log.types.length === 0 && !log.accepted && !log.rejected) return null;
+  return (
+    <div className="push-log">
+      <h4>Zuletzt verschickt</h4>
+      {log.types.length > 0 && (
+        <ul className="small muted">
+          {log.types.map((t) => (
+            <li key={t.type}>
+              {t.label} – {formatUntil(t.at)}, {devicesText(t.devices)}
+            </li>
+          ))}
+        </ul>
+      )}
+      {log.accepted && (
+        <p className="small muted">
+          Zuletzt vom Push-Dienst angenommen: {formatUntil(log.accepted.at)} (
+          {log.accepted.count === 1 ? '1 Nachricht' : `${log.accepted.count} Nachrichten`}).
+        </p>
+      )}
+      {log.rejected && (
+        <p className="small muted">
+          Zuletzt vom Push-Dienst abgelehnt: {formatUntil(log.rejected.at)} (
+          {log.rejected.count === 1 ? '1 Nachricht' : `${log.rejected.count} Nachrichten`}, {log.rejected.reason}).
+        </p>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -210,6 +263,7 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
           )}
         </>
       )}
+      <PushLog log={p.log} />
       {saveError && (
         <p className="form-error" role="alert">
           {saveError}
@@ -1036,6 +1090,8 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
 export function Gallery({ settings, onSaved, onToast }: SectionProps) {
   const g = settings.gallery;
   const [root, setRoot] = useState(g.root);
+  const [source, setSource] = useState<GallerySourceType>(g.source ?? 'drive');
+  const [downloads, setDownloads] = useState(!!g.downloads);
   const [progress, setProgress] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const { busy, error, setError, save } = useSave(onSaved, onToast);
@@ -1068,42 +1124,96 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
   return (
     <Section
       id="galerie"
-      title={`${sec.gallery} aus Google Drive`}
+      title={sec.gallery}
       busy={busy}
       error={error}
       onSubmit={(e) => {
         e.preventDefault();
-        save({ gallery_root: root.trim() });
+        if (
+          source === 'server' &&
+          (g.source ?? 'drive') === 'drive' &&
+          !window.confirm(
+            'Nur noch der eigene Server? Alben und Bilder aus Google Drive verschwinden aus der App; hochgeladene Bilder bleiben.',
+          )
+        )
+          return;
+        save(
+          g.source === undefined
+            ? { gallery_root: root.trim() }
+            : {
+                gallery_source: source,
+                gallery_store: 'server',
+                ...(source === 'drive' ? { gallery_root: root.trim() } : {}),
+                ...(g.downloads !== undefined ? { gallery_downloads: downloads ? '1' : '0' } : {}),
+              },
+        );
       }}
     >
-      <p className="muted small">
-        Hier den Link zum Galerie-Ordner in Google Drive eintragen. Darin je Jahr ein Ordner, darin je Album ein Ordner; Bilder im
-        Unterordner <em>intern</em> sehen nur Mitglieder.
-      </p>
-      <p className="small">
-        {access ? (
-          <>
-            Gelesen wird über {access} (<GoogleLink />
-            ).
-          </>
-        ) : (
-          <>
-            Noch kein Zugang zu Google: zuerst unter <GoogleLink /> mit Google verbinden oder ein Dienstkonto hinterlegen.
-          </>
-        )}
-      </p>
-      <label className="field">
-        <span>Link zum Galerie-Ordner</span>
-        <input
-          type="text"
-          autoComplete="off"
-          placeholder="https://drive.google.com/drive/folders/…"
-          value={root}
-          onChange={(e) => setRoot(e.target.value)}
-        />
-      </label>
-      {g.status.error && <p className="form-error small">Letzter Abgleich: {g.status.error}</p>}
-      {g.configured && (
+      {g.source !== undefined && (
+        <>
+          <label className="field">
+            <span>Quelle</span>
+            <select value={source} onChange={(e) => setSource(e.target.value as GallerySourceType)}>
+              <option value="drive">Google Drive (dazu Alben der App)</option>
+              <option value="server">Eigener Server (nur Alben der App)</option>
+            </select>
+          </label>
+          <label className="field">
+            <span>Ablageort für hochgeladene Bilder</span>
+            <select value="server" disabled>
+              <option value="server">Eigener Server</option>
+            </select>
+          </label>
+          <p className="muted small">
+            Hochgeladene Bilder belegen {formatBytes(g.media_bytes ?? 0)}. Die App setzt keine Grenze; behalte den Speicherplatz deines
+            Webspace im Blick. Sie sind in der Sicherung enthalten.
+          </p>
+        </>
+      )}
+      {source === 'drive' && (
+        <>
+          <p className="muted small">
+            Hier den Link zum Galerie-Ordner in Google Drive eintragen. Darin je Jahr ein Ordner, darin je Album ein Ordner; Bilder im
+            Unterordner <em>intern</em> sehen nur Mitglieder.
+          </p>
+          <p className="small">
+            {access ? (
+              <>
+                Gelesen wird über {access} (<GoogleLink />
+                ).
+              </>
+            ) : (
+              <>
+                Noch kein Zugang zu Google: zuerst unter <GoogleLink /> mit Google verbinden oder ein Dienstkonto hinterlegen.
+              </>
+            )}
+          </p>
+          <label className="field">
+            <span>Link zum Galerie-Ordner</span>
+            <input
+              type="text"
+              autoComplete="off"
+              placeholder="https://drive.google.com/drive/folders/…"
+              value={root}
+              onChange={(e) => setRoot(e.target.value)}
+            />
+          </label>
+        </>
+      )}
+      {g.downloads !== undefined && (
+        <label className="toggle feature-toggle">
+          <input type="checkbox" checked={downloads} onChange={(e) => setDownloads(e.target.checked)} />
+          <span>
+            Knöpfe zum Herunterladen zeigen
+            <span className="small muted feature-desc">
+              Wer die {sec.gallery} sieht, kann dann jedes Bild in der Großansicht und jedes Album als ZIP herunterladen (in
+              Originalauflösung, ohne Videos).
+            </span>
+          </span>
+        </label>
+      )}
+      {source === 'drive' && g.status.error && <p className="form-error small">Letzter Abgleich: {g.status.error}</p>}
+      {g.configured && source === 'drive' && (
         <button type="button" className="btn btn-secondary" onClick={sync} disabled={syncing}>
           {syncing ? 'Gleicht ab …' : 'Jetzt abgleichen'}
         </button>
@@ -1175,9 +1285,13 @@ function FailedPhotos({ count, disabled, onRetry }: { count: number; disabled: b
                 </span>
                 <br />
                 <span className="small">{p.error || 'ohne Fehlermeldung'}</span>{' '}
-                <a className="small" href={p.drive_url} target="_blank" rel="noopener noreferrer">
-                  In Google Drive öffnen
-                </a>
+                {p.drive_url ? (
+                  <a className="small" href={p.drive_url} target="_blank" rel="noopener noreferrer">
+                    In Google Drive öffnen
+                  </a>
+                ) : (
+                  <span className="small muted">hochgeladen</span>
+                )}
               </li>
             ))}
           </ul>
@@ -1276,6 +1390,62 @@ export function News({ settings, onSaved, onToast }: SectionProps) {
           {result}
         </p>
       )}
+    </Section>
+  );
+}
+
+/**
+ * Links auf Impressum und Datenschutzerklärung (z. B. die Seiten auf der Webseite der Kompanie). Die App zeigt sie allen,
+ * auch ohne Anmeldung: auf der Anmeldeseite, im Konto und in der Hilfe. Ohne einen der Links ist die Statusseite gelb.
+ */
+export function Legal({ settings, onSaved, onToast }: SectionProps) {
+  const saved = settings.legal ?? { imprint_url: '', privacy_url: '' };
+  const [imprint, setImprint] = useState(saved.imprint_url);
+  const [privacy, setPrivacy] = useState(saved.privacy_url);
+  // Gleich sichtbar machen (Anmeldeseite, Konto, Hilfe), ohne die App neu zu laden.
+  const { busy, error, save } = useSave((s) => {
+    if (config && s.legal) config.legal = { imprint: s.legal.imprint_url || null, privacy: s.legal.privacy_url || null };
+    onSaved(s);
+  }, onToast);
+  return (
+    <Section
+      id="rechtliches"
+      title="Impressum und Datenschutz"
+      busy={busy}
+      error={error}
+      onSubmit={(e) => {
+        e.preventDefault();
+        save({ legal_imprint_url: imprint.trim(), legal_privacy_url: privacy.trim() });
+      }}
+    >
+      <p className="muted small">
+        Trage die Adressen eures Impressums und eurer Datenschutzerklärung ein, z. B. die Seiten auf eurer Webseite. Die App zeigt die Links
+        allen, auch ohne Anmeldung: auf der Anmeldeseite, im Konto und in der Hilfe.
+      </p>
+      <label className="field">
+        <span>Impressum</span>
+        <input
+          type="url"
+          inputMode="url"
+          placeholder="https://www.beispiel.de/impressum"
+          value={imprint}
+          onChange={(e) => setImprint(e.target.value)}
+        />
+      </label>
+      <label className="field">
+        <span>Datenschutzerklärung</span>
+        <input
+          type="url"
+          inputMode="url"
+          placeholder="https://www.beispiel.de/datenschutz"
+          value={privacy}
+          onChange={(e) => setPrivacy(e.target.value)}
+        />
+      </label>
+      <p className="muted small">
+        Was die App an Daten verarbeitet (für eure Datenschutzerklärung), steht in der Hilfe unter „Impressum und Datenschutz“. Ein leeres
+        Feld entfernt den Link.
+      </p>
     </Section>
   );
 }

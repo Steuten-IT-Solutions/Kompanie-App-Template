@@ -14,6 +14,7 @@ Tippe unten auf **Verwaltung** und dann auf **Einstellungen**.
 Je Thema eine Zeile mit einem kurzen Satz. Tippe auf eine Zeile, um ihre Seite zu öffnen. Mit **‹ Einstellungen** oben kommst du von dort zurück zur Übersicht.
 
 - **Bereiche**: welche Bereiche die App für alle hat. Siehe [Bereiche](seite:admin-bereiche).
+- **Navigation**: welche Bereiche unten in der Leiste stehen und welche in Untermenüs. Siehe [Navigation](seite:admin-navigation).
 - **Rollen**: wer was in der App darf. Siehe [Rollen](seite:admin-rollen-und-mitglieder).
 - **Benachrichtigungen**: angemeldete Geräte und Uhrzeit der Erinnerung. Siehe [Benachrichtigungen einstellen](seite:admin-benachrichtigungen).
 - **{bereich.birthdays}**: wie lange vorher anstehende {bereich.birthdays} bei den {bereich.events} erscheinen (nur, wenn {bereich.birthdays} an ist).
@@ -22,6 +23,7 @@ Je Thema eine Zeile mit einem kurzen Satz. Tippe auf eine Zeile, um ihre Seite z
 - **{bereich.gallery}**: der Ordner in Google Drive mit den Fotoalben. Siehe [{bereich.gallery} einrichten](seite:admin-galerie).
 - **Kalender**: woher der Kalender für Mitglieder kommt. Siehe [Kalender einrichten](seite:admin-kalender).
 - **Neuigkeiten**: woher die {bereich.news} kommen. Heißt der Bereich bei euch anders als „News“, steht hier sein Name. Die Seite gibt es nur in der eigenständigen App (ohne WordPress).
+- **Impressum und Datenschutz**: Links auf Impressum und Datenschutzerklärung, für alle sichtbar. Siehe [Impressum und Datenschutz](seite:admin-rechtliches).
 - **Nutzung**: wer die App wann nutzt und welche Bereiche. Siehe [Nutzung](seite:admin-nutzung).
 - **Zustand und Updates**: Ampel je Bereich, installierte Version, Updates und Fehlerprotokoll. Siehe [Zustand und Updates](seite:admin-zustand).
 - **Datensicherung**: Sicherung herunterladen oder einspielen. Siehe [Datensicherung](seite:admin-updates-und-sicherung).

@@ -55,6 +55,8 @@ final class RoleService
     public const VIEW_SETTING = 'roles_view_split';
     /** Gesetzt, sobald Rollen mit create_users die Rechte für persönliche Angaben haben (migratePersonalRights). */
     public const PERSONAL_SETTING = 'roles_personal_split';
+    /** Rechte aus Roles::ADDED_VIEW, die die Rollen schon bekommen haben (migrateAddedViewRights). */
+    public const ADDED_VIEW_SETTING = 'roles_view_added';
     public const LABEL_MAX = 30;
     public const MAX_ROLES = 30;
     public const FACTOR_MAX = 10.0;
@@ -660,6 +662,7 @@ final class RoleService
             $this->migrateCandidate();
             $this->migrateViewRights();
             $this->migratePersonalRights();
+            $this->migrateAddedViewRights();
             return;
         }
         $roles = $this->templates();
@@ -675,6 +678,7 @@ final class RoleService
         $this->settings->set(self::CANDIDATE_SETTING, true);
         $this->settings->set(self::VIEW_SETTING, true);
         $this->settings->set(self::PERSONAL_SETTING, true);
+        $this->settings->set(self::ADDED_VIEW_SETTING, Roles::ADDED_VIEW);
     }
 
     /**
@@ -799,6 +803,31 @@ final class RoleService
     }
 
     /**
+     * Einmalig je Recht nach dem Update: Rechte zum Sehen für spätere Bereiche (Roles::ADDED_VIEW) bekommt jede Rolle außer
+     * Admin, wie Gast und Mitglied bei der Ersteinrichtung, damit nach dem Einschalten jemand etwas sieht. Die Bereiche sind anfangs
+     * aus, es ändert sich also erst etwas, wenn der Admin einen einschaltet; dann kann er die Rechte enger stellen. Was
+     * einzelnen Personen entzogen ist, bleibt entzogen. Welche Rechte schon verteilt sind, steht in ADDED_VIEW_SETTING:
+     * Ein später ergänztes Recht wird so ebenfalls genau einmal verteilt, ein vom Admin wieder entzogenes nicht erneut.
+     */
+    private function migrateAddedViewRights(): void
+    {
+        $done = $this->settings->get(self::ADDED_VIEW_SETTING);
+        $done = is_array($done) ? array_values(array_filter($done, 'is_string')) : [];
+        $add = array_values(array_diff(Roles::ADDED_VIEW, $done));
+        if ($add === []) {
+            return;
+        }
+        $roles = $this->all();
+        foreach ($roles as $key => $r) {
+            if ($key !== Roles::ADMIN) {
+                $roles[$key]['capabilities'] = self::ordered([...$r['capabilities'], ...$add]);
+            }
+        }
+        $this->save($roles);
+        $this->settings->set(self::ADDED_VIEW_SETTING, [...$done, ...$add]);
+    }
+
+    /**
      * Rechte einer Person mit Ausnahmen nach den Regeln vor migrateViewRights, in heutigen Rechten.
      *
      * @param string[] $base
@@ -835,7 +864,8 @@ final class RoleService
                 }
             }
             // Die Standardrolle sieht, was Mitglieder anfangs sehen (Features nennt nur member und das Recht des Bereichs).
-            $this->save(self::beforeAdmin($roles, self::role($key, $label, self::ordered(Roles::expandLegacy($capabilities)))));
+            $caps = [...Roles::expandLegacy($capabilities), ...Roles::ADDED_VIEW];
+            $this->save(self::beforeAdmin($roles, self::role($key, $label, self::ordered($caps))));
             return;
         }
         if (!isset($roles[$key]) || Roles::isSystem($key)) {

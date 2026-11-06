@@ -333,6 +333,7 @@ final class PushServiceTest extends TestCase
         $this->assertCount(1, $sent);
         $this->assertSame('aes128gcm', $sent[0]['headers']['Content-Encoding']);
         $this->assertSame('86400', $sent[0]['headers']['TTL']);
+        $this->assertSame('high', $sent[0]['headers']['Urgency'], 'jede Nachricht zeigt eine Benachrichtigung: hohe Priorität');
         $this->assertMatchesRegularExpression('/^vapid t=[^.]+\.[^.]+\.[^,]+, k=[A-Za-z0-9_-]{87}$/', $sent[0]['headers']['Authorization']);
         $msg = self::decrypt((string) $sent[0]['body'], $a);
         $this->assertSame('meins/strafen/7', $msg['route'], 'führt zum Eintrag (Issue #190)');
@@ -353,6 +354,50 @@ final class PushServiceTest extends TestCase
         }
         $this->assertSame(0, $p->repository()->counts()['queued'], 'nach drei Versuchen verworfen');
         $this->assertNotNull($p->repository()->byEndpoint($b['endpoint']), '5xx löscht das Abo nicht');
+    }
+
+    public function testLogShowsLastSendPerTypeAndWhatThePushServiceDid(): void
+    {
+        $app = $this->app();
+        $p = $app->push();
+        $empty = ['types' => [], 'accepted' => null, 'rejected' => null];
+        $this->assertSame($empty, $p->logStatus(), 'noch nichts verschickt');
+        $m = $this->users->find($this->users->add('m', Roles::MEMBER));
+        $a = self::device('a');
+        $b = self::device('b');
+        $p->subscribe($m, $a['endpoint'], $a['keys'], ['penalties', 'points'], null, '');
+        $p->subscribe($m, $b['endpoint'], $b['keys'], ['points'], null, '');
+
+        // Je Art der letzte Versand mit der Zahl der Geräte; ohne Gerät mit der Art: 0.
+        $app->pushTriggers()->penaltiesAdded([['id' => 1, 'user_id' => $m->id, 'amount_cents' => 100, 'reason' => 'x']]);
+        $this->clock->at = $this->clock->now()->modify('+5 minutes');
+        $app->pushTriggers()->pointsAdded([['id' => 2, 'user_id' => $m->id, 'points' => 1, 'reason' => 'y']]);
+        $this->assertSame(3, $p->processQueue());
+        $log = $p->logStatus();
+        $labels = $p->types();
+        $this->assertSame([
+            ['type' => 'penalties', 'label' => $labels['penalties']['label'], 'at' => '2026-10-19T10:00:00+02:00', 'devices' => 1],
+            ['type' => 'points', 'label' => $labels['points']['label'], 'at' => '2026-10-19T10:05:00+02:00', 'devices' => 2],
+        ], $log['types'], 'in der Reihenfolge der Arten, Zeit in der Zeitzone der Kompanie');
+        $this->assertSame(['at' => '2026-10-19T10:05:00+02:00', 'count' => 3], $log['accepted']);
+        $this->assertNull($log['rejected']);
+        $this->assertSame($log, $p->adminStatus()['log']);
+
+        // Abgelehnt: endgültig (400) und abgemeldet (410), mit dem letzten Grund; angenommen bleibt beim letzten Mal.
+        $this->clock->at = $this->clock->now()->modify('+1 hour');
+        $this->pushStatus[$a['endpoint']] = 400;
+        $this->pushStatus[$b['endpoint']] = 410;
+        $app->pushTriggers()->pointsAdded([['id' => 3, 'user_id' => $m->id, 'points' => 1, 'reason' => 'z']]);
+        $this->assertSame(0, $p->processQueue());
+        $log = $p->logStatus();
+        $this->assertSame('2026-10-19T10:05:00+02:00', $log['accepted']['at'] ?? null);
+        $this->assertSame(2, $log['rejected']['count'] ?? null);
+        $this->assertSame('2026-10-19T11:05:00+02:00', $log['rejected']['at'] ?? null);
+        $this->assertContains($log['rejected']['reason'] ?? null, ['HTTP 400', 'Gerät beim Push-Dienst abgemeldet (HTTP 410)']);
+
+        // Ausgeschalteter Bereich: seine Art erscheint nicht mehr.
+        $app->features()->update(['penalties' => false]);
+        $this->assertSame(['points'], array_column($p->logStatus()['types'], 'type'));
     }
 
     public function testClaimedMessagesAreNotSentTwiceAndOldOnesExpire(): void

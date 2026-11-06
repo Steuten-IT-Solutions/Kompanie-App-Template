@@ -354,6 +354,45 @@ try {
     $doc = $d->send('GET', $base . 'index.php?r=/dokument/1&v=x', [], null);
     $c->ok(in_array($doc[0], [401, 404], true) && ($doc[2]['x-content-type-options'] ?? '') === 'nosniff', 'Dokument ohne Anmeldung → kein Inhalt');
 
+    $c->section('Logos der Sponsoren (Auslieferung, Issue #279)');
+    $d->actAs($anna);
+    $d->request('PUT', '/admin/features', ['sponsors' => true]);
+    [, $sponsor] = $d->request('POST', '/sponsors', ['name' => 'Kpsa Sponsor']);
+    $svgLogo = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 10"><script>alert(1)</script><rect width="20" height="10"/></svg>';
+    [$s, $sponsor] = $d->request('POST', '/sponsors/' . ($sponsor['id'] ?? 0) . '/logo', ['file' => ['name' => 'logo.svg', 'data' => base64_encode($svgLogo)]]);
+    $logoUrl = (string) ($sponsor['logo_url'] ?? '');
+    $c->ok($s === 200 && str_starts_with($logoUrl, $base . 'index.php?r=/sponsorlogo/' . ($sponsor['id'] ?? 0) . '&v='), 'Logo hochgeladen, Adresse im Bereich der App');
+    $anon = $d->send('GET', $logoUrl, [], null);
+    $c->ok($anon[0] === 200 && ($anon[2]['content-type'] ?? '') === 'image/svg+xml' && str_starts_with((string) ($anon[2]['cache-control'] ?? ''), 'public')
+        && ($anon[2]['content-security-policy'] ?? '') === "default-src 'none'; style-src 'unsafe-inline'; sandbox", 'Logo ohne Anmeldung: öffentlich, SVG mit strenger CSP');
+    $c->ok(!str_contains((string) file_get_contents($logoUrl), 'script'), 'Ausgeliefert wird das bereinigte SVG');
+    $c->ok($d->send('GET', $base . 'index.php?r=/sponsorlogo/999999', [], null)[0] === 404, 'Unbekanntes Logo → 404');
+    $d->request('DELETE', '/sponsors/' . ($sponsor['id'] ?? 0));
+
+    $c->section('Logos der Kompanien (Auslieferung, Issue #280)');
+    $d->actAs($anna);
+    $d->request('PUT', '/admin/features', ['companies' => true]);
+    [, $company] = $d->request('POST', '/companies', ['name' => 'Kpsa Kompanie']);
+    [$s, $company] = $d->request('POST', '/companies/' . ($company['id'] ?? 0) . '/logo', ['file' => ['name' => 'logo.svg', 'data' => base64_encode($svgLogo)]]);
+    $logoUrl = (string) ($company['logo_url'] ?? '');
+    $c->ok($s === 200 && str_starts_with($logoUrl, $base . 'index.php?r=/kompanielogo/' . ($company['id'] ?? 0) . '&v='), 'Logo hochgeladen, Adresse im Bereich der App');
+    $anon = $d->send('GET', $logoUrl, [], null);
+    $c->ok($anon[0] === 200 && ($anon[2]['content-type'] ?? '') === 'image/svg+xml' && str_starts_with((string) ($anon[2]['cache-control'] ?? ''), 'public'), 'Logo ohne Anmeldung: öffentlich');
+    $c->ok(!str_contains((string) file_get_contents($logoUrl), 'script'), 'Ausgeliefert wird das bereinigte SVG');
+    $c->ok($d->send('GET', $base . 'index.php?r=/kompanielogo/999999', [], null)[0] === 404, 'Unbekanntes Logo → 404');
+    // Bilder der Beschreibung (Issue #281): öffentlich wie die Liste
+    $gd = imagecreatetruecolor(3, 2);
+    ob_start();
+    imagepng($gd);
+    [$s, $rich] = $d->request('POST', '/rich-images', ['file' => ['name' => 'bild.png', 'data' => base64_encode((string) ob_get_clean())]]);
+    $richUrl = (string) ($rich['url'] ?? '');
+    $c->ok($s === 201 && $d->send('GET', $richUrl, [], null)[0] === 401, 'Bild als Entwurf: ohne Anmeldung 401');
+    $d->request('PATCH', '/companies/' . ($company['id'] ?? 0), ['description' => '<img data-image="' . ($rich['uid'] ?? '') . '">']);
+    $anonImage = $d->send('GET', $richUrl, [], null);
+    $c->ok($anonImage[0] === 200 && ($anonImage[2]['content-type'] ?? '') === 'image/png' && str_starts_with((string) ($anonImage[2]['cache-control'] ?? ''), 'public'), 'Bild der Beschreibung ohne Anmeldung: öffentlich');
+    $d->request('DELETE', '/companies/' . ($company['id'] ?? 0));
+    $c->ok($d->send('GET', $richUrl, [], null)[0] === 401, 'Kompanie gelöscht: Bild weg');
+
     $c->section('Abzeichen der Dienstgrade (Auslieferung)');
     $d->actAs($anna);
     [, $badgeRank] = $d->request('POST', '/ranks', ['title' => 'Kpsa Abzeichen ' . bin2hex(random_bytes(2))]);
@@ -528,16 +567,36 @@ try {
         $c->ok($pdo->writes() === [], 'Normale Anfrage schreibt nichts (Aufgaben werden nicht bei jeder Anfrage eingeplant)' . ($pdo->writes() ? ': ' . implode(' | ', $pdo->writes()) : ''));
         $c->ok(!preg_grep('/\{?tasks\}?/', $pdo->log), 'Normale Anfrage liest die Aufgaben nicht (nächster Lauf steht in den Einstellungen)');
 
-        // Fällige Aufgabe ohne PHP-FPM: Selbstaufruf, ohne auf die Antwort zu warten.
+        // Fällige Aufgabe ohne PHP-FPM: Selbstaufruf, ohne auf die Antwort zu warten. Gemessen an einem Empfänger, der erst
+        // nach SLOW_MS antwortet und nichts in die Datenbank schreibt: Wartete der Selbstaufruf auf die Antwort, dauerte er
+        // mindestens so lange. (Gegen den echten Testserver schwankte die Zeit: Dessen Cron-Lauf schreibt gleichzeitig in
+        // dieselbe SQLite-Datei, und eine feste Grenze von 150 ms schlug auf CI gelegentlich fehl, Issue #216.)
+        $slowMs = 2000;
+        $slowPort = $port + 2;
+        $slowRouter = $data . '-langsam.php';
+        file_put_contents($slowRouter, '<?php usleep(' . ($slowMs * 1000) . '); echo "ok";');
+        $slow = proc_open([PHP_BINARY, '-S', "127.0.0.1:$slowPort", $slowRouter], [1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $sp);
+        for ($i = 0; $i < 50 && !@fsockopen('127.0.0.1', $slowPort); $i++) {
+            usleep(100000);
+        }
         $kernel->db()->insert('tasks', ['name' => 'testaufgabe', 'interval_seconds' => 3600, 'next_run' => time() - 10]);
         $kernel->scheduler()->refresh();
         $kernel->app()->settings->delete(Kernel::CRON_SPAWN_SETTING);
-        [$k] = $counted();
+        [$k] = $counted(new Config($data, ['base_url' => "http://127.0.0.1:$slowPort/"] + Config::load($data)->toArray()));
         $k->upgrade();
         $t = microtime(true);
         $afterResponse($k);
         $elapsed = microtime(true) - $t;
-        $c->ok($elapsed < 0.15, sprintf('Selbstaufruf wartet nicht auf die Aufgaben (%.0f ms)', $elapsed * 1000));
+        $c->ok($elapsed < $slowMs / 2000, sprintf('Selbstaufruf wartet nicht auf die Antwort (%.0f ms, Empfänger antwortet nach %d ms)', $elapsed * 1000, $slowMs));
+        proc_terminate($slow);
+        proc_close($slow);
+        @unlink($slowRouter);
+
+        // Gegen den echten Testserver: Die Aufgabe läuft im aufgerufenen Prozess.
+        $kernel->app()->settings->delete(Kernel::CRON_SPAWN_SETTING);
+        [$k] = $counted();
+        $k->upgrade();
+        $afterResponse($k);
         $ran = false;
         for ($i = 0; $i < 30 && !$ran; $i++) {
             usleep(100000);

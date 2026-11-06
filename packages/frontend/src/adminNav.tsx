@@ -15,9 +15,12 @@ const canAttendance = (): boolean => !!config?.features.attendance && can('manag
 const canOffices = (): boolean => !!config?.features.offices && can('manage_offices');
 const canLists = (): boolean => !!config?.features.lists && can('manage_lists');
 const canMail = (): boolean => !!config?.features.mail && can('send_mail');
+const canCompanies = (): boolean => !!config?.features.companies && can('manage_companies');
+const canSponsors = (): boolean => !!config?.features.sponsors && can('manage_sponsors');
+const canPages = (): boolean => !!config?.features.pages && can('manage_pages');
 
 /** Mitgliederliste: für alle, die Punkte oder Strafen vergeben, Dienstgrade, Titel oder Anwesenheit pflegen, Mitglieder
- * anlegen oder Rollen vergeben. */
+ * anlegen, Rollen vergeben oder Kompanien zuordnen. */
 export function memberListAllowed(): boolean {
   return (
     canPoints() ||
@@ -25,6 +28,7 @@ export function memberListAllowed(): boolean {
     canRanks() ||
     canTitles() ||
     canAttendance() ||
+    canCompanies() ||
     can('view_personal') ||
     can('create_users') ||
     can('promote_users')
@@ -50,6 +54,9 @@ export function adminTabs(): AdminTab[] {
       { id: 'befoerderungen', label: 'Beförderungen', on: canRanks() && !!config?.features.points },
       { id: 'titel', label: sec.titles, on: canTitles(), group: SETUP },
       { id: 'aemter', label: sec.offices, on: canOffices(), group: SETUP },
+      { id: 'kompanien', label: sec.companies, on: canCompanies(), group: SETUP },
+      { id: 'sponsoren', label: sec.sponsors, on: canSponsors(), group: SETUP },
+      { id: 'seiten', label: sec.pages, on: canPages(), group: SETUP },
       { id: 'anwesenheit', label: sec.attendance, on: canAttendance() },
       { id: 'brett', label: sec.board, on: canPostBoard(), route: 'brett' },
       { id: 'umfragen', label: sec.polls, on: canManagePolls(), route: 'umfragen/verwalten' },
@@ -147,6 +154,44 @@ export function MenuNav({
 
 /** Symbole der Verwaltung und von „Intern“ (24 × 24, Linien in Textfarbe). */
 const ADMIN_ICONS: Record<string, ReactNode> = {
+  // Termine, News und Galerie: als Knopf in einem Untermenü der Navigation (Einstellungen → Navigation, Issue #277)
+  termine: (
+    <>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+    </>
+  ),
+  news: (
+    <>
+      <path d="M4 5h12v14a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z" />
+      <path d="M16 9h3a1 1 0 0 1 1 1v9a2 2 0 0 1-4 0M7 9h6M7 13h6M7 17h4" />
+    </>
+  ),
+  galerie: (
+    <>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="8.5" cy="10" r="1.5" />
+      <path d="M21 16l-5-5-8 8" />
+    </>
+  ),
+  // Kompanien: Schild, als Bereich in einem Untermenü und als Knopf der Verwaltung
+  kompanien: (
+    <>
+      <path d="M12 3 5 5.5V11c0 4.6 3 8.6 7 10 4-1.4 7-5.4 7-10V5.5z" />
+      <path d="M12 3v18" />
+    </>
+  ),
+  // Sponsoren: als Bereich in einem Untermenü und als Knopf der Verwaltung
+  sponsoren: (
+    <path d="M12 20.5l-1.3-1.2C5.9 15 3 12.2 3 8.8 3 6.1 5.1 4 7.7 4c1.6 0 3.2.8 4.3 2 1.1-1.2 2.7-2 4.3-2C18.9 4 21 6.1 21 8.8c0 3.4-2.9 6.2-7.7 10.5z" />
+  ),
+  // Eigene Seiten: Blatt mit Zeilen, als Bereich in einem Untermenü und als Knopf der Verwaltung
+  seiten: (
+    <>
+      <path d="M6 3h9l4 4v14H6z" />
+      <path d="M9 11h7M9 14.5h7M9 18h4" />
+    </>
+  ),
   mitglieder: (
     <>
       <circle cx="9" cy="8" r="3.5" />

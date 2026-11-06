@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { api, config } from '../api';
 import brand from '../generated/brand';
 import logoUrl from '../generated/logo.png';
+import { LegalLinks } from '../legal';
 
 /** Anmeldeformular der eigenständigen Version (bei WordPress geht es zu wp-login.php). */
 export default function Anmelden() {
@@ -67,6 +68,7 @@ export default function Anmelden() {
         {busy ? 'Meldet an …' : 'Anmelden'}
       </button>
       <p className="muted small">Passwort vergessen? Bitte bei einem Admin melden – er kann ein neues Startpasswort erzeugen.</p>
+      <LegalLinks />
     </form>
   );
 }

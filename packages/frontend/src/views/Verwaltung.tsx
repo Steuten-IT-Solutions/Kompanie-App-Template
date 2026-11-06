@@ -3,6 +3,7 @@ import {
   api,
   can,
   config,
+  inBackground,
   levelLabel,
   personFactor,
   roleInfo,
@@ -20,7 +21,7 @@ import {
 import brand from '../generated/brand';
 import { formatDate, formatEuro, formatPoints, formatYearOrDate, parseEuroToCents, groupCounts as countLabels, todayYmd } from '../format';
 import { navigate, redirect as redirectTo } from '../router';
-import { neighbors, usePrefetchChain, useSwipeDrag } from '../swipe';
+import { batchFrom, neighbors, prefetchOrder, usePrefetchChain, useSwipeDrag } from '../swipe';
 import { AdminBack, AdminMenu, adminTabs, setupTabs } from '../adminNav';
 import {
   AddressFields,
@@ -46,6 +47,8 @@ import { PersonalPanel } from '../personal';
 import { cacheKey, dataCache, prefetch } from '../dataCache';
 import { prefetchOnTap, sources } from '../viewData';
 import { PersonName, PersonSkeleton } from '../skeleton';
+import { memberPreview, type MemberPreview } from '../memberPreview';
+import { createImageQueue } from '../imageQueue';
 import Anwesenheit from './Anwesenheit';
 import { preloadBadge, RankBadge, RankStack } from '../RankBadge';
 import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
@@ -56,6 +59,9 @@ import { AccountPanel, BulkNewMembers, Credentials, NewAccountRole } from './Kon
 import { TitleBadges } from '../TitleBadges';
 import { MemberTitles, TitleList } from './TitelVerwalten';
 import { OfficeAdmin } from './AemterVerwalten';
+import { SponsorAdmin } from './SponsorenVerwalten';
+import { PageAdmin } from './SeitenVerwalten';
+import { CompanyAdmin, MemberCompanies } from './KompanienVerwalten';
 import { ListAdmin } from './ListenVerwalten';
 import { MailAdmin } from './EmailsVerwalten';
 import { PersonOffices } from './Aemter';
@@ -102,6 +108,9 @@ type Sub =
   | 'befoerderungen'
   | 'titel'
   | 'aemter'
+  | 'kompanien'
+  | 'sponsoren'
+  | 'seiten'
   | 'anwesenheit'
   | 'listen'
   | 'mail';
@@ -210,6 +219,12 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <TitleList onToast={onToast} />
       ) : active === 'aemter' ? (
         <OfficeAdmin path={path.slice(1)} onToast={onToast} />
+      ) : active === 'kompanien' ? (
+        <CompanyAdmin onToast={onToast} />
+      ) : active === 'sponsoren' ? (
+        <SponsorAdmin onToast={onToast} />
+      ) : active === 'seiten' ? (
+        <PageAdmin onToast={onToast} />
       ) : active === 'anwesenheit' ? (
         <Anwesenheit key={arg ?? ''} id={arg && /^\d+$/.test(arg) ? Number(arg) : undefined} onToast={onToast} />
       ) : active === 'listen' ? (
@@ -519,6 +534,101 @@ function roleLine(m: MemberDetail): string {
 }
 
 /**
+ * Person aus den Listen im Speicher (Mitglieder mit und ohne Gäste, Ehemalige; zuerst die Liste, aus der geblättert
+ * wird): Kopf ihrer Seite, solange ihre eigenen Daten noch laden.
+ */
+function previewFromLists(id: number, former: boolean): MemberPreview | null {
+  const members = [cacheKey('members', [false]), cacheKey('members', [true])];
+  const formers = [cacheKey('former-members', [])];
+  const keys = former ? [...formers, ...members] : [...members, ...formers];
+  return memberPreview(
+    keys.map((k) => (dataCache.has(k) ? dataCache.get<Array<MemberSummary | FormerMember>>(k) : null)),
+    id,
+  );
+}
+
+/** Rollenzeile aus der Liste (ohne den Hinweis auf Ausnahmen bei den Rechten, den kennt erst die Seite). */
+function previewRoleLine(p: MemberPreview): string {
+  if (p.previous_level) return `Ehemalig (zuvor ${levelLabel(p.previous_level)})`;
+  if (!p.level) return '';
+  return p.extra_roles.length > 0
+    ? `Rollen: ${roleLabels({ level: p.level, extra_roles: p.extra_roles })}`
+    : `Rolle: ${levelLabel(p.level)}`;
+}
+
+/**
+ * Kopf der Seite aus der Liste (Abzeichen, Foto, Rolle, Kacheln), solange die eigenen Daten laden. Die Kacheln öffnen
+ * mit `onOpen` schon ihr Fenster (es erscheint, sobald die Daten da sind); ohne (Vorschau beim Wischen) nichts. Ohne Abzeichen und Foto in der Liste der runde Platzhalter wie im Gerüst, denn die Seite
+ * kann dort noch „Kein Dienstgrad“ oder das Feld fürs Foto zeigen.
+ */
+function MemberPreviewHead({ p, onOpen }: { p: MemberPreview; onOpen?: (sheet: 'punkte' | 'strafen') => void }) {
+  const open = (sheet: 'punkte' | 'strafen') => () => onOpen?.(sheet);
+  const role = previewRoleLine(p);
+  return (
+    <>
+      <div className="member-rank-line">
+        {p.rank_title && (
+          <span className="member-rank-badge">
+            <RankBadge url={p.rank_badge_url} title={p.rank_title} size="large" />
+            <span>{p.rank_title}</span>
+          </span>
+        )}
+        {p.photo_url ? (
+          <span className="member-photo-open">
+            <MemberAvatar url={p.photo_url} name={p.name} size="large" />
+          </span>
+        ) : (
+          !p.rank_title && <span className="skeleton-box" style={{ width: 96, height: 96, borderRadius: '50%' }} />
+        )}
+      </div>
+      <p className="muted small member-level">{role || <span className="skeleton-text" style={{ width: '16ch' }} />}</p>
+      {(canPoints() || canPenalties()) && (
+        <div className="stats member-stats">
+          {canPoints() && (
+            <StatCard label={sec.points} value={(p.points ?? 0).toLocaleString('de-DE')} tone="good" onClick={open('punkte')} />
+          )}
+          {canPenalties() && (
+            <StatCard
+              label="Offen"
+              value={formatEuro(p.open_cents ?? 0)}
+              tone={(p.open_cents ?? 0) > 0 ? 'warn' : 'good'}
+              onClick={open('strafen')}
+            />
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Fotos und Abzeichen der vorgeladenen Personen (siehe MemberDetailView). */
+const personImages = createImageQueue();
+
+/** Personen je Anfrage beim Vorladen (der Server nimmt bis zu 25). */
+const MEMBER_BATCH = 12;
+
+/**
+ * Daten von `id` laden und die übrigen aus `batch` gleich mit (eine Anfrage, GET /members/details): Diese legt die
+ * Funktion selbst im Speicher ab (wie prefetch: nur, wenn seitdem nichts geändert wurde und noch nichts da ist). Klappt
+ * der Sammelabruf nicht (z. B. kurz nach einem Update noch ein älterer Server), still nur diese eine Person.
+ */
+async function loadMemberBatch(id: number, batch: number[]): Promise<MemberDetail> {
+  if (batch.length < 2) return api.member(id);
+  const since = dataCache.generation();
+  let list: MemberDetail[];
+  try {
+    list = await inBackground(() => api.memberDetails(batch));
+  } catch {
+    return api.member(id);
+  }
+  for (const d of list) {
+    const key = cacheKey('member', [d.id]);
+    if (d.id !== id && !dataCache.has(key)) dataCache.set(key, d, since);
+  }
+  return list.find((d) => d.id === id) ?? api.member(id);
+}
+
+/**
  * Nachbar beim Wischen: oberer Teil seiner Seite (Navigation, Name, Abzeichen, Foto, Rolle, Kacheln) aus den
  * vorgeladenen Daten, so wie er gleich erscheint. Nur zum Ansehen: inert und aria-hidden, und eigene Klasse für den
  * Namen, damit ihn niemand mit der echten Seite verwechselt. Sind die Daten noch nicht da, der Name aus der Liste und
@@ -541,6 +651,7 @@ function MemberPeek({
 }) {
   const key = cacheKey('member', [id]);
   const m = dataCache.has(key) ? dataCache.get<MemberDetail>(key) : null;
+  const preview = m ? null : previewFromLists(id, former);
   const rankOn = !!m && rankEditable(m);
   const avatar = !!m && (!!m.photo_url || !!m.photo_editable);
   const none = () => {};
@@ -604,6 +715,11 @@ function MemberPeek({
             </div>
           )}
         </>
+      ) : preview ? (
+        <>
+          <h2 className="member-peek-name member-name-centered with-rank">{preview.name}</h2>
+          <MemberPreviewHead p={preview} />
+        </>
       ) : (
         <>
           <h2 className="member-peek-name member-name-centered with-rank">
@@ -617,8 +733,8 @@ function MemberPeek({
 }
 
 /** Fenster auf der Seite eines Mitglieds; stehen in der Adresse (verwaltung/mitglied/<id>/<fenster>), damit „Zurück“ sie schließt. */
-type MemberSheet = 'punkte' | 'strafen' | 'dienstgrad' | 'titel' | 'geburtstag' | 'eintritt' | 'austritt';
-const MEMBER_SHEETS: MemberSheet[] = ['punkte', 'strafen', 'dienstgrad', 'titel', 'geburtstag', 'eintritt', 'austritt'];
+type MemberSheet = 'punkte' | 'strafen' | 'dienstgrad' | 'titel' | 'kompanien' | 'geburtstag' | 'eintritt' | 'austritt';
+const MEMBER_SHEETS: MemberSheet[] = ['punkte', 'strafen', 'dienstgrad', 'titel', 'kompanien', 'geburtstag', 'eintritt', 'austritt'];
 /** Fenster in der App geöffnet (eigener Verlaufseintrag): Schließen geht dann zurück, sonst (Link) ersetzt es die Adresse. */
 let sheetOpenedHere = false;
 
@@ -666,20 +782,31 @@ function MemberDetailView({
     onCommit: (step) => show(step === 1 ? next : prev),
   });
   // Alle Personen der Reihenfolge vorladen (Daten, Foto, Abzeichen), nacheinander von hier nach außen: Nach dem Wechsel
-  // steht ihre Seite sofort, ohne Gerüst. Erst nach den eigenen Daten und erneut nach jedem Laden, denn eigene
+  // steht ihre Seite sofort, ohne Gerüst. Fotos und Abzeichen laden in einer eigenen Schlange (personImages), damit die
+  // Daten der weiter entfernten Personen nicht auf sie warten. Erst nach den eigenen Daten und erneut nach jedem Laden, denn eigene
   // Änderungen leeren den Speicher. Steht ein direkter Nachbar bereit, neu zeichnen (seine Vorschau beim Wischen).
   const [, setPrefetched] = useState(0);
+  const queue = useMemo(() => prefetchOrder(ids, index, true), [ids, index]);
   usePrefetchChain(
     ids,
     index,
     async (n: number) => {
       const src = sources.member(n);
-      await prefetch(src.key, src.deps, src.load);
       const key = cacheKey(src.key, src.deps);
+      // Nicht einzeln: n mit den nächsten noch fehlenden Personen der Reihenfolge in einer Anfrage.
+      const batch = dataCache.has(key) ? [n] : batchFrom(queue, n, (o) => dataCache.has(cacheKey('member', [o])), MEMBER_BATCH);
+      await prefetch(src.key, src.deps, () => loadMemberBatch(n, batch));
       if (!dataCache.has(key)) return;
       const other = dataCache.get<MemberDetail>(key);
-      if (n === prev || n === next) setPrefetched((t) => t + 1);
-      await Promise.all([preloadAvatar(other.photo_url), preloadBadge(other.rank_badge_url)]);
+      const near = n === prev || n === next;
+      if (near) setPrefetched((t) => t + 1);
+      // Bilder neben den Daten her: Die Kette wartet nur auf die der direkten Nachbarn (ihre Vorschau beim Wischen).
+      const images = personImages.add(
+        `${other.photo_url ?? ''}|${other.rank_badge_url ?? ''}`,
+        () => Promise.all([preloadAvatar(other.photo_url), preloadBadge(other.rank_badge_url)]),
+        near,
+      );
+      if (near) await images;
     },
     data,
     true,
@@ -787,12 +914,21 @@ function MemberDetailView({
   );
 
   if (loading && !data) {
+    // Steht die Person in einer Liste im Speicher, ihr Kopf schon aus der Liste; der Rest der Seite kommt mit den Daten.
+    const preview = previewFromLists(id, base === 'ehemalige');
     return frame(
       base === 'ehemalige',
-      <h2 className="member-name member-name-centered with-rank">
-        <PersonName name={nameOf(id)} />
-      </h2>,
-      <PersonSkeleton />,
+      <h2 className="member-name member-name-centered with-rank">{preview ? preview.name : <PersonName name={nameOf(id)} />}</h2>,
+      preview ? (
+        <>
+          <MemberPreviewHead p={preview} onOpen={openSheet} />
+          <div role="status" data-loading="">
+            <span className="visually-hidden">Lädt …</span>
+          </div>
+        </>
+      ) : (
+        <PersonSkeleton />
+      ),
     );
   }
   if (error) return frame(base === 'ehemalige', null, <ErrorBox message={error} onRetry={reload} />);
@@ -802,6 +938,8 @@ function MemberDetailView({
   const self = m.id === config?.user?.id;
   const rankOn = rankEditable(m);
   const titlesOn = !!m.titles && (m.member || m.titles.length > 0);
+  // Kompanien (Issue #280): kommen nur mit Bereich und manage_companies mit.
+  const companiesOn = !!m.companies && (m.member || m.companies.length > 0);
   // Ämter (Issue #112): Konten in Amtszeiten sieht, wer Ämter pflegt, sonst nur bei öffentlicher Mitgliederliste.
   const officesOn = !!config?.features.offices && (!!config.features.directory || can('manage_offices'));
   const birthdayOn = m.birthday !== undefined && (m.member || m.birthday !== null || canSetBirthdays());
@@ -886,6 +1024,22 @@ function MemberDetailView({
           <span className="member-tile-label">{sec.titles}</span>
           <span className="member-tile-value">
             {(m.titles ?? []).length > 0 ? <TitleBadges titles={m.titles} /> : <span className="muted">Keine</span>}
+          </span>
+          <span className="chevron" aria-hidden="true">
+            ›
+          </span>
+        </button>
+      )}
+
+      {companiesOn && (
+        <button type="button" className="card member-tile member-companies-tile" onClick={() => openSheet('kompanien')}>
+          <span className="member-tile-label">{sec.companies}</span>
+          <span className="member-tile-value">
+            {(m.companies ?? []).length > 0 ? (
+              (m.companies ?? []).map((c) => c.short_name || c.name).join(', ')
+            ) : (
+              <span className="muted">Keine</span>
+            )}
           </span>
           <span className="chevron" aria-hidden="true">
             ›
@@ -1027,6 +1181,18 @@ function MemberDetailView({
         </Sheet>
       )}
 
+      {sheet === 'kompanien' && companiesOn && m.companies && (
+        <Sheet title={sec.companies} onClose={closeSheet}>
+          <MemberCompanies
+            key={`${m.id}:${m.companies.map((c) => c.id).join(',')}`}
+            id={m.id}
+            member={m.member}
+            companies={m.companies}
+            onChanged={reload}
+            onToast={onToast}
+          />
+        </Sheet>
+      )}
       {sheet === 'geburtstag' && birthdayOn && m.birthday !== undefined && (
         <Sheet title="Geburtstag" onClose={closeSheet}>
           <MemberBirthday key={JSON.stringify(m.birthday)} id={m.id} birthday={m.birthday} onChanged={reload} onToast={onToast} />

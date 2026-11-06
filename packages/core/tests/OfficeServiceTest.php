@@ -108,7 +108,7 @@ final class OfficeServiceTest extends TestCase
 
         $res = $this->call('GET', '/offices');
         $this->assertSame(200, $res->status);
-        $this->assertSame([['id' => $club, 'title' => 'Verein'], ['id' => $umbrella, 'title' => 'Dachverband']], $res->data['groups']);
+        $this->assertSame([['id' => $club, 'title' => 'Verein', 'joint_terms' => false], ['id' => $umbrella, 'title' => 'Dachverband', 'joint_terms' => false]], $res->data['groups']);
         $this->assertSame([$chair, $flag, $honor, $ministers, $honorUmbrella, $free], array_column($res->data['offices'], 'id'), 'nach Gruppen, ohne Gruppe zuletzt');
 
         $chairTerms = $this->overviewOffice($chair, null)['terms'];

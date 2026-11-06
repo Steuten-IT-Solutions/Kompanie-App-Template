@@ -10,13 +10,18 @@ use KompanieApp\Core\Infra\RemoteNewsSource;
 
 /**
  * Einstellungen, die Admins in der App pflegen (bei WordPress zusätzlich im WP-Admin):
- * Google-Zugang, Kalender, Galerie und – wo die App keine eigenen Beiträge hat – die Quelle der Neuigkeiten.
+ * Google-Zugang, Kalender, Galerie, – wo die App keine eigenen Beiträge hat – die Quelle der Neuigkeiten und die Links
+ * auf Impressum und Datenschutzerklärung der Kompanie.
  *
  * Geheimnisse (geheime iCal-Adresse, API-Schlüssel, Dienstkonto, Client-Secret, Refresh-Token) werden nie zurückgegeben,
  * nur ob sie gesetzt sind. Zum Ändern schickt man den neuen Wert, zum Löschen einen leeren Text.
  */
 final class SettingsService
 {
+    /** Links auf Impressum und Datenschutzerklärung (z. B. auf der Webseite der Kompanie), in der App für alle sichtbar. */
+    public const IMPRINT_SETTING = 'legal_imprint_url';
+    public const PRIVACY_SETTING = 'legal_privacy_url';
+
     public function __construct(private readonly App $app)
     {
     }
@@ -52,6 +57,11 @@ final class SettingsService
             'gallery' => [
                 'configured' => $a->gallery()->isConfigured(),
                 'root' => $a->gallery()->root(),
+                // Quelle und Ablageort (Issue #285); belegter Platz der hochgeladenen Bilder
+                'source' => $a->gallery()->sourceType(),
+                'store' => $a->gallery()->store(),
+                'media_bytes' => $a->gallery()->mediaBytes(),
+                'downloads' => $a->gallery()->downloadsEnabled(),
                 // Wie google.* (für ältere Fassungen der App)
                 'service_account_email' => $drive->clientEmail(),
                 'oauth_connected' => $drive->oauth() !== null,
@@ -60,11 +70,26 @@ final class SettingsService
                 'status' => array_merge($a->gallery()->status(), ['pending' => $a->gallery()->countPending(), 'failed' => $a->gallery()->countFailed()]),
             ],
             'news' => null,
+            'legal' => $this->legal(),
         ];
         if ($a->news instanceof RemoteNewsSource) {
             $out['news'] = ['source' => $a->news->type(), 'url' => $a->news->url()];
         }
         return $out;
+    }
+
+    /**
+     * Links auf Impressum und Datenschutzerklärung; leer, solange keiner eingetragen ist.
+     *
+     * @return array{imprint_url: string, privacy_url: string}
+     */
+    public function legal(): array
+    {
+        $s = $this->app->settings;
+        return [
+            'imprint_url' => trim((string) $s->get(self::IMPRINT_SETTING, '')),
+            'privacy_url' => trim((string) $s->get(self::PRIVACY_SETTING, '')),
+        ];
     }
 
     /**
@@ -134,6 +159,23 @@ final class SettingsService
                 throw ApiError::invalid('Der Galerie-Ordner wurde nicht erkannt. Bitte den Link zum Ordner aus Google Drive einfügen.');
             }
         }
+        $gallerySource = null;
+        if (array_key_exists('gallery_source', $in)) {
+            if (!in_array($in['gallery_source'], GalleryService::SOURCES, true)) {
+                throw ApiError::invalid('Unbekannte Quelle für die Galerie.');
+            }
+            $gallerySource = (string) $in['gallery_source'];
+        }
+        if (array_key_exists('gallery_store', $in) && !in_array($in['gallery_store'], GalleryService::STORES, true)) {
+            throw ApiError::invalid('Unbekannter Ablageort für hochgeladene Bilder.');
+        }
+        $downloads = null;
+        if (array_key_exists('gallery_downloads', $in)) {
+            if (!in_array($in['gallery_downloads'], ['0', '1'], true)) {
+                throw ApiError::invalid('Ungültiger Wert für gallery_downloads (0 oder 1).');
+            }
+            $downloads = $in['gallery_downloads'] === '1';
+        }
         if ($news && array_key_exists('news_source', $in)) {
             if (!in_array($in['news_source'], RemoteNewsSource::SOURCES, true)) {
                 throw ApiError::invalid('Unbekannte Quelle für Neuigkeiten.');
@@ -142,6 +184,12 @@ final class SettingsService
         }
         if ($news && array_key_exists('news_url', $in)) {
             $set['news_url'] = Input::url($in['news_url'], 'Bitte die Adresse der Webseite bzw. des Feeds angeben (beginnt mit https://).');
+        }
+        if (array_key_exists('legal_imprint_url', $in)) {
+            $set[self::IMPRINT_SETTING] = Input::url($in['legal_imprint_url'], 'Bitte die Adresse des Impressums angeben (beginnt mit https://).');
+        }
+        if (array_key_exists('legal_privacy_url', $in)) {
+            $set[self::PRIVACY_SETTING] = Input::url($in['legal_privacy_url'], 'Bitte die Adresse der Datenschutzerklärung angeben (beginnt mit https://).');
         }
         if (($set['news_source'] ?? 'none') !== 'none' && ($set['news_url'] ?? ($news ? $a->news->url() : '')) === '') {
             throw ApiError::invalid('Bitte die Adresse der Webseite bzw. des Feeds angeben.');
@@ -164,6 +212,17 @@ final class SettingsService
             // Trennen wie POST /admin/google/disconnect: bei Google widerrufen, der Client bleibt gespeichert.
             $a->drive()->disconnect();
             $a->settings->delete(GoogleConnect::RESULT_SETTING);
+        }
+        if ($gallerySource !== null && $gallerySource !== $a->gallery()->sourceType()) {
+            $a->settings->set(GalleryService::SOURCE_SETTING, $gallerySource);
+            // Nur noch der eigene Server: Alben und Bilder aus Drive verschwinden, hochgeladene bleiben. Zurück zu Drive
+            // holt der nächste Abgleich sie wieder.
+            if ($gallerySource === GalleryService::SOURCE_SERVER) {
+                $a->gallery()->reset();
+            }
+        }
+        if ($downloads !== null) {
+            $a->gallery()->setDownloads($downloads);
         }
         if ($root !== null) {
             $before = $a->gallery()->root();
@@ -216,7 +275,8 @@ final class SettingsService
             @set_time_limit(120);
         }
         try {
-            $stats = $onlyProcess ? $g->status() : $g->sync();
+            // Ohne Drive (eigener Server) nur aufbereiten
+            $stats = $onlyProcess || !$g->driveConfigured() ? $g->status() : $g->sync();
         } catch (\RuntimeException $e) {
             throw ApiError::upstream($e->getMessage());
         }
