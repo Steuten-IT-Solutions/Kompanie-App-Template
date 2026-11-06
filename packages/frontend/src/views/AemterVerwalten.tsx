@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { createContext, useContext, useMemo, useState, type FormEvent } from 'react';
 import {
   api,
   can,
@@ -17,6 +17,7 @@ import {
 import { memberListAllowed } from '../adminNav';
 import { useDragSort, useSaveQueue } from '../dragSort';
 import brand from '../generated/brand';
+import { MemberAvatar } from '../memberPhoto';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { termYears } from './Aemter';
@@ -66,12 +67,40 @@ export function OfficeAdmin({ path, onToast }: { path: string[]; onToast: Toast 
   if (loading && !data) return <Loading />;
   if (error && !data) return <ErrorBox message={error} onRetry={reload} />;
   const overview = data!;
-  if (/^\d+$/.test(path[0] ?? '')) {
-    const office = overview.offices.find((o) => o.id === Number(path[0]));
-    if (!office) return <Empty>Dieses Amt gibt es nicht mehr.</Empty>;
-    return <OfficeEditor key={office.id} office={office} groups={overview.groups} onToast={onToast} reload={reload} />;
+  return (
+    <KnownPhotos.Provider value={knownPhotos(overview.offices)}>
+      {/^\d+$/.test(path[0] ?? '') ? (
+        <OfficeEditorFor overview={overview} id={Number(path[0])} onToast={onToast} reload={reload} />
+      ) : (
+        <OfficeOverview overview={overview} onToast={onToast} reload={reload} setData={setData} />
+      )}
+    </KnownPhotos.Provider>
+  );
+}
+
+function OfficeEditorFor({ overview, id, onToast, reload }: { overview: OfficesOverview; id: number; onToast: Toast; reload: () => void }) {
+  const office = overview.offices.find((o) => o.id === id);
+  if (!office) return <Empty>Dieses Amt gibt es nicht mehr.</Empty>;
+  return <OfficeEditor key={office.id} office={office} groups={overview.groups} onToast={onToast} reload={reload} />;
+}
+
+type HolderPhoto = { uid: string; url: string };
+
+/** Fotos freier Namen aus allen Amtszeiten (Issue #283): Name (klein) => zuletzt eingetragenes Foto, zur Übernahme. */
+const KnownPhotos = createContext<Map<string, HolderPhoto>>(new Map());
+
+function knownPhotos(offices: Office[]): Map<string, HolderPhoto> {
+  const out = new Map<string, HolderPhoto>();
+  for (const o of offices) {
+    for (const t of o.terms) {
+      for (const h of t.holders) {
+        const key = h.name.trim().toLowerCase();
+        // Amtszeiten kommen neueste zuerst: die erste Fundstelle gewinnt
+        if (!h.user_id && h.image_uid && h.photo_url && !out.has(key)) out.set(key, { uid: h.image_uid, url: h.photo_url });
+      }
+    }
   }
-  return <OfficeOverview overview={overview} onToast={onToast} reload={reload} setData={setData} />;
+  return out;
 }
 
 function OfficeOverview({
@@ -588,7 +617,7 @@ const NO_PEOPLE: People = { members: [], former: [] };
 /** Person in der Amtszeit: ohne Profil (freier Name), Mitglied oder Ehemaliger (Konto). */
 type HolderKind = 'name' | 'member' | 'former';
 /** kind fehlt bei vorhandenen Einträgen, bis man sie ändert: ergibt sich dann aus den Listen (siehe kindOf). */
-type HolderRow = { kind?: HolderKind; user: string; name: string };
+type HolderRow = { kind?: HolderKind; user: string; name: string; image?: HolderPhoto | null };
 
 /**
  * Gemeinsame Amtszeiten einer Gruppe (Issue #282): Liste mit Bearbeiten und Löschen, Formular für eine neue. Die Jahre
@@ -805,7 +834,12 @@ function JointTermForm({
 
 /** Zeilen der Personen aus einer gespeicherten Amtszeit. */
 function holderRows(holders: OfficeHolder[] | undefined, empty: boolean): HolderRow[] {
-  const rows = holders?.map((h) => ({ user: h.user_id ? String(h.user_id) : '', name: h.name })) ?? [];
+  const rows =
+    holders?.map((h) => ({
+      user: h.user_id ? String(h.user_id) : '',
+      name: h.name,
+      image: !h.user_id && h.image_uid && h.photo_url ? { uid: h.image_uid, url: h.photo_url } : null,
+    })) ?? [];
   return rows.length > 0 || !empty ? rows : [{ user: '', name: '' }];
 }
 
@@ -813,7 +847,9 @@ function holderRows(holders: OfficeHolder[] | undefined, empty: boolean): Holder
 function holderInput(holders: HolderRow[], people: People): OfficeTermInput['holders'] {
   const formerIds = new Set(people.former.map((p) => p.id));
   const kindOf = (h: HolderRow): HolderKind => h.kind ?? (!h.user ? 'name' : formerIds.has(Number(h.user)) ? 'former' : 'member');
-  return holders.map((h) => (kindOf(h) !== 'name' && h.user ? { user_id: Number(h.user) } : { name: h.name.trim() }));
+  return holders.map((h) =>
+    kindOf(h) !== 'name' && h.user ? { user_id: Number(h.user) } : { name: h.name.trim(), image_uid: h.image?.uid ?? null },
+  );
 }
 
 /**
@@ -869,10 +905,13 @@ function HolderFields({
               </label>
             )}
             {kind === 'name' ? (
-              <label className="field">
-                <span>Name</span>
-                <input type="text" maxLength={100} value={h.name} onChange={(e) => set(i, { name: e.target.value })} required />
-              </label>
+              <>
+                <label className="field">
+                  <span>Name</span>
+                  <input type="text" maxLength={100} value={h.name} onChange={(e) => set(i, { name: e.target.value })} required />
+                </label>
+                <HolderPhotoField row={h} onChange={(image) => set(i, { image })} />
+              </>
             ) : (
               <label className="field">
                 <span>{kind === 'former' ? 'Ehemaliger' : 'Mitglied'}</span>
@@ -905,6 +944,63 @@ function HolderFields({
         </button>
       )}
     </fieldset>
+  );
+}
+
+/**
+ * Foto eines freien Namens (Issue #283): hochladen, entfernen oder das Foto aus einer früheren Amtszeit mit demselben
+ * Namen übernehmen. Öffentlich wie die Ämter.
+ */
+function HolderPhotoField({ row, onChange }: { row: HolderRow; onChange: (image: HolderPhoto | null) => void }) {
+  const known = useContext(KnownPhotos);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const suggestion = useMemo(() => known.get(row.name.trim().toLowerCase()) ?? null, [known, row.name]);
+  const label = row.name.trim() || 'Person';
+
+  async function upload(file: File | null) {
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const img = await api.uploadRichImage(file);
+      onChange({ uid: img.uid, url: img.url });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="office-holder-photo">
+      {row.image && <MemberAvatar url={row.image.url} name={label} />}
+      <label className="btn btn-small btn-secondary">
+        {uploading ? 'Lädt …' : row.image ? 'Foto ersetzen' : 'Foto'}
+        <input
+          type="file"
+          accept=".jpg,.jpeg,.png,.webp"
+          hidden
+          aria-label={`Foto von ${label}`}
+          disabled={uploading}
+          onChange={(e) => {
+            void upload(e.target.files?.[0] ?? null);
+            e.target.value = '';
+          }}
+        />
+      </label>
+      {row.image && (
+        <button type="button" className="btn btn-small btn-secondary" onClick={() => onChange(null)}>
+          Foto entfernen
+        </button>
+      )}
+      {!row.image && suggestion && (
+        <button type="button" className="btn btn-small btn-secondary" onClick={() => onChange(suggestion)}>
+          Foto von früher übernehmen
+        </button>
+      )}
+      <FormError error={error} />
+    </div>
   );
 }
 

@@ -1582,6 +1582,56 @@ test('Ämter: gemeinsame Amtszeiten einer Gruppe mit Gruppenbild, öffentlich al
   await expect(page.locator('.toast')).toHaveText('Gelöscht');
 });
 
+test('Ämter: Foto für eine Person ohne Profil, öffentlich im Zeitstrahl, Übernahme in eine spätere Amtszeit (Issue #283)', async ({
+  page,
+}) => {
+  const n = Date.now() % 1000000;
+  const office = `Hofdamen ${n}`;
+  const name = `Erika ${n}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Ämter');
+  const newOffice = page.locator('form', { hasText: 'Neues Amt' });
+  await newOffice.getByLabel('Bezeichnung').fill(office);
+  await newOffice.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amt angelegt');
+  await page.getByRole('button', { name: office, exact: true }).click();
+
+  await page.getByRole('button', { name: 'Amtszeit eintragen' }).click();
+  let form = page.locator('form', { hasText: 'Neue Amtszeit' });
+  await form.getByLabel('Von (Jahr)', { exact: true }).fill('2010');
+  await form.getByLabel('Bis (leer: bis heute)').fill('2012');
+  await form.getByLabel('Name', { exact: true }).fill(name);
+  await expect(form.getByRole('button', { name: 'Foto von früher übernehmen' })).toHaveCount(0);
+  await form.getByLabel(`Foto von ${name}`).setInputFiles(PNG);
+  await expect(form.locator('.office-holder-photo img')).toBeVisible();
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amtszeit eingetragen');
+
+  // Spätere Amtszeit mit demselben Namen: Foto von früher übernehmen
+  await page.getByRole('button', { name: 'Amtszeit eintragen' }).click();
+  form = page.locator('form', { hasText: 'Neue Amtszeit' });
+  await form.getByLabel('Von (Jahr)', { exact: true }).fill('2020');
+  await form.getByLabel('Name', { exact: true }).fill(name.toUpperCase());
+  await form.getByRole('button', { name: 'Foto von früher übernehmen' }).click();
+  await expect(form.locator('.office-holder-photo img')).toBeVisible();
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amtszeit eingetragen');
+
+  // Zeitstrahl: das Foto bei beiden Amtszeiten (ohne Anmeldung prüft OfficeHolderPhotoTest)
+  await page.goto('/app/#/mitglieder/aemter');
+  const card = page.locator('.office-card', { hasText: office });
+  await card.locator('.office-head').click();
+  const photos = card.locator('.spotlight-avatar img, .holder-chip .member-avatar img');
+  await expect(photos).toHaveCount(2);
+  expect(await photos.first().evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
+
+  await page.goto('/app/#/verwaltung/aemter');
+  await page.getByRole('button', { name: office, exact: true }).click();
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Amt löschen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
+});
+
 test('Ehemalig eintragen: Vorschau der endenden Ämter, danach enden sie mit dem Austrittsjahr (Issue #181)', async ({ page }) => {
   const id = Date.now() % 1000000;
   const flag = `Fahne ${id}`;

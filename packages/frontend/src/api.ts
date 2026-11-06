@@ -1333,7 +1333,10 @@ export interface OfficeGroupTermInput {
 export interface OfficeHolder {
   name: string;
   user_id?: number | null;
+  /** Foto des Kontos bzw. bei freien Namen das eigene Foto (Issue #283) */
   photo_url?: string | null;
+  /** Nur für die Pflege: Kennung des Fotos eines freien Namens */
+  image_uid?: string | null;
 }
 
 export type OfficeTermKind = 'period' | 'point';
@@ -1382,7 +1385,8 @@ export interface OfficeTermInput {
   end_year: number | null;
   note: string;
   honor: boolean;
-  holders: ({ user_id: number } | { name: string })[];
+  /** Konto oder freier Name, dieser mit optionalem Foto (Kennung aus POST /rich-images) */
+  holders: ({ user_id: number } | { name: string; image_uid?: string | null })[];
 }
 
 export interface OfficeImportRow {
