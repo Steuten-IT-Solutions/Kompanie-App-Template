@@ -9,6 +9,10 @@ use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Http\Response;
 use KompanieApp\Core\Storage\Backup;
+use KompanieApp\Core\Storage\Sql\Schema;
+use KompanieApp\Core\Storage\Sql\Migrations;
+use KompanieApp\Core\Storage\Sql\Migrator;
+use KompanieApp\Core\Tests\Support\MemorySettings;
 use KompanieApp\Core\Tests\Support\FakeUsers;
 use KompanieApp\Core\Tests\Support\FixedClock;
 use KompanieApp\Core\Tests\Support\TestApp;
@@ -214,5 +218,49 @@ final class OfficeGroupTermTest extends TestCase
         $overview = $this->ok('GET', '/offices');
         $this->assertSame([], $overview['group_terms']);
         $this->assertNull(array_column($overview['offices'], null, 'id')[$this->queen]['terms'][0]['group_term_id'], 'Amtszeit bleibt, ohne Bündelung');
+    }
+
+    /** Einzahl der Gruppe („Königshaus“ zu „Königshäuser“): anlegen, ändern, leeren, Länge, in der Übersicht. */
+    public function testGroupSingular(): void
+    {
+        $this->assertSame('', $this->ok('GET', '/offices')['groups'][0]['singular'], 'ohne Angabe leer');
+
+        $houses = $this->ok('POST', '/office-groups', ['title' => 'Königshäuser', 'singular' => ' Königshaus ']);
+        $this->assertSame(['title' => 'Königshäuser', 'singular' => 'Königshaus'], ['title' => $houses['title'], 'singular' => $houses['singular']]);
+
+        $renamed = $this->ok('PATCH', "/office-groups/{$this->group}", ['title' => 'Vorstände', 'singular' => 'Vorstand']);
+        $this->assertSame(['Vorstände', 'Vorstand', false], [$renamed['title'], $renamed['singular'], $renamed['joint_terms']]);
+        $this->assertSame('Vorstand', $this->ok('PATCH', "/office-groups/{$this->group}", ['joint_terms' => true])['singular'], 'fehlende Felder bleiben');
+        $this->assertSame('', $this->ok('PATCH', "/office-groups/{$this->group}", ['singular' => ''])['singular'], 'leeren');
+        $this->assertSame(400, $this->call('PATCH', "/office-groups/{$this->group}", ['singular' => str_repeat('x', 61)])->status);
+
+        $groups = array_column($this->ok('GET', '/offices')['groups'], 'singular', 'title');
+        $this->assertSame(['Vorstände' => '', 'Königshäuser' => 'Königshaus'], $groups);
+
+        // Wie früher: nur der Titel
+        $this->assertSame('', $this->app->offices()->createGroup('Ehrungen')['singular']);
+    }
+
+    /** Update (SQLite und MySQL): Vorhandene Gruppen bekommen eine leere Einzahl. */
+    public function testMigrationAddsEmptyGroupSingular(): void
+    {
+        foreach (['sqlite', getenv('KOMPANIE_TEST_MYSQL') ? 'mysql' : null] as $driver) {
+            if ($driver === null) {
+                continue;
+            }
+            $db = TestApp::connection($driver);
+            try {
+                $settings = new MemorySettings();
+                (new Migrator($db, $settings, array_filter(Migrations::all(), static fn (int $v): bool => $v < 45, ARRAY_FILTER_USE_KEY)))->migrate();
+                $this->assertNotContains('singular', Schema::columns($db, 'office_groups'), $driver);
+                $id = $db->insert('office_groups', ['title' => 'Königshäuser', 'sort' => 10]);
+
+                $app = TestApp::create($db, new FakeUsers(), [], null, null, $settings);
+                $this->assertSame(Migrations::latest(), (new Migrator($db, $settings))->current(), $driver);
+                $this->assertSame('', $app->offices()->repository()->findGroup($id)['singular'] ?? null, $driver);
+            } finally {
+                TestApp::dropTables($db);
+            }
+        }
     }
 }

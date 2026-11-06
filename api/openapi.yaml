@@ -3840,6 +3840,7 @@ paths:
               required: [title]
               properties:
                 title: { type: string, maxLength: 60, description: Eindeutig ohne Groß-/Kleinschreibung }
+                singular: { type: string, maxLength: 60, description: Einzahl (optional) }
       responses:
         '201':
           description: Angelegt
@@ -3940,7 +3941,7 @@ paths:
       - { name: id, in: path, required: true, schema: { type: integer } }
     patch:
       tags: [Ämter]
-      summary: Gruppe umbenennen oder gemeinsame Amtszeiten ein-/ausschalten (fehlende Felder bleiben)
+      summary: Gruppe umbenennen (Bezeichnung, Einzahl) oder gemeinsame Amtszeiten ein-/ausschalten (fehlende Felder bleiben)
       description: Beim Einschalten von joint_terms werden vorhandene Amtszeiten der Ämter mit denselben Jahren (ohne Ehrungen) zu gemeinsamen Amtszeiten gebündelt. Ausschalten behält alle Daten.
       x-capability: manage_offices
       requestBody:
@@ -3951,6 +3952,7 @@ paths:
               type: object
               properties:
                 title: { type: string, maxLength: 60 }
+                singular: { type: string, maxLength: 60, description: 'Einzahl; leer: keine eigene' }
                 joint_terms: { type: boolean }
       responses:
         '200':
@@ -8290,10 +8292,12 @@ components:
 
     OfficeGroup:
       type: object
-      required: [id, title, joint_terms]
+      required: [id, title, singular, joint_terms]
       properties:
         id: { type: integer }
-        title: { type: string, maxLength: 60 }
+        title: { type: string, maxLength: 60, description: 'Bezeichnung, Überschrift der Gruppe (meist Mehrzahl, „Königshäuser“)' }
+        singular:
+          { type: string, maxLength: 60, description: 'Eigene Einzahl für eine einzelne gemeinsame Amtszeit („Königshaus“); leer ohne (dann title)' }
         joint_terms: { type: boolean, description: 'Gemeinsame Amtszeiten mit Gruppenbild (z. B. ein Königshaus)' }
 
     OfficeGroupTerm:

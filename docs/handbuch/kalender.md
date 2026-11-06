@@ -15,7 +15,7 @@ Tippe unten auf **{bereich.events}**. Meist ist das auch die Startseite der App.
 - **Anstehende {bereich.birthdays}** (oben, nur für {rolle.member} und nur, wenn die {kompanie.name} {bereich.birthdays} nutzt): wer heute oder in den nächsten Tagen Geburtstag hat (wie viele Tage vorher, legt ein {rolle.admin} fest; anfangs 7).
 - **Öffentliche Termine verwalten**: nur, wenn du öffentliche Termine pflegen darfst.
 - **Monatsüberschrift**: z. B. „Oktober 2026“; darunter die Termine dieses Monats.
-- **Termin**: links das Datum, rechts Titel, Wochentag und Uhrzeit und, falls angegeben, der Ort. Steht keine Uhrzeit dabei, dauert der Termin den ganzen Tag.
+- **Termin**: links das Datum, rechts Titel, Wochentag und Uhrzeit und, falls angegeben, der Ort. Liegt der Termin nicht im laufenden Jahr, steht auch das Jahr dabei. Steht keine Uhrzeit dabei, dauert der Termin den ganzen Tag.
 
 ## So gehst du vor
 ### Einen Termin ansehen

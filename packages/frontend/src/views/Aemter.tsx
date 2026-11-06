@@ -268,7 +268,16 @@ function OfficeCard({ office, open, onToggle }: { office: Office; open: boolean;
  * Gruppe mit gemeinsamen Amtszeiten (Issue #282): je Amtszeit eine Karte mit Gruppenbild und allen Personen mit ihren
  * Ämtern, die laufende oben als „aktuell“.
  */
-export function JointTerms({ terms, offices, group }: { terms: OfficeGroupTerm[]; offices: Office[]; group: string }) {
+export function JointTerms({
+  terms,
+  offices,
+  group,
+}: {
+  terms: OfficeGroupTerm[];
+  offices: Office[];
+  /** Einzahl der Gruppe („Königshaus“), sonst ihre Bezeichnung */
+  group: string;
+}) {
   if (terms.length === 0) return null;
   return (
     <ul className="joint-terms">
@@ -516,10 +525,11 @@ export function OfficesView() {
     ...(data?.groups ?? []).map((g) => ({
       key: `g${g.id}`,
       title: g.title,
+      singular: g.singular || g.title,
       offices: offices.filter((o) => o.group_id === g.id),
       joint: g.joint_terms ? (data?.group_terms ?? []).filter((t) => t.group_id === g.id) : null,
     })),
-    { key: 'none', title: '', offices: offices.filter((o) => o.group_id === null), joint: null },
+    { key: 'none', title: '', singular: '', offices: offices.filter((o) => o.group_id === null), joint: null },
   ].filter((s) => s.offices.length > 0);
   const all = offices.every((o) => open.has(o.id));
 
@@ -559,7 +569,7 @@ export function OfficesView() {
         sections.map((s) => (
           <section key={s.key} className="office-group">
             {s.title && <h2 className="section-title">{s.title}</h2>}
-            {s.joint && <JointTerms terms={s.joint} offices={s.offices} group={s.title} />}
+            {s.joint && <JointTerms terms={s.joint} offices={s.offices} group={s.singular} />}
             {/* Mit gemeinsamen Amtszeiten nur noch, was nicht dazugehört (z. B. Ehrungen) je Amt */}
             {(s.joint
               ? s.offices.map((o) => ({ ...o, terms: o.terms.filter((t) => !t.group_term_id) })).filter((o) => o.terms.length > 0)
@@ -575,18 +585,14 @@ export function OfficesView() {
 
 /**
  * Alle Amtszeiten einer Person über alle Ämter, als ein Zeitstrahl (laufende zuerst, dann nach Beginn). Je Karte die
- * Einzahl („Kompaniekönig“) aus dem verknüpften Titel, ohne Verknüpfung die Bezeichnung des Amtes mit seiner Gruppe.
+ * Einzahl des Amts („Kompaniekönig“: eigene Einzahl oder verknüpfter Titel), sonst seine Bezeichnung; ohne Gruppe.
  */
 export function personEntries(data: OfficesOverview | null | undefined, userId: number): TimelineEntry[] {
-  const groups = new Map((data?.groups ?? []).map((g) => [g.id, g.title]));
   const out: TimelineEntry[] = [];
   for (const o of data?.offices ?? []) {
     for (const t of o.terms) {
       if (t.holders.some((h) => h.user_id === userId)) {
-        const group = o.group_id !== null ? groups.get(o.group_id) : undefined;
-        // Der Titel nennt die Gruppe meist schon („Kompaniekönig“); nur die Bezeichnung des Amtes bekommt sie dazu.
-        const office = o.holder_title || (group ? `${o.title} · ${group}` : o.title);
-        out.push({ key: t.id, term: t, office });
+        out.push({ key: t.id, term: t, office: o.holder_title || o.title });
       }
     }
   }

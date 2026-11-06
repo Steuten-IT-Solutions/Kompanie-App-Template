@@ -17,6 +17,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Ämter: Einzahl für Gruppen**: Eine Gruppe der Ämter kann neben ihrer Bezeichnung (z. B. „Königshäuser“) eine
+  Einzahl bekommen (z. B. „Königshaus“). Über einer einzelnen gemeinsamen Amtszeit steht dann „Königshaus 2026–2028“
+  statt „Königshäuser 2026–2028“. Einzutragen in der Verwaltung der Ämter unter *Gruppen → Bearbeiten*; ohne Einzahl
+  bleibt es wie bisher.
 - **Zugang beantragen**: Personen können ihren Zugang zur App jetzt selbst beantragen, ihr müsst nicht mehr jedes
   Konto selbst anlegen. Eingeschaltet wird das unter *Einstellungen → Zugang beantragen* (bis dahin bleibt es aus).
   Die Person füllt ein Formular mit Name, E-Mail-Adresse, Benutzername und Passwort aus; die Anfrage erscheint unter
@@ -27,6 +31,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Unbearbeitete Anfragen löscht die App nach 30 Tagen. Wer Mitglieder anlegen darf, kann sich über neue Anfragen
   benachrichtigen lassen.
 
+### Geändert
+
+- **Ämter einer Person**: Im Zeitstrahl einer Person steht nur noch das Amt (bzw. seine Einzahl), nicht mehr
+  zusätzlich die Gruppe.
+- **Jahreszahl bei Terminen**: Liegt ein Termin nicht im laufenden Jahr, zeigt die App beim Datum jetzt auch das Jahr,
+  z. B. „Fr., 8. Jan. 2027“. Das gilt für die internen und öffentlichen Termine, die Termine bei der Anwesenheit, die
+  Verwaltung der öffentlichen Termine und die anstehenden Geburtstage.
+
 ### Behoben
 
 - **Formatierte Texte im dunklen Design lesbar**: Eingefügter Text (z. B. von eurer Webseite) brachte oft eine feste
@@ -35,6 +47,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   sie auf normal. Gespeichert bleibt der Text unverändert. Links in formatierten Texten sind im dunklen Design jetzt
   ebenfalls gut lesbar.
 - **Kompanien**: *Webseite* und *App der Kompanie* sind jetzt Knöpfe im Stil der App statt blauer Standard-Links.
+- **Zurück-Knopf in Untermenüs oben**: Auf *Sponsoren*, *Kompanien*, eigenen Seiten und auf *Termine*, *News* und
+  *Galerie*, wenn sie in einem Untermenü stehen (z. B. *Intern*), stand *‹ Intern* bzw. *‹ <Untermenü>* unter dem
+  Inhalt. Er steht jetzt wie auf den übrigen Seiten oben.
 
 ## [0.6.0] – 2026-11-06
 

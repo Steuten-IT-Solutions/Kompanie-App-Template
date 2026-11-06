@@ -62,7 +62,7 @@ final class OfficeService
      * Alle Gruppen, Ämter und Amtszeiten für den Zeitstrahl, mit einer festen Zahl von Abfragen.
      * Ämter in der Reihenfolge ihrer Gruppen (ohne Gruppe zuletzt), Amtszeiten: laufende zuerst, dann nach Beginn absteigend.
      *
-     * @return array{groups: list<array{id: int, title: string}>, offices: list<array<string, mixed>>}
+     * @return array{groups: list<array{id: int, title: string, singular: string, joint_terms: bool}>, offices: list<array<string, mixed>>}
      */
     public function overview(?User $viewer): array
     {
@@ -135,20 +135,24 @@ final class OfficeService
 
     // ---- Gruppen ----
 
-    /** @return array{id: int, title: string} */
-    public function createGroup(mixed $title): array
+    /**
+     * @param mixed $in {title, singular?} (oder nur der Titel, wie früher)
+     * @return array{id: int, title: string, singular: string, joint_terms: bool}
+     */
+    public function createGroup(mixed $in): array
     {
+        $in = is_array($in) ? $in : ['title' => $in];
         $repo = $this->repository();
-        $id = $repo->insertGroup($this->validGroupTitle($title, null), $repo->maxGroupSort() + 10);
+        $id = $repo->insertGroup($this->validGroupTitle($in['title'] ?? null, null), $repo->maxGroupSort() + 10, $this->validSingular($in['singular'] ?? ''));
         return $this->group($id);
     }
 
     /**
-     * Umbenennen (title) und gemeinsame Amtszeiten ein- oder ausschalten (joint_terms). Eingeschaltet werden vorhandene
-     * Amtszeiten mit denselben Jahren gebündelt; ausgeschaltet bleibt alles gespeichert.
+     * Umbenennen (title, singular) und gemeinsame Amtszeiten ein- oder ausschalten (joint_terms). Eingeschaltet werden
+     * vorhandene Amtszeiten mit denselben Jahren gebündelt; ausgeschaltet bleibt alles gespeichert.
      *
-     * @param mixed $in {title?, joint_terms?} (oder nur der Titel, wie früher)
-     * @return array{id: int, title: string, joint_terms: bool}
+     * @param mixed $in {title?, singular?, joint_terms?} (oder nur der Titel, wie früher)
+     * @return array{id: int, title: string, singular: string, joint_terms: bool}
      */
     public function updateGroup(int $id, mixed $in): array
     {
@@ -157,6 +161,9 @@ final class OfficeService
         $data = [];
         if (array_key_exists('title', $in)) {
             $data['title'] = $this->validGroupTitle($in['title'], $id);
+        }
+        if (array_key_exists('singular', $in)) {
+            $data['singular'] = $this->validSingular($in['singular']);
         }
         if (array_key_exists('joint_terms', $in)) {
             if (!is_bool($in['joint_terms'])) {
@@ -702,12 +709,15 @@ final class OfficeService
     }
 
     /**
+     * Mit der Einzahl (singular, z. B. „Königshaus“ zu „Königshäuser“) für eine einzelne gemeinsame Amtszeit; leer ohne
+     * eigene (dann die Bezeichnung).
+     *
      * @param Group $g
-     * @return array{id: int, title: string, joint_terms: bool}
+     * @return array{id: int, title: string, singular: string, joint_terms: bool}
      */
     private static function groupOut(array $g): array
     {
-        return ['id' => $g['id'], 'title' => $g['title'], 'joint_terms' => $g['joint_terms']];
+        return ['id' => $g['id'], 'title' => $g['title'], 'singular' => $g['singular'], 'joint_terms' => $g['joint_terms']];
     }
 
     // ---- Ausscheiden (Issue #181) ----
@@ -1328,7 +1338,7 @@ final class OfficeService
         return array_map('intval', $order);
     }
 
-    /** @return array{id: int, title: string, joint_terms: bool} */
+    /** @return array{id: int, title: string, singular: string, joint_terms: bool} */
     private function group(int $id): array
     {
         return self::groupOut($this->repository()->findGroup($id) ?? throw ApiError::notFound('Gruppe nicht gefunden.'));
@@ -1379,7 +1389,7 @@ final class OfficeService
         return $title;
     }
 
-    /** Einzahl des Amts (optional, z. B. „Kapitän“ zu „Kapitäne“). */
+    /** Einzahl eines Amts oder einer Gruppe (optional, z. B. „Kapitän“ zu „Kapitäne“). */
     private function validSingular(mixed $raw): string
     {
         $singular = Text::line(is_string($raw) ? $raw : '', self::TITLE_MAX + 1);

@@ -9,7 +9,7 @@ use KompanieApp\Core\Storage\Sql\Connection;
 /**
  * Ämter (Issue #112): Gruppen, Ämter, Amtszeiten und ihre Inhaber, dazu gemeinsame Amtszeiten einer Gruppe (Issue #282).
  *
- * @phpstan-type Group array{id: int, title: string, sort: int, joint_terms: bool}
+ * @phpstan-type Group array{id: int, title: string, singular: string, sort: int, joint_terms: bool}
  * @phpstan-type GroupTerm array{id: int, group_id: int, kind: string, start_year: int, end_year: int|null, note: string, image_uid: string|null}
  * @phpstan-type Office array{id: int, group_id: int|null, title: string, singular: string, sort: int, title_id: int|null}
  * @phpstan-type Term array{id: int, office_id: int, kind: string, start_year: int, end_year: int|null, note: string, honor: bool, ended_for: int|null, group_term_id: int|null}
@@ -34,12 +34,12 @@ final class OfficeRepository
         return $row === null ? null : self::group($row);
     }
 
-    public function insertGroup(string $title, int $sort): int
+    public function insertGroup(string $title, int $sort, string $singular = ''): int
     {
-        return $this->db->insert('office_groups', ['title' => $title, 'sort' => $sort]);
+        return $this->db->insert('office_groups', ['title' => $title, 'singular' => $singular, 'sort' => $sort]);
     }
 
-    /** @param array{title?: string, sort?: int, joint_terms?: int} $data */
+    /** @param array{title?: string, singular?: string, sort?: int, joint_terms?: int} $data */
     public function updateGroup(int $id, array $data): void
     {
         if ($data !== []) {
@@ -264,7 +264,7 @@ final class OfficeRepository
      */
     private static function group(array $r): array
     {
-        return ['id' => (int) $r['id'], 'title' => (string) $r['title'], 'sort' => (int) $r['sort'], 'joint_terms' => (bool) ($r['joint_terms'] ?? false)];
+        return ['id' => (int) $r['id'], 'title' => (string) $r['title'], 'singular' => (string) ($r['singular'] ?? ''), 'sort' => (int) $r['sort'], 'joint_terms' => (bool) ($r['joint_terms'] ?? false)];
     }
 
     /**

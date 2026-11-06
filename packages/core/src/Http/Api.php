@@ -769,7 +769,7 @@ final class Api
 
             // Ämter (Issue #112): Zeitstrahl öffentlich, Pflege mit manage_offices
             new Route('GET', '/offices', Cap::ViewOffices, fn () => $a->offices()->overview($a->authContext->currentUser()), 'offices', $denyView),
-            new Route('POST', '/office-groups', Cap::ManageOffices, fn (Request $r) => Response::created($a->offices()->createGroup($r->input('title'))), 'offices', $denyRights),
+            new Route('POST', '/office-groups', Cap::ManageOffices, fn (Request $r) => Response::created($a->offices()->createGroup($r->body)), 'offices', $denyRights),
             new Route('PUT', '/office-groups/order', Cap::ManageOffices, fn (Request $r) => $a->offices()->reorderGroups($r->input('ids')), 'offices', $denyRights),
             new Route('PATCH', '/office-groups/{id}', Cap::ManageOffices, fn (Request $r) => $a->offices()->updateGroup($r->id(), $r->body), 'offices', $denyRights),
             // Gemeinsame Amtszeiten einer Gruppe (Issue #282)
