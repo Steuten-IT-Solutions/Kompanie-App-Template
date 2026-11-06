@@ -5797,33 +5797,31 @@ button.spotlight-person:focus-visible {
   white-space: nowrap;
 }
 
-/* Kompanien (Issue #280): aufklappbare Karten mit Logo; Logos auf hellem Grund wie bei den Sponsoren. */
+/* Kompanien (Issue #280): Karten mit Logo, Antippen öffnet die Seite der Kompanie; Logos auf hellem Grund wie bei den
+   Sponsoren. */
 .company-card {
   padding: 0;
 }
-.company-card.inactive {
+.company-card.inactive,
+.company-page.inactive .company-page-head {
   opacity: 0.75;
 }
 .company-summary {
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 100%;
   padding: 12px 14px;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
-  list-style: none;
 }
-.company-summary::-webkit-details-marker {
-  display: none;
-}
-.company-summary::after {
-  content: '›';
+.company-summary .chevron {
   margin-left: auto;
-  color: var(--muted);
-  font-size: 1.3rem;
-  transition: transform 0.15s;
-}
-.company-card details[open] > .company-summary::after {
-  transform: rotate(90deg);
 }
 .company-logo-box,
 .company-admin-logo {
@@ -5865,8 +5863,28 @@ button.spotlight-person:focus-visible {
   gap: 6px;
   flex-wrap: wrap;
 }
-.company-body {
-  padding: 0 14px 14px;
+/* Seite einer Kompanie: großes Logo neben Name und Angaben */
+.company-page-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 4px 0 12px;
+}
+.company-page-logo {
+  flex-basis: 88px;
+  height: 88px;
+  padding: 4px;
+}
+.company-page-head .member-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.company-page-head .row-sub {
+  margin: 4px 0 0;
 }
 .company-offices {
   margin: 8px 0;
@@ -5892,12 +5910,7 @@ button.spotlight-person:focus-visible {
   margin: 12px 0 0;
 }
 .company-members {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
+  margin-top: 8px;
 }
 .company-member-options {
   max-height: 50vh;

@@ -4246,7 +4246,7 @@ test('Punktekatalog und Dienstgrade per Ziehen am Griff umsortieren, Schwellen w
   }
 });
 
-test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast sieht Karte mit Beschreibung und Mitgliedern, Filter, löschen', async ({
+test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast öffnet die Seite mit Beschreibung und Mitgliedern, Filter, löschen', async ({
   page,
 }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
@@ -4288,12 +4288,20 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast sieht Karte mit B
     await page.locator('.tabbar').getByRole('button', { name: 'Kompanien' }).click();
     const card = page.locator('.company-card', { hasText: 'Testkompanie' });
     await expect(card).toContainText('TK · gegründet 1905 · 1 Mitglieder');
-    await card.locator('summary').click();
-    await expect(card).toContainText('Gegründet zum Schützenfest.');
-    await expect(card.getByRole('link', { name: 'Webseite' })).toHaveAttribute('href', 'https://kompanie.example/');
-    await expect(card.getByRole('link', { name: 'Webseite' })).toHaveClass(/\bbtn\b/);
+    // Antippen öffnet die eigene Seite der Kompanie (statt Aufklappen), zurück zur Liste
+    await card.getByRole('button', { name: /Testkompanie/ }).click();
+    await expect(page).toHaveURL(/#\/kompanien\/\d+$/);
+    const detail = page.locator('.company-page');
+    await expect(detail.getByRole('heading', { name: 'Testkompanie' })).toBeVisible();
+    await expect(detail).toContainText('TK · gegründet 1905 · 1 Mitglieder');
+    await expect(detail).toContainText('Gegründet zum Schützenfest.');
+    await expect(detail.getByRole('link', { name: 'Webseite' })).toHaveAttribute('href', 'https://kompanie.example/');
+    await expect(detail.getByRole('link', { name: 'Webseite' })).toHaveClass(/\bbtn\b/);
+    await detail.getByRole('button', { name: '‹ Alle Kompanien' }).click();
+    await expect(page).toHaveURL(/#\/kompanien$/);
+    await card.getByRole('button', { name: /Testkompanie/ }).click();
     // Eingefügte Farbe: hell lesbar und angezeigt, dunkel zu wenig Kontrast und entfernt; großer Zeilenabstand nie
-    const pasted = card.locator('.rich-text span', { hasText: 'Seit 1905 dabei.' });
+    const pasted = detail.locator('.rich-text span', { hasText: 'Seit 1905 dabei.' });
     const setTheme = (theme: 'light' | 'dark') =>
       page.evaluate((t) => {
         localStorage.setItem('kompanie-theme', t);
@@ -4308,8 +4316,11 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast sieht Karte mit B
     await expect(pasted).not.toHaveAttribute('style', /line-height/);
     await setTheme('light');
     await shot(page, 'kompanien');
-    await card.getByRole('button', { name: 'Mitglied1' }).click();
+    await detail.getByRole('button', { name: 'Mitglied1' }).click();
     await expect(page.locator('.member-page-companies')).toHaveText('Testkompanie');
+    // Von der Seite der Person zurück zur Seite der Kompanie
+    await page.locator('.member-page-companies').getByRole('button', { name: 'Testkompanie' }).click();
+    await expect(page.locator('.company-page').getByRole('heading', { name: 'Testkompanie' })).toBeVisible();
     // Filter in der Mitgliederliste
     await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
     await page.locator('.member-company-filter select').selectOption({ label: 'Testkompanie' });
