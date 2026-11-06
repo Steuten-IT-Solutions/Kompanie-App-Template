@@ -59,6 +59,7 @@ import { AccountPanel, BulkNewMembers, Credentials, NewAccountRole } from './Kon
 import { TitleBadges } from '../TitleBadges';
 import { MemberTitles, TitleList } from './TitelVerwalten';
 import { OfficeAdmin } from './AemterVerwalten';
+import { SponsorAdmin } from './SponsorenVerwalten';
 import { ListAdmin } from './ListenVerwalten';
 import { MailAdmin } from './EmailsVerwalten';
 import { PersonOffices } from './Aemter';
@@ -105,6 +106,7 @@ type Sub =
   | 'befoerderungen'
   | 'titel'
   | 'aemter'
+  | 'sponsoren'
   | 'anwesenheit'
   | 'listen'
   | 'mail';
@@ -213,6 +215,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <TitleList onToast={onToast} />
       ) : active === 'aemter' ? (
         <OfficeAdmin path={path.slice(1)} onToast={onToast} />
+      ) : active === 'sponsoren' ? (
+        <SponsorAdmin onToast={onToast} />
       ) : active === 'anwesenheit' ? (
         <Anwesenheit key={arg ?? ''} id={arg && /^\d+$/.test(arg) ? Number(arg) : undefined} onToast={onToast} />
       ) : active === 'listen' ? (

@@ -1437,6 +1437,37 @@ WHERE title IS NULL",
                 'mysql' => ["ALTER TABLE {lists} ADD COLUMN people varchar(255) NOT NULL DEFAULT ''"],
                 'sqlite' => ["ALTER TABLE {lists} ADD COLUMN people TEXT NOT NULL DEFAULT ''"],
             ],
+            // Sponsoren (Issue #279): Name (Pflicht, auch Alternativtext des Logos), Link (nur https, leer ohne), Reihenfolge.
+            // Das Logo steht wie die Fotos der Mitglieder in der Datenbank (so enthält es die Sicherung): logo_type png
+            // (Base64, höchstens 512 Pixel) oder svg (bereinigt, Klartext), leer ohne Logo; logo_version wechselt mit jedem
+            // Logo (Adresse). updated_at in UTC.
+            38 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {sponsors} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  name varchar(100) NOT NULL,
+  url varchar(255) NOT NULL DEFAULT \'\',
+  sort int(11) NOT NULL DEFAULT 0,
+  logo_type varchar(4) NOT NULL DEFAULT \'\',
+  logo_version varchar(32) NOT NULL DEFAULT \'\',
+  logo mediumtext DEFAULT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {sponsors} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  url TEXT NOT NULL DEFAULT \'\',
+  sort INTEGER NOT NULL DEFAULT 0,
+  logo_type TEXT NOT NULL DEFAULT \'\',
+  logo_version TEXT NOT NULL DEFAULT \'\',
+  logo TEXT DEFAULT NULL,
+  updated_at TEXT NOT NULL
+)',
+                ],
+            ],
         ];
     }
 

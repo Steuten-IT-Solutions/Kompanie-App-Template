@@ -17,6 +17,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Sponsoren**: Der neue Bereich *Sponsoren* (unter *Einstellungen → Bereiche* einschalten) zeigt eure Sponsoren mit
+  Logo und Link in eurer Reihenfolge, für alle, auch ohne Anmeldung. Gepflegt werden sie unter *Verwaltung →
+  Einrichtungen → Sponsoren*: anlegen, Link und Logo (PNG, JPG, WebP oder SVG) hinzufügen, per Ziehen ordnen. Dazu kommt
+  die Rolle *Sponsoren verwalten*. Wer die Sponsoren sieht, legst du unter *Einstellungen → Rollen* mit dem Haken
+  *Sponsoren* fest.
 - **Navigation einrichten**: Unter *Einstellungen → Navigation* legst du fest, welche Bereiche unten in der Leiste
   stehen und in welcher Reihenfolge, fasst Bereiche zu Untermenüs mit eigenem Namen und Symbol zusammen (wie *Intern*)
   oder blendest sie aus. *Verwaltung* und *Meins* stehen immer ganz rechts. Jede Person sieht weiter nur, was sie sehen

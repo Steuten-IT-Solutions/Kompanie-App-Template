@@ -132,6 +132,7 @@ const ORDER: Capability[] = [
   'manage_polls',
   'manage_lists',
   'send_mail',
+  'manage_sponsors',
   'manage_points',
   'manage_penalties',
   'manage_ranks',

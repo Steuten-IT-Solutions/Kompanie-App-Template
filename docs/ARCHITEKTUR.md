@@ -317,6 +317,14 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - Verlauf `GET /mails`, `GET /mails/{id}` für `send_mail`; Aufgabe `mailing_cleanup` (täglich) löscht Mails nach 365 Tagen samt Protokoll und Bildern. Sicherungen enthalten `mailings`, nicht `mailing_recipients`; Konto löschen entfernt dessen Zeilen im Protokoll.
 - App: *Verwaltung → E-Mails* (`#/verwaltung/mail`, `views/EmailsVerwalten.tsx`), Empfängerfelder mit Kärtchen und Vorschlägen, derselbe Editor wie am Brett (`composeEditor.tsx`, mit „Signatur einfügen“ und Rücksprung aus der Signatur-Einrichtung), Entwurf je Gerät.
 
+### Sponsoren (Issue #279)
+
+- Bereich `sponsors` (Bezeichnung „Sponsoren“, `labels.sections.sponsors`; aus, nie automatisch eingeschaltet), Recht `manage_sponsors` (Standardrolle „Sponsoren verwalten“: `member`, `manage_sponsors`), sehen mit `view_sponsors` (`Roles::ADDED_VIEW`, anfangs auch Gast und ohne Anmeldung).
+- `SponsorService`, `SponsorRepository`, Tabelle `sponsors` (Migration 38: Name, Link, Reihenfolge, Logo). Link nur `https://` oder leer. Das Logo liegt wie die Fotos der Mitglieder in der Datenbank (PNG Base64 bzw. bereinigtes SVG, `SvgSanitizer`) und ist damit Teil der Sicherung (`CORE_TABLES`, schwer: `HEAVY_TABLES`). Rasterbilder (PNG, JPG, WebP, höchstens 2 MB, 4096 Pixel) werden zu einem PNG mit höchstens 512 Pixeln an der längeren Kante, nie vergrößert.
+- Routen `GET/POST /sponsors`, `PUT /sponsors/order`, `PATCH/DELETE /sponsors/{id}`, `POST/DELETE /sponsors/{id}/logo`.
+- Auslieferung `<App>/sponsorlogo/<id>?v=<Fassung>` (beide Adapter, `Environment::sponsorLogoUrl`, `SponsorService::logoForDelivery`): mit `view_sponsors` für Gäste `public, max-age=31536000, immutable`, sonst `private`; veraltete Fassung `no-cache`; SVG mit `RankService::SVG_CSP`; Bereich aus → 404.
+- App: Tab bzw. Navigationspunkt `sponsoren` (`views/Sponsoren.tsx`, Logos auf hellen Kacheln, Link mit `rel="sponsored noopener noreferrer"`), Pflege unter *Verwaltung → Einrichtungen → Sponsoren* (`views/SponsorenVerwalten.tsx`). In der Standardnavigation steht er nach der Galerie.
+
 ### Dateianhänge (Schwarzes Brett, E-Mails)
 
 - `AttachmentService`, Tabelle `attachments` (Migration 33: Kennung, Besitzer `draft`/`board`/`mail`, Name, MIME-Typ aus der Endung, Größe, Datei), Dateien geschützt unter `anhaenge/anh-<Kennung>.bin`. Jeder Dateityp, je Datei höchstens `DocumentService::requestLimit()` (20 MB oder weniger nach `post_max_size`; `GET /attachments/limits`).
@@ -407,7 +415,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 | `calendar` | interner Kalender (allein z. B. für Anwärter) |
 | `view_intern` | Navigation: die Knöpfe unter „Intern“ gesammelt unter einem Knopf statt Mitglieder und Dokumente als eigene Tabs; regelt nicht, was die Person sieht. Gilt nur für die Standardnavigation; mit einer eingerichteten Navigation (Einstellung `navigation`, `NavigationService`, `navigation.ts`, Issue #277) legt der Admin Hauptpunkte und Untermenüs (`#/menue/<n>`) selbst fest |
 | `view_events`, `view_news`, `view_gallery` | Tabs: öffentliche Termine, News, öffentliche Alben (`GET /events`, `/news`, `/gallery`) |
-| `view_companies`, `view_sponsors` | Kompanieliste und Sponsoren (Issue #278; die Bereiche kommen mit #279 und #280) |
+| `view_companies`, `view_sponsors` | Kompanieliste (Bereich kommt mit #280) und Sponsoren (`GET /sponsors`, Logos; Issue #278, #279) |
 | `view_gallery_internal` | interne Bilder und Videos der Galerie (dann auch die öffentlichen Alben) |
 | `view_own_points`, `view_own_penalties`, `view_own_rank`, `view_own_attendance` | eigene Daten in „Meins“ (`/me/points`, `/me/penalties`, `/me/rank` und Rang/Titel in `/me`, `/me/attendance`); nur mit `member` |
 | `view_birthdays` | Geburtstage der anderen sehen und am Tag benachrichtigt werden (eintragen und erscheinen: `member`) |
@@ -427,6 +435,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 | `manage_offices` | Ämter, ihre Gruppen und Amtszeiten pflegen, auch frühere; Import (Issue #112) |
 | `manage_lists` | Listen zum Drucken und als CSV anlegen, bearbeiten und löschen; Werte nur, soweit sichtbar (Issue #121) |
 | `send_mail` | E-Mails aus der Verwaltung an Rollen, Mitglieder und freie Adressen versenden; Verlauf mit Protokoll |
+| `manage_sponsors` | Sponsoren anlegen, ändern, ordnen und löschen, Logos hochladen (Issue #279) |
 | `view_personal` | Persönliche Angaben anderer sehen: E-Mail-Adresse, Handynummer, Adresse, ganzes Geburtsdatum (Verwaltung → Mitglied) |
 | `manage_personal` | Persönliche Angaben anderer ändern (setzt `view_personal` voraus); Geburtstage anderer eintragen (nur das Datum) |
 | `create_users` | Mitglieder anlegen (auch mit ihren persönlichen Angaben), Startpasswörter erzeugen; Ehemalige eintragen, wieder aufnehmen, importieren |
@@ -468,6 +477,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
   | Ämter | Ämter verwalten | `member`, `manage_offices` |
   | Listen | Listen verwalten | `member`, `manage_lists` |
   | E-Mails | E-Mails verwalten | `member`, `send_mail` |
+  | Sponsoren | Sponsoren verwalten | `member`, `manage_sponsors` |
 
 - **Eigene Rollen** bekommen feste Schlüssel `r1`, `r2`, … (nie wiederverwendet, `roles_seq`; höchstens 10 Zeichen, Spalte `users.level`).
 - **Vergebbar** sind alle Rechte außer `view_activity` und `manage_settings`: Einstellungen, Updates und Datensicherung (also auch das Einspielen von Programmcode) bleiben den Admins. Verwaltungsrechte und `view_own_*` brauchen `member` (`Capability::requires()`); die übrigen Rechte zum Sehen gehen auch ohne. Standardrollen der Bereiche bekommen dazu, was Mitglieder anfangs sehen (`RoleService::featureChanged`).

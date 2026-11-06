@@ -41,6 +41,7 @@ use KompanieApp\Core\Domain\NavigationService;
 use KompanieApp\Core\Domain\MemberPhotoService;
 use KompanieApp\Core\Domain\InventoryService;
 use KompanieApp\Core\Domain\OfficeService;
+use KompanieApp\Core\Domain\SponsorService;
 use KompanieApp\Core\Domain\ListService;
 use KompanieApp\Core\Domain\MailGroupService;
 use KompanieApp\Core\Domain\MailingService;
@@ -629,6 +630,12 @@ final class App
     public function offices(): OfficeService
     {
         return $this->service(OfficeService::class, fn () => new OfficeService($this));
+    }
+
+    /** Sponsoren (Issue #279, Bereich sponsors) */
+    public function sponsors(): SponsorService
+    {
+        return $this->service(SponsorService::class, fn () => new SponsorService($this));
     }
 
     public function lists(): ListService

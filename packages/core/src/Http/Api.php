@@ -754,6 +754,19 @@ final class Api
                 return ['deleted' => true];
             }, 'offices', $denyRights),
 
+            // Sponsoren (Issue #279): öffentlich mit view_sponsors (anfangs auch Gast), Pflege mit manage_sponsors;
+            // Logo als Datei Base64 im JSON
+            new Route('GET', '/sponsors', [Cap::ViewSponsors, Cap::ManageSponsors], fn () => $a->sponsors()->list(), 'sponsors', $denyView),
+            new Route('POST', '/sponsors', Cap::ManageSponsors, fn (Request $r) => Response::created($a->sponsors()->create($r->body)), 'sponsors', $denyRights),
+            new Route('PUT', '/sponsors/order', Cap::ManageSponsors, fn (Request $r) => $a->sponsors()->reorder($r->input('ids')), 'sponsors', $denyRights),
+            new Route('PATCH', '/sponsors/{id}', Cap::ManageSponsors, fn (Request $r) => $a->sponsors()->update($r->id(), $r->body), 'sponsors', $denyRights),
+            new Route('DELETE', '/sponsors/{id}', Cap::ManageSponsors, function (Request $r) use ($a) {
+                $a->sponsors()->delete($r->id());
+                return ['deleted' => true];
+            }, 'sponsors', $denyRights),
+            new Route('POST', '/sponsors/{id}/logo', Cap::ManageSponsors, fn (Request $r) => $a->sponsors()->uploadLogo($r->id(), $r->input('file')), 'sponsors', $denyRights),
+            new Route('DELETE', '/sponsors/{id}/logo', Cap::ManageSponsors, fn (Request $r) => $a->sponsors()->removeLogo($r->id()), 'sponsors', $denyRights),
+
             // Listen (Issue #121): nur mit manage_lists; Werte der Mitglieder nur, soweit die Person sie ohnehin sieht
             new Route('GET', '/lists', Cap::ManageLists, fn () => $a->lists()->overview(), 'lists', $denyRights),
             new Route('POST', '/lists', Cap::ManageLists, fn (Request $r) => Response::created($a->lists()->create($this->user(), $r->body)), 'lists', $denyRights),
