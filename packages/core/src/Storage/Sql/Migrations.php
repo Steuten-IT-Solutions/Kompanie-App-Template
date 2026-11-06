@@ -1630,6 +1630,32 @@ WHERE title IS NULL",
                     'CREATE INDEX IF NOT EXISTS {gallery_submissions}_status ON {gallery_submissions} (status)',
                 ],
             ],
+            // Eigene Seiten (Issue #287): Text als RichText, Bilder in rich_images (Besitzer page), audience public oder members.
+            44 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {app_pages} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  title varchar(100) NOT NULL,
+  body mediumtext DEFAULT NULL,
+  audience varchar(10) NOT NULL DEFAULT \'members\',
+  sort int(11) NOT NULL DEFAULT 0,
+  updated_by bigint(20) unsigned DEFAULT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {app_pages} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  body TEXT DEFAULT NULL,
+  audience TEXT NOT NULL DEFAULT \'members\',
+  sort INTEGER NOT NULL DEFAULT 0,
+  updated_by INTEGER DEFAULT NULL,
+  updated_at TEXT NOT NULL
+)',
+                ],
+            ],
         ];
     }
 

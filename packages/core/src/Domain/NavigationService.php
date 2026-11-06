@@ -26,8 +26,11 @@ final class NavigationService
     /** Bereiche, die in der Navigation stehen können, in der Reihenfolge der Standardnavigation (Ansichten der App). */
     public const TARGETS = ['termine', 'news', 'galerie', 'kompanien', 'sponsoren', 'mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog'];
 
+    /** Eigene Seiten (Issue #287) stehen je Seite als „seiten/<id>“ in der Navigation (Adresse #/seiten/<id>). */
+    public const PAGE_PREFIX = 'seiten/';
+
     /** Symbole für Untermenüs (in der App gezeichnet). */
-    public const ICONS = ['ordner', 'termine', 'news', 'galerie', 'kompanien', 'sponsoren', 'mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog', 'stern'];
+    public const ICONS = ['ordner', 'termine', 'news', 'galerie', 'kompanien', 'sponsoren', 'mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog', 'seiten', 'stern'];
 
     /** Hauptpunkte neben „Verwaltung“ und „Meins“: Mehr als sieben Tabs passen auf schmalen Handys nicht in die Leiste. */
     public const MAX_MAIN = 5;
@@ -36,6 +39,38 @@ final class NavigationService
 
     public function __construct(private readonly Settings $settings)
     {
+    }
+
+    /** Bereich der Navigation: einer der festen oder eine eigene Seite (ob es sie gibt, prüft die App beim Anzeigen). */
+    public static function isTarget(mixed $id): bool
+    {
+        return is_string($id) && (in_array($id, self::TARGETS, true) || preg_match('#^seiten/[1-9][0-9]{0,9}$#D', $id) === 1);
+    }
+
+    /** Eine gelöschte Seite aus der gespeicherten Navigation nehmen (leere Untermenüs fallen mit weg). */
+    public function removeTarget(string $id): void
+    {
+        $nav = $this->get();
+        if ($nav === null) {
+            return;
+        }
+        $items = [];
+        foreach ($nav['items'] as $entry) {
+            if (is_string($entry)) {
+                if ($entry !== $id) {
+                    $items[] = $entry;
+                }
+                continue;
+            }
+            $entry['items'] = array_values(array_filter($entry['items'], static fn (string $t): bool => $t !== $id));
+            if ($entry['items'] !== []) {
+                $items[] = $entry;
+            }
+        }
+        $hidden = array_values(array_filter($nav['hidden'], static fn (string $t): bool => $t !== $id));
+        if ($items !== $nav['items'] || $hidden !== $nav['hidden']) {
+            $this->settings->set(self::SETTING, ['items' => $items, 'hidden' => $hidden]);
+        }
     }
 
     /**
@@ -49,7 +84,7 @@ final class NavigationService
         if (!is_array($raw) || !is_array($raw['items'] ?? null)) {
             return null;
         }
-        $known = static fn (mixed $id): bool => is_string($id) && in_array($id, self::TARGETS, true);
+        $known = static fn (mixed $id): bool => self::isTarget($id);
         $items = [];
         foreach ($raw['items'] as $entry) {
             if (is_string($entry)) {
@@ -100,7 +135,7 @@ final class NavigationService
         }
         $seen = [];
         $target = function (mixed $id) use (&$seen): string {
-            if (!is_string($id) || !in_array($id, self::TARGETS, true)) {
+            if (!self::isTarget($id)) {
                 throw ApiError::invalid('Unbekannter Bereich in der Navigation.');
             }
             if (isset($seen[$id])) {

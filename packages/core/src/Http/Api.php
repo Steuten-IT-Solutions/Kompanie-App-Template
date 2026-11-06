@@ -531,6 +531,8 @@ final class Api
             'maintenance' => self::maintenanceInfo($a->maintenance()->state()),
             // Einrichtbare Navigation (Issue #277): null = Standardnavigation; nur Darstellung, die Rechte prüfen die Routen
             'navigation' => $a->navigation()->get(),
+            // Eigene Seiten (Issue #287), die die Person lesen darf: für die Kacheln unter „Seiten“ (ohne Text)
+            'pages' => array_map(static fn (array $p): array => ['id' => $p['id'], 'title' => $p['title']], $a->pages()->list($user)),
             'setupPending' => $this->can(Cap::ManageSettings) && !(bool) $a->settings->get(self::SETUP_SETTING, false),
             // Datensicherung als Datei herunterladen (Domain\BackupDownload); nur für Admins, nicht in der Vorschau
             'backupUrl' => $a->backup !== null && $this->can(Cap::ManageSettings) && !$a->preview()->active() ? $a->env->backupUrl() : null,
@@ -787,6 +789,16 @@ final class Api
 
             // Sponsoren (Issue #279): öffentlich mit view_sponsors (anfangs auch Gast), Pflege mit manage_sponsors;
             // Logo als Datei Base64 im JSON
+            // Eigene Seiten (Issue #287): lesen nach audience (public für alle, members für Mitglieder), pflegen mit manage_pages
+            new Route('GET', '/pages', $P, fn () => ['pages' => $a->pages()->list($a->authContext->currentUser())], 'pages'),
+            new Route('GET', '/pages/{id}', $P, fn (Request $r) => $a->pages()->get($r->id(), $a->authContext->currentUser()), 'pages'),
+            new Route('POST', '/pages', Cap::ManagePages, fn (Request $r) => Response::created($a->pages()->create((array) $r->body, $this->user())), 'pages', $denyRights),
+            new Route('PUT', '/pages/order', Cap::ManagePages, fn (Request $r) => ['pages' => $a->pages()->reorder($r->input('ids'), $this->user())], 'pages', $denyRights),
+            new Route('PATCH', '/pages/{id}', Cap::ManagePages, fn (Request $r) => $a->pages()->update($r->id(), (array) $r->body, $this->user()), 'pages', $denyRights),
+            new Route('DELETE', '/pages/{id}', Cap::ManagePages, function (Request $r) use ($a) {
+                $a->pages()->delete($r->id());
+                return ['deleted' => true];
+            }, 'pages', $denyRights),
             new Route('GET', '/sponsors', [Cap::ViewSponsors, Cap::ManageSponsors], fn () => $a->sponsors()->list(), 'sponsors', $denyView),
             new Route('POST', '/sponsors', Cap::ManageSponsors, fn (Request $r) => Response::created($a->sponsors()->create($r->body)), 'sponsors', $denyRights),
             new Route('PUT', '/sponsors/order', Cap::ManageSponsors, fn (Request $r) => $a->sponsors()->reorder($r->input('ids')), 'sponsors', $denyRights),

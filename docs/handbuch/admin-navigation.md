@@ -14,6 +14,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Navigation*
 - Ein **Untermenü** hat einen Namen, ein Symbol und seine Bereiche.
 - **Nicht in der Navigation**: Bereiche, die in der Leiste nicht erscheinen. Ein Bereich, der mit einem Update neu dazukommt, steht hier mit dem Hinweis **Neu** und erscheint hinten in der Leiste, bis du ihm einen Platz gibst.
 - Bei jedem Bereich wählst du seinen **Platz**: unten in der Leiste, in einem Untermenü oder nicht in der Navigation.
+- Mit dem Bereich {bereich.pages} steht jede eigene Seite als eigener Punkt in der Liste (mit dem Hinweis **Eigene Seite**). Eine neue Seite erscheint wie ein neuer Bereich hinten in der Leiste, bis du ihr einen Platz gibst; eine gelöschte verschwindet von selbst.
 
 Die Navigation ändert nur, wo etwas steht, nicht wer es sehen darf. Jede Person sieht nur die Bereiche, die ihre Rolle sehen darf (siehe [Rollen](seite:admin-rollen-und-mitglieder)). Ein Untermenü ohne sichtbaren Bereich erscheint für diese Person nicht. Ein ausgeschalteter Bereich erscheint für niemanden.
 
@@ -31,4 +32,4 @@ Die Navigation ändert nur, wo etwas steht, nicht wer es sehen darf. Jede Person
 Ein Untermenü braucht mindestens einen Bereich. **Untermenü entfernen** schiebt seine Bereiche zu **Nicht in der Navigation**; gib ihnen dann einen neuen Platz.
 
 ### Zur Standardnavigation zurück
-Tippe auf **Standardnavigation wiederherstellen** und bestätige die Rückfrage. In der Standardnavigation stehen {bereich.events}, {bereich.news} und {bereich.gallery} unten. Wer das Recht **Intern** hat, findet {bereich.directory}, {bereich.documents}, {bereich.board}, {bereich.ranks} und den {bereich.points}katalog unter **Intern**; alle anderen sehen {bereich.directory} und {bereich.documents} als eigene Punkte. Mit eurer eigenen Navigation spielt das Recht **Intern** für die Leiste keine Rolle mehr.
+Tippe auf **Standardnavigation wiederherstellen** und bestätige die Rückfrage. In der Standardnavigation stehen {bereich.events}, {bereich.news} und {bereich.gallery} unten, dahinter {bereich.companies}, {bereich.sponsors} und jede eigene Seite, soweit sie an sind. Wer das Recht **Intern** hat, sieht unten höchstens fünf Punkte; was nicht passt, steht vorne unter **Intern**. Wer das Recht **Intern** hat, findet {bereich.directory}, {bereich.documents}, {bereich.board}, {bereich.ranks} und den {bereich.points}katalog unter **Intern**; alle anderen sehen {bereich.directory} und {bereich.documents} als eigene Punkte. Mit eurer eigenen Navigation spielt das Recht **Intern** für die Leiste keine Rolle mehr.

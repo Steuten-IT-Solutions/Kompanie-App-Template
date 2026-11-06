@@ -58,6 +58,7 @@ final class ApiScenario
             $this->mails();
             $this->companies();
             $this->sponsors();
+            $this->pages();
             $this->activity();
             $this->accounts();
             $this->formerMembers();
@@ -111,7 +112,7 @@ final class ApiScenario
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Ausgeschalteter Bereich → 403 feature_disabled');
 
         $this->d->actAs($admin);
-        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true, 'directory' => true, 'offices' => true, 'lists' => true, 'mail' => true, 'companies' => true, 'sponsors' => true];
+        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true, 'directory' => true, 'offices' => true, 'lists' => true, 'mail' => true, 'companies' => true, 'sponsors' => true, 'pages' => true];
         [$s, $d] = $this->req('PUT', '/admin/features', $all);
         $c->ok($s === 200 && !in_array(false, array_column((array) $d, 'enabled', 'key'), true), 'Alle Bereiche einschalten');
 
@@ -1463,6 +1464,49 @@ final class ApiScenario
         [$s, $d] = $this->req('DELETE', "/sponsors/{$mine[0]}/logo");
         $c->ok($s === 200 && array_key_exists('logo_url', (array) $d) && $d['logo_url'] === null, 'Logo entfernen');
         $c->ok($this->req('DELETE', "/sponsors/{$mine[0]}")[0] === 200 && $this->req('DELETE', "/sponsors/{$mine[1]}")[0] === 200 && $this->req('PATCH', "/sponsors/{$mine[0]}", ['name' => 'x'])[0] === 404, 'Aufräumen: Sponsoren löschen');
+    }
+
+    /** Eigene Seiten (Issue #287): Lesen nach Zielgruppe, Pflege mit manage_pages, Konflikt beim Speichern, Reihenfolge. */
+    private function pages(): void
+    {
+        $c = $this->c;
+        $c->section('Eigene Seiten');
+        $admin = $this->user('kptest_pages_admin', 'admin');
+        $m = $this->user('kptest_pages_m', 'member');
+        $this->d->actAs($admin);
+        $this->req('PUT', '/admin/features', ['pages' => true]);
+        [$s, $pub] = $this->req('POST', '/pages', ['title' => 'Kptest Anfahrt', 'audience' => 'public', 'body' => '<p>Über die <b>Brücke</b></p><script>alert(1)</script>']);
+        $c->ok($s === 201 && !str_contains((string) ($pub['body'] ?? ''), 'script') && str_contains((string) ($pub['body'] ?? ''), '<b>Brücke</b>'), 'Seite anlegen, Text bereinigt');
+        [$s, $mem] = $this->req('POST', '/pages', ['title' => 'Kptest Uniform', 'body' => '<p>Intern</p>']);
+        $c->ok($s === 201 && ($mem['audience'] ?? '') === 'members', 'Vorgabe: nur Mitglieder');
+        $c->ok($this->req('POST', '/pages', ['title' => ''])[0] === 400, 'Ohne Titel → 400');
+        $titles = fn (): array => array_column((array) ($this->req('GET', '/pages')[1]['pages'] ?? []), 'title');
+        $this->d->actAs(null);
+        $c->ok(in_array('Kptest Anfahrt', $titles(), true) && !in_array('Kptest Uniform', $titles(), true), 'Ohne Anmeldung nur die öffentliche');
+        $c->ok($this->req('GET', '/pages/' . ($mem['id'] ?? 0))[0] === 404, 'Seite nur für Mitglieder ohne Anmeldung → 404');
+        $this->d->actAs($m);
+        $c->ok(in_array('Kptest Uniform', $titles(), true), 'Mitglied sieht die Seite für Mitglieder');
+        $c->ok($this->req('PATCH', '/pages/' . ($pub['id'] ?? 0), ['title' => 'X'])[0] === 403, 'Ohne manage_pages → 403');
+        $this->d->actAs($admin);
+        $loaded = (string) ($this->req('GET', '/pages/' . ($pub['id'] ?? 0))[1]['updated_at'] ?? '');
+        [$s, $d] = $this->req('PATCH', '/pages/' . ($pub['id'] ?? 0), ['title' => 'Kptest Anfahrt und Parken', 'updated_at' => $loaded]);
+        $c->ok($s === 200 && ($d['title'] ?? '') === 'Kptest Anfahrt und Parken', 'Mit aktuellem Stand speichern');
+        [$s, $d] = $this->req('PATCH', '/pages/' . ($pub['id'] ?? 0), ['title' => 'Zu spät', 'updated_at' => '2000-01-01T00:00:00Z']);
+        $c->ok($s === 409 && ($d['code'] ?? '') === 'conflict', 'Veralteter Stand → 409 conflict');
+        $ids = array_column((array) ($this->req('GET', '/pages')[1]['pages'] ?? []), 'id');
+        [$s, $d] = $this->req('PUT', '/pages/order', ['ids' => array_reverse($ids)]);
+        $c->ok($s === 200 && array_column((array) ($d['pages'] ?? []), 'id') === array_reverse($ids), 'Reihenfolge ändern');
+        [, $config] = $this->req('GET', '/config');
+        $c->ok(in_array('Kptest Uniform', array_column((array) ($config['pages'] ?? []), 'title'), true), '/config nennt die Seiten');
+        $nav = ['items' => ['termine', ['label' => 'Infos', 'icon' => 'seiten', 'items' => ['seiten/' . ($pub['id'] ?? 0), 'seiten/' . ($mem['id'] ?? 0)]]], 'hidden' => []];
+        [$s, $d] = $this->req('PUT', '/admin/navigation', ['navigation' => $nav]);
+        $c->ok($s === 200 && ($d['navigation'] ?? null) === $nav, 'Jede Seite als eigener Punkt der Navigation');
+        $c->ok($this->req('PUT', '/admin/navigation', ['navigation' => ['items' => ['seiten'], 'hidden' => []]])[0] === 400, 'Ohne Nummer kein Punkt der Navigation → 400');
+        $this->req('DELETE', '/pages/' . ($mem['id'] ?? 0));
+        [, $d] = $this->req('GET', '/admin/navigation');
+        $c->ok(($d['navigation']['items'][1]['items'] ?? null) === ['seiten/' . ($pub['id'] ?? 0)], 'Gelöschte Seite fällt aus der Navigation');
+        $this->req('PUT', '/admin/navigation', ['navigation' => null]);
+        $c->ok($this->req('DELETE', '/pages/' . ($pub['id'] ?? 0))[0] === 200 && $this->req('GET', '/pages/' . ($mem['id'] ?? 0))[0] === 404, 'Aufräumen: Seiten löschen');
     }
 
     /**

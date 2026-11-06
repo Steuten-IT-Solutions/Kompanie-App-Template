@@ -1,26 +1,30 @@
 import { useState, type ReactNode } from 'react';
-import { api, applyNavigation, config, type Feature, type NavigationAdmin } from '../api';
+import { api, applyNavigation, config, type Feature, type NavigationAdmin, type PageSummary } from '../api';
 import { useDragSort } from '../dragSort';
 import {
   draftError,
   draftOf,
+  isPageTarget,
   moveTo,
   NAV_ICONS,
   NAV_MAX_MAIN,
   NAV_TARGETS,
+  pageTarget,
   placeOf,
   removeMenu,
   unplaced,
+  type FixedTarget,
   type NavigationSetting,
   type NavMenuSetting,
   type NavPlace,
   type NavTarget,
+  type PageTarget,
 } from '../navigation';
 import { targetLabels } from '../navLabels';
 import { ErrorBox, Loading, useAsync } from '../ui';
 
 /** Bereiche der App, ohne die ein Punkt der Navigation für niemanden erscheint. */
-const FEATURES: Record<NavTarget, Feature[]> = {
+const FEATURES: Record<FixedTarget, Feature[]> = {
   termine: ['events', 'calendar', 'birthdays'],
   news: ['news'],
   galerie: ['gallery'],
@@ -45,10 +49,13 @@ const ICON_LABELS: Record<string, string> = {
   brett: 'Brett',
   dienstgrade: 'Abzeichen',
   punktekatalog: 'Liste',
+  seiten: 'Seite',
   stern: 'Stern',
 };
 
-const isOn = (t: NavTarget): boolean => FEATURES[t].some((f) => !!config?.features[f]);
+const isOn = (t: NavTarget): boolean => (isPageTarget(t) ? !!config?.features.pages : FEATURES[t].some((f) => !!config?.features[f]));
+
+type Labels = Record<string, string | undefined>;
 
 /**
  * Einstellungen → Navigation (Issue #277): Hauptpunkte der Tab-Leiste ordnen, Bereiche in Untermenüs schieben oder
@@ -57,28 +64,37 @@ const isOn = (t: NavTarget): boolean => FEATURES[t].some((f) => !!config?.featur
  */
 export default function NavigationEinstellen({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(api.navigation, [], 'navigation');
-  if (loading && !data) return <Loading shape="form" />;
+  // Eigene Seiten (Issue #287): jede ist ein eigener Punkt; Titel aktuell vom Server (auch gerade angelegte).
+  const pagesOn = !!config?.features.pages;
+  const pages = useAsync(pagesOn ? api.pages : () => Promise.resolve([] as PageSummary[]), [pagesOn]);
+  if ((loading && !data) || (pages.loading && !pages.data)) return <Loading shape="form" />;
   if (error || !data) return <ErrorBox message={error ?? 'Die Navigation konnte nicht geladen werden.'} onRetry={reload} />;
-  return <Editor key={JSON.stringify(data.navigation)} data={data} onSaved={setData} onToast={onToast} />;
+  if (pages.error || !pages.data)
+    return <ErrorBox message={pages.error ?? 'Die Seiten konnten nicht geladen werden.'} onRetry={pages.reload} />;
+  return <Editor key={JSON.stringify(data.navigation)} data={data} pages={pages.data} onSaved={setData} onToast={onToast} />;
 }
 
 function Editor({
   data,
+  pages,
   onSaved,
   onToast,
 }: {
   data: NavigationAdmin;
+  pages: PageSummary[];
   onSaved: (d: NavigationAdmin) => void;
   onToast: (msg: string) => void;
 }) {
-  const [draft, setDraft] = useState<NavigationSetting>(() => draftOf(data.navigation, isOn));
+  const pageTargets: PageTarget[] = pages.map((p) => pageTarget(p.id));
+  const known = (t: string): t is NavTarget => NAV_TARGETS.includes(t as FixedTarget) || pageTargets.includes(t as PageTarget);
+  const [draft, setDraft] = useState<NavigationSetting>(() => draftOf(data.navigation, isOn, pageTargets));
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const labels = targetLabels();
+  const labels: Labels = targetLabels(pages);
   const custom = data.navigation !== null;
   const problem = draftError(draft, data.label_max);
   const menus = draft.items.filter((i): i is NavMenuSetting => typeof i !== 'string');
-  const newOnes = unplaced(draft);
+  const newOnes = unplaced(draft, pageTargets);
 
   const change = (next: NavigationSetting) => {
     setDraft(next);
@@ -140,6 +156,7 @@ function Editor({
   const targetRow = (t: NavTarget) => (
     <div className="row-main">
       <span className="row-title">{labels[t]}</span>
+      {isPageTarget(t) && <span className="row-sub">Eigene Seite</span>}
       {!isOn(t) && <span className="row-sub">Der Bereich ist ausgeschaltet und erscheint erst, wenn er an ist.</span>}
       {placeSelect(t)}
     </div>
@@ -166,7 +183,7 @@ function Editor({
         disabled={busy}
         labels={labels}
         render={(item, index) => {
-          if (typeof item === 'string') return NAV_TARGETS.includes(item as NavTarget) ? targetRow(item as NavTarget) : null;
+          if (typeof item === 'string') return known(item) ? targetRow(item) : null;
           return (
             <div className="row-main nav-menu">
               <label className="field">
@@ -189,7 +206,7 @@ function Editor({
                 </select>
               </label>
               <SubList
-                items={item.items.filter((t): t is NavTarget => NAV_TARGETS.includes(t as NavTarget))}
+                items={item.items.filter(known)}
                 disabled={busy}
                 onMove={(next) => updateMenu(index, { items: next })}
                 render={targetRow}
@@ -216,13 +233,11 @@ function Editor({
         <>
           <h4>Nicht in der Navigation</h4>
           <ul className="card-list">
-            {draft.hidden
-              .filter((t): t is NavTarget => NAV_TARGETS.includes(t as NavTarget))
-              .map((t) => (
-                <li key={t} className="card row">
-                  {targetRow(t)}
-                </li>
-              ))}
+            {draft.hidden.filter(known).map((t) => (
+              <li key={t} className="card row">
+                {targetRow(t)}
+              </li>
+            ))}
             {newOnes.map((t) => (
               <li key={t} className="card row">
                 <div className="row-main">
@@ -271,7 +286,7 @@ function MainList({
   labels,
 }: {
   draft: NavigationSetting;
-  labels: Record<NavTarget, string>;
+  labels: Labels;
   onMove: (items: Item[]) => void;
   disabled: boolean;
   /** index: Nummer des Untermenüs (ab 0), bei Bereichen -1 */
@@ -285,7 +300,7 @@ function MainList({
         if (typeof item !== 'string') menu++;
         return (
           <li key={typeof item === 'string' ? item : `menu-${i}`} {...sort.itemProps(i, 'card row')}>
-            {draft.items.length > 1 && sort.handle(i, typeof item === 'string' ? (labels[item as NavTarget] ?? item) : item.label)}
+            {draft.items.length > 1 && sort.handle(i, typeof item === 'string' ? (labels[item] ?? item) : item.label)}
             {render(item, typeof item === 'string' ? -1 : menu)}
           </li>
         );
@@ -306,7 +321,7 @@ function SubList({
   onMove: (next: NavTarget[]) => void;
   disabled: boolean;
   render: (t: NavTarget) => ReactNode;
-  labels: Record<NavTarget, string>;
+  labels: Labels;
 }) {
   const sort = useDragSort(items, onMove, disabled);
   if (items.length === 0) return null;
@@ -314,7 +329,7 @@ function SubList({
     <ul className="card-list nav-submenu">
       {items.map((t, i) => (
         <li key={t} {...sort.itemProps(i, 'row')}>
-          {items.length > 1 && sort.handle(i, labels[t])}
+          {items.length > 1 && sort.handle(i, labels[t] ?? t)}
           {render(t)}
         </li>
       ))}

@@ -17,6 +17,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Eigene Seiten**: Mit dem neuen Bereich *Seiten* (unter *Einstellungen → Bereiche*) legt ihr unter *Verwaltung →
+  Einrichtungen → Seiten* freie Seiten wie Geschichte, Festprogramm oder Anfahrt an, mit formatiertem Text und
+  Bildern. Je Seite wählst du, ob sie alle sehen, auch ohne Anmeldung, oder nur Mitglieder. Jede Seite ist ein eigener
+  Punkt der Navigation, den du unter *Einstellungen → Navigation* in die Leiste oder ein Untermenü schiebst; ohne eigene
+  Navigation stehen die Seiten in der Reihenfolge, die du per Ziehen festlegst, nach den Bereichen. Speichert jemand
+  dazwischen, überschreibt die App seine Fassung nicht. Mit dem Bereich gibt es die Rolle *Seiten verwalten*.
 - **Bilder für die Galerie einreichen**: Mitglieder mit dem neuen Recht *Bilder einreichen* schlagen unter *Galerie →
   Bilder einreichen* Bilder für ein Album vor und bestätigen, dass sie die Rechte haben und die erkennbaren Personen
   einverstanden sind. Wer *Einreichungen prüfen* hat, bekommt eine Benachrichtigung und gibt sie unter *Galerie →

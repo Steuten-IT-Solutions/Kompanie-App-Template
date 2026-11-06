@@ -26,6 +26,7 @@ use KompanieApp\Core\Domain\FileMediaStore;
 use KompanieApp\Core\Domain\FormerMemberService;
 use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Domain\GallerySubmissionService;
+use KompanieApp\Core\Domain\PageService;
 use KompanieApp\Core\Domain\GalleryUploadService;
 use KompanieApp\Core\Domain\GoogleConnect;
 use KompanieApp\Core\Domain\JoinYearService;
@@ -803,6 +804,11 @@ final class App
     public function galleryUploads(): GalleryUploadService
     {
         return $this->service(GalleryUploadService::class, fn () => new GalleryUploadService($this));
+    }
+
+    public function pages(): PageService
+    {
+        return $this->service(PageService::class, fn () => new PageService($this));
     }
 
     public function gallerySubmissions(): GallerySubmissionService

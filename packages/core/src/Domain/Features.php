@@ -61,6 +61,8 @@ final class Features
         // Sponsoren (Issue #279): Logos mit Link, öffentlich (view_sponsors, anfangs auch Gast).
         'companies' => ['label' => 'Kompanien', 'description' => 'Liste eurer Kompanien mit Logo, Beschreibung und Links; Mitglieder lassen sich ihnen zuordnen. Für alle sichtbar, auch ohne Anmeldung.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_companies']],
         'sponsors' => ['label' => 'Sponsoren', 'description' => 'Eure Sponsoren mit Logo und Link, in eurer Reihenfolge, für alle sichtbar, auch ohne Anmeldung.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_sponsors']],
+        // Eigene Seiten (Issue #287): freie Texte mit Bildern, öffentlich oder für Mitglieder.
+        'pages' => ['label' => 'Seiten', 'description' => 'Eigene Seiten mit formatiertem Text und Bildern, z. B. Geschichte, Festprogramm oder Anfahrt; je Seite für alle oder nur für Mitglieder.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_pages']],
     ];
 
     /** @var array<string, bool>|null */
@@ -224,7 +226,7 @@ final class Features
         foreach (self::keys() as $key) {
             // Dienstgrade, Titel, Anwesenheit, Dokumente, das Schwarze Brett, Umfragen, Geburtstage, Inventar, die
             // Mitgliederliste, Ämter, Listen, E-Mails und Sponsoren gab es in den alten Versionen nicht: nie aus kompanie.json einschalten.
-            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices', 'lists', 'mail', 'sponsors', 'companies'], true) && $this->app->config->legacyFeature($key);
+            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices', 'lists', 'mail', 'sponsors', 'companies', 'pages'], true) && $this->app->config->legacyFeature($key);
         }
         $this->save($state);
     }

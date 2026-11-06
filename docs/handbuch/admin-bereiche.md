@@ -11,7 +11,7 @@ Hier legst du fest, welche Bereiche die App für alle hat, zum Beispiel {bereich
 Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Bereiche**.
 
 ## Was du hier siehst
-Je Bereich ein Schalter mit seinem Namen und einem Satz, wofür er da ist: {bereich.events}, {bereich.calendar}, {bereich.news}, {bereich.gallery}, {bereich.points}, {bereich.penalties}, {bereich.ranks}, {bereich.titles}, {bereich.attendance}, {bereich.documents}, {bereich.board}, {bereich.polls}, {bereich.birthdays}, {bereich.inventory}, {bereich.directory}, {bereich.offices}, {bereich.lists}, {bereich.mail}, {bereich.companies} und {bereich.sponsors}.
+Je Bereich ein Schalter mit seinem Namen und einem Satz, wofür er da ist: {bereich.events}, {bereich.calendar}, {bereich.news}, {bereich.gallery}, {bereich.points}, {bereich.penalties}, {bereich.ranks}, {bereich.titles}, {bereich.attendance}, {bereich.documents}, {bereich.board}, {bereich.polls}, {bereich.birthdays}, {bereich.inventory}, {bereich.directory}, {bereich.offices}, {bereich.lists}, {bereich.mail}, {bereich.companies}, {bereich.sponsors} und {bereich.pages}.
 
 Unter einem Schalter steht außerdem, falls nötig:
 - **Braucht …**: Der Bereich lässt sich erst einschalten, wenn der genannte an ist. Das betrifft {bereich.polls}; sie brauchen das {bereich.board}.

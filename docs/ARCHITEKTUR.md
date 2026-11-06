@@ -334,6 +334,15 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - Auslieferung `<App>/kompanielogo/<id>?v=<Fassung>` (beide Adapter, `Environment::companyLogoUrl`, `CompanyService::logoForDelivery`), Zwischenspeichern wie bei den Sponsoren.
 - App: Tab bzw. Navigationspunkt `kompanien` (`views/Kompanien.tsx`, aufklappbare Karten), Pflege unter *Verwaltung → Einrichtungen → Kompanien* (`views/KompanienVerwalten.tsx`), Kachel auf der Seite der Person in der Verwaltung, Filter in der Mitgliederliste. Standardnavigation: Mit „Intern“ höchstens `NAV_MAX_MAIN` Punkte; was nicht passt (`OPTIONAL_MAIN`: Kompanien, Sponsoren), steht vorn unter „Intern“.
 
+### Eigene Seiten (Issue #287)
+
+- Bereich `pages` (Bezeichnung „Seiten“, `labels.sections.pages`; aus, nie automatisch eingeschaltet), Recht `manage_pages` (Standardrolle „Seiten verwalten“: `member`, `manage_pages`); wer pflegt, sieht alle Seiten.
+- `PageService`, Tabelle `app_pages` (Migration 44: Titel bis 100 Zeichen, Text als bereinigtes HTML (`RichText::sanitize`, kein eigenes HTML, CSS oder JavaScript), `audience` `public`/`members`, Reihenfolge, `updated_by`, `updated_at`). Bilder über `rich_images` mit Besitzer `page`: sichtbar wie die Seite (`PageService::canSeeImage`), öffentlich zwischengespeichert nur bei `public`; Bilder, die nicht mehr im Text stehen, werden beim Speichern gelöscht. Sicherung: `CORE_TABLES`.
+- Lesen: `public` für alle, auch ohne Anmeldung; `members` für alle, die das Schwarze Brett lesen (`BoardService::isRecipient`, `view_board`). Wer eine Seite nicht lesen darf, bekommt 404.
+- Routen `GET /pages` (ohne Text), `GET /pages/{id}`, `POST /pages`, `PUT /pages/order`, `PATCH/DELETE /pages/{id}`. `PATCH` mit `updated_at` (Stand, den die App geladen hat): 409 `conflict` mit dem Namen dessen, der dazwischen gespeichert hat. `/config` enthält `pages` (`id`, `title`) für die Kacheln.
+- Navigation: Jede Seite ist ein eigener Punkt `seiten/<id>` (`NavigationService::isTarget`, `PAGE_PREFIX`; Adresse `#/seiten/<id>`, Titel als Bezeichnung), frei in die Leiste oder ein Untermenü zu schieben. `PageService::delete` nimmt die Seite aus der gespeicherten Navigation (`removeTarget`, leere Untermenüs fallen weg). In der Standardnavigation folgen die lesbaren Seiten (aus `/config`) nach `OPTIONAL_MAIN`; mit eigener Navigation hängen noch nicht platzierte hinten an.
+- App: `views/Seiten.tsx` (eine Seite; `#/seiten` ohne Nummer zeigt alle als Kacheln), Pflege unter *Verwaltung → Einrichtungen → Seiten* (`views/SeitenVerwalten.tsx`, `RichTextEditor`, Ziehen zum Sortieren).
+
 ### Dateianhänge (Schwarzes Brett, E-Mails)
 
 - `AttachmentService`, Tabelle `attachments` (Migration 33: Kennung, Besitzer `draft`/`board`/`mail`, Name, MIME-Typ aus der Endung, Größe, Datei), Dateien geschützt unter `anhaenge/anh-<Kennung>.bin`. Jeder Dateityp, je Datei höchstens `DocumentService::requestLimit()` (20 MB oder weniger nach `post_max_size`; `GET /attachments/limits`).
@@ -448,6 +457,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 | `send_mail` | E-Mails aus der Verwaltung an Rollen, Mitglieder und freie Adressen versenden; Verlauf mit Protokoll |
 | `manage_sponsors` | Sponsoren anlegen, ändern, ordnen und löschen, Logos hochladen (Issue #279) |
 | `manage_companies` | Kompanien anlegen, ändern, ordnen und löschen, Logos hochladen, Mitglieder zuordnen (Issue #280) |
+| `manage_pages` | Eigene Seiten anlegen, ändern, ordnen und löschen; sieht alle Seiten (Issue #287) |
 | `view_personal` | Persönliche Angaben anderer sehen: E-Mail-Adresse, Handynummer, Adresse, ganzes Geburtsdatum (Verwaltung → Mitglied) |
 | `manage_personal` | Persönliche Angaben anderer ändern (setzt `view_personal` voraus); Geburtstage anderer eintragen (nur das Datum) |
 | `create_users` | Mitglieder anlegen (auch mit ihren persönlichen Angaben), Startpasswörter erzeugen; Ehemalige eintragen, wieder aufnehmen, importieren |
@@ -491,6 +501,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
   | E-Mails | E-Mails verwalten | `member`, `send_mail` |
   | Kompanien | Kompanien verwalten | `member`, `manage_companies` |
   | Sponsoren | Sponsoren verwalten | `member`, `manage_sponsors` |
+  | Seiten | Seiten verwalten | `member`, `manage_pages` |
 
 - **Eigene Rollen** bekommen feste Schlüssel `r1`, `r2`, … (nie wiederverwendet, `roles_seq`; höchstens 10 Zeichen, Spalte `users.level`).
 - **Vergebbar** sind alle Rechte außer `view_activity` und `manage_settings`: Einstellungen, Updates und Datensicherung (also auch das Einspielen von Programmcode) bleiben den Admins. Verwaltungsrechte und `view_own_*` brauchen `member` (`Capability::requires()`); die übrigen Rechte zum Sehen gehen auch ohne. Standardrollen der Bereiche bekommen dazu, was Mitglieder anfangs sehen (`RoleService::featureChanged`).

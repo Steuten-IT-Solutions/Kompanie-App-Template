@@ -17,6 +17,7 @@ const canLists = (): boolean => !!config?.features.lists && can('manage_lists');
 const canMail = (): boolean => !!config?.features.mail && can('send_mail');
 const canCompanies = (): boolean => !!config?.features.companies && can('manage_companies');
 const canSponsors = (): boolean => !!config?.features.sponsors && can('manage_sponsors');
+const canPages = (): boolean => !!config?.features.pages && can('manage_pages');
 
 /** Mitgliederliste: für alle, die Punkte oder Strafen vergeben, Dienstgrade, Titel oder Anwesenheit pflegen, Mitglieder
  * anlegen, Rollen vergeben oder Kompanien zuordnen. */
@@ -55,6 +56,7 @@ export function adminTabs(): AdminTab[] {
       { id: 'aemter', label: sec.offices, on: canOffices(), group: SETUP },
       { id: 'kompanien', label: sec.companies, on: canCompanies(), group: SETUP },
       { id: 'sponsoren', label: sec.sponsors, on: canSponsors(), group: SETUP },
+      { id: 'seiten', label: sec.pages, on: canPages(), group: SETUP },
       { id: 'anwesenheit', label: sec.attendance, on: canAttendance() },
       { id: 'brett', label: sec.board, on: canPostBoard(), route: 'brett' },
       { id: 'umfragen', label: sec.polls, on: canManagePolls(), route: 'umfragen/verwalten' },
@@ -182,6 +184,13 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
   // Sponsoren: als Bereich in einem Untermenü und als Knopf der Verwaltung
   sponsoren: (
     <path d="M12 20.5l-1.3-1.2C5.9 15 3 12.2 3 8.8 3 6.1 5.1 4 7.7 4c1.6 0 3.2.8 4.3 2 1.1-1.2 2.7-2 4.3-2C18.9 4 21 6.1 21 8.8c0 3.4-2.9 6.2-7.7 10.5z" />
+  ),
+  // Eigene Seiten: Blatt mit Zeilen, als Bereich in einem Untermenü und als Knopf der Verwaltung
+  seiten: (
+    <>
+      <path d="M6 3h9l4 4v14H6z" />
+      <path d="M9 11h7M9 14.5h7M9 18h4" />
+    </>
   ),
   mitglieder: (
     <>
