@@ -243,7 +243,7 @@ final class NewsAndSettingsTest extends TestCase
         }
 
         $r = $h('PATCH', '/admin/settings', ['news_source' => 'rss', 'news_url' => 'https://v.example/feed']);
-        $this->assertSame(['source' => 'rss', 'url' => 'https://v.example/feed'], $r->data['news']);
+        $this->assertSame(['source' => 'rss', 'url' => 'https://v.example/feed', 'sources' => ['none', 'wordpress', 'rss', 'app']], $r->data['news']);
         $this->assertSame(['count' => 1], $h('POST', '/admin/news/test')->data);
         $this->assertTrue($app->api()->config()['features']['news']);
 

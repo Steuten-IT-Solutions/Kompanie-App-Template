@@ -29,9 +29,20 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Einzahl bekommen (z. B. „Königshaus“). Über einer einzelnen gemeinsamen Amtszeit steht dann „Königshaus 2026–2028“
   statt „Königshäuser 2026–2028“. Einzutragen in der Verwaltung der Ämter unter *Gruppen → Bearbeiten*; ohne Einzahl
   bleibt es wie bisher.
+- **News direkt in der App schreiben**: Unter *Einstellungen → Neuigkeiten* gibt es die Quelle *In der App schreiben*,
+  mit WordPress und ohne. Dann steht unter News der Knopf *Neuer Beitrag*: Titel und formatierter Text mit Bildern,
+  das erste Bild erscheint auch in der Liste. Beiträge lassen sich später bearbeiten und löschen; wer News abonniert
+  hat, bekommt bei einem neuen Beitrag eine Benachrichtigung. Schreiben darf, wer das neue Recht *News schreiben* hat;
+  mit der Quelle legt die App die Rolle „News verwalten“ an. Es gilt immer eine Quelle, Beiträge der Webseite oder
+  eines Feeds und der App werden nicht gemischt; beim Wechsel bleibt alles gespeichert. Wer die News von der Webseite
+  oder aus einem Feed bezieht, merkt nichts davon.
 
 ### Geändert
 
+- **Kompanien haben eine eigene Seite**: Ein Tipp auf eine Kompanie klappt die Karte nicht mehr auf, sondern öffnet
+  ihre Seite mit Logo, Beschreibung, laufenden Ämtern, Links und der Liste ihrer Mitglieder (wie bisher nur für alle,
+  die die Mitgliederliste sehen dürfen). Die Seite hat einen eigenen Link zum Teilen; „‹ Alle Kompanien“ führt zurück
+  an dieselbe Stelle der Liste. Auch der Name einer Kompanie auf der Seite einer Person führt jetzt direkt dorthin.
 - **Ämter einer Person**: Im Zeitstrahl einer Person steht nur noch das Amt (bzw. seine Einzahl), nicht mehr
   zusätzlich die Gruppe.
 - **Jahreszahl bei Terminen**: Liegt ein Termin nicht im laufenden Jahr, zeigt die App beim Datum jetzt auch das Jahr,
@@ -61,9 +72,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
-- **Bilder aus der Galerie herunterladen**: Unter *Einstellungen → Galerie* schaltest du mit *Knöpfe zum
-  Herunterladen zeigen* ein, dass alle, die die Galerie sehen, jedes Bild in der Großansicht und jedes Album als
-  ZIP-Datei herunterladen können, in voller Auflösung. Videos sind nicht dabei. Vorgabe: aus.
+- **Bilder und Videos aus der Galerie herunterladen**: Unter *Einstellungen → Galerie* schaltest du mit *Knöpfe zum
+  Herunterladen zeigen* ein, dass alle, die die Galerie sehen, jedes Bild und Video in der Großansicht und jedes Album
+  als ZIP-Datei herunterladen können, Bilder in voller Auflösung, Videos unverändert. Große Alben passen auch über
+  4 GB in ein ZIP (ZIP64). Vorgabe: aus.
 - **Eigene Seiten**: Mit dem neuen Bereich *Seiten* (unter *Einstellungen → Bereiche*) legt ihr unter *Verwaltung →
   Einrichtungen → Seiten* freie Seiten wie Geschichte, Festprogramm oder Anfahrt an, mit formatiertem Text und
   Bildern. Je Seite wählst du, ob sie alle sehen, auch ohne Anmeldung, oder nur Mitglieder. Jede Seite ist ein eigener

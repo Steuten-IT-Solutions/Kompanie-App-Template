@@ -531,6 +531,8 @@ final class Api
             'maintenance' => self::maintenanceInfo($a->maintenance()->state()),
             // Einrichtbare Navigation (Issue #277): null = Standardnavigation; nur Darstellung, die Rechte prüfen die Routen
             'navigation' => $a->navigation()->get(),
+            // News in der App geschrieben (Quelle „app“): Wer manage_news hat, sieht dort Knöpfe zum Schreiben und Ändern
+            'newsInApp' => ($features['news'] ?? false) && $a->newsService()->inApp(),
             // Eigene Seiten (Issue #287), die die Person lesen darf: für die Kacheln unter „Seiten“ (ohne Text)
             'pages' => array_map(static fn (array $p): array => ['id' => $p['id'], 'title' => $p['title']], $a->pages()->list($user)),
             'setupPending' => $this->can(Cap::ManageSettings) && !(bool) $a->settings->get(self::SETUP_SETTING, false),
@@ -708,14 +710,23 @@ final class Api
                 return ['removed' => true];
             }, 'gallery'),
 
-            // Neuigkeiten
+            // Neuigkeiten aus der eingestellten Quelle (NewsService); mit der Quelle „app“ schreibt manage_news sie in der App.
             new Route('GET', '/news', Cap::ViewNews, function (Request $r) use ($a) {
                 $page = max(1, (int) ($r->query['page'] ?? 1));
-                $result = $a->news->available() ? $a->news->page($page, self::NEWS_PER_PAGE) : ['items' => [], 'totalPages' => 0];
+                $result = $a->newsService()->page($page, self::NEWS_PER_PAGE);
                 return new Response($result['items'], 200, ['X-Total-Pages' => (string) $result['totalPages']]);
             }, 'news', $denyView),
-            new Route('GET', '/news/{key}', Cap::ViewNews, fn (Request $r) => ($a->news->available() ? $a->news->item((string) $r->params['key']) : null)
-                ?? throw ApiError::notFound('Beitrag nicht gefunden.'), 'news', $denyView),
+            new Route('GET', '/news/{key}', Cap::ViewNews, fn (Request $r) => $a->newsService()->item((string) $r->params['key'], $a->authContext->currentUser()), 'news', $denyView),
+            new Route('POST', '/news', Cap::ManageNews, function (Request $r) use ($a) {
+                $item = $a->newsService()->create((array) $r->body, $this->user());
+                $this->notify(static fn () => $a->pushTriggers()->checkNews());
+                return Response::created($item);
+            }, 'news', $denyRights),
+            new Route('PATCH', '/news/{id}', Cap::ManageNews, fn (Request $r) => $a->newsService()->update($r->id(), (array) $r->body, $this->user()), 'news', $denyRights),
+            new Route('DELETE', '/news/{id}', Cap::ManageNews, function (Request $r) use ($a) {
+                $a->newsService()->delete($r->id());
+                return ['deleted' => true];
+            }, 'news', $denyRights),
 
             // Punktekatalog
             new Route('GET', '/catalog', [Cap::ViewCatalog, Cap::ManagePoints], fn (Request $r) => $a->scores()->catalog($r->queryFlag('all') && $this->can(Cap::ManagePoints)), 'points', $denyView),

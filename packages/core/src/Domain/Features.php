@@ -35,7 +35,9 @@ final class Features
     public const DEFINITIONS = [
         'events' => ['label' => 'Termine', 'description' => 'Öffentliche Termine, die auch Gäste ohne Anmeldung sehen.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_events']],
         'calendar' => ['label' => 'Kalender', 'description' => 'Alle Termine aus Google Kalender für angemeldete Mitglieder.', 'requires' => [], 'setup' => 'kalender', 'role' => null],
-        'news' => ['label' => 'News', 'description' => 'Neuigkeiten der Kompanie, z. B. aus den Beiträgen der Webseite.', 'requires' => [], 'setup' => 'news', 'role' => null],
+        // News: aus den Beiträgen einer Webseite, einem Feed oder in der App geschrieben (NewsService). Die Standardrolle
+        // „News verwalten“ gibt es nur mit der Quelle „In der App“ (roleOf); sonst gibt es in der App nichts zu pflegen.
+        'news' => ['label' => 'News', 'description' => 'Neuigkeiten der Kompanie: aus den Beiträgen der Webseite, einem Feed oder direkt in der App geschrieben.', 'requires' => [], 'setup' => 'news', 'role' => null],
         'gallery' => ['label' => 'Galerie', 'description' => 'Fotoalben aus Google Drive oder nur in der App, mit internen Bildern nur für Mitglieder; auf Wunsch reichen Mitglieder Bilder zur Freigabe ein.', 'requires' => [], 'setup' => 'galerie', 'role' => ['member', 'review_gallery']],
         'points' => ['label' => 'Punkte', 'description' => 'Punkte für Mitglieder, mit Katalog und Verlauf.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_points']],
         'penalties' => ['label' => 'Strafen', 'description' => 'Strafen der Mitglieder, offen oder bezahlt.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_penalties']],
@@ -145,7 +147,7 @@ final class Features
         return match ($feature) {
             'calendar' => $this->app->calendar()->isConfigured(),
             'gallery' => $this->app->gallery()->isConfigured(),
-            'news' => $this->app->news->available(),
+            'news' => $this->app->newsService()->available(),
             'mail' => $this->app->mail()->configured(),
             default => true,
         };
@@ -186,7 +188,7 @@ final class Features
         // Standardrollen der Bereiche (Issue #28): beim Einschalten anlegen, beim Ausschalten entfernen,
         // wenn niemand sie hat.
         foreach ($next as $key => $on) {
-            $caps = self::DEFINITIONS[$key]['role'];
+            $caps = $this->roleOf($key);
             if ($caps !== null && $on !== ($before[$key] ?? false)) {
                 $this->app->roles()->featureChanged($key, $on, $this->roleLabel($key), $caps);
             }
@@ -207,6 +209,19 @@ final class Features
     }
 
     /** Name der Standardrolle eines Bereichs, z. B. „Punkte verwalten“ (mit der Bezeichnung aus kompanie.json). */
+    /**
+     * Rechte der Standardrolle eines Bereichs (DEFINITIONS role); bei den News nur mit der Quelle „In der App“.
+     *
+     * @return string[]|null
+     */
+    public function roleOf(string $feature): ?array
+    {
+        if ($feature === 'news') {
+            return $this->app->newsService()->inApp() ? NewsService::ROLE : null;
+        }
+        return self::DEFINITIONS[$feature]['role'];
+    }
+
     public function roleLabel(string $feature): string
     {
         return $this->app->config->sectionLabel($feature, self::DEFINITIONS[$feature]['label']) . ' verwalten';

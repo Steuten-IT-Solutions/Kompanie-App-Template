@@ -508,6 +508,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
   }
 
   const albumId = tab === 'galerie' && /^\d+$/.test(path[1] ?? '') ? Number(path[1]) : undefined;
+  const companyId = tab === 'kompanien' && /^\d+$/.test(path[1] ?? '') ? Number(path[1]) : undefined;
   const docId = tab === 'dokumente' && /^\d+$/.test(path[1] ?? '') ? Number(path[1]) : undefined;
   const newsId = tab === 'news' && /^[A-Za-z0-9_-]+$/.test(path[1] ?? '') ? path[1] : undefined;
 
@@ -622,7 +623,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
               ) : (
                 <Termine focus={path[1] === 'termin' ? focusId(path[2]) : undefined} />
               ))}
-            {tab === 'news' && <News id={newsId} />}
+            {tab === 'news' && <News id={newsId} onToast={showToast} />}
             {tab === 'galerie' &&
               (path[1] === 'einreichen' && can('submit_gallery') ? (
                 <GalerieEinreichungen mode="einreichen" onToast={showToast} />
@@ -631,7 +632,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
               ) : (
                 <Galerie albumId={albumId} />
               ))}
-            {tab === 'kompanien' && <Kompanien />}
+            {tab === 'kompanien' && <Kompanien id={companyId} />}
             {tab === 'sponsoren' && <Sponsoren />}
             {tab === 'seiten' && <Seiten id={/^\d+$/.test(path[1] ?? '') ? Number(path[1]) : null} />}
             {openMenu?.children && (

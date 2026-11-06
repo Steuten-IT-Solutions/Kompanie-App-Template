@@ -90,8 +90,8 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
 }
 
 /**
- * Übersicht: je Seite eine Zeile; Neuigkeiten nur, wenn die Installation eine eigene News-Quelle hat, Geburtstage nur
- * mit dem Bereich.
+ * Übersicht: je Seite eine Zeile; Neuigkeiten nur, wenn der Server die Quelle einstellen lässt (ältere WordPress-Server
+ * nicht), Geburtstage nur mit dem Bereich.
  */
 function Overview() {
   // Erst nach dem Laden zeigen (beim nächsten Öffnen sofort aus dem Speicher): Sonst rückt „Neuigkeiten“ nachträglich
@@ -1206,8 +1206,8 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
           <span>
             Knöpfe zum Herunterladen zeigen
             <span className="small muted feature-desc">
-              Wer die {sec.gallery} sieht, kann dann jedes Bild in der Großansicht und jedes Album als ZIP herunterladen (in
-              Originalauflösung, ohne Videos).
+              Wer die {sec.gallery} sieht, kann dann jedes Bild und Video in der Großansicht und jedes Album als ZIP herunterladen (Bilder
+              in Originalauflösung, Videos unverändert).
             </span>
           </span>
         </label>
@@ -1320,14 +1320,30 @@ function FailedPhotos({ count, disabled, onRetry }: { count: number; disabled: b
   );
 }
 
+/** Bezeichnung je Quelle der News (Auswahl in den Einstellungen). */
+const NEWS_SOURCE_LABELS: Record<NewsSourceType, string> = {
+  none: 'Keine Neuigkeiten',
+  site: 'Beiträge dieser WordPress-Seite',
+  wordpress: 'Andere WordPress-Webseite',
+  rss: 'RSS- oder Atom-Feed',
+  app: 'In der App schreiben',
+};
+
 export function News({ settings, onSaved, onToast }: SectionProps) {
   const n = settings.news!;
+  // Ältere Server nennen keine Auswahl: dann wie bisher Webseite oder Feed.
+  const choices: NewsSourceType[] = n.sources ?? ['none', 'wordpress', 'rss'];
   const [source, setSource] = useState<NewsSourceType>(n.source);
   const [url, setUrl] = useState(n.url);
   const [result, setResult] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
-  const { busy, error, setError, save } = useSave(onSaved, onToast);
-  const unsaved = source !== n.source || (source !== 'none' && url.trim() !== n.url);
+  const { busy, error, setError, save } = useSave((s) => {
+    // Knöpfe zum Schreiben gleich zeigen bzw. ausblenden, ohne die App neu zu laden.
+    if (config && s.news) config.newsInApp = s.news.source === 'app' && !!config.features.news;
+    onSaved(s);
+  }, onToast);
+  const needsUrl = source === 'wordpress' || source === 'rss';
+  const unsaved = source !== n.source || (needsUrl && url.trim() !== n.url);
 
   async function test() {
     setTesting(true);
@@ -1351,20 +1367,25 @@ export function News({ settings, onSaved, onToast }: SectionProps) {
       error={error}
       onSubmit={(e) => {
         e.preventDefault();
-        if (source !== 'none' && !url.trim()) return setError('Bitte die Adresse angeben.');
-        save({ news_source: source, news_url: source === 'none' ? '' : url.trim() });
+        if (needsUrl && !url.trim()) return setError('Bitte die Adresse angeben.');
+        save({ news_source: source, ...(needsUrl ? { news_url: url.trim() } : {}) });
       }}
     >
-      <p className="muted small">Die Neuigkeiten kommen von einer vorhandenen Webseite der Kompanie.</p>
+      <p className="muted small">
+        Die {newsTitle()} kommen von einer Webseite oder einem Feed, oder ihr schreibt sie direkt in der App. Es gilt immer eine Quelle;
+        beim Wechsel bleiben die Beiträge der anderen erhalten und erscheinen wieder, wenn ihr zurückwechselt.
+      </p>
       <label className="field">
         <span>Quelle</span>
         <select value={source} onChange={(e) => setSource(e.target.value as NewsSourceType)}>
-          <option value="none">Keine Neuigkeiten</option>
-          <option value="wordpress">WordPress-Webseite</option>
-          <option value="rss">RSS- oder Atom-Feed</option>
+          {choices.map((c) => (
+            <option key={c} value={c}>
+              {NEWS_SOURCE_LABELS[c]}
+            </option>
+          ))}
         </select>
       </label>
-      {source !== 'none' && (
+      {needsUrl && (
         <label className="field">
           <span>{source === 'wordpress' ? 'Adresse der Webseite' : 'Adresse des Feeds'}</span>
           <input
@@ -1377,7 +1398,13 @@ export function News({ settings, onSaved, onToast }: SectionProps) {
           />
         </label>
       )}
-      {n.source !== 'none' &&
+      {source === 'app' && (
+        <p className="muted small">
+          Beiträge schreibt, wer das Recht „{sec.news} schreiben“ hat (Standardrolle „{sec.news} verwalten“), direkt unter {sec.news} mit{' '}
+          <strong>Neuer Beitrag</strong>.
+        </p>
+      )}
+      {(n.source === 'wordpress' || n.source === 'rss') &&
         (unsaved ? (
           <p className="muted small">Erst speichern, dann testen.</p>
         ) : (

@@ -1662,9 +1662,37 @@ WHERE title IS NULL",
                 'mysql' => ["ALTER TABLE {office_groups} ADD COLUMN singular varchar(60) NOT NULL DEFAULT ''"],
                 'sqlite' => ["ALTER TABLE {office_groups} ADD COLUMN singular TEXT NOT NULL DEFAULT ''"],
             ],
+            // News in der App (Quelle „app“, NewsService): Text als RichText, Bilder in rich_images (Besitzer news).
+            46 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {app_news} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  title varchar(150) NOT NULL,
+  body mediumtext DEFAULT NULL,
+  created_by bigint(20) unsigned DEFAULT NULL,
+  created_at datetime NOT NULL,
+  updated_by bigint(20) unsigned DEFAULT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  KEY created_at (created_at)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {app_news} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  body TEXT DEFAULT NULL,
+  created_by INTEGER DEFAULT NULL,
+  created_at TEXT NOT NULL,
+  updated_by INTEGER DEFAULT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {app_news}_created_at ON {app_news} (created_at)',
+                ],
+            ],
             // Öffentliche Nachrichten am Schwarzen Brett: audience public (alle, auch ohne Anmeldung) oder members (wer das
             // Brett liest, view_board; wie bei eigenen Seiten). Bestehende Nachrichten bleiben intern.
-            46 => [
+            47 => [
                 'mysql' => ["ALTER TABLE {board_messages} ADD COLUMN audience varchar(10) NOT NULL DEFAULT 'members'"],
                 'sqlite' => ["ALTER TABLE {board_messages} ADD COLUMN audience TEXT NOT NULL DEFAULT 'members'"],
             ],

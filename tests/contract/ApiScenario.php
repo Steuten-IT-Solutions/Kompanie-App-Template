@@ -59,6 +59,7 @@ final class ApiScenario
             $this->companies();
             $this->sponsors();
             $this->pages();
+            $this->newsInApp();
             $this->activity();
             $this->accounts();
             $this->formerMembers();
@@ -1490,6 +1491,39 @@ final class ApiScenario
         [$s, $d] = $this->req('DELETE', "/sponsors/{$mine[0]}/logo");
         $c->ok($s === 200 && array_key_exists('logo_url', (array) $d) && $d['logo_url'] === null, 'Logo entfernen');
         $c->ok($this->req('DELETE', "/sponsors/{$mine[0]}")[0] === 200 && $this->req('DELETE', "/sponsors/{$mine[1]}")[0] === 200 && $this->req('PATCH', "/sponsors/{$mine[0]}", ['name' => 'x'])[0] === 404, 'Aufräumen: Sponsoren löschen');
+    }
+
+    /** News in der App (Quelle app): schreiben, lesen ohne Anmeldung, ändern mit Stand, löschen; Quelle danach zurück. */
+    private function newsInApp(): void
+    {
+        $c = $this->c;
+        $c->section('News in der App');
+        $admin = $this->user('kptest_news_admin', 'admin');
+        $m = $this->user('kptest_news_m', 'member');
+        $this->d->actAs($admin);
+        $this->req('PUT', '/admin/features', ['news' => true]);
+        [, $settings] = $this->req('GET', '/admin/settings');
+        $before = (string) ($settings['news']['source'] ?? 'none');
+        $c->ok(in_array('app', (array) ($settings['news']['sources'] ?? []), true), 'Quelle app wählbar');
+        [$s] = $this->req('PATCH', '/admin/settings', ['news_source' => 'app']);
+        $c->ok($s === 200 && ($this->req('GET', '/config')[1]['newsInApp'] ?? null) === true, 'Quelle app eingestellt, /config newsInApp');
+        [$s, $item] = $this->req('POST', '/news', ['title' => 'Kptest Beitrag', 'body' => '<p>Hallo <b>alle</b></p><script>alert(1)</script>']);
+        $c->ok($s === 201 && ($item['link'] ?? null) === '' && !str_contains((string) ($item['content'] ?? ''), 'script'), 'Beitrag schreiben, Text bereinigt');
+        $id = (string) ($item['id'] ?? '0');
+        $this->d->actAs(null);
+        $c->ok(in_array('Kptest Beitrag', array_column((array) ($this->req('GET', '/news')[1] ?? []), 'title'), true), 'Ohne Anmeldung in der Liste');
+        $this->d->actAs($m);
+        $c->ok($this->req('PATCH', '/news/' . $id, ['title' => 'X'])[0] === 403, 'Ohne manage_news → 403');
+        $this->d->actAs($admin);
+        $loaded = (string) ($this->req('GET', '/news/' . $id)[1]['updated_at'] ?? '');
+        [$s, $d] = $this->req('PATCH', '/news/' . $id, ['title' => 'Kptest Beitrag geändert', 'updated_at' => $loaded]);
+        $c->ok($s === 200 && ($d['title'] ?? '') === 'Kptest Beitrag geändert', 'Mit aktuellem Stand speichern');
+        [$s, $d] = $this->req('PATCH', '/news/' . $id, ['title' => 'Zu spät', 'updated_at' => '2000-01-01T00:00:00Z']);
+        $c->ok($s === 409 && ($d['code'] ?? '') === 'conflict', 'Veralteter Stand → 409 conflict');
+        $c->ok($this->req('DELETE', '/news/' . $id)[0] === 200 && $this->req('GET', '/news/' . $id)[0] === 404, 'Beitrag löschen');
+        [$s] = $this->req('PATCH', '/admin/settings', ['news_source' => $before]);
+        [$s2, $d] = $this->req('POST', '/news', ['title' => 'X']);
+        $c->ok($s === 200 && $s2 === 409 && ($d['code'] ?? '') === 'not_in_app', 'Quelle zurück, Schreiben dann 409 not_in_app');
     }
 
     /** Eigene Seiten (Issue #287): Lesen nach Zielgruppe, Pflege mit manage_pages, Konflikt beim Speichern, Reihenfolge. */

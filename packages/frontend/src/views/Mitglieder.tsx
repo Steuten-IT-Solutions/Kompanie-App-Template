@@ -223,7 +223,7 @@ function PersonHead({
           {m.companies.map((c, i) => (
             <span key={c.id}>
               {i > 0 && ', '}
-              <button type="button" className="link-button" onClick={() => navigate('kompanien')}>
+              <button type="button" className="link-button" onClick={() => navigate(`kompanien/${c.id}`)}>
                 {c.name}
               </button>
             </span>

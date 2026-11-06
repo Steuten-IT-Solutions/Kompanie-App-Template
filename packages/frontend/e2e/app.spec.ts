@@ -1723,7 +1723,7 @@ test('Galerie: Knöpfe zum Herunterladen für ein Bild und das Album als ZIP, nu
     const bytes = readFileSync((await zip.path())!);
     expect(bytes.subarray(0, 4).toString('latin1')).toBe('PK\x03\x04');
     expect(bytes.includes(Buffer.from('foto.jpg'))).toBe(true);
-    await expect(page.locator('.album-download [role=status]')).toHaveText('1 Bild gespeichert.');
+    await expect(page.locator('.album-download [role=status]')).toHaveText('1 Datei gespeichert.');
 
     await page.locator('.photo-grid .photo').first().click();
     const [single] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Bild herunterladen' }).click()]);
@@ -3357,6 +3357,48 @@ test('Galerie: Video mit ▶ im Album, spielt in der Großansicht aus Drive (Ran
   await page.keyboard.press('Escape');
 });
 
+test('Galerie: Videos lassen sich herunterladen, einzeln und im ZIP des Albums', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const patch = (value: '0' | '1') =>
+    page.evaluate(async (value) => {
+      const cfg = window.KOMPANIE_CONFIG!;
+      const res = await fetch(cfg.apiBase + 'admin/settings', {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+        body: JSON.stringify({ gallery_downloads: value }),
+      });
+      return res.status;
+    }, value);
+  expect(await patch('1')).toBe(200);
+  try {
+    // Als Gast wie im Test oben (Umzug: ein Bild und ein Video)
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
+    await page.goto('/app/#/galerie');
+    await page.locator('.album-card', { hasText: 'Umzug' }).click();
+    await expect(page.locator('.photo')).toHaveCount(2);
+    const size = readFileSync(new URL('../../../tests/fixtures/galerie-video.webm', import.meta.url)).length;
+
+    const zipButton = page.getByRole('button', { name: /^Album herunterladen \(1 Bild · 1 Video, ZIP\)$/ });
+    const [zip] = await Promise.all([page.waitForEvent('download'), zipButton.click()]);
+    const bytes = readFileSync((await zip.path())!);
+    expect(bytes.includes(Buffer.from('umzug.webm'))).toBe(true);
+    expect(bytes.length).toBeGreaterThan(size);
+    await expect(page.locator('.album-download [role=status]')).toHaveText('2 Dateien gespeichert.');
+
+    await page.locator('.photo-video').click();
+    const [single] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Video herunterladen' }).click()]);
+    expect(single.suggestedFilename()).toBe('umzug.webm');
+    expect(readFileSync((await single.path())!).length).toBe(size);
+    await page.keyboard.press('Escape');
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD);
+    expect(await patch('0')).toBe(200);
+  }
+});
+
 test('iPhone: Banner führt zur bebilderten Installationsanleitung', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/');
@@ -3952,10 +3994,11 @@ test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ 
     await page.locator('.toast').waitFor({ state: 'detached' });
   };
   if (!STANDALONE) {
-    // WordPress: Neuigkeiten kommen aus den Beiträgen (keine Seite); Kalender und Galerie sind einstellbar.
+    // WordPress: Neuigkeiten aus den Beiträgen der Seite oder in der App; Kalender und Galerie sind einstellbar.
     // Die Test-Instanz hat keine Attrappen für Google, deshalb nur Speichern und Prüfen der Eingabe.
     await expect(page.locator('.settings-link').filter({ has: page.getByText('Galerie', { exact: true }) })).toBeVisible();
-    await expect(page.locator('.settings-link').filter({ has: page.getByText('Neuigkeiten', { exact: true }) })).toHaveCount(0);
+    await open('Neuigkeiten');
+    await expect(page.locator('.settings-section', { hasText: 'Neuigkeiten' }).getByLabel('Quelle')).toHaveValue('site');
     await open('Kalender');
     await cacheMinutes();
     const cal = page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' });
@@ -4265,7 +4308,7 @@ test('Punktekatalog und Dienstgrade per Ziehen am Griff umsortieren, Schwellen w
   }
 });
 
-test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast sieht Karte mit Beschreibung und Mitgliedern, Filter, löschen', async ({
+test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast öffnet die Seite mit Beschreibung und Mitgliedern, Filter, löschen', async ({
   page,
 }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
@@ -4307,12 +4350,20 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast sieht Karte mit B
     await page.locator('.tabbar').getByRole('button', { name: 'Kompanien' }).click();
     const card = page.locator('.company-card', { hasText: 'Testkompanie' });
     await expect(card).toContainText('TK · gegründet 1905 · 1 Mitglieder');
-    await card.locator('summary').click();
-    await expect(card).toContainText('Gegründet zum Schützenfest.');
-    await expect(card.getByRole('link', { name: 'Webseite' })).toHaveAttribute('href', 'https://kompanie.example/');
-    await expect(card.getByRole('link', { name: 'Webseite' })).toHaveClass(/\bbtn\b/);
+    // Antippen öffnet die eigene Seite der Kompanie (statt Aufklappen), zurück zur Liste
+    await card.getByRole('button', { name: /Testkompanie/ }).click();
+    await expect(page).toHaveURL(/#\/kompanien\/\d+$/);
+    const detail = page.locator('.company-page');
+    await expect(detail.getByRole('heading', { name: 'Testkompanie' })).toBeVisible();
+    await expect(detail).toContainText('TK · gegründet 1905 · 1 Mitglieder');
+    await expect(detail).toContainText('Gegründet zum Schützenfest.');
+    await expect(detail.getByRole('link', { name: 'Webseite' })).toHaveAttribute('href', 'https://kompanie.example/');
+    await expect(detail.getByRole('link', { name: 'Webseite' })).toHaveClass(/\bbtn\b/);
+    await detail.getByRole('button', { name: '‹ Alle Kompanien' }).click();
+    await expect(page).toHaveURL(/#\/kompanien$/);
+    await card.getByRole('button', { name: /Testkompanie/ }).click();
     // Eingefügte Farbe: hell lesbar und angezeigt, dunkel zu wenig Kontrast und entfernt; großer Zeilenabstand nie
-    const pasted = card.locator('.rich-text span', { hasText: 'Seit 1905 dabei.' });
+    const pasted = detail.locator('.rich-text span', { hasText: 'Seit 1905 dabei.' });
     const setTheme = (theme: 'light' | 'dark') =>
       page.evaluate((t) => {
         localStorage.setItem('kompanie-theme', t);
@@ -4327,8 +4378,11 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast sieht Karte mit B
     await expect(pasted).not.toHaveAttribute('style', /line-height/);
     await setTheme('light');
     await shot(page, 'kompanien');
-    await card.getByRole('button', { name: 'Mitglied1' }).click();
+    await detail.getByRole('button', { name: 'Mitglied1' }).click();
     await expect(page.locator('.member-page-companies')).toHaveText('Testkompanie');
+    // Von der Seite der Person zurück zur Seite der Kompanie
+    await page.locator('.member-page-companies').getByRole('button', { name: 'Testkompanie' }).click();
+    await expect(page.locator('.company-page').getByRole('heading', { name: 'Testkompanie' })).toBeVisible();
     // Filter in der Mitgliederliste
     await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
     await page.locator('.member-company-filter select').selectOption({ label: 'Testkompanie' });
@@ -4392,6 +4446,73 @@ test('Sponsoren (Issue #279): anlegen mit Link und Logo, Gast sieht sie ohne Anm
       .getByRole('button', { name: 'Löschen' })
       .click();
     await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  }
+});
+
+test('News in der App: Quelle wählen, Beitrag schreiben, Gast liest ihn, bearbeiten, löschen, Quelle zurück', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const openNewsSettings = async () => {
+    await page.goto('/app/#/einstellungen');
+    await page
+      .locator('.settings-link')
+      .filter({ has: page.getByText('Neuigkeiten', { exact: true }) })
+      .click();
+    return page.locator('.settings-section', { hasText: 'Neuigkeiten' });
+  };
+  let section = await openNewsSettings();
+  const before = await section.getByLabel('Quelle').inputValue();
+  await section.getByLabel('Quelle').selectOption({ label: 'In der App schreiben' });
+  await expect(section.locator('input[type=url]')).toHaveCount(0);
+  await section.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+
+  try {
+    await page.goto('/app/#/news');
+    await page.getByRole('button', { name: 'Neuer Beitrag' }).click();
+    const form = page.locator('form.news-editor');
+    await form.getByLabel('Titel').fill('Schützenfest am Samstag');
+    await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Wir treffen uns um 14 Uhr am Festplatz.');
+    await form.getByRole('button', { name: 'Veröffentlichen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Beitrag veröffentlicht');
+    await expect(page.locator('.news-headline')).toHaveText('Schützenfest am Samstag');
+    await expect(page.locator('.news-content')).toContainText('Wir treffen uns um 14 Uhr am Festplatz.');
+    await expect(page.getByRole('link', { name: 'Auf der Webseite öffnen' })).toHaveCount(0);
+    await shot(page, 'news-schreiben');
+
+    // Bearbeiten
+    await page.getByRole('button', { name: 'Bearbeiten' }).click();
+    const edit = page.locator('form.news-editor');
+    await expect(edit.getByRole('textbox', { name: 'Text', exact: true })).toContainText('Festplatz');
+    await edit.getByLabel('Titel').fill('Schützenfest am Samstag, 14 Uhr');
+    await edit.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
+    await expect(page.locator('.news-headline')).toHaveText('Schützenfest am Samstag, 14 Uhr');
+
+    // Ohne Anmeldung: lesen ja, schreiben nein
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
+    await page.locator('.tabbar').getByRole('button', { name: 'News' }).click();
+    await expect(page.locator('.news-card').first()).toContainText('Schützenfest am Samstag, 14 Uhr');
+    await expect(page.getByRole('button', { name: 'Neuer Beitrag' })).toHaveCount(0);
+    await page.locator('.news-card').first().click();
+    await expect(page.locator('.news-content')).toContainText('Festplatz');
+    await expect(page.getByRole('button', { name: 'Bearbeiten' })).toHaveCount(0);
+
+    // Löschen
+    await login(page, 'admin', ADMIN_PASSWORD);
+    await page.goto('/app/#/news');
+    await page.locator('.news-card', { hasText: 'Schützenfest am Samstag, 14 Uhr' }).click();
+    page.once('dialog', (d) => d.accept());
+    await page.getByRole('button', { name: 'Löschen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Beitrag gelöscht');
+    await expect(page.locator('.news-card', { hasText: 'Schützenfest' })).toHaveCount(0);
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD);
+    section = await openNewsSettings();
+    await section.getByLabel('Quelle').selectOption(before);
+    await section.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
   }
 });
 
