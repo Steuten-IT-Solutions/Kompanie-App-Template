@@ -287,11 +287,12 @@ final class PushTriggers
      */
     public function checkNews(): int
     {
-        if (!$this->app->news->available()) {
+        $source = $this->app->newsService()->source();
+        if (!$source->available()) {
             return 0;
         }
         try {
-            $items = $this->app->news->page(1, 10)['items'];
+            $items = $source->page(1, 10)['items'];
         } catch (\RuntimeException) {
             return 0;
         }

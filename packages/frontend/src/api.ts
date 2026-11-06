@@ -53,6 +53,7 @@ export type Capability =
   | 'submit_gallery'
   | 'review_gallery'
   | 'manage_pages'
+  | 'manage_news'
   | 'view_personal'
   | 'manage_personal'
   | 'create_users'
@@ -128,6 +129,8 @@ export interface AppConfig {
   navigation?: NavigationSetting | null;
   /** Eigene Seiten (Issue #287), die die Person lesen darf, in ihrer Reihenfolge; fehlt bei älteren Servern */
   pages?: { id: number; title: string }[];
+  /** News werden in der App geschrieben (Quelle „In der App“); fehlt bei älteren Servern */
+  newsInApp?: boolean;
   /** Vorschau „App als Rolle ansehen“ (Issue #63): vom Server bestätigt; role ist der Schlüssel oder @public */
   preview?: { role: string; label: string } | null;
   /** Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen; null ohne den Bereich, fehlt bei älteren Servern */
@@ -437,8 +440,19 @@ export interface NewsItem {
   date: string;
   excerpt: string;
   image: string | null;
+  /** Adresse auf der Webseite; leer bei Beiträgen, die in der App geschrieben wurden */
   link: string;
   content?: string;
+  /** Nur für die Pflege der News in der App (manage_news): Stand für das Speichern (409 conflict) */
+  updated_at?: string | null;
+  updated_by_name?: string | null;
+}
+
+/** Beitrag der News in der App: Titel und formatierter Text (RichText mit Bildern). */
+export interface NewsInput {
+  title?: string;
+  body?: string;
+  updated_at?: string | null;
 }
 
 export interface GalleryAlbumSummary {
@@ -1837,6 +1851,9 @@ export const api = {
     return { items: data, totalPages: Number(headers.get('X-Total-Pages') ?? 1) };
   },
   newsItem: (id: string) => request<NewsItem>('GET', `/news/${encodeURIComponent(id)}`),
+  createNews: (data: NewsInput) => request<NewsItem>('POST', '/news', data),
+  updateNews: (id: string, data: NewsInput) => request<NewsItem>('PATCH', `/news/${encodeURIComponent(id)}`, data),
+  deleteNews: (id: string) => request<{ deleted: boolean }>('DELETE', `/news/${encodeURIComponent(id)}`),
 
   gallery: () => request<{ years: GalleryYear[] }>('GET', '/gallery'),
   galleryAlbum: (id: number) => request<GalleryAlbum>('GET', `/gallery/${id}`),
@@ -2452,7 +2469,8 @@ export interface ErrorLogEntry {
   message: string;
 }
 
-export type NewsSourceType = 'none' | 'wordpress' | 'rss';
+/** site: Beiträge dieser WordPress-Seite (nur im Plugin); app: in der App geschrieben */
+export type NewsSourceType = 'none' | 'wordpress' | 'rss' | 'site' | 'app';
 
 export interface AdminSettings {
   /** Gemeinsamer Google-Zugang für Galerie und Kalender: „Mit Google verbinden“ oder Dienstkonto */
@@ -2496,7 +2514,8 @@ export interface AdminSettings {
     calendar_access: boolean;
     status: { albums?: number; photos?: number; pending?: number; failed?: number; last_sync?: number; error?: string };
   };
-  news: { source: NewsSourceType; url: string } | null;
+  /** sources: was diese Installation kann (fehlt bei älteren Servern; null bei älteren WordPress-Servern) */
+  news: { source: NewsSourceType; url: string; sources?: NewsSourceType[] } | null;
   /** Links auf Impressum und Datenschutzerklärung; leer, solange keiner eingetragen ist (fehlt bei älteren Servern) */
   legal?: { imprint_url: string; privacy_url: string };
 }

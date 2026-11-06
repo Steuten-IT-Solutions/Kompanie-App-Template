@@ -3933,10 +3933,11 @@ test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ 
     await page.locator('.toast').waitFor({ state: 'detached' });
   };
   if (!STANDALONE) {
-    // WordPress: Neuigkeiten kommen aus den Beiträgen (keine Seite); Kalender und Galerie sind einstellbar.
+    // WordPress: Neuigkeiten aus den Beiträgen der Seite oder in der App; Kalender und Galerie sind einstellbar.
     // Die Test-Instanz hat keine Attrappen für Google, deshalb nur Speichern und Prüfen der Eingabe.
     await expect(page.locator('.settings-link').filter({ has: page.getByText('Galerie', { exact: true }) })).toBeVisible();
-    await expect(page.locator('.settings-link').filter({ has: page.getByText('Neuigkeiten', { exact: true }) })).toHaveCount(0);
+    await open('Neuigkeiten');
+    await expect(page.locator('.settings-section', { hasText: 'Neuigkeiten' }).getByLabel('Quelle')).toHaveValue('site');
     await open('Kalender');
     await cacheMinutes();
     const cal = page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' });
@@ -4373,6 +4374,73 @@ test('Sponsoren (Issue #279): anlegen mit Link und Logo, Gast sieht sie ohne Anm
       .getByRole('button', { name: 'Löschen' })
       .click();
     await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  }
+});
+
+test('News in der App: Quelle wählen, Beitrag schreiben, Gast liest ihn, bearbeiten, löschen, Quelle zurück', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const openNewsSettings = async () => {
+    await page.goto('/app/#/einstellungen');
+    await page
+      .locator('.settings-link')
+      .filter({ has: page.getByText('Neuigkeiten', { exact: true }) })
+      .click();
+    return page.locator('.settings-section', { hasText: 'Neuigkeiten' });
+  };
+  let section = await openNewsSettings();
+  const before = await section.getByLabel('Quelle').inputValue();
+  await section.getByLabel('Quelle').selectOption({ label: 'In der App schreiben' });
+  await expect(section.locator('input[type=url]')).toHaveCount(0);
+  await section.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+
+  try {
+    await page.goto('/app/#/news');
+    await page.getByRole('button', { name: 'Neuer Beitrag' }).click();
+    const form = page.locator('form.news-editor');
+    await form.getByLabel('Titel').fill('Schützenfest am Samstag');
+    await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Wir treffen uns um 14 Uhr am Festplatz.');
+    await form.getByRole('button', { name: 'Veröffentlichen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Beitrag veröffentlicht');
+    await expect(page.locator('.news-headline')).toHaveText('Schützenfest am Samstag');
+    await expect(page.locator('.news-content')).toContainText('Wir treffen uns um 14 Uhr am Festplatz.');
+    await expect(page.getByRole('link', { name: 'Auf der Webseite öffnen' })).toHaveCount(0);
+    await shot(page, 'news-schreiben');
+
+    // Bearbeiten
+    await page.getByRole('button', { name: 'Bearbeiten' }).click();
+    const edit = page.locator('form.news-editor');
+    await expect(edit.getByRole('textbox', { name: 'Text', exact: true })).toContainText('Festplatz');
+    await edit.getByLabel('Titel').fill('Schützenfest am Samstag, 14 Uhr');
+    await edit.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
+    await expect(page.locator('.news-headline')).toHaveText('Schützenfest am Samstag, 14 Uhr');
+
+    // Ohne Anmeldung: lesen ja, schreiben nein
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
+    await page.locator('.tabbar').getByRole('button', { name: 'News' }).click();
+    await expect(page.locator('.news-card').first()).toContainText('Schützenfest am Samstag, 14 Uhr');
+    await expect(page.getByRole('button', { name: 'Neuer Beitrag' })).toHaveCount(0);
+    await page.locator('.news-card').first().click();
+    await expect(page.locator('.news-content')).toContainText('Festplatz');
+    await expect(page.getByRole('button', { name: 'Bearbeiten' })).toHaveCount(0);
+
+    // Löschen
+    await login(page, 'admin', ADMIN_PASSWORD);
+    await page.goto('/app/#/news');
+    await page.locator('.news-card', { hasText: 'Schützenfest am Samstag, 14 Uhr' }).click();
+    page.once('dialog', (d) => d.accept());
+    await page.getByRole('button', { name: 'Löschen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Beitrag gelöscht');
+    await expect(page.locator('.news-card', { hasText: 'Schützenfest' })).toHaveCount(0);
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD);
+    section = await openNewsSettings();
+    await section.getByLabel('Quelle').selectOption(before);
+    await section.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
   }
 });
 

@@ -26,7 +26,7 @@ Diesen Schritt kannst du nicht überspringen. Ohne Bereich zeigt die App nur die
 Für jeden gewählten Bereich, der eine Verbindung braucht, folgt ein eigener Schritt:
 - **Kalender für Mitglieder** (wenn {bereich.calendar} an ist), siehe [Kalender einrichten](seite:admin-kalender).
 - **Google-Zugang** und **{bereich.gallery} aus Google Drive** (wenn {bereich.gallery} an ist), siehe [Google-Zugang](seite:admin-google) und [{bereich.gallery} einrichten](seite:admin-galerie). Ist {bereich.gallery} aus, steht der Google-Zugang im Schritt für den Kalender.
-- **Neuigkeiten** (wenn {bereich.news} an ist; nur ohne WordPress).
+- **Neuigkeiten** (wenn {bereich.news} an ist), siehe [{bereich.news} einrichten](seite:admin-neuigkeiten).
 
 1. Fülle die Felder aus und tippe im Abschnitt auf **Speichern**.
 2. Tippe auf **Weiter**. Willst du das später erledigen, tippe gleich auf **Weiter**.
