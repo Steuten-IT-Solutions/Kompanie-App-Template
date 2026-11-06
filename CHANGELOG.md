@@ -25,6 +25,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   öffentlichen Nachricht einmalig dazugeschaltet); die E-Mail geht weiter nur an Mitglieder und alle mit dem internen
   Kalender. Die Sichtbarkeit lässt sich beim Bearbeiten ändern und steht im Verlauf. Bisherige Nachrichten bleiben
   intern.
+- **Kompanien: Suche und Sortierung**: Über der Liste der Kompanien stehen wie in der Mitgliederliste ein Suchfeld
+  (Name oder Kurzname) und die Sortierung: wie festgelegt, nach Name, Gründung oder Mitgliedern, jeweils auch
+  umgekehrt. Aufgelöste Kompanien stehen weiter unten; die Wahl merkt sich das Gerät.
 - **Ämter: Einzahl für Gruppen**: Eine Gruppe der Ämter kann neben ihrer Bezeichnung (z. B. „Königshäuser“) eine
   Einzahl bekommen (z. B. „Königshaus“). Über einer einzelnen gemeinsamen Amtszeit steht dann „Königshaus 2026–2028“
   statt „Königshäuser 2026–2028“. Einzutragen in der Verwaltung der Ämter unter *Gruppen → Bearbeiten*; ohne Einzahl
@@ -51,6 +54,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Kein Leerraum zum Scrollen auf kurzen Seiten**: Seiten mit wenig Inhalt, etwa die leere Galerie, ließen sich im
+  Handy-Browser ein Stück nach unten scrollen, so dass die Knöpfe oben aus dem Bild rutschten. Die Mindesthöhe der App
+  richtet sich jetzt nach dem sichtbaren Bildschirm (ohne die Adressleiste des Browsers).
 - **Formatierte Texte im dunklen Design lesbar**: Eingefügter Text (z. B. von eurer Webseite) brachte oft eine feste
   Schriftfarbe mit, die im dunklen Design kaum zu lesen war, etwa in der Beschreibung einer Kompanie. Farben mit zu
   wenig Kontrast zum Hintergrund zeigt die App jetzt in ihrer normalen Schriftfarbe, sehr große Zeilenabstände setzt

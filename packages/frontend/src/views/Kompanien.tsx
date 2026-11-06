@@ -1,5 +1,17 @@
-import { useLayoutEffect } from 'react';
+import { useLayoutEffect, useMemo, useState } from 'react';
 import { can, config, type Company, type Office } from '../api';
+import {
+  COMPANY_SORT_LABELS,
+  companyDirLabel,
+  companyOrderFor,
+  defaultCompanyDir,
+  loadCompanyOrder,
+  matchesCompany,
+  saveCompanyOrder,
+  sortCompanies,
+  type CompanyOrder,
+  type CompanySort,
+} from '../companySort';
 import brand from '../generated/brand';
 import RichTextView from '../richtext/RichTextView';
 import { navigate } from '../router';
@@ -49,10 +61,12 @@ function facts(c: Company): string {
  * dorthin statt an den Anfang (wie bei den Alben der Galerie).
  */
 let listScroll: number | null = null;
+/** Suche der Liste: bleibt beim Öffnen einer Kompanie und beim Zurückkehren stehen (bis zum Neuladen der App). */
+let listQuery = '';
 
 /**
- * Kompanien (Issue #280): Liste mit Logo in der Reihenfolge der Verwaltung; Antippen öffnet die eigene Seite der Kompanie
- * (#/kompanien/<id>). Aufgelöste stehen unten als „ehemalig“.
+ * Kompanien (Issue #280): Liste mit Logo, Suche und Sortierung (wie in der Mitgliederliste; Standard: Reihenfolge der
+ * Verwaltung); Antippen öffnet die eigene Seite der Kompanie (#/kompanien/<id>). Aufgelöste stehen unten als „ehemalig“.
  */
 export default function Kompanien({ id }: { id?: number }) {
   return id === undefined ? <CompanyList /> : <CompanyDetail id={id} />;
@@ -60,6 +74,30 @@ export default function Kompanien({ id }: { id?: number }) {
 
 function CompanyList() {
   const { data, error, loading, reload } = useAsync(sources.companies.load, sources.companies.deps, sources.companies.key);
+  const [query, setQueryState] = useState(listQuery);
+  const setQuery = (q: string) => {
+    listQuery = q;
+    setQueryState(q);
+  };
+  const [stored, setStored] = useState<CompanyOrder>(loadCompanyOrder);
+  // Nach Mitgliedern nur, wenn der Server die Zahlen schickt (wer die Mitgliederliste sieht).
+  const sorts: CompanySort[] = (data ?? []).some((c) => c.member_count !== undefined)
+    ? ['order', 'name', 'founded', 'members']
+    : ['order', 'name', 'founded'];
+  const order = companyOrderFor(stored, sorts);
+  const changeOrder = (next: CompanyOrder) => {
+    setStored(next);
+    saveCompanyOrder(next);
+  };
+  const list = useMemo(
+    () =>
+      sortCompanies(
+        (data ?? []).filter((c) => matchesCompany(c, query)),
+        order,
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data, query, order.sort, order.dir],
+  );
   const ready = !!data;
   useLayoutEffect(() => {
     if (!ready || listScroll === null) return;
@@ -69,36 +107,82 @@ function CompanyList() {
   if (loading && !data) return <Loading />;
   if (error || !data) return <ErrorBox message={error ?? `Die ${sec.companies} konnten nicht geladen werden.`} onRetry={reload} />;
   if (data.length === 0) return <Empty>Noch keine {sec.companies}.</Empty>;
-  const ordered = [...data.filter((c) => c.active), ...data.filter((c) => !c.active)];
   return (
-    <ul className="card-list company-list">
-      {ordered.map((c) => (
-        <li key={c.id} className={`card company-card${c.active ? '' : ' inactive'}`} data-focus-id={c.id}>
-          <button
-            type="button"
-            className="company-summary"
-            onClick={() => {
-              listScroll = window.scrollY;
-              navigate(`kompanien/${c.id}`);
-            }}
-          >
-            <span className="company-logo-box">
-              <CompanyLogo company={c} />
-            </span>
-            <span className="company-head">
-              <span className="row-title">
-                {c.name}
-                {!c.active && <span className="badge badge-level-guest">ehemalig</span>}
+    <div className="company-directory">
+      {data.length > 1 && (
+        <>
+          <input
+            className="search"
+            type="search"
+            placeholder="Suchen …"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label={`${sec.companies} suchen`}
+          />
+          <div className="field-row member-sort">
+            {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
+            <div className="field">
+              <span id="companies-sort-label">Sortierung</span>
+              <select
+                aria-labelledby="companies-sort-label"
+                value={order.sort}
+                onChange={(e) => {
+                  const sort = e.target.value as CompanySort;
+                  changeOrder({ sort, dir: defaultCompanyDir(sort) });
+                }}
+              >
+                {sorts.map((s) => (
+                  <option key={s} value={s}>
+                    {COMPANY_SORT_LABELS[s]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field member-sort-dir">
+              <span id="companies-sort-dir-label">Reihenfolge</span>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                aria-labelledby="companies-sort-dir-label companies-sort-dir-value"
+                title="Reihenfolge umkehren"
+                onClick={() => changeOrder({ ...order, dir: order.dir === 'asc' ? 'desc' : 'asc' })}
+              >
+                <span id="companies-sort-dir-value">{companyDirLabel(order.sort, order.dir)}</span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+      <ul className="card-list company-list">
+        {list.map((c) => (
+          <li key={c.id} className={`card company-card${c.active ? '' : ' inactive'}`} data-focus-id={c.id}>
+            <button
+              type="button"
+              className="company-summary"
+              onClick={() => {
+                listScroll = window.scrollY;
+                navigate(`kompanien/${c.id}`);
+              }}
+            >
+              <span className="company-logo-box">
+                <CompanyLogo company={c} />
               </span>
-              <span className="row-sub">{facts(c)}</span>
-            </span>
-            <span className="chevron" aria-hidden="true">
-              ›
-            </span>
-          </button>
-        </li>
-      ))}
-    </ul>
+              <span className="company-head">
+                <span className="row-title">
+                  {c.name}
+                  {!c.active && <span className="badge badge-level-guest">ehemalig</span>}
+                </span>
+                <span className="row-sub">{facts(c)}</span>
+              </span>
+              <span className="chevron" aria-hidden="true">
+                ›
+              </span>
+            </button>
+          </li>
+        ))}
+        {list.length === 0 && <Empty>Nichts gefunden.</Empty>}
+      </ul>
+    </div>
   );
 }
 
