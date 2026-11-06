@@ -3,7 +3,7 @@
 
 import { type BirthdayEntry } from './api';
 import brand from './generated/brand';
-import { formatWeekdayDate, parseLocalDate, shortMonth } from './format';
+import { formatWeekdayDateYear, parseLocalDate, shortMonth } from './format';
 import { ErrorBox, useAsync } from './ui';
 import { sources, upcomingBirthdayDays } from './viewData';
 
@@ -14,7 +14,7 @@ export { birthdaysVisible } from './viewData';
 
 function whenText(b: BirthdayEntry): string {
   if (b.days_until === 1) return 'Morgen';
-  return formatWeekdayDate(parseLocalDate(b.date));
+  return formatWeekdayDateYear(parseLocalDate(b.date));
 }
 
 function BirthdayRow({ b }: { b: BirthdayEntry }) {
