@@ -1517,6 +1517,71 @@ test('Ämter: Haken „Ehrung“ an der Amtszeit, einzelnes Jahr ohne Ehrung (Is
   await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
 });
 
+test('Ämter: gemeinsame Amtszeiten einer Gruppe mit Gruppenbild, öffentlich als Karte (Issue #282)', async ({ page }) => {
+  const n = Date.now() % 1000000;
+  const group = `Königshaus ${n}`;
+  const offices = [`Majestät ${n}`, `Adjutant ${n}`];
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Ämter');
+  await page.getByLabel('Neue Gruppe').fill(group);
+  await page.getByRole('button', { name: 'Gruppe anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gruppe angelegt');
+  const newOffice = page.locator('form', { hasText: 'Neues Amt' });
+  for (const office of offices) {
+    await newOffice.getByLabel('Bezeichnung').fill(office);
+    await newOffice.getByLabel('Gruppe').selectOption({ label: group });
+    await newOffice.getByRole('button', { name: 'Anlegen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Amt angelegt');
+  }
+  const groupRow = page.locator('li.card', { hasText: group }).filter({ has: page.getByRole('button', { name: 'Umbenennen' }) });
+  // Gesteuert: der Haken steht erst, wenn der Server die Änderung bestätigt hat
+  await groupRow.getByLabel('Amtszeiten gemeinsam').click();
+  await expect(page.locator('.toast')).toHaveText('Gemeinsame Amtszeiten an');
+  await expect(groupRow.getByLabel('Amtszeiten gemeinsam')).toBeChecked();
+
+  const admin = page.locator('.office-admin-group', { hasText: group }).locator('.joint-admin');
+  await expect(admin).toContainText('Noch keine gemeinsamen Amtszeiten.');
+  await admin.getByRole('button', { name: 'Neue gemeinsame Amtszeit' }).click();
+  const form = admin.locator('form.joint-term-form');
+  await form.getByLabel('Von (Jahr)', { exact: true }).fill('2023');
+  await form.locator('input[type=file]').setInputFiles(PNG);
+  await expect(form.locator('img.joint-term-form-image')).toBeVisible();
+  const holders = [`Anna ${n}`, `Bernd ${n}`];
+  for (const [i, office] of offices.entries()) {
+    const set = form.locator('fieldset', { hasText: office });
+    await set.getByRole('button', { name: 'Person hinzufügen' }).click();
+    await set.getByLabel('Name', { exact: true }).fill(holders[i]);
+  }
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gemeinsame Amtszeit angelegt');
+  await expect(admin.locator('li.card')).toContainText(`${offices[0]}: ${holders[0]}`);
+  await expect(admin.locator('li.card')).toContainText(`${offices[1]}: ${holders[1]}`);
+
+  // Öffentlich: eine Karte je gemeinsame Amtszeit mit Bild und den Personen je Amt
+  await page.goto('/app/#/mitglieder/aemter');
+  const card = page.locator('.joint-term', { hasText: group });
+  await expect(card.locator('.joint-term-title')).toContainText('aktuell');
+  await expect(card.locator('img.joint-term-image')).toBeVisible();
+  expect(await card.locator('img.joint-term-image').evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  await expect(card.locator('.joint-term-offices > div', { hasText: offices[0] }).locator('dd')).toContainText(holders[0]);
+  await expect(card.locator('.joint-term-offices > div', { hasText: offices[1] }).locator('dd')).toContainText(holders[1]);
+
+  // Aufräumen: gemeinsame Amtszeit, Ämter und Gruppe löschen
+  await page.goto('/app/#/verwaltung/aemter');
+  page.once('dialog', (d) => d.accept());
+  await page.locator('.office-admin-group', { hasText: group }).locator('.joint-admin').getByRole('button', { name: 'Löschen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  for (const office of offices) {
+    await page.getByRole('button', { name: office, exact: true }).click();
+    page.once('dialog', (d) => d.accept());
+    await page.getByRole('button', { name: 'Amt löschen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
+  }
+  page.once('dialog', (d) => d.accept());
+  await page.locator('li.card', { hasText: group }).getByRole('button', { name: 'Löschen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gelöscht');
+});
+
 test('Ehemalig eintragen: Vorschau der endenden Ämter, danach enden sie mit dem Austrittsjahr (Issue #181)', async ({ page }) => {
   const id = Date.now() % 1000000;
   const flag = `Fahne ${id}`;

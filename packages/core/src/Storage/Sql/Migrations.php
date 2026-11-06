@@ -1523,6 +1523,43 @@ WHERE title IS NULL",
                     'CREATE INDEX IF NOT EXISTS {member_companies}_company_id ON {member_companies} (company_id)',
                 ],
             ],
+            // Gemeinsame Amtszeiten einer Gruppe der Ämter (Issue #282), z. B. „Königshaus 2025–2026“ mit Gruppenbild:
+            // office_groups.joint_terms schaltet sie je Gruppe ein; office_group_terms hält Jahre, Zusatz und Bild
+            // (image_uid in rich_images). Je Amt bleibt eine normale Zeile in office_terms mit denselben Jahren
+            // (group_term_id), damit Chronik, Jahre, Zeitstrahl, Titel und ein Zurückrollen weiter funktionieren.
+            40 => [
+                'mysql' => [
+                    'ALTER TABLE {office_groups} ADD COLUMN joint_terms tinyint(1) NOT NULL DEFAULT 0',
+                    'ALTER TABLE {office_terms} ADD COLUMN group_term_id bigint(20) unsigned DEFAULT NULL',
+                    'ALTER TABLE {office_terms} ADD KEY group_term_id (group_term_id)',
+                    'CREATE TABLE IF NOT EXISTS {office_group_terms} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  group_id bigint(20) unsigned NOT NULL,
+  kind varchar(10) NOT NULL DEFAULT \'period\',
+  start_year int(11) NOT NULL,
+  end_year int(11) DEFAULT NULL,
+  note varchar(100) NOT NULL DEFAULT \'\',
+  image_uid varchar(32) DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY group_id (group_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'ALTER TABLE {office_groups} ADD COLUMN joint_terms INTEGER NOT NULL DEFAULT 0',
+                    'ALTER TABLE {office_terms} ADD COLUMN group_term_id INTEGER DEFAULT NULL',
+                    'CREATE INDEX IF NOT EXISTS {office_terms}_group_term_id ON {office_terms} (group_term_id)',
+                    'CREATE TABLE IF NOT EXISTS {office_group_terms} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_id INTEGER NOT NULL,
+  kind TEXT NOT NULL DEFAULT \'period\',
+  start_year INTEGER NOT NULL,
+  end_year INTEGER DEFAULT NULL,
+  note TEXT NOT NULL DEFAULT \'\',
+  image_uid TEXT DEFAULT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {office_group_terms}_group_id ON {office_group_terms} (group_id)',
+                ],
+            ],
         ];
     }
 
