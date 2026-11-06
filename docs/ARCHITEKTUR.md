@@ -602,7 +602,7 @@ Sind Kalender-IDs ohne API-Key eingetragen, darf die OAuth-Verbindung den Kalend
 
 ### Galerie
 
-**Schnittstellen** (Issue #284): `GalleryService` spricht nur mit `Port\GallerySource` (Ordner und Dateien auflisten, Datei lesen, Vorschaubild, Ausschnitt für Videos, Adresse in der Quelle, Erkennen von Ordnern, Bildern und Videos; erste Umsetzung `DriveClient`, unverändert) und `Port\MediaStore` (eigene Originale ablegen, lesen, löschen, einem Album zuordnen, belegter Platz; `Domain\FileMediaStore` im geschützten Bereich von `FileStorage`, flach im Ordner `galerie-medien`, Schlüssel `galerie-medien/<Album>-<Zufall>.<Endung>`, nur `jpg`, `png`, `webp`, `mp4`, `webm`). Der Abgleich nutzt den `MediaStore` noch nicht; ihn braucht die Quelle „eigener Server“ (Issue #285). Verhalten und Daten bestehender Installationen bleiben gleich.
+**Schnittstellen** (Issue #284): `GalleryService` spricht nur mit `Port\GallerySource` (Ordner und Dateien auflisten, Datei lesen, Vorschaubild, Ausschnitt für Videos, Adresse in der Quelle, Erkennen von Ordnern, Bildern und Videos; erste Umsetzung `DriveClient`, unverändert) und `Port\MediaStore` (eigene Originale ablegen, lesen, löschen, einem Album zuordnen, belegter Platz; `Domain\FileMediaStore` im geschützten Bereich von `FileStorage`, flach im Ordner `einreichungen` (Name aus dem Konzept, kommt mit Issue #285 in die Sicherung), Schlüssel `einreichungen/<Album>-<Zufall>.<Endung>`, nur `jpg`, `png`, `webp`, `mp4`, `webm`). Der Abgleich nutzt den `MediaStore` noch nicht; ihn braucht die Quelle „eigener Server“ (Issue #285). Verhalten und Daten bestehender Installationen bleiben gleich.
 
 **Google-Zugang** (gemeinsam für Galerie und Kalender, `DriveClient`), in dieser Reihenfolge:
 

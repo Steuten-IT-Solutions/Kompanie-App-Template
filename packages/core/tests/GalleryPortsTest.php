@@ -152,17 +152,17 @@ final class GalleryPortsTest extends TestCase
         $src = (string) tempnam(sys_get_temp_dir(), 'm-');
         file_put_contents($src, 'abc');
         $key = $store->put(7, $src, 'JPEG');
-        $this->assertMatchesRegularExpression('#^galerie-medien/7-[a-f0-9]{24}\.jpg$#', $key);
+        $this->assertMatchesRegularExpression('#^einreichungen/7-[a-f0-9]{24}\.jpg$#', $key);
         $this->assertSame('abc', file_get_contents((string) $store->path($key)));
         $this->assertSame(3, $store->bytes());
 
         $moved = $store->move($key, 9);
-        $this->assertStringStartsWith('galerie-medien/9-', $moved);
+        $this->assertStringStartsWith('einreichungen/9-', $moved);
         $this->assertNull($store->path($key), 'alter Schlüssel weg');
         $this->assertSame('abc', file_get_contents((string) $store->path($moved)));
         $this->assertSame($moved, $store->move($moved, 9), 'gleiches Album: unverändert');
 
-        foreach (['../secret', 'galerie-medien/../x', 'dokumente/1-' . str_repeat('a', 24) . '.jpg'] as $bad) {
+        foreach (['../secret', 'einreichungen/../x', 'dokumente/1-' . str_repeat('a', 24) . '.jpg'] as $bad) {
             $this->assertNull($store->path($bad), $bad);
         }
         $store->delete($moved);

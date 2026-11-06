@@ -13,7 +13,7 @@ use KompanieApp\Core\Port\MediaStore;
  */
 final class FileMediaStore implements MediaStore
 {
-    public const DIR = 'galerie-medien';
+    public const DIR = 'einreichungen';
     public const EXTENSIONS = ['jpg', 'png', 'webp', 'mp4', 'webm'];
     private const KEY = '#^' . self::DIR . '/(\d+)-([a-f0-9]{24})\.([a-z0-9]{2,4})$#';
 
