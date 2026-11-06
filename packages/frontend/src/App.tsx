@@ -32,6 +32,7 @@ const Galerie = lazyView(() => import('./views/Galerie'));
 const GalerieEinreichungen = lazyView(() => import('./views/GalerieEinreichungen'));
 const Kompanien = lazyView(() => import('./views/Kompanien'));
 const Sponsoren = lazyView(() => import('./views/Sponsoren'));
+const Seiten = lazyView(() => import('./views/Seiten'));
 const Meins = lazyView(() => import('./views/Meins'));
 const MaintenancePage = lazyView(() => import('./maintenance').then((m) => ({ default: m.MaintenancePage })));
 const MaintenanceBanner = lazyView(() => import('./maintenance').then((m) => ({ default: m.MaintenanceBanner })));
@@ -57,6 +58,7 @@ const tabViews: Partial<Record<string, { preload: () => void }>> = {
   galerie: Galerie,
   kompanien: Kompanien,
   sponsoren: Sponsoren,
+  seiten: Seiten,
   dokumente: Dokumente,
   mitglieder: Mitglieder,
   brett: Brett,
@@ -71,7 +73,7 @@ const tabViews: Partial<Record<string, { preload: () => void }>> = {
  * als eigene Tabs (z. B. Mitglieder für Gäste); Schwarzes Brett, Dienstgrade und Punktekatalog gibt es dort nur unter
  * „Intern“ (Mitglieder haben das Recht immer; das Brett erreicht man sonst über das Banner). */
 type InternView = 'mitglieder' | 'dokumente' | 'brett' | 'dienstgrade' | 'punktekatalog';
-type Tab = 'termine' | 'news' | 'galerie' | 'kompanien' | 'sponsoren' | 'intern' | InternView | 'meins' | 'verwaltung';
+type Tab = 'termine' | 'news' | 'galerie' | 'kompanien' | 'sponsoren' | 'seiten' | 'intern' | InternView | 'meins' | 'verwaltung';
 type View =
   | Tab
   | 'menue'
@@ -91,6 +93,7 @@ const VIEWS: View[] = [
   'galerie',
   'kompanien',
   'sponsoren',
+  'seiten',
   'intern',
   'menue',
   'dokumente',
@@ -128,6 +131,7 @@ const tabLabels = (): Record<Tab | 'menue', string> => ({
   galerie: sec.gallery,
   kompanien: sec.companies,
   sponsoren: sec.sponsors,
+  seiten: sec.pages,
   intern: 'Intern',
   // Untermenü der einrichtbaren Navigation: Titel ist sein Name (App)
   menue: 'Menü',
@@ -197,6 +201,8 @@ function Icon({ name }: { name: string }) {
     // Herz: Sponsoren unterstützen die Kompanie
     sponsoren:
       'M12 21l-1.5-1.3C5.4 15.1 2 12 2 8.3 2 5.3 4.3 3 7.3 3c1.7 0 3.4.8 4.7 2.1C13.3 3.8 15 3 16.7 3 19.7 3 22 5.3 22 8.3c0 3.7-3.4 6.8-8.5 11.4L12 21z',
+    // Blatt mit Zeilen: eigene Seiten
+    seiten: 'M5 2h10l5 5v15H5V2zm9 1.5V8h4.5L14 3.5zM8 11v1.5h9V11H8zm0 3.5V16h9v-1.5H8zm0 3.5v1.5h5V18H8z',
     dokumente:
       'M6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm7 1.5V9h5.5L13 3.5zM8 13v1.5h8V13H8zm0 3v1.5h8V16H8zm0-6v1.5h4V10H8z',
     mitglieder:
@@ -353,6 +359,8 @@ export default function App({ notice = null }: { notice?: string | null }) {
     kompanien: !!features?.companies && (can('view_companies') || can('manage_companies')),
     // Sponsoren (Issue #279): mit view_sponsors sehen, mit manage_sponsors (Verwaltung) ohnehin
     sponsoren: !!features?.sponsors && (can('view_sponsors') || can('manage_sponsors')),
+    // Eigene Seiten (Issue #287): wenn es eine gibt, die die Person lesen darf; wer sie pflegt, ohnehin
+    seiten: !!features?.pages && ((config?.pages?.length ?? 0) > 0 || can('manage_pages')),
     dokumente: docsAllowed,
     mitglieder: membersAllowed,
     dienstgrade: ranksAllowed,
@@ -412,7 +420,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
     tab === 'brett' ||
     tab === 'dienstgrade' ||
     tab === 'punktekatalog' ||
-    (['termine', 'news', 'galerie', 'kompanien', 'sponsoren', 'dokumente'].includes(tab) && !path[1]) ||
+    (['termine', 'news', 'galerie', 'kompanien', 'sponsoren', 'seiten', 'dokumente'].includes(tab) && !path[1]) ||
     (tab === 'mitglieder' && !/^\d+$/.test(path[1] ?? '') && !path[2]);
   const activeTab: string = adminView ? 'verwaltung' : (parentMenu?.key ?? openMenu?.key ?? tab);
   // Gast öffnet einen geteilten Link auf eine Seite für Angemeldete: Hinweis; nach der Anmeldung geht sie auf (share.ts).
@@ -609,6 +617,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
               ))}
             {tab === 'kompanien' && <Kompanien />}
             {tab === 'sponsoren' && <Sponsoren />}
+            {tab === 'seiten' && <Seiten id={/^\d+$/.test(path[1] ?? '') ? Number(path[1]) : null} />}
             {openMenu?.children && (
               <InternMenu label={openMenu.label} tabs={openMenu.children.map((v) => ({ id: v, label: targetLabels()[v] }))} />
             )}

@@ -31,6 +31,7 @@ const FEATURES: Record<NavTarget, Feature[]> = {
   brett: ['board'],
   dienstgrade: ['ranks'],
   punktekatalog: ['points'],
+  seiten: ['pages'],
 };
 
 const ICON_LABELS: Record<string, string> = {
@@ -45,6 +46,7 @@ const ICON_LABELS: Record<string, string> = {
   brett: 'Brett',
   dienstgrade: 'Abzeichen',
   punktekatalog: 'Liste',
+  seiten: 'Seite',
   stern: 'Stern',
 };
 

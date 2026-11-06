@@ -35,6 +35,8 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
       return 'kompanien';
     case 'sponsoren':
       return 'sponsoren';
+    case 'seiten':
+      return 'seiten';
     case 'intern':
       return 'intern';
     case 'menue':
@@ -120,6 +122,7 @@ function adminSlug([sub, arg, page]: string[], ctx: HelpContext): string | null 
     titel: 'titel-verwalten',
     aemter: 'aemter-verwalten',
     sponsoren: 'sponsoren-verwalten',
+    seiten: 'seiten-verwalten',
     kompanien: 'kompanien-verwalten',
     neu: 'mitglieder-anlegen',
     'neu-mehrere': 'mitglieder-mehrere-anlegen',

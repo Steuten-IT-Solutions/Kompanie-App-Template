@@ -134,6 +134,12 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         short: 'Einreichungen prüfen',
         features: ['gallery'],
       },
+      {
+        key: 'manage_pages',
+        label: `${sec.pages}: eigene Seiten anlegen, bearbeiten, sortieren und löschen (sieht alle Seiten)`,
+        short: `${sec.pages} pflegen`,
+        features: ['pages'],
+      },
     ],
   },
   {

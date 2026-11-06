@@ -6021,3 +6021,32 @@ button.spotlight-person:focus-visible {
   border-radius: 8px;
   object-fit: contain;
 }
+
+/* Eigene Seiten (Issue #287): Kacheln je Seite, darunter die Seite mit ihrem Text */
+.page-tiles {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+.page-tile {
+  width: 100%;
+  min-height: 88px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.page-tile .badge {
+  margin-left: 0;
+}
+.page-article h2 {
+  margin-top: 0;
+}

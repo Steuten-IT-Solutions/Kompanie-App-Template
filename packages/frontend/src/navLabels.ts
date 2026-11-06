@@ -18,5 +18,6 @@ export function targetLabels(): Record<NavTarget, string> {
     brett: sec.board,
     dienstgrade: sec.ranks,
     punktekatalog: `${sec.points}katalog`,
+    seiten: sec.pages,
   };
 }

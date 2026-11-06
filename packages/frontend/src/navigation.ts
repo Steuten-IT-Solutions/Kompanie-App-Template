@@ -16,6 +16,7 @@ export const NAV_TARGETS = [
   'brett',
   'dienstgrade',
   'punktekatalog',
+  'seiten',
 ] as const;
 export type NavTarget = (typeof NAV_TARGETS)[number];
 
@@ -32,6 +33,7 @@ export const NAV_ICONS = [
   'brett',
   'dienstgrade',
   'punktekatalog',
+  'seiten',
   'stern',
 ] as const;
 export type NavIcon = (typeof NAV_ICONS)[number];
@@ -43,8 +45,8 @@ export type NavMenuSetting = { label: string; icon: string; items: string[] };
 /** Gespeicherte Einstellung (/config navigation): Hauptpunkte und ausgeblendete Bereiche. */
 export type NavigationSetting = { items: (string | NavMenuSetting)[]; hidden: string[] };
 
-/** Bereiche, die in der Standardnavigation nur mit eingeschaltetem Bereich einen Hauptpunkt belegen (Issue #279, #280). */
-const OPTIONAL_MAIN: NavTarget[] = ['kompanien', 'sponsoren'];
+/** Bereiche, die in der Standardnavigation nur mit eingeschaltetem Bereich einen Hauptpunkt belegen (Issue #279, #280, #287). */
+const OPTIONAL_MAIN: NavTarget[] = ['kompanien', 'sponsoren', 'seiten'];
 
 /** Bereiche unter „Intern“ in der Standardnavigation, in dieser Reihenfolge. */
 export const INTERN_TARGETS: NavTarget[] = ['mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog'];
@@ -107,8 +109,8 @@ export function menuOf(entries: NavEntry[], target: string): NavEntry | undefine
 }
 
 /**
- * Entwurf für die Seite Einstellungen → Navigation: die gespeicherte Einstellung oder die Standardnavigation. Kompanien
- * und Sponsoren stehen nur darin, wenn ihr Bereich an ist (on), damit sie keinen der Hauptpunkte belegen; wird einer
+ * Entwurf für die Seite Einstellungen → Navigation: die gespeicherte Einstellung oder die Standardnavigation. Kompanien,
+ * Sponsoren und eigene Seiten stehen nur darin, wenn ihr Bereich an ist (on), damit sie keinen der Hauptpunkte belegen; wird einer
  * später eingeschaltet, erscheint er hinten in der Leiste wie jeder Bereich, den die Einstellung nicht kennt. Passen
  * nicht alle unten hin, kommen die letzten vorne ins Untermenü „Intern“.
  */

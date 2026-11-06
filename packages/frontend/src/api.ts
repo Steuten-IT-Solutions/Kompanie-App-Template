@@ -52,6 +52,7 @@ export type Capability =
   | 'manage_companies'
   | 'submit_gallery'
   | 'review_gallery'
+  | 'manage_pages'
   | 'view_personal'
   | 'manage_personal'
   | 'create_users'
@@ -78,7 +79,8 @@ export type Feature =
   | 'lists'
   | 'mail'
   | 'sponsors'
-  | 'companies';
+  | 'companies'
+  | 'pages';
 
 export interface AppUser {
   id: number;
@@ -124,11 +126,28 @@ export interface AppConfig {
   maintenance?: MaintenanceInfo;
   /** Einrichtbare Navigation (Issue #277): null bzw. fehlt = Standardnavigation */
   navigation?: NavigationSetting | null;
+  /** Eigene Seiten (Issue #287), die die Person lesen darf, in ihrer Reihenfolge; fehlt bei älteren Servern */
+  pages?: { id: number; title: string }[];
   /** Vorschau „App als Rolle ansehen“ (Issue #63): vom Server bestätigt; role ist der Schlüssel oder @public */
   preview?: { role: string; label: string } | null;
   /** Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen; null ohne den Bereich, fehlt bei älteren Servern */
   birthdays?: { upcomingDays: number } | null;
 }
+
+/** Eigene Seite (Issue #287): public für alle, members nur für Mitglieder; Stand nur für die Pflege (manage_pages). */
+export type PageAudience = 'public' | 'members';
+export interface PageSummary {
+  id: number;
+  title: string;
+  audience: PageAudience;
+  updated_at?: string;
+  updated_by_name?: string | null;
+}
+export interface PageDetail extends PageSummary {
+  /** Formatierter Text (bereinigt), Bilder als Adressen */
+  body: string;
+}
+export type PageInput = { title?: string; audience?: PageAudience; body?: string; updated_at?: string };
 
 /** Einstellungen → Navigation (Issue #277): gespeicherte Navigation und was der Server erlaubt. */
 export interface NavigationAdmin {
@@ -2019,6 +2038,13 @@ export const api = {
   // Ämter (Issue #112): Zeitstrahl öffentlich, Pflege mit manage_offices
   offices: () => request<OfficesOverview>('GET', '/offices'),
 
+  // Eigene Seiten (Issue #287)
+  pages: () => request<{ pages: PageSummary[] }>('GET', '/pages').then((r) => r.pages),
+  page: (id: number) => request<PageDetail>('GET', `/pages/${id}`),
+  createPage: (data: PageInput) => request<PageDetail>('POST', '/pages', data),
+  updatePage: (id: number, data: PageInput) => request<PageDetail>('PATCH', `/pages/${id}`, data),
+  deletePage: (id: number) => request<{ deleted: boolean }>('DELETE', `/pages/${id}`),
+  reorderPages: (ids: number[]) => request<{ pages: PageSummary[] }>('PUT', '/pages/order', { ids }).then((r) => r.pages),
   // Sponsoren (Issue #279)
   sponsors: () => request<Sponsor[]>('GET', '/sponsors'),
   createSponsor: (data: { name: string; url: string }) => request<Sponsor>('POST', '/sponsors', data),

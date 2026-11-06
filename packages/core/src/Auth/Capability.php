@@ -95,6 +95,8 @@ enum Capability: string
     case SubmitGallery = 'submit_gallery';
     /** Einreichungen sehen, freigeben (öffentlich oder intern), ablehnen und freigegebene wieder entfernen (Issue #286). */
     case ReviewGallery = 'review_gallery';
+    /** Eigene Seiten anlegen, bearbeiten, sortieren und löschen (Bereich Seiten, Issue #287). */
+    case ManagePages = 'manage_pages';
     /**
      * Persönliche Angaben anderer sehen: Adresse, Handynummer, E-Mail-Adresse und das ganze Geburtsdatum (in der
      * Verwaltung auf der Seite der Person). Die eigenen sieht jede Person unter Meins → Konto.

@@ -25,8 +25,8 @@ const keys = (e: { key: string }[]) => e.map((x) => x.key);
 test('Standard mit dem Recht Intern: Termine, News, Galerie, Kompanien und Intern mit seinen Bereichen', () => {
   const nav = buildNav(null, ctx([...NAV_TARGETS], true));
   assert.deepEqual(keys(nav), ['termine', 'news', 'galerie', 'kompanien', 'intern']);
-  // Höchstens fünf Hauptpunkte: Sponsoren rutscht vorne ins Untermenü
-  assert.deepEqual(nav[4].children, ['sponsoren', 'mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog']);
+  // Höchstens fünf Hauptpunkte: Sponsoren und Seiten rutschen vorne ins Untermenü
+  assert.deepEqual(nav[4].children, ['sponsoren', 'seiten', 'mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog']);
   const noCompanies = buildNav(
     null,
     ctx(
@@ -46,6 +46,7 @@ test('Standard ohne das Recht Intern: Mitglieder und Dokumente als eigene Tabs, 
     'galerie',
     'kompanien',
     'sponsoren',
+    'seiten',
     'mitglieder',
     'dokumente',
   ]);
@@ -76,9 +77,9 @@ test('Entwurf: Standard als Ausgangspunkt, verschieben, Untermenü entfernen, pr
   assert.deepEqual((draftOf(null).items[4] as { items: string[] }).items[0], 'sponsoren', 'passt nicht unten hin: ins Untermenü');
   assert.deepEqual(unplaced(draftOf(null)), []);
   assert.equal(draftError(draftOf(null)), null);
-  // Kompanien und Sponsoren aus: nicht im Entwurf, belegen keinen Hauptpunkt
-  let d = draftOf(null, (t) => t !== 'sponsoren' && t !== 'kompanien');
-  assert.deepEqual(unplaced(d), ['kompanien', 'sponsoren']);
+  // Kompanien, Sponsoren und Seiten aus: nicht im Entwurf, belegen keinen Hauptpunkt
+  let d = draftOf(null, (t) => t !== 'sponsoren' && t !== 'kompanien' && t !== 'seiten');
+  assert.deepEqual(unplaced(d), ['kompanien', 'sponsoren', 'seiten']);
   assert.equal(placeOf(d, 'dokumente'), 0);
   d = moveTo(d, 'dokumente', 'main');
   assert.equal(placeOf(d, 'dokumente'), 'main');
