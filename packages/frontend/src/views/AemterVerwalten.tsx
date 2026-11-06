@@ -5,6 +5,9 @@ import {
   config,
   type Office,
   type OfficeGroup,
+  type OfficeGroupTerm,
+  type OfficeGroupTermInput,
+  type OfficeHolder,
   type OfficeImportResult,
   type OfficesOverview,
   type OfficeTerm,
@@ -104,8 +107,8 @@ function OfficeOverview({
   }
 
   const sections = [
-    ...overview.groups.map((g) => ({ key: `g${g.id}`, group: g.id as number | null, title: g.title })),
-    { key: 'none', group: null, title: 'Ohne Gruppe' },
+    ...overview.groups.map((g) => ({ key: `g${g.id}`, group: g.id as number | null, title: g.title, joint: !!g.joint_terms })),
+    { key: 'none', group: null, title: 'Ohne Gruppe', joint: false },
   ];
 
   return (
@@ -136,6 +139,16 @@ function OfficeOverview({
               <p className="muted small">Noch keine Ämter in dieser Gruppe.</p>
             ) : (
               <OfficeSortList offices={offices} onMove={(next) => reorderOffices(s.group, next)} />
+            )}
+            {s.joint && offices.length > 0 && (
+              <JointTermAdmin
+                groupId={s.group!}
+                groupTitle={s.title}
+                offices={offices}
+                terms={(overview.group_terms ?? []).filter((t) => t.group_id === s.group)}
+                onToast={onToast}
+                reload={reload}
+              />
             )}
           </section>
         );
@@ -228,7 +241,9 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
     <section>
       <h3 className="section-title">Gruppen</h3>
       <p className="muted small">
-        Die Gruppen ordnen die Ämter im Zeitstrahl, z. B. Verein und Dachverband. Zum Ändern der Reihenfolge am Griff ziehen.
+        Die Gruppen ordnen die Ämter im Zeitstrahl, z. B. Verein und Dachverband. Zum Ändern der Reihenfolge am Griff ziehen. Mit
+        „Amtszeiten gemeinsam“ haben alle Ämter einer Gruppe dieselben Jahre und ein Gruppenbild, z. B. ein Königshaus; vorhandene
+        Amtszeiten mit denselben Jahren werden dabei zusammengefasst.
       </p>
       <FormError error={error} />
       {list.length > 0 && (
@@ -273,6 +288,20 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
                     >
                       Umbenennen
                     </button>
+                    <label className="toggle joint-toggle">
+                      <input
+                        type="checkbox"
+                        checked={!!g.joint_terms}
+                        disabled={busy}
+                        onChange={(e) =>
+                          run(
+                            () => api.setOfficeGroupJoint(g.id, e.target.checked),
+                            e.target.checked ? 'Gemeinsame Amtszeiten an' : 'Gemeinsame Amtszeiten aus',
+                          )
+                        }
+                      />
+                      <span>Amtszeiten gemeinsam</span>
+                    </label>
                     <button
                       className="btn btn-small btn-danger"
                       disabled={busy}
@@ -561,17 +590,118 @@ type HolderKind = 'name' | 'member' | 'former';
 /** kind fehlt bei vorhandenen Einträgen, bis man sie ändert: ergibt sich dann aus den Listen (siehe kindOf). */
 type HolderRow = { kind?: HolderKind; user: string; name: string };
 
-/** Amtszeit eintragen oder bearbeiten: Art, Jahre, Zusatz und eine oder mehrere Personen (Konto oder freier Name). */
-function TermForm({
+/**
+ * Gemeinsame Amtszeiten einer Gruppe (Issue #282): Liste mit Bearbeiten und Löschen, Formular für eine neue. Die Jahre
+ * gelten für alle Ämter; je Amt stehen die Personen darunter.
+ */
+function JointTermAdmin({
+  groupId,
+  groupTitle,
+  offices,
+  terms,
+  onToast,
+  reload,
+}: {
+  groupId: number;
+  groupTitle: string;
+  offices: Office[];
+  terms: OfficeGroupTerm[];
+  onToast: Toast;
+  reload: () => void;
+}) {
+  const { busy, error, run } = useRunner(onToast, reload);
+  const [editing, setEditing] = useState<number | 'new' | null>(null);
+  const people = usePeople();
+  const holdersOf = (gt: OfficeGroupTerm | undefined, o: Office) => o.terms.find((t) => gt && t.group_term_id === gt.id)?.holders;
+  const form = (gt?: OfficeGroupTerm) => (
+    <JointTermForm
+      key={gt?.id ?? 'new'}
+      initial={gt}
+      offices={offices}
+      holdersOf={(o) => holdersOf(gt, o)}
+      people={people.data ?? NO_PEOPLE}
+      busy={busy}
+      onCancel={() => setEditing(null)}
+      onSave={async (input) => {
+        const ok = await run(
+          () => (gt ? api.updateOfficeGroupTerm(gt.id, input) : api.createOfficeGroupTerm(groupId, input)),
+          gt ? 'Gespeichert' : 'Gemeinsame Amtszeit angelegt',
+        );
+        if (ok) setEditing(null);
+      }}
+    />
+  );
+  return (
+    <div className="joint-admin">
+      <h4 className="section-title">Gemeinsame Amtszeiten</h4>
+      <FormError error={error} />
+      {terms.length === 0 && <p className="muted small">Noch keine gemeinsamen Amtszeiten.</p>}
+      <ul className="card-list">
+        {terms.map((gt) =>
+          editing === gt.id ? (
+            <li key={gt.id}>{form(gt)}</li>
+          ) : (
+            <li key={gt.id} className="card row">
+              {gt.image_url && <img className="joint-admin-image" src={gt.image_url} alt="" loading="lazy" />}
+              <div className="row-main">
+                <div className="row-title">
+                  {groupTitle} {termYears(gt)}
+                  {gt.current && <span className="badge">aktuell</span>}
+                </div>
+                <div className="row-sub">
+                  {offices
+                    .flatMap((o) => {
+                      const h = holdersOf(gt, o);
+                      return h && h.length > 0 ? [`${o.title}: ${h.map((x) => x.name).join(', ')}`] : [];
+                    })
+                    .join(' · ') || 'Noch keine Personen'}
+                </div>
+                <div className="row-actions">
+                  <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => setEditing(gt.id)}>
+                    Bearbeiten
+                  </button>
+                  <button
+                    className="btn btn-small btn-danger"
+                    disabled={busy}
+                    onClick={() =>
+                      window.confirm(`Gemeinsame Amtszeit ${termYears(gt)} mit allen Amtszeiten darin und dem Bild löschen?`) &&
+                      run(() => api.deleteOfficeGroupTerm(gt.id), 'Gelöscht')
+                    }
+                  >
+                    Löschen
+                  </button>
+                </div>
+              </div>
+            </li>
+          ),
+        )}
+      </ul>
+      {editing === 'new' ? (
+        form()
+      ) : (
+        <button className="btn btn-secondary" disabled={busy} onClick={() => setEditing('new')}>
+          Neue gemeinsame Amtszeit
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Formular einer gemeinsamen Amtszeit: Jahre, Zusatz, Gruppenbild und je Amt die Personen. */
+function JointTermForm({
   initial,
+  offices,
+  holdersOf,
   people,
   onSave,
   onCancel,
   busy,
 }: {
-  initial?: OfficeTerm;
+  initial?: OfficeGroupTerm;
+  offices: Office[];
+  holdersOf: (o: Office) => OfficeHolder[] | undefined;
   people: People;
-  onSave: (input: OfficeTermInput) => void;
+  onSave: (input: OfficeGroupTermInput) => void;
   onCancel: () => void;
   busy: boolean;
 }) {
@@ -579,15 +709,137 @@ function TermForm({
   const [start, setStart] = useState(initial ? String(initial.start_year) : '');
   const [end, setEnd] = useState(initial?.end_year != null ? String(initial.end_year) : '');
   const [note, setNote] = useState(initial?.note ?? '');
-  const [honor, setHonor] = useState(initial?.honor ?? false);
-  const [holders, setHolders] = useState<HolderRow[]>(
-    initial?.holders.map((h) => ({ user: h.user_id ? String(h.user_id) : '', name: h.name })) ?? [{ user: '', name: '' }],
+  const [image, setImage] = useState<{ uid: string | null; url: string | null }>({
+    uid: initial?.image_uid ?? null,
+    url: initial?.image_url ?? null,
+  });
+  const [uploading, setUploading] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [holders, setHolders] = useState<Record<number, HolderRow[]>>(() =>
+    Object.fromEntries(offices.map((o) => [o.id, holderRows(holdersOf(o), false)])),
   );
+
+  async function upload(file: File | null) {
+    if (!file) return;
+    setUploading(true);
+    setImageError(null);
+    try {
+      const img = await api.uploadRichImage(file);
+      setImage({ uid: img.uid, url: img.url });
+    } catch (e) {
+      setImageError((e as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <form
+      className="form card joint-term-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave({
+          kind,
+          start_year: Number(start),
+          end_year: kind === 'period' && end.trim() !== '' ? Number(end) : null,
+          note: note.trim(),
+          image_uid: image.uid,
+          offices: offices.map((o) => ({ office_id: o.id, holders: holderInput(holders[o.id] ?? [], people) })),
+        });
+      }}
+    >
+      <h3>{initial ? 'Gemeinsame Amtszeit bearbeiten' : 'Neue gemeinsame Amtszeit'}</h3>
+      <YearFields kind={kind} setKind={setKind} start={start} setStart={setStart} end={end} setEnd={setEnd} />
+      <label className="field">
+        <span>Zusatz (optional)</span>
+        <input type="text" maxLength={100} value={note} onChange={(e) => setNote(e.target.value)} />
+      </label>
+      <div className="field">
+        <span>Gruppenbild (optional)</span>
+        {image.url && <img className="joint-term-form-image" src={image.url} alt="Gruppenbild" />}
+        <div className="button-row">
+          <label className="btn btn-small btn-secondary">
+            {uploading ? 'Lädt …' : image.url ? 'Bild ersetzen' : 'Bild wählen'}
+            <input
+              type="file"
+              accept=".jpg,.jpeg,.png,.webp"
+              hidden
+              aria-label="Gruppenbild"
+              disabled={uploading}
+              onChange={(e) => {
+                void upload(e.target.files?.[0] ?? null);
+                e.target.value = '';
+              }}
+            />
+          </label>
+          {image.url && (
+            <button type="button" className="btn btn-small btn-secondary" onClick={() => setImage({ uid: null, url: null })}>
+              Bild entfernen
+            </button>
+          )}
+        </div>
+        <FormError error={imageError} />
+      </div>
+      {offices.map((o) => (
+        <HolderFields
+          key={o.id}
+          holders={holders[o.id] ?? []}
+          setHolders={(rows) => setHolders({ ...holders, [o.id]: rows })}
+          people={people}
+          initial={holdersOf(o)}
+          legend={o.title}
+          optional
+        />
+      ))}
+      <div className="button-row">
+        <button className="btn" type="submit" disabled={busy || uploading}>
+          Speichern
+        </button>
+        <button className="btn btn-secondary" type="button" onClick={onCancel}>
+          Abbrechen
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** Zeilen der Personen aus einer gespeicherten Amtszeit. */
+function holderRows(holders: OfficeHolder[] | undefined, empty: boolean): HolderRow[] {
+  const rows = holders?.map((h) => ({ user: h.user_id ? String(h.user_id) : '', name: h.name })) ?? [];
+  return rows.length > 0 || !empty ? rows : [{ user: '', name: '' }];
+}
+
+/** Zeilen für den Server: Konto oder freier Name. */
+function holderInput(holders: HolderRow[], people: People): OfficeTermInput['holders'] {
+  const formerIds = new Set(people.former.map((p) => p.id));
+  const kindOf = (h: HolderRow): HolderKind => h.kind ?? (!h.user ? 'name' : formerIds.has(Number(h.user)) ? 'former' : 'member');
+  return holders.map((h) => (kindOf(h) !== 'name' && h.user ? { user_id: Number(h.user) } : { name: h.name.trim() }));
+}
+
+/**
+ * Personen einer Amtszeit (Konto oder freier Name), bis zu 20. Mit optional dürfen alle Zeilen fehlen (gemeinsame
+ * Amtszeit: Amt ohne Personen).
+ */
+function HolderFields({
+  holders,
+  setHolders,
+  people,
+  initial,
+  legend,
+  optional = false,
+}: {
+  holders: HolderRow[];
+  setHolders: (rows: HolderRow[]) => void;
+  people: People;
+  initial?: OfficeHolder[];
+  legend: string;
+  optional?: boolean;
+}) {
   const formerIds = new Set(people.former.map((p) => p.id));
   const kindOf = (h: HolderRow): HolderKind => h.kind ?? (!h.user ? 'name' : formerIds.has(Number(h.user)) ? 'former' : 'member');
   // Konten, die schon in der Amtszeit stehen, aber in keiner Liste (z. B. ohne Recht darauf), bleiben bei den Mitgliedern wählbar.
   const members = [...people.members];
-  for (const h of initial?.holders ?? []) {
+  for (const h of initial ?? []) {
     if (h.user_id && !formerIds.has(h.user_id) && !members.some((p) => p.id === h.user_id)) members.push({ id: h.user_id, name: h.name });
   }
   const kinds: { value: HolderKind; label: string }[] = [
@@ -596,23 +848,84 @@ function TermForm({
     ...(people.former.length > 0 ? [{ value: 'former' as const, label: 'Ehemaliger' }] : []),
   ];
   const set = (i: number, row: Partial<HolderRow>) => setHolders(holders.map((h, j) => (j === i ? { ...h, ...row } : h)));
-
   return (
-    <form
-      className="form card"
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSave({
-          kind,
-          start_year: Number(start),
-          end_year: kind === 'period' && end.trim() !== '' ? Number(end) : null,
-          note: note.trim(),
-          honor,
-          holders: holders.map((h) => (kindOf(h) !== 'name' && h.user ? { user_id: Number(h.user) } : { name: h.name.trim() })),
-        });
-      }}
-    >
-      <h3>{initial ? 'Amtszeit bearbeiten' : 'Neue Amtszeit'}</h3>
+    <fieldset className="extra-roles">
+      <legend>{legend}</legend>
+      {holders.map((h, i) => {
+        const kind = kindOf(h);
+        const list = kind === 'former' ? people.former : members;
+        return (
+          <div key={i} className="office-holder-row">
+            {kinds.length > 1 && (
+              <label className="field">
+                <span>Profil</span>
+                <select value={kind} onChange={(e) => set(i, { kind: e.target.value as HolderKind, user: '' })}>
+                  {kinds.map((k) => (
+                    <option key={k.value} value={k.value}>
+                      {k.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {kind === 'name' ? (
+              <label className="field">
+                <span>Name</span>
+                <input type="text" maxLength={100} value={h.name} onChange={(e) => set(i, { name: e.target.value })} required />
+              </label>
+            ) : (
+              <label className="field">
+                <span>{kind === 'former' ? 'Ehemaliger' : 'Mitglied'}</span>
+                <select value={h.user} onChange={(e) => set(i, { user: e.target.value })} required>
+                  <option value="">Bitte wählen</option>
+                  {list.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {(optional || holders.length > 1) && (
+              <button
+                type="button"
+                className="btn btn-small btn-secondary"
+                aria-label="Person entfernen"
+                onClick={() => setHolders(holders.filter((_, j) => j !== i))}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        );
+      })}
+      {holders.length < 20 && (
+        <button type="button" className="btn btn-small btn-secondary" onClick={() => setHolders([...holders, { user: '', name: '' }])}>
+          {holders.length === 0 ? 'Person hinzufügen' : 'Weitere Person'}
+        </button>
+      )}
+    </fieldset>
+  );
+}
+
+/** Art und Jahre einer Amtszeit (auch für gemeinsame Amtszeiten). */
+function YearFields({
+  kind,
+  setKind,
+  start,
+  setStart,
+  end,
+  setEnd,
+}: {
+  kind: OfficeTermKind;
+  setKind: (k: OfficeTermKind) => void;
+  start: string;
+  setStart: (v: string) => void;
+  end: string;
+  setEnd: (v: string) => void;
+}) {
+  return (
+    <>
       <label className="field">
         <span>Art</span>
         <select value={kind} onChange={(e) => setKind(e.target.value as OfficeTermKind)}>
@@ -640,62 +953,54 @@ function TermForm({
           </label>
         )}
       </div>
-      <fieldset className="extra-roles">
-        <legend>Personen</legend>
-        {holders.map((h, i) => {
-          const kind = kindOf(h);
-          const list = kind === 'former' ? people.former : members;
-          return (
-            <div key={i} className="office-holder-row">
-              {kinds.length > 1 && (
-                <label className="field">
-                  <span>Profil</span>
-                  <select value={kind} onChange={(e) => set(i, { kind: e.target.value as HolderKind, user: '' })}>
-                    {kinds.map((k) => (
-                      <option key={k.value} value={k.value}>
-                        {k.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              {kind === 'name' ? (
-                <label className="field">
-                  <span>Name</span>
-                  <input type="text" maxLength={100} value={h.name} onChange={(e) => set(i, { name: e.target.value })} required />
-                </label>
-              ) : (
-                <label className="field">
-                  <span>{kind === 'former' ? 'Ehemaliger' : 'Mitglied'}</span>
-                  <select value={h.user} onChange={(e) => set(i, { user: e.target.value })} required>
-                    <option value="">Bitte wählen</option>
-                    {list.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              {holders.length > 1 && (
-                <button
-                  type="button"
-                  className="btn btn-small btn-secondary"
-                  aria-label="Person entfernen"
-                  onClick={() => setHolders(holders.filter((_, j) => j !== i))}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          );
-        })}
-        {holders.length < 20 && (
-          <button type="button" className="btn btn-small btn-secondary" onClick={() => setHolders([...holders, { user: '', name: '' }])}>
-            Weitere Person
-          </button>
-        )}
-      </fieldset>
+    </>
+  );
+}
+
+/** Amtszeit eintragen oder bearbeiten: Art, Jahre, Zusatz und eine oder mehrere Personen (Konto oder freier Name). */
+function TermForm({
+  initial,
+  people,
+  onSave,
+  onCancel,
+  busy,
+}: {
+  initial?: OfficeTerm;
+  people: People;
+  onSave: (input: OfficeTermInput) => void;
+  onCancel: () => void;
+  busy: boolean;
+}) {
+  const [kind, setKind] = useState<OfficeTermKind>(initial?.kind ?? 'period');
+  const [start, setStart] = useState(initial ? String(initial.start_year) : '');
+  const [end, setEnd] = useState(initial?.end_year != null ? String(initial.end_year) : '');
+  const [note, setNote] = useState(initial?.note ?? '');
+  const [honor, setHonor] = useState(initial?.honor ?? false);
+  const [holders, setHolders] = useState<HolderRow[]>(holderRows(initial?.holders, true));
+
+  return (
+    <form
+      className="form card"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave({
+          kind,
+          start_year: Number(start),
+          end_year: kind === 'period' && end.trim() !== '' ? Number(end) : null,
+          note: note.trim(),
+          honor,
+          holders: holderInput(holders, people),
+        });
+      }}
+    >
+      <h3>{initial ? 'Amtszeit bearbeiten' : 'Neue Amtszeit'}</h3>
+      {initial?.group_term_id && (
+        <p className="muted small">
+          Gehört zu einer gemeinsamen Amtszeit der Gruppe. Andere Jahre lösen sie daraus; Jahre für alle änderst du bei der Gruppe.
+        </p>
+      )}
+      <YearFields kind={kind} setKind={setKind} start={start} setStart={setStart} end={end} setEnd={setEnd} />
+      <HolderFields holders={holders} setHolders={setHolders} people={people} initial={initial?.holders} legend="Personen" />
       <label className="field">
         <span>Zusatz (optional, z. B. „Unter …“ oder „Ehrenvorsitz“)</span>
         <input type="text" maxLength={100} value={note} onChange={(e) => setNote(e.target.value)} />

@@ -14,7 +14,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf **{bereich.of
 ## Was du hier siehst
 - **Tabelle importieren**: viele Amtszeiten auf einmal übernehmen.
 - **Zeitstrahl ansehen**: öffnet die Ansicht, die alle sehen.
-- **Gruppen**: je Gruppe **Umbenennen** und **Löschen**, darunter **Neue Gruppe** mit **Gruppe anlegen**.
+- **Gruppen**: je Gruppe **Umbenennen**, der Schalter **Amtszeiten gemeinsam** und **Löschen**, darunter **Neue Gruppe** mit **Gruppe anlegen**.
 - **Die Ämter** je Gruppe (und unter **Ohne Gruppe**), mit der Zahl der Amtszeiten und, falls verknüpft, dem {bereich.titles}, den das Amt vergibt.
 - **Neues Amt** mit **Bezeichnung**, **Gruppe** und **Anlegen**.
 - Links an Gruppen und Ämtern ein Griff (sechs Punkte) zum Verschieben.
@@ -47,6 +47,15 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf **{bereich.of
 2. Endet ein Amt, trage bei der Amtszeit das Jahr unter **Bis** ein und tippe auf **Speichern**.
 3. Wird jemand als ehemalig eingetragen, enden seine laufenden Amtszeiten von selbst mit dem Jahr des Ausscheidens (siehe *Ehemalige*). Eine solche Amtszeit kannst du hier wie jede andere ändern; danach zieht eine Änderung des Austrittsdatums sie nicht mehr nach.
 
+### Gemeinsame Amtszeiten einer Gruppe pflegen
+Haben alle Ämter einer Gruppe immer dieselben Jahre, z. B. ein Königshaus oder ein Vorstand, trägst du sie zusammen ein – mit einem Gruppenbild.
+1. Schalte bei der Gruppe **Amtszeiten gemeinsam** ein. Vorhandene Amtszeiten der Ämter mit genau denselben Jahren fasst die App dabei zusammen.
+2. Unter den Ämtern der Gruppe steht jetzt **Gemeinsame Amtszeiten**. Tippe auf **Neue gemeinsame Amtszeit**.
+3. Wähle die **Art** und trage die Jahre ein wie bei einer einzelnen Amtszeit, dazu, wenn gewünscht, einen **Zusatz**.
+4. Wähle unter **Gruppenbild** mit **Bild wählen** ein Foto (JPG, PNG oder WebP). **Bild entfernen** nimmt es wieder heraus.
+5. Trage je Amt die Personen ein. Ein Amt ohne Personen bleibt in dieser Amtszeit leer.
+6. Tippe auf **Speichern**. Mit **Bearbeiten** änderst du Jahre, Bild und Personen für alle Ämter auf einmal; **Löschen** löscht die gemeinsame Amtszeit mit allen Amtszeiten darin und dem Bild.
+
 ### Ein Amt umbenennen oder löschen
 1. Öffne das Amt und ändere unter **Amt bearbeiten** **Bezeichnung**, **Einzahl** oder **Gruppe**; tippe auf **Speichern**.
 2. **Amt löschen** löscht das Amt mit allen Amtszeiten. **‹ Alle {bereich.offices}** führt zurück.
@@ -60,6 +69,8 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf **{bereich.of
 ## Gut zu wissen
 - Die Reihenfolge der Amtszeiten im Zeitstrahl ergibt sich von selbst: laufende zuerst, dann nach Jahren.
 - Löschen lässt sich nur eine leere Gruppe.
+- Gemeinsame Amtszeiten: Änderst du bei einem Amt die Jahre einer Amtszeit, die zu einer gemeinsamen gehört, löst die App sie daraus; sie steht dann einzeln. Eine Ehrung gehört nie zu einer gemeinsamen Amtszeit. Schaltest du **Amtszeiten gemeinsam** aus, bleiben alle Amtszeiten und Bilder erhalten; der Zeitstrahl zeigt sie dann wieder je Amt.
+- Das Gruppenbild ist wie der Zeitstrahl für alle sichtbar, auch ohne Anmeldung. Große Bilder verkleinert die App beim Hochladen.
 - Ehemalige stehen bei **Ehemaliger** zur Auswahl, wenn sie in der Verwaltung als ehemalig eingetragen sind.
 - Wird ein Konto gelöscht, bleiben seine Amtszeiten mit dem Namen stehen; nur die Verbindung zum Konto fällt weg.
 - Import: **ende** ist ein Jahr, „heute“ für eine laufende Amtszeit oder leer für ein einzelnes Jahr. **art** ist meist leer; „zeitraum“ oder „zeitpunkt“ erzwingt die Art. Mehrere **personen** trennst du mit „&“. **ehrung** ist „ja“ für eine Ehrung, sonst leer oder „nein“. Eine Kopfzeile ist erlaubt. Gruppen und Ämter findet die App nach ihrem Namen oder legt sie an. Was es genau so schon gibt, überspringt sie; du kannst dieselbe Tabelle also gefahrlos noch einmal einspielen. Zeilen mit Fehler musst du erst korrigieren.

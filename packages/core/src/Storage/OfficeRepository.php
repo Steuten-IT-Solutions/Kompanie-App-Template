@@ -7,11 +7,12 @@ namespace KompanieApp\Core\Storage;
 use KompanieApp\Core\Storage\Sql\Connection;
 
 /**
- * Ämter (Issue #112): Gruppen, Ämter, Amtszeiten und ihre Inhaber.
+ * Ämter (Issue #112): Gruppen, Ämter, Amtszeiten und ihre Inhaber, dazu gemeinsame Amtszeiten einer Gruppe (Issue #282).
  *
- * @phpstan-type Group array{id: int, title: string, sort: int}
+ * @phpstan-type Group array{id: int, title: string, sort: int, joint_terms: bool}
+ * @phpstan-type GroupTerm array{id: int, group_id: int, kind: string, start_year: int, end_year: int|null, note: string, image_uid: string|null}
  * @phpstan-type Office array{id: int, group_id: int|null, title: string, singular: string, sort: int, title_id: int|null}
- * @phpstan-type Term array{id: int, office_id: int, kind: string, start_year: int, end_year: int|null, note: string, honor: bool, ended_for: int|null}
+ * @phpstan-type Term array{id: int, office_id: int, kind: string, start_year: int, end_year: int|null, note: string, honor: bool, ended_for: int|null, group_term_id: int|null}
  * @phpstan-type Holder array{id: int, term_id: int, user_id: int|null, name: string, sort: int}
  */
 final class OfficeRepository
@@ -38,7 +39,7 @@ final class OfficeRepository
         return $this->db->insert('office_groups', ['title' => $title, 'sort' => $sort]);
     }
 
-    /** @param array{title?: string, sort?: int} $data */
+    /** @param array{title?: string, sort?: int, joint_terms?: int} $data */
     public function updateGroup(int $id, array $data): void
     {
         if ($data !== []) {
@@ -46,9 +47,61 @@ final class OfficeRepository
         }
     }
 
+    /** Gruppe samt ihren gemeinsamen Amtszeiten; Amtszeiten der Ämter (inzwischen anderswo) verlieren nur die Bündelung. */
     public function deleteGroup(int $id): void
     {
-        $this->db->execute('DELETE FROM {office_groups} WHERE id = ?', [$id]);
+        $this->db->transaction(function () use ($id): void {
+            $this->db->execute('UPDATE {office_terms} SET group_term_id = NULL WHERE group_term_id IN (SELECT id FROM {office_group_terms} WHERE group_id = ?)', [$id]);
+            $this->db->execute('DELETE FROM {office_group_terms} WHERE group_id = ?', [$id]);
+            $this->db->execute('DELETE FROM {office_groups} WHERE id = ?', [$id]);
+        });
+    }
+
+    // ---- Gemeinsame Amtszeiten (Issue #282) ----
+
+    /** @return list<GroupTerm> */
+    public function groupTerms(?int $groupId = null): array
+    {
+        $rows = $groupId === null
+            ? $this->db->select('SELECT * FROM {office_group_terms} ORDER BY id ASC')
+            : $this->db->select('SELECT * FROM {office_group_terms} WHERE group_id = ? ORDER BY id ASC', [$groupId]);
+        return array_values(array_map(self::groupTerm(...), $rows));
+    }
+
+    /** @return GroupTerm|null */
+    public function findGroupTerm(int $id): ?array
+    {
+        $row = $this->db->selectOne('SELECT * FROM {office_group_terms} WHERE id = ?', [$id]);
+        return $row === null ? null : self::groupTerm($row);
+    }
+
+    /** @param array{kind: string, start_year: int, end_year: int|null, note: string} $term */
+    public function insertGroupTerm(int $groupId, array $term): int
+    {
+        return $this->db->insert('office_group_terms', ['group_id' => $groupId, 'image_uid' => null] + $term);
+    }
+
+    /** @param array{kind?: string, start_year?: int, end_year?: int|null, note?: string, image_uid?: string|null} $data */
+    public function updateGroupTerm(int $id, array $data): void
+    {
+        if ($data !== []) {
+            $this->db->update('office_group_terms', $data, ['id' => $id]);
+        }
+    }
+
+    /** Gemeinsame Amtszeit samt den Amtszeiten der Ämter darin, in einer Transaktion. */
+    public function deleteGroupTerm(int $id): void
+    {
+        $this->db->transaction(function () use ($id): void {
+            $this->db->execute('DELETE FROM {office_holders} WHERE term_id IN (SELECT id FROM {office_terms} WHERE group_term_id = ?)', [$id]);
+            $this->db->execute('DELETE FROM {office_terms} WHERE group_term_id = ?', [$id]);
+            $this->db->execute('DELETE FROM {office_group_terms} WHERE id = ?', [$id]);
+        });
+    }
+
+    public function setGroupTerm(int $termId, ?int $groupTermId): void
+    {
+        $this->db->update('office_terms', ['group_term_id' => $groupTermId], ['id' => $termId]);
     }
 
     public function maxGroupSort(): int
@@ -199,7 +252,24 @@ final class OfficeRepository
      */
     private static function group(array $r): array
     {
-        return ['id' => (int) $r['id'], 'title' => (string) $r['title'], 'sort' => (int) $r['sort']];
+        return ['id' => (int) $r['id'], 'title' => (string) $r['title'], 'sort' => (int) $r['sort'], 'joint_terms' => (bool) ($r['joint_terms'] ?? false)];
+    }
+
+    /**
+     * @param array<string, mixed> $r
+     * @return GroupTerm
+     */
+    private static function groupTerm(array $r): array
+    {
+        return [
+            'id' => (int) $r['id'],
+            'group_id' => (int) $r['group_id'],
+            'kind' => (string) $r['kind'],
+            'start_year' => (int) $r['start_year'],
+            'end_year' => $r['end_year'] === null ? null : (int) $r['end_year'],
+            'note' => (string) $r['note'],
+            'image_uid' => ($r['image_uid'] ?? null) === null || $r['image_uid'] === '' ? null : (string) $r['image_uid'],
+        ];
     }
 
     /**
@@ -233,6 +303,7 @@ final class OfficeRepository
             'note' => (string) $r['note'],
             'honor' => (bool) ($r['honor'] ?? false),
             'ended_for' => ($r['ended_for'] ?? null) === null ? null : (int) $r['ended_for'],
+            'group_term_id' => ($r['group_term_id'] ?? null) === null ? null : (int) $r['group_term_id'],
         ];
     }
 

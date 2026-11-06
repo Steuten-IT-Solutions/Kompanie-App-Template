@@ -738,7 +738,14 @@ final class Api
             new Route('GET', '/offices', Cap::ViewOffices, fn () => $a->offices()->overview($a->authContext->currentUser()), 'offices', $denyView),
             new Route('POST', '/office-groups', Cap::ManageOffices, fn (Request $r) => Response::created($a->offices()->createGroup($r->input('title'))), 'offices', $denyRights),
             new Route('PUT', '/office-groups/order', Cap::ManageOffices, fn (Request $r) => $a->offices()->reorderGroups($r->input('ids')), 'offices', $denyRights),
-            new Route('PATCH', '/office-groups/{id}', Cap::ManageOffices, fn (Request $r) => $a->offices()->updateGroup($r->id(), $r->input('title')), 'offices', $denyRights),
+            new Route('PATCH', '/office-groups/{id}', Cap::ManageOffices, fn (Request $r) => $a->offices()->updateGroup($r->id(), $r->body), 'offices', $denyRights),
+            // Gemeinsame Amtszeiten einer Gruppe (Issue #282)
+            new Route('POST', '/office-groups/{id}/terms', Cap::ManageOffices, fn (Request $r) => Response::created($a->offices()->createGroupTerm($r->id(), $r->body, $this->user())), 'offices', $denyRights),
+            new Route('PATCH', '/office-group-terms/{id}', Cap::ManageOffices, fn (Request $r) => $a->offices()->updateGroupTerm($r->id(), $r->body, $this->user()), 'offices', $denyRights),
+            new Route('DELETE', '/office-group-terms/{id}', Cap::ManageOffices, function (Request $r) use ($a) {
+                $a->offices()->deleteGroupTerm($r->id());
+                return ['deleted' => true];
+            }, 'offices', $denyRights),
             new Route('DELETE', '/office-groups/{id}', Cap::ManageOffices, function (Request $r) use ($a) {
                 $a->offices()->deleteGroup($r->id());
                 return ['deleted' => true];
