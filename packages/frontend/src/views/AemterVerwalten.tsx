@@ -136,8 +136,14 @@ function OfficeOverview({
   }
 
   const sections = [
-    ...overview.groups.map((g) => ({ key: `g${g.id}`, group: g.id as number | null, title: g.title, joint: !!g.joint_terms })),
-    { key: 'none', group: null, title: 'Ohne Gruppe', joint: false },
+    ...overview.groups.map((g) => ({
+      key: `g${g.id}`,
+      group: g.id as number | null,
+      title: g.title,
+      singular: g.singular || g.title,
+      joint: !!g.joint_terms,
+    })),
+    { key: 'none', group: null, title: 'Ohne Gruppe', singular: '', joint: false },
   ];
 
   return (
@@ -172,7 +178,7 @@ function OfficeOverview({
             {s.joint && offices.length > 0 && (
               <JointTermAdmin
                 groupId={s.group!}
-                groupTitle={s.title}
+                groupTitle={s.singular}
                 offices={offices}
                 terms={(overview.group_terms ?? []).filter((t) => t.group_id === s.group)}
                 onToast={onToast}
@@ -242,6 +248,7 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
   const [title, setTitle] = useState('');
   const [editing, setEditing] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [editSingular, setEditSingular] = useState('');
   const [list, setList] = useState(groups);
   const [seen, setSeen] = useState(groups);
   if (seen !== groups) {
@@ -272,7 +279,8 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
       <p className="muted small">
         Die Gruppen ordnen die Ämter im Zeitstrahl, z. B. Verein und Dachverband. Zum Ändern der Reihenfolge am Griff ziehen. Mit
         „Amtszeiten gemeinsam“ haben alle Ämter einer Gruppe dieselben Jahre und ein Gruppenbild, z. B. ein Königshaus; vorhandene
-        Amtszeiten mit denselben Jahren werden dabei zusammengefasst.
+        Amtszeiten mit denselben Jahren werden dabei zusammengefasst. Die Bezeichnung steht über der Gruppe (z. B. „Königshäuser“), die
+        Einzahl über einer einzelnen gemeinsamen Amtszeit (z. B. „Königshaus 2026–2028“).
       </p>
       <FormError error={error} />
       {list.length > 0 && (
@@ -284,12 +292,23 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
                   className="form"
                   onSubmit={async (e) => {
                     e.preventDefault();
-                    if (await run(() => api.updateOfficeGroup(g.id, editTitle.trim()), 'Gespeichert')) setEditing(null);
+                    if (await run(() => api.updateOfficeGroup(g.id, editTitle.trim(), editSingular.trim()), 'Gespeichert'))
+                      setEditing(null);
                   }}
                 >
                   <label className="field">
                     <span>Bezeichnung</span>
                     <input type="text" maxLength={60} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} required autoFocus />
+                  </label>
+                  <label className="field">
+                    <span>Einzahl (optional, z. B. „Königshaus“ zu „Königshäuser“)</span>
+                    <input
+                      type="text"
+                      maxLength={60}
+                      value={editSingular}
+                      placeholder={editTitle}
+                      onChange={(e) => setEditSingular(e.target.value)}
+                    />
                   </label>
                   <div className="button-row">
                     <button className="btn" type="submit" disabled={busy}>
@@ -305,17 +324,21 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
               <li key={g.id} {...sort.itemProps(i, 'card row')}>
                 {list.length > 1 && sort.handle(i, g.title)}
                 <div className="row-main">
-                  <div className="row-title">{g.title}</div>
+                  <div className="row-title">
+                    {g.title}
+                    {g.singular && <span className="muted small"> · Einzahl: {g.singular}</span>}
+                  </div>
                   <div className="row-actions">
                     <button
                       className="btn btn-small btn-secondary"
                       disabled={busy}
                       onClick={() => {
                         setEditTitle(g.title);
+                        setEditSingular(g.singular ?? '');
                         setEditing(g.id);
                       }}
                     >
-                      Umbenennen
+                      Bearbeiten
                     </button>
                     <label className="toggle joint-toggle">
                       <input

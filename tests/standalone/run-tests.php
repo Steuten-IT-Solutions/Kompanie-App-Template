@@ -836,9 +836,13 @@ try {
     $d->actAs($max);
     $c->ok($d->request('POST', '/admin/backup', ['backup' => json_encode($dl), 'confirm' => true])[0] === 403, 'Mitglied darf nicht wiederherstellen');
     $d->actAs($anna);
+    $c->ok(($d->request('GET', '/config')[1]['setupPending'] ?? null) === true, 'Vor dem Wiederherstellen: Einrichtung steht noch aus');
     [$s, $r] = $d->request('POST', '/admin/backup', ['backup' => json_encode($dl), 'confirm' => true]);
     $c->ok($s === 200 && ($r['restored'] ?? false) === true, 'POST /admin/backup stellt wieder her');
     $c->ok((int) $kernel->db()->scalar("SELECT COUNT(*) FROM {events} WHERE title = 'Sicherungstest'") === 1, 'Gelöschter Termin ist nach dem Wiederherstellen über die API wieder da');
+    $d->forgetSessions();
+    $d->actAs($anna);
+    $c->ok(($d->request('GET', '/config')[1]['setupPending'] ?? null) === false, 'Nach dem Wiederherstellen kein Hinweis „Einrichtung starten“ mehr');
     // Verschlüsselte Sicherung: Passwort einrichten, verschlüsselt herunterladen, nur mit dem Passwort wiederherstellen.
     $d->forgetSessions();
     $d->actAs($anna);

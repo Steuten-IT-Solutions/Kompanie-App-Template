@@ -1656,9 +1656,15 @@ WHERE title IS NULL",
 )',
                 ],
             ],
+            // Ämter: eigene Einzahl einer Gruppe („Königshaus“ zu „Königshäuser“) für eine einzelne gemeinsame Amtszeit und den
+            // Zeitstrahl einer Person; leer: wie bisher die Bezeichnung.
+            45 => [
+                'mysql' => ["ALTER TABLE {office_groups} ADD COLUMN singular varchar(60) NOT NULL DEFAULT ''"],
+                'sqlite' => ["ALTER TABLE {office_groups} ADD COLUMN singular TEXT NOT NULL DEFAULT ''"],
+            ],
             // Öffentliche Nachrichten am Schwarzen Brett: audience public (alle, auch ohne Anmeldung) oder members (wer das
             // Brett liest, view_board; wie bei eigenen Seiten). Bestehende Nachrichten bleiben intern.
-            45 => [
+            46 => [
                 'mysql' => ["ALTER TABLE {board_messages} ADD COLUMN audience varchar(10) NOT NULL DEFAULT 'members'"],
                 'sqlite' => ["ALTER TABLE {board_messages} ADD COLUMN audience TEXT NOT NULL DEFAULT 'members'"],
             ],

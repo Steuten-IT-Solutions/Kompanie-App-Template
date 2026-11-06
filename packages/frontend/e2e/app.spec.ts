@@ -1533,11 +1533,19 @@ test('Ämter: gemeinsame Amtszeiten einer Gruppe mit Gruppenbild, öffentlich al
     await newOffice.getByRole('button', { name: 'Anlegen' }).click();
     await expect(page.locator('.toast')).toHaveText('Amt angelegt');
   }
-  const groupRow = page.locator('li.card', { hasText: group }).filter({ has: page.getByRole('button', { name: 'Umbenennen' }) });
+  const groupRow = page.locator('li.card', { hasText: group }).filter({ has: page.getByLabel('Amtszeiten gemeinsam') });
   // Gesteuert: der Haken steht erst, wenn der Server die Änderung bestätigt hat
   await groupRow.getByLabel('Amtszeiten gemeinsam').click();
   await expect(page.locator('.toast')).toHaveText('Gemeinsame Amtszeiten an');
   await expect(groupRow.getByLabel('Amtszeiten gemeinsam')).toBeChecked();
+  // Einzahl der Gruppe: steht über einer einzelnen gemeinsamen Amtszeit
+  const singular = `Hofstaat ${n}`;
+  await groupRow.getByRole('button', { name: 'Bearbeiten' }).click();
+  const groupForm = page.locator('form', { has: page.getByLabel(/^Einzahl/) });
+  await groupForm.getByLabel(/^Einzahl/).fill(singular);
+  await groupForm.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  await expect(groupRow).toContainText(`Einzahl: ${singular}`);
 
   const admin = page.locator('.office-admin-group', { hasText: group }).locator('.joint-admin');
   await expect(admin).toContainText('Noch keine gemeinsamen Amtszeiten.');
@@ -1559,7 +1567,9 @@ test('Ämter: gemeinsame Amtszeiten einer Gruppe mit Gruppenbild, öffentlich al
 
   // Öffentlich: eine Karte je gemeinsame Amtszeit mit Bild und den Personen je Amt
   await page.goto('/app/#/mitglieder/aemter');
-  const card = page.locator('.joint-term', { hasText: group });
+  await expect(page.locator('.office-group h2', { hasText: group })).toBeVisible();
+  const card = page.locator('.joint-term', { hasText: singular });
+  await expect(card.locator('.joint-term-title')).toContainText(`${singular} seit 2023`);
   await expect(card.locator('.joint-term-title')).toContainText('aktuell');
   await expect(card.locator('img.joint-term-image')).toBeVisible();
   expect(await card.locator('img.joint-term-image').evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
@@ -3431,6 +3441,13 @@ test('Admin wird durch die Einrichtung geführt', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   const hint = page.locator('.setup-hint');
   await expect(hint).toBeVisible();
+  // Die Karte hat Innenabstand und hält Abstand zu dem, was darunter folgt.
+  const style = await hint.evaluate((el) => {
+    const s = getComputedStyle(el);
+    return { padding: parseFloat(s.paddingLeft), margin: parseFloat(s.marginBottom) };
+  });
+  expect(style.padding).toBeGreaterThan(0);
+  expect(style.margin).toBeGreaterThan(0);
   await hint.getByRole('button', { name: 'Einrichtung starten' }).click();
   await expect(page.locator('.topbar-title')).toHaveText('Einrichtung');
   // Erster Schritt: Bereiche wählen. Ohne Galerie entfällt deren Schritt.
@@ -4430,6 +4447,14 @@ test('Eigene Seiten (Issue #287): anlegen öffentlich und nur für Mitglieder, j
     await intern.getByRole('button', { name: 'Uniform', exact: true }).click();
     await expect(page.locator('.page-article')).toContainText('Nur intern.');
     await expect(tabbar.getByRole('button', { name: 'Intern' })).toHaveAttribute('aria-current', 'page');
+    // „‹ Intern“ steht über dem Inhalt, nicht darunter
+    expect(
+      await page.evaluate(() => {
+        const back = document.querySelector('main.content .back');
+        const article = document.querySelector('.page-article');
+        return !!back && !!article && !!(back.compareDocumentPosition(article) & Node.DOCUMENT_POSITION_FOLLOWING);
+      }),
+    ).toBe(true);
     await page.getByRole('button', { name: '‹ Intern' }).click();
     await expect(intern.getByRole('button', { name: 'Anfahrt und Parken', exact: true })).toBeVisible();
 

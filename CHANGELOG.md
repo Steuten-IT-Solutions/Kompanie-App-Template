@@ -25,6 +25,18 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   öffentlichen Nachricht einmalig dazugeschaltet); die E-Mail geht weiter nur an Mitglieder und alle mit dem internen
   Kalender. Die Sichtbarkeit lässt sich beim Bearbeiten ändern und steht im Verlauf. Bisherige Nachrichten bleiben
   intern.
+- **Ämter: Einzahl für Gruppen**: Eine Gruppe der Ämter kann neben ihrer Bezeichnung (z. B. „Königshäuser“) eine
+  Einzahl bekommen (z. B. „Königshaus“). Über einer einzelnen gemeinsamen Amtszeit steht dann „Königshaus 2026–2028“
+  statt „Königshäuser 2026–2028“. Einzutragen in der Verwaltung der Ämter unter *Gruppen → Bearbeiten*; ohne Einzahl
+  bleibt es wie bisher.
+
+### Geändert
+
+- **Ämter einer Person**: Im Zeitstrahl einer Person steht nur noch das Amt (bzw. seine Einzahl), nicht mehr
+  zusätzlich die Gruppe.
+- **Jahreszahl bei Terminen**: Liegt ein Termin nicht im laufenden Jahr, zeigt die App beim Datum jetzt auch das Jahr,
+  z. B. „Fr., 8. Jan. 2027“. Das gilt für die internen und öffentlichen Termine, die Termine bei der Anwesenheit, die
+  Verwaltung der öffentlichen Termine und die anstehenden Geburtstage.
 
 ### Behoben
 
@@ -34,6 +46,16 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   sie auf normal. Gespeichert bleibt der Text unverändert. Links in formatierten Texten sind im dunklen Design jetzt
   ebenfalls gut lesbar.
 - **Kompanien**: *Webseite* und *App der Kompanie* sind jetzt Knöpfe im Stil der App statt blauer Standard-Links.
+- **Hinweis „Einrichtung starten“ nach dem Wiederherstellen**: Wurde in einer frisch installierten, noch nicht
+  eingerichteten App eine Sicherung eingespielt, stand der Hinweis „Einrichtung starten“ weiter über jeder Seite. Mit
+  der Sicherung gilt die App jetzt als eingerichtet; Bereiche und Verbindungen lassen sich wie gewohnt unter
+  *Einstellungen* ändern.
+- **Zurück-Knopf in Untermenüs oben**: Auf *Sponsoren*, *Kompanien*, eigenen Seiten und auf *Termine*, *News* und
+  *Galerie*, wenn sie in einem Untermenü stehen (z. B. *Intern*), stand *‹ Intern* bzw. *‹ <Untermenü>* unter dem
+  Inhalt. Er steht jetzt wie auf den übrigen Seiten oben.
+- **Hinweis „Einrichtung starten“**: Die Karte hatte keinen Innenabstand, der Text stand am linken Rand, und die
+  Kacheln darunter schlossen ohne Abstand an. Beides ist behoben; dasselbe gilt für den Hinweis „Anmelden“ auf Seiten,
+  die erst nach der Anmeldung zu sehen sind.
 
 ## [0.6.0] – 2026-11-06
 
