@@ -15,6 +15,15 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Behoben
+
+- **Formatierte Texte im dunklen Design lesbar**: Eingefügter Text (z. B. von eurer Webseite) brachte oft eine feste
+  Schriftfarbe mit, die im dunklen Design kaum zu lesen war, etwa in der Beschreibung einer Kompanie. Farben mit zu
+  wenig Kontrast zum Hintergrund zeigt die App jetzt in ihrer normalen Schriftfarbe, sehr große Zeilenabstände setzt
+  sie auf normal. Gespeichert bleibt der Text unverändert. Links in formatierten Texten sind im dunklen Design jetzt
+  ebenfalls gut lesbar.
+- **Kompanien**: *Webseite* und *App der Kompanie* sind jetzt Knöpfe im Stil der App statt blauer Standard-Links.
+
 ## [0.6.0] – 2026-11-06
 
 ### Neu

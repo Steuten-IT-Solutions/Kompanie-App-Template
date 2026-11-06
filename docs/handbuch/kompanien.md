@@ -16,7 +16,7 @@ Tippe unten auf **{bereich.companies}**. Steht der Punkt nicht unten, findest du
 ## So gehst du vor
 ### Mehr über eine Kompanie erfahren
 1. Tippe auf die Karte. Sie klappt auf.
-2. Du siehst die **Beschreibung**, die laufenden **{bereich.offices}** (z. B. Hauptmann und Fähnrich, wenn die Kompanie mit einer Gruppe der {bereich.offices} verknüpft ist), Links zur **Webseite** und zur **App der Kompanie** und die **Mitglieder**.
+2. Du siehst die **Beschreibung**, die laufenden **{bereich.offices}** (z. B. Hauptmann und Fähnrich, wenn die Kompanie mit einer Gruppe der {bereich.offices} verknüpft ist), die Knöpfe **Webseite** und **App der Kompanie** (sie öffnen sich in einem neuen Tab) und die **Mitglieder**.
 3. Tippe auf einen Namen, um die Seite der Person unter **{bereich.directory}** zu öffnen. Ein erneuter Tipp auf die Karte klappt sie wieder zu.
 
 ## Gut zu wissen

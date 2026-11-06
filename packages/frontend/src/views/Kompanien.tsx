@@ -86,12 +86,12 @@ export default function Kompanien() {
                 {(c.website_url || c.app_url) && (
                   <p className="company-links">
                     {c.website_url && (
-                      <a href={c.website_url} target="_blank" rel="noopener noreferrer">
+                      <a className="btn btn-secondary btn-small" href={c.website_url} target="_blank" rel="noopener noreferrer">
                         Webseite
                       </a>
                     )}
                     {c.app_url && (
-                      <a href={c.app_url} target="_blank" rel="noopener noreferrer">
+                      <a className="btn btn-secondary btn-small" href={c.app_url} target="_blank" rel="noopener noreferrer">
                         App der Kompanie
                       </a>
                     )}

@@ -3676,8 +3676,9 @@ fieldset.rights-tree legend {
   padding: 2px 6px;
   vertical-align: top;
 }
+/* accent-text ist in hell und dunkel auf Karten lesbar (mindestens 4,5 : 1, packages/branding/theme.mjs). */
 .rich-text a {
-  color: var(--primary-ink, var(--primary));
+  color: var(--accent-text);
   text-decoration: underline;
 }
 .rich-text hr {
@@ -5883,10 +5884,12 @@ button.spotlight-person:focus-visible {
 .company-offices dd {
   margin: 0;
 }
+/* Webseite und App der Kompanie als Knöpfe im Stil der App (wie „Mehr Infos“ bei Terminen). */
 .company-links {
   display: flex;
-  gap: 16px;
+  gap: 8px;
   flex-wrap: wrap;
+  margin: 12px 0 0;
 }
 .company-members {
   list-style: none;

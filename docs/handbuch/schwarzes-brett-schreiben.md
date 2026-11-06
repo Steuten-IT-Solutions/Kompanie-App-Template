@@ -60,7 +60,7 @@ Hast du noch keine Signatur, tippe auf **Noch keine Signatur – jetzt einrichte
 1. Markiere den Text in Word oder Outlook und kopiere ihn.
 2. Füge ihn in das Feld **Text** ein.
 
-Schrift, Farben, Aufzählungen und Tabellen kommen mit. Bilder übernimmt die App, wo es geht. Klappt das bei einem Bild nicht, sagt sie dir Bescheid; füge es dann einzeln über **🖼** ein.
+Schrift, Farben, Aufzählungen und Tabellen kommen mit. Bilder übernimmt die App, wo es geht. Klappt das bei einem Bild nicht, sagt sie dir Bescheid; füge es dann einzeln über **🖼** ein. Farben, die auf dem Hintergrund schlecht lesbar wären (z. B. dunkle Schrift im dunklen Design), zeigt die App in ihrer normalen Schriftfarbe; sehr große Zeilenabstände setzt sie beim Anzeigen auf normal. Gespeichert bleibt der Text so, wie du ihn eingegeben hast.
 
 ### Eine Nachricht ändern
 1. Tippe bei der Nachricht auf **Bearbeiten**.
