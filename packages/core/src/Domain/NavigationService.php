@@ -24,10 +24,10 @@ final class NavigationService
     public const SETTING = 'navigation';
 
     /** Bereiche, die in der Navigation stehen können, in der Reihenfolge der Standardnavigation (Ansichten der App). */
-    public const TARGETS = ['termine', 'news', 'galerie', 'sponsoren', 'mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog'];
+    public const TARGETS = ['termine', 'news', 'galerie', 'kompanien', 'sponsoren', 'mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog'];
 
     /** Symbole für Untermenüs (in der App gezeichnet). */
-    public const ICONS = ['ordner', 'termine', 'news', 'galerie', 'sponsoren', 'mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog', 'stern'];
+    public const ICONS = ['ordner', 'termine', 'news', 'galerie', 'kompanien', 'sponsoren', 'mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog', 'stern'];
 
     /** Hauptpunkte neben „Verwaltung“ und „Meins“: Mehr als sieben Tabs passen auf schmalen Handys nicht in die Leiste. */
     public const MAX_MAIN = 5;

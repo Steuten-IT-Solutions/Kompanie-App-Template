@@ -59,6 +59,7 @@ final class Features
         // E-Mails: in der Verwaltung schreiben und versenden (An, Cc, Bcc); braucht den Mailversand (Einstellungen → E-Mail).
         'mail' => ['label' => 'E-Mails', 'description' => 'E-Mails aus der App an Rollen, einzelne Mitglieder und beliebige Adressen schreiben, mit An, Cc und Bcc und Versandprotokoll; nur für alle, die sie versenden dürfen.', 'requires' => [], 'setup' => 'email', 'role' => ['member', 'send_mail']],
         // Sponsoren (Issue #279): Logos mit Link, öffentlich (view_sponsors, anfangs auch Gast).
+        'companies' => ['label' => 'Kompanien', 'description' => 'Liste eurer Kompanien mit Logo, Beschreibung und Links; Mitglieder lassen sich ihnen zuordnen. Für alle sichtbar, auch ohne Anmeldung.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_companies']],
         'sponsors' => ['label' => 'Sponsoren', 'description' => 'Eure Sponsoren mit Logo und Link, in eurer Reihenfolge, für alle sichtbar, auch ohne Anmeldung.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_sponsors']],
     ];
 
@@ -222,7 +223,7 @@ final class Features
         foreach (self::keys() as $key) {
             // Dienstgrade, Titel, Anwesenheit, Dokumente, das Schwarze Brett, Umfragen, Geburtstage, Inventar, die
             // Mitgliederliste, Ämter, Listen, E-Mails und Sponsoren gab es in den alten Versionen nicht: nie aus kompanie.json einschalten.
-            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices', 'lists', 'mail', 'sponsors'], true) && $this->app->config->legacyFeature($key);
+            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices', 'lists', 'mail', 'sponsors', 'companies'], true) && $this->app->config->legacyFeature($key);
         }
         $this->save($state);
     }

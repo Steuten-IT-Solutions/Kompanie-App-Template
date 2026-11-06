@@ -28,7 +28,7 @@ final class QueryCountTest extends TestCase
     private const LISTS = [
         'GET /members', 'GET /members?all=1', 'GET /members/{m}', 'GET /promotions', 'GET /ranks?all=1', 'GET /titles',
         'GET /attendance', 'GET /attendance/{list}', 'GET /birthdays', 'GET /inventory', 'GET /inventory/log',
-        'GET /polls', 'GET /polls/{poll}', 'GET /board', 'GET /directory', 'GET /directory/counts', 'GET /directory/former', 'GET /offices', 'GET /lists', 'GET /lists/{printlist}', 'POST /lists/{printlist}/sync-members', 'GET /mails/options', 'POST /mails/preview', 'GET /me', 'GET /me/rank', 'GET /me/points', 'GET /me/penalties',
+        'GET /polls', 'GET /polls/{poll}', 'GET /board', 'GET /directory', 'GET /directory/counts', 'GET /directory/former', 'GET /offices', 'GET /companies', 'GET /lists', 'GET /lists/{printlist}', 'POST /lists/{printlist}/sync-members', 'GET /mails/options', 'POST /mails/preview', 'GET /me', 'GET /me/rank', 'GET /me/points', 'GET /me/penalties',
     ];
 
     public function testListsDoNotGrowWithMembers(): void
@@ -101,6 +101,8 @@ final class QueryCountTest extends TestCase
         // Ämter (Issue #112): eine Amtszeit je Mitglied, mit einem Konto und einem freien Namen
         $group = $call('POST', '/office-groups', ['title' => 'Verein'])['id'];
         $office = $call('POST', '/offices', ['title' => 'Kassenprüfer', 'group_id' => $group])['id'];
+        // Kompanien (Issue #280): zwei, mit der Gruppe der Ämter verknüpft
+        $companies = [$call('POST', '/companies', ['name' => 'Erste', 'office_group_id' => $group])['id'], $call('POST', '/companies', ['name' => 'Zweite'])['id']];
         $members = [];
         for ($i = 0; $i < $n; $i++) {
             $members[] = $users->add('m' . $i, Roles::MEMBER);
@@ -112,6 +114,7 @@ final class QueryCountTest extends TestCase
             $call('POST', '/penalties', ['user_ids' => [$id], 'amount_cents' => 200, 'reason' => 'Zu spät']);
             $call('PUT', "/members/$id/rank", ['rank_id' => $ranks[$i % 2], 'reason' => 'x']);
             $call('PUT', "/members/$id/titles", ['title_ids' => [$titles[$i % 2]]]);
+            $call('PUT', "/members/$id/companies", ['company_ids' => $i % 3 === 0 ? $companies : [$companies[$i % 2]]]);
             // Zusatzrollen (Issue #66): für alle Benutzer einer Anfrage eine Abfrage
             $call('PATCH', "/members/$id/role", ['extra_roles' => $i % 2 === 0 ? ['events'] : ['events', 'documents']]);
             $call('PUT', "/members/$id/birthday", ['month' => 1 + $i % 12, 'day' => 1 + $i % 28]);

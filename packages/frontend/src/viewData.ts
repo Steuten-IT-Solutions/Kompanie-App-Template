@@ -43,6 +43,7 @@ export const sources = {
   gallery: source('galerie', api.gallery),
   album: (id: number) => source('galerie-album', () => api.galleryAlbum(id), [id]),
   sponsors: source('sponsors', api.sponsors),
+  companies: source('companies', api.companies),
   documents: source('documents', api.documents),
   directory: source('directory', api.directory),
   directoryCounts: source('directory-counts', api.directoryCounts),
@@ -120,6 +121,7 @@ export function menuSources(menu: 'meins' | 'verwaltung' | 'einstellungen', id: 
       titel: [s.titles],
       aemter: [s.offices],
       sponsoren: [s.sponsors],
+      kompanien: [s.companies],
       anwesenheit: [s.attendanceOverview],
       umfragen: [s.polls],
       inventar: [s.inventory, s.inventoryLocations],
@@ -190,6 +192,7 @@ export type TabId =
   | 'termine'
   | 'news'
   | 'galerie'
+  | 'kompanien'
   | 'sponsoren'
   | 'dokumente'
   | 'mitglieder'
@@ -213,6 +216,8 @@ export function tabSources(tab: TabId): Source[] {
       return [sources.news(1)];
     case 'galerie':
       return [sources.gallery];
+    case 'kompanien':
+      return [sources.companies];
     case 'sponsoren':
       return [sources.sponsors];
     case 'dokumente':

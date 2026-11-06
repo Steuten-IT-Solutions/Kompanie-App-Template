@@ -49,6 +49,7 @@ export type Capability =
   | 'manage_lists'
   | 'send_mail'
   | 'manage_sponsors'
+  | 'manage_companies'
   | 'view_personal'
   | 'manage_personal'
   | 'create_users'
@@ -74,7 +75,8 @@ export type Feature =
   | 'offices'
   | 'lists'
   | 'mail'
-  | 'sponsors';
+  | 'sponsors'
+  | 'companies';
 
 export interface AppUser {
   id: number;
@@ -507,6 +509,8 @@ export interface DirectoryEntry {
   rank_badge_url?: string | null;
   /** Titel (fehlen ohne Bereich Titel) */
   titles?: TitleRef[];
+  /** Kompanien der Person (fehlen ohne Bereich Kompanien oder ohne view_companies) */
+  companies?: CompanyRef[];
   /** Geburtstag, soweit die Person ihn dem Betrachter zeigt (fehlt ohne Bereich Geburtstage und bei Ehemaligen) */
   birthday?: DirectoryBirthday | null;
   /** Eintrittsjahr, soweit die Person es dem Betrachter zeigt (fehlt bei Ehemaligen: Sie haben joined_year) */
@@ -547,6 +551,8 @@ export interface DirectoryFormerEntry extends DirectoryEntry {
 }
 
 export interface MemberDetail extends MemberSummary {
+  /** Kompanien der Person (nur mit Bereich und Recht „Kompanien verwalten“) */
+  companies?: CompanyRef[];
   point_list: PointEntry[];
   penalties: Penalty[];
   /** Dienstgrad und Verlauf (nur mit Bereich und Recht „Dienstgrade verwalten“) */
@@ -1223,6 +1229,44 @@ export interface AttendanceGroup {
   label: string;
   /** null: eigene Gruppe */
   counts_as: Level | null;
+}
+
+/** Kompanie einer Person (Issue #280), in der Reihenfolge der Kompanieliste. */
+export interface CompanyRef {
+  id: number;
+  name: string;
+  short_name: string;
+  /** false: aufgelöst („ehemalig“) */
+  active: boolean;
+}
+
+/** Kompanie der Kompanieliste (Issue #280). */
+export interface Company extends CompanyRef {
+  founded_year: number | null;
+  /** Bereinigtes HTML, leer ohne */
+  description: string;
+  website_url: string;
+  app_url: string;
+  logo_url: string | null;
+  logo_type: 'png' | 'svg' | null;
+  /** Verknüpfte Gruppe der Ämter; shown: Bereich Ämter an (dann zeigt die App deren laufende Amtszeiten) */
+  office_group: { id: number; title: string; shown: boolean } | null;
+  /** Zugeordnete Personen, nur soweit die Mitgliederliste sichtbar ist (fehlt sonst) */
+  members?: { id: number; name: string }[];
+  member_count?: number;
+  /** Nur für die Pflege: alle Zugeordneten */
+  member_ids?: number[];
+}
+
+export interface CompanyInput {
+  name?: string;
+  short_name?: string;
+  founded_year?: number | null;
+  description?: string;
+  website_url?: string;
+  app_url?: string;
+  office_group_id?: number | null;
+  active?: boolean;
 }
 
 /** Sponsor (Issue #279): Name (auch Alternativtext), Link (nur https, leer ohne), Logo. */
@@ -1946,6 +1990,17 @@ export const api = {
   reorderSponsors: (ids: number[]) => request<Sponsor[]>('PUT', '/sponsors/order', { ids }),
   uploadSponsorLogo: async (id: number, file: File) => request<Sponsor>('POST', `/sponsors/${id}/logo`, { file: await encodeFile(file) }),
   removeSponsorLogo: (id: number) => request<Sponsor>('DELETE', `/sponsors/${id}/logo`),
+  // Kompanien (Issue #280)
+  companies: () => request<Company[]>('GET', '/companies'),
+  createCompany: (data: CompanyInput) => request<Company>('POST', '/companies', data),
+  updateCompany: (id: number, data: CompanyInput) => request<Company>('PATCH', `/companies/${id}`, data),
+  deleteCompany: (id: number) => request<{ deleted: boolean }>('DELETE', `/companies/${id}`),
+  reorderCompanies: (ids: number[]) => request<Company[]>('PUT', '/companies/order', { ids }),
+  uploadCompanyLogo: async (id: number, file: File) => request<Company>('POST', `/companies/${id}/logo`, { file: await encodeFile(file) }),
+  removeCompanyLogo: (id: number) => request<Company>('DELETE', `/companies/${id}/logo`),
+  setCompanyMembers: (id: number, user_ids: number[]) => request<Company>('PUT', `/companies/${id}/members`, { user_ids }),
+  setMemberCompanies: (id: number, company_ids: number[]) =>
+    request<{ companies: CompanyRef[] }>('PUT', `/members/${id}/companies`, { company_ids }),
   createOfficeGroup: (title: string) => request<OfficeGroup>('POST', '/office-groups', { title }),
   updateOfficeGroup: (id: number, title: string) => request<OfficeGroup>('PATCH', `/office-groups/${id}`, { title }),
   deleteOfficeGroup: (id: number) => request<{ deleted: boolean }>('DELETE', `/office-groups/${id}`),

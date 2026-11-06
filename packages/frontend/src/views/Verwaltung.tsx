@@ -60,6 +60,7 @@ import { TitleBadges } from '../TitleBadges';
 import { MemberTitles, TitleList } from './TitelVerwalten';
 import { OfficeAdmin } from './AemterVerwalten';
 import { SponsorAdmin } from './SponsorenVerwalten';
+import { CompanyAdmin, MemberCompanies } from './KompanienVerwalten';
 import { ListAdmin } from './ListenVerwalten';
 import { MailAdmin } from './EmailsVerwalten';
 import { PersonOffices } from './Aemter';
@@ -106,6 +107,7 @@ type Sub =
   | 'befoerderungen'
   | 'titel'
   | 'aemter'
+  | 'kompanien'
   | 'sponsoren'
   | 'anwesenheit'
   | 'listen'
@@ -215,6 +217,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <TitleList onToast={onToast} />
       ) : active === 'aemter' ? (
         <OfficeAdmin path={path.slice(1)} onToast={onToast} />
+      ) : active === 'kompanien' ? (
+        <CompanyAdmin onToast={onToast} />
       ) : active === 'sponsoren' ? (
         <SponsorAdmin onToast={onToast} />
       ) : active === 'anwesenheit' ? (
@@ -725,8 +729,8 @@ function MemberPeek({
 }
 
 /** Fenster auf der Seite eines Mitglieds; stehen in der Adresse (verwaltung/mitglied/<id>/<fenster>), damit „Zurück“ sie schließt. */
-type MemberSheet = 'punkte' | 'strafen' | 'dienstgrad' | 'titel' | 'geburtstag' | 'eintritt' | 'austritt';
-const MEMBER_SHEETS: MemberSheet[] = ['punkte', 'strafen', 'dienstgrad', 'titel', 'geburtstag', 'eintritt', 'austritt'];
+type MemberSheet = 'punkte' | 'strafen' | 'dienstgrad' | 'titel' | 'kompanien' | 'geburtstag' | 'eintritt' | 'austritt';
+const MEMBER_SHEETS: MemberSheet[] = ['punkte', 'strafen', 'dienstgrad', 'titel', 'kompanien', 'geburtstag', 'eintritt', 'austritt'];
 /** Fenster in der App geöffnet (eigener Verlaufseintrag): Schließen geht dann zurück, sonst (Link) ersetzt es die Adresse. */
 let sheetOpenedHere = false;
 
@@ -930,6 +934,8 @@ function MemberDetailView({
   const self = m.id === config?.user?.id;
   const rankOn = rankEditable(m);
   const titlesOn = !!m.titles && (m.member || m.titles.length > 0);
+  // Kompanien (Issue #280): kommen nur mit Bereich und manage_companies mit.
+  const companiesOn = !!m.companies && (m.member || m.companies.length > 0);
   // Ämter (Issue #112): Konten in Amtszeiten sieht, wer Ämter pflegt, sonst nur bei öffentlicher Mitgliederliste.
   const officesOn = !!config?.features.offices && (!!config.features.directory || can('manage_offices'));
   const birthdayOn = m.birthday !== undefined && (m.member || m.birthday !== null || canSetBirthdays());
@@ -1014,6 +1020,22 @@ function MemberDetailView({
           <span className="member-tile-label">{sec.titles}</span>
           <span className="member-tile-value">
             {(m.titles ?? []).length > 0 ? <TitleBadges titles={m.titles} /> : <span className="muted">Keine</span>}
+          </span>
+          <span className="chevron" aria-hidden="true">
+            ›
+          </span>
+        </button>
+      )}
+
+      {companiesOn && (
+        <button type="button" className="card member-tile member-companies-tile" onClick={() => openSheet('kompanien')}>
+          <span className="member-tile-label">{sec.companies}</span>
+          <span className="member-tile-value">
+            {(m.companies ?? []).length > 0 ? (
+              (m.companies ?? []).map((c) => c.short_name || c.name).join(', ')
+            ) : (
+              <span className="muted">Keine</span>
+            )}
           </span>
           <span className="chevron" aria-hidden="true">
             ›
@@ -1155,6 +1177,18 @@ function MemberDetailView({
         </Sheet>
       )}
 
+      {sheet === 'kompanien' && companiesOn && m.companies && (
+        <Sheet title={sec.companies} onClose={closeSheet}>
+          <MemberCompanies
+            key={`${m.id}:${m.companies.map((c) => c.id).join(',')}`}
+            id={m.id}
+            member={m.member}
+            companies={m.companies}
+            onChanged={reload}
+            onToast={onToast}
+          />
+        </Sheet>
+      )}
       {sheet === 'geburtstag' && birthdayOn && m.birthday !== undefined && (
         <Sheet title="Geburtstag" onClose={closeSheet}>
           <MemberBirthday key={JSON.stringify(m.birthday)} id={m.id} birthday={m.birthday} onChanged={reload} onToast={onToast} />

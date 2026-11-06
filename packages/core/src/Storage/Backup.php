@@ -67,7 +67,7 @@ final class Backup
         'push_log',
     ];
     /** Tabellen des Kerns, in einer Reihenfolge, die beim Einfügen passt. */
-    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'member_photos', 'member_contacts', 'office_groups', 'offices', 'office_terms', 'office_holders', 'former_members', 'lists', 'list_columns', 'list_rows', 'mailings', 'attachments', 'sponsors', 'push_subscriptions'];
+    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'member_photos', 'member_contacts', 'office_groups', 'offices', 'office_terms', 'office_holders', 'former_members', 'lists', 'list_columns', 'list_rows', 'mailings', 'attachments', 'sponsors', 'companies', 'member_companies', 'push_subscriptions'];
     /**
      * Tabellen, die beim Wiederherstellen nur geleert werden, wenn die Sicherung sie enthält: Push-Abos waren früher nicht
      * in Sicherungen; eine ältere Sicherung soll die Geräte nicht abmelden (der Schlüssel bleibt dann ebenfalls).
@@ -79,7 +79,7 @@ final class Backup
     public const JSON_FLAGS = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE;
     /** write(): Zeilen je Abfrage; Tabellen mit großen Zeilen (Fotos und Bilder als Base64) zeilenweise. */
     private const CHUNK_ROWS = 200;
-    private const HEAVY_TABLES = ['member_photos', 'rich_images', 'sponsors'];
+    private const HEAVY_TABLES = ['member_photos', 'rich_images', 'sponsors', 'companies'];
     /** write(): Block einer Datei (Vielfaches von 3, damit die Base64-Teile aneinanderpassen). */
     private const FILE_BLOCK = 3 * 1024 * 1024;
 

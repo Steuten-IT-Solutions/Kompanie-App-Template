@@ -56,6 +56,7 @@ final class ApiScenario
             $this->offices();
             $this->lists();
             $this->mails();
+            $this->companies();
             $this->sponsors();
             $this->activity();
             $this->accounts();
@@ -110,7 +111,7 @@ final class ApiScenario
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Ausgeschalteter Bereich → 403 feature_disabled');
 
         $this->d->actAs($admin);
-        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true, 'directory' => true, 'offices' => true, 'lists' => true, 'mail' => true, 'sponsors' => true];
+        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true, 'directory' => true, 'offices' => true, 'lists' => true, 'mail' => true, 'companies' => true, 'sponsors' => true];
         [$s, $d] = $this->req('PUT', '/admin/features', $all);
         $c->ok($s === 200 && !in_array(false, array_column((array) $d, 'enabled', 'key'), true), 'Alle Bereiche einschalten');
 
@@ -1376,6 +1377,49 @@ final class ApiScenario
         [$s, $d] = $this->req('GET', '/mails/options');
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
         $this->req('PUT', '/admin/features', ['mail' => true]);
+    }
+
+    /**
+     * Kompanien (Issue #280): Liste für alle mit view_companies, Pflege und Zuordnung mit manage_companies, Logo mit eigener
+     * Adresse, Mitglieder einer Kompanie nur mit Mitgliederliste, Kompanien je Person in der Mitgliederliste.
+     */
+    private function companies(): void
+    {
+        $c = $this->c;
+        $c->section('Kompanien');
+        $admin = $this->user('kptest_company_admin', 'admin');
+        $m = $this->user('kptest_company_m', 'member');
+        $this->d->actAs($m);
+        $c->ok($this->req('GET', '/companies')[0] === 200, 'Mitglied sieht die Kompanien');
+        $c->ok($this->req('POST', '/companies', ['name' => 'Kptest'])[0] === 403, 'Ohne manage_companies → 403');
+        $this->d->actAs(null);
+        $c->ok($this->req('GET', '/companies')[0] === 200, 'Auch ohne Anmeldung sichtbar');
+        $c->ok($this->req('POST', '/companies', ['name' => 'Kptest'])[0] === 401, 'Pflegen ohne Anmeldung → 401');
+
+        $this->d->actAs($admin);
+        [$s, $a] = $this->req('POST', '/companies', ['name' => 'Kptest Erste', 'short_name' => 'KT1', 'founded_year' => 1900, 'description' => '<p>Text<script>x</script></p>', 'website_url' => 'https://example.org/']);
+        $c->ok($s === 201 && ($a['description'] ?? '') === '<p>Text</p>' && ($a['founded_year'] ?? null) === 1900 && array_key_exists('logo_url', (array) $a) && $a['logo_url'] === null, 'Kompanie anlegen, Beschreibung bereinigt');
+        [, $b] = $this->req('POST', '/companies', ['name' => 'Kptest Zweite']);
+        $c->ok($this->req('POST', '/companies', ['name' => 'Kptest', 'app_url' => 'http://example.org/'])[0] === 400, 'Link ohne https → 400');
+        $mine = [(int) ($a['id'] ?? 0), (int) ($b['id'] ?? 0)];
+        $others = array_values(array_diff(array_column((array) $this->req('GET', '/companies')[1], 'id'), $mine));
+        [$s, $d] = $this->req('PUT', '/companies/order', ['ids' => [...$others, $mine[1], $mine[0]]]);
+        $c->ok($s === 200 && array_slice(array_column((array) $d, 'id'), -2) === [$mine[1], $mine[0]], 'Reihenfolge ändern');
+        [$s, $d] = $this->req('POST', "/companies/{$mine[0]}/logo", ['file' => ['name' => 'logo.png', 'data' => self::pngBase64()]]);
+        $c->ok($s === 200 && ($d['logo_type'] ?? '') === 'png' && str_contains((string) ($d['logo_url'] ?? ''), 'kompanielogo/' . $mine[0]), 'Logo (PNG) hochladen');
+        [$s, $d] = $this->req('PUT', "/members/$m/companies", ['company_ids' => $mine]);
+        $c->ok($s === 200 && array_column((array) ($d['companies'] ?? []), 'id') === [$mine[1], $mine[0]], 'Person zwei Kompanien zuordnen (Reihenfolge der Liste)');
+        [$s, $d] = $this->req('PATCH', "/companies/{$mine[1]}", ['active' => false]);
+        $c->ok($s === 200 && ($d['active'] ?? null) === false && ($d['member_ids'] ?? null) === [$m], 'Als aufgelöst markieren, Zuordnung bleibt');
+        $dir = array_column((array) $this->req('GET', '/directory')[1], null, 'id');
+        $c->ok(array_column((array) ($dir[$m]['companies'] ?? []), 'id') === [$mine[1], $mine[0]], 'Kompanien in der Mitgliederliste');
+        [, $roles] = $this->req('GET', '/admin/roles');
+        $c->ok((array_column((array) $roles, 'capabilities', 'key')['companies'] ?? null) === self::caps(['member', 'manage_companies']), 'Standardrolle „Kompanien verwalten“');
+        $this->req('PUT', '/admin/features', ['companies' => false]);
+        [$s, $d] = $this->req('GET', '/companies');
+        $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
+        $this->req('PUT', '/admin/features', ['companies' => true]);
+        $c->ok($this->req('DELETE', "/companies/{$mine[0]}")[0] === 200 && $this->req('DELETE', "/companies/{$mine[1]}")[0] === 200 && $this->req('PATCH', "/companies/{$mine[0]}", ['name' => 'x'])[0] === 404, 'Aufräumen: Kompanien löschen');
     }
 
     /**

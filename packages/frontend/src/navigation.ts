@@ -9,6 +9,7 @@ export const NAV_TARGETS = [
   'termine',
   'news',
   'galerie',
+  'kompanien',
   'sponsoren',
   'mitglieder',
   'dokumente',
@@ -24,6 +25,7 @@ export const NAV_ICONS = [
   'termine',
   'news',
   'galerie',
+  'kompanien',
   'sponsoren',
   'mitglieder',
   'dokumente',
@@ -40,6 +42,9 @@ export const NAV_MAX_MAIN = 5;
 export type NavMenuSetting = { label: string; icon: string; items: string[] };
 /** Gespeicherte Einstellung (/config navigation): Hauptpunkte und ausgeblendete Bereiche. */
 export type NavigationSetting = { items: (string | NavMenuSetting)[]; hidden: string[] };
+
+/** Bereiche, die in der Standardnavigation nur mit eingeschaltetem Bereich einen Hauptpunkt belegen (Issue #279, #280). */
+const OPTIONAL_MAIN: NavTarget[] = ['kompanien', 'sponsoren'];
 
 /** Bereiche unter „Intern“ in der Standardnavigation, in dieser Reihenfolge. */
 export const INTERN_TARGETS: NavTarget[] = ['mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog'];
@@ -68,10 +73,13 @@ export function buildNav(setting: NavigationSetting | null | undefined, ctx: Nav
   const view = (t: NavTarget): NavEntry => ({ key: t, label: ctx.label(t), icon: t, children: null });
   if (!setting) {
     // Standard: Mitglieder und Dokumente mit dem Recht „Intern“ dort gesammelt, sonst je ein eigener Tab.
-    const main: NavEntry[] = (['termine', 'news', 'galerie', 'sponsoren'] as NavTarget[]).filter(ctx.visible).map(view);
+    const main: NavEntry[] = (['termine', 'news', 'galerie', ...OPTIONAL_MAIN] as NavTarget[]).filter(ctx.visible).map(view);
     const intern = INTERN_TARGETS.filter(ctx.visible);
-    if (ctx.intern && intern.length > 0) main.push({ key: 'intern', label: 'Intern', icon: 'intern', children: intern });
-    else main.push(...OWN_TABS.filter(ctx.visible).map(view));
+    if (ctx.intern && intern.length > 0) {
+      // Wie draftOf: Passen nicht alle unten hin, kommen die letzten vorne ins Untermenü.
+      const overflow = main.splice(NAV_MAX_MAIN - 1).map((e) => e.key as NavTarget);
+      main.push({ key: 'intern', label: 'Intern', icon: 'intern', children: [...overflow, ...intern] });
+    } else main.push(...OWN_TABS.filter(ctx.visible).map(view));
     return main;
   }
   const listed = new Set<string>(setting.hidden);
@@ -99,15 +107,17 @@ export function menuOf(entries: NavEntry[], target: string): NavEntry | undefine
 }
 
 /**
- * Entwurf für die Seite Einstellungen → Navigation: die gespeicherte Einstellung oder die Standardnavigation. Ist der
- * Bereich Sponsoren aus (on), fehlt er im Entwurf, damit er keinen der Hauptpunkte belegt; wird er später
- * eingeschaltet, erscheint er hinten in der Leiste wie jeder Bereich, den die Einstellung nicht kennt.
+ * Entwurf für die Seite Einstellungen → Navigation: die gespeicherte Einstellung oder die Standardnavigation. Kompanien
+ * und Sponsoren stehen nur darin, wenn ihr Bereich an ist (on), damit sie keinen der Hauptpunkte belegen; wird einer
+ * später eingeschaltet, erscheint er hinten in der Leiste wie jeder Bereich, den die Einstellung nicht kennt. Passen
+ * nicht alle unten hin, kommen die letzten vorne ins Untermenü „Intern“.
  */
 export function draftOf(setting: NavigationSetting | null | undefined, on: (t: NavTarget) => boolean = () => true): NavigationSetting {
   if (setting)
     return { items: setting.items.map((i) => (typeof i === 'string' ? i : { ...i, items: [...i.items] })), hidden: [...setting.hidden] };
-  const main: NavTarget[] = ['termine', 'news', 'galerie', ...(on('sponsoren') ? (['sponsoren'] as NavTarget[]) : [])];
-  return { items: [...main, { label: 'Intern', icon: 'ordner', items: [...INTERN_TARGETS] }], hidden: [] };
+  const main: NavTarget[] = ['termine', 'news', 'galerie', ...OPTIONAL_MAIN.filter(on)];
+  const overflow = main.splice(NAV_MAX_MAIN - 1);
+  return { items: [...main, { label: 'Intern', icon: 'ordner', items: [...overflow, ...INTERN_TARGETS] }], hidden: [] };
 }
 
 /** Bereiche, die im Entwurf nirgends stehen (neu dazugekommen): Sie erscheinen hinten in der Leiste. */

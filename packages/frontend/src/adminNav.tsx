@@ -15,10 +15,11 @@ const canAttendance = (): boolean => !!config?.features.attendance && can('manag
 const canOffices = (): boolean => !!config?.features.offices && can('manage_offices');
 const canLists = (): boolean => !!config?.features.lists && can('manage_lists');
 const canMail = (): boolean => !!config?.features.mail && can('send_mail');
+const canCompanies = (): boolean => !!config?.features.companies && can('manage_companies');
 const canSponsors = (): boolean => !!config?.features.sponsors && can('manage_sponsors');
 
 /** Mitgliederliste: für alle, die Punkte oder Strafen vergeben, Dienstgrade, Titel oder Anwesenheit pflegen, Mitglieder
- * anlegen oder Rollen vergeben. */
+ * anlegen, Rollen vergeben oder Kompanien zuordnen. */
 export function memberListAllowed(): boolean {
   return (
     canPoints() ||
@@ -26,6 +27,7 @@ export function memberListAllowed(): boolean {
     canRanks() ||
     canTitles() ||
     canAttendance() ||
+    canCompanies() ||
     can('view_personal') ||
     can('create_users') ||
     can('promote_users')
@@ -51,6 +53,7 @@ export function adminTabs(): AdminTab[] {
       { id: 'befoerderungen', label: 'Beförderungen', on: canRanks() && !!config?.features.points },
       { id: 'titel', label: sec.titles, on: canTitles(), group: SETUP },
       { id: 'aemter', label: sec.offices, on: canOffices(), group: SETUP },
+      { id: 'kompanien', label: sec.companies, on: canCompanies(), group: SETUP },
       { id: 'sponsoren', label: sec.sponsors, on: canSponsors(), group: SETUP },
       { id: 'anwesenheit', label: sec.attendance, on: canAttendance() },
       { id: 'brett', label: sec.board, on: canPostBoard(), route: 'brett' },
@@ -167,6 +170,13 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
       <rect x="3" y="5" width="18" height="14" rx="2" />
       <circle cx="8.5" cy="10" r="1.5" />
       <path d="M21 16l-5-5-8 8" />
+    </>
+  ),
+  // Kompanien: Schild, als Bereich in einem Untermenü und als Knopf der Verwaltung
+  kompanien: (
+    <>
+      <path d="M12 3 5 5.5V11c0 4.6 3 8.6 7 10 4-1.4 7-5.4 7-10V5.5z" />
+      <path d="M12 3v18" />
     </>
   ),
   // Sponsoren: als Bereich in einem Untermenü und als Knopf der Verwaltung

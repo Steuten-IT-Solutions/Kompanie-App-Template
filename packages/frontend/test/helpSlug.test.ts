@@ -27,6 +27,7 @@ const ALL_FEATURES = [
   'lists',
   'mail',
   'sponsors',
+  'companies',
 ];
 /** Admin mit allen Rechten und allen Bereichen. */
 const admin: HelpContext = { boardWriter: true, can: () => true, features: Object.fromEntries(ALL_FEATURES.map((f) => [f, true])) };
@@ -63,6 +64,7 @@ const PATHS = [
   ['galerie'],
   ['galerie', '3'],
   ['sponsoren'],
+  ['kompanien'],
   ['intern'],
   ['menue', '1'],
   ['dokumente'],
@@ -181,6 +183,8 @@ test('Eine eigene Seite je Bildschirm', () => {
     [['galerie', '3'], 'galerie-album'],
     [['sponsoren'], 'sponsoren'],
     [['verwaltung', 'sponsoren'], 'sponsoren-verwalten'],
+    [['kompanien'], 'kompanien'],
+    [['verwaltung', 'kompanien'], 'kompanien-verwalten'],
     [['intern'], 'intern'],
     [['dienstgrade'], 'dienstgrade'],
     [['punktekatalog'], 'punktekatalog-ansehen'],

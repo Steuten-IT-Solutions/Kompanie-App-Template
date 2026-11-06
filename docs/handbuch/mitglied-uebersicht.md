@@ -20,6 +20,7 @@ Du siehst nur, wofür du das Recht hast und was die Kompanie nutzt.
 - **Rolle**: die Rolle der Person (bei Zusatzrollen „Rollen: …“). Hat sie Ausnahmen bei den Rechten, steht „mit Ausnahmen bei den Rechten“ dabei.
 - Kacheln **{bereich.points}** und **Offen**: Stand der {bereich.points} und offene {bereich.penalties}. Ein Tipp öffnet die Einträge der Person.
 - Kachel **{bereich.titles}**: ihre {bereich.titles} (oder „Keine“); ein Tipp öffnet die Auswahl.
+- Kachel **{bereich.companies}** (mit dem Recht **{bereich.companies} verwalten**): ihre {bereich.companies} (oder „Keine“); ein Tipp öffnet die Auswahl zum Ankreuzen.
 - **Geburtstag**: nur mit dem Recht **Persönliche Angaben sehen**. **Eintritt** und **Austritt**: nur für alle, die Mitglieder anlegen dürfen. „Nicht eingetragen“ heißt: Es fehlt noch.
 - **Persönliche Angaben**: E-Mail-Adresse, Handynummer und Adresse der Person, nur mit dem Recht **Persönliche Angaben sehen**. Ein Tipp auf die E-Mail-Adresse oder Handynummer schreibt bzw. ruft an.
 - **{bereich.offices}**: die Ämter der Person als Zeitstrahl, nur zum Ansehen.

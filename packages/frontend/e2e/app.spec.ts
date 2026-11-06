@@ -15,7 +15,7 @@ const SHOTS = process.env.KOMPANIE_SCREENSHOT_DIR;
 const MANAGER = 'Verwaltung';
 
 /** Bereiche, die unter „Einrichtungen“ stehen, sobald es davon mindestens zwei gibt. */
-const SETUP = ['Punktekatalog', 'Dienstgrade', 'Titel', 'Ämter', 'Sponsoren'];
+const SETUP = ['Punktekatalog', 'Dienstgrade', 'Titel', 'Ämter', 'Kompanien', 'Sponsoren'];
 
 /** Startseite der Verwaltung (Tab unten) öffnen und dort den Knopf eines Bereichs wählen (ggf. über „Einrichtungen“). */
 async function adminMenu(page: Page, name: string) {
@@ -1189,7 +1189,15 @@ test('Intern: Knöpfe für Mitglieder, Dokumente, Brett, Dienstgrade und Punktek
   await expect(page).toHaveURL(/#\/intern$/);
   await expect(page.locator('.topbar-title')).toHaveText('Intern');
   const tiles = page.getByRole('navigation', { name: 'Intern' });
-  await expect(tiles.getByRole('button')).toHaveText(['Mitglieder', 'Dokumente', 'Schwarzes Brett', 'Dienstgrade', 'Punktekatalog']);
+  // Unten höchstens fünf Punkte (mit Intern): Sponsoren passen nicht mehr und stehen vorn unter Intern.
+  await expect(tiles.getByRole('button')).toHaveText([
+    'Sponsoren',
+    'Mitglieder',
+    'Dokumente',
+    'Schwarzes Brett',
+    'Dienstgrade',
+    'Punktekatalog',
+  ]);
 
   await tiles.getByRole('button', { name: 'Dokumente', exact: true }).click();
   await expect(page).toHaveURL(/#\/dokumente$/);
@@ -3965,6 +3973,61 @@ test('Punktekatalog und Dienstgrade per Ziehen am Griff umsortieren, Schwellen w
   for (const title of ranks) {
     page.once('dialog', (d) => void d.accept());
     await page.locator('.card-list .row', { hasText: title }).getByRole('button', { name: 'Löschen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  }
+});
+
+test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast sieht Karte mit Beschreibung und Mitgliedern, Filter, löschen', async ({
+  page,
+}) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Kompanien');
+  const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neue Kompanie' }) });
+  await form.getByLabel('Name', { exact: true }).fill('Testkompanie');
+  await form.getByLabel(/^Kurzname/).fill('TK');
+  await form.getByLabel(/^Gründungsjahr/).fill('1905');
+  await form.getByLabel(/^Webseite/).fill('http://kompanie.example/');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.getByRole('alert')).toContainText('https://');
+  await form.getByLabel(/^Webseite/).fill('https://kompanie.example/');
+  await form.getByRole('textbox', { name: 'Beschreibung (optional)' }).fill('Gegründet zum Schützenfest.');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Kompanie angelegt');
+  const row = page.locator('.row', { has: page.getByText('Testkompanie', { exact: true }) });
+  await expect(row).toContainText('TK · gegründet 1905 · 0 Mitglieder');
+  await row.getByRole('button', { name: 'Mitglieder' }).click();
+  await page.locator('.company-member-form').getByLabel('Mitglied1', { exact: true }).check();
+  await page.locator('.company-member-form').getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Mitglieder gespeichert');
+  await expect(row).toContainText('1 Mitglieder');
+  await shot(page, 'kompanien-verwalten');
+
+  try {
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
+    await page.locator('.tabbar').getByRole('button', { name: 'Kompanien' }).click();
+    const card = page.locator('.company-card', { hasText: 'Testkompanie' });
+    await expect(card).toContainText('TK · gegründet 1905 · 1 Mitglieder');
+    await card.locator('summary').click();
+    await expect(card).toContainText('Gegründet zum Schützenfest.');
+    await expect(card.getByRole('link', { name: 'Webseite' })).toHaveAttribute('href', 'https://kompanie.example/');
+    await shot(page, 'kompanien');
+    await card.getByRole('button', { name: 'Mitglied1' }).click();
+    await expect(page.locator('.member-page-companies')).toHaveText('Testkompanie');
+    // Filter in der Mitgliederliste
+    await page.locator('.tabbar').getByRole('button', { name: 'Mitglieder' }).click();
+    await page.locator('.member-company-filter select').selectOption({ label: 'Testkompanie' });
+    await expect(page.locator('.directory .member-row')).toHaveCount(1);
+    await expect(page.locator('.directory .member-row')).toContainText('Mitglied1');
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD);
+    await adminMenu(page, 'Kompanien');
+    page.once('dialog', (d) => d.accept());
+    await page
+      .locator('.row', { has: page.getByText('Testkompanie', { exact: true }) })
+      .getByRole('button', { name: 'Löschen' })
+      .click();
     await expect(page.locator('.toast')).toHaveText('Gelöscht');
   }
 });

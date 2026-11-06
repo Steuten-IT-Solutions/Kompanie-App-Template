@@ -325,6 +325,15 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - Auslieferung `<App>/sponsorlogo/<id>?v=<Fassung>` (beide Adapter, `Environment::sponsorLogoUrl`, `SponsorService::logoForDelivery`): mit `view_sponsors` für Gäste `public, max-age=31536000, immutable`, sonst `private`; veraltete Fassung `no-cache`; SVG mit `RankService::SVG_CSP`; Bereich aus → 404.
 - App: Tab bzw. Navigationspunkt `sponsoren` (`views/Sponsoren.tsx`, Logos auf hellen Kacheln, Link mit `rel="sponsored noopener noreferrer"`), Pflege unter *Verwaltung → Einrichtungen → Sponsoren* (`views/SponsorenVerwalten.tsx`). In der Standardnavigation steht er nach der Galerie.
 
+### Kompanien (Issue #280)
+
+- Bereich `companies` (Bezeichnung „Kompanien“, `labels.sections.companies`; aus, nie automatisch eingeschaltet), Recht `manage_companies` (Standardrolle „Kompanien verwalten“: `member`, `manage_companies`; zählt für die Mitgliederliste der Verwaltung), sehen mit `view_companies` (`Roles::ADDED_VIEW`).
+- `CompanyService`, `CompanyRepository`, Tabellen `companies` (Migration 39: Name, Kurzname, Gründungsjahr ab `OfficeService::YEAR_MIN`, Beschreibung als bereinigtes HTML ohne Bilder, Webseite und App nur `https://`, Gruppe der Ämter, Reihenfolge, aktiv, Logo) und `member_companies` (Person, Kompanie, Datum; mehrere je Person). Logos wie bei den Sponsoren (`LogoImage`, gemeinsam mit `SponsorService`). Sicherung: `CORE_TABLES`, `companies` schwer (`HEAVY_TABLES`); `member_companies` steht in `UserData::TABLES` (Löschen der Person, Datenauskunft).
+- Routen `GET/POST /companies`, `PUT /companies/order`, `PATCH/DELETE /companies/{id}`, `POST/DELETE /companies/{id}/logo`, `PUT /companies/{id}/members`, `PUT /members/{id}/companies`. Neue Zuordnungen nur für Personen mit `member`. `GET /companies` liefert `members`/`member_count` nur mit Bereich Mitgliederliste und `view_directory`, `member_ids` nur mit `manage_companies`; feste Zahl an Abfragen (`QueryCountTest`).
+- `GET /directory` und `/directory/former` enthalten `companies` je Person (Bereich an und `view_companies` des Betrachters), `GET /members/{id}` mit `manage_companies`. Eine gelöschte Gruppe der Ämter löst die Verknüpfung (`unlinkOfficeGroup`).
+- Auslieferung `<App>/kompanielogo/<id>?v=<Fassung>` (beide Adapter, `Environment::companyLogoUrl`, `CompanyService::logoForDelivery`), Zwischenspeichern wie bei den Sponsoren.
+- App: Tab bzw. Navigationspunkt `kompanien` (`views/Kompanien.tsx`, aufklappbare Karten), Pflege unter *Verwaltung → Einrichtungen → Kompanien* (`views/KompanienVerwalten.tsx`), Kachel auf der Seite der Person in der Verwaltung, Filter in der Mitgliederliste. Standardnavigation: Mit „Intern“ höchstens `NAV_MAX_MAIN` Punkte; was nicht passt (`OPTIONAL_MAIN`: Kompanien, Sponsoren), steht vorn unter „Intern“.
+
 ### Dateianhänge (Schwarzes Brett, E-Mails)
 
 - `AttachmentService`, Tabelle `attachments` (Migration 33: Kennung, Besitzer `draft`/`board`/`mail`, Name, MIME-Typ aus der Endung, Größe, Datei), Dateien geschützt unter `anhaenge/anh-<Kennung>.bin`. Jeder Dateityp, je Datei höchstens `DocumentService::requestLimit()` (20 MB oder weniger nach `post_max_size`; `GET /attachments/limits`).
@@ -415,7 +424,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 | `calendar` | interner Kalender (allein z. B. für Anwärter) |
 | `view_intern` | Navigation: die Knöpfe unter „Intern“ gesammelt unter einem Knopf statt Mitglieder und Dokumente als eigene Tabs; regelt nicht, was die Person sieht. Gilt nur für die Standardnavigation; mit einer eingerichteten Navigation (Einstellung `navigation`, `NavigationService`, `navigation.ts`, Issue #277) legt der Admin Hauptpunkte und Untermenüs (`#/menue/<n>`) selbst fest |
 | `view_events`, `view_news`, `view_gallery` | Tabs: öffentliche Termine, News, öffentliche Alben (`GET /events`, `/news`, `/gallery`) |
-| `view_companies`, `view_sponsors` | Kompanieliste (Bereich kommt mit #280) und Sponsoren (`GET /sponsors`, Logos; Issue #278, #279) |
+| `view_companies`, `view_sponsors` | Kompanieliste (`GET /companies`, Logos, Kompanien in der Mitgliederliste; Issue #278, #280) und Sponsoren (`GET /sponsors`, Logos; Issue #278, #279) |
 | `view_gallery_internal` | interne Bilder und Videos der Galerie (dann auch die öffentlichen Alben) |
 | `view_own_points`, `view_own_penalties`, `view_own_rank`, `view_own_attendance` | eigene Daten in „Meins“ (`/me/points`, `/me/penalties`, `/me/rank` und Rang/Titel in `/me`, `/me/attendance`); nur mit `member` |
 | `view_birthdays` | Geburtstage der anderen sehen und am Tag benachrichtigt werden (eintragen und erscheinen: `member`) |
@@ -436,6 +445,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 | `manage_lists` | Listen zum Drucken und als CSV anlegen, bearbeiten und löschen; Werte nur, soweit sichtbar (Issue #121) |
 | `send_mail` | E-Mails aus der Verwaltung an Rollen, Mitglieder und freie Adressen versenden; Verlauf mit Protokoll |
 | `manage_sponsors` | Sponsoren anlegen, ändern, ordnen und löschen, Logos hochladen (Issue #279) |
+| `manage_companies` | Kompanien anlegen, ändern, ordnen und löschen, Logos hochladen, Mitglieder zuordnen (Issue #280) |
 | `view_personal` | Persönliche Angaben anderer sehen: E-Mail-Adresse, Handynummer, Adresse, ganzes Geburtsdatum (Verwaltung → Mitglied) |
 | `manage_personal` | Persönliche Angaben anderer ändern (setzt `view_personal` voraus); Geburtstage anderer eintragen (nur das Datum) |
 | `create_users` | Mitglieder anlegen (auch mit ihren persönlichen Angaben), Startpasswörter erzeugen; Ehemalige eintragen, wieder aufnehmen, importieren |
@@ -477,6 +487,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
   | Ämter | Ämter verwalten | `member`, `manage_offices` |
   | Listen | Listen verwalten | `member`, `manage_lists` |
   | E-Mails | E-Mails verwalten | `member`, `send_mail` |
+  | Kompanien | Kompanien verwalten | `member`, `manage_companies` |
   | Sponsoren | Sponsoren verwalten | `member`, `manage_sponsors` |
 
 - **Eigene Rollen** bekommen feste Schlüssel `r1`, `r2`, … (nie wiederverwendet, `roles_seq`; höchstens 10 Zeichen, Spalte `users.level`).

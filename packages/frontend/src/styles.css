@@ -5776,3 +5776,108 @@ button.spotlight-person:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Kompanien (Issue #280): aufklappbare Karten mit Logo; Logos auf hellem Grund wie bei den Sponsoren. */
+.company-card {
+  padding: 0;
+}
+.company-card.inactive {
+  opacity: 0.75;
+}
+.company-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  list-style: none;
+}
+.company-summary::-webkit-details-marker {
+  display: none;
+}
+.company-summary::after {
+  content: '›';
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 1.3rem;
+  transition: transform 0.15s;
+}
+.company-card details[open] > .company-summary::after {
+  transform: rotate(90deg);
+}
+.company-logo-box,
+.company-admin-logo {
+  flex: 0 0 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  color: #1d1d1f;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.company-admin-logo {
+  flex-basis: 48px;
+  height: 48px;
+}
+.company-logo {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.company-logo-empty {
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-align: center;
+  padding: 2px;
+  overflow: hidden;
+}
+.company-head {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.company-head .row-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.company-body {
+  padding: 0 14px 14px;
+}
+.company-offices {
+  margin: 8px 0;
+  display: grid;
+  gap: 4px;
+}
+.company-offices > div {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.company-offices dt {
+  font-weight: 600;
+}
+.company-offices dd {
+  margin: 0;
+}
+.company-links {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.company-members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.company-member-options {
+  max-height: 50vh;
+  overflow-y: auto;
+}

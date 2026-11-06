@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Storage;
 
+use KompanieApp\Core\Domain\LogoImage;
 use KompanieApp\Core\Storage\Sql\Connection;
 
 /**
@@ -37,14 +38,7 @@ final class SponsorRepository
     public function logo(int $id): ?string
     {
         $row = $this->db->selectOne('SELECT logo_type, logo FROM {sponsors} WHERE id = ?', [$id]);
-        if ($row === null || !is_string($row['logo'] ?? null) || $row['logo'] === '') {
-            return null;
-        }
-        if ($row['logo_type'] === 'png') {
-            $bytes = base64_decode($row['logo'], true);
-            return $bytes === false || $bytes === '' ? null : $bytes;
-        }
-        return $row['logo_type'] === 'svg' ? $row['logo'] : null;
+        return $row === null ? null : LogoImage::decodeStored($row['logo_type'], $row['logo'] ?? null);
     }
 
     public function insert(string $name, string $url, int $sort, string $now): int
@@ -66,7 +60,7 @@ final class SponsorRepository
         $this->db->update('sponsors', [
             'logo_type' => $type,
             'logo_version' => $type === '' ? '' : $version,
-            'logo' => $type === '' ? null : ($type === 'png' ? base64_encode($logo) : $logo),
+            'logo' => LogoImage::encode($type, $logo),
             'updated_at' => $now,
         ], ['id' => $id]);
     }

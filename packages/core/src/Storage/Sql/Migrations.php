@@ -1468,6 +1468,61 @@ WHERE title IS NULL",
 )',
                 ],
             ],
+            // Kompanieliste (Issue #280): Kompanien mit Logo, Beschreibung und Links; Mitglieder optional zugeordnet
+            // (mehrere je Person möglich, eindeutig ist das Paar).
+            39 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {companies} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  name varchar(100) NOT NULL,
+  short_name varchar(30) NOT NULL DEFAULT \'\',
+  founded_year smallint(5) unsigned DEFAULT NULL,
+  description mediumtext DEFAULT NULL,
+  website_url varchar(255) NOT NULL DEFAULT \'\',
+  app_url varchar(255) NOT NULL DEFAULT \'\',
+  office_group_id bigint(20) unsigned DEFAULT NULL,
+  sort int(11) NOT NULL DEFAULT 0,
+  active tinyint(1) NOT NULL DEFAULT 1,
+  logo_type varchar(4) NOT NULL DEFAULT \'\',
+  logo_version varchar(32) NOT NULL DEFAULT \'\',
+  logo mediumtext DEFAULT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id)
+) {options}',
+                    'CREATE TABLE IF NOT EXISTS {member_companies} (
+  user_id bigint(20) unsigned NOT NULL,
+  company_id bigint(20) unsigned NOT NULL,
+  assigned_at datetime NOT NULL,
+  PRIMARY KEY (user_id, company_id),
+  KEY company_id (company_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {companies} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  short_name TEXT NOT NULL DEFAULT \'\',
+  founded_year INTEGER DEFAULT NULL,
+  description TEXT DEFAULT NULL,
+  website_url TEXT NOT NULL DEFAULT \'\',
+  app_url TEXT NOT NULL DEFAULT \'\',
+  office_group_id INTEGER DEFAULT NULL,
+  sort INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1,
+  logo_type TEXT NOT NULL DEFAULT \'\',
+  logo_version TEXT NOT NULL DEFAULT \'\',
+  logo TEXT DEFAULT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE TABLE IF NOT EXISTS {member_companies} (
+  user_id INTEGER NOT NULL,
+  company_id INTEGER NOT NULL,
+  assigned_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, company_id)
+)',
+                    'CREATE INDEX IF NOT EXISTS {member_companies}_company_id ON {member_companies} (company_id)',
+                ],
+            ],
         ];
     }
 

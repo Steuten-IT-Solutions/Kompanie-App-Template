@@ -15,12 +15,13 @@ Tippe unten in der Leiste auf **Intern** und dann auf **{bereich.directory}**; m
 - **Umschalter** oben: **{bereich.directory}**, **{bereich.offices}** (wenn die Kompanie sie nutzt; dazu gibt es eine eigene Handbuchseite) und **Ehemalige**. Die App merkt sich auf diesem Gerät, was du zuletzt gewählt hast.
 - **Zähler**: wie viele Personen es je Gruppe gibt, z. B. {rolle.member} und Anwärter.
 - **Mitglied suchen …**: filtert die Liste nach dem Namen; ein Teil des Namens genügt.
+- **{bereich.companies}** (wenn Personen {bereich.companies} zugeordnet sind): zeigt nur die Personen einer Kompanie.
 - **Sortierung** und **Reihenfolge**: **Nachname** oder **Vorname** (**A → Z** bzw. **Z → A**) oder **Eintritt** (**Früheste zuerst** bzw. **Neueste zuerst**).
 - **Die Liste**: vorn ein rundes Foto oder die Anfangsbuchstaben, dann der Name mit {bereich.titles}. Bei Anwärtern (Personen, die noch als {rolle.member} aufzunehmen sind) steht davor wie ein Titel der Name ihrer Rolle, z. B. „Anwärter“. Nutzt die Kompanie {bereich.ranks}, steht rechts das Abzeichen mit dem {begriff.rank}.
 
 ## So gehst du vor
 ### Die Seite einer Person öffnen
-1. Tippe auf den Namen. Es öffnet sich ihre Seite: Foto, Name, {bereich.titles} und {begriff.rank}, Geburtstag und Eintritt (soweit die Person sie zeigt) und darunter ihre {bereich.offices} als Zeitstrahl.
+1. Tippe auf den Namen. Es öffnet sich ihre Seite: Foto, Name, {bereich.titles} und {begriff.rank}, Geburtstag und Eintritt (soweit die Person sie zeigt), ihre {bereich.companies} und darunter ihre {bereich.offices} als Zeitstrahl.
 2. **‹ Zurück** führt wieder zur Liste.
 
 ### Zur nächsten Person blättern

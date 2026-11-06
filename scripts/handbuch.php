@@ -22,7 +22,7 @@
  *   Markdown: ## und ### Überschriften, Absätze, Listen (- oder 1.), **fett**, *kursiv*, `Code`,
  *   [Text](https://…), [Text](seite:name) für eine andere Handbuchseite, > Hinweis,
  *   ![Beschreibung](bild:name) als eigene Zeile für ein Bildschirmfoto (erzeugt von scripts/handbuch-bilder.sh).
- *   Platzhalter: {kompanie.name}, {bereich.events|calendar|news|gallery|points|penalties|ranks|titles|attendance|documents|board|polls|birthdays|inventory|directory|offices|lists|mail|sponsors}, {begriff.rank},
+ *   Platzhalter: {kompanie.name}, {bereich.events|calendar|news|gallery|points|penalties|ranks|titles|attendance|documents|board|polls|birthdays|inventory|directory|offices|lists|mail|sponsors|companies}, {begriff.rank},
  *   {rolle.guest|member|admin}; App und Webseite setzen die Bezeichnungen der Kompanie ein.
  */
 
@@ -30,23 +30,23 @@ declare(strict_types=1);
 
 require __DIR__ . '/markdown.php';
 
-const CAPABILITIES = ['member', 'calendar', 'view_intern', 'view_events', 'view_news', 'view_gallery', 'view_companies', 'view_sponsors', 'view_gallery_internal', 'view_own_points', 'view_own_penalties', 'view_own_rank', 'view_own_attendance', 'view_birthdays', 'vote_polls', 'view_directory', 'view_offices', 'view_former', 'view_documents', 'view_board', 'view_ranks', 'view_catalog', 'manage_points', 'manage_penalties', 'manage_ranks', 'manage_titles', 'manage_attendance', 'manage_events', 'manage_documents', 'post_board', 'manage_polls', 'manage_inventory', 'manage_offices', 'manage_lists', 'send_mail', 'manage_sponsors', 'view_personal', 'manage_personal', 'create_users', 'promote_users', 'view_activity', 'manage_settings'];
+const CAPABILITIES = ['member', 'calendar', 'view_intern', 'view_events', 'view_news', 'view_gallery', 'view_companies', 'view_sponsors', 'view_gallery_internal', 'view_own_points', 'view_own_penalties', 'view_own_rank', 'view_own_attendance', 'view_birthdays', 'vote_polls', 'view_directory', 'view_offices', 'view_former', 'view_documents', 'view_board', 'view_ranks', 'view_catalog', 'manage_points', 'manage_penalties', 'manage_ranks', 'manage_titles', 'manage_attendance', 'manage_events', 'manage_documents', 'post_board', 'manage_polls', 'manage_inventory', 'manage_offices', 'manage_lists', 'send_mail', 'manage_sponsors', 'manage_companies', 'view_personal', 'manage_personal', 'create_users', 'promote_users', 'view_activity', 'manage_settings'];
 /** Wie Roles::PUBLIC_DEFAULTS mit ADDED_VIEW, CANDIDATE_DEFAULTS und MEMBER_DEFAULTS im Kern (Gast, Anwärter, Mitglied anfangs). */
 const PUBLIC_DEFAULTS = ['view_events', 'view_news', 'view_gallery', 'view_directory', 'view_offices', 'view_former', 'view_companies', 'view_sponsors'];
 const CANDIDATE_DEFAULTS = ['calendar', 'view_board'];
 const MEMBER_DEFAULTS = ['member', 'calendar', 'view_intern', 'view_gallery_internal', 'view_own_points', 'view_own_penalties', 'view_own_rank', 'view_own_attendance', 'view_birthdays', 'vote_polls', 'view_documents', 'view_board', 'view_ranks', 'view_catalog'];
-const FEATURES = ['events', 'calendar', 'news', 'gallery', 'points', 'penalties', 'ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices', 'lists', 'mail', 'sponsors'];
+const FEATURES = ['events', 'calendar', 'news', 'gallery', 'points', 'penalties', 'ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices', 'lists', 'mail', 'sponsors', 'companies'];
 /** Bereiche mit eigenen Rechten: Jeder braucht eine Handbuchseite (siehe Domain\Features, Feld role). */
-const FEATURES_WITH_ROLE = ['events' => 'manage_events', 'points' => 'manage_points', 'penalties' => 'manage_penalties', 'ranks' => 'manage_ranks', 'titles' => 'manage_titles', 'attendance' => 'manage_attendance', 'documents' => 'manage_documents', 'board' => 'post_board', 'polls' => 'manage_polls', 'inventory' => 'manage_inventory', 'offices' => 'manage_offices', 'lists' => 'manage_lists', 'mail' => 'send_mail', 'sponsors' => 'manage_sponsors'];
+const FEATURES_WITH_ROLE = ['events' => 'manage_events', 'points' => 'manage_points', 'penalties' => 'manage_penalties', 'ranks' => 'manage_ranks', 'titles' => 'manage_titles', 'attendance' => 'manage_attendance', 'documents' => 'manage_documents', 'board' => 'post_board', 'polls' => 'manage_polls', 'inventory' => 'manage_inventory', 'offices' => 'manage_offices', 'lists' => 'manage_lists', 'mail' => 'send_mail', 'sponsors' => 'manage_sponsors', 'companies' => 'manage_companies'];
 /** Bereiche, die andere voraussetzen (wie Domain\Features, Feld requires): Ist der erste an, sind es auch diese. */
 const FEATURE_REQUIRES = ['polls' => ['board']];
 /** Rechte ohne eigenen Bereich, die eine Rolle bekommen kann: Auch dafür braucht es eine Seite. */
 const RIGHTS_WITH_PAGE = ['create_users', 'promote_users'];
-const PLACEHOLDERS = ['kompanie.name', 'bereich.events', 'bereich.calendar', 'bereich.news', 'bereich.gallery', 'bereich.points', 'bereich.penalties', 'bereich.ranks', 'bereich.titles', 'bereich.attendance', 'bereich.documents', 'bereich.board', 'bereich.polls', 'bereich.birthdays', 'bereich.inventory', 'bereich.directory', 'bereich.offices', 'bereich.lists', 'bereich.mail', 'bereich.sponsors', 'begriff.rank', 'rolle.guest', 'rolle.member', 'rolle.admin'];
+const PLACEHOLDERS = ['kompanie.name', 'bereich.events', 'bereich.calendar', 'bereich.news', 'bereich.gallery', 'bereich.points', 'bereich.penalties', 'bereich.ranks', 'bereich.titles', 'bereich.attendance', 'bereich.documents', 'bereich.board', 'bereich.polls', 'bereich.birthdays', 'bereich.inventory', 'bereich.directory', 'bereich.offices', 'bereich.lists', 'bereich.mail', 'bereich.sponsors', 'bereich.companies', 'begriff.rank', 'rolle.guest', 'rolle.member', 'rolle.admin'];
 const DEFAULT_LABELS = [
     'kompanie.name' => 'Kompanie',
     'bereich.events' => 'Termine', 'bereich.calendar' => 'Kalender', 'bereich.news' => 'News', 'bereich.gallery' => 'Galerie',
-    'bereich.points' => 'Punkte', 'bereich.penalties' => 'Strafen', 'bereich.ranks' => 'Dienstgrade', 'bereich.titles' => 'Titel', 'bereich.attendance' => 'Anwesenheit', 'bereich.documents' => 'Dokumente', 'bereich.board' => 'Schwarzes Brett', 'bereich.polls' => 'Umfragen', 'bereich.birthdays' => 'Geburtstage', 'bereich.inventory' => 'Inventar', 'bereich.directory' => 'Mitglieder', 'bereich.offices' => 'Ämter', 'bereich.lists' => 'Listen', 'bereich.mail' => 'E-Mails', 'bereich.sponsors' => 'Sponsoren', 'begriff.rank' => 'Dienstgrad',
+    'bereich.points' => 'Punkte', 'bereich.penalties' => 'Strafen', 'bereich.ranks' => 'Dienstgrade', 'bereich.titles' => 'Titel', 'bereich.attendance' => 'Anwesenheit', 'bereich.documents' => 'Dokumente', 'bereich.board' => 'Schwarzes Brett', 'bereich.polls' => 'Umfragen', 'bereich.birthdays' => 'Geburtstage', 'bereich.inventory' => 'Inventar', 'bereich.directory' => 'Mitglieder', 'bereich.offices' => 'Ämter', 'bereich.lists' => 'Listen', 'bereich.mail' => 'E-Mails', 'bereich.sponsors' => 'Sponsoren', 'bereich.companies' => 'Kompanien', 'begriff.rank' => 'Dienstgrad',
     'rolle.guest' => 'Gast', 'rolle.member' => 'Mitglied', 'rolle.admin' => 'Admin',
 ];
 

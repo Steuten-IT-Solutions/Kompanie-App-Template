@@ -17,6 +17,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Kompanien**: Der neue Bereich *Kompanien* (unter *Einstellungen → Bereiche* einschalten) zeigt eure Kompanien mit
+  Logo in eurer Reihenfolge, für alle, auch ohne Anmeldung. Jede Karte klappt auf und zeigt Beschreibung,
+  Gründungsjahr, Links zur Webseite und zur App der Kompanie, die laufenden Ämter einer verknüpften Gruppe der Ämter
+  und die Mitglieder (die nur, wer die Mitgliederliste sieht). Aufgelöste Kompanien stehen unten als „ehemalig“.
+  Gepflegt werden sie unter *Verwaltung → Einrichtungen → Kompanien*; Mitglieder ordnest du dort oder auf der Seite
+  der Person in der Verwaltung zu, auch zu mehreren Kompanien. In der Mitgliederliste stehen die Kompanien auf der
+  Seite der Person, und die Liste lässt sich nach Kompanie filtern. Dazu kommt die Rolle *Kompanien verwalten*. Passen
+  in der Standardnavigation nicht alle Punkte in die Leiste, stehen Kompanien und Sponsoren unter *Intern*.
 - **Sponsoren**: Der neue Bereich *Sponsoren* (unter *Einstellungen → Bereiche* einschalten) zeigt eure Sponsoren mit
   Logo und Link in eurer Reihenfolge, für alle, auch ohne Anmeldung. Gepflegt werden sie unter *Verwaltung →
   Einrichtungen → Sponsoren*: anlegen, Link und Logo (PNG, JPG, WebP oder SVG) hinzufügen, per Ziehen ordnen. Dazu kommt
