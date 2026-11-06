@@ -1327,6 +1327,9 @@ final class Api
                 } catch (\RuntimeException $e) {
                     throw $e instanceof ApiError ? $e : ApiError::invalid($e->getMessage());
                 }
+                // Die Einrichtung gehört zur Installation und kommt nicht aus der Sicherung (Backup::LOCAL_SETTINGS). Mit den
+                // Daten sind aber Bereiche und ihre Verbindungen zurück: Der Hinweis „Einrichtung starten“ soll nicht bleiben.
+                $a->settings->set(self::SETUP_SETTING, true);
                 return ['restored' => true];
             }, null, $denySettings),
             // Passwort für Sicherungen (verschlüsselte Sicherungen, auch in Google Drive)

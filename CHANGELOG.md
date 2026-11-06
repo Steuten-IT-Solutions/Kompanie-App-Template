@@ -38,6 +38,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   sie auf normal. Gespeichert bleibt der Text unverändert. Links in formatierten Texten sind im dunklen Design jetzt
   ebenfalls gut lesbar.
 - **Kompanien**: *Webseite* und *App der Kompanie* sind jetzt Knöpfe im Stil der App statt blauer Standard-Links.
+- **Hinweis „Einrichtung starten“ nach dem Wiederherstellen**: Wurde in einer frisch installierten, noch nicht
+  eingerichteten App eine Sicherung eingespielt, stand der Hinweis „Einrichtung starten“ weiter über jeder Seite. Mit
+  der Sicherung gilt die App jetzt als eingerichtet; Bereiche und Verbindungen lassen sich wie gewohnt unter
+  *Einstellungen* ändern.
 - **Zurück-Knopf in Untermenüs oben**: Auf *Sponsoren*, *Kompanien*, eigenen Seiten und auf *Termine*, *News* und
   *Galerie*, wenn sie in einem Untermenü stehen (z. B. *Intern*), stand *‹ Intern* bzw. *‹ <Untermenü>* unter dem
   Inhalt. Er steht jetzt wie auf den übrigen Seiten oben.
