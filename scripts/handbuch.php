@@ -30,9 +30,9 @@ declare(strict_types=1);
 
 require __DIR__ . '/markdown.php';
 
-const CAPABILITIES = ['member', 'calendar', 'view_intern', 'view_events', 'view_news', 'view_gallery', 'view_gallery_internal', 'view_own_points', 'view_own_penalties', 'view_own_rank', 'view_own_attendance', 'view_birthdays', 'vote_polls', 'view_directory', 'view_offices', 'view_former', 'view_documents', 'view_board', 'view_ranks', 'view_catalog', 'manage_points', 'manage_penalties', 'manage_ranks', 'manage_titles', 'manage_attendance', 'manage_events', 'manage_documents', 'post_board', 'manage_polls', 'manage_inventory', 'manage_offices', 'manage_lists', 'send_mail', 'view_personal', 'manage_personal', 'create_users', 'promote_users', 'view_activity', 'manage_settings'];
-/** Wie Roles::PUBLIC_DEFAULTS, CANDIDATE_DEFAULTS und MEMBER_DEFAULTS im Kern (Gast, Anwärter, Mitglied anfangs). */
-const PUBLIC_DEFAULTS = ['view_events', 'view_news', 'view_gallery', 'view_directory', 'view_offices', 'view_former'];
+const CAPABILITIES = ['member', 'calendar', 'view_intern', 'view_events', 'view_news', 'view_gallery', 'view_companies', 'view_sponsors', 'view_gallery_internal', 'view_own_points', 'view_own_penalties', 'view_own_rank', 'view_own_attendance', 'view_birthdays', 'vote_polls', 'view_directory', 'view_offices', 'view_former', 'view_documents', 'view_board', 'view_ranks', 'view_catalog', 'manage_points', 'manage_penalties', 'manage_ranks', 'manage_titles', 'manage_attendance', 'manage_events', 'manage_documents', 'post_board', 'manage_polls', 'manage_inventory', 'manage_offices', 'manage_lists', 'send_mail', 'view_personal', 'manage_personal', 'create_users', 'promote_users', 'view_activity', 'manage_settings'];
+/** Wie Roles::PUBLIC_DEFAULTS mit ADDED_VIEW, CANDIDATE_DEFAULTS und MEMBER_DEFAULTS im Kern (Gast, Anwärter, Mitglied anfangs). */
+const PUBLIC_DEFAULTS = ['view_events', 'view_news', 'view_gallery', 'view_directory', 'view_offices', 'view_former', 'view_companies', 'view_sponsors'];
 const CANDIDATE_DEFAULTS = ['calendar', 'view_board'];
 const MEMBER_DEFAULTS = ['member', 'calendar', 'view_intern', 'view_gallery_internal', 'view_own_points', 'view_own_penalties', 'view_own_rank', 'view_own_attendance', 'view_birthdays', 'vote_polls', 'view_documents', 'view_board', 'view_ranks', 'view_catalog'];
 const FEATURES = ['events', 'calendar', 'news', 'gallery', 'points', 'penalties', 'ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices', 'lists', 'mail'];

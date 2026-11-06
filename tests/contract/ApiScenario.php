@@ -19,14 +19,15 @@ final class ApiScenario
     }
 
     /**
-     * Rechte einer Rolle, wie sie früher gemeint waren (member schloss das Sehen ein), in der gespeicherten Reihenfolge.
+     * Rechte einer Rolle, wie sie früher gemeint waren (member schloss das Sehen ein), mit den später dazugekommenen
+     * Rechten zum Sehen (Roles::ADDED_VIEW), in der gespeicherten Reihenfolge.
      *
      * @param string[] $caps
      * @return string[]
      */
     private static function caps(array $caps): array
     {
-        $all = \KompanieApp\Core\Auth\Roles::expandLegacy($caps);
+        $all = [...\KompanieApp\Core\Auth\Roles::expandLegacy($caps), ...\KompanieApp\Core\Auth\Roles::ADDED_VIEW];
         return array_values(array_filter(array_map(static fn (\KompanieApp\Core\Auth\Capability $c): string => $c->value, \KompanieApp\Core\Auth\Roles::GRANTABLE), static fn (string $v): bool => in_array($v, $all, true)));
     }
 
@@ -571,7 +572,7 @@ final class ApiScenario
         sort($caps);
         $c->ok($s === 200 && ($d['preview']['role'] ?? '') === 'member' && is_string($d['preview']['label'] ?? null), '/config meldet die Vorschau mit Bezeichnung');
         $c->ok(($d['user']['id'] ?? 0) === $admin && ($d['user']['level'] ?? '') === 'member' && ($d['user']['extra_roles'] ?? null) === [], 'Vorschau: dieselbe Person mit der Rolle, ohne Zusatzrollen');
-        $expected = \KompanieApp\Core\Auth\Roles::MEMBER_DEFAULTS;
+        $expected = \KompanieApp\Core\Auth\Roles::TEMPLATES[\KompanieApp\Core\Auth\Roles::MEMBER];
         sort($expected);
         $c->ok($caps === $expected, 'Vorschau: genau die Rechte der Rolle');
         $c->ok(($d['setupPending'] ?? null) === false, 'Vorschau: kein Einrichtungsassistent');

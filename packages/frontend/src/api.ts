@@ -19,6 +19,8 @@ export type Capability =
   | 'view_events'
   | 'view_news'
   | 'view_gallery'
+  | 'view_companies'
+  | 'view_sponsors'
   | 'view_gallery_internal'
   | 'view_own_points'
   | 'view_own_penalties'

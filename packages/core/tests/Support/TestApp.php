@@ -91,15 +91,16 @@ final class TestApp
     }
 
     /**
-     * Rechte, wie sie vor dem Aufteilen gemeint waren (member schloss das Sehen ein, Roles::expandLegacy), in der
-     * Reihenfolge, in der sie gespeichert werden.
+     * Rechte, wie sie vor dem Aufteilen gemeint waren (member schloss das Sehen ein, Roles::expandLegacy), mit den
+     * später dazugekommenen Rechten zum Sehen (Roles::ADDED_VIEW, wie nach dem Update), in der Reihenfolge, in der sie
+     * gespeichert werden.
      *
      * @param string[] $legacy
      * @return string[]
      */
     public static function caps(array $legacy): array
     {
-        $all = \KompanieApp\Core\Auth\Roles::expandLegacy($legacy);
+        $all = [...\KompanieApp\Core\Auth\Roles::expandLegacy($legacy), ...\KompanieApp\Core\Auth\Roles::ADDED_VIEW];
         return array_values(array_filter(
             array_map(static fn (\KompanieApp\Core\Auth\Capability $c): string => $c->value, \KompanieApp\Core\Auth\Roles::GRANTABLE),
             static fn (string $v): bool => in_array($v, $all, true),

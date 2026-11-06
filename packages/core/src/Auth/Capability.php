@@ -26,6 +26,10 @@ enum Capability: string
     case ViewNews = 'view_news';
     /** Öffentliche Alben der Galerie. */
     case ViewGallery = 'view_gallery';
+    /** Liste der Kompanien (Bereich Kompanien, Issue #280). */
+    case ViewCompanies = 'view_companies';
+    /** Sponsoren (Bereich Sponsoren, Issue #279). */
+    case ViewSponsors = 'view_sponsors';
     /** Interne Bilder und Videos der Galerie (Ordner „intern“). */
     case ViewGalleryInternal = 'view_gallery_internal';
     /** Eigene Punkte in „Meins“. */
@@ -126,7 +130,8 @@ enum Capability: string
     public function isView(): bool
     {
         return in_array($this, [
-            self::Calendar, self::ViewIntern, self::ViewEvents, self::ViewNews, self::ViewGallery, self::ViewGalleryInternal,
+            self::Calendar, self::ViewIntern, self::ViewEvents, self::ViewNews, self::ViewGallery, self::ViewCompanies,
+            self::ViewSponsors, self::ViewGalleryInternal,
             self::ViewOwnPoints, self::ViewOwnPenalties, self::ViewOwnRank, self::ViewOwnAttendance, self::ViewBirthdays,
             self::VotePolls, self::ViewDirectory, self::ViewOffices, self::ViewFormer, self::ViewDocuments, self::ViewBoard,
             self::ViewRanks, self::ViewCatalog,

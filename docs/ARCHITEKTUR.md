@@ -407,6 +407,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 | `calendar` | interner Kalender (allein z. B. für Anwärter) |
 | `view_intern` | Navigation: die Knöpfe unter „Intern“ gesammelt unter einem Knopf statt Mitglieder und Dokumente als eigene Tabs; regelt nicht, was die Person sieht. Gilt nur für die Standardnavigation; mit einer eingerichteten Navigation (Einstellung `navigation`, `NavigationService`, `navigation.ts`, Issue #277) legt der Admin Hauptpunkte und Untermenüs (`#/menue/<n>`) selbst fest |
 | `view_events`, `view_news`, `view_gallery` | Tabs: öffentliche Termine, News, öffentliche Alben (`GET /events`, `/news`, `/gallery`) |
+| `view_companies`, `view_sponsors` | Kompanieliste und Sponsoren (Issue #278; die Bereiche kommen mit #279 und #280) |
 | `view_gallery_internal` | interne Bilder und Videos der Galerie (dann auch die öffentlichen Alben) |
 | `view_own_points`, `view_own_penalties`, `view_own_rank`, `view_own_attendance` | eigene Daten in „Meins“ (`/me/points`, `/me/penalties`, `/me/rank` und Rang/Titel in `/me`, `/me/attendance`); nur mit `member` |
 | `view_birthdays` | Geburtstage der anderen sehen und am Tag benachrichtigt werden (eintragen und erscheinen: `member`) |
@@ -436,14 +437,16 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 
 **Migration** (`RoleService::migrateViewRights`, einmalig, Einstellung `roles_view_split`): Früher schloss `member` alles Sehen ein, Öffentliches sah jeder, `calendar` brachte das Brett mit. Jede gespeicherte Rolle bekommt `Roles::expandLegacy(...)` (Gast `PUBLIC_DEFAULTS`, Mitglied `MEMBER_DEFAULTS`, Rollen nur mit Kalender dazu `view_board`); die Ausnahmen einzelner Personen werden aus ihren alten wirksamen Rechten neu berechnet, sodass jede Person danach genau dasselbe sieht (`ViewRightsMigrationTest`).
 
+**Später dazugekommene Rechte zum Sehen** (`Roles::ADDED_VIEW`, `RoleService::migrateAddedViewRights`, Einstellung `roles_view_added`, Issue #278): Neue Installationen geben sie Gast, Mitglied, den früheren festen Rollen und den Standardrollen der Bereiche. Beim Update bekommt jede Rolle außer Admin jedes dieser Rechte genau einmal; `roles_view_added` listet, welche schon verteilt sind, damit ein später ergänztes Recht ebenso einmal verteilt wird und ein vom Admin entzogenes entzogen bleibt. Ausnahmen einzelner Personen bleiben unverändert (`AddedViewRightsTest`). Weil jeder Bereich anfangs aus ist, sieht dadurch niemand etwas Neues, bis der Admin ihn einschaltet.
+
 **Rollen legt der Admin der Kompanie in der App an** (*Einstellungen → Rollen*, Issue #28; `Domain\RoleService`). Jede Person hat genau **eine Grundrolle** und beliebig viele **Zusatzrollen** (Issue #66, Abschnitt unten). Eine Rolle hat einen Namen, Rechte aus der Tabelle oben und einen **Punktefaktor**.
 
 - **Fest** (umbenennen; Namen bei der Ersteinrichtung aus `kompanie.json`, `labels.roles`; nicht löschbar):
 
   | Rolle | Rechte |
   |---|---|
-  | `guest` (Gast) | anfangs `Roles::PUBLIC_DEFAULTS`; nur Rechte zum Sehen ohne Voraussetzung änderbar; gilt auch ohne Anmeldung |
-  | `member` (Mitglied) | anfangs `Roles::MEMBER_DEFAULTS`; immer `member`, sonst nur Rechte zum Sehen änderbar – Rolle neuer Konten; Punktefaktor änderbar |
+  | `guest` (Gast) | anfangs `Roles::PUBLIC_DEFAULTS` und `ADDED_VIEW`; nur Rechte zum Sehen ohne Voraussetzung änderbar; gilt auch ohne Anmeldung |
+  | `member` (Mitglied) | anfangs `Roles::MEMBER_DEFAULTS` und `ADDED_VIEW`; immer `member`, sonst nur Rechte zum Sehen änderbar – Rolle neuer Konten; Punktefaktor änderbar |
   | `admin` (Admin) | alle; Punktefaktor änderbar |
 
   Reihenfolge überall (Auswahl, Zusatzrollen; Zähler umgekehrt, von unten nach oben) so, wie der Admin alle Rollen per Ziehen ordnet (`PUT /admin/roles/order`, auch die festen); anfangs `guest`, `member`, eigene Rollen, `admin`. Neue Rollen kommen ans Ende, vor `admin`, wenn der dort steht.
