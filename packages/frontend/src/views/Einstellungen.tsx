@@ -1206,8 +1206,8 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
           <span>
             Knöpfe zum Herunterladen zeigen
             <span className="small muted feature-desc">
-              Wer die {sec.gallery} sieht, kann dann jedes Bild in der Großansicht und jedes Album als ZIP herunterladen (in
-              Originalauflösung, ohne Videos).
+              Wer die {sec.gallery} sieht, kann dann jedes Bild und Video in der Großansicht und jedes Album als ZIP herunterladen (Bilder
+              in Originalauflösung, Videos unverändert).
             </span>
           </span>
         </label>

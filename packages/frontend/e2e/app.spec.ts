@@ -1723,7 +1723,7 @@ test('Galerie: Knöpfe zum Herunterladen für ein Bild und das Album als ZIP, nu
     const bytes = readFileSync((await zip.path())!);
     expect(bytes.subarray(0, 4).toString('latin1')).toBe('PK\x03\x04');
     expect(bytes.includes(Buffer.from('foto.jpg'))).toBe(true);
-    await expect(page.locator('.album-download [role=status]')).toHaveText('1 Bild gespeichert.');
+    await expect(page.locator('.album-download [role=status]')).toHaveText('1 Datei gespeichert.');
 
     await page.locator('.photo-grid .photo').first().click();
     const [single] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Bild herunterladen' }).click()]);
@@ -3353,6 +3353,48 @@ test('Galerie: Video mit ▶ im Album, spielt in der Großansicht aus Drive (Ran
   await expect(page.locator('.lightbox video')).toHaveCount(0);
   await expect(page.locator('.lb-track > img')).toBeVisible();
   await page.keyboard.press('Escape');
+});
+
+test('Galerie: Videos lassen sich herunterladen, einzeln und im ZIP des Albums', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const patch = (value: '0' | '1') =>
+    page.evaluate(async (value) => {
+      const cfg = window.KOMPANIE_CONFIG!;
+      const res = await fetch(cfg.apiBase + 'admin/settings', {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+        body: JSON.stringify({ gallery_downloads: value }),
+      });
+      return res.status;
+    }, value);
+  expect(await patch('1')).toBe(200);
+  try {
+    // Als Gast wie im Test oben (Umzug: ein Bild und ein Video)
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
+    await page.goto('/app/#/galerie');
+    await page.locator('.album-card', { hasText: 'Umzug' }).click();
+    await expect(page.locator('.photo')).toHaveCount(2);
+    const size = readFileSync(new URL('../../../tests/fixtures/galerie-video.webm', import.meta.url)).length;
+
+    const zipButton = page.getByRole('button', { name: /^Album herunterladen \(1 Bild · 1 Video, ZIP\)$/ });
+    const [zip] = await Promise.all([page.waitForEvent('download'), zipButton.click()]);
+    const bytes = readFileSync((await zip.path())!);
+    expect(bytes.includes(Buffer.from('umzug.webm'))).toBe(true);
+    expect(bytes.length).toBeGreaterThan(size);
+    await expect(page.locator('.album-download [role=status]')).toHaveText('2 Dateien gespeichert.');
+
+    await page.locator('.photo-video').click();
+    const [single] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Video herunterladen' }).click()]);
+    expect(single.suggestedFilename()).toBe('umzug.webm');
+    expect(readFileSync((await single.path())!).length).toBe(size);
+    await page.keyboard.press('Escape');
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD);
+    expect(await patch('0')).toBe(200);
+  }
 });
 
 test('iPhone: Banner führt zur bebilderten Installationsanleitung', async ({ page }) => {

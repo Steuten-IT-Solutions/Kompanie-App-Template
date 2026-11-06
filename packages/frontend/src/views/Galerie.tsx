@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { can, type GalleryAlbum, type GalleryPhoto } from '../api';
 import { downloadablePhotos } from '../downloadFiles';
-import { downloadAlbum, downloadPhoto } from '../galleryDownload';
+import { downloadAlbum, downloadMedia } from '../galleryDownload';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { useSwipeDrag } from '../swipe';
@@ -262,7 +262,7 @@ function Album({ id }: { id: number }) {
 
 /**
  * Das ganze Album als ZIP (nur mit „Knöpfe zum Herunterladen zeigen“ in Einstellungen → Galerie). Die Bilder lädt der
- * Browser einzeln und packt sie selbst (galleryDownload.ts); Videos sind nicht dabei.
+ * Browser einzeln und packt sie selbst (galleryDownload.ts), Videos eingeschlossen.
  */
 function AlbumDownload({ album }: { album: GalleryAlbum }) {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -270,9 +270,11 @@ function AlbumDownload({ album }: { album: GalleryAlbum }) {
   const [error, setError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
-  const count = downloadablePhotos(album.photos).length;
-  const videos = album.photos.some(isVideo);
+  const list = downloadablePhotos(album.photos);
+  const count = list.length;
+  const videos = list.filter(isVideo).length;
   if (count === 0) return null;
+  const files = (n: number) => `${n} ${n === 1 ? 'Datei' : 'Dateien'}`;
 
   async function start() {
     const ctrl = new AbortController();
@@ -283,8 +285,8 @@ function AlbumDownload({ album }: { album: GalleryAlbum }) {
       const r = await downloadAlbum(album, (done, total) => setProgress({ done, total }), ctrl.signal);
       setResult(
         r.missing > 0
-          ? `${r.saved} ${r.saved === 1 ? 'Bild' : 'Bilder'} gespeichert. ${r.missing} ließen sich gerade nicht laden (noch nicht fertig aufbereitet?).`
-          : `${r.saved} ${r.saved === 1 ? 'Bild' : 'Bilder'} gespeichert.`,
+          ? `${files(r.saved)} gespeichert. ${r.missing} ließen sich gerade nicht laden (noch nicht fertig aufbereitet?).`
+          : `${files(r.saved)} gespeichert.`,
       );
     } catch (e) {
       if ((e as Error).name !== 'AbortError') setError((e as Error).message);
@@ -298,7 +300,7 @@ function AlbumDownload({ album }: { album: GalleryAlbum }) {
     <div className="album-download">
       <div className="button-row">
         <button type="button" className="btn btn-secondary" onClick={start} disabled={progress !== null}>
-          {progress ? `Lädt ${progress.done} von ${progress.total} …` : `Album herunterladen (${mediaCount(count, 0)}, ZIP)`}
+          {progress ? `Lädt ${progress.done} von ${progress.total} …` : `Album herunterladen (${mediaCount(count, videos)}, ZIP)`}
         </button>
         {progress && (
           <button type="button" className="btn btn-link" onClick={() => abort.current?.abort()}>
@@ -306,7 +308,7 @@ function AlbumDownload({ album }: { album: GalleryAlbum }) {
           </button>
         )}
       </div>
-      {videos && !progress && !result && <p className="muted small">Videos sind im ZIP nicht enthalten.</p>}
+      {videos > 0 && !progress && !result && <p className="muted small">Mit Videos kann das ZIP groß werden; am besten im WLAN laden.</p>}
       {result && (
         <p className="small" role="status">
           {result}
@@ -506,19 +508,22 @@ function Lightbox({
   }, [i, photos, originals]);
 
   const p = photos[i];
-  // Herunterladen des gezeigten Bilds (Knopf oben rechts, mit „Knöpfe zum Herunterladen zeigen“)
+  // Herunterladen des gezeigten Bilds oder Videos (Knopf oben rechts, mit „Knöpfe zum Herunterladen zeigen“). Videos laden
+  // in Stücken; solange zeigt die Ansicht, wie weit es ist.
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveProgress, setSaveProgress] = useState<string | null>(null);
   useEffect(() => setSaveError(null), [i]);
   const save = async () => {
     setSaving(true);
     setSaveError(null);
     try {
-      await downloadPhoto(p, i);
+      await downloadMedia(p, i, (loaded, total) => setSaveProgress(`Video wird geladen … ${Math.floor((loaded / total) * 100)} %`));
     } catch (e) {
       setSaveError((e as Error).message);
     } finally {
       setSaving(false);
+      setSaveProgress(null);
     }
   };
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -604,10 +609,21 @@ function Lightbox({
       <button ref={closeRef} className="lb-btn lb-close" onClick={close} aria-label="Schließen">
         ✕
       </button>
-      {downloads && !isVideo(p) && (
-        <button className="lb-btn lb-download" onClick={save} disabled={saving} aria-label="Bild herunterladen" title="Bild herunterladen">
+      {downloads && (
+        <button
+          className="lb-btn lb-download"
+          onClick={save}
+          disabled={saving}
+          aria-label={isVideo(p) ? 'Video herunterladen' : 'Bild herunterladen'}
+          title={isVideo(p) ? 'Video herunterladen' : 'Bild herunterladen'}
+        >
           {saving ? <span className="img-loading lb-download-busy" aria-hidden="true" /> : <DownloadIcon />}
         </button>
+      )}
+      {saveProgress && (
+        <p className="lb-save-error" role="status">
+          {saveProgress}
+        </p>
       )}
       {saveError && (
         <p className="lb-save-error" role="alert">
