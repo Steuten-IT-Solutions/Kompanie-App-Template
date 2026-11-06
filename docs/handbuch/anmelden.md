@@ -3,7 +3,7 @@ titel: Anmelden
 reihenfolge: 15
 rechte: []
 ---
-Mit der Anmeldung siehst du außer dem Öffentlichen auch deine eigenen Daten und alles, was nur für {rolle.member} bestimmt ist. Benutzername und Passwort bekommst du von der {kompanie.name}.
+Mit der Anmeldung siehst du außer dem Öffentlichen auch deine eigenen Daten und alles, was nur für {rolle.member} bestimmt ist. Benutzername und Passwort bekommst du von der {kompanie.name}. Hat sie es eingeschaltet, kannst du einen Zugang auch selbst beantragen (siehe [Zugang beantragen](seite:zugang-beantragen)).
 
 ![Anmeldeformular mit Benutzername, Passwort und „Angemeldet bleiben“](bild:anmelden)
 
@@ -15,6 +15,7 @@ Tippe oben rechts auf **Login**. Läuft die App über die Webseite der {kompanie
 - **Passwort**: dein Passwort.
 - **Angemeldet bleiben**: ist vorausgewählt. Dann bleibst du auf diesem Gerät angemeldet, auch wenn du den Browser schließt.
 - **Anmelden**: meldet dich an.
+- **Zugang beantragen**: nur, wenn die {kompanie.name} das eingeschaltet hat. Siehe [Zugang beantragen](seite:zugang-beantragen).
 
 ## So gehst du vor
 ### Dich anmelden
@@ -37,9 +38,11 @@ Hat dir jemand einen Link auf einen Bildschirm geschickt, der nur für Angemelde
 - Mit **Angemeldet bleiben** bleibst du auf diesem Gerät rund ein Jahr angemeldet (400 Tage); wenn du die App zwischendurch nutzt, verlängert sich das von selbst. Ohne den Haken endet die Anmeldung, wenn du den Browser schließt, spätestens nach zwei Tagen. Das gilt für die Anmeldung in der App; mit der Anmeldeseite der Webseite gelten deren Regeln.
 - Nach mehreren falschen Versuchen sperrt die App die Anmeldung für eine Weile. Dann steht dort „Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen.“
 - Passwort vergessen? Ein {rolle.admin} der {kompanie.name} (oder wer Mitglieder anlegen darf) kann dir ein neues Startpasswort geben.
+- Hast du einen Zugang beantragt und ist er noch nicht freigegeben, sagt dir die App das bei der Anmeldung, z. B. „Deine Anfrage auf einen Zugang wartet noch auf Freigabe.“
 - Ist dein Konto nicht mehr aktiv, meldet die App „Dieses Konto ist nicht mehr aktiv. Bitte wende dich an die Kompanie.“
 - Abmelden und dein Passwort ändern kannst du unter [Mein Konto](seite:anmelden-und-konto).
 
 ## Siehe auch
 - [Mein Konto](seite:anmelden-und-konto)
+- [Zugang beantragen](seite:zugang-beantragen)
 - [Die App im Überblick](seite:app-ueberblick)

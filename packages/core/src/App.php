@@ -34,6 +34,7 @@ use KompanieApp\Core\Domain\MemberImportService;
 use KompanieApp\Core\Domain\MemberService;
 use KompanieApp\Core\Domain\PollService;
 use KompanieApp\Core\Domain\RankService;
+use KompanieApp\Core\Domain\RegistrationService;
 use KompanieApp\Core\Domain\RoleService;
 use KompanieApp\Core\Domain\ScoreService;
 use KompanieApp\Core\Domain\SettingsService;
@@ -118,6 +119,7 @@ final class App
         BackupUploadService::TASK => BackupUploadService::INTERVAL,
         ActivityService::TASK => ActivityService::INTERVAL,
         FormerMemberService::RETENTION_TASK => FormerMemberService::RETENTION_INTERVAL,
+        RegistrationService::TASK => RegistrationService::INTERVAL,
     ];
 
     /**
@@ -283,6 +285,8 @@ final class App
             ActivityService::TASK => true,
             // Ehemalige nach Ablauf der Aufbewahrungsfrist löschen: täglich, nur mit eingestellter Frist.
             FormerMemberService::RETENTION_TASK => $this->formerMembers()->retention()['years'] > 0,
+            // Selbstregistrierung (Issue #314): stündlich abgelaufene Anfragen löschen, auch nach dem Ausschalten.
+            RegistrationService::TASK => true,
         ];
         foreach ($wanted as $task => $on) {
             $on ? $this->scheduler->schedule($task, self::TASKS[$task]) : $this->scheduler->unschedule($task);
@@ -357,6 +361,8 @@ final class App
                 $this->activity()->prune();
             } elseif ($task === FormerMemberService::RETENTION_TASK) {
                 $this->formerMembers()->purgeExpired();
+            } elseif ($task === RegistrationService::TASK) {
+                $this->registrations()->runTask();
             }
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Aufgabe ' . $task . ' fehlgeschlagen: ' . $e->getMessage());
@@ -686,6 +692,12 @@ final class App
     public function memberContacts(): MemberContactRepository
     {
         return $this->service(MemberContactRepository::class, fn () => new MemberContactRepository($this->db));
+    }
+
+    /** Selbstregistrierung: Zugang beantragen, freigeben, ablehnen (Issue #314) */
+    public function registrations(): RegistrationService
+    {
+        return $this->service(RegistrationService::class, fn () => new RegistrationService($this));
     }
 
     public function formerMembers(): FormerMemberService

@@ -255,6 +255,13 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - Hintergrundaufgaben pausieren außer Updates und Statusmeldungen (`MaintenanceService::runsDuringMaintenance`); die Push-Warteschlange wird beim Beenden gleich verschickt. Die Statusmeldung enthält `maintenance: true/false`, nie die Begründung.
 - Die App zeigt Nicht-Admins die Wartungsseite (auch wenn eine Anfrage 503 `maintenance` bekommt), Admins ein rotes Banner mit „Beenden“. Der Service Worker speichert nur erfolgreiche Antworten; offline gespeicherte Daten bleiben erhalten. Die Shortcodes der Webseite zeigen weiter an (Entscheidung im Issue).
 
+### Zugang beantragen (Issue #314)
+
+- **Ablauf:** Gast füllt `#/registrieren` aus → `registration_requests` (nur Passwort-Hash, `PASSWORD_DEFAULT`) → wer `create_users` hat, gibt unter `#/verwaltung/anfragen` frei → erst dann `UserDirectory::createWithPasswordHash` (über `MemberService::insertWithPasswordHash`, gleiche Prüfungen wie beim Anlegen; Rolle nie `admin`). Ausgeschaltet, bis ein Admin es einschaltet (`registration_enabled`).
+- **Zwei Wege je nach Mailversand** (`MailService::configured()`): mit Mail Bestätigungslink (24 h, nur sha256 des Tokens gespeichert), Ergebnis per Mail, und das Formular verrät nicht, ob es eine Adresse schon gibt. Ohne Mail sofort `pending`, Ergebnis über den Hinweis bei der Anmeldung (`RegistrationService::loginHint`, 403 `registration_*` statt `login_failed`) oder `POST /registration/status`; Ablehnungen bleiben dann 14 Tage ohne Namen und Adresse stehen.
+- **Schutz:** `Domain\FormTrap` (Honeypot und signierte Zeitmarke, mit den Fehlermeldungen geteilt), Begrenzung je IP-Hash und je Tag, höchstens 50 offene Anfragen. Aufgabe `registrations` (stündlich) räumt Abgelaufenes ab. Die Tabelle ist keine Kerntabelle der Sicherung.
+- **WordPress:** Der Hash wird direkt in `user_pass` geschrieben; WordPress prüft ihn mit `password_verify` (ab 6.8) bzw. über phpass mit `crypt()`.
+
 ### Fehlermeldungen (Issue #64)
 
 - **Weg:** App → Cockpit (signiert wie die Statusmeldungen) → Issue in einem privaten Repository für Meldungen. Die Installationen haben keinen GitHub-Zugang; nur das Cockpit legt Issues an. Wire-Format, Antworten und Spamschutz: [FEHLERMELDUNGEN.md](FEHLERMELDUNGEN.md).

@@ -76,6 +76,8 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
       return 'anmelden-und-konto';
     case 'anmelden':
       return 'anmelden';
+    case 'registrieren':
+      return 'zugang-beantragen';
     case 'benachrichtigungen':
       return 'benachrichtigungen';
     case 'installieren':
@@ -88,6 +90,7 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
           bereiche: 'admin-bereiche',
           navigation: 'admin-navigation',
           rollen: 'admin-rollen-und-mitglieder',
+          zugang: 'admin-zugang',
           benachrichtigungen: 'admin-benachrichtigungen',
           geburtstage: 'admin-geburtstage',
           email: 'admin-email',
@@ -127,6 +130,7 @@ function adminSlug([sub, arg, page]: string[], ctx: HelpContext): string | null 
     neu: 'mitglieder-anlegen',
     'neu-mehrere': 'mitglieder-mehrere-anlegen',
     import: 'mitglieder-import',
+    anfragen: 'anfragen-freigeben',
   };
   // „Einrichtungen“ sammelt nur Knöpfe der Startseite; ihre Anleitung steht dort.
   if (!sub || sub === 'einrichtungen') return 'verwaltung';
