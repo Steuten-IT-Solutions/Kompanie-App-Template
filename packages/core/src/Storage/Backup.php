@@ -74,7 +74,8 @@ final class Backup
      */
     public const KEEP_IF_MISSING = ['push_subscriptions'];
     /** Ordner der geschützten Dateiablage mit Dateien, die zur Sicherung gehören: Dokumente, Abzeichen der Dienstgrade, Anhänge. */
-    public const FILE_DIRS = ['dokumente', 'abzeichen', 'anhaenge'];
+    /** einreichungen: hochgeladene Bilder der Galerie (Issue #285), lassen sich nicht aus Drive neu erzeugen */
+    public const FILE_DIRS = ['dokumente', 'abzeichen', 'anhaenge', 'einreichungen'];
     /** JSON-Optionen der Sicherung (wie beim Herunterladen, Hochladen nach Drive und vor einem Update). */
     public const JSON_FLAGS = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE;
     /** write(): Zeilen je Abfrage; Tabellen mit großen Zeilen (Fotos und Bilder als Base64) zeilenweise. */
@@ -185,13 +186,18 @@ final class Backup
             'abzeichen' => array_values(array_filter(array_map('strval', array_column($tables['ranks'] ?? [], 'badge_file')))),
             // Anhänge gespeicherter Nachrichten und Mails, keine Entwürfe
             'anhaenge' => array_map('strval', array_column(array_filter($tables['attachments'] ?? [], static fn (mixed $r): bool => is_array($r) && ($r['owner_type'] ?? '') !== 'draft'), 'file')),
+            // Hochgeladene Bilder der Galerie (Issue #285): photos.drive_file_id „upload:einreichungen/<Datei>“
+            'einreichungen' => array_values(array_filter(array_map(
+                static fn (mixed $r): string => is_array($r) && str_starts_with((string) ($r['drive_file_id'] ?? ''), 'upload:einreichungen/') ? substr((string) $r['drive_file_id'], strlen('upload:einreichungen/')) : '',
+                $tables['photos'] ?? [],
+            ))),
         ];
         $out = [];
         foreach (self::FILE_DIRS as $dir) {
             $base = dirname($files->path($dir . '/x', false));
             foreach (glob($base . '/*') ?: [] as $file) {
                 $name = basename($file);
-                $referenced = $dir === 'dokumente' || $dir === 'anhaenge'
+                $referenced = $dir !== 'abzeichen'
                     ? in_array($name, $wanted[$dir], true)
                     : array_filter($wanted['abzeichen'], static fn (string $b): bool => str_starts_with($name, $b . '-') || str_starts_with($name, $b . '.')) !== [];
                 if (!$referenced || !is_file($file) || !self::validFileName($name)) {
@@ -250,6 +256,8 @@ final class Backup
                     $first = false;
                     if ($table === 'documents' || $table === 'ranks' || $table === 'attachments') {
                         $refs[$table][] = array_intersect_key($row, ['file' => 1, 'badge_file' => 1, 'owner_type' => 1]);
+                    } elseif ($table === 'photos' && str_starts_with((string) ($row['drive_file_id'] ?? ''), 'upload:')) {
+                        $refs[$table][] = ['drive_file_id' => $row['drive_file_id']];
                     }
                 }
                 if (count($rows) < $size) {

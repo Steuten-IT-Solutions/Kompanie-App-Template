@@ -1632,6 +1632,43 @@ test('Ämter: Foto für eine Person ohne Profil, öffentlich im Zeitstrahl, Übe
   await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
 });
 
+test('Galerie: Album nur in der App anlegen, Bilder hochladen, ändern und löschen (Issue #285)', async ({ page }) => {
+  const n = Date.now() % 1000000;
+  const title = `Sommerfest ${n}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/einstellungen/galerie');
+  const section = page.locator('#einstellungen-galerie-alben');
+  await expect(page.getByLabel('Quelle')).toHaveValue('drive');
+  const form = section.locator('form', { hasText: 'Neues Album in der App' });
+  await form.getByLabel('Titel').fill(title);
+  await form.getByLabel('Jahr').fill('2026');
+  await form.getByRole('button', { name: 'Album anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Album angelegt');
+  const item = section.locator('.gallery-album-item', { hasText: title });
+  await expect(item).toContainText('nur in der App · 0 hochgeladen');
+
+  // Zwei Bilder auf einmal, eines davon später löschen
+  await item.getByLabel(`Bilder in ${title} hochladen`).setInputFiles([PNG, { ...PNG, name: 'zweites.png' }]);
+  await expect(page.locator('.toast')).toHaveText('2 Bilder hochgeladen');
+  await expect(item.locator('.gallery-upload')).toHaveCount(2);
+  await expect(item).toContainText('2 hochgeladen');
+  await expect(item.locator('.gallery-upload', { hasText: 'foto.jpg' })).toBeVisible();
+  page.once('dialog', (d) => void d.accept());
+  await item.locator('.gallery-upload', { hasText: 'zweites.jpg' }).getByRole('button', { name: 'Löschen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Bild gelöscht');
+  await expect(item.locator('.gallery-upload')).toHaveCount(1);
+
+  await item.getByLabel('Titel des Albums').fill(`${title} neu`);
+  await item.getByRole('button', { name: 'Album speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  await expect(section.locator('.gallery-album-head', { hasText: `${title} neu` })).toBeVisible();
+
+  page.once('dialog', (d) => void d.accept());
+  await item.getByRole('button', { name: 'Album löschen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Album gelöscht');
+  await expect(section.locator('.gallery-album-item', { hasText: title })).toHaveCount(0);
+});
+
 test('Ehemalig eintragen: Vorschau der endenden Ämter, danach enden sie mit dem Austrittsjahr (Issue #181)', async ({ page }) => {
   const id = Date.now() % 1000000;
   const flag = `Fahne ${id}`;
@@ -3286,7 +3323,7 @@ test('Admin wird durch die Einrichtung geführt', async ({ page }) => {
   let importStep = false;
   while ((await page.getByRole('heading', { name: 'Fast fertig' }).count()) === 0) {
     importStep ||= (await page.getByRole('heading', { name: 'Mitglieder übernehmen' }).count()) > 0;
-    await expect(page.getByRole('heading', { name: 'Galerie aus Google Drive' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Galerie', exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Weiter', exact: true }).click();
   }
   expect(importStep).toBe(true);
@@ -3808,7 +3845,7 @@ test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ 
   await expect(cal.locator('.form-error')).toBeVisible();
 
   await open('Galerie');
-  const gallery = page.locator('.settings-section', { hasText: 'Galerie aus Google Drive' });
+  const gallery = page.locator('.settings-section', { has: page.getByRole('heading', { name: 'Galerie', exact: true }) });
   await expect(gallery.getByText('test@example.iam.gserviceaccount.com')).toBeVisible();
   await gallery.getByRole('button', { name: 'Jetzt abgleichen' }).click();
   await expect(gallery.getByText('Fertig: 3 Alben, 6 Bilder und Videos.')).toBeVisible();
@@ -3860,7 +3897,7 @@ test('Admin verbindet die App mit Google (Google simuliert) und trennt wieder', 
   await expect(google.getByText('Es darf auch den Kalender lesen.')).toBeVisible();
   expect(page.url()).not.toContain('google=1'); // Hinweis nur einmal
   await page.goto('/app/#/einstellungen/galerie');
-  await expect(page.locator('.settings-section', { hasText: 'Galerie aus Google Drive' })).toContainText(
+  await expect(page.locator('.settings-section', { has: page.getByRole('heading', { name: 'Galerie', exact: true }) })).toContainText(
     'die Verbindung mit Google (kompanie@example.org)',
   );
   await page.goto('/app/#/einstellungen/google');

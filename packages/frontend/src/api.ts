@@ -2138,6 +2138,16 @@ export const api = {
       { only_process: onlyProcess },
     ),
   galleryFailed: () => request<{ photos: FailedPhoto[]; total: number }>('GET', '/admin/gallery/failed'),
+  // Alben der App und hochgeladene Bilder (Issue #285)
+  galleryAlbums: () => request<{ albums: GalleryAdminAlbum[] }>('GET', '/admin/gallery/albums'),
+  galleryAdminAlbum: (id: number) => request<GalleryAdminAlbumDetail>('GET', `/admin/gallery/albums/${id}`),
+  createGalleryAlbum: (input: { title: string; year: number }) => request<GalleryAdminAlbumDetail>('POST', '/admin/gallery/albums', input),
+  updateGalleryAlbum: (id: number, input: { title?: string; year?: number }) =>
+    request<GalleryAdminAlbumDetail>('PATCH', `/admin/gallery/albums/${id}`, input),
+  deleteGalleryAlbum: (id: number) => request<{ deleted: boolean }>('DELETE', `/admin/gallery/albums/${id}`),
+  uploadGalleryPhoto: async (albumId: number, file: File, intern: boolean) =>
+    request<GalleryAdminAlbumDetail>('POST', `/admin/gallery/albums/${albumId}/photos`, { file: await encodeFile(file), intern }),
+  deleteGalleryPhoto: (id: number) => request<{ deleted: boolean }>('DELETE', `/admin/gallery/photos/${id}`),
   retryGallery: () => request<{ retried: number; pending: number }>('POST', '/admin/gallery/retry', {}),
 
   status: () => request<AdminStatus>('GET', '/admin/status'),
@@ -2419,6 +2429,12 @@ export interface AdminSettings {
   gallery: {
     configured: boolean;
     root: string;
+    /** Quelle (Issue #285): Google Drive (dazu Alben der App) oder nur der eigene Server; fehlt bei älteren Servern */
+    source?: GallerySourceType;
+    /** Ablageort hochgeladener Bilder (vorerst nur der eigene Server) */
+    store?: 'server';
+    /** Belegter Platz der hochgeladenen Bilder in Bytes */
+    media_bytes?: number;
     service_account_email: string;
     oauth_connected: boolean;
     oauth_email: string;
@@ -2432,6 +2448,26 @@ export interface AdminSettings {
 }
 
 /** Bild der Galerie, das sich nicht aufbereiten ließ (Einstellungen → Galerie). */
+export type GallerySourceType = 'drive' | 'server';
+
+/** Album in Einstellungen → Galerie: aus Drive oder nur in der App, mit Zahl der hochgeladenen Bilder */
+export interface GalleryAdminAlbum {
+  id: number;
+  title: string;
+  year: string;
+  source: 'drive' | 'app';
+  uploads: number;
+  drive_photos: number;
+}
+
+export interface GalleryAdminAlbumDetail {
+  id: number;
+  title: string;
+  year: string;
+  source: 'drive' | 'app';
+  uploads: { id: number; name: string; intern: boolean; thumb: string; status: string; error: string }[];
+}
+
 export interface FailedPhoto {
   id: number;
   name: string;
@@ -2453,6 +2489,8 @@ export interface AdminSettingsInput {
   drive_service_account?: string;
   drive_oauth?: '';
   gallery_root?: string;
+  gallery_source?: GallerySourceType;
+  gallery_store?: 'server';
   news_source?: NewsSourceType;
   news_url?: string;
   legal_imprint_url?: string;

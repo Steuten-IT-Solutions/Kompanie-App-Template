@@ -95,6 +95,16 @@ final class StatusService
         if (!$g->isConfigured()) {
             return $this->item('gallery', $label, 'off', "Noch nicht eingerichtet (Einstellungen → {$label}).");
         }
+        // Belegter Platz der hochgeladenen Bilder (Issue #285): keine Grenze in der App, ein voller Webspace soll auffallen
+        $bytes = $g->mediaBytes();
+        $space = $bytes > 0 ? ' Hochgeladene Bilder belegen ' . ServerLimits::format($bytes) . '.' : '';
+        if (!$g->driveConfigured()) {
+            $failed = $g->countFailed();
+            $pending = $g->countPending();
+            return $this->item('gallery', $label, $failed > 0 ? 'warn' : 'ok', 'Quelle: eigener Server.'
+                . ($pending > 0 ? " $pending Bilder werden noch aufbereitet." : '')
+                . ($failed > 0 ? " $failed Bilder ließen sich nicht aufbereiten." : '') . $space);
+        }
         $st = $g->status();
         $last = isset($st['last_sync']) ? (int) $st['last_sync'] : null;
         if (($st['error'] ?? '') !== '') {
@@ -108,7 +118,7 @@ final class StatusService
         if ($failed > 0) {
             return $this->item('gallery', $label, 'warn', "$failed Bilder ließen sich nicht laden (z. B. beschädigte Dateien). Abgleich zuletzt: " . $this->date($last) . '.');
         }
-        return $this->item('gallery', $label, 'ok', ($pending > 0 ? "$pending Bilder werden noch aufbereitet. " : '') . 'Abgleich zuletzt: ' . $this->date($last) . '.');
+        return $this->item('gallery', $label, 'ok', ($pending > 0 ? "$pending Bilder werden noch aufbereitet. " : '') . 'Abgleich zuletzt: ' . $this->date($last) . '.' . $space);
     }
 
     private function calendar(): array

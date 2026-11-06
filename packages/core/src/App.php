@@ -25,6 +25,7 @@ use KompanieApp\Core\Domain\Features;
 use KompanieApp\Core\Domain\FileMediaStore;
 use KompanieApp\Core\Domain\FormerMemberService;
 use KompanieApp\Core\Domain\GalleryService;
+use KompanieApp\Core\Domain\GalleryUploadService;
 use KompanieApp\Core\Domain\GoogleConnect;
 use KompanieApp\Core\Domain\JoinYearService;
 use KompanieApp\Core\Domain\MemberImportService;
@@ -782,6 +783,12 @@ final class App
             $this->cache,
             $this->mediaStore(),
         ));
+    }
+
+    /** Alben der App und hochgeladene Bilder (Issue #285) */
+    public function galleryUploads(): GalleryUploadService
+    {
+        return $this->service(GalleryUploadService::class, fn () => new GalleryUploadService($this));
     }
 
     /** Eigene Originale der Galerie auf dem Server (Issue #284) */
