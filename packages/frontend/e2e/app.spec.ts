@@ -1669,6 +1669,63 @@ test('Galerie: Album nur in der App anlegen, Bilder hochladen, ändern und lösc
   await expect(section.locator('.gallery-album-item', { hasText: title })).toHaveCount(0);
 });
 
+test('Galerie: Knöpfe zum Herunterladen für ein Bild und das Album als ZIP, nur wenn eingeschaltet', async ({ page }) => {
+  const n = Date.now() % 1000000;
+  const title = `Download ${n}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json()) as { id?: number } };
+      },
+      [path, method, body] as const,
+    );
+  const albumId = (await api('admin/gallery/albums', 'POST', { title, year: 2026 })).data.id!;
+  const upload = await api(`admin/gallery/albums/${albumId}/photos`, 'POST', {
+    file: { name: 'foto.png', data: PNG.buffer.toString('base64') },
+  });
+  expect(upload.status).toBe(201);
+  try {
+    // Aus (Vorgabe): keine Knöpfe
+    await page.goto(`/app/#/galerie/${albumId}`);
+    await expect(page.locator('.photo-grid .photo')).toHaveCount(1);
+    await expect(page.getByRole('button', { name: /Album herunterladen/ })).toHaveCount(0);
+
+    // Einschalten unter Einstellungen → Galerie
+    await page.goto('/app/#/einstellungen/galerie');
+    const toggle = page.getByLabel(/Knöpfe zum Herunterladen zeigen/);
+    await expect(toggle).not.toBeChecked();
+    await toggle.check();
+    await page.locator('#einstellungen-galerie').getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
+
+    await page.goto(`/app/#/galerie/${albumId}`);
+    const zipButton = page.getByRole('button', { name: 'Album herunterladen (1 Bild, ZIP)' });
+    const [zip] = await Promise.all([page.waitForEvent('download'), zipButton.click()]);
+    expect(zip.suggestedFilename()).toBe(`${title} 2026.zip`);
+    const bytes = readFileSync((await zip.path())!);
+    expect(bytes.subarray(0, 4).toString('latin1')).toBe('PK\x03\x04');
+    expect(bytes.includes(Buffer.from('foto.jpg'))).toBe(true);
+    await expect(page.locator('.album-download [role=status]')).toHaveText('1 Bild gespeichert.');
+
+    await page.locator('.photo-grid .photo').first().click();
+    const [single] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Bild herunterladen' }).click()]);
+    expect(single.suggestedFilename()).toBe('foto.jpg');
+    const jpeg = readFileSync((await single.path())!);
+    expect(jpeg.subarray(0, 2).toString('hex')).toBe('ffd8');
+  } finally {
+    expect((await api('admin/settings', 'PATCH', { gallery_downloads: '0' })).status).toBe(200);
+    expect((await api(`admin/gallery/albums/${albumId}`, 'DELETE')).status).toBe(200);
+  }
+});
+
 test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)', async ({ page }) => {
   const n = Date.now() % 1000000;
   const title = `Einreichung ${n}`;

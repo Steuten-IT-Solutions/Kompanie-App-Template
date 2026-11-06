@@ -482,6 +482,8 @@ export interface GalleryAlbum {
   id: number;
   title: string;
   year: string;
+  /** Knöpfe zum Herunterladen zeigen (je Bild in der Großansicht, das Album als ZIP); fehlt bei älteren Servern */
+  downloads?: boolean;
   photos: GalleryPhoto[];
 }
 
@@ -2485,6 +2487,8 @@ export interface AdminSettings {
     store?: 'server';
     /** Belegter Platz der hochgeladenen Bilder in Bytes */
     media_bytes?: number;
+    /** Knöpfe zum Herunterladen in der Galerie; fehlt bei älteren Servern */
+    downloads?: boolean;
     service_account_email: string;
     oauth_connected: boolean;
     oauth_email: string;
@@ -2567,6 +2571,7 @@ export interface AdminSettingsInput {
   gallery_root?: string;
   gallery_source?: GallerySourceType;
   gallery_store?: 'server';
+  gallery_downloads?: '0' | '1';
   news_source?: NewsSourceType;
   news_url?: string;
   legal_imprint_url?: string;

@@ -1851,6 +1851,25 @@ code {
   top: calc(14px + env(safe-area-inset-top));
   right: 14px;
 }
+.lb-download {
+  top: calc(14px + env(safe-area-inset-top));
+  right: 70px;
+  display: grid;
+  place-items: center;
+}
+.lightbox .lb-download-busy {
+  width: 22px;
+  height: 22px;
+}
+.lb-save-error {
+  position: absolute;
+  top: calc(70px + env(safe-area-inset-top));
+  left: 14px;
+  right: 14px;
+  margin: 0;
+  text-align: center;
+  color: #fff;
+}
 .lb-prev {
   left: 10px;
 }
@@ -6005,6 +6024,9 @@ button.spotlight-person:focus-visible {
 
 /* Einreichungen der Galerie (Issue #286) */
 .gallery-actions {
+  margin-bottom: 12px;
+}
+.album-download {
   margin-bottom: 12px;
 }
 .gallery-review-list {

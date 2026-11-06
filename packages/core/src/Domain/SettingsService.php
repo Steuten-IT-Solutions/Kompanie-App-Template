@@ -61,6 +61,7 @@ final class SettingsService
                 'source' => $a->gallery()->sourceType(),
                 'store' => $a->gallery()->store(),
                 'media_bytes' => $a->gallery()->mediaBytes(),
+                'downloads' => $a->gallery()->downloadsEnabled(),
                 // Wie google.* (für ältere Fassungen der App)
                 'service_account_email' => $drive->clientEmail(),
                 'oauth_connected' => $drive->oauth() !== null,
@@ -168,6 +169,13 @@ final class SettingsService
         if (array_key_exists('gallery_store', $in) && !in_array($in['gallery_store'], GalleryService::STORES, true)) {
             throw ApiError::invalid('Unbekannter Ablageort für hochgeladene Bilder.');
         }
+        $downloads = null;
+        if (array_key_exists('gallery_downloads', $in)) {
+            if (!in_array($in['gallery_downloads'], ['0', '1'], true)) {
+                throw ApiError::invalid('Ungültiger Wert für gallery_downloads (0 oder 1).');
+            }
+            $downloads = $in['gallery_downloads'] === '1';
+        }
         if ($news && array_key_exists('news_source', $in)) {
             if (!in_array($in['news_source'], RemoteNewsSource::SOURCES, true)) {
                 throw ApiError::invalid('Unbekannte Quelle für Neuigkeiten.');
@@ -212,6 +220,9 @@ final class SettingsService
             if ($gallerySource === GalleryService::SOURCE_SERVER) {
                 $a->gallery()->reset();
             }
+        }
+        if ($downloads !== null) {
+            $a->gallery()->setDownloads($downloads);
         }
         if ($root !== null) {
             $before = $a->gallery()->root();

@@ -5227,6 +5227,7 @@ paths:
                 gallery_root: { type: string, description: Link oder ID des Galerie-Ordners in Google Drive }
                 gallery_source: { type: string, enum: [drive, server], description: 'Quelle der Galerie: Google Drive oder eigener Server (nur Alben der App und hochgeladene Bilder). Der Wechsel zu server entfernt Alben und Bilder aus Drive aus der App; hochgeladene bleiben.' }
                 gallery_store: { type: string, enum: [server], description: Ablageort für hochgeladene Bilder (heute nur der eigene Server) }
+                gallery_downloads: { type: string, enum: ['0', '1'], description: 'Knöpfe zum Herunterladen in der Galerie zeigen (1) oder nicht (0, Vorgabe): je Bild in der Großansicht und je Album als ZIP' }
                 news_source: { type: string, enum: [none, wordpress, rss], description: Nur eigenständige Version }
                 news_url: { type: string, description: Nur eigenständige Version }
                 legal_imprint_url: { type: string, description: 'Link auf das Impressum (http:// oder https://, höchstens 255 Zeichen); leer entfernt ihn' }
@@ -6977,6 +6978,7 @@ components:
             source: { type: string, enum: [drive, server] }
             store: { type: string, enum: [server] }
             media_bytes: { type: integer, description: Belegter Platz der hochgeladenen Bilder in Bytes }
+            downloads: { type: boolean, description: 'Knöpfe zum Herunterladen in der Galerie (Einstellung gallery_downloads)' }
             service_account_email: { type: string, description: wie google.service_account_email (für ältere Fassungen der App) }
             oauth_connected: { type: boolean, description: 'wie google.connected: OAuth-Verbindung zu Google (geht dem Dienstkonto vor)' }
             oauth_email: { type: string, description: Google-Konto der OAuth-Verbindung, leer wenn unbekannt }
@@ -7423,6 +7425,11 @@ components:
         id: { type: integer }
         title: { type: string }
         year: { type: string }
+        downloads:
+          type: boolean
+          description: |
+            Knöpfe zum Herunterladen zeigen (Einstellung `gallery_downloads`): je Bild in der Großansicht und das Album als ZIP.
+            Die App lädt dafür `original` (sonst `large`) und packt das ZIP selbst; Videos sind nicht dabei.
         photos:
           type: array
           items: { $ref: '#/components/schemas/GalleryPhoto' }

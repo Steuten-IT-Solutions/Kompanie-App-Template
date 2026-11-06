@@ -1091,6 +1091,7 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
   const g = settings.gallery;
   const [root, setRoot] = useState(g.root);
   const [source, setSource] = useState<GallerySourceType>(g.source ?? 'drive');
+  const [downloads, setDownloads] = useState(!!g.downloads);
   const [progress, setProgress] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const { busy, error, setError, save } = useSave(onSaved, onToast);
@@ -1139,7 +1140,12 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
         save(
           g.source === undefined
             ? { gallery_root: root.trim() }
-            : { gallery_source: source, gallery_store: 'server', ...(source === 'drive' ? { gallery_root: root.trim() } : {}) },
+            : {
+                gallery_source: source,
+                gallery_store: 'server',
+                ...(source === 'drive' ? { gallery_root: root.trim() } : {}),
+                ...(g.downloads !== undefined ? { gallery_downloads: downloads ? '1' : '0' } : {}),
+              },
         );
       }}
     >
@@ -1193,6 +1199,18 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
             />
           </label>
         </>
+      )}
+      {g.downloads !== undefined && (
+        <label className="toggle feature-toggle">
+          <input type="checkbox" checked={downloads} onChange={(e) => setDownloads(e.target.checked)} />
+          <span>
+            Knöpfe zum Herunterladen zeigen
+            <span className="small muted feature-desc">
+              Wer die {sec.gallery} sieht, kann dann jedes Bild in der Großansicht und jedes Album als ZIP herunterladen (in
+              Originalauflösung, ohne Videos).
+            </span>
+          </span>
+        </label>
       )}
       {source === 'drive' && g.status.error && <p className="form-error small">Letzter Abgleich: {g.status.error}</p>}
       {g.configured && source === 'drive' && (
