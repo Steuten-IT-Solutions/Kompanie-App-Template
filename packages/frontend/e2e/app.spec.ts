@@ -1669,6 +1669,66 @@ test('Galerie: Album nur in der App anlegen, Bilder hochladen, ändern und lösc
   await expect(section.locator('.gallery-album-item', { hasText: title })).toHaveCount(0);
 });
 
+test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)', async ({ page }) => {
+  const n = Date.now() % 1000000;
+  const title = `Einreichung ${n}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const albumId = await page.evaluate(async (title) => {
+    const cfg = window.KOMPANIE_CONFIG!;
+    const res = await fetch(cfg.apiBase + 'admin/gallery/albums', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+      body: JSON.stringify({ title, year: 2026 }),
+    });
+    return ((await res.json()) as { id: number }).id;
+  }, title);
+  expect(albumId).toBeGreaterThan(0);
+
+  await page.goto('/app/#/galerie');
+  await page.getByRole('button', { name: 'Bilder einreichen' }).click();
+  const form = page.locator('form', { hasText: 'Bilder einreichen' });
+  await form.getByLabel('Album').selectOption({ label: `2026 · ${title}` });
+  await form.getByLabel('Bilder (JPG, PNG oder WebP)').setInputFiles([PNG, { ...PNG, name: 'zweites.png' }]);
+  await expect(form.getByRole('button', { name: 'Einreichen' })).toBeDisabled();
+  await form.getByLabel('Ich habe die Rechte an den Bildern, und die erkennbaren Personen sind einverstanden.').check();
+  await form.getByRole('button', { name: 'Einreichen' }).click();
+  await expect(page.locator('.toast')).toHaveText('2 Bilder eingereicht');
+  const mine = page.locator('.gallery-upload', { hasText: title });
+  await expect(mine).toHaveCount(2);
+  await expect(mine.first()).toContainText('wartet auf Freigabe');
+
+  // Prüfen: eines öffentlich freigeben, eines mit Grund ablehnen
+  await page.getByRole('button', { name: '‹ Alle Alben' }).click();
+  await page.getByRole('button', { name: 'Einreichungen prüfen' }).click();
+  const items = page.locator('.gallery-review-item', { hasText: title });
+  await expect(items).toHaveCount(2);
+  await items.filter({ hasText: 'foto.jpg' }).getByRole('button', { name: 'Öffentlich freigeben' }).click();
+  await expect(page.locator('.toast')).toHaveText('Freigegeben');
+  page.once('dialog', (d) => void d.accept('Unscharf'));
+  await items.filter({ hasText: 'zweites.jpg' }).getByRole('button', { name: 'Ablehnen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Abgelehnt');
+  await expect(items).toHaveCount(0);
+  await expect(page.locator('.gallery-upload', { hasText: title })).toHaveCount(1);
+
+  await page.goto('/app/#/galerie/einreichen');
+  await expect(page.locator('.gallery-upload', { hasText: 'zweites.jpg' })).toContainText('nicht freigegeben: Unscharf');
+  await expect(page.locator('.gallery-upload', { hasText: 'foto.jpg' }).filter({ hasText: title })).toContainText('freigegeben');
+
+  // Aufräumen: das Album mit dem freigegebenen Bild löschen
+  const status = await page.evaluate(async (id) => {
+    const cfg = window.KOMPANIE_CONFIG!;
+    return (
+      await fetch(cfg.apiBase + `admin/gallery/albums/${id}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+        headers: { [cfg.csrf.header]: cfg.csrf.token },
+      })
+    ).status;
+  }, albumId);
+  expect(status).toBe(200);
+});
+
 test('Ehemalig eintragen: Vorschau der endenden Ämter, danach enden sie mit dem Austrittsjahr (Issue #181)', async ({ page }) => {
   const id = Date.now() % 1000000;
   const flag = `Fahne ${id}`;

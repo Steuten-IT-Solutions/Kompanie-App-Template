@@ -6002,3 +6002,22 @@ button.spotlight-person:focus-visible {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+/* Einreichungen der Galerie (Issue #286) */
+.gallery-actions {
+  margin-bottom: 12px;
+}
+.gallery-review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.gallery-review-item img {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 8px;
+  object-fit: contain;
+}

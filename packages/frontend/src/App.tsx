@@ -29,6 +29,7 @@ import { whenIdle } from './prefetch';
 // Der Service Worker speichert alle Teile trotzdem vorab, damit sie auch offline da sind.
 const Anmelden = lazyView(() => import('./views/Anmelden'));
 const Galerie = lazyView(() => import('./views/Galerie'));
+const GalerieEinreichungen = lazyView(() => import('./views/GalerieEinreichungen'));
 const Kompanien = lazyView(() => import('./views/Kompanien'));
 const Sponsoren = lazyView(() => import('./views/Sponsoren'));
 const Meins = lazyView(() => import('./views/Meins'));
@@ -598,7 +599,14 @@ export default function App({ notice = null }: { notice?: string | null }) {
                 <Termine focus={path[1] === 'termin' ? focusId(path[2]) : undefined} />
               ))}
             {tab === 'news' && <News id={newsId} />}
-            {tab === 'galerie' && <Galerie albumId={albumId} />}
+            {tab === 'galerie' &&
+              (path[1] === 'einreichen' && can('submit_gallery') ? (
+                <GalerieEinreichungen mode="einreichen" onToast={showToast} />
+              ) : path[1] === 'pruefen' && can('review_gallery') ? (
+                <GalerieEinreichungen mode="pruefen" onToast={showToast} />
+              ) : (
+                <Galerie albumId={albumId} />
+              ))}
             {tab === 'kompanien' && <Kompanien />}
             {tab === 'sponsoren' && <Sponsoren />}
             {openMenu?.children && (

@@ -50,6 +50,8 @@ export type Capability =
   | 'send_mail'
   | 'manage_sponsors'
   | 'manage_companies'
+  | 'submit_gallery'
+  | 'review_gallery'
   | 'view_personal'
   | 'manage_personal'
   | 'create_users'
@@ -2148,6 +2150,16 @@ export const api = {
   uploadGalleryPhoto: async (albumId: number, file: File, intern: boolean) =>
     request<GalleryAdminAlbumDetail>('POST', `/admin/gallery/albums/${albumId}/photos`, { file: await encodeFile(file), intern }),
   deleteGalleryPhoto: (id: number) => request<{ deleted: boolean }>('DELETE', `/admin/gallery/photos/${id}`),
+  // Einreichungen (Issue #286)
+  gallerySubmissions: () => request<GallerySubmissionsOwn>('GET', '/gallery/submissions'),
+  submitGalleryPhoto: async (albumId: number, file: File) =>
+    request<GallerySubmission>('POST', '/gallery/submissions', { album_id: albumId, file: await encodeFile(file), consent: true }),
+  withdrawGallerySubmission: (id: number) => request<{ deleted: boolean }>('DELETE', `/gallery/submissions/${id}`),
+  galleryReview: () => request<GalleryReview>('GET', '/gallery/review'),
+  approveGallerySubmission: (id: number, intern: boolean) =>
+    request<GallerySubmission>('POST', `/gallery/review/${id}/approve`, { intern }),
+  rejectGallerySubmission: (id: number, reason: string) => request<GallerySubmission>('POST', `/gallery/review/${id}/reject`, { reason }),
+  removeGallerySubmission: (id: number, reason = '') => request<{ removed: boolean }>('POST', `/gallery/review/${id}/remove`, { reason }),
   retryGallery: () => request<{ retried: number; pending: number }>('POST', '/admin/gallery/retry', {}),
 
   status: () => request<AdminStatus>('GET', '/admin/status'),
@@ -2244,7 +2256,19 @@ export interface ReportInput {
   website?: string;
 }
 
-export type PushType = 'board' | 'polls' | 'birthdays' | 'penalties' | 'points' | 'ranks' | 'titles' | 'events' | 'reminder' | 'news';
+export type PushType =
+  | 'board'
+  | 'polls'
+  | 'birthdays'
+  | 'gallery_review'
+  | 'gallery_submissions'
+  | 'penalties'
+  | 'points'
+  | 'ranks'
+  | 'titles'
+  | 'events'
+  | 'reminder'
+  | 'news';
 
 /** Angaben des Browsers zu seinem Push-Abo (PushSubscription.toJSON()). */
 export interface PushDevice {
@@ -2449,6 +2473,32 @@ export interface AdminSettings {
 
 /** Bild der Galerie, das sich nicht aufbereiten ließ (Einstellungen → Galerie). */
 export type GallerySourceType = 'drive' | 'server';
+
+/** Eingereichtes Bild (Issue #286); user_id und user_name nur beim Prüfen */
+export interface GallerySubmission {
+  id: number;
+  album_id: number;
+  album: string;
+  name: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reason: string;
+  created_at: string;
+  reviewed_at: string | null;
+  thumb: string | null;
+  photo_id: number | null;
+  user_id?: number;
+  user_name?: string;
+}
+
+export interface GallerySubmissionsOwn {
+  albums: { id: number; title: string; year: string }[];
+  submissions: GallerySubmission[];
+}
+
+export interface GalleryReview {
+  pending: GallerySubmission[];
+  approved: GallerySubmission[];
+}
 
 /** Album in Einstellungen → Galerie: aus Drive oder nur in der App, mit Zahl der hochgeladenen Bilder */
 export interface GalleryAdminAlbum {

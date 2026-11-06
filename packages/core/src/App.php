@@ -25,6 +25,7 @@ use KompanieApp\Core\Domain\Features;
 use KompanieApp\Core\Domain\FileMediaStore;
 use KompanieApp\Core\Domain\FormerMemberService;
 use KompanieApp\Core\Domain\GalleryService;
+use KompanieApp\Core\Domain\GallerySubmissionService;
 use KompanieApp\Core\Domain\GalleryUploadService;
 use KompanieApp\Core\Domain\GoogleConnect;
 use KompanieApp\Core\Domain\JoinYearService;
@@ -217,6 +218,12 @@ final class App
         }
         $this->features()->initialize($existing);
         $this->roles()->initialize($existing);
+        // Einreichungen der Galerie (Issue #286): Standardrolle und Benachrichtigungen bei eingeschalteter Galerie
+        try {
+            $this->gallerySubmissions()->initialize($existing);
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Einreichungen der Galerie nicht eingerichtet: ' . $e->getMessage());
+        }
         // Die laufende Version festhalten: Fehlt später die Datei VERSION, weiß der Installer trotzdem,
         // welche Hauptversion installiert ist (auch nach einem abgebrochenen oder händischen Wechsel).
         // Reine Hilfsinformation: Ein Fehler beim Schreiben darf keinen Aufruf scheitern lassen.
@@ -313,6 +320,7 @@ final class App
                 }
             } elseif ($task === GalleryService::PROCESS_TASK && $this->features()->enabled('gallery')) {
                 $this->gallery()->runProcessTask(25);
+                $this->gallerySubmissions()->pruneOrphans();
             } elseif ($task === CalendarService::TASK && $this->features()->enabled('calendar')) {
                 $error = $this->calendar()->refreshIfStale();
                 if ($error !== null) {
@@ -449,6 +457,12 @@ final class App
     public function userDeleted(int $userId, bool $keepChronicle = false): bool
     {
         // $keepChronicle: nur die persönlichen Angaben (Aufbewahrungsfrist für Ehemalige, UserData::CHRONICLE bleibt).
+        // Dateien offener Einreichungen der Galerie (Issue #286); die Zeilen löscht UserData::purge.
+        try {
+            $this->gallerySubmissions()->userDeleted($userId);
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Einreichungen der Galerie nicht gelöscht: ' . $e->getMessage());
+        }
         $ok = UserData::purge($this->db, $userId, PollService::existingSecret($this->settings), $keepChronicle);
         // Noch nicht gespeicherte Dateianhänge samt Dateien (Anhänge gespeicherter Nachrichten und Mails bleiben bei ihnen).
         try {
@@ -789,6 +803,11 @@ final class App
     public function galleryUploads(): GalleryUploadService
     {
         return $this->service(GalleryUploadService::class, fn () => new GalleryUploadService($this));
+    }
+
+    public function gallerySubmissions(): GallerySubmissionService
+    {
+        return $this->service(GallerySubmissionService::class, fn () => new GallerySubmissionService($this));
     }
 
     /** Eigene Originale der Galerie auf dem Server (Issue #284) */

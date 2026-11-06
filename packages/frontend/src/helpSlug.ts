@@ -30,7 +30,7 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
     case 'news':
       return sub ? 'neuigkeiten-beitrag' : 'neuigkeiten';
     case 'galerie':
-      return id ? 'galerie-album' : 'galerie';
+      return id ? 'galerie-album' : sub === 'einreichen' ? 'galerie-einreichen' : sub === 'pruefen' ? 'galerie-pruefen' : 'galerie';
     case 'kompanien':
       return 'kompanien';
     case 'sponsoren':

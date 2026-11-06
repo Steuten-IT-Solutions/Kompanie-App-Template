@@ -38,7 +38,7 @@ final class PersonalDataExport
      * Spalten je Tabelle, die nie in die Auskunft gehören (Schlüssel, Pseudonyme, Bildschirmfotos); je Tabelle, damit eine
      * gleich benannte Spalte anderswo nicht still fehlt. member_photos steht ganz unter person.photo.
      */
-    private const DROP_COLUMNS = ['poll_answers' => ['vote_ref'], 'push_subscriptions' => ['p256dh', 'auth'], 'bug_reports' => ['screenshot'], 'attachments' => ['file']];
+    private const DROP_COLUMNS = ['poll_answers' => ['vote_ref'], 'push_subscriptions' => ['p256dh', 'auth'], 'bug_reports' => ['screenshot'], 'attachments' => ['file'], 'gallery_submissions' => ['file_key', 'md5']];
     private const ACTIVITY_TABLES = ['activity', 'activity_last'];
     /**
      * Rechte für die Auskunft über andere: Sie enthält Punkte, Strafen, Dienstgrade, Titel, Anwesenheit, namentliche

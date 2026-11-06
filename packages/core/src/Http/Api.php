@@ -692,6 +692,20 @@ final class Api
             new Route('GET', '/gallery', [Cap::ViewGallery, Cap::ViewGalleryInternal], fn () => ['years' => $a->gallery()->overview($this->can(Cap::ViewGalleryInternal))], 'gallery', $denyView),
             new Route('GET', '/gallery/{id}', [Cap::ViewGallery, Cap::ViewGalleryInternal], fn (Request $r) => $a->gallery()->album($r->id(), $this->can(Cap::ViewGalleryInternal))
                 ?? throw ApiError::notFound('Album nicht gefunden.'), 'gallery', $denyView),
+            // Einreichungen (Issue #286): einreichen und eigene sehen mit submit_gallery, prüfen mit review_gallery
+            new Route('GET', '/gallery/submissions', Cap::SubmitGallery, fn () => $a->gallerySubmissions()->own($this->user()), 'gallery'),
+            new Route('POST', '/gallery/submissions', Cap::SubmitGallery, fn (Request $r) => Response::created($a->gallerySubmissions()->submit($this->user(), $r->input('album_id'), $r->input('file'), $r->input('consent'))), 'gallery'),
+            new Route('DELETE', '/gallery/submissions/{id}', Cap::SubmitGallery, function (Request $r) use ($a) {
+                $a->gallerySubmissions()->withdraw($this->user(), $r->id());
+                return ['deleted' => true];
+            }, 'gallery'),
+            new Route('GET', '/gallery/review', Cap::ReviewGallery, fn () => $a->gallerySubmissions()->review(), 'gallery'),
+            new Route('POST', '/gallery/review/{id}/approve', Cap::ReviewGallery, fn (Request $r) => $a->gallerySubmissions()->approve($this->user(), $r->id(), Input::bool($r->input('intern'))), 'gallery'),
+            new Route('POST', '/gallery/review/{id}/reject', Cap::ReviewGallery, fn (Request $r) => $a->gallerySubmissions()->reject($this->user(), $r->id(), $r->input('reason')), 'gallery'),
+            new Route('POST', '/gallery/review/{id}/remove', Cap::ReviewGallery, function (Request $r) use ($a) {
+                $a->gallerySubmissions()->remove($this->user(), $r->id(), $r->input('reason'));
+                return ['removed' => true];
+            }, 'gallery'),
 
             // Neuigkeiten
             new Route('GET', '/news', Cap::ViewNews, function (Request $r) use ($a) {
@@ -1211,7 +1225,7 @@ final class Api
             }, null, $denySettings),
             new Route('POST', '/admin/gallery/albums/{id}/photos', Cap::ManageSettings, fn (Request $r) => Response::created($a->galleryUploads()->upload($r->id(), $r->input('file'), Input::bool($r->input('intern')))), null, $denySettings),
             new Route('DELETE', '/admin/gallery/photos/{id}', Cap::ManageSettings, function (Request $r) use ($a) {
-                $a->galleryUploads()->deletePhoto($r->id());
+                $a->galleryUploads()->deletePhoto($r->id(), $this->user());
                 return ['deleted' => true];
             }, null, $denySettings),
 

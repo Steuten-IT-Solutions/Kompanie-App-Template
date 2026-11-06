@@ -70,6 +70,19 @@ final class FileMediaStore implements MediaStore
         return $new;
     }
 
+    public function keys(): array
+    {
+        $dir = dirname($this->files->path(self::DIR . '/x', false));
+        $out = [];
+        foreach (glob($dir . '/*') ?: [] as $file) {
+            $key = self::DIR . '/' . basename($file);
+            if (is_file($file) && preg_match(self::KEY, $key) === 1) {
+                $out[$key] = (int) filemtime($file);
+            }
+        }
+        return $out;
+    }
+
     public function bytes(): int
     {
         $dir = dirname($this->files->path(self::DIR . '/x', false));

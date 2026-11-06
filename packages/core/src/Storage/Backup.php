@@ -67,7 +67,7 @@ final class Backup
         'push_log',
     ];
     /** Tabellen des Kerns, in einer Reihenfolge, die beim Einfügen passt. */
-    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'member_photos', 'member_contacts', 'office_groups', 'offices', 'office_terms', 'office_holders', 'office_group_terms', 'former_members', 'lists', 'list_columns', 'list_rows', 'mailings', 'attachments', 'sponsors', 'companies', 'member_companies', 'push_subscriptions'];
+    public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'member_photos', 'member_contacts', 'office_groups', 'offices', 'office_terms', 'office_holders', 'office_group_terms', 'former_members', 'lists', 'list_columns', 'list_rows', 'mailings', 'attachments', 'sponsors', 'companies', 'member_companies', 'gallery_submissions', 'push_subscriptions'];
     /**
      * Tabellen, die beim Wiederherstellen nur geleert werden, wenn die Sicherung sie enthält: Push-Abos waren früher nicht
      * in Sicherungen; eine ältere Sicherung soll die Geräte nicht abmelden (der Schlüssel bleibt dann ebenfalls).
@@ -80,7 +80,7 @@ final class Backup
     public const JSON_FLAGS = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE;
     /** write(): Zeilen je Abfrage; Tabellen mit großen Zeilen (Fotos und Bilder als Base64) zeilenweise. */
     private const CHUNK_ROWS = 200;
-    private const HEAVY_TABLES = ['member_photos', 'rich_images', 'sponsors', 'companies'];
+    private const HEAVY_TABLES = ['member_photos', 'rich_images', 'sponsors', 'companies', 'gallery_submissions'];
     /** write(): Block einer Datei (Vielfaches von 3, damit die Base64-Teile aneinanderpassen). */
     private const FILE_BLOCK = 3 * 1024 * 1024;
 
@@ -187,10 +187,17 @@ final class Backup
             // Anhänge gespeicherter Nachrichten und Mails, keine Entwürfe
             'anhaenge' => array_map('strval', array_column(array_filter($tables['attachments'] ?? [], static fn (mixed $r): bool => is_array($r) && ($r['owner_type'] ?? '') !== 'draft'), 'file')),
             // Hochgeladene Bilder der Galerie (Issue #285): photos.drive_file_id „upload:einreichungen/<Datei>“
-            'einreichungen' => array_values(array_filter(array_map(
-                static fn (mixed $r): string => is_array($r) && str_starts_with((string) ($r['drive_file_id'] ?? ''), 'upload:einreichungen/') ? substr((string) $r['drive_file_id'], strlen('upload:einreichungen/')) : '',
-                $tables['photos'] ?? [],
-            ))),
+            // und offene Einreichungen (Issue #286): gallery_submissions.file_key „einreichungen/<Datei>“
+            'einreichungen' => array_values(array_filter([
+                ...array_map(
+                    static fn (mixed $r): string => is_array($r) && str_starts_with((string) ($r['drive_file_id'] ?? ''), 'upload:einreichungen/') ? substr((string) $r['drive_file_id'], strlen('upload:einreichungen/')) : '',
+                    $tables['photos'] ?? [],
+                ),
+                ...array_map(
+                    static fn (mixed $r): string => is_array($r) && ($r['status'] ?? '') === 'pending' && str_starts_with((string) ($r['file_key'] ?? ''), 'einreichungen/') ? substr((string) $r['file_key'], strlen('einreichungen/')) : '',
+                    $tables['gallery_submissions'] ?? [],
+                ),
+            ])),
         ];
         $out = [];
         foreach (self::FILE_DIRS as $dir) {
@@ -258,6 +265,8 @@ final class Backup
                         $refs[$table][] = array_intersect_key($row, ['file' => 1, 'badge_file' => 1, 'owner_type' => 1]);
                     } elseif ($table === 'photos' && str_starts_with((string) ($row['drive_file_id'] ?? ''), 'upload:')) {
                         $refs[$table][] = ['drive_file_id' => $row['drive_file_id']];
+                    } elseif ($table === 'gallery_submissions' && ($row['status'] ?? '') === 'pending') {
+                        $refs[$table][] = ['status' => 'pending', 'file_key' => $row['file_key']];
                     }
                 }
                 if (count($rows) < $size) {

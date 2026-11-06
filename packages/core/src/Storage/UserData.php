@@ -30,6 +30,8 @@ final class UserData
         'member_titles' => 'user_id',
         // Kompanien, denen die Person zugeordnet ist (Issue #280)
         'member_companies' => 'user_id',
+        // Eingereichte Bilder der Galerie (Issue #286); freigegebene Bilder bleiben ohne Verknüpfung in der Galerie.
+        'gallery_submissions' => 'user_id',
         'member_roles' => 'user_id',
         'attendance_entries' => 'user_id',
         'poll_votes' => 'user_id',

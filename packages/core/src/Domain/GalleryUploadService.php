@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Storage\GalleryRepository;
 
@@ -114,6 +115,7 @@ final class GalleryUploadService
         foreach ($repo->photosOfAlbum($id) as $photo) {
             $this->removePhoto($photo);
         }
+        $this->app->gallerySubmissions()->albumDeleted($id);
         $repo->deleteAlbum($id);
     }
 
@@ -125,8 +127,21 @@ final class GalleryUploadService
      */
     public function upload(int $albumId, mixed $file, bool $intern): array
     {
-        $repo = $this->repo();
-        $repo->album($albumId) ?? throw ApiError::notFound('Album nicht gefunden.');
+        $this->repo()->album($albumId) ?? throw ApiError::notFound('Album nicht gefunden.');
+        $this->insertPhoto($albumId, $this->store($albumId, $file), $intern);
+        return $this->album($albumId);
+    }
+
+    /**
+     * Prüft ein Bild, kodiert es neu als JPEG ohne Metadaten (auch ohne GPS-Ort, nach EXIF gedreht, höchstens
+     * ORIGINAL_EDGE Pixel) und legt es im MediaStore ab; auch für Einreichungen (Issue #286), dann mit kleiner Vorschau.
+     *
+     * @param mixed $file {name, data (Base64, auch als data:-Adresse)}
+     * @param int|null $thumbEdge Kantenlänge einer Vorschau (JPEG als Base64), null ohne
+     * @return array{key: string, name: string, width: int, height: int, md5: string, bytes: int, thumb: string|null}
+     */
+    public function store(int $albumId, mixed $file, ?int $thumbEdge = null): array
+    {
         $name = is_array($file) && is_string($file['name'] ?? null) ? trim($file['name']) : '';
         $data = is_array($file) && is_string($file['data'] ?? null) ? $file['data'] : '';
         if ($data === '') {
@@ -154,6 +169,7 @@ final class GalleryUploadService
         $files = $this->app->files;
         $src = $files->tempFile();
         $jpeg = $files->tempFile();
+        $small = $thumbEdge !== null ? $files->tempFile() : null;
         try {
             if (@file_put_contents($src, $bytes) === false) {
                 throw new \RuntimeException('Die Datei lässt sich nicht zwischenspeichern.');
@@ -162,50 +178,78 @@ final class GalleryUploadService
             try {
                 // Neu kodiert: ohne Metadaten (auch kein GPS-Ort), nach EXIF gedreht
                 $size = $this->app->images->resizeToJpeg($src, $jpeg, GalleryService::ORIGINAL_EDGE, GalleryService::ORIGINAL_QUALITY);
+                if ($small !== null) {
+                    $this->app->images->resizeToJpeg($jpeg, $small, (int) $thumbEdge, 80);
+                }
             } catch (\RuntimeException $e) {
                 throw ApiError::invalid('Das Bild lässt sich nicht lesen: ' . $e->getMessage());
             }
             $key = $this->app->gallery()->media()->put($albumId, $jpeg, 'jpg');
             $md5 = (string) md5_file($jpeg);
             $bytesOut = (int) filesize($jpeg);
+            $thumb = $small !== null ? base64_encode((string) file_get_contents($small)) : null;
         } finally {
             @unlink($src);
             @unlink($jpeg);
+            if ($small !== null) {
+                @unlink($small);
+            }
         }
         $base = pathinfo($name, PATHINFO_FILENAME);
-        $repo->insertPhoto([
-            'album_id' => $albumId,
-            'drive_file_id' => GalleryService::UPLOAD_PREFIX . $key,
+        return [
+            'key' => $key,
             'name' => mb_substr(($base !== '' ? $base : 'Bild') . '.jpg', 0, 255),
-            'is_intern' => $intern ? 1 : 0,
-            'width' => $size['width'],
-            'height' => $size['height'],
-            'taken_at' => null,
+            'width' => (int) $size['width'],
+            'height' => (int) $size['height'],
             'md5' => $md5,
+            'bytes' => $bytesOut,
+            'thumb' => $thumb,
+        ];
+    }
+
+    /**
+     * Ein abgelegtes Bild ins Album aufnehmen; aufbereitet wird es danach im Hintergrund wie Bilder aus Drive.
+     *
+     * @param array{key: string, name: string, width: int, height: int, md5: string, bytes: int} $stored aus store()
+     * @return int ID des Bilds
+     */
+    public function insertPhoto(int $albumId, array $stored, bool $intern): int
+    {
+        $id = $this->repo()->insertPhoto([
+            'album_id' => $albumId,
+            'drive_file_id' => GalleryService::UPLOAD_PREFIX . $stored['key'],
+            'name' => $stored['name'],
+            'is_intern' => $intern ? 1 : 0,
+            'width' => $stored['width'],
+            'height' => $stored['height'],
+            'taken_at' => null,
+            'md5' => $stored['md5'],
             'file_key' => bin2hex(random_bytes(16)),
             'status' => GalleryRepository::PENDING,
             'error' => '',
             'media' => 'image',
             'mime' => 'image/jpeg',
-            'bytes' => $bytesOut,
+            'bytes' => $stored['bytes'],
             'source' => 'upload',
         ]);
         $this->app->scheduler->runSoon(GalleryService::PROCESS_TASK);
-        return $this->album($albumId);
+        return $id;
     }
 
     /** Ein hochgeladenes Bild löschen (Bilder aus Drive kämen beim nächsten Abgleich wieder). */
-    public function deletePhoto(int $id): void
+    public function deletePhoto(int $id, ?User $actor = null): void
     {
         $photo = $this->repo()->photo($id);
         if ($photo === null || !GalleryService::isUpload($photo)) {
             throw ApiError::notFound('Hochgeladenes Bild nicht gefunden.');
         }
         $this->removePhoto($photo);
+        // Kam es aus einer Einreichung (Issue #286), gilt diese als wieder entfernt.
+        $this->app->gallerySubmissions()->photoRemoved($id, $actor);
     }
 
     /** @param array<string, mixed> $photo */
-    private function removePhoto(array $photo): void
+    public function removePhoto(array $photo): void
     {
         $gallery = $this->app->gallery();
         $gallery->deleteFiles($photo);

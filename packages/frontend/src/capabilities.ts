@@ -122,6 +122,18 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         short: `${sec.companies} pflegen`,
         features: ['companies'],
       },
+      {
+        key: 'submit_gallery',
+        label: `${sec.gallery}: Bilder einreichen, eigene Einreichungen sehen und zurückziehen`,
+        short: 'Bilder einreichen',
+        features: ['gallery'],
+      },
+      {
+        key: 'review_gallery',
+        label: `${sec.gallery}: Einreichungen freigeben oder ablehnen, freigegebene wieder entfernen`,
+        short: 'Einreichungen prüfen',
+        features: ['gallery'],
+      },
     ],
   },
   {

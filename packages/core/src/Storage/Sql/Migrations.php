@@ -1579,6 +1579,57 @@ WHERE title IS NULL",
                     "ALTER TABLE {albums} ADD COLUMN source TEXT NOT NULL DEFAULT 'drive'",
                 ],
             ],
+            // Eingereichte Bilder der Galerie (Issue #286): Datei im MediaStore (file_key), kleine Vorschau als Base64,
+            // Status pending, approved (photo_id zeigt auf das Bild) oder rejected (Datei schon gelöscht, Grund bleibt).
+            43 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {gallery_submissions} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  user_id bigint(20) unsigned NOT NULL,
+  album_id bigint(20) unsigned NOT NULL,
+  file_key varchar(100) NOT NULL DEFAULT \'\',
+  name varchar(255) NOT NULL DEFAULT \'\',
+  width int(11) NOT NULL DEFAULT 0,
+  height int(11) NOT NULL DEFAULT 0,
+  bytes bigint(20) unsigned NOT NULL DEFAULT 0,
+  md5 varchar(32) NOT NULL DEFAULT \'\',
+  thumb mediumtext DEFAULT NULL,
+  status varchar(10) NOT NULL DEFAULT \'pending\',
+  consent_at datetime NOT NULL,
+  created_at datetime NOT NULL,
+  reviewed_by bigint(20) unsigned DEFAULT NULL,
+  reviewed_at datetime DEFAULT NULL,
+  reason varchar(255) NOT NULL DEFAULT \'\',
+  photo_id bigint(20) unsigned DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY user_id (user_id),
+  KEY status (status)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {gallery_submissions} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  album_id INTEGER NOT NULL,
+  file_key TEXT NOT NULL DEFAULT \'\',
+  name TEXT NOT NULL DEFAULT \'\',
+  width INTEGER NOT NULL DEFAULT 0,
+  height INTEGER NOT NULL DEFAULT 0,
+  bytes INTEGER NOT NULL DEFAULT 0,
+  md5 TEXT NOT NULL DEFAULT \'\',
+  thumb TEXT DEFAULT NULL,
+  status TEXT NOT NULL DEFAULT \'pending\',
+  consent_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  reviewed_by INTEGER DEFAULT NULL,
+  reviewed_at TEXT DEFAULT NULL,
+  reason TEXT NOT NULL DEFAULT \'\',
+  photo_id INTEGER DEFAULT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {gallery_submissions}_user_id ON {gallery_submissions} (user_id)',
+                    'CREATE INDEX IF NOT EXISTS {gallery_submissions}_status ON {gallery_submissions} (status)',
+                ],
+            ],
         ];
     }
 

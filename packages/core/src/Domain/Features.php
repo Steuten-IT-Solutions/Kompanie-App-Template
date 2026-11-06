@@ -36,7 +36,7 @@ final class Features
         'events' => ['label' => 'Termine', 'description' => 'Öffentliche Termine, die auch Gäste ohne Anmeldung sehen.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_events']],
         'calendar' => ['label' => 'Kalender', 'description' => 'Alle Termine aus Google Kalender für angemeldete Mitglieder.', 'requires' => [], 'setup' => 'kalender', 'role' => null],
         'news' => ['label' => 'News', 'description' => 'Neuigkeiten der Kompanie, z. B. aus den Beiträgen der Webseite.', 'requires' => [], 'setup' => 'news', 'role' => null],
-        'gallery' => ['label' => 'Galerie', 'description' => 'Fotoalben aus Google Drive, mit internen Bildern nur für Mitglieder.', 'requires' => [], 'setup' => 'galerie', 'role' => null],
+        'gallery' => ['label' => 'Galerie', 'description' => 'Fotoalben aus Google Drive oder nur in der App, mit internen Bildern nur für Mitglieder; auf Wunsch reichen Mitglieder Bilder zur Freigabe ein.', 'requires' => [], 'setup' => 'galerie', 'role' => ['member', 'review_gallery']],
         'points' => ['label' => 'Punkte', 'description' => 'Punkte für Mitglieder, mit Katalog und Verlauf.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_points']],
         'penalties' => ['label' => 'Strafen', 'description' => 'Strafen der Mitglieder, offen oder bezahlt.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_penalties']],
         'ranks' => ['label' => 'Dienstgrade', 'description' => 'Dienstgrade der Mitglieder mit Verlauf; zusammen mit Punkten mit Punkteschwellen und Beförderungsübersicht.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_ranks']],
@@ -191,7 +191,8 @@ final class Features
         }
         // Schwarzes Brett (Issue #5), Umfragen (Issue #4) und Geburtstage (Issue #1): Beim ersten Einschalten bekommen
         // bestehende Abos die neue Art dazu (einmalig je Art, siehe PushService::offerTypeToExisting).
-        foreach (['board' => PushService::TYPE_BOARD, 'polls' => PushService::TYPE_POLLS, 'birthdays' => PushService::TYPE_BIRTHDAYS] as $feature => $type) {
+        // Ebenso die Galerie mit Einreichungen (Issue #286).
+        foreach ([['board', PushService::TYPE_BOARD], ['polls', PushService::TYPE_POLLS], ['birthdays', PushService::TYPE_BIRTHDAYS], ['gallery', PushService::TYPE_GALLERY_REVIEW], ['gallery', PushService::TYPE_GALLERY_SUBMISSIONS]] as [$feature, $type]) {
             if ($next[$feature] && !($before[$feature] ?? false)) {
                 try {
                     $this->app->push()->offerTypeToExisting($type);
