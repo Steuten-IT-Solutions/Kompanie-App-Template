@@ -3,6 +3,7 @@ import { api, config } from '../api';
 import brand from '../generated/brand';
 import logoUrl from '../generated/logo.png';
 import { LegalLinks } from '../legal';
+import { navigate } from '../router';
 
 /** Anmeldeformular der eigenständigen Version (bei WordPress geht es zu wp-login.php). */
 export default function Anmelden() {
@@ -68,6 +69,14 @@ export default function Anmelden() {
         {busy ? 'Meldet an …' : 'Anmelden'}
       </button>
       <p className="muted small">Passwort vergessen? Bitte bei einem Admin melden – er kann ein neues Startpasswort erzeugen.</p>
+      {config?.registration && (
+        <p className="muted small">
+          Noch keinen Zugang?{' '}
+          <button type="button" className="btn btn-link inline-link" onClick={() => navigate('registrieren')}>
+            Zugang beantragen
+          </button>
+        </p>
+      )}
       <LegalLinks />
     </form>
   );

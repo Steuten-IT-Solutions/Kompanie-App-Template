@@ -46,7 +46,7 @@ final class Api
      * Zählen nicht als Nutzung (Issue #175): ruft die App von selbst auf (Konfiguration, Abgleich der Benachrichtigungen,
      * Formular zum Fehlermelden). Die Anmeldung erfasst ihre Route selbst (Aktion login), die Abmeldung gar nicht.
      */
-    private const NOT_TRACKED = ['/config', '/auth/csrf', '/auth/login', '/auth/logout', '/push/status', '/me/push/status', '/reports/form'];
+    private const NOT_TRACKED = ['/config', '/auth/csrf', '/auth/login', '/auth/logout', '/push/status', '/me/push/status', '/reports/form', '/registration/form'];
 
     /** @var Route[]|null */
     private ?array $routes = null;
@@ -516,6 +516,10 @@ final class Api
             'features' => $features,
             // Fehlermeldungen an die Betreuer der App (Issue #64): ohne Empfänger kein Knopf „Fehler melden“
             'reports' => $a->bugReports()->available(),
+            // Zugang beantragen (Issue #314): Link „Zugang beantragen“ für Gäste; pendingRegistrations: offene Anfragen
+            // für alle, die freigeben (Zähler in der Verwaltung), sonst null
+            'registration' => $a->registrations()->enabled(),
+            'pendingRegistrations' => $user !== null && $this->can(Cap::CreateUsers) ? $a->registrations()->countPending() : null,
             // Impressum und Datenschutzerklärung der Kompanie (Einstellungen → Impressum und Datenschutz): für alle, auch Gäste
             'legal' => self::legalLinks($a->settingsService()->legal()),
             // Handbuch auf GitHub Pages der Kompanie: neben updates.json (Issue #12)
@@ -600,11 +604,18 @@ final class Api
             new Route('GET', '/config', $P, fn () => $this->config()),
             new Route('GET', '/auth/csrf', $L, fn () => ['token' => $a->authenticator->csrfToken()]),
             new Route('POST', '/auth/login', $P, function (Request $r) use ($a) {
-                $user = $a->authenticator->login(
-                    is_string($r->input('username')) ? trim($r->input('username')) : '',
-                    is_string($r->input('password')) ? $r->input('password') : '',
-                    $r->input('remember') === null ? true : Input::bool($r->input('remember')),
-                );
+                $username = is_string($r->input('username')) ? trim($r->input('username')) : '';
+                $password = is_string($r->input('password')) ? $r->input('password') : '';
+                try {
+                    $user = $a->authenticator->login($username, $password, $r->input('remember') === null ? true : Input::bool($r->input('remember')));
+                } catch (ApiError $e) {
+                    // Selbstregistrierung (Issue #314): Wer noch auf die Freigabe wartet, erfährt das hier (nur mit dem
+                    // Passwort aus der Anfrage).
+                    if ($e->errorCode === 'login_failed') {
+                        throw $a->registrations()->loginHint($username, $password) ?? $e;
+                    }
+                    throw $e;
+                }
                 $a->activity()->record($user, 'login', 'login');
                 return $this->config();
             }),
@@ -651,6 +662,12 @@ final class Api
             // Fehlermeldungen (Issue #64): auch ohne Anmeldung; Zeitfalle, Honeypot und Begrenzung im Dienst
             new Route('GET', '/reports/form', $P, fn () => $a->bugReports()->form($a->authContext->currentUser())),
             new Route('POST', '/reports', $P, fn (Request $r) => Response::created($a->bugReports()->submit($a->authContext->currentUser(), $r->body, $r->client))),
+            // Selbstregistrierung (Issue #314): Zugang beantragen (auch ohne Anmeldung; Zeitfalle, Honeypot und Begrenzung
+            // im Dienst), E-Mail-Adresse bestätigen, Stand der Anfrage
+            new Route('GET', '/registration/form', $P, fn () => $a->registrations()->form()),
+            new Route('POST', '/registration', $P, fn (Request $r) => Response::created($a->registrations()->submit($a->authContext->currentUser(), $r->body, $r->client))),
+            new Route('POST', '/registration/confirm', $P, fn (Request $r) => $a->registrations()->confirm($r->input('token'))),
+            new Route('POST', '/registration/status', $P, fn (Request $r) => $a->registrations()->status($r->input('username'), $r->input('password'), $r->client)),
             new Route('POST', '/me/push/status', $L, fn (Request $r) => $this->pushStatus($r, $this->user())),
             new Route('POST', '/push/status', $P, fn (Request $r) => $this->pushStatus($r, null)),
             new Route('POST', '/me/push', $L, fn (Request $r) => PushService::formatSubscription($a->push()->subscribe(
@@ -1159,6 +1176,10 @@ final class Api
                 $this->storePhoto((int) $created['id'], $photo, $created);
                 return Response::created($created);
             }, null, $denyUsers),
+            // Anfragen auf einen Zugang (Issue #314): freigeben legt das Konto an, mit denselben Grenzen wie POST /users
+            new Route('GET', '/registrations', Cap::CreateUsers, fn () => $a->registrations()->pending(), null, $denyUsers),
+            new Route('POST', '/registrations/{id}/approve', Cap::CreateUsers, fn (Request $r) => $a->registrations()->approve($this->user(), $r->id(), $r->body), null, $denyUsers),
+            new Route('POST', '/registrations/{id}/reject', Cap::CreateUsers, fn (Request $r) => $a->registrations()->reject($r->id(), $r->input('reason')), null, $denyUsers),
             // Mehrere auf einmal (Issue #24): erst alle prüfen; bei einem Fehler wird keiner angelegt.
             new Route('POST', '/users/bulk', Cap::CreateUsers, fn (Request $r) => Response::created($this->createUsers($r->input('level'), $r->input('people'))), null, $denyUsers),
 
@@ -1177,6 +1198,9 @@ final class Api
                 return $a->navigation()->set($r->body['navigation']);
             }, null, $denySettings),
             new Route('GET', '/admin/settings', Cap::ManageSettings, fn () => $a->settingsService()->get(), null, $denySettings),
+            // Zugang beantragen (Issue #314): ein/aus und vorgeschlagene Rolle
+            new Route('GET', '/admin/registration', Cap::ManageSettings, fn () => $a->registrations()->settings(), null, $denySettings),
+            new Route('PUT', '/admin/registration', Cap::ManageSettings, fn (Request $r) => $a->registrations()->updateSettings($r->body), null, $denySettings),
             // Push (Issue #19): Voraussetzungen, Zahl der Abos, Uhrzeit der Erinnerung; Benachrichtigung am Geburtstag
             new Route('GET', '/admin/push', Cap::ManageSettings, fn () => $a->push()->adminStatus(), null, $denySettings),
             new Route('PATCH', '/admin/push', Cap::ManageSettings, function (Request $r) use ($a) {

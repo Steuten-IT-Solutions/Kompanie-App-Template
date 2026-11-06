@@ -1690,6 +1690,56 @@ WHERE title IS NULL",
                     'CREATE INDEX IF NOT EXISTS {app_news}_created_at ON {app_news} (created_at)',
                 ],
             ],
+            // Selbstregistrierung (Issue #314): Anträge auf einen Zugang, bis zur Freigabe ohne Konto. Nicht in Sicherungen.
+            // status: unconfirmed (E-Mail-Adresse noch nicht bestätigt), pending (wartet auf Freigabe), rejected (abgelehnt,
+            // nur ohne Mailversand eine Weile aufbewahrt, damit die Person es beim Anmelden erfährt).
+            47 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {registration_requests} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  first_name varchar(100) NOT NULL DEFAULT \'\',
+  last_name varchar(100) NOT NULL DEFAULT \'\',
+  email varchar(191) NOT NULL DEFAULT \'\',
+  login varchar(60) NOT NULL,
+  password_hash varchar(255) NOT NULL,
+  message text DEFAULT NULL,
+  status varchar(12) NOT NULL DEFAULT \'pending\',
+  token_hash varchar(64) DEFAULT NULL,
+  reason text DEFAULT NULL,
+  created_at datetime NOT NULL,
+  confirmed_at datetime DEFAULT NULL,
+  expires_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  KEY status (status),
+  KEY login (login),
+  KEY email (email),
+  KEY token_hash (token_hash),
+  KEY expires_at (expires_at)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {registration_requests} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  first_name TEXT NOT NULL DEFAULT \'\',
+  last_name TEXT NOT NULL DEFAULT \'\',
+  email TEXT NOT NULL DEFAULT \'\',
+  login TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  message TEXT DEFAULT NULL,
+  status TEXT NOT NULL DEFAULT \'pending\',
+  token_hash TEXT DEFAULT NULL,
+  reason TEXT DEFAULT NULL,
+  created_at TEXT NOT NULL,
+  confirmed_at TEXT DEFAULT NULL,
+  expires_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {registration_requests}_status ON {registration_requests} (status)',
+                    'CREATE INDEX IF NOT EXISTS {registration_requests}_login ON {registration_requests} (login)',
+                    'CREATE INDEX IF NOT EXISTS {registration_requests}_email ON {registration_requests} (email)',
+                    'CREATE INDEX IF NOT EXISTS {registration_requests}_token_hash ON {registration_requests} (token_hash)',
+                    'CREATE INDEX IF NOT EXISTS {registration_requests}_expires_at ON {registration_requests} (expires_at)',
+                ],
+            ],
         ];
     }
 

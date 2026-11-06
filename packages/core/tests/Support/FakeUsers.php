@@ -115,6 +115,13 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
         return $id;
     }
 
+    public function createWithPasswordHash(string $firstName, string $lastName, string $login, string $email, string $passwordHash, string $role = Roles::MEMBER): int
+    {
+        $id = $this->create($firstName, $lastName, $login, $email, '', $role);
+        $this->users[$id]['password'] = $passwordHash;
+        return $id;
+    }
+
     public function canAssignAdmin(): bool
     {
         return $this->adminsAssignable;
@@ -211,7 +218,7 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
                 return $this->user($id);
             }
         }
-        throw ApiError::invalid('Benutzername oder Passwort ist falsch.');
+        throw new ApiError(400, 'login_failed', 'Benutzername oder Passwort ist falsch.');
     }
 
     public function logout(): void

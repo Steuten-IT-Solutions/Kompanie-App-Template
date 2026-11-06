@@ -28,6 +28,7 @@ import { whenIdle } from './prefetch';
 // Erst bei Bedarf laden: Der App-Start braucht nur die Ansichten, mit denen Gäste meist beginnen (Termine, News).
 // Der Service Worker speichert alle Teile trotzdem vorab, damit sie auch offline da sind.
 const Anmelden = lazyView(() => import('./views/Anmelden'));
+const Registrieren = lazyView(() => import('./views/Registrieren'));
 const Galerie = lazyView(() => import('./views/Galerie'));
 const GalerieEinreichungen = lazyView(() => import('./views/GalerieEinreichungen'));
 const Kompanien = lazyView(() => import('./views/Kompanien'));
@@ -83,6 +84,7 @@ type View =
   | 'benachrichtigungen'
   | 'installieren'
   | 'anmelden'
+  | 'registrieren'
   | 'einstellungen'
   | 'einrichtung'
   | 'hilfe';
@@ -108,6 +110,7 @@ const VIEWS: View[] = [
   'benachrichtigungen',
   'installieren',
   'anmelden',
+  'registrieren',
   'einstellungen',
   'einrichtung',
   'hilfe',
@@ -165,6 +168,7 @@ const titles = (): Record<View, string> => ({
   benachrichtigungen: 'Benachrichtigungen',
   installieren: 'App installieren',
   anmelden: 'Anmelden',
+  registrieren: 'Zugang beantragen',
   einstellungen: 'Einstellungen',
   einrichtung: 'Einrichtung',
   hilfe: 'Hilfe',
@@ -382,6 +386,8 @@ export default function App({ notice = null }: { notice?: string | null }) {
     benachrichtigungen: true,
     installieren: true,
     anmelden: !user && config?.auth.mode === 'form',
+    // Zugang beantragen (Issue #314): auch der Link aus der Mail (bestaetigen/<token>) und der Stand der Anfrage
+    registrieren: !!config?.registration || path[1] === 'bestaetigen' || path[1] === 'stand',
     einstellungen: can('manage_settings'),
     einrichtung: can('manage_settings'),
     hilfe: true,
@@ -433,6 +439,8 @@ export default function App({ notice = null }: { notice?: string | null }) {
   // Gast öffnet einen geteilten Link auf eine Seite für Angemeldete: Hinweis; nach der Anmeldung geht sie auf (share.ts).
   const canLogin = config?.auth.mode === 'form' || !!config?.auth.loginUrl;
   const loginFirst = !user && canLogin && VIEWS.includes(requested) && requested !== 'anmelden' && !allowed[requested];
+  // Gäste: Hinweis „Zugang beantragen“ (Issue #314) auf der ersten Seite und bei Seiten, die eine Anmeldung brauchen
+  const canRegister = !user && !!config?.registration;
 
   const [toast, setToast] = useState<string | null>(notice);
   const [online, setOnline] = useState(navigator.onLine);
@@ -527,7 +535,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
         <div className="topbar-title">{caps(title)}</div>
         <div className="topbar-sub">{user ? greeting(user.name) : brand.name}</div>
       </div>
-      {!['anmelden', 'einrichtung'].includes(tab) && (
+      {!['anmelden', 'einrichtung'].includes(tab) && !(tab === 'registrieren' && path[1] === 'bestaetigen') && (
         <button
           className="btn btn-link topbar-share"
           onClick={() => void shareLink(pageUrl, `${brand.shortName}: ${caps(title)}`, showToast)}
@@ -589,7 +597,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
       )}
       {boardVisible() && tab !== 'brett' && <BoardBanner />}
       {!online && <div className="offline">Offline – angezeigt werden die zuletzt geladenen Daten.</div>}
-      {!['installieren', 'anmelden', 'einstellungen', 'einrichtung'].includes(tab) && <InstallBanner onToast={showToast} />}
+      {!['installieren', 'anmelden', 'registrieren', 'einstellungen', 'einrichtung'].includes(tab) && <InstallBanner onToast={showToast} />}
 
       <main className="content">
         <ErrorBoundary key={viewKey(path)}>
@@ -611,11 +619,24 @@ export default function App({ notice = null }: { notice?: string | null }) {
                 <button className="btn btn-block" onClick={toLogin}>
                   Anmelden
                 </button>
+                {canRegister && (
+                  <button className="btn btn-secondary btn-block" onClick={() => navigate('registrieren')}>
+                    Noch keinen Zugang? Zugang beantragen
+                  </button>
+                )}
               </div>
             )}
             {!user && brand.guestWelcome && activeTab === tabs[0]?.key && <p className="guest-welcome card">{brand.guestWelcome}</p>}
             {/* Rückweg ins Untermenü über dem Inhalt, wie „‹ Verwaltung“ (vor allen Bereichen, die darin stehen können) */}
             {parentMenu && menuStart && <MenuBack to={parentMenu.key} label={parentMenu.label} />}
+            {canRegister && !loginFirst && activeTab === tabs[0]?.key && !path[1] && (
+              <p className="registration-hint muted small">
+                Du gehörst dazu und hast noch keinen Zugang?{' '}
+                <button type="button" className="btn btn-link inline-link" onClick={() => navigate('registrieren')}>
+                  Zugang beantragen
+                </button>
+              </p>
+            )}
             {tab === 'termine' &&
               (path[1] === 'verwalten' && features?.events && can('manage_events') ? (
                 <TermineVerwalten onToast={showToast} />
@@ -655,6 +676,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
             {tab === 'benachrichtigungen' && <Benachrichtigungen onToast={showToast} />}
             {tab === 'installieren' && <Installieren onToast={showToast} />}
             {tab === 'anmelden' && <Anmelden />}
+            {tab === 'registrieren' && <Registrieren path={path.slice(1)} />}
             {tab === 'einstellungen' && <Einstellungen path={path.slice(1)} onToast={showToast} />}
             {tab === 'einrichtung' && <Einrichtung onToast={showToast} />}
             {tab === 'hilfe' && <Hilfe slug={path[1]} />}

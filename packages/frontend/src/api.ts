@@ -113,6 +113,10 @@ export interface AppConfig {
   legal?: { imprint: string | null; privacy: string | null };
   /** „Fehler melden“ möglich (Issue #64): Die App hat einen Empfänger für Fehlermeldungen */
   reports?: boolean;
+  /** Zugang beantragen (Issue #314) eingeschaltet: Link „Zugang beantragen“ für Gäste; fehlt bei älteren Servern */
+  registration?: boolean;
+  /** Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null */
+  pendingRegistrations?: number | null;
   /** Rollen der Installation (Einstellungen → Rollen): Bezeichnung und Punktefaktor */
   roles?: RoleInfo[];
   /** null = Gast ohne Anmeldung. */
@@ -246,6 +250,20 @@ export function applyBirthdayUpcomingDays(days: number): void {
 export function applyNavigation(navigation: NavigationSetting | null): void {
   if (!config) return;
   config.navigation = navigation;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/** Zahl der offenen Anfragen auf einen Zugang (Issue #314) nach dem Freigeben oder Ablehnen: Zähler in der Verwaltung. */
+export function applyPendingRegistrations(count: number): void {
+  if (!config || config.pendingRegistrations == null) return;
+  config.pendingRegistrations = count;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/** Übernimmt die Einstellung „Zugang beantragen“ in die geladene Konfiguration (nach dem Speichern). */
+export function applyRegistration(enabled: boolean): void {
+  if (!config) return;
+  config.registration = enabled;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -2278,6 +2296,24 @@ export const api = {
 
   // Fehlermeldungen an die Betreuer der App (Issue #64), auch ohne Anmeldung
   reportForm: () => request<ReportForm>('GET', '/reports/form'),
+  // Zugang beantragen (Issue #314)
+  registrationForm: () => request<RegistrationForm>('GET', '/registration/form'),
+  register: (data: RegistrationInput) => request<{ status: 'confirm_email' | 'pending' }>('POST', '/registration', data),
+  confirmRegistration: (token: string) => request<{ status: 'pending' }>('POST', '/registration/confirm', { token }),
+  registrationStatus: (username: string, password: string) =>
+    request<RegistrationStatus>('POST', '/registration/status', { username, password }),
+  registrations: () => request<RegistrationList>('GET', '/registrations'),
+  approveRegistration: (id: number, data: { level?: Level; username?: string }) =>
+    request<{ member: { id: number; name: string; username: string; level: Level }; mailed: boolean }>(
+      'POST',
+      `/registrations/${id}/approve`,
+      data,
+    ),
+  rejectRegistration: (id: number, reason: string) =>
+    request<{ rejected: boolean; mailed: boolean }>('POST', `/registrations/${id}/reject`, { reason }),
+  registrationSettings: () => request<RegistrationSettings>('GET', '/admin/registration'),
+  setRegistrationSettings: (data: { enabled?: boolean; default_role?: Level }) =>
+    request<RegistrationSettings>('PUT', '/admin/registration', data),
   sendReport: (data: ReportInput) => request<{ queued: boolean }>('POST', '/reports', data),
 };
 
@@ -2289,6 +2325,62 @@ export interface ReportForm {
   /** Höchstgröße des Bildschirmfotos in Bytes */
   maxBytes: number;
   details: { version: string; role: string };
+}
+
+/** Zugang beantragen (Issue #314) */
+export interface RegistrationForm {
+  token: string;
+  minSeconds: number;
+  /** Mailversand eingerichtet: Bestätigung der Adresse und Ergebnis per Mail */
+  email_confirmation: boolean;
+  privacy_url: string | null;
+}
+
+export interface RegistrationInput {
+  token: string;
+  consent: boolean;
+  first_name: string;
+  last_name: string;
+  email: string;
+  username: string;
+  password: string;
+  message?: string;
+  /** Verstecktes Feld gegen Programme (bleibt leer) */
+  website?: string;
+}
+
+export interface RegistrationStatus {
+  status: 'unconfirmed' | 'pending' | 'rejected' | 'none';
+  reason?: string;
+}
+
+export interface RegistrationRequest {
+  id: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  username: string;
+  username_taken: boolean;
+  email_taken: boolean;
+  message: string;
+  created_at: string;
+  email_confirmed: boolean;
+  expires_at: string;
+}
+
+export interface RegistrationList {
+  requests: RegistrationRequest[];
+  default_role: Level;
+  email_confirmation: boolean;
+}
+
+export interface RegistrationSettings {
+  enabled: boolean;
+  default_role: Level;
+  email_confirmation: boolean;
+  pending: number;
+  link: string;
 }
 
 export interface ReportInput {
@@ -2311,6 +2403,7 @@ export type PushType =
   | 'birthdays'
   | 'gallery_review'
   | 'gallery_submissions'
+  | 'registrations'
   | 'penalties'
   | 'points'
   | 'ranks'

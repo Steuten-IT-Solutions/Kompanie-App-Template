@@ -6115,3 +6115,21 @@ button.spotlight-person:focus-visible {
 .page-meta .badge {
   margin-left: 0;
 }
+
+/* Zugang beantragen (Issue #314) */
+.registration-hint {
+  margin: 4px 0 12px;
+  text-align: center;
+}
+.registration-request .registration-message {
+  white-space: pre-line;
+  margin: 8px 0;
+}
+.registration-result {
+  margin: 0;
+}
+.settings-link-code {
+  display: block;
+  overflow-wrap: anywhere;
+  margin: 4px 0 8px;
+}

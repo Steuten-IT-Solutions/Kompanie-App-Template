@@ -47,6 +47,12 @@ export function adminTabs(): AdminTab[] {
     [
       { id: 'mitglieder', label: 'Mitglieder', on: memberListAllowed() },
       { id: 'ehemalige', label: 'Ehemalige', on: can('create_users') },
+      // Anfragen auf einen Zugang (Issue #314): mit Zahl der offenen; auch nach dem Ausschalten, solange welche warten
+      {
+        id: 'anfragen',
+        label: config?.pendingRegistrations ? `Anfragen (${config.pendingRegistrations})` : 'Anfragen',
+        on: can('create_users') && (!!config?.registration || (config?.pendingRegistrations ?? 0) > 0),
+      },
       { id: 'punkte', label: `${sec.points} +`, on: points },
       { id: 'strafe', label: `${sec.penalties} +`, on: canPenalties() },
       { id: 'katalog', label: `${sec.points}katalog`, on: points, group: SETUP },

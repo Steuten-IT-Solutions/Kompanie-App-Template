@@ -38,10 +38,12 @@ Tippe unten auf **Verwaltung**, dann auf **Mitglieder** und über der Liste auf 
 - Persönliche Angaben (E-Mail-Adresse, Handynummer, Adresse, Geburtstag) trägst du beim Anlegen ein; danach sieht sie auf der Seite des Mitglieds nur, wer das Recht **Persönliche Angaben sehen** hat, und ändern darf sie, wer **Persönliche Angaben pflegen** hat. Die E-Mail-Adresse siehst du weiter unter **Konto und Rolle**. Tippst du dort auf die Adresse, zeigt die Karten-App den Ort: Auf Android wählst du die App aus (z. B. Google Maps oder Waze), auf iPhone und Mac öffnet sich Apple Karten, am PC Google Maps.
 - Das Startpasswort steht **nur dieses eine Mal** da. Eine E-Mail verschickt die App nicht. **Teilen …** gibt es nur, wenn dein Gerät es kann.
 - Andere Rollen vergibt danach, wer Rollen vergeben darf (unter **Konto und Rolle** auf der Seite des Mitglieds).
+- Ist **Zugang beantragen** eingeschaltet, können Personen ihren Zugang auch selbst beantragen; du gibst ihn dann nur noch frei (siehe [Anfragen auf einen Zugang](seite:anfragen-freigeben)).
 - Wie die neue Person die App aufs Handy holt und sich anmeldet, steht unter [App installieren](seite:app-installieren) und [Mein Konto](seite:anmelden-und-konto).
 - Bitte lade ein Foto nur mit dem Einverständnis der Person hoch. Erlaubt sind JPG, PNG und WebP.
 
 ## Siehe auch
 - [Mitgliederliste](seite:mitgliederliste)
+- [Anfragen auf einen Zugang](seite:anfragen-freigeben)
 - [Seite eines Mitglieds](seite:mitglied-uebersicht)
 - [Ehemalige](seite:ehemalige-mitglieder)
