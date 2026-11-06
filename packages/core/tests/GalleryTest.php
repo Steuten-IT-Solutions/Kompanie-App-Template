@@ -286,7 +286,7 @@ final class GalleryTest extends TestCase
         $this->assertSame([], $pdo->writes(), 'Abgleich ohne Änderungen schreibt nichts in die Datenbank');
         $this->assertSame([], $pdo->transactions, 'und öffnet keine Transaktion (SQLite: keine Schreibsperre)');
         $this->assertSame(3, count(preg_grep('/FROM kompanie_photos WHERE drive_file_id IN/', $pdo->log)), 'eine Abfrage je Album für die vorhandenen Bilder');
-        $this->assertSame(['SELECT * FROM kompanie_albums'], array_values(preg_grep('/FROM kompanie_albums/', $pdo->log)), 'alle Alben mit einer Abfrage');
+        $this->assertSame(["SELECT * FROM kompanie_albums WHERE source = 'drive'"], array_values(preg_grep('/FROM kompanie_albums/', $pdo->log)), 'alle Alben aus Drive mit einer Abfrage');
         // gemessen: 3 Alben → 7 Abfragen (vorher 10 und 4 Transaktionen; bei 23 Alben 27 statt 50 und 24)
         $this->assertCount(7, $pdo->log);
 

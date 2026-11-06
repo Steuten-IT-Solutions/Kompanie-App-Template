@@ -49,6 +49,16 @@ use KompanieApp\Core\Storage\GalleryRepository;
 final class GalleryService
 {
     public const ROOT_SETTING = 'gallery_root';
+    /** Quelle der Galerie (Issue #285): Google Drive (Abgleich, dazu Alben der App) oder nur der eigene Server. */
+    public const SOURCE_SETTING = 'gallery_source';
+    public const SOURCE_DRIVE = 'drive';
+    public const SOURCE_SERVER = 'server';
+    public const SOURCES = [self::SOURCE_DRIVE, self::SOURCE_SERVER];
+    /** Ablageort hochgeladener Bilder; vorerst nur der eigene Server (MediaStore), weitere später. */
+    public const STORE_SETTING = 'gallery_store';
+    public const STORES = ['server'];
+    /** Präfix von photos.drive_file_id bei hochgeladenen Bildern (die Spalte ist NOT NULL UNIQUE). */
+    public const UPLOAD_PREFIX = 'upload:';
     public const STATUS_SETTING = 'gallery_status';
     public const TASK = 'gallery_sync';
     /** Nur aufbereiten (ohne Abgleich mit Drive); läuft bei ausstehenden Bildern bald wieder. */
@@ -103,9 +113,73 @@ final class GalleryService
     ) {
     }
 
+    /**
+     * Nutzbar: mit Drive als Quelle, sobald Ordner und Zugang eingerichtet sind; mit dem eigenen Server immer (Alben
+     * der App, Issue #285).
+     */
     public function isConfigured(): bool
     {
-        return $this->root() !== '' && $this->source->hasCredentials();
+        return $this->driveConfigured() || $this->sourceType() === self::SOURCE_SERVER;
+    }
+
+    /** Gleicht die Galerie mit Drive ab? */
+    public function driveConfigured(): bool
+    {
+        return $this->sourceType() === self::SOURCE_DRIVE && $this->root() !== '' && $this->source->hasCredentials();
+    }
+
+    public function sourceType(): string
+    {
+        $v = (string) $this->settings->get(self::SOURCE_SETTING, self::SOURCE_DRIVE);
+        return in_array($v, self::SOURCES, true) ? $v : self::SOURCE_DRIVE;
+    }
+
+    public function store(): string
+    {
+        return self::STORES[0];
+    }
+
+    /** Ablage der hochgeladenen Bilder. */
+    public function media(): MediaStore
+    {
+        return $this->media ?? throw new \RuntimeException('Keine Ablage für hochgeladene Bilder eingerichtet.');
+    }
+
+    /** Belegter Platz der hochgeladenen Bilder in Bytes (Statusseite). */
+    public function mediaBytes(): int
+    {
+        return $this->media?->bytes() ?? 0;
+    }
+
+    /** @param array<string, mixed> $photo */
+    public static function isUpload(array $photo): bool
+    {
+        return ($photo['source'] ?? 'drive') === 'upload' || str_starts_with((string) ($photo['drive_file_id'] ?? ''), self::UPLOAD_PREFIX);
+    }
+
+    /** @param array<string, mixed> $photo */
+    public static function uploadKey(array $photo): string
+    {
+        return substr((string) $photo['drive_file_id'], strlen(self::UPLOAD_PREFIX));
+    }
+
+    /**
+     * Original als temporäre Datei, die der Aufrufer löscht: hochgeladene aus der Ablage, sonst aus der Quelle.
+     *
+     * @param array<string, mixed> $photo
+     */
+    private function fetchOriginal(array $photo): string
+    {
+        if (!self::isUpload($photo)) {
+            return $this->source->download((string) $photo['drive_file_id']);
+        }
+        $path = $this->media()->path(self::uploadKey($photo)) ?? throw new \RuntimeException('Die hochgeladene Datei fehlt.');
+        $tmp = $this->files->tempFile();
+        if (!@copy($path, $tmp)) {
+            @unlink($tmp);
+            throw new \RuntimeException('Die hochgeladene Datei lässt sich nicht lesen.');
+        }
+        return $tmp;
     }
 
     public function root(): string
@@ -136,10 +210,12 @@ final class GalleryService
         if (!$this->isConfigured()) {
             return;
         }
-        try {
-            $this->sync();
-        } catch (\RuntimeException) {
-            // Fehler steht im Status; die Aufbereitung läuft trotzdem weiter.
+        if ($this->driveConfigured()) {
+            try {
+                $this->sync();
+            } catch (\RuntimeException) {
+                // Fehler steht im Status; die Aufbereitung läuft trotzdem weiter.
+            }
         }
         $this->processPending($budgetSeconds);
         $this->continueSoon();
@@ -421,7 +497,8 @@ final class GalleryService
             'error' => (string) $p['error'],
             'attempts' => (int) $p['attempts'],
             'unsupported' => (string) $p['error'] === self::UNSUPPORTED_VIDEO,
-            'drive_url' => $this->source->fileUrl((string) $p['drive_file_id']),
+            // Hochgeladene Bilder liegen in keiner Quelle: keine Adresse
+            'drive_url' => self::isUpload($p) ? '' : $this->source->fileUrl((string) $p['drive_file_id']),
         ], $this->repo->failedPhotos($limit)));
     }
 
@@ -516,7 +593,7 @@ final class GalleryService
         // beim nächsten Lauf nach den anderen dran (nextPending) und hält sie nicht auf.
         $this->repo->updatePhoto((int) $photo['id'], ['attempts' => $attempts + 1]);
         try {
-            $tmp = $this->source->download((string) $photo['drive_file_id']);
+            $tmp = $this->fetchOriginal($photo);
         } catch (\RuntimeException $e) {
             return $this->markFailed($photo, $e->getMessage());
         }
@@ -593,6 +670,9 @@ final class GalleryService
     /** @return array{width: int, height: int}|null */
     private function fromDriveThumbnail(array $photo): ?array
     {
+        if (self::isUpload($photo)) {
+            return null; // hochgeladen: kein Vorschaubild einer Quelle
+        }
         try {
             $thumb = $this->source->thumbnail((string) $photo['drive_file_id'], self::SIZES['large']);
         } catch (\RuntimeException) {
@@ -919,7 +999,7 @@ final class GalleryService
     private function renderOriginal(array $photo, string $target): bool
     {
         try {
-            $tmp = $this->source->download((string) $photo['drive_file_id']);
+            $tmp = $this->fetchOriginal($photo);
         } catch (\RuntimeException) {
             return false;
         }
@@ -1137,13 +1217,13 @@ final class GalleryService
         ];
     }
 
-    /** Alles entfernen (Index und Dateien), z. B. beim Wechsel des Ordners. */
+    /** Alles aus Drive entfernen (Index und Dateien), z. B. beim Wechsel des Ordners; hochgeladene Bilder bleiben. */
     public function reset(): void
     {
-        foreach ($this->repo->allPhotos() as $photo) {
+        foreach ($this->repo->drivePhotos() as $photo) {
             $this->deleteFiles($photo);
         }
-        $this->repo->clear();
+        $this->repo->clearDrive();
         $this->settings->delete(self::STATUS_SETTING);
     }
 }

@@ -4934,6 +4934,8 @@ paths:
                 drive_service_account: { type: string, description: JSON-Schlüssel des Dienstkontos }
                 drive_oauth: { type: string, enum: [''], description: 'Leer trennt die OAuth-Verbindung zu Google wie POST /admin/google/disconnect (Widerruf bei Google, der Client bleibt gespeichert)' }
                 gallery_root: { type: string, description: Link oder ID des Galerie-Ordners in Google Drive }
+                gallery_source: { type: string, enum: [drive, server], description: 'Quelle der Galerie: Google Drive oder eigener Server (nur Alben der App und hochgeladene Bilder). Der Wechsel zu server entfernt Alben und Bilder aus Drive aus der App; hochgeladene bleiben.' }
+                gallery_store: { type: string, enum: [server], description: Ablageort für hochgeladene Bilder (heute nur der eigene Server) }
                 news_source: { type: string, enum: [none, wordpress, rss], description: Nur eigenständige Version }
                 news_url: { type: string, description: Nur eigenständige Version }
                 legal_imprint_url: { type: string, description: 'Link auf das Impressum (http:// oder https://, höchstens 255 Zeichen); leer entfernt ihn' }
@@ -5138,6 +5140,141 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
+
+  /admin/gallery/albums:
+    get:
+      tags: [Einstellungen]
+      summary: Alle Alben mit Herkunft und Anzahl der Bilder
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [albums]
+                properties:
+                  albums:
+                    type: array
+                    items: { $ref: '#/components/schemas/GalleryAdminAlbum' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Einstellungen]
+      summary: Album nur in der App anlegen
+      description: Der Abgleich mit Google Drive lässt Alben der App in Ruhe.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GalleryAlbumInput' }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GalleryAdminAlbumDetail' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/gallery/albums/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Einstellungen]
+      summary: Album mit seinen hochgeladenen Bildern
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GalleryAdminAlbumDetail' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Einstellungen]
+      summary: Titel oder Jahr eines Albums der App ändern
+      description: Alben aus Google Drive ändert man in Drive (400).
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GalleryAlbumInput' }
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GalleryAdminAlbumDetail' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Einstellungen]
+      summary: Album der App mit allen Bildern darin löschen
+      description: Alben aus Google Drive lassen sich hier nicht löschen (400).
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/gallery/albums/{id}/photos:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Einstellungen]
+      summary: Ein Bild in ein Album hochladen (auch in eines aus Google Drive)
+      description: 'JPG, PNG oder WebP. Der Server prüft Format, Größe und Arbeitsspeicher, kodiert das Bild neu als JPEG ohne Metadaten (auch ohne Aufnahmeort) und bereitet es danach wie Bilder aus Drive auf.'
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: object
+                  required: [name, data]
+                  properties:
+                    name: { type: string, description: Dateiname mit Endung .jpg, .jpeg, .png oder .webp }
+                    data: { type: string, description: 'Inhalt als Base64, auch als data:-Adresse' }
+                intern: { type: boolean, description: Nur für Mitglieder sichtbar }
+      responses:
+        '201':
+          description: Album mit seinen hochgeladenen Bildern
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GalleryAdminAlbumDetail' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/gallery/photos/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    delete:
+      tags: [Einstellungen]
+      summary: Ein hochgeladenes Bild löschen
+      description: Nur hochgeladene Bilder (Bilder aus Drive kämen beim nächsten Abgleich wieder; sonst 404).
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
 
   /admin/push:
     get:
@@ -6448,6 +6585,41 @@ components:
             Nur WordPress: `use_login_page` (400).
         message: { type: string, description: Für Menschen lesbar, in der Sprache der Kompanie }
 
+    GalleryAlbumInput:
+      type: object
+      properties:
+        title: { type: string, maxLength: 120 }
+        year: { type: integer, minimum: 1800, description: höchstens das nächste Jahr }
+    GalleryAdminAlbum:
+      type: object
+      required: [id, title, year, source, uploads, drive_photos]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        year: { type: string }
+        source: { type: string, enum: [app, drive], description: 'app: nur in der App; drive: aus Google Drive' }
+        uploads: { type: integer, description: Anzahl hochgeladener Bilder }
+        drive_photos: { type: integer, description: Anzahl Bilder aus Drive }
+    GalleryAdminAlbumDetail:
+      type: object
+      required: [id, title, year, source, uploads]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        year: { type: string }
+        source: { type: string, enum: [app, drive] }
+        uploads:
+          type: array
+          items:
+            type: object
+            required: [id, name, intern, thumb, status, error]
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              intern: { type: boolean }
+              thumb: { type: string, description: Adresse des Vorschaubilds }
+              status: { type: string, enum: [pending, ready, error] }
+              error: { type: string }
     AdminSettings:
       type: object
       required: [google, calendar, gallery, news]
@@ -6491,8 +6663,11 @@ components:
         gallery:
           type: object
           properties:
-            configured: { type: boolean }
+            configured: { type: boolean, description: 'Quelle server immer, Quelle drive mit Zugang und Ordner' }
             root: { type: string }
+            source: { type: string, enum: [drive, server] }
+            store: { type: string, enum: [server] }
+            media_bytes: { type: integer, description: Belegter Platz der hochgeladenen Bilder in Bytes }
             service_account_email: { type: string, description: wie google.service_account_email (für ältere Fassungen der App) }
             oauth_connected: { type: boolean, description: 'wie google.connected: OAuth-Verbindung zu Google (geht dem Dienstkonto vor)' }
             oauth_email: { type: string, description: Google-Konto der OAuth-Verbindung, leer wenn unbekannt }

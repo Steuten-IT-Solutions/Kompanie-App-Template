@@ -5956,3 +5956,49 @@ button.spotlight-person:focus-visible {
   flex-wrap: wrap;
   gap: 6px;
 }
+
+/* Alben und eigene Bilder in Einstellungen → Galerie (Issue #285) */
+.gallery-album-list,
+.gallery-upload-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+.gallery-album-item {
+  border-top: 1px solid var(--line);
+}
+.gallery-album-head {
+  display: block;
+  width: 100%;
+  padding: 10px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.gallery-album-body {
+  display: grid;
+  gap: 10px;
+  padding: 0 0 12px;
+}
+.gallery-upload {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+.gallery-upload img {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--line);
+}
+.gallery-upload .small {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

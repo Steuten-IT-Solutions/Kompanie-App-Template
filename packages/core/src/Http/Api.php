@@ -1200,6 +1200,20 @@ final class Api
             new Route('GET', '/admin/gallery/failed', Cap::ManageSettings, fn () => ['photos' => $a->gallery()->failedPhotos(), 'total' => $a->gallery()->countFailed()], null, $denySettings),
             new Route('POST', '/admin/gallery/retry', Cap::ManageSettings, fn () => ['retried' => $a->gallery()->retryFailedNow(), 'pending' => $a->gallery()->countPending()], null, $denySettings),
             new Route('POST', '/admin/gallery/sync', Cap::ManageSettings, fn (Request $r) => $a->settingsService()->syncGallery(Input::bool($r->input('only_process'))), null, $denySettings),
+            // Alben der App und hochgeladene Bilder (Issue #285)
+            new Route('GET', '/admin/gallery/albums', Cap::ManageSettings, fn () => ['albums' => $a->galleryUploads()->albums()], null, $denySettings),
+            new Route('POST', '/admin/gallery/albums', Cap::ManageSettings, fn (Request $r) => Response::created($a->galleryUploads()->createAlbum($r->body)), null, $denySettings),
+            new Route('GET', '/admin/gallery/albums/{id}', Cap::ManageSettings, fn (Request $r) => $a->galleryUploads()->album($r->id()), null, $denySettings),
+            new Route('PATCH', '/admin/gallery/albums/{id}', Cap::ManageSettings, fn (Request $r) => $a->galleryUploads()->updateAlbum($r->id(), $r->body), null, $denySettings),
+            new Route('DELETE', '/admin/gallery/albums/{id}', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->galleryUploads()->deleteAlbum($r->id());
+                return ['deleted' => true];
+            }, null, $denySettings),
+            new Route('POST', '/admin/gallery/albums/{id}/photos', Cap::ManageSettings, fn (Request $r) => Response::created($a->galleryUploads()->upload($r->id(), $r->input('file'), Input::bool($r->input('intern')))), null, $denySettings),
+            new Route('DELETE', '/admin/gallery/photos/{id}', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->galleryUploads()->deletePhoto($r->id());
+                return ['deleted' => true];
+            }, null, $denySettings),
 
             // Status, Updates, Datensicherung, Einrichtung (Admins)
             new Route('GET', '/admin/status', Cap::ManageSettings, fn () => $a->status()->report() + [

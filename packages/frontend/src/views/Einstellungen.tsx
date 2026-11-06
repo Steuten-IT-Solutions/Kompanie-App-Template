@@ -10,6 +10,7 @@ import {
   refreshRoles,
   type AdminSettings,
   type FailedPhoto,
+  type GallerySourceType,
   type Feature,
   type FeatureInfo,
   type MailSettings,
@@ -23,6 +24,7 @@ import NavigationEinstellen from './NavigationEinstellen';
 import Rollen from './Rollen';
 import Wartung from './Wartung';
 import Nutzung from './Nutzung';
+import GalleryAlbums from './GalerieAlben';
 import { MaintenanceCard } from '../maintenance';
 import { navigate } from '../router';
 import { formatBytes, formatUntil } from '../format';
@@ -146,7 +148,13 @@ function Verbindung({
   const props = { settings: s, onSaved: setData, onToast };
   if (page === 'google') return <GoogleAccess key={revision} {...props} />;
   if (page === 'kalender') return <Calendar key={revision} {...props} />;
-  if (page === 'galerie') return <Gallery key={revision} {...props} />;
+  if (page === 'galerie')
+    return (
+      <>
+        <Gallery key={revision} {...props} />
+        {s.gallery.source !== undefined && <GalleryAlbums onToast={onToast} />}
+      </>
+    );
   if (page === 'rechtliches') return <Legal key={revision} {...props} />;
   return s.news ? <News key={revision} {...props} /> : null;
 }
@@ -1082,6 +1090,7 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
 export function Gallery({ settings, onSaved, onToast }: SectionProps) {
   const g = settings.gallery;
   const [root, setRoot] = useState(g.root);
+  const [source, setSource] = useState<GallerySourceType>(g.source ?? 'drive');
   const [progress, setProgress] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const { busy, error, setError, save } = useSave(onSaved, onToast);
@@ -1114,42 +1123,79 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
   return (
     <Section
       id="galerie"
-      title={`${sec.gallery} aus Google Drive`}
+      title={sec.gallery}
       busy={busy}
       error={error}
       onSubmit={(e) => {
         e.preventDefault();
-        save({ gallery_root: root.trim() });
+        if (
+          source === 'server' &&
+          (g.source ?? 'drive') === 'drive' &&
+          !window.confirm(
+            'Nur noch der eigene Server? Alben und Bilder aus Google Drive verschwinden aus der App; hochgeladene Bilder bleiben.',
+          )
+        )
+          return;
+        save(
+          g.source === undefined
+            ? { gallery_root: root.trim() }
+            : { gallery_source: source, gallery_store: 'server', ...(source === 'drive' ? { gallery_root: root.trim() } : {}) },
+        );
       }}
     >
-      <p className="muted small">
-        Hier den Link zum Galerie-Ordner in Google Drive eintragen. Darin je Jahr ein Ordner, darin je Album ein Ordner; Bilder im
-        Unterordner <em>intern</em> sehen nur Mitglieder.
-      </p>
-      <p className="small">
-        {access ? (
-          <>
-            Gelesen wird über {access} (<GoogleLink />
-            ).
-          </>
-        ) : (
-          <>
-            Noch kein Zugang zu Google: zuerst unter <GoogleLink /> mit Google verbinden oder ein Dienstkonto hinterlegen.
-          </>
-        )}
-      </p>
-      <label className="field">
-        <span>Link zum Galerie-Ordner</span>
-        <input
-          type="text"
-          autoComplete="off"
-          placeholder="https://drive.google.com/drive/folders/…"
-          value={root}
-          onChange={(e) => setRoot(e.target.value)}
-        />
-      </label>
-      {g.status.error && <p className="form-error small">Letzter Abgleich: {g.status.error}</p>}
-      {g.configured && (
+      {g.source !== undefined && (
+        <>
+          <label className="field">
+            <span>Quelle</span>
+            <select value={source} onChange={(e) => setSource(e.target.value as GallerySourceType)}>
+              <option value="drive">Google Drive (dazu Alben der App)</option>
+              <option value="server">Eigener Server (nur Alben der App)</option>
+            </select>
+          </label>
+          <label className="field">
+            <span>Ablageort für hochgeladene Bilder</span>
+            <select value="server" disabled>
+              <option value="server">Eigener Server</option>
+            </select>
+          </label>
+          <p className="muted small">
+            Hochgeladene Bilder belegen {formatBytes(g.media_bytes ?? 0)}. Die App setzt keine Grenze; behalte den Speicherplatz deines
+            Webspace im Blick. Sie sind in der Sicherung enthalten.
+          </p>
+        </>
+      )}
+      {source === 'drive' && (
+        <>
+          <p className="muted small">
+            Hier den Link zum Galerie-Ordner in Google Drive eintragen. Darin je Jahr ein Ordner, darin je Album ein Ordner; Bilder im
+            Unterordner <em>intern</em> sehen nur Mitglieder.
+          </p>
+          <p className="small">
+            {access ? (
+              <>
+                Gelesen wird über {access} (<GoogleLink />
+                ).
+              </>
+            ) : (
+              <>
+                Noch kein Zugang zu Google: zuerst unter <GoogleLink /> mit Google verbinden oder ein Dienstkonto hinterlegen.
+              </>
+            )}
+          </p>
+          <label className="field">
+            <span>Link zum Galerie-Ordner</span>
+            <input
+              type="text"
+              autoComplete="off"
+              placeholder="https://drive.google.com/drive/folders/…"
+              value={root}
+              onChange={(e) => setRoot(e.target.value)}
+            />
+          </label>
+        </>
+      )}
+      {source === 'drive' && g.status.error && <p className="form-error small">Letzter Abgleich: {g.status.error}</p>}
+      {g.configured && source === 'drive' && (
         <button type="button" className="btn btn-secondary" onClick={sync} disabled={syncing}>
           {syncing ? 'Gleicht ab …' : 'Jetzt abgleichen'}
         </button>
@@ -1221,9 +1267,13 @@ function FailedPhotos({ count, disabled, onRetry }: { count: number; disabled: b
                 </span>
                 <br />
                 <span className="small">{p.error || 'ohne Fehlermeldung'}</span>{' '}
-                <a className="small" href={p.drive_url} target="_blank" rel="noopener noreferrer">
-                  In Google Drive öffnen
-                </a>
+                {p.drive_url ? (
+                  <a className="small" href={p.drive_url} target="_blank" rel="noopener noreferrer">
+                    In Google Drive öffnen
+                  </a>
+                ) : (
+                  <span className="small muted">hochgeladen</span>
+                )}
               </li>
             ))}
           </ul>

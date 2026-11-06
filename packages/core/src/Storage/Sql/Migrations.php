@@ -1566,6 +1566,19 @@ WHERE title IS NULL",
                 'mysql' => ['ALTER TABLE {office_holders} ADD COLUMN image_uid varchar(32) DEFAULT NULL'],
                 'sqlite' => ['ALTER TABLE {office_holders} ADD COLUMN image_uid TEXT DEFAULT NULL'],
             ],
+            // Galerie-Quelle „eigener Server“ (Issue #285): Herkunft je Bild (drive aus dem Abgleich, upload in der App
+            // hochgeladen; drive_file_id dann „upload:<Schlüssel>“) und je Album (drive, app: nur in der App, drive_id
+            // „app:<Kennung>“). Der Abgleich mit Drive ändert und löscht nur, was aus Drive kommt.
+            42 => [
+                'mysql' => [
+                    "ALTER TABLE {photos} ADD COLUMN source varchar(10) NOT NULL DEFAULT 'drive'",
+                    "ALTER TABLE {albums} ADD COLUMN source varchar(10) NOT NULL DEFAULT 'drive'",
+                ],
+                'sqlite' => [
+                    "ALTER TABLE {photos} ADD COLUMN source TEXT NOT NULL DEFAULT 'drive'",
+                    "ALTER TABLE {albums} ADD COLUMN source TEXT NOT NULL DEFAULT 'drive'",
+                ],
+            ],
         ];
     }
 

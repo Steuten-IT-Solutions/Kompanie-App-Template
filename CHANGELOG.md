@@ -17,6 +17,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Galerie ohne Google Drive und eigene Bilder**: Unter *Einstellungen → Galerie* wählst du als Quelle *Google
+  Drive* oder *eigener Server*. Mit beiden Quellen legst du dort Alben nur in der App an und lädst Bilder (JPG, PNG,
+  WebP) in jedes Album hoch, auch in eines aus Drive, öffentlich oder nur für Mitglieder. Der Server entfernt beim
+  Hochladen Metadaten wie den Aufnahmeort. Der Abgleich mit Drive lässt hochgeladene Bilder in Ruhe, und die Sicherung
+  enthält sie. Mit *eigener Server* braucht die Galerie keinen Google-Zugang.
+
 - **Fotos für Personen ohne Konto in den Ämtern**: Unter *Verwaltung → Einrichtungen → Ämter* lädst du bei einer
   Amtszeit für Personen ohne Profil (z. B. frühere Mitglieder oder Hofdamen) ein Foto hoch. Steht derselbe Name schon
   mit Foto in einer früheren Amtszeit, bietet die App an, es zu übernehmen. Die Fotos sind wie die Ämter für alle

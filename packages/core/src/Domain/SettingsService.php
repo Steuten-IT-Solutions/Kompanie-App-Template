@@ -57,6 +57,10 @@ final class SettingsService
             'gallery' => [
                 'configured' => $a->gallery()->isConfigured(),
                 'root' => $a->gallery()->root(),
+                // Quelle und Ablageort (Issue #285); belegter Platz der hochgeladenen Bilder
+                'source' => $a->gallery()->sourceType(),
+                'store' => $a->gallery()->store(),
+                'media_bytes' => $a->gallery()->mediaBytes(),
                 // Wie google.* (für ältere Fassungen der App)
                 'service_account_email' => $drive->clientEmail(),
                 'oauth_connected' => $drive->oauth() !== null,
@@ -154,6 +158,16 @@ final class SettingsService
                 throw ApiError::invalid('Der Galerie-Ordner wurde nicht erkannt. Bitte den Link zum Ordner aus Google Drive einfügen.');
             }
         }
+        $gallerySource = null;
+        if (array_key_exists('gallery_source', $in)) {
+            if (!in_array($in['gallery_source'], GalleryService::SOURCES, true)) {
+                throw ApiError::invalid('Unbekannte Quelle für die Galerie.');
+            }
+            $gallerySource = (string) $in['gallery_source'];
+        }
+        if (array_key_exists('gallery_store', $in) && !in_array($in['gallery_store'], GalleryService::STORES, true)) {
+            throw ApiError::invalid('Unbekannter Ablageort für hochgeladene Bilder.');
+        }
         if ($news && array_key_exists('news_source', $in)) {
             if (!in_array($in['news_source'], RemoteNewsSource::SOURCES, true)) {
                 throw ApiError::invalid('Unbekannte Quelle für Neuigkeiten.');
@@ -190,6 +204,14 @@ final class SettingsService
             // Trennen wie POST /admin/google/disconnect: bei Google widerrufen, der Client bleibt gespeichert.
             $a->drive()->disconnect();
             $a->settings->delete(GoogleConnect::RESULT_SETTING);
+        }
+        if ($gallerySource !== null && $gallerySource !== $a->gallery()->sourceType()) {
+            $a->settings->set(GalleryService::SOURCE_SETTING, $gallerySource);
+            // Nur noch der eigene Server: Alben und Bilder aus Drive verschwinden, hochgeladene bleiben. Zurück zu Drive
+            // holt der nächste Abgleich sie wieder.
+            if ($gallerySource === GalleryService::SOURCE_SERVER) {
+                $a->gallery()->reset();
+            }
         }
         if ($root !== null) {
             $before = $a->gallery()->root();
@@ -242,7 +264,8 @@ final class SettingsService
             @set_time_limit(120);
         }
         try {
-            $stats = $onlyProcess ? $g->status() : $g->sync();
+            // Ohne Drive (eigener Server) nur aufbereiten
+            $stats = $onlyProcess || !$g->driveConfigured() ? $g->status() : $g->sync();
         } catch (\RuntimeException $e) {
             throw ApiError::upstream($e->getMessage());
         }
