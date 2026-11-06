@@ -4332,6 +4332,11 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast öffnet die Seite
   await expect(description).toContainText('Seit 1905 dabei.');
   await form.getByRole('button', { name: 'Anlegen' }).click();
   await expect(page.locator('.toast')).toHaveText('Kompanie angelegt');
+  // Zweite Kompanie für Suche und Sortierung der Liste (steht in der Reihenfolge der Verwaltung hinten)
+  await form.getByLabel('Name', { exact: true }).fill('Alte Garde');
+  await form.getByLabel(/^Gründungsjahr/).fill('1880');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.row', { has: page.getByText('Alte Garde', { exact: true }) })).toContainText('gegründet 1880');
   const row = page.locator('.row', { has: page.getByText('Testkompanie', { exact: true }) });
   await expect(row).toContainText('TK · gegründet 1905 · 0 Mitglieder');
   await row.getByRole('button', { name: 'Mitglieder' }).click();
@@ -4348,6 +4353,22 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast öffnet die Seite
     await page.locator('.tabbar').getByRole('button', { name: 'Kompanien' }).click();
     const card = page.locator('.company-card', { hasText: 'Testkompanie' });
     await expect(card).toContainText('TK · gegründet 1905 · 1 Mitglieder');
+    // Suche und Sortierung wie in der Mitgliederliste: zuerst wie festgelegt, dann nach Name, nach Gründung jüngste zuerst
+    const names = page.locator('.company-list .company-card .row-title');
+    await expect(names).toHaveText(['Testkompanie', 'Alte Garde']);
+    const sortSelect = page.getByRole('combobox', { name: 'Sortierung' });
+    await sortSelect.selectOption({ label: 'Name' });
+    await expect(names).toHaveText(['Alte Garde', 'Testkompanie']);
+    await sortSelect.selectOption({ label: 'Gründung' });
+    await page.getByRole('button', { name: 'Reihenfolge Älteste zuerst' }).click();
+    await expect(names).toHaveText(['Testkompanie', 'Alte Garde']);
+    await sortSelect.selectOption({ label: 'Wie festgelegt' });
+    const search = page.getByRole('searchbox', { name: 'Kompanien suchen' });
+    await search.fill('tk');
+    await expect(names).toHaveText(['Testkompanie']);
+    await search.fill('xyz');
+    await expect(page.locator('.company-list')).toContainText('Nichts gefunden.');
+    await search.fill('');
     // Antippen öffnet die eigene Seite der Kompanie (statt Aufklappen), zurück zur Liste
     await card.getByRole('button', { name: /Testkompanie/ }).click();
     await expect(page).toHaveURL(/#\/kompanien\/\d+$/);
@@ -4389,12 +4410,15 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast öffnet die Seite
   } finally {
     await login(page, 'admin', ADMIN_PASSWORD);
     await adminMenu(page, 'Kompanien');
-    page.once('dialog', (d) => d.accept());
-    await page
-      .locator('.row', { has: page.getByText('Testkompanie', { exact: true }) })
-      .getByRole('button', { name: 'Löschen' })
-      .click();
-    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+    for (const name of ['Testkompanie', 'Alte Garde']) {
+      page.once('dialog', (d) => d.accept());
+      await page
+        .locator('.row', { has: page.getByText(name, { exact: true }) })
+        .getByRole('button', { name: 'Löschen' })
+        .click();
+      await expect(page.locator('.toast')).toHaveText('Gelöscht');
+      await expect(page.locator('.toast')).toHaveCount(0);
+    }
   }
 });
 
