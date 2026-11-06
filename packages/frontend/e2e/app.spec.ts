@@ -4259,7 +4259,17 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast sieht Karte mit B
   await form.getByRole('button', { name: 'Anlegen' }).click();
   await expect(page.getByRole('alert')).toContainText('https://');
   await form.getByLabel(/^Webseite/).fill('https://kompanie.example/');
-  await form.getByRole('textbox', { name: 'Beschreibung (optional)' }).fill('Gegründet zum Schützenfest.');
+  const description = form.getByRole('textbox', { name: 'Beschreibung (optional)' });
+  await description.fill('Gegründet zum Schützenfest.');
+  // Von einer Webseite eingefügt: dunkle Schrift mit großem Zeilenabstand (im dunklen Design schlecht lesbar)
+  await description.press('End');
+  await description.evaluate((el) => {
+    const data = new DataTransfer();
+    data.setData('text/html', '<span style="color: rgb(51, 85, 34); line-height: 2.6">Seit 1905 dabei.</span>');
+    data.setData('text/plain', 'Seit 1905 dabei.');
+    el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect(description).toContainText('Seit 1905 dabei.');
   await form.getByRole('button', { name: 'Anlegen' }).click();
   await expect(page.locator('.toast')).toHaveText('Kompanie angelegt');
   const row = page.locator('.row', { has: page.getByText('Testkompanie', { exact: true }) });
@@ -4281,6 +4291,22 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast sieht Karte mit B
     await card.locator('summary').click();
     await expect(card).toContainText('Gegründet zum Schützenfest.');
     await expect(card.getByRole('link', { name: 'Webseite' })).toHaveAttribute('href', 'https://kompanie.example/');
+    await expect(card.getByRole('link', { name: 'Webseite' })).toHaveClass(/\bbtn\b/);
+    // Eingefügte Farbe: hell lesbar und angezeigt, dunkel zu wenig Kontrast und entfernt; großer Zeilenabstand nie
+    const pasted = card.locator('.rich-text span', { hasText: 'Seit 1905 dabei.' });
+    const setTheme = (theme: 'light' | 'dark') =>
+      page.evaluate((t) => {
+        localStorage.setItem('kompanie-theme', t);
+        document.documentElement.dataset.theme = t;
+        window.dispatchEvent(new Event('kompanie-theme-changed'));
+      }, theme);
+    await setTheme('light');
+    await expect(pasted).toHaveCSS('color', 'rgb(51, 85, 34)');
+    await expect(pasted).not.toHaveAttribute('style', /line-height/);
+    await setTheme('dark');
+    await expect(pasted).not.toHaveAttribute('style', /color/);
+    await expect(pasted).not.toHaveAttribute('style', /line-height/);
+    await setTheme('light');
     await shot(page, 'kompanien');
     await card.getByRole('button', { name: 'Mitglied1' }).click();
     await expect(page.locator('.member-page-companies')).toHaveText('Testkompanie');

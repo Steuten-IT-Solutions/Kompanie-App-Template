@@ -2,6 +2,9 @@
 // zusätzlich mit DOMPurify bereinigt, bevor der Inhalt ins Dokument kommt. Links öffnen in neuem Tab.
 
 import DOMPurify from 'dompurify';
+import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useTheme } from '../theme';
+import { makeReadable } from './readable';
 
 /** Bereinigtes HTML für dangerouslySetInnerHTML. */
 export function cleanRichHtml(html: string): string {
@@ -39,6 +42,20 @@ export function cleanRichHtml(html: string): string {
   return div.innerHTML;
 }
 
+/**
+ * Formatierter Inhalt, an die Darstellung angepasst (readable.ts): Farben mit zu wenig Kontrast und übergroße
+ * Zeilenabstände aus eingefügtem Text fallen beim Anzeigen weg. Bei jedem Wechsel zwischen hell und dunkel wird der
+ * Inhalt neu eingesetzt und neu geprüft.
+ */
 export default function RichTextView({ html, className }: { html: string; className?: string }) {
-  return <div className={`rich-text${className ? ' ' + className : ''}`} dangerouslySetInnerHTML={{ __html: cleanRichHtml(html) }} />;
+  const ref = useRef<HTMLDivElement>(null);
+  const clean = useMemo(() => cleanRichHtml(html), [html]);
+  const { shown } = useTheme();
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.innerHTML = clean;
+    makeReadable(el);
+  }, [clean, shown]);
+  return <div ref={ref} className={`rich-text${className ? ' ' + className : ''}`} />;
 }
