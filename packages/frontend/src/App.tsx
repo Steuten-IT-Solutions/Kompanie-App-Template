@@ -613,6 +613,8 @@ export default function App({ notice = null }: { notice?: string | null }) {
               </div>
             )}
             {!user && brand.guestWelcome && activeTab === tabs[0]?.key && <p className="guest-welcome card">{brand.guestWelcome}</p>}
+            {/* Rückweg ins Untermenü über dem Inhalt, wie „‹ Verwaltung“ (vor allen Bereichen, die darin stehen können) */}
+            {parentMenu && menuStart && <MenuBack to={parentMenu.key} label={parentMenu.label} />}
             {tab === 'termine' &&
               (path[1] === 'verwalten' && features?.events && can('manage_events') ? (
                 <TermineVerwalten onToast={showToast} />
@@ -634,7 +636,6 @@ export default function App({ notice = null }: { notice?: string | null }) {
             {openMenu?.children && (
               <InternMenu label={openMenu.label} tabs={openMenu.children.map((v) => ({ id: v, label: targetLabels()[v] ?? v }))} />
             )}
-            {parentMenu && menuStart && <MenuBack to={parentMenu.key} label={parentMenu.label} />}
             {tab === 'dokumente' &&
               (path[1] === 'verwalten' && can('manage_documents') ? (
                 <DokumenteVerwalten onToast={showToast} />
