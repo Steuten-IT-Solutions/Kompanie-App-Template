@@ -22,6 +22,7 @@ use KompanieApp\Core\Domain\DocumentService;
 use KompanieApp\Core\Domain\DriveClient;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Features;
+use KompanieApp\Core\Domain\FileMediaStore;
 use KompanieApp\Core\Domain\FormerMemberService;
 use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Domain\GoogleConnect;
@@ -67,6 +68,7 @@ use KompanieApp\Core\Port\FileStorage;
 use KompanieApp\Core\Port\HttpClient;
 use KompanieApp\Core\Port\ImageResizer;
 use KompanieApp\Core\Port\Mailer;
+use KompanieApp\Core\Port\MediaStore;
 use KompanieApp\Core\Port\NewsSource;
 use KompanieApp\Core\Port\Scheduler;
 use KompanieApp\Core\Port\Settings;
@@ -778,7 +780,14 @@ final class App
             $this->time(),
             $this->scheduler,
             $this->cache,
+            $this->mediaStore(),
         ));
+    }
+
+    /** Eigene Originale der Galerie auf dem Server (Issue #284) */
+    public function mediaStore(): MediaStore
+    {
+        return $this->service(MediaStore::class, fn () => new FileMediaStore($this->files));
     }
 
     /**
