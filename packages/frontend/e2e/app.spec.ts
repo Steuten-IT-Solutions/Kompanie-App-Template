@@ -3362,6 +3362,8 @@ test('Galerie: Videos lassen sich herunterladen, einzeln und im ZIP des Albums',
   try {
     // Als Gast wie im Test oben (Umzug: ein Bild und ein Video)
     await page.context().clearCookies();
+    await page.goto('/app/');
+    await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
     await page.goto('/app/#/galerie');
     await page.locator('.album-card', { hasText: 'Umzug' }).click();
     await expect(page.locator('.photo')).toHaveCount(2);
