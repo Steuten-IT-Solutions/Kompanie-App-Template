@@ -15,7 +15,7 @@ Tippe unten auf **{bereich.events}**. Meist ist das auch die Startseite der App.
 
 ## Was du hier siehst
 - **Monatsüberschrift**: z. B. „Oktober 2026“; darunter die Termine dieses Monats.
-- **Termin**: links das Datum, rechts Titel, Wochentag und Uhrzeit und, falls angegeben, der Ort. Steht keine Uhrzeit dabei, dauert der Termin den ganzen Tag.
+- **Termin**: links das Datum, rechts Titel, Wochentag und Uhrzeit und, falls angegeben, der Ort. Liegt der Termin nicht im laufenden Jahr, steht auch das Jahr dabei. Steht keine Uhrzeit dabei, dauert der Termin den ganzen Tag.
 - **Bei neuen Terminen benachrichtigen** (unter der Liste, nur ohne Anmeldung): führt zu den Benachrichtigungen.
 
 ## So gehst du vor

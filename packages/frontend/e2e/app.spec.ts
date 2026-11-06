@@ -4438,6 +4438,14 @@ test('Eigene Seiten (Issue #287): anlegen öffentlich und nur für Mitglieder, j
     await intern.getByRole('button', { name: 'Uniform', exact: true }).click();
     await expect(page.locator('.page-article')).toContainText('Nur intern.');
     await expect(tabbar.getByRole('button', { name: 'Intern' })).toHaveAttribute('aria-current', 'page');
+    // „‹ Intern“ steht über dem Inhalt, nicht darunter
+    expect(
+      await page.evaluate(() => {
+        const back = document.querySelector('main.content .back');
+        const article = document.querySelector('.page-article');
+        return !!back && !!article && !!(back.compareDocumentPosition(article) & Node.DOCUMENT_POSITION_FOLLOWING);
+      }),
+    ).toBe(true);
     await page.getByRole('button', { name: '‹ Intern' }).click();
     await expect(intern.getByRole('button', { name: 'Anfahrt und Parken', exact: true })).toBeVisible();
 
