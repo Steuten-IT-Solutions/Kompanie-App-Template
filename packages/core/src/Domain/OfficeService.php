@@ -121,7 +121,7 @@ final class OfficeService
                         if ($visible) {
                             $out['photo_url'] = $photos[$user->id] ?? null;
                         }
-                        return $out;
+                        return $out + ($user === null ? $this->holderPhoto($h, $manager) : []);
                     }, $holders[$t['id']] ?? [])];
                 }, $terms),
             ] + ($manager ? ['title_id' => $o['title_id'], 'linked_title' => $o['title_id'] !== null ? ($titles[$o['title_id']] ?? null) : null] : []);
@@ -185,6 +185,7 @@ final class OfficeService
             $images->deleteOwner(RichImageService::OWNER_OFFICE_GROUP_TERM, $t['id']);
         }
         $repo->deleteGroup($id);
+        $this->pruneHolderPhotos();
         $this->app->companies()->repository()->unlinkOfficeGroup($id);
     }
 
@@ -261,6 +262,7 @@ final class OfficeService
         $repo = $this->repository();
         $office = $repo->findOffice($id) ?? throw ApiError::notFound('Amt nicht gefunden.');
         $repo->deleteOffice($id);
+        $this->pruneHolderPhotos();
         $this->syncTitles($office['title_id'] !== null ? [$office['title_id']] : []);
     }
 
@@ -301,13 +303,14 @@ final class OfficeService
     // ---- Amtszeiten ----
 
     /**
-     * @param array<string, mixed> $in kind, start_year, end_year, note, honor, holders [{user_id} | {name}]
+     * @param array<string, mixed> $in kind, start_year, end_year, note, honor, holders [{user_id} | {name, image_uid?}]
      * @return array<string, mixed>
      */
-    public function createTerm(int $officeId, array $in): array
+    public function createTerm(int $officeId, array $in, ?User $actor = null): array
     {
         $office = $this->repository()->findOffice($officeId) ?? throw ApiError::notFound('Amt nicht gefunden.');
         [$term, $holders] = $this->validTerm($in);
+        $holders = $this->claimHolderPhotos($holders, $actor);
         $id = $this->repository()->saveTerm(null, $officeId, $term, $holders);
         $this->bundleOf($office['group_id']);
         $this->syncTitles($office['title_id'] !== null ? [$office['title_id']] : []);
@@ -320,7 +323,7 @@ final class OfficeService
      * @param array<string, mixed> $in
      * @return array<string, mixed>
      */
-    public function updateTerm(int $id, array $in): array
+    public function updateTerm(int $id, array $in, ?User $actor = null): array
     {
         $repo = $this->repository();
         $current = $repo->findTerm($id) ?? throw ApiError::notFound('Amtszeit nicht gefunden.');
@@ -330,10 +333,12 @@ final class OfficeService
             'end_year' => $current['end_year'],
             'note' => $current['note'],
             'honor' => $current['honor'],
-            'holders' => array_map(static fn (array $h): array => $h['user_id'] !== null ? ['user_id' => $h['user_id'], 'name' => $h['name']] : ['name' => $h['name']], $repo->holdersOf($id)),
+            'holders' => array_map(static fn (array $h): array => $h['user_id'] !== null ? ['user_id' => $h['user_id'], 'name' => $h['name']] : ['name' => $h['name'], 'image_uid' => $h['image_uid']], $repo->holdersOf($id)),
         ];
         [$term, $holders] = $this->validTerm($merged);
+        $holders = $this->claimHolderPhotos($holders, $actor);
         $repo->saveTerm($id, $current['office_id'], $term, $holders);
+        $this->pruneHolderPhotos();
         if ($current['ended_for'] !== null) {
             $repo->releaseEnd($id); // von Hand geändert: Ein neues Austrittsdatum zieht das Ende nicht mehr nach
         }
@@ -353,6 +358,7 @@ final class OfficeService
         $repo = $this->repository();
         $term = $repo->findTerm($id) ?? throw ApiError::notFound('Amtszeit nicht gefunden.');
         $repo->deleteTerm($id);
+        $this->pruneHolderPhotos();
         $office = $repo->findOffice($term['office_id']);
         $this->syncTitles($office !== null && $office['title_id'] !== null ? [$office['title_id']] : []);
     }
@@ -374,7 +380,7 @@ final class OfficeService
             throw ApiError::invalid('Für diese Gruppe sind gemeinsame Amtszeiten ausgeschaltet.');
         }
         $term = $this->validYears($in);
-        $members = $this->validMembers($groupId, $in['offices'] ?? null, $term, true);
+        $members = array_map(fn (array $h): array => $this->claimHolderPhotos($h, $actor), $this->validMembers($groupId, $in['offices'] ?? null, $term, true));
         $id = (int) $this->app->db->transaction(function () use ($repo, $groupId, $term, $members, $in, $actor): int {
             $id = $repo->insertGroupTerm($groupId, $term);
             foreach (array_filter($members) as $officeId => $holders) {
@@ -399,7 +405,7 @@ final class OfficeService
         $repo = $this->repository();
         $current = $repo->findGroupTerm($id) ?? throw ApiError::notFound('Gemeinsame Amtszeit nicht gefunden.');
         $term = $this->validYears($in + ['kind' => $current['kind'], 'start_year' => $current['start_year'], 'end_year' => $current['end_year'], 'note' => $current['note']]);
-        $members = array_key_exists('offices', $in) ? $this->validMembers($current['group_id'], $in['offices'], $term, false) : null;
+        $members = array_key_exists('offices', $in) ? array_map(fn (array $h): array => $this->claimHolderPhotos($h, $actor), $this->validMembers($current['group_id'], $in['offices'], $term, false)) : null;
         $linked = [];
         foreach ($repo->terms() as $t) {
             if ($t['group_term_id'] === $id) {
@@ -414,7 +420,7 @@ final class OfficeService
                     $repo->deleteTerm($t['id']);
                     continue;
                 }
-                $holders = $members[$officeId] ?? array_map(static fn (array $h): array => ['user_id' => $h['user_id'], 'name' => $h['name']], $repo->holdersOf($t['id']));
+                $holders = $members[$officeId] ?? array_map(static fn (array $h): array => ['user_id' => $h['user_id'], 'name' => $h['name'], 'image_uid' => $h['image_uid']], $repo->holdersOf($t['id']));
                 $repo->saveTerm($t['id'], $officeId, $term + ['honor' => false], $holders);
                 if ($t['ended_for'] !== null) {
                     $repo->releaseEnd($t['id']);
@@ -446,6 +452,7 @@ final class OfficeService
         }
         $repo->deleteGroupTerm($id);
         $this->app->richImages()->deleteOwner(RichImageService::OWNER_OFFICE_GROUP_TERM, $id);
+        $this->pruneHolderPhotos();
         $this->syncTitles($this->titlesOf($offices));
     }
 
@@ -520,6 +527,52 @@ final class OfficeService
     /**
      * Gruppenbild setzen (Kennung aus POST /rich-images) oder mit null/'' entfernen; das bisherige wird gelöscht.
      */
+    /**
+     * Fotos freier Namen (Issue #283) in den gemeinsamen Bestand übernehmen: eigene Entwürfe werden umgehängt, schon
+     * vorhandene Fotos bleiben (auch dasselbe Foto in mehreren Amtszeiten). Ohne Konto (z. B. Tests) zählen nur Fotos,
+     * die schon im Bestand sind.
+     *
+     * @param list<array{user_id: int|null, name: string, image_uid?: string|null}> $holders
+     * @return list<array{user_id: int|null, name: string, image_uid?: string|null}>
+     */
+    private function claimHolderPhotos(array $holders, ?User $actor): array
+    {
+        $images = $this->app->richImages();
+        foreach ($holders as $i => $h) {
+            $uid = $h['image_uid'] ?? null;
+            if ($h['user_id'] !== null || $uid === null) {
+                continue;
+            }
+            $html = $images->claim($actor ?? $this->app->anonymous(), '<img data-image="' . $uid . '">', RichImageService::OWNER_OFFICE_HOLDER, 0);
+            $claimed = RichText::imageUids($html)[0] ?? null;
+            if ($claimed === null) {
+                throw ApiError::invalid(sprintf('Das Foto von „%s“ ist nicht mehr da. Bitte noch einmal hochladen.', $h['name']));
+            }
+            $holders[$i]['image_uid'] = $claimed;
+        }
+        return $holders;
+    }
+
+    /** Fotos freier Namen löschen, die in keiner Amtszeit mehr stehen. */
+    private function pruneHolderPhotos(): void
+    {
+        $this->app->richImages()->prune(RichImageService::OWNER_OFFICE_HOLDER, 0, $this->repository()->holderImageUids());
+    }
+
+    /**
+     * Foto eines freien Namens für die Ausgabe: photo_url, für die Pflege auch image_uid.
+     *
+     * @param array{user_id: int|null, image_uid: string|null} $h
+     * @return array<string, string>
+     */
+    private function holderPhoto(array $h, bool $manager): array
+    {
+        if ($h['user_id'] !== null || $h['image_uid'] === null) {
+            return [];
+        }
+        return ['photo_url' => $this->app->env->richImageUrl($h['image_uid'])] + ($manager ? ['image_uid' => $h['image_uid']] : []);
+    }
+
     private function setGroupImage(int $id, mixed $uid, User $actor): void
     {
         $images = $this->app->richImages();
@@ -713,7 +766,7 @@ final class OfficeService
                     }
                 }
                 $data = ['kind' => $t['kind'], 'start_year' => $t['start_year'], 'end_year' => null, 'note' => $t['note'], 'honor' => $t['honor']];
-                $keep = static fn (array $list): array => array_map(static fn (array $h): array => ['user_id' => $h['user_id'], 'name' => $h['name']], $list);
+                $keep = static fn (array $list): array => array_map(static fn (array $h): array => ['user_id' => $h['user_id'], 'name' => $h['name'], 'image_uid' => $h['image_uid']], $list);
                 $repo->saveTerm($t['id'], $t['office_id'], $data, $keep($others));
                 $repo->setEnd($repo->saveTerm(null, $t['office_id'], $data, $keep($mine)), $end, $userId);
             }
@@ -1104,7 +1157,11 @@ final class OfficeService
                 if (mb_strlen($name) > self::NAME_MAX) {
                     throw ApiError::invalid(sprintf('Ein Name darf höchstens %d Zeichen lang sein.', self::NAME_MAX));
                 }
-                $holder = ['user_id' => null, 'name' => $name];
+                $uid = $h['image_uid'] ?? null;
+                if ($uid !== null && $uid !== '' && (!is_string($uid) || preg_match(RichText::IMAGE_UID, strtolower($uid)) !== 1)) {
+                    throw ApiError::invalid('Unbekanntes Foto.');
+                }
+                $holder = ['user_id' => null, 'name' => $name, 'image_uid' => is_string($uid) && $uid !== '' ? strtolower($uid) : null];
             }
             $key = $holder['user_id'] !== null ? 'u' . $holder['user_id'] : 'n' . mb_strtolower($holder['name']);
             if (isset($seen[$key])) {
@@ -1297,7 +1354,7 @@ final class OfficeService
     {
         $repo = $this->repository();
         $t = $repo->findTerm($id) ?? throw ApiError::notFound('Amtszeit nicht gefunden.');
-        return self::termOut($t) + ['office_id' => $t['office_id'], 'holders' => array_map(static fn (array $h): array => ['name' => $h['name'], 'user_id' => $h['user_id']], $repo->holdersOf($id))];
+        return self::termOut($t) + ['office_id' => $t['office_id'], 'holders' => array_map(fn (array $h): array => ['name' => $h['name'], 'user_id' => $h['user_id']] + $this->holderPhoto($h, true), $repo->holdersOf($id))];
     }
 
     private function validGroupTitle(mixed $raw, ?int $id): string

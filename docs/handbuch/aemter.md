@@ -39,7 +39,7 @@ Tippe unten in der Leiste auf **Intern**, dann auf **{bereich.directory}** und o
 
 ## Gut zu wissen
 - Die neueste Amtszeit steht oben. Bei langen Listen gliedern Marken wie **2000er** die Jahrzehnte. Eine Ehrung trägt einen Stern und den Hinweis **Ehrung**. Ein einzelnes Jahr ohne Ehrung, z. B. ein Königsjahr, steht wie jede andere Amtszeit da.
-- Antippen lassen sich nur Personen, die in der Mitgliederliste stehen. Frühere Mitglieder ohne Konto stehen nur mit ihrem Namen da.
+- Antippen lassen sich nur Personen, die in der Mitgliederliste stehen. Personen ohne Konto stehen mit ihrem Namen da und, wenn die Kompanie eines eingetragen hat, mit Foto.
 - Auf dem Handy steht die Chronik in einer Spalte, auf breiten Bildschirmen abwechselnd links und rechts der Linie.
 - Deine eigenen Ämter findest du als {rolle.member} auch unter **Meins**.
 

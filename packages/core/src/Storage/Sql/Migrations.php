@@ -1560,6 +1560,12 @@ WHERE title IS NULL",
                     'CREATE INDEX IF NOT EXISTS {office_group_terms}_group_id ON {office_group_terms} (group_id)',
                 ],
             ],
+            // Fotos für Amtsinhaber ohne Konto (Issue #283): Bild in rich_images (Besitzer office_holder), je Eintrag einer
+            // Amtszeit; bei Konten bleibt das Foto des Kontos maßgeblich.
+            41 => [
+                'mysql' => ['ALTER TABLE {office_holders} ADD COLUMN image_uid varchar(32) DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {office_holders} ADD COLUMN image_uid TEXT DEFAULT NULL'],
+            ],
         ];
     }
 

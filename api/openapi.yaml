@@ -7555,6 +7555,7 @@ components:
                   properties:
                     user_id: { type: integer }
                     name: { type: string, maxLength: 100 }
+                    image_uid: { type: [string, 'null'], description: Nur bei freien Namen }
 
     OfficeRef:
       type: object
@@ -7573,6 +7574,7 @@ components:
         name: { type: string, description: 'Anzeigename des Kontos, sonst der gespeicherte Name (auch nach dem Löschen des Kontos)' }
         user_id: { type: integer, description: 'Nur bei Personen der Mitgliederliste, für manage_offices und das eigene Konto' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
+        image_uid: { type: [string, 'null'], description: 'Nur freie Namen mit Foto, nur mit manage_offices (Issue #283); photo_url ist dann das öffentliche Foto' }
 
     OfficeTerm:
       type: object
@@ -7609,6 +7611,7 @@ components:
             properties:
               user_id: { type: integer }
               name: { type: string, maxLength: 100 }
+              image_uid: { type: [string, 'null'], description: 'Nur bei freien Namen: Foto (Kennung aus POST /rich-images), öffentlich wie die Ämter; bei Konten ignoriert' }
 
     Office:
       allOf:

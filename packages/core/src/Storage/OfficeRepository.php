@@ -13,7 +13,7 @@ use KompanieApp\Core\Storage\Sql\Connection;
  * @phpstan-type GroupTerm array{id: int, group_id: int, kind: string, start_year: int, end_year: int|null, note: string, image_uid: string|null}
  * @phpstan-type Office array{id: int, group_id: int|null, title: string, singular: string, sort: int, title_id: int|null}
  * @phpstan-type Term array{id: int, office_id: int, kind: string, start_year: int, end_year: int|null, note: string, honor: bool, ended_for: int|null, group_term_id: int|null}
- * @phpstan-type Holder array{id: int, term_id: int, user_id: int|null, name: string, sort: int}
+ * @phpstan-type Holder array{id: int, term_id: int, user_id: int|null, name: string, sort: int, image_uid: string|null}
  */
 final class OfficeRepository
 {
@@ -181,7 +181,7 @@ final class OfficeRepository
      * Amtszeit mit Inhabern anlegen bzw. ersetzen, in einer Transaktion.
      *
      * @param array{kind: string, start_year: int, end_year: int|null, note: string, honor: bool} $term
-     * @param list<array{user_id: int|null, name: string}> $holders
+     * @param list<array{user_id: int|null, name: string, image_uid?: string|null}> $holders Foto nur bei freien Namen
      */
     public function saveTerm(?int $id, int $officeId, array $term, array $holders): int
     {
@@ -194,7 +194,13 @@ final class OfficeRepository
                 $this->db->execute('DELETE FROM {office_holders} WHERE term_id = ?', [$id]);
             }
             foreach ($holders as $i => $h) {
-                $this->db->insert('office_holders', ['term_id' => $id, 'user_id' => $h['user_id'], 'name' => $h['name'], 'sort' => $i]);
+                $this->db->insert('office_holders', [
+                    'term_id' => $id,
+                    'user_id' => $h['user_id'],
+                    'name' => $h['name'],
+                    'sort' => $i,
+                    'image_uid' => $h['user_id'] === null ? ($h['image_uid'] ?? null) : null,
+                ]);
             }
             return $id;
         });
@@ -238,6 +244,12 @@ final class OfficeRepository
             $out[$h['term_id']][] = $h;
         }
         return $out;
+    }
+
+    /** @return list<string> Fotos, die noch in einer Amtszeit stehen (Issue #283) */
+    public function holderImageUids(): array
+    {
+        return array_values(array_unique(array_map(static fn (array $r): string => (string) $r['image_uid'], $this->db->select('SELECT image_uid FROM {office_holders} WHERE image_uid IS NOT NULL'))));
     }
 
     /** @return list<Holder> */
@@ -318,6 +330,7 @@ final class OfficeRepository
             'term_id' => (int) $r['term_id'],
             'user_id' => $r['user_id'] === null ? null : (int) $r['user_id'],
             'name' => (string) $r['name'],
+            'image_uid' => isset($r['image_uid']) && $r['image_uid'] !== '' ? (string) $r['image_uid'] : null,
             'sort' => (int) $r['sort'],
         ];
     }
