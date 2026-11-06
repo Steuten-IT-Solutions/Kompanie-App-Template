@@ -9,7 +9,7 @@ import {
   type TouchEvent,
   type TouchList,
 } from 'react';
-import { type GalleryPhoto } from '../api';
+import { can, type GalleryPhoto } from '../api';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { useSwipeDrag } from '../swipe';
@@ -82,10 +82,33 @@ function Overview() {
   if (loading && !data) return <Loading shape="grid" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const years = data?.years ?? [];
-  if (years.length === 0) return <Empty>Noch keine Bilder in der Galerie.</Empty>;
+  // Einreichungen (Issue #286)
+  const actions =
+    can('submit_gallery') || can('review_gallery') ? (
+      <div className="button-row gallery-actions">
+        {can('submit_gallery') && (
+          <button className="btn btn-secondary" onClick={() => navigate('galerie/einreichen')}>
+            Bilder einreichen
+          </button>
+        )}
+        {can('review_gallery') && (
+          <button className="btn btn-secondary" onClick={() => navigate('galerie/pruefen')}>
+            Einreichungen prüfen
+          </button>
+        )}
+      </div>
+    ) : null;
+  if (years.length === 0)
+    return (
+      <>
+        {actions}
+        <Empty>Noch keine Bilder in der Galerie.</Empty>
+      </>
+    );
 
   return (
     <div>
+      {actions}
       {years.map((y) => (
         <section key={y.year}>
           <h2 className="section-title">{y.year}</h2>

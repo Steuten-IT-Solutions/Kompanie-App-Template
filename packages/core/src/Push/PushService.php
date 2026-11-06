@@ -85,6 +85,9 @@ final class PushService
     public const TYPE_BOARD = 'board';
     public const TYPE_POLLS = 'polls';
     public const TYPE_BIRTHDAYS = 'birthdays';
+    /** Galerie (Issue #286): neue Einreichungen an alle mit review_gallery, das Ergebnis an die einreichende Person. */
+    public const TYPE_GALLERY_REVIEW = 'gallery_review';
+    public const TYPE_GALLERY_SUBMISSIONS = 'gallery_submissions';
 
     /** Push-Dienste der Browser (wie im Projekt-Cockpit). */
     private const PUSH_HOSTS = ['/^fcm\.googleapis\.com$/', '/(^|\.)push\.services\.mozilla\.com$/', '/(^|\.)push\.apple\.com$/', '/(^|\.)notify\.windows\.com$/'];
@@ -174,6 +177,8 @@ final class PushService
             self::TYPE_BOARD => ['label' => $c->sectionLabel('board', 'Schwarzes Brett') . ': dringende Nachrichten', 'features' => ['board'], 'audience' => 'view_board'],
             self::TYPE_POLLS => ['label' => $c->sectionLabel('polls', 'Umfragen') . ': neue Umfrage und Erinnerung', 'features' => ['polls'], 'audience' => 'vote_polls'],
             self::TYPE_BIRTHDAYS => ['label' => $c->sectionLabel('birthdays', 'Geburtstage') . ': am Tag selbst', 'features' => ['birthdays'], 'audience' => 'view_birthdays'],
+            self::TYPE_GALLERY_REVIEW => ['label' => $c->sectionLabel('gallery', 'Galerie') . ': neue Bilder zum Prüfen', 'features' => ['gallery'], 'audience' => 'review_gallery'],
+            self::TYPE_GALLERY_SUBMISSIONS => ['label' => $c->sectionLabel('gallery', 'Galerie') . ': deine Bilder freigegeben oder abgelehnt', 'features' => ['gallery'], 'audience' => 'submit_gallery'],
             self::TYPE_PENALTIES => ['label' => $c->sectionLabel('penalties', 'Strafen') . ': neue Einträge', 'features' => ['penalties'], 'audience' => 'view_own_penalties'],
             self::TYPE_POINTS => ['label' => $c->sectionLabel('points', 'Punkte') . ': neue Einträge', 'features' => ['points'], 'audience' => 'view_own_points'],
             self::TYPE_RANKS => ['label' => $c->rankLabel() . ': Beförderung oder Änderung', 'features' => ['ranks'], 'audience' => 'view_own_rank'],

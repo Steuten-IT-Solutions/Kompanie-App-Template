@@ -28,4 +28,11 @@ interface MediaStore
 
     /** Belegter Platz in Bytes. */
     public function bytes(): int;
+
+    /**
+     * Alle Schlüssel mit der Zeit der letzten Änderung (Unix-Zeit), z. B. zum Aufräumen von Dateien ohne Verweis.
+     *
+     * @return array<string, int>
+     */
+    public function keys(): array;
 }

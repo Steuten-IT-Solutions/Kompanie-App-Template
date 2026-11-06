@@ -147,7 +147,8 @@ final class GalleryRepository
         if ($ids !== []) {
             $this->db->execute(
                 "DELETE FROM {albums} WHERE id IN (" . implode(', ', array_map('intval', $ids)) . ") AND source = 'drive'
-                 AND NOT EXISTS (SELECT 1 FROM {photos} p WHERE p.album_id = {albums}.id AND p.source = 'upload')",
+                 AND NOT EXISTS (SELECT 1 FROM {photos} p WHERE p.album_id = {albums}.id AND p.source = 'upload')
+                 AND NOT EXISTS (SELECT 1 FROM {gallery_submissions} s WHERE s.album_id = {albums}.id AND s.status = 'pending')",
             );
         }
     }
@@ -314,6 +315,7 @@ final class GalleryRepository
     public function clearDrive(): void
     {
         $this->db->execute("DELETE FROM {photos} WHERE source = 'drive'");
-        $this->db->execute("DELETE FROM {albums} WHERE source = 'drive' AND NOT EXISTS (SELECT 1 FROM {photos} p WHERE p.album_id = {albums}.id)");
+        $this->db->execute("DELETE FROM {albums} WHERE source = 'drive' AND NOT EXISTS (SELECT 1 FROM {photos} p WHERE p.album_id = {albums}.id)
+            AND NOT EXISTS (SELECT 1 FROM {gallery_submissions} s WHERE s.album_id = {albums}.id AND s.status = 'pending')");
     }
 }

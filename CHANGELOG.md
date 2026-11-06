@@ -17,6 +17,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Bilder für die Galerie einreichen**: Mitglieder mit dem neuen Recht *Bilder einreichen* schlagen unter *Galerie →
+  Bilder einreichen* Bilder für ein Album vor und bestätigen, dass sie die Rechte haben und die erkennbaren Personen
+  einverstanden sind. Wer *Einreichungen prüfen* hat, bekommt eine Benachrichtigung und gibt sie unter *Galerie →
+  Einreichungen prüfen* öffentlich oder nur für Mitglieder frei oder lehnt sie mit Grund ab; die Person erfährt das
+  Ergebnis. Abgelehnte Bilder löscht der Server sofort. Mit der Galerie gibt es die neue Rolle *Galerie verwalten*
+  (mit dem Recht zum Prüfen), auch bei Installationen mit schon eingeschalteter Galerie.
 - **Galerie ohne Google Drive und eigene Bilder**: Unter *Einstellungen → Galerie* wählst du als Quelle *Google
   Drive* oder *eigener Server*. Mit beiden Quellen legst du dort Alben nur in der App an und lädst Bilder (JPG, PNG,
   WebP) in jedes Album hoch, auch in eines aus Drive, öffentlich oder nur für Mitglieder. Der Server entfernt beim

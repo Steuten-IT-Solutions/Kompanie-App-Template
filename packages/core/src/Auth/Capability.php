@@ -91,6 +91,10 @@ enum Capability: string
     case ManageSponsors = 'manage_sponsors';
     /** Kompanieliste pflegen und Mitglieder zuordnen (Bereich Kompanien, Issue #280). */
     case ManageCompanies = 'manage_companies';
+    /** Bilder für die Galerie einreichen, eigene Einreichungen sehen und zurückziehen (Issue #286). */
+    case SubmitGallery = 'submit_gallery';
+    /** Einreichungen sehen, freigeben (öffentlich oder intern), ablehnen und freigegebene wieder entfernen (Issue #286). */
+    case ReviewGallery = 'review_gallery';
     /**
      * Persönliche Angaben anderer sehen: Adresse, Handynummer, E-Mail-Adresse und das ganze Geburtsdatum (in der
      * Verwaltung auf der Seite der Person). Die eigenen sieht jede Person unter Meins → Konto.
