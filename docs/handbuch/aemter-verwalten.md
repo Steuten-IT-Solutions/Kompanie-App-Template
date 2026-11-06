@@ -14,7 +14,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf **{bereich.of
 ## Was du hier siehst
 - **Tabelle importieren**: viele Amtszeiten auf einmal übernehmen.
 - **Zeitstrahl ansehen**: öffnet die Ansicht, die alle sehen.
-- **Gruppen**: je Gruppe **Umbenennen**, der Schalter **Amtszeiten gemeinsam** und **Löschen**, darunter **Neue Gruppe** mit **Gruppe anlegen**.
+- **Gruppen**: je Gruppe **Bearbeiten**, der Schalter **Amtszeiten gemeinsam** und **Löschen**, darunter **Neue Gruppe** mit **Gruppe anlegen**.
 - **Die Ämter** je Gruppe (und unter **Ohne Gruppe**), mit der Zahl der Amtszeiten und, falls verknüpft, dem {bereich.titles}, den das Amt vergibt.
 - **Neues Amt** mit **Bezeichnung**, **Gruppe** und **Anlegen**.
 - Links an Gruppen und Ämtern ein Griff (sechs Punkte) zum Verschieben.
@@ -46,6 +46,12 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf **{bereich.of
 1. Tippe im Amt bei der Amtszeit auf **Bearbeiten** (oder **Löschen**).
 2. Endet ein Amt, trage bei der Amtszeit das Jahr unter **Bis** ein und tippe auf **Speichern**.
 3. Wird jemand als ehemalig eingetragen, enden seine laufenden Amtszeiten von selbst mit dem Jahr des Ausscheidens (siehe *Ehemalige*). Eine solche Amtszeit kannst du hier wie jede andere ändern; danach zieht eine Änderung des Austrittsdatums sie nicht mehr nach.
+
+### Eine Gruppe umbenennen
+1. Tippe bei der Gruppe auf **Bearbeiten**.
+2. Ändere die **Bezeichnung**. Sie steht als Überschrift über der Gruppe, meist in der Mehrzahl, z. B. „Königshäuser“.
+3. Trage, wenn gewünscht, die **Einzahl** ein, z. B. „Königshaus“. Sie steht über jeder einzelnen gemeinsamen Amtszeit („Königshaus 2026–2028“). Leer lässt die App dort die Bezeichnung stehen.
+4. Tippe auf **Speichern**.
 
 ### Gemeinsame Amtszeiten einer Gruppe pflegen
 Haben alle Ämter einer Gruppe immer dieselben Jahre, z. B. ein Königshaus oder ein Vorstand, trägst du sie zusammen ein – mit einem Gruppenbild.
