@@ -1664,14 +1664,17 @@ paths:
       tags: [Schwarzes Brett]
       summary: Gültige Einträge am Schwarzen Brett, neueste zuerst (Issue #5, #172)
       description: |
-        Für Mitglieder und Anwärter (Recht `member` oder `calendar`) sowie für alle mit `post_board`. Nur Einträge, deren
+        Öffentlich: Nachrichten mit `audience: public` sehen alle, auch ohne Anmeldung; interne (`audience: members`) nur
+        Konten mit `view_board` (Mitglieder und Anwärter) sowie alle mit `post_board`. Ohne `view_board` enthält die Liste
+        daher nur öffentliche Nachrichten (vor dieser Version: 401 ohne Anmeldung, 403 ohne Recht). Nur Einträge, deren
         `expires_at` noch nicht erreicht ist und die nicht gelöscht wurden. Abgelaufene und gelöschte Nachrichten bleiben
         30 Tage im Verlauf (`GET /board/history`, nur `post_board`); danach löscht die Hintergrundaufgabe `board_cleanup`
         sie endgültig. Die App blendet Einträge anhand von `expires_at` auch selbst aus (offline aus dem Speicher).
         Erst die Nachrichten (`kind: message`), neueste zuerst; danach für Mitglieder (Recht `member`) mit eingeschaltetem
         Bereich Umfragen jede laufende Umfrage (`kind: poll`, Issue #4) mit `has_voted`. Später können weitere Arten
         dazukommen – Clients überspringen unbekannte. Mit `post_board` zusätzlich `last_edit` und `mail`.
-      x-capability: 'view_board oder post_board'
+      x-capability: 'öffentlich (interne Nachrichten: view_board oder post_board)'
+      security: []
       responses:
         '200':
           description: OK
@@ -1687,7 +1690,6 @@ paths:
                       oneOf:
                         - $ref: '#/components/schemas/BoardItem'
                         - $ref: '#/components/schemas/BoardPollItem'
-        '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
     post:
       tags: [Schwarzes Brett]
@@ -1696,7 +1698,9 @@ paths:
         Sichtbar bis `expires_at` (ohne Angabe 24 Stunden ab jetzt; keine Obergrenze). Alle Mitglieder und Anwärter
         außer dem Verfasser bekommen eine Benachrichtigung (Art `board`, Urgency high, Überschrift „Schwarzes Brett:
         Verfasser“, Text = Titel, TTL bis `expires_at`, höchstens 28 Tage), sofern sie die Art für das Gerät eingeschaltet
-        haben und `push` nicht false ist. Mit `mail` zusätzlich je eine Mail an alle Mitglieder und Anwärter mit
+        haben und `push` nicht false ist. Bei `audience: public` zusätzlich alle übrigen Geräte (Gäste ohne Konto, Konten
+        ohne `view_board`) mit der Art `board_public`, außer dem Verfasser; jedes Gerät höchstens einmal. Bei der ersten
+        öffentlichen Nachricht bekommen bestehende Abos dieser Geräte die Art einmalig dazu. Mit `mail` zusätzlich je eine Mail an alle Mitglieder und Anwärter mit
         Mailadresse, die den Empfang nicht abgeschaltet haben (auch an den Verfasser), im Hintergrund. Meldet der
         Mailserver eine Höchstgröße und ist die fertige Mail größer, wird nichts veröffentlicht (400 mit Erklärung).
       x-capability: post_board
@@ -1794,11 +1798,12 @@ paths:
       - $ref: '#/components/parameters/Id'
     patch:
       tags: [Schwarzes Brett]
-      summary: Titel, Inhalt und/oder Enddatum einer gültigen Nachricht ändern
+      summary: Titel, Inhalt, Enddatum und/oder Sichtbarkeit einer gültigen Nachricht ändern
       description: |
-        Jede und jeder mit `post_board`, nicht nur der Verfasser. Ohne neue Benachrichtigung und ohne neue Mail. Die
-        Felder einzeln oder zusammen; mindestens eins. `updated_at` wechselt nur, wenn sich Titel oder Inhalt ändern (auf
-        Geräten ausgeblendete Nachrichten erscheinen dann wieder); ein neues Enddatum allein lässt es unverändert.
+        Jede und jeder mit `post_board`, nicht nur der Verfasser. Ohne neue Benachrichtigung und ohne neue Mail (auch
+        nicht, wenn eine Nachricht öffentlich wird). Die Felder einzeln oder zusammen; mindestens eins. `updated_at`
+        wechselt nur, wenn sich Titel oder Inhalt ändern (auf Geräten ausgeblendete Nachrichten erscheinen dann wieder);
+        ein neues Enddatum oder eine neue Sichtbarkeit allein lässt es unverändert.
         Jede Änderung steht im Verlauf. Abgelaufene oder gelöschte Nachrichten → 404.
       x-capability: post_board
       requestBody:
@@ -1811,6 +1816,7 @@ paths:
                 title: { type: string }
                 text: { type: string, description: Formatierter Inhalt (HTML), wird bereinigt }
                 expires_at: { type: string, description: 'Wie bei POST; muss in der Zukunft liegen' }
+                audience: { $ref: '#/components/schemas/BoardAudience' }
                 attachments:
                   type: array
                   items: { type: string }
@@ -6393,6 +6399,7 @@ components:
           description: |
             Sichtbar bis: ISO 8601 mit Zeitzone (`Z` oder `±hh:mm`) oder `JJJJ-MM-TTTHH:MM` ohne Zeitzone (Zeitzone der
             Kompanie). Gespeichert in UTC. Muss in der Zukunft liegen, keine Obergrenze. Ohne Angabe 24 Stunden.
+        audience: { $ref: '#/components/schemas/BoardAudience' }
         push:
           type: boolean
           default: true
@@ -6404,6 +6411,11 @@ components:
           type: array
           items: { type: string, pattern: '^[a-f0-9]{32}$' }
           description: 'Kennungen von Anhängen (eigene Entwürfe aus `POST /attachments`); sonst → 400'
+    BoardAudience:
+      type: string
+      enum: [members, public]
+      default: members
+      description: 'Sichtbarkeit: members (intern, wer das Brett liest: view_board) oder public (alle, auch ohne Anmeldung). Andere Werte → 400.'
     BoardItem:
       type: object
       required: [kind, id, title, text, excerpt, author_name, created_at, updated_at, expires_at]
@@ -6417,9 +6429,10 @@ components:
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time, description: 'Wechselt, wenn sich Titel, Inhalt oder Anhänge ändern' }
         expires_at: { type: string, format: date-time, description: 'Sichtbar bis (UTC); standardmäßig 24 Stunden nach created_at' }
-        attachments: { type: array, items: { $ref: '#/components/schemas/Attachment' }, description: 'Dateianhänge; sehen alle, die die Nachricht sehen' }
+        audience: { $ref: '#/components/schemas/BoardAudience' }
+        attachments: { type: array, items: { $ref: '#/components/schemas/Attachment' }, description: 'Dateianhänge; sehen alle, die die Nachricht sehen (bei öffentlichen auch ohne Anmeldung)' }
         last_edit:
-          description: 'Nur mit post_board: wer zuletzt Titel, Inhalt oder Enddatum geändert hat (null: unverändert)'
+          description: 'Nur mit post_board: wer zuletzt Titel, Inhalt, Enddatum oder Sichtbarkeit geändert hat (null: unverändert)'
           oneOf:
             - type: 'null'
             - type: object
@@ -6445,7 +6458,7 @@ components:
         name: { type: string, description: Dateiname }
         size: { type: integer, description: Bytes }
         mime: { type: string, description: 'Typ aus der Endung (für die Mail), sonst application/octet-stream' }
-        url: { type: string, description: 'Download nach Anmeldung (<App>/anhang/<uid>), immer als Anhang (Content-Disposition attachment)' }
+        url: { type: string, description: 'Download (<App>/anhang/<uid>) nach Anmeldung, bei öffentlichen Nachrichten am Brett auch ohne; immer als Anhang (Content-Disposition attachment)' }
     MailSelection:
       type: object
       description: Empfänger eines Felds (An, Cc oder Bcc)
@@ -6530,16 +6543,17 @@ components:
         deleted_at: { type: [string, 'null'], format: date-time }
         deleted_by_name: { type: [string, 'null'] }
         active: { type: boolean, description: Noch sichtbar }
+        audience: { $ref: '#/components/schemas/BoardAudience' }
         attachments: { type: array, items: { $ref: '#/components/schemas/Attachment' } }
     BoardRevision:
       type: object
       properties:
         id: { type: integer }
-        action: { type: string, enum: [created, title, content, expires, attachments, deleted, mailed] }
+        action: { type: string, enum: [created, title, content, expires, audience, attachments, deleted, mailed] }
         user_name: { type: [string, 'null'], description: '„gelöschtes Konto“, wenn es das Konto nicht mehr gibt' }
         at: { type: string, format: date-time }
-        before: { description: 'Vorheriger Stand (Titel, Inhalt als HTML, Enddatum, bei attachments die Dateinamen; bei deleted {expires_at}); null bei created und mailed' }
-        after: { description: 'Neuer Stand; bei created {title, text, expires_at, attachments?}, bei attachments die Dateinamen, bei mailed {recipients}, bei deleted null' }
+        before: { description: 'Vorheriger Stand (Titel, Inhalt als HTML, Enddatum, Sichtbarkeit, bei attachments die Dateinamen; bei deleted {expires_at}); null bei created und mailed' }
+        after: { description: 'Neuer Stand; bei created {title, text, expires_at, audience, attachments?}, bei attachments die Dateinamen, bei mailed {recipients}, bei deleted null' }
     SignatureResponse:
       type: object
       required: [signature]
@@ -6680,8 +6694,8 @@ components:
                   name: { type: string, description: Nur bei namentlichen Umfragen }
     PushType:
       type: string
-      enum: [board, polls, birthdays, gallery_review, gallery_submissions, penalties, points, ranks, titles, events, reminder, news]
-      description: '`board` (Schwarzes Brett, Issue #5) nur für Mitglieder und Anwärter; dringend (Urgency high), TTL höchstens bis zum Ablauf der Nachricht. `polls` (Umfragen, Issue #4) nur für Mitglieder: neue Umfrage und Erinnerung 24 Stunden vor dem Ende an alle ohne Antwort. `birthdays` (Geburtstage, Issue #1) nur für Mitglieder: am Tag selbst ab 7 Uhr (Zeitzone der Kompanie), nicht an das Geburtstagskind, nur für sichtbare Geburtstage; TTL bis Mitternacht.'
+      enum: [board, board_public, polls, birthdays, gallery_review, gallery_submissions, penalties, points, ranks, titles, events, reminder, news]
+      description: '`board` (Schwarzes Brett, Issue #5) nur für Mitglieder und Anwärter (view_board); dringend (Urgency high), TTL höchstens bis zum Ablauf der Nachricht. `board_public`: öffentliche Nachrichten am Brett für alle anderen (Gäste ohne Konto, Konten ohne view_board), sonst wie `board`. `polls` (Umfragen, Issue #4) nur für Mitglieder: neue Umfrage und Erinnerung 24 Stunden vor dem Ende an alle ohne Antwort. `birthdays` (Geburtstage, Issue #1) nur für Mitglieder: am Tag selbst ab 7 Uhr (Zeitzone der Kompanie), nicht an das Geburtstagskind, nur für sichtbare Geburtstage; TTL bis Mitternacht.'
     PushSubscribe:
       type: object
       required: [endpoint, keys]

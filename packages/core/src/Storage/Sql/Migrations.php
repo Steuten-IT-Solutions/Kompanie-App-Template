@@ -1656,6 +1656,12 @@ WHERE title IS NULL",
 )',
                 ],
             ],
+            // Öffentliche Nachrichten am Schwarzen Brett: audience public (alle, auch ohne Anmeldung) oder members (wer das
+            // Brett liest, view_board; wie bei eigenen Seiten). Bestehende Nachrichten bleiben intern.
+            45 => [
+                'mysql' => ["ALTER TABLE {board_messages} ADD COLUMN audience varchar(10) NOT NULL DEFAULT 'members'"],
+                'sqlite' => ["ALTER TABLE {board_messages} ADD COLUMN audience TEXT NOT NULL DEFAULT 'members'"],
+            ],
         ];
     }
 

@@ -114,8 +114,8 @@ final class PushServiceTest extends TestCase
         $guest = $this->users->find($this->users->add('g', Roles::GUEST));
         $p = $app->push();
         $this->assertSame(['board', 'polls', 'birthdays', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'], $p->availableTypes($member));
-        $this->assertSame(['events', 'reminder', 'news'], $p->availableTypes(null), 'Gäste ohne Konto: nur Öffentliches');
-        $this->assertSame(['events', 'reminder', 'news'], $p->availableTypes($guest), 'Konto ohne Mitgliederbereich');
+        $this->assertSame(['board_public', 'events', 'reminder', 'news'], $p->availableTypes(null), 'Gäste ohne Konto: nur Öffentliches');
+        $this->assertSame(['board_public', 'events', 'reminder', 'news'], $p->availableTypes($guest), 'Konto ohne Mitgliederbereich');
 
         $app->features()->update(['penalties' => false, 'news' => false, 'events' => false, 'ranks' => false, 'titles' => false, 'board' => false, 'polls' => false, 'birthdays' => false]);
         $this->assertSame(['points', 'events', 'reminder'], $p->availableTypes($member), 'Termine aus dem Kalender');
@@ -129,7 +129,7 @@ final class PushServiceTest extends TestCase
         $p = $app->push();
         $d = self::device('a');
         $sub = $p->subscribe(null, $d['endpoint'], $d['keys'], null, null, '1.2.3.4');
-        $this->assertSame(['events', 'reminder', 'news'], $sub['types']);
+        $this->assertSame(['board_public', 'events', 'reminder', 'news'], $sub['types']);
 
         foreach ([
             'kein https' => ['http://fcm.googleapis.com/fcm/send/x', $d['keys']],

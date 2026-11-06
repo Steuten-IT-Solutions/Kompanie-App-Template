@@ -333,7 +333,8 @@ final class ApiScenario
             ['GET', '/catalog', [], [401, 403, 200, 200, 200, 200]],
             ['GET', '/ranks', [], [401, 403, 200, 200, 200, 200]],
             ['GET', '/documents', [], [401, 403, 200, 200, 200, 200]],
-            ['GET', '/board', [], [401, 403, 200, 200, 200, 200]],
+            // Brett: ohne view_board nur öffentliche Nachrichten (board())
+            ['GET', '/board', [], [200, 200, 200, 200, 200, 200]],
             ['GET', '/directory', [], [200, 200, 200, 200, 200, 200]],
             ['GET', '/members', [], [401, 403, 403, 403, 200, 200]],
             ['POST', '/events', ['title' => ''], [401, 403, 403, 400, 400, 400]],
@@ -956,7 +957,10 @@ final class ApiScenario
         $c->ok($ok, 'Dokumente löschen');
     }
 
-    /** Schwarzes Brett (Issue #5): Mitglieder und Anwärter lesen, post_board schreibt; Prüfung, Ablauf bleibt beim Ändern. */
+    /**
+     * Schwarzes Brett (Issue #5): Mitglieder und Anwärter lesen, post_board schreibt; Prüfung, Ablauf bleibt beim Ändern.
+     * Öffentliche Nachrichten sehen alle, auch ohne Anmeldung, interne nicht.
+     */
     private function board(): void
     {
         $c = $this->c;
@@ -966,9 +970,11 @@ final class ApiScenario
         $cand = $this->user('kptest_brett_anw', $this->anw);
         $guest = $this->user('kptest_brett_gast', 'guest');
         $this->d->actAs(null);
-        $c->ok($this->req('GET', '/board')[0] === 401, 'GET /board ohne Anmeldung → 401');
+        $c->ok($this->req('GET', '/board')[0] === 200, 'GET /board ohne Anmeldung → 200 (nur öffentliche)');
+        $c->ok($this->req('POST', '/board', ['title' => 'Kptest', 'text' => 'Kptest'])[0] === 401, 'Ohne Anmeldung schreibt niemand → 401');
         $this->d->actAs($guest);
-        $c->ok($this->req('GET', '/board')[0] === 403, 'Gast-Konto: GET /board → 403');
+        $c->ok($this->req('GET', '/board')[0] === 200, 'Gast-Konto: GET /board → 200 (nur öffentliche)');
+        $c->ok($this->req('POST', '/board', ['title' => 'Kptest', 'text' => 'Kptest'])[0] === 403, 'Gast-Konto schreibt nicht → 403');
         $this->d->actAs($m);
         $c->ok($this->req('POST', '/board', ['title' => 'Kptest', 'text' => 'Kptest'])[0] === 403, 'Mitglied ohne Recht schreibt nicht → 403');
         $c->ok($this->req('GET', '/board/history')[0] === 403, 'Mitglied ohne Recht sieht keinen Verlauf → 403');
@@ -984,12 +990,32 @@ final class ApiScenario
         $c->ok(strlen((string) ($item['text'] ?? '')) > 65535, 'Keine Längengrenze (mehr als 64 KB)');
         $c->ok(str_starts_with((string) ($item['excerpt'] ?? ''), 'Kptest fett'), 'Textauszug');
         $c->ok(((int) strtotime((string) ($item['expires_at'] ?? ''))) - ((int) strtotime((string) ($item['created_at'] ?? ''))) === 86400, 'Standard: 24 Stunden');
+        $c->ok(($item['audience'] ?? '') === 'members', 'Ohne Angabe intern');
+        $c->ok($this->req('POST', '/board', ['title' => 'Kptest', 'text' => 'x', 'audience' => 'alle'])[0] === 400, 'Unbekannte Sichtbarkeit → 400');
+        [$s, $pub] = $this->req('POST', '/board', ['title' => "Kptest öffentlich $sfx", 'text' => '<p>Kptest für alle</p>', 'audience' => 'public', 'push' => false, 'mail' => false]);
+        $pubId = (int) ($pub['id'] ?? 0);
+        $c->ok($s === 201 && ($pub['audience'] ?? '') === 'public', 'Öffentliche Nachricht');
         foreach ([$m => 'Mitglied', $cand => 'Anwärter'] as $who => $label) {
             $this->d->actAs($who);
             [$s, $d] = $this->req('GET', '/board');
-            $c->ok($s === 200 && in_array($id, array_column((array) ($d['items'] ?? []), 'id'), true), "$label sieht die Nachricht");
+            $ids = array_column((array) ($d['items'] ?? []), 'id');
+            $c->ok($s === 200 && in_array($id, $ids, true) && in_array($pubId, $ids, true), "$label sieht interne und öffentliche Nachricht");
+        }
+        foreach ([[null, 'Ohne Anmeldung'], [$guest, 'Gast-Konto']] as [$who, $label]) {
+            $this->d->actAs($who);
+            [$s, $d] = $this->req('GET', '/board');
+            $byId = array_column((array) ($d['items'] ?? []), null, 'id');
+            $c->ok($s === 200 && isset($byId[$pubId]) && !isset($byId[$id]), "$label: nur die öffentliche Nachricht");
+            $c->ok(isset($byId[$pubId]) && !array_key_exists('last_edit', $byId[$pubId]) && !array_key_exists('mail', $byId[$pubId]), "$label: ohne Angaben für Schreibende");
         }
         $this->d->actAs($admin);
+        [$s, $edited] = $this->req('PATCH', "/board/$pubId", ['audience' => 'members']);
+        $c->ok($s === 200 && ($edited['audience'] ?? '') === 'members', 'Sichtbarkeit geändert');
+        $this->d->actAs(null);
+        [, $d] = $this->req('GET', '/board');
+        $c->ok(!in_array($pubId, array_column((array) ($d['items'] ?? []), 'id'), true), 'Wieder intern: ohne Anmeldung nicht mehr sichtbar');
+        $this->d->actAs($admin);
+        $this->req('DELETE', "/board/$pubId");
         $future = gmdate('Y-m-d\TH:i:s\Z', time() + 40 * 86400);
         [$s, $edited] = $this->req('PATCH', "/board/$id", ['expires_at' => $future]);
         $c->ok($s === 200 && strtotime((string) ($edited['expires_at'] ?? '')) === strtotime($future) && ($edited['updated_at'] ?? null) === ($item['updated_at'] ?? ''), 'Enddatum verlängert (ohne Obergrenze), updated_at bleibt');

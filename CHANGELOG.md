@@ -15,6 +15,17 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Neu
+
+- **Öffentliche Nachrichten am Schwarzen Brett**: Beim Schreiben wählt ihr unter *Sichtbar für*, ob eine Nachricht
+  *intern* bleibt (wie bisher: Mitglieder und alle mit dem internen Kalender) oder *öffentlich* ist. Öffentliche
+  Nachrichten sehen alle, auch Besucher ohne Anmeldung, im Banner oben auf jeder Seite und auf der Seite des Bretts,
+  samt Bildern, Anhängen und dem Namen der Person, die sie geschrieben hat. Die Benachrichtigung geht dann zusätzlich an
+  alle Geräte ohne Brett, auch ohne Anmeldung (neue Art *Schwarzes Brett: öffentliche Nachrichten*, bei der ersten
+  öffentlichen Nachricht einmalig dazugeschaltet); die E-Mail geht weiter nur an Mitglieder und alle mit dem internen
+  Kalender. Die Sichtbarkeit lässt sich beim Bearbeiten ändern und steht im Verlauf. Bisherige Nachrichten bleiben
+  intern.
+
 ### Behoben
 
 - **Formatierte Texte im dunklen Design lesbar**: Eingefügter Text (z. B. von eurer Webseite) brachte oft eine feste

@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import {
   api,
+  config,
+  type BoardAudience,
   type BoardEnded,
   type BoardHistory,
   type BoardMailInfo,
@@ -11,7 +13,7 @@ import {
   type Attachment,
 } from '../api';
 import { AttachmentList, AttachmentsField } from '../attachments';
-import { boardLoaded, canManagePolls, canPostBoard, pollsVisible, refreshBoard, useBoard } from '../board';
+import { boardLoaded, boardVisible, canManagePolls, canPostBoard, pollsVisible, refreshBoard, useBoard } from '../board';
 import { ComposeEditor } from '../composeEditor';
 import { BoardMeta, pollEndText } from '../BoardBanner';
 import brand from '../generated/brand';
@@ -30,6 +32,8 @@ interface Draft {
   text: string;
   /** datetime-local (Ortszeit); leer = jetzt + 24 Stunden beim Öffnen */
   expires: string;
+  /** intern (members, Standard) oder öffentlich (public) */
+  audience: BoardAudience;
   push: boolean;
   mail: boolean;
   /** schon hochgeladene Anhänge (Entwürfe auf dem Server, 7 Tage gültig) */
@@ -40,7 +44,11 @@ function readDraft(): Draft | null {
   try {
     const raw = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null');
     return raw && typeof raw === 'object' && typeof raw.title === 'string' && typeof raw.text === 'string'
-      ? ({ ...raw, attachments: Array.isArray(raw.attachments) ? raw.attachments : [] } as Draft)
+      ? ({
+          ...raw,
+          audience: raw.audience === 'public' ? 'public' : 'members',
+          attachments: Array.isArray(raw.attachments) ? raw.attachments : [],
+        } as Draft)
       : null;
   } catch {
     return null;
@@ -87,6 +95,33 @@ function ExpiresField({ value, onChange }: { value: string; onChange: (v: string
   );
 }
 
+/** Wer die Nachricht sieht: intern (wer das Brett liest) oder öffentlich (alle, auch ohne Anmeldung). */
+function AudienceField({ value, onChange }: { value: BoardAudience; onChange: (v: BoardAudience) => void }) {
+  return (
+    <label className="field">
+      <span>Sichtbar für</span>
+      <select className="board-audience" value={value} onChange={(e) => onChange(e.target.value === 'public' ? 'public' : 'members')}>
+        <option value="members">Intern: Mitglieder und alle mit dem internen Kalender</option>
+        <option value="public">Öffentlich: alle, auch ohne Anmeldung</option>
+      </select>
+    </label>
+  );
+}
+
+/** Kennzeichen „öffentlich“ an einer Nachricht (interne tragen keins). */
+export function AudienceBadge({ audience }: { audience?: BoardAudience }) {
+  return audience === 'public' ? <span className="badge badge-open board-public">öffentlich</span> : null;
+}
+
+/** Wer beim Veröffentlichen eine Benachrichtigung bekommt. */
+function pushAudienceText(audience: BoardAudience): string {
+  return audience === 'public'
+    ? 'alle Mitglieder, alle mit dem internen Kalender (z. B. Anwärter) und alle anderen Geräte, die öffentliche Nachrichten vom Brett eingeschaltet haben (auch ohne Anmeldung)'
+    : 'alle Mitglieder und alle mit dem internen Kalender (z. B. Anwärter)';
+}
+
+const capitalize = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+
 function mailText(mail: BoardMailSummary): string {
   const parts = [`${mail.sent} von ${mail.recipients} gesendet`];
   if (mail.pending > 0) parts.push(`${mail.pending} ausstehend`);
@@ -101,7 +136,7 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
     const saved = readDraft();
     return saved
       ? { ...saved, expires: saved.expires || defaultExpires() }
-      : { title: '', text: '', expires: defaultExpires(), push: true, mail: true, attachments: [] };
+      : { title: '', text: '', expires: defaultExpires(), audience: 'members', push: true, mail: true, attachments: [] };
   });
   const [editorKey, setEditorKey] = useState(0);
   const [mailInfo, setMailInfo] = useState<BoardMailInfo | null>(null);
@@ -131,8 +166,9 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
     const lines = [
       `Nachricht „${draft.title.trim()}“ jetzt veröffentlichen?`,
       '',
+      `Sichtbar für: ${draft.audience === 'public' ? 'alle, auch ohne Anmeldung (öffentlich)' : 'intern'}`,
       `Sichtbar bis: ${formatUntil(expires)}`,
-      `Benachrichtigung: ${draft.push ? 'an alle Mitglieder und alle mit dem internen Kalender (z. B. Anwärter)' : 'keine'}`,
+      `Benachrichtigung: ${draft.push ? `an ${pushAudienceText(draft.audience)}` : 'keine'}`,
       `E-Mail: ${mailOn ? `an ${mailInfo?.recipients ?? 0} Empfänger` : 'keine'}`,
     ];
     if (draft.attachments.length > 0) lines.push(`Anhänge: ${draft.attachments.map((a) => a.name).join(', ')}`);
@@ -143,12 +179,13 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
         title: draft.title,
         text: draft.text,
         expires_at: expires,
+        audience: draft.audience,
         push: draft.push,
         mail: mailOn,
         attachments: draft.attachments.map((a) => a.uid),
       });
       saveDraft(null);
-      setDraft({ title: '', text: '', expires: defaultExpires(), push: true, mail: true, attachments: [] });
+      setDraft({ title: '', text: '', expires: defaultExpires(), audience: 'members', push: true, mail: true, attachments: [] });
       setEditorKey((k) => k + 1);
       onToast('Nachricht veröffentlicht');
       await refreshBoard();
@@ -183,6 +220,7 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
         onAdd={(a) => setDraft((d) => withSaved({ ...d, attachments: [...d.attachments, a] }))}
         onRemove={(uid) => setDraft((d) => withSaved({ ...d, attachments: d.attachments.filter((a) => a.uid !== uid) }))}
       />
+      <AudienceField value={draft.audience} onChange={(audience) => update({ audience })} />
       <ExpiresField value={draft.expires} onChange={(expires) => update({ expires })} />
       <label className="toggle">
         <input type="checkbox" className="board-push" checked={draft.push} onChange={(e) => update({ push: e.target.checked })} />
@@ -200,8 +238,10 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
       </label>
       {mailInfo && !mailInfo.available && <p className="muted small">{mailInfo.reason}</p>}
       <p className="muted small">
+        {draft.audience === 'public' &&
+          'Öffentlich: Alle sehen die Nachricht samt Anhängen und deinem Namen, auch ohne Anmeldung. Die E-Mail geht trotzdem nur an Mitglieder und alle mit dem internen Kalender. '}
         {draft.push
-          ? 'Alle Mitglieder und alle mit dem internen Kalender (z. B. Anwärter) bekommen sofort eine Benachrichtigung mit dem Titel.'
+          ? `${capitalize(pushAudienceText(draft.audience))} bekommen sofort eine Benachrichtigung mit dem Titel.`
           : 'Ohne Benachrichtigung: Die Nachricht erscheint nur in der App.'}{' '}
         Der Titel steht oben auf jeder Seite der App, bis zum gewählten Ende (standardmäßig 24 Stunden); danach verschwindet die Nachricht
         von selbst.
@@ -219,6 +259,7 @@ const ACTIONS: Record<BoardRevision['action'], string> = {
   title: 'Titel geändert',
   content: 'Inhalt geändert',
   expires: 'Enddatum geändert',
+  audience: 'Sichtbarkeit geändert',
   attachments: 'Anhänge geändert',
   deleted: 'gelöscht',
   mailed: 'per E-Mail versendet',
@@ -237,6 +278,7 @@ function History({ id }: { id: number }) {
     if (v === null || v === undefined) return null;
     if (r.action === 'expires') return <span>{formatUntil(String(v))}</span>;
     if (r.action === 'title') return <span>{String(v)}</span>;
+    if (r.action === 'audience') return <span>{v === 'public' ? 'öffentlich' : 'intern'}</span>;
     if (r.action === 'content') return <RichTextView html={String(v)} className="board-rev-content" />;
     if (r.action === 'attachments') return <span>{Array.isArray(v) && v.length > 0 ? v.join(', ') : 'keine'}</span>;
     return null;
@@ -253,7 +295,11 @@ function History({ id }: { id: number }) {
                 r.after !== null &&
                 ` (an ${(r.after as { recipients?: number }).recipients ?? 0} Empfänger)`}
             </span>
-            {(r.action === 'title' || r.action === 'content' || r.action === 'expires' || r.action === 'attachments') && (
+            {(r.action === 'title' ||
+              r.action === 'content' ||
+              r.action === 'expires' ||
+              r.action === 'audience' ||
+              r.action === 'attachments') && (
               <div className="board-diff">
                 <div className="board-before">
                   <span className="muted small">vorher</span>
@@ -287,7 +333,13 @@ function History({ id }: { id: number }) {
 }
 
 function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolean; onToast: (msg: string) => void }) {
-  const [edit, setEdit] = useState<{ title: string; text: string; expires: string; attachments: Attachment[] } | null>(null);
+  const [edit, setEdit] = useState<{
+    title: string;
+    text: string;
+    expires: string;
+    audience: BoardAudience;
+    attachments: Attachment[];
+  } | null>(null);
   const [history, setHistory] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -311,8 +363,9 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
 
   function save() {
     if (!edit) return;
-    const changes: { title?: string; text?: string; expires_at?: string | null; attachments?: string[] } = {};
+    const changes: { title?: string; text?: string; expires_at?: string | null; audience?: BoardAudience; attachments?: string[] } = {};
     if (edit.title !== item.title) changes.title = edit.title;
+    if (edit.audience !== (item.audience ?? 'members')) changes.audience = edit.audience;
     if (edit.text !== item.text) changes.text = edit.text;
     const uids = edit.attachments.map((a) => a.uid);
     if (uids.join() !== (item.attachments ?? []).map((a) => a.uid).join()) changes.attachments = uids;
@@ -324,7 +377,7 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
 
   return (
     <article className={`card board-card ${focused ? 'focused' : ''}`} data-focus-id={item.id}>
-      <BoardMeta item={item} />
+      <BoardMeta item={item} /> {(canPost || boardVisible()) && <AudienceBadge audience={item.audience} />}
       {edit === null ? (
         <>
           <h3 className="board-title">{item.title}</h3>
@@ -357,6 +410,7 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
             onAdd={(a) => setEdit((d) => (d ? { ...d, attachments: [...d.attachments, a] } : d))}
             onRemove={(uid) => setEdit((d) => (d ? { ...d, attachments: d.attachments.filter((a) => a.uid !== uid) } : d))}
           />
+          <AudienceField value={edit.audience} onChange={(audience) => setEdit({ ...edit, audience })} />
           <ExpiresField value={edit.expires} onChange={(expires) => setEdit({ ...edit, expires })} />
         </div>
       )}
@@ -375,7 +429,13 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
               className="btn btn-secondary"
               disabled={busy}
               onClick={() =>
-                setEdit({ title: item.title, text: item.text, expires: toLocalInput(item.expires_at), attachments: item.attachments ?? [] })
+                setEdit({
+                  title: item.title,
+                  text: item.text,
+                  expires: toLocalInput(item.expires_at),
+                  audience: item.audience ?? 'members',
+                  attachments: item.attachments ?? [],
+                })
               }
             >
               Bearbeiten
@@ -396,7 +456,8 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
         ) : (
           <>
             <p className="muted small">
-              Ändern verschickt keine neue Benachrichtigung und keine neue E-Mail. Alle Änderungen stehen im Verlauf.
+              Ändern verschickt keine neue Benachrichtigung und keine neue E-Mail, auch nicht, wenn die Nachricht öffentlich wird. Alle
+              Änderungen stehen im Verlauf.
             </p>
             <div className="button-row">
               <button className="btn" disabled={busy || edit.title.trim() === '' || edit.text.trim() === ''} onClick={save}>
@@ -442,6 +503,7 @@ function Ended() {
             ) : (
               data.items.map((m) => (
                 <article key={m.id} className="card board-card board-ended-card">
+                  <AudienceBadge audience={m.audience} />
                   <span className="board-meta">
                     {m.author_name ?? 'Unbekannt'} · {formatShortTime(m.created_at)} ·{' '}
                     {m.deleted_at
@@ -514,7 +576,7 @@ export default function Brett({ focus, onToast }: { focus?: string; onToast: (ms
       ) : !boardLoaded() && error ? (
         <ErrorBox message={error} onRetry={load} />
       ) : messages.length === 0 ? (
-        <Empty>Zurzeit gibt es keine Nachrichten.</Empty>
+        <Empty>Zurzeit gibt es keine {boardVisible() || canPostBoard() ? '' : 'öffentlichen '}Nachrichten.</Empty>
       ) : (
         <>
           <h2 className="board-page-title">Aktuelle Nachrichten</h2>
@@ -522,6 +584,9 @@ export default function Brett({ focus, onToast }: { focus?: string; onToast: (ms
             <Entry key={`${item.id}-${item.updated_at}`} item={item} focused={flash === String(item.id)} onToast={onToast} />
           ))}
         </>
+      )}
+      {!config?.user && (config?.auth.mode === 'form' || !!config?.auth.loginUrl) && (
+        <p className="muted small board-login-hint">Interne Nachrichten siehst du nach der Anmeldung.</p>
       )}
       {canPostBoard() && <Ended />}
       {(pollsVisible() || canManagePolls()) && boardLoaded() && (

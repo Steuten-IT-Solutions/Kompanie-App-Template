@@ -5,7 +5,7 @@ import brand from './generated/brand';
 import logoUrl from './generated/logo-small.webp';
 import { detectPlatform, isStandalone, promptInstall, useCanPrompt } from './install';
 import BoardBanner from './BoardBanner';
-import { boardVisible, canManagePolls, canPostBoard, pollsVisible } from './board';
+import { boardReadable, boardVisible, canManagePolls, canPostBoard, pollsVisible } from './board';
 import { ErrorBoundary, lazyView, Loading } from './ui';
 import { birthdaysVisible } from './upcomingBirthdays';
 import { forgetPushOnLogout } from './push';
@@ -373,8 +373,9 @@ export default function App({ notice = null }: { notice?: string | null }) {
     meins: !!user,
     // Verwaltung: Mitgliederliste und Pflege (Punkte, Strafen, Dienstgrade …), dazu Schwarzes Brett, Umfragen und Inventar.
     verwaltung: adminTabs().length > 0,
-    // Schwarzes Brett (Issue #5): mit view_board lesen, mit post_board schreiben.
-    brett: boardVisible() || canPostBoard(),
+    // Schwarzes Brett (Issue #5): öffentliche Nachrichten alle (auch ohne Anmeldung, über Banner und Benachrichtigung),
+    // interne mit view_board; mit post_board schreiben. In der Navigation nur mit view_board (unten).
+    brett: boardReadable(),
     // Umfragen (Issue #4): mit vote_polls antworten, manage_polls verwaltet; laufende stehen am Brett.
     umfragen: pollsVisible() || canManagePolls(),
     // Inventar (Issue #6): nur mit manage_inventory, Einstieg über das Menü der Verwaltung.
@@ -586,7 +587,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
           </Suspense>
         </ErrorBoundary>
       )}
-      {boardVisible() && tab !== 'brett' && <BoardBanner />}
+      {boardReadable() && tab !== 'brett' && <BoardBanner />}
       {!online && <div className="offline">Offline – angezeigt werden die zuletzt geladenen Daten.</div>}
       {!['installieren', 'anmelden', 'einstellungen', 'einrichtung'].includes(tab) && <InstallBanner onToast={showToast} />}
 
