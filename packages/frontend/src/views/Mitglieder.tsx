@@ -305,7 +305,10 @@ function MemberPage({
   };
   const { f, m } = findPerson(userId);
   const name =
-    m?.name ?? officeData.data?.offices.flatMap((o) => o.terms.flatMap((t) => t.holders)).find((h) => h.user_id === userId)?.name;
+    m?.name ??
+    officeData.data?.offices
+      .flatMap((o) => o.terms.flatMap((t) => t.holders.flatMap((h) => [h, ...(h.companions ?? [])])))
+      .find((h) => h.user_id === userId)?.name;
 
   const order = useDirectoryOrder(userId, list.data, former.data);
   const ids = useMemo(() => order.map((e) => e.id), [order]);

@@ -1377,7 +1377,12 @@ export interface OfficeHolder {
   photo_url?: string | null;
   /** Nur für die Pflege: Kennung des Fotos eines freien Namens */
   image_uid?: string | null;
+  /** Begleitpersonen (z. B. Partnerin oder Partner), die das Amt nicht selbst bekleiden; fehlt ohne */
+  companions?: OfficeHolder[];
 }
+
+/** Person einer Amtszeit beim Speichern: Konto oder freier Name, dieser mit optionalem Foto (Kennung aus POST /rich-images) */
+export type OfficePersonInput = { user_id: number } | { name: string; image_uid?: string | null };
 
 export type OfficeTermKind = 'period' | 'point';
 
@@ -1425,8 +1430,8 @@ export interface OfficeTermInput {
   end_year: number | null;
   note: string;
   honor: boolean;
-  /** Konto oder freier Name, dieser mit optionalem Foto (Kennung aus POST /rich-images) */
-  holders: ({ user_id: number } | { name: string; image_uid?: string | null })[];
+  /** Konto oder freier Name, je mit bis zu 5 Begleitpersonen */
+  holders: (OfficePersonInput & { companions?: OfficePersonInput[] })[];
 }
 
 export interface OfficeImportRow {

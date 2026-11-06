@@ -17,6 +17,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Ämter: Begleitpersonen**: Bei einer Amtszeit kann jede Person eine Begleitung bekommen, die das Amt nicht selbst
+  bekleidet, z. B. Partnerin oder Partner. Sie steht im Zeitstrahl abgesetzt darunter („Max Muster“, darunter „mit
+  Erika Muster“), als Mitglied, Ehemaliger oder Name ohne Profil, auf Wunsch mit Foto. Einzutragen in der Verwaltung
+  der Ämter bei der Amtszeit mit *+ Begleitung*. Begleitpersonen bekommen keinen mit dem Amt verknüpften Titel, und
+  ihr Ausscheiden beendet keine Amtszeit. Partner, die bisher als eigene Person im Amt stehen, dort entfernen und als
+  Begleitung neu eintragen.
 - **Ämter: Einzahl für Gruppen**: Eine Gruppe der Ämter kann neben ihrer Bezeichnung (z. B. „Königshäuser“) eine
   Einzahl bekommen (z. B. „Königshaus“). Über einer einzelnen gemeinsamen Amtszeit steht dann „Königshaus 2026–2028“
   statt „Königshäuser 2026–2028“. Einzutragen in der Verwaltung der Ämter unter *Gruppen → Bearbeiten*; ohne Einzahl

@@ -1690,6 +1690,12 @@ WHERE title IS NULL",
                     'CREATE INDEX IF NOT EXISTS {app_news}_created_at ON {app_news} (created_at)',
                 ],
             ],
+            // Begleitpersonen einer Amtszeit (z. B. Partnerin oder Partner, die das Amt nicht selbst bekleiden): eigene
+            // Zeilen in office_holders mit der ID der Inhaber-Zeile, die sie begleiten; NULL: Inhaber wie bisher.
+            48 => [
+                'mysql' => ['ALTER TABLE {office_holders} ADD COLUMN companion_of bigint(20) unsigned DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {office_holders} ADD COLUMN companion_of INTEGER DEFAULT NULL'],
+            ],
         ];
     }
 
