@@ -3995,9 +3995,11 @@ test('Sponsoren (Issue #279): anlegen mit Link und Logo, Gast sieht sie ohne Anm
   await shot(page, 'sponsoren-verwalten');
 
   try {
+    // Neu laden ohne Anmeldung (ein Sprung nur im Anker # lädt die Seite nicht neu)
     await page.context().clearCookies();
-    await page.goto('/app/#/sponsoren');
+    await page.goto('/app/');
     await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
+    await page.locator('.tabbar').getByRole('button', { name: 'Sponsoren' }).click();
     const link = page.locator('.sponsor-grid a', { has: page.locator('img[alt="Bäckerei Test"]') });
     await expect(link).toHaveAttribute('href', 'https://baeckerei.example/');
     await expect(link).toHaveAttribute('rel', 'sponsored noopener noreferrer');
