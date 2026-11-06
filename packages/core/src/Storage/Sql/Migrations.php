@@ -1530,8 +1530,8 @@ WHERE title IS NULL",
             40 => [
                 'mysql' => [
                     'ALTER TABLE {office_groups} ADD COLUMN joint_terms tinyint(1) NOT NULL DEFAULT 0',
-                    'ALTER TABLE {office_terms} ADD COLUMN group_term_id bigint(20) unsigned DEFAULT NULL',
-                    'ALTER TABLE {office_terms} ADD KEY group_term_id (group_term_id)',
+                    // Spalte und Index in einer Anweisung: wiederholt ausgeführt überspringt der Migrator beides
+                    'ALTER TABLE {office_terms} ADD COLUMN group_term_id bigint(20) unsigned DEFAULT NULL, ADD KEY group_term_id (group_term_id)',
                     'CREATE TABLE IF NOT EXISTS {office_group_terms} (
   id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   group_id bigint(20) unsigned NOT NULL,
