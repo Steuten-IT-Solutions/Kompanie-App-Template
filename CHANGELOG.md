@@ -41,6 +41,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Zurück-Knopf in Untermenüs oben**: Auf *Sponsoren*, *Kompanien*, eigenen Seiten und auf *Termine*, *News* und
   *Galerie*, wenn sie in einem Untermenü stehen (z. B. *Intern*), stand *‹ Intern* bzw. *‹ <Untermenü>* unter dem
   Inhalt. Er steht jetzt wie auf den übrigen Seiten oben.
+- **Hinweis „Einrichtung starten“**: Die Karte hatte keinen Innenabstand, der Text stand am linken Rand, und die
+  Kacheln darunter schlossen ohne Abstand an. Beides ist behoben; dasselbe gilt für den Hinweis „Anmelden“ auf Seiten,
+  die erst nach der Anmeldung zu sehen sind.
 
 ## [0.6.0] – 2026-11-06
 

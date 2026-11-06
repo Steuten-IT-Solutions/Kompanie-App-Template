@@ -727,6 +727,16 @@ select {
   margin: 0 0 14px;
   color: var(--ink-2);
 }
+/* Hinweiskarten über dem Inhalt („Einrichtung starten“, „Anmelden“): Innenabstand und Abstand zu dem, was darunter folgt */
+.setup-hint,
+.login-first {
+  padding: 14px 16px;
+  margin: 0 0 14px;
+}
+.setup-hint p,
+.login-first p {
+  margin: 0 0 12px;
+}
 .toast {
   position: fixed;
   left: 50%;

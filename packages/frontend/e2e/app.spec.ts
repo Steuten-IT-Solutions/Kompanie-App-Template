@@ -3439,6 +3439,13 @@ test('Admin wird durch die Einrichtung geführt', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   const hint = page.locator('.setup-hint');
   await expect(hint).toBeVisible();
+  // Die Karte hat Innenabstand und hält Abstand zu dem, was darunter folgt.
+  const style = await hint.evaluate((el) => {
+    const s = getComputedStyle(el);
+    return { padding: parseFloat(s.paddingLeft), margin: parseFloat(s.marginBottom) };
+  });
+  expect(style.padding).toBeGreaterThan(0);
+  expect(style.margin).toBeGreaterThan(0);
   await hint.getByRole('button', { name: 'Einrichtung starten' }).click();
   await expect(page.locator('.topbar-title')).toHaveText('Einrichtung');
   // Erster Schritt: Bereiche wählen. Ohne Galerie entfällt deren Schritt.
