@@ -43,6 +43,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Kein Leerraum zum Scrollen auf kurzen Seiten**: Seiten mit wenig Inhalt, etwa die leere Galerie, ließen sich im
+  Handy-Browser ein Stück nach unten scrollen, so dass die Knöpfe oben aus dem Bild rutschten. Die Mindesthöhe der App
+  richtet sich jetzt nach dem sichtbaren Bildschirm (ohne die Adressleiste des Browsers).
 - **Formatierte Texte im dunklen Design lesbar**: Eingefügter Text (z. B. von eurer Webseite) brachte oft eine feste
   Schriftfarbe mit, die im dunklen Design kaum zu lesen war, etwa in der Beschreibung einer Kompanie. Farben mit zu
   wenig Kontrast zum Hintergrund zeigt die App jetzt in ihrer normalen Schriftfarbe, sehr große Zeilenabstände setzt

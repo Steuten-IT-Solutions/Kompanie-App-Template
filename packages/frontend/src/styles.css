@@ -45,6 +45,9 @@ select {
 .app {
   /* --kompanie-zoom: Ausgleich für die Desktop-Ansicht im Handy-Browser (viewport.ts) */
   min-height: calc(100vh / var(--kompanie-zoom, 1));
+  /* svh: sichtbare Höhe bei eingeblendeter Adressleiste. 100vh ist im Handy-Browser höher als der sichtbare Bereich,
+   * dann ließe sich eine Seite mit wenig Inhalt (z. B. leere Galerie) trotzdem ein Stück scrollen. */
+  min-height: calc(100svh / var(--kompanie-zoom, 1));
   padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
 }
 
