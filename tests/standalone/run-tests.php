@@ -369,6 +369,19 @@ try {
     $c->ok($d->send('GET', $base . 'index.php?r=/sponsorlogo/999999', [], null)[0] === 404, 'Unbekanntes Logo → 404');
     $d->request('DELETE', '/sponsors/' . ($sponsor['id'] ?? 0));
 
+    $c->section('Logos der Kompanien (Auslieferung, Issue #280)');
+    $d->actAs($anna);
+    $d->request('PUT', '/admin/features', ['companies' => true]);
+    [, $company] = $d->request('POST', '/companies', ['name' => 'Kpsa Kompanie']);
+    [$s, $company] = $d->request('POST', '/companies/' . ($company['id'] ?? 0) . '/logo', ['file' => ['name' => 'logo.svg', 'data' => base64_encode($svgLogo)]]);
+    $logoUrl = (string) ($company['logo_url'] ?? '');
+    $c->ok($s === 200 && str_starts_with($logoUrl, $base . 'index.php?r=/kompanielogo/' . ($company['id'] ?? 0) . '&v='), 'Logo hochgeladen, Adresse im Bereich der App');
+    $anon = $d->send('GET', $logoUrl, [], null);
+    $c->ok($anon[0] === 200 && ($anon[2]['content-type'] ?? '') === 'image/svg+xml' && str_starts_with((string) ($anon[2]['cache-control'] ?? ''), 'public'), 'Logo ohne Anmeldung: öffentlich');
+    $c->ok(!str_contains((string) file_get_contents($logoUrl), 'script'), 'Ausgeliefert wird das bereinigte SVG');
+    $c->ok($d->send('GET', $base . 'index.php?r=/kompanielogo/999999', [], null)[0] === 404, 'Unbekanntes Logo → 404');
+    $d->request('DELETE', '/companies/' . ($company['id'] ?? 0));
+
     $c->section('Abzeichen der Dienstgrade (Auslieferung)');
     $d->actAs($anna);
     [, $badgeRank] = $d->request('POST', '/ranks', ['title' => 'Kpsa Abzeichen ' . bin2hex(random_bytes(2))]);

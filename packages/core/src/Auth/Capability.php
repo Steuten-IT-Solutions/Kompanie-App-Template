@@ -89,6 +89,8 @@ enum Capability: string
     case SendMail = 'send_mail';
     /** Sponsoren pflegen: anlegen, ändern, Logo hochladen, sortieren, löschen (Bereich Sponsoren, Issue #279). */
     case ManageSponsors = 'manage_sponsors';
+    /** Kompanieliste pflegen und Mitglieder zuordnen (Bereich Kompanien, Issue #280). */
+    case ManageCompanies = 'manage_companies';
     /**
      * Persönliche Angaben anderer sehen: Adresse, Handynummer, E-Mail-Adresse und das ganze Geburtsdatum (in der
      * Verwaltung auf der Seite der Person). Die eigenen sieht jede Person unter Meins → Konto.
@@ -152,7 +154,7 @@ enum Capability: string
 
     /**
      * Wer die Mitgliederliste der Verwaltung sieht: wer Punkte oder Strafen vergibt, Dienstgrade, Titel oder die
-     * Anwesenheit pflegt, persönliche Angaben sieht, Mitglieder anlegt oder Rollen vergibt (wie memberListAllowed() in
+     * Anwesenheit pflegt, Mitglieder Kompanien zuordnet (Issue #280), persönliche Angaben sieht, Mitglieder anlegt oder Rollen vergibt (wie memberListAllowed() in
      * adminNav.tsx). Punkte und Strafen der Mitglieder zeigt sie nur mit dem jeweiligen Recht
      * (MemberService::visibleParts).
      *
@@ -160,6 +162,6 @@ enum Capability: string
      */
     public static function memberList(): array
     {
-        return [self::ManagePoints, self::ManagePenalties, self::ManageRanks, self::ManageTitles, self::ManageAttendance, self::ViewPersonal, self::CreateUsers, self::PromoteUsers];
+        return [self::ManagePoints, self::ManagePenalties, self::ManageRanks, self::ManageTitles, self::ManageAttendance, self::ManageCompanies, self::ViewPersonal, self::CreateUsers, self::PromoteUsers];
     }
 }

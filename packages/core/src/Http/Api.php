@@ -337,6 +337,7 @@ final class Api
             + ['photo_url' => $a->memberPhotos()->url($id), 'photo_editable' => $a->memberPhotos()->canEdit($this->user(), $id)]
             + $this->memberRank($id)
             + ($this->showTitles() ? ['titles' => $a->titles()->of($id)] : [])
+            + ($this->showCompanies() ? ['companies' => $a->companies()->of($id)] : [])
             // Persönliche Angaben (E-Mail, Handynummer, Adresse) und Geburtstag mit Jahr und Schaltern (Issue #1) nur mit
             // view_personal: Wer etwa nur Punkte verwaltet oder Konten anlegt, sieht kein Geburtsdatum, auch kein verborgenes
             + ($this->user()->can(Cap::ViewPersonal) ? ['personal' => $a->members()->personal($id)] : [])
@@ -388,12 +389,15 @@ final class Api
         $ranks = $a->features()->enabled('ranks') ? $a->ranks()->assigned() : null;
         $titles = $a->features()->enabled('titles') ? $a->titles()->byUser() : null;
         $viewer = $a->authContext->currentUser();
+        // Kompanien (Issue #280): mit dem Bereich und dem Recht, sie zu sehen; zum Filtern in der Mitgliederliste
+        $companies = $a->features()->enabled('companies') && ($viewer ?? $a->anonymous())->can(Cap::ViewCompanies) ? $a->companies()->byUser() : null;
         $birthdays = $entries === null && $a->features()->enabled('birthdays') ? $a->birthdays()->shownTo($viewer) : null;
         $joined = $entries === null ? $a->joinYears()->shownTo($viewer) : null;
         return array_map(static fn (array $m): array => $m
             + ['photo_url' => $photos[$m['id']] ?? null]
             + ($ranks !== null ? ['rank_title' => $ranks[$m['id']]['title'] ?? null, 'rank_badge_url' => $ranks[$m['id']]['badge_url'] ?? null] : [])
             + ($titles !== null ? ['titles' => $titles[$m['id']] ?? []] : [])
+            + ($companies !== null ? ['companies' => $companies[$m['id']] ?? []] : [])
             + ($birthdays !== null ? ['birthday' => $birthdays[$m['id']] ?? null] : [])
             + ($joined !== null ? ['join_year' => $joined[$m['id']]['year'] ?? null, 'join_date' => $joined[$m['id']]['date'] ?? null] : []), $entries ?? $a->members()->directory());
     }
@@ -412,6 +416,12 @@ final class Api
         $date = $a->time()->format($a->time()->timestamp(), 'Y-m-d');
         $name = $this->user()->id === $userId ? 'meine-daten-' . $date . '.json' : 'daten-' . $userId . '-' . $date . '.json';
         return Response::attachment($data, $name);
+    }
+
+    /** Kompanien in den Mitgliedsdetails der Verwaltung: Bereich an und Recht, sie zu verwalten (Issue #280). */
+    private function showCompanies(): bool
+    {
+        return $this->app->features()->enabled('companies') && $this->can(Cap::ManageCompanies);
     }
 
     /** Titel in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
@@ -766,6 +776,21 @@ final class Api
             }, 'sponsors', $denyRights),
             new Route('POST', '/sponsors/{id}/logo', Cap::ManageSponsors, fn (Request $r) => $a->sponsors()->uploadLogo($r->id(), $r->input('file')), 'sponsors', $denyRights),
             new Route('DELETE', '/sponsors/{id}/logo', Cap::ManageSponsors, fn (Request $r) => $a->sponsors()->removeLogo($r->id()), 'sponsors', $denyRights),
+
+            // Kompanien (Issue #280): öffentlich mit view_companies (anfangs auch Gast), Pflege und Zuordnung mit
+            // manage_companies; Mitglieder einer Kompanie nur, soweit die Mitgliederliste sichtbar ist
+            new Route('GET', '/companies', [Cap::ViewCompanies, Cap::ManageCompanies], fn () => $a->companies()->list($a->authContext->currentUser()), 'companies', $denyView),
+            new Route('POST', '/companies', Cap::ManageCompanies, fn (Request $r) => Response::created($a->companies()->create($r->body, $this->user())), 'companies', $denyRights),
+            new Route('PUT', '/companies/order', Cap::ManageCompanies, fn (Request $r) => $a->companies()->reorder($r->input('ids'), $this->user()), 'companies', $denyRights),
+            new Route('PATCH', '/companies/{id}', Cap::ManageCompanies, fn (Request $r) => $a->companies()->update($r->id(), $r->body, $this->user()), 'companies', $denyRights),
+            new Route('DELETE', '/companies/{id}', Cap::ManageCompanies, function (Request $r) use ($a) {
+                $a->companies()->delete($r->id());
+                return ['deleted' => true];
+            }, 'companies', $denyRights),
+            new Route('POST', '/companies/{id}/logo', Cap::ManageCompanies, fn (Request $r) => $a->companies()->uploadLogo($r->id(), $r->input('file'), $this->user()), 'companies', $denyRights),
+            new Route('DELETE', '/companies/{id}/logo', Cap::ManageCompanies, fn (Request $r) => $a->companies()->removeLogo($r->id(), $this->user()), 'companies', $denyRights),
+            new Route('PUT', '/companies/{id}/members', Cap::ManageCompanies, fn (Request $r) => $a->companies()->assignMembers($r->id(), $r->input('user_ids'), $this->user()), 'companies', $denyRights),
+            new Route('PUT', '/members/{id}/companies', Cap::ManageCompanies, fn (Request $r) => ['companies' => $a->companies()->assignToUser($r->id(), $r->input('company_ids'))], 'companies', $denyRights),
 
             // Listen (Issue #121): nur mit manage_lists; Werte der Mitglieder nur, soweit die Person sie ohnehin sieht
             new Route('GET', '/lists', Cap::ManageLists, fn () => $a->lists()->overview(), 'lists', $denyRights),

@@ -154,6 +154,7 @@ final class OfficeService
             throw ApiError::invalid(sprintf('In der Gruppe %s. Bitte erst verschieben oder löschen.', $count === 1 ? 'steht noch ein Amt' : 'stehen noch ' . $count . ' Ämter'));
         }
         $repo->deleteGroup($id);
+        $this->app->companies()->repository()->unlinkOfficeGroup($id);
     }
 
     /** @return list<array{id: int, title: string}> */

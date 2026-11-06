@@ -69,4 +69,14 @@ final class Input
         }
         return $url;
     }
+
+    /** Wie url(), aber nur https (Sponsoren, Kompanien); leer bleibt leer. */
+    public static function httpsUrl(mixed $value, string $message): string
+    {
+        $url = self::url($value, $message);
+        if ($url !== '' && strtolower((string) parse_url($url, PHP_URL_SCHEME)) !== 'https') {
+            throw ApiError::invalid($message);
+        }
+        return $url;
+    }
 }

@@ -29,6 +29,7 @@ import { whenIdle } from './prefetch';
 // Der Service Worker speichert alle Teile trotzdem vorab, damit sie auch offline da sind.
 const Anmelden = lazyView(() => import('./views/Anmelden'));
 const Galerie = lazyView(() => import('./views/Galerie'));
+const Kompanien = lazyView(() => import('./views/Kompanien'));
 const Sponsoren = lazyView(() => import('./views/Sponsoren'));
 const Meins = lazyView(() => import('./views/Meins'));
 const MaintenancePage = lazyView(() => import('./maintenance').then((m) => ({ default: m.MaintenancePage })));
@@ -53,6 +54,7 @@ const Punktekatalog = lazyView(() => import('./views/Punktekatalog'));
 // Untermenüs (Intern oder eingerichtet) laden die Teile ihrer Bereiche (preloadEntry).
 const tabViews: Partial<Record<string, { preload: () => void }>> = {
   galerie: Galerie,
+  kompanien: Kompanien,
   sponsoren: Sponsoren,
   dokumente: Dokumente,
   mitglieder: Mitglieder,
@@ -68,7 +70,7 @@ const tabViews: Partial<Record<string, { preload: () => void }>> = {
  * als eigene Tabs (z. B. Mitglieder für Gäste); Schwarzes Brett, Dienstgrade und Punktekatalog gibt es dort nur unter
  * „Intern“ (Mitglieder haben das Recht immer; das Brett erreicht man sonst über das Banner). */
 type InternView = 'mitglieder' | 'dokumente' | 'brett' | 'dienstgrade' | 'punktekatalog';
-type Tab = 'termine' | 'news' | 'galerie' | 'sponsoren' | 'intern' | InternView | 'meins' | 'verwaltung';
+type Tab = 'termine' | 'news' | 'galerie' | 'kompanien' | 'sponsoren' | 'intern' | InternView | 'meins' | 'verwaltung';
 type View =
   | Tab
   | 'menue'
@@ -86,6 +88,7 @@ const VIEWS: View[] = [
   'termine',
   'news',
   'galerie',
+  'kompanien',
   'sponsoren',
   'intern',
   'menue',
@@ -122,6 +125,7 @@ const tabLabels = (): Record<Tab | 'menue', string> => ({
   termine: sec.events,
   news: sec.news,
   galerie: sec.gallery,
+  kompanien: sec.companies,
   sponsoren: sec.sponsors,
   intern: 'Intern',
   // Untermenü der einrichtbaren Navigation: Titel ist sein Name (App)
@@ -187,6 +191,8 @@ function Icon({ name }: { name: string }) {
     news: 'M4 4h13v14a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2V4zm15 4h1a1 1 0 0 1 1 1v9a2 2 0 0 1-4 0V8h2zM7 7v4h7V7H7zm0 6v1.5h7V13H7zm0 3v1.5h7V16H7z',
     galerie:
       'M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm1 11.5V17h14v-2.5l-4-4-3.5 3.5-2-2L5 16.5zM8.5 7a1.75 1.75 0 1 0 0 3.5 1.75 1.75 0 0 0 0-3.5z',
+    // Schild: Kompanien
+    kompanien: 'M12 2 4 5v6c0 5 3.4 9.7 8 11 4.6-1.3 8-6 8-11V5l-8-3zm0 2.2 6 2.2V11c0 3.9-2.5 7.6-6 8.9V4.2z',
     // Herz: Sponsoren unterstützen die Kompanie
     sponsoren:
       'M12 21l-1.5-1.3C5.4 15.1 2 12 2 8.3 2 5.3 4.3 3 7.3 3c1.7 0 3.4.8 4.7 2.1C13.3 3.8 15 3 16.7 3 19.7 3 22 5.3 22 8.3c0 3.7-3.4 6.8-8.5 11.4L12 21z',
@@ -342,6 +348,8 @@ export default function App({ notice = null }: { notice?: string | null }) {
     termine: hasEvents() || birthdaysVisible(),
     news: !!features?.news && can('view_news'),
     galerie: !!features?.gallery && (can('view_gallery') || can('view_gallery_internal')),
+    // Kompanien (Issue #280): mit view_companies sehen, mit manage_companies (Verwaltung) ohnehin
+    kompanien: !!features?.companies && (can('view_companies') || can('manage_companies')),
     // Sponsoren (Issue #279): mit view_sponsors sehen, mit manage_sponsors (Verwaltung) ohnehin
     sponsoren: !!features?.sponsors && (can('view_sponsors') || can('manage_sponsors')),
     dokumente: docsAllowed,
@@ -403,7 +411,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
     tab === 'brett' ||
     tab === 'dienstgrade' ||
     tab === 'punktekatalog' ||
-    (['termine', 'news', 'galerie', 'sponsoren', 'dokumente'].includes(tab) && !path[1]) ||
+    (['termine', 'news', 'galerie', 'kompanien', 'sponsoren', 'dokumente'].includes(tab) && !path[1]) ||
     (tab === 'mitglieder' && !/^\d+$/.test(path[1] ?? '') && !path[2]);
   const activeTab: string = adminView ? 'verwaltung' : (parentMenu?.key ?? openMenu?.key ?? tab);
   // Gast öffnet einen geteilten Link auf eine Seite für Angemeldete: Hinweis; nach der Anmeldung geht sie auf (share.ts).
@@ -591,6 +599,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
               ))}
             {tab === 'news' && <News id={newsId} />}
             {tab === 'galerie' && <Galerie albumId={albumId} />}
+            {tab === 'kompanien' && <Kompanien />}
             {tab === 'sponsoren' && <Sponsoren />}
             {openMenu?.children && (
               <InternMenu label={openMenu.label} tabs={openMenu.children.map((v) => ({ id: v, label: targetLabels()[v] }))} />

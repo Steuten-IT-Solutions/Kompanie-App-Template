@@ -70,6 +70,7 @@ const DEFAULTS = {
     lists: 'Listen',
     mail: 'E-Mails',
     sponsors: 'Sponsoren',
+    companies: 'Kompanien',
   },
   rank: 'Dienstgrad',
 };

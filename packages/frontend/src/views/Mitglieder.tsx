@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { can, config, type DirectoryBirthday, type DirectoryEntry, type DirectoryFormerEntry } from '../api';
+import { can, config, type CompanyRef, type DirectoryBirthday, type DirectoryEntry, type DirectoryFormerEntry } from '../api';
 import { formatBirthday } from '../birthdays';
 import brand from '../generated/brand';
 import { formatYearOrDate, groupCounts } from '../format';
@@ -177,6 +177,13 @@ function useDirectoryOrder(userId: number, list: DirectoryEntry[] | null, former
  * Platzhalter fürs Foto; dasselbe Element mit derselben Überschrift, damit eine schon begonnene Geste weiterläuft.
  * peek: als Nachbar beim Wischen (nur zum Ansehen, eigene Klasse für den Namen, Foto ohne Vergrößern).
  */
+/** Kompanien, die in der Liste vorkommen: bestehende zuerst, dann nach Name. */
+function companyOptions(entries: DirectoryEntry[]): CompanyRef[] {
+  const byId = new Map<number, CompanyRef>();
+  for (const e of entries) for (const c of e.companies ?? []) byId.set(c.id, c);
+  return [...byId.values()].sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name, 'de'));
+}
+
 function PersonHead({
   name,
   m,
@@ -209,6 +216,18 @@ function PersonHead({
       {((m?.titles && m.titles.length > 0) || m?.candidate_role) && (
         <p className="member-page-titles">
           <TitleBadges titles={m.titles} role={m.candidate_role ?? undefined} />
+        </p>
+      )}
+      {m?.companies && m.companies.length > 0 && (
+        <p className="small member-page-companies">
+          {m.companies.map((c, i) => (
+            <span key={c.id}>
+              {i > 0 && ', '}
+              <button type="button" className="link-button" onClick={() => navigate('kompanien')}>
+                {c.name}
+              </button>
+            </span>
+          ))}
         </p>
       )}
       {m?.rank_title && (
@@ -377,6 +396,10 @@ function MemberList({ former = false }: { former?: boolean }) {
     former ? undefined : sources.directoryCounts.key,
   );
   const [query, setQuery] = useState('');
+  // Filter nach Kompanie (Issue #280): nur, wenn Personen Kompanien haben; 0 = alle.
+  const [companyId, setCompanyId] = useState(0);
+  const companies = useMemo(() => companyOptions(data ?? []), [data]);
+  const companyFilter = companies.some((c) => c.id === companyId) ? companyId : 0;
   const [stored, setStored] = useState<MemberOrder>(loadMemberOrder);
   // Gemerkt ist vielleicht die Sortierung nach Punkten aus der Verwaltung: hier dann nach Nachname.
   const sorts = former ? FORMER_SORTS : SORTS;
@@ -388,11 +411,15 @@ function MemberList({ former = false }: { former?: boolean }) {
   const list = useMemo(
     () =>
       sortMembers(
-        (data ?? []).filter((m) => m.name.toLowerCase().includes(query.trim().toLowerCase())),
+        (data ?? []).filter(
+          (m) =>
+            m.name.toLowerCase().includes(query.trim().toLowerCase()) &&
+            (companyFilter === 0 || (m.companies ?? []).some((c) => c.id === companyFilter)),
+        ),
         order,
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, query, order.sort, order.dir],
+    [data, query, companyFilter, order.sort, order.dir],
   );
 
   // Auf der Seite der Person blättert man in dieser Reihenfolge (mit Suche und Sortierung) weiter.
@@ -423,6 +450,20 @@ function MemberList({ former = false }: { former?: boolean }) {
         onChange={(e) => setQuery(e.target.value)}
         aria-label={former ? 'Ehemalige suchen' : 'Mitglied suchen'}
       />
+      {companies.length > 0 && (
+        <label className="field member-company-filter">
+          <span>{sec.companies}</span>
+          <select value={companyFilter} onChange={(e) => setCompanyId(Number(e.target.value))}>
+            <option value={0}>alle</option>
+            {companies.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+                {c.active ? '' : ' (ehemalig)'}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <div className="field-row member-sort">
         {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
         <div className="field">

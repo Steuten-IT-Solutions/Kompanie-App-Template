@@ -118,6 +118,7 @@ final class Roles
         Capability::ManageLists,
         Capability::SendMail,
         Capability::ManageSponsors,
+        Capability::ManageCompanies,
         // Kompanie verwalten
         Capability::ManagePoints,
         Capability::ManagePenalties,

@@ -31,6 +31,8 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
       return sub ? 'neuigkeiten-beitrag' : 'neuigkeiten';
     case 'galerie':
       return id ? 'galerie-album' : 'galerie';
+    case 'kompanien':
+      return 'kompanien';
     case 'sponsoren':
       return 'sponsoren';
     case 'intern':
@@ -118,6 +120,7 @@ function adminSlug([sub, arg, page]: string[], ctx: HelpContext): string | null 
     titel: 'titel-verwalten',
     aemter: 'aemter-verwalten',
     sponsoren: 'sponsoren-verwalten',
+    kompanien: 'kompanien-verwalten',
     neu: 'mitglieder-anlegen',
     'neu-mehrere': 'mitglieder-mehrere-anlegen',
     import: 'mitglieder-import',

@@ -63,6 +63,11 @@ final class FakeEnvironment implements Environment
         return 'https://example.org/app/sponsorlogo/' . $id . '?v=' . $version;
     }
 
+    public function companyLogoUrl(int $id, string $version): string
+    {
+        return 'https://example.org/app/kompanielogo/' . $id . '?v=' . $version;
+    }
+
     public function memberPhotoUrl(int $userId, string $version, int $size): string
     {
         return 'https://example.org/app/mitgliedsfoto/' . $userId . '?v=' . $version . '&s=' . $size;
