@@ -15,8 +15,17 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Neu
+
+- **Ämter: Einzahl für Gruppen**: Eine Gruppe der Ämter kann neben ihrer Bezeichnung (z. B. „Königshäuser“) eine
+  Einzahl bekommen (z. B. „Königshaus“). Über einer einzelnen gemeinsamen Amtszeit steht dann „Königshaus 2026–2028“
+  statt „Königshäuser 2026–2028“. Einzutragen in der Verwaltung der Ämter unter *Gruppen → Bearbeiten*; ohne Einzahl
+  bleibt es wie bisher.
+
 ### Geändert
 
+- **Ämter einer Person**: Im Zeitstrahl einer Person steht nur noch das Amt (bzw. seine Einzahl), nicht mehr
+  zusätzlich die Gruppe.
 - **Jahreszahl bei Terminen**: Liegt ein Termin nicht im laufenden Jahr, zeigt die App beim Datum jetzt auch das Jahr,
   z. B. „Fr., 8. Jan. 2027“. Das gilt für die internen und öffentlichen Termine, die Termine bei der Anwesenheit, die
   Verwaltung der öffentlichen Termine und die anstehenden Geburtstage.
