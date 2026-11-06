@@ -161,14 +161,28 @@ export async function crc32(blob: Blob): Promise<number> {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-/** Größte Größe eines ZIP ohne die Erweiterung ZIP64 (4 GB); größere Alben lädt man in Teilen. */
-export const ZIP_MAX_BYTES = 0xffffffff;
+/** Ab hier braucht ein Wert im ZIP die Erweiterung ZIP64 (0xffffffff selbst ist dort das Zeichen „steht in ZIP64“). */
+const ZIP32_MAX = 0xffffffff;
+const ZIP16_MAX = 0xffff;
+
+/** 64-Bit-Zahl (bis 2^53) als zwei 32-Bit-Hälften, ohne BigInt. */
+function setUint64(view: DataView, at: number, value: number): void {
+  view.setUint32(at, value % 0x100000000, true);
+  view.setUint32(at + 4, Math.floor(value / 0x100000000), true);
+}
 
 /**
  * ZIP ohne Packen („stored“: Bilder und Videos sind schon gepackt). Die Dateien werden nicht kopiert: Das Ergebnis setzt
  * sich aus den Kopfdaten und den Dateien selbst zusammen, so braucht auch ein großes Album kaum zusätzlichen Speicher.
+ * Über 4 GB (oder bei mehr als 65535 Dateien) schreibt es die Erweiterung ZIP64, aber nur bei den Einträgen, die sie
+ * brauchen; ein kleines Album bleibt ein gewöhnliches ZIP.
  */
-export async function storedZip(files: { name: string; blob: Blob }[], date = new Date()): Promise<Blob> {
+export async function storedZip(
+  files: { name: string; blob: Blob }[],
+  date = new Date(),
+  /** Nur für Tests: ab dieser Größe ZIP64 (sonst ab 4 GB). */
+  zip64From = ZIP32_MAX,
+): Promise<Blob> {
   const enc = new TextEncoder();
   const time = (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2);
   const day = ((Math.max(1980, date.getFullYear()) - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate();
@@ -176,48 +190,95 @@ export async function storedZip(files: { name: string; blob: Blob }[], date = ne
   const central: BlobPart[] = [];
   let offset = 0;
   let cdSize = 0;
-  if (files.length > 0xffff) throw new Error('Zu viele Dateien für ein ZIP.');
   for (const f of files) {
     const name = enc.encode(f.name);
     const crc = await crc32(f.blob);
     const size = f.blob.size;
-    if (offset + 30 + name.length + size > ZIP_MAX_BYTES) throw new Error('Das Album ist zu groß für ein ZIP (über 4 GB).');
-    const local = new DataView(new ArrayBuffer(30));
+    const bigSize = size >= zip64From;
+    const bigOffset = offset >= zip64From;
+    const version = bigSize || bigOffset ? 45 : 20;
+    // Lokaler Kopf: Bei ZIP64 stehen beide Größen (je 8 Byte) im Zusatzfeld 0x0001.
+    const localExtra = bigSize ? 20 : 0;
+    const local = new DataView(new ArrayBuffer(30 + localExtra));
     local.setUint32(0, 0x04034b50, true);
-    local.setUint16(4, 20, true);
+    local.setUint16(4, bigSize ? 45 : 20, true);
     local.setUint16(6, 0x0800, true); // Namen in UTF-8
     local.setUint16(8, 0, true);
     local.setUint16(10, time, true);
     local.setUint16(12, day, true);
     local.setUint32(14, crc, true);
-    local.setUint32(18, size, true);
-    local.setUint32(22, size, true);
+    local.setUint32(18, bigSize ? ZIP32_MAX : size, true);
+    local.setUint32(22, bigSize ? ZIP32_MAX : size, true);
     local.setUint16(26, name.length, true);
-    local.setUint16(28, 0, true);
-    parts.push(local.buffer, name as Uint8Array<ArrayBuffer>, f.blob);
+    local.setUint16(28, localExtra, true);
+    if (bigSize) {
+      local.setUint16(30, 0x0001, true);
+      local.setUint16(32, 16, true);
+      setUint64(local, 34, size);
+      setUint64(local, 42, size);
+    }
+    parts.push(local.buffer.slice(0, 30), name as Uint8Array<ArrayBuffer>);
+    if (localExtra) parts.push(local.buffer.slice(30));
+    parts.push(f.blob);
+    // Zentralverzeichnis: Im Zusatzfeld stehen nur die Werte, die 0xffffffff tragen, in dieser Reihenfolge.
+    const extraLen = (bigSize ? 16 : 0) + (bigOffset ? 8 : 0);
+    const centralExtra = extraLen ? 4 + extraLen : 0;
     const c = new DataView(new ArrayBuffer(46));
     c.setUint32(0, 0x02014b50, true);
-    c.setUint16(4, 20, true);
-    c.setUint16(6, 20, true);
+    c.setUint16(4, version, true);
+    c.setUint16(6, version, true);
     c.setUint16(8, 0x0800, true);
     c.setUint16(10, 0, true);
     c.setUint16(12, time, true);
     c.setUint16(14, day, true);
     c.setUint32(16, crc, true);
-    c.setUint32(20, size, true);
-    c.setUint32(24, size, true);
+    c.setUint32(20, bigSize ? ZIP32_MAX : size, true);
+    c.setUint32(24, bigSize ? ZIP32_MAX : size, true);
     c.setUint16(28, name.length, true);
-    c.setUint32(42, offset, true);
+    c.setUint16(30, centralExtra, true);
+    c.setUint32(42, bigOffset ? ZIP32_MAX : offset, true);
     central.push(c.buffer, name as Uint8Array<ArrayBuffer>);
-    offset += 30 + name.length + size;
-    cdSize += 46 + name.length;
+    if (centralExtra) {
+      const x = new DataView(new ArrayBuffer(centralExtra));
+      x.setUint16(0, 0x0001, true);
+      x.setUint16(2, extraLen, true);
+      let at = 4;
+      if (bigSize) {
+        setUint64(x, at, size);
+        setUint64(x, at + 8, size);
+        at += 16;
+      }
+      if (bigOffset) setUint64(x, at, offset);
+      central.push(x.buffer);
+    }
+    offset += 30 + localExtra + name.length + size;
+    cdSize += 46 + name.length + centralExtra;
   }
-  if (offset + cdSize + 22 > ZIP_MAX_BYTES) throw new Error('Das Album ist zu groß für ein ZIP (über 4 GB).');
+  const tail: BlobPart[] = [];
+  const zip64End = files.length >= ZIP16_MAX || cdSize >= zip64From || offset >= zip64From;
+  if (zip64End) {
+    // Ende des Zentralverzeichnisses als ZIP64-Satz (56 Byte) und der Verweis darauf (20 Byte).
+    const r = new DataView(new ArrayBuffer(56 + 20));
+    r.setUint32(0, 0x06064b50, true);
+    setUint64(r, 4, 44);
+    r.setUint16(12, 45, true);
+    r.setUint16(14, 45, true);
+    setUint64(r, 24, files.length);
+    setUint64(r, 32, files.length);
+    setUint64(r, 40, cdSize);
+    setUint64(r, 48, offset);
+    r.setUint32(56, 0x07064b50, true);
+    setUint64(r, 64, offset + cdSize);
+    r.setUint32(72, 1, true);
+    tail.push(r.buffer);
+  }
   const end = new DataView(new ArrayBuffer(22));
   end.setUint32(0, 0x06054b50, true);
-  end.setUint16(8, files.length, true);
-  end.setUint16(10, files.length, true);
-  end.setUint32(12, cdSize, true);
-  end.setUint32(16, offset, true);
-  return new Blob([...parts, ...central, end.buffer], { type: 'application/zip' });
+  // Mit ZIP64 tragen alle Felder das Zeichen „steht im ZIP64-Satz“.
+  end.setUint16(8, zip64End ? ZIP16_MAX : files.length, true);
+  end.setUint16(10, zip64End ? ZIP16_MAX : files.length, true);
+  end.setUint32(12, zip64End ? ZIP32_MAX : cdSize, true);
+  end.setUint32(16, zip64End ? ZIP32_MAX : offset, true);
+  tail.push(end.buffer);
+  return new Blob([...parts, ...central, ...tail], { type: 'application/zip' });
 }

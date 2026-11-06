@@ -125,3 +125,66 @@ test('Erst die Originalauflösung, sonst die 1600er; der Platzhalter (202) zähl
     globalThis.fetch = real;
   }
 });
+
+/** Signaturen im ZIP von hinten: EOCD, davor bei ZIP64 Verweis und ZIP64-Satz. */
+function zipTail(bytes: Uint8Array) {
+  const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const end = bytes.length - 22;
+  return {
+    eocd: v.getUint32(end, true),
+    entries: v.getUint16(end + 10, true),
+    locator: end >= 20 ? v.getUint32(end - 20, true) : 0,
+    zip64Entries: end >= 76 ? Number(v.getBigUint64(end - 76 + 32, true)) : 0,
+    zip64CdOffset: end >= 76 ? Number(v.getBigUint64(end - 76 + 48, true)) : 0,
+  };
+}
+
+test('Kleines ZIP bleibt ohne ZIP64', async () => {
+  const zip = new Uint8Array(await (await storedZip([{ name: 'a.jpg', blob: new Blob(['abc']) }])).arrayBuffer());
+  const t = zipTail(zip);
+  assert.equal(t.eocd, 0x06054b50);
+  assert.equal(t.entries, 1);
+  assert.notEqual(t.locator, 0x07064b50);
+  assert.equal(new DataView(zip.buffer).getUint16(4, true), 20); // Version 2.0 reicht
+});
+
+test('ZIP64: Größen und Versatz im Zusatzfeld, Ende als ZIP64-Satz; entpackbar', async () => {
+  // Ab 0 Byte ZIP64, damit der Test keine 4 GB braucht. Die Werte stehen dann alle im Zusatzfeld.
+  const zip = new Uint8Array(
+    await (
+      await storedZip(
+        [
+          { name: 'Schützenfest.jpg', blob: new Blob([new Uint8Array([0xff, 0xd8, 1, 2])]) },
+          { name: 'Umzug.mp4', blob: new Blob(['video']) },
+        ],
+        new Date(),
+        0,
+      )
+    ).arrayBuffer(),
+  );
+  const v = new DataView(zip.buffer);
+  assert.equal(v.getUint16(4, true), 45); // Version 4.5 (ZIP64)
+  assert.equal(v.getUint32(18, true), 0xffffffff); // Größe steht im Zusatzfeld
+  assert.equal(v.getUint16(30 + v.getUint16(26, true), true), 0x0001); // Zusatzfeld ZIP64
+  const t = zipTail(zip);
+  assert.equal(t.eocd, 0x06054b50);
+  assert.equal(t.entries, 0xffff);
+  assert.equal(t.locator, 0x07064b50);
+  assert.equal(t.zip64Entries, 2);
+  assert.equal(v.getUint32(t.zip64CdOffset, true), 0x02014b50); // Zentralverzeichnis dort, wo der ZIP64-Satz sagt
+  const files = unzipSync(zip);
+  assert.deepEqual(Object.keys(files), ['Schützenfest.jpg', 'Umzug.mp4']);
+  assert.deepEqual([...files['Schützenfest.jpg']], [0xff, 0xd8, 1, 2]);
+  assert.equal(new TextDecoder().decode(files['Umzug.mp4']), 'video');
+});
+
+test('ZIP64 auch bei mehr als 65535 Dateien', async () => {
+  const many = Array.from({ length: 0x10000 }, (_, i) => ({ name: `${i}.jpg`, blob: new Blob([String(i)]) }));
+  const zip = new Uint8Array(await (await storedZip(many)).arrayBuffer());
+  const t = zipTail(zip);
+  assert.equal(t.locator, 0x07064b50);
+  assert.equal(t.zip64Entries, 0x10000);
+  const files = unzipSync(zip);
+  assert.equal(Object.keys(files).length, 0x10000);
+  assert.equal(new TextDecoder().decode(files['65535.jpg']), '65535');
+});

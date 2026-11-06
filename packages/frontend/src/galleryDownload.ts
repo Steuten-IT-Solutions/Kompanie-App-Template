@@ -1,14 +1,5 @@
 import type { GalleryAlbum, GalleryPhoto } from './api';
-import {
-  albumFileName,
-  downloadablePhotos,
-  fetchMedia,
-  isVideoEntry,
-  mediaFileName,
-  storedZip,
-  uniqueNames,
-  ZIP_MAX_BYTES,
-} from './downloadFiles';
+import { albumFileName, downloadablePhotos, fetchMedia, isVideoEntry, mediaFileName, storedZip, uniqueNames } from './downloadFiles';
 import { saveFile } from './saveFile';
 
 /**
@@ -33,7 +24,8 @@ const PARALLEL = 2;
 
 /**
  * Alle Bilder und Videos eines Albums als ZIP. onProgress bekommt die Zahl der geladenen Dateien. Was gerade nicht zu
- * laden ist, fehlt; die Zahl steht im Ergebnis. Ist gar nichts zu laden, ein Fehler. Über 4 GB bricht es ab.
+ * laden ist, fehlt; die Zahl steht im Ergebnis. Ist gar nichts zu laden, ein Fehler. Über 4 GB wird es ein
+ * ZIP64; Grenze ist dann der Platz, den der Browser für Dateien hat.
  */
 export async function downloadAlbum(
   album: GalleryAlbum,
@@ -45,19 +37,14 @@ export async function downloadAlbum(
   const blobs: (Blob | null)[] = new Array(photos.length).fill(null);
   let next = 0;
   let done = 0;
-  let bytes = 0;
-  const tooBig = new Error('Das Album ist zu groß für ein ZIP (über 4 GB). Lade die Videos einzeln in der Großansicht herunter.');
   onProgress(0, photos.length);
   const worker = async () => {
     while (next < photos.length) {
       const i = next++;
       try {
-        const blob = await fetchMedia(photos[i], signal);
-        bytes += blob.size;
-        if (bytes > ZIP_MAX_BYTES) throw tooBig;
-        blobs[i] = blob;
+        blobs[i] = await fetchMedia(photos[i], signal);
       } catch (e) {
-        if ((e as Error).name === 'AbortError' || e === tooBig) throw e;
+        if ((e as Error).name === 'AbortError') throw e;
       }
       onProgress(++done, photos.length);
     }
@@ -65,6 +52,16 @@ export async function downloadAlbum(
   await Promise.all(Array.from({ length: Math.min(PARALLEL, photos.length) }, worker));
   const files = photos.flatMap((_, i) => (blobs[i] ? [{ name: names[i], blob: blobs[i]! }] : []));
   if (files.length === 0) throw new Error('Die Dateien lassen sich gerade nicht laden. Bitte später erneut versuchen.');
-  await saveFile(await storedZip(files), albumFileName(album), { title: album.title });
+  let zip: Blob;
+  try {
+    zip = await storedZip(files);
+  } catch {
+    // Liest der Browser die geladenen Dateien nicht mehr (meist fehlt ihm Platz, z. B. im privaten Fenster), meldet er nur
+    // einen allgemeinen Fehler.
+    throw new Error(
+      'Das ZIP ließ sich nicht erstellen, vermutlich fehlt dem Browser Platz. Lade die Videos einzeln in der Großansicht herunter oder nutze kein privates Fenster.',
+    );
+  }
+  await saveFile(zip, albumFileName(album), { title: album.title });
   return { saved: files.length, missing: photos.length - files.length };
 }
