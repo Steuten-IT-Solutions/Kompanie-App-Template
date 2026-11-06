@@ -21,6 +21,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Einzahl bekommen (z. B. „Königshaus“). Über einer einzelnen gemeinsamen Amtszeit steht dann „Königshaus 2026–2028“
   statt „Königshäuser 2026–2028“. Einzutragen in der Verwaltung der Ämter unter *Gruppen → Bearbeiten*; ohne Einzahl
   bleibt es wie bisher.
+- **News direkt in der App schreiben**: Unter *Einstellungen → Neuigkeiten* gibt es die Quelle *In der App schreiben*,
+  mit WordPress und ohne. Dann steht unter News der Knopf *Neuer Beitrag*: Titel und formatierter Text mit Bildern,
+  das erste Bild erscheint auch in der Liste. Beiträge lassen sich später bearbeiten und löschen; wer News abonniert
+  hat, bekommt bei einem neuen Beitrag eine Benachrichtigung. Schreiben darf, wer das neue Recht *News schreiben* hat;
+  mit der Quelle legt die App die Rolle „News verwalten“ an. Es gilt immer eine Quelle, Beiträge der Webseite oder
+  eines Feeds und der App werden nicht gemischt; beim Wechsel bleibt alles gespeichert. Wer die News von der Webseite
+  oder aus einem Feed bezieht, merkt nichts davon.
 - **Zugang beantragen**: Personen können ihren Zugang zur App jetzt selbst beantragen, ihr müsst nicht mehr jedes
   Konto selbst anlegen. Eingeschaltet wird das unter *Einstellungen → Zugang beantragen* (bis dahin bleibt es aus).
   Die Person füllt ein Formular mit Name, E-Mail-Adresse, Benutzername und Passwort aus; die Anfrage erscheint unter
@@ -33,6 +40,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Kompanien haben eine eigene Seite**: Ein Tipp auf eine Kompanie klappt die Karte nicht mehr auf, sondern öffnet
+  ihre Seite mit Logo, Beschreibung, laufenden Ämtern, Links und der Liste ihrer Mitglieder (wie bisher nur für alle,
+  die die Mitgliederliste sehen dürfen). Die Seite hat einen eigenen Link zum Teilen; „‹ Alle Kompanien“ führt zurück
+  an dieselbe Stelle der Liste. Auch der Name einer Kompanie auf der Seite einer Person führt jetzt direkt dorthin.
 - **Ämter einer Person**: Im Zeitstrahl einer Person steht nur noch das Amt (bzw. seine Einzahl), nicht mehr
   zusätzlich die Gruppe.
 - **Jahreszahl bei Terminen**: Liegt ein Termin nicht im laufenden Jahr, zeigt die App beim Datum jetzt auch das Jahr,
@@ -47,9 +58,16 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   sie auf normal. Gespeichert bleibt der Text unverändert. Links in formatierten Texten sind im dunklen Design jetzt
   ebenfalls gut lesbar.
 - **Kompanien**: *Webseite* und *App der Kompanie* sind jetzt Knöpfe im Stil der App statt blauer Standard-Links.
+- **Hinweis „Einrichtung starten“ nach dem Wiederherstellen**: Wurde in einer frisch installierten, noch nicht
+  eingerichteten App eine Sicherung eingespielt, stand der Hinweis „Einrichtung starten“ weiter über jeder Seite. Mit
+  der Sicherung gilt die App jetzt als eingerichtet; Bereiche und Verbindungen lassen sich wie gewohnt unter
+  *Einstellungen* ändern.
 - **Zurück-Knopf in Untermenüs oben**: Auf *Sponsoren*, *Kompanien*, eigenen Seiten und auf *Termine*, *News* und
   *Galerie*, wenn sie in einem Untermenü stehen (z. B. *Intern*), stand *‹ Intern* bzw. *‹ <Untermenü>* unter dem
   Inhalt. Er steht jetzt wie auf den übrigen Seiten oben.
+- **Hinweis „Einrichtung starten“**: Die Karte hatte keinen Innenabstand, der Text stand am linken Rand, und die
+  Kacheln darunter schlossen ohne Abstand an. Beides ist behoben; dasselbe gilt für den Hinweis „Anmelden“ auf Seiten,
+  die erst nach der Anmeldung zu sehen sind.
 
 ## [0.6.0] – 2026-11-06
 

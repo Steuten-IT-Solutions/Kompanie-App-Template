@@ -91,6 +91,12 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
     items: [
       { key: 'manage_events', label: `Öffentliche ${sec.events} pflegen`, short: `${sec.events} pflegen`, features: ['events'] },
       {
+        key: 'manage_news',
+        label: `${sec.news}: Beiträge in der App schreiben, bearbeiten und löschen (nur mit der Quelle „In der App“)`,
+        short: `${sec.news} schreiben`,
+        features: ['news'],
+      },
+      {
         key: 'manage_documents',
         label: `${sec.documents} pflegen und alle ${sec.documents} sehen`,
         short: `${sec.documents} pflegen`,

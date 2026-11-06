@@ -112,6 +112,7 @@ final class Roles
         Capability::ViewCatalog,
         // Inhalte verwalten
         Capability::ManageEvents,
+        Capability::ManageNews,
         Capability::ManageDocuments,
         Capability::PostBoard,
         Capability::ManagePolls,

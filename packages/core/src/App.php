@@ -26,6 +26,7 @@ use KompanieApp\Core\Domain\FileMediaStore;
 use KompanieApp\Core\Domain\FormerMemberService;
 use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Domain\GallerySubmissionService;
+use KompanieApp\Core\Domain\NewsService;
 use KompanieApp\Core\Domain\PageService;
 use KompanieApp\Core\Domain\GalleryUploadService;
 use KompanieApp\Core\Domain\GoogleConnect;
@@ -816,6 +817,12 @@ final class App
     public function galleryUploads(): GalleryUploadService
     {
         return $this->service(GalleryUploadService::class, fn () => new GalleryUploadService($this));
+    }
+
+    /** Quelle der News und News in der App (Einstellung news_source). */
+    public function newsService(): NewsService
+    {
+        return $this->service(NewsService::class, fn () => new NewsService($this));
     }
 
     public function pages(): PageService

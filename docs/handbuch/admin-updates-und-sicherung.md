@@ -38,7 +38,7 @@ Mit diesem Passwort sind heruntergeladene Sicherungen und alle Sicherungen in Go
 1. Tippe auf **Sicherung wiederherstellen …**.
 2. Wähle die Sicherungsdatei. Liegt sie in Google Drive, lädst du sie vorher von dort herunter.
 3. Bestätige die Rückfrage. Ist die Sicherung verschlüsselt, gib das Passwort für Sicherungen ein, das beim Erstellen der Sicherung galt, und tippe auf **Wiederherstellen**.
-4. Die Sicherung ersetzt **alle** Daten der App; danach lädt die App neu.
+4. Die Sicherung ersetzt **alle** Daten der App; danach lädt die App neu. In einer frisch installierten App gilt die Einrichtung damit als erledigt: Bereiche und Verbindungen kommen aus der Sicherung, der Hinweis **Einrichtung starten** verschwindet.
 
 ## Gut zu wissen
 - **Inhalt:** Die Sicherung enthält alle Daten der App, die Einstellungen, die Zugangsschlüssel und die Konten (Passwörter nur als Prüfwerte), dazu die Dateien der {bereich.documents}, die Abzeichen der {bereich.ranks} und die Anmeldungen der Geräte für Benachrichtigungen. Mit WordPress sind alle Benutzer der Webseite dabei. Behandle eine unverschlüsselte Datei wie ein Passwort.

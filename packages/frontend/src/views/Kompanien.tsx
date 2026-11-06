@@ -1,3 +1,4 @@
+import { useLayoutEffect } from 'react';
 import { can, config, type Company, type Office } from '../api';
 import brand from '../generated/brand';
 import RichTextView from '../richtext/RichTextView';
@@ -36,12 +37,76 @@ function CurrentOffices({ offices }: { offices: Office[] }) {
   );
 }
 
+/** Kurzname, Gründungsjahr und Zahl der Mitglieder in einer Zeile. */
+function facts(c: Company): string {
+  return [c.short_name, c.founded_year ? `gegründet ${c.founded_year}` : '', c.member_count ? `${c.member_count} Mitglieder` : '']
+    .filter(Boolean)
+    .join(' · ');
+}
+
 /**
- * Kompanien (Issue #280): Liste mit Logo in der Reihenfolge der Verwaltung, jede Karte aufklappbar mit Beschreibung,
- * Gründungsjahr, Links, den laufenden Ämtern der verknüpften Gruppe und den Mitgliedern (soweit die Mitgliederliste
- * sichtbar ist). Aufgelöste stehen unten als „ehemalig“.
+ * Scrollposition der Liste beim Öffnen einer Kompanie: Zurück (im Browser, per Wischen oder mit „‹ Alle …“) führt wieder
+ * dorthin statt an den Anfang (wie bei den Alben der Galerie).
  */
-export default function Kompanien() {
+let listScroll: number | null = null;
+
+/**
+ * Kompanien (Issue #280): Liste mit Logo in der Reihenfolge der Verwaltung; Antippen öffnet die eigene Seite der Kompanie
+ * (#/kompanien/<id>). Aufgelöste stehen unten als „ehemalig“.
+ */
+export default function Kompanien({ id }: { id?: number }) {
+  return id === undefined ? <CompanyList /> : <CompanyDetail id={id} />;
+}
+
+function CompanyList() {
+  const { data, error, loading, reload } = useAsync(sources.companies.load, sources.companies.deps, sources.companies.key);
+  const ready = !!data;
+  useLayoutEffect(() => {
+    if (!ready || listScroll === null) return;
+    window.scrollTo(0, listScroll);
+    listScroll = null;
+  }, [ready]);
+  if (loading && !data) return <Loading />;
+  if (error || !data) return <ErrorBox message={error ?? `Die ${sec.companies} konnten nicht geladen werden.`} onRetry={reload} />;
+  if (data.length === 0) return <Empty>Noch keine {sec.companies}.</Empty>;
+  const ordered = [...data.filter((c) => c.active), ...data.filter((c) => !c.active)];
+  return (
+    <ul className="card-list company-list">
+      {ordered.map((c) => (
+        <li key={c.id} className={`card company-card${c.active ? '' : ' inactive'}`} data-focus-id={c.id}>
+          <button
+            type="button"
+            className="company-summary"
+            onClick={() => {
+              listScroll = window.scrollY;
+              navigate(`kompanien/${c.id}`);
+            }}
+          >
+            <span className="company-logo-box">
+              <CompanyLogo company={c} />
+            </span>
+            <span className="company-head">
+              <span className="row-title">
+                {c.name}
+                {!c.active && <span className="badge badge-level-guest">ehemalig</span>}
+              </span>
+              <span className="row-sub">{facts(c)}</span>
+            </span>
+            <span className="chevron" aria-hidden="true">
+              ›
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * Seite einer Kompanie: Logo, Name, Beschreibung, laufende Ämter der verknüpften Gruppe, Links und die Mitglieder (die
+ * schickt der Server nur, wenn der Betrachter die Mitgliederliste sieht, und nur mit Namen).
+ */
+function CompanyDetail({ id }: { id: number }) {
   const { data, error, loading, reload } = useAsync(sources.companies.load, sources.companies.deps, sources.companies.key);
   const officesShown = !!config?.features.offices && can('view_offices');
   const offices = useAsync(
@@ -49,73 +114,79 @@ export default function Kompanien() {
     sources.offices.deps,
     officesShown ? sources.offices.key : undefined,
   );
-  if (loading && !data) return <Loading />;
-  if (error || !data) return <ErrorBox message={error ?? `Die ${sec.companies} konnten nicht geladen werden.`} onRetry={reload} />;
-  if (data.length === 0) return <Empty>Noch keine {sec.companies}.</Empty>;
-  const ordered = [...data.filter((c) => c.active), ...data.filter((c) => !c.active)];
+  const back = (
+    <button type="button" className="btn btn-link back" onClick={() => navigate('kompanien')}>
+      ‹ Alle {sec.companies}
+    </button>
+  );
+  if (loading && !data) return <Loading shape="detail" />;
+  if (error || !data)
+    return (
+      <>
+        {back}
+        <ErrorBox message={error ?? `Die ${sec.companies} konnten nicht geladen werden.`} onRetry={reload} />
+      </>
+    );
+  const c = data.find((x) => x.id === id);
+  if (!c)
+    return (
+      <>
+        {back}
+        <Empty>Diesen Eintrag gibt es nicht (mehr).</Empty>
+      </>
+    );
+  const groupOffices = c.office_group?.shown ? (offices.data?.offices ?? []).filter((o) => o.group_id === c.office_group?.id) : [];
   return (
-    <ul className="card-list company-list">
-      {ordered.map((c) => {
-        const groupOffices = c.office_group?.shown ? (offices.data?.offices ?? []).filter((o) => o.group_id === c.office_group?.id) : [];
-        return (
-          <li key={c.id} className={`card company-card${c.active ? '' : ' inactive'}`} data-focus-id={c.id}>
-            <details>
-              <summary className="company-summary">
-                <span className="company-logo-box">
-                  <CompanyLogo company={c} />
+    <div className={`company-page${c.active ? '' : ' inactive'}`}>
+      {back}
+      <header className="company-page-head">
+        <span className="company-logo-box company-page-logo">
+          <CompanyLogo company={c} />
+        </span>
+        <div className="company-head">
+          <h2 className="member-name">
+            {c.name}
+            {!c.active && <span className="badge badge-level-guest">ehemalig</span>}
+          </h2>
+          {facts(c) && <p className="row-sub">{facts(c)}</p>}
+        </div>
+      </header>
+      {c.description && <RichTextView html={c.description} />}
+      <CurrentOffices offices={groupOffices} />
+      {(c.website_url || c.app_url) && (
+        <p className="company-links">
+          {c.website_url && (
+            <a className="btn btn-secondary btn-small" href={c.website_url} target="_blank" rel="noopener noreferrer">
+              Webseite
+            </a>
+          )}
+          {c.app_url && (
+            <a className="btn btn-secondary btn-small" href={c.app_url} target="_blank" rel="noopener noreferrer">
+              App der Kompanie
+            </a>
+          )}
+        </p>
+      )}
+      {c.members && c.members.length > 0 && (
+        <>
+          <h3 className="section-title">Mitglieder</h3>
+          <ul className="card-list company-members">
+            {c.members.map((m) => (
+              <li key={m.id} className="card row member-row-link">
+                <div className="row-main">
+                  {/* Die ganze Zeile öffnet die Seite der Person (wie in der Mitgliederliste). */}
+                  <button type="button" className="row-title member-row-open" onClick={() => navigate(`mitglieder/${m.id}`)}>
+                    {m.name}
+                  </button>
+                </div>
+                <span className="chevron" aria-hidden="true">
+                  ›
                 </span>
-                <span className="company-head">
-                  <span className="row-title">
-                    {c.name}
-                    {!c.active && <span className="badge badge-level-guest">ehemalig</span>}
-                  </span>
-                  <span className="row-sub">
-                    {[
-                      c.short_name,
-                      c.founded_year ? `gegründet ${c.founded_year}` : '',
-                      c.member_count ? `${c.member_count} Mitglieder` : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </span>
-                </span>
-              </summary>
-              <div className="company-body">
-                {c.description && <RichTextView html={c.description} />}
-                <CurrentOffices offices={groupOffices} />
-                {(c.website_url || c.app_url) && (
-                  <p className="company-links">
-                    {c.website_url && (
-                      <a className="btn btn-secondary btn-small" href={c.website_url} target="_blank" rel="noopener noreferrer">
-                        Webseite
-                      </a>
-                    )}
-                    {c.app_url && (
-                      <a className="btn btn-secondary btn-small" href={c.app_url} target="_blank" rel="noopener noreferrer">
-                        App der Kompanie
-                      </a>
-                    )}
-                  </p>
-                )}
-                {c.members && c.members.length > 0 && (
-                  <>
-                    <h3 className="section-title">Mitglieder</h3>
-                    <ul className="company-members">
-                      {c.members.map((m) => (
-                        <li key={m.id}>
-                          <button type="button" className="link-button" onClick={() => navigate(`mitglieder/${m.id}`)}>
-                            {m.name}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-              </div>
-            </details>
-          </li>
-        );
-      })}
-    </ul>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
   );
 }
