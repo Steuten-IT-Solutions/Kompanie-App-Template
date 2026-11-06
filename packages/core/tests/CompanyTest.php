@@ -63,7 +63,7 @@ final class CompanyTest extends TestCase
         $this->assertSame([$a, $b], array_column($list, 'id'), 'neue ans Ende');
         $this->assertSame('Erste Kompanie', $list[0]['name']);
         $this->assertSame(1862, $list[0]['founded_year']);
-        $this->assertSame('<p>Seit <strong>1862</strong></p>', $list[0]['description'], 'bereinigt, ohne Bilder');
+        $this->assertSame('<p>Seit <strong>1862</strong></p>', $list[0]['description'], 'bereinigt, fremde Bilder entfernt');
         $this->assertTrue($list[0]['active']);
         $this->assertNull($list[0]['logo_url']);
         $this->assertSame([], $list[0]['member_ids'], 'Pflege sieht die Zuordnungen');
@@ -181,6 +181,51 @@ final class CompanyTest extends TestCase
         $this->assertSame(404, $this->app->companies()->logoForDelivery(null, $id, null)['status']);
         $this->app->features()->update(['companies' => false]);
         $this->assertSame(404, $this->app->companies()->logoForDelivery(null, $id, null)['status'], 'Bereich aus');
+    }
+
+    public function testDescriptionImagesArePublicWithViewCompanies(): void
+    {
+        $png = imagecreatetruecolor(4, 3);
+        ob_start();
+        imagepng($png);
+        $bytes = (string) ob_get_clean();
+        $up = $this->call('POST', '/rich-images', ['file' => ['name' => 'bild.png', 'data' => base64_encode($bytes)]]);
+        $this->assertSame(201, $up->status);
+        $uid = $up->data['uid'];
+        $d = fn (?int $user, string $u = ''): array => $this->app->richImages()->forDelivery($user === null ? null : $this->users->find($user), $u === '' ? $uid : $u);
+        $this->assertSame(401, $d(null)['status'], 'Entwurf: ohne Anmeldung nicht');
+
+        $id = $this->company(['name' => 'Erste', 'description' => '<p>Bild:</p><img data-image="' . $uid . '">']);
+        $desc = $this->call('GET', '/companies')->data[0]['description'];
+        $this->assertSame('<p>Bild:</p><img src="https://example.org/app/bild/' . $uid . '" data-image="' . $uid . '">', $desc, 'Bild gehört der Kompanie, mit Adresse');
+        $anon = $d(null);
+        $this->assertSame(200, $anon['status'], 'öffentlich: Gäste haben view_companies');
+        $this->assertSame('public, max-age=86400', $anon['headers']['Cache-Control']);
+        $this->assertSame(200, $d($this->member)['status']);
+
+        // Brett-Bilder bleiben ohne Anmeldung gesperrt (Besitzer nicht öffentlich)
+        $this->assertSame(401, $d(null, str_repeat('a', 32))['status']);
+
+        // Gäste ohne Sehrecht: wie heute 401; mit Anmeldung und Recht weiter sichtbar
+        $this->app->roles()->update(Roles::GUEST, ['capabilities' => ['view_news']]);
+        $this->assertSame(401, $d(null)['status']);
+        $this->assertSame(403, $d($this->guest)['status']);
+        $this->assertSame(200, $d($this->member)['status']);
+        $this->assertSame('private, max-age=86400', $d($this->member)['headers']['Cache-Control']);
+        $this->app->roles()->update(Roles::GUEST, ['capabilities' => ['view_news', 'view_companies']]);
+        $this->app->features()->update(['companies' => false]);
+        $this->assertSame(401, $d(null)['status'], 'Bereich aus');
+        $this->assertSame(403, $d($this->admin)['status']);
+        $this->app->features()->update(['companies' => true]);
+
+        // Bild aus der Beschreibung genommen: gelöscht; Kompanie gelöscht: ihre Bilder auch
+        $this->call('PATCH', "/companies/$id", ['description' => '<p>ohne</p>']);
+        $this->assertNull($this->app->richImages()->repository()->find($uid));
+        $up2 = $this->call('POST', '/rich-images', ['file' => ['name' => 'bild.png', 'data' => base64_encode($bytes)]])->data['uid'];
+        $this->call('PATCH', "/companies/$id", ['description' => '<img data-image="' . $up2 . '">']);
+        $this->assertSame(200, $d(null, $up2)['status']);
+        $this->call('DELETE', "/companies/$id");
+        $this->assertNull($this->app->richImages()->repository()->find($up2));
     }
 
     public function testBackup(): void

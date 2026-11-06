@@ -1948,10 +1948,10 @@ paths:
   /rich-images:
     post:
       tags: [Eigene Daten]
-      summary: Bild für einen formatierten Inhalt hochladen (Signatur, Schwarzes Brett; Issue #172)
+      summary: Bild für einen formatierten Inhalt hochladen (Signatur, Schwarzes Brett, E-Mails, Kompanien; Issue #172, #281)
       description: |
         Für Mitglieder, Anwärter und alle mit `post_board` oder `send_mail`. JPG, PNG oder WebP; gespeichert wird eine neu kodierte Fassung
-        ohne Metadaten in Originalgröße (PNG bleibt PNG). Keine eigene Grenze für Größe oder Pixel; die technischen Grenzen
+        ohne Metadaten mit höchstens 2048 Pixeln an der längeren Kante (nie vergrößert; PNG bleibt PNG). Sonst keine eigene Grenze; die technischen Grenzen
         des Servers (`GET /rich-images/limits`) werden verständlich gemeldet. Das Bild ist zunächst ein Entwurf des Kontos;
         im Inhalt steht es als `<img data-image="uid">`. Nie gespeicherte Entwürfe werden nach 7 Tagen gelöscht.
       x-capability: 'member, calendar, post_board oder send_mail'
@@ -1979,7 +1979,7 @@ paths:
                 required: [uid, url, width, height]
                 properties:
                   uid: { type: string, pattern: '^[a-f0-9]{32}$' }
-                  url: { type: string, description: '<App>/bild/<uid>, ausgeliefert nach Prüfung der Anmeldung und der Rechte' }
+                  url: { type: string, description: '<App>/bild/<uid>, ausgeliefert nach Prüfung der Rechte; ohne Anmeldung nur Bilder öffentlicher Inhalte (Beschreibung einer Kompanie, wenn Gäste view_companies haben; sonst 401)' }
                   width: { type: integer }
                   height: { type: integer }
         '400': { $ref: '#/components/responses/Error' }

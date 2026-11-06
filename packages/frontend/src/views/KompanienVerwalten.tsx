@@ -128,7 +128,6 @@ function CompanyFields({
             onChange={(html) => set({ description: html })}
             label="Beschreibung (optional)"
             id={`${idPrefix}-description`}
-            images={false}
           />
         </Suspense>
       </div>

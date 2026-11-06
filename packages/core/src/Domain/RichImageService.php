@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Storage\RichImageRepository;
@@ -17,12 +18,14 @@ use KompanieApp\Core\Storage\RichImageRepository;
  *   übernimmt dessen Besitzer die Bilder, auf die er verweist (claim): eigene Entwürfe werden umgehängt, Bilder anderer
  *   Besitzer (z. B. der Signatur beim Einfügen in eine Nachricht) kopiert, damit spätere Änderungen dort nichts ändern.
  *   Entwürfe, die nie gespeichert wurden, räumt cleanupDrafts() nach DRAFT_KEEP_DAYS auf.
- * - Erlaubt sind JPG, PNG und WebP. Gespeichert wird nur eine neu erzeugte Fassung ohne Metadaten in Originalgröße
- *   (PNG bleibt PNG mit Transparenz, sonst JPEG). Es gibt keine eigene Grenze für Größe, Pixel oder Anzahl; geprüft
- *   werden nur die technischen Grenzen (ServerLimits): Arbeitsspeicher vor dem Dekodieren, max_allowed_packet vor dem
- *   Speichern. post_max_size kennt die App vorab (limits()) und prüft sie selbst.
+ * - Erlaubt sind JPG, PNG und WebP. Gespeichert wird nur eine neu erzeugte Fassung ohne Metadaten (PNG bleibt PNG mit
+ *   Transparenz, sonst JPEG), verkleinert auf höchstens MAX_EDGE Pixel an der längeren Kante (Issue #281: Die Bilder
+ *   liegen als Base64 in der Datenbank und in jeder Sicherung). Sonst gibt es keine eigene Grenze für Größe oder Anzahl;
+ *   geprüft werden die technischen Grenzen (ServerLimits): Arbeitsspeicher vor dem Dekodieren, max_allowed_packet vor
+ *   dem Speichern. post_max_size kennt die App vorab (limits()) und prüft sie selbst.
  * - Im Inhalt stehen Bilder nur als <img data-image="Kennung">; ausgeliefert werden sie über Environment::richImageUrl
- *   an Angemeldete, die den Inhalt sehen dürfen (canView je Besitzer).
+ *   an alle, die den Inhalt sehen dürfen (canView je Besitzer). Ohne Anmeldung nur Bilder öffentlicher Besitzer
+ *   (Issue #281, z. B. die Beschreibung einer Kompanie mit view_companies der Gäste), sonst 401.
  */
 final class RichImageService
 {
@@ -31,6 +34,10 @@ final class RichImageService
     public const OWNER_BOARD = 'board';
     /** E-Mails aus der Verwaltung (MailingService) */
     public const OWNER_MAIL = 'mail';
+    /** Beschreibung einer Kompanie (CompanyService), öffentlich mit view_companies */
+    public const OWNER_COMPANY = 'company';
+    /** Längste Kante gespeicherter Bilder (nie vergrößert). */
+    public const MAX_EDGE = 2048;
     /** Nie gespeicherte Entwürfe so lange aufheben (ein begonnener Text kann über Nacht liegen bleiben). */
     public const DRAFT_KEEP_DAYS = 7;
     public const QUALITY = 88;
@@ -107,8 +114,10 @@ final class RichImageService
             throw ApiError::invalid(sprintf('Die Datei ist keine gültige .%s-Datei.', $ext));
         }
         $png = $ext === 'png';
-        $this->checkMemory((int) $info[0], (int) $info[1], strlen($bytes), !$png && $ext !== 'webp');
-        $encoded = $this->encode($bytes, $ext, max((int) $info[0], (int) $info[1]), $png);
+        $edge = max((int) $info[0], (int) $info[1]);
+        // Ohne Verkleinern braucht ein JPEG nur eine Kopie im Speicher, sonst Quelle und Ziel.
+        $this->checkMemory((int) $info[0], (int) $info[1], strlen($bytes), !$png && $ext !== 'webp' && $edge <= self::MAX_EDGE);
+        $encoded = $this->encode($bytes, $ext, min($edge, self::MAX_EDGE), $png);
         unset($bytes);
         $this->checkPacket(strlen($encoded['bytes']));
         $uid = self::newUid();
@@ -178,21 +187,41 @@ final class RichImageService
 
     /**
      * Darf $viewer das Bild sehen? Entwürfe und Signaturen nur ihr Konto, Bilder am Brett wie die Nachricht
-     * (BoardService::canSeeImage), Bilder in E-Mails alle mit send_mail (MailingService::canSeeImage).
+     * (BoardService::canSeeImage), Bilder in E-Mails alle mit send_mail (MailingService::canSeeImage), Bilder einer
+     * Kompanie wie die Liste (auch ohne Anmeldung, s. isPublic).
      *
      * @param array{owner_type: string, owner_id: int, user_id: int} $img
      */
     public function canView(?User $viewer, array $img): bool
     {
         if ($viewer === null) {
-            return false;
+            return $this->isPublic($img);
         }
         return match ($img['owner_type']) {
+            self::OWNER_COMPANY => $this->companyVisible($viewer),
             self::OWNER_DRAFT, self::OWNER_SIGNATURE => $viewer->id === $img['owner_id'],
             self::OWNER_BOARD => $this->app->board()->canSeeImage($viewer, $img['owner_id']),
             self::OWNER_MAIL => $this->app->mailings()->canSeeImage($viewer, $img['owner_id']),
             default => false,
         };
+    }
+
+    /**
+     * Sieht man das Bild ohne Anmeldung (Rechte der Rolle guest)? Nur bei öffentlichen Besitzern.
+     *
+     * @param array{owner_type: string, owner_id: int, user_id: int} $img
+     */
+    public function isPublic(array $img): bool
+    {
+        return match ($img['owner_type']) {
+            self::OWNER_COMPANY => $this->companyVisible($this->app->anonymous()),
+            default => false,
+        };
+    }
+
+    private function companyVisible(User $viewer): bool
+    {
+        return $this->app->features()->enabled('companies') && ($viewer->can(Capability::ViewCompanies) || $viewer->can(Capability::ManageCompanies));
     }
 
     /** Bilddaten und Typ für eingebettete Bilder (Mail). */
@@ -214,17 +243,16 @@ final class RichImageService
         if ($this->app->maintenance()->blocks($viewer)) {
             return $deny(503);
         }
-        if ($viewer === null) {
-            return $deny(401);
-        }
         $uid = is_string($uid) ? strtolower($uid) : '';
         $img = preg_match(RichText::IMAGE_UID, $uid) === 1 ? $this->repository()->find($uid) : null;
+        // Ohne Anmeldung verrät die Antwort nicht, ob es ein nicht öffentliches Bild gibt: 401 wie bisher.
         if ($img === null) {
-            return $deny(404);
+            return $deny($viewer === null ? 401 : 404);
         }
         if (!$this->canView($viewer, $img)) {
-            return $deny(403);
+            return $deny($viewer === null ? 401 : 403);
         }
+        $public = $this->isPublic($img);
         $body = $this->repository()->data($uid);
         if ($body === null) {
             return $deny(404);
@@ -232,9 +260,9 @@ final class RichImageService
         return ['status' => 200, 'headers' => [
             'Content-Type' => $img['mime'],
             'X-Content-Type-Options' => 'nosniff',
-            // Eine Kennung hat immer denselben Inhalt; Rechte können sich ändern, deshalb nur im Browser und höchstens
-            // einen Tag. In der Vorschau (Issue #63) nie speichern.
-            'Cache-Control' => $this->app->preview()->cacheControl('private, max-age=86400'),
+            // Eine Kennung hat immer denselben Inhalt; Rechte können sich ändern, deshalb höchstens einen Tag und nur im
+            // Browser, außer das Bild ist ohnehin öffentlich. In der Vorschau (Issue #63) nie speichern.
+            'Cache-Control' => $this->app->preview()->cacheControl(($public ? 'public' : 'private') . ', max-age=86400'),
             'X-Robots-Tag' => 'noindex',
             'ETag' => '"' . $uid . '"',
         ], 'body' => $body];
@@ -299,7 +327,7 @@ final class RichImageService
     }
 
     /**
-     * Neu kodieren, ohne Metadaten, in Originalgröße (nie verkleinert).
+     * Neu kodieren, ohne Metadaten, auf höchstens $edge Pixel an der längeren Kante (nie vergrößert).
      *
      * @return array{bytes: string, width: int, height: int}
      */

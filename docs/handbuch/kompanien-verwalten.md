@@ -45,7 +45,7 @@ Tippe auf **Löschen** und bestätige. Logo und alle Zuordnungen der Mitglieder 
 - Neue Zuordnungen gibt es nur für {rolle.member}.
 - Logos: PNG, JPG, WebP oder SVG, höchstens 2 MB. Bilder werden auf höchstens 512 Pixel an der längeren Kante verkleinert. Angezeigt werden sie auf hellem Grund.
 - Links müssen mit `https://` beginnen. Das Gründungsjahr liegt zwischen 1800 und dem laufenden Jahr.
-- In der Beschreibung sind Bilder nicht möglich.
+- Bilder in der Beschreibung sieht jeder, der die {bereich.companies} sieht, auch ohne Anmeldung. Sehr große Bilder werden auf höchstens 2048 Pixel an der längeren Kante verkleinert.
 - Wer die {bereich.companies} sieht, legt das Recht „{bereich.companies}“ in den Rollen fest; in neuen Installationen sehen sie alle, auch ohne Anmeldung. Wer welcher Kompanie angehört, sieht nur, wer **{bereich.directory}** sehen darf.
 - {bereich.companies} und Zuordnungen sind Teil der Datensicherung.
 
