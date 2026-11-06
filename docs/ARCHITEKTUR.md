@@ -604,6 +604,8 @@ Sind Kalender-IDs ohne API-Key eingetragen, darf die OAuth-Verbindung den Kalend
 
 ### Galerie
 
+**Schnittstellen** (Issue #284): `GalleryService` spricht nur mit `Port\GallerySource` (Ordner und Dateien auflisten, Datei lesen, Vorschaubild, Ausschnitt für Videos, Adresse in der Quelle, Erkennen von Ordnern, Bildern und Videos; erste Umsetzung `DriveClient`, unverändert) und `Port\MediaStore` (eigene Originale ablegen, lesen, löschen, einem Album zuordnen, belegter Platz; `Domain\FileMediaStore` im geschützten Bereich von `FileStorage`, flach im Ordner `einreichungen` (Name aus dem Konzept, kommt mit Issue #285 in die Sicherung), Schlüssel `einreichungen/<Album>-<Zufall>.<Endung>`, nur `jpg`, `png`, `webp`, `mp4`, `webm`). Der Abgleich nutzt den `MediaStore` noch nicht; ihn braucht die Quelle „eigener Server“ (Issue #285). Verhalten und Daten bestehender Installationen bleiben gleich.
+
 **Google-Zugang** (gemeinsam für Galerie und Kalender, `DriveClient`), in dieser Reihenfolge:
 
 1. **„Mit Google verbinden“** mit dem **eigenen OAuth-Client der Installation**: Der Admin legt in einem eigenen Google-Cloud-Projekt einen OAuth-Client (Typ Webanwendung) an und trägt Client-ID und Client-Secret in der App ein. Angefragt werden `drive.readonly` und `calendar.readonly`. Erprobt im Betrieb: externe App im Status „In Produktion“, **nichts** unter Google Auth Platform → Datenzugriff eingetragen (dort eingetragene Berechtigungen verlangen Googles Prüfung mit Demo-Video); der Admin bestätigt die Warnung „Google hat diese App nicht überprüft“ über „Erweitert → Weiter“ und setzt beide Häkchen. Im Status „Testen“ laufen Refresh-Tokens nach 7 Tagen ab. Anleitung: [Handbuch, Google-Zugang](handbuch/admin-google.md).

@@ -8,13 +8,18 @@ use KompanieApp\Core\Http\FileCache;
 use KompanieApp\Core\Port\Cache;
 use KompanieApp\Core\Port\Environment;
 use KompanieApp\Core\Port\FileStorage;
+use KompanieApp\Core\Port\GallerySource;
 use KompanieApp\Core\Port\ImageResizer;
+use KompanieApp\Core\Port\MediaStore;
 use KompanieApp\Core\Port\Scheduler;
 use KompanieApp\Core\Port\Settings;
 use KompanieApp\Core\Storage\GalleryRepository;
 
 /**
  * Galerie aus Google Drive.
+ *
+ * Die Galerie spricht nur mit den Schnittstellen GallerySource (Ordner und Dateien der Quelle, heute Google Drive über
+ * DriveClient) und MediaStore (eigene Originale, ab Issue #285), dazu FileStorage für die aufbereiteten Größen.
  *
  * Ordnerstruktur:  Galerie → Jahr → Album → Bilder und Videos
  *                                          └ intern → Bilder und Videos nur für Mitglieder
@@ -86,7 +91,7 @@ final class GalleryService
 
     public function __construct(
         private readonly GalleryRepository $repo,
-        private readonly DriveClient $drive,
+        private readonly GallerySource $source,
         private readonly FileStorage $files,
         private readonly ImageResizer $images,
         private readonly Settings $settings,
@@ -94,12 +99,13 @@ final class GalleryService
         private readonly Time $time,
         private readonly Scheduler $scheduler,
         private readonly Cache $cache,
+        private readonly ?MediaStore $media = null,
     ) {
     }
 
     public function isConfigured(): bool
     {
-        return $this->root() !== '' && $this->drive->hasCredentials();
+        return $this->root() !== '' && $this->source->hasCredentials();
     }
 
     public function root(): string
@@ -110,7 +116,7 @@ final class GalleryService
     /** Ordner aus einem Drive-Link setzen; leer löscht ihn. */
     public function setRoot(string $input): void
     {
-        $id = DriveClient::parseFolderId($input);
+        $id = $this->source::parseFolderId($input);
         if (trim($input) !== '' && $id === '') {
             throw new \RuntimeException('Der Galerie-Ordner wurde nicht erkannt.');
         }
@@ -174,14 +180,14 @@ final class GalleryService
             // Alle Alben mit einer Abfrage statt einer je Album.
             $albumRows = $this->repo->albumsByDriveId();
 
-            foreach (array_filter($this->drive->listChildren($root), [DriveClient::class, 'isFolder']) as $year) {
-                foreach (array_filter($this->drive->listChildren($year['id']), [DriveClient::class, 'isFolder']) as $album) {
+            foreach (array_filter($this->source->listChildren($root), [$this->source, 'isFolder']) as $year) {
+                foreach (array_filter($this->source->listChildren($year['id']), [$this->source, 'isFolder']) as $album) {
                     $images = [];
-                    foreach ($this->drive->listChildren($album['id']) as $f) {
-                        if (self::isMedia($f)) {
+                    foreach ($this->source->listChildren($album['id']) as $f) {
+                        if ($this->isMedia($f)) {
                             $images[] = [$f, 0];
-                        } elseif (DriveClient::isFolder($f) && mb_strtolower(trim((string) $f['name'])) === self::INTERN_FOLDER) {
-                            foreach (array_filter($this->drive->listChildren($f['id']), [self::class, 'isMedia']) as $img) {
+                        } elseif ($this->source::isFolder($f) && mb_strtolower(trim((string) $f['name'])) === self::INTERN_FOLDER) {
+                            foreach (array_filter($this->source->listChildren($f['id']), [$this, 'isMedia']) as $img) {
                                 $images[] = [$img, 1];
                             }
                         }
@@ -255,9 +261,9 @@ final class GalleryService
     }
 
     /** Bild oder Video (auch nicht abspielbare: die kommen in die Liste für Admins). */
-    public static function isMedia(array $f): bool
+    public function isMedia(array $f): bool
     {
-        return DriveClient::isImage($f) || DriveClient::isVideo($f);
+        return $this->source::isImage($f) || $this->source::isVideo($f);
     }
 
     private function fail(string $message): \RuntimeException
@@ -323,7 +329,7 @@ final class GalleryService
                 'is_intern' => $intern,
                 'taken_at' => self::driveTime($meta['time'] ?? ''),
             ];
-            $video = DriveClient::isVideo($f);
+            $video = $this->source::isVideo($f);
             if ($video) {
                 $meta = $f['videoMediaMetadata'] ?? [];
                 $data += [
@@ -336,7 +342,7 @@ final class GalleryService
                 $data['media'] = 'image';
             }
             // Nicht abspielbare Videos: gleich als fehlgeschlagen (Liste für Admins), ohne weitere Versuche.
-            $state = $video && !DriveClient::isPlayableVideo((string) $f['mimeType'])
+            $state = $video && !$this->source::isPlayableVideo((string) $f['mimeType'])
                 ? ['status' => GalleryRepository::FAILED, 'error' => self::UNSUPPORTED_VIDEO, 'attempts' => self::MAX_ATTEMPTS]
                 : ['status' => GalleryRepository::PENDING, 'error' => '', 'attempts' => 0];
             // Maße aus Drive nur für neue oder geänderte Bilder (bzw. solange keine bekannt sind):
@@ -407,7 +413,7 @@ final class GalleryService
      */
     public function failedPhotos(int $limit = self::FAILED_LIST_MAX): array
     {
-        return array_values(array_map(static fn (array $p): array => [
+        return array_values(array_map(fn (array $p): array => [
             'id' => (int) $p['id'],
             'name' => (string) $p['name'],
             'album' => trim((string) ($p['album_year'] ?? '') . ' · ' . (string) ($p['album_title'] ?? ''), ' ·'),
@@ -415,7 +421,7 @@ final class GalleryService
             'error' => (string) $p['error'],
             'attempts' => (int) $p['attempts'],
             'unsupported' => (string) $p['error'] === self::UNSUPPORTED_VIDEO,
-            'drive_url' => 'https://drive.google.com/file/d/' . rawurlencode((string) $p['drive_file_id']) . '/view',
+            'drive_url' => $this->source->fileUrl((string) $p['drive_file_id']),
         ], $this->repo->failedPhotos($limit)));
     }
 
@@ -510,7 +516,7 @@ final class GalleryService
         // beim nächsten Lauf nach den anderen dran (nextPending) und hält sie nicht auf.
         $this->repo->updatePhoto((int) $photo['id'], ['attempts' => $attempts + 1]);
         try {
-            $tmp = $this->drive->download((string) $photo['drive_file_id']);
+            $tmp = $this->source->download((string) $photo['drive_file_id']);
         } catch (\RuntimeException $e) {
             return $this->markFailed($photo, $e->getMessage());
         }
@@ -543,7 +549,7 @@ final class GalleryService
      */
     private function generateVideo(array $photo): bool
     {
-        if (!DriveClient::isPlayableVideo((string) ($photo['mime'] ?? ''))) {
+        if (!$this->source::isPlayableVideo((string) ($photo['mime'] ?? ''))) {
             $this->repo->updatePhoto((int) $photo['id'], ['status' => GalleryRepository::FAILED, 'error' => self::UNSUPPORTED_VIDEO, 'attempts' => self::MAX_ATTEMPTS]);
             return false;
         }
@@ -588,7 +594,7 @@ final class GalleryService
     private function fromDriveThumbnail(array $photo): ?array
     {
         try {
-            $thumb = $this->drive->thumbnail((string) $photo['drive_file_id'], self::SIZES['large']);
+            $thumb = $this->source->thumbnail((string) $photo['drive_file_id'], self::SIZES['large']);
         } catch (\RuntimeException) {
             return null;
         }
@@ -812,7 +818,7 @@ final class GalleryService
             return true;
         };
         try {
-            $this->drive->streamRange((string) $photo['drive_file_id'], $start, $end, $onStart, $onData);
+            $this->source->streamRange((string) $photo['drive_file_id'], $start, $end, $onStart, $onData);
         } catch (\RuntimeException) {
             if ($head === null) {
                 return ['status' => 502];
@@ -913,7 +919,7 @@ final class GalleryService
     private function renderOriginal(array $photo, string $target): bool
     {
         try {
-            $tmp = $this->drive->download((string) $photo['drive_file_id']);
+            $tmp = $this->source->download((string) $photo['drive_file_id']);
         } catch (\RuntimeException) {
             return false;
         }
