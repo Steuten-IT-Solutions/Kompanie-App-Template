@@ -380,7 +380,18 @@ try {
     $c->ok($anon[0] === 200 && ($anon[2]['content-type'] ?? '') === 'image/svg+xml' && str_starts_with((string) ($anon[2]['cache-control'] ?? ''), 'public'), 'Logo ohne Anmeldung: öffentlich');
     $c->ok(!str_contains((string) file_get_contents($logoUrl), 'script'), 'Ausgeliefert wird das bereinigte SVG');
     $c->ok($d->send('GET', $base . 'index.php?r=/kompanielogo/999999', [], null)[0] === 404, 'Unbekanntes Logo → 404');
+    // Bilder der Beschreibung (Issue #281): öffentlich wie die Liste
+    $gd = imagecreatetruecolor(3, 2);
+    ob_start();
+    imagepng($gd);
+    [$s, $rich] = $d->request('POST', '/rich-images', ['file' => ['name' => 'bild.png', 'data' => base64_encode((string) ob_get_clean())]]);
+    $richUrl = (string) ($rich['url'] ?? '');
+    $c->ok($s === 201 && $d->send('GET', $richUrl, [], null)[0] === 401, 'Bild als Entwurf: ohne Anmeldung 401');
+    $d->request('PATCH', '/companies/' . ($company['id'] ?? 0), ['description' => '<img data-image="' . ($rich['uid'] ?? '') . '">']);
+    $anonImage = $d->send('GET', $richUrl, [], null);
+    $c->ok($anonImage[0] === 200 && ($anonImage[2]['content-type'] ?? '') === 'image/png' && str_starts_with((string) ($anonImage[2]['cache-control'] ?? ''), 'public'), 'Bild der Beschreibung ohne Anmeldung: öffentlich');
     $d->request('DELETE', '/companies/' . ($company['id'] ?? 0));
+    $c->ok($d->send('GET', $richUrl, [], null)[0] === 401, 'Kompanie gelöscht: Bild weg');
 
     $c->section('Abzeichen der Dienstgrade (Auslieferung)');
     $d->actAs($anna);

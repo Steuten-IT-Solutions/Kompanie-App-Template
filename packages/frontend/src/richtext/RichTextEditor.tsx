@@ -20,7 +20,7 @@ import { Indent } from './indent';
 import { cleanPastedHtml, isOfficeHtml, rtfImages } from './wordPaste';
 
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
-/** Anfangsbreite eingefügter Bilder (nur die Anzeige; gespeichert wird das Bild in Originalgröße, die Breite ist änderbar). */
+/** Anfangsbreite eingefügter Bilder (nur die Anzeige; gespeichert wird das Bild mit höchstens 2048 Pixeln an der längeren Kante, die Breite ist änderbar). */
 const IMAGE_WIDTH = 480;
 
 /** Bild mit der Kennung aus dem Bildspeicher (data-image); nur solche Bilder behält der Server. */

@@ -103,8 +103,17 @@ final class CompanyService
             throw ApiError::invalid('Bitte den Namen der Kompanie angeben.');
         }
         $data = $this->validate($in);
+        $description = $data['description'] ?? '';
         $repo = $this->repository();
-        $id = $repo->insert($data + ['sort' => $repo->maxSort() + 10, 'active' => 1], $this->app->time()->nowUtc());
+        $now = $this->app->time()->nowUtc();
+        $id = $this->app->db->transaction(function () use ($repo, $data, $description, $actor, $now): int {
+            $id = $repo->insert(['description' => ''] + $data + ['sort' => $repo->maxSort() + 10, 'active' => 1], $now);
+            // Bilder der Beschreibung gehören danach der Kompanie (dafür braucht es ihre ID).
+            if ($description !== '') {
+                $repo->update($id, ['description' => $this->app->richImages()->claim($actor, $description, RichImageService::OWNER_COMPANY, $id)], $now);
+            }
+            return $id;
+        });
         return $this->one($id, $actor);
     }
 
@@ -115,14 +124,22 @@ final class CompanyService
     public function update(int $id, array $in, User $actor): array
     {
         $this->find($id);
-        $this->repository()->update($id, $this->validate($in), $this->app->time()->nowUtc());
+        $data = $this->validate($in);
+        if (isset($data['description'])) {
+            // Bilder, die nicht mehr in der Beschreibung stehen, werden gelöscht (es gibt keinen Verlauf).
+            $data['description'] = $this->app->richImages()->claim($actor, $data['description'], RichImageService::OWNER_COMPANY, $id, true);
+        }
+        $this->repository()->update($id, $data, $this->app->time()->nowUtc());
         return $this->one($id, $actor);
     }
 
     public function delete(int $id): void
     {
         $this->find($id);
-        $this->repository()->delete($id);
+        $this->app->db->transaction(function () use ($id): void {
+            $this->repository()->delete($id);
+            $this->app->richImages()->deleteOwner(RichImageService::OWNER_COMPANY, $id);
+        });
     }
 
     /**
@@ -300,7 +317,7 @@ final class CompanyService
             'name' => $c['name'],
             'short_name' => $c['short_name'],
             'founded_year' => $c['founded_year'],
-            'description' => $c['description'],
+            'description' => $c['description'] === '' ? '' : $this->app->richImages()->render($c['description']),
             'website_url' => $c['website_url'],
             'app_url' => $c['app_url'],
             'active' => $c['active'],
@@ -331,8 +348,8 @@ final class CompanyService
             if ($in['description'] !== null && !is_string($in['description'])) {
                 throw ApiError::invalid('Ungültige Beschreibung.');
             }
-            // Ohne Bilder: Bilder auf öffentlichen Seiten kommen mit der öffentlichen Auslieferung (Issue #281).
-            $html = RichText::replaceImageUids(RichText::sanitize((string) $in['description']), [], true);
+            // Bilder übernimmt create()/update() (claim); öffentlich ausgeliefert mit view_companies (Issue #281).
+            $html = RichText::sanitize((string) $in['description']);
             $html = RichText::isEmpty($html) ? '' : $html;
             if (strlen($html) > self::DESCRIPTION_MAX) {
                 throw ApiError::invalid('Die Beschreibung ist zu lang.');

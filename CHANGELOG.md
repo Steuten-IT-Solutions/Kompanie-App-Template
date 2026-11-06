@@ -18,8 +18,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 ### Neu
 
 - **Kompanien**: Der neue Bereich *Kompanien* (unter *Einstellungen → Bereiche* einschalten) zeigt eure Kompanien mit
-  Logo in eurer Reihenfolge, für alle, auch ohne Anmeldung. Jede Karte klappt auf und zeigt Beschreibung,
-  Gründungsjahr, Links zur Webseite und zur App der Kompanie, die laufenden Ämter einer verknüpften Gruppe der Ämter
+  Logo in eurer Reihenfolge, für alle, auch ohne Anmeldung. Jede Karte klappt auf und zeigt Beschreibung (auch mit
+  Bildern), Gründungsjahr, Links zur Webseite und zur App der Kompanie, die laufenden Ämter einer verknüpften Gruppe der Ämter
   und die Mitglieder (die nur, wer die Mitgliederliste sieht). Aufgelöste Kompanien stehen unten als „ehemalig“.
   Gepflegt werden sie unter *Verwaltung → Einrichtungen → Kompanien*; Mitglieder ordnest du dort oder auf der Seite
   der Person in der Verwaltung zu, auch zu mehreren Kompanien. In der Mitgliederliste stehen die Kompanien auf der
@@ -47,6 +47,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Bilder in formatierten Texten** (Schwarzes Brett, E-Mails, Signatur, Beschreibung der Kompanien) werden beim
+  Hochladen auf höchstens 2048 Pixel an der längeren Kante verkleinert, damit Datenbank und Sicherungen nicht unnötig
+  wachsen. Kleinere Bilder bleiben, wie sie sind.
 - **Seite eines Mitglieds erscheint schneller**: Öffnest du in der Verwaltung eine Person oder blätterst weiter, stehen
   Dienstgrad, Foto, Rolle, Punkte und Offen sofort da (aus der Mitgliederliste); der Rest der Seite folgt, sobald ihre
   Daten geladen sind. Die übrigen Personen lädt die App jetzt zu zwölft in einer Anfrage vor statt einzeln, und ohne
