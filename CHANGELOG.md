@@ -21,6 +21,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   ihre Seite mit Logo, Beschreibung, laufenden Ämtern, Links und der Liste ihrer Mitglieder (wie bisher nur für alle,
   die die Mitgliederliste sehen dürfen). Die Seite hat einen eigenen Link zum Teilen; „‹ Alle Kompanien“ führt zurück
   an dieselbe Stelle der Liste. Auch der Name einer Kompanie auf der Seite einer Person führt jetzt direkt dorthin.
+- **Jahreszahl bei Terminen**: Liegt ein Termin nicht im laufenden Jahr, zeigt die App beim Datum jetzt auch das Jahr,
+  z. B. „Fr., 8. Jan. 2027“. Das gilt für die internen und öffentlichen Termine, die Termine bei der Anwesenheit, die
+  Verwaltung der öffentlichen Termine und die anstehenden Geburtstage.
 
 ### Behoben
 
