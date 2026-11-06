@@ -179,7 +179,7 @@ final class CapabilityOverridesTest extends TestCase
         // Gast und Admin: keine Ausnahmen; sie verfallen.
         $this->assertSame(200, $this->call('PATCH', "/members/{$this->m}/role", ['level' => Roles::GUEST])->status);
         $this->assertSame([], $this->app->settings->get(RoleService::OVERRIDES_SETTING));
-        $this->assertSame(Roles::from(Roles::PUBLIC_DEFAULTS), $this->users->find($this->m)?->capabilities, 'wie Gast');
+        $this->assertSame(Roles::from(TestApp::caps([])), $this->users->find($this->m)?->capabilities, 'wie Gast');
     }
 
     public function testExtraRolesAreTheBase(): void

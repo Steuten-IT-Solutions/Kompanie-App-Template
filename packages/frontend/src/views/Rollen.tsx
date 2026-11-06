@@ -246,7 +246,8 @@ function AttendanceGroups({ roles, onToast }: { roles: RoleAdmin[]; onToast: (ms
 function summary(r: RoleAdmin): string {
   if (r.key === 'admin') return 'alle Rechte';
   if (r.capabilities.length === 0) return 'sieht nichts';
-  const views = r.capabilities.filter(isView).length;
+  // Nur Rechte, die in der Liste stehen (Rechte für Bereiche, die es noch nicht gibt, zählen nicht mit).
+  const views = CAPABILITIES.filter((c) => isView(c.key) && r.capabilities.includes(c.key)).length;
   return [
     ...(r.capabilities.includes('member') ? ['gehört zur Kompanie'] : []),
     ...(views > 0 ? [views === 1 ? '1 Recht zum Sehen' : `${views} Rechte zum Sehen`] : []),

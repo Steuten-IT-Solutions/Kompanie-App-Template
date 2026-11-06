@@ -51,26 +51,29 @@ final class ViewRightsMigrationTest extends TestCase
             ['user' => $f, 'grant' => [], 'revoke' => ['calendar']],
         ]);
         $settings->delete(RoleService::VIEW_SETTING);
+        $settings->delete(RoleService::ADDED_VIEW_SETTING);
 
         $app = TestApp::create($db, $users, settings: $settings, features: false);
         $this->assertTrue($settings->get(RoleService::VIEW_SETTING));
         $caps = static fn (int $id): array => array_map(static fn (Capability $cap): string => $cap->value, $users->find($id)?->capabilities ?? []);
+        // Dazu bekommt jede Rolle die später dazugekommenen Rechte zum Sehen (migrateAddedViewRights).
+        $public = [...Roles::PUBLIC_DEFAULTS, ...Roles::ADDED_VIEW];
 
-        $this->assertEqualsCanonicalizing(Roles::PUBLIC_DEFAULTS, $caps($a), 'Mitgliederbereich entzogen: nur das Öffentliche');
-        $this->assertEqualsCanonicalizing([...Roles::MEMBER_DEFAULTS, 'manage_events'], $caps($b));
-        $this->assertEqualsCanonicalizing([...Roles::MEMBER_DEFAULTS, 'manage_documents'], $caps($c));
-        $this->assertEqualsCanonicalizing(Roles::MEMBER_DEFAULTS, $caps($d), 'Zusatzrolle, ihr Recht entzogen');
+        $this->assertEqualsCanonicalizing($public, $caps($a), 'Mitgliederbereich entzogen: nur das Öffentliche');
+        $this->assertEqualsCanonicalizing([...Roles::MEMBER_DEFAULTS, ...Roles::ADDED_VIEW, 'manage_events'], $caps($b));
+        $this->assertEqualsCanonicalizing([...Roles::MEMBER_DEFAULTS, ...Roles::ADDED_VIEW, 'manage_documents'], $caps($c));
+        $this->assertEqualsCanonicalizing([...Roles::MEMBER_DEFAULTS, ...Roles::ADDED_VIEW], $caps($d), 'Zusatzrolle, ihr Recht entzogen');
         $this->assertEqualsCanonicalizing([...Roles::CANDIDATE_DEFAULTS, 'view_intern'], $caps($e));
-        $this->assertEqualsCanonicalizing(Roles::PUBLIC_DEFAULTS, $caps($f), 'Kalender entzogen: auch das Brett nicht mehr');
-        $this->assertEqualsCanonicalizing(Roles::PUBLIC_DEFAULTS, $caps($g));
-        $this->assertEqualsCanonicalizing(Roles::PUBLIC_DEFAULTS, array_map(static fn (Capability $cap): string => $cap->value, $app->anonymous()->capabilities), 'ohne Anmeldung wie bisher');
+        $this->assertEqualsCanonicalizing($public, $caps($f), 'Kalender entzogen: auch das Brett nicht mehr');
+        $this->assertEqualsCanonicalizing($public, $caps($g));
+        $this->assertEqualsCanonicalizing($public, array_map(static fn (Capability $cap): string => $cap->value, $app->anonymous()->capabilities), 'ohne Anmeldung wie bisher');
         $this->assertSame(TestApp::caps(['member', 'manage_points']), $app->roles()->find('r1')['capabilities'] ?? null);
 
         // Nur einmal: Was der Admin danach ändert, bleibt.
         $app->roles()->update(Roles::MEMBER, ['capabilities' => array_values(array_diff(TestApp::caps(['member']), ['view_catalog']))]);
         $again = TestApp::create($db, $users, settings: $settings, features: false);
         $this->assertNotContains('view_catalog', $again->roles()->find(Roles::MEMBER)['capabilities'] ?? []);
-        $this->assertEqualsCanonicalizing([...Roles::MEMBER_DEFAULTS, 'manage_documents'], [...$caps($c), 'view_catalog'], 'Ausnahmen bleiben');
+        $this->assertEqualsCanonicalizing([...Roles::MEMBER_DEFAULTS, ...Roles::ADDED_VIEW, 'manage_documents'], [...$caps($c), 'view_catalog'], 'Ausnahmen bleiben');
     }
 
     public function testNewInstallationNeedsNoMigration(): void

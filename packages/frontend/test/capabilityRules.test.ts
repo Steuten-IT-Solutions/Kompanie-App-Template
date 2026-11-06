@@ -65,3 +65,18 @@ test('Mitglied gehört immer zur Kompanie und hat nur Rechte zum Sehen; Admin al
   assert.equal(lockedFor('r1', false, 'manage_points'), false, 'eigene Rollen: alles');
   assert.deepEqual(orderedCaps(toggleForRole('member', true, set('member', 'view_catalog'), ['view_catalog'], false)), ['member']);
 });
+
+test('Kompanien und Sponsoren: Rechte zum Sehen, auch für Gast, und beim Speichern einer Rolle erhalten (Issue #278)', () => {
+  for (const c of ['view_companies', 'view_sponsors'] as Capability[]) {
+    assert.equal(requires(c), null, c);
+    assert.equal(lockedFor('guest', true, c), false, c);
+    assert.equal(lockedFor('member', true, c), false, c);
+  }
+  // Ohne Haken in der Liste (die Bereiche kommen später) dürfen sie beim Speichern nicht verloren gehen.
+  assert.deepEqual(orderedCaps(set('member', 'view_sponsors', 'view_news', 'view_companies')), [
+    'view_news',
+    'view_companies',
+    'view_sponsors',
+    'member',
+  ]);
+});

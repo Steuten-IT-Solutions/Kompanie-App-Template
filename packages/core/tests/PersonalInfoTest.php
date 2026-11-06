@@ -48,7 +48,7 @@ final class PersonalInfoTest extends TestCase
     /** Konto mit einer eigenen Rolle aus diesen Rechten (dazu, was Mitglieder sehen). */
     private function withRights(string $login, array $caps): int
     {
-        $key = $this->app->roles()->create(['label' => 'Rolle ' . $login, 'capabilities' => [...Roles::MEMBER_DEFAULTS, ...$caps]])['key'];
+        $key = $this->app->roles()->create(['label' => 'Rolle ' . $login, 'capabilities' => [...Roles::TEMPLATES[Roles::MEMBER], ...$caps]])['key'];
         return $this->users->add($login, $key);
     }
 
