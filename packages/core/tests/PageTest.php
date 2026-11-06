@@ -129,8 +129,20 @@ final class PageTest extends TestCase
     {
         $this->assertSame(TestApp::caps(['member', 'manage_pages']), $this->app->roles()->find('pages')['capabilities'] ?? null);
         $this->assertSame('Seiten verwalten', $this->app->roles()->find('pages')['label'] ?? null);
-        $this->ok('PUT', '/admin/navigation', ['navigation' => ['items' => ['termine', ['label' => 'Infos', 'icon' => 'seiten', 'items' => ['seiten']]], 'hidden' => []]]);
-        $this->assertSame(['seiten'], $this->call('GET', '/config', [], $this->member)->data['navigation']['items'][1]['items']);
+        // Jede Seite ist ein eigener Punkt der Navigation (seiten/<id>), unten oder in einem Untermenü.
+        $fest = $this->ok('POST', '/pages', ['title' => 'Festprogramm', 'body' => '<p>Samstag</p>']);
+        $old = $this->ok('POST', '/pages', ['title' => 'Alt']);
+        $nav = ['items' => ['termine', "seiten/{$fest['id']}", ['label' => 'Infos', 'icon' => 'seiten', 'items' => ["seiten/{$old['id']}"]]], 'hidden' => []];
+        $this->ok('PUT', '/admin/navigation', ['navigation' => $nav]);
+        $this->assertSame($nav, $this->call('GET', '/config', [], $this->member)->data['navigation']);
+        foreach (['seiten', 'seiten/0', 'seiten/x', 'seiten/1/2'] as $bad) {
+            $this->assertSame(400, $this->call('PUT', '/admin/navigation', ['navigation' => ['items' => [$bad], 'hidden' => []]])->status, $bad);
+        }
+        // Gelöscht: fällt aus der Navigation, das leere Untermenü mit
+        $this->ok('DELETE', "/pages/{$old['id']}");
+        $this->assertSame(['termine', "seiten/{$fest['id']}"], $this->call('GET', '/config')->data['navigation']['items']);
+        $this->ok('DELETE', "/pages/{$fest['id']}");
+        $this->assertSame(['termine'], $this->call('GET', '/config')->data['navigation']['items']);
 
         $this->ok('POST', '/pages', ['title' => 'Festprogramm', 'body' => '<p>Samstag</p>']);
         $this->assertContains('app_pages', Backup::CORE_TABLES);

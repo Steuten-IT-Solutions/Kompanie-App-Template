@@ -5,9 +5,11 @@ import {
   buildNav,
   draftError,
   draftOf,
+  isPageTarget,
   menuOf,
   moveTo,
   NAV_TARGETS,
+  pageTarget,
   placeOf,
   removeMenu,
   unplaced,
@@ -25,8 +27,8 @@ const keys = (e: { key: string }[]) => e.map((x) => x.key);
 test('Standard mit dem Recht Intern: Termine, News, Galerie, Kompanien und Intern mit seinen Bereichen', () => {
   const nav = buildNav(null, ctx([...NAV_TARGETS], true));
   assert.deepEqual(keys(nav), ['termine', 'news', 'galerie', 'kompanien', 'intern']);
-  // Höchstens fünf Hauptpunkte: Sponsoren und Seiten rutschen vorne ins Untermenü
-  assert.deepEqual(nav[4].children, ['sponsoren', 'seiten', 'mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog']);
+  // Höchstens fünf Hauptpunkte: Sponsoren rutscht vorne ins Untermenü
+  assert.deepEqual(nav[4].children, ['sponsoren', 'mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog']);
   const noCompanies = buildNav(
     null,
     ctx(
@@ -46,7 +48,6 @@ test('Standard ohne das Recht Intern: Mitglieder und Dokumente als eigene Tabs, 
     'galerie',
     'kompanien',
     'sponsoren',
-    'seiten',
     'mitglieder',
     'dokumente',
   ]);
@@ -77,9 +78,9 @@ test('Entwurf: Standard als Ausgangspunkt, verschieben, Untermenü entfernen, pr
   assert.deepEqual((draftOf(null).items[4] as { items: string[] }).items[0], 'sponsoren', 'passt nicht unten hin: ins Untermenü');
   assert.deepEqual(unplaced(draftOf(null)), []);
   assert.equal(draftError(draftOf(null)), null);
-  // Kompanien, Sponsoren und Seiten aus: nicht im Entwurf, belegen keinen Hauptpunkt
-  let d = draftOf(null, (t) => t !== 'sponsoren' && t !== 'kompanien' && t !== 'seiten');
-  assert.deepEqual(unplaced(d), ['kompanien', 'sponsoren', 'seiten']);
+  // Kompanien und Sponsoren aus: nicht im Entwurf, belegen keinen Hauptpunkt
+  let d = draftOf(null, (t) => t !== 'sponsoren' && t !== 'kompanien');
+  assert.deepEqual(unplaced(d), ['kompanien', 'sponsoren']);
   assert.equal(placeOf(d, 'dokumente'), 0);
   d = moveTo(d, 'dokumente', 'main');
   assert.equal(placeOf(d, 'dokumente'), 'main');
@@ -104,4 +105,28 @@ test('Entwurf aus einer Einstellung ist eine Kopie', () => {
   (d.items[0] as { items: string[] }).items.push('galerie');
   assert.deepEqual(setting.items[0].items, ['news']);
   assert.deepEqual(unplaced(setting).length, NAV_TARGETS.length - 1);
+});
+
+test('Eigene Seiten (Issue #287): jede Seite ein eigener Punkt, im Standard nach den Bereichen, unbekannte hinten', () => {
+  const pages = [pageTarget(7), pageTarget(3)];
+  const visible: NavTarget[] = ['termine', 'news', pageTarget(7), pageTarget(3), 'mitglieder'];
+  const nav = buildNav(null, { ...ctx(visible), pages });
+  assert.deepEqual(keys(nav), ['termine', 'news', 'seiten/7', 'seiten/3', 'mitglieder']);
+  assert.equal(nav[2].icon, 'seiten');
+  // Mit „Intern“: was unten nicht passt, kommt vorne ins Untermenü
+  const intern = buildNav(null, {
+    ...ctx(['termine', 'news', 'galerie', 'kompanien', pageTarget(7), pageTarget(3), 'mitglieder'], true),
+    pages,
+  });
+  assert.deepEqual(keys(intern), ['termine', 'news', 'galerie', 'kompanien', 'intern']);
+  assert.deepEqual(intern[4].children, ['seiten/7', 'seiten/3', 'mitglieder']);
+  // Eigene Navigation: Seite in einem Untermenü, eine nicht lesbare fällt weg, eine neue hängt hinten an
+  const setting = { items: ['termine', { label: 'Infos', icon: 'seiten', items: ['seiten/3', 'seiten/9'] }], hidden: [] as string[] };
+  const own = buildNav(setting, { ...ctx(visible), pages });
+  assert.deepEqual(keys(own), ['termine', 'menue/1', 'news', 'mitglieder', 'seiten/7']);
+  assert.deepEqual(own[1].children, ['seiten/3']);
+  assert.equal(menuOf(own, 'seiten/3')?.key, 'menue/1');
+  assert.deepEqual(unplaced(setting, pages), [...NAV_TARGETS.filter((t) => t !== 'termine'), 'seiten/7']);
+  assert.equal(placeOf(moveTo(draftOf(setting, undefined, pages), 'seiten/7', 0), 'seiten/7'), 0);
+  assert.ok(isPageTarget('seiten/12') && !isPageTarget('seiten') && !isPageTarget('seiten/0') && !isPageTarget('seiten/1/2'));
 });

@@ -16,6 +16,8 @@ use KompanieApp\Core\Http\ApiError;
  * - audience public: alle, auch ohne Anmeldung; members: Mitglieder und Rollen mit internem Kalender (wer das Schwarze
  *   Brett liest, wie BoardService::isRecipient). Lesen prüft der Server danach.
  * - Pflegen mit manage_pages (Standardrolle „Seiten verwalten“); wer pflegt, sieht alle Seiten.
+ * - In der Navigation steht jede Seite als eigener Punkt „seiten/<id>“ (NavigationService), den der Admin in die
+ *   Leiste oder ein Untermenü schiebt; gelöschte Seiten fallen dort heraus.
  * - Speichern mit updated_at (Stand, den die App geladen hat): 409 conflict, wenn jemand dazwischen gespeichert hat
  *   (wie bei den Listen). Reihenfolge per Ziehen (sort).
  */
@@ -142,6 +144,7 @@ final class PageService
             $this->app->db->execute('DELETE FROM {app_pages} WHERE id = ?', [$id]);
             $this->app->richImages()->deleteOwner(RichImageService::OWNER_PAGE, $id);
         });
+        $this->app->navigation()->removeTarget(NavigationService::PAGE_PREFIX . $id);
     }
 
     /** @return list<array<string, mixed>> */

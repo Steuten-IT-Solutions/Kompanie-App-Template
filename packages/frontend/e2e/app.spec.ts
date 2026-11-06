@@ -4293,7 +4293,7 @@ test('Sponsoren (Issue #279): anlegen mit Link und Logo, Gast sieht sie ohne Anm
   }
 });
 
-test('Eigene Seiten (Issue #287): anlegen öffentlich und nur für Mitglieder, Gast sieht nur die öffentliche, bearbeiten, löschen', async ({
+test('Eigene Seiten (Issue #287): anlegen öffentlich und nur für Mitglieder, je Seite ein Punkt der Navigation, Gast sieht nur die öffentliche, löschen', async ({
   page,
 }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
@@ -4325,23 +4325,39 @@ test('Eigene Seiten (Issue #287): anlegen öffentlich und nur für Mitglieder, G
   await shot(page, 'seiten-verwalten');
 
   try {
-    // Neu laden ohne Anmeldung: nur die öffentliche Seite
+    // Neu laden ohne Anmeldung: nur die öffentliche Seite, als eigener Punkt der Leiste mit ihrem Titel
     await page.context().clearCookies();
     await page.goto('/app/');
     await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
-    await page.locator('.tabbar').getByRole('button', { name: 'Seiten' }).click();
-    await expect(page.locator('.page-tile')).toHaveCount(1);
-    await page.locator('.page-tile', { hasText: 'Anfahrt und Parken' }).click();
+    const tabbar = page.locator('.tabbar');
+    await expect(tabbar.getByRole('button', { name: 'Uniform' })).toHaveCount(0);
+    await tabbar.getByRole('button', { name: 'Anfahrt und Parken' }).click();
+    await expect(page).toHaveURL(/#\/seiten\/\d+$/);
+    await expect(page.locator('.topbar-title')).toHaveText('Anfahrt und Parken');
     await expect(page.locator('.page-article')).toContainText('Über die Brücke und dann links.');
-    await expect(page.locator('.tabbar').getByRole('button', { name: 'Seiten' })).toHaveAttribute('aria-current', 'page');
+    await expect(tabbar.getByRole('button', { name: 'Anfahrt und Parken' })).toHaveAttribute('aria-current', 'page');
     await shot(page, 'seiten');
-    await page.getByRole('button', { name: '‹ Alle Seiten' }).click();
-    await expect(page.locator('.page-tile')).toHaveCount(1);
 
-    // Mitglied: beide Seiten
+    // Mitglied (mit „Intern“): unten kein Platz mehr, beide Seiten vorne unter „Intern“
     await login(page, 'mitglied1');
-    await page.goto('/app/#/seiten');
-    await expect(page.locator('.page-tile')).toHaveText(['Anfahrt und Parken', 'Uniform']);
+    await tabbar.getByRole('button', { name: 'Intern' }).click();
+    const intern = page.getByRole('navigation', { name: 'Intern' });
+    await intern.getByRole('button', { name: 'Uniform', exact: true }).click();
+    await expect(page.locator('.page-article')).toContainText('Nur intern.');
+    await expect(tabbar.getByRole('button', { name: 'Intern' })).toHaveAttribute('aria-current', 'page');
+    await page.getByRole('button', { name: '‹ Intern' }).click();
+    await expect(intern.getByRole('button', { name: 'Anfahrt und Parken', exact: true })).toBeVisible();
+
+    // Admin: in Einstellungen → Navigation hat jede Seite einen eigenen Platz
+    await login(page, 'admin', ADMIN_PASSWORD);
+    await adminMenu(page, 'Einstellungen');
+    await page
+      .locator('.settings-link')
+      .filter({ has: page.getByText('Navigation', { exact: true }) })
+      .click();
+    const card = page.locator('#einstellungen-navigation');
+    await expect(card.getByLabel('Platz von Uniform')).toHaveValue('0');
+    await expect(card.getByLabel('Platz von Anfahrt und Parken')).toHaveValue('0');
   } finally {
     await login(page, 'admin', ADMIN_PASSWORD);
     await adminMenu(page, 'Seiten');

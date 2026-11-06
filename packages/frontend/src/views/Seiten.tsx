@@ -1,4 +1,4 @@
-import { api, can, type PageSummary } from '../api';
+import { can, type PageSummary } from '../api';
 import brand from '../generated/brand';
 import RichTextView from '../richtext/RichTextView';
 import { navigate } from '../router';
@@ -13,9 +13,9 @@ export function AudienceBadge({ page }: { page: Pick<PageSummary, 'audience'> })
 }
 
 /**
- * Eigene Seiten (Issue #287): ein Punkt der Navigation mit einer Kachel je Seite, die die Person lesen darf (in der
- * Reihenfolge der Verwaltung), darunter #/seiten/<id> mit dem Text. Was nicht für sie gedacht ist, liefert der Server
- * gar nicht erst.
+ * Eigene Seiten (Issue #287): Jede Seite ist ein eigener Punkt der Navigation (#/seiten/<id>, Titel in der Kopfzeile).
+ * #/seiten ohne Nummer zeigt alle als Kacheln (z. B. für ältere Links). Was nicht für die Person gedacht ist, liefert der
+ * Server gar nicht erst.
  */
 export default function Seiten({ id }: { id: number | null }) {
   return id === null ? <PageTiles /> : <PageView id={id} />;
@@ -54,21 +54,23 @@ function PageTiles() {
 }
 
 function PageView({ id }: { id: number }) {
-  const { data, error, loading, reload } = useAsync(() => api.page(id), [id], 'page');
+  const { data, error, loading, reload } = useAsync(sources.page(id).load, sources.page(id).deps, sources.page(id).key);
   return (
     <div className="page-view">
-      <button className="btn btn-link back" onClick={() => navigate('seiten')}>
-        ‹ Alle {sec.pages}
-      </button>
       {loading && !data ? (
         <Loading shape="text" />
       ) : error || !data ? (
         <ErrorBox message={error ?? 'Die Seite konnte nicht geladen werden.'} onRetry={reload} />
       ) : (
         <article className="card page-article">
-          <h2>
-            {data.title} {can('manage_pages') && <AudienceBadge page={data} />}
-          </h2>
+          {can('manage_pages') && (
+            <p className="page-meta">
+              <AudienceBadge page={data} />
+              <button type="button" className="btn btn-small btn-secondary" onClick={() => navigate('verwaltung/seiten')}>
+                {sec.pages} verwalten
+              </button>
+            </p>
+          )}
           {data.body ? <RichTextView html={data.body} /> : <p className="muted">Diese Seite hat noch keinen Text.</p>}
         </article>
       )}

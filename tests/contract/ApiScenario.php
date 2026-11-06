@@ -1498,7 +1498,15 @@ final class ApiScenario
         $c->ok($s === 200 && array_column((array) ($d['pages'] ?? []), 'id') === array_reverse($ids), 'Reihenfolge ändern');
         [, $config] = $this->req('GET', '/config');
         $c->ok(in_array('Kptest Uniform', array_column((array) ($config['pages'] ?? []), 'title'), true), '/config nennt die Seiten');
-        $c->ok($this->req('DELETE', '/pages/' . ($pub['id'] ?? 0))[0] === 200 && $this->req('DELETE', '/pages/' . ($mem['id'] ?? 0))[0] === 200 && $this->req('GET', '/pages/' . ($mem['id'] ?? 0))[0] === 404, 'Aufräumen: Seiten löschen');
+        $nav = ['items' => ['termine', ['label' => 'Infos', 'icon' => 'seiten', 'items' => ['seiten/' . ($pub['id'] ?? 0), 'seiten/' . ($mem['id'] ?? 0)]]], 'hidden' => []];
+        [$s, $d] = $this->req('PUT', '/admin/navigation', ['navigation' => $nav]);
+        $c->ok($s === 200 && ($d['navigation'] ?? null) === $nav, 'Jede Seite als eigener Punkt der Navigation');
+        $c->ok($this->req('PUT', '/admin/navigation', ['navigation' => ['items' => ['seiten'], 'hidden' => []]])[0] === 400, 'Ohne Nummer kein Punkt der Navigation → 400');
+        $this->req('DELETE', '/pages/' . ($mem['id'] ?? 0));
+        [, $d] = $this->req('GET', '/admin/navigation');
+        $c->ok(($d['navigation']['items'][1]['items'] ?? null) === ['seiten/' . ($pub['id'] ?? 0)], 'Gelöschte Seite fällt aus der Navigation');
+        $this->req('PUT', '/admin/navigation', ['navigation' => null]);
+        $c->ok($this->req('DELETE', '/pages/' . ($pub['id'] ?? 0))[0] === 200 && $this->req('GET', '/pages/' . ($mem['id'] ?? 0))[0] === 404, 'Aufräumen: Seiten löschen');
     }
 
     /**

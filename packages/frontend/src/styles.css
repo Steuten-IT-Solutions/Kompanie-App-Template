@@ -6047,6 +6047,14 @@ button.spotlight-person:focus-visible {
 .page-tile .badge {
   margin-left: 0;
 }
-.page-article h2 {
+.page-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-top: 0;
+}
+.page-meta .badge {
+  margin-left: 0;
 }

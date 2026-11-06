@@ -15,7 +15,7 @@ import { focusId } from './focus';
 import { AdminBack, adminTabs } from './adminNav';
 import { MenuBack, InternMenu } from './internNav';
 import { targetLabels } from './navLabels';
-import { buildNav, menuOf, type NavEntry, type NavTarget } from './navigation';
+import { buildNav, isPageTarget, menuOf, pageTarget, type NavEntry, type NavTarget } from './navigation';
 import { helpSlug } from './helpSlug';
 import { setReportOrigin } from './lastError';
 import { shareLink, shareUrl } from './share';
@@ -153,7 +153,7 @@ function internLabels(): Record<InternView, string> {
 
 /** Programmteile eines Tabs vorab laden; bei einem Untermenü die seiner Bereiche. */
 function preloadEntry(e: NavEntry) {
-  (e.children ?? [e.key]).forEach((k) => tabViews[k]?.preload());
+  (e.children ?? [e.key]).forEach((k) => tabViews[isPageTarget(k) ? 'seiten' : k]?.preload());
 }
 
 const titles = (): Record<View, string> => ({
@@ -350,6 +350,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
   // Dienstgrade und Punktekatalog zum Nachschlagen.
   const ranksAllowed = !!features?.ranks && can('view_ranks');
   const catalogAllowed = !!features?.points && can('view_catalog');
+  const pageIds = new Set((config?.pages ?? []).map((p) => p.id));
   const allowed: Record<View, boolean> = {
     // Geburtstage (Issue #1) stehen bei den Terminen: für alle, die sie sehen, auch wenn es sonst keine Termine gibt.
     termine: hasEvents() || birthdaysVisible(),
@@ -359,7 +360,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
     kompanien: !!features?.companies && (can('view_companies') || can('manage_companies')),
     // Sponsoren (Issue #279): mit view_sponsors sehen, mit manage_sponsors (Verwaltung) ohnehin
     sponsoren: !!features?.sponsors && (can('view_sponsors') || can('manage_sponsors')),
-    // Eigene Seiten (Issue #287): wenn es eine gibt, die die Person lesen darf; wer sie pflegt, ohnehin
+    // Eigene Seiten (Issue #287): #/seiten/<id>, wenn es eine gibt, die die Person lesen darf; wer sie pflegt, ohnehin
     seiten: !!features?.pages && ((config?.pages?.length ?? 0) > 0 || can('manage_pages')),
     dokumente: docsAllowed,
     mitglieder: membersAllowed,
@@ -388,9 +389,12 @@ export default function App({ notice = null }: { notice?: string | null }) {
   // Tab-Leiste: eingerichtet (Einstellungen → Navigation, Issue #277) oder die Standardnavigation; nur, was die Person
   // sehen darf. Das Brett zum Lesen (view_board); wer schreibt, hat es außerdem in der Verwaltung.
   const navEntries = buildNav(config?.navigation, {
-    visible: (t: NavTarget) => (t === 'brett' ? boardVisible() : allowed[t]),
+    // Eigene Seiten (Issue #287): jede, die die Person lesen darf (/config), als eigener Punkt
+    visible: (t: NavTarget) =>
+      t === 'brett' ? boardVisible() : isPageTarget(t) ? allowed.seiten && pageIds.has(Number(t.slice(7))) : allowed[t],
     intern: can('view_intern'),
-    label: (t: NavTarget) => targetLabels()[t],
+    label: (t: NavTarget) => targetLabels()[t] ?? t,
+    pages: (config?.pages ?? []).map((p) => pageTarget(p.id)),
   });
   allowed.intern = navEntries.some((e) => e.key === 'intern');
   // „Meins“ ganz rechts, die Verwaltung davor.
@@ -415,14 +419,17 @@ export default function App({ notice = null }: { notice?: string | null }) {
   // Die Bereiche eines Untermenüs („Intern“ oder eingerichtet) gehören zu diesem Tab unten; „‹ Intern“ bzw. „‹ <Name>“
   // auf ihrer ersten Seite, Unterseiten (ein Dokument, eine Person, Dokumente verwalten) haben ihren eigenen Rückweg.
   // Wer am Brett schreibt, hat es in der Verwaltung (adminView), auch wenn er es über das Untermenü öffnet.
-  const parentMenu = adminView ? undefined : menuOf(navEntries, tab);
+  // Eine eigene Seite ist ihr eigener Punkt der Navigation (seiten/<id>).
+  const navKey: string = tab === 'seiten' && /^\d+$/.test(path[1] ?? '') ? pageTarget(Number(path[1])) : tab;
+  const parentMenu = adminView ? undefined : menuOf(navEntries, navKey);
   const menuStart =
     tab === 'brett' ||
     tab === 'dienstgrade' ||
     tab === 'punktekatalog' ||
-    (['termine', 'news', 'galerie', 'kompanien', 'sponsoren', 'seiten', 'dokumente'].includes(tab) && !path[1]) ||
+    tab === 'seiten' ||
+    (['termine', 'news', 'galerie', 'kompanien', 'sponsoren', 'dokumente'].includes(tab) && !path[1]) ||
     (tab === 'mitglieder' && !/^\d+$/.test(path[1] ?? '') && !path[2]);
-  const activeTab: string = adminView ? 'verwaltung' : (parentMenu?.key ?? openMenu?.key ?? tab);
+  const activeTab: string = adminView ? 'verwaltung' : (parentMenu?.key ?? openMenu?.key ?? navKey);
   // Gast öffnet einen geteilten Link auf eine Seite für Angemeldete: Hinweis; nach der Anmeldung geht sie auf (share.ts).
   const canLogin = config?.auth.mode === 'form' || !!config?.auth.loginUrl;
   const loginFirst = !user && canLogin && VIEWS.includes(requested) && requested !== 'anmelden' && !allowed[requested];
@@ -503,7 +510,13 @@ export default function App({ notice = null }: { notice?: string | null }) {
   const docId = tab === 'dokumente' && /^\d+$/.test(path[1] ?? '') ? Number(path[1]) : undefined;
   const newsId = tab === 'news' && /^[A-Za-z0-9_-]+$/.test(path[1] ?? '') ? path[1] : undefined;
 
-  const title = tab === 'menue' ? (openMenu?.label ?? titles().menue) : titles()[tab];
+  // Eine eigene Seite trägt ihren Titel (wie ihr Punkt in der Navigation).
+  const title =
+    tab === 'menue'
+      ? (openMenu?.label ?? titles().menue)
+      : navKey !== tab
+        ? (targetLabels()[navKey as NavTarget] ?? titles()[tab])
+        : titles()[tab];
   // Ist der Start ein Untermenü (menue/<n>), gehört seine Nummer in den Link.
   const pageUrl = shareUrl(config.appUrl, valid ? tab : start, requested, path);
   const head = (
@@ -619,7 +632,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
             {tab === 'sponsoren' && <Sponsoren />}
             {tab === 'seiten' && <Seiten id={/^\d+$/.test(path[1] ?? '') ? Number(path[1]) : null} />}
             {openMenu?.children && (
-              <InternMenu label={openMenu.label} tabs={openMenu.children.map((v) => ({ id: v, label: targetLabels()[v] }))} />
+              <InternMenu label={openMenu.label} tabs={openMenu.children.map((v) => ({ id: v, label: targetLabels()[v] ?? v }))} />
             )}
             {parentMenu && menuStart && <MenuBack to={parentMenu.key} label={parentMenu.label} />}
             {tab === 'dokumente' &&

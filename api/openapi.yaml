@@ -6822,8 +6822,10 @@ components:
           items: { $ref: '#/components/schemas/NavigationTarget' }
     NavigationTarget:
       type: string
-      description: Bereich der App, der in der Navigation stehen kann
-      enum: [termine, news, galerie, kompanien, sponsoren, mitglieder, dokumente, brett, dienstgrade, punktekatalog, seiten]
+      description: 'Bereich der App, der in der Navigation stehen kann: einer der festen (`targets` in GET /admin/navigation) oder eine eigene Seite als `seiten/<id>` (Issue #287)'
+      anyOf:
+        - enum: [termine, news, galerie, kompanien, sponsoren, mitglieder, dokumente, brett, dienstgrade, punktekatalog]
+        - pattern: '^seiten/[1-9][0-9]{0,9}$'
     NavigationAdmin:
       type: object
       required: [navigation, targets, icons, max_main, max_menu_items, label_max]

@@ -44,6 +44,7 @@ export const sources = {
   album: (id: number) => source('galerie-album', () => api.galleryAlbum(id), [id]),
   sponsors: source('sponsors', api.sponsors),
   pages: source('pages', api.pages),
+  page: (id: number) => source('page', () => api.page(id), [id]),
   companies: source('companies', api.companies),
   documents: source('documents', api.documents),
   directory: source('directory', api.directory),
@@ -209,8 +210,10 @@ export type TabId =
  * Was die Startseite eines Tabs beim Öffnen lädt, mit denselben Bedingungen wie die Ansicht. Ob die Person den Tab sehen
  * darf, prüft App.tsx (allowed). Die Verwaltung zeigt zuerst nur ihr Menü; ihre Daten (/admin/…) lädt die App nicht vorab.
  */
-export function tabSources(tab: TabId): Source[] {
+export function tabSources(tab: TabId | `seiten/${number}`): Source[] {
   const f = config?.features;
+  // Eigene Seite als Punkt der Navigation (Issue #287)
+  if (tab.startsWith('seiten/')) return [sources.page(Number(tab.slice(7)))];
   switch (tab) {
     case 'termine':
       // wie Termine.tsx: Termine und die Karte „Anstehende Geburtstage“
@@ -258,6 +261,7 @@ export function tabSources(tab: TabId): Source[] {
     case 'verwaltung':
       return [];
   }
+  return [];
 }
 
 /**

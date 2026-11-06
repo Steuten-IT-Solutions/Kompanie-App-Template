@@ -16,9 +16,17 @@ export const NAV_TARGETS = [
   'brett',
   'dienstgrade',
   'punktekatalog',
-  'seiten',
 ] as const;
-export type NavTarget = (typeof NAV_TARGETS)[number];
+/** Feste Bereiche der Navigation. */
+export type FixedTarget = (typeof NAV_TARGETS)[number];
+/** Eigene Seite (Issue #287): jede steht als eigener Punkt „seiten/<id>“ in der Navigation (wie NavigationService::PAGE_PREFIX). */
+export type PageTarget = `seiten/${number}`;
+export type NavTarget = FixedTarget | PageTarget;
+
+export const pageTarget = (id: number): PageTarget => `seiten/${id}`;
+export const isPageTarget = (t: string): t is PageTarget => /^seiten\/[1-9][0-9]*$/.test(t);
+/** Symbol eines Bereichs (eigene Seiten haben alle dasselbe). */
+export const targetIcon = (t: string): string => (isPageTarget(t) ? 'seiten' : t);
 
 /** Symbole für Untermenüs (wie NavigationService::ICONS). */
 export const NAV_ICONS = [
@@ -45,8 +53,9 @@ export type NavMenuSetting = { label: string; icon: string; items: string[] };
 /** Gespeicherte Einstellung (/config navigation): Hauptpunkte und ausgeblendete Bereiche. */
 export type NavigationSetting = { items: (string | NavMenuSetting)[]; hidden: string[] };
 
-/** Bereiche, die in der Standardnavigation nur mit eingeschaltetem Bereich einen Hauptpunkt belegen (Issue #279, #280, #287). */
-const OPTIONAL_MAIN: NavTarget[] = ['kompanien', 'sponsoren', 'seiten'];
+/** Bereiche, die in der Standardnavigation nur mit eingeschaltetem Bereich einen Hauptpunkt belegen (Issue #279, #280);
+ * danach folgen die eigenen Seiten (Issue #287), jede als eigener Punkt. */
+const OPTIONAL_MAIN: NavTarget[] = ['kompanien', 'sponsoren'];
 
 /** Bereiche unter „Intern“ in der Standardnavigation, in dieser Reihenfolge. */
 export const INTERN_TARGETS: NavTarget[] = ['mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog'];
@@ -64,18 +73,22 @@ export interface NavContext {
   visible: (target: NavTarget) => boolean;
   /** Standardnavigation: hat die Person das Recht „Intern“ (view_intern)? */
   intern: boolean;
-  /** Bezeichnung eines Bereichs (aus der Konfiguration der Kompanie). */
+  /** Bezeichnung eines Bereichs (aus der Konfiguration der Kompanie, bei eigenen Seiten ihr Titel). */
   label: (target: NavTarget) => string;
+  /** Eigene Seiten in ihrer Reihenfolge (seiten/<id>), die es gibt; fehlt = keine. */
+  pages?: PageTarget[];
 }
 
-const isTarget = (id: unknown): id is NavTarget => typeof id === 'string' && (NAV_TARGETS as readonly string[]).includes(id);
+const isTarget = (id: unknown): id is NavTarget =>
+  typeof id === 'string' && ((NAV_TARGETS as readonly string[]).includes(id) || isPageTarget(id));
 
 /** Punkte der Tab-Leiste (ohne „Verwaltung“ und „Meins“); ein Untermenü ohne sichtbaren Bereich entfällt. */
 export function buildNav(setting: NavigationSetting | null | undefined, ctx: NavContext): NavEntry[] {
-  const view = (t: NavTarget): NavEntry => ({ key: t, label: ctx.label(t), icon: t, children: null });
+  const view = (t: NavTarget): NavEntry => ({ key: t, label: ctx.label(t), icon: targetIcon(t), children: null });
+  const pages = ctx.pages ?? [];
   if (!setting) {
     // Standard: Mitglieder und Dokumente mit dem Recht „Intern“ dort gesammelt, sonst je ein eigener Tab.
-    const main: NavEntry[] = (['termine', 'news', 'galerie', ...OPTIONAL_MAIN] as NavTarget[]).filter(ctx.visible).map(view);
+    const main: NavEntry[] = (['termine', 'news', 'galerie', ...OPTIONAL_MAIN, ...pages] as NavTarget[]).filter(ctx.visible).map(view);
     const intern = INTERN_TARGETS.filter(ctx.visible);
     if (ctx.intern && intern.length > 0) {
       // Wie draftOf: Passen nicht alle unten hin, kommen die letzten vorne ins Untermenü.
@@ -99,7 +112,7 @@ export function buildNav(setting: NavigationSetting | null | undefined, ctx: Nav
     if (children.length > 0) out.push({ key: `menue/${menus}`, label: item.label, icon: item.icon, children });
   }
   // Bereiche, die die Einstellung noch nicht kennt (z. B. mit einer neuen Version dazugekommen): hinten anhängen.
-  for (const t of NAV_TARGETS) if (!listed.has(t) && ctx.visible(t)) out.push(view(t));
+  for (const t of [...NAV_TARGETS, ...pages]) if (!listed.has(t) && ctx.visible(t)) out.push(view(t));
   return out;
 }
 
@@ -110,22 +123,26 @@ export function menuOf(entries: NavEntry[], target: string): NavEntry | undefine
 
 /**
  * Entwurf für die Seite Einstellungen → Navigation: die gespeicherte Einstellung oder die Standardnavigation. Kompanien,
- * Sponsoren und eigene Seiten stehen nur darin, wenn ihr Bereich an ist (on), damit sie keinen der Hauptpunkte belegen; wird einer
+ * Sponsoren und eigene Seiten (je Seite ein Punkt) stehen nur darin, wenn ihr Bereich an ist (on), damit sie keinen der Hauptpunkte belegen; wird einer
  * später eingeschaltet, erscheint er hinten in der Leiste wie jeder Bereich, den die Einstellung nicht kennt. Passen
  * nicht alle unten hin, kommen die letzten vorne ins Untermenü „Intern“.
  */
-export function draftOf(setting: NavigationSetting | null | undefined, on: (t: NavTarget) => boolean = () => true): NavigationSetting {
+export function draftOf(
+  setting: NavigationSetting | null | undefined,
+  on: (t: NavTarget) => boolean = () => true,
+  pages: PageTarget[] = [],
+): NavigationSetting {
   if (setting)
     return { items: setting.items.map((i) => (typeof i === 'string' ? i : { ...i, items: [...i.items] })), hidden: [...setting.hidden] };
-  const main: NavTarget[] = ['termine', 'news', 'galerie', ...OPTIONAL_MAIN.filter(on)];
+  const main: NavTarget[] = ['termine', 'news', 'galerie', ...OPTIONAL_MAIN.filter(on), ...pages.filter(on)];
   const overflow = main.splice(NAV_MAX_MAIN - 1);
   return { items: [...main, { label: 'Intern', icon: 'ordner', items: [...overflow, ...INTERN_TARGETS] }], hidden: [] };
 }
 
 /** Bereiche, die im Entwurf nirgends stehen (neu dazugekommen): Sie erscheinen hinten in der Leiste. */
-export function unplaced(draft: NavigationSetting): NavTarget[] {
+export function unplaced(draft: NavigationSetting, pages: PageTarget[] = []): NavTarget[] {
   const used = new Set<string>([...draft.hidden, ...draft.items.flatMap((i) => (typeof i === 'string' ? [i] : i.items))]);
-  return NAV_TARGETS.filter((t) => !used.has(t));
+  return [...NAV_TARGETS, ...pages].filter((t) => !used.has(t));
 }
 
 /** Platz eines Bereichs im Entwurf: 'main' (unten in der Leiste), Nummer des Untermenüs (ab 0) oder 'hidden'. */
