@@ -5807,8 +5807,8 @@ button.spotlight-person:focus-visible {
   white-space: nowrap;
 }
 
-/* Kompanien (Issue #280): Karten mit Logo, Antippen öffnet die Seite der Kompanie; Logos auf hellem Grund wie bei den
-   Sponsoren. */
+/* Kompanien (Issue #280): Karten mit Logo, Antippen öffnet die Seite der Kompanie. Logos ohne eigenen Grund, damit
+   transparente Logos auf der Karte stehen (hell wie dunkel); nur der Kurzname ohne Logo steht in einem Kasten. */
 .company-card {
   padding: 0;
 }
@@ -5840,11 +5840,6 @@ button.spotlight-person:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
-  color: #1d1d1f;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  overflow: hidden;
 }
 .company-admin-logo {
   flex-basis: 48px;
@@ -5854,8 +5849,19 @@ button.spotlight-person:focus-visible {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+  /* Logos mit eigenem (deckendem) Hintergrund behalten runde Ecken wie zuvor der Kasten */
+  border-radius: 8px;
 }
 .company-logo-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
   font-weight: 700;
   font-size: 0.8rem;
   text-align: center;

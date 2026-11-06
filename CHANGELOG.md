@@ -49,6 +49,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   sie auf normal. Gespeichert bleibt der Text unverändert. Links in formatierten Texten sind im dunklen Design jetzt
   ebenfalls gut lesbar.
 - **Kompanien**: *Webseite* und *App der Kompanie* sind jetzt Knöpfe im Stil der App statt blauer Standard-Links.
+- **Kompanien: transparente Logos**: Logos der Kompanien standen in der Liste, auf der Seite der Kompanie und in der
+  Verwaltung immer in einem weißen Kasten, auch wenn sie einen durchsichtigen Hintergrund haben. Jetzt stehen sie
+  direkt auf der Karte, im hellen wie im dunklen Design. Ein Logo ohne durchsichtigen Hintergrund (z. B. ein JPG)
+  zeigt weiter seinen eigenen Hintergrund.
 - **Hinweis „Einrichtung starten“ nach dem Wiederherstellen**: Wurde in einer frisch installierten, noch nicht
   eingerichteten App eine Sicherung eingespielt, stand der Hinweis „Einrichtung starten“ weiter über jeder Seite. Mit
   der Sicherung gilt die App jetzt als eingerichtet; Bereiche und Verbindungen lassen sich wie gewohnt unter
