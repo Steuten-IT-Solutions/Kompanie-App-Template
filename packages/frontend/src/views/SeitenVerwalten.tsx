@@ -17,13 +17,30 @@ const TITLE_MAX = 100;
 type Draft = { title: string; audience: PageAudience; body: string };
 const EMPTY: Draft = { title: '', audience: 'members', body: '' };
 
-function PageFields({ draft, onChange, idPrefix, autoFocus }: { draft: Draft; onChange: (d: Draft) => void; idPrefix: string; autoFocus?: boolean }) {
+function PageFields({
+  draft,
+  onChange,
+  idPrefix,
+  autoFocus,
+}: {
+  draft: Draft;
+  onChange: (d: Draft) => void;
+  idPrefix: string;
+  autoFocus?: boolean;
+}) {
   const set = (patch: Partial<Draft>) => onChange({ ...draft, ...patch });
   return (
     <>
       <label className="field">
         <span>Titel</span>
-        <input type="text" maxLength={TITLE_MAX} value={draft.title} onChange={(e) => set({ title: e.target.value })} required autoFocus={autoFocus} />
+        <input
+          type="text"
+          maxLength={TITLE_MAX}
+          value={draft.title}
+          onChange={(e) => set({ title: e.target.value })}
+          required
+          autoFocus={autoFocus}
+        />
       </label>
       <label className="field">
         <span>Für wen?</span>
@@ -216,7 +233,9 @@ export function PageAdmin({ onToast }: { onToast: (msg: string) => void }) {
                     <button
                       className="btn btn-small btn-danger"
                       disabled={busy}
-                      onClick={() => window.confirm(`Seite „${p.title}“ samt ihren Bildern löschen?`) && run(() => api.deletePage(p.id), 'Gelöscht')}
+                      onClick={() =>
+                        window.confirm(`Seite „${p.title}“ samt ihren Bildern löschen?`) && run(() => api.deletePage(p.id), 'Gelöscht')
+                      }
                     >
                       Löschen
                     </button>
