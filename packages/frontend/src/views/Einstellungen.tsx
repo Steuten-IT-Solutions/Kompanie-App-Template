@@ -6,6 +6,8 @@ import {
   config,
   applyBirthdayUpcomingDays,
   applyFeatures,
+  applyRegistration,
+  newAccountRoles,
   newsTitle,
   refreshRoles,
   type AdminSettings,
@@ -37,6 +39,7 @@ const PAGES = [
   { id: 'bereiche', title: 'Bereiche', text: 'Welche Bereiche die App für alle hat.' },
   { id: 'navigation', title: 'Navigation', text: 'Welche Bereiche unten in der Leiste stehen, auch in Untermenüs.' },
   { id: 'rollen', title: 'Rollen', text: 'Wer was in der App darf.' },
+  { id: 'zugang', title: 'Zugang beantragen', text: 'Ob Personen selbst einen Zugang beantragen können, den ihr dann freigebt.' },
   { id: 'benachrichtigungen', title: 'Benachrichtigungen', text: 'Angemeldete Geräte und Uhrzeit der Erinnerung.' },
   { id: 'geburtstage', title: sec.birthdays, text: `Wie lange vorher anstehende ${sec.birthdays} bei den ${sec.events} erscheinen.` },
   { id: 'email', title: 'E-Mail', text: `Kompanieadresse und Mailserver, z. B. für Nachrichten aus „${sec.board}“.` },
@@ -74,6 +77,7 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
       {page.id === 'bereiche' && <Bereiche onToast={onToast} />}
       {page.id === 'navigation' && <NavigationEinstellen onToast={onToast} />}
       {page.id === 'rollen' && <Rollen onToast={onToast} />}
+      {page.id === 'zugang' && <RegistrationSection onToast={onToast} />}
       {page.id === 'benachrichtigungen' && <PushSettings onToast={onToast} />}
       {page.id === 'geburtstage' && <BirthdaySettingsSection onToast={onToast} />}
       {page.id === 'email' && <MailSection onToast={onToast} />}
@@ -280,6 +284,89 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
 const UPCOMING_DAYS_MAX = 30;
 
 /** Geburtstage (Issue #1): wie viele Tage im Voraus die Karte „Anstehende Geburtstage“ bei den Terminen einen zeigt. */
+/**
+ * Zugang beantragen (Issue #314): ein- und ausschalten, Rolle, die beim Freigeben vorgeschlagen ist, Link zum Weitergeben.
+ * Ohne Mailversand geht es auch; dann bestätigt niemand seine Adresse, und das Ergebnis sieht die Person beim Anmelden.
+ */
+function RegistrationSection({ onToast }: { onToast: (msg: string) => void }) {
+  const { data, error, loading, reload, setData } = useAsync(() => api.registrationSettings(), [], 'admin/registration');
+  const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  if (loading && !data) return <Loading shape="form" />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+  const s = data!;
+  const roles = newAccountRoles();
+
+  async function save(change: { enabled?: boolean; default_role?: string }) {
+    setBusy(true);
+    setSaveError(null);
+    try {
+      const next = await api.setRegistrationSettings(change);
+      setData(next);
+      applyRegistration(next.enabled);
+      onToast('Gespeichert');
+    } catch (err) {
+      setSaveError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card settings-section" id="einstellungen-zugang">
+      <h3>Zugang beantragen</h3>
+      <label className="toggle">
+        <input type="checkbox" checked={s.enabled} disabled={busy} onChange={(e) => save({ enabled: e.target.checked })} />
+        <span>Personen können selbst einen Zugang beantragen</span>
+      </label>
+      <p className="small muted">
+        Die Anfrage wartet, bis jemand mit dem Recht „Mitglieder anlegen“ sie unter Verwaltung → Anfragen freigibt oder ablehnt. Erst dann
+        entsteht das Konto.
+      </p>
+      {roles.length > 1 && (
+        <label className="field">
+          <span>Vorgeschlagene Rolle beim Freigeben</span>
+          <select value={s.default_role} disabled={busy} onChange={(e) => save({ default_role: e.target.value })}>
+            {roles.map((r) => (
+              <option key={r.key} value={r.key}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <p className="small muted">
+        {s.email_confirmation
+          ? 'Der Mailversand ist eingerichtet: Wer einen Zugang beantragt, bestätigt zuerst die E-Mail-Adresse und erfährt das Ergebnis per Mail.'
+          : 'Ohne eingerichteten Mailversand (Einstellungen → E-Mail) wird die E-Mail-Adresse nicht geprüft. Das Ergebnis erfährt die Person, wenn sie sich anmeldet oder den Stand ihrer Anfrage prüft.'}
+      </p>
+      {s.enabled && (
+        <div className="field">
+          <span>Link zum Formular (zum Weitergeben)</span>
+          <code className="settings-link-code">{s.link}</code>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() =>
+              void navigator.clipboard?.writeText(s.link).then(
+                () => onToast('Link kopiert'),
+                () => onToast('Kopieren hat nicht geklappt'),
+              )
+            }
+          >
+            Link kopieren
+          </button>
+        </div>
+      )}
+      {saveError && (
+        <p className="form-error" role="alert">
+          {saveError}
+        </p>
+      )}
+    </section>
+  );
+}
+
 function BirthdaySettingsSection({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.birthdaySettings(), [], 'admin/birthdays');
   const [busy, setBusy] = useState(false);
@@ -1206,8 +1293,8 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
           <span>
             Knöpfe zum Herunterladen zeigen
             <span className="small muted feature-desc">
-              Wer die {sec.gallery} sieht, kann dann jedes Bild in der Großansicht und jedes Album als ZIP herunterladen (in
-              Originalauflösung, ohne Videos).
+              Wer die {sec.gallery} sieht, kann dann jedes Bild und Video in der Großansicht und jedes Album als ZIP herunterladen (Bilder
+              in Originalauflösung, Videos unverändert).
             </span>
           </span>
         </label>

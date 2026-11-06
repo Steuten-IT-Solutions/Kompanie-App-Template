@@ -183,6 +183,30 @@ final class CompanyTest extends TestCase
         $this->assertSame(404, $this->app->companies()->logoForDelivery(null, $id, null)['status'], 'Bereich aus');
     }
 
+    /** Transparente Logos bleiben transparent: PNG mit Alphakanal, Ecke durchsichtig, Fläche deckend. */
+    public function testPngLogoKeepsTransparency(): void
+    {
+        $id = $this->company(['name' => 'Erste']);
+        $im = imagecreatetruecolor(1024, 512);
+        imagealphablending($im, false);
+        imagesavealpha($im, true);
+        imagefill($im, 0, 0, (int) imagecolorallocatealpha($im, 0, 0, 0, 127));
+        imagefilledrectangle($im, 256, 128, 767, 383, (int) imagecolorallocate($im, 20, 20, 220));
+        ob_start();
+        imagepng($im);
+        $res = $this->call('POST', "/companies/$id/logo", ['file' => ['name' => 'logo.png', 'data' => base64_encode((string) ob_get_clean())]]);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame('png', $res->data['logo_type']);
+        $out = $this->app->companies()->logoForDelivery(null, $id, null);
+        $this->assertSame('image/png', $out['headers']['Content-Type']);
+        $stored = imagecreatefromstring((string) $out['body']);
+        $this->assertNotFalse($stored);
+        $this->assertSame([512, 256], [imagesx($stored), imagesy($stored)], 'auf 512 Pixel verkleinert');
+        $this->assertSame(127, imagecolorsforindex($stored, imagecolorat($stored, 2, 2))['alpha'], 'Ecke durchsichtig, nicht weiß');
+        $center = imagecolorsforindex($stored, imagecolorat($stored, 256, 128));
+        $this->assertSame([0, 220], [$center['alpha'], $center['blue']], 'Fläche deckend');
+    }
+
     public function testDescriptionImagesArePublicWithViewCompanies(): void
     {
         $png = imagecreatetruecolor(4, 3);

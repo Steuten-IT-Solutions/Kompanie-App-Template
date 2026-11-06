@@ -1723,7 +1723,7 @@ test('Galerie: Knöpfe zum Herunterladen für ein Bild und das Album als ZIP, nu
     const bytes = readFileSync((await zip.path())!);
     expect(bytes.subarray(0, 4).toString('latin1')).toBe('PK\x03\x04');
     expect(bytes.includes(Buffer.from('foto.jpg'))).toBe(true);
-    await expect(page.locator('.album-download [role=status]')).toHaveText('1 Bild gespeichert.');
+    await expect(page.locator('.album-download [role=status]')).toHaveText('1 Datei gespeichert.');
 
     await page.locator('.photo-grid .photo').first().click();
     const [single] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Bild herunterladen' }).click()]);
@@ -3355,6 +3355,48 @@ test('Galerie: Video mit ▶ im Album, spielt in der Großansicht aus Drive (Ran
   await page.keyboard.press('Escape');
 });
 
+test('Galerie: Videos lassen sich herunterladen, einzeln und im ZIP des Albums', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const patch = (value: '0' | '1') =>
+    page.evaluate(async (value) => {
+      const cfg = window.KOMPANIE_CONFIG!;
+      const res = await fetch(cfg.apiBase + 'admin/settings', {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+        body: JSON.stringify({ gallery_downloads: value }),
+      });
+      return res.status;
+    }, value);
+  expect(await patch('1')).toBe(200);
+  try {
+    // Als Gast wie im Test oben (Umzug: ein Bild und ein Video)
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
+    await page.goto('/app/#/galerie');
+    await page.locator('.album-card', { hasText: 'Umzug' }).click();
+    await expect(page.locator('.photo')).toHaveCount(2);
+    const size = readFileSync(new URL('../../../tests/fixtures/galerie-video.webm', import.meta.url)).length;
+
+    const zipButton = page.getByRole('button', { name: /^Album herunterladen \(1 Bild · 1 Video, ZIP\)$/ });
+    const [zip] = await Promise.all([page.waitForEvent('download'), zipButton.click()]);
+    const bytes = readFileSync((await zip.path())!);
+    expect(bytes.includes(Buffer.from('umzug.webm'))).toBe(true);
+    expect(bytes.length).toBeGreaterThan(size);
+    await expect(page.locator('.album-download [role=status]')).toHaveText('2 Dateien gespeichert.');
+
+    await page.locator('.photo-video').click();
+    const [single] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Video herunterladen' }).click()]);
+    expect(single.suggestedFilename()).toBe('umzug.webm');
+    expect(readFileSync((await single.path())!).length).toBe(size);
+    await page.keyboard.press('Escape');
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD);
+    expect(await patch('0')).toBe(200);
+  }
+});
+
 test('iPhone: Banner führt zur bebilderten Installationsanleitung', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/');
@@ -4290,6 +4332,11 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast öffnet die Seite
   await expect(description).toContainText('Seit 1905 dabei.');
   await form.getByRole('button', { name: 'Anlegen' }).click();
   await expect(page.locator('.toast')).toHaveText('Kompanie angelegt');
+  // Zweite Kompanie für Suche und Sortierung der Liste (steht in der Reihenfolge der Verwaltung hinten)
+  await form.getByLabel('Name', { exact: true }).fill('Alte Garde');
+  await form.getByLabel(/^Gründungsjahr/).fill('1880');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.row', { has: page.getByText('Alte Garde', { exact: true }) })).toContainText('gegründet 1880');
   const row = page.locator('.row', { has: page.getByText('Testkompanie', { exact: true }) });
   await expect(row).toContainText('TK · gegründet 1905 · 0 Mitglieder');
   await row.getByRole('button', { name: 'Mitglieder' }).click();
@@ -4306,6 +4353,22 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast öffnet die Seite
     await page.locator('.tabbar').getByRole('button', { name: 'Kompanien' }).click();
     const card = page.locator('.company-card', { hasText: 'Testkompanie' });
     await expect(card).toContainText('TK · gegründet 1905 · 1 Mitglieder');
+    // Suche und Sortierung wie in der Mitgliederliste: zuerst wie festgelegt, dann nach Name, nach Gründung jüngste zuerst
+    const names = page.locator('.company-list .company-card .row-title');
+    await expect(names).toHaveText(['Testkompanie', 'Alte Garde']);
+    const sortSelect = page.getByRole('combobox', { name: 'Sortierung' });
+    await sortSelect.selectOption({ label: 'Name' });
+    await expect(names).toHaveText(['Alte Garde', 'Testkompanie']);
+    await sortSelect.selectOption({ label: 'Gründung' });
+    await page.getByRole('button', { name: 'Reihenfolge Älteste zuerst' }).click();
+    await expect(names).toHaveText(['Testkompanie', 'Alte Garde']);
+    await sortSelect.selectOption({ label: 'Wie festgelegt' });
+    const search = page.getByRole('searchbox', { name: 'Kompanien suchen' });
+    await search.fill('tk');
+    await expect(names).toHaveText(['Testkompanie']);
+    await search.fill('xyz');
+    await expect(page.locator('.company-list')).toContainText('Nichts gefunden.');
+    await search.fill('');
     // Antippen öffnet die eigene Seite der Kompanie (statt Aufklappen), zurück zur Liste
     await card.getByRole('button', { name: /Testkompanie/ }).click();
     await expect(page).toHaveURL(/#\/kompanien\/\d+$/);
@@ -4347,12 +4410,15 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast öffnet die Seite
   } finally {
     await login(page, 'admin', ADMIN_PASSWORD);
     await adminMenu(page, 'Kompanien');
-    page.once('dialog', (d) => d.accept());
-    await page
-      .locator('.row', { has: page.getByText('Testkompanie', { exact: true }) })
-      .getByRole('button', { name: 'Löschen' })
-      .click();
-    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+    for (const name of ['Testkompanie', 'Alte Garde']) {
+      page.once('dialog', (d) => d.accept());
+      await page
+        .locator('.row', { has: page.getByText(name, { exact: true }) })
+        .getByRole('button', { name: 'Löschen' })
+        .click();
+      await expect(page.locator('.toast')).toHaveText('Gelöscht');
+      await expect(page.locator('.toast')).toHaveCount(0);
+    }
   }
 });
 

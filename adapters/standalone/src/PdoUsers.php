@@ -73,17 +73,25 @@ final class PdoUsers implements UserDirectory
 
     public function create(string $firstName, string $lastName, string $login, string $email, string $password, string $role = Roles::MEMBER): int
     {
-        return $this->insertUser($firstName, $lastName, $login, $email, $password, $role);
+        return $this->insertUser($firstName, $lastName, $login, $email, password_hash($password, PASSWORD_DEFAULT), $role);
+    }
+
+    public function createWithPasswordHash(string $firstName, string $lastName, string $login, string $email, string $passwordHash, string $role = Roles::MEMBER): int
+    {
+        if (password_get_info($passwordHash)['algo'] === null) {
+            throw new \DomainException('Ungültiger Passwort-Hash.');
+        }
+        return $this->insertUser($firstName, $lastName, $login, $email, $passwordHash, $role);
     }
 
     /** Mit dem ganzen Namen (Einrichtung, Kommandozeile): das letzte Wort ist der Nachname. */
     public function add(string $name, string $login, string $email, string $password, string $role): int
     {
         [$first, $last] = PersonName::split($name);
-        return $this->insertUser($first, $last, $login, $email, $password, $role);
+        return $this->insertUser($first, $last, $login, $email, password_hash($password, PASSWORD_DEFAULT), $role);
     }
 
-    private function insertUser(string $firstName, string $lastName, string $login, string $email, string $password, string $role): int
+    private function insertUser(string $firstName, string $lastName, string $login, string $email, string $passwordHash, string $role): int
     {
         $now = gmdate('Y-m-d H:i:s');
         return $this->db->insert('users', [
@@ -92,7 +100,7 @@ final class PdoUsers implements UserDirectory
             'name' => PersonName::join($firstName, $lastName),
             'first_name' => $firstName,
             'last_name' => $lastName,
-            'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+            'password_hash' => $passwordHash,
             'level' => $role,
             'created_at' => $now,
             'updated_at' => $now,

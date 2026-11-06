@@ -12,13 +12,25 @@ Tippe unten auf **{bereich.companies}**. Steht der Punkt nicht unten, findest du
 ## Was du hier siehst
 - Je Kompanie eine Karte mit **Logo**, **Name** und darunter Kurzname, Gründungsjahr und Zahl der Mitglieder (soweit eingetragen). Ohne Logo steht dort der Kurzname.
 - Aufgelöste Kompanien stehen unten und sind mit **ehemalig** markiert.
+- Ab zwei Einträgen stehen über der Liste ein **Suchfeld** und die **Sortierung**, wie unter **{bereich.directory}**.
 
 ## So gehst du vor
+### Eine Kompanie suchen
+1. Tippe oben in das Feld **Suchen …**.
+2. Gib einen Teil des Namens oder des Kurznamens ein. Groß- und Kleinschreibung ist egal.
+3. Die Liste zeigt nur noch die Treffer. Findet sich nichts, steht dort „Nichts gefunden.“
+
+### Die Liste sortieren
+1. Wähle unter **Sortierung**: **Wie festgelegt** (die Reihenfolge, die die {kompanie.name} festlegt), **Name**, **Gründung** oder **Mitglieder** (nur, wenn du die Zahl der Mitglieder siehst).
+2. Tippe auf den Knopf unter **Reihenfolge**, um die Richtung umzukehren, z. B. von **A → Z** zu **Z → A** oder von **Älteste zuerst** zu **Jüngste zuerst**.
+3. Kompanien ohne Gründungsjahr stehen bei **Gründung** am Ende. Aufgelöste stehen immer unten.
+4. Die Wahl merkt sich dein Gerät.
+
 ### Mehr über eine Kompanie erfahren
 1. Tippe auf die Karte. Die Seite der Kompanie geht auf.
 2. Du siehst das **Logo**, die **Beschreibung**, die laufenden **{bereich.offices}** (z. B. Hauptmann und Fähnrich, wenn die Kompanie mit einer Gruppe der {bereich.offices} verknüpft ist), die Knöpfe **Webseite** und **App der Kompanie** (sie öffnen sich in einem neuen Tab) und darunter die **Mitglieder** der Kompanie.
 3. Tippe auf einen Namen, um die Seite der Person unter **{bereich.directory}** zu öffnen.
-4. Mit **‹ Alle {bereich.companies}** oben (oder „Zurück“ im Browser) kommst du wieder zur Liste, an dieselbe Stelle.
+4. Mit **‹ Alle {bereich.companies}** oben (oder „Zurück“ im Browser) kommst du wieder zur Liste, an dieselbe Stelle und mit derselben Suche.
 
 ## Gut zu wissen
 - Die Mitglieder einer Kompanie siehst du nur, wenn du auch **{bereich.directory}** sehen darfst.

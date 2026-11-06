@@ -110,6 +110,7 @@ const PATHS = [
   ['verwaltung', 'ehemalige'],
   ['verwaltung', 'ehemalige', 'import'],
   ['verwaltung', 'ehemalige', 'neu'],
+  ['verwaltung', 'anfragen'],
   ...['mitglied', 'ehemalige'].flatMap((base) =>
     ['uebersicht', 'konto', 'punkte', 'strafen', 'dienstgrad', 'titel', 'aemter', 'geburtstag', 'eintritt', 'austritt'].map((s) => [
       'verwaltung',
@@ -127,6 +128,8 @@ const PATHS = [
   ['inventar', 'verlauf', '4'],
   ['konto'],
   ['anmelden'],
+  ['registrieren'],
+  ['registrieren', 'stand'],
   ['benachrichtigungen'],
   ['installieren'],
   ['einrichtung'],
@@ -135,6 +138,7 @@ const PATHS = [
     'bereiche',
     'navigation',
     'rollen',
+    'zugang',
     'google',
     'kalender',
     'galerie',
@@ -213,6 +217,9 @@ test('Eine eigene Seite je Bildschirm', () => {
     [['verwaltung', 'ehemalige', 'neu'], 'ehemalige-anlegen'],
     [['einstellungen', 'kalender'], 'admin-kalender'],
     [['einstellungen', 'neuerungen'], 'admin-neuerungen'],
+    [['einstellungen', 'zugang'], 'admin-zugang'],
+    [['verwaltung', 'anfragen'], 'anfragen-freigeben'],
+    [['registrieren', 'bestaetigen', 'abc'], 'zugang-beantragen'],
   ];
   for (const [p, expected] of cases) assert.equal(helpSlug(p, admin), expected, p.join('/'));
 });
