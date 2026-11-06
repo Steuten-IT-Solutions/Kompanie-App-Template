@@ -141,6 +141,32 @@ final class GalleryUploadTest extends TestCase
         $this->assertSame([], $this->ok('GET', '/admin/gallery/albums')['albums']);
     }
 
+    /** Knöpfe zum Herunterladen: Einstellung gallery_downloads, Vorgabe aus; das Album meldet sie der App. */
+    public function testDownloadButtonsSetting(): void
+    {
+        $settings = $this->ok('PATCH', '/admin/settings', ['gallery_source' => 'server']);
+        $this->assertFalse($settings['gallery']['downloads'], 'Vorgabe: keine Knöpfe');
+        $id = (int) $this->ok('POST', '/admin/gallery/albums', ['title' => 'Fest', 'year' => 2026])['id'];
+        $this->ok('POST', "/admin/gallery/albums/{$id}/photos", ['file' => $this->file()]);
+        $this->app->gallery()->processPending(30);
+        $this->users->current = $this->m;
+        $this->assertFalse($this->ok('GET', "/gallery/{$id}")['downloads']);
+
+        $this->users->current = $this->admin;
+        $this->assertTrue($this->ok('PATCH', '/admin/settings', ['gallery_downloads' => '1'])['gallery']['downloads']);
+        foreach (['ja', '2', ''] as $bad) {
+            $this->assertSame(400, $this->call('PATCH', '/admin/settings', ['gallery_downloads' => $bad])->status, $bad);
+        }
+        $this->assertSame(400, $this->call('PATCH', '/admin/settings', ['gallery_downloads' => true])->status, 'nur Text wie alle Felder');
+        $this->users->current = $this->m;
+        $this->assertTrue($this->ok('GET', "/gallery/{$id}")['downloads']);
+        $this->assertSame(403, $this->call('PATCH', '/admin/settings', ['gallery_downloads' => '0'])->status, 'nur mit manage_settings');
+
+        $this->users->current = $this->admin;
+        $this->assertFalse($this->ok('PATCH', '/admin/settings', ['gallery_downloads' => '0'])['gallery']['downloads']);
+        $this->assertTrue($this->ok('PATCH', '/admin/settings', ['gallery_root' => ''])['gallery']['downloads'] === false, 'andere Felder ändern nichts daran');
+    }
+
     public function testDriveSyncLeavesUploadsAndAppAlbumsAlone(): void
     {
         $this->app->drive()->saveServiceAccount($this->drive->serviceAccountJson());

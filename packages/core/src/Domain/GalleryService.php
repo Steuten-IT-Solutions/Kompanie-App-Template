@@ -57,6 +57,8 @@ final class GalleryService
     /** Ablageort hochgeladener Bilder; vorerst nur der eigene Server (MediaStore), weitere später. */
     public const STORE_SETTING = 'gallery_store';
     public const STORES = ['server'];
+    /** Knöpfe zum Herunterladen (je Bild in der Großansicht und je Album als ZIP) für alle, die die Galerie sehen. */
+    public const DOWNLOADS_SETTING = 'gallery_downloads';
     /** Präfix von photos.drive_file_id bei hochgeladenen Bildern (die Spalte ist NOT NULL UNIQUE). */
     public const UPLOAD_PREFIX = 'upload:';
     public const STATUS_SETTING = 'gallery_status';
@@ -137,6 +139,17 @@ final class GalleryService
     public function store(): string
     {
         return self::STORES[0];
+    }
+
+    /** Zeigt die Galerie Knöpfe zum Herunterladen? Vorgabe: nein. */
+    public function downloadsEnabled(): bool
+    {
+        return (string) $this->settings->get(self::DOWNLOADS_SETTING, '0') === '1';
+    }
+
+    public function setDownloads(bool $on): void
+    {
+        $this->settings->set(self::DOWNLOADS_SETTING, $on ? '1' : '0');
     }
 
     /** Ablage der hochgeladenen Bilder. */
@@ -1185,6 +1198,8 @@ final class GalleryService
             'id' => (int) $album['id'],
             'title' => (string) $album['title'],
             'year' => (string) $album['year'],
+            // Knöpfe zum Herunterladen zeigen (Einstellungen → Galerie)
+            'downloads' => $this->downloadsEnabled(),
             'photos' => array_map(fn (array $ph): array => self::isVideoRow($ph) ? [
                 'id' => (int) $ph['id'],
                 'type' => 'video',

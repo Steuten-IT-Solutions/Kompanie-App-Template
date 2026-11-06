@@ -9,7 +9,9 @@ import {
   type TouchEvent,
   type TouchList,
 } from 'react';
-import { can, type GalleryPhoto } from '../api';
+import { can, type GalleryAlbum, type GalleryPhoto } from '../api';
+import { downloadablePhotos } from '../downloadFiles';
+import { downloadAlbum, downloadPhoto } from '../galleryDownload';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { useSwipeDrag } from '../swipe';
@@ -222,6 +224,7 @@ function Album({ id }: { id: number }) {
       <h2 className="member-name">
         {album.title} <span className="muted album-year">{album.year}</span>
       </h2>
+      {album.downloads && <AlbumDownload album={album} />}
       <ul className="photo-grid">
         {photos.map((p, i) => (
           <li key={p.id}>
@@ -252,8 +255,88 @@ function Album({ id }: { id: number }) {
           </li>
         ))}
       </ul>
-      {open !== null && <Lightbox photos={photos} start={open} onClose={close} />}
+      {open !== null && <Lightbox photos={photos} start={open} onClose={close} downloads={!!album.downloads} />}
     </div>
+  );
+}
+
+/**
+ * Das ganze Album als ZIP (nur mit „Knöpfe zum Herunterladen zeigen“ in Einstellungen → Galerie). Die Bilder lädt der
+ * Browser einzeln und packt sie selbst (galleryDownload.ts); Videos sind nicht dabei.
+ */
+function AlbumDownload({ album }: { album: GalleryAlbum }) {
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const abort = useRef<AbortController | null>(null);
+  useEffect(() => () => abort.current?.abort(), []);
+  const count = downloadablePhotos(album.photos).length;
+  const videos = album.photos.some(isVideo);
+  if (count === 0) return null;
+
+  async function start() {
+    const ctrl = new AbortController();
+    abort.current = ctrl;
+    setError(null);
+    setResult(null);
+    try {
+      const r = await downloadAlbum(album, (done, total) => setProgress({ done, total }), ctrl.signal);
+      setResult(
+        r.missing > 0
+          ? `${r.saved} ${r.saved === 1 ? 'Bild' : 'Bilder'} gespeichert. ${r.missing} ließen sich gerade nicht laden (noch nicht fertig aufbereitet?).`
+          : `${r.saved} ${r.saved === 1 ? 'Bild' : 'Bilder'} gespeichert.`,
+      );
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') setError((e as Error).message);
+    } finally {
+      abort.current = null;
+      setProgress(null);
+    }
+  }
+
+  return (
+    <div className="album-download">
+      <div className="button-row">
+        <button type="button" className="btn btn-secondary" onClick={start} disabled={progress !== null}>
+          {progress ? `Lädt ${progress.done} von ${progress.total} …` : `Album herunterladen (${mediaCount(count, 0)}, ZIP)`}
+        </button>
+        {progress && (
+          <button type="button" className="btn btn-link" onClick={() => abort.current?.abort()}>
+            Abbrechen
+          </button>
+        )}
+      </div>
+      {videos && !progress && !result && <p className="muted small">Videos sind im ZIP nicht enthalten.</p>}
+      {result && (
+        <p className="small" role="status">
+          {result}
+        </p>
+      )}
+      {error && (
+        <p className="form-error small" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Pfeil nach unten auf einer Linie (Herunterladen). */
+function DownloadIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="22"
+      height="22"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" />
+    </svg>
   );
 }
 
@@ -285,7 +368,17 @@ function pinch(t: TouchList): { dist: number; cx: number; cy: number } {
  * Originalauflösung wird nachgeladen und ersetzt sie, sobald sie ganz da ist. Videos spielt der Player des Browsers ab
  * (ohne Zoom; auf dem Bild des Videos wird geblättert, in den Leisten des Players bedient der Finger das Video).
  */
-function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: number; onClose: (last: number) => void }) {
+function Lightbox({
+  photos,
+  start,
+  onClose,
+  downloads = false,
+}: {
+  photos: GalleryPhoto[];
+  start: number;
+  onClose: (last: number) => void;
+  downloads?: boolean;
+}) {
   const [i, setI] = useState(start);
   const current = useRef(i);
   current.current = i;
@@ -413,6 +506,21 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
   }, [i, photos, originals]);
 
   const p = photos[i];
+  // Herunterladen des gezeigten Bilds (Knopf oben rechts, mit „Knöpfe zum Herunterladen zeigen“)
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  useEffect(() => setSaveError(null), [i]);
+  const save = async () => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await downloadPhoto(p, i);
+    } catch (e) {
+      setSaveError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
   const videoRef = useRef<HTMLVideoElement>(null);
   const togglePlay = () => {
     const v = videoRef.current;
@@ -496,6 +604,16 @@ function Lightbox({ photos, start, onClose }: { photos: GalleryPhoto[]; start: n
       <button ref={closeRef} className="lb-btn lb-close" onClick={close} aria-label="Schließen">
         ✕
       </button>
+      {downloads && !isVideo(p) && (
+        <button className="lb-btn lb-download" onClick={save} disabled={saving} aria-label="Bild herunterladen" title="Bild herunterladen">
+          {saving ? <span className="img-loading lb-download-busy" aria-hidden="true" /> : <DownloadIcon />}
+        </button>
+      )}
+      {saveError && (
+        <p className="lb-save-error" role="alert">
+          {saveError}
+        </p>
+      )}
       {many && (
         <>
           <button className="lb-btn lb-prev" onClick={() => swipe.slide(-1)} aria-label="Vorheriges">

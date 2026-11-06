@@ -17,6 +17,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Bilder aus der Galerie herunterladen**: Unter *Einstellungen → Galerie* schaltest du mit *Knöpfe zum
+  Herunterladen zeigen* ein, dass alle, die die Galerie sehen, jedes Bild in der Großansicht und jedes Album als
+  ZIP-Datei herunterladen können, in voller Auflösung. Videos sind nicht dabei. Vorgabe: aus.
 - **Eigene Seiten**: Mit dem neuen Bereich *Seiten* (unter *Einstellungen → Bereiche*) legt ihr unter *Verwaltung →
   Einrichtungen → Seiten* freie Seiten wie Geschichte, Festprogramm oder Anfahrt an, mit formatiertem Text und
   Bildern. Je Seite wählst du, ob sie alle sehen, auch ohne Anmeldung, oder nur Mitglieder. Jede Seite ist ein eigener
