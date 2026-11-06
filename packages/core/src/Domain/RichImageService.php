@@ -25,7 +25,8 @@ use KompanieApp\Core\Storage\RichImageRepository;
  *   dem Speichern. post_max_size kennt die App vorab (limits()) und prüft sie selbst.
  * - Im Inhalt stehen Bilder nur als <img data-image="Kennung">; ausgeliefert werden sie über Environment::richImageUrl
  *   an alle, die den Inhalt sehen dürfen (canView je Besitzer). Ohne Anmeldung nur Bilder öffentlicher Besitzer
- *   (Issue #281, z. B. die Beschreibung einer Kompanie mit view_companies der Gäste), sonst 401.
+ *   (Issue #281, z. B. die Beschreibung einer Kompanie mit view_companies der Gäste, das Gruppenbild einer
+ *   gemeinsamen Amtszeit mit view_offices, Issue #282), sonst 401.
  */
 final class RichImageService
 {
@@ -36,6 +37,13 @@ final class RichImageService
     public const OWNER_MAIL = 'mail';
     /** Beschreibung einer Kompanie (CompanyService), öffentlich mit view_companies */
     public const OWNER_COMPANY = 'company';
+    /** Gruppenbild einer gemeinsamen Amtszeit (OfficeService, Issue #282), öffentlich mit view_offices */
+    public const OWNER_OFFICE_GROUP_TERM = 'office_group_term';
+    /**
+     * Fotos von Amtsinhabern ohne Konto (OfficeService, Issue #283), öffentlich mit view_offices. Ein gemeinsamer Bestand
+     * (owner_id 0), weil dasselbe Foto in mehreren Amtszeiten stehen kann; was in keiner mehr steht, wird gelöscht.
+     */
+    public const OWNER_OFFICE_HOLDER = 'office_holder';
     /** Längste Kante gespeicherter Bilder (nie vergrößert). */
     public const MAX_EDGE = 2048;
     /** Nie gespeicherte Entwürfe so lange aufheben (ein begonnener Text kann über Nacht liegen bleiben). */
@@ -173,6 +181,24 @@ final class RichImageService
         return RichText::withImageUrls($html, fn (string $uid): string => $this->app->env->richImageUrl($uid));
     }
 
+    /**
+     * Bilder von $ownerType/$ownerId löschen, die nicht in $keep stehen.
+     *
+     * @param list<string> $keep
+     */
+    public function prune(string $ownerType, int $ownerId, array $keep): int
+    {
+        $keep = array_flip($keep);
+        $n = 0;
+        foreach ($this->repository()->uidsOf($ownerType, $ownerId) as $uid) {
+            if (!isset($keep[$uid])) {
+                $this->repository()->deleteUid($uid);
+                $n++;
+            }
+        }
+        return $n;
+    }
+
     public function deleteOwner(string $ownerType, int $ownerId): void
     {
         $this->repository()->deleteOwner($ownerType, $ownerId);
@@ -188,7 +214,7 @@ final class RichImageService
     /**
      * Darf $viewer das Bild sehen? Entwürfe und Signaturen nur ihr Konto, Bilder am Brett wie die Nachricht
      * (BoardService::canSeeImage), Bilder in E-Mails alle mit send_mail (MailingService::canSeeImage), Bilder einer
-     * Kompanie wie die Liste (auch ohne Anmeldung, s. isPublic).
+     * Kompanie wie die Liste, Gruppenbilder und Fotos freier Namen der Ämter wie die Ämter (alle auch ohne Anmeldung, s. isPublic).
      *
      * @param array{owner_type: string, owner_id: int, user_id: int} $img
      */
@@ -199,6 +225,7 @@ final class RichImageService
         }
         return match ($img['owner_type']) {
             self::OWNER_COMPANY => $this->companyVisible($viewer),
+            self::OWNER_OFFICE_GROUP_TERM, self::OWNER_OFFICE_HOLDER => $this->officesVisible($viewer),
             self::OWNER_DRAFT, self::OWNER_SIGNATURE => $viewer->id === $img['owner_id'],
             self::OWNER_BOARD => $this->app->board()->canSeeImage($viewer, $img['owner_id']),
             self::OWNER_MAIL => $this->app->mailings()->canSeeImage($viewer, $img['owner_id']),
@@ -215,8 +242,14 @@ final class RichImageService
     {
         return match ($img['owner_type']) {
             self::OWNER_COMPANY => $this->companyVisible($this->app->anonymous()),
+            self::OWNER_OFFICE_GROUP_TERM, self::OWNER_OFFICE_HOLDER => $this->officesVisible($this->app->anonymous()),
             default => false,
         };
+    }
+
+    private function officesVisible(User $viewer): bool
+    {
+        return $this->app->features()->enabled('offices') && ($viewer->can(Capability::ViewOffices) || $viewer->can(Capability::ManageOffices));
     }
 
     private function companyVisible(User $viewer): bool

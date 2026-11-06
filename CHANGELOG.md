@@ -17,6 +17,15 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Fotos für Personen ohne Konto in den Ämtern**: Unter *Verwaltung → Einrichtungen → Ämter* lädst du bei einer
+  Amtszeit für Personen ohne Profil (z. B. frühere Mitglieder oder Hofdamen) ein Foto hoch. Steht derselbe Name schon
+  mit Foto in einer früheren Amtszeit, bietet die App an, es zu übernehmen. Die Fotos sind wie die Ämter für alle
+  sichtbar; bei Mitgliedern bleibt das Foto ihres Profils maßgeblich.
+- **Gemeinsame Amtszeiten mit Gruppenbild**: Haben alle Ämter einer Gruppe dieselben Jahre, z. B. ein Königshaus oder
+  ein Vorstand, schaltest du unter *Verwaltung → Einrichtungen → Ämter* bei der Gruppe *Amtszeiten gemeinsam* ein.
+  Dann trägst du Jahre, Gruppenbild und die Personen aller Ämter in einem Formular ein; vorhandene Amtszeiten mit
+  denselben Jahren fasst die App beim Einschalten zusammen. Unter *Ämter* steht je gemeinsame Amtszeit eine Karte mit
+  dem Bild und wer welches Amt hatte, für alle sichtbar wie die Ämter. Ausschalten behält alle Daten.
 - **Kompanien**: Der neue Bereich *Kompanien* (unter *Einstellungen → Bereiche* einschalten) zeigt eure Kompanien mit
   Logo in eurer Reihenfolge, für alle, auch ohne Anmeldung. Jede Karte klappt auf und zeigt Beschreibung (auch mit
   Bildern), Gründungsjahr, Links zur Webseite und zur App der Kompanie, die laufenden Ämter einer verknüpften Gruppe der Ämter

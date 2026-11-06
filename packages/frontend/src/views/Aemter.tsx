@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactElement } from 'react';
-import { type Office, type OfficeGroup, type OfficeHolder, type OfficesOverview, type OfficeTerm } from '../api';
+import { type Office, type OfficeGroup, type OfficeGroupTerm, type OfficeHolder, type OfficesOverview, type OfficeTerm } from '../api';
 import brand from '../generated/brand';
 import { MemberAvatar } from '../memberPhoto';
 import { navigate } from '../router';
@@ -264,6 +264,48 @@ function OfficeCard({ office, open, onToggle }: { office: Office; open: boolean;
   );
 }
 
+/**
+ * Gruppe mit gemeinsamen Amtszeiten (Issue #282): je Amtszeit eine Karte mit Gruppenbild und allen Personen mit ihren
+ * Ämtern, die laufende oben als „aktuell“.
+ */
+export function JointTerms({ terms, offices, group }: { terms: OfficeGroupTerm[]; offices: Office[]; group: string }) {
+  if (terms.length === 0) return null;
+  return (
+    <ul className="joint-terms">
+      {terms.map((gt) => {
+        const rows = offices.flatMap((o) => {
+          const t = o.terms.find((x) => x.group_term_id === gt.id);
+          return t && t.holders.length > 0 ? [{ office: o, holders: t.holders }] : [];
+        });
+        return (
+          <li key={gt.id} className={`card joint-term${gt.current ? ' current' : ''}`}>
+            {gt.image_url && (
+              <img className="joint-term-image" src={gt.image_url} alt={`${group} ${termYears(gt)}`} loading="lazy" decoding="async" />
+            )}
+            <div className="joint-term-body">
+              <h3 className="joint-term-title">
+                {group} {termYears(gt)}
+                {gt.current && <span className="badge">aktuell</span>}
+              </h3>
+              {gt.note && <p className="muted small">{gt.note}</p>}
+              <dl className="joint-term-offices">
+                {rows.map((r) => (
+                  <div key={r.office.id}>
+                    <dt>{r.office.title}</dt>
+                    <dd>
+                      <Holders holders={r.holders} to={memberPath} />
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 const VIEW_KEY = 'kompanie.offices.view';
 
 function loadView(): 'chronik' | 'jahre' {
@@ -471,8 +513,13 @@ export function OfficesView() {
       return next;
     });
   const sections = [
-    ...(data?.groups ?? []).map((g) => ({ key: `g${g.id}`, title: g.title, offices: offices.filter((o) => o.group_id === g.id) })),
-    { key: 'none', title: '', offices: offices.filter((o) => o.group_id === null) },
+    ...(data?.groups ?? []).map((g) => ({
+      key: `g${g.id}`,
+      title: g.title,
+      offices: offices.filter((o) => o.group_id === g.id),
+      joint: g.joint_terms ? (data?.group_terms ?? []).filter((t) => t.group_id === g.id) : null,
+    })),
+    { key: 'none', title: '', offices: offices.filter((o) => o.group_id === null), joint: null },
   ].filter((s) => s.offices.length > 0);
   const all = offices.every((o) => open.has(o.id));
 
@@ -512,7 +559,12 @@ export function OfficesView() {
         sections.map((s) => (
           <section key={s.key} className="office-group">
             {s.title && <h2 className="section-title">{s.title}</h2>}
-            {s.offices.map((o) => (
+            {s.joint && <JointTerms terms={s.joint} offices={s.offices} group={s.title} />}
+            {/* Mit gemeinsamen Amtszeiten nur noch, was nicht dazugehört (z. B. Ehrungen) je Amt */}
+            {(s.joint
+              ? s.offices.map((o) => ({ ...o, terms: o.terms.filter((t) => !t.group_term_id) })).filter((o) => o.terms.length > 0)
+              : s.offices
+            ).map((o) => (
               <OfficeCard key={o.id} office={o} open={open.has(o.id)} onToggle={() => toggle(o.id)} />
             ))}
           </section>

@@ -1300,13 +1300,43 @@ export interface TitleRef {
 export interface OfficeGroup {
   id: number;
   title: string;
+  /** Gemeinsame Amtszeiten (Issue #282): Die App zeigt die Gruppe als Chronik der gemeinsamen Amtszeiten */
+  joint_terms?: boolean;
+}
+
+/** Gemeinsame Amtszeit einer Gruppe (Issue #282), z. B. „Königshaus 2025–2026“; die Personen stehen in den Amtszeiten der Ämter (group_term_id). */
+export interface OfficeGroupTerm {
+  id: number;
+  group_id: number;
+  kind: OfficeTermKind;
+  start_year: number;
+  end_year: number | null;
+  note: string;
+  current: boolean;
+  image_url: string | null;
+  /** Nur für die Pflege */
+  image_uid?: string | null;
+}
+
+export interface OfficeGroupTermInput {
+  kind?: OfficeTermKind;
+  start_year?: number;
+  end_year?: number | null;
+  note?: string;
+  /** Kennung aus POST /rich-images, null entfernt das Bild */
+  image_uid?: string | null;
+  /** Je Amt der Gruppe die Personen (leer: keine Amtszeit für dieses Amt) */
+  offices?: { office_id: number; holders: OfficeTermInput['holders'] }[];
 }
 
 /** Inhaber einer Amtszeit: user_id und Foto nur bei Personen der Mitgliederliste (bzw. für die Pflege) */
 export interface OfficeHolder {
   name: string;
   user_id?: number | null;
+  /** Foto des Kontos bzw. bei freien Namen das eigene Foto (Issue #283) */
   photo_url?: string | null;
+  /** Nur für die Pflege: Kennung des Fotos eines freien Namens */
+  image_uid?: string | null;
 }
 
 export type OfficeTermKind = 'period' | 'point';
@@ -1322,6 +1352,8 @@ export interface OfficeTerm {
   honor: boolean;
   /** Zeitraum ohne Ende */
   current: boolean;
+  /** Teil einer gemeinsamen Amtszeit der Gruppe (Issue #282), sonst null */
+  group_term_id?: number | null;
   holders: OfficeHolder[];
 }
 
@@ -1343,6 +1375,8 @@ export interface Office {
 export interface OfficesOverview {
   groups: OfficeGroup[];
   offices: Office[];
+  /** Gemeinsame Amtszeiten aller Gruppen, laufende zuerst, dann nach Beginn absteigend (fehlt bei älteren Servern) */
+  group_terms?: OfficeGroupTerm[];
 }
 
 export interface OfficeTermInput {
@@ -1351,7 +1385,8 @@ export interface OfficeTermInput {
   end_year: number | null;
   note: string;
   honor: boolean;
-  holders: ({ user_id: number } | { name: string })[];
+  /** Konto oder freier Name, dieser mit optionalem Foto (Kennung aus POST /rich-images) */
+  holders: ({ user_id: number } | { name: string; image_uid?: string | null })[];
 }
 
 export interface OfficeImportRow {
@@ -2003,6 +2038,11 @@ export const api = {
     request<{ companies: CompanyRef[] }>('PUT', `/members/${id}/companies`, { company_ids }),
   createOfficeGroup: (title: string) => request<OfficeGroup>('POST', '/office-groups', { title }),
   updateOfficeGroup: (id: number, title: string) => request<OfficeGroup>('PATCH', `/office-groups/${id}`, { title }),
+  setOfficeGroupJoint: (id: number, joint_terms: boolean) => request<OfficeGroup>('PATCH', `/office-groups/${id}`, { joint_terms }),
+  createOfficeGroupTerm: (groupId: number, input: OfficeGroupTermInput) =>
+    request<OfficeGroupTerm>('POST', `/office-groups/${groupId}/terms`, input),
+  updateOfficeGroupTerm: (id: number, input: OfficeGroupTermInput) => request<OfficeGroupTerm>('PATCH', `/office-group-terms/${id}`, input),
+  deleteOfficeGroupTerm: (id: number) => request<{ deleted: boolean }>('DELETE', `/office-group-terms/${id}`),
   deleteOfficeGroup: (id: number) => request<{ deleted: boolean }>('DELETE', `/office-groups/${id}`),
   reorderOfficeGroups: (ids: number[]) => request<OfficeGroup[]>('PUT', '/office-groups/order', { ids }),
   createOffice: (data: { title: string; group_id: number | null }) => request<Office>('POST', '/offices', data),

@@ -24,10 +24,16 @@ use KompanieApp\Core\Storage\OfficeRepository;
  * - Wird ein Konto gelöscht, bleiben seine Amtszeiten mit dem gespeicherten Namen stehen (UserData::purge).
  * - Scheidet jemand aus (FormerMemberService::mark), enden seine laufenden Amtszeiten mit dem Austrittsjahr (endFor,
  *   Issue #181). Teilt er die Amtszeit mit anderen, bekommt er eine eigene, beendete; die anderen laufen weiter.
+ * - Gemeinsame Amtszeiten (Issue #282): Mit dem Schalter joint_terms einer Gruppe bündeln sich die Amtszeiten ihrer Ämter
+ *   mit denselben Jahren zu einer gemeinsamen Amtszeit (z. B. „Königshaus 2025–2026“) mit Zusatz und Gruppenbild. Je Amt
+ *   bleibt eine normale Amtszeit (group_term_id), damit Chronik, Jahre, Zeitstrahl, Titel und Import weiterlaufen.
+ *   Ehrungen werden nicht gebündelt.
  *
  * @phpstan-import-type Office from OfficeRepository
  * @phpstan-import-type Term from OfficeRepository
  * @phpstan-import-type Holder from OfficeRepository
+ * @phpstan-import-type GroupTerm from OfficeRepository
+ * @phpstan-import-type Group from OfficeRepository
  */
 final class OfficeService
 {
@@ -115,14 +121,15 @@ final class OfficeService
                         if ($visible) {
                             $out['photo_url'] = $photos[$user->id] ?? null;
                         }
-                        return $out;
+                        return $out + ($user === null ? $this->holderPhoto($h, $manager) : []);
                     }, $holders[$t['id']] ?? [])];
                 }, $terms),
             ] + ($manager ? ['title_id' => $o['title_id'], 'linked_title' => $o['title_id'] !== null ? ($titles[$o['title_id']] ?? null) : null] : []);
         }
         return [
-            'groups' => array_map(static fn (array $g): array => ['id' => $g['id'], 'title' => $g['title']], $groups),
+            'groups' => array_map(static fn (array $g): array => self::groupOut($g), $groups),
             'offices' => $out,
+            'group_terms' => array_map(fn (array $t): array => $this->groupTermOut($t, $manager), self::sortTerms($repo->groupTerms())),
         ];
     }
 
@@ -136,11 +143,31 @@ final class OfficeService
         return $this->group($id);
     }
 
-    /** @return array{id: int, title: string} */
-    public function updateGroup(int $id, mixed $title): array
+    /**
+     * Umbenennen (title) und gemeinsame Amtszeiten ein- oder ausschalten (joint_terms). Eingeschaltet werden vorhandene
+     * Amtszeiten mit denselben Jahren gebündelt; ausgeschaltet bleibt alles gespeichert.
+     *
+     * @param mixed $in {title?, joint_terms?} (oder nur der Titel, wie früher)
+     * @return array{id: int, title: string, joint_terms: bool}
+     */
+    public function updateGroup(int $id, mixed $in): array
     {
-        $this->repository()->findGroup($id) ?? throw ApiError::notFound('Gruppe nicht gefunden.');
-        $this->repository()->updateGroup($id, ['title' => $this->validGroupTitle($title, $id)]);
+        $group = $this->repository()->findGroup($id) ?? throw ApiError::notFound('Gruppe nicht gefunden.');
+        $in = is_array($in) ? $in : ['title' => $in];
+        $data = [];
+        if (array_key_exists('title', $in)) {
+            $data['title'] = $this->validGroupTitle($in['title'], $id);
+        }
+        if (array_key_exists('joint_terms', $in)) {
+            if (!is_bool($in['joint_terms'])) {
+                throw ApiError::invalid('joint_terms muss wahr oder falsch sein.');
+            }
+            $data['joint_terms'] = $in['joint_terms'] ? 1 : 0;
+        }
+        $this->repository()->updateGroup($id, $data);
+        if (($data['joint_terms'] ?? 0) === 1 && !$group['joint_terms']) {
+            $this->bundle($id);
+        }
         return $this->group($id);
     }
 
@@ -153,7 +180,12 @@ final class OfficeService
         if ($count > 0) {
             throw ApiError::invalid(sprintf('In der Gruppe %s. Bitte erst verschieben oder löschen.', $count === 1 ? 'steht noch ein Amt' : 'stehen noch ' . $count . ' Ämter'));
         }
+        $images = $this->app->richImages();
+        foreach ($repo->groupTerms($id) as $t) {
+            $images->deleteOwner(RichImageService::OWNER_OFFICE_GROUP_TERM, $t['id']);
+        }
         $repo->deleteGroup($id);
+        $this->pruneHolderPhotos();
         $this->app->companies()->repository()->unlinkOfficeGroup($id);
     }
 
@@ -171,7 +203,7 @@ final class OfficeService
                 $repo->updateGroup($id, ['sort' => $sort]);
             }
         }
-        return array_map(static fn (array $g): array => ['id' => $g['id'], 'title' => $g['title']], $repo->groups());
+        return array_map(static fn (array $g): array => self::groupOut($g), $repo->groups());
     }
 
     // ---- Ämter ----
@@ -230,6 +262,7 @@ final class OfficeService
         $repo = $this->repository();
         $office = $repo->findOffice($id) ?? throw ApiError::notFound('Amt nicht gefunden.');
         $repo->deleteOffice($id);
+        $this->pruneHolderPhotos();
         $this->syncTitles($office['title_id'] !== null ? [$office['title_id']] : []);
     }
 
@@ -270,14 +303,16 @@ final class OfficeService
     // ---- Amtszeiten ----
 
     /**
-     * @param array<string, mixed> $in kind, start_year, end_year, note, honor, holders [{user_id} | {name}]
+     * @param array<string, mixed> $in kind, start_year, end_year, note, honor, holders [{user_id} | {name, image_uid?}]
      * @return array<string, mixed>
      */
-    public function createTerm(int $officeId, array $in): array
+    public function createTerm(int $officeId, array $in, ?User $actor = null): array
     {
         $office = $this->repository()->findOffice($officeId) ?? throw ApiError::notFound('Amt nicht gefunden.');
         [$term, $holders] = $this->validTerm($in);
+        $holders = $this->claimHolderPhotos($holders, $actor);
         $id = $this->repository()->saveTerm(null, $officeId, $term, $holders);
+        $this->bundleOf($office['group_id']);
         $this->syncTitles($office['title_id'] !== null ? [$office['title_id']] : []);
         return $this->term($id);
     }
@@ -288,7 +323,7 @@ final class OfficeService
      * @param array<string, mixed> $in
      * @return array<string, mixed>
      */
-    public function updateTerm(int $id, array $in): array
+    public function updateTerm(int $id, array $in, ?User $actor = null): array
     {
         $repo = $this->repository();
         $current = $repo->findTerm($id) ?? throw ApiError::notFound('Amtszeit nicht gefunden.');
@@ -298,14 +333,22 @@ final class OfficeService
             'end_year' => $current['end_year'],
             'note' => $current['note'],
             'honor' => $current['honor'],
-            'holders' => array_map(static fn (array $h): array => $h['user_id'] !== null ? ['user_id' => $h['user_id'], 'name' => $h['name']] : ['name' => $h['name']], $repo->holdersOf($id)),
+            'holders' => array_map(static fn (array $h): array => $h['user_id'] !== null ? ['user_id' => $h['user_id'], 'name' => $h['name']] : ['name' => $h['name'], 'image_uid' => $h['image_uid']], $repo->holdersOf($id)),
         ];
         [$term, $holders] = $this->validTerm($merged);
+        $holders = $this->claimHolderPhotos($holders, $actor);
         $repo->saveTerm($id, $current['office_id'], $term, $holders);
+        $this->pruneHolderPhotos();
         if ($current['ended_for'] !== null) {
             $repo->releaseEnd($id); // von Hand geändert: Ein neues Austrittsdatum zieht das Ende nicht mehr nach
         }
+        // Andere Jahre (oder jetzt eine Ehrung): gehört nicht mehr zur gemeinsamen Amtszeit, ggf. zu einer anderen
+        $joint = $current['group_term_id'] !== null ? $repo->findGroupTerm($current['group_term_id']) : null;
+        if ($current['group_term_id'] !== null && ($joint === null || $term['honor'] || !self::sameYears($term, $joint))) {
+            $repo->setGroupTerm($id, null);
+        }
         $office = $repo->findOffice($current['office_id']);
+        $this->bundleOf($office['group_id'] ?? null);
         $this->syncTitles($office !== null && $office['title_id'] !== null ? [$office['title_id']] : []);
         return $this->term($id);
     }
@@ -315,8 +358,356 @@ final class OfficeService
         $repo = $this->repository();
         $term = $repo->findTerm($id) ?? throw ApiError::notFound('Amtszeit nicht gefunden.');
         $repo->deleteTerm($id);
+        $this->pruneHolderPhotos();
         $office = $repo->findOffice($term['office_id']);
         $this->syncTitles($office !== null && $office['title_id'] !== null ? [$office['title_id']] : []);
+    }
+
+    // ---- Gemeinsame Amtszeiten (Issue #282) ----
+
+    /**
+     * Gemeinsame Amtszeit anlegen: Jahre, Zusatz, Gruppenbild (image_uid aus POST /rich-images) und je Amt der Gruppe die
+     * Personen (offices: [{office_id, holders}], Ämter ohne Personen bekommen keine Amtszeit).
+     *
+     * @param array<string, mixed> $in
+     * @return array<string, mixed>
+     */
+    public function createGroupTerm(int $groupId, array $in, User $actor): array
+    {
+        $repo = $this->repository();
+        $group = $repo->findGroup($groupId) ?? throw ApiError::notFound('Gruppe nicht gefunden.');
+        if (!$group['joint_terms']) {
+            throw ApiError::invalid('Für diese Gruppe sind gemeinsame Amtszeiten ausgeschaltet.');
+        }
+        $term = $this->validYears($in);
+        $members = array_map(fn (array $h): array => $this->claimHolderPhotos($h, $actor), $this->validMembers($groupId, $in['offices'] ?? null, $term, true));
+        $id = (int) $this->app->db->transaction(function () use ($repo, $groupId, $term, $members, $in, $actor): int {
+            $id = $repo->insertGroupTerm($groupId, $term);
+            foreach (array_filter($members) as $officeId => $holders) {
+                $repo->setGroupTerm($repo->saveTerm(null, $officeId, $term + ['honor' => false], $holders), $id);
+            }
+            $this->setGroupImage($id, $in['image_uid'] ?? null, $actor);
+            return $id;
+        });
+        $this->syncTitles($this->titlesOf(array_keys($members)));
+        return $this->groupTerm($id);
+    }
+
+    /**
+     * Gemeinsame Amtszeit ändern (fehlende Felder bleiben): Die Jahre gelten für alle Ämter darin. Mit offices werden die
+     * Personen je Amt der Gruppe ersetzt (ohne Personen: Amtszeit dieses Amts weg).
+     *
+     * @param array<string, mixed> $in
+     * @return array<string, mixed>
+     */
+    public function updateGroupTerm(int $id, array $in, User $actor): array
+    {
+        $repo = $this->repository();
+        $current = $repo->findGroupTerm($id) ?? throw ApiError::notFound('Gemeinsame Amtszeit nicht gefunden.');
+        $term = $this->validYears($in + ['kind' => $current['kind'], 'start_year' => $current['start_year'], 'end_year' => $current['end_year'], 'note' => $current['note']]);
+        $members = array_key_exists('offices', $in) ? array_map(fn (array $h): array => $this->claimHolderPhotos($h, $actor), $this->validMembers($current['group_id'], $in['offices'], $term, false)) : null;
+        $linked = [];
+        foreach ($repo->terms() as $t) {
+            if ($t['group_term_id'] === $id) {
+                $linked[$t['office_id']] = $t;
+            }
+        }
+        $affected = array_keys($linked + ($members ?? []));
+        $this->app->db->transaction(function () use ($repo, $id, $term, $members, $linked, $in, $actor): void {
+            $repo->updateGroupTerm($id, $term);
+            foreach ($linked as $officeId => $t) {
+                if ($members !== null && array_key_exists($officeId, $members) && $members[$officeId] === []) {
+                    $repo->deleteTerm($t['id']);
+                    continue;
+                }
+                $holders = $members[$officeId] ?? array_map(static fn (array $h): array => ['user_id' => $h['user_id'], 'name' => $h['name'], 'image_uid' => $h['image_uid']], $repo->holdersOf($t['id']));
+                $repo->saveTerm($t['id'], $officeId, $term + ['honor' => false], $holders);
+                if ($t['ended_for'] !== null) {
+                    $repo->releaseEnd($t['id']);
+                }
+            }
+            foreach ($members ?? [] as $officeId => $holders) {
+                if (!isset($linked[$officeId]) && $holders !== []) {
+                    $repo->setGroupTerm($repo->saveTerm(null, $officeId, $term + ['honor' => false], $holders), $id);
+                }
+            }
+            if (array_key_exists('image_uid', $in)) {
+                $this->setGroupImage($id, $in['image_uid'], $actor);
+            }
+        });
+        $this->syncTitles($this->titlesOf($affected));
+        return $this->groupTerm($id);
+    }
+
+    /** Gemeinsame Amtszeit samt den Amtszeiten der Ämter darin und dem Gruppenbild löschen. */
+    public function deleteGroupTerm(int $id): void
+    {
+        $repo = $this->repository();
+        $repo->findGroupTerm($id) ?? throw ApiError::notFound('Gemeinsame Amtszeit nicht gefunden.');
+        $offices = [];
+        foreach ($repo->terms() as $t) {
+            if ($t['group_term_id'] === $id) {
+                $offices[] = $t['office_id'];
+            }
+        }
+        $repo->deleteGroupTerm($id);
+        $this->app->richImages()->deleteOwner(RichImageService::OWNER_OFFICE_GROUP_TERM, $id);
+        $this->pruneHolderPhotos();
+        $this->syncTitles($this->titlesOf($offices));
+    }
+
+    /**
+     * Amtszeiten der Ämter einer Gruppe mit gemeinsamen Amtszeiten bündeln: ohne Bündelung (und keine Ehrung) mit
+     * denselben Jahren wie eine gemeinsame Amtszeit, deren Amt dort noch fehlt, kommt dazu; sonst entsteht eine neue.
+     *
+     * @return int neu angelegte gemeinsame Amtszeiten
+     */
+    public function bundle(int $groupId): int
+    {
+        $repo = $this->repository();
+        $officeIds = [];
+        foreach ($repo->offices() as $o) {
+            if ($o['group_id'] === $groupId) {
+                $officeIds[$o['id']] = true;
+            }
+        }
+        $joint = [];
+        foreach ($repo->groupTerms($groupId) as $g) {
+            $joint[self::yearsKey($g)][] = ['id' => $g['id'], 'offices' => []];
+        }
+        $terms = $repo->terms();
+        $index = [];
+        foreach ($joint as $key => $list) {
+            foreach ($list as $i => $g) {
+                $index[$g['id']] = [$key, $i];
+            }
+        }
+        foreach ($terms as $t) {
+            if ($t['group_term_id'] !== null && isset($index[$t['group_term_id']])) {
+                [$key, $i] = $index[$t['group_term_id']];
+                $joint[$key][$i]['offices'][$t['office_id']] = true;
+            }
+        }
+        $created = 0;
+        $this->app->db->transaction(function () use ($repo, $terms, $officeIds, $groupId, &$joint, &$created): void {
+            foreach ($terms as $t) {
+                if ($t['group_term_id'] !== null || $t['honor'] || !isset($officeIds[$t['office_id']])) {
+                    continue;
+                }
+                $key = self::yearsKey($t);
+                $target = null;
+                foreach ($joint[$key] ?? [] as $i => $g) {
+                    if (!isset($g['offices'][$t['office_id']])) {
+                        $target = $i;
+                        break;
+                    }
+                }
+                if ($target === null) {
+                    $id = $repo->insertGroupTerm($groupId, ['kind' => $t['kind'], 'start_year' => $t['start_year'], 'end_year' => $t['end_year'], 'note' => '']);
+                    $joint[$key][] = ['id' => $id, 'offices' => []];
+                    $target = array_key_last($joint[$key]);
+                    $created++;
+                }
+                $joint[$key][$target]['offices'][$t['office_id']] = true;
+                $repo->setGroupTerm($t['id'], $joint[$key][$target]['id']);
+            }
+        });
+        return $created;
+    }
+
+    /** Bündeln, wenn die Gruppe gemeinsame Amtszeiten hat. */
+    private function bundleOf(?int $groupId): void
+    {
+        $group = $groupId !== null ? $this->repository()->findGroup($groupId) : null;
+        if ($group !== null && $group['joint_terms']) {
+            $this->bundle($group['id']);
+        }
+    }
+
+    /**
+     * Gruppenbild setzen (Kennung aus POST /rich-images) oder mit null/'' entfernen; das bisherige wird gelöscht.
+     */
+    /**
+     * Fotos freier Namen (Issue #283) in den gemeinsamen Bestand übernehmen: eigene Entwürfe werden umgehängt, schon
+     * vorhandene Fotos bleiben (auch dasselbe Foto in mehreren Amtszeiten). Ohne Konto (z. B. Tests) zählen nur Fotos,
+     * die schon im Bestand sind.
+     *
+     * @param list<array{user_id: int|null, name: string, image_uid?: string|null}> $holders
+     * @return list<array{user_id: int|null, name: string, image_uid?: string|null}>
+     */
+    private function claimHolderPhotos(array $holders, ?User $actor): array
+    {
+        $images = $this->app->richImages();
+        foreach ($holders as $i => $h) {
+            $uid = $h['image_uid'] ?? null;
+            if ($h['user_id'] !== null || $uid === null) {
+                continue;
+            }
+            $html = $images->claim($actor ?? $this->app->anonymous(), '<img data-image="' . $uid . '">', RichImageService::OWNER_OFFICE_HOLDER, 0);
+            $claimed = RichText::imageUids($html)[0] ?? null;
+            if ($claimed === null) {
+                throw ApiError::invalid(sprintf('Das Foto von „%s“ ist nicht mehr da. Bitte noch einmal hochladen.', $h['name']));
+            }
+            $holders[$i]['image_uid'] = $claimed;
+        }
+        return $holders;
+    }
+
+    /** Fotos freier Namen löschen, die in keiner Amtszeit mehr stehen. */
+    private function pruneHolderPhotos(): void
+    {
+        $this->app->richImages()->prune(RichImageService::OWNER_OFFICE_HOLDER, 0, $this->repository()->holderImageUids());
+    }
+
+    /**
+     * Foto eines freien Namens für die Ausgabe: photo_url, für die Pflege auch image_uid.
+     *
+     * @param array{user_id: int|null, image_uid: string|null} $h
+     * @return array<string, string>
+     */
+    private function holderPhoto(array $h, bool $manager): array
+    {
+        if ($h['user_id'] !== null || $h['image_uid'] === null) {
+            return [];
+        }
+        return ['photo_url' => $this->app->env->richImageUrl($h['image_uid'])] + ($manager ? ['image_uid' => $h['image_uid']] : []);
+    }
+
+    private function setGroupImage(int $id, mixed $uid, User $actor): void
+    {
+        $images = $this->app->richImages();
+        if ($uid === null || $uid === '') {
+            $images->deleteOwner(RichImageService::OWNER_OFFICE_GROUP_TERM, $id);
+            $this->repository()->updateGroupTerm($id, ['image_uid' => null]);
+            return;
+        }
+        if (!is_string($uid) || preg_match(RichText::IMAGE_UID, strtolower($uid)) !== 1) {
+            throw ApiError::invalid('Unbekanntes Bild.');
+        }
+        $html = $images->claim($actor, '<img data-image="' . strtolower($uid) . '">', RichImageService::OWNER_OFFICE_GROUP_TERM, $id, true);
+        $claimed = RichText::imageUids($html)[0] ?? null;
+        if ($claimed === null) {
+            throw ApiError::invalid('Unbekanntes Bild. Bitte das Bild noch einmal hochladen.');
+        }
+        $this->repository()->updateGroupTerm($id, ['image_uid' => $claimed]);
+    }
+
+    /**
+     * @param array<string, mixed> $in
+     * @return array{kind: string, start_year: int, end_year: int|null, note: string}
+     */
+    private function validYears(array $in): array
+    {
+        [$term] = $this->validTerm(['holders' => [['name' => '-']], 'honor' => false] + $in);
+        unset($term['honor']);
+        return $term;
+    }
+
+    /**
+     * Personen je Amt der Gruppe.
+     *
+     * @param array{kind: string, start_year: int, end_year: int|null, note: string} $term
+     * @return array<int, list<array{user_id: int|null, name: string}>> Amt-ID => Personen (leer: keine Amtszeit)
+     */
+    private function validMembers(int $groupId, mixed $raw, array $term, bool $required): array
+    {
+        if (!is_array($raw)) {
+            throw ApiError::invalid('Bitte je Amt die Personen angeben.');
+        }
+        $inGroup = [];
+        foreach ($this->repository()->offices() as $o) {
+            if ($o['group_id'] === $groupId) {
+                $inGroup[$o['id']] = true;
+            }
+        }
+        $out = [];
+        foreach ($raw as $m) {
+            $officeId = is_array($m) ? Input::integer($m['office_id'] ?? null) : null;
+            if ($officeId === null || !isset($inGroup[$officeId])) {
+                throw ApiError::invalid('Unbekanntes Amt in dieser Gruppe.');
+            }
+            if (isset($out[$officeId])) {
+                throw ApiError::invalid('Ein Amt steht doppelt in der gemeinsamen Amtszeit.');
+            }
+            $holders = $m['holders'] ?? [];
+            $out[$officeId] = is_array($holders) && $holders === [] ? [] : $this->validTerm(['holders' => $holders] + $term)[1];
+        }
+        if ($required && array_filter($out) === []) {
+            throw ApiError::invalid('Bitte bei mindestens einem Amt eine Person angeben.');
+        }
+        return $out;
+    }
+
+    /**
+     * @param list<int> $officeIds
+     * @return list<int>
+     */
+    private function titlesOf(array $officeIds): array
+    {
+        $ids = array_flip($officeIds);
+        $out = [];
+        foreach ($this->repository()->offices() as $o) {
+            if (isset($ids[$o['id']]) && $o['title_id'] !== null) {
+                $out[] = $o['title_id'];
+            }
+        }
+        return $out;
+    }
+
+    /** @return array<string, mixed> */
+    private function groupTerm(int $id): array
+    {
+        $repo = $this->repository();
+        $g = $repo->findGroupTerm($id) ?? throw ApiError::notFound('Gemeinsame Amtszeit nicht gefunden.');
+        $terms = [];
+        foreach ($repo->terms() as $t) {
+            if ($t['group_term_id'] === $id) {
+                $terms[] = ['id' => $t['id'], 'office_id' => $t['office_id'], 'holders' => array_map(static fn (array $h): array => ['name' => $h['name'], 'user_id' => $h['user_id']], $repo->holdersOf($t['id']))];
+            }
+        }
+        return $this->groupTermOut($g, true) + ['terms' => $terms];
+    }
+
+    /**
+     * @param GroupTerm $g
+     * @return array<string, mixed>
+     */
+    private function groupTermOut(array $g, bool $manager): array
+    {
+        return [
+            'id' => $g['id'],
+            'group_id' => $g['group_id'],
+            'kind' => $g['kind'],
+            'start_year' => $g['start_year'],
+            'end_year' => $g['end_year'],
+            'note' => $g['note'],
+            'current' => self::current($g),
+            'image_url' => $g['image_uid'] !== null ? $this->app->env->richImageUrl($g['image_uid']) : null,
+        ] + ($manager ? ['image_uid' => $g['image_uid']] : []);
+    }
+
+    /** @param array{kind: string, start_year: int, end_year: int|null} $a */
+    private static function yearsKey(array $a): string
+    {
+        return $a['kind'] . ':' . $a['start_year'] . ':' . ($a['end_year'] ?? '');
+    }
+
+    /**
+     * @param array{kind: string, start_year: int, end_year: int|null} $a
+     * @param array{kind: string, start_year: int, end_year: int|null} $b
+     */
+    private static function sameYears(array $a, array $b): bool
+    {
+        return self::yearsKey($a) === self::yearsKey($b);
+    }
+
+    /**
+     * @param Group $g
+     * @return array{id: int, title: string, joint_terms: bool}
+     */
+    private static function groupOut(array $g): array
+    {
+        return ['id' => $g['id'], 'title' => $g['title'], 'joint_terms' => $g['joint_terms']];
     }
 
     // ---- Ausscheiden (Issue #181) ----
@@ -375,7 +766,7 @@ final class OfficeService
                     }
                 }
                 $data = ['kind' => $t['kind'], 'start_year' => $t['start_year'], 'end_year' => null, 'note' => $t['note'], 'honor' => $t['honor']];
-                $keep = static fn (array $list): array => array_map(static fn (array $h): array => ['user_id' => $h['user_id'], 'name' => $h['name']], $list);
+                $keep = static fn (array $list): array => array_map(static fn (array $h): array => ['user_id' => $h['user_id'], 'name' => $h['name'], 'image_uid' => $h['image_uid']], $list);
                 $repo->saveTerm($t['id'], $t['office_id'], $data, $keep($others));
                 $repo->setEnd($repo->saveTerm(null, $t['office_id'], $data, $keep($mine)), $end, $userId);
             }
@@ -483,6 +874,7 @@ final class OfficeService
      * - personen mit „&“ getrennt; wer genau so heißt wie genau ein Konto, wird damit verknüpft (link).
      * - Gruppen und Ämter werden nach Namen gefunden oder angelegt; eine Amtszeit, die es genau so schon gibt, wird
      *   übersprungen. Ohne apply nur die Vorschau; mit apply alles in einer Transaktion (bei einem Fehler nichts).
+     *   Danach werden in Gruppen mit gemeinsamen Amtszeiten Zeilen mit denselben Jahren gebündelt (bundle).
      *
      * @return array{rows: list<array<string, mixed>>, groups_new: int, offices_new: int, terms_new: int, applied: bool}
      */
@@ -593,6 +985,12 @@ final class OfficeService
                 $repo->saveTerm(null, $offices[$officeKey], $term, $holders);
             }
         });
+        // Gruppen mit gemeinsamen Amtszeiten: dieselben Jahre bündeln (Issue #282)
+        foreach ($repo->groups() as $g) {
+            if ($g['joint_terms']) {
+                $this->bundle($g['id']);
+            }
+        }
         $this->syncTitles(array_keys($this->linkedTitles()));
         $result['applied'] = true;
         return $result;
@@ -759,7 +1157,11 @@ final class OfficeService
                 if (mb_strlen($name) > self::NAME_MAX) {
                     throw ApiError::invalid(sprintf('Ein Name darf höchstens %d Zeichen lang sein.', self::NAME_MAX));
                 }
-                $holder = ['user_id' => null, 'name' => $name];
+                $uid = $h['image_uid'] ?? null;
+                if ($uid !== null && $uid !== '' && (!is_string($uid) || preg_match(RichText::IMAGE_UID, strtolower($uid)) !== 1)) {
+                    throw ApiError::invalid('Unbekanntes Foto.');
+                }
+                $holder = ['user_id' => null, 'name' => $name, 'image_uid' => is_string($uid) && $uid !== '' ? strtolower($uid) : null];
             }
             $key = $holder['user_id'] !== null ? 'u' . $holder['user_id'] : 'n' . mb_strtolower($holder['name']);
             if (isset($seen[$key])) {
@@ -888,7 +1290,7 @@ final class OfficeService
      */
     private static function termOut(array $t): array
     {
-        return ['id' => $t['id'], 'kind' => $t['kind'], 'start_year' => $t['start_year'], 'end_year' => $t['end_year'], 'note' => $t['note'], 'honor' => $t['honor'], 'current' => self::current($t)];
+        return ['id' => $t['id'], 'kind' => $t['kind'], 'start_year' => $t['start_year'], 'end_year' => $t['end_year'], 'note' => $t['note'], 'honor' => $t['honor'], 'current' => self::current($t), 'group_term_id' => $t['group_term_id']];
     }
 
     /**
@@ -926,11 +1328,10 @@ final class OfficeService
         return array_map('intval', $order);
     }
 
-    /** @return array{id: int, title: string} */
+    /** @return array{id: int, title: string, joint_terms: bool} */
     private function group(int $id): array
     {
-        $g = $this->repository()->findGroup($id) ?? throw ApiError::notFound('Gruppe nicht gefunden.');
-        return ['id' => $g['id'], 'title' => $g['title']];
+        return self::groupOut($this->repository()->findGroup($id) ?? throw ApiError::notFound('Gruppe nicht gefunden.'));
     }
 
     /** @return array<string, mixed> */
@@ -953,7 +1354,7 @@ final class OfficeService
     {
         $repo = $this->repository();
         $t = $repo->findTerm($id) ?? throw ApiError::notFound('Amtszeit nicht gefunden.');
-        return self::termOut($t) + ['office_id' => $t['office_id'], 'holders' => array_map(static fn (array $h): array => ['name' => $h['name'], 'user_id' => $h['user_id']], $repo->holdersOf($id))];
+        return self::termOut($t) + ['office_id' => $t['office_id'], 'holders' => array_map(fn (array $h): array => ['name' => $h['name'], 'user_id' => $h['user_id']] + $this->holderPhoto($h, true), $repo->holdersOf($id))];
     }
 
     private function validGroupTitle(mixed $raw, ?int $id): string

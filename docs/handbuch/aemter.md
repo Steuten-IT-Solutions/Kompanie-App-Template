@@ -14,6 +14,7 @@ Tippe unten in der Leiste auf **Intern**, dann auf **{bereich.directory}** und o
 ## Was du hier siehst
 - **Alle aufklappen** (bzw. **Alle zuklappen**): öffnet oder schließt alle Karten auf einmal.
 - **Gruppen**, z. B. Vorstand: Darunter stehen ihre Ämter.
+- **Gemeinsame Amtszeiten**: Hat eine Gruppe gemeinsame Amtszeiten (z. B. ein Königshaus), steht je Amtszeit eine Karte mit dem Gruppenbild, den Jahren und wer welches Amt hatte; die laufende trägt **aktuell**.
 - **Je Amt eine Karte**: ein Siegel mit den Anfangsbuchstaben des Amts, wer es gerade hat (mit Fotos) – sonst „zuletzt“ und die letzte Amtszeit – und seit wann die Chronik reicht.
 
 ## So gehst du vor
@@ -38,7 +39,7 @@ Tippe unten in der Leiste auf **Intern**, dann auf **{bereich.directory}** und o
 
 ## Gut zu wissen
 - Die neueste Amtszeit steht oben. Bei langen Listen gliedern Marken wie **2000er** die Jahrzehnte. Eine Ehrung trägt einen Stern und den Hinweis **Ehrung**. Ein einzelnes Jahr ohne Ehrung, z. B. ein Königsjahr, steht wie jede andere Amtszeit da.
-- Antippen lassen sich nur Personen, die in der Mitgliederliste stehen. Frühere Mitglieder ohne Konto stehen nur mit ihrem Namen da.
+- Antippen lassen sich nur Personen, die in der Mitgliederliste stehen. Personen ohne Konto stehen mit ihrem Namen da und, wenn die Kompanie eines eingetragen hat, mit Foto.
 - Auf dem Handy steht die Chronik in einer Spalte, auf breiten Bildschirmen abwechselnd links und rechts der Linie.
 - Deine eigenen Ämter findest du als {rolle.member} auch unter **Meins**.
 

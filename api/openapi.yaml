@@ -3454,12 +3454,74 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /office-groups/{id}/terms:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Ämter]
+      summary: Gemeinsame Amtszeit der Gruppe anlegen (nur mit joint_terms)
+      description: Legt je Amt mit Personen eine Amtszeit mit denselben Jahren an. Mindestens ein Amt braucht Personen.
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OfficeGroupTermInput' }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfficeGroupTerm' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /office-group-terms/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    patch:
+      tags: [Ämter]
+      summary: Gemeinsame Amtszeit ändern (fehlende Felder bleiben)
+      description: Die Jahre gelten für alle Ämter darin. Mit offices werden die Personen je genanntem Amt ersetzt; leere holders entfernen die Amtszeit dieses Amts.
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OfficeGroupTermInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OfficeGroupTerm' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Ämter]
+      summary: Gemeinsame Amtszeit mit allen Amtszeiten darin und dem Gruppenbild löschen
+      x-capability: manage_offices
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /office-groups/{id}:
     parameters:
       - { name: id, in: path, required: true, schema: { type: integer } }
     patch:
       tags: [Ämter]
-      summary: Gruppe umbenennen
+      summary: Gruppe umbenennen oder gemeinsame Amtszeiten ein-/ausschalten (fehlende Felder bleiben)
+      description: Beim Einschalten von joint_terms werden vorhandene Amtszeiten der Ämter mit denselben Jahren (ohne Ehrungen) zu gemeinsamen Amtszeiten gebündelt. Ausschalten behält alle Daten.
       x-capability: manage_offices
       requestBody:
         required: true
@@ -3467,9 +3529,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [title]
               properties:
                 title: { type: string, maxLength: 60 }
+                joint_terms: { type: boolean }
       responses:
         '200':
           description: OK
@@ -7449,10 +7511,51 @@ components:
 
     OfficeGroup:
       type: object
-      required: [id, title]
+      required: [id, title, joint_terms]
       properties:
         id: { type: integer }
         title: { type: string, maxLength: 60 }
+        joint_terms: { type: boolean, description: 'Gemeinsame Amtszeiten mit Gruppenbild (z. B. ein Königshaus)' }
+
+    OfficeGroupTerm:
+      type: object
+      required: [id, group_id, kind, start_year, end_year, note, current, image_url]
+      properties:
+        id: { type: integer }
+        group_id: { type: integer }
+        kind: { type: string, enum: [period, point] }
+        start_year: { type: integer }
+        end_year: { type: [integer, 'null'] }
+        note: { type: string, maxLength: 100 }
+        current: { type: boolean, description: Zeitraum ohne Ende }
+        image_url: { type: [string, 'null'], description: 'Gruppenbild; öffentlich, solange der Bereich offices sichtbar ist' }
+        image_uid: { type: [string, 'null'], description: Nur mit manage_offices }
+
+    OfficeGroupTermInput:
+      type: object
+      properties:
+        kind: { type: string, enum: [period, point], default: period }
+        start_year: { type: integer, minimum: 1800 }
+        end_year: { type: [integer, 'null'] }
+        note: { type: string, maxLength: 100 }
+        image_uid: { type: [string, 'null'], description: 'Hochgeladenes Bild (POST /rich-images); null entfernt das Gruppenbild' }
+        offices:
+          type: array
+          description: Personen je Amt der Gruppe (beim Anlegen Pflicht); jedes Amt höchstens einmal
+          items:
+            type: object
+            required: [office_id, holders]
+            properties:
+              office_id: { type: integer }
+              holders:
+                type: array
+                maxItems: 20
+                items:
+                  type: object
+                  properties:
+                    user_id: { type: integer }
+                    name: { type: string, maxLength: 100 }
+                    image_uid: { type: [string, 'null'], description: Nur bei freien Namen }
 
     OfficeRef:
       type: object
@@ -7471,6 +7574,7 @@ components:
         name: { type: string, description: 'Anzeigename des Kontos, sonst der gespeicherte Name (auch nach dem Löschen des Kontos)' }
         user_id: { type: integer, description: 'Nur bei Personen der Mitgliederliste, für manage_offices und das eigene Konto' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
+        image_uid: { type: [string, 'null'], description: 'Nur freie Namen mit Foto, nur mit manage_offices (Issue #283); photo_url ist dann das öffentliche Foto' }
 
     OfficeTerm:
       type: object
@@ -7483,6 +7587,7 @@ components:
         note: { type: string, maxLength: 100 }
         honor: { type: boolean, description: 'Ehrung (Stern und Abzeichen im Zeitstrahl), bei jeder Art; vergibt keinen Titel' }
         current: { type: boolean, description: Zeitraum ohne Ende }
+        group_term_id: { type: [integer, 'null'], description: Gehört zu dieser gemeinsamen Amtszeit der Gruppe }
         office_id: { type: integer, description: Nur in Antworten der Pflege }
         holders:
           type: array
@@ -7506,6 +7611,7 @@ components:
             properties:
               user_id: { type: integer }
               name: { type: string, maxLength: 100 }
+              image_uid: { type: [string, 'null'], description: 'Nur bei freien Namen: Foto (Kennung aus POST /rich-images), öffentlich wie die Ämter; bei Konten ignoriert' }
 
     Office:
       allOf:
@@ -7531,6 +7637,10 @@ components:
         offices:
           type: array
           items: { $ref: '#/components/schemas/Office' }
+        group_terms:
+          type: array
+          description: Gemeinsame Amtszeiten aller Gruppen, laufende und neueste zuerst; angezeigt werden sie nur bei Gruppen mit joint_terms
+          items: { $ref: '#/components/schemas/OfficeGroupTerm' }
 
     OfficeTitleChange:
       type: object
