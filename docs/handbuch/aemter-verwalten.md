@@ -34,9 +34,10 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf **{bereich.of
 3. Wähle die **Art**: **Zeitraum (von–bis oder bis heute)** oder **Einzelnes Jahr**.
 4. Trage **Von (Jahr)** und, wenn die Amtszeit vorbei ist, **Bis** ein. Leer heißt: läuft noch.
 5. Wähle unter **Personen** bei **Profil**, wer die Person ist: **Ohne Profil** (kein Konto, z. B. frühere oder verstorbene Mitglieder; dann trägst du den **Name**n ein), **Mitglied** oder **Ehemaliger** (dann wählst du sie aus). Mit **Weitere Person** trägst du mehrere ein. Bei **Ohne Profil** kannst du mit **Foto** ein Bild der Person hochladen (JPG, PNG oder WebP); **Foto entfernen** nimmt es wieder heraus. Hatte jemand mit genau diesem Namen schon in einer früheren Amtszeit ein Foto, bietet die App **Foto von früher übernehmen** an.
-6. Trage, wenn gewünscht, einen **Zusatz** ein, z. B. „Unter …“ oder „Ehrenvorsitz“.
-7. Setze den Haken bei **Ehrung**, wenn es eine Ehrung ist (z. B. Ehrenmitglied). Das geht bei beiden Arten. Im Zeitstrahl trägt sie dann einen Stern und den Hinweis **Ehrung**. Ein einzelnes Jahr ohne Haken (z. B. ein Königsjahr) erscheint als gewöhnliches Jahr.
-8. Tippe auf **Speichern**.
+6. Hat die Person eine Begleitung, die das Amt nicht selbst bekleidet (z. B. Partnerin oder Partner), tippe unter ihr auf **+ Begleitung (z. B. Partner/in)** und trage sie wie eine Person ein, ohne Profil oder als Mitglied bzw. Ehemaliger. **Weitere Begleitperson** fügt eine weitere hinzu (bis zu 5), **✕** entfernt sie. Im Zeitstrahl steht die Begleitung abgesetzt unter der Person: „mit …“.
+7. Trage, wenn gewünscht, einen **Zusatz** ein, z. B. „Unter …“ oder „Ehrenvorsitz“.
+8. Setze den Haken bei **Ehrung**, wenn es eine Ehrung ist (z. B. Ehrenmitglied). Das geht bei beiden Arten. Im Zeitstrahl trägt sie dann einen Stern und den Hinweis **Ehrung**. Ein einzelnes Jahr ohne Haken (z. B. ein Königsjahr) erscheint als gewöhnliches Jahr.
+9. Tippe auf **Speichern**.
 
 ![Amtszeiten eines Amts](bild:aemter-verwalten-amt)
 
@@ -59,7 +60,7 @@ Haben alle Ämter einer Gruppe immer dieselben Jahre, z. B. ein Königshaus oder
 2. Unter den Ämtern der Gruppe steht jetzt **Gemeinsame Amtszeiten**. Tippe auf **Neue gemeinsame Amtszeit**.
 3. Wähle die **Art** und trage die Jahre ein wie bei einer einzelnen Amtszeit, dazu, wenn gewünscht, einen **Zusatz**.
 4. Wähle unter **Gruppenbild** mit **Bild wählen** ein Foto (JPG, PNG oder WebP). **Bild entfernen** nimmt es wieder heraus.
-5. Trage je Amt die Personen ein. Ein Amt ohne Personen bleibt in dieser Amtszeit leer.
+5. Trage je Amt die Personen ein, wenn nötig mit **+ Begleitung (z. B. Partner/in)**. Ein Amt ohne Personen bleibt in dieser Amtszeit leer.
 6. Tippe auf **Speichern**. Mit **Bearbeiten** änderst du Jahre, Bild und Personen für alle Ämter auf einmal; **Löschen** löscht die gemeinsame Amtszeit mit allen Amtszeiten darin und dem Bild.
 
 ### Ein Amt umbenennen oder löschen
@@ -80,6 +81,8 @@ Haben alle Ämter einer Gruppe immer dieselben Jahre, z. B. ein Königshaus oder
 - Fotos von Personen ohne Profil sind wie der Zeitstrahl für alle sichtbar, auch ohne Anmeldung. Hol vorher die Einwilligung der Person ein (bei Verstorbenen die der Angehörigen). Bei Mitgliedern und Ehemaligen zeigt die App immer das Foto ihres Profils. Ein Foto, das in keiner Amtszeit mehr steht, löscht die App.
 - Ehemalige stehen bei **Ehemaliger** zur Auswahl, wenn sie in der Verwaltung als ehemalig eingetragen sind.
 - Wird ein Konto gelöscht, bleiben seine Amtszeiten mit dem Namen stehen; nur die Verbindung zum Konto fällt weg.
+- Begleitpersonen bekleiden das Amt nicht: Ein mit dem Amt verknüpfter {bereich.titles} geht nur an die Person selbst, und scheidet eine Begleitperson aus, endet keine Amtszeit. Scheidet die Person aus, geht ihre Begleitung mit in die beendete Amtszeit. Mitglieder und Ehemalige sehen die Amtszeit auf ihrer Seite mit dem Zusatz „(Begleitung)“. Der Import kennt keine Begleitpersonen; trag sie danach von Hand ein.
+- Steht eine Partnerin oder ein Partner bisher als eigene Person in der Amtszeit, entferne sie dort mit **✕** und trage sie mit **+ Begleitung** bei der richtigen Person neu ein.
 - Import: **ende** ist ein Jahr, „heute“ für eine laufende Amtszeit oder leer für ein einzelnes Jahr. **art** ist meist leer; „zeitraum“ oder „zeitpunkt“ erzwingt die Art. Mehrere **personen** trennst du mit „&“. **ehrung** ist „ja“ für eine Ehrung, sonst leer oder „nein“. Eine Kopfzeile ist erlaubt. Gruppen und Ämter findet die App nach ihrem Namen oder legt sie an. Was es genau so schon gibt, überspringt sie; du kannst dieselbe Tabelle also gefahrlos noch einmal einspielen. Zeilen mit Fehler musst du erst korrigieren.
 - Import älterer Tabellen mit nur 7 Spalten (ohne **ehrung**): Daraus entstehen keine Ehrungen, auch nicht bei „zeitpunkt“. Früher wurde aus jedem einzelnen Jahr eine Ehrung. Ergänze bei Ehrungen also die Spalte mit „ja“ oder setze den Haken danach von Hand. Eine Zeile, die sich nur im Wert der Ehrung von einer vorhandenen Amtszeit unterscheidet, gilt als schon vorhanden.
 

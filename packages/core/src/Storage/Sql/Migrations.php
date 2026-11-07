@@ -1740,9 +1740,15 @@ WHERE title IS NULL",
                     'CREATE INDEX IF NOT EXISTS {registration_requests}_expires_at ON {registration_requests} (expires_at)',
                 ],
             ],
+            // Begleitpersonen einer Amtszeit (z. B. Partnerin oder Partner, die das Amt nicht selbst bekleiden): eigene
+            // Zeilen in office_holders mit der ID der Inhaber-Zeile, die sie begleiten; NULL: Inhaber wie bisher.
+            48 => [
+                'mysql' => ['ALTER TABLE {office_holders} ADD COLUMN companion_of bigint(20) unsigned DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {office_holders} ADD COLUMN companion_of INTEGER DEFAULT NULL'],
+            ],
             // Öffentliche Nachrichten am Schwarzen Brett: audience public (alle, auch ohne Anmeldung) oder members (wer das
             // Brett liest, view_board; wie bei eigenen Seiten). Bestehende Nachrichten bleiben intern.
-            48 => [
+            49 => [
                 'mysql' => ["ALTER TABLE {board_messages} ADD COLUMN audience varchar(10) NOT NULL DEFAULT 'members'"],
                 'sqlite' => ["ALTER TABLE {board_messages} ADD COLUMN audience TEXT NOT NULL DEFAULT 'members'"],
             ],

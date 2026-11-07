@@ -348,6 +348,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
                 $url = ($h['photo_url'] ?? null) !== null ? ($photos[$h['user_id'] ?? 0] ?? $h['photo_url']) : null;
                 $html .= '<li class="ka-person">' . self::photo($h['name'], $url, 56)
                     . '<span><span class="ka-name">' . esc_html($h['name']) . '</span>'
+                    . (($h['companions'] ?? []) !== [] ? '<span class="ka-klein">mit ' . esc_html(self::withNames($h)) . '</span>' : '')
                     . '<span class="ka-klein">' . esc_html(self::years($t)) . ($t['note'] !== '' && $t['note'] !== null ? ' · ' . esc_html($t['note']) : '') . '</span></span></li>';
             }
         }
@@ -356,13 +357,21 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
             $since = min(array_column($o['terms'], 'start_year'));
             $html .= '<details class="ka-chronik"><summary>' . esc_html(sprintf('Chronik seit %d', $since)) . '</summary><ol>';
             foreach ($rest as $t) {
-                $names = implode(', ', array_map(static fn (array $h): string => $h['name'], $t['holders']));
+                $names = implode(', ', array_map(static fn (array $h): string => $h['name'] . (($h['companions'] ?? []) !== [] ? ' mit ' . self::withNames($h) : ''), $t['holders']));
                 $html .= '<li><span class="ka-jahre">' . esc_html(self::years($t)) . '</span>' . esc_html($names)
                     . ($t['note'] !== '' && $t['note'] !== null ? '<span class="ka-klein">' . esc_html($t['note']) . '</span>' : '') . '</li>';
             }
             $html .= '</ol></details>';
         }
         return $html . '</section>';
+    }
+
+    /** Begleitpersonen eines Inhabers: „Laura“ bzw. „Laura und Max“, wie in der App (Aemter.tsx, companionNames). */
+    private static function withNames(array $h): string
+    {
+        $names = array_column($h['companions'] ?? [], 'name');
+        $last = array_pop($names);
+        return $names === [] ? (string) $last : implode(', ', $names) . ' und ' . $last;
     }
 
     /** „2007–2020“, „seit 2020“ (läuft), „2025“ (einzelnes Jahr), wie in der App (Aemter.tsx, termYears). */

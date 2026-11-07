@@ -8426,6 +8426,11 @@ components:
                     user_id: { type: integer }
                     name: { type: string, maxLength: 100 }
                     image_uid: { type: [string, 'null'], description: Nur bei freien Namen }
+                    companions:
+                      type: array
+                      maxItems: 5
+                      description: Begleitpersonen wie bei OfficeTermInput
+                      items: { type: object }
 
     OfficeRef:
       type: object
@@ -8445,6 +8450,11 @@ components:
         user_id: { type: integer, description: 'Nur bei Personen der Mitgliederliste, für manage_offices und das eigene Konto' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
         image_uid: { type: [string, 'null'], description: 'Nur freie Namen mit Foto, nur mit manage_offices (Issue #283); photo_url ist dann das öffentliche Foto' }
+        companions:
+          type: array
+          maxItems: 5
+          description: 'Begleitpersonen des Inhabers (z. B. Partnerin oder Partner), die das Amt nicht selbst bekleiden; Angaben wie bei Inhabern, ohne eigene companions. Fehlt ohne Begleitpersonen.'
+          items: { $ref: '#/components/schemas/OfficeHolder' }
 
     OfficeTerm:
       type: object
@@ -8477,11 +8487,22 @@ components:
           maxItems: 20
           items:
             type: object
-            description: Ein Konto (user_id) oder ein freier Name; jede Person nur einmal
+            description: Ein Konto (user_id) oder ein freier Name; jede Person nur einmal in der Amtszeit (auch als Begleitperson)
             properties:
               user_id: { type: integer }
               name: { type: string, maxLength: 100 }
               image_uid: { type: [string, 'null'], description: 'Nur bei freien Namen: Foto (Kennung aus POST /rich-images), öffentlich wie die Ämter; bei Konten ignoriert' }
+              companions:
+                type: array
+                maxItems: 5
+                description: 'Begleitpersonen (z. B. Partnerin oder Partner): bekleiden das Amt nicht, bekommen keinen verknüpften Titel, ihre Amtszeit endet nicht beim Ausscheiden. Ohne Angabe: keine.'
+                items:
+                  type: object
+                  description: Ein Konto (user_id) oder ein freier Name
+                  properties:
+                    user_id: { type: integer }
+                    name: { type: string, maxLength: 100 }
+                    image_uid: { type: [string, 'null'], description: Nur bei freien Namen }
 
     Office:
       allOf:

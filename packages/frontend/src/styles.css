@@ -4830,6 +4830,39 @@ button.spotlight-person:focus-visible {
 .holder-chip-link:focus-visible {
   background: color-mix(in srgb, var(--primary-text) 12%, transparent);
 }
+/* Inhaber mit Begleitpersonen: eigene Zeile, darunter abgesetzt „mit …“ */
+.timeline-holders li.with-companions {
+  flex-basis: 100%;
+}
+.holder-companions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 4px 0 2px 16px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+}
+.holder-companions-label {
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--muted);
+}
+.holder-companions .holder-chip {
+  font-size: 0.86rem;
+  font-weight: 400;
+}
+.holder-companions .holder-chip .member-avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 0.6rem;
+}
+.spotlight-with {
+  font-size: 0.86rem;
+  font-style: italic;
+  opacity: 0.9;
+  overflow-wrap: anywhere;
+}
 .timeline-note {
   margin-top: 6px;
   font-size: 0.86rem;
@@ -4860,8 +4893,15 @@ button.spotlight-person:focus-visible {
     text-align: right;
   }
   .tl-left .tl-meta,
-  .tl-left .timeline-holders {
+  .tl-left .timeline-holders,
+  .tl-left .holder-companions {
     justify-content: flex-end;
+  }
+  .tl-left .holder-companions {
+    margin: 4px 16px 2px 0;
+    padding: 0 10px 0 0;
+    border-left: 0;
+    border-right: 2px solid var(--line);
   }
   .tl-left .tl-when {
     grid-column: 3;
@@ -4945,6 +4985,25 @@ button.spotlight-person:focus-visible {
   flex: 1 1 140px;
   min-width: 0;
   margin: 0;
+}
+/* Begleitpersonen eines Inhabers: eingerückt unter seiner Zeile */
+.office-holder {
+  margin-bottom: 8px;
+}
+.office-holder > .office-holder-row {
+  margin-bottom: 4px;
+}
+.office-companions {
+  margin-left: 16px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+}
+.office-companions legend {
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+.office-companion-add {
+  padding-left: 0;
 }
 .office-import textarea {
   width: 100%;
