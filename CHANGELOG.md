@@ -74,8 +74,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 - **Mitglieder auf der Seite einer Kompanie**: Ist der Bereich *Mitglieder* aus (z. B. in einer Bruderschaft ohne
   eigene Mitgliederliste), fehlten die zugeordneten Personen. Jetzt stehen ihre Namen dort für alle mit dem Recht, die
-  Mitgliederliste zu sehen, auch für Gäste mit diesem Recht. Zur Seite einer Person führt ein Name nur, wenn es die
-  Mitgliederliste gibt.
+  Mitgliederliste zu sehen, auch für Gäste mit diesem Recht. Die Liste sieht aus wie die Mitgliederliste (Foto, Titel,
+  Dienstgrad); ein Tipp öffnet die Seite der Person, auch ohne Mitgliederliste, wenn ihr *Ämter* nutzt. Dort blättert
+  man in den Mitgliedern dieser Kompanie weiter.
 - **Kein Leerraum zum Scrollen auf kurzen Seiten**: Seiten mit wenig Inhalt, etwa die leere Galerie, ließen sich im
   Handy-Browser ein Stück nach unten scrollen, so dass die Knöpfe oben aus dem Bild rutschten. Die Mindesthöhe der App
   richtet sich jetzt nach dem sichtbaren Bildschirm (ohne die Adressleiste des Browsers).

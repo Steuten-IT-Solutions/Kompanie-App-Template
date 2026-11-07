@@ -28,12 +28,12 @@ Tippe unten auf **{bereich.companies}**. Steht der Punkt nicht unten, findest du
 
 ### Mehr über eine Kompanie erfahren
 1. Tippe auf die Karte. Die Seite der Kompanie geht auf.
-2. Du siehst das **Logo**, die **Beschreibung**, die Knöpfe **Webseite** und **App der Kompanie** (sie öffnen sich in einem neuen Tab) und darunter die **Mitglieder** der Kompanie.
-3. Gibt es **{bereich.directory}**, öffnet ein Tipp auf einen Namen die Seite der Person dort.
+2. Du siehst das **Logo**, die **Beschreibung**, die Knöpfe **Webseite** und **App der Kompanie** (sie öffnen sich in einem neuen Tab) und darunter die **Mitglieder** der Kompanie, so wie in der Mitgliederliste mit Foto, Titeln und Dienstgrad.
+3. Tippe auf eine Person, um ihre Seite zu öffnen (mit ihren {bereich.offices}). Dort wischst du zur nächsten Person dieser Kompanie.
 4. Mit **‹ Alle {bereich.companies}** oben (oder „Zurück“ im Browser) kommst du wieder zur Liste, an dieselbe Stelle und mit derselben Suche.
 
 ## Gut zu wissen
-- Die Mitglieder einer Kompanie siehst du nur, wenn du das Recht hast, die Mitgliederliste zu sehen. Das gilt auch, wenn es keine eigene Mitgliederliste gibt (z. B. in einer Bruderschaft); dann stehen dort nur die Namen.
+- Die Mitglieder einer Kompanie siehst du nur, wenn du das Recht hast, die Mitgliederliste zu sehen. Das gilt auch, wenn es keine eigene Mitgliederliste gibt (z. B. in einer Bruderschaft). Die Seite einer Person gibt es dann nur, wenn ihr {bereich.offices} nutzt.
 - {bereich.offices} gehören zu den Personen, nicht zu einer Kompanie. Sie stehen unter **{bereich.offices}**, nicht auf der Seite der Kompanie.
 - Unter **{bereich.directory}** kannst du die Liste nach Kompanie filtern; auf der Seite einer Person stehen ihre Kompanien; ein Tipp darauf öffnet die Seite der Kompanie.
 - Gibt es noch keine Einträge, steht dort „Noch keine {bereich.companies}.“

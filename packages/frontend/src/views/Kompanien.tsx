@@ -14,6 +14,8 @@ import {
 } from '../companySort';
 import brand from '../generated/brand';
 import RichTextView from '../richtext/RichTextView';
+import { setBrowseOrder } from '../memberSort';
+import { MemberRow } from '../MemberRow';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
@@ -170,12 +172,13 @@ function CompanyList() {
 
 /**
  * Seite einer Kompanie: Logo, Name, Beschreibung, Links und die Mitglieder (die schickt der Server nur mit
- * view_directory, ohne Bereich Mitgliederliste nur an Angemeldete, und nur mit Namen). Zur Seite der Person führt ein
- * Name nur, wenn es die Mitgliederliste gibt.
+ * view_directory, wie in der Mitgliederliste mit Foto, Titeln und Dienstgrad). Zur Seite der Person führt eine Zeile,
+ * wenn es die Seite gibt: mit Mitgliederliste oder mit Ämtern.
  */
 function CompanyDetail({ id }: { id: number }) {
   const { data, error, loading, reload } = useAsync(sources.companies.load, sources.companies.deps, sources.companies.key);
-  const linked = !!config?.features.directory && can('view_directory');
+  // Seite der Person: mit Mitgliederliste oder (z. B. in einer Bruderschaft ohne Mitgliederliste) mit den Ämtern
+  const linked = (!!config?.features.directory && can('view_directory')) || (!!config?.features.offices && can('view_offices'));
   const back = (
     <button type="button" className="btn btn-link back" onClick={() => navigate('kompanien')}>
       ‹ Alle {sec.companies}
@@ -231,27 +234,21 @@ function CompanyDetail({ id }: { id: number }) {
         <>
           <h3 className="section-title">Mitglieder</h3>
           <ul className="card-list company-members">
-            {c.members.map((m) =>
-              linked ? (
-                <li key={m.id} className="card row member-row-link">
-                  <div className="row-main">
-                    {/* Die ganze Zeile öffnet die Seite der Person (wie in der Mitgliederliste). */}
-                    <button type="button" className="row-title member-row-open" onClick={() => navigate(`mitglieder/${m.id}`)}>
-                      {m.name}
-                    </button>
-                  </div>
-                  <span className="chevron" aria-hidden="true">
-                    ›
-                  </span>
-                </li>
-              ) : (
-                <li key={m.id} className="card row">
-                  <div className="row-main">
-                    <div className="row-title">{m.name}</div>
-                  </div>
-                </li>
-              ),
-            )}
+            {c.members.map((m) => (
+              <MemberRow
+                key={m.id}
+                m={m}
+                onOpen={
+                  linked
+                    ? () => {
+                        // Auf der Seite der Person blättert man in den Mitgliedern dieser Kompanie weiter.
+                        setBrowseOrder('directory', c.members ?? []);
+                        navigate(`mitglieder/${m.id}`);
+                      }
+                    : undefined
+                }
+              />
+            ))}
           </ul>
         </>
       )}
