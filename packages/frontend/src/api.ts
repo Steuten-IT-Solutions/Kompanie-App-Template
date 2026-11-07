@@ -904,6 +904,8 @@ export interface BoardMessage {
   updated_at: string;
   /** Sichtbar bis (standardmäßig 24 Stunden nach created_at); danach blendet die App den Eintrag aus, auch offline */
   expires_at: string;
+  /** Sichtbarkeit: members (intern, wer das Brett liest) oder public (alle, auch ohne Anmeldung); fehlt bei älteren Servern (intern) */
+  audience?: BoardAudience;
   /** Dateianhänge (fehlt bei älteren Servern) */
   attachments?: Attachment[];
   /** nur mit post_board: wer zuletzt geändert hat */
@@ -925,10 +927,14 @@ export interface BoardEnded {
   deleted_at: string | null;
   deleted_by_name: string | null;
   active: boolean;
+  audience?: BoardAudience;
   attachments?: Attachment[];
 }
 
-export type BoardRevisionAction = 'created' | 'title' | 'content' | 'expires' | 'attachments' | 'deleted' | 'mailed';
+/** Sichtbarkeit einer Nachricht am Brett: intern (members) oder öffentlich (public) */
+export type BoardAudience = 'members' | 'public';
+
+export type BoardRevisionAction = 'created' | 'title' | 'content' | 'expires' | 'audience' | 'attachments' | 'deleted' | 'mailed';
 
 /** Eintrag im Verlauf einer Nachricht. before/after: Titel, Inhalt (HTML), Enddatum oder eine Momentaufnahme. */
 export interface BoardRevision {
@@ -962,6 +968,8 @@ export interface BoardInput {
   text: string;
   /** UTC (…Z); ohne Angabe 24 Stunden */
   expires_at?: string | null;
+  /** ohne Angabe intern (members) */
+  audience?: BoardAudience;
   push?: boolean;
   mail?: boolean;
   /** Kennungen der Anhänge (eigene Entwürfe aus uploadAttachment) */
@@ -1993,7 +2001,7 @@ export const api = {
   // Schwarzes Brett (Issue #5, #172)
   board: () => request<{ items: BoardItem[] }>('GET', '/board'),
   postBoard: (input: BoardInput) => request<BoardMessage>('POST', '/board', input),
-  updateBoard: (id: number, changes: Partial<Pick<BoardInput, 'title' | 'text' | 'expires_at' | 'attachments'>>) =>
+  updateBoard: (id: number, changes: Partial<Pick<BoardInput, 'title' | 'text' | 'expires_at' | 'audience' | 'attachments'>>) =>
     request<BoardMessage>('PATCH', `/board/${id}`, changes),
   boardMailInfo: () => request<BoardMailInfo>('GET', '/board/mail'),
   boardHistory: (id: number) => request<BoardHistory>('GET', `/board/${id}/history`),
@@ -2404,6 +2412,7 @@ export interface ReportInput {
 
 export type PushType =
   | 'board'
+  | 'board_public'
   | 'polls'
   | 'birthdays'
   | 'gallery_review'

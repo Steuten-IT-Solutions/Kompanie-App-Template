@@ -11,7 +11,12 @@ use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Storage\BoardRepository;
 
 /**
- * Schwarzes Brett (Issue #5, Umbau #172): dringende Nachrichten für alle Mitglieder und Anwärter.
+ * Schwarzes Brett (Issue #5, Umbau #172): dringende Nachrichten für alle Mitglieder und Anwärter, auf Wunsch auch öffentlich.
+ *
+ * - Jede Nachricht ist intern (audience members: wer das Brett liest, isRecipient) oder öffentlich (audience public:
+ *   alle, auch ohne Anmeldung, wie bei eigenen Seiten). Das wählt, wer schreibt; ändern lässt es sich, solange sie gilt.
+ *   Bestehende Nachrichten sind intern. Öffentlich sichtbar sind nur Titel, Inhalt, Anhänge, Zeiten und der Name des
+ *   Verfassers; wer zuletzt geändert hat, der Mailversand und der Verlauf bleiben bei post_board.
  *
  * - Schreiben, ändern und vorzeitig löschen darf, wer das Recht post_board hat (nicht nur, wer sie geschrieben hat).
  * - Jede Nachricht hat einen Titel (reiner Text, ohne Längengrenze; Banner, Push und Betreff der Mail) und formatierten
@@ -27,7 +32,8 @@ use KompanieApp\Core\Storage\BoardRepository;
  *   Sichtbar nur mit post_board. Abgelaufene und gelöschte Nachrichten bleiben mit ihrem Verlauf HISTORY_KEEP_DAYS
  *   einsehbar; dann entfernt die Aufgabe board_cleanup sie samt Verlauf, Mailprotokoll und Bildern endgültig.
  * - Beim Schreiben bekommen alle Empfänger auf Wunsch eine Benachrichtigung (PushTriggers::boardPosted) und eine Mail
- *   (BoardMailService), beim Ändern nicht.
+ *   (BoardMailService), beim Ändern nicht. Bei öffentlichen Nachrichten kommen zur Benachrichtigung die Geräte ohne
+ *   Brett dazu (Gäste und Konten ohne view_board, Art board_public); die Mail geht weiter nur an die Empfänger.
  * - Die Liste besteht aus Einträgen mit kind: „message“ und für Mitglieder „poll“ (laufende Umfragen, Issue #4,
  *   PollService::boardItems); Clients überspringen unbekannte Arten.
  *
@@ -41,6 +47,9 @@ final class BoardService
     public const HISTORY_KEEP_DAYS = 30;
     public const TASK = 'board_cleanup';
     public const KIND_MESSAGE = 'message';
+    public const AUDIENCE_PUBLIC = 'public';
+    public const AUDIENCE_MEMBERS = 'members';
+    public const AUDIENCES = [self::AUDIENCE_MEMBERS, self::AUDIENCE_PUBLIC];
 
     public const REV_CREATED = 'created';
     public const REV_TITLE = 'title';
@@ -49,6 +58,7 @@ final class BoardService
     public const REV_DELETED = 'deleted';
     public const REV_MAILED = 'mailed';
     public const REV_ATTACHMENTS = 'attachments';
+    public const REV_AUDIENCE = 'audience';
 
     private ?BoardRepository $repo = null;
 
@@ -71,7 +81,16 @@ final class BoardService
     }
 
     /**
-     * Gültige Nachrichten, neueste zuerst; danach für Mitglieder die laufenden Umfragen (Issue #4, kind „poll“, mit
+     * Darf $viewer (null = ohne Anmeldung) eine Nachricht mit dieser audience lesen? Öffentliche alle, interne die
+     * Empfänger (isRecipient), alle mit post_board ohnehin.
+     */
+    public static function canRead(?User $viewer, string $audience): bool
+    {
+        return $audience === self::AUDIENCE_PUBLIC || self::isRecipient($viewer) || ($viewer !== null && $viewer->can(Capability::PostBoard));
+    }
+
+    /**
+     * Gültige Nachrichten, die $viewer lesen darf (canRead; ohne Anmeldung nur öffentliche), neueste zuerst; danach für Mitglieder die laufenden Umfragen (Issue #4, kind „poll“, mit
      * has_voted), sofern der Bereich Umfragen an ist. Mit post_board zusätzlich, wer zuletzt geändert hat, und der Stand
      * des Mailversands.
      *
@@ -79,7 +98,7 @@ final class BoardService
      */
     public function list(?User $viewer = null): array
     {
-        $active = $this->repository()->active($this->app->time()->nowUtc());
+        $active = array_values(array_filter($this->repository()->active($this->app->time()->nowUtc()), static fn (array $m): bool => self::canRead($viewer, $m['audience'])));
         $editor = $viewer !== null && $viewer->can(Capability::PostBoard);
         $ids = array_column($active, 'id');
         $edits = $editor ? $this->repository()->lastEdits($ids) : [];
@@ -93,27 +112,29 @@ final class BoardService
     /**
      * Neue Nachricht.
      *
-     * @param array<string, mixed> $in title, text (formatierter Inhalt), expires_at (optional, ISO 8601)
+     * @param array<string, mixed> $in title, text (formatierter Inhalt), expires_at (optional, ISO 8601), audience (members
+     *                                 Standard, oder public)
      * @return BoardItem
      */
     public function create(User $author, array $in): array
     {
         $title = self::validTitle($in['title'] ?? null);
         $body = self::validBody($in['text'] ?? null);
+        $audience = self::validAudience($in['audience'] ?? self::AUDIENCE_MEMBERS);
         $nowTs = $this->app->time()->timestamp();
         $now = gmdate('Y-m-d H:i:s', $nowTs);
         $expires = array_key_exists('expires_at', $in) && $in['expires_at'] !== null && $in['expires_at'] !== ''
             ? $this->validExpires($in['expires_at'])
             : gmdate('Y-m-d H:i:s', $nowTs + self::LIFETIME);
         $files = $this->app->attachments()->resolve($author, $in['attachments'] ?? null, AttachmentService::OWNER_BOARD);
-        $id = $this->app->db->transaction(function () use ($author, $title, $body, $now, $expires, $files): int {
-            $id = $this->repository()->insert($title, $body, $author->id, $now, $expires);
+        $id = $this->app->db->transaction(function () use ($author, $title, $body, $now, $expires, $files, $audience): int {
+            $id = $this->repository()->insert($title, $body, $author->id, $now, $expires, $audience);
             $claimed = $this->app->richImages()->claim($author, $body, RichImageService::OWNER_BOARD, $id);
             if ($claimed !== $body) {
                 $this->repository()->update($id, ['body' => $claimed]);
             }
             $this->app->attachments()->assign($files, AttachmentService::OWNER_BOARD, $id);
-            $snapshot = ['title' => $title, 'body' => $claimed, 'expires_at' => $expires];
+            $snapshot = ['title' => $title, 'body' => $claimed, 'expires_at' => $expires, 'audience' => $audience];
             if ($files !== []) {
                 $snapshot['attachments'] = array_map(static fn (array $f): string => (string) $f['name'], $files);
             }
@@ -124,12 +145,13 @@ final class BoardService
     }
 
     /**
-     * Titel, Inhalt und/oder Enddatum ändern, solange die Nachricht gilt (einzeln oder zusammen). Unverändertes ändert
+     * Titel, Inhalt, Enddatum und/oder Sichtbarkeit (audience) ändern, solange die Nachricht gilt (einzeln oder zusammen). Unverändertes ändert
      * nichts. Geänderter Titel oder Inhalt bekommt immer ein späteres updated_at als vorher, auch innerhalb derselben
      * Sekunde (Issue #68): Ausgeblendet merkt sich die App die Fassung über updated_at. Nur ein neues Enddatum lässt
-     * updated_at unverändert (ausgeblendet bleibt ausgeblendet).
+     * updated_at unverändert (ausgeblendet bleibt ausgeblendet), ebenso eine neue Sichtbarkeit. Eine Benachrichtigung
+     * gibt es beim Ändern nie, auch nicht, wenn eine Nachricht öffentlich wird.
      *
-     * @param array<string, mixed> $in title, text, expires_at, attachments (alle Anhänge danach: Kennungen)
+     * @param array<string, mixed> $in title, text, expires_at, audience, attachments (alle Anhänge danach: Kennungen)
      * @return BoardItem
      */
     public function update(User $actor, int $id, array $in): array
@@ -154,8 +176,14 @@ final class BoardService
                 $values['expires_at'] = $expires;
             }
         }
-        if (!array_key_exists('title', $in) && !array_key_exists('text', $in) && !array_key_exists('expires_at', $in) && !array_key_exists('attachments', $in)) {
-            throw ApiError::invalid('Bitte Titel, Text, Anhänge oder Enddatum angeben.');
+        if (array_key_exists('audience', $in)) {
+            $audience = self::validAudience($in['audience']);
+            if ($audience !== $message['audience']) {
+                $values['audience'] = $audience;
+            }
+        }
+        if (!array_key_exists('title', $in) && !array_key_exists('text', $in) && !array_key_exists('expires_at', $in) && !array_key_exists('attachments', $in) && !array_key_exists('audience', $in)) {
+            throw ApiError::invalid('Bitte Titel, Text, Anhänge, Enddatum oder Sichtbarkeit angeben.');
         }
         // Anhänge: die genannten Kennungen sind danach genau die Anhänge (neue Entwürfe kommen dazu, fehlende gehen).
         $files = null;
@@ -196,6 +224,9 @@ final class BoardService
             }
             if (isset($values['expires_at'])) {
                 $this->repository()->addRevision($id, $actor->id, $now, self::REV_EXPIRES, $message['expires_at'], $values['expires_at']);
+            }
+            if (isset($values['audience'])) {
+                $this->repository()->addRevision($id, $actor->id, $now, self::REV_AUDIENCE, $message['audience'], $values['audience']);
             }
         });
         return $this->one($id, $actor);
@@ -253,18 +284,19 @@ final class BoardService
     }
 
     /**
-     * Bild einer Nachricht ansehen (RichImageService::canView): solange sie gilt wie die Nachricht selbst, danach (im
-     * Verlauf) nur mit post_board.
+     * Bild oder Anhang einer Nachricht ansehen (RichImageService::canView, AttachmentService::canView): solange sie gilt
+     * wie die Nachricht selbst (öffentliche auch ohne Anmeldung, $viewer null), danach (im Verlauf) nur mit post_board.
      */
-    public function canSeeImage(User $viewer, int $messageId): bool
+    public function canSeeImage(?User $viewer, int $messageId): bool
     {
         if (!$this->app->features()->enabled('board')) {
             return false;
         }
-        if ($viewer->can(Capability::PostBoard)) {
+        if ($viewer !== null && $viewer->can(Capability::PostBoard)) {
             return $this->repository()->find($messageId) !== null;
         }
-        return self::isRecipient($viewer) && $this->repository()->findActive($messageId, $this->app->time()->nowUtc()) !== null;
+        $message = $this->repository()->findActive($messageId, $this->app->time()->nowUtc());
+        return $message !== null && self::canRead($viewer, $message['audience']);
     }
 
     /**
@@ -319,6 +351,7 @@ final class BoardService
             'created_at' => Time::utcToIso($m['created_at']),
             'updated_at' => Time::utcToIso($m['updated_at']),
             'expires_at' => Time::utcToIso($m['expires_at']),
+            'audience' => $m['audience'],
             'attachments' => array_map(fn (array $f): array => $this->app->attachments()->format($f), $files),
         ];
         if ($editor) {
@@ -348,6 +381,7 @@ final class BoardService
             'deleted_at' => Time::utcToIso($m['deleted_at']),
             'deleted_by_name' => $m['deleted_by'] !== null ? $names->name($m['deleted_by']) : null,
             'active' => $m['deleted_at'] === null && $m['expires_at'] > $this->app->time()->nowUtc(),
+            'audience' => $m['audience'],
             'attachments' => array_map(fn (array $f): array => $this->app->attachments()->format($f), $files),
         ];
     }
@@ -367,7 +401,7 @@ final class BoardService
             return match ($r['action']) {
                 self::REV_CONTENT => $this->app->richImages()->render($v),
                 self::REV_EXPIRES => Time::utcToIso($v),
-                self::REV_TITLE => $v,
+                self::REV_TITLE, self::REV_AUDIENCE => $v,
                 default => $this->decode($v),
             };
         };
@@ -423,6 +457,14 @@ final class BoardService
             throw ApiError::invalid('Bitte einen Text eingeben.');
         }
         return $body;
+    }
+
+    private static function validAudience(mixed $audience): string
+    {
+        if (!is_string($audience) || !in_array($audience, self::AUDIENCES, true)) {
+            throw ApiError::invalid('Sichtbarkeit muss „members“ (intern) oder „public“ (öffentlich) sein.');
+        }
+        return $audience;
     }
 
     /** Enddatum: gültiger Zeitpunkt (Time::parseToUtc) in der Zukunft; keine Obergrenze. */

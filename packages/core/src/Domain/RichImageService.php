@@ -216,8 +216,8 @@ final class RichImageService
     }
 
     /**
-     * Darf $viewer das Bild sehen? Entwürfe und Signaturen nur ihr Konto, Bilder am Brett wie die Nachricht
-     * (BoardService::canSeeImage), Bilder in E-Mails alle mit send_mail (MailingService::canSeeImage), Bilder einer
+     * Darf $viewer das Bild sehen? Entwürfe und Signaturen nur ihr Konto, Bilder am Brett wie die Nachricht (öffentliche
+     * auch ohne Anmeldung, BoardService::canSeeImage), Bilder in E-Mails alle mit send_mail (MailingService::canSeeImage), Bilder einer
      * Kompanie wie die Liste, Gruppenbilder und Fotos freier Namen der Ämter wie die Ämter (alle auch ohne Anmeldung, s. isPublic).
      *
      * @param array{owner_type: string, owner_id: int, user_id: int} $img
@@ -225,7 +225,9 @@ final class RichImageService
     public function canView(?User $viewer, array $img): bool
     {
         if ($viewer === null) {
-            return $this->isPublic($img);
+            // Öffentliche Nachrichten am Brett auch ohne Anmeldung, aber nicht als öffentlich zwischengespeichert
+            // (isPublic): Sie laufen ab und lassen sich wieder intern stellen.
+            return $img['owner_type'] === self::OWNER_BOARD ? $this->app->board()->canSeeImage(null, $img['owner_id']) : $this->isPublic($img);
         }
         return match ($img['owner_type']) {
             self::OWNER_COMPANY => $this->companyVisible($viewer),

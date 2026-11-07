@@ -242,14 +242,15 @@ final class AttachmentService
     }
 
     /**
-     * Darf $viewer den Anhang sehen? Entwürfe nur ihr Konto, am Brett wie die Nachricht, an Mails wer sie versendet.
+     * Darf $viewer den Anhang sehen? Entwürfe nur ihr Konto, am Brett wie die Nachricht (öffentliche auch ohne Anmeldung),
+     * an Mails wer sie versendet.
      *
      * @param array<string, mixed> $row
      */
     public function canView(?User $viewer, array $row): bool
     {
         if ($viewer === null) {
-            return false;
+            return $row['owner_type'] === self::OWNER_BOARD && $this->app->board()->canSeeImage(null, (int) $row['owner_id']);
         }
         return match ($row['owner_type']) {
             self::OWNER_DRAFT => $viewer->id === $row['owner_id'],
@@ -270,16 +271,14 @@ final class AttachmentService
         if ($this->app->maintenance()->blocks($viewer)) {
             return $deny(503);
         }
-        if ($viewer === null) {
-            return $deny(401);
-        }
         $uid = is_string($uid) ? strtolower($uid) : '';
         $row = preg_match('/^[a-f0-9]{32}$/', $uid) === 1 ? $this->find($uid) : null;
+        // Ohne Anmeldung nur Anhänge öffentlicher Nachrichten am Brett; die Antwort verrät nicht, ob es andere gibt (401).
         if ($row === null) {
-            return $deny(404);
+            return $deny($viewer === null ? 401 : 404);
         }
         if (!$this->canView($viewer, $row)) {
-            return $deny(403);
+            return $deny($viewer === null ? 401 : 403);
         }
         $path = $this->pathOf($row);
         if ($path === null) {

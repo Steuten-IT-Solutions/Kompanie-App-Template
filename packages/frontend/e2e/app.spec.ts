@@ -2540,6 +2540,8 @@ test.describe('Android', () => {
     await expect(page.getByRole('heading', { name: 'Benachrichtigungen' }).last()).toBeVisible();
     // Gäste: nur Öffentliches
     await expect(page.getByLabel('Termine: neue und geänderte')).toBeChecked();
+    await expect(page.getByLabel('Schwarzes Brett: öffentliche Nachrichten')).toBeChecked();
+    await expect(page.getByText('Schwarzes Brett: dringende Nachrichten')).toHaveCount(0);
     await expect(page.getByText('Kasse: neue Einträge')).toHaveCount(0);
     await page.getByLabel('News: neue Beiträge').uncheck();
     await page.getByRole('button', { name: 'Benachrichtigungen einschalten' }).click();
@@ -5165,6 +5167,57 @@ test('Schwarzes Brett: Banner mit Titel auf allen Seiten, ausblenden, „+1 weit
     await expect(admin.locator('.board-card', { hasText: text })).toHaveCount(0);
   }
   await expect(admin.getByText('Zurzeit gibt es keine Nachrichten.')).toBeVisible();
+  await admin.close();
+});
+
+test('Schwarzes Brett: öffentliche Nachricht auch ohne Anmeldung, interne nicht', async ({ page, browser }) => {
+  const id = Date.now().toString(36);
+  const open = `Tag der offenen Tür ${id}`;
+  const intern = `Nur intern ${id}`;
+  const admin = await browser.newPage();
+  const dialogs: string[] = [];
+  admin.on('dialog', (d) => {
+    dialogs.push(d.message());
+    void d.accept();
+  });
+  await login(admin, 'admin', ADMIN_PASSWORD);
+  await admin.goto('/app/#/brett');
+  const form = admin.locator('.board-form');
+  await expect(form.getByLabel('Sichtbar für')).toHaveValue('members');
+  await postBoard(admin, intern, 'Nur für Mitglieder');
+  await form.getByLabel('Titel').fill(open);
+  await form.getByLabel('Text der Nachricht').fill('Alle sind eingeladen.');
+  await form.getByLabel('Sichtbar für').selectOption('public');
+  await expect(form).toContainText('auch ohne Anmeldung');
+  await form.getByRole('button', { name: 'Veröffentlichen' }).click();
+  await expect(admin.locator('.board-card', { hasText: open })).toBeVisible();
+  expect(dialogs.at(-1)).toContain('Sichtbar für: alle, auch ohne Anmeldung');
+  await expect(admin.locator('.board-card', { hasText: open }).locator('.board-public')).toHaveText('öffentlich');
+  await expect(admin.locator('.board-card', { hasText: intern }).locator('.board-public')).toHaveCount(0);
+
+  // Ohne Anmeldung: Banner und Seite nur mit der öffentlichen Nachricht.
+  await page.goto('/app/#/termine');
+  const banner = page.locator('.board-banner');
+  await expect(banner).toContainText(open);
+  await expect(banner).not.toContainText(intern);
+  await banner.getByRole('button', { name: open }).click();
+  await expect(page.locator('.board-card', { hasText: open })).toContainText('Alle sind eingeladen.');
+  await expect(page.locator('.board-card', { hasText: intern })).toHaveCount(0);
+  await expect(page.locator('.board-form')).toHaveCount(0);
+  await expect(page.getByText('Interne Nachrichten siehst du nach der Anmeldung.')).toBeVisible();
+
+  // Wieder intern gestellt: ohne Anmeldung weg.
+  const card = await boardCard(admin, open);
+  await card.getByRole('button', { name: 'Bearbeiten' }).click();
+  await card.getByLabel('Sichtbar für').selectOption('members');
+  await saveBoardCard(admin, card);
+  await page.reload();
+  await expect(page.getByText('Zurzeit gibt es keine öffentlichen Nachrichten.')).toBeVisible();
+
+  for (const text of [open, intern]) {
+    await admin.locator('.board-card', { hasText: text }).getByRole('button', { name: 'Löschen' }).click();
+    await expect(admin.locator('.board-card', { hasText: text })).toHaveCount(0);
+  }
   await admin.close();
 });
 

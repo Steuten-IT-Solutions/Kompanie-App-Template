@@ -590,7 +590,6 @@ final class Api
         $denyUsers = 'Nur Administratoren dürfen Mitglieder anlegen.';
         $denyRoles = 'Nur Administratoren dürfen Rollen ändern.';
         $denyRights = 'Dafür fehlen dir die Rechte.';
-        $denyBoard = 'Das Schwarze Brett darfst du nicht sehen.';
         $denyPolls = 'An Umfragen darfst du nicht teilnehmen.';
         $denyBirthdays = 'Geburtstage sind nur für Mitglieder.';
         $denyPersonal = 'Persönliche Angaben anderer pflegt nur, wer das Recht dazu hat.';
@@ -883,11 +882,13 @@ final class Api
                 return ['deleted' => true];
             }, 'documents', $denyRights),
 
-            // Schwarzes Brett (Issue #5): view_board liest (BoardService::isRecipient), post_board schreibt,
-            // ändert und löscht (und liest daher auch); nur beim Schreiben eine Benachrichtigung
-            new Route('GET', '/board', [Cap::ViewBoard, Cap::PostBoard], fn () => $a->board()->list($a->viewer()), 'board', $denyBoard),
+            // Schwarzes Brett (Issue #5): öffentliche Nachrichten lesen alle (auch ohne Anmeldung), interne view_board
+            // (BoardService::canRead); post_board schreibt, ändert und löscht (und liest daher auch); nur beim Schreiben
+            // eine Benachrichtigung
+            new Route('GET', '/board', $P, fn () => $a->board()->list($a->viewer()), 'board'),
             new Route('POST', '/board', Cap::PostBoard, function (Request $r) use ($a) {
-                // push: ob Mitglieder und Anwärter benachrichtigt werden; mail: ob sie eine Mail bekommen (Issue #172).
+                // push: ob Mitglieder und Anwärter (bei öffentlichen Nachrichten auch Gäste) benachrichtigt werden; mail: ob
+                // Mitglieder und Anwärter eine Mail bekommen (Issue #172).
                 // Beides Standard ja (Haken beim Schreiben); ohne eingerichteten Mailversand ist mail Standard nein.
                 $push = $r->input('push') ?? true;
                 $mail = $r->input('mail') ?? $a->boardMail()->available();

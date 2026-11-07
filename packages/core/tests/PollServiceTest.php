@@ -581,7 +581,7 @@ final class PollServiceTest extends TestCase
         $this->app->features()->update(['polls' => true]);
         $this->assertSame(['board', 'polls', 'events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/m'], 'in der üblichen Reihenfolge');
         $this->assertSame(['board', 'events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/a'], 'Anwärter nicht');
-        $this->assertSame(['events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/gast']);
+        $this->assertSame(['board_public', 'events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/gast'], 'Gäste: öffentliche Nachrichten am Brett, keine Umfragen');
 
         $this->app->push()->update($this->users->find($this->m), 'https://fcm.googleapis.com/fcm/send/m', null, ['events'], null);
         $this->app->features()->update(['polls' => false]);
