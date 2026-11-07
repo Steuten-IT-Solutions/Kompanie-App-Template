@@ -15,6 +15,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.7.0] – 2026-11-07
+
 ### Neu
 
 - **Öffentliche Nachrichten am Schwarzen Brett**: Beim Schreiben wählt ihr unter *Sichtbar für*, ob eine Nachricht
