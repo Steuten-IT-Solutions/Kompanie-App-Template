@@ -57,6 +57,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Kompanien ohne Ämter**: Ämter gehören zu den Personen, nicht zu einer Kompanie. Die Seite einer Kompanie zeigt
+  deshalb keine Amtszeiten mehr, und beim Anlegen oder Bearbeiten gibt es keine *Gruppe der Ämter* mehr. Bisher
+  gesetzte Verknüpfungen wertet die App nicht mehr aus.
 - **Kompanien haben eine eigene Seite**: Ein Tipp auf eine Kompanie klappt die Karte nicht mehr auf, sondern öffnet
   ihre Seite mit Logo, Beschreibung, laufenden Ämtern, Links und der Liste ihrer Mitglieder (wie bisher nur für alle,
   die die Mitgliederliste sehen dürfen). Die Seite hat einen eigenen Link zum Teilen; „‹ Alle Kompanien“ führt zurück
@@ -69,6 +72,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Mitglieder auf der Seite einer Kompanie**: Ist der Bereich *Mitglieder* aus (z. B. in einer Bruderschaft ohne
+  eigene Mitgliederliste), fehlten die zugeordneten Personen. Jetzt stehen ihre Namen dort für alle mit dem Recht, die
+  Mitgliederliste zu sehen, auch für Gäste mit diesem Recht. Zur Seite einer Person führt ein Name nur, wenn es die
+  Mitgliederliste gibt.
 - **Kein Leerraum zum Scrollen auf kurzen Seiten**: Seiten mit wenig Inhalt, etwa die leere Galerie, ließen sich im
   Handy-Browser ein Stück nach unten scrollen, so dass die Knöpfe oben aus dem Bild rutschten. Die Mindesthöhe der App
   richtet sich jetzt nach dem sichtbaren Bildschirm (ohne die Adressleiste des Browsers).

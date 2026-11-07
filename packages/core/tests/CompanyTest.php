@@ -17,7 +17,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Kompanieliste (Issue #280): Liste für alle mit view_companies, Pflege und Zuordnung mit manage_companies, Mitglieder
- * nur so weit wie in der Mitgliederliste, Logo, Verknüpfung mit Ämtern, Löschen der Person, Sicherung.
+ * nur mit view_directory, Logo, keine Verknüpfung mit Ämtern, Löschen der Person, Sicherung.
  */
 final class CompanyTest extends TestCase
 {
@@ -87,7 +87,6 @@ final class CompanyTest extends TestCase
             'Jahr in der Zukunft' => ['name' => 'A', 'founded_year' => 9999],
             'nur http' => ['name' => 'A', 'website_url' => 'http://example.org/'],
             'App nur https' => ['name' => 'A', 'app_url' => 'javascript:alert(1)'],
-            'unbekannte Gruppe' => ['name' => 'A', 'office_group_id' => 999],
             'aktiv kein Wahrheitswert' => ['name' => 'A', 'active' => 'ja'],
         ] as $case => $body) {
             $this->assertSame(400, $this->call('POST', '/companies', $body)->status, $case);
@@ -148,21 +147,31 @@ final class CompanyTest extends TestCase
         $this->assertArrayNotHasKey('members', $anon, 'ohne view_directory keine Namen');
         $this->assertArrayNotHasKey('member_count', $anon);
 
+        // Auch ohne Bereich Mitgliederliste (z. B. Bruderschaft): Namen für alle mit view_directory, auch Gäste
+        $this->users->current = $this->admin;
+        $this->app->roles()->update(Roles::GUEST, ['capabilities' => ['view_news', 'view_companies', 'view_directory']]);
+        $this->app->features()->update(['directory' => false]);
+        $this->users->current = null;
+        $list = array_column($this->call('GET', '/companies')->data, null, 'id');
+        $this->assertSame(['Admin', 'Anna'], array_column($list[$a]['members'], 'name'), 'Gast mit view_directory, ohne Mitgliederliste');
+        $this->assertSame(['id', 'name'], array_keys($list[$a]['members'][0]), 'nur Namen');
+        $this->users->current = $this->admin;
+        $this->app->features()->update(['directory' => true]);
+
         // Personen löschen: Zuordnung weg
         $this->users->current = $this->admin;
         UserData::purge($this->app->db, $this->member);
         $this->assertSame([$this->admin], $this->app->companies()->repository()->memberIdsOf($a));
     }
 
-    public function testOfficeGroupLink(): void
+    public function testOfficeGroupNotLinked(): void
     {
+        // Ämter gehören zu Personen: Eine Gruppe der Ämter lässt sich nicht mehr mit einer Kompanie verknüpfen.
         $group = $this->call('POST', '/office-groups', ['title' => 'Vorstand Erste'])->data['id'];
         $id = $this->company(['name' => 'Erste', 'office_group_id' => $group]);
-        $this->assertSame(['id' => $group, 'title' => 'Vorstand Erste', 'shown' => true], $this->call('GET', '/companies')->data[0]['office_group']);
-        $this->assertSame(200, $this->call('DELETE', "/office-groups/$group")->status);
-        $this->assertNull($this->call('GET', '/companies')->data[0]['office_group'], 'Gruppe gelöscht: Verknüpfung weg');
+        $this->assertArrayNotHasKey('office_group', $this->call('GET', '/companies')->data[0]);
         $this->assertNull($this->app->companies()->repository()->find($id)['office_group_id'] ?? null);
-        $this->assertNotNull($this->app->companies()->repository()->find($id));
+        $this->assertSame(200, $this->call('DELETE', "/office-groups/$group")->status);
     }
 
     public function testLogoAndDelivery(): void

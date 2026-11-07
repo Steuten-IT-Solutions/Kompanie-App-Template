@@ -8583,7 +8583,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/CompanyRef'
         - type: object
-          required: [founded_year, description, website_url, app_url, logo_url, logo_type, office_group]
+          required: [founded_year, description, website_url, app_url, logo_url, logo_type]
           properties:
             founded_year: { type: [integer, 'null'] }
             description: { type: string, description: 'Bereinigtes HTML (ohne Bilder), leer ohne' }
@@ -8593,18 +8593,8 @@ components:
               type: [string, 'null']
               description: 'Adresse des Logos (`/kompanielogo/<id>?v=<Fassung>`, öffentlich und lange zwischengespeichert, solange Gäste `view_companies` haben); null ohne Logo'
             logo_type: { type: [string, 'null'], enum: [png, svg, null] }
-            office_group:
-              description: 'Verknüpfte Gruppe der Ämter; shown: Bereich Ämter an (die App zeigt dann deren laufende Amtszeiten)'
-              oneOf:
-                - type: object
-                  required: [id, title, shown]
-                  properties:
-                    id: { type: integer }
-                    title: { type: string }
-                    shown: { type: boolean }
-                - type: 'null'
             members:
-              description: Zugeordnete Personen in der Reihenfolge der Mitgliederliste (nur mit Bereich Mitgliederliste und view_directory)
+              description: Zugeordnete Personen in der Reihenfolge der Mitgliederliste, nur Namen (mit view_directory, auch für Gäste und ohne Bereich Mitgliederliste)
               type: array
               items:
                 type: object
@@ -8624,7 +8614,6 @@ components:
         description: { type: string, maxLength: 20000, description: 'HTML wie bei News, wird bereinigt; Bilder werden entfernt' }
         website_url: { type: string, maxLength: 255, description: 'Nur https://…, leer ohne' }
         app_url: { type: string, maxLength: 255, description: 'Nur https://…, leer ohne' }
-        office_group_id: { type: [integer, 'null'], description: 'Gruppe der Ämter, null ohne' }
         active: { type: boolean, description: 'false: aufgelöst' }
 
     Sponsor:

@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useState } from 'react';
-import { can, config, type Company, type Office } from '../api';
+import { can, config, type Company } from '../api';
 import {
   COMPANY_SORT_LABELS,
   companyDirLabel,
@@ -28,24 +28,6 @@ export function CompanyLogo({ company }: { company: Pick<Company, 'name' | 'shor
     <span className="company-logo company-logo-empty" aria-hidden="true">
       {(company.short_name || company.name).slice(0, 4)}
     </span>
-  );
-}
-
-/** Laufende Amtszeiten der verknüpften Gruppe der Ämter, z. B. Hauptmann und Fähnrich. */
-function CurrentOffices({ offices }: { offices: Office[] }) {
-  const rows = offices.flatMap((o) =>
-    o.terms.filter((t) => t.current).map((t) => ({ id: t.id, office: o.holder_title || o.title, names: t.holders.map((h) => h.name) })),
-  );
-  if (rows.length === 0) return null;
-  return (
-    <dl className="company-offices">
-      {rows.map((r) => (
-        <div key={r.id}>
-          <dt>{r.office}</dt>
-          <dd>{r.names.join(', ')}</dd>
-        </div>
-      ))}
-    </dl>
   );
 }
 
@@ -187,17 +169,13 @@ function CompanyList() {
 }
 
 /**
- * Seite einer Kompanie: Logo, Name, Beschreibung, laufende Ämter der verknüpften Gruppe, Links und die Mitglieder (die
- * schickt der Server nur, wenn der Betrachter die Mitgliederliste sieht, und nur mit Namen).
+ * Seite einer Kompanie: Logo, Name, Beschreibung, Links und die Mitglieder (die schickt der Server nur mit
+ * view_directory, ohne Bereich Mitgliederliste nur an Angemeldete, und nur mit Namen). Zur Seite der Person führt ein
+ * Name nur, wenn es die Mitgliederliste gibt.
  */
 function CompanyDetail({ id }: { id: number }) {
   const { data, error, loading, reload } = useAsync(sources.companies.load, sources.companies.deps, sources.companies.key);
-  const officesShown = !!config?.features.offices && can('view_offices');
-  const offices = useAsync(
-    officesShown ? sources.offices.load : () => Promise.resolve(null),
-    sources.offices.deps,
-    officesShown ? sources.offices.key : undefined,
-  );
+  const linked = !!config?.features.directory && can('view_directory');
   const back = (
     <button type="button" className="btn btn-link back" onClick={() => navigate('kompanien')}>
       ‹ Alle {sec.companies}
@@ -219,7 +197,6 @@ function CompanyDetail({ id }: { id: number }) {
         <Empty>Diesen Eintrag gibt es nicht (mehr).</Empty>
       </>
     );
-  const groupOffices = c.office_group?.shown ? (offices.data?.offices ?? []).filter((o) => o.group_id === c.office_group?.id) : [];
   return (
     <div className={`company-page${c.active ? '' : ' inactive'}`}>
       {back}
@@ -236,7 +213,6 @@ function CompanyDetail({ id }: { id: number }) {
         </div>
       </header>
       {c.description && <RichTextView html={c.description} />}
-      <CurrentOffices offices={groupOffices} />
       {(c.website_url || c.app_url) && (
         <p className="company-links">
           {c.website_url && (
@@ -255,19 +231,27 @@ function CompanyDetail({ id }: { id: number }) {
         <>
           <h3 className="section-title">Mitglieder</h3>
           <ul className="card-list company-members">
-            {c.members.map((m) => (
-              <li key={m.id} className="card row member-row-link">
-                <div className="row-main">
-                  {/* Die ganze Zeile öffnet die Seite der Person (wie in der Mitgliederliste). */}
-                  <button type="button" className="row-title member-row-open" onClick={() => navigate(`mitglieder/${m.id}`)}>
-                    {m.name}
-                  </button>
-                </div>
-                <span className="chevron" aria-hidden="true">
-                  ›
-                </span>
-              </li>
-            ))}
+            {c.members.map((m) =>
+              linked ? (
+                <li key={m.id} className="card row member-row-link">
+                  <div className="row-main">
+                    {/* Die ganze Zeile öffnet die Seite der Person (wie in der Mitgliederliste). */}
+                    <button type="button" className="row-title member-row-open" onClick={() => navigate(`mitglieder/${m.id}`)}>
+                      {m.name}
+                    </button>
+                  </div>
+                  <span className="chevron" aria-hidden="true">
+                    ›
+                  </span>
+                </li>
+              ) : (
+                <li key={m.id} className="card row">
+                  <div className="row-main">
+                    <div className="row-title">{m.name}</div>
+                  </div>
+                </li>
+              ),
+            )}
           </ul>
         </>
       )}

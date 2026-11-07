@@ -5964,22 +5964,6 @@ button.spotlight-person:focus-visible {
 .company-page-head .row-sub {
   margin: 4px 0 0;
 }
-.company-offices {
-  margin: 8px 0;
-  display: grid;
-  gap: 4px;
-}
-.company-offices > div {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.company-offices dt {
-  font-weight: 600;
-}
-.company-offices dd {
-  margin: 0;
-}
 /* Webseite und App der Kompanie als Knöpfe im Stil der App (wie „Mehr Infos“ bei Terminen). */
 .company-links {
   display: flex;

@@ -16,9 +16,11 @@ use KompanieApp\Core\Storage\CompanyRepository;
  * und Personen zuordnen darf, wer „Kompanien verwalten“ (manage_companies) hat.
  *
  * - Aufgelöste Kompanien (active false) bleiben als „ehemalig“ in der Liste.
- * - Eine Gruppe der Ämter lässt sich verknüpfen (office_group_id): Die App zeigt dann deren laufende Amtszeiten.
- * - Personen sind optional zugeordnet, auch mehreren Kompanien (eindeutig ist das Paar). Wer sie sehen darf, regelt die
- *   Mitgliederliste: nur mit Bereich directory und view_directory, nur Personen, die dort stehen.
+ * - Ämter gehören zu Personen, nicht zu Kompanien: Die frühere Verknüpfung mit einer Gruppe der Ämter (Spalte
+ *   office_group_id) wertet die App nicht mehr aus; die Spalte bleibt für das Zurückrollen.
+ * - Personen sind optional zugeordnet, auch mehreren Kompanien (eindeutig ist das Paar). Sehen darf sie, wer die
+ *   Mitgliederliste sehen darf (view_directory, auch Gäste und auch, wenn der Bereich directory aus ist), nur Personen,
+ *   die dort stehen würden, nur mit Namen.
  * - Feste Zahl von Abfragen für die Liste, unabhängig von der Zahl der Kompanien und Personen.
  *
  * @phpstan-import-type Company from CompanyRepository
@@ -43,8 +45,9 @@ final class CompanyService
     }
 
     /**
-     * Alle Kompanien in ihrer Reihenfolge, für $viewer (null: ohne Anmeldung). Mitglieder (members, member_count) nur,
-     * soweit der Betrachter die Mitgliederliste sieht; wer Kompanien verwaltet, bekommt dazu die IDs aller Zugeordneten.
+     * Alle Kompanien in ihrer Reihenfolge, für $viewer (null: ohne Anmeldung). Mitglieder (members, member_count) nur
+     * mit view_directory; wer Kompanien verwaltet, bekommt dazu die IDs aller
+     * Zugeordneten.
      *
      * @return list<array<string, mixed>>
      */
@@ -52,7 +55,8 @@ final class CompanyService
     {
         $who = $viewer ?? $this->app->anonymous();
         $manager = $viewer !== null && $viewer->can(Capability::ManageCompanies);
-        $directory = $this->app->features()->enabled('directory') && $who->can(Capability::ViewDirectory);
+        // Auch ohne Bereich directory (z. B. Bruderschaft ohne eigene Mitgliederliste): Namen mit view_directory.
+        $directory = $who->can(Capability::ViewDirectory);
         $assignments = $this->repository()->assignments();
         $byCompany = [];
         foreach ($assignments as $userId => $ids) {
@@ -67,14 +71,9 @@ final class CompanyService
                 $people[(int) $m['id']] = ['id' => (int) $m['id'], 'name' => (string) $m['name'], 'pos' => $i];
             }
         }
-        $groups = [];
-        foreach ($this->app->offices()->repository()->groups() as $g) {
-            $groups[$g['id']] = $g['title'];
-        }
-        $offices = $this->app->features()->enabled('offices');
-        return array_map(function (array $c) use ($byCompany, $people, $directory, $manager, $groups, $offices): array {
+        return array_map(function (array $c) use ($byCompany, $people, $directory, $manager): array {
             $ids = $byCompany[$c['id']] ?? [];
-            $out = $this->format($c, $groups, $offices);
+            $out = $this->format($c);
             if ($directory) {
                 $members = [];
                 foreach ($ids as $userId) {
@@ -94,7 +93,7 @@ final class CompanyService
     }
 
     /**
-     * @param array<string, mixed> $in name (Pflicht), short_name, founded_year, description, website_url, app_url, office_group_id, active
+     * @param array<string, mixed> $in name (Pflicht), short_name, founded_year, description, website_url, app_url, active
      * @return array<string, mixed>
      */
     public function create(array $in, User $actor): array
@@ -305,13 +304,11 @@ final class CompanyService
 
     /**
      * @param Company $c
-     * @param array<int, string> $groups Gruppen der Ämter: ID => Bezeichnung
      * @return array<string, mixed>
      */
-    private function format(array $c, array $groups, bool $offices): array
+    private function format(array $c): array
     {
         $logo = in_array($c['logo_type'], ['png', 'svg'], true) && $c['logo_version'] !== '';
-        $group = $c['office_group_id'] !== null && isset($groups[$c['office_group_id']]) ? $c['office_group_id'] : null;
         return [
             'id' => $c['id'],
             'name' => $c['name'],
@@ -323,8 +320,6 @@ final class CompanyService
             'active' => $c['active'],
             'logo_url' => $logo ? $this->app->env->companyLogoUrl($c['id'], $c['logo_version']) : null,
             'logo_type' => $logo ? $c['logo_type'] : null,
-            // Gruppe der Ämter: die App zeigt deren laufende Amtszeiten; ohne Bereich Ämter nur für die Pflege
-            'office_group' => $group !== null ? ['id' => $group, 'title' => $groups[$group], 'shown' => $offices] : null,
         ];
     }
 
@@ -362,13 +357,6 @@ final class CompanyService
         }
         if (array_key_exists('app_url', $in)) {
             $data['app_url'] = Input::httpsUrl($in['app_url'], $message);
-        }
-        if (array_key_exists('office_group_id', $in)) {
-            $group = $in['office_group_id'] === null || $in['office_group_id'] === '' ? null : Input::integer($in['office_group_id']);
-            if ($in['office_group_id'] !== null && $in['office_group_id'] !== '' && ($group === null || $this->app->offices()->repository()->findGroup($group) === null)) {
-                throw ApiError::invalid('Unbekannte Gruppe der Ämter.');
-            }
-            $data['office_group_id'] = $group;
         }
         if (array_key_exists('active', $in)) {
             if (!is_bool($in['active'])) {
