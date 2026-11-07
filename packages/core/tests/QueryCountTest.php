@@ -101,8 +101,8 @@ final class QueryCountTest extends TestCase
         // Ämter (Issue #112): eine Amtszeit je Mitglied, mit einem Konto und einem freien Namen
         $group = $call('POST', '/office-groups', ['title' => 'Verein'])['id'];
         $office = $call('POST', '/offices', ['title' => 'Kassenprüfer', 'group_id' => $group])['id'];
-        // Kompanien (Issue #280): zwei, mit der Gruppe der Ämter verknüpft
-        $companies = [$call('POST', '/companies', ['name' => 'Erste', 'office_group_id' => $group])['id'], $call('POST', '/companies', ['name' => 'Zweite'])['id']];
+        // Kompanien (Issue #280): zwei
+        $companies = [$call('POST', '/companies', ['name' => 'Erste'])['id'], $call('POST', '/companies', ['name' => 'Zweite'])['id']];
         $members = [];
         for ($i = 0; $i < $n; $i++) {
             $members[] = $users->add('m' . $i, Roles::MEMBER);

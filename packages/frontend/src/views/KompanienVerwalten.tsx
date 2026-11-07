@@ -1,5 +1,5 @@
 import { Suspense, useRef, useState, type FormEvent } from 'react';
-import { api, can, config, type Company, type CompanyInput, type CompanyRef } from '../api';
+import { api, type Company, type CompanyInput, type CompanyRef } from '../api';
 import { useDragSort, useSaveQueue } from '../dragSort';
 import brand from '../generated/brand';
 import { Empty, ErrorBox, lazyView, Loading, useAsync } from '../ui';
@@ -24,7 +24,6 @@ type Draft = {
   description: string;
   website_url: string;
   app_url: string;
-  office_group_id: string;
   active: boolean;
 };
 
@@ -35,7 +34,6 @@ const EMPTY: Draft = {
   description: '',
   website_url: '',
   app_url: '',
-  office_group_id: '',
   active: true,
 };
 
@@ -47,13 +45,12 @@ function draftOf(c: Company): Draft {
     description: c.description,
     website_url: c.website_url,
     app_url: c.app_url,
-    office_group_id: c.office_group ? String(c.office_group.id) : '',
     active: c.active,
   };
 }
 
-/** Eingaben für den Server; die Gruppe der Ämter nur, wenn die Auswahl da ist (sonst bleibt die Verknüpfung). */
-function inputOf(d: Draft, withGroup: boolean): CompanyInput {
+/** Eingaben für den Server. */
+function inputOf(d: Draft): CompanyInput {
   const year = d.founded_year.trim();
   return {
     name: d.name.trim(),
@@ -63,31 +60,17 @@ function inputOf(d: Draft, withGroup: boolean): CompanyInput {
     website_url: d.website_url.trim(),
     app_url: d.app_url.trim(),
     active: d.active,
-    ...(withGroup ? { office_group_id: d.office_group_id === '' ? null : Number(d.office_group_id) } : {}),
   };
-}
-
-/** Gruppen der Ämter zur Auswahl: nur mit Bereich Ämter und Recht, sie zu sehen. */
-function useOfficeGroups(): { id: number; title: string }[] | null {
-  const shown = !!config?.features.offices && (can('view_offices') || can('manage_offices'));
-  const res = useAsync(
-    shown ? sources.offices.load : () => Promise.resolve(null),
-    sources.offices.deps,
-    shown ? sources.offices.key : undefined,
-  );
-  return shown && res.data ? res.data.groups : null;
 }
 
 function CompanyFields({
   draft,
   onChange,
-  groups,
   autoFocus,
   idPrefix,
 }: {
   draft: Draft;
   onChange: (d: Draft) => void;
-  groups: { id: number; title: string }[] | null;
   autoFocus?: boolean;
   idPrefix: string;
 }) {
@@ -145,21 +128,6 @@ function CompanyFields({
         <span>App der Kompanie (optional)</span>
         <input type="url" inputMode="url" placeholder="https://" value={draft.app_url} onChange={(e) => set({ app_url: e.target.value })} />
       </label>
-      {groups && (
-        <label className="field">
-          <span>
-            Gruppe der {sec.offices} (optional, ihre laufenden {sec.offices} stehen bei der Kompanie)
-          </span>
-          <select value={draft.office_group_id} onChange={(e) => set({ office_group_id: e.target.value })}>
-            <option value="">keine</option>
-            {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.title}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
       <label className="toggle">
         <input type="checkbox" checked={!draft.active} onChange={(e) => set({ active: !e.target.checked })} />
         <span>Aufgelöst (steht als „ehemalig“ unten in der Liste)</span>
@@ -239,7 +207,6 @@ function CompanyMembers({ company, onSaved, onCancel }: { company: Company; onSa
  */
 export function CompanyAdmin({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(sources.companies.load, sources.companies.deps, sources.companies.key);
-  const groups = useOfficeGroups();
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [newKey, setNewKey] = useState(0);
   const [editing, setEditing] = useState<number | null>(null);
@@ -268,7 +235,7 @@ export function CompanyAdmin({ onToast }: { onToast: (msg: string) => void }) {
 
   async function add(e: FormEvent) {
     e.preventDefault();
-    if (await run(() => api.createCompany(inputOf(draft, !!groups)), 'Kompanie angelegt')) {
+    if (await run(() => api.createCompany(inputOf(draft)), 'Kompanie angelegt')) {
       setDraft(EMPTY);
       setNewKey((k) => k + 1);
     }
@@ -338,10 +305,10 @@ export function CompanyAdmin({ onToast }: { onToast: (msg: string) => void }) {
                   className="form"
                   onSubmit={async (e) => {
                     e.preventDefault();
-                    if (await run(() => api.updateCompany(c.id, inputOf(editDraft, !!groups)), 'Gespeichert')) setEditing(null);
+                    if (await run(() => api.updateCompany(c.id, inputOf(editDraft)), 'Gespeichert')) setEditing(null);
                   }}
                 >
-                  <CompanyFields draft={editDraft} onChange={setEditDraft} groups={groups} autoFocus idPrefix={`company-${c.id}`} />
+                  <CompanyFields draft={editDraft} onChange={setEditDraft} autoFocus idPrefix={`company-${c.id}`} />
                   <div className="button-row">
                     <button className="btn" type="submit" disabled={busy}>
                       Speichern
@@ -441,7 +408,7 @@ export function CompanyAdmin({ onToast }: { onToast: (msg: string) => void }) {
 
       <form className="form card" onSubmit={add}>
         <h3>Neue Kompanie</h3>
-        <CompanyFields key={newKey} draft={draft} onChange={setDraft} groups={groups} idPrefix="company-new" />
+        <CompanyFields key={newKey} draft={draft} onChange={setDraft} idPrefix="company-new" />
         <button className="btn btn-block" type="submit" disabled={busy}>
           Anlegen
         </button>

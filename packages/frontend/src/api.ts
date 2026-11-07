@@ -1312,9 +1312,7 @@ export interface Company extends CompanyRef {
   app_url: string;
   logo_url: string | null;
   logo_type: 'png' | 'svg' | null;
-  /** Verknüpfte Gruppe der Ämter; shown: Bereich Ämter an (dann zeigt die App deren laufende Amtszeiten) */
-  office_group: { id: number; title: string; shown: boolean } | null;
-  /** Zugeordnete Personen, nur soweit die Mitgliederliste sichtbar ist (fehlt sonst) */
+  /** Zugeordnete Personen, nur Namen, nur mit view_directory (fehlt sonst) */
   members?: { id: number; name: string }[];
   member_count?: number;
   /** Nur für die Pflege: alle Zugeordneten */
@@ -1328,7 +1326,6 @@ export interface CompanyInput {
   description?: string;
   website_url?: string;
   app_url?: string;
-  office_group_id?: number | null;
   active?: boolean;
 }
 

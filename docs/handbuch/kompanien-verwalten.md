@@ -18,8 +18,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{
 ## So gehst du vor
 ### Eine Kompanie anlegen
 1. Trage unter **Neue Kompanie** den **Name** ein. Auf Wunsch auch **Kurzname**, **Gründungsjahr**, **Beschreibung**, **Webseite** und **App der Kompanie**.
-2. Nutzt ihr {bereich.offices}, kannst du eine **Gruppe der {bereich.offices}** wählen. Deren laufende Amtszeiten stehen dann bei der Kompanie.
-3. Tippe auf **Anlegen**. Die Kompanie steht danach ganz unten.
+2. Tippe auf **Anlegen**. Die Kompanie steht danach ganz unten.
 
 ### Mitglieder zuordnen
 1. Tippe bei der Kompanie auf **Mitglieder**.
