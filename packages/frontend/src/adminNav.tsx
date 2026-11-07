@@ -213,6 +213,14 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
       <path d="M18 3.5a3 3 0 0 1 0 4" />
     </>
   ),
+  // Anfragen auf einen Zugang: Person mit Plus (wartet auf Aufnahme)
+  anfragen: (
+    <>
+      <circle cx="10" cy="8" r="3.5" />
+      <path d="M3.5 20c0-3.6 2.9-6 6.5-6 1.6 0 3 .5 4.1 1.3" />
+      <path d="M18.5 14v6M15.5 17h6" />
+    </>
+  ),
   punkte: <path d="M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6L12 16.3l-5.4 3 1.3-6-4.6-4.1 6.1-.6z" />,
   strafe: (
     <>
