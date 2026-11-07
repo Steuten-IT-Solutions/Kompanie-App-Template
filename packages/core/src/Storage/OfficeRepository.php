@@ -13,7 +13,12 @@ use KompanieApp\Core\Storage\Sql\Connection;
  * @phpstan-type GroupTerm array{id: int, group_id: int, kind: string, start_year: int, end_year: int|null, note: string, image_uid: string|null}
  * @phpstan-type Office array{id: int, group_id: int|null, title: string, singular: string, sort: int, title_id: int|null}
  * @phpstan-type Term array{id: int, office_id: int, kind: string, start_year: int, end_year: int|null, note: string, honor: bool, ended_for: int|null, group_term_id: int|null}
- * @phpstan-type Holder array{id: int, term_id: int, user_id: int|null, name: string, sort: int, image_uid: string|null}
+ * @phpstan-type Companion array{id: int, term_id: int, user_id: int|null, name: string, sort: int, image_uid: string|null}
+ * @phpstan-type Holder array{id: int, term_id: int, user_id: int|null, name: string, sort: int, image_uid: string|null, companions: list<Companion>}
+ *
+ * Begleitpersonen (z. B. Partnerin oder Partner, die das Amt nicht selbst bekleiden) stehen ebenfalls in office_holders,
+ * mit companion_of = ID der Inhaber-Zeile. holders() und holdersOf() liefern nur Inhaber, ihre Begleitpersonen unter
+ * companions; so zählen Begleitpersonen nirgends als Inhaber (Titel, Ausscheiden, Import).
  */
 final class OfficeRepository
 {
@@ -181,7 +186,8 @@ final class OfficeRepository
      * Amtszeit mit Inhabern anlegen bzw. ersetzen, in einer Transaktion.
      *
      * @param array{kind: string, start_year: int, end_year: int|null, note: string, honor: bool} $term
-     * @param list<array{user_id: int|null, name: string, image_uid?: string|null}> $holders Foto nur bei freien Namen
+     * @param list<array{user_id: int|null, name: string, image_uid?: string|null, companions?: list<array{user_id: int|null, name: string, image_uid?: string|null}>}> $holders
+     *        Foto nur bei freien Namen; companions: Begleitpersonen des Inhabers
      */
     public function saveTerm(?int $id, int $officeId, array $term, array $holders): int
     {
@@ -193,14 +199,19 @@ final class OfficeRepository
                 $this->db->update('office_terms', $row, ['id' => $id]);
                 $this->db->execute('DELETE FROM {office_holders} WHERE term_id = ?', [$id]);
             }
+            $row = static fn (array $h, int $sort, ?int $of): array => [
+                'term_id' => $id,
+                'user_id' => $h['user_id'],
+                'name' => $h['name'],
+                'sort' => $sort,
+                'image_uid' => $h['user_id'] === null ? ($h['image_uid'] ?? null) : null,
+                'companion_of' => $of,
+            ];
             foreach ($holders as $i => $h) {
-                $this->db->insert('office_holders', [
-                    'term_id' => $id,
-                    'user_id' => $h['user_id'],
-                    'name' => $h['name'],
-                    'sort' => $i,
-                    'image_uid' => $h['user_id'] === null ? ($h['image_uid'] ?? null) : null,
-                ]);
+                $holderId = $this->db->insert('office_holders', $row($h, $i, null));
+                foreach ($h['companions'] ?? [] as $j => $c) {
+                    $this->db->insert('office_holders', $row($c, $j, $holderId));
+                }
             }
             return $id;
         });
@@ -235,12 +246,11 @@ final class OfficeRepository
         });
     }
 
-    /** @return array<int, list<Holder>> Amtszeit-ID => Inhaber in ihrer Reihenfolge, in einer Abfrage für alle */
+    /** @return array<int, list<Holder>> Amtszeit-ID => Inhaber in ihrer Reihenfolge (mit Begleitpersonen), in einer Abfrage für alle */
     public function holders(): array
     {
         $out = [];
-        foreach ($this->db->select('SELECT * FROM {office_holders} ORDER BY term_id ASC, sort ASC, id ASC') as $r) {
-            $h = self::holder($r);
+        foreach (self::nest($this->db->select('SELECT * FROM {office_holders} ORDER BY term_id ASC, sort ASC, id ASC')) as $h) {
             $out[$h['term_id']][] = $h;
         }
         return $out;
@@ -252,10 +262,32 @@ final class OfficeRepository
         return array_values(array_unique(array_map(static fn (array $r): string => (string) $r['image_uid'], $this->db->select('SELECT image_uid FROM {office_holders} WHERE image_uid IS NOT NULL'))));
     }
 
-    /** @return list<Holder> */
+    /** @return list<Holder> mit Begleitpersonen */
     public function holdersOf(int $termId): array
     {
-        return array_values(array_map(self::holder(...), $this->db->select('SELECT * FROM {office_holders} WHERE term_id = ? ORDER BY sort ASC, id ASC', [$termId])));
+        return self::nest($this->db->select('SELECT * FROM {office_holders} WHERE term_id = ? ORDER BY sort ASC, id ASC', [$termId]));
+    }
+
+    /**
+     * Zeilen nach Inhabern und ihren Begleitpersonen ordnen. Begleitpersonen, deren Inhaber fehlt (sollte nicht
+     * vorkommen), fallen weg.
+     *
+     * @param list<array<string, mixed>> $rows
+     * @return list<Holder>
+     */
+    private static function nest(array $rows): array
+    {
+        $holders = [];
+        $companions = [];
+        foreach ($rows as $r) {
+            $of = $r['companion_of'] ?? null;
+            if ($of === null || $of === '') {
+                $holders[] = self::holder($r);
+            } else {
+                $companions[(int) $of][] = self::companion($r);
+            }
+        }
+        return array_map(static fn (array $h): array => ['companions' => $companions[$h['id']] ?? []] + $h, $holders);
     }
 
     /**
@@ -324,6 +356,15 @@ final class OfficeRepository
      * @return Holder
      */
     private static function holder(array $r): array
+    {
+        return self::companion($r) + ['companions' => []];
+    }
+
+    /**
+     * @param array<string, mixed> $r
+     * @return Companion
+     */
+    private static function companion(array $r): array
     {
         return [
             'id' => (int) $r['id'],

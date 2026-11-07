@@ -17,6 +17,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Ämter: Begleitpersonen**: Bei einer Amtszeit kann jede Person eine Begleitung bekommen, die das Amt nicht selbst
+  bekleidet, z. B. Partnerin oder Partner. Sie steht im Zeitstrahl abgesetzt darunter („Max Muster“, darunter „mit
+  Erika Muster“), als Mitglied, Ehemaliger oder Name ohne Profil, auf Wunsch mit Foto. Einzutragen in der Verwaltung
+  der Ämter bei der Amtszeit mit *+ Begleitung*. Begleitpersonen bekommen keinen mit dem Amt verknüpften Titel, und
+  ihr Ausscheiden beendet keine Amtszeit. Partner, die bisher als eigene Person im Amt stehen, dort entfernen und als
+  Begleitung neu eintragen.
 - **Kompanien: Suche und Sortierung**: Über der Liste der Kompanien stehen wie in der Mitgliederliste ein Suchfeld
   (Name oder Kurzname) und die Sortierung: wie festgelegt, nach Name, Gründung oder Mitgliedern, jeweils auch
   umgekehrt. Aufgelöste Kompanien stehen weiter unten; die Wahl merkt sich das Gerät.
