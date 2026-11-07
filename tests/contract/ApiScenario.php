@@ -66,6 +66,7 @@ final class ApiScenario
             $this->events();
             $this->push();
             $this->reports();
+            $this->registrations();
             $this->config();
         } finally {
             $this->d->preview(null);
@@ -2012,6 +2013,97 @@ final class ApiScenario
         $this->d->actAs($this->m1);
         [$s] = $this->req('POST', '/reports', ['token' => $memberForm['token'], 'includeName' => true] + $body);
         $c->ok($s === 201, 'Mitglied meldet mit Namen → 201');
+        $this->d->actAs(null);
+    }
+
+    /**
+     * Zugang beantragen (Issue #314), ohne Mailversand: Anfrage, Freigabe mit dem Passwort aus der Anfrage (der Hash
+     * muss im jeweiligen Adapter zur Anmeldung taugen), Ablehnung, Rechte.
+     */
+    private function registrations(): void
+    {
+        $c = $this->c;
+        $c->section('Zugang beantragen');
+        $admin = $this->user('kptest_zugang_admin', 'admin');
+        $member = $this->user('kptest_zugang_mitglied', 'member');
+        $this->d->actAs(null);
+        [$s, $d] = $this->req('GET', '/registration/form');
+        $c->ok($s === 404 && ($d['code'] ?? '') === 'registration_unavailable', 'Ausgeschaltet: kein Formular (404)');
+        $this->d->actAs($member);
+        $c->ok($this->req('PUT', '/admin/registration', ['enabled' => true])[0] === 403, 'Einschalten nur für Admins (403)');
+        $c->ok($this->req('GET', '/registrations')[0] === 403, 'Anfragen nur mit „Mitglieder anlegen“ (403)');
+        $this->d->actAs($admin);
+        [$s, $d] = $this->req('PUT', '/admin/registration', ['enabled' => true]);
+        $c->ok($s === 200 && ($d['enabled'] ?? false) === true && str_ends_with((string) ($d['link'] ?? ''), '#/registrieren'), 'Admin schaltet „Zugang beantragen“ ein');
+        $c->ok($this->req('PUT', '/admin/registration', ['default_role' => 'admin'])[0] === 400, 'Vorgeschlagene Rolle nie Admin (400)');
+
+        $this->d->actAs(null);
+        [, $config] = $this->req('GET', '/config');
+        $c->ok(($config['registration'] ?? null) === true && array_key_exists('pendingRegistrations', $config) && $config['pendingRegistrations'] === null, '/config: an, Gäste sehen keinen Zähler');
+        [$s, $form] = $this->req('GET', '/registration/form');
+        $c->ok($s === 200 && is_string($form['token'] ?? null) && is_bool($form['email_confirmation'] ?? null), 'Formular mit Zeitmarke');
+        $suffix = substr(bin2hex(random_bytes(3)), 0, 6);
+        $body = ['token' => $form['token'], 'consent' => true, 'first_name' => 'Zugang', 'last_name' => 'Test' . $suffix,
+            'email' => "zugang.$suffix@example.org", 'username' => "kptest_zugang_$suffix", 'password' => 'Anfrage-Passwort-1'];
+        $c->ok(($this->req('POST', '/registration', $body)[1]['code'] ?? '') === 'too_fast', 'Sofort abgeschickt → too_fast (Zeitfalle)');
+        sleep((int) ($form['minSeconds'] ?? 3));
+        $c->ok($this->req('POST', '/registration', ['consent' => false] + $body)[0] === 400, 'Ohne Einwilligung → 400');
+        $c->ok($this->req('POST', '/registration', ['username' => 'kptest_zugang_admin'] + $body)[0] === 400, 'Vergebener Benutzername → 400');
+        [$s, $d] = $this->req('POST', '/registration', $body);
+        $mail = ($form['email_confirmation'] ?? false) === true;
+        $c->ok($s === 201 && ($d['status'] ?? '') === ($mail ? 'confirm_email' : 'pending'), 'Anfrage angenommen');
+        if ($mail) {
+            // Mit Mailversand müsste erst der Link aus der Mail bestätigt werden; das prüfen die Kern-Tests.
+            $this->d->actAs($admin);
+            $this->req('PUT', '/admin/registration', ['enabled' => false]);
+            return;
+        }
+        [, $d] = $this->req('POST', '/registration/status', ['username' => $body['username'], 'password' => $body['password']]);
+        $c->ok(($d['status'] ?? '') === 'pending', 'Stand der Anfrage: wartet');
+
+        $this->d->actAs($admin);
+        [, $list] = $this->req('GET', '/registrations');
+        $req = null;
+        foreach ($list['requests'] ?? [] as $r) {
+            if (($r['username'] ?? '') === $body['username']) {
+                $req = $r;
+            }
+        }
+        $c->ok($req !== null && !array_key_exists('password_hash', $req) && ($req['email_confirmed'] ?? true) === false, 'Anfrage in der Liste, ohne Passwort-Hash');
+        [, $config] = $this->req('GET', '/config');
+        $c->ok(($config['pendingRegistrations'] ?? 0) >= 1, '/config: Zähler für Freigebende');
+        $this->d->actAs($member);
+        $c->ok($this->req('POST', '/registrations/' . (int) ($req['id'] ?? 0) . '/approve')[0] === 403, 'Mitglied ohne Recht gibt nicht frei (403)');
+        $this->d->actAs($admin);
+        [$s, $d] = $this->req('POST', '/registrations/' . (int) ($req['id'] ?? 0) . '/approve', ['level' => 'member']);
+        $id = (int) ($d['member']['id'] ?? 0);
+        if ($id > 0) {
+            $this->users[] = $id;
+        }
+        $c->ok($s === 200 && $id > 0 && ($d['member']['username'] ?? '') === $body['username'], 'Admin gibt frei → Konto angelegt');
+        $c->ok($id > 0 && $this->d->checkPassword($id, $body['password']), 'Anmelden mit dem Passwort aus der Anfrage möglich');
+        $c->ok($this->req('POST', '/registrations/' . (int) ($req['id'] ?? 0) . '/approve')[0] === 404, 'Schon freigegeben → 404');
+
+        // Zweite Anfrage ablehnen
+        $this->d->actAs(null);
+        [, $form] = $this->req('GET', '/registration/form');
+        sleep((int) ($form['minSeconds'] ?? 3));
+        $body2 = ['token' => $form['token'], 'username' => "kptest_zugang2_$suffix", 'email' => "zugang2.$suffix@example.org"] + $body;
+        $c->ok($this->req('POST', '/registration', $body2)[0] === 201, 'Zweite Anfrage angenommen');
+        $this->d->actAs($admin);
+        $second = null;
+        foreach ($this->req('GET', '/registrations')[1]['requests'] ?? [] as $r) {
+            if (($r['username'] ?? '') === $body2['username']) {
+                $second = $r;
+            }
+        }
+        [$s, $d] = $this->req('POST', '/registrations/' . (int) ($second['id'] ?? 0) . '/reject', ['reason' => 'Vertragstest']);
+        $c->ok($s === 200 && ($d['rejected'] ?? false) === true, 'Admin lehnt ab');
+        $this->d->actAs(null);
+        [, $d] = $this->req('POST', '/registration/status', ['username' => $body2['username'], 'password' => $body['password']]);
+        $c->ok(($d['status'] ?? '') === 'rejected' && ($d['reason'] ?? '') === 'Vertragstest', 'Stand der Anfrage: abgelehnt mit Begründung');
+        $this->d->actAs($admin);
+        $this->req('PUT', '/admin/registration', ['enabled' => false]);
         $this->d->actAs(null);
     }
 

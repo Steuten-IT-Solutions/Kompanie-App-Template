@@ -48,6 +48,13 @@ interface UserDirectory
      */
     public function create(string $firstName, string $lastName, string $login, string $email, string $password, string $role = Roles::MEMBER): int;
 
+    /**
+     * Wie create(), aber mit einem schon berechneten Passwort-Hash (password_hash mit PASSWORD_DEFAULT) statt des
+     * Passworts: für die Selbstregistrierung (Domain\RegistrationService), bei der die Person ihr Passwort schon im
+     * Antrag festlegt und der Kern nur den Hash aufbewahrt.
+     */
+    public function createWithPasswordHash(string $firstName, string $lastName, string $login, string $email, string $passwordHash, string $role = Roles::MEMBER): int;
+
     /** Ob in dieser Umgebung Admins in der App ernannt werden können (nur Standalone). */
     public function canAssignAdmin(): bool;
 

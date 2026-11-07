@@ -81,7 +81,7 @@ final class BugReportService
         $this->requireAvailable();
         $now = $this->app->time()->timestamp();
         return [
-            'token' => $now . '.' . $this->formSignature($now),
+            'token' => $this->trap()->token($now),
             'minSeconds' => self::MIN_SECONDS,
             'maxBytes' => self::MAX_SCREENSHOT_BYTES,
             'details' => ['version' => $this->app->env->version(), 'role' => $this->roleLabel($user)],
@@ -98,10 +98,10 @@ final class BugReportService
     {
         $this->requireAvailable();
         // Honeypot: Menschen sehen das Feld nicht. Antwort wie bei Erfolg, damit Programme nichts lernen.
-        if (trim(is_string($in['website'] ?? null) ? $in['website'] : '') !== '') {
+        if (FormTrap::honeypot($in)) {
             return ['queued' => true];
         }
-        $this->checkForm($in['token'] ?? null);
+        $this->trap()->check($in['token'] ?? null, $this->app->time()->timestamp());
         if (($in['consent'] ?? null) !== true) {
             throw ApiError::invalid('Bitte bestätige, dass die Meldung an die Betreuer der App gehen darf.');
         }
@@ -286,22 +286,10 @@ final class BugReportService
         }
     }
 
-    /** Zeitfalle: Zeitmarke aus form(), nicht zu frisch und nicht zu alt. */
-    private function checkForm(mixed $token): void
+    /** Zeitfalle und Honeypot (gemeinsam mit der Selbstregistrierung). */
+    private function trap(): FormTrap
     {
-        $now = $this->app->time()->timestamp();
-        if (!is_string($token) || !preg_match('/^(\d{1,12})\.([0-9a-f]{64})$/D', $token, $m) || !hash_equals($this->formSignature((int) $m[1]), $m[2])
-            || $now - (int) $m[1] > self::MAX_FORM_AGE || (int) $m[1] > $now + 60) {
-            throw new ApiError(400, 'form_expired', 'Das Formular ist abgelaufen. Bitte öffne es neu.');
-        }
-        if ($now - (int) $m[1] < self::MIN_SECONDS) {
-            throw new ApiError(429, 'too_fast', 'Das ging sehr schnell. Bitte warte einen Moment und sende dann erneut.');
-        }
-    }
-
-    private function formSignature(int $at): string
-    {
-        return hash_hmac('sha256', 'bug-report-form|' . $at, $this->app->statusReporter()->secret());
+        return new FormTrap($this->app->statusReporter()->secret(), 'bug-report-form', self::MIN_SECONDS, self::MAX_FORM_AGE);
     }
 
     /**

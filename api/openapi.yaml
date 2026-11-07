@@ -61,6 +61,7 @@ tags:
   - name: Einstellungen
   - name: Wartung
   - name: Fehlermeldungen
+  - name: Zugang beantragen
 
 paths:
   /config:
@@ -550,6 +551,134 @@ paths:
         '404': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
+
+  /registration/form:
+    get:
+      tags: [Zugang beantragen]
+      summary: Formular „Zugang beantragen“ öffnen (ohne Anmeldung)
+      description: |
+        Zeitmarke für die Zeitfalle (frühestens `minSeconds`, spätestens 6 Stunden später absenden). Ist „Zugang
+        beantragen“ aus, 404 `registration_unavailable`. `email_confirmation`: Mailversand eingerichtet, die Person
+        bestätigt ihre Adresse über einen Link und erfährt das Ergebnis per Mail.
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, minSeconds, email_confirmation, privacy_url]
+                properties:
+                  token: { type: string, description: 'Zeitpunkt.HMAC; beim Absenden mitschicken' }
+                  minSeconds: { type: integer }
+                  email_confirmation: { type: boolean }
+                  privacy_url: { type: [string, 'null'], description: Link auf die Datenschutzerklärung der Kompanie }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /registration:
+    post:
+      tags: [Zugang beantragen]
+      summary: Zugang beantragen (ohne Anmeldung)
+      description: |
+        Legt eine Anfrage an, noch kein Konto. Mit Mailversand Status `confirm_email` (Mail mit Link zum Bestätigen,
+        24 Stunden gültig); ohne wartet sie gleich auf Freigabe (`pending`). Mit Mailversand ist die Antwort auch dann
+        `confirm_email`, wenn es zur Adresse schon ein Konto oder eine wartende Anfrage gibt (die Mail sagt es). Begrenzt
+        je Anfragendem (IPv6: je /64) und Stunde, je Installation und Tag und durch die Zahl offener Anfragen. Ist
+        `website` (verstecktes Feld) gefüllt, antwortet der Server wie bei Erfolg, speichert aber nichts.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, consent, first_name, last_name, email, username, password]
+              properties:
+                token: { type: string, description: Zeitmarke aus GET /registration/form }
+                consent: { type: boolean, const: true, description: Datenschutzerklärung gelesen }
+                first_name: { type: string, maxLength: 100 }
+                last_name: { type: string, maxLength: 100 }
+                email: { type: string, format: email, maxLength: 100 }
+                username: { type: string, pattern: '^[A-Za-z0-9._@-]{1,60}$' }
+                password: { type: string, minLength: 8, maxLength: 72 }
+                message: { type: string, maxLength: 500, description: Freiwillig, z. B. wer man ist }
+                website: { type: string, description: Verstecktes Feld; muss leer bleiben }
+      responses:
+        '201':
+          description: Angenommen
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [confirm_email, pending] }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+
+  /registration/confirm:
+    post:
+      tags: [Zugang beantragen]
+      summary: E-Mail-Adresse bestätigen (Link aus der Mail)
+      description: Danach wartet die Anfrage auf Freigabe. Ungültiger oder abgelaufener Link 400 `link_invalid`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string, pattern: '^[0-9a-f]{64}$' }
+      responses:
+        '200':
+          description: Bestätigt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [pending] }
+        '400': { $ref: '#/components/responses/Error' }
+
+  /registration/status:
+    post:
+      tags: [Zugang beantragen]
+      summary: Stand der eigenen Anfrage
+      description: |
+        Nur mit Benutzername (oder E-Mail-Adresse) und dem Passwort aus der Anfrage. `none`: keine offene Anfrage (z. B.
+        schon freigegeben: dann einfach anmelden). Abgelehnte Anfragen sind nur ohne Mailversand eine Weile zu sehen.
+        Höchstens 10 Abfragen je Anfragendem in 15 Minuten. In der eigenständigen Version sagt auch die Anmeldung
+        (POST /auth/login) mit 403 `registration_pending`, `registration_unconfirmed` bzw. `registration_rejected`
+        Bescheid.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [unconfirmed, pending, rejected, none] }
+                  reason: { type: string, description: Begründung der Ablehnung (kann leer sein) }
+        '400': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
 
   /me/push/status:
     post:
@@ -4669,6 +4798,111 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /registrations:
+    get:
+      tags: [Zugang beantragen]
+      summary: Anfragen, die auf Freigabe warten (create_users)
+      responses:
+        '200':
+          description: Älteste zuerst
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requests, default_role, email_confirmation]
+                properties:
+                  requests:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+                        first_name: { type: string }
+                        last_name: { type: string }
+                        email: { type: string }
+                        username: { type: string }
+                        username_taken: { type: boolean, description: Benutzername inzwischen vergeben; beim Freigeben einen anderen wählen }
+                        email_taken: { type: boolean, description: Zur Adresse gibt es inzwischen ein Konto; Freigeben geht nicht }
+                        message: { type: string }
+                        created_at: { type: string, format: date-time }
+                        email_confirmed: { type: boolean, description: Adresse per Link bestätigt (nur mit Mailversand) }
+                        expires_at: { type: string, format: date-time, description: Danach wird die Anfrage gelöscht }
+                  default_role: { type: string, description: Vorgeschlagene Rolle (Einstellungen → Zugang beantragen) }
+                  email_confirmation: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /registrations/{id}/approve:
+    post:
+      tags: [Zugang beantragen]
+      summary: Anfrage freigeben (create_users)
+      description: |
+        Legt das Konto mit dem Passwort aus der Anfrage an, mit denselben Prüfungen wie POST /users (Rolle, die man
+        vergeben darf; Benutzername und E-Mail-Adresse frei). Mit Mailversand bekommt die Person eine Mail (`mailed`).
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                level: { type: string, description: Rolle; ohne Angabe die vorgeschlagene }
+                username: { type: string, description: Anderer Benutzername, wenn der gewünschte vergeben ist }
+      responses:
+        '200':
+          description: Freigegeben
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  member:
+                    type: object
+                    properties:
+                      id: { type: integer }
+                      name: { type: string }
+                      first_name: { type: string }
+                      last_name: { type: string }
+                      username: { type: string }
+                      email: { type: string }
+                      level: { type: string }
+                  mailed: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /registrations/{id}/reject:
+    post:
+      tags: [Zugang beantragen]
+      summary: Anfrage ablehnen (create_users)
+      description: |
+        Mit Mailversand bekommt die Person eine Mail (mit Begründung, falls angegeben), und die Anfrage ist gelöscht.
+        Ohne Mailversand bleiben Benutzername, Passwort-Hash und Begründung 14 Tage, damit die Person es beim Anmelden
+        erfährt; Name, E-Mail-Adresse und Nachricht werden gleich gelöscht.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Abgelehnt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rejected: { type: boolean }
+                  mailed: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /users/bulk:
     post:
       tags: [Verwaltung]
@@ -5263,6 +5497,39 @@ paths:
                   message: { type: string }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+  /admin/registration:
+    get:
+      tags: [Einstellungen]
+      summary: Zugang beantragen (Issue #314)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegistrationSettings' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Einstellungen]
+      summary: Zugang beantragen ein- oder ausschalten, vorgeschlagene Rolle
+      description: Übernimmt nur die mitgeschickten Felder. Die Rolle muss Mitglied oder eine Rolle für neue Konten sein.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled: { type: boolean }
+                default_role: { type: string }
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegistrationSettings' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
   /admin/settings:
     get:
       tags: [Einstellungen]
@@ -6759,7 +7026,7 @@ components:
                   name: { type: string, description: Nur bei namentlichen Umfragen }
     PushType:
       type: string
-      enum: [board, board_public, polls, birthdays, gallery_review, gallery_submissions, penalties, points, ranks, titles, events, reminder, news]
+      enum: [board, board_public, polls, birthdays, gallery_review, gallery_submissions, registrations, penalties, points, ranks, titles, events, reminder, news]
       description: '`board` (Schwarzes Brett, Issue #5) nur für Mitglieder und Anwärter (view_board); dringend (Urgency high), TTL höchstens bis zum Ablauf der Nachricht. `board_public`: öffentliche Nachrichten am Brett für alle anderen (Gäste ohne Konto, Konten ohne view_board), sonst wie `board`. `polls` (Umfragen, Issue #4) nur für Mitglieder: neue Umfrage und Erinnerung 24 Stunden vor dem Ende an alle ohne Antwort. `birthdays` (Geburtstage, Issue #1) nur für Mitglieder: am Tag selbst ab 7 Uhr (Zeitzone der Kompanie), nicht an das Geburtstagskind, nur für sichtbare Geburtstage; TTL bis Mitternacht.'
     PushSubscribe:
       type: object
@@ -6801,6 +7068,15 @@ components:
         setup:
           type: [string, 'null']
           description: Abschnitt der Einstellungen bzw. Schritt der Ersteinrichtung, z. B. `kalender`
+    RegistrationSettings:
+      type: object
+      required: [enabled, default_role, email_confirmation, pending, link]
+      properties:
+        enabled: { type: boolean }
+        default_role: { type: string, description: Rolle, die beim Freigeben vorgeschlagen ist }
+        email_confirmation: { type: boolean, description: 'Mailversand eingerichtet: Bestätigung der Adresse und Ergebnis per Mail' }
+        pending: { type: integer, description: Anfragen, die auf Freigabe warten }
+        link: { type: string, description: 'Adresse des Formulars zum Weitergeben (<App>#/registrieren)' }
     MaintenanceInfo:
       type: object
       required: ['on', reason, since]
@@ -7249,6 +7525,8 @@ components:
             imprint: { type: [string, 'null'] }
             privacy: { type: [string, 'null'] }
         reports: { type: boolean, description: 'Fehlermeldungen an die Betreuer möglich (reportUrl in update.json, Issue #64); sonst kein Knopf „Fehler melden“' }
+        registration: { type: boolean, description: 'Zugang beantragen eingeschaltet (Issue #314): Link „Zugang beantragen“ für Gäste' }
+        pendingRegistrations: { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null' }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
         backupUrl: { type: [string, 'null'], description: 'Nur für Admins (nicht in der Vorschau): Adresse zum Herunterladen der Datensicherung als Datei (<App>/sicherung), Stück für Stück erzeugt; sonst null' }
         maintenance: { $ref: '#/components/schemas/MaintenanceInfo' }

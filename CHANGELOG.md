@@ -39,6 +39,15 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   mit der Quelle legt die App die Rolle „News verwalten“ an. Es gilt immer eine Quelle, Beiträge der Webseite oder
   eines Feeds und der App werden nicht gemischt; beim Wechsel bleibt alles gespeichert. Wer die News von der Webseite
   oder aus einem Feed bezieht, merkt nichts davon.
+- **Zugang beantragen**: Personen können ihren Zugang zur App jetzt selbst beantragen, ihr müsst nicht mehr jedes
+  Konto selbst anlegen. Eingeschaltet wird das unter *Einstellungen → Zugang beantragen* (bis dahin bleibt es aus).
+  Die Person füllt ein Formular mit Name, E-Mail-Adresse, Benutzername und Passwort aus; die Anfrage erscheint unter
+  *Verwaltung → Anfragen*. Freigeben oder ablehnen darf, wer Mitglieder anlegen darf, Admins also immer. Erst mit
+  der Freigabe entsteht das Konto, mit der dort gewählten Rolle (Admin lässt sich dabei nicht vergeben) und dem
+  Passwort aus der Anfrage. Ist der Mailversand eingerichtet, bestätigt die Person zuerst ihre E-Mail-Adresse und
+  erfährt das Ergebnis per Mail. Ohne Mailversand sieht sie es bei der Anmeldung oder unter *Stand meiner Anfrage*.
+  Unbearbeitete Anfragen löscht die App nach 30 Tagen. Wer Mitglieder anlegen darf, kann sich über neue Anfragen
+  benachrichtigen lassen.
 
 ### Geändert
 
@@ -63,6 +72,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   sie auf normal. Gespeichert bleibt der Text unverändert. Links in formatierten Texten sind im dunklen Design jetzt
   ebenfalls gut lesbar.
 - **Kompanien**: *Webseite* und *App der Kompanie* sind jetzt Knöpfe im Stil der App statt blauer Standard-Links.
+- **Kompanien: transparente Logos**: Logos der Kompanien standen in der Liste, auf der Seite der Kompanie und in der
+  Verwaltung immer in einem weißen Kasten, auch wenn sie einen durchsichtigen Hintergrund haben. Jetzt stehen sie
+  direkt auf der Karte, im hellen wie im dunklen Design. Ein Logo ohne durchsichtigen Hintergrund (z. B. ein JPG)
+  zeigt weiter seinen eigenen Hintergrund.
 - **Hinweis „Einrichtung starten“ nach dem Wiederherstellen**: Wurde in einer frisch installierten, noch nicht
   eingerichteten App eine Sicherung eingespielt, stand der Hinweis „Einrichtung starten“ weiter über jeder Seite. Mit
   der Sicherung gilt die App jetzt als eingerichtet; Bereiche und Verbindungen lassen sich wie gewohnt unter

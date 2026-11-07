@@ -90,6 +90,8 @@ final class PushService
     /** Galerie (Issue #286): neue Einreichungen an alle mit review_gallery, das Ergebnis an die einreichende Person. */
     public const TYPE_GALLERY_REVIEW = 'gallery_review';
     public const TYPE_GALLERY_SUBMISSIONS = 'gallery_submissions';
+    /** Selbstregistrierung (Issue #314): neue Anfrage auf einen Zugang an alle, die freigeben (create_users). */
+    public const TYPE_REGISTRATIONS = 'registrations';
 
     /** Push-Dienste der Browser (wie im Projekt-Cockpit). */
     private const PUSH_HOSTS = ['/^fcm\.googleapis\.com$/', '/(^|\.)push\.services\.mozilla\.com$/', '/(^|\.)push\.apple\.com$/', '/(^|\.)notify\.windows\.com$/'];
@@ -169,8 +171,9 @@ final class PushService
     /**
      * Typen mit Bezeichnung, Bereichen (einer davon muss eingeschaltet sein) und wer sie bekommt: Konten mit diesem
      * Recht (Wert einer Capability, z. B. view_board wie BoardService::isRecipient), all = alle einschließlich Gästen.
+     * Ohne Bereiche (features leer) gilt stattdessen active, z. B. „Zugang beantragen“ eingeschaltet.
      *
-     * @return array<string, array{label: string, features: list<string>, audience: string}>
+     * @return array<string, array{label: string, features: list<string>, audience: string, active?: bool}>
      */
     public function types(): array
     {
@@ -182,6 +185,7 @@ final class PushService
             self::TYPE_BIRTHDAYS => ['label' => $c->sectionLabel('birthdays', 'Geburtstage') . ': am Tag selbst', 'features' => ['birthdays'], 'audience' => 'view_birthdays'],
             self::TYPE_GALLERY_REVIEW => ['label' => $c->sectionLabel('gallery', 'Galerie') . ': neue Bilder zum Prüfen', 'features' => ['gallery'], 'audience' => 'review_gallery'],
             self::TYPE_GALLERY_SUBMISSIONS => ['label' => $c->sectionLabel('gallery', 'Galerie') . ': deine Bilder freigegeben oder abgelehnt', 'features' => ['gallery'], 'audience' => 'submit_gallery'],
+            self::TYPE_REGISTRATIONS => ['label' => 'Zugang beantragt: neue Anfragen', 'features' => [], 'audience' => 'create_users', 'active' => $this->app->registrations()->enabled()],
             self::TYPE_PENALTIES => ['label' => $c->sectionLabel('penalties', 'Strafen') . ': neue Einträge', 'features' => ['penalties'], 'audience' => 'view_own_penalties'],
             self::TYPE_POINTS => ['label' => $c->sectionLabel('points', 'Punkte') . ': neue Einträge', 'features' => ['points'], 'audience' => 'view_own_points'],
             self::TYPE_RANKS => ['label' => $c->rankLabel() . ': Beförderung oder Änderung', 'features' => ['ranks'], 'audience' => 'view_own_rank'],
@@ -197,7 +201,7 @@ final class PushService
     {
         $out = [];
         foreach ($this->types() as $key => $type) {
-            if (!$this->offered($key, $type['audience'], $user) || !$this->anyEnabled($type['features'])) {
+            if (!$this->offered($key, $type['audience'], $user) || !$this->active($type)) {
                 continue;
             }
             // Termine und Erinnerungen: Mitglieder mit Kalender bekommen sie aus dem Kalender, alle anderen aus
@@ -225,6 +229,12 @@ final class PushService
     {
         // Wie die App (Bereich an und eingerichtet): Sonst sehen Mitglieder die öffentliche Terminliste.
         return $user !== null && $user->can(Capability::Calendar) && $this->app->features()->enabled('calendar') && $this->app->calendar()->isConfigured();
+    }
+
+    /** @param array{features: list<string>, active?: bool} $type */
+    private function active(array $type): bool
+    {
+        return $type['features'] === [] ? ($type['active'] ?? false) : $this->anyEnabled($type['features']);
     }
 
     /** @param list<string> $features */
@@ -669,7 +679,7 @@ final class PushService
     private function typeEnabled(string $type): bool
     {
         $t = $this->types()[$type] ?? null;
-        return $t !== null && $this->supported() && $this->anyEnabled($t['features']);
+        return $t !== null && $this->supported() && $this->active($t);
     }
 
     /** @param list<array{subscription_id: int, payload: string}> $items */
@@ -927,7 +937,7 @@ final class PushService
         $types = [];
         foreach ($this->types() as $key => $type) {
             $entry = $log['types'][$key] ?? null;
-            if (is_array($entry) && is_numeric($entry['at'] ?? null) && $this->anyEnabled($type['features'])) {
+            if (is_array($entry) && is_numeric($entry['at'] ?? null) && $this->active($type)) {
                 $types[] = ['type' => $key, 'label' => $type['label'], 'at' => $iso($entry['at']), 'devices' => (int) ($entry['devices'] ?? 0)];
             }
         }

@@ -160,6 +160,24 @@ final class WpUsers implements UserDirectory, AuthContext
         return (int) $id;
     }
 
+    /**
+     * Konto wie create(), danach der Hash aus der Selbstregistrierung (password_hash, bcrypt) statt eines Passworts.
+     * WordPress prüft solche Hashes selbst: ab 6.8 über password_verify(), davor über phpass, das für Hashes ohne eigenes
+     * Präfix auf crypt() zurückfällt. Beim ersten Anmelden schreibt WordPress ihn in sein eigenes Format um.
+     */
+    public function createWithPasswordHash(string $firstName, string $lastName, string $login, string $email, string $passwordHash, string $role = AppRoles::MEMBER): int
+    {
+        global $wpdb;
+        if (password_get_info($passwordHash)['algo'] === null) {
+            throw new \DomainException('Ungültiger Passwort-Hash.');
+        }
+        // Zufälliges Passwort, das niemand kennt; gleich danach durch den Hash ersetzt.
+        $id = $this->create($firstName, $lastName, $login, $email, wp_generate_password(32, true, true), $role);
+        $wpdb->update($wpdb->users, ['user_pass' => $passwordHash, 'user_activation_key' => ''], ['ID' => $id]);
+        clean_user_cache($id);
+        return $id;
+    }
+
     public function canAssignAdmin(): bool
     {
         return false;
