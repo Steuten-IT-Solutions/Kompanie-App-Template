@@ -8594,14 +8594,9 @@ components:
               description: 'Adresse des Logos (`/kompanielogo/<id>?v=<Fassung>`, öffentlich und lange zwischengespeichert, solange Gäste `view_companies` haben); null ohne Logo'
             logo_type: { type: [string, 'null'], enum: [png, svg, null] }
             members:
-              description: Zugeordnete Personen in der Reihenfolge der Mitgliederliste, nur Namen (mit view_directory, auch für Gäste und ohne Bereich Mitgliederliste)
+              description: 'Zugeordnete Personen in der Reihenfolge der Mitgliederliste, Einträge wie dort (Foto, Titel, Dienstgrad), aber ohne birthday, join_year, join_date und companies; nur mit view_directory, auch für Gäste und ohne Bereich Mitgliederliste'
               type: array
-              items:
-                type: object
-                required: [id, name]
-                properties:
-                  id: { type: integer }
-                  name: { type: string }
+              items: { $ref: '#/components/schemas/DirectoryEntry' }
             member_count: { type: integer, description: Nur zusammen mit members }
             member_ids: { type: array, items: { type: integer }, description: 'Nur mit manage_companies: alle Zugeordneten' }
 

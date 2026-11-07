@@ -154,7 +154,14 @@ final class CompanyTest extends TestCase
         $this->users->current = null;
         $list = array_column($this->call('GET', '/companies')->data, null, 'id');
         $this->assertSame(['Admin', 'Anna'], array_column($list[$a]['members'], 'name'), 'Gast mit view_directory, ohne Mitgliederliste');
-        $this->assertSame(['id', 'name'], array_keys($list[$a]['members'][0]), 'nur Namen');
+        // Wie in der Mitgliederliste (Foto, Titel, Dienstgrad), aber ohne Geburtstag, Eintritt und Kompanien
+        $keys = array_keys($list[$a]['members'][0]);
+        foreach (['id', 'name', 'photo_url'] as $key) {
+            $this->assertContains($key, $keys);
+        }
+        foreach (['birthday', 'join_year', 'join_date', 'companies', 'email', 'phone'] as $key) {
+            $this->assertNotContains($key, $keys);
+        }
         $this->users->current = $this->admin;
         $this->app->features()->update(['directory' => true]);
 

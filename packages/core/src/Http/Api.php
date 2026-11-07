@@ -402,6 +402,37 @@ final class Api
             + ($joined !== null ? ['join_year' => $joined[$m['id']]['year'] ?? null, 'join_date' => $joined[$m['id']]['date'] ?? null] : []), $entries ?? $a->members()->directory());
     }
 
+    /**
+     * Kompanien (Issue #280) mit ihren Mitgliedern wie in der Mitgliederliste: Foto, Titel und Dienstgrad dazu (ohne
+     * Geburtstag und Eintritt). Wer die Namen sieht, regelt CompanyService::list (view_directory).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function companies(): array
+    {
+        $list = $this->app->companies()->list($this->app->authContext->currentUser());
+        $ids = [];
+        foreach ($list as $c) {
+            foreach ($c['members'] ?? [] as $m) {
+                $ids[$m['id']] = true;
+            }
+        }
+        if ($ids === []) {
+            return $list;
+        }
+        $entries = [];
+        foreach ($this->directory(array_values(array_filter($this->app->members()->directory(), static fn (array $m): bool => isset($ids[$m['id']])))) as $e) {
+            unset($e['companies']);
+            $entries[$e['id']] = $e;
+        }
+        return array_map(static function (array $c) use ($entries): array {
+            if (isset($c['members'])) {
+                $c['members'] = array_map(static fn (array $m): array => $entries[$m['id']] ?? $m, $c['members']);
+            }
+            return $c;
+        }, $list);
+    }
+
     /** Stand, Verlauf und frühere Mitglieder mit Dienstgrad in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
     private function showRanks(): bool
     {
@@ -839,7 +870,7 @@ final class Api
 
             // Kompanien (Issue #280): öffentlich mit view_companies (anfangs auch Gast), Pflege und Zuordnung mit
             // manage_companies; Mitglieder einer Kompanie nur, soweit die Mitgliederliste sichtbar ist
-            new Route('GET', '/companies', [Cap::ViewCompanies, Cap::ManageCompanies], fn () => $a->companies()->list($a->authContext->currentUser()), 'companies', $denyView),
+            new Route('GET', '/companies', [Cap::ViewCompanies, Cap::ManageCompanies], fn () => $this->companies(), 'companies', $denyView),
             new Route('POST', '/companies', Cap::ManageCompanies, fn (Request $r) => Response::created($a->companies()->create($r->body, $this->user())), 'companies', $denyRights),
             new Route('PUT', '/companies/order', Cap::ManageCompanies, fn (Request $r) => $a->companies()->reorder($r->input('ids'), $this->user()), 'companies', $denyRights),
             new Route('PATCH', '/companies/{id}', Cap::ManageCompanies, fn (Request $r) => $a->companies()->update($r->id(), $r->body, $this->user()), 'companies', $denyRights),

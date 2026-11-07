@@ -1312,12 +1312,16 @@ export interface Company extends CompanyRef {
   app_url: string;
   logo_url: string | null;
   logo_type: 'png' | 'svg' | null;
-  /** Zugeordnete Personen, nur Namen, nur mit view_directory (fehlt sonst) */
-  members?: { id: number; name: string }[];
+  /** Zugeordnete Personen wie in der Mitgliederliste (ohne Geburtstag und Eintritt), nur mit view_directory (fehlt sonst) */
+  members?: CompanyMember[];
   member_count?: number;
   /** Nur für die Pflege: alle Zugeordneten */
   member_ids?: number[];
 }
+
+/** Mitglied einer Kompanie: Eintrag wie in der Mitgliederliste; ältere Server schicken nur id und name. */
+export type CompanyMember = Pick<DirectoryEntry, 'id' | 'name'> &
+  Partial<Pick<DirectoryEntry, 'first_name' | 'last_name' | 'candidate_role' | 'photo_url' | 'rank_title' | 'rank_badge_url' | 'titles'>>;
 
 export interface CompanyInput {
   name?: string;
