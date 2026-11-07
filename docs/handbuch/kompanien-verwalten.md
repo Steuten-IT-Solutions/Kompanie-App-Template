@@ -18,8 +18,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{
 ## So gehst du vor
 ### Eine Kompanie anlegen
 1. Trage unter **Neue Kompanie** den **Name** ein. Auf Wunsch auch **Kurzname**, **Gründungsjahr**, **Beschreibung**, **Webseite** und **App der Kompanie**.
-2. Nutzt ihr {bereich.offices}, kannst du eine **Gruppe der {bereich.offices}** wählen. Deren laufende Amtszeiten stehen dann bei der Kompanie.
-3. Tippe auf **Anlegen**. Die Kompanie steht danach ganz unten.
+2. Tippe auf **Anlegen**. Die Kompanie steht danach ganz unten.
 
 ### Mitglieder zuordnen
 1. Tippe bei der Kompanie auf **Mitglieder**.
@@ -43,7 +42,8 @@ Tippe auf **Löschen** und bestätige. Logo und alle Zuordnungen der Mitglieder 
 
 ## Gut zu wissen
 - Neue Zuordnungen gibt es nur für {rolle.member}.
-- Logos: PNG, JPG, WebP oder SVG, höchstens 2 MB. Bilder werden auf höchstens 512 Pixel an der längeren Kante verkleinert. Angezeigt werden sie auf hellem Grund.
+- Logos: PNG, JPG, WebP oder SVG, höchstens 2 MB. Bilder werden auf höchstens 512 Pixel an der längeren Kante verkleinert. Ein durchsichtiger Hintergrund bleibt erhalten; das Logo steht dann direkt auf der Karte, im hellen wie im dunklen Design. Am besten wirkt ein Logo mit durchsichtigem Hintergrund, das auf hellem und dunklem Grund gut zu erkennen ist.
+- In die **Beschreibung** kannst du Text von eurer Webseite kopieren. Farben, die auf dem Hintergrund schlecht lesbar wären (z. B. dunkle Schrift im dunklen Design), zeigt die App in ihrer normalen Schriftfarbe; sehr große Zeilenabstände setzt sie beim Anzeigen auf normal. Gespeichert bleibt der Text so, wie du ihn eingegeben hast.
 - Links müssen mit `https://` beginnen. Das Gründungsjahr liegt zwischen 1800 und dem laufenden Jahr.
 - Bilder in der Beschreibung sieht jeder, der die {bereich.companies} sieht, auch ohne Anmeldung. Sehr große Bilder werden auf höchstens 2048 Pixel an der längeren Kante verkleinert.
 - Wer die {bereich.companies} sieht, legt das Recht „{bereich.companies}“ in den Rollen fest; in neuen Installationen sehen sie alle, auch ohne Anmeldung. Wer welcher Kompanie angehört, sieht nur, wer **{bereich.directory}** sehen darf.

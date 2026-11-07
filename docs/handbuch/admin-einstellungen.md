@@ -16,13 +16,14 @@ Je Thema eine Zeile mit einem kurzen Satz. Tippe auf eine Zeile, um ihre Seite z
 - **Bereiche**: welche Bereiche die App für alle hat. Siehe [Bereiche](seite:admin-bereiche).
 - **Navigation**: welche Bereiche unten in der Leiste stehen und welche in Untermenüs. Siehe [Navigation](seite:admin-navigation).
 - **Rollen**: wer was in der App darf. Siehe [Rollen](seite:admin-rollen-und-mitglieder).
+- **Zugang beantragen**: ob Personen selbst einen Zugang beantragen können. Siehe [Zugang beantragen einstellen](seite:admin-zugang).
 - **Benachrichtigungen**: angemeldete Geräte und Uhrzeit der Erinnerung. Siehe [Benachrichtigungen einstellen](seite:admin-benachrichtigungen).
 - **{bereich.birthdays}**: wie lange vorher anstehende {bereich.birthdays} bei den {bereich.events} erscheinen (nur, wenn {bereich.birthdays} an ist).
 - **E-Mail**: Kompanieadresse und Mailserver, z. B. für Nachrichten aus dem Bereich **{bereich.board}**. Siehe [E-Mail einrichten](seite:admin-email).
 - **Google-Zugang**: die Verbindung zu Google für {bereich.gallery} und Kalender. Siehe [Google-Zugang](seite:admin-google).
 - **{bereich.gallery}**: der Ordner in Google Drive mit den Fotoalben. Siehe [{bereich.gallery} einrichten](seite:admin-galerie).
 - **Kalender**: woher der Kalender für Mitglieder kommt. Siehe [Kalender einrichten](seite:admin-kalender).
-- **Neuigkeiten**: woher die {bereich.news} kommen. Heißt der Bereich bei euch anders als „News“, steht hier sein Name. Die Seite gibt es nur in der eigenständigen App (ohne WordPress).
+- **Neuigkeiten**: woher die {bereich.news} kommen, auch **In der App schreiben**. Heißt der Bereich bei euch anders als „News“, steht hier sein Name.
 - **Impressum und Datenschutz**: Links auf Impressum und Datenschutzerklärung, für alle sichtbar. Siehe [Impressum und Datenschutz](seite:admin-rechtliches).
 - **Nutzung**: wer die App wann nutzt und welche Bereiche. Siehe [Nutzung](seite:admin-nutzung).
 - **Zustand und Updates**: Ampel je Bereich, installierte Version, Updates und Fehlerprotokoll. Siehe [Zustand und Updates](seite:admin-zustand).
@@ -31,7 +32,7 @@ Je Thema eine Zeile mit einem kurzen Satz. Tippe auf eine Zeile, um ihre Seite z
 - **Was ist neu**: Änderungen von Version zu Version. Siehe [Was ist neu](seite:admin-neuerungen).
 
 ## Gut zu wissen
-- Mit WordPress kommen die {bereich.news} immer aus den Beiträgen der Webseite; deshalb fehlt dort die Zeile **Neuigkeiten**. Einige Einstellungen findest du mit WordPress zusätzlich im WordPress-Backend auf der Seite der App.
+- Mit WordPress kommen die {bereich.news} anfangs aus den Beiträgen der Webseite; unter **Neuigkeiten** kannst du auf **In der App schreiben** wechseln. Einige Einstellungen findest du mit WordPress zusätzlich im WordPress-Backend auf der Seite der App.
 - Klappt etwas nicht, hilft oft [Häufige Probleme](seite:haeufige-probleme).
 
 ## Siehe auch

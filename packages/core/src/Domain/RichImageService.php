@@ -46,6 +46,8 @@ final class RichImageService
     public const OWNER_OFFICE_HOLDER = 'office_holder';
     /** Bilder einer eigenen Seite (PageService, Issue #287), sichtbar wie die Seite (öffentlich bei audience public) */
     public const OWNER_PAGE = 'page';
+    /** Bilder eines Beitrags der News in der App (NewsService), sichtbar mit view_news (auch ohne Anmeldung) */
+    public const OWNER_NEWS = 'news';
     /** Längste Kante gespeicherter Bilder (nie vergrößert). */
     public const MAX_EDGE = 2048;
     /** Nie gespeicherte Entwürfe so lange aufheben (ein begonnener Text kann über Nacht liegen bleiben). */
@@ -214,8 +216,8 @@ final class RichImageService
     }
 
     /**
-     * Darf $viewer das Bild sehen? Entwürfe und Signaturen nur ihr Konto, Bilder am Brett wie die Nachricht
-     * (BoardService::canSeeImage), Bilder in E-Mails alle mit send_mail (MailingService::canSeeImage), Bilder einer
+     * Darf $viewer das Bild sehen? Entwürfe und Signaturen nur ihr Konto, Bilder am Brett wie die Nachricht (öffentliche
+     * auch ohne Anmeldung, BoardService::canSeeImage), Bilder in E-Mails alle mit send_mail (MailingService::canSeeImage), Bilder einer
      * Kompanie wie die Liste, Gruppenbilder und Fotos freier Namen der Ämter wie die Ämter (alle auch ohne Anmeldung, s. isPublic).
      *
      * @param array{owner_type: string, owner_id: int, user_id: int} $img
@@ -223,11 +225,14 @@ final class RichImageService
     public function canView(?User $viewer, array $img): bool
     {
         if ($viewer === null) {
-            return $this->isPublic($img);
+            // Öffentliche Nachrichten am Brett auch ohne Anmeldung, aber nicht als öffentlich zwischengespeichert
+            // (isPublic): Sie laufen ab und lassen sich wieder intern stellen.
+            return $img['owner_type'] === self::OWNER_BOARD ? $this->app->board()->canSeeImage(null, $img['owner_id']) : $this->isPublic($img);
         }
         return match ($img['owner_type']) {
             self::OWNER_COMPANY => $this->companyVisible($viewer),
             self::OWNER_PAGE => $this->app->pages()->canSeeImage($viewer, $img['owner_id']),
+            self::OWNER_NEWS => $this->app->newsService()->canSeeImage($viewer, $img['owner_id']),
             self::OWNER_OFFICE_GROUP_TERM, self::OWNER_OFFICE_HOLDER => $this->officesVisible($viewer),
             self::OWNER_DRAFT, self::OWNER_SIGNATURE => $viewer->id === $img['owner_id'],
             self::OWNER_BOARD => $this->app->board()->canSeeImage($viewer, $img['owner_id']),
@@ -246,6 +251,7 @@ final class RichImageService
         return match ($img['owner_type']) {
             self::OWNER_COMPANY => $this->companyVisible($this->app->anonymous()),
             self::OWNER_PAGE => $this->app->pages()->canSeeImage(null, $img['owner_id']),
+            self::OWNER_NEWS => $this->app->newsService()->canSeeImage(null, $img['owner_id']),
             self::OWNER_OFFICE_GROUP_TERM, self::OWNER_OFFICE_HOLDER => $this->officesVisible($this->app->anonymous()),
             default => false,
         };

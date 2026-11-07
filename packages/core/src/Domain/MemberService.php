@@ -475,6 +475,23 @@ final class MemberService
         return $out;
     }
 
+    /**
+     * Konto aus einem freigegebenen Antrag (Selbstregistrierung, Issue #314) anlegen: geprüft mit prepare(), das Passwort hat
+     * die Person im Antrag festgelegt (hier nur der Hash). Ohne Startpasswort in der Antwort.
+     *
+     * @param array{name: string, first_name: string, last_name: string, login: string, email: string, level: string} $p
+     * @return array{id: int, name: string, first_name: string, last_name: string, username: string, email: string, level: string}
+     */
+    public function insertWithPasswordHash(array $p, string $passwordHash): array
+    {
+        try {
+            $id = $this->users->createWithPasswordHash($p['first_name'], $p['last_name'], $p['login'], $p['email'], $passwordHash, $p['level']);
+        } catch (\DomainException $e) {
+            throw ApiError::invalid($e->getMessage());
+        }
+        return ['id' => $id, 'name' => $p['name'], 'first_name' => $p['first_name'], 'last_name' => $p['last_name'], 'username' => $p['login'], 'email' => $p['email'], 'level' => $p['level']];
+    }
+
     /** Neues Startpasswort für ein Mitglied; meldet alle seine Geräte ab. */
     public function resetPassword(User $actor, int $id): array
     {

@@ -45,6 +45,9 @@ select {
 .app {
   /* --kompanie-zoom: Ausgleich für die Desktop-Ansicht im Handy-Browser (viewport.ts) */
   min-height: calc(100vh / var(--kompanie-zoom, 1));
+  /* svh: sichtbare Höhe bei eingeblendeter Adressleiste. 100vh ist im Handy-Browser höher als der sichtbare Bereich,
+   * dann ließe sich eine Seite mit wenig Inhalt (z. B. leere Galerie) trotzdem ein Stück scrollen. */
+  min-height: calc(100svh / var(--kompanie-zoom, 1));
   padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
 }
 
@@ -726,6 +729,16 @@ select {
   padding: 14px 16px;
   margin: 0 0 14px;
   color: var(--ink-2);
+}
+/* Hinweiskarten über dem Inhalt („Einrichtung starten“, „Anmelden“): Innenabstand und Abstand zu dem, was darunter folgt */
+.setup-hint,
+.login-first {
+  padding: 14px 16px;
+  margin: 0 0 14px;
+}
+.setup-hint p,
+.login-first p {
+  margin: 0 0 12px;
 }
 .toast {
   position: fixed;
@@ -3676,8 +3689,9 @@ fieldset.rights-tree legend {
   padding: 2px 6px;
   vertical-align: top;
 }
+/* accent-text ist in hell und dunkel auf Karten lesbar (mindestens 4,5 : 1, packages/branding/theme.mjs). */
 .rich-text a {
-  color: var(--primary-ink, var(--primary));
+  color: var(--accent-text);
   text-decoration: underline;
 }
 .rich-text hr {
@@ -4816,6 +4830,39 @@ button.spotlight-person:focus-visible {
 .holder-chip-link:focus-visible {
   background: color-mix(in srgb, var(--primary-text) 12%, transparent);
 }
+/* Inhaber mit Begleitpersonen: eigene Zeile, darunter abgesetzt „mit …“ */
+.timeline-holders li.with-companions {
+  flex-basis: 100%;
+}
+.holder-companions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 4px 0 2px 16px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+}
+.holder-companions-label {
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--muted);
+}
+.holder-companions .holder-chip {
+  font-size: 0.86rem;
+  font-weight: 400;
+}
+.holder-companions .holder-chip .member-avatar {
+  width: 24px;
+  height: 24px;
+  font-size: 0.6rem;
+}
+.spotlight-with {
+  font-size: 0.86rem;
+  font-style: italic;
+  opacity: 0.9;
+  overflow-wrap: anywhere;
+}
 .timeline-note {
   margin-top: 6px;
   font-size: 0.86rem;
@@ -4846,8 +4893,15 @@ button.spotlight-person:focus-visible {
     text-align: right;
   }
   .tl-left .tl-meta,
-  .tl-left .timeline-holders {
+  .tl-left .timeline-holders,
+  .tl-left .holder-companions {
     justify-content: flex-end;
+  }
+  .tl-left .holder-companions {
+    margin: 4px 16px 2px 0;
+    padding: 0 10px 0 0;
+    border-left: 0;
+    border-right: 2px solid var(--line);
   }
   .tl-left .tl-when {
     grid-column: 3;
@@ -4931,6 +4985,25 @@ button.spotlight-person:focus-visible {
   flex: 1 1 140px;
   min-width: 0;
   margin: 0;
+}
+/* Begleitpersonen eines Inhabers: eingerückt unter seiner Zeile */
+.office-holder {
+  margin-bottom: 8px;
+}
+.office-holder > .office-holder-row {
+  margin-bottom: 4px;
+}
+.office-companions {
+  margin-left: 16px;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+}
+.office-companions legend {
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+.office-companion-add {
+  padding-left: 0;
 }
 .office-import textarea {
   width: 100%;
@@ -5796,33 +5869,31 @@ button.spotlight-person:focus-visible {
   white-space: nowrap;
 }
 
-/* Kompanien (Issue #280): aufklappbare Karten mit Logo; Logos auf hellem Grund wie bei den Sponsoren. */
+/* Kompanien (Issue #280): Karten mit Logo, Antippen öffnet die Seite der Kompanie. Logos ohne eigenen Grund, damit
+   transparente Logos auf der Karte stehen (hell wie dunkel); nur der Kurzname ohne Logo steht in einem Kasten. */
 .company-card {
   padding: 0;
 }
-.company-card.inactive {
+.company-card.inactive,
+.company-page.inactive .company-page-head {
   opacity: 0.75;
 }
 .company-summary {
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 100%;
   padding: 12px 14px;
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
-  list-style: none;
 }
-.company-summary::-webkit-details-marker {
-  display: none;
-}
-.company-summary::after {
-  content: '›';
+.company-summary .chevron {
   margin-left: auto;
-  color: var(--muted);
-  font-size: 1.3rem;
-  transition: transform 0.15s;
-}
-.company-card details[open] > .company-summary::after {
-  transform: rotate(90deg);
 }
 .company-logo-box,
 .company-admin-logo {
@@ -5831,11 +5902,6 @@ button.spotlight-person:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
-  color: #1d1d1f;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  overflow: hidden;
 }
 .company-admin-logo {
   flex-basis: 48px;
@@ -5845,8 +5911,19 @@ button.spotlight-person:focus-visible {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+  /* Logos mit eigenem (deckendem) Hintergrund behalten runde Ecken wie zuvor der Kasten */
+  border-radius: 8px;
 }
 .company-logo-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
   font-weight: 700;
   font-size: 0.8rem;
   text-align: center;
@@ -5864,37 +5941,38 @@ button.spotlight-person:focus-visible {
   gap: 6px;
   flex-wrap: wrap;
 }
-.company-body {
-  padding: 0 14px 14px;
+/* Seite einer Kompanie: großes Logo neben Name und Angaben */
+.company-page-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 4px 0 12px;
 }
-.company-offices {
-  margin: 8px 0;
-  display: grid;
-  gap: 4px;
+.company-page-logo {
+  flex-basis: 88px;
+  height: 88px;
+  padding: 4px;
 }
-.company-offices > div {
+.company-page-head .member-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.company-page-head .row-sub {
+  margin: 4px 0 0;
+}
+/* Webseite und App der Kompanie als Knöpfe im Stil der App (wie „Mehr Infos“ bei Terminen). */
+.company-links {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-}
-.company-offices dt {
-  font-weight: 600;
-}
-.company-offices dd {
-  margin: 0;
-}
-.company-links {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
+  margin: 12px 0 0;
 }
 .company-members {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
+  margin-top: 8px;
 }
 .company-member-options {
   max-height: 50vh;
@@ -6079,4 +6157,22 @@ button.spotlight-person:focus-visible {
 }
 .page-meta .badge {
   margin-left: 0;
+}
+
+/* Zugang beantragen (Issue #314) */
+.registration-hint {
+  margin: 4px 0 12px;
+  text-align: center;
+}
+.registration-request .registration-message {
+  white-space: pre-line;
+  margin: 8px 0;
+}
+.registration-result {
+  margin: 0;
+}
+.settings-link-code {
+  display: block;
+  overflow-wrap: anywhere;
+  margin: 4px 0 8px;
 }

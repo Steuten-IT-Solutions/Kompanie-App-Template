@@ -77,8 +77,10 @@ final class BoardServiceTest extends TestCase
     public function testRightsPerRole(): void
     {
         $this->setUpApp();
-        $this->assertSame(401, $this->as(null)->call('GET', '/board')->status, 'nicht angemeldet');
-        $this->assertSame(403, $this->as($this->guest)->call('GET', '/board')->status, 'Gast-Konto');
+        // Lesen dürfen alle (ohne Brett nur öffentliche Nachrichten, testPublicMessages), schreiben nur mit post_board.
+        $this->assertSame(200, $this->as(null)->call('GET', '/board')->status, 'nicht angemeldet');
+        $this->assertSame(401, $this->call('POST', '/board', ['title' => 'T', 'text' => 'x'])->status);
+        $this->assertSame(200, $this->as($this->guest)->call('GET', '/board')->status, 'Gast-Konto');
         $this->assertSame(403, $this->call('POST', '/board', ['title' => 'T', 'text' => 'x'])->status);
         $this->assertSame(200, $this->as($this->m)->call('GET', '/board')->status, 'Mitglied liest');
         $this->assertSame(403, $this->call('POST', '/board', ['title' => 'T', 'text' => 'x'])->status, 'Mitglied ohne Recht schreibt nicht');
@@ -99,6 +101,64 @@ final class BoardServiceTest extends TestCase
         $this->assertSame(200, $this->as($poster)->call('DELETE', "/board/{$item['id']}")->status, 'vorzeitig löschen');
         $this->assertSame([], $this->as($this->m)->call('GET', '/board')->data['items']);
         $this->assertSame(404, $this->as($this->admin)->call('DELETE', "/board/{$item['id']}")->status);
+    }
+
+    public function testPublicMessages(): void
+    {
+        $this->setUpApp();
+        $intern = $this->post('<p>Nur für uns</p>', 'Intern');
+        $this->assertSame('members', $intern['audience'], 'ohne Angabe intern');
+        $public = $this->post('<p>Alle sind eingeladen</p>', 'Öffentlich', ['audience' => 'public']);
+        $this->assertSame('public', $public['audience']);
+        $this->assertSame(400, $this->call('POST', '/board', ['title' => 'T', 'text' => 'x', 'audience' => 'alle'])->status);
+
+        $titles = fn (?int $user): array => array_column($this->as($user)->call('GET', '/board')->data['items'], 'title');
+        $this->assertSame(['Öffentlich', 'Intern'], $titles($this->m), 'Mitglied sieht beide');
+        $this->assertSame(['Öffentlich', 'Intern'], $titles($this->cand), 'Anwärter sieht beide');
+        $this->assertSame(['Öffentlich'], $titles(null), 'ohne Anmeldung nur die öffentliche');
+        $this->assertSame(['Öffentlich'], $titles($this->guest), 'Gast-Konto ebenso');
+
+        // Öffentlich nur, was zur Nachricht gehört: Name des Verfassers, nicht wer zuletzt geändert hat oder der Mailversand.
+        $seen = $this->as(null)->call('GET', '/board')->data['items'][0];
+        $this->assertSame('Admin', $seen['author_name']);
+        $this->assertArrayNotHasKey('last_edit', $seen);
+        $this->assertArrayNotHasKey('mail', $seen);
+
+        // Bilder und Anhänge wie die Nachricht.
+        $admin = $this->users->find($this->admin);
+        $files = [];
+        foreach ([$public, $intern] as $msg) {
+            $file = $this->app->attachments()->upload($admin, ['name' => 'plan.pdf', 'data' => base64_encode('%PDF-1.4 x')]);
+            $this->assertSame(200, $this->as($this->admin)->call('PATCH', "/board/{$msg['id']}", ['attachments' => [$file['uid']]])->status);
+            $files[] = $file['uid'];
+        }
+        $this->assertSame(200, $this->app->attachments()->forDelivery(null, $files[0])['status'], 'Anhang einer öffentlichen Nachricht ohne Anmeldung');
+        $this->assertSame(401, $this->app->attachments()->forDelivery(null, $files[1])['status'], 'interner Anhang nicht');
+        $this->assertSame(401, $this->app->attachments()->forDelivery(null, str_repeat('a', 32))['status'], 'unbekannt: verrät nichts');
+        $this->assertSame(403, $this->app->attachments()->forDelivery($this->users->find($this->guest), $files[1])['status']);
+        $this->assertTrue($this->app->board()->canSeeImage(null, $public['id']));
+        $this->assertFalse($this->app->board()->canSeeImage(null, $intern['id']));
+        $this->assertFalse($this->app->board()->canSeeImage($this->users->find($this->guest), $intern['id']));
+        $this->assertTrue($this->app->board()->canSeeImage($this->users->find($this->cand), $intern['id']));
+
+        // Sichtbarkeit ändern: im Verlauf, updated_at bleibt (ausgeblendet bleibt ausgeblendet), nur mit post_board.
+        $this->assertSame(403, $this->as($this->m)->call('PATCH', "/board/{$intern['id']}", ['audience' => 'public'])->status);
+        $before = $this->app->board()->one($intern['id'])['updated_at'];
+        $changed = $this->as($this->admin)->call('PATCH', "/board/{$intern['id']}", ['audience' => 'public'])->data;
+        $this->assertSame(['public', $before], [$changed['audience'], $changed['updated_at']]);
+        $this->assertSame('Admin', $changed['last_edit']['name']);
+        $this->assertSame(['Öffentlich', 'Intern'], $titles(null));
+        $this->assertSame(400, $this->as($this->admin)->call('PATCH', "/board/{$intern['id']}", ['audience' => null])->status);
+        $revisions = $this->call('GET', "/board/{$intern['id']}/history")->data['revisions'];
+        $this->assertSame(['created', 'attachments', 'audience'], array_column($revisions, 'action'));
+        $this->assertSame(['members', 'public'], [$revisions[2]['before'], $revisions[2]['after']]);
+        $this->assertSame('members', $revisions[0]['after']['audience']);
+
+        // Verlauf der beendeten Nachrichten mit Sichtbarkeit; danach sieht sie ohne Anmeldung niemand mehr.
+        $this->call('DELETE', "/board/{$public['id']}");
+        $this->assertSame('public', array_column($this->call('GET', '/board/history')->data['items'], 'audience', 'id')[$public['id']]);
+        $this->assertFalse($this->app->board()->canSeeImage(null, $public['id']));
+        $this->assertSame(['Intern'], $titles(null));
     }
 
     public function testFeatureOff(): void
@@ -289,6 +349,61 @@ final class BoardServiceTest extends TestCase
         }
         $this->as($this->admin)->post('Dritte');
         $this->assertSame(0, $this->app->push()->repository()->counts()['queued'], 'Art abbestellt');
+    }
+
+    public function testPublicMessagesAlsoNotifyGuests(): void
+    {
+        $this->setUpApp(['board' => true, 'events' => true]);
+        if (!$this->app->push()->supported()) {
+            $this->markTestSkipped('ohne Push-Unterstützung');
+        }
+        $off = $this->users->add('ohne', Roles::MEMBER);
+        // Gerät eines Gasts von vorher (nur Termine), bevor es öffentliche Nachrichten am Brett gab.
+        $this->subscribe(null, 'gast-alt', ['events']);
+        $this->subscribe($this->m, 'm');
+        $this->subscribe($this->cand, 'anwaerter');
+        $this->subscribe($this->guest, 'gast-konto');
+        $this->subscribe(null, 'gast');
+        $this->subscribe($off, 'ohne-brett', ['events']);
+        $this->assertContains('board_public', $this->app->push()->availableTypes(null), 'Gäste können öffentliche Nachrichten abonnieren');
+        $this->assertContains('board_public', $this->app->push()->availableTypes($this->users->find($this->guest)));
+        $this->assertNotContains('board_public', $this->app->push()->availableTypes($this->users->find($this->m)), 'Mitglieder bekommen sie über board');
+        $endpoints = fn (): array => array_map(
+            static fn (string $e): string => substr($e, strlen('https://fcm.googleapis.com/fcm/send/')),
+            array_column($this->app->db->select('SELECT s.endpoint FROM {push_queue} q JOIN {push_subscriptions} s ON s.id = q.subscription_id ORDER BY q.id'), 'endpoint'),
+        );
+
+        // Intern: wie bisher nur Mitglieder und Anwärter.
+        $this->post('Intern');
+        $this->assertSame(['m', 'anwaerter'], $endpoints());
+
+        // Öffentlich: dazu alle Gäste; bestehende Abos ohne die Art bekommen sie beim ersten Mal dazu (nicht Mitglieder,
+        // die board abbestellt haben).
+        $this->app->db->execute('DELETE FROM {push_queue}');
+        $this->post('Öffentlich', 'Tag der offenen Tür', ['audience' => 'public']);
+        $this->assertSame(['gast-alt', 'm', 'anwaerter', 'gast-konto', 'gast'], $endpoints(), 'je Gerät einmal, nicht an den Verfasser');
+        $types = array_column($this->app->push()->repository()->all(), 'types', 'endpoint');
+        $this->assertSame(['board_public', 'events'], $types['https://fcm.googleapis.com/fcm/send/gast-alt'] ?? null);
+        $this->assertSame(['events'], $types['https://fcm.googleapis.com/fcm/send/ohne-brett'] ?? null);
+        $payload = json_decode((string) $this->app->db->scalar('SELECT payload FROM {push_queue} ORDER BY id LIMIT 1'), true);
+        $this->assertSame(['Schwarzes Brett: Admin', 'Tag der offenen Tür'], [$payload['title'], $payload['body']]);
+
+        // Danach entscheidet das Gerät: abbestellt bleibt abbestellt.
+        $this->app->db->execute('DELETE FROM {push_queue}');
+        foreach ($this->app->push()->repository()->all() as $sub) {
+            if (str_ends_with($sub['endpoint'], '/gast-alt')) {
+                $this->app->push()->repository()->update($sub['id'], ['types' => ['events']], $this->app->time()->nowUtc());
+            }
+        }
+        $this->post('Noch eine', 'Zweite', ['audience' => 'public']);
+        $this->assertSame(['m', 'anwaerter', 'gast-konto', 'gast'], $endpoints());
+
+        // Wird eine Nachricht beim Ändern öffentlich, gibt es keine Benachrichtigung.
+        $this->app->db->execute('DELETE FROM {push_queue}');
+        $intern = $this->post('Später öffentlich', 'Dritte');
+        $this->app->db->execute('DELETE FROM {push_queue}');
+        $this->call('PATCH', "/board/{$intern['id']}", ['audience' => 'public']);
+        $this->assertSame([], $endpoints());
     }
 
     public function testTtlNeverLongerThanTheMessage(): void

@@ -10,9 +10,10 @@ use KompanieApp\Core\Storage\Sql\Connection;
  * Nachrichten am Schwarzen Brett (Issue #5, #172). Zeiten in UTC ('Y-m-d H:i:s'); eine Nachricht gilt bis expires_at.
  * Vorzeitig gelöschte Nachrichten bleiben mit deleted_at/deleted_by stehen (expires_at = Zeitpunkt des Löschens), bis
  * BoardService::cleanup sie nach der Aufbewahrung des Verlaufs endgültig entfernt. body ist bereinigter formatierter
- * Inhalt (RichText), title reiner Text (NULL nur bei Nachrichten, die eine ältere Version geschrieben hat).
+ * Inhalt (RichText), title reiner Text (NULL nur bei Nachrichten, die eine ältere Version geschrieben hat). audience:
+ * public (alle, auch ohne Anmeldung) oder members (wer das Brett liest); fehlt die Spalte noch, gilt members.
  *
- * @phpstan-type BoardMessage array{id: int, title: string, body: string, author_id: int, created_at: string, updated_at: string, expires_at: string, deleted_at: string|null, deleted_by: int|null}
+ * @phpstan-type BoardMessage array{id: int, title: string, body: string, author_id: int, created_at: string, updated_at: string, expires_at: string, deleted_at: string|null, deleted_by: int|null, audience: string}
  * @phpstan-type BoardRevision array{id: int, message_id: int, user_id: int, created_at: string, action: string, before_value: string|null, after_value: string|null}
  */
 final class BoardRepository
@@ -53,12 +54,12 @@ final class BoardRepository
         )));
     }
 
-    public function insert(string $title, string $body, int $authorId, string $now, string $expires): int
+    public function insert(string $title, string $body, int $authorId, string $now, string $expires, string $audience = 'members'): int
     {
-        return $this->db->insert('board_messages', ['title' => $title, 'body' => $body, 'author_id' => $authorId, 'created_at' => $now, 'updated_at' => $now, 'expires_at' => $expires]);
+        return $this->db->insert('board_messages', ['title' => $title, 'body' => $body, 'author_id' => $authorId, 'created_at' => $now, 'updated_at' => $now, 'expires_at' => $expires, 'audience' => $audience]);
     }
 
-    /** @param array<string, string> $values title, body, updated_at, expires_at */
+    /** @param array<string, string> $values title, body, updated_at, expires_at, audience */
     public function update(int $id, array $values): void
     {
         if ($values !== []) {
@@ -158,7 +159,7 @@ final class BoardRepository
         $out = [];
         $rows = $this->db->select(
             "SELECT message_id, user_id, created_at FROM {board_message_revisions}
-             WHERE action IN ('title', 'content', 'expires') AND message_id IN (" . implode(',', array_fill(0, count($messageIds), '?')) . ')
+             WHERE action IN ('title', 'content', 'expires', 'audience') AND message_id IN (" . implode(',', array_fill(0, count($messageIds), '?')) . ')
              ORDER BY created_at, id',
             $messageIds,
         );
@@ -184,6 +185,7 @@ final class BoardRepository
             'expires_at' => (string) $r['expires_at'],
             'deleted_at' => isset($r['deleted_at']) && $r['deleted_at'] !== '' ? (string) $r['deleted_at'] : null,
             'deleted_by' => isset($r['deleted_by']) ? (int) $r['deleted_by'] : null,
+            'audience' => ($r['audience'] ?? null) === 'public' ? 'public' : 'members',
         ];
     }
 }

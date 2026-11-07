@@ -47,6 +47,12 @@ export function adminTabs(): AdminTab[] {
     [
       { id: 'mitglieder', label: 'Mitglieder', on: memberListAllowed() },
       { id: 'ehemalige', label: 'Ehemalige', on: can('create_users') },
+      // Anfragen auf einen Zugang (Issue #314): mit Zahl der offenen; auch nach dem Ausschalten, solange welche warten
+      {
+        id: 'anfragen',
+        label: config?.pendingRegistrations ? `Anfragen (${config.pendingRegistrations})` : 'Anfragen',
+        on: can('create_users') && (!!config?.registration || (config?.pendingRegistrations ?? 0) > 0),
+      },
       { id: 'punkte', label: `${sec.points} +`, on: points },
       { id: 'strafe', label: `${sec.penalties} +`, on: canPenalties() },
       { id: 'katalog', label: `${sec.points}katalog`, on: points, group: SETUP },
@@ -205,6 +211,14 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
       <circle cx="12" cy="8" r="3.5" />
       <path d="M5.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6" />
       <path d="M18 3.5a3 3 0 0 1 0 4" />
+    </>
+  ),
+  // Anfragen auf einen Zugang: Person mit Plus (wartet auf Aufnahme)
+  anfragen: (
+    <>
+      <circle cx="10" cy="8" r="3.5" />
+      <path d="M3.5 20c0-3.6 2.9-6 6.5-6 1.6 0 3 .5 4.1 1.3" />
+      <path d="M18.5 14v6M15.5 17h6" />
     </>
   ),
   punkte: <path d="M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6L12 16.3l-5.4 3 1.3-6-4.6-4.1 6.1-.6z" />,

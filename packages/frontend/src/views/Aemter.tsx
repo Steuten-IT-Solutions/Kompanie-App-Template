@@ -39,27 +39,61 @@ export function termDuration(t: Pick<OfficeTerm, 'kind' | 'start_year' | 'end_ye
 export type PersonPath = (userId: number) => string;
 const memberPath: PersonPath = (userId) => `mitglieder/${userId}`;
 
-/** Personen als Chips mit Foto bzw. Anfangsbuchstaben; Personen mit Konto führen zu ihrer Seite (to). */
+/** Eine Person als Chip mit Foto bzw. Anfangsbuchstaben; Personen mit Konto führen zu ihrer Seite (to). */
+function HolderChip({ h, to }: { h: OfficeHolder; to: PersonPath }) {
+  return h.user_id ? (
+    <button type="button" className="holder-chip holder-chip-link" onClick={() => navigate(to(h.user_id!))}>
+      <MemberAvatar url={h.photo_url} name={h.name} />
+      <span>{h.name}</span>
+    </button>
+  ) : (
+    <span className="holder-chip">
+      <MemberAvatar url={h.photo_url} name={h.name} />
+      <span>{h.name}</span>
+    </span>
+  );
+}
+
+/** „mit …“: Begleitpersonen eines Inhabers, abgesetzt unter seinem Chip. */
+function Companions({ people, to }: { people: OfficeHolder[]; to: PersonPath }) {
+  return (
+    <div className="holder-companions">
+      <span className="holder-companions-label">mit</span>
+      <ul className="timeline-holders">
+        {people.map((c, i) => (
+          <li key={i}>
+            <HolderChip h={c} to={to} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Personen als Chips, je Inhaber darunter seine Begleitpersonen. */
 function Holders({ holders, to }: { holders: OfficeHolder[]; to: PersonPath }) {
   return (
     <ul className="timeline-holders">
       {holders.map((h, i) => (
-        <li key={i}>
-          {h.user_id ? (
-            <button type="button" className="holder-chip holder-chip-link" onClick={() => navigate(to(h.user_id!))}>
-              <MemberAvatar url={h.photo_url} name={h.name} />
-              <span>{h.name}</span>
-            </button>
-          ) : (
-            <span className="holder-chip">
-              <MemberAvatar url={h.photo_url} name={h.name} />
-              <span>{h.name}</span>
-            </span>
-          )}
+        <li key={i} className={h.companions?.length ? 'with-companions' : undefined}>
+          <HolderChip h={h} to={to} />
+          {!!h.companions?.length && <Companions people={h.companions} to={to} />}
         </li>
       ))}
     </ul>
   );
+}
+
+/** Begleitpersonen als Text: „Erika Muster“ bzw. „A und B“. */
+export function companionNames(h: OfficeHolder): string {
+  const names = (h.companions ?? []).map((c) => c.name);
+  return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} und ${names[names.length - 1]}`;
+}
+
+/** Name mit Begleitung für Textzeilen: „Max Muster mit Erika Muster“. */
+export function nameWithCompanions(h: OfficeHolder): string {
+  const others = companionNames(h);
+  return others ? `${h.name} mit ${others}` : h.name;
 }
 
 export type TimelineEntry = { key: string | number; term: OfficeTerm; office?: string };
@@ -125,7 +159,14 @@ export function Timeline({
             </div>
           )}
           {(() => {
-            const shown = self === undefined ? term.holders : term.holders.filter((h) => h.user_id !== self);
+            // Seite einer Person: alle anderen der Amtszeit, Inhaber und Begleitpersonen, als „mit …“
+            const shown =
+              self === undefined
+                ? term.holders
+                : term.holders
+                    .flatMap((h) => [h, ...(h.companions ?? [])])
+                    .filter((h) => h.user_id !== self)
+                    .map((h) => ({ ...h, companions: undefined }));
             return (
               shown.length > 0 &&
               (self === undefined ? (
@@ -172,6 +213,7 @@ function Spotlight({ terms, link }: { terms: OfficeTerm[]; link: boolean }) {
               </span>
               <span className="spotlight-text">
                 <span className="spotlight-name">{h.name}</span>
+                {!!h.companions?.length && <span className="spotlight-with">mit {companionNames(h)}</span>}
                 <span className="spotlight-since">
                   seit {t.start_year}
                   {termDuration(t) ? ` · ${termDuration(t)}` : ''}
@@ -268,7 +310,16 @@ function OfficeCard({ office, open, onToggle }: { office: Office; open: boolean;
  * Gruppe mit gemeinsamen Amtszeiten (Issue #282): je Amtszeit eine Karte mit Gruppenbild und allen Personen mit ihren
  * Ämtern, die laufende oben als „aktuell“.
  */
-export function JointTerms({ terms, offices, group }: { terms: OfficeGroupTerm[]; offices: Office[]; group: string }) {
+export function JointTerms({
+  terms,
+  offices,
+  group,
+}: {
+  terms: OfficeGroupTerm[];
+  offices: Office[];
+  /** Einzahl der Gruppe („Königshaus“), sonst ihre Bezeichnung */
+  group: string;
+}) {
   if (terms.length === 0) return null;
   return (
     <ul className="joint-terms">
@@ -403,7 +454,7 @@ export function YearGrid({
       );
       for (const { term, lane, first, last } of bars) {
         const names = term.holders.map((h) => h.name).join(', ');
-        const label = `${o.title}: ${termYears(term)} · ${names}${term.note ? ` · ${term.note}` : ''}${term.honor ? ' · Ehrung' : ''}`;
+        const label = `${o.title}: ${termYears(term)} · ${term.holders.map(nameWithCompanions).join(', ')}${term.note ? ` · ${term.note}` : ''}${term.honor ? ' · Ehrung' : ''}`;
         const style: CSSProperties = { gridColumn: column + lane, gridRow: `${row(last)} / ${row(first) + 1}` };
         cells.push(
           <div
@@ -516,10 +567,11 @@ export function OfficesView() {
     ...(data?.groups ?? []).map((g) => ({
       key: `g${g.id}`,
       title: g.title,
+      singular: g.singular || g.title,
       offices: offices.filter((o) => o.group_id === g.id),
       joint: g.joint_terms ? (data?.group_terms ?? []).filter((t) => t.group_id === g.id) : null,
     })),
-    { key: 'none', title: '', offices: offices.filter((o) => o.group_id === null), joint: null },
+    { key: 'none', title: '', singular: '', offices: offices.filter((o) => o.group_id === null), joint: null },
   ].filter((s) => s.offices.length > 0);
   const all = offices.every((o) => open.has(o.id));
 
@@ -559,7 +611,7 @@ export function OfficesView() {
         sections.map((s) => (
           <section key={s.key} className="office-group">
             {s.title && <h2 className="section-title">{s.title}</h2>}
-            {s.joint && <JointTerms terms={s.joint} offices={s.offices} group={s.title} />}
+            {s.joint && <JointTerms terms={s.joint} offices={s.offices} group={s.singular} />}
             {/* Mit gemeinsamen Amtszeiten nur noch, was nicht dazugehört (z. B. Ehrungen) je Amt */}
             {(s.joint
               ? s.offices.map((o) => ({ ...o, terms: o.terms.filter((t) => !t.group_term_id) })).filter((o) => o.terms.length > 0)
@@ -575,18 +627,18 @@ export function OfficesView() {
 
 /**
  * Alle Amtszeiten einer Person über alle Ämter, als ein Zeitstrahl (laufende zuerst, dann nach Beginn). Je Karte die
- * Einzahl („Kompaniekönig“) aus dem verknüpften Titel, ohne Verknüpfung die Bezeichnung des Amtes mit seiner Gruppe.
+ * Einzahl des Amts („Kompaniekönig“: eigene Einzahl oder verknüpfter Titel), sonst seine Bezeichnung; ohne Gruppe.
+ * Als Begleitperson steht die Amtszeit auch dabei, mit „(Begleitung)“.
  */
 export function personEntries(data: OfficesOverview | null | undefined, userId: number): TimelineEntry[] {
-  const groups = new Map((data?.groups ?? []).map((g) => [g.id, g.title]));
   const out: TimelineEntry[] = [];
   for (const o of data?.offices ?? []) {
     for (const t of o.terms) {
+      const office = o.holder_title || o.title;
       if (t.holders.some((h) => h.user_id === userId)) {
-        const group = o.group_id !== null ? groups.get(o.group_id) : undefined;
-        // Der Titel nennt die Gruppe meist schon („Kompaniekönig“); nur die Bezeichnung des Amtes bekommt sie dazu.
-        const office = o.holder_title || (group ? `${o.title} · ${group}` : o.title);
         out.push({ key: t.id, term: t, office });
+      } else if (t.holders.some((h) => h.companions?.some((c) => c.user_id === userId))) {
+        out.push({ key: t.id, term: t, office: `${office} (Begleitung)` });
       }
     }
   }

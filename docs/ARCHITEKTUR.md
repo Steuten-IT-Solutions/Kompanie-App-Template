@@ -159,6 +159,8 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 | `ImageResizer` | Bildgrößen erzeugen | `wp_get_image_editor` | GD oder Imagick |
 | `Scheduler` | wiederkehrende Aufgaben | WP-Cron | Pseudo-Cron, optional Cronjob |
 | `NewsSource` | Neuigkeiten | eigene Beiträge | fremde WordPress-Seite, RSS oder keine |
+
+Unabhängig vom Adapter kann der Admin als Quelle „In der App schreiben“ wählen (`news_source` = `app`, `Domain\NewsService`, Tabelle `app_news` ab Migration 46, Bilder in `rich_images` mit Besitzer `news`). Dann liest die App aus `AppNewsSource` statt aus dem `NewsSource` des Adapters; es gilt immer genau eine Quelle (kein Mischen). Schreiben mit `manage_news`, Standardrolle „News verwalten“ (`member`, `manage_news`) entsteht beim Wechsel auf `app`.
 | `Clock` | Zeit und Zeitzone | `wp_timezone` | Europe/Berlin |
 | `Mailer` | Mails über SMTP (Issue #172) | PHPMailer von WordPress | mitgeliefertes PHPMailer |
 
@@ -254,6 +256,13 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 - Zentrale Sperre in `Api::dispatch` vor allen Routen: Wer `manage_settings` nicht hat, bekommt 503 `maintenance` mit `reason`. Ausgenommen sind `/config` (liefert `maintenance`, damit die App die Wartungsseite zeigt) und die Anmeldung (`/auth/login`, `/auth/logout`, `/auth/csrf`). Geschützte Fotos und Dokumente antworten ebenso mit 503; öffentliche Bilder liefert der Webserver direkt aus.
 - Hintergrundaufgaben pausieren außer Updates und Statusmeldungen (`MaintenanceService::runsDuringMaintenance`); die Push-Warteschlange wird beim Beenden gleich verschickt. Die Statusmeldung enthält `maintenance: true/false`, nie die Begründung.
 - Die App zeigt Nicht-Admins die Wartungsseite (auch wenn eine Anfrage 503 `maintenance` bekommt), Admins ein rotes Banner mit „Beenden“. Der Service Worker speichert nur erfolgreiche Antworten; offline gespeicherte Daten bleiben erhalten. Die Shortcodes der Webseite zeigen weiter an (Entscheidung im Issue).
+
+### Zugang beantragen (Issue #314)
+
+- **Ablauf:** Gast füllt `#/registrieren` aus → `registration_requests` (nur Passwort-Hash, `PASSWORD_DEFAULT`) → wer `create_users` hat, gibt unter `#/verwaltung/anfragen` frei → erst dann `UserDirectory::createWithPasswordHash` (über `MemberService::insertWithPasswordHash`, gleiche Prüfungen wie beim Anlegen; Rolle nie `admin`). Ausgeschaltet, bis ein Admin es einschaltet (`registration_enabled`).
+- **Zwei Wege je nach Mailversand** (`MailService::configured()`): mit Mail Bestätigungslink (24 h, nur sha256 des Tokens gespeichert), Ergebnis per Mail, und das Formular verrät nicht, ob es eine Adresse schon gibt. Ohne Mail sofort `pending`, Ergebnis über den Hinweis bei der Anmeldung (`RegistrationService::loginHint`, 403 `registration_*` statt `login_failed`) oder `POST /registration/status`; Ablehnungen bleiben dann 14 Tage ohne Namen und Adresse stehen.
+- **Schutz:** `Domain\FormTrap` (Honeypot und signierte Zeitmarke, mit den Fehlermeldungen geteilt), Begrenzung je IP-Hash und je Tag, höchstens 50 offene Anfragen. Aufgabe `registrations` (stündlich) räumt Abgelaufenes ab. Die Tabelle ist keine Kerntabelle der Sicherung.
+- **WordPress:** Der Hash wird direkt in `user_pass` geschrieben; WordPress prüft ihn mit `password_verify` (ab 6.8) bzw. über phpass mit `crypt()`.
 
 ### Fehlermeldungen (Issue #64)
 
@@ -458,6 +467,7 @@ Neben den Repositories bekommt der Kern diese Ports von außen:
 | `manage_sponsors` | Sponsoren anlegen, ändern, ordnen und löschen, Logos hochladen (Issue #279) |
 | `manage_companies` | Kompanien anlegen, ändern, ordnen und löschen, Logos hochladen, Mitglieder zuordnen (Issue #280) |
 | `manage_pages` | Eigene Seiten anlegen, ändern, ordnen und löschen; sieht alle Seiten (Issue #287) |
+| `manage_news` | News in der App schreiben, ändern und löschen (nur mit der Quelle „In der App schreiben“) |
 | `view_personal` | Persönliche Angaben anderer sehen: E-Mail-Adresse, Handynummer, Adresse, ganzes Geburtsdatum (Verwaltung → Mitglied) |
 | `manage_personal` | Persönliche Angaben anderer ändern (setzt `view_personal` voraus); Geburtstage anderer eintragen (nur das Datum) |
 | `create_users` | Mitglieder anlegen (auch mit ihren persönlichen Angaben), Startpasswörter erzeugen; Ehemalige eintragen, wieder aufnehmen, importieren |
@@ -819,7 +829,7 @@ Die Schritte 2–5 lassen sich überspringen und später unter *Einstellungen* n
 - **Sicherheit:** Begrenzung fehlgeschlagener Anmeldungen, geschützte Dateien und Datenbank außerhalb des Web-Verzeichnisses oder gesperrt **und** geprüft, Sicherheits-Header.
 - **Läuft auf** Apache, nginx und LiteSpeed, im Hauptverzeichnis oder Unterordner, mit oder ohne URL-Umschreibung.
 - **Zwischenspeicher und Komprimierung** (beide Adapter, Apache/LiteSpeed): `app/assets/.htaccess` lässt die gehashten JS/CSS-Dateien ein Jahr unverändert im Browser (`immutable`), `app/.htaccess` komprimiert Text-Dateien (`mod_deflate`) und cacht Icons und Manifest einen Tag. Die Vorlagen liegen in `adapters/shared/`; `scripts/package.php` und `scripts/build-frontend.sh` legen sie ab (nie aus dem Build-Ergebnis). Auf nginx muss der Hoster das selbst einstellen.
-- **Einstellungen in der App** für Admins: Google-Zugang, Kalender, Galerie, Quelle der Neuigkeiten (fremde WordPress-Seite oder RSS/Atom-Feed). Geheime Werte zeigt die App nie wieder an.
+- **Einstellungen in der App** für Admins: Google-Zugang, Kalender, Galerie, Quelle der Neuigkeiten (WordPress: Beiträge der Seite oder in der App; eigenständig: fremde WordPress-Seite, RSS/Atom-Feed, in der App oder keine). Geheime Werte zeigt die App nie wieder an.
 - **Datensicherung** im gemeinsamen Export-Format, in der App und über `bin/kompanie.php export`/`import`.
 - **Updates** durch Tausch der Programmdateien (mit Rücktausch bei Fehlern), auch über `bin/kompanie.php update-check`/`update`/`rollback`.
 - Einzelheiten: [adapters/standalone/README.md](../adapters/standalone/README.md).

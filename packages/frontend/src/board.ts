@@ -18,9 +18,17 @@ let items: BoardItem[] | null = null;
 /** Zuletzt gestartete Ladeanfrage: Eine ältere, die später ankommt, überschreibt keinen neueren Stand. */
 let latestRequest = 0;
 
-/** Wer das Brett sieht: Bereich an und Recht view_board (wie BoardService::isRecipient im Kern). */
+/** Wer das Brett mit allen internen Nachrichten sieht (und in der Navigation hat): Bereich an und Recht view_board (wie BoardService::isRecipient im Kern). */
 export function boardVisible(): boolean {
   return !!config?.features.board && can('view_board');
+}
+
+/**
+ * Wer das Brett überhaupt lädt: bei eingeschaltetem Bereich alle, auch ohne Anmeldung. Ohne view_board liefert der
+ * Server nur die öffentlichen Nachrichten (BoardService::canRead); Banner und Seite erscheinen dann nur mit solchen.
+ */
+export function boardReadable(): boolean {
+  return !!config?.features.board;
 }
 
 /** Schreiben, ändern und löschen. */
@@ -43,7 +51,7 @@ export function canManagePolls(): boolean {
  * zurück oder null.
  */
 export async function refreshBoard(): Promise<string | null> {
-  if (!boardVisible() && !canPostBoard()) return null;
+  if (!boardReadable()) return null;
   const request = ++latestRequest;
   let loaded: BoardItem[];
   try {

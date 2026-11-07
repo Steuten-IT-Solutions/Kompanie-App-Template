@@ -28,6 +28,8 @@ use KompanieApp\Core\Storage\OfficeRepository;
  *   mit denselben Jahren zu einer gemeinsamen Amtszeit (z. B. „Königshaus 2025–2026“) mit Zusatz und Gruppenbild. Je Amt
  *   bleibt eine normale Amtszeit (group_term_id), damit Chronik, Jahre, Zeitstrahl, Titel und Import weiterlaufen.
  *   Ehrungen werden nicht gebündelt.
+ * - Begleitpersonen: Ein Inhaber kann Begleitpersonen haben (z. B. Partnerin oder Partner: „Prinz … mit …“), Konten oder
+ *   freie Namen wie die Inhaber. Sie bekleiden das Amt nicht: kein Titel, kein Ende beim Ausscheiden, nicht im Import.
  *
  * @phpstan-import-type Office from OfficeRepository
  * @phpstan-import-type Term from OfficeRepository
@@ -41,6 +43,7 @@ final class OfficeService
     public const NAME_MAX = 100;
     public const NOTE_MAX = 100;
     public const HOLDERS_MAX = 20;
+    public const COMPANIONS_MAX = 5;
     public const YEAR_MIN = 1800;
     public const KIND_PERIOD = 'period';
     public const KIND_POINT = 'point';
@@ -62,7 +65,7 @@ final class OfficeService
      * Alle Gruppen, Ämter und Amtszeiten für den Zeitstrahl, mit einer festen Zahl von Abfragen.
      * Ämter in der Reihenfolge ihrer Gruppen (ohne Gruppe zuletzt), Amtszeiten: laufende zuerst, dann nach Beginn absteigend.
      *
-     * @return array{groups: list<array{id: int, title: string}>, offices: list<array<string, mixed>>}
+     * @return array{groups: list<array{id: int, title: string, singular: string, joint_terms: bool}>, offices: list<array<string, mixed>>}
      */
     public function overview(?User $viewer): array
     {
@@ -74,8 +77,10 @@ final class OfficeService
         $userIds = [];
         foreach ($holders as $list) {
             foreach ($list as $h) {
-                if ($h['user_id'] !== null) {
-                    $userIds[$h['user_id']] = $h['user_id'];
+                foreach ([$h, ...$h['companions']] as $p) {
+                    if ($p['user_id'] !== null) {
+                        $userIds[$p['user_id']] = $p['user_id'];
+                    }
                 }
             }
         }
@@ -95,6 +100,22 @@ final class OfficeService
         foreach ($repo->terms() as $t) {
             $termsByOffice[$t['office_id']][] = $t;
         }
+        // Eine Person (Inhaber oder Begleitperson) für den Zeitstrahl
+        $person = function (array $h) use ($users, $photos, $directory, $manager, $viewer, $guest): array {
+            $user = $h['user_id'] !== null ? ($users[$h['user_id']] ?? null) : null;
+            $out = ['name' => $user !== null ? $user->name : $h['name']];
+            // Konto und Foto: für Personen, deren Foto der Betrachter sehen darf (Mitgliederliste und Ehemalige,
+            // dieselbe Regel wie beim Abrufen des Fotos: MemberPhotoService::visibility), sonst nur für die
+            // Pflege (und das eigene Konto, für „Meine Ämter“).
+            $visible = $user !== null && $directory && $this->app->memberPhotos()->visibility($viewer, $user, $guest)['visible'];
+            if ($user !== null && ($visible || $manager || $viewer?->id === $user->id)) {
+                $out['user_id'] = $user->id;
+            }
+            if ($visible) {
+                $out['photo_url'] = $photos[$user->id] ?? null;
+            }
+            return $out + ($user === null ? $this->holderPhoto($h, $manager) : []);
+        };
 
         $out = [];
         foreach ($offices as $o) {
@@ -107,23 +128,11 @@ final class OfficeService
                 // Einzahl für den Zeitstrahl einer Person: „Kompaniekönig“ statt „Kompaniekönige“; die eigene Einzahl des
                 // Amts, sonst der verknüpfte Titel, null ohne beides (dann die Bezeichnung)
                 'holder_title' => $o['singular'] !== '' ? $o['singular'] : ($titlesShown && $o['title_id'] !== null ? ($titles[$o['title_id']] ?? null) : null),
-                'terms' => array_map(function (array $t) use ($holders, $users, $photos, $directory, $manager, $viewer, $guest): array {
-                    return self::termOut($t) + ['holders' => array_map(function (array $h) use ($users, $photos, $directory, $manager, $viewer, $guest): array {
-                        $user = $h['user_id'] !== null ? ($users[$h['user_id']] ?? null) : null;
-                        $out = ['name' => $user !== null ? $user->name : $h['name']];
-                        // Konto und Foto: für Personen, deren Foto der Betrachter sehen darf (Mitgliederliste und Ehemalige,
-                        // dieselbe Regel wie beim Abrufen des Fotos: MemberPhotoService::visibility), sonst nur für die
-                        // Pflege (und das eigene Konto, für „Meine Ämter“).
-                        $visible = $user !== null && $directory && $this->app->memberPhotos()->visibility($viewer, $user, $guest)['visible'];
-                        if ($user !== null && ($visible || $manager || $viewer?->id === $user->id)) {
-                            $out['user_id'] = $user->id;
-                        }
-                        if ($visible) {
-                            $out['photo_url'] = $photos[$user->id] ?? null;
-                        }
-                        return $out + ($user === null ? $this->holderPhoto($h, $manager) : []);
-                    }, $holders[$t['id']] ?? [])];
-                }, $terms),
+                'terms' => array_map(static fn (array $t): array => self::termOut($t) + ['holders' => array_map(
+                    // Begleitpersonen nur, wenn es welche gibt
+                    static fn (array $h): array => $person($h) + ($h['companions'] !== [] ? ['companions' => array_map($person, $h['companions'])] : []),
+                    $holders[$t['id']] ?? [],
+                )], $terms),
             ] + ($manager ? ['title_id' => $o['title_id'], 'linked_title' => $o['title_id'] !== null ? ($titles[$o['title_id']] ?? null) : null] : []);
         }
         return [
@@ -135,20 +144,24 @@ final class OfficeService
 
     // ---- Gruppen ----
 
-    /** @return array{id: int, title: string} */
-    public function createGroup(mixed $title): array
+    /**
+     * @param mixed $in {title, singular?} (oder nur der Titel, wie früher)
+     * @return array{id: int, title: string, singular: string, joint_terms: bool}
+     */
+    public function createGroup(mixed $in): array
     {
+        $in = is_array($in) ? $in : ['title' => $in];
         $repo = $this->repository();
-        $id = $repo->insertGroup($this->validGroupTitle($title, null), $repo->maxGroupSort() + 10);
+        $id = $repo->insertGroup($this->validGroupTitle($in['title'] ?? null, null), $repo->maxGroupSort() + 10, $this->validSingular($in['singular'] ?? ''));
         return $this->group($id);
     }
 
     /**
-     * Umbenennen (title) und gemeinsame Amtszeiten ein- oder ausschalten (joint_terms). Eingeschaltet werden vorhandene
-     * Amtszeiten mit denselben Jahren gebündelt; ausgeschaltet bleibt alles gespeichert.
+     * Umbenennen (title, singular) und gemeinsame Amtszeiten ein- oder ausschalten (joint_terms). Eingeschaltet werden
+     * vorhandene Amtszeiten mit denselben Jahren gebündelt; ausgeschaltet bleibt alles gespeichert.
      *
-     * @param mixed $in {title?, joint_terms?} (oder nur der Titel, wie früher)
-     * @return array{id: int, title: string, joint_terms: bool}
+     * @param mixed $in {title?, singular?, joint_terms?} (oder nur der Titel, wie früher)
+     * @return array{id: int, title: string, singular: string, joint_terms: bool}
      */
     public function updateGroup(int $id, mixed $in): array
     {
@@ -157,6 +170,9 @@ final class OfficeService
         $data = [];
         if (array_key_exists('title', $in)) {
             $data['title'] = $this->validGroupTitle($in['title'], $id);
+        }
+        if (array_key_exists('singular', $in)) {
+            $data['singular'] = $this->validSingular($in['singular']);
         }
         if (array_key_exists('joint_terms', $in)) {
             if (!is_bool($in['joint_terms'])) {
@@ -333,7 +349,7 @@ final class OfficeService
             'end_year' => $current['end_year'],
             'note' => $current['note'],
             'honor' => $current['honor'],
-            'holders' => array_map(static fn (array $h): array => $h['user_id'] !== null ? ['user_id' => $h['user_id'], 'name' => $h['name']] : ['name' => $h['name'], 'image_uid' => $h['image_uid']], $repo->holdersOf($id)),
+            'holders' => array_map(self::stored(...), $repo->holdersOf($id)),
         ];
         [$term, $holders] = $this->validTerm($merged);
         $holders = $this->claimHolderPhotos($holders, $actor);
@@ -420,7 +436,7 @@ final class OfficeService
                     $repo->deleteTerm($t['id']);
                     continue;
                 }
-                $holders = $members[$officeId] ?? array_map(static fn (array $h): array => ['user_id' => $h['user_id'], 'name' => $h['name'], 'image_uid' => $h['image_uid']], $repo->holdersOf($t['id']));
+                $holders = $members[$officeId] ?? array_map(self::stored(...), $repo->holdersOf($t['id']));
                 $repo->saveTerm($t['id'], $officeId, $term + ['honor' => false], $holders);
                 if ($t['ended_for'] !== null) {
                     $repo->releaseEnd($t['id']);
@@ -532,13 +548,16 @@ final class OfficeService
      * vorhandene Fotos bleiben (auch dasselbe Foto in mehreren Amtszeiten). Ohne Konto (z. B. Tests) zählen nur Fotos,
      * die schon im Bestand sind.
      *
-     * @param list<array{user_id: int|null, name: string, image_uid?: string|null}> $holders
-     * @return list<array{user_id: int|null, name: string, image_uid?: string|null}>
+     * @param list<array{user_id: int|null, name: string, image_uid?: string|null, companions?: list<array<string, mixed>>}> $holders auch Begleitpersonen
+     * @return list<array{user_id: int|null, name: string, image_uid?: string|null, companions?: list<array<string, mixed>>}>
      */
     private function claimHolderPhotos(array $holders, ?User $actor): array
     {
         $images = $this->app->richImages();
         foreach ($holders as $i => $h) {
+            if (($h['companions'] ?? []) !== []) {
+                $holders[$i]['companions'] = $this->claimHolderPhotos($h['companions'], $actor);
+            }
             $uid = $h['image_uid'] ?? null;
             if ($h['user_id'] !== null || $uid === null) {
                 continue;
@@ -662,7 +681,7 @@ final class OfficeService
         $terms = [];
         foreach ($repo->terms() as $t) {
             if ($t['group_term_id'] === $id) {
-                $terms[] = ['id' => $t['id'], 'office_id' => $t['office_id'], 'holders' => array_map(static fn (array $h): array => ['name' => $h['name'], 'user_id' => $h['user_id']], $repo->holdersOf($t['id']))];
+                $terms[] = ['id' => $t['id'], 'office_id' => $t['office_id'], 'holders' => array_map(static fn (array $h): array => ['name' => $h['name'], 'user_id' => $h['user_id']] + ($h['companions'] !== [] ? ['companions' => array_map(static fn (array $c): array => ['name' => $c['name'], 'user_id' => $c['user_id']], $h['companions'])] : []), $repo->holdersOf($t['id']))];
             }
         }
         return $this->groupTermOut($g, true) + ['terms' => $terms];
@@ -702,12 +721,15 @@ final class OfficeService
     }
 
     /**
+     * Mit der Einzahl (singular, z. B. „Königshaus“ zu „Königshäuser“) für eine einzelne gemeinsame Amtszeit; leer ohne
+     * eigene (dann die Bezeichnung).
+     *
      * @param Group $g
-     * @return array{id: int, title: string, joint_terms: bool}
+     * @return array{id: int, title: string, singular: string, joint_terms: bool}
      */
     private static function groupOut(array $g): array
     {
-        return ['id' => $g['id'], 'title' => $g['title'], 'joint_terms' => $g['joint_terms']];
+        return ['id' => $g['id'], 'title' => $g['title'], 'singular' => $g['singular'], 'joint_terms' => $g['joint_terms']];
     }
 
     // ---- Ausscheiden (Issue #181) ----
@@ -766,7 +788,7 @@ final class OfficeService
                     }
                 }
                 $data = ['kind' => $t['kind'], 'start_year' => $t['start_year'], 'end_year' => null, 'note' => $t['note'], 'honor' => $t['honor']];
-                $keep = static fn (array $list): array => array_map(static fn (array $h): array => ['user_id' => $h['user_id'], 'name' => $h['name'], 'image_uid' => $h['image_uid']], $list);
+                $keep = static fn (array $list): array => array_map(self::stored(...), $list); // Begleitpersonen gehen mit
                 $repo->saveTerm($t['id'], $t['office_id'], $data, $keep($others));
                 $repo->setEnd($repo->saveTerm(null, $t['office_id'], $data, $keep($mine)), $end, $userId);
             }
@@ -997,9 +1019,9 @@ final class OfficeService
     }
 
     /**
-     * Freie Namen in Amtszeiten mit Konten verknüpfen (nach dem Import ehemaliger Mitglieder): Ein Inhaber ohne Konto,
-     * dessen Name (ohne Unterschied in Groß- und Kleinschreibung und bei Leerzeichen) einem der Konten entspricht, bekommt
-     * dieses Konto; der gespeicherte Name bleibt. Steht die Person in der Amtszeit schon, bleibt der Eintrag frei. Fehlt
+     * Freie Namen in Amtszeiten mit Konten verknüpfen (nach dem Import ehemaliger Mitglieder): Ein Inhaber oder eine
+     * Begleitperson ohne Konto, deren Name (ohne Unterschied in Groß- und Kleinschreibung und bei Leerzeichen) einem der
+     * Konten entspricht, bekommt dieses Konto; der gespeicherte Name bleibt. Steht die Person in der Amtszeit schon, bleibt der Eintrag frei. Fehlt
      * die Tabelle (ältere Version), gibt es nichts zu verknüpfen. Ohne $apply nur zählen.
      *
      * @param array<string, int|null> $accounts Name (klein) => Benutzer-ID (null: noch nicht angelegt, nur zählen)
@@ -1017,9 +1039,14 @@ final class OfficeService
         }
         $count = 0;
         foreach ($holders as $termHolders) {
-            $inTerm = array_filter(array_column($termHolders, 'user_id'));
-            $named = [];
+            // Inhaber und Begleitpersonen der Amtszeit
+            $people = [];
             foreach ($termHolders as $h) {
+                $people = [...$people, $h, ...$h['companions']];
+            }
+            $inTerm = array_filter(array_column($people, 'user_id'));
+            $named = [];
+            foreach ($people as $h) {
                 $key = mb_strtolower(Text::line($h['name']));
                 if ($h['user_id'] !== null || !array_key_exists($key, $accounts) || isset($named[$key])) {
                     continue;
@@ -1093,10 +1120,11 @@ final class OfficeService
     }
 
     /**
-     * Prüft Angaben und Inhaber einer Amtszeit. Konten werden mit ihrem aktuellen Namen gespeichert.
+     * Prüft Angaben und Inhaber einer Amtszeit (mit ihren Begleitpersonen). Konten werden mit ihrem aktuellen Namen
+     * gespeichert.
      *
      * @param array<string, mixed> $in
-     * @return array{0: array{kind: string, start_year: int, end_year: int|null, note: string, honor: bool}, 1: list<array{user_id: int|null, name: string}>}
+     * @return array{0: array{kind: string, start_year: int, end_year: int|null, note: string, honor: bool}, 1: list<array{user_id: int|null, name: string, image_uid?: string|null, companions?: list<array{user_id: int|null, name: string, image_uid?: string|null}>}>}
      */
     private function validTerm(array $in): array
     {
@@ -1131,17 +1159,21 @@ final class OfficeService
         if (count($raw) > self::HOLDERS_MAX) {
             throw ApiError::invalid(sprintf('Höchstens %d Personen je Amtszeit.', self::HOLDERS_MAX));
         }
+        // Konten aller Inhaber und Begleitpersonen in einer Abfrage
         $ids = [];
         foreach ($raw as $h) {
-            $id = is_array($h) ? Input::integer($h['user_id'] ?? null) : null;
-            if ($id !== null) {
-                $ids[] = $id;
+            foreach (is_array($h) ? [$h, ...(is_array($h['companions'] ?? null) ? $h['companions'] : [])] : [] as $p) {
+                $id = is_array($p) ? Input::integer($p['user_id'] ?? null) : null;
+                if ($id !== null) {
+                    $ids[] = $id;
+                }
             }
         }
-        $users = $ids === [] ? [] : $this->app->users->findMany($ids);
+        $users = $ids === [] ? [] : $this->app->users->findMany(array_values(array_unique($ids)));
         $holders = [];
         $seen = [];
-        foreach (array_values($raw) as $h) {
+        // Jede Person nur einmal je Amtszeit, ob als Inhaber oder als Begleitperson
+        $person = function (mixed $h) use ($users, &$seen): array {
             if (!is_array($h)) {
                 throw ApiError::invalid('Ungültige Angabe zu einer Person.');
             }
@@ -1168,6 +1200,20 @@ final class OfficeService
                 throw ApiError::invalid(sprintf('„%s“ steht doppelt in der Amtszeit.', $holder['name']));
             }
             $seen[$key] = true;
+            return $holder;
+        };
+        foreach (array_values($raw) as $h) {
+            $holder = $person($h);
+            $companions = $h['companions'] ?? [];
+            if (!is_array($companions)) {
+                throw ApiError::invalid('Ungültige Angabe zu den Begleitpersonen.');
+            }
+            if (count($companions) > self::COMPANIONS_MAX) {
+                throw ApiError::invalid(sprintf('Höchstens %d Begleitpersonen je Person.', self::COMPANIONS_MAX));
+            }
+            if ($companions !== []) {
+                $holder['companions'] = array_map($person, array_values($companions));
+            }
             $holders[] = $holder;
         }
         return [['kind' => $kind, 'start_year' => $start, 'end_year' => $end, 'note' => $note, 'honor' => Input::bool($in['honor'] ?? false)], $holders];
@@ -1294,6 +1340,18 @@ final class OfficeService
     }
 
     /**
+     * Gespeicherter Inhaber als Eingabe für saveTerm bzw. validTerm, mit seinen Begleitpersonen.
+     *
+     * @param Holder $h
+     * @return array{user_id: int|null, name: string, image_uid: string|null, companions: list<array{user_id: int|null, name: string, image_uid: string|null}>}
+     */
+    private static function stored(array $h): array
+    {
+        $one = static fn (array $p): array => ['user_id' => $p['user_id'], 'name' => $p['name'], 'image_uid' => $p['image_uid']];
+        return $one($h) + ['companions' => array_map($one, $h['companions'])];
+    }
+
+    /**
      * Ämter in der Reihenfolge ihrer Gruppen, ohne Gruppe zuletzt.
      *
      * @param list<array{id: int, title: string, sort: int}> $groups
@@ -1328,7 +1386,7 @@ final class OfficeService
         return array_map('intval', $order);
     }
 
-    /** @return array{id: int, title: string, joint_terms: bool} */
+    /** @return array{id: int, title: string, singular: string, joint_terms: bool} */
     private function group(int $id): array
     {
         return self::groupOut($this->repository()->findGroup($id) ?? throw ApiError::notFound('Gruppe nicht gefunden.'));
@@ -1354,7 +1412,8 @@ final class OfficeService
     {
         $repo = $this->repository();
         $t = $repo->findTerm($id) ?? throw ApiError::notFound('Amtszeit nicht gefunden.');
-        return self::termOut($t) + ['office_id' => $t['office_id'], 'holders' => array_map(fn (array $h): array => ['name' => $h['name'], 'user_id' => $h['user_id']] + $this->holderPhoto($h, true), $repo->holdersOf($id))];
+        $person = fn (array $h): array => ['name' => $h['name'], 'user_id' => $h['user_id']] + $this->holderPhoto($h, true);
+        return self::termOut($t) + ['office_id' => $t['office_id'], 'holders' => array_map(static fn (array $h): array => $person($h) + ($h['companions'] !== [] ? ['companions' => array_map($person, $h['companions'])] : []), $repo->holdersOf($id))];
     }
 
     private function validGroupTitle(mixed $raw, ?int $id): string
@@ -1379,7 +1438,7 @@ final class OfficeService
         return $title;
     }
 
-    /** Einzahl des Amts (optional, z. B. „Kapitän“ zu „Kapitäne“). */
+    /** Einzahl eines Amts oder einer Gruppe (optional, z. B. „Kapitän“ zu „Kapitäne“). */
     private function validSingular(mixed $raw): string
     {
         $singular = Text::line(is_string($raw) ? $raw : '', self::TITLE_MAX + 1);

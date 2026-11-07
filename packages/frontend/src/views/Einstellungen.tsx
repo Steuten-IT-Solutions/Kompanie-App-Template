@@ -6,6 +6,8 @@ import {
   config,
   applyBirthdayUpcomingDays,
   applyFeatures,
+  applyRegistration,
+  newAccountRoles,
   newsTitle,
   refreshRoles,
   type AdminSettings,
@@ -37,6 +39,7 @@ const PAGES = [
   { id: 'bereiche', title: 'Bereiche', text: 'Welche Bereiche die App für alle hat.' },
   { id: 'navigation', title: 'Navigation', text: 'Welche Bereiche unten in der Leiste stehen, auch in Untermenüs.' },
   { id: 'rollen', title: 'Rollen', text: 'Wer was in der App darf.' },
+  { id: 'zugang', title: 'Zugang beantragen', text: 'Ob Personen selbst einen Zugang beantragen können, den ihr dann freigebt.' },
   { id: 'benachrichtigungen', title: 'Benachrichtigungen', text: 'Angemeldete Geräte und Uhrzeit der Erinnerung.' },
   { id: 'geburtstage', title: sec.birthdays, text: `Wie lange vorher anstehende ${sec.birthdays} bei den ${sec.events} erscheinen.` },
   { id: 'email', title: 'E-Mail', text: `Kompanieadresse und Mailserver, z. B. für Nachrichten aus „${sec.board}“.` },
@@ -74,6 +77,7 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
       {page.id === 'bereiche' && <Bereiche onToast={onToast} />}
       {page.id === 'navigation' && <NavigationEinstellen onToast={onToast} />}
       {page.id === 'rollen' && <Rollen onToast={onToast} />}
+      {page.id === 'zugang' && <RegistrationSection onToast={onToast} />}
       {page.id === 'benachrichtigungen' && <PushSettings onToast={onToast} />}
       {page.id === 'geburtstage' && <BirthdaySettingsSection onToast={onToast} />}
       {page.id === 'email' && <MailSection onToast={onToast} />}
@@ -90,8 +94,8 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
 }
 
 /**
- * Übersicht: je Seite eine Zeile; Neuigkeiten nur, wenn die Installation eine eigene News-Quelle hat, Geburtstage nur
- * mit dem Bereich.
+ * Übersicht: je Seite eine Zeile; Neuigkeiten nur, wenn der Server die Quelle einstellen lässt (ältere WordPress-Server
+ * nicht), Geburtstage nur mit dem Bereich.
  */
 function Overview() {
   // Erst nach dem Laden zeigen (beim nächsten Öffnen sofort aus dem Speicher): Sonst rückt „Neuigkeiten“ nachträglich
@@ -280,6 +284,89 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
 const UPCOMING_DAYS_MAX = 30;
 
 /** Geburtstage (Issue #1): wie viele Tage im Voraus die Karte „Anstehende Geburtstage“ bei den Terminen einen zeigt. */
+/**
+ * Zugang beantragen (Issue #314): ein- und ausschalten, Rolle, die beim Freigeben vorgeschlagen ist, Link zum Weitergeben.
+ * Ohne Mailversand geht es auch; dann bestätigt niemand seine Adresse, und das Ergebnis sieht die Person beim Anmelden.
+ */
+function RegistrationSection({ onToast }: { onToast: (msg: string) => void }) {
+  const { data, error, loading, reload, setData } = useAsync(() => api.registrationSettings(), [], 'admin/registration');
+  const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  if (loading && !data) return <Loading shape="form" />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+  const s = data!;
+  const roles = newAccountRoles();
+
+  async function save(change: { enabled?: boolean; default_role?: string }) {
+    setBusy(true);
+    setSaveError(null);
+    try {
+      const next = await api.setRegistrationSettings(change);
+      setData(next);
+      applyRegistration(next.enabled);
+      onToast('Gespeichert');
+    } catch (err) {
+      setSaveError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card settings-section" id="einstellungen-zugang">
+      <h3>Zugang beantragen</h3>
+      <label className="toggle">
+        <input type="checkbox" checked={s.enabled} disabled={busy} onChange={(e) => save({ enabled: e.target.checked })} />
+        <span>Personen können selbst einen Zugang beantragen</span>
+      </label>
+      <p className="small muted">
+        Die Anfrage wartet, bis jemand mit dem Recht „Mitglieder anlegen“ sie unter Verwaltung → Anfragen freigibt oder ablehnt. Erst dann
+        entsteht das Konto.
+      </p>
+      {roles.length > 1 && (
+        <label className="field">
+          <span>Vorgeschlagene Rolle beim Freigeben</span>
+          <select value={s.default_role} disabled={busy} onChange={(e) => save({ default_role: e.target.value })}>
+            {roles.map((r) => (
+              <option key={r.key} value={r.key}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <p className="small muted">
+        {s.email_confirmation
+          ? 'Der Mailversand ist eingerichtet: Wer einen Zugang beantragt, bestätigt zuerst die E-Mail-Adresse und erfährt das Ergebnis per Mail.'
+          : 'Ohne eingerichteten Mailversand (Einstellungen → E-Mail) wird die E-Mail-Adresse nicht geprüft. Das Ergebnis erfährt die Person, wenn sie sich anmeldet oder den Stand ihrer Anfrage prüft.'}
+      </p>
+      {s.enabled && (
+        <div className="field">
+          <span>Link zum Formular (zum Weitergeben)</span>
+          <code className="settings-link-code">{s.link}</code>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() =>
+              void navigator.clipboard?.writeText(s.link).then(
+                () => onToast('Link kopiert'),
+                () => onToast('Kopieren hat nicht geklappt'),
+              )
+            }
+          >
+            Link kopieren
+          </button>
+        </div>
+      )}
+      {saveError && (
+        <p className="form-error" role="alert">
+          {saveError}
+        </p>
+      )}
+    </section>
+  );
+}
+
 function BirthdaySettingsSection({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.birthdaySettings(), [], 'admin/birthdays');
   const [busy, setBusy] = useState(false);
@@ -1206,8 +1293,8 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
           <span>
             Knöpfe zum Herunterladen zeigen
             <span className="small muted feature-desc">
-              Wer die {sec.gallery} sieht, kann dann jedes Bild in der Großansicht und jedes Album als ZIP herunterladen (in
-              Originalauflösung, ohne Videos).
+              Wer die {sec.gallery} sieht, kann dann jedes Bild und Video in der Großansicht und jedes Album als ZIP herunterladen (Bilder
+              in Originalauflösung, Videos unverändert).
             </span>
           </span>
         </label>
@@ -1320,14 +1407,30 @@ function FailedPhotos({ count, disabled, onRetry }: { count: number; disabled: b
   );
 }
 
+/** Bezeichnung je Quelle der News (Auswahl in den Einstellungen). */
+const NEWS_SOURCE_LABELS: Record<NewsSourceType, string> = {
+  none: 'Keine Neuigkeiten',
+  site: 'Beiträge dieser WordPress-Seite',
+  wordpress: 'Andere WordPress-Webseite',
+  rss: 'RSS- oder Atom-Feed',
+  app: 'In der App schreiben',
+};
+
 export function News({ settings, onSaved, onToast }: SectionProps) {
   const n = settings.news!;
+  // Ältere Server nennen keine Auswahl: dann wie bisher Webseite oder Feed.
+  const choices: NewsSourceType[] = n.sources ?? ['none', 'wordpress', 'rss'];
   const [source, setSource] = useState<NewsSourceType>(n.source);
   const [url, setUrl] = useState(n.url);
   const [result, setResult] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
-  const { busy, error, setError, save } = useSave(onSaved, onToast);
-  const unsaved = source !== n.source || (source !== 'none' && url.trim() !== n.url);
+  const { busy, error, setError, save } = useSave((s) => {
+    // Knöpfe zum Schreiben gleich zeigen bzw. ausblenden, ohne die App neu zu laden.
+    if (config && s.news) config.newsInApp = s.news.source === 'app' && !!config.features.news;
+    onSaved(s);
+  }, onToast);
+  const needsUrl = source === 'wordpress' || source === 'rss';
+  const unsaved = source !== n.source || (needsUrl && url.trim() !== n.url);
 
   async function test() {
     setTesting(true);
@@ -1351,20 +1454,25 @@ export function News({ settings, onSaved, onToast }: SectionProps) {
       error={error}
       onSubmit={(e) => {
         e.preventDefault();
-        if (source !== 'none' && !url.trim()) return setError('Bitte die Adresse angeben.');
-        save({ news_source: source, news_url: source === 'none' ? '' : url.trim() });
+        if (needsUrl && !url.trim()) return setError('Bitte die Adresse angeben.');
+        save({ news_source: source, ...(needsUrl ? { news_url: url.trim() } : {}) });
       }}
     >
-      <p className="muted small">Die Neuigkeiten kommen von einer vorhandenen Webseite der Kompanie.</p>
+      <p className="muted small">
+        Die {newsTitle()} kommen von einer Webseite oder einem Feed, oder ihr schreibt sie direkt in der App. Es gilt immer eine Quelle;
+        beim Wechsel bleiben die Beiträge der anderen erhalten und erscheinen wieder, wenn ihr zurückwechselt.
+      </p>
       <label className="field">
         <span>Quelle</span>
         <select value={source} onChange={(e) => setSource(e.target.value as NewsSourceType)}>
-          <option value="none">Keine Neuigkeiten</option>
-          <option value="wordpress">WordPress-Webseite</option>
-          <option value="rss">RSS- oder Atom-Feed</option>
+          {choices.map((c) => (
+            <option key={c} value={c}>
+              {NEWS_SOURCE_LABELS[c]}
+            </option>
+          ))}
         </select>
       </label>
-      {source !== 'none' && (
+      {needsUrl && (
         <label className="field">
           <span>{source === 'wordpress' ? 'Adresse der Webseite' : 'Adresse des Feeds'}</span>
           <input
@@ -1377,7 +1485,13 @@ export function News({ settings, onSaved, onToast }: SectionProps) {
           />
         </label>
       )}
-      {n.source !== 'none' &&
+      {source === 'app' && (
+        <p className="muted small">
+          Beiträge schreibt, wer das Recht „{sec.news} schreiben“ hat (Standardrolle „{sec.news} verwalten“), direkt unter {sec.news} mit{' '}
+          <strong>Neuer Beitrag</strong>.
+        </p>
+      )}
+      {(n.source === 'wordpress' || n.source === 'rss') &&
         (unsaved ? (
           <p className="muted small">Erst speichern, dann testen.</p>
         ) : (

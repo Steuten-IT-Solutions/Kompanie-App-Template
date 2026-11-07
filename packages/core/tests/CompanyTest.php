@@ -17,7 +17,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Kompanieliste (Issue #280): Liste für alle mit view_companies, Pflege und Zuordnung mit manage_companies, Mitglieder
- * nur so weit wie in der Mitgliederliste, Logo, Verknüpfung mit Ämtern, Löschen der Person, Sicherung.
+ * nur mit view_directory, Logo, keine Verknüpfung mit Ämtern, Löschen der Person, Sicherung.
  */
 final class CompanyTest extends TestCase
 {
@@ -87,7 +87,6 @@ final class CompanyTest extends TestCase
             'Jahr in der Zukunft' => ['name' => 'A', 'founded_year' => 9999],
             'nur http' => ['name' => 'A', 'website_url' => 'http://example.org/'],
             'App nur https' => ['name' => 'A', 'app_url' => 'javascript:alert(1)'],
-            'unbekannte Gruppe' => ['name' => 'A', 'office_group_id' => 999],
             'aktiv kein Wahrheitswert' => ['name' => 'A', 'active' => 'ja'],
         ] as $case => $body) {
             $this->assertSame(400, $this->call('POST', '/companies', $body)->status, $case);
@@ -148,21 +147,38 @@ final class CompanyTest extends TestCase
         $this->assertArrayNotHasKey('members', $anon, 'ohne view_directory keine Namen');
         $this->assertArrayNotHasKey('member_count', $anon);
 
+        // Auch ohne Bereich Mitgliederliste (z. B. Bruderschaft): Namen für alle mit view_directory, auch Gäste
+        $this->users->current = $this->admin;
+        $this->app->roles()->update(Roles::GUEST, ['capabilities' => ['view_news', 'view_companies', 'view_directory']]);
+        $this->app->features()->update(['directory' => false]);
+        $this->users->current = null;
+        $list = array_column($this->call('GET', '/companies')->data, null, 'id');
+        $this->assertSame(['Admin', 'Anna'], array_column($list[$a]['members'], 'name'), 'Gast mit view_directory, ohne Mitgliederliste');
+        // Wie in der Mitgliederliste (Foto, Titel, Dienstgrad), aber ohne Geburtstag, Eintritt und Kompanien
+        $keys = array_keys($list[$a]['members'][0]);
+        foreach (['id', 'name', 'photo_url'] as $key) {
+            $this->assertContains($key, $keys);
+        }
+        foreach (['birthday', 'join_year', 'join_date', 'companies', 'email', 'phone'] as $key) {
+            $this->assertNotContains($key, $keys);
+        }
+        $this->users->current = $this->admin;
+        $this->app->features()->update(['directory' => true]);
+
         // Personen löschen: Zuordnung weg
         $this->users->current = $this->admin;
         UserData::purge($this->app->db, $this->member);
         $this->assertSame([$this->admin], $this->app->companies()->repository()->memberIdsOf($a));
     }
 
-    public function testOfficeGroupLink(): void
+    public function testOfficeGroupNotLinked(): void
     {
+        // Ämter gehören zu Personen: Eine Gruppe der Ämter lässt sich nicht mehr mit einer Kompanie verknüpfen.
         $group = $this->call('POST', '/office-groups', ['title' => 'Vorstand Erste'])->data['id'];
         $id = $this->company(['name' => 'Erste', 'office_group_id' => $group]);
-        $this->assertSame(['id' => $group, 'title' => 'Vorstand Erste', 'shown' => true], $this->call('GET', '/companies')->data[0]['office_group']);
-        $this->assertSame(200, $this->call('DELETE', "/office-groups/$group")->status);
-        $this->assertNull($this->call('GET', '/companies')->data[0]['office_group'], 'Gruppe gelöscht: Verknüpfung weg');
+        $this->assertArrayNotHasKey('office_group', $this->call('GET', '/companies')->data[0]);
         $this->assertNull($this->app->companies()->repository()->find($id)['office_group_id'] ?? null);
-        $this->assertNotNull($this->app->companies()->repository()->find($id));
+        $this->assertSame(200, $this->call('DELETE', "/office-groups/$group")->status);
     }
 
     public function testLogoAndDelivery(): void
@@ -181,6 +197,30 @@ final class CompanyTest extends TestCase
         $this->assertSame(404, $this->app->companies()->logoForDelivery(null, $id, null)['status']);
         $this->app->features()->update(['companies' => false]);
         $this->assertSame(404, $this->app->companies()->logoForDelivery(null, $id, null)['status'], 'Bereich aus');
+    }
+
+    /** Transparente Logos bleiben transparent: PNG mit Alphakanal, Ecke durchsichtig, Fläche deckend. */
+    public function testPngLogoKeepsTransparency(): void
+    {
+        $id = $this->company(['name' => 'Erste']);
+        $im = imagecreatetruecolor(1024, 512);
+        imagealphablending($im, false);
+        imagesavealpha($im, true);
+        imagefill($im, 0, 0, (int) imagecolorallocatealpha($im, 0, 0, 0, 127));
+        imagefilledrectangle($im, 256, 128, 767, 383, (int) imagecolorallocate($im, 20, 20, 220));
+        ob_start();
+        imagepng($im);
+        $res = $this->call('POST', "/companies/$id/logo", ['file' => ['name' => 'logo.png', 'data' => base64_encode((string) ob_get_clean())]]);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame('png', $res->data['logo_type']);
+        $out = $this->app->companies()->logoForDelivery(null, $id, null);
+        $this->assertSame('image/png', $out['headers']['Content-Type']);
+        $stored = imagecreatefromstring((string) $out['body']);
+        $this->assertNotFalse($stored);
+        $this->assertSame([512, 256], [imagesx($stored), imagesy($stored)], 'auf 512 Pixel verkleinert');
+        $this->assertSame(127, imagecolorsforindex($stored, imagecolorat($stored, 2, 2))['alpha'], 'Ecke durchsichtig, nicht weiß');
+        $center = imagecolorsforindex($stored, imagecolorat($stored, 256, 128));
+        $this->assertSame([0, 220], [$center['alpha'], $center['blue']], 'Fläche deckend');
     }
 
     public function testDescriptionImagesArePublicWithViewCompanies(): void

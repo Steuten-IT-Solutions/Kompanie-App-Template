@@ -83,11 +83,15 @@ final class PushService
     public const TYPE_REMINDER = 'reminder';
     public const TYPE_NEWS = 'news';
     public const TYPE_BOARD = 'board';
+    /** Öffentliche Nachrichten am Brett für alle, die das Brett sonst nicht lesen (Gäste, Konten ohne view_board). */
+    public const TYPE_BOARD_PUBLIC = 'board_public';
     public const TYPE_POLLS = 'polls';
     public const TYPE_BIRTHDAYS = 'birthdays';
     /** Galerie (Issue #286): neue Einreichungen an alle mit review_gallery, das Ergebnis an die einreichende Person. */
     public const TYPE_GALLERY_REVIEW = 'gallery_review';
     public const TYPE_GALLERY_SUBMISSIONS = 'gallery_submissions';
+    /** Selbstregistrierung (Issue #314): neue Anfrage auf einen Zugang an alle, die freigeben (create_users). */
+    public const TYPE_REGISTRATIONS = 'registrations';
 
     /** Push-Dienste der Browser (wie im Projekt-Cockpit). */
     private const PUSH_HOSTS = ['/^fcm\.googleapis\.com$/', '/(^|\.)push\.services\.mozilla\.com$/', '/(^|\.)push\.apple\.com$/', '/(^|\.)notify\.windows\.com$/'];
@@ -167,18 +171,21 @@ final class PushService
     /**
      * Typen mit Bezeichnung, Bereichen (einer davon muss eingeschaltet sein) und wer sie bekommt: Konten mit diesem
      * Recht (Wert einer Capability, z. B. view_board wie BoardService::isRecipient), all = alle einschließlich Gästen.
+     * Ohne Bereiche (features leer) gilt stattdessen active, z. B. „Zugang beantragen“ eingeschaltet.
      *
-     * @return array<string, array{label: string, features: list<string>, audience: string}>
+     * @return array<string, array{label: string, features: list<string>, audience: string, active?: bool}>
      */
     public function types(): array
     {
         $c = $this->app->config;
         return [
             self::TYPE_BOARD => ['label' => $c->sectionLabel('board', 'Schwarzes Brett') . ': dringende Nachrichten', 'features' => ['board'], 'audience' => 'view_board'],
+            self::TYPE_BOARD_PUBLIC => ['label' => $c->sectionLabel('board', 'Schwarzes Brett') . ': öffentliche Nachrichten', 'features' => ['board'], 'audience' => 'all'],
             self::TYPE_POLLS => ['label' => $c->sectionLabel('polls', 'Umfragen') . ': neue Umfrage und Erinnerung', 'features' => ['polls'], 'audience' => 'vote_polls'],
             self::TYPE_BIRTHDAYS => ['label' => $c->sectionLabel('birthdays', 'Geburtstage') . ': am Tag selbst', 'features' => ['birthdays'], 'audience' => 'view_birthdays'],
             self::TYPE_GALLERY_REVIEW => ['label' => $c->sectionLabel('gallery', 'Galerie') . ': neue Bilder zum Prüfen', 'features' => ['gallery'], 'audience' => 'review_gallery'],
             self::TYPE_GALLERY_SUBMISSIONS => ['label' => $c->sectionLabel('gallery', 'Galerie') . ': deine Bilder freigegeben oder abgelehnt', 'features' => ['gallery'], 'audience' => 'submit_gallery'],
+            self::TYPE_REGISTRATIONS => ['label' => 'Zugang beantragt: neue Anfragen', 'features' => [], 'audience' => 'create_users', 'active' => $this->app->registrations()->enabled()],
             self::TYPE_PENALTIES => ['label' => $c->sectionLabel('penalties', 'Strafen') . ': neue Einträge', 'features' => ['penalties'], 'audience' => 'view_own_penalties'],
             self::TYPE_POINTS => ['label' => $c->sectionLabel('points', 'Punkte') . ': neue Einträge', 'features' => ['points'], 'audience' => 'view_own_points'],
             self::TYPE_RANKS => ['label' => $c->rankLabel() . ': Beförderung oder Änderung', 'features' => ['ranks'], 'audience' => 'view_own_rank'],
@@ -194,7 +201,7 @@ final class PushService
     {
         $out = [];
         foreach ($this->types() as $key => $type) {
-            if (!$this->inAudience($type['audience'], $user) || !$this->anyEnabled($type['features'])) {
+            if (!$this->offered($key, $type['audience'], $user) || !$this->active($type)) {
                 continue;
             }
             // Termine und Erinnerungen: Mitglieder mit Kalender bekommen sie aus dem Kalender, alle anderen aus
@@ -208,11 +215,26 @@ final class PushService
         return $out;
     }
 
+    /**
+     * Bekommt dieses Konto (null bzw. ID 0 = Gast) die Art angeboten? Empfängerkreis der Art; öffentliche Nachrichten am
+     * Brett nur, wer das Brett nicht ohnehin liest (sonst kämen sie über board, doppelt wäre zu viel).
+     */
+    private function offered(string $type, string $audience, ?User $user): bool
+    {
+        return $this->inAudience($audience, $user) && !($type === self::TYPE_BOARD_PUBLIC && BoardService::isRecipient($user));
+    }
+
     /** Termine aus dem internen Kalender (Mitglieder, wenn der Bereich Kalender an ist) oder aus der öffentlichen Liste. */
     public function usesCalendar(?User $user): bool
     {
         // Wie die App (Bereich an und eingerichtet): Sonst sehen Mitglieder die öffentliche Terminliste.
         return $user !== null && $user->can(Capability::Calendar) && $this->app->features()->enabled('calendar') && $this->app->calendar()->isConfigured();
+    }
+
+    /** @param array{features: list<string>, active?: bool} $type */
+    private function active(array $type): bool
+    {
+        return $type['features'] === [] ? ($type['active'] ?? false) : $this->anyEnabled($type['features']);
     }
 
     /** @param list<string> $features */
@@ -550,13 +572,35 @@ final class PushService
     /**
      * Schwarzes Brett (Issue #5): an alle Geräte der Empfänger mit dem Typ, außer denen des Verfassers. Dringend
      * (Urgency high) und nur so lange zustellbar, wie die Nachricht gilt, höchstens MAX_TTL (Issue #172).
+     * Öffentliche Nachrichten ($public) zusätzlich an alle Geräte mit der Art board_public (Gäste und Konten ohne
+     * view_board); jedes Gerät bekommt die Nachricht höchstens einmal.
      *
      * @param Message $message
      * @param int $ttl Sekunden bis zum Ablauf der Nachricht (höchstens MAX_TTL)
      */
-    public function notifyBoard(array $message, int $authorId, int $ttl): int
+    public function notifyBoard(array $message, int $authorId, int $ttl, bool $public = false): int
     {
-        return $this->notifyAudience(self::TYPE_BOARD, $message, static fn (int $uid): bool => $uid !== $authorId, 'high', $ttl, self::MAX_TTL);
+        if (!$public) {
+            return $this->notifyAudience(self::TYPE_BOARD, $message, static fn (int $uid): bool => $uid !== $authorId, 'high', $ttl, self::MAX_TTL);
+        }
+        if (!$this->typeEnabled(self::TYPE_BOARD) || $ttl <= 0) {
+            return 0;
+        }
+        $json = $this->json($message);
+        $items = [];
+        $members = [];
+        $subs = array_values(array_filter($this->repository()->all(), static fn (array $sub): bool => $sub['user_id'] !== $authorId
+            && (in_array(self::TYPE_BOARD, $sub['types'], true) || in_array(self::TYPE_BOARD_PUBLIC, $sub['types'], true))));
+        $accounts = $this->accountsOf($subs);
+        foreach ($subs as $sub) {
+            $uid = $sub['user_id'];
+            $members[$uid] ??= BoardService::isRecipient($accounts[$uid] ?? null);
+            // Wer das Brett liest, über board; alle anderen (auch Gäste) über board_public.
+            if (in_array($members[$uid] ? self::TYPE_BOARD : self::TYPE_BOARD_PUBLIC, $sub['types'], true)) {
+                $items[] = ['subscription_id' => $sub['id'], 'payload' => $json];
+            }
+        }
+        return $this->enqueue(self::TYPE_BOARD, $items, 'high', min(self::MAX_TTL, $ttl));
     }
 
     /**
@@ -599,7 +643,8 @@ final class PushService
      * Beim ersten Einschalten eines Bereichs mit eigener Art (Schwarzes Brett, Umfragen): die neue Art bei allen
      * bestehenden Abos der Konten aus ihrem Empfängerkreis einschalten (wie bei neuen Abos, die alle angebotenen Arten
      * bekommen). Einmalig je Art (Einstellung push_<art>_offered); danach entscheidet jedes Gerät selbst, erneutes
-     * Ein- und Ausschalten des Bereichs ändert die Abos nicht mehr.
+     * Ein- und Ausschalten des Bereichs ändert die Abos nicht mehr. Öffentliche Nachrichten am Brett (board_public)
+     * bekommen bestehende Abos bei der ersten öffentlichen Nachricht (PushTriggers::boardPosted), auch die der Gäste.
      */
     public function offerTypeToExisting(string $type): int
     {
@@ -613,11 +658,13 @@ final class PushService
         $order = array_flip(array_keys($this->types()));
         $recipients = [];
         $count = 0;
-        $subs = array_values(array_filter($this->repository()->all(), static fn (array $sub): bool => $sub['user_id'] > 0 && !in_array($type, $sub['types'], true)));
+        // Gäste (ID 0) nur bei Arten für alle (z. B. öffentliche Nachrichten am Brett).
+        $guests = $definition['audience'] === 'all';
+        $subs = array_values(array_filter($this->repository()->all(), static fn (array $sub): bool => ($sub['user_id'] > 0 || $guests) && !in_array($type, $sub['types'], true)));
         $accounts = $this->accountsOf($subs);
         foreach ($subs as $sub) {
             $uid = $sub['user_id'];
-            $recipients[$uid] ??= $this->inAudience($definition['audience'], $accounts[$uid] ?? null);
+            $recipients[$uid] ??= $this->offered($type, $definition['audience'], $accounts[$uid] ?? null);
             if ($recipients[$uid]) {
                 // In der üblichen Reihenfolge der Arten (wie bei neuen Abos).
                 $types = [...$sub['types'], $type];
@@ -632,7 +679,7 @@ final class PushService
     private function typeEnabled(string $type): bool
     {
         $t = $this->types()[$type] ?? null;
-        return $t !== null && $this->supported() && $this->anyEnabled($t['features']);
+        return $t !== null && $this->supported() && $this->active($t);
     }
 
     /** @param list<array{subscription_id: int, payload: string}> $items */
@@ -890,7 +937,7 @@ final class PushService
         $types = [];
         foreach ($this->types() as $key => $type) {
             $entry = $log['types'][$key] ?? null;
-            if (is_array($entry) && is_numeric($entry['at'] ?? null) && $this->anyEnabled($type['features'])) {
+            if (is_array($entry) && is_numeric($entry['at'] ?? null) && $this->active($type)) {
                 $types[] = ['type' => $key, 'label' => $type['label'], 'at' => $iso($entry['at']), 'devices' => (int) ($entry['devices'] ?? 0)];
             }
         }

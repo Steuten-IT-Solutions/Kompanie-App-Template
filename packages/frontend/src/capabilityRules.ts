@@ -127,6 +127,7 @@ const ORDER: Capability[] = [
   'view_ranks',
   'view_catalog',
   'manage_events',
+  'manage_news',
   'manage_documents',
   'post_board',
   'manage_polls',

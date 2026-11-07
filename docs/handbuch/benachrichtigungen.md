@@ -47,8 +47,11 @@ Für alle, auch ohne Konto:
 
 Diese Nachrichten bekommst du zu den Terminen, die du unter **{bereich.events}** siehst: ohne Konto zu den öffentlichen Terminen, als {rolle.member} oder mit dem internen Kalender (z. B. Anwärter) zum Kalender der {kompanie.name}, wenn sie ihn nutzt.
 
+Für alle, die das {bereich.board} sonst nicht sehen (z. B. ohne Konto):
+- **{bereich.board}: öffentliche Nachrichten**: sobald jemand eine öffentliche Nachricht ans {bereich.board} schreibt (außer er schaltet die Benachrichtigung dabei ab).
+
 Für {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter):
-- **{bereich.board}: dringende Nachrichten**: sobald jemand eine Nachricht ans {bereich.board} schreibt (außer er schaltet die Benachrichtigung dabei ab).
+- **{bereich.board}: dringende Nachrichten**: sobald jemand eine Nachricht ans {bereich.board} schreibt, interne wie öffentliche (außer er schaltet die Benachrichtigung dabei ab).
 
 Nur für {rolle.member}:
 - **{bereich.polls}: neue Umfrage und Erinnerung**: bei jeder neuen Umfrage und 24 Stunden vor ihrem Ende, wenn du noch nicht geantwortet hast.
@@ -70,7 +73,7 @@ Dort gibt es Benachrichtigungen nur in der installierten App (ab iOS 16.4), nich
 - Die Einstellung gilt nur für das Gerät, auf dem du sie vornimmst. Auf weiteren Geräten schaltest du sie dort ein.
 - Mit einem Konto bekommen höchstens 10 Geräte Benachrichtigungen. Schaltest du sie auf einem weiteren ein, fällt das am längsten eingerichtete weg.
 - Meldest du dich in der App ab, schaltet sie die Benachrichtigungen deines Kontos auf diesem Gerät aus. Endet die Anmeldung anders (z. B. abgelaufen), passiert das, sobald die App auf dem Gerät wieder geöffnet wird.
-- Schaltet die {kompanie.name} {bereich.board}, {bereich.polls} oder {bereich.birthdays} zum ersten Mal ein, kommt die neue Art auf Geräten, die schon Benachrichtigungen bekommen, einmalig von selbst dazu.
+- Schaltet die {kompanie.name} {bereich.board}, {bereich.polls} oder {bereich.birthdays} zum ersten Mal ein, kommt die neue Art auf Geräten, die schon Benachrichtigungen bekommen, einmalig von selbst dazu. **{bereich.board}: öffentliche Nachrichten** kommt so bei der ersten öffentlichen Nachricht dazu.
 - Ohne Konto eingeschaltete Benachrichtigungen enden von selbst, wenn die App auf dem Gerät ein halbes Jahr lang nicht geöffnet wurde und keine Nachricht kam.
 
 ## Wenn nichts ankommt

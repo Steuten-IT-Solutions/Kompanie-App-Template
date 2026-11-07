@@ -69,12 +69,15 @@ final class SettingsService
                 'calendar_access' => $drive->calendarAccess(),
                 'status' => array_merge($a->gallery()->status(), ['pending' => $a->gallery()->countPending(), 'failed' => $a->gallery()->countFailed()]),
             ],
-            'news' => null,
+            // Quelle der News: sources nennt, was diese Installation kann (WordPress: site oder app; sonst none,
+            // wordpress, rss oder app); url nur für Webseite und Feed der eigenständigen App.
+            'news' => [
+                'source' => $a->newsService()->sourceType(),
+                'url' => $a->news instanceof RemoteNewsSource ? $a->news->url() : '',
+                'sources' => $a->newsService()->sources(),
+            ],
             'legal' => $this->legal(),
         ];
-        if ($a->news instanceof RemoteNewsSource) {
-            $out['news'] = ['source' => $a->news->type(), 'url' => $a->news->url()];
-        }
         return $out;
     }
 
@@ -103,6 +106,7 @@ final class SettingsService
     {
         $a = $this->app;
         $news = $a->news instanceof RemoteNewsSource;
+        $newsBefore = $a->newsService()->sourceType();
         foreach ($in as $key => $value) {
             if (!is_string($value) && !($key === 'calendar_cache_minutes' && is_int($value))) {
                 throw ApiError::invalid('Ungültiger Wert für ' . $key . '.');
@@ -176,8 +180,8 @@ final class SettingsService
             }
             $downloads = $in['gallery_downloads'] === '1';
         }
-        if ($news && array_key_exists('news_source', $in)) {
-            if (!in_array($in['news_source'], RemoteNewsSource::SOURCES, true)) {
+        if (array_key_exists('news_source', $in)) {
+            if (!in_array($in['news_source'], $a->newsService()->sources(), true)) {
                 throw ApiError::invalid('Unbekannte Quelle für Neuigkeiten.');
             }
             $set['news_source'] = $in['news_source'];
@@ -191,7 +195,7 @@ final class SettingsService
         if (array_key_exists('legal_privacy_url', $in)) {
             $set[self::PRIVACY_SETTING] = Input::url($in['legal_privacy_url'], 'Bitte die Adresse der Datenschutzerklärung angeben (beginnt mit https://).');
         }
-        if (($set['news_source'] ?? 'none') !== 'none' && ($set['news_url'] ?? ($news ? $a->news->url() : '')) === '') {
+        if (in_array($set['news_source'] ?? 'none', ['wordpress', 'rss'], true) && ($set['news_url'] ?? ($news ? $a->news->url() : '')) === '') {
             throw ApiError::invalid('Bitte die Adresse der Webseite bzw. des Feeds angeben.');
         }
 
@@ -231,6 +235,9 @@ final class SettingsService
                 $a->gallery()->reset();
             }
         }
+        if (isset($set['news_source'])) {
+            $a->newsService()->sourceChanged($newsBefore);
+        }
         $a->scheduleTasks();
         return $this->get();
     }
@@ -250,6 +257,9 @@ final class SettingsService
     /** @return array{count: int} */
     public function testNews(): array
     {
+        if ($this->app->newsService()->inApp()) {
+            return ['count' => count($this->app->newsService()->page(1, 10)['items'])];
+        }
         if (!$this->app->news instanceof RemoteNewsSource) {
             throw ApiError::notFound('Die Neuigkeiten kommen hier aus den Beiträgen der Webseite.');
         }

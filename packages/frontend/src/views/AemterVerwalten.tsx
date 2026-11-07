@@ -9,6 +9,7 @@ import {
   type OfficeGroupTermInput,
   type OfficeHolder,
   type OfficeImportResult,
+  type OfficePersonInput,
   type OfficesOverview,
   type OfficeTerm,
   type OfficeTermInput,
@@ -20,7 +21,7 @@ import brand from '../generated/brand';
 import { MemberAvatar } from '../memberPhoto';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
-import { termYears } from './Aemter';
+import { nameWithCompanions, termYears } from './Aemter';
 
 const sec = brand.labels.sections;
 
@@ -136,8 +137,14 @@ function OfficeOverview({
   }
 
   const sections = [
-    ...overview.groups.map((g) => ({ key: `g${g.id}`, group: g.id as number | null, title: g.title, joint: !!g.joint_terms })),
-    { key: 'none', group: null, title: 'Ohne Gruppe', joint: false },
+    ...overview.groups.map((g) => ({
+      key: `g${g.id}`,
+      group: g.id as number | null,
+      title: g.title,
+      singular: g.singular || g.title,
+      joint: !!g.joint_terms,
+    })),
+    { key: 'none', group: null, title: 'Ohne Gruppe', singular: '', joint: false },
   ];
 
   return (
@@ -172,7 +179,7 @@ function OfficeOverview({
             {s.joint && offices.length > 0 && (
               <JointTermAdmin
                 groupId={s.group!}
-                groupTitle={s.title}
+                groupTitle={s.singular}
                 offices={offices}
                 terms={(overview.group_terms ?? []).filter((t) => t.group_id === s.group)}
                 onToast={onToast}
@@ -242,6 +249,7 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
   const [title, setTitle] = useState('');
   const [editing, setEditing] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [editSingular, setEditSingular] = useState('');
   const [list, setList] = useState(groups);
   const [seen, setSeen] = useState(groups);
   if (seen !== groups) {
@@ -272,7 +280,8 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
       <p className="muted small">
         Die Gruppen ordnen die Ämter im Zeitstrahl, z. B. Verein und Dachverband. Zum Ändern der Reihenfolge am Griff ziehen. Mit
         „Amtszeiten gemeinsam“ haben alle Ämter einer Gruppe dieselben Jahre und ein Gruppenbild, z. B. ein Königshaus; vorhandene
-        Amtszeiten mit denselben Jahren werden dabei zusammengefasst.
+        Amtszeiten mit denselben Jahren werden dabei zusammengefasst. Die Bezeichnung steht über der Gruppe (z. B. „Königshäuser“), die
+        Einzahl über einer einzelnen gemeinsamen Amtszeit (z. B. „Königshaus 2026–2028“).
       </p>
       <FormError error={error} />
       {list.length > 0 && (
@@ -284,12 +293,23 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
                   className="form"
                   onSubmit={async (e) => {
                     e.preventDefault();
-                    if (await run(() => api.updateOfficeGroup(g.id, editTitle.trim()), 'Gespeichert')) setEditing(null);
+                    if (await run(() => api.updateOfficeGroup(g.id, editTitle.trim(), editSingular.trim()), 'Gespeichert'))
+                      setEditing(null);
                   }}
                 >
                   <label className="field">
                     <span>Bezeichnung</span>
                     <input type="text" maxLength={60} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} required autoFocus />
+                  </label>
+                  <label className="field">
+                    <span>Einzahl (optional, z. B. „Königshaus“ zu „Königshäuser“)</span>
+                    <input
+                      type="text"
+                      maxLength={60}
+                      value={editSingular}
+                      placeholder={editTitle}
+                      onChange={(e) => setEditSingular(e.target.value)}
+                    />
                   </label>
                   <div className="button-row">
                     <button className="btn" type="submit" disabled={busy}>
@@ -305,17 +325,21 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
               <li key={g.id} {...sort.itemProps(i, 'card row')}>
                 {list.length > 1 && sort.handle(i, g.title)}
                 <div className="row-main">
-                  <div className="row-title">{g.title}</div>
+                  <div className="row-title">
+                    {g.title}
+                    {g.singular && <span className="muted small"> · Einzahl: {g.singular}</span>}
+                  </div>
                   <div className="row-actions">
                     <button
                       className="btn btn-small btn-secondary"
                       disabled={busy}
                       onClick={() => {
                         setEditTitle(g.title);
+                        setEditSingular(g.singular ?? '');
                         setEditing(g.id);
                       }}
                     >
-                      Umbenennen
+                      Bearbeiten
                     </button>
                     <label className="toggle joint-toggle">
                       <input
@@ -428,7 +452,7 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
           ) : (
             <div key={t.id} className="office-term-row">
               <strong>{termYears(t)}</strong>
-              <span>{t.holders.map((h) => h.name).join(', ')}</span>
+              <span>{t.holders.map(nameWithCompanions).join(', ')}</span>
               {t.note && <span className="muted small">{t.note}</span>}
               {t.honor && <span className="badge timeline-honor">Ehrung</span>}
               {t.current && <span className="badge timeline-now">aktuell</span>}
@@ -617,7 +641,10 @@ const NO_PEOPLE: People = { members: [], former: [] };
 /** Person in der Amtszeit: ohne Profil (freier Name), Mitglied oder Ehemaliger (Konto). */
 type HolderKind = 'name' | 'member' | 'former';
 /** kind fehlt bei vorhandenen Einträgen, bis man sie ändert: ergibt sich dann aus den Listen (siehe kindOf). */
-type HolderRow = { kind?: HolderKind; user: string; name: string; image?: HolderPhoto | null };
+type HolderRow = { kind?: HolderKind; user: string; name: string; image?: HolderPhoto | null; companions?: HolderRow[] };
+
+/** Höchstens so viele Begleitpersonen je Person (wie OfficeService::COMPANIONS_MAX). */
+const COMPANIONS_MAX = 5;
 
 /**
  * Gemeinsame Amtszeiten einer Gruppe (Issue #282): Liste mit Bearbeiten und Löschen, Formular für eine neue. Die Jahre
@@ -681,7 +708,7 @@ function JointTermAdmin({
                   {offices
                     .flatMap((o) => {
                       const h = holdersOf(gt, o);
-                      return h && h.length > 0 ? [`${o.title}: ${h.map((x) => x.name).join(', ')}`] : [];
+                      return h && h.length > 0 ? [`${o.title}: ${h.map(nameWithCompanions).join(', ')}`] : [];
                     })
                     .join(' · ') || 'Noch keine Personen'}
                 </div>
@@ -832,29 +859,30 @@ function JointTermForm({
   );
 }
 
-/** Zeilen der Personen aus einer gespeicherten Amtszeit. */
+/** Zeilen der Personen aus einer gespeicherten Amtszeit, mit ihren Begleitpersonen. */
 function holderRows(holders: OfficeHolder[] | undefined, empty: boolean): HolderRow[] {
-  const rows =
-    holders?.map((h) => ({
-      user: h.user_id ? String(h.user_id) : '',
-      name: h.name,
-      image: !h.user_id && h.image_uid && h.photo_url ? { uid: h.image_uid, url: h.photo_url } : null,
-    })) ?? [];
+  const row = (h: OfficeHolder): HolderRow => ({
+    user: h.user_id ? String(h.user_id) : '',
+    name: h.name,
+    image: !h.user_id && h.image_uid && h.photo_url ? { uid: h.image_uid, url: h.photo_url } : null,
+  });
+  const rows = holders?.map((h) => ({ ...row(h), companions: (h.companions ?? []).map(row) })) ?? [];
   return rows.length > 0 || !empty ? rows : [{ user: '', name: '' }];
 }
 
-/** Zeilen für den Server: Konto oder freier Name. */
+/** Zeilen für den Server: Konto oder freier Name, je mit Begleitpersonen. */
 function holderInput(holders: HolderRow[], people: People): OfficeTermInput['holders'] {
   const formerIds = new Set(people.former.map((p) => p.id));
   const kindOf = (h: HolderRow): HolderKind => h.kind ?? (!h.user ? 'name' : formerIds.has(Number(h.user)) ? 'former' : 'member');
-  return holders.map((h) =>
-    kindOf(h) !== 'name' && h.user ? { user_id: Number(h.user) } : { name: h.name.trim(), image_uid: h.image?.uid ?? null },
-  );
+  const person = (h: HolderRow): OfficePersonInput =>
+    kindOf(h) !== 'name' && h.user ? { user_id: Number(h.user) } : { name: h.name.trim(), image_uid: h.image?.uid ?? null };
+  return holders.map((h) => ({ ...person(h), companions: (h.companions ?? []).map(person) }));
 }
 
 /**
- * Personen einer Amtszeit (Konto oder freier Name), bis zu 20. Mit optional dürfen alle Zeilen fehlen (gemeinsame
- * Amtszeit: Amt ohne Personen).
+ * Personen einer Amtszeit (Konto oder freier Name), bis zu 20, je mit bis zu 5 Begleitpersonen (z. B. Partnerin oder
+ * Partner, die das Amt nicht selbst bekleiden). Mit optional dürfen alle Zeilen fehlen (gemeinsame Amtszeit: Amt ohne
+ * Personen; Begleitpersonen).
  */
 function HolderFields({
   holders,
@@ -863,6 +891,7 @@ function HolderFields({
   initial,
   legend,
   optional = false,
+  companions = true,
 }: {
   holders: HolderRow[];
   setHolders: (rows: HolderRow[]) => void;
@@ -870,12 +899,14 @@ function HolderFields({
   initial?: OfficeHolder[];
   legend: string;
   optional?: boolean;
+  /** false: Zeilen sind selbst Begleitpersonen (keine weitere Ebene, höchstens 5) */
+  companions?: boolean;
 }) {
   const formerIds = new Set(people.former.map((p) => p.id));
   const kindOf = (h: HolderRow): HolderKind => h.kind ?? (!h.user ? 'name' : formerIds.has(Number(h.user)) ? 'former' : 'member');
   // Konten, die schon in der Amtszeit stehen, aber in keiner Liste (z. B. ohne Recht darauf), bleiben bei den Mitgliedern wählbar.
   const members = [...people.members];
-  for (const h of initial ?? []) {
+  for (const h of (initial ?? []).flatMap((x) => [x, ...(x.companions ?? [])])) {
     if (h.user_id && !formerIds.has(h.user_id) && !members.some((p) => p.id === h.user_id)) members.push({ id: h.user_id, name: h.name });
   }
   const kinds: { value: HolderKind; label: string }[] = [
@@ -890,57 +921,82 @@ function HolderFields({
       {holders.map((h, i) => {
         const kind = kindOf(h);
         const list = kind === 'former' ? people.former : members;
+        const who = (kind === 'name' ? h.name : list.find((p) => String(p.id) === h.user)?.name)?.trim() || 'dieser Person';
         return (
-          <div key={i} className="office-holder-row">
-            {kinds.length > 1 && (
-              <label className="field">
-                <span>Profil</span>
-                <select value={kind} onChange={(e) => set(i, { kind: e.target.value as HolderKind, user: '' })}>
-                  {kinds.map((k) => (
-                    <option key={k.value} value={k.value}>
-                      {k.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {kind === 'name' ? (
-              <>
+          <div key={i} className="office-holder">
+            <div className="office-holder-row">
+              {kinds.length > 1 && (
                 <label className="field">
-                  <span>Name</span>
-                  <input type="text" maxLength={100} value={h.name} onChange={(e) => set(i, { name: e.target.value })} required />
+                  <span>Profil</span>
+                  <select value={kind} onChange={(e) => set(i, { kind: e.target.value as HolderKind, user: '' })}>
+                    {kinds.map((k) => (
+                      <option key={k.value} value={k.value}>
+                        {k.label}
+                      </option>
+                    ))}
+                  </select>
                 </label>
-                <HolderPhotoField row={h} onChange={(image) => set(i, { image })} />
-              </>
-            ) : (
-              <label className="field">
-                <span>{kind === 'former' ? 'Ehemaliger' : 'Mitglied'}</span>
-                <select value={h.user} onChange={(e) => set(i, { user: e.target.value })} required>
-                  <option value="">Bitte wählen</option>
-                  {list.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            {(optional || holders.length > 1) && (
-              <button
-                type="button"
-                className="btn btn-small btn-secondary"
-                aria-label="Person entfernen"
-                onClick={() => setHolders(holders.filter((_, j) => j !== i))}
-              >
-                ✕
-              </button>
-            )}
+              )}
+              {kind === 'name' ? (
+                <>
+                  <label className="field">
+                    <span>Name</span>
+                    <input type="text" maxLength={100} value={h.name} onChange={(e) => set(i, { name: e.target.value })} required />
+                  </label>
+                  <HolderPhotoField row={h} onChange={(image) => set(i, { image })} />
+                </>
+              ) : (
+                <label className="field">
+                  <span>{kind === 'former' ? 'Ehemaliger' : 'Mitglied'}</span>
+                  <select value={h.user} onChange={(e) => set(i, { user: e.target.value })} required>
+                    <option value="">Bitte wählen</option>
+                    {list.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {(optional || holders.length > 1) && (
+                <button
+                  type="button"
+                  className="btn btn-small btn-secondary"
+                  aria-label={companions ? 'Person entfernen' : 'Begleitperson entfernen'}
+                  onClick={() => setHolders(holders.filter((_, j) => j !== i))}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            {companions &&
+              (h.companions?.length ? (
+                <div className="office-companions">
+                  <HolderFields
+                    holders={h.companions}
+                    setHolders={(rows) => set(i, { companions: rows })}
+                    people={people}
+                    initial={initial}
+                    legend={`Begleitung von ${who}`}
+                    optional
+                    companions={false}
+                  />
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-small btn-link office-companion-add"
+                  onClick={() => set(i, { companions: [{ user: '', name: '' }] })}
+                >
+                  + Begleitung (z. B. Partner/in)
+                </button>
+              ))}
           </div>
         );
       })}
-      {holders.length < 20 && (
+      {holders.length < (companions ? 20 : COMPANIONS_MAX) && (holders.length > 0 || companions) && (
         <button type="button" className="btn btn-small btn-secondary" onClick={() => setHolders([...holders, { user: '', name: '' }])}>
-          {holders.length === 0 ? 'Person hinzufügen' : 'Weitere Person'}
+          {!companions ? 'Weitere Begleitperson' : holders.length === 0 ? 'Person hinzufügen' : 'Weitere Person'}
         </button>
       )}
     </fieldset>

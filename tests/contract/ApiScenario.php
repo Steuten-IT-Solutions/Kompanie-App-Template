@@ -59,12 +59,14 @@ final class ApiScenario
             $this->companies();
             $this->sponsors();
             $this->pages();
+            $this->newsInApp();
             $this->activity();
             $this->accounts();
             $this->formerMembers();
             $this->events();
             $this->push();
             $this->reports();
+            $this->registrations();
             $this->config();
         } finally {
             $this->d->preview(null);
@@ -333,7 +335,8 @@ final class ApiScenario
             ['GET', '/catalog', [], [401, 403, 200, 200, 200, 200]],
             ['GET', '/ranks', [], [401, 403, 200, 200, 200, 200]],
             ['GET', '/documents', [], [401, 403, 200, 200, 200, 200]],
-            ['GET', '/board', [], [401, 403, 200, 200, 200, 200]],
+            // Brett: ohne view_board nur öffentliche Nachrichten (board())
+            ['GET', '/board', [], [200, 200, 200, 200, 200, 200]],
             ['GET', '/directory', [], [200, 200, 200, 200, 200, 200]],
             ['GET', '/members', [], [401, 403, 403, 403, 200, 200]],
             ['POST', '/events', ['title' => ''], [401, 403, 403, 400, 400, 400]],
@@ -956,7 +959,10 @@ final class ApiScenario
         $c->ok($ok, 'Dokumente löschen');
     }
 
-    /** Schwarzes Brett (Issue #5): Mitglieder und Anwärter lesen, post_board schreibt; Prüfung, Ablauf bleibt beim Ändern. */
+    /**
+     * Schwarzes Brett (Issue #5): Mitglieder und Anwärter lesen, post_board schreibt; Prüfung, Ablauf bleibt beim Ändern.
+     * Öffentliche Nachrichten sehen alle, auch ohne Anmeldung, interne nicht.
+     */
     private function board(): void
     {
         $c = $this->c;
@@ -966,9 +972,11 @@ final class ApiScenario
         $cand = $this->user('kptest_brett_anw', $this->anw);
         $guest = $this->user('kptest_brett_gast', 'guest');
         $this->d->actAs(null);
-        $c->ok($this->req('GET', '/board')[0] === 401, 'GET /board ohne Anmeldung → 401');
+        $c->ok($this->req('GET', '/board')[0] === 200, 'GET /board ohne Anmeldung → 200 (nur öffentliche)');
+        $c->ok($this->req('POST', '/board', ['title' => 'Kptest', 'text' => 'Kptest'])[0] === 401, 'Ohne Anmeldung schreibt niemand → 401');
         $this->d->actAs($guest);
-        $c->ok($this->req('GET', '/board')[0] === 403, 'Gast-Konto: GET /board → 403');
+        $c->ok($this->req('GET', '/board')[0] === 200, 'Gast-Konto: GET /board → 200 (nur öffentliche)');
+        $c->ok($this->req('POST', '/board', ['title' => 'Kptest', 'text' => 'Kptest'])[0] === 403, 'Gast-Konto schreibt nicht → 403');
         $this->d->actAs($m);
         $c->ok($this->req('POST', '/board', ['title' => 'Kptest', 'text' => 'Kptest'])[0] === 403, 'Mitglied ohne Recht schreibt nicht → 403');
         $c->ok($this->req('GET', '/board/history')[0] === 403, 'Mitglied ohne Recht sieht keinen Verlauf → 403');
@@ -984,12 +992,32 @@ final class ApiScenario
         $c->ok(strlen((string) ($item['text'] ?? '')) > 65535, 'Keine Längengrenze (mehr als 64 KB)');
         $c->ok(str_starts_with((string) ($item['excerpt'] ?? ''), 'Kptest fett'), 'Textauszug');
         $c->ok(((int) strtotime((string) ($item['expires_at'] ?? ''))) - ((int) strtotime((string) ($item['created_at'] ?? ''))) === 86400, 'Standard: 24 Stunden');
+        $c->ok(($item['audience'] ?? '') === 'members', 'Ohne Angabe intern');
+        $c->ok($this->req('POST', '/board', ['title' => 'Kptest', 'text' => 'x', 'audience' => 'alle'])[0] === 400, 'Unbekannte Sichtbarkeit → 400');
+        [$s, $pub] = $this->req('POST', '/board', ['title' => "Kptest öffentlich $sfx", 'text' => '<p>Kptest für alle</p>', 'audience' => 'public', 'push' => false, 'mail' => false]);
+        $pubId = (int) ($pub['id'] ?? 0);
+        $c->ok($s === 201 && ($pub['audience'] ?? '') === 'public', 'Öffentliche Nachricht');
         foreach ([$m => 'Mitglied', $cand => 'Anwärter'] as $who => $label) {
             $this->d->actAs($who);
             [$s, $d] = $this->req('GET', '/board');
-            $c->ok($s === 200 && in_array($id, array_column((array) ($d['items'] ?? []), 'id'), true), "$label sieht die Nachricht");
+            $ids = array_column((array) ($d['items'] ?? []), 'id');
+            $c->ok($s === 200 && in_array($id, $ids, true) && in_array($pubId, $ids, true), "$label sieht interne und öffentliche Nachricht");
+        }
+        foreach ([[null, 'Ohne Anmeldung'], [$guest, 'Gast-Konto']] as [$who, $label]) {
+            $this->d->actAs($who);
+            [$s, $d] = $this->req('GET', '/board');
+            $byId = array_column((array) ($d['items'] ?? []), null, 'id');
+            $c->ok($s === 200 && isset($byId[$pubId]) && !isset($byId[$id]), "$label: nur die öffentliche Nachricht");
+            $c->ok(isset($byId[$pubId]) && !array_key_exists('last_edit', $byId[$pubId]) && !array_key_exists('mail', $byId[$pubId]), "$label: ohne Angaben für Schreibende");
         }
         $this->d->actAs($admin);
+        [$s, $edited] = $this->req('PATCH', "/board/$pubId", ['audience' => 'members']);
+        $c->ok($s === 200 && ($edited['audience'] ?? '') === 'members', 'Sichtbarkeit geändert');
+        $this->d->actAs(null);
+        [, $d] = $this->req('GET', '/board');
+        $c->ok(!in_array($pubId, array_column((array) ($d['items'] ?? []), 'id'), true), 'Wieder intern: ohne Anmeldung nicht mehr sichtbar');
+        $this->d->actAs($admin);
+        $this->req('DELETE', "/board/$pubId");
         $future = gmdate('Y-m-d\TH:i:s\Z', time() + 40 * 86400);
         [$s, $edited] = $this->req('PATCH', "/board/$id", ['expires_at' => $future]);
         $c->ok($s === 200 && strtotime((string) ($edited['expires_at'] ?? '')) === strtotime($future) && ($edited['updated_at'] ?? null) === ($item['updated_at'] ?? ''), 'Enddatum verlängert (ohne Obergrenze), updated_at bleibt');
@@ -1464,6 +1492,39 @@ final class ApiScenario
         [$s, $d] = $this->req('DELETE', "/sponsors/{$mine[0]}/logo");
         $c->ok($s === 200 && array_key_exists('logo_url', (array) $d) && $d['logo_url'] === null, 'Logo entfernen');
         $c->ok($this->req('DELETE', "/sponsors/{$mine[0]}")[0] === 200 && $this->req('DELETE', "/sponsors/{$mine[1]}")[0] === 200 && $this->req('PATCH', "/sponsors/{$mine[0]}", ['name' => 'x'])[0] === 404, 'Aufräumen: Sponsoren löschen');
+    }
+
+    /** News in der App (Quelle app): schreiben, lesen ohne Anmeldung, ändern mit Stand, löschen; Quelle danach zurück. */
+    private function newsInApp(): void
+    {
+        $c = $this->c;
+        $c->section('News in der App');
+        $admin = $this->user('kptest_news_admin', 'admin');
+        $m = $this->user('kptest_news_m', 'member');
+        $this->d->actAs($admin);
+        $this->req('PUT', '/admin/features', ['news' => true]);
+        [, $settings] = $this->req('GET', '/admin/settings');
+        $before = (string) ($settings['news']['source'] ?? 'none');
+        $c->ok(in_array('app', (array) ($settings['news']['sources'] ?? []), true), 'Quelle app wählbar');
+        [$s] = $this->req('PATCH', '/admin/settings', ['news_source' => 'app']);
+        $c->ok($s === 200 && ($this->req('GET', '/config')[1]['newsInApp'] ?? null) === true, 'Quelle app eingestellt, /config newsInApp');
+        [$s, $item] = $this->req('POST', '/news', ['title' => 'Kptest Beitrag', 'body' => '<p>Hallo <b>alle</b></p><script>alert(1)</script>']);
+        $c->ok($s === 201 && ($item['link'] ?? null) === '' && !str_contains((string) ($item['content'] ?? ''), 'script'), 'Beitrag schreiben, Text bereinigt');
+        $id = (string) ($item['id'] ?? '0');
+        $this->d->actAs(null);
+        $c->ok(in_array('Kptest Beitrag', array_column((array) ($this->req('GET', '/news')[1] ?? []), 'title'), true), 'Ohne Anmeldung in der Liste');
+        $this->d->actAs($m);
+        $c->ok($this->req('PATCH', '/news/' . $id, ['title' => 'X'])[0] === 403, 'Ohne manage_news → 403');
+        $this->d->actAs($admin);
+        $loaded = (string) ($this->req('GET', '/news/' . $id)[1]['updated_at'] ?? '');
+        [$s, $d] = $this->req('PATCH', '/news/' . $id, ['title' => 'Kptest Beitrag geändert', 'updated_at' => $loaded]);
+        $c->ok($s === 200 && ($d['title'] ?? '') === 'Kptest Beitrag geändert', 'Mit aktuellem Stand speichern');
+        [$s, $d] = $this->req('PATCH', '/news/' . $id, ['title' => 'Zu spät', 'updated_at' => '2000-01-01T00:00:00Z']);
+        $c->ok($s === 409 && ($d['code'] ?? '') === 'conflict', 'Veralteter Stand → 409 conflict');
+        $c->ok($this->req('DELETE', '/news/' . $id)[0] === 200 && $this->req('GET', '/news/' . $id)[0] === 404, 'Beitrag löschen');
+        [$s] = $this->req('PATCH', '/admin/settings', ['news_source' => $before]);
+        [$s2, $d] = $this->req('POST', '/news', ['title' => 'X']);
+        $c->ok($s === 200 && $s2 === 409 && ($d['code'] ?? '') === 'not_in_app', 'Quelle zurück, Schreiben dann 409 not_in_app');
     }
 
     /** Eigene Seiten (Issue #287): Lesen nach Zielgruppe, Pflege mit manage_pages, Konflikt beim Speichern, Reihenfolge. */
@@ -1952,6 +2013,97 @@ final class ApiScenario
         $this->d->actAs($this->m1);
         [$s] = $this->req('POST', '/reports', ['token' => $memberForm['token'], 'includeName' => true] + $body);
         $c->ok($s === 201, 'Mitglied meldet mit Namen → 201');
+        $this->d->actAs(null);
+    }
+
+    /**
+     * Zugang beantragen (Issue #314), ohne Mailversand: Anfrage, Freigabe mit dem Passwort aus der Anfrage (der Hash
+     * muss im jeweiligen Adapter zur Anmeldung taugen), Ablehnung, Rechte.
+     */
+    private function registrations(): void
+    {
+        $c = $this->c;
+        $c->section('Zugang beantragen');
+        $admin = $this->user('kptest_zugang_admin', 'admin');
+        $member = $this->user('kptest_zugang_mitglied', 'member');
+        $this->d->actAs(null);
+        [$s, $d] = $this->req('GET', '/registration/form');
+        $c->ok($s === 404 && ($d['code'] ?? '') === 'registration_unavailable', 'Ausgeschaltet: kein Formular (404)');
+        $this->d->actAs($member);
+        $c->ok($this->req('PUT', '/admin/registration', ['enabled' => true])[0] === 403, 'Einschalten nur für Admins (403)');
+        $c->ok($this->req('GET', '/registrations')[0] === 403, 'Anfragen nur mit „Mitglieder anlegen“ (403)');
+        $this->d->actAs($admin);
+        [$s, $d] = $this->req('PUT', '/admin/registration', ['enabled' => true]);
+        $c->ok($s === 200 && ($d['enabled'] ?? false) === true && str_ends_with((string) ($d['link'] ?? ''), '#/registrieren'), 'Admin schaltet „Zugang beantragen“ ein');
+        $c->ok($this->req('PUT', '/admin/registration', ['default_role' => 'admin'])[0] === 400, 'Vorgeschlagene Rolle nie Admin (400)');
+
+        $this->d->actAs(null);
+        [, $config] = $this->req('GET', '/config');
+        $c->ok(($config['registration'] ?? null) === true && array_key_exists('pendingRegistrations', $config) && $config['pendingRegistrations'] === null, '/config: an, Gäste sehen keinen Zähler');
+        [$s, $form] = $this->req('GET', '/registration/form');
+        $c->ok($s === 200 && is_string($form['token'] ?? null) && is_bool($form['email_confirmation'] ?? null), 'Formular mit Zeitmarke');
+        $suffix = substr(bin2hex(random_bytes(3)), 0, 6);
+        $body = ['token' => $form['token'], 'consent' => true, 'first_name' => 'Zugang', 'last_name' => 'Test' . $suffix,
+            'email' => "zugang.$suffix@example.org", 'username' => "kptest_zugang_$suffix", 'password' => 'Anfrage-Passwort-1'];
+        $c->ok(($this->req('POST', '/registration', $body)[1]['code'] ?? '') === 'too_fast', 'Sofort abgeschickt → too_fast (Zeitfalle)');
+        sleep((int) ($form['minSeconds'] ?? 3));
+        $c->ok($this->req('POST', '/registration', ['consent' => false] + $body)[0] === 400, 'Ohne Einwilligung → 400');
+        $c->ok($this->req('POST', '/registration', ['username' => 'kptest_zugang_admin'] + $body)[0] === 400, 'Vergebener Benutzername → 400');
+        [$s, $d] = $this->req('POST', '/registration', $body);
+        $mail = ($form['email_confirmation'] ?? false) === true;
+        $c->ok($s === 201 && ($d['status'] ?? '') === ($mail ? 'confirm_email' : 'pending'), 'Anfrage angenommen');
+        if ($mail) {
+            // Mit Mailversand müsste erst der Link aus der Mail bestätigt werden; das prüfen die Kern-Tests.
+            $this->d->actAs($admin);
+            $this->req('PUT', '/admin/registration', ['enabled' => false]);
+            return;
+        }
+        [, $d] = $this->req('POST', '/registration/status', ['username' => $body['username'], 'password' => $body['password']]);
+        $c->ok(($d['status'] ?? '') === 'pending', 'Stand der Anfrage: wartet');
+
+        $this->d->actAs($admin);
+        [, $list] = $this->req('GET', '/registrations');
+        $req = null;
+        foreach ($list['requests'] ?? [] as $r) {
+            if (($r['username'] ?? '') === $body['username']) {
+                $req = $r;
+            }
+        }
+        $c->ok($req !== null && !array_key_exists('password_hash', $req) && ($req['email_confirmed'] ?? true) === false, 'Anfrage in der Liste, ohne Passwort-Hash');
+        [, $config] = $this->req('GET', '/config');
+        $c->ok(($config['pendingRegistrations'] ?? 0) >= 1, '/config: Zähler für Freigebende');
+        $this->d->actAs($member);
+        $c->ok($this->req('POST', '/registrations/' . (int) ($req['id'] ?? 0) . '/approve')[0] === 403, 'Mitglied ohne Recht gibt nicht frei (403)');
+        $this->d->actAs($admin);
+        [$s, $d] = $this->req('POST', '/registrations/' . (int) ($req['id'] ?? 0) . '/approve', ['level' => 'member']);
+        $id = (int) ($d['member']['id'] ?? 0);
+        if ($id > 0) {
+            $this->users[] = $id;
+        }
+        $c->ok($s === 200 && $id > 0 && ($d['member']['username'] ?? '') === $body['username'], 'Admin gibt frei → Konto angelegt');
+        $c->ok($id > 0 && $this->d->checkPassword($id, $body['password']), 'Anmelden mit dem Passwort aus der Anfrage möglich');
+        $c->ok($this->req('POST', '/registrations/' . (int) ($req['id'] ?? 0) . '/approve')[0] === 404, 'Schon freigegeben → 404');
+
+        // Zweite Anfrage ablehnen
+        $this->d->actAs(null);
+        [, $form] = $this->req('GET', '/registration/form');
+        sleep((int) ($form['minSeconds'] ?? 3));
+        $body2 = ['token' => $form['token'], 'username' => "kptest_zugang2_$suffix", 'email' => "zugang2.$suffix@example.org"] + $body;
+        $c->ok($this->req('POST', '/registration', $body2)[0] === 201, 'Zweite Anfrage angenommen');
+        $this->d->actAs($admin);
+        $second = null;
+        foreach ($this->req('GET', '/registrations')[1]['requests'] ?? [] as $r) {
+            if (($r['username'] ?? '') === $body2['username']) {
+                $second = $r;
+            }
+        }
+        [$s, $d] = $this->req('POST', '/registrations/' . (int) ($second['id'] ?? 0) . '/reject', ['reason' => 'Vertragstest']);
+        $c->ok($s === 200 && ($d['rejected'] ?? false) === true, 'Admin lehnt ab');
+        $this->d->actAs(null);
+        [, $d] = $this->req('POST', '/registration/status', ['username' => $body2['username'], 'password' => $body['password']]);
+        $c->ok(($d['status'] ?? '') === 'rejected' && ($d['reason'] ?? '') === 'Vertragstest', 'Stand der Anfrage: abgelehnt mit Begründung');
+        $this->d->actAs($admin);
+        $this->req('PUT', '/admin/registration', ['enabled' => false]);
         $this->d->actAs(null);
     }
 

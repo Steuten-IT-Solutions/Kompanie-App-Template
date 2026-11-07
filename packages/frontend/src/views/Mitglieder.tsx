@@ -23,6 +23,7 @@ import {
   type MemberOrder,
   type MemberSort,
 } from '../memberSort';
+import { MemberRow } from '../MemberRow';
 import { navigate, redirect } from '../router';
 import { PersonName } from '../skeleton';
 import { neighbors, usePrefetchChain, useSwipeDrag } from '../swipe';
@@ -223,7 +224,7 @@ function PersonHead({
           {m.companies.map((c, i) => (
             <span key={c.id}>
               {i > 0 && ', '}
-              <button type="button" className="link-button" onClick={() => navigate('kompanien')}>
+              <button type="button" className="link-button" onClick={() => navigate(`kompanien/${c.id}`)}>
                 {c.name}
               </button>
             </span>
@@ -299,13 +300,29 @@ function MemberPage({
   );
   // Nur für den Namen ohne Mitgliederliste; die Ämter darunter laden selbst.
   const officeData = useOffices(offices && !directory);
+  // Ohne Mitgliederliste (z. B. aus der Seite einer Kompanie geöffnet): Foto, Titel und Dienstgrad aus den Kompanien.
+  const fromCompanies = !directory && !!config?.features.companies && can('view_companies');
+  const companies = useAsync(
+    () => (fromCompanies ? sources.companies.load() : Promise.resolve(null)),
+    [],
+    fromCompanies ? sources.companies.key : undefined,
+  );
+  const companyMembers = useMemo(() => {
+    const byId = new Map<number, DirectoryEntry>();
+    for (const c of companies.data ?? [])
+      for (const m of c.members ?? []) byId.set(m.id, { first_name: '', last_name: '', photo_url: null, ...m });
+    return byId;
+  }, [companies.data]);
   const findPerson = (id: number | null) => {
     const f = former.data?.find((e) => e.id === id);
-    return { f, m: list.data?.find((e) => e.id === id) ?? f };
+    return { f, m: list.data?.find((e) => e.id === id) ?? f ?? (id !== null ? companyMembers.get(id) : undefined) };
   };
   const { f, m } = findPerson(userId);
   const name =
-    m?.name ?? officeData.data?.offices.flatMap((o) => o.terms.flatMap((t) => t.holders)).find((h) => h.user_id === userId)?.name;
+    m?.name ??
+    officeData.data?.offices
+      .flatMap((o) => o.terms.flatMap((t) => t.holders.flatMap((h) => [h, ...(h.companions ?? [])])))
+      .find((h) => h.user_id === userId)?.name;
 
   const order = useDirectoryOrder(userId, list.data, former.data);
   const ids = useMemo(() => order.map((e) => e.id), [order]);
@@ -344,7 +361,11 @@ function MemberPage({
     );
   };
 
-  const waiting = (list.loading && !list.data) || (former.loading && !former.data) || (officeData.loading && !officeData.data);
+  const waiting =
+    (list.loading && !list.data) ||
+    (former.loading && !former.data) ||
+    (officeData.loading && !officeData.data) ||
+    (companies.loading && !companies.data);
   return (
     <div className="member-page" ref={root}>
       <div className={`member-track${swipe.peeking ? ' peeking' : ''}`} ref={track}>
@@ -498,22 +519,11 @@ function MemberList({ former = false }: { former?: boolean }) {
       </div>
       <ul className="card-list">
         {list.map((m) => (
-          <li key={m.id} className="card row member-row member-row-link">
-            <ZoomableAvatar url={m.photo_url} name={m.name} size="medium" />
-            <div className="row-main">
-              {/* Die ganze Zeile öffnet die Seite der Person; das Foto vergrößert weiterhin (liegt darüber). */}
-              <button type="button" className="row-title member-row-open" onClick={() => open(m.id)}>
-                {listName(m, order.sort)} <TitleBadges titles={m.titles} role={m.candidate_role ?? undefined} />
-              </button>
-              {former && formerYears(m) && <div className="row-sub">{formerYears(m)}</div>}
-              {/* Nach Eintritt sortiert: das Jahr, soweit die Person es zeigt (Ehemalige haben ihre Jahre oben). */}
-              {!former && order.sort === 'joined' && joinedText(m) && <div className="row-sub">Eintritt {joinedText(m)}</div>}
-            </div>
-            {/* Dienstgrad rechts, gegenüber dem Foto; ohne Dienstgrad bleibt die Spalte leer (Text in allen Zeilen mittig). */}
-            {m.rank_title !== undefined && (
-              <div className="member-row-rank">{m.rank_title && <RankStack url={m.rank_badge_url} title={m.rank_title} />}</div>
-            )}
-          </li>
+          <MemberRow key={m.id} m={m} name={listName(m, order.sort)} onOpen={() => open(m.id)}>
+            {former && formerYears(m) && <div className="row-sub">{formerYears(m)}</div>}
+            {/* Nach Eintritt sortiert: das Jahr, soweit die Person es zeigt (Ehemalige haben ihre Jahre oben). */}
+            {!former && order.sort === 'joined' && joinedText(m) && <div className="row-sub">Eintritt {joinedText(m)}</div>}
+          </MemberRow>
         ))}
         {list.length === 0 && <Empty>Niemand gefunden.</Empty>}
       </ul>

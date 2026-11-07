@@ -14,9 +14,6 @@ export function parseLocalDate(ymd: string): Date {
 
 export const formatDate = (ymd: string) => dateFmt.format(parseLocalDate(ymd));
 
-/** Wochentag, Tag und Monat kurz, z. B. „Di., 27. Okt.“ */
-export const formatWeekdayDate = (d: Date) => weekdayFmt.format(d);
-
 /** Monat kurz ohne Punkt für das Datumsfeld links an Karten, z. B. „Okt“. */
 export const shortMonth = (d: Date) => d.toLocaleDateString('de-DE', { month: 'short' }).replace('.', '');
 
@@ -80,18 +77,31 @@ export function eventEnd(ev: { end: string; start: string; all_day: boolean }): 
   return d;
 }
 
-export function formatEventWhen(ev: { start: string; end: string; all_day: boolean }): string {
+const yearDateFmt = new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+/** Wochentag, Tag und Monat kurz („Di., 27. Okt.“), in einem anderen Jahr als `now` mit Jahreszahl („Fr., 8. Jan. 2027“). */
+export const formatWeekdayDateYear = (d: Date, now: Date = new Date()) =>
+  (d.getFullYear() === now.getFullYear() ? weekdayFmt : yearDateFmt).format(d);
+
+/**
+ * Zeitraum eines Termins. Liegt er nicht im laufenden Jahr, steht die Jahreszahl dabei; bei mehrtägigen Terminen im
+ * selben Jahr nur am Ende („Fr., 8. Jan. – So., 10. Jan. 2027“).
+ */
+export function formatEventWhen(ev: { start: string; end: string; all_day: boolean }, now: Date = new Date()): string {
   const s = eventStart(ev);
   const e = eventEnd(ev);
   const sameDay = s.toDateString() === e.toDateString();
+  const day = (d: Date) => formatWeekdayDateYear(d, now);
+  // Anfang mit Jahr nur, wenn er nicht im laufenden Jahr liegt und das Ende es nicht schon nennt.
+  const from = s.getFullYear() === e.getFullYear() ? weekdayFmt.format(s) : day(s);
   if (ev.all_day) {
     // Eintägig ohne Uhrzeit: nur das Datum (ohne Zusatz „ganztägig“).
-    return sameDay ? weekdayFmt.format(s) : `${weekdayFmt.format(s)} – ${weekdayFmt.format(e)}`;
+    return sameDay ? day(s) : `${from} – ${day(e)}`;
   }
-  if (e.getTime() <= s.getTime()) return `${weekdayFmt.format(s)} · ${timeFmt.format(s)} Uhr`;
+  if (e.getTime() <= s.getTime()) return `${day(s)} · ${timeFmt.format(s)} Uhr`;
   return sameDay
-    ? `${weekdayFmt.format(s)} · ${timeFmt.format(s)}–${timeFmt.format(e)} Uhr`
-    : `${weekdayFmt.format(s)}, ${timeFmt.format(s)} – ${weekdayFmt.format(e)}, ${timeFmt.format(e)} Uhr`;
+    ? `${day(s)} · ${timeFmt.format(s)}–${timeFmt.format(e)} Uhr`
+    : `${from}, ${timeFmt.format(s)} – ${day(e)}, ${timeFmt.format(e)} Uhr`;
 }
 
 export const formatMonth = (d: Date) => monthFmt.format(d);
@@ -146,8 +156,6 @@ export function fromLocalInput(value: string): string | null {
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? value : d.toISOString();
 }
-
-const yearDateFmt = new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 
 /** Wie formatShortTime, aber in einem anderen Jahr mit Jahreszahl („Mo., 19. Okt. 2027, 14:05 Uhr“), z. B. „Sichtbar bis“. */
 export function formatUntil(iso: string): string {

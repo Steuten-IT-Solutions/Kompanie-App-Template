@@ -181,7 +181,7 @@ final class BoardRebuildTest extends TestCase
         $this->assertSame(['Erst', 'Zweit'], [$history['revisions'][1]['before'], $history['revisions'][1]['after']]);
         $this->assertSame(['<p>Alt</p>', '<p>Neu</p>'], [$history['revisions'][2]['before'], $history['revisions'][2]['after']], 'vorher/nachher');
         $this->assertSame(['2026-10-21T10:00:00+00:00', '2026-10-22T10:00:00+00:00'], [$history['revisions'][3]['before'], $history['revisions'][3]['after']]);
-        $this->assertEquals(['title' => 'Erst', 'text' => '<p>Alt</p>', 'expires_at' => '2026-10-21T10:00:00+00:00'], $history['revisions'][0]['after']);
+        $this->assertEquals(['title' => 'Erst', 'text' => '<p>Alt</p>', 'expires_at' => '2026-10-21T10:00:00+00:00', 'audience' => 'members'], $history['revisions'][0]['after']);
 
         // Vorzeitig löschen: mit Konto und Zeitpunkt; danach im Verlauf der letzten 30 Tage
         $this->clock->at = $this->clock->now()->modify('+1 hour');
@@ -229,6 +229,6 @@ final class BoardRebuildTest extends TestCase
         $this->assertSame("• eins\n• zwei", $item['excerpt']);
         $this->assertSame(BoardService::KIND_MESSAGE, $item['kind']);
         $member = $this->as($this->m)->call('GET', '/board')->data['items'][0];
-        $this->assertSame(['kind', 'id', 'title', 'text', 'excerpt', 'author_name', 'created_at', 'updated_at', 'expires_at', 'attachments'], array_keys($member));
+        $this->assertSame(['kind', 'id', 'title', 'text', 'excerpt', 'author_name', 'created_at', 'updated_at', 'expires_at', 'audience', 'attachments'], array_keys($member));
     }
 }

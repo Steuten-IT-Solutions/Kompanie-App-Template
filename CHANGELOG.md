@@ -15,13 +15,102 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.7.0] – 2026-11-07
+
+### Neu
+
+- **Öffentliche Nachrichten am Schwarzen Brett**: Beim Schreiben wählt ihr unter *Sichtbar für*, ob eine Nachricht
+  *intern* bleibt (wie bisher: Mitglieder und alle mit dem internen Kalender) oder *öffentlich* ist. Öffentliche
+  Nachrichten sehen alle, auch Besucher ohne Anmeldung, im Banner oben auf jeder Seite und auf der Seite des Bretts,
+  samt Bildern, Anhängen und dem Namen der Person, die sie geschrieben hat. Die Benachrichtigung geht dann zusätzlich an
+  alle Geräte ohne Brett, auch ohne Anmeldung (neue Art *Schwarzes Brett: öffentliche Nachrichten*, bei der ersten
+  öffentlichen Nachricht einmalig dazugeschaltet); die E-Mail geht weiter nur an Mitglieder und alle mit dem internen
+  Kalender. Die Sichtbarkeit lässt sich beim Bearbeiten ändern und steht im Verlauf. Bisherige Nachrichten bleiben
+  intern.
+- **Ämter: Begleitpersonen**: Bei einer Amtszeit kann jede Person eine Begleitung bekommen, die das Amt nicht selbst
+  bekleidet, z. B. Partnerin oder Partner. Sie steht im Zeitstrahl abgesetzt darunter („Max Muster“, darunter „mit
+  Erika Muster“), als Mitglied, Ehemaliger oder Name ohne Profil, auf Wunsch mit Foto. Einzutragen in der Verwaltung
+  der Ämter bei der Amtszeit mit *+ Begleitung*. Begleitpersonen bekommen keinen mit dem Amt verknüpften Titel, und
+  ihr Ausscheiden beendet keine Amtszeit. Partner, die bisher als eigene Person im Amt stehen, dort entfernen und als
+  Begleitung neu eintragen.
+- **Kompanien: Suche und Sortierung**: Über der Liste der Kompanien stehen wie in der Mitgliederliste ein Suchfeld
+  (Name oder Kurzname) und die Sortierung: wie festgelegt, nach Name, Gründung oder Mitgliedern, jeweils auch
+  umgekehrt. Aufgelöste Kompanien stehen weiter unten; die Wahl merkt sich das Gerät.
+- **Ämter: Einzahl für Gruppen**: Eine Gruppe der Ämter kann neben ihrer Bezeichnung (z. B. „Königshäuser“) eine
+  Einzahl bekommen (z. B. „Königshaus“). Über einer einzelnen gemeinsamen Amtszeit steht dann „Königshaus 2026–2028“
+  statt „Königshäuser 2026–2028“. Einzutragen in der Verwaltung der Ämter unter *Gruppen → Bearbeiten*; ohne Einzahl
+  bleibt es wie bisher.
+- **News direkt in der App schreiben**: Unter *Einstellungen → Neuigkeiten* gibt es die Quelle *In der App schreiben*,
+  mit WordPress und ohne. Dann steht unter News der Knopf *Neuer Beitrag*: Titel und formatierter Text mit Bildern,
+  das erste Bild erscheint auch in der Liste. Beiträge lassen sich später bearbeiten und löschen; wer News abonniert
+  hat, bekommt bei einem neuen Beitrag eine Benachrichtigung. Schreiben darf, wer das neue Recht *News schreiben* hat;
+  mit der Quelle legt die App die Rolle „News verwalten“ an. Es gilt immer eine Quelle, Beiträge der Webseite oder
+  eines Feeds und der App werden nicht gemischt; beim Wechsel bleibt alles gespeichert. Wer die News von der Webseite
+  oder aus einem Feed bezieht, merkt nichts davon.
+- **Zugang beantragen**: Personen können ihren Zugang zur App jetzt selbst beantragen, ihr müsst nicht mehr jedes
+  Konto selbst anlegen. Eingeschaltet wird das unter *Einstellungen → Zugang beantragen* (bis dahin bleibt es aus).
+  Die Person füllt ein Formular mit Name, E-Mail-Adresse, Benutzername und Passwort aus; die Anfrage erscheint unter
+  *Verwaltung → Anfragen*. Freigeben oder ablehnen darf, wer Mitglieder anlegen darf, Admins also immer. Erst mit
+  der Freigabe entsteht das Konto, mit der dort gewählten Rolle (Admin lässt sich dabei nicht vergeben) und dem
+  Passwort aus der Anfrage. Ist der Mailversand eingerichtet, bestätigt die Person zuerst ihre E-Mail-Adresse und
+  erfährt das Ergebnis per Mail. Ohne Mailversand sieht sie es bei der Anmeldung oder unter *Stand meiner Anfrage*.
+  Unbearbeitete Anfragen löscht die App nach 30 Tagen. Wer Mitglieder anlegen darf, kann sich über neue Anfragen
+  benachrichtigen lassen.
+
+### Geändert
+
+- **Kompanien ohne Ämter**: Ämter gehören zu den Personen, nicht zu einer Kompanie. Die Seite einer Kompanie zeigt
+  deshalb keine Amtszeiten mehr, und beim Anlegen oder Bearbeiten gibt es keine *Gruppe der Ämter* mehr. Bisher
+  gesetzte Verknüpfungen wertet die App nicht mehr aus.
+- **Kompanien haben eine eigene Seite**: Ein Tipp auf eine Kompanie klappt die Karte nicht mehr auf, sondern öffnet
+  ihre Seite mit Logo, Beschreibung, laufenden Ämtern, Links und der Liste ihrer Mitglieder (wie bisher nur für alle,
+  die die Mitgliederliste sehen dürfen). Die Seite hat einen eigenen Link zum Teilen; „‹ Alle Kompanien“ führt zurück
+  an dieselbe Stelle der Liste. Auch der Name einer Kompanie auf der Seite einer Person führt jetzt direkt dorthin.
+- **Ämter einer Person**: Im Zeitstrahl einer Person steht nur noch das Amt (bzw. seine Einzahl), nicht mehr
+  zusätzlich die Gruppe.
+- **Jahreszahl bei Terminen**: Liegt ein Termin nicht im laufenden Jahr, zeigt die App beim Datum jetzt auch das Jahr,
+  z. B. „Fr., 8. Jan. 2027“. Das gilt für die internen und öffentlichen Termine, die Termine bei der Anwesenheit, die
+  Verwaltung der öffentlichen Termine und die anstehenden Geburtstage.
+
+### Behoben
+
+- **Mitglieder auf der Seite einer Kompanie**: Ist der Bereich *Mitglieder* aus (z. B. in einer Bruderschaft ohne
+  eigene Mitgliederliste), fehlten die zugeordneten Personen. Jetzt stehen ihre Namen dort für alle mit dem Recht, die
+  Mitgliederliste zu sehen, auch für Gäste mit diesem Recht. Die Liste sieht aus wie die Mitgliederliste (Foto, Titel,
+  Dienstgrad); ein Tipp öffnet die Seite der Person, auch ohne Mitgliederliste, wenn ihr *Ämter* nutzt. Dort blättert
+  man in den Mitgliedern dieser Kompanie weiter.
+- **Kein Leerraum zum Scrollen auf kurzen Seiten**: Seiten mit wenig Inhalt, etwa die leere Galerie, ließen sich im
+  Handy-Browser ein Stück nach unten scrollen, so dass die Knöpfe oben aus dem Bild rutschten. Die Mindesthöhe der App
+  richtet sich jetzt nach dem sichtbaren Bildschirm (ohne die Adressleiste des Browsers).
+- **Formatierte Texte im dunklen Design lesbar**: Eingefügter Text (z. B. von eurer Webseite) brachte oft eine feste
+  Schriftfarbe mit, die im dunklen Design kaum zu lesen war, etwa in der Beschreibung einer Kompanie. Farben mit zu
+  wenig Kontrast zum Hintergrund zeigt die App jetzt in ihrer normalen Schriftfarbe, sehr große Zeilenabstände setzt
+  sie auf normal. Gespeichert bleibt der Text unverändert. Links in formatierten Texten sind im dunklen Design jetzt
+  ebenfalls gut lesbar.
+- **Kompanien**: *Webseite* und *App der Kompanie* sind jetzt Knöpfe im Stil der App statt blauer Standard-Links.
+- **Kompanien: transparente Logos**: Logos der Kompanien standen in der Liste, auf der Seite der Kompanie und in der
+  Verwaltung immer in einem weißen Kasten, auch wenn sie einen durchsichtigen Hintergrund haben. Jetzt stehen sie
+  direkt auf der Karte, im hellen wie im dunklen Design. Ein Logo ohne durchsichtigen Hintergrund (z. B. ein JPG)
+  zeigt weiter seinen eigenen Hintergrund.
+- **Hinweis „Einrichtung starten“ nach dem Wiederherstellen**: Wurde in einer frisch installierten, noch nicht
+  eingerichteten App eine Sicherung eingespielt, stand der Hinweis „Einrichtung starten“ weiter über jeder Seite. Mit
+  der Sicherung gilt die App jetzt als eingerichtet; Bereiche und Verbindungen lassen sich wie gewohnt unter
+  *Einstellungen* ändern.
+- **Zurück-Knopf in Untermenüs oben**: Auf *Sponsoren*, *Kompanien*, eigenen Seiten und auf *Termine*, *News* und
+  *Galerie*, wenn sie in einem Untermenü stehen (z. B. *Intern*), stand *‹ Intern* bzw. *‹ <Untermenü>* unter dem
+  Inhalt. Er steht jetzt wie auf den übrigen Seiten oben.
+- **Hinweis „Einrichtung starten“**: Die Karte hatte keinen Innenabstand, der Text stand am linken Rand, und die
+  Kacheln darunter schlossen ohne Abstand an. Beides ist behoben; dasselbe gilt für den Hinweis „Anmelden“ auf Seiten,
+  die erst nach der Anmeldung zu sehen sind.
+
 ## [0.6.0] – 2026-11-06
 
 ### Neu
 
-- **Bilder aus der Galerie herunterladen**: Unter *Einstellungen → Galerie* schaltest du mit *Knöpfe zum
-  Herunterladen zeigen* ein, dass alle, die die Galerie sehen, jedes Bild in der Großansicht und jedes Album als
-  ZIP-Datei herunterladen können, in voller Auflösung. Videos sind nicht dabei. Vorgabe: aus.
+- **Bilder und Videos aus der Galerie herunterladen**: Unter *Einstellungen → Galerie* schaltest du mit *Knöpfe zum
+  Herunterladen zeigen* ein, dass alle, die die Galerie sehen, jedes Bild und Video in der Großansicht und jedes Album
+  als ZIP-Datei herunterladen können, Bilder in voller Auflösung, Videos unverändert. Große Alben passen auch über
+  4 GB in ein ZIP (ZIP64). Vorgabe: aus.
 - **Eigene Seiten**: Mit dem neuen Bereich *Seiten* (unter *Einstellungen → Bereiche*) legt ihr unter *Verwaltung →
   Einrichtungen → Seiten* freie Seiten wie Geschichte, Festprogramm oder Anfahrt an, mit formatiertem Text und
   Bildern. Je Seite wählst du, ob sie alle sehen, auch ohne Anmeldung, oder nur Mitglieder. Jede Seite ist ein eigener

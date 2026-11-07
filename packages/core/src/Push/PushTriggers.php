@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Push;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Domain\BoardService;
 use KompanieApp\Core\Domain\RankService;
 
 /**
@@ -19,8 +20,9 @@ use KompanieApp\Core\Domain\RankService;
  * - neue Neuigkeiten (Abgleich mit dem letzten Stand): an alle Abonnenten;
  * - Erinnerung an die Termine von morgen, einmal am Tag ab der eingestellten Uhrzeit;
  * - Dienstgrad geändert bzw. Titel neu verliehen: nur an das betroffene Mitglied;
- * - neue Nachricht am Schwarzen Brett (Issue #5): an alle Mitglieder und Anwärter außer dem Verfasser, dringend und
- *   höchstens bis zum Ablauf der Nachricht zustellbar; Ändern löst nichts aus;
+ * - neue Nachricht am Schwarzen Brett (Issue #5): an alle Mitglieder und Anwärter außer dem Verfasser, bei öffentlichen
+ *   Nachrichten auch an Gäste und Konten ohne Brett (Art board_public), dringend und höchstens bis zum Ablauf der
+ *   Nachricht zustellbar; Ändern löst nichts aus (auch nicht, wenn eine Nachricht öffentlich wird);
  * - neue Umfrage (Issue #4): an alle Mitglieder außer dem, der sie angelegt hat; Erinnerung 24 Stunden vor dem Ende an
  *   alle Mitglieder ohne Antwort (einmal je Umfrage, Aufgabe poll_reminders);
  * - Geburtstag (Issue #1): am Tag selbst ab der eingestellten Stunde (Standard 7 Uhr) an alle Mitglieder außer dem Geburtstagskind, nur für Geburtstage,
@@ -78,14 +80,21 @@ final class PushTriggers
      * bis zum Enddatum, höchstens PushService::MAX_TTL (Obergrenze der Push-Dienste): Das begrenzt nur, wie lange ein
      * ausgeschaltetes Gerät die Benachrichtigung nachgeliefert bekommt, nicht, wie lange die Nachricht sichtbar ist.
      *
-     * @param array{id: int, title: string, author_name: string|null, expires_at: string|null} $item neue Nachricht (BoardService::create)
+     * Öffentliche Nachrichten (audience public) gehen zusätzlich an Gäste und Konten ohne Brett; bei der ersten bekommen
+     * bestehende Abos dieser Geräte die Art board_public einmalig dazu (PushService::offerTypeToExisting).
+     *
+     * @param array{id: int, title: string, author_name: string|null, expires_at: string|null, audience?: string} $item neue Nachricht (BoardService::create)
      */
     public function boardPosted(array $item, int $authorId): int
     {
         $expires = $item['expires_at'] !== null ? (int) strtotime($item['expires_at']) : 0;
         $ttl = min($expires - $this->app->time()->timestamp(), PushService::MAX_TTL);
         $title = $this->app->config->sectionLabel('board', 'Schwarzes Brett') . ($item['author_name'] !== null ? ': ' . $item['author_name'] : '');
-        return $this->push->notifyBoard(PushService::message($title, $item['title'], 'brett/' . $item['id'], 'brett-' . $item['id']), $authorId, $ttl);
+        $public = ($item['audience'] ?? null) === BoardService::AUDIENCE_PUBLIC;
+        if ($public) {
+            $this->push->offerTypeToExisting(PushService::TYPE_BOARD_PUBLIC);
+        }
+        return $this->push->notifyBoard(PushService::message($title, $item['title'], 'brett/' . $item['id'], 'brett-' . $item['id']), $authorId, $ttl, $public);
     }
 
     /**
@@ -287,11 +296,12 @@ final class PushTriggers
      */
     public function checkNews(): int
     {
-        if (!$this->app->news->available()) {
+        $source = $this->app->newsService()->source();
+        if (!$source->available()) {
             return 0;
         }
         try {
-            $items = $this->app->news->page(1, 10)['items'];
+            $items = $source->page(1, 10)['items'];
         } catch (\RuntimeException) {
             return 0;
         }

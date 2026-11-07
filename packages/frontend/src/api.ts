@@ -53,6 +53,7 @@ export type Capability =
   | 'submit_gallery'
   | 'review_gallery'
   | 'manage_pages'
+  | 'manage_news'
   | 'view_personal'
   | 'manage_personal'
   | 'create_users'
@@ -112,6 +113,10 @@ export interface AppConfig {
   legal?: { imprint: string | null; privacy: string | null };
   /** „Fehler melden“ möglich (Issue #64): Die App hat einen Empfänger für Fehlermeldungen */
   reports?: boolean;
+  /** Zugang beantragen (Issue #314) eingeschaltet: Link „Zugang beantragen“ für Gäste; fehlt bei älteren Servern */
+  registration?: boolean;
+  /** Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null */
+  pendingRegistrations?: number | null;
   /** Rollen der Installation (Einstellungen → Rollen): Bezeichnung und Punktefaktor */
   roles?: RoleInfo[];
   /** null = Gast ohne Anmeldung. */
@@ -128,6 +133,8 @@ export interface AppConfig {
   navigation?: NavigationSetting | null;
   /** Eigene Seiten (Issue #287), die die Person lesen darf, in ihrer Reihenfolge; fehlt bei älteren Servern */
   pages?: { id: number; title: string }[];
+  /** News werden in der App geschrieben (Quelle „In der App“); fehlt bei älteren Servern */
+  newsInApp?: boolean;
   /** Vorschau „App als Rolle ansehen“ (Issue #63): vom Server bestätigt; role ist der Schlüssel oder @public */
   preview?: { role: string; label: string } | null;
   /** Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen; null ohne den Bereich, fehlt bei älteren Servern */
@@ -243,6 +250,20 @@ export function applyBirthdayUpcomingDays(days: number): void {
 export function applyNavigation(navigation: NavigationSetting | null): void {
   if (!config) return;
   config.navigation = navigation;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/** Zahl der offenen Anfragen auf einen Zugang (Issue #314) nach dem Freigeben oder Ablehnen: Zähler in der Verwaltung. */
+export function applyPendingRegistrations(count: number): void {
+  if (!config || config.pendingRegistrations == null) return;
+  config.pendingRegistrations = count;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/** Übernimmt die Einstellung „Zugang beantragen“ in die geladene Konfiguration (nach dem Speichern). */
+export function applyRegistration(enabled: boolean): void {
+  if (!config) return;
+  config.registration = enabled;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -437,8 +458,19 @@ export interface NewsItem {
   date: string;
   excerpt: string;
   image: string | null;
+  /** Adresse auf der Webseite; leer bei Beiträgen, die in der App geschrieben wurden */
   link: string;
   content?: string;
+  /** Nur für die Pflege der News in der App (manage_news): Stand für das Speichern (409 conflict) */
+  updated_at?: string | null;
+  updated_by_name?: string | null;
+}
+
+/** Beitrag der News in der App: Titel und formatierter Text (RichText mit Bildern). */
+export interface NewsInput {
+  title?: string;
+  body?: string;
+  updated_at?: string | null;
 }
 
 export interface GalleryAlbumSummary {
@@ -872,6 +904,8 @@ export interface BoardMessage {
   updated_at: string;
   /** Sichtbar bis (standardmäßig 24 Stunden nach created_at); danach blendet die App den Eintrag aus, auch offline */
   expires_at: string;
+  /** Sichtbarkeit: members (intern, wer das Brett liest) oder public (alle, auch ohne Anmeldung); fehlt bei älteren Servern (intern) */
+  audience?: BoardAudience;
   /** Dateianhänge (fehlt bei älteren Servern) */
   attachments?: Attachment[];
   /** nur mit post_board: wer zuletzt geändert hat */
@@ -893,10 +927,14 @@ export interface BoardEnded {
   deleted_at: string | null;
   deleted_by_name: string | null;
   active: boolean;
+  audience?: BoardAudience;
   attachments?: Attachment[];
 }
 
-export type BoardRevisionAction = 'created' | 'title' | 'content' | 'expires' | 'attachments' | 'deleted' | 'mailed';
+/** Sichtbarkeit einer Nachricht am Brett: intern (members) oder öffentlich (public) */
+export type BoardAudience = 'members' | 'public';
+
+export type BoardRevisionAction = 'created' | 'title' | 'content' | 'expires' | 'audience' | 'attachments' | 'deleted' | 'mailed';
 
 /** Eintrag im Verlauf einer Nachricht. before/after: Titel, Inhalt (HTML), Enddatum oder eine Momentaufnahme. */
 export interface BoardRevision {
@@ -930,6 +968,8 @@ export interface BoardInput {
   text: string;
   /** UTC (…Z); ohne Angabe 24 Stunden */
   expires_at?: string | null;
+  /** ohne Angabe intern (members) */
+  audience?: BoardAudience;
   push?: boolean;
   mail?: boolean;
   /** Kennungen der Anhänge (eigene Entwürfe aus uploadAttachment) */
@@ -1272,14 +1312,16 @@ export interface Company extends CompanyRef {
   app_url: string;
   logo_url: string | null;
   logo_type: 'png' | 'svg' | null;
-  /** Verknüpfte Gruppe der Ämter; shown: Bereich Ämter an (dann zeigt die App deren laufende Amtszeiten) */
-  office_group: { id: number; title: string; shown: boolean } | null;
-  /** Zugeordnete Personen, nur soweit die Mitgliederliste sichtbar ist (fehlt sonst) */
-  members?: { id: number; name: string }[];
+  /** Zugeordnete Personen wie in der Mitgliederliste (ohne Geburtstag und Eintritt), nur mit view_directory (fehlt sonst) */
+  members?: CompanyMember[];
   member_count?: number;
   /** Nur für die Pflege: alle Zugeordneten */
   member_ids?: number[];
 }
+
+/** Mitglied einer Kompanie: Eintrag wie in der Mitgliederliste; ältere Server schicken nur id und name. */
+export type CompanyMember = Pick<DirectoryEntry, 'id' | 'name'> &
+  Partial<Pick<DirectoryEntry, 'first_name' | 'last_name' | 'candidate_role' | 'photo_url' | 'rank_title' | 'rank_badge_url' | 'titles'>>;
 
 export interface CompanyInput {
   name?: string;
@@ -1288,7 +1330,6 @@ export interface CompanyInput {
   description?: string;
   website_url?: string;
   app_url?: string;
-  office_group_id?: number | null;
   active?: boolean;
 }
 
@@ -1322,7 +1363,10 @@ export interface TitleRef {
 /** Ämter (Issue #112): Gruppe der Anzeige */
 export interface OfficeGroup {
   id: number;
+  /** Mehrzahl, Überschrift der Gruppe („Königshäuser“) */
   title: string;
+  /** Einzahl für eine einzelne gemeinsame Amtszeit („Königshaus 2026–2028“); leer: wie title. Fehlt bei älteren Servern. */
+  singular?: string;
   /** Gemeinsame Amtszeiten (Issue #282): Die App zeigt die Gruppe als Chronik der gemeinsamen Amtszeiten */
   joint_terms?: boolean;
 }
@@ -1360,7 +1404,12 @@ export interface OfficeHolder {
   photo_url?: string | null;
   /** Nur für die Pflege: Kennung des Fotos eines freien Namens */
   image_uid?: string | null;
+  /** Begleitpersonen (z. B. Partnerin oder Partner), die das Amt nicht selbst bekleiden; fehlt ohne */
+  companions?: OfficeHolder[];
 }
+
+/** Person einer Amtszeit beim Speichern: Konto oder freier Name, dieser mit optionalem Foto (Kennung aus POST /rich-images) */
+export type OfficePersonInput = { user_id: number } | { name: string; image_uid?: string | null };
 
 export type OfficeTermKind = 'period' | 'point';
 
@@ -1408,8 +1457,8 @@ export interface OfficeTermInput {
   end_year: number | null;
   note: string;
   honor: boolean;
-  /** Konto oder freier Name, dieser mit optionalem Foto (Kennung aus POST /rich-images) */
-  holders: ({ user_id: number } | { name: string; image_uid?: string | null })[];
+  /** Konto oder freier Name, je mit bis zu 5 Begleitpersonen */
+  holders: (OfficePersonInput & { companions?: OfficePersonInput[] })[];
 }
 
 export interface OfficeImportRow {
@@ -1837,6 +1886,9 @@ export const api = {
     return { items: data, totalPages: Number(headers.get('X-Total-Pages') ?? 1) };
   },
   newsItem: (id: string) => request<NewsItem>('GET', `/news/${encodeURIComponent(id)}`),
+  createNews: (data: NewsInput) => request<NewsItem>('POST', '/news', data),
+  updateNews: (id: string, data: NewsInput) => request<NewsItem>('PATCH', `/news/${encodeURIComponent(id)}`, data),
+  deleteNews: (id: string) => request<{ deleted: boolean }>('DELETE', `/news/${encodeURIComponent(id)}`),
 
   gallery: () => request<{ years: GalleryYear[] }>('GET', '/gallery'),
   galleryAlbum: (id: number) => request<GalleryAlbum>('GET', `/gallery/${id}`),
@@ -1950,7 +2002,7 @@ export const api = {
   // Schwarzes Brett (Issue #5, #172)
   board: () => request<{ items: BoardItem[] }>('GET', '/board'),
   postBoard: (input: BoardInput) => request<BoardMessage>('POST', '/board', input),
-  updateBoard: (id: number, changes: Partial<Pick<BoardInput, 'title' | 'text' | 'expires_at' | 'attachments'>>) =>
+  updateBoard: (id: number, changes: Partial<Pick<BoardInput, 'title' | 'text' | 'expires_at' | 'audience' | 'attachments'>>) =>
     request<BoardMessage>('PATCH', `/board/${id}`, changes),
   boardMailInfo: () => request<BoardMailInfo>('GET', '/board/mail'),
   boardHistory: (id: number) => request<BoardHistory>('GET', `/board/${id}/history`),
@@ -2066,8 +2118,9 @@ export const api = {
   setCompanyMembers: (id: number, user_ids: number[]) => request<Company>('PUT', `/companies/${id}/members`, { user_ids }),
   setMemberCompanies: (id: number, company_ids: number[]) =>
     request<{ companies: CompanyRef[] }>('PUT', `/members/${id}/companies`, { company_ids }),
-  createOfficeGroup: (title: string) => request<OfficeGroup>('POST', '/office-groups', { title }),
-  updateOfficeGroup: (id: number, title: string) => request<OfficeGroup>('PATCH', `/office-groups/${id}`, { title }),
+  createOfficeGroup: (title: string, singular = '') => request<OfficeGroup>('POST', '/office-groups', { title, singular }),
+  updateOfficeGroup: (id: number, title: string, singular: string) =>
+    request<OfficeGroup>('PATCH', `/office-groups/${id}`, { title, singular }),
   setOfficeGroupJoint: (id: number, joint_terms: boolean) => request<OfficeGroup>('PATCH', `/office-groups/${id}`, { joint_terms }),
   createOfficeGroupTerm: (groupId: number, input: OfficeGroupTermInput) =>
     request<OfficeGroupTerm>('POST', `/office-groups/${groupId}/terms`, input),
@@ -2257,6 +2310,24 @@ export const api = {
 
   // Fehlermeldungen an die Betreuer der App (Issue #64), auch ohne Anmeldung
   reportForm: () => request<ReportForm>('GET', '/reports/form'),
+  // Zugang beantragen (Issue #314)
+  registrationForm: () => request<RegistrationForm>('GET', '/registration/form'),
+  register: (data: RegistrationInput) => request<{ status: 'confirm_email' | 'pending' }>('POST', '/registration', data),
+  confirmRegistration: (token: string) => request<{ status: 'pending' }>('POST', '/registration/confirm', { token }),
+  registrationStatus: (username: string, password: string) =>
+    request<RegistrationStatus>('POST', '/registration/status', { username, password }),
+  registrations: () => request<RegistrationList>('GET', '/registrations'),
+  approveRegistration: (id: number, data: { level?: Level; username?: string }) =>
+    request<{ member: { id: number; name: string; username: string; level: Level }; mailed: boolean }>(
+      'POST',
+      `/registrations/${id}/approve`,
+      data,
+    ),
+  rejectRegistration: (id: number, reason: string) =>
+    request<{ rejected: boolean; mailed: boolean }>('POST', `/registrations/${id}/reject`, { reason }),
+  registrationSettings: () => request<RegistrationSettings>('GET', '/admin/registration'),
+  setRegistrationSettings: (data: { enabled?: boolean; default_role?: Level }) =>
+    request<RegistrationSettings>('PUT', '/admin/registration', data),
   sendReport: (data: ReportInput) => request<{ queued: boolean }>('POST', '/reports', data),
 };
 
@@ -2268,6 +2339,62 @@ export interface ReportForm {
   /** Höchstgröße des Bildschirmfotos in Bytes */
   maxBytes: number;
   details: { version: string; role: string };
+}
+
+/** Zugang beantragen (Issue #314) */
+export interface RegistrationForm {
+  token: string;
+  minSeconds: number;
+  /** Mailversand eingerichtet: Bestätigung der Adresse und Ergebnis per Mail */
+  email_confirmation: boolean;
+  privacy_url: string | null;
+}
+
+export interface RegistrationInput {
+  token: string;
+  consent: boolean;
+  first_name: string;
+  last_name: string;
+  email: string;
+  username: string;
+  password: string;
+  message?: string;
+  /** Verstecktes Feld gegen Programme (bleibt leer) */
+  website?: string;
+}
+
+export interface RegistrationStatus {
+  status: 'unconfirmed' | 'pending' | 'rejected' | 'none';
+  reason?: string;
+}
+
+export interface RegistrationRequest {
+  id: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  username: string;
+  username_taken: boolean;
+  email_taken: boolean;
+  message: string;
+  created_at: string;
+  email_confirmed: boolean;
+  expires_at: string;
+}
+
+export interface RegistrationList {
+  requests: RegistrationRequest[];
+  default_role: Level;
+  email_confirmation: boolean;
+}
+
+export interface RegistrationSettings {
+  enabled: boolean;
+  default_role: Level;
+  email_confirmation: boolean;
+  pending: number;
+  link: string;
 }
 
 export interface ReportInput {
@@ -2286,10 +2413,12 @@ export interface ReportInput {
 
 export type PushType =
   | 'board'
+  | 'board_public'
   | 'polls'
   | 'birthdays'
   | 'gallery_review'
   | 'gallery_submissions'
+  | 'registrations'
   | 'penalties'
   | 'points'
   | 'ranks'
@@ -2452,7 +2581,8 @@ export interface ErrorLogEntry {
   message: string;
 }
 
-export type NewsSourceType = 'none' | 'wordpress' | 'rss';
+/** site: Beiträge dieser WordPress-Seite (nur im Plugin); app: in der App geschrieben */
+export type NewsSourceType = 'none' | 'wordpress' | 'rss' | 'site' | 'app';
 
 export interface AdminSettings {
   /** Gemeinsamer Google-Zugang für Galerie und Kalender: „Mit Google verbinden“ oder Dienstkonto */
@@ -2496,7 +2626,8 @@ export interface AdminSettings {
     calendar_access: boolean;
     status: { albums?: number; photos?: number; pending?: number; failed?: number; last_sync?: number; error?: string };
   };
-  news: { source: NewsSourceType; url: string } | null;
+  /** sources: was diese Installation kann (fehlt bei älteren Servern; null bei älteren WordPress-Servern) */
+  news: { source: NewsSourceType; url: string; sources?: NewsSourceType[] } | null;
   /** Links auf Impressum und Datenschutzerklärung; leer, solange keiner eingetragen ist (fehlt bei älteren Servern) */
   legal?: { imprint_url: string; privacy_url: string };
 }
