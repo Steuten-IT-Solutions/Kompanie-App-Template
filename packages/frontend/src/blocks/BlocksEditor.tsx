@@ -12,7 +12,9 @@ import {
   type CountdownDraft,
   type DividerDraft,
   type EventsDraft,
+  type FactsDraft,
   type NoticeDraft,
+  type ScheduleDraft,
 } from './blockDrafts';
 import Countdown from './Countdown';
 import { previewRange } from './countdown';
@@ -106,6 +108,143 @@ function NoticeFields({ block, onChange }: { block: NoticeDraft; onChange: (b: N
           <option value="success">Erfolg</option>
         </select>
       </label>
+    </div>
+  );
+}
+
+const SCHEDULE_MAX = 50;
+const FACTS_MAX = 12;
+
+/** Zeilen einer Liste (Ablauf, Zahlen) bearbeiten: hinzufügen, entfernen. */
+function RowsEditor<T>({
+  rows,
+  onChange,
+  empty,
+  max,
+  addLabel,
+  render,
+}: {
+  rows: T[];
+  onChange: (rows: T[]) => void;
+  empty: T;
+  max: number;
+  addLabel: string;
+  render: (row: T, set: (r: T) => void, n: number) => ReactNode;
+}) {
+  return (
+    <div className="block-rows">
+      {rows.map((r, n) => (
+        <div key={n} className="block-row field-row">
+          {render(r, (next) => onChange(rows.map((x, j) => (j === n ? next : x))), n)}
+          <button
+            type="button"
+            className="btn btn-small btn-secondary"
+            aria-label={`Zeile ${n + 1} entfernen`}
+            disabled={rows.length === 1}
+            onClick={() => onChange(rows.filter((_, j) => j !== n))}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="btn btn-small btn-secondary"
+        disabled={rows.length >= max}
+        onClick={() => onChange([...rows, { ...empty }])}
+      >
+        {addLabel}
+      </button>
+    </div>
+  );
+}
+
+function ScheduleFields({ block, onChange }: { block: ScheduleDraft; onChange: (b: ScheduleDraft) => void }) {
+  return (
+    <div className="block-schedule-fields">
+      <label className="field">
+        <span>Überschrift (optional)</span>
+        <input type="text" maxLength={TITLE_MAX} value={block.title} onChange={(e) => onChange({ ...block, title: e.target.value })} />
+      </label>
+      <RowsEditor
+        rows={block.items}
+        onChange={(items) => onChange({ ...block, items })}
+        empty={{ time: '', text: '' }}
+        max={SCHEDULE_MAX}
+        addLabel="+ Programmpunkt"
+        render={(r, set, n) => (
+          <>
+            <label className="field block-row-short">
+              <span>Zeit</span>
+              <input
+                type="text"
+                maxLength={20}
+                value={r.time}
+                placeholder="14:00"
+                aria-label={`Zeit ${n + 1}`}
+                onChange={(e) => set({ ...r, time: e.target.value })}
+              />
+            </label>
+            <label className="field">
+              <span>Programmpunkt</span>
+              <input
+                type="text"
+                maxLength={200}
+                value={r.text}
+                aria-label={`Programmpunkt ${n + 1}`}
+                onChange={(e) => set({ ...r, text: e.target.value })}
+                required
+              />
+            </label>
+          </>
+        )}
+      />
+    </div>
+  );
+}
+
+function FactsFields({ block, onChange }: { block: FactsDraft; onChange: (b: FactsDraft) => void }) {
+  return (
+    <div className="block-facts-fields">
+      <label className="field">
+        <span>Überschrift (optional)</span>
+        <input type="text" maxLength={TITLE_MAX} value={block.title} onChange={(e) => onChange({ ...block, title: e.target.value })} />
+      </label>
+      <RowsEditor
+        rows={block.items}
+        onChange={(items) => onChange({ ...block, items })}
+        empty={{ value: '', label: '' }}
+        max={FACTS_MAX}
+        addLabel="+ Zahl"
+        render={(r, set, n) => (
+          <>
+            <label className="field block-row-short">
+              <span>Wert</span>
+              <input
+                type="text"
+                maxLength={20}
+                value={r.value}
+                placeholder="1848"
+                aria-label={`Wert ${n + 1}`}
+                onChange={(e) => set({ ...r, value: e.target.value })}
+                required
+              />
+            </label>
+            <label className="field">
+              <span>Bezeichnung</span>
+              <input
+                type="text"
+                maxLength={60}
+                value={r.label}
+                placeholder="gegründet"
+                aria-label={`Bezeichnung ${n + 1}`}
+                onChange={(e) => set({ ...r, label: e.target.value })}
+                required
+              />
+            </label>
+          </>
+        )}
+      />
     </div>
   );
 }
@@ -433,6 +572,10 @@ export default function BlocksEditor({
               <NoticeFields block={b} onChange={(c) => update(i, c)} />
             ) : b.type === 'divider' ? (
               <DividerFields block={b} onChange={(c) => update(i, c)} />
+            ) : b.type === 'schedule' ? (
+              <ScheduleFields block={b} onChange={(c) => update(i, c)} />
+            ) : b.type === 'facts' ? (
+              <FactsFields block={b} onChange={(c) => update(i, c)} />
             ) : (
               <CountdownFields block={b} onChange={(c) => update(i, c)} idPrefix={id} />
             )}

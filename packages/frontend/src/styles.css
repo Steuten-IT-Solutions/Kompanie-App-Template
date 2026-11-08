@@ -6398,3 +6398,61 @@ fieldset.block-source legend {
   flex-direction: column;
   gap: 4px;
 }
+
+/* Blöcke „Ablauf“ und „Zahlen und Fakten“ */
+.block-schedule h3,
+.block-facts h3 {
+  margin: 0 0 8px;
+}
+.block-schedule-list {
+  margin: 0;
+}
+.block-schedule-item {
+  display: grid;
+  grid-template-columns: minmax(4.5em, max-content) 1fr;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.block-schedule-item:last-child {
+  border-bottom: 0;
+}
+.block-schedule-item dt {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.block-schedule-item dd {
+  margin: 0;
+}
+.block-facts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  text-align: center;
+}
+.block-facts-value {
+  display: block;
+  font-family: var(--font-head);
+  font-size: 2rem;
+  line-height: 1.1;
+  color: var(--primary-text);
+}
+.block-facts-label {
+  color: var(--muted);
+}
+.block-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+.block-row {
+  width: 100%;
+  align-items: flex-end;
+}
+.block-row-short {
+  flex: 0 0 7em;
+}

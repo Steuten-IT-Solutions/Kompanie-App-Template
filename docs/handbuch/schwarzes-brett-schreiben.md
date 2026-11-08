@@ -61,6 +61,8 @@ Mit der Leiste über dem Text gestaltest du die Nachricht wie in einem Mailprogr
 - **Ansprechpartner**: Hake bei **Ämter** die Ämter an, deren Inhaber erscheinen sollen. E-Mail-Adresse und Handynummer sehen nur Personen, die persönliche Angaben sehen dürfen.
 - **Hinweis-Kasten**: ein kurzer **Hinweis**, farbig als **Info**, **Warnung** oder **Erfolg**.
 - **Trennlinie**: eine **Linie** oder **Nur Abstand** zwischen zwei Blöcken.
+- **Ablauf**: je Zeile eine **Zeit** und ein **Programmpunkt**, z. B. für den Ablauf eines Festes.
+- **Zahlen und Fakten**: je Zeile ein **Wert** und eine **Bezeichnung**, groß nebeneinander.
 
 ### Einen Countdown einfügen
 1. Wähle bei **+ Block einfügen** **Countdown**.

@@ -4711,7 +4711,7 @@ test('Eigene Seiten: Knopf mit Link und Nächste Termine, Gast sieht beide', asy
   }
 });
 
-test('Eigene Seiten: Hinweis-Kasten und Trennlinie', async ({ page }) => {
+test('Eigene Seiten: Hinweis-Kasten, Trennlinie, Ablauf und Zahlen', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await adminMenu(page, 'Seiten');
   const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neue Seite' }) });
@@ -4722,6 +4722,14 @@ test('Eigene Seiten: Hinweis-Kasten und Trennlinie', async ({ page }) => {
   await form.getByLabel('Hinweis', { exact: true }).fill('Halle gesperrt.');
   await form.locator('.block-notice-fields select').selectOption('warning');
   await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('divider');
+  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('schedule');
+  await form.getByLabel('Zeit 1').fill('14:00');
+  await form.getByLabel('Programmpunkt 1').fill('Treffen');
+  await form.getByRole('button', { name: '+ Programmpunkt' }).click();
+  await form.getByLabel('Programmpunkt 2').fill('Umzug');
+  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('facts');
+  await form.getByLabel('Wert 1').fill('1848');
+  await form.getByLabel('Bezeichnung 1').fill('gegründet');
   await form.getByRole('button', { name: 'Anlegen' }).click();
   await expect(page.locator('.toast')).toHaveText('Seite angelegt');
   const row = page.locator('.page-admin-list .row', { hasText: title });
@@ -4731,6 +4739,8 @@ test('Eigene Seiten: Hinweis-Kasten und Trennlinie', async ({ page }) => {
     const article = page.locator('.page-article');
     await expect(article.locator('.block-notice-warning')).toHaveText('Halle gesperrt.');
     await expect(article.locator('hr.block-divider')).toHaveCount(1);
+    await expect(article.locator('.block-schedule-item')).toHaveText(['14:00Treffen', 'Umzug']);
+    await expect(article.locator('.block-facts-list li')).toHaveText('1848gegründet');
   } finally {
     await adminMenu(page, 'Seiten');
     page.once('dialog', (d) => d.accept());

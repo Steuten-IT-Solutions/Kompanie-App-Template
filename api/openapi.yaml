@@ -8872,6 +8872,8 @@ components:
         - $ref: '#/components/schemas/BlockContacts'
         - $ref: '#/components/schemas/BlockNotice'
         - $ref: '#/components/schemas/BlockDivider'
+        - $ref: '#/components/schemas/BlockSchedule'
+        - $ref: '#/components/schemas/BlockFacts'
       discriminator:
         propertyName: type
         mapping:
@@ -8882,6 +8884,8 @@ components:
           contacts: '#/components/schemas/BlockContacts'
           notice: '#/components/schemas/BlockNotice'
           divider: '#/components/schemas/BlockDivider'
+          schedule: '#/components/schemas/BlockSchedule'
+          facts: '#/components/schemas/BlockFacts'
     BlockBase:
       type: object
       required: [type]
@@ -8996,6 +9000,42 @@ components:
           properties:
             type: { type: string, const: divider }
             style: { type: string, enum: [line, space], default: line, description: 'line: Trennlinie; space: nur Abstand. In Mails nichts.' }
+    BlockSchedule:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [items]
+          properties:
+            type: { type: string, const: schedule }
+            title: { type: string, maxLength: 100 }
+            items:
+              type: array
+              minItems: 1
+              maxItems: 50
+              items:
+                type: object
+                required: [text]
+                properties:
+                  time: { type: string, maxLength: 20, description: 'Freier kurzer Text, z. B. 14:00 oder „ab 20 Uhr“ (optional)' }
+                  text: { type: string, minLength: 1, maxLength: 200 }
+    BlockFacts:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [items]
+          properties:
+            type: { type: string, const: facts }
+            title: { type: string, maxLength: 100 }
+            items:
+              type: array
+              minItems: 1
+              maxItems: 12
+              items:
+                type: object
+                required: [value, label]
+                properties:
+                  value: { type: string, minLength: 1, maxLength: 20, description: 'z. B. 1848 oder 250+' }
+                  label: { type: string, minLength: 1, maxLength: 60 }
 
     Title:
       type: object

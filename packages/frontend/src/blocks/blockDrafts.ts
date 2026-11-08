@@ -8,7 +8,9 @@ import type {
   CountdownBlock,
   DividerBlock,
   EventsBlock,
+  FactsBlock,
   NoticeBlock,
+  ScheduleBlock,
   TextBlock,
 } from '../api';
 
@@ -19,7 +21,18 @@ export type EventsDraft = Omit<EventsBlock, 'events'>;
 export type ContactsDraft = Omit<ContactsBlock, 'offices'>;
 export type NoticeDraft = NoticeBlock;
 export type DividerDraft = DividerBlock;
-export type BlockDraft = TextDraft | CountdownDraft | ButtonDraft | EventsDraft | ContactsDraft | NoticeDraft | DividerDraft;
+export type ScheduleDraft = ScheduleBlock;
+export type FactsDraft = FactsBlock;
+export type BlockDraft =
+  | TextDraft
+  | CountdownDraft
+  | ButtonDraft
+  | EventsDraft
+  | ContactsDraft
+  | NoticeDraft
+  | DividerDraft
+  | ScheduleDraft
+  | FactsDraft;
 export type BlockKind = BlockDraft['type'];
 
 /** Blöcke, die man einfügen kann, mit Bezeichnung und Erklärung (Reihenfolge der Auswahl). */
@@ -31,6 +44,8 @@ export const BLOCK_KINDS: { type: BlockKind; label: string; hint: string }[] = [
   { type: 'contacts', label: 'Ansprechpartner', hint: 'Wer ein Amt gerade innehat, mit Foto' },
   { type: 'notice', label: 'Hinweis-Kasten', hint: 'Kurzer Text, farbig hervorgehoben' },
   { type: 'divider', label: 'Trennlinie', hint: 'Linie oder Abstand zwischen Blöcken' },
+  { type: 'schedule', label: 'Ablauf', hint: 'Uhrzeit und Programmpunkt untereinander' },
+  { type: 'facts', label: 'Zahlen und Fakten', hint: 'Kurze Kennzahlen nebeneinander' },
 ];
 
 let counter = 0;
@@ -63,6 +78,8 @@ export function newBlock(type: BlockKind, audience: BlockAudience = 'all'): Bloc
   if (type === 'contacts') return { id, type, audience, title: '', office_ids: [] };
   if (type === 'notice') return { id, type, audience, title: '', text: '', tone: 'info' };
   if (type === 'divider') return { id, type, audience, style: 'line' };
+  if (type === 'schedule') return { id, type, audience, title: '', items: [{ time: '', text: '' }] };
+  if (type === 'facts') return { id, type, audience, title: '', items: [{ value: '', label: '' }] };
   return { id, type: 'text', audience, html: '' };
 }
 

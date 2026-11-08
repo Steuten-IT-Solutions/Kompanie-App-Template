@@ -245,7 +245,28 @@ export interface DividerBlock extends BlockBase {
   type: 'divider';
   style: 'line' | 'space';
 }
-export type Block = TextBlock | CountdownBlock | ButtonBlock | EventsBlock | ContactsBlock | NoticeBlock | DividerBlock;
+/** Ablauf/Zeitplan: Zeit (freier kurzer Text) und Programmpunkt */
+export interface ScheduleBlock extends BlockBase {
+  type: 'schedule';
+  title: string;
+  items: { time: string; text: string }[];
+}
+/** Zahlen/Fakten: Wert und Bezeichnung nebeneinander */
+export interface FactsBlock extends BlockBase {
+  type: 'facts';
+  title: string;
+  items: { value: string; label: string }[];
+}
+export type Block =
+  | TextBlock
+  | CountdownBlock
+  | ButtonBlock
+  | EventsBlock
+  | ContactsBlock
+  | NoticeBlock
+  | DividerBlock
+  | ScheduleBlock
+  | FactsBlock;
 /** Zum Speichern: wie gelesen, ohne die vom Server berechneten Felder (werden ignoriert). */
 export type BlockInput =
   | (Omit<TextBlock, 'id'> & { id?: string })
@@ -254,7 +275,9 @@ export type BlockInput =
   | (Omit<EventsBlock, 'id' | 'events'> & { id?: string })
   | (Omit<ContactsBlock, 'id' | 'offices'> & { id?: string })
   | (Omit<NoticeBlock, 'id'> & { id?: string })
-  | (Omit<DividerBlock, 'id'> & { id?: string });
+  | (Omit<DividerBlock, 'id'> & { id?: string })
+  | (Omit<ScheduleBlock, 'id'> & { id?: string })
+  | (Omit<FactsBlock, 'id'> & { id?: string });
 
 /** Einstellungen → Navigation (Issue #277): gespeicherte Navigation und was der Server erlaubt. */
 export interface NavigationAdmin {

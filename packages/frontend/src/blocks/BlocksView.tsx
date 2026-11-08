@@ -1,4 +1,4 @@
-import type { Block, ButtonBlock, ContactsBlock, EventsBlock, NoticeBlock } from '../api';
+import type { Block, ButtonBlock, ContactsBlock, EventsBlock, FactsBlock, NoticeBlock, ScheduleBlock } from '../api';
 import { MemberAvatar } from '../memberPhoto';
 import { formatEventWhen } from '../format';
 import RichTextView from '../richtext/RichTextView';
@@ -33,6 +33,12 @@ export default function BlocksView({ blocks, manager, textClassName }: { blocks:
             break;
           case 'notice':
             view = <Notice block={b} />;
+            break;
+          case 'schedule':
+            view = <Schedule block={b} />;
+            break;
+          case 'facts':
+            view = <Facts block={b} />;
             break;
           case 'divider':
             view = b.style === 'space' ? <div className="block-space" aria-hidden="true" /> : <hr className="block-divider" />;
@@ -128,5 +134,39 @@ function Notice({ block }: { block: NoticeBlock }) {
       {block.title && <strong className="block-notice-title">{block.title}</strong>}
       <p>{block.text}</p>
     </aside>
+  );
+}
+
+/** Ablauf: Zeit links, Programmpunkt rechts. */
+function Schedule({ block }: { block: ScheduleBlock }) {
+  return (
+    <section className="block-schedule">
+      {block.title && <h3>{block.title}</h3>}
+      <dl className="block-schedule-list">
+        {block.items.map((i, n) => (
+          <div key={n} className="block-schedule-item">
+            <dt>{i.time}</dt>
+            <dd>{i.text}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+/** Zahlen und Fakten nebeneinander (auf schmalen Geräten umbrechend). */
+function Facts({ block }: { block: FactsBlock }) {
+  return (
+    <section className="block-facts">
+      {block.title && <h3>{block.title}</h3>}
+      <ul className="block-facts-list">
+        {block.items.map((i, n) => (
+          <li key={n}>
+            <strong className="block-facts-value">{i.value}</strong>
+            <span className="block-facts-label">{i.label}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

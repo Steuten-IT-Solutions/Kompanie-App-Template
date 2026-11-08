@@ -36,7 +36,7 @@ final class Blocks
     {
         if ($this->types === null) {
             $this->types = [];
-            foreach ([new TextBlock($this->app), new CountdownBlock($this->app), new ButtonBlock($this->app), new EventsBlock($this->app), new ContactsBlock($this->app), new NoticeBlock(), new DividerBlock()] as $type) {
+            foreach ([new TextBlock($this->app), new CountdownBlock($this->app), new ButtonBlock($this->app), new EventsBlock($this->app), new ContactsBlock($this->app), new NoticeBlock(), new DividerBlock(), new ScheduleBlock(), new FactsBlock()] as $type) {
                 $this->types[$type->type()] = $type;
             }
         }

@@ -136,3 +136,14 @@ test('Ansprechpartner, Hinweis und Trennlinie: neue Blöcke, ohne die Ämter vom
   const drafts = draftsFrom([{ id: 'c1', type: 'contacts', audience: 'all', title: '', office_ids: [2, 1], offices: [] }], '');
   assert.deepEqual(blocksInput(drafts), [{ id: 'c1', type: 'contacts', audience: 'all', title: '', office_ids: [2, 1] }]);
 });
+
+test('Ablauf und Zahlen: neue Blöcke mit einer leeren Zeile', () => {
+  assert.deepEqual(
+    { ...newBlock('schedule'), id: '' },
+    { id: '', type: 'schedule', audience: 'all', title: '', items: [{ time: '', text: '' }] },
+  );
+  assert.deepEqual(
+    { ...newBlock('facts'), id: '' },
+    { id: '', type: 'facts', audience: 'all', title: '', items: [{ value: '', label: '' }] },
+  );
+});
