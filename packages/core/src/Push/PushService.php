@@ -30,6 +30,9 @@ use KompanieApp\Core\Storage\PushRepository;
  * - Umfragen (Issue #4): neue Umfrage an alle Mitglieder außer dem, der sie angelegt hat; Erinnerung 24 Stunden vor dem
  *   Ende an alle Mitglieder ohne Antwort; TTL höchstens bis zum Ende.
  * - Geburtstage (Issue #1): am Tag selbst an alle Mitglieder außer dem Geburtstagskind; TTL höchstens bis Mitternacht.
+ * - Standardmäßig an: Neue Abos bekommen alle angebotenen Arten. Jedes Abo merkt sich, welche Arten es schon angeboten
+ *   bekam (offered); kommt später eine Art dazu (neue Rolle, Bereich eingeschaltet), schaltet addNewTypes sie ein.
+ *   Arten, die jemand selbst abgeschaltet hat, bleiben aus.
  *
  * Die Nachricht enthält Titel, Text, Ziel in der App (route) und tag; das Symbol setzt der Service Worker. Optional
  * image: vollständige Adresse eines Bildes (Abzeichen bei Beförderungen, Issue #17), das der Service Worker als Bild
@@ -291,10 +294,12 @@ final class PushService
         $same = $existing !== null && $existing['user_id'] === $userId;
         $types = $types !== null ? self::cleanTypes($types, $allowed) : ($same ? self::cleanTypes($existing['types'], $allowed) : $allowed);
         self::requireTypes($types);
+        // Alles Angebotene hat die Person gesehen (und ggf. abgewählt); ein bisher anderes Konto fängt neu an.
+        $offered = $same ? self::union($existing['offered'] ?? [], $allowed) : $allowed;
         $details = $details !== null ? (bool) $details : ($same && $existing['details']);
         $now = $this->app->time()->nowUtc();
         if ($existing !== null) {
-            $repo->update($existing['id'], ['user_id' => $userId, 'p256dh' => $p256dhText, 'auth' => $authText, 'types' => $types, 'details' => $details], $now);
+            $repo->update($existing['id'], ['user_id' => $userId, 'p256dh' => $p256dhText, 'auth' => $authText, 'types' => $types, 'offered' => $offered, 'details' => $details], $now);
             if (!$same) {
                 $repo->clearQueueFor($existing['id']); // Nachrichten für das vorige Konto nicht mehr zustellen
             }
@@ -302,7 +307,7 @@ final class PushService
             if ($userId === 0) {
                 $this->guestLimit($client);
             }
-            $repo->insert($userId, $endpoint, $p256dhText, $authText, $types, $details, $now);
+            $repo->insert($userId, $endpoint, $p256dhText, $authText, $types, $details, $now, $offered);
             if ($userId > 0) {
                 $subs = $repo->forUser($userId);
                 foreach (array_slice($subs, 0, max(0, count($subs) - self::MAX_PER_USER)) as $old) {
@@ -338,7 +343,9 @@ final class PushService
         $sub = $this->own($user, $endpoint, $auth);
         $values = [];
         if ($types !== null) {
-            $values['types'] = self::requireTypes(self::cleanTypes($types, $this->availableTypes($user)));
+            $allowed = $this->availableTypes($user);
+            $values['types'] = self::requireTypes(self::cleanTypes($types, $allowed));
+            $values['offered'] = self::union($sub['offered'] ?? [], $allowed);
         }
         if ($details !== null) {
             $values['details'] = (bool) $details;
@@ -670,7 +677,6 @@ final class PushService
         }
         $this->app->settings->set($setting, true);
         $now = $this->app->time()->nowUtc();
-        $order = array_flip(array_keys($this->types()));
         $recipients = [];
         $count = 0;
         // Gäste (ID 0) nur bei Arten für alle (z. B. öffentliche Nachrichten am Brett).
@@ -681,14 +687,94 @@ final class PushService
             $uid = $sub['user_id'];
             $recipients[$uid] ??= $this->offered($type, $definition['audience'], $accounts[$uid] ?? null);
             if ($recipients[$uid]) {
-                // In der üblichen Reihenfolge der Arten (wie bei neuen Abos).
-                $types = [...$sub['types'], $type];
-                usort($types, static fn (string $a, string $b): int => ($order[$a] ?? 999) <=> ($order[$b] ?? 999));
-                $this->repository()->update($sub['id'], ['types' => $types], $now);
+                $values = ['types' => $this->sorted([...$sub['types'], $type])];
+                if ($sub['offered'] !== null) {
+                    $values['offered'] = self::union($sub['offered'], [$type]);
+                }
+                $this->repository()->update($sub['id'], $values, $now);
                 $count++;
             }
         }
         return $count;
+    }
+
+    /**
+     * Arten, die ein Abo jetzt neu angeboten bekäme (z. B. nach einer neuen Rolle oder einem eingeschalteten Bereich),
+     * einschalten: alles, was es angeboten bekommt und noch nicht kannte (offered). Abgeschaltete Arten kennt es schon,
+     * sie bleiben aus. Abos ohne offered (vor dieser Regel angelegt) übernehmen beim ersten Abgleich das gerade
+     * Angebotene als bekannt, ohne etwas einzuschalten: Ob dort eine Art fehlt, weil jemand sie abgeschaltet hat, ist
+     * nicht mehr zu erkennen. Schreibt nur bei einer Änderung und lässt updated_at (Verfall der Gast-Abos) unberührt.
+     * Läuft mit dem Abgleich alle 15 Minuten (PushTriggers::watch) und beim Öffnen der Benachrichtigungen.
+     *
+     * @return int Zahl der Abos, die eine Art dazubekommen haben
+     */
+    public function addNewTypes(): int
+    {
+        $subs = $this->repository()->all();
+        $accounts = $this->accountsOf($subs);
+        $available = [];
+        $count = 0;
+        foreach ($subs as $sub) {
+            $uid = $sub['user_id'];
+            if ($uid > 0 && !isset($accounts[$uid])) {
+                continue; // Konto gibt es nicht mehr; das Abo räumt das Löschen des Kontos auf.
+            }
+            $available[$uid] ??= $this->availableTypes($uid > 0 ? $accounts[$uid] : null);
+            $before = $sub['types'];
+            $count += $this->applyNewTypes($sub, $available[$uid])['types'] !== $before ? 1 : 0;
+        }
+        return $count;
+    }
+
+    /**
+     * Wie addNewTypes für das Abo dieses Geräts (beim Öffnen der Benachrichtigungen, damit es gleich stimmt).
+     *
+     * @param Subscription $sub
+     * @return Subscription
+     */
+    public function addNewTypesTo(array $sub, ?User $user): array
+    {
+        return $this->applyNewTypes($sub, $this->availableTypes($user));
+    }
+
+    /**
+     * @param Subscription $sub
+     * @param list<string> $available angebotene Arten des Kontos
+     * @return Subscription
+     */
+    private function applyNewTypes(array $sub, array $available): array
+    {
+        $known = $sub['offered'];
+        $new = $known === null ? [] : array_values(array_diff($available, $known, $sub['types']));
+        $offered = self::union($known ?? $sub['types'], $available);
+        if ($new === [] && $known !== null && array_diff($offered, $known) === []) {
+            return $sub;
+        }
+        $types = $new === [] ? $sub['types'] : $this->sorted([...$sub['types'], ...$new]);
+        $this->repository()->setTypes($sub['id'], $types, $offered);
+        return ['types' => $types, 'offered' => $offered] + $sub;
+    }
+
+    /**
+     * @param list<string> $types
+     * @return list<string> in der üblichen Reihenfolge der Arten (wie bei neuen Abos)
+     */
+    private function sorted(array $types): array
+    {
+        $order = array_flip(array_keys($this->types()));
+        $types = array_values(array_unique($types));
+        usort($types, static fn (string $a, string $b): int => ($order[$a] ?? 999) <=> ($order[$b] ?? 999));
+        return $types;
+    }
+
+    /**
+     * @param list<string> $a
+     * @param list<string> $b
+     * @return list<string>
+     */
+    private static function union(array $a, array $b): array
+    {
+        return array_values(array_unique([...$a, ...$b]));
     }
 
     private function typeEnabled(string $type): bool

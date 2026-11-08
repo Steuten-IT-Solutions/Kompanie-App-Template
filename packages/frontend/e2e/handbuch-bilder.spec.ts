@@ -15,6 +15,8 @@ test.use({ deviceScaleFactor: 2 });
 test.beforeEach(async ({ page }) => {
   // Den Hinweis „App aufs Handy holen“ ausblenden: Er verdeckt sonst den Inhalt.
   await page.addInitScript(() => localStorage.setItem('kompanie-install-hint-dismissed', '1'));
+  // Ebenso den Hinweis „Benachrichtigungen einschalten“ auf der Startseite (pushHint.ts).
+  await page.addInitScript(() => localStorage.setItem('kompanie-push-hint-later', String(Date.now())));
 });
 
 for (const [name, gruppe] of Object.entries(GRUPPEN)) {
