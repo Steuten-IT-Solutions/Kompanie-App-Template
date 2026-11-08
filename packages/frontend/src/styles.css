@@ -2049,6 +2049,9 @@ code {
 }
 .lb-count .lb-intern {
   margin-left: 0.75em;
+  border: 0;
+  background: rgb(255 255 255 / 14%);
+  color: #fff;
   letter-spacing: normal;
   font-family: inherit;
 }
