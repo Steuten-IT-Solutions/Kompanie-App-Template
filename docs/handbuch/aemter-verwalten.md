@@ -14,6 +14,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf **{bereich.of
 ## Was du hier siehst
 - **Tabelle importieren**: viele Amtszeiten auf einmal übernehmen.
 - **Zeitstrahl ansehen**: öffnet die Ansicht, die alle sehen.
+- **Namen mit Mitgliedern verknüpfen**: Vorschläge, welche Personen ohne Profil schon als Mitglied oder Ehemaliger in der App stehen.
 - **Gruppen**: je Gruppe **Bearbeiten**, der Schalter **Amtszeiten gemeinsam** und **Löschen**, darunter **Neue Gruppe** mit **Gruppe anlegen**.
 - **Die Ämter** je Gruppe (und unter **Ohne Gruppe**), mit der Zahl der Amtszeiten und, falls verknüpft, dem {bereich.titles}, den das Amt vergibt.
 - **Neues Amt** mit **Bezeichnung**, **Gruppe** und **Anlegen**.
@@ -67,6 +68,13 @@ Haben alle Ämter einer Gruppe immer dieselben Jahre, z. B. ein Königshaus oder
 1. Öffne das Amt und ändere unter **Amt bearbeiten** **Bezeichnung**, **Einzahl** oder **Gruppe**; tippe auf **Speichern**.
 2. **Amt löschen** löscht das Amt mit allen Amtszeiten. **‹ Alle {bereich.offices}** führt zurück.
 
+### Namen mit Mitgliedern verknüpfen
+Steht jemand in Amtszeiten nur mit seinem Namen (**Ohne Profil**), ist aber inzwischen als Mitglied (auch ohne Zugang) oder Ehemaliger angelegt, verknüpfst du die Einträge mit ihm.
+1. Tippe auf **Namen mit Mitgliedern verknüpfen**.
+2. Je Name steht eine Karte mit der Zahl der Einträge und den Amtszeiten, z. B. „König 1999“. Darunter stehen die Personen, die passen könnten, mit dem Grund (**gleicher Name** oder **ähnlicher Name**, bei Ehemaligen mit **ehemalig**).
+3. Wähle die richtige Person und tippe auf **Verknüpfen**. Bestätige die Rückfrage.
+4. Alle Einträge mit diesem Namen gehören jetzt zu der Person. Im Zeitstrahl lässt sich ihr Name antippen, es steht ihr Foto da, und ein Amt mit {bereich.titles} vergibt ihn, solange die Amtszeit läuft.
+
 ### Eine Tabelle importieren
 1. Tippe auf **Tabelle importieren**.
 2. Füge die Tabelle ins Feld **Tabelle** ein oder wähle eine CSV-Datei. Eine Zeile je Amtszeit, Spalten durch Semikolon oder Tabulator getrennt: `gruppe;amt;beginn;ende;art;personen;zusatz;ehrung`.
@@ -76,6 +84,8 @@ Haben alle Ämter einer Gruppe immer dieselben Jahre, z. B. ein Königshaus oder
 ## Gut zu wissen
 - Die Reihenfolge der Amtszeiten im Zeitstrahl ergibt sich von selbst: laufende zuerst, dann nach Jahren.
 - Löschen lässt sich nur eine leere Gruppe.
+- Beim Verknüpfen zählen Groß- und Kleinschreibung, Leerzeichen, Bindestriche und Umlaute (ä/ae, ö/oe, ü/ue, ß/ss) nicht. Ähnlich heißt: gleicher Nachname, und ein Vorname beginnt mit dem anderen (z. B. „Chris“ und „Christian“). Vorausgewählt ist eine Person nur bei gleichem Namen; verknüpft wird erst, wenn du auf **Verknüpfen** tippst. Steht die Person in einer Amtszeit schon, bleibt der freie Name dort stehen.
+- Personen, die nicht zur Kompanie gehören (z. B. eine Begleitung von außerhalb), bleiben ohne Profil. Lege sie nicht als Mitglied an, sonst stehen sie in der Mitgliederliste.
 - Gemeinsame Amtszeiten: Änderst du bei einem Amt die Jahre einer Amtszeit, die zu einer gemeinsamen gehört, löst die App sie daraus; sie steht dann einzeln. Eine Ehrung gehört nie zu einer gemeinsamen Amtszeit. Schaltest du **Amtszeiten gemeinsam** aus, bleiben alle Amtszeiten und Bilder erhalten; der Zeitstrahl zeigt sie dann wieder je Amt.
 - Das Gruppenbild ist wie der Zeitstrahl für alle sichtbar, auch ohne Anmeldung. Große Bilder verkleinert die App beim Hochladen.
 - Fotos von Personen ohne Profil sind wie der Zeitstrahl für alle sichtbar, auch ohne Anmeldung. Hol vorher die Einwilligung der Person ein (bei Verstorbenen die der Angehörigen). Bei Mitgliedern und Ehemaligen zeigt die App immer das Foto ihres Profils. Ein Foto, das in keiner Amtszeit mehr steht, löscht die App.

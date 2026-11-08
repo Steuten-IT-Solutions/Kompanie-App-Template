@@ -9,6 +9,7 @@ import {
   type OfficeGroupTermInput,
   type OfficeHolder,
   type OfficeImportResult,
+  type OfficeLinkSuggestion,
   type OfficePersonInput,
   type OfficesOverview,
   type OfficeTerm,
@@ -60,11 +61,13 @@ function FormError({ error }: { error: string | null }) {
 /**
  * Verwaltung → Ämter (Issue #112, manage_offices): Gruppen und Ämter anlegen, sortieren, umbenennen; je Amt die
  * Amtszeiten und die Verknüpfung mit einem Titel; Import einer Tabelle für die Ersterfassung.
- * verwaltung/aemter, verwaltung/aemter/<id>, verwaltung/aemter/import
+ * Freie Namen lassen sich auf Vorschlag mit Mitgliedern oder Ehemaligen verknüpfen.
+ * verwaltung/aemter, verwaltung/aemter/<id>, verwaltung/aemter/import, verwaltung/aemter/verknuepfen
  */
 export function OfficeAdmin({ path, onToast }: { path: string[]; onToast: Toast }) {
   const { data, error, loading, reload, setData } = useAsync(api.offices, [], 'offices');
   if (path[0] === 'import') return <OfficeImport onToast={onToast} />;
+  if (path[0] === 'verknuepfen') return <OfficeLink onToast={onToast} />;
   if (loading && !data) return <Loading />;
   if (error && !data) return <ErrorBox message={error} onRetry={reload} />;
   const overview = data!;
@@ -159,6 +162,9 @@ function OfficeOverview({
         </button>
         <button className="btn btn-secondary" onClick={() => navigate('mitglieder/aemter')}>
           Zeitstrahl ansehen
+        </button>
+        <button className="btn btn-secondary" onClick={() => navigate('verwaltung/aemter/verknuepfen')}>
+          Namen mit Mitgliedern verknüpfen
         </button>
       </div>
       <FormError error={error} />
@@ -1180,6 +1186,95 @@ const IMPORT_EXAMPLE =
  * Tabelle importieren (Ersterfassung): einfügen oder Datei wählen, Vorschau mit Fehlern je Zeile, dann übernehmen.
  * Vorhandene Gruppen und Ämter werden nach Namen gefunden; was es schon gibt, wird übersprungen.
  */
+const LINK_MATCH: Record<OfficeLinkSuggestion['candidates'][number]['match'], string> = {
+  name: 'gleicher Name',
+  similar: 'ähnlicher Name',
+};
+
+/**
+ * Freie Namen in Amtszeiten mit Mitgliedern oder Ehemaligen verknüpfen: Die App schlägt passende Personen vor
+ * (tolerant bei Umlauten, Bindestrichen und Leerzeichen); verknüpft wird erst nach Bestätigung.
+ */
+function OfficeLink({ onToast }: { onToast: Toast }) {
+  const { data, error, loading, reload } = useAsync(api.officeLinkSuggestions, [], 'office-link-suggestions');
+  if (loading && !data) return <Loading />;
+  if (error && !data) return <ErrorBox message={error} onRetry={reload} />;
+  const list = data ?? [];
+  return (
+    <div className="office-link">
+      <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/aemter')}>
+        ‹ Alle {sec.offices}
+      </button>
+      <p className="muted small">
+        Personen, die in Amtszeiten nur mit ihrem Namen stehen, aber als Mitglied, Ehemaliger oder in der Mitgliederliste angelegt sind.
+        Verknüpfst du sie, stehen im Zeitstrahl ihr Konto und ihr Foto, und Ämter mit {sec.titles} vergeben ihn.
+      </p>
+      {list.length === 0 ? (
+        <Empty>Keine Vorschläge: Kein freier Name passt zu einer Person in der App.</Empty>
+      ) : (
+        <ul className="card-list">
+          {list.map((s) => (
+            <li key={s.name}>
+              <LinkCard suggestion={s} onToast={onToast} onDone={reload} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function LinkCard({ suggestion: s, onToast, onDone }: { suggestion: OfficeLinkSuggestion; onToast: Toast; onDone: () => void }) {
+  const [choice, setChoice] = useState(s.candidates[0]?.match === 'name' ? String(s.candidates[0].id) : '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const person = s.candidates.find((c) => String(c.id) === choice);
+  async function link() {
+    if (
+      !person ||
+      !window.confirm(`„${s.name}“ in ${s.entries === 1 ? 'einer Amtszeit' : `${s.entries} Einträgen`} mit ${person.name} verknüpfen?`)
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.linkOfficeName(s.name, person.id);
+      onToast(`${res.linked === 1 ? '1 Eintrag' : `${res.linked} Einträge`} mit ${person.name} verknüpft`);
+      onDone();
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="card office-link-card">
+      <div className="row-title">{s.name}</div>
+      <div className="row-sub">
+        {s.entries === 1 ? '1 Eintrag' : `${s.entries} Einträge`}: {s.terms.join(', ')}
+        {s.entries > s.terms.length && ' …'}
+      </div>
+      <fieldset className="fieldset">
+        <legend>Verknüpfen mit</legend>
+        {s.candidates.map((c) => (
+          <label key={c.id} className="toggle">
+            <input type="radio" name={`link-${s.name}`} checked={choice === String(c.id)} onChange={() => setChoice(String(c.id))} />
+            {c.name}{' '}
+            <span className="muted small">
+              ({LINK_MATCH[c.match]}
+              {c.former ? ', ehemalig' : ''})
+            </span>
+          </label>
+        ))}
+      </fieldset>
+      <FormError error={error} />
+      <button type="button" className="btn" disabled={busy || !person} onClick={link}>
+        {busy ? 'Verknüpft …' : 'Verknüpfen'}
+      </button>
+    </div>
+  );
+}
+
 function OfficeImport({ onToast }: { onToast: Toast }) {
   const [csv, setCsv] = useState('');
   const [link, setLink] = useState(true);
