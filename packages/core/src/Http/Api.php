@@ -830,6 +830,9 @@ final class Api
             new Route('POST', '/offices', Cap::ManageOffices, fn (Request $r) => Response::created($a->offices()->createOffice($r->body)), 'offices', $denyRights),
             new Route('PUT', '/offices/order', Cap::ManageOffices, fn (Request $r) => $a->offices()->reorderOffices($r->input('ids')), 'offices', $denyRights),
             // Import (Ersterfassung): ohne apply nur die Vorschau
+            // Freie Namen in Amtszeiten mit Konten verknüpfen: Vorschläge (tolerant bei Namen) und Verknüpfen eines Namens
+            new Route('GET', '/offices/link-suggestions', Cap::ManageOffices, fn () => $a->offices()->linkSuggestions(), 'offices', $denyRights),
+            new Route('POST', '/offices/link', Cap::ManageOffices, fn (Request $r) => $a->offices()->linkName($r->input('name'), $r->input('user_id')), 'offices', $denyRights),
             new Route('POST', '/offices/import', Cap::ManageOffices, fn (Request $r) => $a->offices()->import(
                 $r->input('csv'),
                 $r->input('link') === null ? true : Input::bool($r->input('link')),

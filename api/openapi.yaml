@@ -3788,6 +3788,77 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /offices/link-suggestions:
+    get:
+      tags: [Ämter]
+      summary: Vorschläge, freie Namen in Amtszeiten mit Personen zu verknüpfen (manage_offices)
+      description: |
+        Freie Namen (Inhaber und Begleitpersonen ohne Konto), die zu Mitgliedern, Personen der Mitgliederliste (z. B.
+        Anwärter) oder Ehemaligen passen: gleicher Name ohne Unterschied bei Groß- und Kleinschreibung, Leerzeichen,
+        Bindestrichen und Umlauten (`name`) oder gleicher Nachname und ein Vorname beginnt mit dem anderen (`similar`). Je
+        Name (Groß- und Kleinschreibung und Leerzeichen egal) die Zahl der Einträge, bis zu fünf Amtszeiten und die Personen,
+        die besten zuerst. Nur Vorschläge; nur Namen mit mindestens einer passenden Person.
+      x-capability: manage_offices
+      responses:
+        '200':
+          description: Nach Namen
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [name, entries, terms, candidates]
+                  properties:
+                    name: { type: string }
+                    entries: { type: integer }
+                    terms: { type: array, items: { type: string }, description: 'z. B. „König 1999“, „Vorsitz 2001–2005“, „Vorsitz seit 2020“' }
+                    candidates:
+                      type: array
+                      items:
+                        type: object
+                        required: [id, name, match, former]
+                        properties:
+                          id: { type: integer }
+                          name: { type: string }
+                          match: { type: string, enum: [name, similar] }
+                          former: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /offices/link:
+    post:
+      tags: [Ämter]
+      summary: Einen freien Namen in allen Amtszeiten mit einem Konto verknüpfen (manage_offices)
+      description: |
+        Wie beim Import: Jeder Inhaber und jede Begleitperson ohne Konto mit diesem Namen (Groß- und Kleinschreibung und
+        Leerzeichen egal) bekommt das Konto; steht die Person in der Amtszeit schon, bleibt der Eintrag frei. Nur Mitglieder,
+        Personen der Mitgliederliste oder Ehemalige (sonst 400). Danach werden verknüpfte Titel abgeglichen. 404, wenn
+        nichts zu verknüpfen ist.
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, user_id]
+              properties:
+                name: { type: string }
+                user_id: { type: integer }
+      responses:
+        '200':
+          description: Verknüpft
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [linked]
+                properties:
+                  linked: { type: integer, description: Zahl der verknüpften Einträge }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /offices/import:
     post:
       tags: [Ämter]

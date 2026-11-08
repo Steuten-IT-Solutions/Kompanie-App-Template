@@ -24,7 +24,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Freigeben von Anfragen (nur Rolle). Wer nur Mitglieder anlegen darf, wählt wie bisher Mitglied und die Rollen, die
   unter *Einstellungen → Rollen* für neue Konten freigegeben sind. Die Rechte prüft der Server.
 - **Mehrere auf einmal ohne Zugang**: Unter *Mehrere auf einmal anlegen* gibt es je Person den Haken *Ohne Zugang*.
-
+- **Ämter: freie Namen mit Mitgliedern verknüpfen**: Unter *Ämter → Namen mit Mitgliedern verknüpfen* schlägt die App
+  vor, welche Personen ohne Profil schon als Mitglied (auch ohne Zugang), in der Mitgliederliste oder als Ehemalige
+  angelegt sind, mit denselben toleranten Namensregeln wie bei den Anfragen. Mit *Verknüpfen* gehören alle Einträge
+  mit diesem Namen zur gewählten Person; Titel, die das Amt vergibt, werden abgeglichen.
 - **Mitglieder ohne Zugang**: Unter *Mitglied anlegen* gibt es den Haken *Ohne Zugang (meldet sich noch nicht an)*.
   So tragt ihr Personen ein, die noch kein Konto haben, z. B. für Chroniken und Ämter. Sie sind gewöhnliche Mitglieder,
   lassen sich überall auswählen und tragen in der Mitgliederliste der Verwaltung die Marke *ohne Zugang*; ein
