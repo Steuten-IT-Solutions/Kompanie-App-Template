@@ -1213,6 +1213,8 @@ final class GalleryService
                 'width' => (int) $ph['width'],
                 'height' => (int) $ph['height'],
                 'intern' => (bool) (int) $ph['is_intern'],
+                // in der App hochgeladen: intern/öffentlich in der App umstellbar (aus Drive nur über den Ordner)
+                'upload' => self::isUpload($ph),
                 'name' => (string) $ph['name'],
                 'ready' => $ph['status'] === GalleryRepository::READY,
             ] : [
@@ -1225,6 +1227,8 @@ final class GalleryService
                 'width' => (int) $ph['width'],
                 'height' => (int) $ph['height'],
                 'intern' => (bool) (int) $ph['is_intern'],
+                // in der App hochgeladen: intern/öffentlich in der App umstellbar (aus Drive nur über den Ordner)
+                'upload' => self::isUpload($ph),
                 'name' => (string) $ph['name'],
                 // noch nicht aufbereitet: Die Adressen erzeugen das Bild oder liefern vorerst einen Platzhalter (202)
                 'ready' => $ph['status'] === GalleryRepository::READY,

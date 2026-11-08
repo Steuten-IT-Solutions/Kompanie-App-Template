@@ -314,6 +314,10 @@ final class GallerySubmissionService
             'photo_id' => isset($s['photo_id']) ? (int) $s['photo_id'] : null,
         ];
         if ($forReview) {
+            // Freigegebene: ob das Bild in der Galerie intern ist (umstellbar mit PATCH /gallery/photos/{id})
+            $out['intern'] = isset($s['photo_is_intern']) ? (bool) (int) $s['photo_is_intern'] : null;
+        }
+        if ($forReview) {
             $user = $this->app->users->find((int) ($s['user_id'] ?? 0));
             $out['user_id'] = (int) ($s['user_id'] ?? 0);
             $out['user_name'] = $user?->name ?? 'Gelöschtes Konto';

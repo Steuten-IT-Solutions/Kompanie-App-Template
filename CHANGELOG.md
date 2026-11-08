@@ -17,6 +17,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Galerie: hochgeladene Bilder nachträglich intern oder öffentlich stellen**: Bilder, die in der App hochgeladen
+  oder über Einreichungen freigegeben wurden, lassen sich jetzt jederzeit umstellen: unter *Einstellungen → Galerie*
+  mit dem Haken *intern* neben dem Bild, beim Prüfen unter *Zuletzt freigegeben* und in der Großansicht der Galerie
+  (*Nur für Mitglieder* bzw. *Öffentlich zeigen*). Das dürfen alle, die die Einstellungen verwalten oder Einreichungen
+  prüfen. Das Bild bekommt dabei eine neue Adresse, die alte liefert nichts mehr. Bilder aus Google Drive stellt
+  weiterhin der Unterordner *intern* in Drive um.
 - **Rolle und Zusatzrollen gleich beim Anlegen**: Wer Rollen vergeben darf, wählt beim Anlegen eines Mitglieds jetzt
   jede Rolle, die er auch danach unter *Konto und Rolle* vergeben dürfte (z. B. Vorstand), und hakt Zusatzrollen an.
   Das gilt für *Mitglied anlegen*, *Mehrere auf einmal anlegen* (Rolle und Zusatzrollen für alle), den Import aus

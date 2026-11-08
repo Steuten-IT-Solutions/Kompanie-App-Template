@@ -2047,6 +2047,11 @@ code {
   font-family: var(--font-head);
   letter-spacing: 0.08em;
 }
+.lb-count .lb-intern {
+  margin-left: 0.75em;
+  letter-spacing: normal;
+  font-family: inherit;
+}
 @media (min-width: 560px) {
   .album-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));

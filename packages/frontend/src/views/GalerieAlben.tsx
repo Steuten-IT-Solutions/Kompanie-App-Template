@@ -191,9 +191,24 @@ function AlbumUploads({
               <img src={p.thumb} alt={p.name} loading="lazy" />
               <span className="small">
                 {p.name}
-                {p.intern && ' (intern)'}
                 {p.status === 'error' && ` · ${p.error || 'ließ sich nicht aufbereiten'}`}
               </span>
+              <label className="toggle">
+                <input
+                  type="checkbox"
+                  checked={p.intern}
+                  disabled={busy}
+                  aria-label={`${p.name} nur für Mitglieder (intern)`}
+                  onChange={async (e) => {
+                    const next = e.target.checked;
+                    if (await run(() => api.setGalleryPhotoIntern(p.id, next), next ? 'Jetzt nur für Mitglieder' : 'Jetzt öffentlich')) {
+                      reload();
+                      onChanged();
+                    }
+                  }}
+                />
+                <span>intern</span>
+              </label>
               <button
                 type="button"
                 className="btn btn-small btn-danger"

@@ -9,7 +9,7 @@ import {
   type TouchEvent,
   type TouchList,
 } from 'react';
-import { can, type GalleryAlbum, type GalleryPhoto } from '../api';
+import { api, can, type GalleryAlbum, type GalleryPhoto } from '../api';
 import { downloadablePhotos } from '../downloadFiles';
 import { downloadAlbum, downloadMedia } from '../galleryDownload';
 import { navigate } from '../router';
@@ -180,6 +180,8 @@ function Album({ id }: { id: number }) {
   const [open, setOpen] = useState<number | null>(null);
   const tiles = useRef<(HTMLButtonElement | null)[]>([]);
   const [retry, setRetry] = useState(0);
+  // Hochgeladene Bilder und Videos intern oder öffentlich stellen (in der Großansicht)
+  const canIntern = can('manage_settings') || can('review_gallery');
   const pending = !!data?.photos.some((p) => !p.ready);
   // Solange die App noch nachsieht, drehen sich in den Platzhaltern die Ladeschnecken.
   const preparing = retry < PENDING_RETRIES;
@@ -255,7 +257,23 @@ function Album({ id }: { id: number }) {
           </li>
         ))}
       </ul>
-      {open !== null && <Lightbox photos={photos} start={open} onClose={close} downloads={!!album.downloads} />}
+      {open !== null && (
+        <Lightbox
+          photos={photos}
+          start={open}
+          onClose={close}
+          downloads={!!album.downloads}
+          onIntern={
+            canIntern
+              ? async (p, intern) => {
+                  await api.setGalleryPhotoIntern(p.id, intern);
+                  setRetry(0);
+                  reload();
+                }
+              : undefined
+          }
+        />
+      )}
     </div>
   );
 }
@@ -375,11 +393,14 @@ function Lightbox({
   start,
   onClose,
   downloads = false,
+  onIntern,
 }: {
   photos: GalleryPhoto[];
   start: number;
   onClose: (last: number) => void;
   downloads?: boolean;
+  /** Umstellen intern/öffentlich für hochgeladene Bilder und Videos (manage_settings oder review_gallery) */
+  onIntern?: (p: GalleryPhoto, intern: boolean) => Promise<void>;
 }) {
   const [i, setI] = useState(start);
   const current = useRef(i);
@@ -512,6 +533,7 @@ function Lightbox({
   // in Stücken; solange zeigt die Ansicht, wie weit es ist.
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [switching, setSwitching] = useState(false);
   const [saveProgress, setSaveProgress] = useState<string | null>(null);
   useEffect(() => setSaveError(null), [i]);
   const save = async () => {
@@ -643,6 +665,26 @@ function Lightbox({
       <div className="lb-count">
         {i + 1} / {photos.length}
         {p.intern && ' · intern'}
+        {onIntern && p.upload && (
+          <button
+            type="button"
+            className="btn btn-small btn-secondary lb-intern"
+            disabled={switching}
+            onClick={async () => {
+              setSwitching(true);
+              setSaveError(null);
+              try {
+                await onIntern(p, !p.intern);
+              } catch (e) {
+                setSaveError((e as Error).message);
+              } finally {
+                setSwitching(false);
+              }
+            }}
+          >
+            {p.intern ? 'Öffentlich zeigen' : 'Nur für Mitglieder'}
+          </button>
+        )}
       </div>
     </div>
   );

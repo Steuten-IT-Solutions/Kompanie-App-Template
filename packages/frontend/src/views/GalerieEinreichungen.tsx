@@ -237,6 +237,24 @@ function Review({ onToast }: { onToast: (msg: string) => void }) {
                 <span className="small">
                   {s.name} · {s.album} · von {s.user_name}
                 </span>
+                {s.photo_id !== null && typeof s.intern === 'boolean' && (
+                  <label className="toggle">
+                    <input
+                      type="checkbox"
+                      checked={s.intern}
+                      disabled={busy}
+                      aria-label={`${s.name} nur für Mitglieder (intern)`}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        void run(
+                          () => api.setGalleryPhotoIntern(s.photo_id!, next),
+                          next ? 'Jetzt nur für Mitglieder' : 'Jetzt öffentlich',
+                        );
+                      }}
+                    />
+                    <span>intern</span>
+                  </label>
+                )}
                 <button
                   type="button"
                   className="btn btn-small btn-danger"

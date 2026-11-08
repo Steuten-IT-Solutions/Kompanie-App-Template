@@ -236,6 +236,38 @@ final class GalleryUploadService
         return $id;
     }
 
+    /**
+     * Ein hochgeladenes Bild oder Video nachträglich intern (nur für Mitglieder) oder öffentlich stellen. Die
+     * aufbereiteten Größen liegen bei öffentlichen Bildern im öffentlichen Verzeichnis: Sie werden gelöscht und mit
+     * neuem file_key im Hintergrund neu erzeugt, damit alte öffentliche Adressen sofort nichts mehr liefern. Das
+     * Original im MediaStore bleibt, wo es ist. Bilder aus Drive stellt der Ordner „intern“ in Drive um.
+     *
+     * @return array{id: int, intern: bool}
+     */
+    public function setIntern(int $id, mixed $intern): array
+    {
+        if (!is_bool($intern)) {
+            throw ApiError::invalid('Bitte angeben, ob das Bild intern sein soll (intern: true oder false).');
+        }
+        $repo = $this->repo();
+        $photo = $repo->photo($id) ?? throw ApiError::notFound('Bild nicht gefunden.');
+        if (!GalleryService::isUpload($photo)) {
+            throw ApiError::invalid('Bilder aus Google Drive stellst du in Drive um: in den Ordner „intern“ des Albums verschieben oder heraus.');
+        }
+        if ((bool) (int) $photo['is_intern'] !== $intern) {
+            $this->app->gallery()->deleteFiles($photo);
+            $repo->updatePhoto($id, [
+                'is_intern' => $intern ? 1 : 0,
+                'file_key' => bin2hex(random_bytes(16)),
+                'status' => GalleryRepository::PENDING,
+                'error' => '',
+                'attempts' => 0,
+            ]);
+            $this->app->scheduler->runSoon(GalleryService::PROCESS_TASK);
+        }
+        return ['id' => $id, 'intern' => $intern];
+    }
+
     /** Ein hochgeladenes Bild löschen (Bilder aus Drive kämen beim nächsten Abgleich wieder). */
     public function deletePhoto(int $id, ?User $actor = null): void
     {

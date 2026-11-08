@@ -752,6 +752,8 @@ final class Api
                 $a->gallerySubmissions()->withdraw($this->user(), $r->id());
                 return ['deleted' => true];
             }, 'gallery'),
+            // Hochgeladene Bilder und Videos nachträglich intern oder öffentlich stellen (Alben, Prüfen, Großansicht)
+            new Route('PATCH', '/gallery/photos/{id}', [Cap::ManageSettings, Cap::ReviewGallery], fn (Request $r) => $a->galleryUploads()->setIntern($r->id(), $r->input('intern')), 'gallery'),
             new Route('GET', '/gallery/review', Cap::ReviewGallery, fn () => $a->gallerySubmissions()->review(), 'gallery'),
             new Route('POST', '/gallery/review/{id}/approve', Cap::ReviewGallery, fn (Request $r) => $a->gallerySubmissions()->approve($this->user(), $r->id(), Input::bool($r->input('intern'))), 'gallery'),
             new Route('POST', '/gallery/review/{id}/reject', Cap::ReviewGallery, fn (Request $r) => $a->gallerySubmissions()->reject($this->user(), $r->id(), $r->input('reason')), 'gallery'),
