@@ -80,10 +80,22 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   schreibt, bekommt die Benachrichtigung jetzt selbst auch (auf seinen Geräten, auf denen die Art *Schwarzes Brett:
   dringende Nachrichten* eingeschaltet ist), wie schon bisher die Mail. Das gilt für intern, öffentlich, Kompanie und
   Einzeln, auch wenn der Verfasser selbst nicht ausgewählt ist.
+- **Datei auswählen auf Deutsch**: Beim Hochladen von Dokumenten, beim Import von Mitgliedern, Ehemaligen und Ämtern,
+  beim Einreichen von Bildern und beim Fehlermelden steht jetzt überall ein eigener Knopf *Datei auswählen* mit dem
+  Namen der gewählten Datei, statt des Feldes des Browsers (je nach Gerät z. B. „Choose File“).
+- **„… verwalten“ immer oben**: Bei den eigenen Seiten steht der Knopf jetzt oben wie bei Terminen und Dokumenten;
+  bei Sponsoren und Kompanien gibt es ihn neu, für alle, die sie pflegen dürfen.
+- **Punktekatalog verwalten**: *Wert ändern* und *Deaktivieren* stehen in einer Reihe, die Punkte neben dem Titel.
 
 ### Behoben
 
 - **Eigene Seiten**: Der Text einer Seite klebt nicht mehr am Rand ihrer Karte.
+- **Darstellung**: Lange Wörter in Kacheln, Überschriften und Knöpfen werden richtig getrennt (z. B. nicht mehr
+  „Punktekatalo-g“); *Sicherung wiederherstellen* ragt nicht mehr über den Rand; Zurück-Knöpfe in Formularen stehen
+  links statt mittig; Eingabefelder nebeneinander stehen auf einer Höhe, auch bei zweizeiliger Beschriftung; Foto und
+  Knopf beim Anlegen von Mitgliedern und Ehemaligen sind mittig.
+- **Eingabefelder**: Einige Felder (Titel am Schwarzen Brett, Absendername und Mailserver, Name eines Untermenüs)
+  waren grau statt wie alle anderen; Hinweise unter einem Feld sind nicht mehr fett und in Großbuchstaben.
 
 ## [0.7.0] – 2026-11-07
 

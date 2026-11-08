@@ -17,7 +17,7 @@ import brand from '../generated/brand';
 import { editYearOrDate, formatEuro, formatYearOrDate } from '../format';
 import { navigate } from '../router';
 import { readSheet } from '../sheet';
-import { Empty, emptyName, ErrorBox, Loading, NameFields, trimName, useAsync } from '../ui';
+import { Empty, emptyName, ErrorBox, FileInput, Loading, NameFields, trimName, useAsync } from '../ui';
 import { MemberAvatar, PhotoPicker, type PreparedPhoto } from '../memberPhoto';
 import {
   MEMBER_SORT_LABELS,
@@ -706,8 +706,7 @@ export function FormerImport({ onToast }: { onToast: (msg: string) => void }) {
       </label>
       <label className="field">
         <span>Oder Datei wählen (Excel .xlsx oder CSV)</span>
-        <input
-          type="file"
+        <FileInput
           accept=".xlsx,.csv,.txt,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           onChange={async (e) => {
             const file = e.target.files?.[0];

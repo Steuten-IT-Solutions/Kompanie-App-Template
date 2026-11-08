@@ -90,9 +90,21 @@ function CompanyList() {
   }, [ready]);
   if (loading && !data) return <Loading />;
   if (error || !data) return <ErrorBox message={error ?? `Die ${sec.companies} konnten nicht geladen werden.`} onRetry={reload} />;
-  if (data.length === 0) return <Empty>Noch keine {sec.companies}.</Empty>;
+  const manage = can('manage_companies') && (
+    <button type="button" className="btn btn-secondary btn-block manage-events" onClick={() => navigate('verwaltung/kompanien')}>
+      {sec.companies} verwalten
+    </button>
+  );
+  if (data.length === 0)
+    return (
+      <div className="company-directory">
+        {manage}
+        <Empty>Noch keine {sec.companies}.</Empty>
+      </div>
+    );
   return (
     <div className="company-directory">
+      {manage}
       {data.length > 1 && (
         <>
           <input

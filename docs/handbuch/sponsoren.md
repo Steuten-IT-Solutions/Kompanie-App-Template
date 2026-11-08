@@ -12,6 +12,7 @@ Tippe unten auf **{bereich.sponsors}**. Steht der Punkt nicht unten, findest du 
 ## Was du hier siehst
 - Je Sponsor eine Kachel mit seinem **Logo**. Hat ein Sponsor kein Logo, steht dort sein Name.
 - Die Kacheln sind immer hell, damit jedes Logo gut zu erkennen ist, auch im dunklen Modus.
+- Wer die {bereich.sponsors} pflegt, sieht oben den Knopf **{bereich.sponsors} verwalten**.
 
 ## So gehst du vor
 ### Die Seite eines Sponsors öffnen

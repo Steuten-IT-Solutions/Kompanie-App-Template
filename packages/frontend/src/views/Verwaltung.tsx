@@ -2152,9 +2152,14 @@ function Catalog({ onToast }: { onToast: (msg: string) => void }) {
           <li key={c.id} {...sort.itemProps(i, `card row ${c.active ? '' : 'inactive'}`)}>
             {list.length > 1 && sort.handle(i, c.title)}
             <div className="row-main">
-              <div className="row-title">{c.title}</div>
-              <div className="row-sub">{c.active ? 'aktiv' : 'deaktiviert'}</div>
-              <div className="row-actions">
+              <div className="catalog-row-top">
+                <div>
+                  <div className="row-title">{c.title}</div>
+                  <div className="row-sub">{c.active ? 'aktiv' : 'deaktiviert'}</div>
+                </div>
+                <div className="row-value pos">{formatPoints(c.points)}</div>
+              </div>
+              <div className="row-actions catalog-row-actions">
                 <button
                   className="btn btn-small btn-secondary"
                   disabled={busy}
@@ -2177,7 +2182,6 @@ function Catalog({ onToast }: { onToast: (msg: string) => void }) {
                 </button>
               </div>
             </div>
-            <div className="row-value pos">{formatPoints(c.points)}</div>
           </li>
         ))}
         {(data ?? []).length === 0 && <Empty>Noch keine Vorlagen. Lege oben die erste an.</Empty>}

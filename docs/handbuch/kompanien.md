@@ -13,6 +13,7 @@ Tippe unten auf **{bereich.companies}**. Steht der Punkt nicht unten, findest du
 - Je Kompanie eine Karte mit **Logo**, **Name** und darunter Kurzname, Gründungsjahr und Zahl der Mitglieder (soweit eingetragen). Ohne Logo steht dort der Kurzname.
 - Aufgelöste Kompanien stehen unten und sind mit **ehemalig** markiert.
 - Ab zwei Einträgen stehen über der Liste ein **Suchfeld** und die **Sortierung**, wie unter **{bereich.directory}**.
+- Wer die {bereich.companies} pflegt, sieht oben den Knopf **{bereich.companies} verwalten**.
 
 ## So gehst du vor
 ### Eine Kompanie suchen

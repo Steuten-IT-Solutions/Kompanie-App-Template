@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api, type GallerySubmission } from '../api';
 import { navigate } from '../router';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
 
 /**
  * Bilder für die Galerie einreichen (submit_gallery) und Einreichungen prüfen (review_gallery), Issue #286. Unter
@@ -87,8 +87,7 @@ function Submit({ onToast }: { onToast: (msg: string) => void }) {
             </label>
             <label className="field">
               <span>Bilder (JPG, PNG oder WebP)</span>
-              <input
-                type="file"
+              <FileInput
                 accept=".jpg,.jpeg,.png,.webp"
                 multiple
                 required

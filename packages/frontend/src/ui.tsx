@@ -1,4 +1,17 @@
-import { Component, lazy, useCallback, useEffect, useId, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
+import {
+  Component,
+  lazy,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type Ref,
+} from 'react';
 import { createPortal } from 'react-dom';
 import type { MemberSummary, PersonName } from './api';
 import { cacheKey as keyOf, DATA_UPDATED, dataCache, pendingPrefetch, takeFresh } from './dataCache';
@@ -684,5 +697,52 @@ function ContactField({
       </label>
       {left && problem ? <p className="field-note form-error">{problem}</p> : note}
     </div>
+  );
+}
+
+/**
+ * Datei-Auswahl mit eigenem Knopf „Datei auswählen“ und dem Namen der gewählten Datei. Das eingebaute Feld des Browsers
+ * beschriftet sich in der Sprache des Browsers („Choose File“) und sieht je Gerät anders aus; es bleibt hier unsichtbar
+ * und erledigt nur die Auswahl (auch `required`, `accept`, `multiple`).
+ */
+export function FileInput({
+  inputRef,
+  ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'className'> & { inputRef?: Ref<HTMLInputElement> }) {
+  const own = useRef<HTMLInputElement | null>(null);
+  const [, changed] = useState(0);
+  // Aus dem Feld selbst gelesen: Leert die Ansicht es (value = ''), zeigt die nächste Darstellung wieder „Keine Datei“.
+  const names = Array.from(own.current?.files ?? []).map((f) => f.name);
+  const setRef = (el: HTMLInputElement | null) => {
+    own.current = el;
+    if (typeof inputRef === 'function') inputRef(el);
+    else if (inputRef) (inputRef as { current: HTMLInputElement | null }).current = el;
+  };
+  return (
+    <span className="file-input">
+      <input
+        {...props}
+        ref={setRef}
+        type="file"
+        className="visually-hidden"
+        tabIndex={-1}
+        onChange={(e) => {
+          changed((n) => n + 1);
+          props.onChange?.(e);
+        }}
+      />
+      <button type="button" className="btn btn-secondary btn-small" disabled={props.disabled} onClick={() => own.current?.click()}>
+        {props.multiple ? 'Dateien auswählen' : 'Datei auswählen'}
+      </button>
+      <span className="file-input-name">
+        {names.length === 0
+          ? props.multiple
+            ? 'Keine Dateien ausgewählt'
+            : 'Keine Datei ausgewählt'
+          : names.length === 1
+            ? names[0]
+            : `${names.length} Dateien ausgewählt`}
+      </span>
+    </span>
   );
 }

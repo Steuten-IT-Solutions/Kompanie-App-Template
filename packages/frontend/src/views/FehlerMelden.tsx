@@ -3,7 +3,7 @@ import { api, config, encodeFile } from '../api';
 import { formatBytes } from '../format';
 import { lastError, reportOrigin } from '../lastError';
 import { navigate } from '../router';
-import { ErrorBox, Loading, useAsync } from '../ui';
+import { ErrorBox, FileInput, Loading, useAsync } from '../ui';
 
 const MAX_TEXT = 2000;
 const TYPES = ['image/png', 'image/jpeg', 'image/webp'];
@@ -143,7 +143,7 @@ export default function FehlerMelden() {
             </div>
           </div>
         ) : (
-          <input type="file" accept={TYPES.join(',')} aria-label="Bildschirmfoto" onChange={(e) => choose(e.target.files?.[0] ?? null)} />
+          <FileInput accept={TYPES.join(',')} aria-label="Bildschirmfoto" onChange={(e) => choose(e.target.files?.[0] ?? null)} />
         )}
         <span className="muted small">PNG, JPEG oder WebP, höchstens {formatBytes(f.maxBytes)}.</span>
       </div>

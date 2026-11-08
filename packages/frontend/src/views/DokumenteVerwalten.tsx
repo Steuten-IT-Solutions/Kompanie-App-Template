@@ -4,7 +4,7 @@ import { api, type DocCategory, type DocumentInfo, type DocumentMeta, type DocVi
 import brand from '../generated/brand';
 import { formatBytes, formatDate, todayYmd } from '../format';
 import { navigate } from '../router';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
 import { docGroupKey, groupDocuments, groupKey } from '../documents';
 import { ACCEPT, DocGroupSection, DocSortSelect, typeLabel, useDocSort, useOpenGroups, VISIBILITY_LABELS } from './Dokumente';
 
@@ -204,7 +204,7 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
         <h3>Dokument hochladen</h3>
         <label className="field">
           <span>Datei</span>
-          <input ref={fileInput} type="file" accept={ACCEPT} onChange={(e) => chooseFile(e.target.files?.[0] ?? null)} />
+          <FileInput inputRef={fileInput} accept={ACCEPT} onChange={(e) => chooseFile(e.target.files?.[0] ?? null)} />
         </label>
         <MetaFields meta={meta} categories={categories} onChange={setMeta} />
         <p className="muted small">PDF, Word, Excel, PowerPoint, OpenDocument, JPG oder PNG, höchstens {formatBytes(maxBytes)}.</p>

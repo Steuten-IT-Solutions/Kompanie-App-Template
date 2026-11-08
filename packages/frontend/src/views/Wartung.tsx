@@ -751,7 +751,7 @@ function Datensicherung({
         auf dem Server aufbewahren. Vor jedem Update sichert die App automatisch auf dem Server und, wenn die Sicherungen in Google Drive
         eingeschaltet sind, auch dort.
       </p>
-      <div className="button-row">
+      <div className="button-row single">
         <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void download()}>
           {encrypted
             ? 'Sicherung verschlüsselt herunterladen'

@@ -29,6 +29,11 @@ function PageTiles() {
   const manager = can('manage_pages');
   return (
     <div>
+      {manager && (
+        <button type="button" className="btn btn-secondary btn-block manage-events" onClick={() => navigate('verwaltung/seiten')}>
+          {sec.pages} verwalten
+        </button>
+      )}
       {data.length === 0 ? (
         <Empty>Noch keine {sec.pages}.</Empty>
       ) : (
@@ -42,13 +47,6 @@ function PageTiles() {
             </li>
           ))}
         </ul>
-      )}
-      {manager && (
-        <p>
-          <button type="button" className="btn btn-secondary" onClick={() => navigate('verwaltung/seiten')}>
-            {sec.pages} verwalten
-          </button>
-        </p>
       )}
     </div>
   );

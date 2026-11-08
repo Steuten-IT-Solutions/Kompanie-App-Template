@@ -189,6 +189,7 @@ function Editor({
               <label className="field">
                 <span>Name des Untermenüs</span>
                 <input
+                  type="text"
                   value={item.label}
                   maxLength={data.label_max}
                   disabled={busy}

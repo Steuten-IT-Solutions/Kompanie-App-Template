@@ -38,6 +38,25 @@ select {
   color: inherit;
 }
 
+/* Lange Wörter in Überschriften, Kacheln und Titeln nach deutschen Regeln trennen (lang="de"), statt sie an
+   beliebiger Stelle umzubrechen (overflow-wrap: anywhere greift erst, wenn keine Trennstelle passt). */
+h1,
+h2,
+h3,
+.btn,
+.row-title,
+.event-title,
+.page-tile,
+.member-tile-label,
+.sheet-title,
+.album-title,
+.news-headline,
+.office-title,
+.rank-card-title {
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
 /* ------------------------------------------------------------------ */
 /* Rahmen                                                              */
 /* ------------------------------------------------------------------ */
@@ -418,6 +437,13 @@ select {
   gap: 6px;
   margin-top: 10px;
 }
+/* Vorlage im Punktekatalog: Wert rechts neben dem Titel, damit beide Knöpfe darunter in eine Reihe passen */
+.catalog-row-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
 .pos {
   color: var(--good);
 }
@@ -659,6 +685,10 @@ select {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
   margin: 14px 0;
+}
+/* Knöpfe dürfen schmaler als ihr längstes Wort werden (Trennung statt Überlauf über den Rand) */
+.button-row > * {
+  min-width: 0;
 }
 
 /* Gerüst der Seite beim Laden (skeleton.tsx): ohne eigene Box, damit es im Raster bzw. Flex des Bereichs genauso
@@ -1116,6 +1146,8 @@ button.member-date {
 }
 .back {
   margin-bottom: 4px;
+  /* In Formularen (Flex-Spalte) nicht über die ganze Breite gezogen und dadurch mittig, sondern links wie überall */
+  align-self: flex-start;
 }
 /* Mitglied in der Verwaltung bzw. Seite einer Person im Tab „Mitglieder“: zurück zur Liste, daneben vorheriges und
    nächstes (auch per Wischen). */
@@ -1258,6 +1290,48 @@ button.member-date {
   display: flex;
   gap: 10px;
 }
+/* Eingabefelder nebeneinander auf einer Höhe, auch wenn eine Beschriftung zweizeilig umbricht */
+/* Hinweise unter einem Feld (span.small/.muted) sind keine Beschriftung: nicht fett und nicht in Großbuchstaben */
+.field > span.small,
+.field > span.muted,
+.field > span.form-error {
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.field > span.small {
+  font-size: 0.85rem;
+}
+.field > span.muted {
+  color: var(--muted);
+}
+.field > span.form-error {
+  color: var(--danger);
+  font-weight: 600;
+}
+/* Datei-Auswahl (ui.tsx, FileInput): Knopf und Dateiname nebeneinander */
+.field > span.file-input,
+.file-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ink);
+  position: relative;
+}
+.file-input-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.field-row > .field > span:first-child {
+  flex: 1;
+}
 .field.narrow {
   flex: 0 0 96px;
 }
@@ -1269,6 +1343,7 @@ input[type='search'],
 input[type='email'],
 input[type='password'],
 input[type='tel'],
+input:not([type]),
 select {
   width: 100%;
   padding: 10px 12px;
@@ -2292,7 +2367,10 @@ code {
   font-size: 0.92rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  overflow-wrap: anywhere;
+  /* Lange Wörter nach deutschen Regeln trennen (lang="de"), nicht an beliebiger Stelle („Punktekatalo-g“) */
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  overflow-wrap: break-word;
   transition: transform 0.08s ease;
 }
 .admin-tile:active {
@@ -2832,6 +2910,16 @@ fieldset.rights-tree legend {
   width: 128px;
   height: 128px;
   font-size: 2.2rem;
+}
+/* Foto beim Anlegen (Mitglied, ehemalige Person): Foto und Knöpfe mittig untereinander */
+.new-member-photo .photo-picker {
+  flex-direction: column;
+}
+.new-member-photo .photo-picker .button-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 0;
 }
 .member-photo,
 .photo-picker {

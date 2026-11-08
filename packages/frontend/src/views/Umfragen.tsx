@@ -255,7 +255,7 @@ function PollList() {
   return (
     <div className="poll-list">
       {canManagePolls() && (
-        <button className="btn btn-block poll-manage-link" onClick={() => navigate('umfragen/verwalten')}>
+        <button className="btn btn-secondary btn-block poll-manage-link" onClick={() => navigate('umfragen/verwalten')}>
           {sec.polls} verwalten
         </button>
       )}
