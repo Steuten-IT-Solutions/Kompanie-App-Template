@@ -2919,6 +2919,50 @@ fieldset.rights-tree legend {
 .report-done {
   padding: 16px;
 }
+/* Eigene Meldungen unter dem Formular und Eingang der Admins (Verwaltung → Fehlermeldungen) */
+.my-reports {
+  margin-top: 16px;
+  padding: 16px;
+}
+.my-reports ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.report-text {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  margin: 6px 0;
+}
+.report-review .report-meta {
+  margin: 8px 0;
+}
+.report-review .report-meta dl {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+}
+.report-review .report-meta dt {
+  font-weight: 700;
+  color: var(--ink-2);
+  margin-top: 6px;
+}
+.report-review .report-meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.report-shot-full {
+  display: block;
+  max-width: 100%;
+  margin: 8px 0;
+  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+}
+.reports-review h3.section-title {
+  margin-top: 20px;
+}
 
 /* Dienstgrade: eigener Dienstgrad als Karte mit Akzentlinie und Fortschrittsbalken */
 .rank-card {

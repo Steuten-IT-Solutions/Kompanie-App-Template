@@ -2612,7 +2612,7 @@ test.describe('Android', () => {
         return (await res.json()).subscription;
       }, device);
     await expect.poll(status).toEqual({
-      types: ['board', 'polls', 'birthdays', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'],
+      types: ['board', 'polls', 'birthdays', 'reports', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'],
       details: true,
     });
 
@@ -3897,12 +3897,14 @@ test('Hilfe: Seiten passend zu Rechten, Bereichen und Variante, mit eigenen Beze
   }
 });
 
-test('Fehler melden: Gast und Mitglied, mit Bildschirmfoto und angezeigten Angaben', async ({ page }) => {
+test('Fehler melden: Gast und Mitglied, Eingang der Admins (schließen, weiterleiten)', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/#/termine');
-  // Nur mit Empfänger (reportUrl); die eigenständige Testinstallation hat einen simulierten (tests/standalone/MockHttp.php).
+  // Weiterleiten nur mit Empfänger (reportUrl); die eigenständige Testinstallation hat einen simulierten
+  // (tests/standalone/MockHttp.php).
   const available = await page.evaluate(() => !!window.KOMPANIE_CONFIG?.reports);
   test.skip(!available, 'Fehlermeldungen in dieser Testinstallation nicht eingerichtet');
+  test.setTimeout(180_000);
   const details = page.locator('.report-details');
   // 1x1-PNG
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
@@ -3914,18 +3916,19 @@ test('Fehler melden: Gast und Mitglied, mit Bildschirmfoto und angezeigten Angab
   await expect(details).toContainText('#/termine');
   await expect(details).toContainText('ohne Anmeldung');
   await expect(details.locator('dd').last()).toHaveText('keine');
-  await expect(page.getByText('Meinen Namen mitschicken')).toHaveCount(0);
+  await expect(page.getByText(/Meinen Namen/)).toHaveCount(0);
   await expect(page.locator('input[name="website"]')).not.toBeInViewport();
   await page.getByRole('button', { name: 'Meldung senden' }).click();
   await expect(page.locator('.form-error')).toHaveText('Bitte beschreibe kurz, was nicht klappt.');
-  await page.getByLabel('Was klappt nicht? (Pflicht)').fill(`Gast-Test ${Date.now()}`);
+  const guestText = `Gast-Test ${Date.now()}`;
+  await page.getByLabel('Was klappt nicht? (Pflicht)').fill(guestText);
   await page.getByRole('button', { name: 'Meldung senden' }).click();
   await expect(page.locator('.form-error')).toContainText('Bitte bestätige');
   await page.getByLabel('Bildschirmfoto').setInputFiles({ name: 'bild.png', mimeType: 'image/png', buffer: png });
   await expect(page.getByAltText('Gewähltes Bildschirmfoto')).toBeVisible();
   await page.getByLabel(/Ich bin einverstanden/).check();
   await expect(page.getByLabel(/Ich bin einverstanden/)).toBeChecked();
-  await expect(page.locator('.report-consent')).toContainText('Steuten IT Solutions');
+  await expect(page.locator('.report-consent')).toContainText('an die Admins');
   await expect(page.locator('.report-consent')).toContainText('dem Bildschirmfoto');
   await page.getByRole('button', { name: 'Meldung senden' }).click();
   await expect(page.getByRole('heading', { name: 'Danke, deine Meldung ist angekommen' })).toBeVisible({ timeout: 15_000 });
@@ -3940,21 +3943,56 @@ test('Fehler melden: Gast und Mitglied, mit Bildschirmfoto und angezeigten Angab
   await expect(details).toContainText('#/news/gibt-es-nicht');
   await expect(details.locator('dd').last()).not.toHaveText('keine');
   await expect(details).not.toContainText('ohne Anmeldung');
-  await expect(details).not.toContainText('Mitglied1');
-  await page.getByText('Meinen Namen mitschicken').click();
+  // Den Namen sehen die Admins immer; der Haken gilt fürs Weiterleiten an die Betreuer.
   await expect(details).toContainText('Mitglied1');
+  // Ohne Empfänger (forward: false) gibt es keinen Haken; der Name bleibt dann ohnehin bei den Admins.
+  const forward = await page.getByText('Meinen Namen beim Weiterleiten an die Betreuer mitschicken').count();
+  await expect(details).toContainText(forward > 0 ? 'sehen nur die Admins' : 'sehen die Admins');
+  if (forward > 0) {
+    await page.getByText('Meinen Namen beim Weiterleiten an die Betreuer mitschicken').click();
+    await expect(details).toContainText('geht beim Weiterleiten mit');
+  }
   const text = `Mitglied-Test ${Date.now()}`;
   await page.getByLabel('Was klappt nicht? (Pflicht)').fill(text);
   await page.getByLabel('Was hast du erwartet? (freiwillig)').fill('Eine Neuigkeit');
   await page.getByLabel(/Ich bin einverstanden/).check();
   await page.getByRole('button', { name: 'Meldung senden' }).click();
   await expect(page.getByRole('heading', { name: 'Danke, deine Meldung ist angekommen' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.my-reports')).toContainText(text);
+  await expect(page.locator('.my-reports')).toContainText('offen');
+
+  // Admin: Gastmeldung mit Begründung schließen, Meldung des Mitglieds weiterleiten
+  await login(page, 'admin', ADMIN_PASSWORD);
+  // Der Knopf trägt die Zahl der offenen Meldungen, z. B. „Fehlermeldungen (2)“.
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page
+    .locator('.admin-tiles')
+    .getByRole('button', { name: /^Fehlermeldungen \(\d+\)$/ })
+    .click();
+  const guestCard = page.locator('.report-review', { hasText: guestText });
+  await expect(guestCard).toContainText('Ohne Anmeldung');
+  await guestCard.getByRole('button', { name: 'Bildschirmfoto anzeigen' }).click();
+  await expect(guestCard.getByAltText('Bildschirmfoto zur Meldung')).toBeVisible();
+  await guestCard.getByRole('button', { name: 'Schließen …' }).click();
+  await guestCard.getByRole('button', { name: 'Schließen', exact: true }).click();
+  await expect(guestCard.locator('.form-error')).toContainText('Bitte schreibe kurz');
+  await guestCard.getByLabel(/Begründung/).fill('Bitte die App neu laden.');
+  await guestCard.getByRole('button', { name: 'Schließen', exact: true }).click();
+  await expect(page.locator('.toast')).toHaveText('Meldung geschlossen');
+  await expect(guestCard).toContainText('geschlossen von');
+  const memberCard = page.locator('.report-review', { hasText: text });
+  await expect(memberCard).toContainText('Mitglied1');
+  if (forward > 0) {
+    page.once('dialog', (d) => d.accept());
+    await memberCard.getByRole('button', { name: 'An die Betreuer weiterleiten' }).click();
+    await expect(page.locator('.toast')).toHaveText('Meldung weitergeleitet');
+    await expect(memberCard).toContainText('an die Betreuer weitergeleitet');
+  }
 
   // Eigenständig: Die Hintergrundaufgabe schickt die Meldung an den simulierten Empfänger (mit Namen, signiert). Ohne
   // Cronjob startet die Aufgabe über den Selbstaufruf, höchstens einmal pro Minute: Das kann etwas dauern.
-  test.setTimeout(180_000);
   const log = process.env.KOMPANIE_DATA_DIR ? `${process.env.KOMPANIE_DATA_DIR}/mock-reports.jsonl` : '';
-  if (STANDALONE && log) {
+  if (STANDALONE && log && forward > 0) {
     await expect
       .poll(
         async () => {

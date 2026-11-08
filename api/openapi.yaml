@@ -483,8 +483,7 @@ paths:
       summary: Formular „Fehler melden“ öffnen (auch ohne Anmeldung)
       description: |
         Zeitmarke für die Zeitfalle (frühestens `minSeconds`, spätestens 6 Stunden später absenden) und die Angaben,
-        die der Server der Meldung beifügt. Ohne Empfänger (reportUrl) 404 `reports_unavailable`. Format der
-        Weitergabe an die Betreuer: docs/FEHLERMELDUNGEN.md.
+        die der Server der Meldung beifügt. Format der Weitergabe an die Betreuer: docs/FEHLERMELDUNGEN.md.
       security: []
       responses:
         '200':
@@ -493,28 +492,29 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [token, minSeconds, maxBytes, details]
+                required: [token, minSeconds, maxBytes, forward, details]
                 properties:
                   token: { type: string, description: 'Zeitpunkt.HMAC; beim Absenden mitschicken' }
                   minSeconds: { type: integer }
                   maxBytes: { type: integer, description: Höchstgröße des Bildschirmfotos (dekodiert) }
+                  forward: { type: boolean, description: 'Ob die Admins Meldungen an die Betreuer weiterleiten können (reportUrl in update.json)' }
                   details:
                     type: object
                     required: [version, role]
                     properties:
                       version: { type: string }
                       role: { type: string, description: 'Bezeichnung der Rolle oder „ohne Anmeldung“' }
-        '404': { $ref: '#/components/responses/Error' }
 
   /reports:
     post:
       tags: [Fehlermeldungen]
       summary: Fehler melden (auch ohne Anmeldung)
       description: |
-        Reiht die Meldung für den Versand an die Betreuer der App ein; 201 erst, wenn sie gespeichert ist. Die
+        Legt die Meldung in den Eingang der Admins (alle mit review_reports bekommen eine Benachrichtigung); 201 erst,
+        wenn sie gespeichert ist. An die Betreuer der App geht sie erst, wenn ein Admin sie weiterleitet. Die
         Einwilligung (`consent: true`) ist Pflicht. Begrenzt je Anfragendem (IPv6: je /64) und Stunde, je Installation
-        und Tag und durch die Größe der Warteschlange. Ist `website` (verstecktes Feld) gefüllt, antwortet der Server
-        wie bei Erfolg, speichert aber nichts.
+        und Tag und durch die Zahl offener Meldungen (höchstens 100, sonst 503 `reports_full`). Ist `website`
+        (verstecktes Feld) gefüllt, antwortet der Server wie bei Erfolg, speichert aber nichts.
       security: []
       requestBody:
         required: true
@@ -531,7 +531,7 @@ paths:
                 page: { type: string, maxLength: 200, description: 'Seite in der App, z. B. #/termine/verwalten' }
                 userAgent: { type: string, maxLength: 400 }
                 lastError: { type: [string, 'null'], maxLength: 500, description: Letzte Fehlermeldung der App }
-                includeName: { type: boolean, description: Nur angemeldet; dann geht der Name mit }
+                includeName: { type: boolean, description: 'Nur angemeldet; dann geht der Name beim Weiterleiten an die Betreuer mit (die Admins sehen ihn immer)' }
                 screenshot:
                   type: [object, 'null']
                   properties:
@@ -540,7 +540,7 @@ paths:
                 website: { type: string, description: Verstecktes Feld; muss leer bleiben }
       responses:
         '201':
-          description: Gespeichert, wird im Hintergrund versandt
+          description: Gespeichert, wartet auf die Admins
           content:
             application/json:
               schema:
@@ -548,8 +548,123 @@ paths:
                 properties:
                   queued: { type: boolean }
         '400': { $ref: '#/components/responses/Error' }
-        '404': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+
+  /reports/mine:
+    get:
+      tags: [Fehlermeldungen]
+      summary: Eigene Fehlermeldungen mit Stand (angemeldet)
+      description: Meldungen, die die Person angemeldet geschickt hat, die neuesten zuerst; erledigte bis 30 Tage nach dem Bearbeiten.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [id, status, description, created, reason, reviewed_at]
+                  properties:
+                    id: { type: integer }
+                    status: { type: string, enum: [open, closed, forwarded] }
+                    description: { type: string }
+                    created: { type: integer, description: Unix-Zeit des Meldens }
+                    reason: { type: [string, 'null'], description: 'Begründung beim Schließen; sonst null' }
+                    reviewed_at: { type: [integer, 'null'], description: Unix-Zeit des Schließens bzw. Weiterleitens }
+        '401': { $ref: '#/components/responses/Error' }
+
+  /reports/review:
+    get:
+      tags: [Fehlermeldungen]
+      summary: Eingang der Fehlermeldungen (offene zuerst, dann die erledigten der letzten 30 Tage)
+      x-capability: review_reports
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [forward, reports]
+                properties:
+                  forward: { type: boolean, description: 'Weiterleiten möglich (Empfänger eingerichtet)' }
+                  reports:
+                    type: array
+                    items: { $ref: '#/components/schemas/ReviewReport' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /reports/review/{id}/screenshot:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Fehlermeldungen]
+      summary: Bildschirmfoto einer offenen Meldung
+      x-capability: review_reports
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [type, data]
+                properties:
+                  type: { type: string, enum: [image/png, image/jpeg, image/webp] }
+                  data: { type: string, description: Base64 }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /reports/review/{id}/close:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Fehlermeldungen]
+      summary: Meldung mit Begründung schließen
+      description: Das Bildschirmfoto wird gelöscht; wer angemeldet gemeldet hat, sieht die Begründung und wird benachrichtigt.
+      x-capability: review_reports
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        '200':
+          description: Geschlossen
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewReport' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /reports/review/{id}/forward:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Fehlermeldungen]
+      summary: Meldung an die Betreuer der App weiterleiten
+      description: |
+        Reiht die Meldung für den Versand ein (docs/FEHLERMELDUNGEN.md); beim Empfänger entsteht daraus ein Issue. Der
+        Name geht nur mit, wenn die Person „Meinen Namen mitschicken“ gewählt hat. Wer angemeldet gemeldet hat, wird
+        benachrichtigt. 409 `reports_not_forwardable` ohne Empfänger, 409 `report_done` bei schon bearbeiteten
+        Meldungen, 503 `reports_full` bei voller Warteschlange.
+      x-capability: review_reports
+      responses:
+        '200':
+          description: Weitergeleitet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewReport' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
 
   /registration/form:
@@ -7231,7 +7346,7 @@ components:
                   name: { type: string, description: Nur bei namentlichen Umfragen }
     PushType:
       type: string
-      enum: [board, board_public, polls, birthdays, gallery_review, gallery_submissions, registrations, penalties, points, ranks, titles, events, reminder, news]
+      enum: [board, board_public, polls, birthdays, gallery_review, gallery_submissions, registrations, reports_review, reports, penalties, points, ranks, titles, events, reminder, news]
       description: '`board` (Schwarzes Brett, Issue #5) nur für Mitglieder und Anwärter (view_board); dringend (Urgency high), TTL höchstens bis zum Ablauf der Nachricht. `board_public`: öffentliche Nachrichten am Brett für alle anderen (Gäste ohne Konto, Konten ohne view_board), sonst wie `board`. `polls` (Umfragen, Issue #4) nur für Mitglieder: neue Umfrage und Erinnerung 24 Stunden vor dem Ende an alle ohne Antwort. `birthdays` (Geburtstage, Issue #1) nur für Mitglieder: am Tag selbst ab 7 Uhr (Zeitzone der Kompanie), nicht an das Geburtstagskind, nur für sichtbare Geburtstage; TTL bis Mitternacht.'
     PushSubscribe:
       type: object
@@ -7439,6 +7554,29 @@ components:
             Nur WordPress: `use_login_page` (400).
         message: { type: string, description: Für Menschen lesbar, in der Sprache der Kompanie }
 
+    ReviewReport:
+      type: object
+      description: Fehlermeldung im Eingang der Admins (review_reports)
+      required: [id, status, description, expected, page, version, variant, user_agent, role, last_error, user_id, name, share_name, screenshot, created, reason, reviewed_by, reviewed_at]
+      properties:
+        id: { type: integer }
+        status: { type: string, enum: [open, closed, forwarded] }
+        description: { type: string }
+        expected: { type: string }
+        page: { type: string }
+        version: { type: string }
+        variant: { type: string }
+        user_agent: { type: string }
+        role: { type: string, description: 'Bezeichnung der Rolle beim Melden oder „ohne Anmeldung“' }
+        last_error: { type: [string, 'null'] }
+        user_id: { type: [integer, 'null'], description: 'Wer gemeldet hat; null ohne Anmeldung' }
+        name: { type: [string, 'null'], description: 'Name der meldenden Person (angemeldet); null ohne Anmeldung' }
+        share_name: { type: boolean, description: 'Name geht beim Weiterleiten an die Betreuer mit' }
+        screenshot: { type: boolean, description: 'Bildschirmfoto vorhanden (nur bei offenen Meldungen)' }
+        created: { type: integer, description: Unix-Zeit des Meldens }
+        reason: { type: [string, 'null'], description: Begründung beim Schließen }
+        reviewed_by: { type: [string, 'null'], description: Name der Person, die geschlossen bzw. weitergeleitet hat }
+        reviewed_at: { type: [integer, 'null'] }
     GallerySubmission:
       type: object
       required: [id, album_id, album, name, status, reason, created_at, reviewed_at, thumb, photo_id]
@@ -7603,7 +7741,7 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, view_activity, manage_settings] }
+              items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports, view_activity, manage_settings] }
               description: 'Rechte der Rolle, jedes für sich (member schließt nichts ein); bei admin alle; vergebbar sind alle außer view_activity und manage_settings. Rechte zum Verwalten und view_own_* nur zusammen mit member. guest gilt auch ohne Anmeldung.'
             users: { type: integer, description: 'Anzahl der Personen mit dieser Rolle, als Grundrolle oder als Zusatzrolle' }
             extra_users: { type: integer, description: Davon als Zusatzrolle }
@@ -7616,7 +7754,7 @@ components:
         label: { type: string, maxLength: 30 }
         capabilities:
           type: array
-          items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users] }
+          items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports] }
           description: 'Jedes Recht für sich. Rechte zum Verwalten und view_own_* nur zusammen mit member; die übrigen Rechte zum Sehen gehen auch allein (wie bei Anwärtern). guest: nur Rechte zum Sehen ohne member; member: immer member, sonst nur Rechte zum Sehen; admin: nicht änderbar.'
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
         new_accounts: { type: boolean, description: 'Nur eigene Rollen: beim Anlegen von Konten wählbar' }
@@ -7644,7 +7782,7 @@ components:
           type: array
           items:
             type: string
-            enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, view_activity, manage_settings]
+            enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports, view_activity, manage_settings]
           description: 'Wirksame Rechte aller Rollen zusammen (Grundrolle und Zusatzrollen); member bringt calendar mit.'
 
     ErrorLog:
@@ -7738,7 +7876,8 @@ components:
           properties:
             imprint: { type: [string, 'null'] }
             privacy: { type: [string, 'null'] }
-        reports: { type: boolean, description: 'Fehlermeldungen an die Betreuer möglich (reportUrl in update.json, Issue #64); sonst kein Knopf „Fehler melden“' }
+        reports: { type: boolean, description: 'Fehler melden möglich (Knopf „Fehler melden“); Meldungen gehen zuerst an die Admins' }
+        openReports: { type: [integer, 'null'], description: 'Offene Fehlermeldungen; nur für Angemeldete mit review_reports, sonst null' }
         registration: { type: boolean, description: 'Zugang beantragen eingeschaltet (Issue #314): Link „Zugang beantragen“ für Gäste' }
         pendingRegistrations: { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null' }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
@@ -8334,7 +8473,7 @@ components:
     GrantableCapability:
       type: string
       description: Recht, das sich einer Rolle oder einer Person geben lässt (alle außer `manage_settings`).
-      enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users]
+      enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports]
 
     MemberRights:
       type: object
