@@ -1066,6 +1066,116 @@ final class OfficeService
         return $count;
     }
 
+    /**
+     * Vorschläge zum Verknüpfen: freie Namen in Amtszeiten (Inhaber und Begleitpersonen), die zu Mitgliedern, Personen der
+     * Mitgliederliste ohne Mitgliederbereich (z. B. Anwärter) oder Ehemaligen passen (MemberService::nameMatch). Je Name
+     * (ohne Unterschied in Groß- und Kleinschreibung und bei Leerzeichen, wie linkNames) die Amtszeiten und die passenden
+     * Personen, die besten zuerst. Verknüpft wird erst mit linkName().
+     *
+     * @return list<array{name: string, entries: int, terms: list<string>, candidates: list<array{id: int, name: string, match: string, former: bool}>}>
+     */
+    public function linkSuggestions(): array
+    {
+        $repo = $this->repository();
+        try {
+            $holders = $repo->holders();
+        } catch (\RuntimeException) {
+            return [];
+        }
+        $offices = [];
+        foreach ($repo->offices() as $o) {
+            $offices[$o['id']] = $o['title'];
+        }
+        $terms = [];
+        foreach ($repo->terms() as $t) {
+            $terms[$t['id']] = $t;
+        }
+        $names = [];
+        foreach ($holders as $termId => $termHolders) {
+            foreach ($termHolders as $h) {
+                foreach ([$h, ...$h['companions']] as $p) {
+                    $name = Text::line($p['name']);
+                    if ($p['user_id'] !== null || $name === '') {
+                        continue;
+                    }
+                    $key = mb_strtolower($name);
+                    $names[$key] ??= ['name' => $name, 'entries' => 0, 'terms' => []];
+                    $names[$key]['entries']++;
+                    $t = $terms[$termId] ?? null;
+                    if ($t !== null && count($names[$key]['terms']) < 5) {
+                        $names[$key]['terms'][] = trim(($offices[$t['office_id']] ?? '') . ' ' . self::yearsLabel($t));
+                    }
+                }
+            }
+        }
+        if ($names === []) {
+            return [];
+        }
+        $former = array_flip($this->app->formerMembers()->ids());
+        $people = array_filter($this->app->users->list(false), static fn (User $u): bool => MemberService::inDirectory($u));
+        foreach ($this->app->users->findMany(array_keys($former)) as $u) {
+            $people[] = $u;
+        }
+        $out = [];
+        foreach ($names as $n) {
+            [$first, $last] = PersonName::split($n['name']);
+            $candidates = [];
+            $seen = [];
+            foreach ($people as $u) {
+                $match = isset($seen[$u->id]) ? null : MemberService::nameMatch($first, $last, $u);
+                if ($match !== null) {
+                    $seen[$u->id] = true;
+                    $candidates[] = ['id' => $u->id, 'name' => $u->name, 'match' => $match, 'former' => isset($former[$u->id])];
+                }
+            }
+            if ($candidates !== []) {
+                $out[] = $n + ['candidates' => MemberService::sortMatches($candidates)];
+            }
+        }
+        usort($out, static fn (array $a, array $b): int => strcasecmp($a['name'], $b['name']));
+        return $out;
+    }
+
+    /**
+     * Einen freien Namen in allen Amtszeiten mit diesem Konto verknüpfen (Mitglied, Person der Mitgliederliste oder
+     * Ehemaliger), wie linkNames; der gespeicherte Name bleibt, im Zeitstrahl stehen dann Konto und Foto des Mitglieds.
+     * Steht die Person in einer Amtszeit schon, bleibt dort der Eintrag frei. Danach werden verknüpfte Titel abgeglichen.
+     *
+     * @return array{linked: int}
+     */
+    public function linkName(mixed $name, mixed $userId): array
+    {
+        $name = Text::line($name);
+        $id = Input::integer($userId);
+        if ($name === '' || $id === null) {
+            throw ApiError::invalid('Bitte den freien Namen und die Person angeben.');
+        }
+        $user = $this->app->users->find($id);
+        $former = $user !== null && $this->app->formerMembers()->previousRole($user) !== null;
+        if ($user === null || (!MemberService::inDirectory($user) && !$former)) {
+            throw ApiError::invalid('Verknüpfen lässt sich nur mit Mitgliedern, Personen der Mitgliederliste oder Ehemaligen.');
+        }
+        $linked = $this->linkNames([mb_strtolower($name) => $id], true);
+        if ($linked === 0) {
+            throw ApiError::notFound('Diesen freien Namen gibt es in keiner Amtszeit (mehr), oder die Person steht dort schon.');
+        }
+        $this->syncTitles(array_keys($this->linkedTitles()));
+        return ['linked' => $linked];
+    }
+
+    /**
+     * Jahre einer Amtszeit für Vorschläge: „1999“, „1999–2003“ oder „seit 2020“.
+     *
+     * @param Term $t
+     */
+    private static function yearsLabel(array $t): string
+    {
+        if ($t['kind'] === self::KIND_POINT) {
+            return (string) $t['start_year'];
+        }
+        return $t['end_year'] === null ? 'seit ' . $t['start_year'] : ($t['end_year'] === $t['start_year'] ? (string) $t['start_year'] : $t['start_year'] . '–' . $t['end_year']);
+    }
+
     // ---- intern ----
 
     /**

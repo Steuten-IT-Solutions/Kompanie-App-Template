@@ -714,6 +714,16 @@ export interface FormerImportResult {
 }
 
 /** Zeile der Vorschau beim Import der Mitglieder (POST /members/import) */
+/** Freier Name in Amtszeiten mit Personen, die passen könnten (beste zuerst) */
+export interface OfficeLinkSuggestion {
+  name: string;
+  /** Zahl der Einträge (Inhaber und Begleitpersonen) mit diesem Namen */
+  entries: number;
+  /** bis zu fünf Amtszeiten, z. B. „König 1999“ */
+  terms: string[];
+  candidates: { id: number; name: string; match: 'name' | 'similar'; former: boolean }[];
+}
+
 export interface MemberImportRow {
   line: number;
   name: string;
@@ -2183,6 +2193,10 @@ export const api = {
   updateOfficeTerm: (id: number, data: OfficeTermInput) => request<OfficeTerm>('PATCH', `/office-terms/${id}`, data),
   deleteOfficeTerm: (id: number) => request<{ deleted: boolean }>('DELETE', `/office-terms/${id}`),
   importOffices: (csv: string, apply: boolean, link = true) => request<OfficeImportResult>('POST', '/offices/import', { csv, apply, link }),
+  /** Freie Namen in Amtszeiten, die zu Mitgliedern oder Ehemaligen passen (nur Vorschläge) */
+  officeLinkSuggestions: () => request<OfficeLinkSuggestion[]>('GET', '/offices/link-suggestions'),
+  /** Einen freien Namen in allen Amtszeiten mit dem Konto verknüpfen */
+  linkOfficeName: (name: string, user_id: number) => request<{ linked: number }>('POST', '/offices/link', { name, user_id }),
 
   // Listen (Issue #121): nur mit manage_lists
   lists: () => request<PrintListSummary[]>('GET', '/lists'),
