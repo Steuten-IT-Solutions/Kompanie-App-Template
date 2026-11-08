@@ -3931,8 +3931,9 @@ test('Fehler melden: Gast und Mitglied, Eingang der Admins (schließen, weiterle
   await expect(details).not.toContainText('ohne Anmeldung');
   // Den Namen sehen die Admins immer; der Haken gilt fürs Weiterleiten an die Betreuer.
   await expect(details).toContainText('Mitglied1');
-  await expect(details).toContainText('sehen nur die Admins');
+  // Ohne Empfänger (forward: false) gibt es keinen Haken; der Name bleibt dann ohnehin bei den Admins.
   const forward = await page.getByText('Meinen Namen beim Weiterleiten an die Betreuer mitschicken').count();
+  await expect(details).toContainText(forward > 0 ? 'sehen nur die Admins' : 'sehen die Admins');
   if (forward > 0) {
     await page.getByText('Meinen Namen beim Weiterleiten an die Betreuer mitschicken').click();
     await expect(details).toContainText('geht beim Weiterleiten mit');
