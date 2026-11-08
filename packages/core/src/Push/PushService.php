@@ -25,7 +25,7 @@ use KompanieApp\Core\Storage\PushRepository;
  *   einmal am Tag. Was er einreiht, geht im selben Lauf raus (App::runTask).
  *
  * - Alle Nachrichten mit Urgency high (URGENCY).
- * - Schwarzes Brett (Issue #5): an alle Empfänger außer dem Verfasser, mit einer TTL höchstens bis zum
+ * - Schwarzes Brett (Issue #5): an alle Empfänger samt Verfasser, mit einer TTL höchstens bis zum
  *   Ablauf der Nachricht.
  * - Umfragen (Issue #4): neue Umfrage an alle Mitglieder außer dem, der sie angelegt hat; Erinnerung 24 Stunden vor dem
  *   Ende an alle Mitglieder ohne Antwort; TTL höchstens bis zum Ende.
@@ -570,11 +570,12 @@ final class PushService
     }
 
     /**
-     * Schwarzes Brett (Issue #5): an alle Geräte der Empfänger mit dem Typ, außer denen des Verfassers. Dringend
-     * (Urgency high) und nur so lange zustellbar, wie die Nachricht gilt, höchstens MAX_TTL (Issue #172).
-     * Öffentliche Nachrichten ($public) zusätzlich an alle Geräte mit der Art board_public (Gäste und Konten ohne
-     * view_board); jedes Gerät bekommt die Nachricht höchstens einmal. Mit $only (Nachricht für Kompanien oder Personen)
-     * nur an die Geräte dieser Konten, sofern sie das Brett lesen.
+     * Schwarzes Brett (Issue #5): an alle Geräte der Empfänger mit dem Typ, auch an die des Verfassers (so sieht er,
+     * dass die Nachricht raus ist und wie sie ankommt). Dringend (Urgency high) und nur so lange zustellbar, wie die
+     * Nachricht gilt, höchstens MAX_TTL (Issue #172). Öffentliche Nachrichten ($public) zusätzlich an alle Geräte mit
+     * der Art board_public (Gäste und Konten ohne view_board); jedes Gerät bekommt die Nachricht höchstens einmal. Mit
+     * $only (Nachricht für Kompanien oder Personen) nur an die Geräte dieser Konten und des Verfassers, sofern sie das
+     * Brett lesen.
      *
      * @param Message $message
      * @param int $ttl Sekunden bis zum Ablauf der Nachricht (höchstens MAX_TTL)
@@ -583,11 +584,11 @@ final class PushService
     public function notifyBoard(array $message, int $authorId, int $ttl, bool $public = false, ?array $only = null): int
     {
         if ($only !== null) {
-            $allowed = array_flip($only);
-            return $this->notifyAudience(self::TYPE_BOARD, $message, static fn (int $uid): bool => $uid !== $authorId && isset($allowed[$uid]), 'high', $ttl, self::MAX_TTL);
+            $allowed = array_flip([...$only, $authorId]);
+            return $this->notifyAudience(self::TYPE_BOARD, $message, static fn (int $uid): bool => isset($allowed[$uid]), 'high', $ttl, self::MAX_TTL);
         }
         if (!$public) {
-            return $this->notifyAudience(self::TYPE_BOARD, $message, static fn (int $uid): bool => $uid !== $authorId, 'high', $ttl, self::MAX_TTL);
+            return $this->notifyAudience(self::TYPE_BOARD, $message, static fn (int $uid): bool => true, 'high', $ttl, self::MAX_TTL);
         }
         if (!$this->typeEnabled(self::TYPE_BOARD) || $ttl <= 0) {
             return 0;
@@ -595,8 +596,7 @@ final class PushService
         $json = $this->json($message);
         $items = [];
         $members = [];
-        $subs = array_values(array_filter($this->repository()->all(), static fn (array $sub): bool => $sub['user_id'] !== $authorId
-            && (in_array(self::TYPE_BOARD, $sub['types'], true) || in_array(self::TYPE_BOARD_PUBLIC, $sub['types'], true))));
+        $subs = array_values(array_filter($this->repository()->all(), static fn (array $sub): bool => in_array(self::TYPE_BOARD, $sub['types'], true) || in_array(self::TYPE_BOARD_PUBLIC, $sub['types'], true)));
         $accounts = $this->accountsOf($subs);
         foreach ($subs as $sub) {
             $uid = $sub['user_id'];

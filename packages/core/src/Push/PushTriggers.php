@@ -20,7 +20,7 @@ use KompanieApp\Core\Domain\RankService;
  * - neue Neuigkeiten (Abgleich mit dem letzten Stand): an alle Abonnenten;
  * - Erinnerung an die Termine von morgen, einmal am Tag ab der eingestellten Uhrzeit;
  * - Dienstgrad geändert bzw. Titel neu verliehen: nur an das betroffene Mitglied;
- * - neue Nachricht am Schwarzen Brett (Issue #5): an alle Mitglieder und Anwärter außer dem Verfasser, bei öffentlichen
+ * - neue Nachricht am Schwarzen Brett (Issue #5): an alle Mitglieder und Anwärter samt Verfasser, bei öffentlichen
  *   Nachrichten auch an Gäste und Konten ohne Brett (Art board_public), dringend und höchstens bis zum Ablauf der
  *   Nachricht zustellbar; Ändern löst nichts aus (auch nicht, wenn eine Nachricht öffentlich wird);
  * - neue Umfrage (Issue #4): an alle Mitglieder außer dem, der sie angelegt hat; Erinnerung 24 Stunden vor dem Ende an
@@ -83,7 +83,7 @@ final class PushTriggers
      * Öffentliche Nachrichten (audience public) gehen zusätzlich an Gäste und Konten ohne Brett; bei der ersten bekommen
      * bestehende Abos dieser Geräte die Art board_public einmalig dazu (PushService::offerTypeToExisting).
      *
-     * Nachrichten für Kompanien oder Personen gehen nur an deren Geräte (BoardService::readerIds).
+     * Nachrichten für Kompanien oder Personen gehen nur an deren Geräte (BoardService::readerIds) und die des Verfassers.
      *
      * @param array{id: int, title: string, author_name: string|null, expires_at: string|null, audience?: string, audience_ids?: list<int>} $item neue Nachricht (BoardService::create)
      */

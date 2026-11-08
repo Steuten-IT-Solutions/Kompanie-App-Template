@@ -385,7 +385,7 @@ final class BoardServiceTest extends TestCase
         $this->app->push()->subscribe($user === null ? null : $this->users->find($user), $d['endpoint'], $d['keys'], $types, null, '1.2.3.4');
     }
 
-    public function testPushToRecipientsExceptAuthor(): void
+    public function testPushToRecipientsAndAuthor(): void
     {
         $this->setUpApp(['board' => true, 'events' => true]);
         if (!$this->app->push()->supported()) {
@@ -406,9 +406,9 @@ final class BoardServiceTest extends TestCase
         $item = $this->as($this->admin)->post("<p>Heute kein Training!<br>Halle gesperrt.</p>", 'Kein Training');
         $queue = $this->app->db->select('SELECT q.urgency, q.ttl, s.endpoint FROM {push_queue} q JOIN {push_subscriptions} s ON s.id = q.subscription_id ORDER BY q.id');
         $this->assertSame(
-            ['https://fcm.googleapis.com/fcm/send/m-handy', 'https://fcm.googleapis.com/fcm/send/m-tablet', 'https://fcm.googleapis.com/fcm/send/anwaerter'],
+            ['https://fcm.googleapis.com/fcm/send/m-handy', 'https://fcm.googleapis.com/fcm/send/m-tablet', 'https://fcm.googleapis.com/fcm/send/anwaerter', 'https://fcm.googleapis.com/fcm/send/admin'],
             array_column($queue, 'endpoint'),
-            'je Gerät der Empfänger eine Nachricht, nicht an den Verfasser, Gäste oder Geräte ohne die Art',
+            'je Gerät der Empfänger eine Nachricht, auch an den Verfasser, nicht an Gäste oder Geräte ohne die Art',
         );
         $this->assertSame(['high'], array_values(array_unique(array_column($queue, 'urgency'))));
         $this->assertSame([86400], array_values(array_unique(array_map('intval', array_column($queue, 'ttl')))));
@@ -416,7 +416,7 @@ final class BoardServiceTest extends TestCase
 
         // Eine Stunde später verschickt: TTL höchstens bis zum Ablauf der Nachricht.
         $this->move('+1 hour');
-        $this->assertSame(3, $this->app->push()->processQueue());
+        $this->assertSame(4, $this->app->push()->processQueue());
         foreach ($this->pushes() as $p) {
             $this->assertSame('high', $p['headers']['Urgency']);
             $this->assertLessThanOrEqual(23 * 3600, (int) $p['headers']['TTL']);
@@ -433,10 +433,11 @@ final class BoardServiceTest extends TestCase
         $this->call('PATCH', "/board/{$item['id']}", ['text' => 'Doch Training']);
         $this->assertSame($queued, $this->app->push()->repository()->counts()['queued'], 'kein Push beim Ändern');
 
-        // Schreibt jemand anderes mit dem Recht, bekommt auch der Admin eine Benachrichtigung.
+        // Schreibt jemand anderes mit dem Recht, bekommen der Admin und der Verfasser eine Benachrichtigung.
         $poster = $this->users->add('schreiber', 'board');
+        $this->subscribe($poster, 'schreiber');
         $this->as($poster)->post('Zweite');
-        $this->assertSame(4, $this->app->push()->repository()->counts()['queued'], 'jetzt auch der Admin, nicht der Verfasser');
+        $this->assertSame(5, $this->app->push()->repository()->counts()['queued'], 'auch der Admin und der Verfasser');
 
         // Art „Schwarzes Brett“ ausgeschaltet: kein Push.
         $this->app->db->execute('DELETE FROM {push_queue}');
@@ -479,7 +480,7 @@ final class BoardServiceTest extends TestCase
         // die board abbestellt haben).
         $this->app->db->execute('DELETE FROM {push_queue}');
         $this->post('Öffentlich', 'Tag der offenen Tür', ['audience' => 'public']);
-        $this->assertSame(['gast-alt', 'm', 'anwaerter', 'gast-konto', 'gast'], $endpoints(), 'je Gerät einmal, nicht an den Verfasser');
+        $this->assertSame(['gast-alt', 'm', 'anwaerter', 'gast-konto', 'gast'], $endpoints(), 'je Gerät einmal');
         $types = array_column($this->app->push()->repository()->all(), 'types', 'endpoint');
         $this->assertSame(['board_public', 'events'], $types['https://fcm.googleapis.com/fcm/send/gast-alt'] ?? null);
         $this->assertSame(['events'], $types['https://fcm.googleapis.com/fcm/send/ohne-brett'] ?? null);
@@ -525,10 +526,10 @@ final class BoardServiceTest extends TestCase
         );
 
         $this->post('Kompanie', 'Kompanie', ['audience' => 'company', 'audience_ids' => [$first]]);
-        $this->assertSame(['m'], $endpoints(), 'nur die Kompanie, nicht der Verfasser');
+        $this->assertSame(['m', 'admin'], $endpoints(), 'nur die Kompanie und der Verfasser (hier in der Kompanie)');
         $this->app->db->execute('DELETE FROM {push_queue}');
         $this->post('Einzeln', 'Einzeln', ['audience' => 'person', 'audience_ids' => [$this->cand, $other]]);
-        $this->assertSame(['zweites', 'anwaerter'], $endpoints());
+        $this->assertSame(['zweites', 'anwaerter', 'admin'], $endpoints(), 'auch der Verfasser, obwohl nicht ausgewählt');
     }
 
     public function testTtlNeverLongerThanTheMessage(): void

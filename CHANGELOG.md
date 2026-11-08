@@ -74,6 +74,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   und steht im Verlauf. Hinweis: Wer danach auf eine ältere Version zurückgeht, zeigt solche Nachrichten wieder allen
   Mitgliedern und Anwärtern.
 
+### Geändert
+
+- **Benachrichtigung vom Schwarzen Brett auch an den Verfasser**: Wer eine Nachricht mit *Benachrichtigung senden*
+  schreibt, bekommt die Benachrichtigung jetzt selbst auch (auf seinen Geräten, auf denen die Art *Schwarzes Brett:
+  dringende Nachrichten* eingeschaltet ist), wie schon bisher die Mail. Das gilt für intern, öffentlich, Kompanie und
+  Einzeln, auch wenn der Verfasser selbst nicht ausgewählt ist.
+
 ### Behoben
 
 - **Eigene Seiten**: Der Text einer Seite klebt nicht mehr am Rand ihrer Karte.
