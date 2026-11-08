@@ -183,14 +183,14 @@ function CompanyList() {
 }
 
 /**
- * Seite einer Kompanie: Logo, Name, Beschreibung, Links und die Mitglieder (die schickt der Server nur mit
- * view_directory, wie in der Mitgliederliste mit Foto, Titeln und Dienstgrad). Zur Seite der Person führt eine Zeile,
- * wenn es die Seite gibt: mit Mitgliederliste oder mit Ämtern.
+ * Seite einer Kompanie: Logo, Name, Beschreibung, Links und die Mitglieder (die schickt der Server nur mit dem Bereich
+ * Mitgliederliste und view_directory, wie in der Mitgliederliste mit Foto, Titeln und Dienstgrad). Jede Zeile führt
+ * zur Seite der Person.
  */
 function CompanyDetail({ id }: { id: number }) {
   const { data, error, loading, reload } = useAsync(sources.companies.load, sources.companies.deps, sources.companies.key);
-  // Seite der Person: mit Mitgliederliste oder (z. B. in einer Bruderschaft ohne Mitgliederliste) mit den Ämtern
-  const linked = (!!config?.features.directory && can('view_directory')) || (!!config?.features.offices && can('view_offices'));
+  // Seite der Person: gibt es mit der Mitgliederliste, also immer, wenn der Server Mitglieder schickt.
+  const linked = !!config?.features.directory && can('view_directory');
   const back = (
     <button type="button" className="btn btn-link back" onClick={() => navigate('kompanien')}>
       ‹ Alle {sec.companies}

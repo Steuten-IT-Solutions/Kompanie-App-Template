@@ -101,6 +101,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Kompanien: Mitglieder nur mit dem Bereich Mitglieder**: Die Seiten der Kompanien zeigen ihre Mitglieder jetzt
+  nur noch, wenn der Bereich *Mitglieder* eingeschaltet ist, und dann für die Rollen mit dem Recht *Mitglieder*. So
+  schaltest du die Mitgliederlisten unter *Einstellungen → Bereiche* zentral ein oder aus und legst unter *Einstellungen → Rollen*
+  fest, wer sie sieht. Bisher erschienen die Mitglieder auf den Kompanieseiten auch bei ausgeschaltetem Bereich, und
+  das Recht ließ sich dann nicht ändern. Die Zuordnungen bleiben erhalten.
 - **Album herunterladen als kleiner Knopf**: In einem Album der Galerie steht statt des großen Knopfs *Album
   herunterladen (… Bilder, ZIP)* jetzt rechts neben dem Titel ein runder Knopf mit Pfeil nach unten, wie beim
   Herunterladen eines einzelnen Bildes. Die Anzahl der Bilder und Videos zeigt er beim Darüberfahren mit der Maus;
