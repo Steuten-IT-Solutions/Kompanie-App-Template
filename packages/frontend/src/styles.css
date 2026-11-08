@@ -1732,6 +1732,15 @@ code {
 .more {
   margin-top: 14px;
 }
+/* Titelbild beim Schreiben im Format der Karte in der Liste (Issue #351) */
+.news-cover-preview {
+  overflow: hidden;
+  max-width: 420px;
+  margin: 4px 0 8px;
+}
+.news-cover-preview .news-image {
+  border-bottom: 0;
+}
 .news-article .news-hero {
   width: 100%;
   border-radius: var(--radius);

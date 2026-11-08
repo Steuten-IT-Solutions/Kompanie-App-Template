@@ -4581,7 +4581,7 @@ test('News in der App: Quelle wählen, Beitrag schreiben, Gast liest ihn, bearbe
     await page.goto('/app/#/news');
     await page.getByRole('button', { name: 'Neuer Beitrag' }).click();
     const form = page.locator('form.news-editor');
-    await form.getByLabel('Titel').fill('Schützenfest am Samstag');
+    await form.getByLabel('Titel', { exact: true }).fill('Schützenfest am Samstag');
     await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Wir treffen uns um 14 Uhr am Festplatz.');
     await form.getByRole('button', { name: 'Veröffentlichen' }).click();
     await expect(page.locator('.toast')).toHaveText('Beitrag veröffentlicht');
@@ -4594,10 +4594,15 @@ test('News in der App: Quelle wählen, Beitrag schreiben, Gast liest ihn, bearbe
     await page.getByRole('button', { name: 'Bearbeiten' }).click();
     const edit = page.locator('form.news-editor');
     await expect(edit.getByRole('textbox', { name: 'Text', exact: true })).toContainText('Festplatz');
-    await edit.getByLabel('Titel').fill('Schützenfest am Samstag, 14 Uhr');
+    await edit.getByLabel('Titel', { exact: true }).fill('Schützenfest am Samstag, 14 Uhr');
+    // Titelbild (Issue #351): Vorschau im Format der Karte, danach groß oben im Beitrag und in der Liste
+    await expect(page.locator('.news-hero')).toHaveCount(0);
+    await edit.getByLabel('Titelbild').setInputFiles(PNG);
+    await expect(edit.locator('.news-cover-preview img')).toBeVisible();
     await edit.getByRole('button', { name: 'Speichern' }).click();
     await expect(page.locator('.toast')).toHaveText('Gespeichert');
     await expect(page.locator('.news-headline')).toHaveText('Schützenfest am Samstag, 14 Uhr');
+    await expect(page.locator('.news-hero')).toBeVisible();
 
     // Ohne Anmeldung: lesen ja, schreiben nein
     await page.context().clearCookies();
@@ -4605,6 +4610,7 @@ test('News in der App: Quelle wählen, Beitrag schreiben, Gast liest ihn, bearbe
     await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
     await page.locator('.tabbar').getByRole('button', { name: 'News' }).click();
     await expect(page.locator('.news-card').first()).toContainText('Schützenfest am Samstag, 14 Uhr');
+    await expect(page.locator('.news-card').first().locator('.news-image')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Neuer Beitrag' })).toHaveCount(0);
     await page.locator('.news-card').first().click();
     await expect(page.locator('.news-content')).toContainText('Festplatz');

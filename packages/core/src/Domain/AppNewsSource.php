@@ -9,7 +9,7 @@ use KompanieApp\Core\Port\NewsSource;
 
 /**
  * News, die in der App geschrieben wurden (Quelle „app“, NewsService), neueste zuerst. Datum ist der Zeitpunkt des
- * Anlegens; das erste Bild im Text dient als Vorschaubild. Einen Link auf eine Webseite gibt es nicht (link leer).
+ * Anlegens; Vorschaubild ist das Titelbild (cover, Issue #351), sonst das erste Bild im Text. Einen Link auf eine Webseite gibt es nicht (link leer).
  */
 final class AppNewsSource implements NewsSource
 {
@@ -27,7 +27,7 @@ final class AppNewsSource implements NewsSource
         $perPage = max(1, $perPage);
         $offset = (max(1, $page) - 1) * $perPage;
         $total = (int) $this->app->db->scalar('SELECT COUNT(*) FROM {app_news}');
-        $rows = $this->app->db->select('SELECT id, title, body, created_at FROM {app_news} ORDER BY created_at DESC, id DESC LIMIT ' . $perPage . ' OFFSET ' . $offset);
+        $rows = $this->app->db->select('SELECT id, title, body, cover, created_at FROM {app_news} ORDER BY created_at DESC, id DESC LIMIT ' . $perPage . ' OFFSET ' . $offset);
         return ['items' => array_map([$this, 'format'], $rows), 'totalPages' => (int) ceil($total / $perPage)];
     }
 
@@ -38,7 +38,13 @@ final class AppNewsSource implements NewsSource
             return null;
         }
         $body = (string) ($row['body'] ?? '');
-        return $this->format($row) + ['content' => $body === '' ? '' : $this->app->richImages()->render($body)];
+        $cover = self::cover($row);
+        return $this->format($row) + [
+            'content' => $body === '' ? '' : $this->app->richImages()->render($body),
+            // Titelbild groß oben im Beitrag; cover_uid zum Bearbeiten (nur die Kennung, kein Inhalt)
+            'cover' => $cover !== null ? $this->app->env->richImageUrl($cover) : null,
+            'cover_uid' => $cover,
+        ];
     }
 
     /** @return array<string, mixed>|null */
@@ -62,6 +68,13 @@ final class AppNewsSource implements NewsSource
         return ['updated_at' => Time::utcToIso((string) $row['updated_at']), 'updated_by_name' => $by?->name];
     }
 
+    /** @param array<string, mixed> $row */
+    public static function cover(array $row): ?string
+    {
+        $uid = $row['cover'] ?? null;
+        return is_string($uid) && preg_match('/^[a-f0-9]{32}$/', $uid) === 1 ? $uid : null;
+    }
+
     /**
      * @param array<string, mixed> $row
      * @return array<string, mixed>
@@ -69,7 +82,8 @@ final class AppNewsSource implements NewsSource
     private function format(array $row): array
     {
         $body = (string) ($row['body'] ?? '');
-        $uids = RichText::imageUids($body);
+        $cover = self::cover($row);
+        $uids = $cover !== null ? [$cover] : RichText::imageUids($body);
         $text = Text::line(Text::fromHtml($body));
         return [
             'id' => (string) (int) $row['id'],

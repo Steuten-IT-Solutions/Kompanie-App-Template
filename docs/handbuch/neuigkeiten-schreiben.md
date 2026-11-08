@@ -12,14 +12,15 @@ Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum 
 ## Was du hier siehst
 - **Neuer Beitrag** (über der Liste): öffnet das Formular für einen neuen Beitrag.
 - **Titel**: die Überschrift des Beitrags, höchstens 150 Zeichen.
-- **Inhalt**: der Beitrag aus Blöcken, zuerst ein Textblock mit Formatierung, Links und Bildern. Mit **+ Block einfügen** kommen weitere Blöcke dazu, zum Beispiel ein **Countdown**. Das erste Bild in einem Text für alle erscheint auch in der Liste der {bereich.news}.
+- **Titelbild (optional)**: ein Bild, das in der Liste der {bereich.news} über dem Beitrag und groß oben im Beitrag steht. Mit **Bild wählen** lädst du es hoch, mit **Bild ersetzen** tauschst du es aus, mit **Bild entfernen** nimmst du es heraus. Die Vorschau zeigt den Ausschnitt wie in der Liste (Querformat 16:9). Ohne Titelbild erscheint in der Liste das erste Bild in einem Text für alle.
+- **Inhalt**: der Beitrag aus Blöcken, zuerst ein Textblock mit Formatierung, Links und Bildern. Mit **+ Block einfügen** kommen weitere Blöcke dazu, zum Beispiel ein **Countdown**.
 - **Veröffentlichen** bzw. **Speichern** und **Abbrechen**.
 - Im geöffneten Beitrag: **Zuletzt geändert** mit Datum und Name, darunter **Bearbeiten** und **Löschen**.
 
 ## So gehst du vor
 ### Einen Beitrag schreiben
 1. Tippe unter **{bereich.news}** auf **Neuer Beitrag**.
-2. Gib einen **Titel** ein und schreibe unter **Inhalt** den Text. Bilder fügst du über das Bildsymbol im Text ein. Weitere Blöcke fügst du mit **+ Block einfügen** (am Ende) oder **+ Block darunter einfügen** hinzu, verschiebst sie mit **↑** und **↓** und nimmst sie mit **Entfernen** heraus.
+2. Gib einen **Titel** ein, wähle bei Bedarf ein **Titelbild** und schreibe unter **Inhalt** den Text. Bilder fügst du über das Bildsymbol im Text ein. Weitere Blöcke fügst du mit **+ Block einfügen** (am Ende) oder **+ Block darunter einfügen** hinzu, verschiebst sie mit **↑** und **↓** und nimmst sie mit **Entfernen** heraus.
 3. Tippe auf **Veröffentlichen**. Der Beitrag steht sofort oben in der Liste, für alle, die die {bereich.news} lesen dürfen, auch ohne Anmeldung.
 
 ### Weitere Blöcke einfügen
@@ -53,7 +54,7 @@ Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum 
 ## Gut zu wissen
 - Wer die {bereich.news} mit Benachrichtigungen abonniert hat, bekommt bei einem neuen Beitrag eine Benachrichtigung, beim Ändern nicht.
 - Hat jemand den Beitrag gespeichert, während du ihn bearbeitet hast, meldet die App das beim Speichern. Lade den Beitrag dann neu und trage deine Änderungen noch einmal ein.
-- Bilder, die in keinem Block mehr stehen, löscht die App beim Speichern.
+- Bilder, die in keinem Block mehr stehen, löscht die App beim Speichern, ebenso ein ersetztes oder entferntes Titelbild.
 - Bei jedem Block wählst du **Für alle, die die Seite sehen** oder **Nur Mitglieder**. Blöcke nur für Mitglieder samt ihren Bildern fehlen ohne Anmeldung und für Gäste.
 - Wechselt ein {rolle.admin} die Quelle wieder auf eine Webseite oder einen Feed, verschwinden die Beiträge aus der App, bleiben aber gespeichert. Mit **In der App schreiben** sind sie wieder da.
 - Das Recht dazu heißt **{bereich.news} schreiben**. Mit der Quelle **In der App schreiben** legt die App die Rolle „{bereich.news} verwalten“ an; die vergibt ein {rolle.admin}.

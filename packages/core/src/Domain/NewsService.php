@@ -20,7 +20,8 @@ use KompanieApp\Core\Push\PushService;
  *   eigenständigen App eine fremde WordPress-Seite oder ein Feed (RemoteNewsSource: none, wordpress, rss).
  * - Quelle „app“: Beiträge werden in der App geschrieben (Tabelle app_news, AppNewsSource), aus Blöcken wie eigene
  *   Seiten (Domain\Blocks\Blocks: Text mit Bildern in rich_images, Besitzer news; Countdown …; je Block für alle oder
- *   nur Mitglieder). body enthält den Text der Textblöcke für alle; das erste Bild darin ist das Vorschaubild der Liste.
+ *   nur Mitglieder). body enthält den Text der Textblöcke für alle. Vorschaubild der Liste ist das Titelbild (cover,
+ *   Issue #351, Bild in rich_images wie die des Textes), sonst das erste Bild im Text.
  * - Entweder oder, kein Mischen: Eine Quelle bestimmt, was in der Liste steht. Beim Wechsel bleiben die Beiträge der
  *   App erhalten (nur nicht sichtbar), die Einstellungen eines Feeds ebenso; zurückwechseln zeigt sie wieder.
  * - Lesen wie bisher mit view_news (auch ohne Anmeldung, wenn Gast das Recht hat). Schreiben, ändern und löschen mit
@@ -164,12 +165,17 @@ final class NewsService
         [$data, $blocks] = $this->validate($in);
         $now = $this->app->time()->nowUtc();
         $db = $this->app->db;
-        $id = $db->transaction(function () use ($db, $data, $blocks, $actor, $now): int {
+        $id = $db->transaction(function () use ($db, $data, $blocks, $actor, $now, $in): int {
             $id = $db->insert('app_news', ['body' => ''] + $data + ['created_by' => $actor->id, 'created_at' => $now, 'updated_by' => $actor->id, 'updated_at' => $now]);
             // Bilder der Textblöcke gehören danach dem Beitrag (dafür braucht es seine ID).
-            if ($blocks !== null) {
-                $db->update('app_news', $this->app->blocks()->columns($blocks, $actor, RichImageService::OWNER_NEWS, $id), ['id' => $id]);
+            $columns = $blocks !== null ? $this->app->blocks()->columns($blocks, $actor, RichImageService::OWNER_NEWS, $id, false) : [];
+            if (array_key_exists('cover', $in)) {
+                $columns['cover'] = $this->claimCover($in['cover'], $actor, $id);
             }
+            if ($columns !== []) {
+                $db->update('app_news', $columns, ['id' => $id]);
+            }
+            $this->pruneImages($id);
             return $id;
         });
         return $this->item((string) $id, $actor);
@@ -190,10 +196,14 @@ final class NewsService
         }
         [$data, $blocks] = $this->validate($in);
         if ($blocks !== null) {
-            // Bilder, die in keinem Block mehr stehen, werden gelöscht (es gibt keinen Verlauf).
-            $data += $this->app->blocks()->columns($blocks, $actor, RichImageService::OWNER_NEWS, $id);
+            $data += $this->app->blocks()->columns($blocks, $actor, RichImageService::OWNER_NEWS, $id, false);
+        }
+        if (array_key_exists('cover', $in)) {
+            $data['cover'] = $this->claimCover($in['cover'], $actor, $id);
         }
         $this->app->db->update('app_news', $data + ['updated_by' => $actor->id, 'updated_at' => $this->app->time()->nowUtc()], ['id' => $id]);
+        // Bilder, die weder in einem Block noch als Titelbild stehen, werden gelöscht (es gibt keinen Verlauf).
+        $this->pruneImages($id);
         return $this->item((string) $id, $actor);
     }
 
@@ -226,6 +236,42 @@ final class NewsService
             // Ohne Abruf von außen: gleich merken, was schon da ist; der nächste Beitrag wird dann gemeldet.
             $this->app->pushTriggers()->checkNews();
         }
+    }
+
+    /**
+     * Titelbild übernehmen (Issue #351): ein hochgeladenes Bild (Entwurf von $actor, POST /rich-images) oder eines, das
+     * der Beitrag schon hat. null oder leer: kein Titelbild.
+     */
+    private function claimCover(mixed $uid, User $actor, int $id): ?string
+    {
+        if ($uid === null || $uid === '') {
+            return null;
+        }
+        if (!is_string($uid) || preg_match('/^[a-f0-9]{32}$/', $uid) !== 1) {
+            throw ApiError::invalid('Das Titelbild ist ungültig.');
+        }
+        $claimed = RichText::imageUids($this->app->richImages()->claim($actor, '<img data-image="' . $uid . '">', RichImageService::OWNER_NEWS, $id));
+        return $claimed[0] ?? throw ApiError::invalid('Das Titelbild wurde nicht gefunden. Bitte noch einmal hochladen.');
+    }
+
+    /** Bilder des Beitrags löschen, die weder in einem Textblock noch als Titelbild stehen. */
+    private function pruneImages(int $id): void
+    {
+        $row = $this->appSource()->row($id);
+        if ($row === null) {
+            return;
+        }
+        $keep = [];
+        foreach (Blocks::decode($row['blocks'] ?? null, (string) ($row['body'] ?? '')) as $b) {
+            if (is_string($b['html'] ?? null)) {
+                array_push($keep, ...RichText::imageUids($b['html']));
+            }
+        }
+        $cover = AppNewsSource::cover($row);
+        if ($cover !== null) {
+            $keep[] = $cover;
+        }
+        $this->app->richImages()->prune(RichImageService::OWNER_NEWS, $id, $keep);
     }
 
     public function appSource(): AppNewsSource

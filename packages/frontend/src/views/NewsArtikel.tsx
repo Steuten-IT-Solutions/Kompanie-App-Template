@@ -92,7 +92,9 @@ export default function NewsArtikel({ id, onToast }: { id: string; onToast: (msg
   return (
     <article className="news-article">
       {back}
-      {!inApp && n.image && <img className="news-hero" src={n.image} alt="" />}
+      {inApp
+        ? n.cover && <img className="news-hero" src={n.cover} alt="" />
+        : n.image && <img className="news-hero" src={n.image} alt="" />}
       {newsDate(n.date) && <div className="news-date">{newsDate(n.date)}</div>}
       <h2 className="news-headline">{n.title}</h2>
       {inApp ? (

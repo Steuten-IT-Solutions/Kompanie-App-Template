@@ -184,6 +184,54 @@ final class NewsInAppTest extends TestCase
         $this->assertNull($this->app->richImages()->repository()->find($uid), 'nicht mehr im Text: gelöscht');
     }
 
+    public function testCoverImage(): void
+    {
+        $this->useApp();
+        $upload = function (): string {
+            $png = imagecreatetruecolor(4, 3);
+            ob_start();
+            imagepng($png);
+            return (string) $this->call('POST', '/rich-images', ['file' => ['name' => 'bild.png', 'data' => base64_encode((string) ob_get_clean())]])->data['uid'];
+        };
+        $inText = $upload();
+        $cover = $upload();
+        $url = fn (string $uid): string => 'https://example.org/app/bild/' . $uid;
+
+        $item = $this->ok('POST', '/news', ['title' => 'Mit Titelbild', 'body' => '<p>Text</p><img data-image="' . $inText . '">', 'cover' => $cover]);
+        $this->assertSame($url($cover), $item['image'], 'Titelbild vor dem ersten Bild im Text (Issue #351)');
+        $this->assertSame($url($cover), $item['cover']);
+        $this->assertSame($cover, $item['cover_uid']);
+        $this->assertSame($url($cover), $this->ok('GET', '/news')[0]['image'], 'auch in der Liste');
+        $this->assertSame(200, $this->app->richImages()->forDelivery(null, $cover)['status'], 'öffentlich wie der Beitrag');
+
+        // Text ändern, Titelbild bleibt (Feld fehlt)
+        $this->ok('PATCH', '/news/' . $item['id'], ['body' => '<p>ohne Bild</p>']);
+        $this->assertNotNull($this->app->richImages()->repository()->find($cover), 'Titelbild bleibt');
+        $this->assertNull($this->app->richImages()->repository()->find($inText));
+        $this->assertSame($cover, $this->ok('GET', '/news/' . $item['id'])['cover_uid']);
+
+        // Unbekannte Kennung
+        $res = $this->call('PATCH', '/news/' . $item['id'], ['cover' => str_repeat('a', 32)]);
+        $this->assertSame(400, $res->status);
+        $this->assertSame(400, $this->call('PATCH', '/news/' . $item['id'], ['cover' => '../x'])->status);
+
+        // Titelbild ersetzen: das alte wird gelöscht
+        $next = $upload();
+        $this->assertSame($url($next), $this->ok('PATCH', '/news/' . $item['id'], ['cover' => $next])['image']);
+        $this->assertNull($this->app->richImages()->repository()->find($cover));
+
+        // Entfernen: wieder das erste Bild im Text bzw. keins
+        $after = $this->ok('PATCH', '/news/' . $item['id'], ['cover' => null]);
+        $this->assertNull($after['cover']);
+        $this->assertNull($after['image']);
+        $this->assertNull($this->app->richImages()->repository()->find($next));
+
+        // Fremder Entwurf: nicht übernehmen
+        $other = $upload();
+        $this->app->richImages()->repository()->setOwner($other, 'draft', $this->member);
+        $this->assertSame(400, $this->call('PATCH', '/news/' . $item['id'], ['cover' => $other])->status);
+    }
+
     public function testPushForNewPostsOnly(): void
     {
         $this->app->settings->set(PushService::NEWS_SETTING, ['ids' => ['5', '6'], 'newest' => '2030-01-01T00:00:00Z']);

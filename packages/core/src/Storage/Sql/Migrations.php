@@ -1828,6 +1828,12 @@ WHERE title IS NULL",
                 'mysql' => ['ALTER TABLE {push_subscriptions} ADD COLUMN offered varchar(255) DEFAULT NULL'],
                 'sqlite' => ['ALTER TABLE {push_subscriptions} ADD COLUMN offered TEXT DEFAULT NULL'],
             ],
+            // Titelbild eines Beitrags der News in der App (Issue #351): Kennung des Bildes in rich_images (Besitzer news).
+            // NULL: wie bisher das erste Bild im Text als Vorschaubild.
+            56 => [
+                'mysql' => ['ALTER TABLE {app_news} ADD COLUMN cover varchar(32) NULL'],
+                'sqlite' => ['ALTER TABLE {app_news} ADD COLUMN cover TEXT DEFAULT NULL'],
+            ],
         ];
     }
 
