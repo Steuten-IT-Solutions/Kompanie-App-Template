@@ -6868,7 +6868,7 @@ components:
                 type: object
                 description: >-
                   Protokoll des Versands. Zeitpunkte als ISO 8601 in der Zeitzone der Kompanie. types: je angebotener Art der
-                  letzte Versand (devices = Geräte, für die die Nachricht in die Warteschlange ging; 0 = niemand hat die Art
+                  letzte Versand, neueste zuerst (devices = Geräte, für die die Nachricht in die Warteschlange ging; 0 = niemand hat die Art
                   abonniert). accepted/rejected: zuletzt vom Push-Dienst angenommen bzw. endgültig abgelehnt (null = noch nie).
                 required: [types, accepted, rejected]
                 properties:

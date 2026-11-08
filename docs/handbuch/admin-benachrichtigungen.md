@@ -13,7 +13,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Benachricht
 ## Was du hier siehst
 - **… Geräte angemeldet**: wie viele Geräte Benachrichtigungen bekommen, davon wie viele mit Konto und wie viele als Gast. Warten noch Nachrichten auf den Versand, steht ihre Zahl dahinter.
 - **Erinnerung an Termine am nächsten Tag ab**: die Uhrzeit, ab der die Erinnerung an die Termine des Folgetags verschickt wird (anfangs 18:00 Uhr).
-- **Zuletzt verschickt**: für jede Art von Benachrichtigung, wann die App sie zuletzt verschickt hat und an wie viele Geräte. „an kein Gerät“ heißt: Niemand, für den sie gedacht war, hat diese Art auf seinem Gerät eingeschaltet. Darunter steht, wann der Push-Dienst (z. B. von Google oder Apple) zuletzt eine Nachricht angenommen hat und, falls es vorkam, wann er zuletzt eine abgelehnt hat und warum. Der Abschnitt erscheint erst, wenn etwas verschickt wurde.
+- **Zuletzt verschickt**: für jede Art von Benachrichtigung, wann die App sie zuletzt verschickt hat und an wie viele Geräte, das Neueste oben. „an kein Gerät“ heißt: Niemand, für den sie gedacht war, hat diese Art auf seinem Gerät eingeschaltet. Darunter steht, wann der Push-Dienst (z. B. von Google oder Apple) zuletzt eine Nachricht angenommen hat und, falls es vorkam, wann er zuletzt eine abgelehnt hat und warum. Der Abschnitt erscheint erst, wenn etwas verschickt wurde.
 
 ## So gehst du vor
 ### Die Uhrzeit der Erinnerung ändern
