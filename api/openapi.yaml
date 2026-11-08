@@ -1892,12 +1892,12 @@ paths:
       summary: Nachricht ans Schwarze Brett schreiben
       description: |
         Sichtbar bis `expires_at` (ohne Angabe 24 Stunden ab jetzt; keine Obergrenze). Alle Mitglieder und Anwärter
-        außer dem Verfasser bekommen eine Benachrichtigung (Art `board`, Urgency high, Überschrift „Schwarzes Brett:
+        samt Verfasser bekommen eine Benachrichtigung (Art `board`, Urgency high, Überschrift „Schwarzes Brett:
         Verfasser“, Text = Titel, TTL bis `expires_at`, höchstens 28 Tage), sofern sie die Art für das Gerät eingeschaltet
         haben und `push` nicht false ist. Bei `audience: public` zusätzlich alle übrigen Geräte (Gäste ohne Konto, Konten
-        ohne `view_board`) mit der Art `board_public`, außer dem Verfasser; jedes Gerät höchstens einmal. Bei der ersten
+        ohne `view_board`) mit der Art `board_public`; jedes Gerät höchstens einmal. Bei der ersten
         öffentlichen Nachricht bekommen bestehende Abos dieser Geräte die Art einmalig dazu. Bei `audience: company` bzw.
-        `person` nur die Geräte der Konten, die die Nachricht lesen dürfen (siehe `GET /board`), außer dem Verfasser. Mit `mail` zusätzlich je eine Mail an alle Mitglieder und Anwärter mit
+        `person` nur die Geräte der Konten, die die Nachricht lesen dürfen (siehe `GET /board`), und die des Verfassers. Mit `mail` zusätzlich je eine Mail an alle Mitglieder und Anwärter mit
         Mailadresse, die den Empfang nicht abgeschaltet haben (auch an den Verfasser), im Hintergrund; bei `company` und
         `person` nur an die, die die Nachricht lesen dürfen, und den Verfasser. Meldet der
         Mailserver eine Höchstgröße und ist die fertige Mail größer, wird nichts veröffentlicht (400 mit Erklärung).
