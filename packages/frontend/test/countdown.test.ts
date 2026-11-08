@@ -193,3 +193,9 @@ test('Dokument und Sponsoren: ohne die Angaben vom Server zum Speichern', () => 
     { id: 's1', type: 'sponsors', audience: 'all', title: 'Danke' },
   ]);
 });
+
+test('Karte zur Anfahrt: neuer Block mit leerem Ort, unverändert zum Speichern', () => {
+  assert.deepEqual({ ...newBlock('map'), id: '' }, { id: '', type: 'map', audience: 'all', title: '', place: '' });
+  const drafts = draftsFrom([{ id: 'm1', type: 'map', audience: 'all', title: 'Anfahrt', place: 'Am Markt 1' }], '');
+  assert.deepEqual(blocksInput(drafts), [{ id: 'm1', type: 'map', audience: 'all', title: 'Anfahrt', place: 'Am Markt 1' }]);
+});

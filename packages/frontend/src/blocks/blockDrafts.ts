@@ -10,6 +10,7 @@ import type {
   DocumentBlock,
   EventsBlock,
   FactsBlock,
+  MapBlock,
   NoticeBlock,
   PollBlock,
   AlbumBlock,
@@ -31,6 +32,7 @@ export type PollDraft = Omit<PollBlock, 'poll'> & { poll_title?: string };
 export type AlbumDraft = Omit<AlbumBlock, 'album'> & { album_title?: string };
 export type DocumentDraft = Omit<DocumentBlock, 'document'> & { document_title?: string };
 export type SponsorsDraft = Omit<SponsorsBlock, 'sponsors'>;
+export type MapDraft = MapBlock;
 export type BlockDraft =
   | TextDraft
   | CountdownDraft
@@ -44,7 +46,8 @@ export type BlockDraft =
   | PollDraft
   | AlbumDraft
   | DocumentDraft
-  | SponsorsDraft;
+  | SponsorsDraft
+  | MapDraft;
 export type BlockKind = BlockDraft['type'];
 
 /** Blöcke, die man einfügen kann, mit Bezeichnung und Erklärung (Reihenfolge der Auswahl). */
@@ -62,6 +65,7 @@ export const BLOCK_KINDS: { type: BlockKind; label: string; hint: string }[] = [
   { type: 'album', label: 'Album', hint: 'Einige Bilder aus einem Album der Galerie' },
   { type: 'document', label: 'Dokument', hint: 'Eine Datei aus den Dokumenten zum Herunterladen' },
   { type: 'sponsors', label: 'Sponsoren', hint: 'Logos der Sponsoren mit Link' },
+  { type: 'map', label: 'Karte zur Anfahrt', hint: 'Ort mit Knopf zur Karten-App' },
 ];
 
 let counter = 0;
@@ -100,6 +104,7 @@ export function newBlock(type: BlockKind, audience: BlockAudience = 'all'): Bloc
   if (type === 'album') return { id, type, audience, album_id: 0, count: 6 };
   if (type === 'document') return { id, type, audience, document_id: 0 };
   if (type === 'sponsors') return { id, type, audience, title: '' };
+  if (type === 'map') return { id, type, audience, title: '', place: '' };
   return { id, type: 'text', audience, html: '' };
 }
 

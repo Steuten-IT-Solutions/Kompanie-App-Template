@@ -8878,6 +8878,7 @@ components:
         - $ref: '#/components/schemas/BlockAlbum'
         - $ref: '#/components/schemas/BlockDocument'
         - $ref: '#/components/schemas/BlockSponsors'
+        - $ref: '#/components/schemas/BlockMap'
       discriminator:
         propertyName: type
         mapping:
@@ -8894,6 +8895,7 @@ components:
           album: '#/components/schemas/BlockAlbum'
           document: '#/components/schemas/BlockDocument'
           sponsors: '#/components/schemas/BlockSponsors'
+          map: '#/components/schemas/BlockMap'
     BlockBase:
       type: object
       required: [type]
@@ -9131,6 +9133,16 @@ components:
               type: array
               items: { $ref: '#/components/schemas/Sponsor' }
               description: 'Nur in Antworten: alle Sponsoren in ihrer Reihenfolge. Der Block fehlt ganz, wenn Sponsoren ausgeschaltet sind, die Person sie nicht sehen darf (view_sponsors) oder es keine gibt; mit manage_pages kommt er dann mit leerer Liste.'
+    BlockMap:
+      description: 'Karte zur Anfahrt: keine eingebettete Karte, die App zeigt den Ort mit einem Knopf, der ihn in der Karten-App des Geräts öffnet (geo: auf Android, Apple Karten, sonst Google Maps).'
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [place]
+          properties:
+            type: { type: string, const: map }
+            title: { type: string, maxLength: 100 }
+            place: { type: string, minLength: 1, maxLength: 200, description: 'Ort oder Adresse als freier Text, wie der Ort eines Termins' }
 
     Title:
       type: object

@@ -54,6 +54,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Galerie; jeder sieht nur die Bilder, die er auch in der Galerie sehen darf.
 - **Neue Blöcke: Dokument und Sponsoren**: Das *Dokument* bietet eine Datei aus den Dokumenten zum Öffnen und
   Herunterladen an, nur für alle, die sie dort sehen dürfen. *Sponsoren* zeigt alle Sponsoren mit Logo und Link.
+- **Neuer Block: Karte zur Anfahrt**: zeigt einen Ort mit dem Knopf *Karte*, der ihn wie beim Ort eines Termins in
+  der Karten-App des Geräts öffnet. Es wird keine fremde Karte eingebettet.
 - **Mitglieder ohne Zugang**: Unter *Mitglied anlegen* gibt es den Haken *Ohne Zugang (meldet sich noch nicht an)*.
   So tragt ihr Personen ein, die noch kein Konto haben, z. B. für Chroniken und Ämter. Sie sind gewöhnliche Mitglieder,
   lassen sich überall auswählen und tragen in der Mitgliederliste der Verwaltung die Marke *ohne Zugang*; ein

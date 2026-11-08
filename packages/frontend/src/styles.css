@@ -6494,6 +6494,20 @@ fieldset.block-source legend {
   width: auto;
   height: auto;
 }
+/* Block „Karte zur Anfahrt“ */
+.block-map {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+.block-map h3,
+.block-map-place {
+  margin: 0;
+}
+.block-map-place {
+  white-space: pre-line;
+}
 .block-rows {
   display: flex;
   flex-direction: column;

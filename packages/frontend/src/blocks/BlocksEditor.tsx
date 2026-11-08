@@ -19,6 +19,7 @@ import {
   type AlbumDraft,
   type DocumentDraft,
   type SponsorsDraft,
+  type MapDraft,
 } from './blockDrafts';
 import Countdown from './Countdown';
 import { previewRange } from './countdown';
@@ -322,6 +323,38 @@ function SponsorsFields({ block, onChange }: { block: SponsorsDraft; onChange: (
       />
       <span className="muted small">Zeigt alle Sponsoren in ihrer Reihenfolge, mit Logo und Link.</span>
     </label>
+  );
+}
+
+function MapFields({ block, onChange }: { block: MapDraft; onChange: (b: MapDraft) => void }) {
+  return (
+    <div className="block-map-fields">
+      <label className="field">
+        <span>Überschrift (optional)</span>
+        <input
+          type="text"
+          maxLength={TITLE_MAX}
+          value={block.title}
+          placeholder="z. B. So findet ihr uns"
+          onChange={(e) => onChange({ ...block, title: e.target.value })}
+        />
+      </label>
+      <label className="field">
+        <span>Ort oder Adresse</span>
+        <input
+          type="text"
+          maxLength={200}
+          value={block.place}
+          placeholder="z. B. Am Markt 1, 12345 Musterstadt"
+          onChange={(e) => onChange({ ...block, place: e.target.value })}
+          required
+        />
+        <span className="muted small">
+          Der Knopf „Karte“ öffnet den Ort in der Karten-App des Geräts, wie beim Ort eines Termins. Es wird keine Karte eines fremden
+          Anbieters eingebettet.
+        </span>
+      </label>
+    </div>
   );
 }
 
@@ -722,6 +755,8 @@ export default function BlocksEditor({
               <DocumentFields block={b} onChange={(c) => update(i, c)} />
             ) : b.type === 'sponsors' ? (
               <SponsorsFields block={b} onChange={(c) => update(i, c)} />
+            ) : b.type === 'map' ? (
+              <MapFields block={b} onChange={(c) => update(i, c)} />
             ) : (
               <CountdownFields block={b} onChange={(c) => update(i, c)} idPrefix={id} />
             )}

@@ -4793,6 +4793,38 @@ test('Eigene Seiten: Block Sponsoren zeigt die Sponsoren mit Link', async ({ pag
   }
 });
 
+test('Eigene Seiten: Karte zur Anfahrt öffnet den Ort in der Karten-App', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Seiten');
+  const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neue Seite' }) });
+  const title = `Anfahrt ${Date.now().toString(36)}`;
+  await form.getByLabel('Titel').fill(title);
+  await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Oben.');
+  await form.getByLabel('+ Block darunter einfügen').selectOption('map');
+  await form.locator('.block-map-fields input').nth(1).fill('Am Markt 1, 12345 Musterstadt');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Seite angelegt');
+  const row = page.locator('.page-admin-list .row', { hasText: title });
+  try {
+    await page.goto('/app/#/seiten');
+    await page.getByRole('button', { name: title }).first().click();
+    const block = page.locator('.page-article .block-map');
+    await expect(block.locator('.block-map-place')).toHaveText('Am Markt 1, 12345 Musterstadt');
+    // Welche Karten-App, hängt vom Gerät ab (wie bei Terminen); https-Links öffnen in einem neuen Tab
+    const link = block.getByRole('link', { name: 'Karte' });
+    await expect(link).toHaveAttribute(
+      'href',
+      /^https:\/\/(maps\.apple\.com\/\?q=|www\.google\.com\/maps\/search\/\?api=1&query=)Am%20Markt%201%2C%2012345%20Musterstadt$/,
+    );
+    await expect(link).toHaveAttribute('target', '_blank');
+  } finally {
+    await adminMenu(page, 'Seiten');
+    page.once('dialog', (d) => d.accept());
+    await row.getByRole('button', { name: 'Löschen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  }
+});
+
 test('Abzeichen: PNG und SVG hochladen, Mitglied sieht sie in der Liste und in „Meins“, offline, ohne eigene Fläche im Dunkelmodus', async ({
   page,
 }) => {
