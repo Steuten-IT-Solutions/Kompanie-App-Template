@@ -1,4 +1,5 @@
-import type { Block, ButtonBlock, EventsBlock } from '../api';
+import type { Block, ButtonBlock, ContactsBlock, EventsBlock, NoticeBlock } from '../api';
+import { MemberAvatar } from '../memberPhoto';
 import { formatEventWhen } from '../format';
 import RichTextView from '../richtext/RichTextView';
 import Countdown from './Countdown';
@@ -26,6 +27,15 @@ export default function BlocksView({ blocks, manager, textClassName }: { blocks:
             break;
           case 'events':
             view = <NextEvents block={b} />;
+            break;
+          case 'contacts':
+            view = <Contacts block={b} />;
+            break;
+          case 'notice':
+            view = <Notice block={b} />;
+            break;
+          case 'divider':
+            view = b.style === 'space' ? <div className="block-space" aria-hidden="true" /> : <hr className="block-divider" />;
             break;
           default:
             view = manager ? <p className="muted small">Dieser Block wird von dieser Version der App nicht unterstützt.</p> : null;
@@ -80,5 +90,43 @@ function NextEvents({ block }: { block: EventsBlock }) {
         Alle Termine
       </a>
     </section>
+  );
+}
+
+/** Ansprechpartner: je Amt die Inhaber mit Foto; E-Mail und Telefon nur, wenn der Server sie liefert (view_personal). */
+function Contacts({ block }: { block: ContactsBlock }) {
+  return (
+    <section className="block-contacts">
+      {block.title && <h3>{block.title}</h3>}
+      {block.offices.length === 0 ? (
+        <p className="muted">Zurzeit keine Ansprechpartner.</p>
+      ) : (
+        <ul className="block-contacts-list">
+          {block.offices.flatMap((o) =>
+            (o.holders.length === 0 ? [null] : o.holders).map((h, i) => (
+              <li key={`${o.id}-${i}`} className="block-contact">
+                {h && <MemberAvatar url={h.photo_url} name={h.name} size="medium" />}
+                <span className="block-contact-text">
+                  <span className="muted small">{o.title}</span>
+                  <strong>{h ? h.name : 'zurzeit nicht besetzt'}</strong>
+                  {h?.email && <a href={`mailto:${h.email}`}>{h.email}</a>}
+                  {h?.phone && <a href={`tel:${h.phone.replace(/\s+/g, '')}`}>{h.phone}</a>}
+                </span>
+              </li>
+            )),
+          )}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/** Hinweis-Kasten in der Farbe seiner Art. */
+function Notice({ block }: { block: NoticeBlock }) {
+  return (
+    <aside className={`block-notice block-notice-${block.tone}`} role="note">
+      {block.title && <strong className="block-notice-title">{block.title}</strong>}
+      <p>{block.text}</p>
+    </aside>
   );
 }

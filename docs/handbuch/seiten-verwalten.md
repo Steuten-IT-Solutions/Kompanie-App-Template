@@ -31,7 +31,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{
 Hat jemand anderes die Seite gespeichert, während du sie bearbeitet hast, speichert die App deine Fassung nicht und sagt, wer sie geändert hat. Kopiere dann deine Änderungen, tippe auf **Neu laden** und trage sie noch einmal ein. Beim Neu laden gehen deine Änderungen verloren.
 
 ### Blöcke einfügen, verschieben und entfernen
-- Wähle bei **+ Block einfügen** die Art des Blocks: **Text**, **Countdown**, **Knopf mit Link** oder **Nächste Termine**. Mit **+ Block darunter einfügen** kommt der neue Block direkt unter einen bestehenden.
+- Wähle bei **+ Block einfügen** die Art des Blocks: **Text**, **Countdown**, **Knopf mit Link**, **Nächste Termine**, **Ansprechpartner**, **Hinweis-Kasten** oder **Trennlinie**. Mit **+ Block darunter einfügen** kommt der neue Block direkt unter einen bestehenden.
 - Mit **↑** und **↓** verschiebst du einen Block nach oben oder unten, mit **Entfernen** nimmst du ihn heraus.
 - Bei jedem Block wählst du, für wen er ist: **Für alle, die die Seite sehen** oder **Nur Mitglieder**. So kann eine öffentliche Seite einzelne Teile nur für Mitglieder enthalten, zum Beispiel einen internen Treffpunkt. Ohne Anmeldung und für Gäste fehlen diese Blöcke samt ihren Bildern.
 - Erst **Speichern** (bzw. **Anlegen**) übernimmt die Änderungen.
@@ -58,6 +58,16 @@ Webseiten öffnen sich in einem neuen Fenster, Seiten der App im selben.
 2. Trage bei Bedarf eine **Überschrift** ein und wähle bei **Wie viele Termine**, wie viele erscheinen (1 bis 20).
 
 Der Block zeigt immer die nächsten Termine ab heute aus den {bereich.events}, mit Datum, Uhrzeit und Ort, darunter **Alle Termine**. Du musst ihn nie anpassen. Wer die {bereich.events} nicht sehen darf, sieht dort „Zurzeit keine anstehenden Termine.“ Sind die {bereich.events} ausgeschaltet, fehlt der Block.
+
+### Ansprechpartner zeigen
+1. Füge einen Block **Ansprechpartner** ein.
+2. Trage bei Bedarf eine **Überschrift** ein und setze bei **Ämter** die Haken bei den Ämtern, deren Inhaber erscheinen sollen (höchstens 20). Sie erscheinen in der Reihenfolge, in der du sie anhakst.
+
+Der Block zeigt, wer das Amt gerade innehat, mit Foto wie in den Ämtern. E-Mail-Adresse und Handynummer sehen nur Personen, die persönliche Angaben sehen dürfen, und nur bei Inhabern, deren Konto die Ämter zeigen. Ist ein Amt nicht besetzt, steht „zurzeit nicht besetzt“ dabei. Sind die Ämter ausgeschaltet, fehlt der Block.
+
+### Einen Hinweis-Kasten oder eine Trennlinie einfügen
+- **Hinweis-Kasten**: Trage optional eine **Überschrift** und den **Hinweis** ein (höchstens 1000 Zeichen) und wähle bei **Art** **Info**, **Warnung** oder **Erfolg**. Der Kasten erscheint farbig hervorgehoben.
+- **Trennlinie**: Wähle bei **Art der Trennung** **Linie** oder **Nur Abstand**.
 
 ### Die Reihenfolge ändern
 Halte einen Eintrag am Griff links fest, ziehe ihn an die gewünschte Stelle und lass los. Die Reihenfolge ist sofort gespeichert. Am Computer geht es auch mit der Tastatur: Griff mit der Tab-Taste auswählen, dann Pfeil hoch oder runter. Die Reihenfolge gilt in der Standardnavigation; mit eurer eigenen Navigation bestimmt die dort den Platz jeder Seite.

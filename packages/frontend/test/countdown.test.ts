@@ -128,3 +128,11 @@ test('Knopf und Nächste Termine: neue Blöcke, ohne die Termine vom Server zum 
   assert.deepEqual(blocksInput(drafts), drafts);
   assert.equal(hasContent([button]), true);
 });
+
+test('Ansprechpartner, Hinweis und Trennlinie: neue Blöcke, ohne die Ämter vom Server zum Speichern', () => {
+  assert.deepEqual({ ...newBlock('contacts'), id: '' }, { id: '', type: 'contacts', audience: 'all', title: '', office_ids: [] });
+  assert.deepEqual({ ...newBlock('notice'), id: '' }, { id: '', type: 'notice', audience: 'all', title: '', text: '', tone: 'info' });
+  assert.deepEqual({ ...newBlock('divider'), id: '' }, { id: '', type: 'divider', audience: 'all', style: 'line' });
+  const drafts = draftsFrom([{ id: 'c1', type: 'contacts', audience: 'all', title: '', office_ids: [2, 1], offices: [] }], '');
+  assert.deepEqual(blocksInput(drafts), [{ id: 'c1', type: 'contacts', audience: 'all', title: '', office_ids: [2, 1] }]);
+});

@@ -8847,6 +8847,9 @@ components:
         - $ref: '#/components/schemas/BlockCountdown'
         - $ref: '#/components/schemas/BlockButton'
         - $ref: '#/components/schemas/BlockEvents'
+        - $ref: '#/components/schemas/BlockContacts'
+        - $ref: '#/components/schemas/BlockNotice'
+        - $ref: '#/components/schemas/BlockDivider'
       discriminator:
         propertyName: type
         mapping:
@@ -8854,6 +8857,9 @@ components:
           countdown: '#/components/schemas/BlockCountdown'
           button: '#/components/schemas/BlockButton'
           events: '#/components/schemas/BlockEvents'
+          contacts: '#/components/schemas/BlockContacts'
+          notice: '#/components/schemas/BlockNotice'
+          divider: '#/components/schemas/BlockDivider'
     BlockBase:
       type: object
       required: [type]
@@ -8924,6 +8930,50 @@ components:
                   start: { type: string, description: 'Wie bei GET /events (ganztägig: Datum; Ende exklusiv)' }
                   end: { type: string }
                   location: { type: string }
+    BlockContacts:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [office_ids]
+          properties:
+            type: { type: string, const: contacts }
+            title: { type: string, maxLength: 100, description: Überschrift (optional) }
+            office_ids: { type: array, minItems: 1, maxItems: 20, items: { type: integer }, description: 'Ämter in der Reihenfolge der Anzeige (müssen existieren; doppelte zählen einmal); gelöschte fallen beim Lesen weg' }
+            offices:
+              type: array
+              readOnly: true
+              description: 'Nur in Antworten: je Amt die Inhaber der laufenden Amtszeiten (Name und Foto wie GET /offices). Leer ohne view_offices; ist der Bereich Ämter aus, fehlt der Block (außer für die Pflege).'
+              items:
+                type: object
+                properties:
+                  id: { type: integer }
+                  title: { type: string }
+                  holders:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string }
+                        photo_url: { type: [string, 'null'] }
+                        email: { type: string, description: 'Nur mit view_personal und wenn GET /offices das Konto zeigt' }
+                        phone: { type: string, description: wie email }
+    BlockNotice:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [text]
+          properties:
+            type: { type: string, const: notice }
+            title: { type: string, maxLength: 100 }
+            text: { type: string, minLength: 1, maxLength: 1000, description: 'Reiner Text, Zeilenumbrüche bleiben' }
+            tone: { type: string, enum: [info, warning, success], default: info }
+    BlockDivider:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          properties:
+            type: { type: string, const: divider }
+            style: { type: string, enum: [line, space], default: line, description: 'line: Trennlinie; space: nur Abstand. In Mails nichts.' }
 
     Title:
       type: object

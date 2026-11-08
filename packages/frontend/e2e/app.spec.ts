@@ -4711,6 +4711,34 @@ test('Eigene Seiten: Knopf mit Link und Nächste Termine, Gast sieht beide', asy
   }
 });
 
+test('Eigene Seiten: Hinweis-Kasten und Trennlinie', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Seiten');
+  const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neue Seite' }) });
+  const title = `Hinweise ${Date.now().toString(36)}`;
+  await form.getByLabel('Titel').fill(title);
+  await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Oben.');
+  await form.getByLabel('+ Block darunter einfügen').selectOption('notice');
+  await form.getByLabel('Hinweis', { exact: true }).fill('Halle gesperrt.');
+  await form.locator('.block-notice-fields select').selectOption('warning');
+  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('divider');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Seite angelegt');
+  const row = page.locator('.page-admin-list .row', { hasText: title });
+  try {
+    await page.goto('/app/#/seiten');
+    await page.getByRole('button', { name: title }).first().click();
+    const article = page.locator('.page-article');
+    await expect(article.locator('.block-notice-warning')).toHaveText('Halle gesperrt.');
+    await expect(article.locator('hr.block-divider')).toHaveCount(1);
+  } finally {
+    await adminMenu(page, 'Seiten');
+    page.once('dialog', (d) => d.accept());
+    await row.getByRole('button', { name: 'Löschen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  }
+});
+
 test('Abzeichen: PNG und SVG hochladen, Mitglied sieht sie in der Liste und in „Meins“, offline, ohne eigene Fläche im Dunkelmodus', async ({
   page,
 }) => {

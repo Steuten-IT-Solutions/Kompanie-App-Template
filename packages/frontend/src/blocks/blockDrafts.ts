@@ -1,11 +1,25 @@
 // Blöcke beim Bearbeiten (ohne React, für Tests): neue Blöcke, aus der Antwort des Servers, Verschieben.
-import type { Block, BlockAudience, BlockInput, ButtonBlock, CountdownBlock, EventsBlock, TextBlock } from '../api';
+import type {
+  Block,
+  BlockAudience,
+  BlockInput,
+  ButtonBlock,
+  ContactsBlock,
+  CountdownBlock,
+  DividerBlock,
+  EventsBlock,
+  NoticeBlock,
+  TextBlock,
+} from '../api';
 
 export type TextDraft = Omit<TextBlock, never>;
 export type CountdownDraft = Omit<CountdownBlock, 'starts_at' | 'ends_at' | 'event_title'> & { event_title?: string | null };
 export type ButtonDraft = ButtonBlock;
 export type EventsDraft = Omit<EventsBlock, 'events'>;
-export type BlockDraft = TextDraft | CountdownDraft | ButtonDraft | EventsDraft;
+export type ContactsDraft = Omit<ContactsBlock, 'offices'>;
+export type NoticeDraft = NoticeBlock;
+export type DividerDraft = DividerBlock;
+export type BlockDraft = TextDraft | CountdownDraft | ButtonDraft | EventsDraft | ContactsDraft | NoticeDraft | DividerDraft;
 export type BlockKind = BlockDraft['type'];
 
 /** Blöcke, die man einfügen kann, mit Bezeichnung und Erklärung (Reihenfolge der Auswahl). */
@@ -14,6 +28,9 @@ export const BLOCK_KINDS: { type: BlockKind; label: string; hint: string }[] = [
   { type: 'countdown', label: 'Countdown', hint: 'Zählt bis zu einem Datum oder Termin herunter' },
   { type: 'button', label: 'Knopf mit Link', hint: 'Führt zu einer Webseite, Mail, Telefonnummer oder Seite der App' },
   { type: 'events', label: 'Nächste Termine', hint: 'Die nächsten Termine, immer aktuell' },
+  { type: 'contacts', label: 'Ansprechpartner', hint: 'Wer ein Amt gerade innehat, mit Foto' },
+  { type: 'notice', label: 'Hinweis-Kasten', hint: 'Kurzer Text, farbig hervorgehoben' },
+  { type: 'divider', label: 'Trennlinie', hint: 'Linie oder Abstand zwischen Blöcken' },
 ];
 
 let counter = 0;
@@ -43,6 +60,9 @@ export function newBlock(type: BlockKind, audience: BlockAudience = 'all'): Bloc
   }
   if (type === 'button') return { id, type, audience, label: '', url: 'https://', style: 'primary' };
   if (type === 'events') return { id, type, audience, title: '', count: 3 };
+  if (type === 'contacts') return { id, type, audience, title: '', office_ids: [] };
+  if (type === 'notice') return { id, type, audience, title: '', text: '', tone: 'info' };
+  if (type === 'divider') return { id, type, audience, style: 'line' };
   return { id, type: 'text', audience, html: '' };
 }
 
@@ -52,6 +72,10 @@ export function draftsFrom(blocks: Block[] | undefined, body: string): BlockDraf
   return blocks.map((b): BlockDraft => {
     if (b.type === 'events') {
       const { events: _e, ...rest } = b;
+      return rest;
+    }
+    if (b.type === 'contacts') {
+      const { offices: _o, ...rest } = b;
       return rest;
     }
     if (b.type !== 'countdown') return b;

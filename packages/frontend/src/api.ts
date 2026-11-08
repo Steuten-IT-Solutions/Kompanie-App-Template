@@ -215,13 +215,42 @@ export interface EventsBlock extends BlockBase {
   count: number;
   events: BlockEvent[];
 }
-export type Block = TextBlock | CountdownBlock | ButtonBlock | EventsBlock;
+/** Person im Block „Ansprechpartner“: E-Mail und Handynummer nur mit view_personal */
+export interface BlockContact {
+  name: string;
+  photo_url: string | null;
+  email?: string;
+  phone?: string;
+}
+/** Ansprechpartner: ausgewählte Ämter mit den Inhabern ihrer laufenden Amtszeit (vom Server) */
+export interface ContactsBlock extends BlockBase {
+  type: 'contacts';
+  title: string;
+  office_ids: number[];
+  offices: { id: number; title: string; holders: BlockContact[] }[];
+}
+/** Hinweis-Kasten: kurzer reiner Text, farbig */
+export interface NoticeBlock extends BlockBase {
+  type: 'notice';
+  title: string;
+  text: string;
+  tone: 'info' | 'warning' | 'success';
+}
+/** Trennlinie oder Abstand */
+export interface DividerBlock extends BlockBase {
+  type: 'divider';
+  style: 'line' | 'space';
+}
+export type Block = TextBlock | CountdownBlock | ButtonBlock | EventsBlock | ContactsBlock | NoticeBlock | DividerBlock;
 /** Zum Speichern: wie gelesen, ohne die vom Server berechneten Felder (werden ignoriert). */
 export type BlockInput =
   | (Omit<TextBlock, 'id'> & { id?: string })
   | (Omit<CountdownBlock, 'id' | 'starts_at' | 'ends_at' | 'event_title'> & { id?: string })
   | (Omit<ButtonBlock, 'id'> & { id?: string })
-  | (Omit<EventsBlock, 'id' | 'events'> & { id?: string });
+  | (Omit<EventsBlock, 'id' | 'events'> & { id?: string })
+  | (Omit<ContactsBlock, 'id' | 'offices'> & { id?: string })
+  | (Omit<NoticeBlock, 'id'> & { id?: string })
+  | (Omit<DividerBlock, 'id'> & { id?: string });
 
 /** Einstellungen → Navigation (Issue #277): gespeicherte Navigation und was der Server erlaubt. */
 export interface NavigationAdmin {
