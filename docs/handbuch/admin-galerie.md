@@ -45,6 +45,9 @@ Lege in Google Drive einen Galerie-Ordner an. Darin kommt je Jahr ein Ordner und
 3. Tippe auf **Bilder hochladen** und wähle ein oder mehrere Bilder (JPG, PNG oder WebP). Die App zeigt, wie viele schon oben sind.
 4. Die Bilder erscheinen kurz darauf in der {bereich.gallery}. Mit **Löschen** neben einem Bild nimmst du es wieder heraus.
 
+### Ein hochgeladenes Bild intern oder öffentlich stellen
+Setze oder entferne neben dem Bild den Haken **intern**. Mit Haken sehen es nur {rolle.member}, ohne alle. Das Bild wird kurz neu aufbereitet und hat danach eine neue Adresse. Wer es vorher schon angesehen oder gespeichert hat, behält diese Kopie. Dasselbe geht in der Großansicht der {bereich.gallery}. Bilder aus Google Drive stellst du in Drive um: in den Unterordner `intern` des Albums verschieben oder heraus.
+
 Bei einem Album der App änderst du darunter **Titel des Albums** und **Jahr des Albums** (**Album speichern**) oder löschst es mit **Album löschen** samt allen Bildern darin.
 
 ### Herunterladen erlauben

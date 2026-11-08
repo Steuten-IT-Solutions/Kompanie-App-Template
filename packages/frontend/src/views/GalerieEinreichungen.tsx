@@ -3,6 +3,7 @@ import { api, type GallerySubmission } from '../api';
 import { navigate } from '../router';
 import { Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
 import { confirmAsk, promptAsk } from '../ask';
+import { InternToggle } from '../galleryIntern';
 
 /**
  * Bilder für die Galerie einreichen (submit_gallery) und Einreichungen prüfen (review_gallery), Issue #286. Unter
@@ -153,14 +154,16 @@ function Review({ onToast }: { onToast: (msg: string) => void }) {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  async function run(fn: () => Promise<unknown>, msg: string) {
+  async function run(fn: () => Promise<unknown>, msg: string): Promise<boolean> {
     setBusy(true);
     setActionError(null);
     try {
       await fn();
       onToast(msg);
+      return true;
     } catch (e) {
       setActionError((e as Error).message);
+      return false;
     } finally {
       setBusy(false);
       reload();
@@ -234,6 +237,16 @@ function Review({ onToast }: { onToast: (msg: string) => void }) {
                 <span className="small">
                   {s.name} · {s.album} · von {s.user_name}
                 </span>
+                {s.photo_id !== null && typeof s.intern === 'boolean' && (
+                  <InternToggle
+                    checked={s.intern}
+                    name={s.name}
+                    disabled={busy}
+                    onChange={(next) =>
+                      run(() => api.setGalleryPhotoIntern(s.photo_id!, next), next ? 'Jetzt nur für Mitglieder' : 'Jetzt öffentlich')
+                    }
+                  />
+                )}
                 <button
                   type="button"
                   className="btn btn-small btn-danger"

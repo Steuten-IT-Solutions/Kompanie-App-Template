@@ -11,7 +11,7 @@ Tippe unten auf **{bereich.gallery}** und oben auf **Einreichungen prüfen**. Mi
 
 ## Was du hier siehst
 - **Offene Einreichungen**, die ältesten zuerst: das Bild, sein Name, das Album und wer es eingereicht hat.
-- **Zuletzt freigegeben**: die zuletzt freigegebenen Bilder.
+- **Zuletzt freigegeben**: die zuletzt freigegebenen Bilder, mit dem Haken **intern** bei Bildern nur für {rolle.member}.
 
 ## So gehst du vor
 ### Ein Bild freigeben
@@ -19,6 +19,9 @@ Tippe auf **Öffentlich freigeben** (alle sehen es) oder auf **Nur für Mitglied
 
 ### Ein Bild ablehnen
 Tippe auf **Ablehnen** und schreibe kurz, warum. Der Server löscht das Bild sofort; die Person sieht den Grund.
+
+### Ein freigegebenes Bild intern oder öffentlich stellen
+Setze oder entferne unter **Zuletzt freigegeben** den Haken **intern**. Mit Haken sehen es nur {rolle.member}, ohne alle. Wer es vorher schon angesehen oder gespeichert hat, behält diese Kopie. Dasselbe geht in der Großansicht der {bereich.gallery}.
 
 ### Ein freigegebenes Bild wieder entfernen
 Tippe unter **Zuletzt freigegeben** auf **Wieder entfernen** und bestätige. Das Bild verschwindet aus der {bereich.gallery}.

@@ -719,6 +719,8 @@ export interface GalleryPhoto {
   width: number;
   height: number;
   intern: boolean;
+  /** in der App hochgeladen: intern/öffentlich lässt sich in der App umstellen (aus Drive nur über den Ordner); fehlt bei älteren Servern */
+  upload?: boolean;
   name: string;
   /** false: noch nicht aufbereitet; die Adressen erzeugen das Bild oder liefern vorerst einen Platzhalter */
   ready: boolean;
@@ -2513,6 +2515,9 @@ export const api = {
   uploadGalleryPhoto: async (albumId: number, file: File, intern: boolean) =>
     request<GalleryAdminAlbumDetail>('POST', `/admin/gallery/albums/${albumId}/photos`, { file: await encodeFile(file), intern }),
   deleteGalleryPhoto: (id: number) => request<{ deleted: boolean }>('DELETE', `/admin/gallery/photos/${id}`),
+  /** Hochgeladenes Bild oder Video nachträglich intern oder öffentlich stellen (manage_settings oder review_gallery) */
+  setGalleryPhotoIntern: (id: number, intern: boolean) =>
+    request<{ id: number; intern: boolean }>('PATCH', `/gallery/photos/${id}`, { intern }),
   // Einreichungen (Issue #286)
   gallerySubmissions: () => request<GallerySubmissionsOwn>('GET', '/gallery/submissions'),
   submitGalleryPhoto: async (albumId: number, file: File) =>
@@ -2989,6 +2994,8 @@ export interface GallerySubmission {
   photo_id: number | null;
   user_id?: number;
   user_name?: string;
+  /** nur beim Prüfen: ob das freigegebene Bild in der Galerie intern ist (null ohne Bild) */
+  intern?: boolean | null;
 }
 
 export interface GallerySubmissionsOwn {

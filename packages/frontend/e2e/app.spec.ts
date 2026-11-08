@@ -1784,6 +1784,18 @@ test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)',
   await expect(items).toHaveCount(0);
   await expect(page.locator('.gallery-upload', { hasText: title })).toHaveCount(1);
 
+  // Nachträglich intern stellen: Haken unter „Zuletzt freigegeben“, bleibt nach dem Neuladen gesetzt
+  const intern = page
+    .locator('.gallery-upload', { hasText: title })
+    .getByRole('checkbox', { name: 'foto.jpg nur für Mitglieder (intern)' });
+  await expect(intern).not.toBeChecked();
+  await intern.check();
+  await expect(page.locator('.toast')).toHaveText('Jetzt nur für Mitglieder');
+  await page.reload();
+  await expect(
+    page.locator('.gallery-upload', { hasText: title }).getByRole('checkbox', { name: 'foto.jpg nur für Mitglieder (intern)' }),
+  ).toBeChecked();
+
   await page.goto('/app/#/galerie/einreichen');
   await expect(page.locator('.gallery-upload', { hasText: 'zweites.jpg' })).toContainText('nicht freigegeben: Unscharf');
   await expect(page.locator('.gallery-upload', { hasText: 'foto.jpg' }).filter({ hasText: title })).toContainText('freigegeben');

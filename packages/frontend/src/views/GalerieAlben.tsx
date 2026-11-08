@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api, type GalleryAdminAlbum } from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
 import { confirmAsk } from '../ask';
+import { InternToggle } from '../galleryIntern';
 
 /**
  * Alben der App und hochgeladene Bilder (Issue #285), unter Einstellungen → Galerie: Album anlegen (nur in der App),
@@ -187,9 +188,21 @@ function AlbumUploads({
               <img src={p.thumb} alt={p.name} loading="lazy" />
               <span className="small">
                 {p.name}
-                {p.intern && ' (intern)'}
                 {p.status === 'error' && ` · ${p.error || 'ließ sich nicht aufbereiten'}`}
               </span>
+              <InternToggle
+                checked={p.intern}
+                name={p.name}
+                disabled={busy}
+                onChange={async (next) => {
+                  const ok = await run(() => api.setGalleryPhotoIntern(p.id, next), next ? 'Jetzt nur für Mitglieder' : 'Jetzt öffentlich');
+                  if (ok) {
+                    reload();
+                    onChanged();
+                  }
+                  return ok;
+                }}
+              />
               <button
                 type="button"
                 className="btn btn-small btn-danger"

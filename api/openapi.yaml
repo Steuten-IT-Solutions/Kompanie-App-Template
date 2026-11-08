@@ -1307,6 +1307,43 @@ paths:
                     items: { $ref: '#/components/schemas/GallerySubmission' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /gallery/photos/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Galerie]
+      summary: Hochgeladenes Bild oder Video intern oder öffentlich stellen
+      description: |
+        Nur Bilder und Videos, die in der App hochgeladen oder über Einreichungen freigegeben wurden (`upload: true`);
+        Bilder aus Google Drive stellt der Ordner „intern“ in Drive um (400). Bei einem Wechsel löscht der Server die
+        aufbereiteten Größen (öffentliche lagen als statische Dateien vor), vergibt neue Adressen und bereitet im
+        Hintergrund neu auf; die alten öffentlichen Adressen liefern danach nichts mehr. Das Original bleibt.
+      x-capability: 'manage_settings oder review_gallery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [intern]
+              properties:
+                intern: { type: boolean, description: Nur für Mitglieder }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, intern]
+                properties:
+                  id: { type: integer }
+                  intern: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /gallery/review/{id}/approve:
     parameters:
       - $ref: '#/components/parameters/Id'
@@ -7597,6 +7634,7 @@ components:
         photo_id: { type: [integer, 'null'] }
         user_id: { type: integer, description: Nur beim Prüfen }
         user_name: { type: string, description: Nur beim Prüfen }
+        intern: { type: [boolean, 'null'], description: 'Nur beim Prüfen: ob das freigegebene Bild in der Galerie intern ist; null ohne Bild' }
     GalleryAlbumInput:
       type: object
       properties:
@@ -8141,6 +8179,7 @@ components:
         width: { type: integer }
         height: { type: integer }
         intern: { type: boolean }
+        upload: { type: boolean, description: 'In der App hochgeladen (auch über Einreichungen): intern/öffentlich mit PATCH /gallery/photos/{id} umstellbar' }
         name: { type: string }
         ready:
           type: boolean

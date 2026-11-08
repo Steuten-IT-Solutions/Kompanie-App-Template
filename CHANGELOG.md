@@ -21,6 +21,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Galerie: hochgeladene Bilder nachträglich intern oder öffentlich stellen**: Bilder, die in der App hochgeladen
+  oder über Einreichungen freigegeben wurden, lassen sich jetzt jederzeit umstellen: unter *Einstellungen → Galerie*
+  mit dem Haken *intern* neben dem Bild, beim Prüfen unter *Zuletzt freigegeben* und in der Großansicht der Galerie
+  (*Nur für Mitglieder* bzw. *Öffentlich zeigen*). Das dürfen alle, die die Einstellungen verwalten oder Einreichungen
+  prüfen. Das Bild bekommt dabei eine neue Adresse, die alte liefert nichts mehr. Bilder aus Google Drive stellt
+  weiterhin der Unterordner *intern* in Drive um.
 - **Inhalte aus Blöcken**: Eigene Seiten, Beiträge in den News, die in der App geschrieben werden, und Nachrichten am
   Schwarzen Brett bestehen jetzt aus Blöcken, die ihr mit *+ Block einfügen* hinzufügt, mit ↑/↓ verschiebt und
   entfernt. Jeder Block hat ein eigenes *Für wen?*: Blöcke *Nur Mitglieder* samt ihren Bildern fehlen auf öffentlichen
