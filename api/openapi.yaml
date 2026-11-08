@@ -8876,6 +8876,8 @@ components:
         - $ref: '#/components/schemas/BlockFacts'
         - $ref: '#/components/schemas/BlockPoll'
         - $ref: '#/components/schemas/BlockAlbum'
+        - $ref: '#/components/schemas/BlockDocument'
+        - $ref: '#/components/schemas/BlockSponsors'
       discriminator:
         propertyName: type
         mapping:
@@ -8890,6 +8892,8 @@ components:
           facts: '#/components/schemas/BlockFacts'
           poll: '#/components/schemas/BlockPoll'
           album: '#/components/schemas/BlockAlbum'
+          document: '#/components/schemas/BlockDocument'
+          sponsors: '#/components/schemas/BlockSponsors'
     BlockBase:
       type: object
       required: [type]
@@ -9092,6 +9096,41 @@ components:
                           large: { type: string }
                           width: { type: integer }
                           height: { type: integer }
+    BlockDocument:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [document_id]
+          properties:
+            type: { type: string, const: document }
+            document_id: { type: integer, description: 'Dokument aus dem Bereich Dokumente (muss beim Speichern existieren)' }
+            document:
+              readOnly: true
+              description: 'Nur in Antworten. Der Block fehlt ganz, wenn Dokumente ausgeschaltet sind oder die Person das Dokument dort nicht sehen darf (view_documents, bei visibility managers manage_documents; ohne Anmeldung mit den Rechten von Gast); mit manage_pages kommt er dann mit document null. Die Datei prüft die Rechte beim Abruf erneut.'
+              oneOf:
+                - type: 'null'
+                - type: object
+                  required: [id, title, ext, kind, size, date, url]
+                  properties:
+                    id: { type: integer }
+                    title: { type: string }
+                    ext: { type: string }
+                    kind: { type: string, enum: [pdf, image, file] }
+                    size: { type: integer }
+                    date: { type: string, format: date }
+                    url: { type: string }
+    BlockSponsors:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          properties:
+            type: { type: string, const: sponsors }
+            title: { type: string, maxLength: 100 }
+            sponsors:
+              readOnly: true
+              type: array
+              items: { $ref: '#/components/schemas/Sponsor' }
+              description: 'Nur in Antworten: alle Sponsoren in ihrer Reihenfolge. Der Block fehlt ganz, wenn Sponsoren ausgeschaltet sind, die Person sie nicht sehen darf (view_sponsors) oder es keine gibt; mit manage_pages kommt er dann mit leerer Liste.'
 
     Title:
       type: object

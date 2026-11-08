@@ -65,6 +65,8 @@ Mit der Leiste über dem Text gestaltest du die Nachricht wie in einem Mailprogr
 - **Zahlen und Fakten**: je Zeile ein **Wert** und eine **Bezeichnung**, groß nebeneinander.
 - **Umfrage**: Wähle bei **Umfrage** eine aus den {bereich.polls}. Der Block zeigt Titel und Stand mit **Teilnehmen**, wer schon abgestimmt hat, sieht **Antwort und Ergebnis ansehen**. Wer nicht an Umfragen teilnehmen darf, sieht den Block nicht.
 - **Album**: Wähle bei **Album** eines aus der {bereich.gallery} und **Wie viele Bilder** (1 bis 12). Jeder sieht nur die Bilder, die er auch in der {bereich.gallery} sehen darf.
+- **Dokument**: Wähle bei **Dokument** eine Datei aus den {bereich.documents}. Der Block zeigt sie mit **Öffnen** (PDF und Bilder) und **Herunterladen**, aber nur für alle, die sie in den {bereich.documents} sehen dürfen.
+- **Sponsoren**: zeigt alle {bereich.sponsors} mit Logo und Link, optional mit einer **Überschrift**.
 
 ### Einen Countdown einfügen
 1. Wähle bei **+ Block einfügen** **Countdown**.

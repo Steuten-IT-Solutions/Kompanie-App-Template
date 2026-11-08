@@ -7,12 +7,14 @@ import type {
   ContactsBlock,
   CountdownBlock,
   DividerBlock,
+  DocumentBlock,
   EventsBlock,
   FactsBlock,
   NoticeBlock,
   PollBlock,
   AlbumBlock,
   ScheduleBlock,
+  SponsorsBlock,
   TextBlock,
 } from '../api';
 
@@ -27,6 +29,8 @@ export type ScheduleDraft = ScheduleBlock;
 export type FactsDraft = FactsBlock;
 export type PollDraft = Omit<PollBlock, 'poll'> & { poll_title?: string };
 export type AlbumDraft = Omit<AlbumBlock, 'album'> & { album_title?: string };
+export type DocumentDraft = Omit<DocumentBlock, 'document'> & { document_title?: string };
+export type SponsorsDraft = Omit<SponsorsBlock, 'sponsors'>;
 export type BlockDraft =
   | TextDraft
   | CountdownDraft
@@ -38,7 +42,9 @@ export type BlockDraft =
   | ScheduleDraft
   | FactsDraft
   | PollDraft
-  | AlbumDraft;
+  | AlbumDraft
+  | DocumentDraft
+  | SponsorsDraft;
 export type BlockKind = BlockDraft['type'];
 
 /** Blöcke, die man einfügen kann, mit Bezeichnung und Erklärung (Reihenfolge der Auswahl). */
@@ -54,6 +60,8 @@ export const BLOCK_KINDS: { type: BlockKind; label: string; hint: string }[] = [
   { type: 'facts', label: 'Zahlen und Fakten', hint: 'Kurze Kennzahlen nebeneinander' },
   { type: 'poll', label: 'Umfrage', hint: 'Eine Umfrage zum Mitmachen einbinden' },
   { type: 'album', label: 'Album', hint: 'Einige Bilder aus einem Album der Galerie' },
+  { type: 'document', label: 'Dokument', hint: 'Eine Datei aus den Dokumenten zum Herunterladen' },
+  { type: 'sponsors', label: 'Sponsoren', hint: 'Logos der Sponsoren mit Link' },
 ];
 
 let counter = 0;
@@ -90,6 +98,8 @@ export function newBlock(type: BlockKind, audience: BlockAudience = 'all'): Bloc
   if (type === 'facts') return { id, type, audience, title: '', items: [{ value: '', label: '' }] };
   if (type === 'poll') return { id, type, audience, poll_id: 0 };
   if (type === 'album') return { id, type, audience, album_id: 0, count: 6 };
+  if (type === 'document') return { id, type, audience, document_id: 0 };
+  if (type === 'sponsors') return { id, type, audience, title: '' };
   return { id, type: 'text', audience, html: '' };
 }
 
@@ -113,6 +123,14 @@ export function draftsFrom(blocks: Block[] | undefined, body: string): BlockDraf
       const { album, ...rest } = b;
       return { ...rest, album_title: album?.title };
     }
+    if (b.type === 'document') {
+      const { document, ...rest } = b;
+      return { ...rest, document_title: document?.title };
+    }
+    if (b.type === 'sponsors') {
+      const { sponsors: _s, ...rest } = b;
+      return rest;
+    }
     if (b.type !== 'countdown') return b;
     const { starts_at: _s, ends_at: _e, ...rest } = b;
     return { ...rest, time: rest.time ?? '', end_date: rest.end_date ?? '', end_time: rest.end_time ?? '', date: rest.date ?? '' };
@@ -128,6 +146,10 @@ export function blocksInput(drafts: BlockDraft[]): BlockInput[] {
     }
     if (b.type === 'album') {
       const { album_title: _t, ...rest } = b;
+      return rest;
+    }
+    if (b.type === 'document') {
+      const { document_title: _t, ...rest } = b;
       return rest;
     }
     if (b.type !== 'countdown') return b;

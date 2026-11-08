@@ -4749,6 +4749,50 @@ test('Eigene Seiten: Hinweis-Kasten, Trennlinie, Ablauf und Zahlen', async ({ pa
   }
 });
 
+test('Eigene Seiten: Block Sponsoren zeigt die Sponsoren mit Link', async ({ page }) => {
+  const name = `Getränke ${Date.now().toString(36)}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Sponsoren');
+  const sponsorForm = page.locator('form', { has: page.getByRole('heading', { name: 'Neuer Sponsor' }) });
+  await sponsorForm.getByLabel('Name').fill(name);
+  await sponsorForm.getByLabel('Link (optional)').fill('https://getraenke.example/');
+  await sponsorForm.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Sponsor angelegt');
+  const title = `Dank ${Date.now().toString(36)}`;
+  try {
+    await adminMenu(page, 'Seiten');
+    const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neue Seite' }) });
+    await form.getByLabel('Titel').fill(title);
+    await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Oben.');
+    await form.getByLabel('+ Block darunter einfügen').selectOption('sponsors');
+    await form.locator('.block-edit').last().getByLabel('Überschrift (optional)').fill('Mit Dank an');
+    await form.getByRole('button', { name: 'Anlegen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Seite angelegt');
+    const row = page.locator('.page-admin-list .row', { hasText: title });
+    try {
+      await page.goto('/app/#/seiten');
+      await page.getByRole('button', { name: title }).first().click();
+      const block = page.locator('.page-article .block-sponsors');
+      await expect(block.locator('h3')).toHaveText('Mit Dank an');
+      const link = block.locator('a', { hasText: name });
+      await expect(link).toHaveAttribute('href', 'https://getraenke.example/');
+      await expect(link).toHaveAttribute('rel', 'sponsored noopener noreferrer');
+    } finally {
+      await adminMenu(page, 'Seiten');
+      page.once('dialog', (d) => d.accept());
+      await row.getByRole('button', { name: 'Löschen' }).click();
+      await expect(page.locator('.toast')).toHaveText('Gelöscht');
+    }
+  } finally {
+    await adminMenu(page, 'Sponsoren');
+    page.once('dialog', (d) => d.accept());
+    await page
+      .locator('.row', { has: page.getByText(name, { exact: true }) })
+      .getByRole('button', { name: 'Löschen' })
+      .click();
+  }
+});
+
 test('Abzeichen: PNG und SVG hochladen, Mitglied sieht sie in der Liste und in „Meins“, offline, ohne eigene Fläche im Dunkelmodus', async ({
   page,
 }) => {

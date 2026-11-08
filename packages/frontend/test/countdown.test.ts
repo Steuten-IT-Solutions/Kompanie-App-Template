@@ -170,3 +170,26 @@ test('Umfrage und Album: Titel vom Server nur für die Auswahl, nicht zum Speich
     { id: 'a1', type: 'album', audience: 'all', album_id: 5, count: 4 },
   ]);
 });
+
+test('Dokument und Sponsoren: ohne die Angaben vom Server zum Speichern', () => {
+  assert.deepEqual({ ...newBlock('document'), id: '' }, { id: '', type: 'document', audience: 'all', document_id: 0 });
+  assert.deepEqual({ ...newBlock('sponsors'), id: '' }, { id: '', type: 'sponsors', audience: 'all', title: '' });
+  const drafts = draftsFrom(
+    [
+      {
+        id: 'd1',
+        type: 'document',
+        audience: 'members',
+        document_id: 4,
+        document: { id: 4, title: 'Satzung', ext: 'pdf', kind: 'pdf', size: 10, date: '2026-10-01', url: '/d/4' },
+      },
+      { id: 's1', type: 'sponsors', audience: 'all', title: 'Danke', sponsors: [] },
+    ],
+    '',
+  );
+  assert.equal((drafts[0] as { document_title?: string }).document_title, 'Satzung');
+  assert.deepEqual(blocksInput(drafts), [
+    { id: 'd1', type: 'document', audience: 'members', document_id: 4 },
+    { id: 's1', type: 'sponsors', audience: 'all', title: 'Danke' },
+  ]);
+});
