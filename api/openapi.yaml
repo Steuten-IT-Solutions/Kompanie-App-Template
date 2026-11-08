@@ -4422,7 +4422,8 @@ paths:
         Kleinschreibung egal): vorname (Pflicht), nachname (auch name), status (auch rolle), benutzername, e-mail,
         handynummer (auch handy, mobil), straße, hausnummer, adresszusatz, plz, ort, land (Name oder ISO-Code, leer = DE;
         Prüfung wie `AddressInput`), geburtstag, eintritt, punkte, dienstgrad, titel (mit Komma getrennt), ausgeschieden,
-        grund. Unbekannte Spalten und
+        grund, zugang (auch anmeldung: leer/ja wie bisher, nein = Mitglied ohne Zugang wie `no_access` bei `POST /users`,
+        ohne Startpasswort und nicht in `created`, gezählt in `new.no_access`; bei Ehemaligen ohne Bedeutung). Unbekannte Spalten und
         Spalten zu ausgeschalteten Bereichen bzw. ohne das Recht dazu stehen in `columns.ignored`.
         status: leer, „Mitglied“ oder die Bezeichnung einer Rolle, die sich beim Anlegen wählen lässt; „ehemalig“ legt ein
         Konto ohne Anmeldung an, das gleich als ehemalig eingetragen ist (wie `/members/former/import`; eintritt
@@ -8158,7 +8159,7 @@ components:
           type: object
           required: [used, ignored]
           properties:
-            used: { type: array, items: { type: string }, description: 'erkannte Spalten (first_name, last_name, status, username, email, birthday, joined, points, rank, titles, left, reason)' }
+            used: { type: array, items: { type: string }, description: 'erkannte Spalten (first_name, last_name, status, username, email, birthday, joined, points, rank, titles, left, reason, access)' }
             ignored:
               type: array
               items:
@@ -8189,6 +8190,7 @@ components:
               reason: { $ref: '#/components/schemas/FormerReason' }
               founder: { type: boolean }
               left_on: { $ref: '#/components/schemas/FormerDate' }
+              no_access: { type: boolean, description: 'Spalte zugang „nein“: Mitglied ohne Zugang; fehlt sonst' }
               existing:
                 description: Konto mit genau diesem Namen gibt es schon (wird übersprungen)
                 type: object
@@ -8204,6 +8206,7 @@ components:
           properties:
             active: { type: integer }
             former: { type: integer }
+            no_access: { type: integer, description: Davon ohne Zugang (in active enthalten) }
         existing: { type: integer }
         offices_linked: { type: integer }
         applied: { type: boolean }

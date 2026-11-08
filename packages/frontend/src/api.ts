@@ -738,6 +738,8 @@ export interface MemberImportRow {
   reason?: FormerReason;
   founder?: boolean;
   left_on?: string;
+  /** Spalte Zugang „nein“: Mitglied ohne Zugang (kein Startpasswort) */
+  no_access?: boolean;
   /** Konto mit genau diesem Namen gibt es schon: wird übersprungen */
   existing?: { id: number; name: string; former: boolean };
   error?: string;
@@ -747,7 +749,8 @@ export interface MemberImportResult {
   columns: { used: string[]; ignored: { column: string; reason: string }[] };
   rows: MemberImportRow[];
   /** Vorschau: was angelegt würde; nach dem Übernehmen: was angelegt wurde */
-  new: { active: number; former: number };
+  /** active zählt alle Aktiven, no_access davon die ohne Zugang (fehlt bei älteren Servern) */
+  new: { active: number; former: number; no_access?: number };
   existing: number;
   offices_linked: number;
   applied: boolean;

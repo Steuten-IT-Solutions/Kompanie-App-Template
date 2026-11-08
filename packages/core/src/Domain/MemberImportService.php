@@ -23,6 +23,8 @@ use KompanieApp\Core\Http\ApiError;
  * - Geburtstag, Eintritt, Punkte, Dienstgrad und Titel nur mit dem Bereich (und für Punkte, Dienstgrad und Titel mit dem
  *   Recht, sie zu verwalten); sonst wird die Spalte mit Hinweis übergangen. Punkte, Dienstgrad und Titel nur für Rollen mit
  *   Mitgliederbereich.
+ * - zugang: leer oder ja wie bisher (Startpasswort); nein legt ein Mitglied ohne Zugang an (MemberService::NO_ACCESS, kein
+ *   Startpasswort, nicht in created). Bei Ehemaligen ohne Bedeutung (sie melden sich ohnehin nicht an).
  * - Wer genau so heißt wie ein vorhandenes Konto, wird übersprungen (existing); doppelte Namen in der Tabelle sind ein
  *   Fehler. Ein zweiter Import derselben Tabelle legt also niemanden doppelt an.
  * - Ohne apply nur die Vorschau (new: was angelegt würde); mit apply erst, wenn keine Zeile einen Fehler hat (new: was
@@ -58,7 +60,11 @@ final class MemberImportService
         'titles' => ['titel'],
         'left' => ['ausgeschieden', 'austritt', 'austrittsdatum', 'ausgetreten'],
         'reason' => ['grund'],
+        'access' => ['zugang', 'anmeldung'],
     ];
+
+    /** Schreibweisen der Spalte Zugang (klein): true = mit Zugang */
+    private const ACCESS = ['' => true, 'ja' => true, 'j' => true, 'yes' => true, 'x' => true, 'nein' => false, 'n' => false, 'no' => false, 'ohne' => false, 'kein' => false, 'keiner' => false];
 
     /** Feste Schreibweisen des Status (klein); dazu die Bezeichnungen der Rollen, die sich beim Anlegen wählen lassen */
     private const STATUS = ['' => Roles::MEMBER, 'mitglied' => Roles::MEMBER, 'aktiv' => Roles::MEMBER, 'ehemalig' => self::STATUS_FORMER, 'ehemalige' => self::STATUS_FORMER, 'ehemaliger' => self::STATUS_FORMER];
@@ -68,7 +74,7 @@ final class MemberImportService
     }
 
     /**
-     * @return array{columns: array{used: list<string>, ignored: list<array{column: string, reason: string}>}, rows: list<array<string, mixed>>, new: array{active: int, former: int}, existing: int, offices_linked: int, applied: bool, created: list<array<string, mixed>>, error?: string}
+     * @return array{columns: array{used: list<string>, ignored: list<array{column: string, reason: string}>}, rows: list<array<string, mixed>>, new: array{active: int, former: int, no_access: int}, existing: int, offices_linked: int, applied: bool, created: list<array<string, mixed>>, error?: string}
      */
     public function import(User $actor, mixed $csv, bool $apply): array
     {
@@ -102,7 +108,8 @@ final class MemberImportService
         $rows = [];
         $planned = [];
         $existing = 0;
-        $new = [self::STATUS_ACTIVE => 0, self::STATUS_FORMER => 0];
+        // active zählt alle Aktiven, no_access davon die ohne Zugang
+        $new = [self::STATUS_ACTIVE => 0, self::STATUS_FORMER => 0, 'no_access' => 0];
         foreach ($lines as $i => $line) {
             if ($i <= $header || CsvTable::blank($line)) {
                 continue;
@@ -141,6 +148,7 @@ final class MemberImportService
         foreach ($rows as $row) {
             if (!isset($row['existing']) && !isset($row['error'])) {
                 $new[$row['status']]++;
+                $new['no_access'] += !empty($row['no_access']) ? 1 : 0;
             }
         }
         $errors = array_values(array_filter($rows, static fn (array $r): bool => isset($r['error'])));
@@ -166,7 +174,7 @@ final class MemberImportService
         // Konten lassen sich bei WordPress nicht in einer Transaktion anlegen. Bricht es ab, stehen die schon angelegten
         // (mit ihren Startpasswörtern) im Ergebnis; ein zweiter Lauf findet sie als vorhanden und legt nur den Rest an.
         $done = 0;
-        $result['new'] = [self::STATUS_ACTIVE => 0, self::STATUS_FORMER => 0];
+        $result['new'] = [self::STATUS_ACTIVE => 0, self::STATUS_FORMER => 0, 'no_access' => 0];
         foreach ($planned as $plan) {
             try {
                 $names[mb_strtolower($plan['prepared']['name'])] = $this->create($actor, $plan, $result['created']);
@@ -180,6 +188,7 @@ final class MemberImportService
                 break;
             }
             $result['new'][$plan['status']]++;
+            $result['new']['no_access'] += $plan['no_access'] ? 1 : 0;
             $done++;
         }
         $result['offices_linked'] = $this->app->offices()->linkNames(array_filter($names), true);
@@ -284,6 +293,11 @@ final class MemberImportService
         $level = $status === self::STATUS_FORMER ? Roles::MEMBER : $level;
         $today = $this->app->time()->today();
         $out = ['status' => $status, 'level' => $status === self::STATUS_FORMER ? null : $level];
+        $access = self::ACCESS[mb_strtolower($get('access'))] ?? throw ApiError::invalid(sprintf('Zugang „%s“ unbekannt: bitte ja oder nein (leer = ja).', $get('access')));
+        $noAccess = $status === self::STATUS_ACTIVE && !$access;
+        if ($noAccess) {
+            $out['no_access'] = true;
+        }
 
         $former = null;
         $joined = '';
@@ -348,12 +362,12 @@ final class MemberImportService
             'address' => $this->address($get),
             'level' => $level,
         ], $taken, $actor);
-        $out['username'] = $status === self::STATUS_FORMER ? '' : $prepared['login'];
+        $out['username'] = $status === self::STATUS_FORMER || $noAccess ? '' : $prepared['login'];
         $out['email'] = $prepared['email'];
         $out['phone'] = $prepared['phone'];
         $out['address'] = $prepared['address'];
 
-        return ['status' => $status, 'prepared' => $prepared, 'out' => $out, 'initial' => $initial, 'title_ids' => array_values($titleIds), 'birthday' => $birthday, 'joined' => $joined, 'former' => $former];
+        return ['status' => $status, 'no_access' => $noAccess, 'prepared' => $prepared, 'out' => $out, 'initial' => $initial, 'title_ids' => array_values($titleIds), 'birthday' => $birthday, 'joined' => $joined, 'former' => $former];
     }
 
     /**
@@ -370,13 +384,16 @@ final class MemberImportService
             $this->extras($actor, $id, $plan);
             return $id;
         }
-        $account = $this->app->members()->insert($plan['prepared']);
+        $account = $this->app->members()->insert($plan['prepared'], $plan['no_access']);
         $id = (int) $account['id'];
         $warnings = $this->extras($actor, $id, $plan);
         if ($warnings !== []) {
             $account['warning'] = 'Angelegt, aber es fehlen noch: ' . implode(', ', $warnings) . '. Bitte in den Mitgliedsdetails nachtragen.';
         }
-        $created[] = $account;
+        // Ohne Zugang gibt es keine Zugangsdaten zum Weitergeben (gezählt in new.no_access).
+        if (!$plan['no_access']) {
+            $created[] = $account;
+        }
         return $id;
     }
 

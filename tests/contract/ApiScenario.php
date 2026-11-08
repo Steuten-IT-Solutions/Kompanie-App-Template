@@ -1859,7 +1859,7 @@ final class ApiScenario
         // Mitglieder aus einer Tabelle, mit Ehemaligen (POST /members/import)
         $csv = "Nachname;Vorname;Status;E-Mail;Eintritt;Ausgeschieden;Telefon\nImport$sfx;Kptest;;kptest$sfx@example.org;1999;;0\nAlt$sfx;Kptest;ehemalig;;Gründer;2001;\n";
         [$s, $d] = $this->req('POST', '/members/import', ['csv' => $csv]);
-        $c->ok($s === 200 && ($d['new'] ?? null) === ['active' => 1, 'former' => 1] && ($d['columns']['ignored'][0]['column'] ?? '') === 'Telefon', 'Mitglieder-Import: Vorschau');
+        $c->ok($s === 200 && ($d['new'] ?? null) === ['active' => 1, 'former' => 1, 'no_access' => 0] && ($d['columns']['ignored'][0]['column'] ?? '') === 'Telefon', 'Mitglieder-Import: Vorschau');
         [$s, $d] = $this->req('POST', '/members/import', ['csv' => $csv, 'apply' => true]);
         $created = (array) ($d['created'] ?? []);
         foreach ($created as $u) {
@@ -1872,6 +1872,19 @@ final class ApiScenario
         $c->ok($s === 200 && count($created) === 1 && ($created[0]['password'] ?? '') !== '' && count($former) === 1 && ($former[0]['founder'] ?? false) === true, 'Mitglieder-Import: Mitglied mit Startpasswort, Ehemaliger ohne');
         [$s, $d] = $this->req('POST', '/members/import', ['csv' => $csv, 'apply' => true]);
         $c->ok($s === 200 && ($d['existing'] ?? 0) === 2 && ($d['created'] ?? null) === [], 'Mitglieder-Import: zweiter Lauf legt nichts doppelt an');
+        // Mitglied ohne Zugang (z. B. für Chroniken): kein Startpasswort, später „Zugang einrichten“
+        [$s, $d] = $this->req('POST', '/users', ['first_name' => 'Kptest', 'last_name' => "Ohne$sfx", 'no_access' => true]);
+        $noAccess = (int) ($d['id'] ?? 0);
+        if ($noAccess > 0) {
+            $this->users[] = $noAccess;
+        }
+        $c->ok($s === 201 && ($d['no_access'] ?? false) === true && !isset($d['password']), 'Mitglied ohne Zugang anlegen: ohne Startpasswort');
+        [, $d] = $this->req('GET', "/members/$noAccess");
+        $c->ok(($d['no_access'] ?? null) === true, 'Mitglied ohne Zugang: Marke in den Details');
+        [$s, $d] = $this->req('POST', "/members/$noAccess/password");
+        $c->ok($s === 200 && ($d['password'] ?? '') !== '' && ($d['username'] ?? '') !== '', 'Zugang einrichten: Startpasswort mit Benutzername');
+        [, $d] = $this->req('GET', "/members/$noAccess");
+        $c->ok(($d['no_access'] ?? null) === false, 'Nach „Zugang einrichten“ hat das Mitglied Zugang');
     }
 
     private function events(): void
