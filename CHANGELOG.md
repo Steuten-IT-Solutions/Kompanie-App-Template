@@ -17,6 +17,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Eigene Seiten aus Blöcken, mit Countdown**: Eine eigene Seite besteht jetzt aus Blöcken, die ihr unter
+  *Inhalt* mit *+ Block einfügen* hinzufügt, mit ↑/↓ verschiebt und entfernt. Neben *Text* gibt es als ersten
+  vorgefertigten Block den *Countdown*: Er zählt bis zu einem Datum oder einem Termin aus den Terminen herunter
+  (verschoben: zählt mit), zeigt immer zwei Angaben (Tage und Stunden, am letzten Tag Stunden und Minuten, in der
+  letzten Stunde Minuten und Sekunden), auf Wunsch bis zu einem Ende einen Text wie „läuft“ und danach einen eigenen
+  Text oder nichts mehr. Jeder Block hat ein eigenes *Für wen?*: Blöcke *Nur Mitglieder* samt ihren Bildern fehlen
+  auch auf öffentlichen Seiten ohne Anmeldung. Bestehende Seiten bleiben unverändert (ein Textblock).
 - **Ämter: freie Namen mit Mitgliedern verknüpfen**: Unter *Ämter → Namen mit Mitgliedern verknüpfen* schlägt die App
   vor, welche Personen ohne Profil schon als Mitglied (auch ohne Zugang), in der Mitgliederliste oder als Ehemalige
   angelegt sind, mit denselben toleranten Namensregeln wie bei den Anfragen. Mit *Verknüpfen* gehören alle Einträge
@@ -38,6 +45,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Alle, die ans Brett schreiben dürfen, sehen auch diese Nachrichten. Die Auswahl lässt sich beim Bearbeiten ändern
   und steht im Verlauf. Hinweis: Wer danach auf eine ältere Version zurückgeht, zeigt solche Nachrichten wieder allen
   Mitgliedern und Anwärtern.
+
+### Behoben
+
+- **Eigene Seiten**: Der Text einer Seite klebt nicht mehr am Rand ihrer Karte.
 
 ## [0.7.0] – 2026-11-07
 

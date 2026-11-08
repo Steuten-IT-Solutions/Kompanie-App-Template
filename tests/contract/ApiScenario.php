@@ -1582,6 +1582,22 @@ final class ApiScenario
         [, $d] = $this->req('GET', '/admin/navigation');
         $c->ok(($d['navigation']['items'][1]['items'] ?? null) === ['seiten/' . ($pub['id'] ?? 0)], 'Gelöschte Seite fällt aus der Navigation');
         $this->req('PUT', '/admin/navigation', ['navigation' => null]);
+        // Blöcke: Text und Countdown, ein Block nur für Mitglieder; body nur mit dem Text für alle
+        [$s, $d] = $this->req('PATCH', '/pages/' . ($pub['id'] ?? 0), ['blocks' => [
+            ['type' => 'text', 'html' => '<p>Kptest offen</p>'],
+            ['type' => 'countdown', 'title' => 'Kptest bis zum Fest', 'date' => '2099-06-12', 'time' => '14:00'],
+            ['type' => 'text', 'audience' => 'members', 'html' => '<p>Kptest intern</p>'],
+        ]]);
+        $c->ok($s === 200 && array_column((array) ($d['blocks'] ?? []), 'type') === ['text', 'countdown', 'text'] && ($d['body'] ?? '') === '<p>Kptest offen</p>', 'Seite aus Blöcken speichern');
+        $c->ok(($d['blocks'][1]['starts_at'] ?? '') === '2099-06-12T12:00:00Z', 'Countdown: Ortszeit der Installation als UTC');
+        $c->ok($this->req('PATCH', '/pages/' . ($pub['id'] ?? 0), ['blocks' => [['type' => 'video']]])[0] === 400, 'Unbekannter Block → 400');
+        $this->d->actAs(null);
+        [, $d] = $this->req('GET', '/pages/' . ($pub['id'] ?? 0));
+        $c->ok(array_column((array) ($d['blocks'] ?? []), 'type') === ['text', 'countdown'], 'Ohne Anmeldung ohne Block nur für Mitglieder');
+        $this->d->actAs($m);
+        [, $d] = $this->req('GET', '/pages/' . ($pub['id'] ?? 0));
+        $c->ok(count((array) ($d['blocks'] ?? [])) === 3, 'Mitglied sieht auch den Block für Mitglieder');
+        $this->d->actAs($admin);
         $c->ok($this->req('DELETE', '/pages/' . ($pub['id'] ?? 0))[0] === 200 && $this->req('GET', '/pages/' . ($mem['id'] ?? 0))[0] === 404, 'Aufräumen: Seiten löschen');
     }
 

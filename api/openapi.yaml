@@ -3191,7 +3191,8 @@ paths:
               properties:
                 title: { type: string, maxLength: 100 }
                 audience: { type: string, enum: [public, members], default: members }
-                body: { type: string, description: 'Formatierter Text (wird bereinigt, höchstens 200000 Bytes); Bilder aus POST /rich-images als <img data-image="<uid>">' }
+                blocks: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Block' }, description: 'Inhalt aus Blöcken; hat Vorrang vor body. Vom Server berechnete Felder (starts_at, ends_at, event_title) werden ignoriert, fehlende oder doppelte id neu vergeben.' }
+                body: { type: string, description: 'Für ältere Apps: formatierter Text als ein Textblock (wird bereinigt, höchstens 200000 Bytes); Bilder aus POST /rich-images als <img data-image="<uid>">' }
       responses:
         '201':
           description: Angelegt
@@ -3258,7 +3259,8 @@ paths:
               properties:
                 title: { type: string, maxLength: 100 }
                 audience: { type: string, enum: [public, members] }
-                body: { type: string }
+                blocks: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Block' }, description: 'wie bei POST' }
+                body: { type: string, description: 'Für ältere Apps, wie bei POST' }
                 updated_at: { type: string, format: date-time }
       responses:
         '200':
@@ -8817,9 +8819,56 @@ components:
       allOf:
         - $ref: '#/components/schemas/PageSummary'
         - type: object
-          required: [body]
+          required: [body, blocks]
           properties:
-            body: { type: string, description: 'Formatierter Text (bereinigt wie RichText), Bilder mit Adresse (`<App>/bild/<uid>`); leer ohne Text' }
+            body: { type: string, description: 'Für ältere Apps: Text aller Textblöcke für alle (bereinigt wie RichText), Bilder mit Adresse (`<App>/bild/<uid>`); leer ohne Text' }
+            blocks: { type: array, items: { $ref: '#/components/schemas/Block' }, description: 'Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur für Mitglieder bzw. mit manage_pages). Bestehende Seiten: ein Textblock aus body. Leere Textblöcke nur mit manage_pages.' }
+
+    Block:
+      description: 'Vorgefertigter Block einer eigenen Seite. Unbekannte type lehnt der Server beim Speichern ab (400 invalid); die App übergeht sie beim Anzeigen.'
+      oneOf:
+        - $ref: '#/components/schemas/BlockText'
+        - $ref: '#/components/schemas/BlockCountdown'
+      discriminator:
+        propertyName: type
+        mapping:
+          text: '#/components/schemas/BlockText'
+          countdown: '#/components/schemas/BlockCountdown'
+    BlockBase:
+      type: object
+      required: [type]
+      properties:
+        id: { type: string, pattern: '^[a-z0-9]{1,16}$', description: 'Kennung des Blocks in der Seite (in Antworten immer gesetzt)' }
+        type: { type: string }
+        audience: { type: string, enum: [all, members], default: all, description: 'all: alle, die die Seite sehen; members: nur Mitglieder (view_board), auch auf öffentlichen Seiten. Bilder in members-Blöcken sind ohne Anmeldung nicht abrufbar.' }
+    BlockText:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [html]
+          properties:
+            type: { type: string, const: text }
+            html: { type: string, description: 'Formatierter Text (bereinigt wie RichText); in Antworten Bilder mit Adresse, beim Speichern als <img data-image="<uid>">. Alle Textblöcke zusammen höchstens 200000 Bytes.' }
+    BlockCountdown:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [source]
+          properties:
+            type: { type: string, const: countdown }
+            title: { type: string, maxLength: 100, description: 'Überschrift (optional; beim Termin sonst dessen Titel)' }
+            source: { type: string, enum: [date, event], default: date, description: 'date: eigenes Datum; event: Termin aus dem Bereich Termine (verschoben: zählt mit)' }
+            date: { type: string, format: date, description: 'Beginn bei source date (Pflicht), in der Zeitzone der Installation' }
+            time: { type: [string, 'null'], pattern: '^\d{2}:\d{2}$', description: 'Uhrzeit des Beginns; ohne: 0:00 Uhr' }
+            end_date: { type: [string, 'null'], format: date, description: 'Ende (optional); nur Datum: bis zum Ende dieses Tages' }
+            end_time: { type: [string, 'null'], pattern: '^\d{2}:\d{2}$', description: 'Uhrzeit des Endes (ohne end_date: am Tag des Beginns); muss nach dem Beginn liegen' }
+            event_id: { type: integer, description: 'Termin bei source event (Pflicht, muss existieren)' }
+            running_text: { type: string, maxLength: 200, description: 'Text zwischen Beginn und Ende' }
+            after: { type: string, enum: [text, hide], default: text, description: 'Nach dem Ende (ohne Ende: nach dem Beginn): after_text zeigen oder Block ausblenden' }
+            after_text: { type: string, maxLength: 200 }
+            starts_at: { type: [string, 'null'], format: date-time, readOnly: true, description: 'Nur in Antworten: Beginn in UTC; null, wenn der Termin fehlt oder für die Person nicht sichtbar ist (Bereich events, view_events): dann wie nach dem Ende' }
+            ends_at: { type: [string, 'null'], format: date-time, readOnly: true, description: 'Nur in Antworten: Ende in UTC; null ohne Ende' }
+            event_title: { type: [string, 'null'], readOnly: true, description: 'Nur in Antworten bei source event: Titel des Termins, null wenn nicht sichtbar' }
 
     Title:
       type: object

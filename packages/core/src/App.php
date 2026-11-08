@@ -28,6 +28,7 @@ use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Domain\GallerySubmissionService;
 use KompanieApp\Core\Domain\NewsService;
 use KompanieApp\Core\Domain\PageService;
+use KompanieApp\Core\Domain\Blocks\Blocks;
 use KompanieApp\Core\Domain\GalleryUploadService;
 use KompanieApp\Core\Domain\GoogleConnect;
 use KompanieApp\Core\Domain\JoinYearService;
@@ -830,6 +831,12 @@ final class App
     public function pages(): PageService
     {
         return $this->service(PageService::class, fn () => new PageService($this));
+    }
+
+    /** Vorgefertigte Blöcke (eigene Seiten): Typen, Prüfung, Ausgabe. */
+    public function blocks(): Blocks
+    {
+        return $this->service(Blocks::class, fn () => new Blocks($this));
     }
 
     public function gallerySubmissions(): GallerySubmissionService

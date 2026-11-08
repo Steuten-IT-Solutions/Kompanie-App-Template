@@ -4625,6 +4625,56 @@ test('Eigene Seiten (Issue #287): anlegen öffentlich und nur für Mitglieder, j
   }
 });
 
+test('Eigene Seiten aus Blöcken: Countdown einfügen, Block nur für Mitglieder, Gast sieht Countdown ohne den Block', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Seiten');
+  const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neue Seite' }) });
+  await form.getByLabel('Titel').fill('Festprogramm');
+  await form.getByLabel('Für wen?').selectOption({ label: 'Alle, auch ohne Anmeldung' });
+  await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Herzlich willkommen.');
+  // Countdown darunter, ein Jahr im Voraus
+  await form.getByLabel('+ Block darunter einfügen').selectOption('countdown');
+  const next = new Date();
+  next.setFullYear(next.getFullYear() + 1);
+  const date = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
+  await form.getByLabel('Überschrift (optional)').fill('Bis zum Fest');
+  await form.locator('.block-countdown-fields input[type="date"]').first().fill(date);
+  await form.getByLabel('Uhrzeit (optional)').fill('14:00');
+  await expect(form.locator('.block-preview .block-countdown')).toContainText('Tage');
+  await form.locator('.block-countdown-fields').scrollIntoViewIfNeeded();
+  await shot(page, 'seiten-countdown-bearbeiten');
+  // Am Ende ein Text nur für Mitglieder
+  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('text');
+  await form.getByLabel('Sichtbar für (Text)').last().selectOption('members');
+  await form.getByRole('textbox', { name: 'Text', exact: true }).last().fill('Treffpunkt intern.');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Seite angelegt');
+  await shot(page, 'seiten-bloecke');
+  const row = page.locator('.page-admin-list .row', { hasText: 'Festprogramm' });
+  try {
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await page.locator('.tabbar').getByRole('button', { name: 'Festprogramm' }).click();
+    const article = page.locator('.page-article');
+    await expect(article).toContainText('Herzlich willkommen.');
+    await expect(article.locator('.block-countdown')).toContainText('Bis zum Fest');
+    await expect(article.locator('.block-countdown-unit').first()).toHaveText(/^Tag/);
+    await expect(article).not.toContainText('Treffpunkt intern.');
+    await shot(page, 'seiten-countdown');
+
+    await login(page, 'mitglied1');
+    await page.goto('/app/#/seiten');
+    await page.getByRole('button', { name: 'Festprogramm' }).first().click();
+    await expect(page.locator('.page-article')).toContainText('Treffpunkt intern.');
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD);
+    await adminMenu(page, 'Seiten');
+    page.once('dialog', (d) => d.accept());
+    await row.getByRole('button', { name: 'Löschen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  }
+});
+
 test('Abzeichen: PNG und SVG hochladen, Mitglied sieht sie in der Liste und in „Meins“, offline, ohne eigene Fläche im Dunkelmodus', async ({
   page,
 }) => {

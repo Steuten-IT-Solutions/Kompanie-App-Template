@@ -1758,6 +1758,12 @@ WHERE title IS NULL",
                 'mysql' => ['ALTER TABLE {board_messages} ADD COLUMN audience_ids text NULL'],
                 'sqlite' => ['ALTER TABLE {board_messages} ADD COLUMN audience_ids TEXT DEFAULT NULL'],
             ],
+            // Eigene Seiten aus Blöcken (Domain\Blocks\Blocks): Liste als JSON neben body. NULL bei allen bestehenden Seiten,
+            // die dann als ein Textblock aus body gelesen werden; ältere Versionen lesen weiter body.
+            51 => [
+                'mysql' => ['ALTER TABLE {app_pages} ADD COLUMN blocks mediumtext NULL'],
+                'sqlite' => ['ALTER TABLE {app_pages} ADD COLUMN blocks TEXT DEFAULT NULL'],
+            ],
         ];
     }
 
