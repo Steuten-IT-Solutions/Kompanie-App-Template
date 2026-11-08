@@ -6469,6 +6469,31 @@ fieldset.block-source legend {
   border-radius: var(--radius-sm, 6px);
   display: block;
 }
+/* Blöcke „Dokument“ und „Sponsoren“ */
+.block-document {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.block-sponsors h3 {
+  margin: 0 0 8px;
+}
+.block-sponsors-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+.block-sponsors-list .sponsor-logo {
+  display: block;
+  max-height: 64px;
+  max-width: 160px;
+  width: auto;
+  height: auto;
+}
 .block-rows {
   display: flex;
   flex-direction: column;

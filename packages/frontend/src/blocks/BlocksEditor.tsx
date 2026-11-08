@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useState, type ReactNode } from 'react';
-import { api, type BlockAudience, type GalleryAlbumSummary, type Office, type Poll, type PublicEvent } from '../api';
+import { api, type BlockAudience, type DocumentInfo, type GalleryAlbumSummary, type Office, type Poll, type PublicEvent } from '../api';
 import { Loading, lazyView } from '../ui';
 import {
   BLOCK_KINDS,
@@ -17,6 +17,8 @@ import {
   type ScheduleDraft,
   type PollDraft,
   type AlbumDraft,
+  type DocumentDraft,
+  type SponsorsDraft,
 } from './blockDrafts';
 import Countdown from './Countdown';
 import { previewRange } from './countdown';
@@ -275,6 +277,52 @@ function useList<T>(load: () => Promise<T[]>): T[] | null {
     };
   }, [load]);
   return list;
+}
+
+const allDocuments = cached<DocumentInfo>(() => api.documents().then((r) => r.documents));
+
+function DocumentFields({ block, onChange }: { block: DocumentDraft; onChange: (b: DocumentDraft) => void }) {
+  const list = useList(allDocuments);
+  const picked = list?.find((d) => d.id === block.document_id);
+  return (
+    <label className="field">
+      <span>Dokument</span>
+      {list === null ? (
+        <Loading shape="text" />
+      ) : (
+        <select value={block.document_id || ''} onChange={(e) => onChange({ ...block, document_id: Number(e.target.value) || 0 })} required>
+          <option value="">Dokument wählen</option>
+          {block.document_id > 0 && !picked && (
+            <option value={block.document_id}>{block.document_title ?? `Dokument ${block.document_id}`}</option>
+          )}
+          {list.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.title} ({d.ext.toUpperCase()}){d.visibility === 'managers' ? ' – nur Pflege' : ''}
+            </option>
+          ))}
+        </select>
+      )}
+      <span className="muted small">
+        Sichtbar nur für alle, die das Dokument in den Dokumenten sehen dürfen; für andere und ohne Anmeldung fehlt der Block.
+      </span>
+    </label>
+  );
+}
+
+function SponsorsFields({ block, onChange }: { block: SponsorsDraft; onChange: (b: SponsorsDraft) => void }) {
+  return (
+    <label className="field">
+      <span>Überschrift (optional)</span>
+      <input
+        type="text"
+        maxLength={TITLE_MAX}
+        value={block.title}
+        placeholder="z. B. Mit Dank an unsere Sponsoren"
+        onChange={(e) => onChange({ ...block, title: e.target.value })}
+      />
+      <span className="muted small">Zeigt alle Sponsoren in ihrer Reihenfolge, mit Logo und Link.</span>
+    </label>
+  );
 }
 
 function PollFields({ block, onChange }: { block: PollDraft; onChange: (b: PollDraft) => void }) {
@@ -670,6 +718,10 @@ export default function BlocksEditor({
               <PollFields block={b} onChange={(c) => update(i, c)} />
             ) : b.type === 'album' ? (
               <AlbumFields block={b} onChange={(c) => update(i, c)} />
+            ) : b.type === 'document' ? (
+              <DocumentFields block={b} onChange={(c) => update(i, c)} />
+            ) : b.type === 'sponsors' ? (
+              <SponsorsFields block={b} onChange={(c) => update(i, c)} />
             ) : (
               <CountdownFields block={b} onChange={(c) => update(i, c)} idPrefix={id} />
             )}

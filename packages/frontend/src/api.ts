@@ -268,7 +268,21 @@ export type Block =
   | ScheduleBlock
   | FactsBlock
   | PollBlock
-  | AlbumBlock;
+  | AlbumBlock
+  | DocumentBlock
+  | SponsorsBlock;
+/** Dokument zum Herunterladen (vom Server); null nur für die Pflege, wenn es fehlt oder nicht sichtbar ist */
+export interface DocumentBlock extends BlockBase {
+  type: 'document';
+  document_id: number;
+  document: { id: number; title: string; ext: string; kind: 'pdf' | 'image' | 'file'; size: number; date: string; url: string } | null;
+}
+/** Sponsoren mit Logo und Link in ihrer Reihenfolge (vom Server) */
+export interface SponsorsBlock extends BlockBase {
+  type: 'sponsors';
+  title: string;
+  sponsors: Sponsor[];
+}
 /** Umfrage einbinden: Stand der Umfrage (vom Server); null nur für die Pflege, wenn sie fehlt */
 export interface PollBlock extends BlockBase {
   type: 'poll';
@@ -300,7 +314,9 @@ export type BlockInput =
   | (Omit<ScheduleBlock, 'id'> & { id?: string })
   | (Omit<FactsBlock, 'id'> & { id?: string })
   | (Omit<PollBlock, 'id' | 'poll'> & { id?: string })
-  | (Omit<AlbumBlock, 'id' | 'album'> & { id?: string });
+  | (Omit<AlbumBlock, 'id' | 'album'> & { id?: string })
+  | (Omit<DocumentBlock, 'id' | 'document'> & { id?: string })
+  | (Omit<SponsorsBlock, 'id' | 'sponsors'> & { id?: string });
 
 /** Einstellungen → Navigation (Issue #277): gespeicherte Navigation und was der Server erlaubt. */
 export interface NavigationAdmin {

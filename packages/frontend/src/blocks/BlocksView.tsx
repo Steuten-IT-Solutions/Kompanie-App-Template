@@ -1,5 +1,20 @@
-import type { AlbumBlock, Block, ButtonBlock, ContactsBlock, EventsBlock, FactsBlock, NoticeBlock, PollBlock, ScheduleBlock } from '../api';
-import { formatUntil } from '../format';
+import type {
+  AlbumBlock,
+  Block,
+  ButtonBlock,
+  ContactsBlock,
+  DocumentBlock,
+  EventsBlock,
+  FactsBlock,
+  NoticeBlock,
+  PollBlock,
+  ScheduleBlock,
+  SponsorsBlock,
+} from '../api';
+import { useState } from 'react';
+import { safeFileName } from '../downloadFiles';
+import { formatBytes, formatDate, formatUntil } from '../format';
+import { saveFile } from '../saveFile';
 import { MemberAvatar } from '../memberPhoto';
 import { formatEventWhen } from '../format';
 import RichTextView from '../richtext/RichTextView';
@@ -46,6 +61,12 @@ export default function BlocksView({ blocks, manager, textClassName }: { blocks:
             break;
           case 'album':
             view = <AlbumPreview block={b} />;
+            break;
+          case 'document':
+            view = <DocumentCard block={b} />;
+            break;
+          case 'sponsors':
+            view = <SponsorsRow block={b} />;
             break;
           case 'divider':
             view = b.style === 'space' ? <div className="block-space" aria-hidden="true" /> : <hr className="block-divider" />;
@@ -210,6 +231,81 @@ function AlbumPreview({ block }: { block: AlbumBlock }) {
       <a className="btn btn-link" href={`#/galerie/${a.id}`}>
         Alle {a.total} im Album ansehen
       </a>
+    </section>
+  );
+}
+
+/** Dokument: Titel, Art, Größe und Stand; Öffnen in der App (PDF, Bild) und Herunterladen. */
+function DocumentCard({ block }: { block: DocumentBlock }) {
+  const d = block.document;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (!d) return <p className="muted small">Dieses Dokument gibt es nicht mehr oder es ist nicht für alle sichtbar.</p>;
+  const doc = d;
+  async function save() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(doc.url, { credentials: 'same-origin' });
+      if (!res.ok) throw new Error(res.status === 404 ? 'Das Dokument wurde nicht gefunden.' : `Fehler ${res.status}`);
+      await saveFile(await res.blob(), `${safeFileName(doc.title, 'Dokument')}.${doc.ext}`, { title: doc.title });
+    } catch (e) {
+      setError(e instanceof TypeError ? 'Keine Verbindung.' : (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="block-document card">
+      <strong>{d.title}</strong>
+      <span className="muted small">
+        {d.ext.toUpperCase()} · {formatBytes(d.size)} · Stand {formatDate(d.date)}
+      </span>
+      <div className="button-row">
+        {d.kind !== 'file' && (
+          <a className="btn" href={`#/dokumente/${d.id}`}>
+            Öffnen
+          </a>
+        )}
+        <button className="btn btn-secondary" disabled={busy} onClick={() => void save()}>
+          Herunterladen
+        </button>
+      </div>
+      {error && (
+        <p className="form-error small" role="alert">
+          {error}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/** Sponsoren: Logos (ohne Logo der Name) in ihrer Reihenfolge, mit Link in einem neuen Tab. */
+function SponsorsRow({ block }: { block: SponsorsBlock }) {
+  if (block.sponsors.length === 0) return <p className="muted small">Noch keine Sponsoren eingetragen.</p>;
+  return (
+    <section className="block-sponsors">
+      {block.title && <h3>{block.title}</h3>}
+      <ul className="block-sponsors-list">
+        {block.sponsors.map((s) => {
+          const logo = s.logo_url ? (
+            <img className="sponsor-logo" src={s.logo_url} alt={s.name} loading="lazy" decoding="async" />
+          ) : (
+            <span className="sponsor-name">{s.name}</span>
+          );
+          return (
+            <li key={s.id}>
+              {s.url ? (
+                <a href={s.url} target="_blank" rel="sponsored noopener noreferrer" title={s.name}>
+                  {logo}
+                </a>
+              ) : (
+                logo
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }

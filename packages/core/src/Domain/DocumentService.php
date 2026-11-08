@@ -86,6 +86,21 @@ final class DocumentService
     }
 
     /**
+     * Ein Dokument, wenn der Bereich an ist und die Person es sehen darf (ohne Anmeldung mit den Rechten von Gast), sonst
+     * null. Für Blöcke auf Seiten, in News und am Schwarzen Brett.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function visible(?User $viewer, int $id): ?array
+    {
+        if (!$this->app->features()->enabled('documents')) {
+            return null;
+        }
+        $doc = $this->repository()->find($id);
+        return $doc !== null && self::canSee($viewer ?? $this->app->anonymous(), $doc['visibility']) ? $this->format($doc) : null;
+    }
+
+    /**
      * Für die Auslieferung über documentUrl(): prüft Anmeldung und Sichtbarkeit.
      *
      * Die Adresse wechselt mit jeder Fassung (?v=, Issue #18): Passt $version zur aktuellen Fassung, darf der Browser die
