@@ -11,7 +11,7 @@ Hier steht, was sich von Version zu Version der App geändert hat, bis zu der Ve
 Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Was ist neu**. Du erreichst sie auch über den Verweis **Was ist neu** unter **Zustand und Updates** neben der installierten Version.
 
 ## Was du hier siehst
-- **Version …**: je Version ein Abschnitt mit Datum und den Änderungen, die neueste oben. Die installierte Version trägt das Zeichen **installiert**.
+- **Version …**: je Version ein Abschnitt mit Datum, Anzahl der Änderungen und den Änderungen, die neueste oben. Die installierte Version trägt das Zeichen **installiert** und ist aufgeklappt; ältere Versionen sind eingeklappt und öffnen sich beim Antippen. Läuft eine Vorabversion, sind alle Versionen darunter eingeklappt.
 - **Vorabversion** mit dem Zeichen **noch nicht für alle freigegeben**: steht ganz oben, wenn bei euch eine Vorabversion läuft (siehe [Zustand und Updates](seite:admin-zustand)). Hier steht, was dort schon dabei ist, aber noch nicht für alle freigegeben wurde.
 
 ## Gut zu wissen

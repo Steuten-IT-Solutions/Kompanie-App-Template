@@ -213,7 +213,8 @@ final class MemberService
             'first_name' => $u->firstName,
             'last_name' => $u->lastName,
             'level' => $u->role,
-            'extra_roles' => $this->roles?->extraRolesOf($u) ?? [],
+            // Zusatzrollen nur für die, die Rollen vergeben (Issue #349); die Grundrolle braucht die App auch sonst.
+            'extra_roles' => $viewer === null || $viewer->can(Capability::PromoteUsers) ? ($this->roles?->extraRolesOf($u) ?? []) : [],
             'member' => $u->isMember(),
             'points' => $points ? $this->scores->pointsTotal($u->id) : null,
             'open_cents' => $penalties ? $this->scores->openCents($u->id) : null,

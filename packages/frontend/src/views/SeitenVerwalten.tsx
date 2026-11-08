@@ -203,10 +203,6 @@ export function PageAdmin({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <div>
-      <p className="muted small">
-        Jede Seite ist ein eigener Punkt der Navigation, in der Standardnavigation in dieser Reihenfolge; zum Ändern einen Eintrag am Griff
-        links ziehen. Wo jede Seite steht, legt ihr unter Einstellungen → Navigation fest.
-      </p>
       {formError && (
         <p className="form-error" role="alert">
           {formError}

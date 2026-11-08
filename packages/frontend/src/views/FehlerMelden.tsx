@@ -113,10 +113,6 @@ export default function FehlerMelden() {
         ‹ Alle Hilfeseiten
       </button>
       <h2 className="news-headline">Fehler melden</h2>
-      <p className="muted small">
-        Etwas klappt nicht? Beschreibe kurz, was passiert ist. Die Meldung geht an die Betreuer der App, nicht an die Verwaltung eurer
-        Kompanie.
-      </p>
       <label className="field">
         <span>Was klappt nicht? (Pflicht)</span>
         <textarea rows={5} maxLength={MAX_TEXT} required value={description} onChange={(e) => setDescription(e.target.value)} />

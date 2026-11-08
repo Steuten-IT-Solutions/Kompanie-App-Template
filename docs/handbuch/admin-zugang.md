@@ -6,7 +6,7 @@ rechte: [manage_settings]
 Hier legst du fest, ob Personen selbst einen Zugang zur App beantragen können. So müsst ihr nicht jedes Konto selbst anlegen: Die Person füllt ein Formular aus, und wer Mitglieder anlegen darf, gibt die Anfrage frei (siehe [Anfragen auf einen Zugang](seite:anfragen-freigeben)). Erst dann entsteht das Konto. Ausgeschaltet ist das, bis du es einschaltest.
 
 ## So öffnest du die Seite
-Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Zugang beantragen**.
+Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und unter **Mitglieder und Zugang** auf **Rollen**. Der Abschnitt **Zugang beantragen** steht unter den Rollen. Ältere Links auf diese Seite führen dorthin.
 
 ## Was du hier siehst
 - **Personen können selbst einen Zugang beantragen**: schaltet das Formular ein oder aus.

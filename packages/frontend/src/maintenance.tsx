@@ -116,10 +116,6 @@ export function MaintenanceCard({ onToast }: { onToast: (msg: string) => void })
   return (
     <section className="card settings-section" aria-labelledby="maintenance-title">
       <h3 id="maintenance-title">Wartungsmodus</h3>
-      <p className="muted small">
-        Solange er an ist, sehen alle außer Admins nur eine Wartungsseite, z. B. während einer Datenübernahme. Offline gespeicherte Daten
-        bleiben auf den Handys. Hintergrundaufgaben außer Updates pausieren; Benachrichtigungen gehen nach dem Ende raus.
-      </p>
       <label className="field">
         <span>Begründung (optional, erscheint auf der Wartungsseite)</span>
         <textarea rows={3} maxLength={REASON_MAX} value={text} onChange={(e) => setReason(e.target.value)} />

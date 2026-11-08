@@ -70,13 +70,6 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
   return (
     <section className="card settings-section" id="einstellungen-rollen">
       <h3>Rollen</h3>
-      <p className="small muted">
-        Jede Person hat eine Grundrolle und auf Wunsch weitere eigene Rollen als Zusatzrollen; sie hat dann die Rechte aller ihrer Rollen
-        zusammen. Hier legst du fest, welche Rollen es gibt und was sie dürfen. Die Reihenfolge gilt überall, wo Rollen stehen, auch in den
-        Zählern; zum Ändern eine Rolle am Griff links ziehen.{' '}
-        {config?.features.points &&
-          `Der ${sec.points}faktor gilt beim Buchen, z. B. ×0,5 für junge Mitglieder; bei mehreren Rollen der kleinste.`}
-      </p>
       <nav className="segmented role-views" aria-label="Ansicht">
         {(
           [
@@ -159,10 +152,6 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
             </button>
           )}
           <div className="role-preview">
-            <p className="small muted">
-              „Ansehen“ zeigt die App, wie eine Person mit genau dieser Rolle sie sieht (ohne Zusatzrollen) – mit deinen eigenen Daten, nur
-              zum Ansehen. Beenden über das Banner oben.
-            </p>
             <button type="button" className="btn btn-secondary btn-block" onClick={() => startPreview(PUBLIC_PREVIEW)}>
               App ohne Anmeldung ansehen
             </button>
@@ -210,9 +199,6 @@ function AttendanceGroups({ roles, onToast }: { roles: RoleAdmin[]; onToast: (ms
   return (
     <form className="form attendance-group-form" onSubmit={save}>
       <h4>{sec.attendance}: Gruppen im Zähler</h4>
-      <p className="small muted">
-        Als was zählt jede Rolle in den Listen? „Eigene Gruppe“ zeigt sie gesondert, sonst zählt sie bei der gewählten Rolle mit.
-      </p>
       {groups.map((g) => (
         <label key={g.key} className="field field-inline">
           <span>{g.label}</span>

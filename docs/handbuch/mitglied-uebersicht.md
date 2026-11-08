@@ -17,7 +17,7 @@ Du siehst nur, wofür du das Recht hast und was die Kompanie nutzt.
 - **‹** und **›** oben rechts mit der Position (z. B. „3 / 25“): zum vorherigen bzw. nächsten Mitglied.
 - **Name** und darunter das **Abzeichen** mit dem {begriff.rank}. Wer {bereich.ranks} pflegt, tippt darauf, um zu befördern oder zu degradieren; ohne {begriff.rank} steht dort ein Kreis mit „+“ und **Kein {begriff.rank}**.
 - **Foto** daneben: Ein Tipp zeigt es groß und ganz. Ohne Foto stehen dort die Anfangsbuchstaben.
-- **Rolle**: die Rolle der Person (bei Zusatzrollen „Rollen: …“). Hat sie Ausnahmen bei den Rechten, steht „mit Ausnahmen bei den Rechten“ dabei.
+- **Rolle**: die Rolle der Person (bei Zusatzrollen „Rollen: …“), nur wenn du **Rollen vergeben** darfst. Hat sie Ausnahmen bei den Rechten, steht „mit Ausnahmen bei den Rechten“ dabei. Ohne dieses Recht steht dort nur „Ehemalig“ oder „Ohne Zugang“, wenn das zutrifft.
 - Kacheln **{bereich.points}** und **Offen**: Stand der {bereich.points} und offene {bereich.penalties}. Ein Tipp öffnet die Einträge der Person.
 - Kachel **{bereich.titles}**: ihre {bereich.titles} (oder „Keine“); ein Tipp öffnet die Auswahl.
 - Kachel **{bereich.companies}** (mit dem Recht **{bereich.companies} verwalten**): ihre {bereich.companies} (oder „Keine“); ein Tipp öffnet die Auswahl zum Ankreuzen.
