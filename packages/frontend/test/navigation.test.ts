@@ -12,6 +12,9 @@ import {
   pageTarget,
   placeOf,
   removeMenu,
+  startChoices,
+  startOf,
+  tabbarClass,
   unplaced,
   type NavContext,
   type NavTarget,
@@ -93,7 +96,7 @@ test('Entwurf: Standard als Ausgangspunkt, verschieben, Untermenü entfernen, pr
   assert.deepEqual(d.items, ['termine', 'galerie', 'dokumente']);
   assert.deepEqual(d.hidden.sort(), ['brett', 'dienstgrade', 'mitglieder', 'news', 'punktekatalog']);
   d = { ...d, items: [...d.items, 'news', 'brett', 'mitglieder'] };
-  assert.match(draftError(d) ?? '', /höchstens 5/);
+  assert.equal(draftError(d), null, 'beliebig viele Hauptpunkte (Issue #362)');
   assert.match(draftError({ items: [{ label: ' ', icon: 'ordner', items: ['news'] }], hidden: [] }) ?? '', /Namen/);
   assert.match(draftError({ items: [{ label: 'A', icon: 'ordner', items: [] }], hidden: [] }) ?? '', /mindestens einen/);
 });
@@ -129,4 +132,42 @@ test('Eigene Seiten (Issue #287): jede Seite ein eigener Punkt, im Standard nach
   assert.deepEqual(unplaced(setting, pages), [...NAV_TARGETS.filter((t) => t !== 'termine'), 'seiten/7']);
   assert.equal(placeOf(moveTo(draftOf(setting, undefined, pages), 'seiten/7', 0), 'seiten/7'), 0);
   assert.ok(isPageTarget('seiten/12') && !isPageTarget('seiten') && !isPageTarget('seiten/0') && !isPageTarget('seiten/1/2'));
+});
+
+test('Eigene Symbole und Name von „Intern“ (Issue #362)', () => {
+  const nav = buildNav(null, { ...ctx([...NAV_TARGETS], true), icons: { galerie: 'kamera', intern: 'fahne' }, internLabel: 'Vorstand' });
+  assert.equal(nav.find((e) => e.key === 'galerie')?.icon, 'kamera');
+  assert.equal(nav.find((e) => e.key === 'termine')?.icon, 'termine', 'ohne eigenes das feste Symbol');
+  const intern = nav.find((e) => e.key === 'intern');
+  assert.deepEqual([intern?.label, intern?.icon], ['Vorstand', 'fahne']);
+  assert.equal((draftOf(null, () => true, [], 'Vorstand').items.at(-1) as { label: string }).label, 'Vorstand');
+});
+
+test('Startseite: eingestellt, wenn sie in der Leiste steht, sonst der erste Punkt (Issue #362)', () => {
+  const tabs = buildNav(
+    { items: ['termine', { label: 'Mehr', icon: 'ordner', items: ['galerie', 'news'] }], hidden: [] },
+    ctx(['termine', 'galerie']),
+  );
+  assert.equal(startOf(tabs, 'galerie'), 'galerie', 'Bereich in einem Untermenü');
+  assert.equal(startOf(tabs, 'menue/1'), 'menue/1');
+  assert.equal(startOf(tabs, 'news'), 'termine', 'darf die Person nicht sehen: erster Punkt');
+  assert.equal(startOf(tabs, undefined), 'termine');
+  assert.equal(startOf([], 'galerie'), undefined);
+});
+
+test('Startseite: Auswahl aus der Navigation, „Meins“ nur für Angemeldete', () => {
+  const draft = { items: ['termine', { label: 'Mehr', icon: 'ordner', items: ['galerie'] }], hidden: ['news'] };
+  const guest = startChoices(draft, false);
+  assert.ok(guest.includes('menue/1') && guest.includes('galerie') && guest.includes('termine'));
+  assert.ok(!guest.includes('news'), 'ausgeblendet');
+  assert.ok(!guest.includes('meins'));
+  assert.ok(startChoices(draft, true).includes('meins'));
+  assert.ok(startChoices(null, false).includes('intern'), 'Standardnavigation: Intern');
+});
+
+test('Tab-Leiste: Stufen nach Zahl der Tabs, auf Wunsch nur Symbole', () => {
+  assert.equal(tabbarClass(7, true), 'tabbar');
+  assert.equal(tabbarClass(8, true), 'tabbar tabs-8');
+  assert.equal(tabbarClass(11, true), 'tabbar tabs-8 tabs-10');
+  assert.equal(tabbarClass(14, false), 'tabbar tabs-8 tabs-10 tabs-12 tabbar-icons');
 });

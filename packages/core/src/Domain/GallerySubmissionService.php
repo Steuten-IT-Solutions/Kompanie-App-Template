@@ -332,7 +332,7 @@ final class GallerySubmissionService
             'status' => Repo::REJECTED,
             'reviewed_by' => $actorId,
             'reviewed_at' => $this->app->time()->nowUtc(),
-            'reason' => $reason !== '' ? $reason : 'Wieder aus der Galerie entfernt.',
+            'reason' => $reason !== '' ? $reason : 'Wieder entfernt.',
             'photo_id' => null,
             'file_key' => '',
             'thumb' => null,
@@ -343,7 +343,7 @@ final class GallerySubmissionService
     {
         $reason = Text::line(is_string($raw) ? $raw : '', self::REASON_MAX + 1);
         if ($required && $reason === '') {
-            throw ApiError::invalid('Bitte kurz begründen, warum das Bild nicht in die Galerie kommt.');
+            throw ApiError::invalid('Bitte kurz begründen, warum das Bild nicht freigegeben wird.');
         }
         if (mb_strlen($reason) > self::REASON_MAX) {
             throw ApiError::invalid(sprintf('Der Grund darf höchstens %d Zeichen lang sein.', self::REASON_MAX));
@@ -408,7 +408,7 @@ final class GallerySubmissionService
         $album = (string) ($s['album_title'] ?? '');
         $body = $approved
             ? sprintf('Dein Bild „%s“ ist jetzt im Album „%s“.', $s['name'], $album)
-            : sprintf('Dein Bild „%s“ kommt nicht in die Galerie: %s', $s['name'], $reason);
+            : sprintf('Dein Bild „%s“ wurde nicht freigegeben: %s', $s['name'], $reason);
         try {
             $this->app->push()->notifyUser(
                 (int) $s['user_id'],

@@ -147,13 +147,13 @@ export default function TermineVerwalten({ onToast }: { onToast: (msg: string) =
         </button>
       )}
 
-      <h2 className="section-title">Kommende öffentliche Termine</h2>
+      <h2 className="section-title">Kommend und öffentlich</h2>
       {loading && !data ? (
         <Loading shape="text" />
       ) : error ? (
         <ErrorBox message={error} onRetry={reload} />
       ) : (data ?? []).length === 0 ? (
-        <Empty>Noch keine öffentlichen Termine.</Empty>
+        <Empty>Noch keine öffentlichen Einträge.</Empty>
       ) : (
         <ul className="card-list">
           {(data ?? []).map((ev) => (

@@ -48,6 +48,27 @@ const FONT_STACK = {
   'Source Sans 3': "'Source Sans 3', 'Segoe UI', Roboto, Arial, sans-serif",
 };
 
+/**
+ * brand.ts: die Bezeichnungen aus kompanie.json, darüber die eigenen Namen der Installation (Issue #362, /config
+ * section_labels). Das geschieht hier, beim ersten Laden, damit alle Ansichten sie sehen, auch die, die einen Namen
+ * schon beim Laden ihrer Datei auslesen.
+ */
+const BRAND_TS = `// Automatisch erzeugt aus kompanie.json – nicht von Hand ändern.
+import brand from './brand.json';
+
+/** Namen aus kompanie.json bzw. der Standard, ohne die eigenen der Installation (Einstellungen → Navigation zeigt sie an). */
+export const defaultSections: Readonly<typeof brand.labels.sections> = { ...brand.labels.sections };
+
+const own = (globalThis as { KOMPANIE_CONFIG?: { section_labels?: Record<string, string> | unknown[] } }).KOMPANIE_CONFIG?.section_labels;
+if (own && !Array.isArray(own)) {
+  const sections = brand.labels.sections as Record<string, string>;
+  for (const [key, label] of Object.entries(own)) if (key in sections && typeof label === 'string' && label !== '') sections[key] = label;
+}
+
+export default brand;
+export type Brand = typeof brand;
+`;
+
 const DEFAULTS = {
   greeting: 'Hallo, {name}',
   roles: { guest: 'Gast', candidate: 'Anwärter', member: 'Mitglied', organizer: 'Verwalter', manager: 'Leitung', admin: 'Admin' },
@@ -77,6 +98,14 @@ const DEFAULTS = {
 };
 
 export class BrandError extends Error {}
+
+/**
+ * Namen, die nicht in kompanie.json stehen, aber wie Bereiche umbenannt werden können (Issue #362, Einstellungen →
+ * Navigation): der Punktekatalog (heißt nach den Punkten) und das Untermenü „Intern“ der Standardnavigation.
+ */
+function withDerived(sections) {
+  return { ...sections, catalog: `${sections.points}katalog`, intern: 'Intern' };
+}
 
 function args(argv) {
   const out = {};
@@ -110,7 +139,7 @@ export function loadConfig(file) {
     guestWelcome: data.guestWelcome ?? '',
     labels: {
       roles: { ...DEFAULTS.roles, ...(data.labels?.roles ?? {}) },
-      sections: { ...DEFAULTS.sections, ...(data.labels?.sections ?? {}) },
+      sections: withDerived({ ...DEFAULTS.sections, ...(data.labels?.sections ?? {}) }),
       rank: data.labels?.rank ?? DEFAULTS.rank,
     },
     // Veraltet (Bereiche schaltet der Admin in der App); nur für den Hinweis beim Build.
@@ -314,10 +343,7 @@ export async function build({ config, assets, out, publicDir }) {
     legal: cfg.legal,
   };
   writeFileSync(join(out, 'brand.json'), JSON.stringify(brand, null, 2) + '\n');
-  writeFileSync(
-    join(out, 'brand.ts'),
-    `// Automatisch erzeugt aus kompanie.json – nicht von Hand ändern.\nimport brand from './brand.json';\n\nexport default brand;\nexport type Brand = typeof brand;\n`,
-  );
+  writeFileSync(join(out, 'brand.ts'), BRAND_TS);
   writeFileSync(join(out, 'theme.css'), themeCss(theme).replace(':root {\n', `:root {\n  --font-head: ${FONT_STACK[cfg.font]};\n`));
   writeFileSync(
     join(out, 'fonts.ts'),

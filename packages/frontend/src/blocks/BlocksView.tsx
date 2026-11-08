@@ -113,7 +113,7 @@ function NextEvents({ block }: { block: EventsBlock }) {
     <section className="block-events">
       {block.title && <h3>{block.title}</h3>}
       {block.events.length === 0 ? (
-        <p className="muted">Zurzeit keine anstehenden Termine.</p>
+        <p className="muted">Zurzeit steht nichts an.</p>
       ) : (
         <ul className="block-events-list">
           {block.events.map((e) => (
@@ -287,7 +287,7 @@ function DocumentCard({ block }: { block: DocumentBlock }) {
 
 /** Sponsoren: Logos (ohne Logo der Name) in ihrer Reihenfolge, mit Link in einem neuen Tab. */
 function SponsorsRow({ block }: { block: SponsorsBlock }) {
-  if (block.sponsors.length === 0) return <p className="muted small">Noch keine Sponsoren eingetragen.</p>;
+  if (block.sponsors.length === 0) return <p className="muted small">Noch keine Einträge.</p>;
   return (
     <section className="block-sponsors">
       {block.title && <h3>{block.title}</h3>}

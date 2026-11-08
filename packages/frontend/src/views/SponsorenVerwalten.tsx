@@ -122,7 +122,7 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
   const sort = useDragSort(data ?? [], reorder, editing !== null);
 
   if (loading && !data) return <Loading />;
-  if (error || !data) return <ErrorBox message={error ?? 'Die Sponsoren konnten nicht geladen werden.'} onRetry={reload} />;
+  if (error || !data) return <ErrorBox message={error ?? 'Die Einträge konnten nicht geladen werden.'} onRetry={reload} />;
   const list = data;
 
   return (

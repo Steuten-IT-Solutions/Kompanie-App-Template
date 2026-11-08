@@ -25,7 +25,7 @@ Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum 
 
 ### Weitere Blöcke einfügen
 - **Knopf mit Link**: Trage eine **Beschriftung** und ein **Ziel** ein: eine Webseite mit https://, eine E-Mail-Adresse mit mailto:, eine Telefonnummer mit tel: oder eine Seite der App wie #/termine. Bei **Aussehen** wählst du **Hervorgehoben** oder **Zurückhaltend**.
-- **Nächste Termine**: Wähle eine **Überschrift** und **Wie viele Termine** (1 bis 20). Der Block zeigt immer die nächsten Termine ab heute aus den {bereich.events}.
+- **Nächste Einträge**: Wähle eine **Überschrift** und **Wie viele Einträge** (1 bis 20). Der Block zeigt immer die nächsten Einträge ab heute aus {bereich.events}.
 - **Ansprechpartner**: Hake bei **Ämter** die Ämter an, deren Inhaber erscheinen sollen. E-Mail-Adresse und Handynummer sehen nur Personen, die persönliche Angaben sehen dürfen.
 - **Hinweis-Kasten**: ein kurzer **Hinweis**, farbig als **Info**, **Warnung** oder **Erfolg**.
 - **Trennlinie**: eine **Linie** oder **Nur Abstand** zwischen zwei Blöcken.
@@ -34,7 +34,7 @@ Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum 
 - **Umfrage**: Wähle bei **Umfrage** eine aus den {bereich.polls}. Der Block zeigt Titel und Stand mit **Teilnehmen**, wer schon abgestimmt hat, sieht **Antwort und Ergebnis ansehen**. Wer nicht an Umfragen teilnehmen darf, sieht den Block nicht.
 - **Album**: Wähle bei **Album** eines aus der {bereich.gallery} und **Wie viele Bilder** (1 bis 12). Jeder sieht nur die Bilder, die er auch in der {bereich.gallery} sehen darf.
 - **Dokument**: Wähle bei **Dokument** eine Datei aus den {bereich.documents}. Der Block zeigt sie mit **Öffnen** (PDF und Bilder) und **Herunterladen**, aber nur für alle, die sie in den {bereich.documents} sehen dürfen.
-- **Sponsoren**: zeigt alle {bereich.sponsors} mit Logo und Link, optional mit einer **Überschrift**.
+- **{bereich.sponsors}**: zeigt alle {bereich.sponsors} mit Logo und Link, optional mit einer **Überschrift**.
 - **Karte zur Anfahrt**: Trage einen **Ort oder eine Adresse** ein. Der Block zeigt den Ort mit dem Knopf **Karte**, der ihn in der Karten-App des Geräts öffnet, wie beim Ort eines Termins.
 
 ### Einen Countdown einfügen

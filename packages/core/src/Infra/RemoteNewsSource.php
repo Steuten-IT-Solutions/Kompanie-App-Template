@@ -27,7 +27,7 @@ final class RemoteNewsSource implements NewsSource
     private const CACHE_SECONDS = 600;
     private const MAX_FEED_ITEMS = 100;
     private const ERROR_SECONDS = 60;
-    private const PUBLIC_ERROR = 'Die Neuigkeiten sind gerade nicht erreichbar. Bitte später erneut versuchen.';
+    private const PUBLIC_ERROR = 'Die Beiträge sind gerade nicht erreichbar. Bitte später erneut versuchen.';
 
     private bool $bypassCache = false;
 

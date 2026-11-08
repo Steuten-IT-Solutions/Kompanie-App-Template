@@ -222,8 +222,8 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
       {/* Unsichtbares Dateifeld für „Neue Fassung“. */}
       <input ref={replaceInput} type="file" accept={ACCEPT} hidden onChange={(e) => replace(e.target.files?.[0] ?? null)} />
 
-      <h3 className="section-title">Dokumente</h3>
-      {docs.length === 0 ? <Empty>Noch keine Dokumente.</Empty> : <DocSortSelect value={sort} onChange={setSort} />}
+      <h3 className="section-title">{sec.documents}</h3>
+      {docs.length === 0 ? <Empty>Noch keine Dateien.</Empty> : <DocSortSelect value={sort} onChange={setSort} />}
       {groupDocuments(docs, categories, sort).map((g) => {
         const key = groupKey(g);
         // Während ein Dokument bearbeitet wird, bleibt seine Kategorie offen.
@@ -353,7 +353,7 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
             </li>
           );
         })}
-        {categories.length === 0 && <Empty>Noch keine Kategorien. Dokumente ohne Kategorie stehen in einer gemeinsamen Liste.</Empty>}
+        {categories.length === 0 && <Empty>Noch keine Kategorien. Dateien ohne Kategorie stehen in einer gemeinsamen Liste.</Empty>}
       </ul>
     </div>
   );

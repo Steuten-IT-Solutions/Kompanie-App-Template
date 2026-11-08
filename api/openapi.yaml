@@ -5813,6 +5813,8 @@ paths:
         Issue #277. Nur Darstellung: Die App zeigt jedem nur die Bereiche, die er sehen darf; die Routen prüfen wie bisher.
         „Verwaltung“ und „Meins“ stehen immer am Ende und sind nicht einstellbar. Jeder Bereich darf höchstens einmal
         vorkommen (Hauptpunkt, in einem Untermenü oder unter hidden). Bereiche, die nirgends stehen, hängt die App hinten an.
+        Die Zahl der Hauptpunkte ist frei (Issue #362). names, start und show_labels sind optional; fehlen sie, bleiben sie,
+        wie sie sind. Die App setzt mit „Standardnavigation wiederherstellen“ alles zurück (navigation null, names {}, start {}, show_labels true).
       x-capability: manage_settings
       requestBody:
         required: true
@@ -5827,6 +5829,9 @@ paths:
                   oneOf:
                     - $ref: '#/components/schemas/Navigation'
                     - type: 'null'
+                names: { $ref: '#/components/schemas/NavigationNames' }
+                start: { $ref: '#/components/schemas/NavigationStart' }
+                show_labels: { type: boolean }
       responses:
         '200':
           description: Neuer Stand
@@ -7657,8 +7662,7 @@ components:
       properties:
         items:
           type: array
-          maxItems: 5
-          description: 'Hauptpunkte in ihrer Reihenfolge (ohne Verwaltung und Meins): ein Bereich oder ein Untermenü (eine Ebene)'
+          description: 'Hauptpunkte in ihrer Reihenfolge (ohne Verwaltung und Meins), beliebig viele (Issue #362): ein Bereich oder ein Untermenü (eine Ebene)'
           items:
             oneOf:
               - $ref: '#/components/schemas/NavigationTarget'
@@ -7666,7 +7670,7 @@ components:
                 required: [label, icon, items]
                 properties:
                   label: { type: string, minLength: 1, maxLength: 24, description: Name des Untermenüs (Klartext) }
-                  icon: { type: string, enum: [ordner, termine, news, galerie, kompanien, sponsoren, mitglieder, dokumente, brett, dienstgrade, punktekatalog, stern] }
+                  icon: { $ref: '#/components/schemas/NavigationIcon' }
                   items: { type: array, minItems: 1, maxItems: 12, items: { $ref: '#/components/schemas/NavigationTarget' } }
         hidden:
           type: array
@@ -7678,18 +7682,38 @@ components:
       anyOf:
         - enum: [termine, news, galerie, kompanien, sponsoren, mitglieder, dokumente, brett, dienstgrade, punktekatalog]
         - pattern: '^seiten/[1-9][0-9]{0,9}$'
+    NavigationIcon:
+      type: string
+      description: 'Symbol eines Untermenüs oder Bereichs; ab info neutrale Symbole ohne festen Bereich (Issue #362)'
+      enum: [ordner, termine, news, galerie, kompanien, sponsoren, mitglieder, dokumente, brett, dienstgrade, punktekatalog, seiten, stern, info, karte, musik, pokal, glocke, fahne, kamera, haus, buch, uhr]
+    NavigationNames:
+      type: object
+      description: 'Eigene Namen und Symbole (Issue #362) je Bereich (NavigationTarget) oder intern (Untermenü der Standardnavigation). Der Name gilt überall, wo die App den Bereich nennt; bei eigenen Seiten nur in der Leiste. Leer kommt als [] an.'
+      additionalProperties:
+        type: object
+        properties:
+          label: { type: string, minLength: 1, maxLength: 24 }
+          icon: { $ref: '#/components/schemas/NavigationIcon' }
+    NavigationStart:
+      type: object
+      description: 'Startseite beim Öffnen der App (Issue #362): ein Punkt der Navigation (Bereich, eigene Seite, menue/<n>, intern nur in der Standardnavigation), für Angemeldete auch meins. Fehlt = erster Punkt der Leiste. Leer kommt als [] an.'
+      properties:
+        guest: { type: string }
+        member: { type: string }
     NavigationAdmin:
       type: object
-      required: [navigation, targets, icons, max_main, max_menu_items, label_max]
+      required: [navigation, names, start, show_labels, targets, icons, max_menu_items, label_max]
       properties:
         navigation:
           description: Gespeicherte Navigation; null = Standardnavigation
           oneOf:
             - $ref: '#/components/schemas/Navigation'
             - type: 'null'
+        names: { $ref: '#/components/schemas/NavigationNames' }
+        start: { $ref: '#/components/schemas/NavigationStart' }
+        show_labels: { type: boolean, description: 'Namen unter den Symbolen der Leiste' }
         targets: { type: array, items: { $ref: '#/components/schemas/NavigationTarget' } }
-        icons: { type: array, items: { type: string } }
-        max_main: { type: integer }
+        icons: { type: array, items: { $ref: '#/components/schemas/NavigationIcon' } }
         max_menu_items: { type: integer }
         label_max: { type: integer }
     Maintenance:
@@ -8068,6 +8092,13 @@ components:
           oneOf:
             - $ref: '#/components/schemas/Navigation'
             - type: 'null'
+        navigation_names: { $ref: '#/components/schemas/NavigationNames' }
+        navigation_start: { $ref: '#/components/schemas/NavigationStart' }
+        navigation_labels: { type: boolean, description: 'Namen unter den Symbolen der Leiste (Issue #362)' }
+        section_labels:
+          type: object
+          description: 'Eigene Namen als Abschnitte der Bezeichnungen (z. B. gallery, catalog, intern), gehen vor kompanie.json (Issue #362). Leer kommt als [] an.'
+          additionalProperties: { type: string }
         newsInApp:
           type: boolean
           description: 'News werden in der App geschrieben (Quelle app, Bereich news an); wer manage_news hat, sieht die Knöpfe dazu'

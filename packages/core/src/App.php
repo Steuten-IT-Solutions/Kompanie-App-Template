@@ -175,6 +175,11 @@ final class App
         $this->preview = new Preview($authContext, fn (): RoleService => $this->roles());
         $this->authContext = $this->preview;
         $this->env = new PreviewEnvironment($env, $this->preview);
+        // Eigene Bereichsnamen der Installation (Issue #362) gehen überall vor kompanie.json.
+        $config->overrideSections(fn (): array => $this->navigation()->sectionOverrides(
+            $this->features()->enabled('directory'),
+            $this->features()->enabled('offices'),
+        ));
     }
 
     /**

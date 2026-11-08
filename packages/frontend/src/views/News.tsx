@@ -55,7 +55,7 @@ function NewsList({ onToast }: { onToast: Toast }) {
     return (
       <>
         {write}
-        {!writing && <Empty>Noch keine Neuigkeiten.</Empty>}
+        {!writing && <Empty>Noch keine Beiträge.</Empty>}
         {notify}
       </>
     );

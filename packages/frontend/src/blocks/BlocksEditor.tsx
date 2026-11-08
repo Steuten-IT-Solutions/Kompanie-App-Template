@@ -24,6 +24,10 @@ import {
 import Countdown from './Countdown';
 import { previewRange } from './countdown';
 import { confirmAsk } from '../ask';
+import brand from '../generated/brand';
+
+/** Name einer Blockart; „Sponsoren“ heißt wie der Bereich (eigener Name aus Einstellungen → Navigation, Issue #362). */
+const kindLabel = (k: { type: string; label: string }): string => (k.type === 'sponsors' ? brand.labels.sections.sponsors : k.label);
 
 const RichTextEditor = lazyView(() => import('../richtext/RichTextEditor'));
 
@@ -322,7 +326,7 @@ function SponsorsFields({ block, onChange }: { block: SponsorsDraft; onChange: (
         placeholder="z. B. Mit Dank an unsere Sponsoren"
         onChange={(e) => onChange({ ...block, title: e.target.value })}
       />
-      <span className="muted small">Zeigt alle Sponsoren in ihrer Reihenfolge, mit Logo und Link.</span>
+      <span className="muted small">Zeigt alle Einträge in ihrer Reihenfolge, mit Logo und Link.</span>
     </label>
   );
 }
@@ -481,7 +485,7 @@ function EventsFields({ block, onChange }: { block: EventsDraft; onChange: (b: E
         />
       </label>
       <label className="field">
-        <span>Wie viele Termine</span>
+        <span>Wie viele Einträge</span>
         <input
           type="number"
           min={1}
@@ -489,7 +493,7 @@ function EventsFields({ block, onChange }: { block: EventsDraft; onChange: (b: E
           value={block.count}
           onChange={(e) => set({ count: Math.max(1, Math.min(EVENTS_MAX, Number(e.target.value) || 1)) })}
         />
-        <span className="muted small">Die App zeigt immer die nächsten Termine ab heute aus den Terminen.</span>
+        <span className="muted small">Die App zeigt immer die nächsten Einträge ab heute.</span>
       </label>
     </div>
   );
@@ -509,7 +513,7 @@ function InsertBlock({ onInsert, label = '+ Block einfügen' }: { onInsert: (typ
         <option value="">{label}</option>
         {BLOCK_KINDS.map((k) => (
           <option key={k.type} value={k.type}>
-            {k.label}: {k.hint}
+            {kindLabel(k)}: {k.hint}
           </option>
         ))}
       </select>
@@ -686,7 +690,8 @@ export default function BlocksEditor({
     <div className="blocks-editor">
       {value.length === 0 && <p className="muted small">Noch keine Blöcke.</p>}
       {value.map((b, i) => {
-        const label = BLOCK_KINDS.find((k) => k.type === b.type)?.label ?? b.type;
+        const kind = BLOCK_KINDS.find((k) => k.type === b.type);
+        const label = kind ? kindLabel(kind) : b.type;
         const id = `${idPrefix}-${b.id}`;
         return (
           <div key={b.id} className="block-edit card">

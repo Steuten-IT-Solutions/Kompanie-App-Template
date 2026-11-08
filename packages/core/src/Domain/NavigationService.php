@@ -18,10 +18,30 @@ use KompanieApp\Core\Port\Settings;
  * Gespeichert wird {items, hidden}: items sind Kennungen von Bereichen (z. B. "termine") oder Untermenüs
  * {label, icon, items}; hidden sind Bereiche, die nicht in der Navigation stehen. Bereiche, die in keiner der beiden
  * Listen vorkommen (z. B. mit einer neuen Version dazugekommen), hängt die App hinten an die Tab-Leiste an.
+ *
+ * Dazu (Issue #362), je in einer eigenen Einstellung, damit sie auch in der Standardnavigation gelten:
+ * - eigene Namen und Symbole je Bereich, eigene Seite und „Intern“ (NAMES): Der Name gilt überall, wo die App den Bereich
+ *   nennt (sectionOverrides → KompanieConfig::sectionLabel), bei eigenen Seiten nur im Tab (ihr Titel bleibt);
+ * - die Startseite beim Öffnen der App, getrennt für Gäste und Angemeldete (START): ein Punkt der Navigation;
+ * - ob die Tab-Leiste unter den Symbolen Namen zeigt (LABELS).
  */
 final class NavigationService
 {
     public const SETTING = 'navigation';
+    public const NAMES = 'navigation_names';
+    public const START = 'navigation_start';
+    public const LABELS = 'navigation_labels';
+
+    /** Abschnitt (KompanieConfig::sectionLabel) je Bereich der Navigation; „mitglieder“ wählt sectionOverrides. */
+    private const SECTIONS = [
+        'termine' => 'events', 'news' => 'news', 'galerie' => 'gallery', 'kompanien' => 'companies', 'sponsoren' => 'sponsors',
+        'dokumente' => 'documents', 'brett' => 'board', 'dienstgrade' => 'ranks', 'punktekatalog' => 'catalog', 'intern' => 'intern',
+    ];
+
+    /** Untermenü „Intern“ der Standardnavigation: umbenennbar wie ein Bereich. */
+    public const INTERN = 'intern';
+    /** „Meins“ kann für Angemeldete Startseite sein. */
+    public const MINE = 'meins';
 
     /** Bereiche, die in der Navigation stehen können, in der Reihenfolge der Standardnavigation (Ansichten der App). */
     public const TARGETS = ['termine', 'news', 'galerie', 'kompanien', 'sponsoren', 'mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog'];
@@ -30,10 +50,13 @@ final class NavigationService
     public const PAGE_PREFIX = 'seiten/';
 
     /** Symbole für Untermenüs (in der App gezeichnet). */
-    public const ICONS = ['ordner', 'termine', 'news', 'galerie', 'kompanien', 'sponsoren', 'mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog', 'seiten', 'stern'];
+    /** Symbole für Untermenüs und Bereiche (in der App gezeichnet); ab „info“ neutrale Symbole ohne festen Bereich (Issue #362). */
+    public const ICONS = [
+        'ordner', 'termine', 'news', 'galerie', 'kompanien', 'sponsoren', 'mitglieder', 'dokumente', 'brett', 'dienstgrade', 'punktekatalog', 'seiten', 'stern',
+        'info', 'karte', 'musik', 'pokal', 'glocke', 'fahne', 'kamera', 'haus', 'buch', 'uhr',
+    ];
 
-    /** Hauptpunkte neben „Verwaltung“ und „Meins“: Mehr als sieben Tabs passen auf schmalen Handys nicht in die Leiste. */
-    public const MAX_MAIN = 5;
+    /** Die Zahl der Hauptpunkte ist frei (Issue #362): Die App verkleinert Schrift und Symbole, je mehr unten stehen. */
     public const MAX_MENU_ITEMS = 12;
     public const LABEL_MAX = 24;
 
@@ -47,9 +70,18 @@ final class NavigationService
         return is_string($id) && (in_array($id, self::TARGETS, true) || preg_match('#^seiten/[1-9][0-9]{0,9}$#D', $id) === 1);
     }
 
-    /** Eine gelöschte Seite aus der gespeicherten Navigation nehmen (leere Untermenüs fallen mit weg). */
+    /** Eine gelöschte Seite aus der gespeicherten Navigation nehmen (leere Untermenüs fallen mit weg), samt Name und Startseite. */
     public function removeTarget(string $id): void
     {
+        $names = $this->names();
+        if (isset($names[$id])) {
+            unset($names[$id]);
+            $this->saveNames($names);
+        }
+        $start = $this->start();
+        if (in_array($id, $start, true)) {
+            $this->saveStart(array_filter($start, static fn (string $t): bool => $t !== $id));
+        }
         $nav = $this->get();
         if ($nav === null) {
             return;
@@ -103,17 +135,221 @@ final class NavigationService
         return ['items' => $items, 'hidden' => $hidden];
     }
 
-    /** @return array{navigation: array<string, mixed>|null, targets: list<string>, icons: list<string>, max_main: int, max_menu_items: int, label_max: int} */
+    /**
+     * @return array{navigation: array<string, mixed>|null, names: array<string, array{label?: string, icon?: string}>|\stdClass, start: array{guest?: string, member?: string}|\stdClass, show_labels: bool, targets: list<string>, icons: list<string>, max_menu_items: int, label_max: int}
+     */
     public function describe(): array
     {
         return [
             'navigation' => $this->get(),
+            // Leer als Objekt ({}), wie in api/openapi.yaml
+            'names' => $this->names() === [] ? new \stdClass() : $this->names(),
+            'start' => $this->start() === [] ? new \stdClass() : $this->start(),
+            'show_labels' => $this->showLabels(),
             'targets' => self::TARGETS,
             'icons' => self::ICONS,
-            'max_main' => self::MAX_MAIN,
             'max_menu_items' => self::MAX_MENU_ITEMS,
             'label_max' => self::LABEL_MAX,
         ];
+    }
+
+    /**
+     * Eigene Namen und Symbole (Issue #362), je Bereich, eigene Seite oder „intern“; leer = keine.
+     *
+     * @return array<string, array{label?: string, icon?: string}>
+     */
+    public function names(): array
+    {
+        $raw = $this->settings->get(self::NAMES);
+        $out = [];
+        foreach (is_array($raw) ? $raw : [] as $key => $entry) {
+            if (!is_string($key) || !self::isNamed($key) || !is_array($entry)) {
+                continue;
+            }
+            $one = [];
+            if (is_string($entry['label'] ?? null) && $entry['label'] !== '') {
+                $one['label'] = $entry['label'];
+            }
+            if (in_array($entry['icon'] ?? null, self::ICONS, true)) {
+                $one['icon'] = (string) $entry['icon'];
+            }
+            if ($one !== []) {
+                $out[$key] = $one;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Eigene Namen als Abschnitte für KompanieConfig::sectionLabel (z. B. "gallery" => "Fotos"). „mitglieder“ heißt wie
+     * der Abschnitt, den der Tab gerade zeigt: Mitgliederliste, oder nur die Ämter, wenn es keine Liste gibt (Issue #112).
+     *
+     * @return array<string, string>
+     */
+    public function sectionOverrides(bool $directory, bool $offices): array
+    {
+        $out = [];
+        foreach ($this->names() as $key => $entry) {
+            if (!isset($entry['label'])) {
+                continue;
+            }
+            if ($key === 'mitglieder') {
+                $out[$directory || !$offices ? 'directory' : 'offices'] = $entry['label'];
+            } elseif (isset(self::SECTIONS[$key])) {
+                $out[self::SECTIONS[$key]] = $entry['label'];
+            }
+        }
+        return $out;
+    }
+
+    /** @return array{guest?: string, member?: string} Startseite je Gruppe; fehlt = erster Punkt der Leiste */
+    public function start(): array
+    {
+        $raw = $this->settings->get(self::START);
+        $out = [];
+        foreach (['guest', 'member'] as $who) {
+            $t = is_array($raw) ? ($raw[$who] ?? null) : null;
+            if (is_string($t) && self::isStart($t, $who === 'member')) {
+                $out[$who] = $t;
+            }
+        }
+        return $out;
+    }
+
+    /** Zeigt die Tab-Leiste Namen unter den Symbolen? Standard: ja. */
+    public function showLabels(): bool
+    {
+        return $this->settings->get(self::LABELS) !== false;
+    }
+
+    /** Kann einen eigenen Namen bekommen: ein Bereich, eine eigene Seite oder „Intern“ der Standardnavigation. */
+    private static function isNamed(string $key): bool
+    {
+        return self::isTarget($key) || $key === self::INTERN;
+    }
+
+    /** Möglicher Wert einer Startseite (ob er in der Navigation steht, prüft set bzw. beim Öffnen die App). */
+    private static function isStart(string $t, bool $member): bool
+    {
+        return self::isTarget($t) || $t === self::INTERN || preg_match('#^menue/[1-9][0-9]?$#D', $t) === 1 || ($member && $t === self::MINE);
+    }
+
+    /**
+     * Speichert Einstellungen → Navigation (Issue #362): die Navigation (null = Standard) und, falls angegeben, eigene
+     * Namen und Symbole, Startseiten und die Namen in der Leiste. Startseiten prüft das gegen die neue Navigation.
+     *
+     * @param array<mixed> $body navigation (Pflicht), names?, start?, show_labels?
+     * @return array<string, mixed> wie describe()
+     */
+    public function save(array $body): array
+    {
+        if (!array_key_exists('navigation', $body)) {
+            throw ApiError::invalid('Bitte die Navigation angeben (null für die Standardnavigation).');
+        }
+        $names = array_key_exists('names', $body) ? $this->validNames($body['names']) : null;
+        $this->set($body['navigation']);
+        if ($names !== null) {
+            $this->saveNames($names);
+        }
+        if (array_key_exists('start', $body)) {
+            $this->saveStart($this->validStart($body['start']));
+        }
+        if (array_key_exists('show_labels', $body)) {
+            if (!is_bool($body['show_labels'])) {
+                throw ApiError::invalid('show_labels muss true oder false sein.');
+            }
+            $body['show_labels'] ? $this->settings->delete(self::LABELS) : $this->settings->set(self::LABELS, false);
+        }
+        return $this->describe();
+    }
+
+    /** @return array<string, array{label?: string, icon?: string}> */
+    private function validNames(mixed $names): array
+    {
+        if ($names === null) {
+            return [];
+        }
+        if (!is_array($names) || ($names !== [] && array_is_list($names))) {
+            throw ApiError::invalid('Die Namen der Bereiche müssen ein Objekt sein (Bereich → Name und Symbol).');
+        }
+        $out = [];
+        foreach ($names as $key => $entry) {
+            if (!is_string($key) || !self::isNamed($key)) {
+                throw ApiError::invalid('Unbekannter Bereich bei den Namen.');
+            }
+            if (!is_array($entry)) {
+                throw ApiError::invalid('Name und Symbol eines Bereichs müssen ein Objekt sein.');
+            }
+            $one = [];
+            $label = Text::line(is_string($entry['label'] ?? null) ? $entry['label'] : '');
+            if (mb_strlen($label) > self::LABEL_MAX) {
+                throw ApiError::invalid(sprintf('Ein Name darf höchstens %d Zeichen lang sein („%s“).', self::LABEL_MAX, $label));
+            }
+            if ($label !== '') {
+                $one['label'] = $label;
+            }
+            $icon = $entry['icon'] ?? null;
+            if ($icon !== null && $icon !== '') {
+                if (!is_string($icon) || !in_array($icon, self::ICONS, true)) {
+                    throw ApiError::invalid('Unbekanntes Symbol.');
+                }
+                $one['icon'] = $icon;
+            }
+            if ($one !== []) {
+                $out[$key] = $one;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Startseiten müssen in der (eben gespeicherten) Navigation stehen: nicht ausgeblendet, ein vorhandenes Untermenü,
+     * „Intern“ nur in der Standardnavigation, „Meins“ nur für Angemeldete.
+     *
+     * @return array{guest?: string, member?: string}
+     */
+    private function validStart(mixed $start): array
+    {
+        if ($start === null) {
+            return [];
+        }
+        if (!is_array($start)) {
+            throw ApiError::invalid('Die Startseite muss ein Objekt sein (guest, member).');
+        }
+        $nav = $this->get();
+        $menus = $nav === null ? 0 : count(array_filter($nav['items'], 'is_array'));
+        $out = [];
+        foreach (['guest', 'member'] as $who) {
+            $t = $start[$who] ?? null;
+            if ($t === null || $t === '') {
+                continue;
+            }
+            $ok = is_string($t) && self::isStart($t, $who === 'member');
+            if ($ok && $t === self::INTERN) {
+                $ok = $nav === null;
+            } elseif ($ok && str_starts_with($t, 'menue/')) {
+                $ok = (int) substr($t, 6) <= $menus;
+            } elseif ($ok && $nav !== null) {
+                $ok = !in_array($t, $nav['hidden'], true);
+            }
+            if (!$ok) {
+                throw ApiError::invalid('Als Startseite geht nur ein Punkt, der in der Navigation steht.');
+            }
+            $out[$who] = $t;
+        }
+        return $out;
+    }
+
+    /** @param array<string, array{label?: string, icon?: string}> $names */
+    private function saveNames(array $names): void
+    {
+        $names === [] ? $this->settings->delete(self::NAMES) : $this->settings->set(self::NAMES, $names);
+    }
+
+    /** @param array{guest?: string, member?: string} $start */
+    private function saveStart(array $start): void
+    {
+        $start === [] ? $this->settings->delete(self::START) : $this->settings->set(self::START, $start);
     }
 
     /**
@@ -129,9 +365,6 @@ final class NavigationService
         }
         if (!is_array($navigation) || !is_array($navigation['items'] ?? null) || !array_is_list($navigation['items'])) {
             throw ApiError::invalid('Die Navigation braucht eine Liste der Hauptpunkte.');
-        }
-        if (count($navigation['items']) > self::MAX_MAIN) {
-            throw ApiError::invalid(sprintf('Unten passen höchstens %d Hauptpunkte neben Verwaltung und Meins.', self::MAX_MAIN));
         }
         $seen = [];
         $target = function (mixed $id) use (&$seen): string {

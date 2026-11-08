@@ -195,8 +195,8 @@ final class PushTriggers
             return 0;
         }
         $message = $before !== null
-            ? PushService::message('Termin geändert', $this->changeBody($before, $event), self::eventRoute('p' . $event['id']), 'termin-p' . $event['id'])
-            : PushService::message('Neuer Termin', $this->eventBody($event), self::eventRoute('p' . $event['id']), 'termin-p' . $event['id']);
+            ? PushService::message($this->eventsTitle('geändert'), $this->changeBody($before, $event), self::eventRoute('p' . $event['id']), 'termin-p' . $event['id'])
+            : PushService::message($this->eventsTitle('neu'), $this->eventBody($event), self::eventRoute('p' . $event['id']), 'termin-p' . $event['id']);
         return $this->push->notifyAll(PushService::TYPE_EVENTS, $message, false);
     }
 
@@ -277,10 +277,10 @@ final class PushTriggers
         $count = 0;
         if (count($diff['new']) >= 4) {
             $titles = implode(', ', array_map(static fn (array $e): string => (string) $e['title'], array_slice($diff['new'], 0, 3)));
-            $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message('Neue Termine', sprintf('%d neue Termine im Kalender, z. B. %s', count($diff['new']), $titles), 'termine', 'termine-neu'), true);
+            $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message($this->eventsTitle('neu'), sprintf('%d neue Einträge, z. B. %s', count($diff['new']), $titles), 'termine', 'termine-neu'), true);
         } else {
             foreach ($diff['new'] as $ev) {
-                $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message('Neuer Termin', $this->eventBody($ev), self::eventRoute((string) $ev['id']), 'termin-' . $ev['id']), true);
+                $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message($this->eventsTitle('neu'), $this->eventBody($ev), self::eventRoute((string) $ev['id']), 'termin-' . $ev['id']), true);
             }
         }
         foreach ($diff['changed'] as ['event' => $ev, 'before' => $sig]) {
@@ -289,7 +289,7 @@ final class PushTriggers
                 ? ['start' => $sig[0], 'end' => (string) $sig[1], 'location' => (string) $sig[2], 'all_day' => strlen($sig[0]) === 10]
                 : null;
             $body = $before !== null ? $this->changeBody($before, $ev) : $this->eventBody($ev);
-            $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message('Termin geändert', $body, self::eventRoute((string) $ev['id']), 'termin-' . $ev['id']), true);
+            $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message($this->eventsTitle('geändert'), $body, self::eventRoute((string) $ev['id']), 'termin-' . $ev['id']), true);
         }
         return $count;
     }
@@ -530,5 +530,11 @@ final class PushTriggers
     private static function euro(int $cents): string
     {
         return number_format($cents / 100, 2, ',', '.') . ' €';
+    }
+
+    /** Titel einer Benachrichtigung zu Terminen, neutral mit dem Namen des Bereichs (Issue #362), z. B. „Termine: neu“. */
+    private function eventsTitle(string $what): string
+    {
+        return $this->app->config->sectionLabel('events', 'Termine') . ': ' . $what;
     }
 }

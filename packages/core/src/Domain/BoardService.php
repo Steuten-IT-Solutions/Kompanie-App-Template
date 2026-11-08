@@ -785,7 +785,7 @@ final class BoardService
         sort($out);
         if ($company) {
             if (!$this->app->features()->enabled(CompanyService::FEATURE)) {
-                throw ApiError::invalid('Der Bereich Kompanien ist ausgeschaltet.');
+                throw ApiError::invalid(sprintf('Der Bereich %s ist ausgeschaltet.', $this->app->config->sectionLabel('companies', 'Kompanien')));
             }
             $known = array_column($this->app->companies()->repository()->all(), 'id');
             if (array_diff($out, $known) !== []) {

@@ -68,7 +68,7 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
           {typeof events === 'string' ? (
             <ErrorBox message={events} onRetry={reload} />
           ) : events.length === 0 ? (
-            <Empty>Keine Termine in den letzten 90 Tagen.</Empty>
+            <Empty>In den letzten 90 Tagen stand nichts an.</Empty>
           ) : (
             <>
               <ul className="card-list attendance-events">
@@ -108,7 +108,7 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
 
       <form className="form card free-event" onSubmit={createFree}>
         <h3>Freier Termin</h3>
-        <p className="muted small">Für Termine, die nicht im Kalender stehen, z. B. einen spontanen Arbeitsdienst.</p>
+        <p className="muted small">Für Anlässe, die nicht im Kalender stehen, z. B. einen spontanen Arbeitsdienst.</p>
         <div className="field-row">
           <label className="field">
             <span>Titel</span>

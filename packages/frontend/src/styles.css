@@ -3643,6 +3643,63 @@ fieldset.rights-tree legend {
     letter-spacing: 0.02em;
   }
 }
+/* Beliebig viele Punkte (Issue #362): ab 8 Tabs Schrift und Symbol in Stufen kleiner (Klassen aus App.tsx tabbarClass).
+ * Nicht in der Leiste am linken Rand (Querformat, flach): Dort stehen die Tabs untereinander und lassen sich rollen. */
+@media (orientation: portrait), (min-height: 521px) {
+  .tabbar.tabs-8 button {
+    flex: 1 1 0;
+    gap: 2px;
+    font-size: 0.52rem;
+    letter-spacing: 0;
+  }
+  .tabbar.tabs-8 button svg {
+    width: 20px;
+    height: 20px;
+  }
+  .tabbar.tabs-10 button {
+    font-size: 0.48rem;
+  }
+  .tabbar.tabs-10 button svg {
+    width: 18px;
+    height: 18px;
+  }
+  .tabbar.tabs-12 button {
+    font-size: 0.44rem;
+  }
+  .tabbar.tabs-12 button svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+/* Breiter Bildschirm: genug Platz für die Schrift von sieben Tabs, nur die Symbole bleiben etwas kleiner. */
+@media (min-width: 900px) and ((orientation: portrait) or (min-height: 521px)) {
+  .tabbar.tabs-8 button {
+    font-size: 0.58rem;
+  }
+}
+/* Nur Symbole (Einstellungen → Navigation): Der Name steht weiter als aria-label am Knopf. */
+.tabbar.tabbar-icons button span {
+  display: none;
+}
+.tabbar.tabbar-icons button svg {
+  width: 24px;
+  height: 24px;
+}
+.tabbar.tabbar-icons.tabs-12 button svg {
+  width: 20px;
+  height: 20px;
+}
+/* Einstellungen → Navigation: Umbenennen je Bereich */
+.nav-rename {
+  margin-top: 6px;
+}
+.nav-rename summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.nav-rename .field {
+  margin-top: 8px;
+}
 
 /* Konten (Issue #24): Zugangsdaten, mehrere anlegen, Druckzettel */
 .credentials-url {

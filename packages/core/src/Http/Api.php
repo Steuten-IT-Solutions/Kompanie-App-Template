@@ -571,6 +571,11 @@ final class Api
             'maintenance' => self::maintenanceInfo($a->maintenance()->state()),
             // Einrichtbare Navigation (Issue #277): null = Standardnavigation; nur Darstellung, die Rechte prüfen die Routen
             'navigation' => $a->navigation()->get(),
+            // Eigene Namen, Symbole und Startseiten (Issue #362); section_labels = die Namen als Abschnitte (brand.labels.sections)
+            'navigation_names' => self::jsonObject($a->navigation()->names()),
+            'navigation_start' => self::jsonObject($a->navigation()->start()),
+            'navigation_labels' => $a->navigation()->showLabels(),
+            'section_labels' => self::jsonObject($a->navigation()->sectionOverrides($a->features()->enabled('directory'), $a->features()->enabled('offices'))),
             // News in der App geschrieben (Quelle „app“): Wer manage_news hat, sieht dort Knöpfe zum Schreiben und Ändern
             'newsInApp' => ($features['news'] ?? false) && $a->newsService()->inApp(),
             // Eigene Seiten (Issue #287), die die Person lesen darf: für die Kacheln unter „Seiten“ (ohne Text)
@@ -604,6 +609,17 @@ final class Api
             'imprint' => $legal['imprint_url'] !== '' ? $legal['imprint_url'] : null,
             'privacy' => $legal['privacy_url'] !== '' ? $legal['privacy_url'] : null,
         ];
+    }
+
+    /**
+     * Leere Zuordnung als JSON-Objekt ({}) statt Liste ([]), wie in api/openapi.yaml.
+     *
+     * @param array<mixed> $map
+     * @return array<mixed>|\stdClass
+     */
+    private static function jsonObject(array $map): array|\stdClass
+    {
+        return $map === [] ? new \stdClass() : $map;
     }
 
     /** https://…/updates.json → https://…/handbuch/ (dort liegt die Seite der Kompanie); sonst null. */
@@ -1257,12 +1273,7 @@ final class Api
             new Route('GET', '/admin/maintenance', Cap::ManageSettings, fn () => $a->maintenance()->state() + ['log' => $a->maintenance()->log()], null, $denySettings),
             new Route('POST', '/admin/maintenance', Cap::ManageSettings, fn (Request $r) => $a->maintenance()->set($r->input('on'), $r->body['reason'] ?? null, $this->user()) + ['log' => $a->maintenance()->log()], null, $denySettings),
             new Route('GET', '/admin/navigation', Cap::ManageSettings, fn () => $a->navigation()->describe(), null, $denySettings),
-            new Route('PUT', '/admin/navigation', Cap::ManageSettings, function (Request $r) use ($a) {
-                if (!array_key_exists('navigation', $r->body)) {
-                    throw ApiError::invalid('Bitte die Navigation angeben (null für die Standardnavigation).');
-                }
-                return $a->navigation()->set($r->body['navigation']);
-            }, null, $denySettings),
+            new Route('PUT', '/admin/navigation', Cap::ManageSettings, fn (Request $r) => $a->navigation()->save((array) $r->body), null, $denySettings),
             new Route('GET', '/admin/settings', Cap::ManageSettings, fn () => $a->settingsService()->get(), null, $denySettings),
             // Zugang beantragen (Issue #314): ein/aus und vorgeschlagene Rolle
             new Route('GET', '/admin/registration', Cap::ManageSettings, fn () => $a->registrations()->settings(), null, $denySettings),
