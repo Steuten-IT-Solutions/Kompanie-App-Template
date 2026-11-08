@@ -576,11 +576,11 @@ final class PollServiceTest extends TestCase
         $this->subscribe($this->cand, 'a');
         $this->subscribe(null, 'gast');
         $types = fn (): array => array_column($this->app->push()->repository()->all(), 'types', 'endpoint');
-        $this->assertSame(['board', 'events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/m']);
+        $this->assertSame(['board', 'reports', 'events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/m']);
 
         $this->app->features()->update(['polls' => true]);
-        $this->assertSame(['board', 'polls', 'events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/m'], 'in der üblichen Reihenfolge');
-        $this->assertSame(['board', 'events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/a'], 'Anwärter nicht');
+        $this->assertSame(['board', 'polls', 'reports', 'events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/m'], 'in der üblichen Reihenfolge');
+        $this->assertSame(['board', 'reports', 'events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/a'], 'Anwärter nicht');
         $this->assertSame(['board_public', 'events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/gast'], 'Gäste: öffentliche Nachrichten am Brett, keine Umfragen');
 
         $this->app->push()->update($this->users->find($this->m), 'https://fcm.googleapis.com/fcm/send/m', null, ['events'], null);

@@ -111,6 +111,11 @@ enum Capability: string
     /** Rollen vergeben. */
     case PromoteUsers = 'promote_users';
     /**
+     * Fehlermeldungen der App sehen (mit Namen angemeldeter Personen und Bildschirmfoto), mit Begründung schließen oder
+     * an die Betreuer der App weiterleiten (BugReportService).
+     */
+    case ReviewReports = 'review_reports';
+    /**
      * Nutzungsauswertung ansehen: wer wann welchen Bereich genutzt hat (Issue #175). Nur Admins; nicht an Rollen vergebbar
      * (Roles::GRANTABLE), solange offen ist, wer außer dem Admin die Auswertung je Person sehen darf.
      */

@@ -17,6 +17,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Fehlermeldungen zuerst an die Admins**: Was jemand über *Fehler melden* schickt, geht nicht mehr gleich an die
+  Betreuer der App, sondern landet unter *Verwaltung → Fehlermeldungen* (mit Zahl der offenen und einer
+  Benachrichtigung). Dort schließt ihr eine Meldung mit Begründung, z. B. wenn ihr selbst helfen konntet, oder leitet
+  sie an die Betreuer weiter; erst dann wird daraus ein Eintrag bei ihnen. Wer angemeldet meldet, sieht unter
+  *Deine Meldungen* den Stand und eure Begründung und wird benachrichtigt. Die Admins sehen den Namen angemeldeter
+  Personen; an die Betreuer geht er weiter nur mit Haken. Neues Recht *Fehlermeldungen bearbeiten*, das ihr an Rollen
+  vergeben könnt (Admins haben es immer). *Fehler melden* gibt es jetzt auch in Apps ohne Empfänger für
+  Fehlermeldungen; dort bleiben die Meldungen bei den Admins. Erledigte Meldungen werden nach 30 Tagen gelöscht.
 - **Rolle und Zusatzrollen gleich beim Anlegen**: Wer Rollen vergeben darf, wählt beim Anlegen eines Mitglieds jetzt
   jede Rolle, die er auch danach unter *Konto und Rolle* vergeben dürfte (z. B. Vorstand), und hakt Zusatzrollen an.
   Das gilt für *Mitglied anlegen*, *Mehrere auf einmal anlegen* (Rolle und Zusatzrollen für alle), den Import aus

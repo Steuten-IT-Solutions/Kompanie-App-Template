@@ -1774,6 +1774,53 @@ WHERE title IS NULL",
                 'mysql' => ['ALTER TABLE {board_messages} ADD COLUMN blocks mediumtext NULL'],
                 'sqlite' => ['ALTER TABLE {board_messages} ADD COLUMN blocks TEXT DEFAULT NULL'],
             ],
+            // Fehlermeldungen erst an die Admins (BugReportService): Eingang der Meldungen in der App. Erst „Weiterleiten“
+            // reiht eine Meldung in bug_reports (Versand an die Betreuer) ein; eine ältere Version sendet also nur, was
+            // schon weitergeleitet ist. user_id: wer gemeldet hat (0 ohne Anmeldung), share_name: Name beim Weiterleiten
+            // mitschicken. status open, closed (mit reason) oder forwarded; das Bildschirmfoto wird beim Schließen bzw.
+            // Weiterleiten aus dieser Tabelle gelöscht. Erledigte Meldungen werden nach 30 Tagen gelöscht. Nicht in
+            // Sicherungen.
+            54 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {report_inbox} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  uuid char(32) NOT NULL,
+  user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  share_name tinyint(1) NOT NULL DEFAULT 0,
+  report text NOT NULL,
+  screenshot mediumtext DEFAULT NULL,
+  screenshot_type varchar(20) NOT NULL DEFAULT \'\',
+  status varchar(10) NOT NULL DEFAULT \'open\',
+  reason text NULL,
+  reviewed_by bigint(20) unsigned DEFAULT NULL,
+  reviewed_at int(11) DEFAULT NULL,
+  created_at int(11) NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uuid (uuid),
+  KEY user_id (user_id),
+  KEY status (status)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {report_inbox} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  uuid TEXT NOT NULL,
+  user_id INTEGER NOT NULL DEFAULT 0,
+  share_name INTEGER NOT NULL DEFAULT 0,
+  report TEXT NOT NULL,
+  screenshot TEXT DEFAULT NULL,
+  screenshot_type TEXT NOT NULL DEFAULT \'\',
+  status TEXT NOT NULL DEFAULT \'open\',
+  reason TEXT DEFAULT NULL,
+  reviewed_by INTEGER DEFAULT NULL,
+  reviewed_at INTEGER DEFAULT NULL,
+  created_at INTEGER NOT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {report_inbox}_uuid ON {report_inbox} (uuid)',
+                    'CREATE INDEX IF NOT EXISTS {report_inbox}_user_id ON {report_inbox} (user_id)',
+                    'CREATE INDEX IF NOT EXISTS {report_inbox}_status ON {report_inbox} (status)',
+                ],
+            ],
         ];
     }
 
