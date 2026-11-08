@@ -188,11 +188,12 @@ final class Api
     /**
      * Mehrere Konten anlegen: alle Einträge vorab prüfen (Namen, Benutzernamen und E-Mail auch untereinander,
      * Anfangspunkte, Dienstgrad); bei einem Fehler wird keiner angelegt und die Meldung nennt die Zeile. Scheitert danach
-     * doch eines (z. B. Datenbank), steht es mit Grund im Ergebnis.
+     * doch eines (z. B. Datenbank), steht es mit Grund im Ergebnis. Mit no_access je Person ohne Zugang (kein
+     * Startpasswort, im Ergebnis no_access statt password; MemberService::insert). Rolle und Zusatzrollen gelten für alle.
      *
      * @return list<array<string, mixed>>
      */
-    private function createUsers(mixed $level, mixed $people): array
+    private function createUsers(mixed $level, mixed $people, mixed $extraRoles = null): array
     {
         $level = $level ?? Roles::MEMBER;
         if (!is_array($people) || $people === []) {
@@ -206,7 +207,7 @@ final class Api
         foreach (array_values($people) as $i => $p) {
             $p = is_array($p) ? $p : [];
             try {
-                $prepared = $this->app->members()->prepare(['level' => $level] + $p, $taken, $this->user());
+                $prepared = $this->app->members()->prepare(['level' => $level, 'extra_roles' => $extraRoles] + $p, $taken, $this->user());
                 $initial = $this->app->ranks()->prepareInitial($this->user(), $p);
                 if (($initial['points'] > 0 || $initial['rank'] !== null) && $level !== Roles::MEMBER) {
                     throw ApiError::invalid('Anfangspunkte und Dienstgrad gibt es nur für Mitglieder.');
@@ -219,12 +220,12 @@ final class Api
                 $who = $label !== '' ? ' (' . $label . ')' : '';
                 throw new ApiError($e->status, $e->errorCode, sprintf('Zeile %d%s: %s', $i + 1, $who, $e->getMessage()));
             }
-            $plans[] = [$prepared, $initial, $birthday, $photo];
+            $plans[] = [$prepared, $initial, $birthday, $photo, Input::bool($p['no_access'] ?? null)];
         }
         $out = [];
-        foreach ($plans as [$prepared, $initial, $birthday, $photo]) {
+        foreach ($plans as [$prepared, $initial, $birthday, $photo, $noAccess]) {
             try {
-                $created = $this->app->members()->insert($prepared);
+                $created = $this->app->members()->insert($prepared, $noAccess);
             } catch (\Throwable $e) {
                 $out[] = ['name' => $prepared['name'], 'username' => $prepared['login'], 'error' => $e instanceof ApiError ? $e->getMessage() : 'Konnte nicht angelegt werden.'];
                 continue;
@@ -558,8 +559,10 @@ final class Api
             // Bezeichnungen und Punktefaktor der Rollen (vom Admin in der App festgelegt)
             'roles' => $a->roles()->publicList(),
             // level ist die Grundrolle; extra_roles die Zusatzrollen (Issue #66), capabilities alle Rechte zusammen
-            // photo_url: eigenes Foto (Konto), null ohne
-            'user' => $user !== null ? $user->toArray() + ['extra_roles' => $a->roles()->extraRolesOf($user), 'photo_url' => $a->memberPhotos()->url($user->id)] : null,
+            // photo_url: eigenes Foto (Konto), null ohne; create_roles bzw. create_extra_roles: Grund- bzw. Zusatzrollen, die
+            // die Person beim Anlegen vergeben darf (RoleService::canCreateAs, creatableExtraRoles), nur mit create_users
+            'user' => $user !== null ? $user->toArray() + ['extra_roles' => $a->roles()->extraRolesOf($user), 'photo_url' => $a->memberPhotos()->url($user->id)]
+                + ($this->can(Cap::CreateUsers) ? ['create_roles' => $a->roles()->creatableRoles($user), 'create_extra_roles' => $a->roles()->creatableExtraRoles($user)] : []) : null,
             // Rechte ohne Anmeldung (die der Rolle Gast): Was die App dann zeigt
             'guestCapabilities' => array_map(static fn (Cap $c): string => $c->value, $a->roles()->guestCapabilities()),
             // Nur für Admins: Einrichtungsassistent beim ersten Öffnen anbieten.
@@ -1220,7 +1223,7 @@ final class Api
             new Route('POST', '/registrations/{id}/approve', Cap::CreateUsers, fn (Request $r) => $a->registrations()->approve($this->user(), $r->id(), $r->body), null, $denyUsers),
             new Route('POST', '/registrations/{id}/reject', Cap::CreateUsers, fn (Request $r) => $a->registrations()->reject($r->id(), $r->input('reason')), null, $denyUsers),
             // Mehrere auf einmal (Issue #24): erst alle prüfen; bei einem Fehler wird keiner angelegt.
-            new Route('POST', '/users/bulk', Cap::CreateUsers, fn (Request $r) => Response::created($this->createUsers($r->input('level'), $r->input('people'))), null, $denyUsers),
+            new Route('POST', '/users/bulk', Cap::CreateUsers, fn (Request $r) => Response::created($this->createUsers($r->input('level'), $r->input('people'), $r->input('extra_roles'))), null, $denyUsers),
 
             // Einstellungen (Admins)
             // Nutzungsauswertung (Issue #175): nur Admins (view_activity); Erfassung je Person schalten mit den Einstellungen.

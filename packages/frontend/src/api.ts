@@ -95,6 +95,10 @@ export interface AppUser {
   capabilities: Capability[];
   /** Eigenes Foto (128 Pixel), null ohne; fehlt bei älteren Servern */
   photo_url?: string | null;
+  /** Rollen, die die Person beim Anlegen vergeben darf (nur mit create_users); fehlt bei älteren Servern */
+  create_roles?: Level[];
+  /** Zusatzrollen, die die Person beim Anlegen vergeben darf (nur mit create_users) */
+  create_extra_roles?: Level[];
 }
 
 export interface AppConfig {
@@ -280,6 +284,8 @@ export interface RoleInfo {
   points_factor: number;
   /** Als Zusatzrolle vergebbar (eigene Rollen, nicht Gast, Mitglied, Admin; Issue #66) */
   extra?: boolean;
+  /** Gehört zur Kompanie (Recht member, nicht Admin): nur dazu gibt es Zusatzrollen; fehlt bei älteren Servern */
+  company?: boolean;
   /** Beim Anlegen von Konten wählbar (Mitglied immer, eigene Rollen nach Einstellung) */
   new_accounts?: boolean;
   /** Wer Mitglieder anlegen darf, macht Personen dieser Rolle zum Mitglied (z. B. Anwärter) */
@@ -307,8 +313,25 @@ export type RoleInput = {
 
 export const roleInfo = (level: Level): RoleInfo | undefined => config?.roles?.find((r) => r.key === level);
 
-/** Rollen, die neue Konten bekommen können (Mitglied und freigegebene eigene Rollen), in der Reihenfolge der Rollen. */
-export const newAccountRoles = (): RoleInfo[] => (config?.roles ?? []).filter((r) => r.key === 'member' || r.new_accounts);
+/**
+ * Rollen, die der angemeldete Benutzer neuen Konten geben darf (create_roles vom Server: Mitglied, die Rollen für neue
+ * Konten und, wer Rollen vergeben darf, die Rollen, die er vergeben dürfte), in der Reihenfolge der Rollen. Ältere
+ * Server ohne create_roles: Mitglied und die freigegebenen eigenen Rollen.
+ */
+export const newAccountRoles = (): RoleInfo[] => {
+  const allowed = config?.user?.create_roles;
+  return (config?.roles ?? []).filter((r) => (allowed ? allowed.includes(r.key) : r.key === 'member' || r.new_accounts));
+};
+
+/** Zusatzrollen, die der angemeldete Benutzer neuen Konten mit der Grundrolle base geben darf (leer: keine Auswahl). */
+export const newAccountExtraRoles = (base: Level): RoleInfo[] => {
+  const allowed = config?.user?.create_extra_roles ?? [];
+  if (!roleInfo(base)?.company) return [];
+  return (config?.roles ?? []).filter((r) => r.extra && r.key !== base && allowed.includes(r.key));
+};
+
+/** Rollen, die neue Konten über die Freigabe in Einstellungen → Rollen bekommen können (Mitglied und „für neue Konten“). */
+export const registrationRoles = (): RoleInfo[] => (config?.roles ?? []).filter((r) => r.key === 'member' || r.new_accounts);
 
 export const levelLabel = (level: Level): string =>
   roleInfo(level)?.label ?? (brand.labels.roles as Record<string, string | undefined>)[level] ?? level;
@@ -341,14 +364,20 @@ export async function refreshRoles(): Promise<RoleAdmin[] | null> {
 /** Übernimmt geänderte Rollen in die geladene Konfiguration (Bezeichnungen überall in der App). */
 export function applyRoles(list: RoleAdmin[]): void {
   if (!config) return;
-  config.roles = list.map(({ key, label, points_factor, system, new_accounts, promotable }) => ({
+  config.roles = list.map(({ key, label, points_factor, system, new_accounts, promotable, capabilities }) => ({
     key,
     label,
     points_factor,
     extra: !system,
+    company: key !== 'admin' && capabilities.includes('member'),
     new_accounts,
     promotable,
   }));
+  // Admins dürfen beim Anlegen jede Rolle vergeben (Admin nur in der eigenständigen Version): neue Rollen gleich mit.
+  if (config.user?.level === 'admin' && config.user.create_roles) {
+    config.user.create_roles = list.map((r) => r.key).filter((k) => k !== 'admin' || config?.variant === 'standalone');
+    config.user.create_extra_roles = list.filter((r) => !r.system).map((r) => r.key);
+  }
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -740,6 +769,8 @@ export interface MemberImportRow {
   left_on?: string;
   /** Spalte Zugang „nein“: Mitglied ohne Zugang (kein Startpasswort) */
   no_access?: boolean;
+  /** Spalte Zusatzrollen: Bezeichnungen; fehlt ohne */
+  extra_roles?: string[];
   /** Konto mit genau diesem Namen gibt es schon: wird übersprungen */
   existing?: { id: number; name: string; former: boolean };
   error?: string;
@@ -1694,6 +1725,10 @@ export interface NewPerson extends PersonName {
   birthday?: string;
   /** Foto (JPG, PNG oder WebP als Base64) */
   photo?: EncodedFile;
+  /** Ohne Zugang anlegen: kein Startpasswort */
+  no_access?: boolean;
+  /** Zusatzrollen (nur mit promote_users) */
+  extra_roles?: Level[];
 }
 
 export interface AccountProfile extends PersonName {
@@ -1955,7 +1990,8 @@ export const api = {
     await request<{ changed: boolean }>('POST', '/me/password', { current_password, new_password });
     await refreshCsrf();
   },
-  createUsers: (level: Level, people: NewPerson[]) => request<BulkResult[]>('POST', '/users/bulk', { level, people }),
+  createUsers: (level: Level, people: NewPerson[], extraRoles: Level[] = []) =>
+    request<BulkResult[]>('POST', '/users/bulk', { level, people, ...(extraRoles.length > 0 ? { extra_roles: extraRoles } : {}) }),
   account: (id: number) => request<AccountProfile>('GET', `/members/${id}/account`),
   /** Eigene E-Mail-Adresse, Handynummer und Adresse; eine neue E-Mail-Adresse nur mit dem aktuellen Passwort. */
   ownAccount: () => request<OwnAccount>('GET', '/me/account'),
@@ -1993,6 +2029,8 @@ export const api = {
       photo?: EncodedFile;
       /** Ohne Zugang anlegen: kein Startpasswort, später „Zugang einrichten“ oder mit einer Anfrage verbinden */
       no_access?: boolean;
+      /** Zusatzrollen (nur mit promote_users und Rollen, die man vergeben darf) */
+      extra_roles?: Level[];
     },
   ) => request<CreatedUser>('POST', '/users', data),
   /** Foto eines Mitglieds hochladen bzw. ersetzen (vorher mit preparePhoto verkleinert). */

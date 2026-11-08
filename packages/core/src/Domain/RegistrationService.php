@@ -459,13 +459,18 @@ final class RegistrationService
         if ($linkTo !== null && $linkTo > 0) {
             return $this->approveLinked($actor, $row, $linkTo, $username);
         }
+        $level = is_string($in['level'] ?? null) && $in['level'] !== '' ? $in['level'] : $this->defaultRole();
+        // Admin nie über eine Anfrage: Wer sich selbst meldet, ist noch niemandem bekannt.
+        if ($level === Roles::ADMIN) {
+            throw ApiError::invalid(sprintf('Beim Freigeben lässt sich „%s“ nicht vergeben.', $this->app->roles()->label(Roles::ADMIN)));
+        }
         $taken = [];
         $prepared = $this->app->members()->prepare([
             'first_name' => (string) $row['first_name'],
             'last_name' => (string) $row['last_name'],
             'username' => $username,
             'email' => (string) $row['email'],
-            'level' => is_string($in['level'] ?? null) && $in['level'] !== '' ? $in['level'] : $this->defaultRole(),
+            'level' => $level,
         ], $taken, $actor);
         // Erst den Antrag beanspruchen (gleichzeitige Freigabe durch zwei Personen), dann das Konto anlegen.
         if ($this->db()->execute('DELETE FROM {registration_requests} WHERE id = ? AND status = ?', [$id, self::PENDING]) !== 1) {

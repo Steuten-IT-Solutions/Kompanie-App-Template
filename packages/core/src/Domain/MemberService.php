@@ -382,7 +382,7 @@ final class MemberService
      * Das Passwort steht nur in dieser Antwort; es wird keine E-Mail verschickt. Mit no_access ohne Zugang: kein
      * Startpasswort (siehe oben).
      *
-     * @param array<string, mixed> $in first_name, last_name (oder name), username, email, level (Rolle), no_access
+     * @param array<string, mixed> $in first_name, last_name (oder name), username, email, level (Rolle), extra_roles, no_access
      * @param User|null $actor wer anlegt (null: intern, z. B. Einrichtung)
      * @return array<string, mixed>
      */
@@ -399,10 +399,10 @@ final class MemberService
      * Beim Anlegen lassen sich alle persönlichen Angaben eintragen (phone, address), auch ohne view_personal: Eingeben ist
      * nicht Sehen, danach zeigt sie nur noch view_personal.
      *
-     * @param array<string, mixed> $in first_name, last_name (oder name), username, email, phone, address, level
+     * @param array<string, mixed> $in first_name, last_name (oder name), username, email, phone, address, level, extra_roles
      * @param array<string, true> $taken
      * @param User|null $actor wer anlegt (null: intern); bestimmt, welche Rollen neue Konten bekommen dürfen
-     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, level: string, phone: string, address: array<string, string>|null}
+     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, level: string, phone: string, address: array<string, string>|null, extra_roles: list<string>}
      */
     public function prepare(array $in, array &$taken, ?User $actor = null): array
     {
@@ -411,13 +411,19 @@ final class MemberService
         $level = $in['level'] ?? Roles::MEMBER;
         if ($level !== Roles::MEMBER) {
             $role = is_string($level) ? $this->roles?->find($level) : null;
-            if ($role === null || !$role['new_accounts']) {
+            if ($role === null) {
+                throw ApiError::invalid('Diese Rolle gibt es nicht.');
+            }
+            // Ohne $actor (intern) nur die Rollen für neue Konten; sonst, was $actor vergeben darf (RoleService::canCreateAs).
+            if ($actor === null && !$role['new_accounts']) {
                 throw ApiError::invalid('Diese Rolle lässt sich beim Anlegen nicht wählen; andere Rollen danach vergeben.');
             }
             if ($actor !== null && !$this->roles?->canCreateAs($actor, $level)) {
                 throw ApiError::forbidden(sprintf('Konten mit der Rolle „%s“ darfst du nicht anlegen.', $role['label']));
             }
         }
+
+        $extraRoles = $this->newExtraRoles($actor, (string) $level, $in['extra_roles'] ?? null);
 
         $login = trim(is_string($in['username'] ?? null) ? $in['username'] : '');
         $isTaken = fn (string $l): bool => isset($taken['login:' . mb_strtolower($l)]) || $this->users->loginExists($l);
@@ -449,7 +455,51 @@ final class MemberService
         $phone = self::phoneInput($in['phone'] ?? null);
         $address = Address::parse($in['address'] ?? null);
         $taken['login:' . mb_strtolower($login)] = true;
-        return ['name' => $name, 'first_name' => $first, 'last_name' => $last, 'login' => $login, 'email' => $email, 'level' => (string) $level, 'phone' => $phone, 'address' => $address];
+        return ['name' => $name, 'first_name' => $first, 'last_name' => $last, 'login' => $login, 'email' => $email, 'level' => (string) $level, 'phone' => $phone, 'address' => $address, 'extra_roles' => $extraRoles];
+    }
+
+    /**
+     * Zusatzrollen eines neuen Kontos (Issue #66) prüfen: wie bei „Rollen vergeben“ (checkExtraRoles) nur eigene Rollen,
+     * nur zu einer Grundrolle, die zur Kompanie gehört, und nur Rollen, die $actor vergeben darf (promote_users und
+     * RoleService::canHandle). Ohne $actor (intern) keine.
+     *
+     * @param mixed $raw Liste von Schlüsseln; null oder leer = keine
+     * @return list<string> in der Reihenfolge der Rollen
+     */
+    private function newExtraRoles(?User $actor, string $base, mixed $raw): array
+    {
+        if ($raw === null || $raw === [] || $raw === '') {
+            return [];
+        }
+        if ($this->roles === null || $actor === null) {
+            throw ApiError::invalid('Zusatzrollen lassen sich hier beim Anlegen nicht vergeben.');
+        }
+        if (!is_array($raw)) {
+            throw ApiError::invalid('Zusatzrollen bitte als Liste angeben.');
+        }
+        $wanted = [];
+        foreach ($raw as $key) {
+            if (!is_string($key) || !$this->roles->exists($key)) {
+                throw ApiError::invalid('Unbekannte Zusatzrolle.');
+            }
+            if (!RoleService::canBeExtra($key)) {
+                throw ApiError::invalid(sprintf('„%s“ ist nur als Grundrolle möglich, nicht als Zusatzrolle.', $this->roles->label($key)));
+            }
+            $wanted[$key] = true;
+        }
+        unset($wanted[$base]);
+        if ($wanted === []) {
+            return [];
+        }
+        if (!$this->roles->allowsExtraRoles($base)) {
+            throw ApiError::invalid(sprintf('Zusatzrollen gibt es nur zu einer Grundrolle, die zur Kompanie gehört, nicht zu „%s“.', $this->roles->label($base)));
+        }
+        foreach (array_keys($wanted) as $key) {
+            if (!$actor->can(Capability::PromoteUsers) || !$this->roles->canHandle($actor, $key)) {
+                throw ApiError::forbidden(sprintf('Die Zusatzrolle „%s“ darfst du nicht vergeben.', $this->roles->label($key)));
+            }
+        }
+        return array_values(array_filter(array_keys($this->roles->all()), static fn (string $k): bool => isset($wanted[$k])));
     }
 
     /**
@@ -489,7 +539,7 @@ final class MemberService
      * ist das Konto trotzdem angelegt; dann steht ein Hinweis in warning. Mit $noAccess ohne Zugang: Das Passwort erfährt
      * niemand, die Antwort hat no_access statt password.
      *
-     * @param array{name: string, first_name: string, last_name: string, login: string, email: string, level: string, phone?: string, address?: array<string, string>|null} $p
+     * @param array{name: string, first_name: string, last_name: string, login: string, email: string, level: string, phone?: string, address?: array<string, string>|null, extra_roles?: list<string>} $p
      * @return array<string, mixed>
      */
     public function insert(array $p, bool $noAccess = false): array
@@ -505,6 +555,16 @@ final class MemberService
             throw ApiError::invalid($e->getMessage());
         }
         $out = ['id' => $id, 'name' => $name, 'first_name' => $first, 'last_name' => $last, 'username' => $login, 'email' => $email, 'level' => $level];
+        $extra = $p['extra_roles'] ?? [];
+        if ($extra !== [] && $this->roles !== null) {
+            try {
+                $this->roles->setExtraRoles($id, $extra);
+                $out['extra_roles'] = $extra;
+            } catch (\Throwable $e) {
+                error_log('Kompanie-App: Zusatzrollen nicht übernommen: ' . $e->getMessage());
+                $out['warning'] = 'Angelegt, aber die Zusatzrollen fehlen noch. Bitte unter „Konto und Rolle“ nachtragen.';
+            }
+        }
         if ($noAccess) {
             $this->settings?->set($id, self::NO_ACCESS, '1');
             $out['no_access'] = true;
@@ -518,7 +578,7 @@ final class MemberService
                 $this->storeContacts($id, $phone !== '' ? $phone : null, $address ?? false);
             } catch (\Throwable $e) {
                 error_log('Kompanie-App: Handynummer bzw. Adresse nicht übernommen: ' . $e->getMessage());
-                $out['warning'] = 'Angelegt, aber Handynummer bzw. Adresse fehlen noch. Bitte in den Mitgliedsdetails nachtragen.';
+                $out['warning'] = trim(($out['warning'] ?? '') . ' Angelegt, aber Handynummer bzw. Adresse fehlen noch. Bitte in den Mitgliedsdetails nachtragen.');
             }
         }
         return $out;

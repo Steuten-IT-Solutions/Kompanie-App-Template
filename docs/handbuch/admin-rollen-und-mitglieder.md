@@ -27,7 +27,7 @@ Oben schaltest du zwischen **Rollen** (die Liste) und **Wer sieht was** (die Üb
 1. Tippe auf **+ Neue Rolle**.
 2. Trage den **Name der Rolle** ein (höchstens 30 Zeichen).
 3. Setze unter **Rechte** die Häkchen für alles, was die Rolle sieht und darf. Eine neue Rolle sieht zuerst, was {rolle.member} sieht. Die Rechte stehen in Gruppen; tippe auf den Namen einer Gruppe, um sie auf- oder zuzuklappen. Der Haken vor der Gruppe setzt oder entfernt alle Rechte der Gruppe auf einmal.
-4. Stelle bei Bedarf unter **Konten** ein, ob die Rolle **Beim Anlegen neuer Konten wählbar** ist und ob, wer Mitglieder anlegen darf, Personen mit dieser Rolle als {rolle.member} aufnimmt.
+4. Stelle bei Bedarf unter **Konten** ein, ob die Rolle **Beim Anlegen neuer Konten wählbar** ist (dann auch für alle, die nur Mitglieder anlegen dürfen; wer Rollen vergeben darf, wählt beim Anlegen ohnehin jede Rolle, die er vergeben darf) und ob, wer Mitglieder anlegen darf, Personen mit dieser Rolle als {rolle.member} aufnimmt.
 5. Nutzt ihr {bereich.points} und gehört die Rolle zur Kompanie, trage den **{bereich.points}faktor** ein (z. B. 0,5 für die Hälfte).
 6. Tippe auf **Anlegen**.
 

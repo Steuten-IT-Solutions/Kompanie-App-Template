@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, levelLabel, newAccountRoles, type MemberImportResult, type MemberImportRow } from '../api';
+import { api, can, levelLabel, newAccountRoles, type MemberImportResult, type MemberImportRow } from '../api';
 import brand from '../generated/brand';
 import { formatAddress } from '../address';
 import { formatYearOrDate } from '../format';
@@ -59,7 +59,11 @@ const TEMPLATE_ROWS = [
 ];
 
 function downloadTemplate() {
-  const blob = new Blob([toCsv(TEMPLATE_HEADER, TEMPLATE_ROWS)], { type: 'text/csv;charset=utf-8' });
+  // Zusatzrollen nur für alle, die Rollen vergeben dürfen (sonst übergeht der Server die Spalte mit Hinweis).
+  const extra = can('promote_users');
+  const header = extra ? [...TEMPLATE_HEADER, 'Zusatzrollen'] : TEMPLATE_HEADER;
+  const rows = extra ? TEMPLATE_ROWS.map((r) => [...r, '']) : TEMPLATE_ROWS;
+  const blob = new Blob([toCsv(header, rows)], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'mitglieder-vorlage.csv';
@@ -160,7 +164,7 @@ export function MemberImport({ onDone, doneLabel }: { onDone: () => void; doneLa
   }
 
   const errors = result?.rows.filter((r) => r.error).length ?? 0;
-  // Rollen, die sich beim Anlegen wählen lassen (z. B. Mitglied, Anwärter)
+  // Rollen, die der Importierende beim Anlegen vergeben darf (z. B. Mitglied, Anwärter, Vorstand)
   const roles = newAccountRoles()
     .map((r) => r.label)
     .join(', ');
@@ -172,8 +176,8 @@ export function MemberImport({ onDone, doneLabel }: { onDone: () => void; doneLa
         Nachname, Status ({roles} oder ehemalig; leer heißt {levelLabel('member')}), Benutzername, E-Mail, Handynummer, Adresse (Straße,
         Hausnummer, Adresszusatz, PLZ, Ort, Land; leer heißt Deutschland), Geburtstag, Eintritt, Punkte, Dienstgrad, Titel sowie bei
         Ehemaligen Ausgeschieden und Grund (ausgetreten, verstorben, sonstiges). Mit Zugang „nein“ entsteht ein Mitglied ohne Zugang (leer
-        heißt ja). Daten als TT.MM.JJJJ, den Eintritt auch nur als Jahr. Die Reihenfolge der Spalten ist egal, andere Spalten werden
-        übergangen.
+        heißt ja).{can('promote_users') && ' Zusatzrollen trägst du mit Komma getrennt in die Spalte Zusatzrollen ein.'} Daten als
+        TT.MM.JJJJ, den Eintritt auch nur als Jahr. Die Reihenfolge der Spalten ist egal, andere Spalten werden übergangen.
       </p>
       <p className="muted small">
         Aktive bekommen ein Startpasswort, das nach dem Übernehmen einmal angezeigt wird, außer Mitglieder ohne Zugang. Ehemalige bekommen
@@ -245,6 +249,11 @@ export function MemberImport({ onDone, doneLabel }: { onDone: () => void; doneLa
                   <>
                     {' '}
                     <span className="badge badge-role">{r.status === 'former' ? 'Ehemalig' : levelLabel(r.level ?? 'member')}</span>
+                    {r.extra_roles?.map((label) => (
+                      <span key={label} className="badge badge-role">
+                        {label}
+                      </span>
+                    ))}
                     {r.no_access && <span className="badge badge-no-access">ohne Zugang</span>}
                   </>
                 )}

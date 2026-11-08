@@ -351,7 +351,7 @@ function RoleForm({
           <legend className="field-label">Konten</legend>
           <label className="toggle feature-toggle">
             <input type="checkbox" checked={newAccounts} onChange={(e) => setNewAccounts(e.target.checked)} />
-            <span>Beim Anlegen neuer Konten wählbar (sonst sind neue Konten {levelLabel('member')})</span>
+            <span>Beim Anlegen neuer Konten wählbar (auch für alle, die nur Mitglieder anlegen dürfen)</span>
           </label>
           <label className="toggle feature-toggle">
             <input

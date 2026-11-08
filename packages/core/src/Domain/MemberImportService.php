@@ -15,14 +15,16 @@ use KompanieApp\Core\Http\ApiError;
  * einer Excel-Datei gelesen, Tabulator-getrennt. Die Kopfzeile ist Pflicht und bestimmt die Spalten (Reihenfolge egal,
  * Groß- und Kleinschreibung egal, siehe COLUMNS).
  *
- * - status: Mitglied (auch leer), eine andere Rolle, die sich beim Anlegen wählen lässt (nach ihrer Bezeichnung, z. B.
- *   Anwärter), oder ehemalig. Ehemalige werden wie beim Import der Ehemaligen angelegt (FormerMemberService::createImported:
+ * - status: Mitglied (auch leer), eine andere Rolle (nach ihrer Bezeichnung, z. B. Anwärter oder Vorstand), die der
+ *   Importierende vergeben darf (RoleService::canCreateAs), oder ehemalig. Ehemalige werden wie beim Import der Ehemaligen angelegt (FormerMemberService::createImported:
  *   Konto ohne Anmeldung); die anderen bekommen ein Startpasswort, das nur in der Antwort von apply steht.
  * - Handynummer und Adresse (Straße, Hausnummer, Zusatz, PLZ, Ort, Land; Land als Name oder ISO-Code, leer =
  *   Deutschland) werden wie beim Anlegen geprüft (MemberService::prepare).
  * - Geburtstag, Eintritt, Punkte, Dienstgrad und Titel nur mit dem Bereich (und für Punkte, Dienstgrad und Titel mit dem
  *   Recht, sie zu verwalten); sonst wird die Spalte mit Hinweis übergangen. Punkte, Dienstgrad und Titel nur für Rollen mit
  *   Mitgliederbereich.
+ * - zusatzrollen: Bezeichnungen eigener Rollen, mit Komma getrennt, nur mit promote_users und nur Rollen, die der
+ *   Importierende vergeben darf (wie beim Anlegen, MemberService::prepare); nicht für Ehemalige.
  * - zugang: leer oder ja wie bisher (Startpasswort); nein legt ein Mitglied ohne Zugang an (MemberService::NO_ACCESS, kein
  *   Startpasswort, nicht in created). Bei Ehemaligen ohne Bedeutung (sie melden sich ohnehin nicht an).
  * - Wer genau so heißt wie ein vorhandenes Konto, wird übersprungen (existing); doppelte Namen in der Tabelle sind ein
@@ -61,12 +63,13 @@ final class MemberImportService
         'left' => ['ausgeschieden', 'austritt', 'austrittsdatum', 'ausgetreten'],
         'reason' => ['grund'],
         'access' => ['zugang', 'anmeldung'],
+        'extra_roles' => ['zusatzrollen', 'zusatzrolle'],
     ];
 
     /** Schreibweisen der Spalte Zugang (klein): true = mit Zugang */
     private const ACCESS = ['' => true, 'ja' => true, 'j' => true, 'yes' => true, 'x' => true, 'nein' => false, 'n' => false, 'no' => false, 'ohne' => false, 'kein' => false, 'keiner' => false];
 
-    /** Feste Schreibweisen des Status (klein); dazu die Bezeichnungen der Rollen, die sich beim Anlegen wählen lassen */
+    /** Feste Schreibweisen des Status (klein); dazu die Bezeichnungen der Rollen */
     private const STATUS = ['' => Roles::MEMBER, 'mitglied' => Roles::MEMBER, 'aktiv' => Roles::MEMBER, 'ehemalig' => self::STATUS_FORMER, 'ehemalige' => self::STATUS_FORMER, 'ehemaliger' => self::STATUS_FORMER];
 
     public function __construct(private readonly App $app)
@@ -102,7 +105,7 @@ final class MemberImportService
         foreach ($this->app->users->list(true) as $u) {
             $accounts[mb_strtolower($u->name)][] = $u;
         }
-        $context = $this->context();
+        $context = $this->context($actor);
         $taken = [];
         $seen = [];
         $rows = [];
@@ -219,6 +222,7 @@ final class MemberImportService
             'points' => !$features->enabled('points') ? $off('points', 'Punkte') : (!$actor->can(Capability::ManagePoints) ? 'du darfst keine Punkte vergeben' : null),
             'rank' => !$features->enabled('ranks') ? $off('ranks', 'Dienstgrade') : (!$actor->can(Capability::ManageRanks) ? 'du darfst keine Dienstgrade vergeben' : null),
             'titles' => !$features->enabled('titles') ? $off('titles', 'Titel') : (!$actor->can(Capability::ManageTitles) ? 'du darfst keine Titel vergeben' : null),
+            'extra_roles' => !$actor->can(Capability::PromoteUsers) ? 'du darfst keine Rollen vergeben' : null,
         ];
         $map = [];
         $ignored = [];
@@ -243,9 +247,12 @@ final class MemberImportService
     /**
      * Dienstgrade und Titel nach Bezeichnung (klein), einmal je Import.
      *
-     * @return array{ranks: array<string, int>, titles: array<string, array{id: int, title: string}>, linked: array<int, mixed>, levels: array<string, string>}
+     * Rollen nach Bezeichnung (klein): alle, damit eine Rolle, die $actor nicht vergeben darf, mit diesem Grund scheitert
+     * (MemberService::prepare) statt als unbekannt; creatable sind die, die er vergeben darf (für die Fehlermeldung).
+     *
+     * @return array{ranks: array<string, int>, titles: array<string, array{id: int, title: string}>, linked: array<int, mixed>, levels: array<string, string>, roles: array<string, string>, creatable: list<string>}
      */
-    private function context(): array
+    private function context(User $actor): array
     {
         $ranks = [];
         if ($this->app->features()->enabled('ranks')) {
@@ -261,21 +268,20 @@ final class MemberImportService
             }
             $linked = $this->app->offices()->linkedTitles();
         }
-        // Rollen für neue Konten nach Bezeichnung (klein); feste Schreibweisen gehen vor.
+        // Rollen nach Bezeichnung (klein); feste Schreibweisen gehen vor.
         $levels = [];
         foreach ($this->app->roles()->all() as $key => $r) {
-            if ($key === Roles::MEMBER || $r['new_accounts']) {
-                $levels[mb_strtolower($r['label'])] = $key;
-            }
+            $levels[mb_strtolower($r['label'])] = $key;
         }
-        return ['ranks' => $ranks, 'titles' => $titles, 'linked' => $linked, 'levels' => self::STATUS + $levels];
+        $creatable = $this->app->roles()->creatableRoles($actor);
+        return ['ranks' => $ranks, 'titles' => $titles, 'linked' => $linked, 'levels' => self::STATUS + $levels, 'roles' => $levels, 'creatable' => $creatable];
     }
 
     /**
      * Eine Zeile prüfen (ohne doppelte Namen und vorhandene Konten, die prüft import()).
      *
      * @param \Closure(string): string $get Zelle der Spalte
-     * @param array{ranks: array<string, int>, titles: array<string, array{id: int, title: string}>, linked: array<int, mixed>, levels: array<string, string>} $context
+     * @param array{ranks: array<string, int>, titles: array<string, array{id: int, title: string}>, linked: array<int, mixed>, levels: array<string, string>, roles: array<string, string>, creatable: list<string>} $context
      * @param array<string, true> $taken
      * @return array{status: string, prepared: array<string, mixed>, out: array<string, mixed>, initial: array<string, mixed>|null, title_ids: list<int>, birthday: array{month: int, day: int, year: int|null}|null, joined: string, former: array{reason: string, joined_on: string, founder: bool, left_on: string}|null}
      */
@@ -286,7 +292,7 @@ final class MemberImportService
         }
         $level = $context['levels'][mb_strtolower($get('status'))] ?? null;
         if ($level === null) {
-            $labels = array_map(fn (string $key): string => $this->app->roles()->label($key), array_values(array_unique(array_diff($context['levels'], [self::STATUS_FORMER]))));
+            $labels = array_map(fn (string $key): string => $this->app->roles()->label($key), $context['creatable']);
             throw ApiError::invalid(sprintf('Status „%s“ unbekannt: bitte %s oder ehemalig (leer = %s).', $get('status'), implode(', ', $labels), $this->app->roles()->label(Roles::MEMBER)));
         }
         $status = $level === self::STATUS_FORMER ? self::STATUS_FORMER : self::STATUS_ACTIVE;
@@ -352,6 +358,15 @@ final class MemberImportService
             }
         }
 
+        // Zusatzrollen nach Bezeichnung, mit Komma getrennt; prüfen wie beim Anlegen (MemberService::prepare).
+        $extraRoles = [];
+        foreach (array_filter(array_map('trim', explode(',', $get('extra_roles'))), static fn (string $t): bool => $t !== '') as $label) {
+            $extraRoles[] = $context['roles'][mb_strtolower($label)] ?? throw ApiError::invalid(sprintf('Zusatzrolle „%s“ gibt es nicht.', $label));
+        }
+        if ($extraRoles !== [] && $status === self::STATUS_FORMER) {
+            throw ApiError::invalid('Zusatzrollen gibt es nicht für Ehemalige.');
+        }
+
         // Benutzername und E-Mail zuletzt: prepare() merkt sie sich als vergeben.
         $prepared = $this->app->members()->prepare([
             'first_name' => $get('first_name'),
@@ -361,7 +376,11 @@ final class MemberImportService
             'phone' => $get('phone'),
             'address' => $this->address($get),
             'level' => $level,
+            'extra_roles' => $extraRoles,
         ], $taken, $actor);
+        if ($prepared['extra_roles'] !== []) {
+            $out['extra_roles'] = array_map(fn (string $key): string => $this->app->roles()->label($key), $prepared['extra_roles']);
+        }
         $out['username'] = $status === self::STATUS_FORMER || $noAccess ? '' : $prepared['login'];
         $out['email'] = $prepared['email'];
         $out['phone'] = $prepared['phone'];
@@ -388,7 +407,7 @@ final class MemberImportService
         $id = (int) $account['id'];
         $warnings = $this->extras($actor, $id, $plan);
         if ($warnings !== []) {
-            $account['warning'] = 'Angelegt, aber es fehlen noch: ' . implode(', ', $warnings) . '. Bitte in den Mitgliedsdetails nachtragen.';
+            $account['warning'] = trim(($account['warning'] ?? '') . ' Angelegt, aber es fehlen noch: ' . implode(', ', $warnings) . '. Bitte in den Mitgliedsdetails nachtragen.');
         }
         // Ohne Zugang gibt es keine Zugangsdaten zum Weitergeben (gezählt in new.no_access).
         if (!$plan['no_access']) {

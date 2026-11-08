@@ -12,16 +12,17 @@ Tippe unten auf **Verwaltung**, dann auf **Mitglieder**, auf **+ Mitglied anlege
 
 ## Was du hier siehst
 - **‹ Einzeln anlegen**: zurück zum Formular für eine Person.
-- **Rolle für alle**: nur, wenn ein {rolle.admin} weitere Rollen für neue Konten freigegeben hat (z. B. Anwärter). Die Rolle gilt für jede Person.
-- **Person 1**, **Person 2** …: je Person **Vorname**, **Nachname**, **Benutzername (optional)**, **E-Mail (optional)**, **Handynummer (optional)**, **Adresse (optional)** zum Aufklappen, **Geburtstag (optional)** und **Foto (optional)**. Für {rolle.member} gibt es, wenn du {bereich.points} verwalten darfst, auch **{bereich.points} (Anfangsbestand, optional)**.
+- **Rolle für alle**: die Rollen, die du vergeben darfst, wie beim [einzelnen Anlegen](seite:mitglieder-anlegen). Die Rolle gilt für jede Person.
+- **Zusatzrollen (optional)**: nur, wenn du Rollen vergeben darfst und die gewählte Rolle zur Kompanie gehört. Sie gelten für jede Person.
+- **Person 1**, **Person 2** …: je Person **Vorname**, **Nachname**, **Ohne Zugang (meldet sich noch nicht an)** (dann ohne Benutzername), **Benutzername (optional)**, **E-Mail (optional)**, **Handynummer (optional)**, **Adresse (optional)** zum Aufklappen, **Geburtstag (optional)** und **Foto (optional)**. Für {rolle.member} gibt es, wenn du {bereich.points} verwalten darfst, auch **{bereich.points} (Anfangsbestand, optional)**.
 - **+ Weitere Person**: fügt eine Zeile hinzu.
 - **Stand der Anfangspunkte**: das Datum für alle Anfangsbestände.
 - **Alle anlegen**.
 
 ## So gehst du vor
 ### Mehrere Personen anlegen
-1. Wähle, falls angeboten, die **Rolle für alle**.
-2. Trage je Person mindestens den Vornamen ein. Für mehr Personen tippe auf **+ Weitere Person**.
+1. Wähle, falls angeboten, die **Rolle für alle** und die **Zusatzrollen**.
+2. Trage je Person mindestens den Vornamen ein. Setze bei Personen, die sich noch nicht anmelden, den Haken **Ohne Zugang**. Für mehr Personen tippe auf **+ Weitere Person**.
 3. Tippe auf **Alle anlegen**.
 4. Drucke die Zugangsdaten aus (**Ausdrucken**, ein Zettel je Person) oder kopiere sie mit **Zugangsdaten kopieren**, und gib sie persönlich weiter.
 
@@ -30,7 +31,7 @@ Tippe unten auf **Verwaltung**, dann auf **Mitglieder**, auf **+ Mitglied anlege
 - Die App prüft zuerst alle Einträge. Ist einer ungültig (z. B. ein vergebener Benutzername), wird niemand angelegt, und die Meldung nennt die Zeile.
 - Die Fotos lädt die App danach einzeln hoch. Klappt eines nicht, steht das bei der Person; du trägst das Foto dann auf ihrer Seite nach.
 - Den {begriff.rank} trägst du hier nicht ein, sondern danach auf der Seite jedes Mitglieds.
-- Die Startpasswörter stehen **nur dieses eine Mal** da.
+- Die Startpasswörter stehen **nur dieses eine Mal** da. Personen **ohne Zugang** bekommen keins; sie stehen in einer eigenen Zeile. Wie sie später einen Zugang bekommen, steht unter [Mitglied anlegen](seite:mitglieder-anlegen).
 
 ## Siehe auch
 - [Mitglied anlegen](seite:mitglieder-anlegen)
