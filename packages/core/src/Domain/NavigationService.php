@@ -31,6 +31,8 @@ final class NavigationService
     public const NAMES = 'navigation_names';
     public const START = 'navigation_start';
     public const LABELS = 'navigation_labels';
+    /** Ein String, kein false: WordPress speichert false als leeren String (get_option liefert dann ''). */
+    private const LABELS_OFF = 'off';
 
     /** Abschnitt (KompanieConfig::sectionLabel) je Bereich der Navigation; „mitglieder“ wählt sectionOverrides. */
     private const SECTIONS = [
@@ -219,7 +221,7 @@ final class NavigationService
     /** Zeigt die Tab-Leiste Namen unter den Symbolen? Standard: ja. */
     public function showLabels(): bool
     {
-        return $this->settings->get(self::LABELS) !== false;
+        return $this->settings->get(self::LABELS) !== self::LABELS_OFF;
     }
 
     /** Kann einen eigenen Namen bekommen: ein Bereich, eine eigene Seite oder „Intern“ der Standardnavigation. */
@@ -258,7 +260,7 @@ final class NavigationService
             if (!is_bool($body['show_labels'])) {
                 throw ApiError::invalid('show_labels muss true oder false sein.');
             }
-            $body['show_labels'] ? $this->settings->delete(self::LABELS) : $this->settings->set(self::LABELS, false);
+            $body['show_labels'] ? $this->settings->delete(self::LABELS) : $this->settings->set(self::LABELS, self::LABELS_OFF);
         }
         return $this->describe();
     }
