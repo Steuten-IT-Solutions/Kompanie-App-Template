@@ -8863,15 +8863,25 @@ components:
             blocks: { type: array, items: { $ref: '#/components/schemas/Block' }, description: 'Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur für Mitglieder bzw. mit manage_pages). Bestehende Seiten: ein Textblock aus body. Leere Textblöcke nur mit manage_pages.' }
 
     Block:
-      description: 'Vorgefertigter Block (eigene Seiten, News in der App). Unbekannte type lehnt der Server beim Speichern ab (400 invalid); die App übergeht sie beim Anzeigen.'
+      description: 'Vorgefertigter Block (eigene Seiten, News in der App, Schwarzes Brett). Unbekannte type lehnt der Server beim Speichern ab (400 invalid); die App übergeht sie beim Anzeigen.'
       oneOf:
         - $ref: '#/components/schemas/BlockText'
         - $ref: '#/components/schemas/BlockCountdown'
+        - $ref: '#/components/schemas/BlockButton'
+        - $ref: '#/components/schemas/BlockEvents'
+        - $ref: '#/components/schemas/BlockContacts'
+        - $ref: '#/components/schemas/BlockNotice'
+        - $ref: '#/components/schemas/BlockDivider'
       discriminator:
         propertyName: type
         mapping:
           text: '#/components/schemas/BlockText'
           countdown: '#/components/schemas/BlockCountdown'
+          button: '#/components/schemas/BlockButton'
+          events: '#/components/schemas/BlockEvents'
+          contacts: '#/components/schemas/BlockContacts'
+          notice: '#/components/schemas/BlockNotice'
+          divider: '#/components/schemas/BlockDivider'
     BlockBase:
       type: object
       required: [type]
@@ -8907,6 +8917,85 @@ components:
             starts_at: { type: [string, 'null'], format: date-time, readOnly: true, description: 'Nur in Antworten: Beginn in UTC; null, wenn der Termin fehlt oder für die Person nicht sichtbar ist (Bereich events, view_events): dann wie nach dem Ende' }
             ends_at: { type: [string, 'null'], format: date-time, readOnly: true, description: 'Nur in Antworten: Ende in UTC; null ohne Ende' }
             event_title: { type: [string, 'null'], readOnly: true, description: 'Nur in Antworten bei source event: Titel des Termins, null wenn nicht sichtbar' }
+    BlockButton:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [label, url]
+          properties:
+            type: { type: string, const: button }
+            label: { type: string, minLength: 1, maxLength: 60, description: Beschriftung }
+            url: { type: string, maxLength: 2000, description: 'Ziel: https://…, mailto:…, tel:… (Leerzeichen werden entfernt) oder eine Seite der App (#/…); sonst 400. In Mails als „Beschriftung: Ziel“, Seiten der App mit voller Adresse.' }
+            style: { type: string, enum: [primary, secondary], default: primary, description: 'primary: hervorgehoben; secondary: zurückhaltend' }
+    BlockEvents:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          properties:
+            type: { type: string, const: events }
+            title: { type: string, maxLength: 100, description: Überschrift (optional) }
+            count: { type: integer, minimum: 1, maximum: 20, default: 3, description: Wie viele der nächsten Termine }
+            events:
+              type: array
+              readOnly: true
+              description: 'Nur in Antworten: die nächsten count Termine ab heute; leer, wenn die Person keine Termine sehen darf (view_events). Ist der Bereich Termine aus, fehlt der Block (außer für die Pflege).'
+              items:
+                type: object
+                properties:
+                  id: { type: integer }
+                  title: { type: string }
+                  start_date: { type: string, format: date }
+                  start_time: { type: [string, 'null'] }
+                  end_date: { type: [string, 'null'], format: date }
+                  end_time: { type: [string, 'null'] }
+                  all_day: { type: boolean }
+                  start: { type: string, description: 'Wie bei GET /events (ganztägig: Datum; Ende exklusiv)' }
+                  end: { type: string }
+                  location: { type: string }
+    BlockContacts:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [office_ids]
+          properties:
+            type: { type: string, const: contacts }
+            title: { type: string, maxLength: 100, description: Überschrift (optional) }
+            office_ids: { type: array, minItems: 1, maxItems: 20, items: { type: integer }, description: 'Ämter in der Reihenfolge der Anzeige (müssen existieren; doppelte zählen einmal); gelöschte fallen beim Lesen weg' }
+            offices:
+              type: array
+              readOnly: true
+              description: 'Nur in Antworten: je Amt die Inhaber der laufenden Amtszeiten (Name und Foto wie GET /offices). Leer ohne view_offices; ist der Bereich Ämter aus, fehlt der Block (außer für die Pflege).'
+              items:
+                type: object
+                properties:
+                  id: { type: integer }
+                  title: { type: string }
+                  holders:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string }
+                        photo_url: { type: [string, 'null'] }
+                        email: { type: string, description: 'Nur mit view_personal und wenn GET /offices das Konto zeigt' }
+                        phone: { type: string, description: wie email }
+    BlockNotice:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [text]
+          properties:
+            type: { type: string, const: notice }
+            title: { type: string, maxLength: 100 }
+            text: { type: string, minLength: 1, maxLength: 1000, description: 'Reiner Text, Zeilenumbrüche bleiben' }
+            tone: { type: string, enum: [info, warning, success], default: info }
+    BlockDivider:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          properties:
+            type: { type: string, const: divider }
+            style: { type: string, enum: [line, space], default: line, description: 'line: Trennlinie; space: nur Abstand. In Mails nichts.' }
 
     Title:
       type: object

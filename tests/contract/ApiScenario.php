@@ -1613,6 +1613,10 @@ final class ApiScenario
         $c->ok($s === 200 && array_column((array) ($d['blocks'] ?? []), 'type') === ['text', 'countdown', 'text'] && ($d['body'] ?? '') === '<p>Kptest offen</p>', 'Seite aus Blöcken speichern');
         $c->ok(($d['blocks'][1]['starts_at'] ?? '') === '2099-06-12T12:00:00Z', 'Countdown: Ortszeit der Installation als UTC');
         $c->ok($this->req('PATCH', '/pages/' . ($pub['id'] ?? 0), ['blocks' => [['type' => 'video']]])[0] === 400, 'Unbekannter Block → 400');
+        $c->ok($this->req('PATCH', '/pages/' . ($pub['id'] ?? 0), ['blocks' => [['type' => 'button', 'label' => 'X', 'url' => 'javascript:alert(1)']]])[0] === 400, 'Knopf mit unsicherem Ziel → 400');
+        [$s, $k] = $this->req('POST', '/pages', ['title' => 'Kptest Knopf', 'blocks' => [['type' => 'button', 'label' => 'Termine', 'url' => '#/termine'], ['type' => 'events', 'count' => 2]]]);
+        $c->ok($s === 201 && ($k['blocks'][0]['url'] ?? '') === '#/termine' && is_array($k['blocks'][1]['events'] ?? null) && count($k['blocks'][1]['events']) <= 2, 'Knopf und Nächste Termine');
+        $this->req('DELETE', '/pages/' . ($k['id'] ?? 0));
         $this->d->actAs(null);
         [, $d] = $this->req('GET', '/pages/' . ($pub['id'] ?? 0));
         $c->ok(array_column((array) ($d['blocks'] ?? []), 'type') === ['text', 'countdown'], 'Ohne Anmeldung ohne Block nur für Mitglieder');

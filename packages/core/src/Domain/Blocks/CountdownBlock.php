@@ -8,7 +8,6 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\Input;
-use KompanieApp\Core\Domain\Text;
 use KompanieApp\Core\Http\ApiError;
 
 /**
@@ -48,7 +47,7 @@ final class CountdownBlock implements BlockType
             throw ApiError::invalid('Was soll nach dem Countdown passieren? Erlaubt sind text und hide.');
         }
         $out = [
-            'title' => $this->line($in['title'] ?? '', self::TITLE_MAX, 'Die Überschrift des Countdowns'),
+            'title' => Field::line($in['title'] ?? '', self::TITLE_MAX, 'Die Überschrift des Countdowns'),
             'source' => $source,
         ];
         if ($source === 'event') {
@@ -75,9 +74,9 @@ final class CountdownBlock implements BlockType
                 throw ApiError::invalid('Das Ende des Countdowns muss nach dem Beginn liegen.');
             }
         }
-        $out['running_text'] = $this->line($in['running_text'] ?? '', self::TEXT_MAX, 'Der Text, solange es läuft,');
+        $out['running_text'] = Field::line($in['running_text'] ?? '', self::TEXT_MAX, 'Der Text, solange es läuft,');
         $out['after'] = $after;
-        $out['after_text'] = $this->line($in['after_text'] ?? '', self::TEXT_MAX, 'Der Text nach dem Ende');
+        $out['after_text'] = Field::line($in['after_text'] ?? '', self::TEXT_MAX, 'Der Text nach dem Ende');
         return $out;
     }
 
@@ -179,15 +178,6 @@ final class CountdownBlock implements BlockType
             throw ApiError::invalid('Ungültige Uhrzeit (Format HH:MM).');
         }
         return $value;
-    }
-
-    private function line(mixed $value, int $max, string $what): string
-    {
-        $s = Text::line($value, $max + 1);
-        if (mb_strlen($s) > $max) {
-            throw ApiError::invalid(sprintf('%s darf höchstens %d Zeichen lang sein.', $what, $max));
-        }
-        return $s;
     }
 
     private static function iso(?\DateTimeImmutable $dt): ?string

@@ -117,3 +117,22 @@ test('Inhalt vorhanden: nicht nur leere Textblöcke (Schwarzes Brett)', () => {
   assert.equal(hasContent([text('<p><img data-image="ab"></p>')]), true);
   assert.equal(hasContent([text(''), newBlock('countdown')]), true);
 });
+
+test('Knopf und Nächste Termine: neue Blöcke, ohne die Termine vom Server zum Speichern', () => {
+  const button = newBlock('button');
+  assert.deepEqual({ ...button, id: '' }, { id: '', type: 'button', audience: 'all', label: '', url: 'https://', style: 'primary' });
+  const events = newBlock('events', 'members');
+  assert.deepEqual({ ...events, id: '' }, { id: '', type: 'events', audience: 'members', title: '', count: 3 });
+  const drafts = draftsFrom([{ id: 'e1', type: 'events', audience: 'all', title: 'Demnächst', count: 2, events: [] }], '');
+  assert.deepEqual(drafts, [{ id: 'e1', type: 'events', audience: 'all', title: 'Demnächst', count: 2 }]);
+  assert.deepEqual(blocksInput(drafts), drafts);
+  assert.equal(hasContent([button]), true);
+});
+
+test('Ansprechpartner, Hinweis und Trennlinie: neue Blöcke, ohne die Ämter vom Server zum Speichern', () => {
+  assert.deepEqual({ ...newBlock('contacts'), id: '' }, { id: '', type: 'contacts', audience: 'all', title: '', office_ids: [] });
+  assert.deepEqual({ ...newBlock('notice'), id: '' }, { id: '', type: 'notice', audience: 'all', title: '', text: '', tone: 'info' });
+  assert.deepEqual({ ...newBlock('divider'), id: '' }, { id: '', type: 'divider', audience: 'all', style: 'line' });
+  const drafts = draftsFrom([{ id: 'c1', type: 'contacts', audience: 'all', title: '', office_ids: [2, 1], offices: [] }], '');
+  assert.deepEqual(blocksInput(drafts), [{ id: 'c1', type: 'contacts', audience: 'all', title: '', office_ids: [2, 1] }]);
+});

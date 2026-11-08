@@ -1,15 +1,188 @@
 import { Suspense, useEffect, useState, type ReactNode } from 'react';
-import { api, type BlockAudience, type PublicEvent } from '../api';
+import { api, type BlockAudience, type Office, type PublicEvent } from '../api';
 import { Loading, lazyView } from '../ui';
-import { BLOCK_KINDS, moveBlock, newBlock, type BlockDraft, type BlockKind, type CountdownDraft } from './blockDrafts';
+import {
+  BLOCK_KINDS,
+  moveBlock,
+  newBlock,
+  type BlockDraft,
+  type BlockKind,
+  type ButtonDraft,
+  type ContactsDraft,
+  type CountdownDraft,
+  type DividerDraft,
+  type EventsDraft,
+  type NoticeDraft,
+} from './blockDrafts';
 import Countdown from './Countdown';
 import { previewRange } from './countdown';
 
 const RichTextEditor = lazyView(() => import('../richtext/RichTextEditor'));
 
-/** Grenzen wie auf dem Server (CountdownBlock::TITLE_MAX, TEXT_MAX). */
+/** Grenzen wie auf dem Server (CountdownBlock::TITLE_MAX, TEXT_MAX, ButtonBlock::LABEL_MAX, EventsBlock::MAX). */
 const TITLE_MAX = 100;
 const TEXT_MAX = 200;
+const LABEL_MAX = 60;
+const EVENTS_MAX = 20;
+const NOTICE_MAX = 1000;
+const OFFICES_MAX = 20;
+
+let offices: Promise<Office[]> | null = null;
+/** Ämter zur Auswahl, einmal je Sitzung geladen (ohne Bereich Ämter: keine). */
+function allOffices(): Promise<Office[]> {
+  offices ??= api.offices().then(
+    (o) => o.offices,
+    () => {
+      offices = null;
+      return [];
+    },
+  );
+  return offices;
+}
+
+function ContactsFields({ block, onChange }: { block: ContactsDraft; onChange: (b: ContactsDraft) => void }) {
+  const set = (patch: Partial<ContactsDraft>) => onChange({ ...block, ...patch });
+  const [list, setList] = useState<Office[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void allOffices().then((l) => alive && setList(l));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const toggle = (id: number, on: boolean) =>
+    set({ office_ids: on ? [...block.office_ids, id].slice(0, OFFICES_MAX) : block.office_ids.filter((x) => x !== id) });
+  return (
+    <div className="block-contacts-fields">
+      <label className="field">
+        <span>Überschrift (optional)</span>
+        <input
+          type="text"
+          maxLength={TITLE_MAX}
+          value={block.title}
+          placeholder="z. B. Sprich uns an"
+          onChange={(e) => set({ title: e.target.value })}
+        />
+      </label>
+      <fieldset className="block-offices">
+        <legend>Ämter</legend>
+        {list === null ? (
+          <Loading shape="text" />
+        ) : list.length === 0 ? (
+          <p className="muted small">Noch keine Ämter angelegt.</p>
+        ) : (
+          list.map((o) => (
+            <label key={o.id} className="toggle">
+              <input type="checkbox" checked={block.office_ids.includes(o.id)} onChange={(e) => toggle(o.id, e.target.checked)} /> {o.title}
+            </label>
+          ))
+        )}
+        <span className="muted small">
+          Die App zeigt, wer das Amt gerade innehat, in der Reihenfolge deiner Auswahl. E-Mail-Adresse und Handynummer sehen nur Personen,
+          die persönliche Angaben sehen dürfen.
+        </span>
+      </fieldset>
+    </div>
+  );
+}
+
+function NoticeFields({ block, onChange }: { block: NoticeDraft; onChange: (b: NoticeDraft) => void }) {
+  const set = (patch: Partial<NoticeDraft>) => onChange({ ...block, ...patch });
+  return (
+    <div className="block-notice-fields">
+      <label className="field">
+        <span>Überschrift (optional)</span>
+        <input type="text" maxLength={TITLE_MAX} value={block.title} onChange={(e) => set({ title: e.target.value })} />
+      </label>
+      <label className="field">
+        <span>Hinweis</span>
+        <textarea maxLength={NOTICE_MAX} rows={3} value={block.text} onChange={(e) => set({ text: e.target.value })} required />
+      </label>
+      <label className="field">
+        <span>Art</span>
+        <select value={block.tone} onChange={(e) => set({ tone: e.target.value as NoticeDraft['tone'] })}>
+          <option value="info">Info</option>
+          <option value="warning">Warnung</option>
+          <option value="success">Erfolg</option>
+        </select>
+      </label>
+    </div>
+  );
+}
+
+function DividerFields({ block, onChange }: { block: DividerDraft; onChange: (b: DividerDraft) => void }) {
+  return (
+    <label className="field">
+      <span>Art der Trennung</span>
+      <select value={block.style} onChange={(e) => onChange({ ...block, style: e.target.value as DividerDraft['style'] })}>
+        <option value="line">Linie</option>
+        <option value="space">Nur Abstand</option>
+      </select>
+    </label>
+  );
+}
+
+function ButtonFields({ block, onChange }: { block: ButtonDraft; onChange: (b: ButtonDraft) => void }) {
+  const set = (patch: Partial<ButtonDraft>) => onChange({ ...block, ...patch });
+  return (
+    <div className="block-button-fields">
+      <label className="field">
+        <span>Beschriftung</span>
+        <input
+          type="text"
+          maxLength={LABEL_MAX}
+          value={block.label}
+          placeholder="z. B. Jetzt anmelden"
+          onChange={(e) => set({ label: e.target.value })}
+          required
+        />
+      </label>
+      <label className="field">
+        <span>Ziel</span>
+        <input type="text" inputMode="url" value={block.url} onChange={(e) => set({ url: e.target.value })} required />
+        <span className="muted small">
+          Eine Adresse mit https://, eine E-Mail-Adresse mit mailto:, eine Telefonnummer mit tel: oder eine Seite der App wie #/termine.
+        </span>
+      </label>
+      <label className="field">
+        <span>Aussehen</span>
+        <select value={block.style} onChange={(e) => set({ style: e.target.value as ButtonDraft['style'] })}>
+          <option value="primary">Hervorgehoben</option>
+          <option value="secondary">Zurückhaltend</option>
+        </select>
+      </label>
+    </div>
+  );
+}
+
+function EventsFields({ block, onChange }: { block: EventsDraft; onChange: (b: EventsDraft) => void }) {
+  const set = (patch: Partial<EventsDraft>) => onChange({ ...block, ...patch });
+  return (
+    <div className="block-events-fields">
+      <label className="field">
+        <span>Überschrift (optional)</span>
+        <input
+          type="text"
+          maxLength={TITLE_MAX}
+          value={block.title}
+          placeholder="z. B. Unsere nächsten Termine"
+          onChange={(e) => set({ title: e.target.value })}
+        />
+      </label>
+      <label className="field">
+        <span>Wie viele Termine</span>
+        <input
+          type="number"
+          min={1}
+          max={EVENTS_MAX}
+          value={block.count}
+          onChange={(e) => set({ count: Math.max(1, Math.min(EVENTS_MAX, Number(e.target.value) || 1)) })}
+        />
+        <span className="muted small">Die App zeigt immer die nächsten Termine ab heute aus den Terminen.</span>
+      </label>
+    </div>
+  );
+}
 
 /** Auswahl „+ Block einfügen“ an einer Stelle der Liste. */
 function InsertBlock({ onInsert, label = '+ Block einfügen' }: { onInsert: (type: BlockKind) => void; label?: string }) {
@@ -250,6 +423,16 @@ export default function BlocksEditor({
               <Suspense fallback={<Loading shape="text" chunk />}>
                 <RichTextEditor value={b.html} onChange={(html) => update(i, { ...b, html })} label="Text" id={id} />
               </Suspense>
+            ) : b.type === 'button' ? (
+              <ButtonFields block={b} onChange={(c) => update(i, c)} />
+            ) : b.type === 'events' ? (
+              <EventsFields block={b} onChange={(c) => update(i, c)} />
+            ) : b.type === 'contacts' ? (
+              <ContactsFields block={b} onChange={(c) => update(i, c)} />
+            ) : b.type === 'notice' ? (
+              <NoticeFields block={b} onChange={(c) => update(i, c)} />
+            ) : b.type === 'divider' ? (
+              <DividerFields block={b} onChange={(c) => update(i, c)} />
             ) : (
               <CountdownFields block={b} onChange={(c) => update(i, c)} idPrefix={id} />
             )}

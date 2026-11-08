@@ -192,11 +192,69 @@ export interface CountdownBlock extends BlockBase {
   starts_at: string | null;
   ends_at: string | null;
 }
-export type Block = TextBlock | CountdownBlock;
+/** Knopf mit Link: https:, mailto:, tel: oder eine Seite der App (#/…) */
+export interface ButtonBlock extends BlockBase {
+  type: 'button';
+  label: string;
+  url: string;
+  style: 'primary' | 'secondary';
+}
+/** Termin im Block „Nächste Termine“ (wie PublicEvent, ohne Beschreibung) */
+export interface BlockEvent {
+  id: number;
+  title: string;
+  start_date: string;
+  start_time: string | null;
+  end_date: string | null;
+  end_time: string | null;
+  all_day: boolean;
+  start: string;
+  end: string;
+  location: string;
+}
+/** Nächste Termine: die nächsten count ab heute (vom Server, immer aktuell; leer ohne Recht auf Termine) */
+export interface EventsBlock extends BlockBase {
+  type: 'events';
+  title: string;
+  count: number;
+  events: BlockEvent[];
+}
+/** Person im Block „Ansprechpartner“: E-Mail und Handynummer nur mit view_personal */
+export interface BlockContact {
+  name: string;
+  photo_url: string | null;
+  email?: string;
+  phone?: string;
+}
+/** Ansprechpartner: ausgewählte Ämter mit den Inhabern ihrer laufenden Amtszeit (vom Server) */
+export interface ContactsBlock extends BlockBase {
+  type: 'contacts';
+  title: string;
+  office_ids: number[];
+  offices: { id: number; title: string; holders: BlockContact[] }[];
+}
+/** Hinweis-Kasten: kurzer reiner Text, farbig */
+export interface NoticeBlock extends BlockBase {
+  type: 'notice';
+  title: string;
+  text: string;
+  tone: 'info' | 'warning' | 'success';
+}
+/** Trennlinie oder Abstand */
+export interface DividerBlock extends BlockBase {
+  type: 'divider';
+  style: 'line' | 'space';
+}
+export type Block = TextBlock | CountdownBlock | ButtonBlock | EventsBlock | ContactsBlock | NoticeBlock | DividerBlock;
 /** Zum Speichern: wie gelesen, ohne die vom Server berechneten Felder (werden ignoriert). */
 export type BlockInput =
   | (Omit<TextBlock, 'id'> & { id?: string })
-  | (Omit<CountdownBlock, 'id' | 'starts_at' | 'ends_at' | 'event_title'> & { id?: string });
+  | (Omit<CountdownBlock, 'id' | 'starts_at' | 'ends_at' | 'event_title'> & { id?: string })
+  | (Omit<ButtonBlock, 'id'> & { id?: string })
+  | (Omit<EventsBlock, 'id' | 'events'> & { id?: string })
+  | (Omit<ContactsBlock, 'id' | 'offices'> & { id?: string })
+  | (Omit<NoticeBlock, 'id'> & { id?: string })
+  | (Omit<DividerBlock, 'id'> & { id?: string });
 
 /** Einstellungen → Navigation (Issue #277): gespeicherte Navigation und was der Server erlaubt. */
 export interface NavigationAdmin {

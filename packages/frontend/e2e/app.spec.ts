@@ -4675,6 +4675,70 @@ test('Eigene Seiten aus Blöcken: Countdown einfügen, Block nur für Mitglieder
   }
 });
 
+test('Eigene Seiten: Knopf mit Link und Nächste Termine, Gast sieht beide', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Seiten');
+  const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neue Seite' }) });
+  const title = `Mitmachen ${Date.now().toString(36)}`;
+  await form.getByLabel('Titel').fill(title);
+  await form.getByLabel('Für wen?').selectOption({ label: 'Alle, auch ohne Anmeldung' });
+  await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Sei dabei.');
+  await form.getByLabel('+ Block darunter einfügen').selectOption('button');
+  await form.getByLabel('Beschriftung').fill('Zu den Terminen');
+  await form.locator('.block-button-fields input[inputmode="url"]').fill('#/termine');
+  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('events');
+  await form.getByLabel('Überschrift (optional)').fill('Demnächst');
+  await form.getByLabel('Wie viele Termine').fill('2');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Seite angelegt');
+  const row = page.locator('.page-admin-list .row', { hasText: title });
+  try {
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await page.locator('.tabbar').getByRole('button', { name: title }).click();
+    const article = page.locator('.page-article');
+    await expect(article.getByRole('link', { name: 'Zu den Terminen' })).toHaveAttribute('href', '#/termine');
+    await expect(article.locator('.block-events h3')).toHaveText('Demnächst');
+    expect(await article.locator('.block-events-list li').count()).toBeLessThanOrEqual(2);
+    await article.getByRole('link', { name: 'Zu den Terminen' }).click();
+    await expect(page).toHaveURL(/#\/termine$/);
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD);
+    await adminMenu(page, 'Seiten');
+    page.once('dialog', (d) => d.accept());
+    await row.getByRole('button', { name: 'Löschen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  }
+});
+
+test('Eigene Seiten: Hinweis-Kasten und Trennlinie', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Seiten');
+  const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neue Seite' }) });
+  const title = `Hinweise ${Date.now().toString(36)}`;
+  await form.getByLabel('Titel').fill(title);
+  await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Oben.');
+  await form.getByLabel('+ Block darunter einfügen').selectOption('notice');
+  await form.getByLabel('Hinweis', { exact: true }).fill('Halle gesperrt.');
+  await form.locator('.block-notice-fields select').selectOption('warning');
+  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('divider');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Seite angelegt');
+  const row = page.locator('.page-admin-list .row', { hasText: title });
+  try {
+    await page.goto('/app/#/seiten');
+    await page.getByRole('button', { name: title }).first().click();
+    const article = page.locator('.page-article');
+    await expect(article.locator('.block-notice-warning')).toHaveText('Halle gesperrt.');
+    await expect(article.locator('hr.block-divider')).toHaveCount(1);
+  } finally {
+    await adminMenu(page, 'Seiten');
+    page.once('dialog', (d) => d.accept());
+    await row.getByRole('button', { name: 'Löschen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  }
+});
+
 test('Abzeichen: PNG und SVG hochladen, Mitglied sieht sie in der Liste und in „Meins“, offline, ohne eigene Fläche im Dunkelmodus', async ({
   page,
 }) => {
