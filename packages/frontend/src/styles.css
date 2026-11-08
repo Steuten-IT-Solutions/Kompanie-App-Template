@@ -2876,6 +2876,50 @@ fieldset.rights-tree legend {
 .report-done {
   padding: 16px;
 }
+/* Eigene Meldungen unter dem Formular und Eingang der Admins (Verwaltung → Fehlermeldungen) */
+.my-reports {
+  margin-top: 16px;
+  padding: 16px;
+}
+.my-reports ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.report-text {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  margin: 6px 0;
+}
+.report-review .report-meta {
+  margin: 8px 0;
+}
+.report-review .report-meta dl {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+}
+.report-review .report-meta dt {
+  font-weight: 700;
+  color: var(--ink-2);
+  margin-top: 6px;
+}
+.report-review .report-meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.report-shot-full {
+  display: block;
+  max-width: 100%;
+  margin: 8px 0;
+  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+}
+.reports-review h3.section-title {
+  margin-top: 20px;
+}
 
 /* Dienstgrade: eigener Dienstgrad als Karte mit Akzentlinie und Fortschrittsbalken */
 .rank-card {
@@ -6365,6 +6409,48 @@ button.spotlight-person:focus-visible {
 }
 .album-download {
   margin-bottom: 12px;
+}
+/* Albumtitel mit rundem Knopf zum Herunterladen rechts daneben (wie in der Großansicht) */
+.album-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.album-head .member-name {
+  min-width: 0;
+}
+.album-download-btn {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin-top: 2px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line-strong);
+  background: transparent;
+  color: var(--accent-text);
+  cursor: pointer;
+}
+.album-download-btn:hover {
+  background: color-mix(in srgb, var(--accent-text) 10%, transparent);
+}
+.album-download-btn:disabled {
+  cursor: default;
+}
+.album-download-btn .album-download-busy {
+  width: 22px;
+  height: 22px;
+}
+.album-download-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.album-download-progress p {
+  margin: 0;
 }
 .gallery-review-list {
   list-style: none;

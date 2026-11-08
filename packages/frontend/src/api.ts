@@ -58,6 +58,7 @@ export type Capability =
   | 'manage_personal'
   | 'create_users'
   | 'promote_users'
+  | 'review_reports'
   | 'view_activity'
   | 'manage_settings';
 export type Feature =
@@ -115,8 +116,10 @@ export interface AppConfig {
   handbookUrl?: string | null;
   /** Links auf Impressum und Datenschutzerklärung der Kompanie (Einstellungen → Impressum und Datenschutz); null ohne */
   legal?: { imprint: string | null; privacy: string | null };
-  /** „Fehler melden“ möglich (Issue #64): Die App hat einen Empfänger für Fehlermeldungen */
+  /** „Fehler melden“ möglich (Issue #64); Meldungen gehen zuerst an die Admins */
   reports?: boolean;
+  /** Offene Fehlermeldungen; nur für Angemeldete mit review_reports, sonst null */
+  openReports?: number | null;
   /** Zugang beantragen (Issue #314) eingeschaltet: Link „Zugang beantragen“ für Gäste; fehlt bei älteren Servern */
   registration?: boolean;
   /** Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null */
@@ -427,6 +430,13 @@ export function applyNavigation(navigation: NavigationSetting | null): void {
 export function applyPendingRegistrations(count: number): void {
   if (!config || config.pendingRegistrations == null) return;
   config.pendingRegistrations = count;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/** Zahl der offenen Fehlermeldungen nach dem Schließen oder Weiterleiten: Zähler in der Verwaltung. */
+export function applyOpenReports(count: number): void {
+  if (!config || config.openReports == null) return;
+  config.openReports = count;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -2601,7 +2611,49 @@ export const api = {
   setRegistrationSettings: (data: { enabled?: boolean; default_role?: Level }) =>
     request<RegistrationSettings>('PUT', '/admin/registration', data),
   sendReport: (data: ReportInput) => request<{ queued: boolean }>('POST', '/reports', data),
+  myReports: () => request<MyReport[]>('GET', '/reports/mine'),
+  reviewReports: () => request<{ forward: boolean; reports: ReviewReport[] }>('GET', '/reports/review'),
+  reportScreenshot: (id: number) => request<{ type: string; data: string }>('GET', `/reports/review/${id}/screenshot`),
+  closeReport: (id: number, reason: string) => request<ReviewReport>('POST', `/reports/review/${id}/close`, { reason }),
+  forwardReport: (id: number) => request<ReviewReport>('POST', `/reports/review/${id}/forward`),
 };
+
+export type ReportStatus = 'open' | 'closed' | 'forwarded';
+
+/** Eigene Fehlermeldung mit Stand (GET /reports/mine) */
+export interface MyReport {
+  id: number;
+  status: ReportStatus;
+  description: string;
+  /** Unix-Zeit */
+  created: number;
+  reason: string | null;
+  reviewed_at: number | null;
+}
+
+/** Fehlermeldung im Eingang der Admins (review_reports) */
+export interface ReviewReport {
+  id: number;
+  status: ReportStatus;
+  description: string;
+  expected: string;
+  page: string;
+  version: string;
+  variant: string;
+  user_agent: string;
+  role: string;
+  last_error: string | null;
+  user_id: number | null;
+  name: string | null;
+  /** Name geht beim Weiterleiten an die Betreuer mit */
+  share_name: boolean;
+  /** Bildschirmfoto vorhanden (nur offene) */
+  screenshot: boolean;
+  created: number;
+  reason: string | null;
+  reviewed_by: string | null;
+  reviewed_at: number | null;
+}
 
 /** Formular „Fehler melden“: Zeitmarke (Zeitfalle) und die Angaben, die der Server beifügt. */
 export interface ReportForm {
@@ -2610,6 +2662,8 @@ export interface ReportForm {
   minSeconds: number;
   /** Höchstgröße des Bildschirmfotos in Bytes */
   maxBytes: number;
+  /** Die Admins können Meldungen an die Betreuer weiterleiten; fehlt bei älteren Servern */
+  forward?: boolean;
   details: { version: string; role: string };
 }
 
@@ -2702,6 +2756,8 @@ export type PushType =
   | 'gallery_review'
   | 'gallery_submissions'
   | 'registrations'
+  | 'reports_review'
+  | 'reports'
   | 'penalties'
   | 'points'
   | 'ranks'

@@ -1,15 +1,16 @@
 # Fehlermeldungen (Format 1)
 
-Über **? → Fehler melden** kann jede Person, auch ohne Anmeldung, einen Fehler an die Betreuer der App melden
-(Issue #64). Die Installation schickt die Meldung signiert an das **Steuten IT Solutions Cockpit**
+Über **? → Fehler melden** kann jede Person, auch ohne Anmeldung, einen Fehler melden (Issue #64). Die Meldung landet
+zuerst im **Eingang der Admins** (Verwaltung → Fehlermeldungen, Recht `review_reports`). Sie schließen sie mit
+Begründung oder leiten sie weiter; erst dann schickt die Installation die Meldung signiert an das **Steuten IT Solutions Cockpit**
 (Repo `Steuten-IT-Solutions/project-cockpit`); das Cockpit legt daraus mit seiner GitHub App ein Issue in **einem
 privaten Repository für Meldungen** an (Vorschlag `Steuten-IT-Solutions/kompanie-meldungen`, Label
 `kompanie:<repo>` je Kompanie). Die Installationen haben keinen GitHub-Zugang.
 
 Der Empfänger steht in der Repo-Variable `KOMPANIE_REPORT_URL` (nur `https://`, z. B.
 `https://status.steuten-it-solutions.de/reports`) und kommt als `reportUrl` in die `update.json` des Pakets
-(`scripts/package.php --report-url`). Ohne sie gibt es in der App keinen Knopf „Fehler melden“ (`/config` →
-`reports: false`), und die Routen antworten 404 `reports_unavailable`.
+(`scripts/package.php --report-url`). Ohne sie bleiben Meldungen bei den Admins: `GET /reports/form` und
+`GET /reports/review` melden `forward: false`, Weiterleiten antwortet 409 `reports_not_forwardable`.
 
 Fehlermeldungen brauchen **keine** Zustimmung zu den [Statusmeldungen](STATUSMELDUNGEN.md): Jede Meldung hat
 ihre eigene Einwilligung im Formular.
@@ -20,19 +21,23 @@ ihre eigene Einwilligung im Formular.
 |---|---|
 | `GET /reports/form` | Zeitmarke (`token`, HMAC mit dem Geheimnis der Installation), `minSeconds`, `maxBytes` und die Angaben, die der Server beifügt (`version`, `role`). |
 | Formular | Beschreibung (Pflicht, ≤ 2000 Zeichen), „Was hast du erwartet?“ (≤ 2000), Bildschirmfoto (PNG/JPEG/WebP, ≤ 2 MB), „Meinen Namen mitschicken“ (nur angemeldet, Standard aus), Einwilligung (Pflicht). Darunter steht, was automatisch mitgeht: Seite in der App, App-Version, Gerät/Browser, Rolle bzw. „ohne Anmeldung“, Uhrzeit, letzte Fehlermeldung der App (nur im Speicher der Sitzung, `lastError.ts`). |
-| `POST /reports` | JSON, CSRF wie bei allen POSTs (eigenständig: Herkunft und `application/json`, angemeldet zusätzlich das Token; WordPress: REST-Nonce). Prüft Einwilligung, Längen, Bild (Signatur, `getimagesize`, Typ passend, Kante ≤ 10000 px, ≤ 40 Megapixel), Zeitfalle, Begrenzung; antwortet `201 {"queued": true}` erst, wenn die Meldung in `bug_reports` steht. |
-| Aufgabe `bug_reports` | stündlich, nach dem Einreihen vorgezogen (`Scheduler::runSoon`); läuft auch im Wartungsmodus. Je Lauf höchstens 10 Meldungen, jede einzeln (Zeitlimit 20 s). |
+| `POST /reports` | JSON, CSRF wie bei allen POSTs (eigenständig: Herkunft und `application/json`, angemeldet zusätzlich das Token; WordPress: REST-Nonce). Prüft Einwilligung, Längen, Bild (Signatur, `getimagesize`, Typ passend, Kante ≤ 10000 px, ≤ 40 Megapixel), Zeitfalle, Begrenzung; antwortet `201 {"queued": true}` erst, wenn die Meldung in `report_inbox` steht. Alle mit `review_reports` bekommen eine Benachrichtigung (Push-Art `reports_review`). |
+| Eingang | `GET /reports/review` (offene zuerst, erledigte 30 Tage), `GET /reports/review/{id}/screenshot`, `POST /reports/review/{id}/close` (Begründung Pflicht, ≤ 500 Zeichen; Bildschirmfoto wird gelöscht), `POST /reports/review/{id}/forward` (reiht in `bug_reports` ein, `report.name` nur mit „Namen mitschicken“). Die meldende Person (angemeldet) sieht den Stand unter `GET /reports/mine` und bekommt eine Benachrichtigung (Push-Art `reports`). |
+| Aufgabe `bug_reports` | stündlich, nach dem Weiterleiten vorgezogen (`Scheduler::runSoon`); läuft auch im Wartungsmodus und ohne Empfänger (Aufräumen des Eingangs). Je Lauf höchstens 10 Meldungen, jede einzeln (Zeitlimit 20 s). |
 
 **Gegen Spam ohne Captcha:** verstecktes Feld `website` (gefüllt → scheinbar `201`, nichts gespeichert),
 Zeitfalle (frühestens 3 s, spätestens 6 h nach dem Öffnen; sonst `429 too_fast` bzw. `400 form_expired`),
 höchstens 5 Meldungen je Anfragendem und Stunde (IP nur als SHA-256 im Zwischenspeicher, IPv6 je /64), höchstens
-30 je Installation und Tag (`429 too_many_attempts`), höchstens 50 wartende Meldungen (`503 reports_full`).
+30 je Installation und Tag (`429 too_many_attempts`), höchstens 100 offene Meldungen im Eingang (`503 reports_full`); beim Weiterleiten höchstens 50 wartende in der Warteschlange.
 
 **Speicher:** Tabelle `bug_reports` (Migration 15): Angaben als JSON, Bildschirmfoto als Base64 in derselben Zeile
 (eine Zeile = eine Meldung; Löschen entfernt alles auf einmal, keine verwaisten Dateien, nichts im öffentlichen
 Verzeichnis). Nicht in Sicherungen (keine Kerntabelle der Sicherung). `user_id` steht nur, wenn der Name
 mitgeht; dann wird die Meldung beim Löschen des Kontos mit gelöscht (`UserData`). Zugestellte Meldungen werden
-gelöscht, nicht zugestellte nach 7 Tagen.
+gelöscht, nicht zugestellte 7 Tage nach dem Weiterleiten. Davor: Eingang `report_inbox` (Migration 54) mit
+denselben Angaben, `user_id` der meldenden Person (0 ohne Anmeldung; mit dem Konto gelöscht), `share_name`, `status`
+(`open`, `closed`, `forwarded`), `reason`, `reviewed_by`, `reviewed_at`. Das Bildschirmfoto verschwindet dort beim
+Schließen bzw. Weiterleiten; erledigte Meldungen werden nach 30 Tagen gelöscht. Ebenfalls nicht in Sicherungen.
 
 ## Inhalt (abschließend)
 
@@ -93,7 +98,7 @@ Cron, bei Ausfall von GitHub später erneut).
 ## Datenschutz
 
 Beschreibung, Erwartung, Bildschirmfoto und ggf. Name sind personenbezogen bzw. können es sein. Deshalb:
-Einwilligung je Meldung mit Hinweis auf die Betreuer und das private Repository, Name nur auf Wunsch, alles vor
+Einwilligung je Meldung mit Hinweis auf die Admins, die Betreuer und das private Repository, Name an die Betreuer nur auf Wunsch (die Admins sehen angemeldete Personen), alles vor
 dem Absenden sichtbar, IP-Adressen nur gehasht und nur für die Begrenzung (im Zwischenspeicher, höchstens eine
 Stunde), keine Sicherungskopien, Löschen nach Zustellung bzw. 7 Tagen bzw. mit dem Konto. Hinweis für die
 Datenschutzerklärung: [Offene Punkte, Abschnitt 3](OFFENE-PUNKTE.md#3-rechtstexte-und-datenschutz).

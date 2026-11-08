@@ -558,11 +558,11 @@ final class BoardServiceTest extends TestCase
         $this->subscribe($this->cand, 'a');
         $this->subscribe(null, 'gast');
         $types = fn (): array => array_column($this->app->push()->repository()->all(), 'types', 'endpoint');
-        $this->assertSame(['events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/m']);
+        $this->assertSame(['reports', 'events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/m']);
 
         $this->app->features()->update(['board' => true]);
-        $this->assertSame(['board', 'events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/m'], 'beim ersten Einschalten dazu');
-        $this->assertSame(['board', 'events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/a'], 'auch Anwärter');
+        $this->assertSame(['board', 'reports', 'events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/m'], 'beim ersten Einschalten dazu');
+        $this->assertSame(['board', 'reports', 'events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/a'], 'auch Anwärter');
         $this->assertSame(['events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/gast'], 'Gäste nicht');
 
         // Danach entscheidet das Gerät: Aus- und wieder Einschalten des Bereichs ändert die Abos nicht mehr.

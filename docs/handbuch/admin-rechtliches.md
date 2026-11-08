@@ -37,7 +37,7 @@ Für eure Datenschutzerklärung: Je nachdem, welche Bereiche ihr eingeschaltet h
 - Bilder aus Google Drive (Kopien auf eurem Server) und Termine aus eurem Kalender,
 - Antworten in Umfragen (bei anonymen Umfragen getrennt von der Person gespeichert, aber nicht anonymisiert im Sinne der DSGVO),
 - je Person, wann sie welchen Bereich genutzt hat (siehe [Nutzung](seite:admin-nutzung)); das lässt sich ausschalten,
-- Statusmeldungen an die Betreuer der App, wenn ihr zugestimmt habt (ohne Namen und Inhalte), und Fehlermeldungen, die jemand über **Fehler melden** selbst abschickt,
+- Statusmeldungen an die Betreuer der App, wenn ihr zugestimmt habt (ohne Namen und Inhalte), Fehlermeldungen, die jemand über **Fehler melden** selbst abschickt (zuerst bei euren Admins, an die Betreuer erst, wenn ein Admin sie weiterleitet),
 - die Server-Logs eures Hosters (z. B. IP-Adressen); darauf hat die App keinen Einfluss.
 
 ## Siehe auch

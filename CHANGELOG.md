@@ -23,6 +23,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   (*Nur für Mitglieder* bzw. *Öffentlich zeigen*). Das dürfen alle, die die Einstellungen verwalten oder Einreichungen
   prüfen. Das Bild bekommt dabei eine neue Adresse, die alte liefert nichts mehr. Bilder aus Google Drive stellt
   weiterhin der Unterordner *intern* in Drive um.
+- **Fehlermeldungen zuerst an die Admins**: Was jemand über *Fehler melden* schickt, geht nicht mehr gleich an die
+  Betreuer der App, sondern landet unter *Verwaltung → Fehlermeldungen* (mit Zahl der offenen und einer
+  Benachrichtigung). Dort schließt ihr eine Meldung mit Begründung, z. B. wenn ihr selbst helfen konntet, oder leitet
+  sie an die Betreuer weiter; erst dann wird daraus ein Eintrag bei ihnen. Wer angemeldet meldet, sieht unter
+  *Deine Meldungen* den Stand und eure Begründung und wird benachrichtigt. Die Admins sehen den Namen angemeldeter
+  Personen; an die Betreuer geht er weiter nur mit Haken. Neues Recht *Fehlermeldungen bearbeiten*, das ihr an Rollen
+  vergeben könnt (Admins haben es immer). *Fehler melden* gibt es jetzt auch in Apps ohne Empfänger für
+  Fehlermeldungen; dort bleiben die Meldungen bei den Admins. Erledigte Meldungen werden nach 30 Tagen gelöscht.
 - **Rolle und Zusatzrollen gleich beim Anlegen**: Wer Rollen vergeben darf, wählt beim Anlegen eines Mitglieds jetzt
   jede Rolle, die er auch danach unter *Konto und Rolle* vergeben dürfte (z. B. Vorstand), und hakt Zusatzrollen an.
   Das gilt für *Mitglied anlegen*, *Mehrere auf einmal anlegen* (Rolle und Zusatzrollen für alle), den Import aus
@@ -82,6 +90,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Album herunterladen als kleiner Knopf**: In einem Album der Galerie steht statt des großen Knopfs *Album
+  herunterladen (… Bilder, ZIP)* jetzt rechts neben dem Titel ein runder Knopf mit Pfeil nach unten, wie beim
+  Herunterladen eines einzelnen Bildes. Die Anzahl der Bilder und Videos zeigt er beim Darüberfahren mit der Maus;
+  während des Ladens steht darunter „Lädt … von …“ mit *Abbrechen*.
 - **Banner des Schwarzen Bretts in einer Zeile**: Das Banner oben zeigt je Eintrag nur noch den Titel, ohne
   Überschrift, Verfasser und Uhrzeit (die stehen am Brett). Ein Tipp auf den Titel öffnet die Nachricht; *+1 weitere*
   und *Brett öffnen* erscheinen erst bei mehreren Einträgen. Auch laufende Umfragen stehen so in einer Zeile.

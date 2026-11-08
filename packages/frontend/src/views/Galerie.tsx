@@ -8,6 +8,7 @@ import {
   useState,
   type TouchEvent,
   type TouchList,
+  type ReactNode,
 } from 'react';
 import { api, can, type GalleryAlbum, type GalleryPhoto } from '../api';
 import { downloadablePhotos } from '../downloadFiles';
@@ -223,10 +224,7 @@ function Album({ id }: { id: number }) {
       <button className="btn btn-link back" onClick={() => navigate('galerie')}>
         ‹ Alle Alben
       </button>
-      <h2 className="member-name">
-        {album.title} <span className="muted album-year">{album.year}</span>
-      </h2>
-      {album.downloads && <AlbumDownload album={album} />}
+      <AlbumHeading album={album} />
       <ul className="photo-grid">
         {photos.map((p, i) => (
           <li key={p.id}>
@@ -282,7 +280,17 @@ function Album({ id }: { id: number }) {
  * Das ganze Album als ZIP (nur mit „Knöpfe zum Herunterladen zeigen“ in Einstellungen → Galerie). Die Bilder lädt der
  * Browser einzeln und packt sie selbst (galleryDownload.ts), Videos eingeschlossen.
  */
-function AlbumDownload({ album }: { album: GalleryAlbum }) {
+/** Titel des Albums, rechts daneben der Knopf zum Herunterladen als ZIP (wenn erlaubt). */
+function AlbumHeading({ album }: { album: GalleryAlbum }) {
+  const heading = (
+    <h2 className="member-name">
+      {album.title} <span className="muted album-year">{album.year}</span>
+    </h2>
+  );
+  return album.downloads ? <AlbumDownload album={album} heading={heading} /> : heading;
+}
+
+function AlbumDownload({ album, heading }: { album: GalleryAlbum; heading: ReactNode }) {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -291,7 +299,8 @@ function AlbumDownload({ album }: { album: GalleryAlbum }) {
   const list = downloadablePhotos(album.photos);
   const count = list.length;
   const videos = list.filter(isVideo).length;
-  if (count === 0) return null;
+  if (count === 0) return heading;
+  const label = `Album herunterladen (${mediaCount(count, videos)}, ZIP)`;
   const files = (n: number) => `${n} ${n === 1 ? 'Datei' : 'Dateien'}`;
 
   async function start() {
@@ -316,16 +325,22 @@ function AlbumDownload({ album }: { album: GalleryAlbum }) {
 
   return (
     <div className="album-download">
-      <div className="button-row">
-        <button type="button" className="btn btn-secondary" onClick={start} disabled={progress !== null}>
-          {progress ? `Lädt ${progress.done} von ${progress.total} …` : `Album herunterladen (${mediaCount(count, videos)}, ZIP)`}
+      <div className="album-head">
+        {heading}
+        <button type="button" className="album-download-btn" onClick={start} disabled={progress !== null} aria-label={label} title={label}>
+          {progress ? <span className="img-loading album-download-busy" aria-hidden="true" /> : <DownloadIcon />}
         </button>
-        {progress && (
+      </div>
+      {progress && (
+        <div className="album-download-progress">
+          <p className="small" role="status">
+            Lädt {progress.done} von {progress.total} …
+          </p>
           <button type="button" className="btn btn-link" onClick={() => abort.current?.abort()}>
             Abbrechen
           </button>
-        )}
-      </div>
+        </div>
+      )}
       {videos > 0 && !progress && !result && <p className="muted small">Mit Videos kann das ZIP groß werden; am besten im WLAN laden.</p>}
       {result && (
         <p className="small" role="status">

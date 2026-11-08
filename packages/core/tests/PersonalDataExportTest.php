@@ -162,7 +162,7 @@ final class PersonalDataExportTest extends TestCase
             'member_titles' => 'manage_titles', 'member_companies' => 'view_personal', 'gallery_submissions' => 'view_personal', 'member_roles' => 'create_users', 'attendance_entries' => 'manage_attendance',
             'poll_votes' => 'manage_polls', 'poll_answers' => 'manage_polls', 'birthdays' => 'view_personal', 'join_years' => 'view_personal',
             'member_photos' => 'view_personal', 'former_members' => 'create_users', 'member_contacts' => 'view_personal',
-            'bug_reports' => 'view_personal', 'user_signatures' => 'view_personal', 'user_settings' => 'view_personal',
+            'bug_reports' => 'view_personal', 'report_inbox' => 'view_personal', 'user_signatures' => 'view_personal', 'user_settings' => 'view_personal',
             'board_mails' => 'send_mail', 'mailing_recipients' => 'send_mail', 'activity' => 'view_activity', 'activity_last' => 'view_activity',
         ];
         $required = [...array_map(static fn ($c) => $c->value, \KompanieApp\Core\Domain\PersonalDataExport::OTHERS_REQUIRE), 'view_activity'];
