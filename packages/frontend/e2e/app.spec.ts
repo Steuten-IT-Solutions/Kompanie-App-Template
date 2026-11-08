@@ -1678,12 +1678,17 @@ test('Galerie: Album nur in der App anlegen, Bilder hochladen, ändern und lösc
   await expect(item.locator('.gallery-upload')).toHaveCount(3);
   const albumId = await page.evaluate(async (title) => {
     const cfg = window.KOMPANIE_CONFIG!;
-    const res = await fetch(cfg.apiBase + 'admin/gallery/albums', { credentials: 'same-origin' });
+    const res = await fetch(cfg.apiBase + 'admin/gallery/albums', {
+      credentials: 'same-origin',
+      headers: { [cfg.csrf.header]: cfg.csrf.token },
+    });
     return ((await res.json()) as { albums: { id: number; title: string }[] }).albums.find((a) => a.title === title)!.id;
   }, title);
   const video = await page.evaluate(async (id) => {
     const cfg = window.KOMPANIE_CONFIG!;
-    const album = (await (await fetch(cfg.apiBase + `gallery/${id}`, { credentials: 'same-origin' })).json()) as {
+    const album = (await (
+      await fetch(cfg.apiBase + `gallery/${id}`, { credentials: 'same-origin', headers: { [cfg.csrf.header]: cfg.csrf.token } })
+    ).json()) as {
       photos: { type: string; video?: string; mime?: string; width: number; height: number; duration?: number }[];
     };
     const v = album.photos.find((p) => p.type === 'video')!;
