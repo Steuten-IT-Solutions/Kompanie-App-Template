@@ -28,6 +28,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   vor, welche Personen ohne Profil schon als Mitglied (auch ohne Zugang), in der Mitgliederliste oder als Ehemalige
   angelegt sind, mit denselben toleranten Namensregeln wie bei den Anfragen. Mit *Verknüpfen* gehören alle Einträge
   mit diesem Namen zur gewählten Person; Titel, die das Amt vergibt, werden abgeglichen.
+- **Blöcke auch in den News**: Beiträge, die in der App geschrieben werden, bestehen ebenfalls aus Blöcken, mit
+  Countdown und *Für wen?* je Block. Vorschaubild der Liste ist das erste Bild in einem Text für alle.
 - **Mitglieder ohne Zugang**: Unter *Mitglied anlegen* gibt es den Haken *Ohne Zugang (meldet sich noch nicht an)*.
   So tragt ihr Personen ein, die noch kein Konto haben, z. B. für Chroniken und Ämter. Sie sind gewöhnliche Mitglieder,
   lassen sich überall auswählen und tragen in der Mitgliederliste der Verwaltung die Marke *ohne Zugang*; ein

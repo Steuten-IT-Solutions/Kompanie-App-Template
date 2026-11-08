@@ -993,7 +993,8 @@ paths:
               required: [title]
               properties:
                 title: { type: string, maxLength: 150 }
-                body: { type: string, description: Formatierter Text (wird bereinigt) }
+                body: { type: string, description: 'Für ältere Apps: formatierter Text als ein Textblock (wird bereinigt)' }
+                blocks: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Block' }, description: 'Inhalt aus Blöcken wie bei eigenen Seiten (hat Vorrang vor body); das erste Bild in einem Textblock für alle ist das Vorschaubild' }
       responses:
         '201':
           description: Angelegt
@@ -1036,7 +1037,8 @@ paths:
               type: object
               properties:
                 title: { type: string, maxLength: 150 }
-                body: { type: string }
+                body: { type: string, description: 'Für ältere Apps, wie bei POST' }
+                blocks: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Block' }, description: 'wie bei POST' }
                 updated_at: { type: string, format: date-time }
       responses:
         '200':
@@ -7900,7 +7902,8 @@ components:
         excerpt: { type: string }
         image: { type: [string, 'null'] }
         link: { type: string, description: Adresse auf der Webseite; leer bei Beiträgen der App }
-        content: { type: string, description: Nur bei der Einzelansicht }
+        content: { type: string, description: 'Nur bei der Einzelansicht; Quelle app: Text der Textblöcke für alle (für ältere Apps)' }
+        blocks: { type: array, items: { $ref: '#/components/schemas/Block' }, description: 'Nur Einzelansicht, Quelle app: Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur für Mitglieder bzw. mit manage_news)' }
         updated_at: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app, mit manage_news: Stand für PATCH' }
         updated_by_name: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app, mit manage_news' }
 
@@ -8825,7 +8828,7 @@ components:
             blocks: { type: array, items: { $ref: '#/components/schemas/Block' }, description: 'Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur für Mitglieder bzw. mit manage_pages). Bestehende Seiten: ein Textblock aus body. Leere Textblöcke nur mit manage_pages.' }
 
     Block:
-      description: 'Vorgefertigter Block einer eigenen Seite. Unbekannte type lehnt der Server beim Speichern ab (400 invalid); die App übergeht sie beim Anzeigen.'
+      description: 'Vorgefertigter Block (eigene Seiten, News in der App). Unbekannte type lehnt der Server beim Speichern ab (400 invalid); die App übergeht sie beim Anzeigen.'
       oneOf:
         - $ref: '#/components/schemas/BlockText'
         - $ref: '#/components/schemas/BlockCountdown'

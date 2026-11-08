@@ -232,7 +232,7 @@ final class RichImageService
         return match ($img['owner_type']) {
             self::OWNER_COMPANY => $this->companyVisible($viewer),
             self::OWNER_PAGE => $this->app->pages()->canSeeImage($viewer, $img['owner_id'], $img['uid'] ?? null),
-            self::OWNER_NEWS => $this->app->newsService()->canSeeImage($viewer, $img['owner_id']),
+            self::OWNER_NEWS => $this->app->newsService()->canSeeImage($viewer, $img['owner_id'], $img['uid'] ?? null),
             self::OWNER_OFFICE_GROUP_TERM, self::OWNER_OFFICE_HOLDER => $this->officesVisible($viewer),
             self::OWNER_DRAFT, self::OWNER_SIGNATURE => $viewer->id === $img['owner_id'],
             self::OWNER_BOARD => $this->app->board()->canSeeImage($viewer, $img['owner_id']),
@@ -251,7 +251,7 @@ final class RichImageService
         return match ($img['owner_type']) {
             self::OWNER_COMPANY => $this->companyVisible($this->app->anonymous()),
             self::OWNER_PAGE => $this->app->pages()->canSeeImage(null, $img['owner_id'], $img['uid'] ?? null),
-            self::OWNER_NEWS => $this->app->newsService()->canSeeImage(null, $img['owner_id']),
+            self::OWNER_NEWS => $this->app->newsService()->canSeeImage(null, $img['owner_id'], $img['uid'] ?? null),
             self::OWNER_OFFICE_GROUP_TERM, self::OWNER_OFFICE_HOLDER => $this->officesVisible($this->app->anonymous()),
             default => false,
         };

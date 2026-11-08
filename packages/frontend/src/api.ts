@@ -499,6 +499,8 @@ export interface NewsItem {
   /** Adresse auf der Webseite; leer bei Beiträgen, die in der App geschrieben wurden */
   link: string;
   content?: string;
+  /** News in der App: Inhalt aus Blöcken, nur die für die Person sichtbaren; fehlt bei anderen Quellen und älteren Servern */
+  blocks?: Block[];
   /** Nur für die Pflege der News in der App (manage_news): Stand für das Speichern (409 conflict) */
   updated_at?: string | null;
   updated_by_name?: string | null;
@@ -508,6 +510,7 @@ export interface NewsItem {
 export interface NewsInput {
   title?: string;
   body?: string;
+  blocks?: BlockInput[];
   updated_at?: string | null;
 }
 

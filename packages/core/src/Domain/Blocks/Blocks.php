@@ -92,6 +92,45 @@ final class Blocks
     }
 
     /**
+     * Inhalt aus einer Anfrage: blocks (hat Vorrang) oder body (ältere App, ein Textblock); null, wenn beides fehlt.
+     *
+     * @param array<string, mixed> $in
+     * @return list<array<string, mixed>>|null
+     */
+    public function fromInput(array $in, int $textMax): ?array
+    {
+        if (array_key_exists('blocks', $in)) {
+            return $this->validate($in['blocks'], $textMax);
+        }
+        if (!array_key_exists('body', $in)) {
+            return null;
+        }
+        if ($in['body'] !== null && !is_string($in['body'])) {
+            throw ApiError::invalid('Ungültiger Text.');
+        }
+        $html = RichText::sanitize((string) $in['body']);
+        $html = RichText::isEmpty($html) ? '' : $html;
+        if (strlen($html) > $textMax) {
+            throw ApiError::invalid('Der Text ist zu lang.');
+        }
+        return self::fromBody($html);
+    }
+
+    /**
+     * Spalten blocks und body zum Speichern; Bilder der Textblöcke gehören danach $ownerType/$ownerId, nicht mehr
+     * verwendete werden gelöscht.
+     *
+     * @param list<array<string, mixed>> $blocks
+     * @return array{blocks: string, body: string}
+     */
+    public function columns(array $blocks, User $actor, string $ownerType, int $ownerId): array
+    {
+        $blocks = $this->claim($blocks, $actor, $ownerType, $ownerId);
+        $body = self::publicBody($blocks);
+        return ['blocks' => self::encode($blocks, $body), 'body' => $body];
+    }
+
+    /**
      * Bisheriger Text als Liste mit einem Textblock (leer: keine Blöcke).
      *
      * @return list<array<string, mixed>>

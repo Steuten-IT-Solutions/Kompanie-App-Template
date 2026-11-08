@@ -1536,6 +1536,15 @@ final class ApiScenario
         $c->ok($s === 200 && ($d['title'] ?? '') === 'Kptest Beitrag geändert', 'Mit aktuellem Stand speichern');
         [$s, $d] = $this->req('PATCH', '/news/' . $id, ['title' => 'Zu spät', 'updated_at' => '2000-01-01T00:00:00Z']);
         $c->ok($s === 409 && ($d['code'] ?? '') === 'conflict', 'Veralteter Stand → 409 conflict');
+        [$s, $d] = $this->req('PATCH', '/news/' . $id, ['blocks' => [
+            ['type' => 'text', 'html' => '<p>Kptest offen</p>'],
+            ['type' => 'countdown', 'date' => '2099-06-12'],
+            ['type' => 'text', 'audience' => 'members', 'html' => '<p>Kptest intern</p>'],
+        ]]);
+        $c->ok($s === 200 && count((array) ($d['blocks'] ?? [])) === 3 && ($d['content'] ?? '') === '<p>Kptest offen</p>', 'Beitrag aus Blöcken speichern');
+        $this->d->actAs(null);
+        $c->ok(array_column((array) ($this->req('GET', '/news/' . $id)[1]['blocks'] ?? []), 'type') === ['text', 'countdown'], 'Ohne Anmeldung ohne Block nur für Mitglieder');
+        $this->d->actAs($admin);
         $c->ok($this->req('DELETE', '/news/' . $id)[0] === 200 && $this->req('GET', '/news/' . $id)[0] === 404, 'Beitrag löschen');
         [$s] = $this->req('PATCH', '/admin/settings', ['news_source' => $before]);
         [$s2, $d] = $this->req('POST', '/news', ['title' => 'X']);

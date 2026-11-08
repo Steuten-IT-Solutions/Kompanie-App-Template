@@ -1,15 +1,16 @@
 import { Suspense, useState, type FormEvent } from 'react';
 import { api, ApiError, type NewsItem } from '../api';
 import { Loading, lazyView } from '../ui';
+import { blocksInput, draftsFrom, newBlock, type BlockDraft } from '../blocks/blockDrafts';
 
-const RichTextEditor = lazyView(() => import('../richtext/RichTextEditor'));
+const BlocksEditor = lazyView(() => import('../blocks/BlocksEditor'));
 
 /** Grenze wie auf dem Server (NewsService::TITLE_MAX). */
 const TITLE_MAX = 150;
 
 /**
- * Beitrag der News in der App schreiben oder ändern (Quelle „In der App“, Recht manage_news): Titel und formatierter
- * Text mit Bildern; das erste Bild ist das Vorschaubild in der Liste. Beim Ändern schickt die App den geladenen Stand
+ * Beitrag der News in der App schreiben oder ändern (Quelle „In der App“, Recht manage_news): Titel und Inhalt aus
+ * Blöcken (Text mit Bildern, Countdown …); das erste Bild in einem Textblock für alle ist das Vorschaubild der Liste. Beim Ändern schickt die App den geladenen Stand
  * mit; hat jemand dazwischen gespeichert, sagt der Server 409 conflict.
  */
 export default function NewsSchreiben({
@@ -23,7 +24,7 @@ export default function NewsSchreiben({
   onToast: (msg: string) => void;
 }) {
   const [title, setTitle] = useState(item?.title ?? '');
-  const [body, setBody] = useState(item?.content ?? '');
+  const [blocks, setBlocks] = useState<BlockDraft[]>(() => (item ? draftsFrom(item.blocks, item.content ?? '') : [newBlock('text')]));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState(false);
@@ -33,7 +34,7 @@ export default function NewsSchreiben({
     setBusy(true);
     setError(null);
     try {
-      const data = { title: title.trim(), body };
+      const data = { title: title.trim(), blocks: blocksInput(blocks) };
       const saved = item ? await api.updateNews(item.id, { ...data, updated_at: item.updated_at ?? null }) : await api.createNews(data);
       onToast(item ? 'Gespeichert' : 'Beitrag veröffentlicht');
       onDone(saved);
@@ -53,11 +54,12 @@ export default function NewsSchreiben({
         <input type="text" maxLength={TITLE_MAX} value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
       </label>
       <div className="field">
+        <span>Inhalt</span>
         <Suspense fallback={<Loading shape="text" chunk />}>
-          <RichTextEditor value={body} onChange={setBody} label="Text" id={`news-${item?.id ?? 'neu'}-body`} />
+          <BlocksEditor value={blocks} onChange={setBlocks} idPrefix={`news-${item?.id ?? 'neu'}`} />
         </Suspense>
       </div>
-      <p className="muted small">Das erste Bild im Text erscheint auch in der Übersicht.</p>
+      <p className="muted small">Das erste Bild in einem Text für alle erscheint auch in der Übersicht.</p>
       {error && (
         <p className="form-error" role="alert">
           {error}

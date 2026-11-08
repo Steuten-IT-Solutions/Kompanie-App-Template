@@ -4,7 +4,7 @@ reihenfolge: 38
 rechte: [manage_news]
 bereiche: [news]
 ---
-Hier schreibst du Beiträge für die {bereich.news} direkt in der App, mit formatiertem Text und Bildern, und änderst oder löschst sie später. Das geht nur, wenn ein {rolle.admin} als Quelle der {bereich.news} **In der App schreiben** gewählt hat (Einstellungen → Neuigkeiten).
+Hier schreibst du Beiträge für die {bereich.news} direkt in der App, aus Blöcken mit formatiertem Text, Bildern und vorgefertigten Blöcken wie einem **Countdown**, und änderst oder löschst sie später. Das geht nur, wenn ein {rolle.admin} als Quelle der {bereich.news} **In der App schreiben** gewählt hat (Einstellungen → Neuigkeiten).
 
 ## So öffnest du die Seite
 Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum Ändern öffnest du einen Beitrag; unter dem Text stehen **Bearbeiten** und **Löschen**.
@@ -12,19 +12,25 @@ Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum 
 ## Was du hier siehst
 - **Neuer Beitrag** (über der Liste): öffnet das Formular für einen neuen Beitrag.
 - **Titel**: die Überschrift des Beitrags, höchstens 150 Zeichen.
-- **Text**: der Beitrag mit Formatierung, Links und Bildern. Das erste Bild im Text erscheint auch in der Liste der {bereich.news}.
+- **Inhalt**: der Beitrag aus Blöcken, zuerst ein Textblock mit Formatierung, Links und Bildern. Mit **+ Block einfügen** kommen weitere Blöcke dazu, zum Beispiel ein **Countdown**. Das erste Bild in einem Text für alle erscheint auch in der Liste der {bereich.news}.
 - **Veröffentlichen** bzw. **Speichern** und **Abbrechen**.
 - Im geöffneten Beitrag: **Zuletzt geändert** mit Datum und Name, darunter **Bearbeiten** und **Löschen**.
 
 ## So gehst du vor
 ### Einen Beitrag schreiben
 1. Tippe unter **{bereich.news}** auf **Neuer Beitrag**.
-2. Gib einen **Titel** ein und schreibe den **Text**. Bilder fügst du über das Bildsymbol im Text ein.
+2. Gib einen **Titel** ein und schreibe unter **Inhalt** den Text. Bilder fügst du über das Bildsymbol im Text ein. Weitere Blöcke fügst du mit **+ Block einfügen** (am Ende) oder **+ Block darunter einfügen** hinzu, verschiebst sie mit **↑** und **↓** und nimmst sie mit **Entfernen** heraus.
 3. Tippe auf **Veröffentlichen**. Der Beitrag steht sofort oben in der Liste, für alle, die die {bereich.news} lesen dürfen, auch ohne Anmeldung.
+
+### Einen Countdown einfügen
+1. Wähle bei **+ Block einfügen** **Countdown**.
+2. Trage bei Bedarf eine **Überschrift** ein und wähle bei **Zählt bis** ein **Datum** (mit **Uhrzeit**) oder einen **Termin** aus den {bereich.events}. Ein verschobener Termin zählt von selbst mit.
+3. Optional: ein Ende (**Ende am**, **Ende um**) mit einem **Text, solange es läuft**, und bei **Danach** einen **Text danach** oder **Block ausblenden**.
+4. Die **Vorschau** zeigt, wie der Countdown gerade aussieht. Er zeigt immer zwei Angaben: Tage und Stunden, am letzten Tag Stunden und Minuten, in der letzten Stunde Minuten und Sekunden.
 
 ### Einen Beitrag ändern
 1. Öffne den Beitrag und tippe auf **Bearbeiten**.
-2. Ändere Titel oder Text und tippe auf **Speichern**. Das Datum bleibt das der Veröffentlichung.
+2. Ändere Titel oder Blöcke und tippe auf **Speichern**. Das Datum bleibt das der Veröffentlichung.
 
 ### Einen Beitrag löschen
 1. Öffne den Beitrag und tippe auf **Löschen**.
@@ -33,7 +39,8 @@ Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum 
 ## Gut zu wissen
 - Wer die {bereich.news} mit Benachrichtigungen abonniert hat, bekommt bei einem neuen Beitrag eine Benachrichtigung, beim Ändern nicht.
 - Hat jemand den Beitrag gespeichert, während du ihn bearbeitet hast, meldet die App das beim Speichern. Lade den Beitrag dann neu und trage deine Änderungen noch einmal ein.
-- Bilder, die du aus dem Text entfernst, löscht die App beim Speichern.
+- Bilder, die in keinem Block mehr stehen, löscht die App beim Speichern.
+- Bei jedem Block wählst du **Für alle, die die Seite sehen** oder **Nur Mitglieder**. Blöcke nur für Mitglieder samt ihren Bildern fehlen ohne Anmeldung und für Gäste.
 - Wechselt ein {rolle.admin} die Quelle wieder auf eine Webseite oder einen Feed, verschwinden die Beiträge aus der App, bleiben aber gespeichert. Mit **In der App schreiben** sind sie wieder da.
 - Das Recht dazu heißt **{bereich.news} schreiben**. Mit der Quelle **In der App schreiben** legt die App die Rolle „{bereich.news} verwalten“ an; die vergibt ein {rolle.admin}.
 
