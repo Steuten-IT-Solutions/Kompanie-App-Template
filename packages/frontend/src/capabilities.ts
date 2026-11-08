@@ -130,8 +130,8 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
       },
       {
         key: 'submit_gallery',
-        label: `${sec.gallery}: Bilder einreichen, eigene Einreichungen sehen und zurückziehen`,
-        short: 'Bilder einreichen',
+        label: `${sec.gallery}: Bilder und Videos einreichen, eigene Einreichungen sehen und zurückziehen`,
+        short: 'Bilder und Videos einreichen',
         features: ['gallery'],
       },
       {

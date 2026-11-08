@@ -30,6 +30,7 @@ use KompanieApp\Core\Domain\NewsService;
 use KompanieApp\Core\Domain\PageService;
 use KompanieApp\Core\Domain\Blocks\Blocks;
 use KompanieApp\Core\Domain\GalleryUploadService;
+use KompanieApp\Core\Domain\VideoUploadService;
 use KompanieApp\Core\Domain\GoogleConnect;
 use KompanieApp\Core\Domain\JoinYearService;
 use KompanieApp\Core\Domain\MemberImportService;
@@ -336,6 +337,7 @@ final class App
             } elseif ($task === GalleryService::PROCESS_TASK && $this->features()->enabled('gallery')) {
                 $this->gallery()->runProcessTask(25);
                 $this->gallerySubmissions()->pruneOrphans();
+                $this->videoUploads()->prune();
             } elseif ($task === CalendarService::TASK && $this->features()->enabled('calendar')) {
                 $error = $this->calendar()->refreshIfStale();
                 if ($error !== null) {
@@ -844,6 +846,12 @@ final class App
     public function blocks(): Blocks
     {
         return $this->service(Blocks::class, fn () => new Blocks($this));
+    }
+
+    /** Videos in Stücken hochladen (Issue #350) */
+    public function videoUploads(): VideoUploadService
+    {
+        return $this->service(VideoUploadService::class, fn () => new VideoUploadService($this));
     }
 
     public function gallerySubmissions(): GallerySubmissionService

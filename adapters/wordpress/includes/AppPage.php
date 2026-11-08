@@ -16,7 +16,8 @@ use KompanieApp\Core\Http\ManifestIcons;
  * /app/manifest.webmanifest  → Web-App-Manifest
  * /app/sw.js                 → Service Worker (Bereich /app/)
  * /app/foto/<id>/<größe>     → Galeriebild (interne nur für Mitglieder)
- * /app/foto/<id>/video       → Galerievideo in Ausschnitten aus Drive (Range; interne nur für Mitglieder)
+ * /app/foto/<id>/video       → Galerievideo in Ausschnitten aus Drive oder der eigenen Ablage (Range; interne nur für Mitglieder)
+ * /app/foto/<id>/einreichung → Video einer offenen Einreichung zum Prüfen (review_gallery, Issue #350)
  * /app/dokument/<id>?v=…     → Dokument (nur für Mitglieder, die es sehen dürfen)
  * /app/abzeichen/<id>?v=…&s=… → Abzeichen eines Dienstgrads (angemeldet mit Mitgliederbereich oder Kalender)
  * /app/mitgliedsfoto/<id>?v=…&s=… → Foto eines Mitglieds (die Person selbst und wer Mitglieder verwaltet)
@@ -61,13 +62,13 @@ final class AppPage
             return;
         }
         $path = self::earlyPath();
-        if ($path === null || !preg_match('#^foto/(\d+)/(thumb|large|original|video/?)$#', $path, $m)) {
+        if ($path === null || !preg_match('#^foto/(\d+)/(thumb|large|original|video/?|einreichung/?)$#', $path, $m)) {
             return;
         }
         $app = Plugin::app();
         self::beginPreview($app);
-        if (str_starts_with($m[2], 'video')) {
-            self::sendVideo($app, (int) $m[1]);
+        if (str_starts_with($m[2], 'video') || str_starts_with($m[2], 'einreichung')) {
+            self::sendVideo($app, (int) $m[1], str_starts_with($m[2], 'einreichung'));
         } else {
             self::sendPhoto($app, (int) $m[1], $m[2]);
         }
@@ -145,8 +146,8 @@ final class AppPage
             self::sendCsrf($app);
         } elseif (preg_match('#^foto/(\d+)/(thumb|large|original)$#', $path, $m)) {
             self::sendPhoto($app, (int) $m[1], $m[2]);
-        } elseif (preg_match('#^foto/(\d+)/video/?$#', $path, $m)) {
-            self::sendVideo($app, (int) $m[1]);
+        } elseif (preg_match('#^foto/(\d+)/(video|einreichung)/?$#', $path, $m)) {
+            self::sendVideo($app, (int) $m[1], $m[2] === 'einreichung');
         } elseif (preg_match('#^dokument/(\d+)/?$#', $path, $m)) {
             self::sendDocument($app, (int) $m[1]);
         } elseif (preg_match('#^abzeichen/(\d+)/?$#', $path, $m)) {
@@ -265,8 +266,11 @@ final class AppPage
         readfile($res['file']);
     }
 
-    /** Galerievideo (Issue #182): Ausschnitt aus Drive, Status und Bereich wie im Kern festgelegt. */
-    private static function sendVideo(App $app, int $id): void
+    /**
+     * Galerievideo (Issue #182): Ausschnitt aus Drive oder der eigenen Ablage, Status und Bereich wie im Kern
+     * festgelegt; mit $submission das Video einer offenen Einreichung (nur für Prüfende, Issue #350).
+     */
+    private static function sendVideo(App $app, int $id, bool $submission = false): void
     {
         if (!defined('DONOTCACHEPAGE')) {
             define('DONOTCACHEPAGE', true);
@@ -297,10 +301,11 @@ final class AppPage
                 flush();
             },
             static function (string $chunk): bool {
-                echo $chunk; // phpcs:ignore WordPress.Security.EscapeOutput -- Videodaten aus Drive
+                echo $chunk; // phpcs:ignore WordPress.Security.EscapeOutput -- Videodaten
                 flush();
                 return connection_aborted() === 0;
             },
+            $submission,
         );
         if (!empty($res['sent'])) {
             return;
@@ -325,20 +330,19 @@ final class AppPage
      * @param (\Closure(string): bool)|null $write
      * @return array{status: int, body?: string, sent?: bool, length?: int, contentRange?: string, mime?: string, etag?: string, intern?: bool, retryAfter?: int}
      */
-    public static function videoResponse(App $app, int $id, ?\Closure $begin = null, ?\Closure $write = null): array
+    public static function videoResponse(App $app, int $id, ?\Closure $begin = null, ?\Closure $write = null, bool $submission = false): array
     {
         // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- nur „bytes=a-b“, der Kern prüft das Format
         $range = isset($_SERVER['HTTP_RANGE']) && is_string($_SERVER['HTTP_RANGE']) ? wp_unslash($_SERVER['HTTP_RANGE']) : null;
-        return $app->gallery()->deliverVideo(
-            $id,
-            $range,
-            static function () use ($app): array {
-                $user = $app->authContext->currentUser();
-                return [$app->can(\KompanieApp\Core\Auth\Capability::ViewGalleryInternal), $user !== null];
-            },
-            $begin,
-            $write,
-        );
+        $access = static function () use ($app, $submission): array {
+            $user = $app->authContext->currentUser();
+            $cap = $submission ? \KompanieApp\Core\Auth\Capability::ReviewGallery : \KompanieApp\Core\Auth\Capability::ViewGalleryInternal;
+            return [$app->can($cap), $user !== null];
+        };
+        if ($submission) {
+            return $app->gallerySubmissions()->deliverVideo($id, $range, $access, $begin, $write);
+        }
+        return $app->gallery()->deliverVideo($id, $range, $access, $begin, $write);
     }
 
     /**

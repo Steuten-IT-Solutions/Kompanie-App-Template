@@ -91,7 +91,7 @@ function Overview() {
       <div className="button-row gallery-actions">
         {can('submit_gallery') && (
           <button className="btn btn-secondary" onClick={() => navigate('galerie/einreichen')}>
-            Bilder einreichen
+            Bilder und Videos einreichen
           </button>
         )}
         {can('review_gallery') && (

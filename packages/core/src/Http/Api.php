@@ -761,6 +761,16 @@ final class Api
                 $a->gallerySubmissions()->withdraw($this->user(), $r->id());
                 return ['deleted' => true];
             }, 'gallery'),
+            // Videos in Stücken hochladen (Issue #350): ins Album (manage_settings) oder als Einreichung (submit_gallery)
+            new Route('POST', '/gallery/video-uploads', [Cap::ManageSettings, Cap::SubmitGallery], fn (Request $r) => Response::created(
+                $a->videoUploads()->start($this->user(), $r->body, $this->can(Cap::ManageSettings), $this->can(Cap::SubmitGallery)),
+            ), 'gallery'),
+            new Route('POST', '/gallery/video-uploads/chunk', [Cap::ManageSettings, Cap::SubmitGallery], fn (Request $r) => $a->videoUploads()->chunk($this->user(), $r->input('upload'), $r->input('offset'), $r->input('data')), 'gallery'),
+            new Route('POST', '/gallery/video-uploads/finish', [Cap::ManageSettings, Cap::SubmitGallery], fn (Request $r) => Response::created($a->videoUploads()->finish($this->user(), $r->body)), 'gallery'),
+            new Route('POST', '/gallery/video-uploads/cancel', [Cap::ManageSettings, Cap::SubmitGallery], function (Request $r) use ($a) {
+                $a->videoUploads()->cancel($this->user(), $r->input('upload'));
+                return ['cancelled' => true];
+            }, 'gallery'),
             // Hochgeladene Bilder und Videos nachträglich intern oder öffentlich stellen (Alben, Prüfen, Großansicht)
             new Route('PATCH', '/gallery/photos/{id}', [Cap::ManageSettings, Cap::ReviewGallery], fn (Request $r) => $a->galleryUploads()->setIntern($r->id(), $r->input('intern')), 'gallery'),
             new Route('GET', '/gallery/review', Cap::ReviewGallery, fn () => $a->gallerySubmissions()->review(), 'gallery'),

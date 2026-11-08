@@ -4,10 +4,11 @@ import { navigate } from '../router';
 import { Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
 import { confirmAsk, promptAsk } from '../ask';
 import { InternToggle } from '../galleryIntern';
+import { VIDEO_ACCEPT, countFiles, isVideoFile, submitVideo } from '../videoUpload';
 
 /**
- * Bilder für die Galerie einreichen (submit_gallery) und Einreichungen prüfen (review_gallery), Issue #286. Unter
- * Galerie → „Bilder einreichen“ bzw. „Einreichungen prüfen“.
+ * Bilder und Videos (Issue #350) für die Galerie einreichen (submit_gallery) und Einreichungen prüfen (review_gallery),
+ * Issue #286. Unter Galerie → „Bilder und Videos einreichen“ bzw. „Einreichungen prüfen“.
  */
 export default function GalerieEinreichungen({ mode, onToast }: { mode: 'einreichen' | 'pruefen'; onToast: (msg: string) => void }) {
   return (
@@ -39,11 +40,19 @@ function Submit({ onToast }: { onToast: (msg: string) => void }) {
     let done = 0;
     try {
       for (const f of files) {
-        setProgress(`Lädt ${done + 1} von ${files.length} …`);
-        await api.submitGalleryPhoto(Number(album), f);
+        const step = files.length > 1 ? ` ${done + 1} von ${files.length}` : '';
+        setProgress(`Lädt${step} …`);
+        if (isVideoFile(f)) {
+          await submitVideo(f, {
+            albumId: Number(album),
+            onProgress: (share) => setProgress(`Lädt${step} … ${Math.floor(share * 100)} %`),
+          });
+        } else {
+          await api.submitGalleryPhoto(Number(album), f);
+        }
         done++;
       }
-      onToast(done === 1 ? 'Bild eingereicht' : `${done} Bilder eingereicht`);
+      onToast(`${countFiles(files)} eingereicht`);
       setFiles([]);
       setConsent(false);
     } catch (e) {
@@ -68,7 +77,7 @@ function Submit({ onToast }: { onToast: (msg: string) => void }) {
           void send();
         }}
       >
-        <h2>Bilder einreichen</h2>
+        <h2>Bilder und Videos einreichen</h2>
         {albums.length === 0 ? (
           <p className="muted small">Noch keine Alben, in die du einreichen kannst.</p>
         ) : (
@@ -85,18 +94,19 @@ function Submit({ onToast }: { onToast: (msg: string) => void }) {
               </select>
             </label>
             <label className="field">
-              <span>Bilder (JPG, PNG oder WebP)</span>
+              <span>Bilder oder Videos</span>
               <FileInput
-                accept=".jpg,.jpeg,.png,.webp"
+                accept={`.jpg,.jpeg,.png,.webp,${VIDEO_ACCEPT}`}
                 multiple
                 required
                 disabled={busy}
                 onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
               />
+              <span className="small muted">Bilder als JPG, PNG oder WebP, Videos als MP4 oder WebM bis 1 GB.</span>
             </label>
             <label className="toggle">
               <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} required />
-              <span>Ich habe die Rechte an den Bildern, und die erkennbaren Personen sind einverstanden.</span>
+              <span>Ich habe die Rechte an den Bildern und Videos, und die erkennbaren Personen sind einverstanden.</span>
             </label>
             {formError && (
               <p className="form-error small" role="alert">
@@ -117,7 +127,7 @@ function Submit({ onToast }: { onToast: (msg: string) => void }) {
           <ul className="gallery-upload-list">
             {data!.submissions.map((s) => (
               <li key={s.id} className="gallery-upload">
-                {s.thumb && <img src={s.thumb} alt={s.name} loading="lazy" />}
+                <Preview s={s} />
                 <span className="small">
                   {s.name} · {s.album} · <strong>{STATUS[s.status]}</strong>
                   {s.reason && `: ${s.reason}`}
@@ -189,7 +199,12 @@ function Review({ onToast }: { onToast: (msg: string) => void }) {
         <ul className="gallery-review-list">
           {pending.map((s) => (
             <li key={s.id} className="card gallery-review-item">
-              {s.thumb && <img src={s.thumb} alt={s.name} loading="lazy" />}
+              {s.video ? (
+                // Vor der Freigabe ansehen; Standbild als Vorschau
+                <video src={s.video} poster={s.thumb ?? undefined} controls preload="none" playsInline aria-label={s.name} />
+              ) : (
+                <Preview s={s} />
+              )}
               <p className="small">
                 <strong>{s.name}</strong> für {s.album}, von {s.user_name}
               </p>
@@ -233,7 +248,7 @@ function Review({ onToast }: { onToast: (msg: string) => void }) {
           <ul className="gallery-upload-list">
             {approved.map((s) => (
               <li key={s.id} className="gallery-upload">
-                {s.thumb && <img src={s.thumb} alt={s.name} loading="lazy" />}
+                <Preview s={s} />
                 <span className="small">
                   {s.name} · {s.album} · von {s.user_name}
                 </span>
@@ -252,7 +267,8 @@ function Review({ onToast }: { onToast: (msg: string) => void }) {
                   className="btn btn-small btn-danger"
                   disabled={busy}
                   onClick={async () => {
-                    if (!(await confirmAsk(`Bild „${s.name}“ wieder aus der Galerie entfernen?`))) return;
+                    if (!(await confirmAsk(`${s.type === 'video' ? 'Video' : 'Bild'} „${s.name}“ wieder aus der Galerie entfernen?`)))
+                      return;
                     void run(() => api.removeGallerySubmission(s.id), 'Entfernt');
                   }}
                 >
@@ -264,5 +280,16 @@ function Review({ onToast }: { onToast: (msg: string) => void }) {
         </section>
       )}
     </>
+  );
+}
+
+/** Vorschau einer Einreichung: Standbild bzw. Bild, bei einem Video mit ▶ darüber */
+function Preview({ s }: { s: GallerySubmission }) {
+  if (s.type !== 'video') return s.thumb ? <img src={s.thumb} alt={s.name} loading="lazy" /> : null;
+  return (
+    <span className="gallery-upload-video" role="img" aria-label={`Video ${s.name}`}>
+      {s.thumb && <img src={s.thumb} alt="" loading="lazy" />}
+      <span aria-hidden="true">▶</span>
+    </span>
   );
 }

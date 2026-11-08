@@ -21,6 +21,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Galerie: Videos hochladen und einreichen**: Unter *Einstellungen → Galerie* lassen sich jetzt neben Bildern auch
+  Videos als MP4 oder WebM in jedes Album hochladen, mit höchstens 1 GB je Video. Wer Bilder einreichen darf, reicht
+  ebenso Videos ein (*Bilder und Videos einreichen*); beim Prüfen spielt ihr ein Video vor der Freigabe ab. Die App lädt
+  Videos in Stücken hoch, damit auch große Handyvideos unter der Grenze des Webspace bleiben, und zeigt den Fortschritt
+  in Prozent. Videos liegen auf dem eigenen Server und werden nicht umgewandelt; als Vorschaubild dient ein Standbild
+  aus der ersten Sekunde. In der Sicherung sind diese Videos wegen ihrer Größe nicht enthalten.
 - **Galerie: hochgeladene Bilder nachträglich intern oder öffentlich stellen**: Bilder, die in der App hochgeladen
   oder über Einreichungen freigegeben wurden, lassen sich jetzt jederzeit umstellen: unter *Einstellungen → Galerie*
   mit dem Haken *intern* neben dem Bild, beim Prüfen unter *Zuletzt freigegeben* und in der Großansicht der Galerie

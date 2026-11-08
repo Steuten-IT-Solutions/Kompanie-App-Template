@@ -902,6 +902,13 @@ test('Konten: das eigene Konto in der Verwaltung ändern, ohne Löschen', async 
 });
 
 /** Kleines gültiges PNG (1 × 1 Pixel) zum Hochladen. */
+/** Kurzes WebM-Video (2 Sekunden, 160 × 90), Issue #350 */
+const WEBM = {
+  name: 'clip.webm',
+  mimeType: 'video/webm',
+  buffer: readFileSync(new URL('../../../tests/fixtures/galerie-video.webm', import.meta.url)),
+};
+
 const PNG = {
   name: 'foto.png',
   mimeType: 'image/png',
@@ -1660,10 +1667,44 @@ test('Galerie: Album nur in der App anlegen, Bilder hochladen, ändern und lösc
   await expect(item).toContainText('nur in der App · 0 hochgeladen');
 
   // Zwei Bilder auf einmal, eines davon später löschen
-  await item.getByLabel(`Bilder in ${title} hochladen`).setInputFiles([PNG, { ...PNG, name: 'zweites.png' }]);
+  await item.getByLabel(`Bilder oder Videos in ${title} hochladen`).setInputFiles([PNG, { ...PNG, name: 'zweites.png' }]);
   await expect(page.locator('.toast')).toHaveText('2 Bilder hochgeladen');
   await expect(item.locator('.gallery-upload')).toHaveCount(2);
   await expect(item).toContainText('2 hochgeladen');
+
+  // Ein Video (Issue #350): in Stücken hochgeladen, mit Standbild als Vorschau, in der Galerie abspielbar
+  await item.getByLabel(`Bilder oder Videos in ${title} hochladen`).setInputFiles([WEBM]);
+  await expect(page.locator('.toast')).toHaveText('1 Video hochgeladen');
+  await expect(item.locator('.gallery-upload')).toHaveCount(3);
+  const albumId = await page.evaluate(async (title) => {
+    const cfg = window.KOMPANIE_CONFIG!;
+    const res = await fetch(cfg.apiBase + 'admin/gallery/albums', {
+      credentials: 'same-origin',
+      headers: { [cfg.csrf.header]: cfg.csrf.token },
+    });
+    return ((await res.json()) as { albums: { id: number; title: string }[] }).albums.find((a) => a.title === title)!.id;
+  }, title);
+  const video = await page.evaluate(async (id) => {
+    const cfg = window.KOMPANIE_CONFIG!;
+    const album = (await (
+      await fetch(cfg.apiBase + `gallery/${id}`, { credentials: 'same-origin', headers: { [cfg.csrf.header]: cfg.csrf.token } })
+    ).json()) as {
+      photos: { type: string; video?: string; mime?: string; width: number; height: number; duration?: number }[];
+    };
+    const v = album.photos.find((p) => p.type === 'video')!;
+    const res = await fetch(v.video!, { headers: { Range: 'bytes=0-3' } });
+    return {
+      status: res.status,
+      bytes: [...new Uint8Array(await res.arrayBuffer())],
+      mime: v.mime,
+      size: [v.width, v.height],
+      duration: v.duration,
+    };
+  }, albumId);
+  expect(video).toEqual({ status: 206, bytes: [0x1a, 0x45, 0xdf, 0xa3], mime: 'video/webm', size: [160, 90], duration: 2 });
+  await item.locator('.gallery-upload', { hasText: 'clip.webm' }).getByRole('button', { name: 'Löschen' }).click();
+  await askOk(page);
+  await expect(page.locator('.toast')).toHaveText('Video gelöscht');
   await expect(item.locator('.gallery-upload', { hasText: 'foto.jpg' })).toBeVisible();
   await item.locator('.gallery-upload', { hasText: 'zweites.jpg' }).getByRole('button', { name: 'Löschen' }).click();
   await askOk(page);
@@ -1759,22 +1800,31 @@ test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)',
   expect(albumId).toBeGreaterThan(0);
 
   await page.goto('/app/#/galerie');
-  await page.getByRole('button', { name: 'Bilder einreichen' }).click();
-  const form = page.locator('form', { hasText: 'Bilder einreichen' });
+  await page.getByRole('button', { name: 'Bilder und Videos einreichen' }).click();
+  const form = page.locator('form', { hasText: 'Bilder und Videos einreichen' });
   await form.getByLabel('Album').selectOption({ label: `2026 · ${title}` });
-  await form.getByLabel('Bilder (JPG, PNG oder WebP)').setInputFiles([PNG, { ...PNG, name: 'zweites.png' }]);
+  await form.getByLabel('Bilder oder Videos').setInputFiles([PNG, { ...PNG, name: 'zweites.png' }, WEBM]);
   await expect(form.getByRole('button', { name: 'Einreichen' })).toBeDisabled();
-  await form.getByLabel('Ich habe die Rechte an den Bildern, und die erkennbaren Personen sind einverstanden.').check();
+  await form.getByLabel('Ich habe die Rechte an den Bildern und Videos, und die erkennbaren Personen sind einverstanden.').check();
   await form.getByRole('button', { name: 'Einreichen' }).click();
-  await expect(page.locator('.toast')).toHaveText('2 Bilder eingereicht');
+  await expect(page.locator('.toast')).toHaveText('2 Bilder und 1 Video eingereicht');
   const mine = page.locator('.gallery-upload', { hasText: title });
-  await expect(mine).toHaveCount(2);
+  await expect(mine).toHaveCount(3);
   await expect(mine.first()).toContainText('wartet auf Freigabe');
+  // Standbild als Vorschau des Videos
+  await expect(mine.filter({ hasText: 'clip.webm' }).getByRole('img', { name: 'Video clip.webm' }).locator('img')).toHaveCount(1);
 
-  // Prüfen: eines öffentlich freigeben, eines mit Grund ablehnen
+  // Prüfen: das Video vorher ansehen und ablehnen, ein Bild öffentlich freigeben, eines mit Grund ablehnen
   await page.getByRole('button', { name: '‹ Alle Alben' }).click();
   await page.getByRole('button', { name: 'Einreichungen prüfen' }).click();
   const items = page.locator('.gallery-review-item', { hasText: title });
+  await expect(items).toHaveCount(3);
+  const clip = items.filter({ hasText: 'clip.webm' }).locator('video');
+  await expect(clip).toHaveAttribute('poster', /^data:image\/jpeg;base64,/);
+  expect(await clip.evaluate(async (v: HTMLVideoElement) => (await fetch(v.src, { headers: { Range: 'bytes=0-3' } })).status)).toBe(206);
+  await items.filter({ hasText: 'clip.webm' }).getByRole('button', { name: 'Ablehnen' }).click();
+  await askOk(page, 'Zu dunkel');
+  await expect(page.locator('.toast')).toHaveText('Abgelehnt');
   await expect(items).toHaveCount(2);
   await items.filter({ hasText: 'foto.jpg' }).getByRole('button', { name: 'Öffentlich freigeben' }).click();
   await expect(page.locator('.toast')).toHaveText('Freigegeben');
