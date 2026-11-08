@@ -1821,6 +1821,12 @@ WHERE title IS NULL",
                     'CREATE INDEX IF NOT EXISTS {report_inbox}_status ON {report_inbox} (status)',
                 ],
             ],
+            // Titelbild eines Beitrags der News in der App (Issue #351): Kennung des Bildes in rich_images (Besitzer news).
+            // NULL: wie bisher das erste Bild im Text als Vorschaubild.
+            55 => [
+                'mysql' => ['ALTER TABLE {app_news} ADD COLUMN cover varchar(32) NULL'],
+                'sqlite' => ['ALTER TABLE {app_news} ADD COLUMN cover TEXT DEFAULT NULL'],
+            ],
         ];
     }
 

@@ -24,9 +24,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Inhalte aus Blöcken**: Eigene Seiten, Beiträge in den News, die in der App geschrieben werden, und Nachrichten am
   Schwarzen Brett bestehen jetzt aus Blöcken, die ihr mit *+ Block einfügen* hinzufügt, mit ↑/↓ verschiebt und
   entfernt. Jeder Block hat ein eigenes *Für wen?*: Blöcke *Nur Mitglieder* samt ihren Bildern fehlen auf öffentlichen
-  Seiten und Nachrichten ohne Anmeldung. Bestehende Inhalte bleiben unverändert (ein Textblock). Vorschaubild in der
-  Liste der News ist das erste Bild in einem Text für alle. Die Mail vom Brett enthält alle Blöcke, den Countdown als
-  Satz; der Verlauf zeigt Blöcke ebenso.
+  Seiten und Nachrichten ohne Anmeldung. Bestehende Inhalte bleiben unverändert (ein Textblock). Ohne Titelbild ist
+  das Vorschaubild in der Liste der News das erste Bild in einem Text für alle. Die Mail vom Brett enthält alle
+  Blöcke, den Countdown als Satz; der Verlauf zeigt Blöcke ebenso.
 - **Vorgefertigte Blöcke**: Neben *Text* gibt es
   *Countdown* (bis zu einem Datum oder Termin, verschoben: zählt mit; immer zwei Angaben wie Tage und Stunden, auf
   Wunsch bis zu einem Ende ein Text wie „läuft“ und danach ein eigener Text oder nichts),
@@ -43,6 +43,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   *Sponsoren* (alle mit Logo und Link) und
   *Karte zur Anfahrt* (ein Ort mit dem Knopf *Karte*, der ihn in der Karten-App des Geräts öffnet; es wird keine fremde
   Karte eingebettet).
+- **Titelbild für Neuigkeiten**: Beim Schreiben eines Beitrags in der App gibt es das Feld *Titelbild (optional)* mit
+  Vorschau im Format der Liste. Das Titelbild steht in der Liste über dem Beitrag und groß oben im Beitrag; ohne
+  Titelbild bleibt wie bisher das erste Bild im Text das Vorschaubild. Neuigkeiten von einer Webseite oder einem Feed
+  zeigen weiter ihr mitgeliefertes Bild.
 - **Mitglieder ohne Zugang**: Unter *Mitglied anlegen* gibt es den Haken *Ohne Zugang (meldet sich noch nicht an)*.
   So tragt ihr Personen ein, die noch kein Konto haben, z. B. für Chroniken und Ämter. Sie sind gewöhnliche Mitglieder,
   lassen sich überall auswählen und tragen in der Mitgliederliste der Verwaltung die Marke *ohne Zugang*; ein

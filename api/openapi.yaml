@@ -1095,8 +1095,8 @@ paths:
       summary: Beitrag in der App schreiben (nur mit der Quelle app)
       description: |
         Nur wenn die News in der App geschrieben werden (Einstellung `news_source` = `app`, siehe `/admin/settings`),
-        sonst 409 `not_in_app`. Der Text ist formatiert (RichText wie bei den Seiten, Bilder über `/rich-images`); das erste
-        Bild ist das Vorschaubild (`image`). Datum ist der Zeitpunkt des Anlegens. Danach prüft der Server gleich, ob es
+        sonst 409 `not_in_app`. Der Text ist formatiert (RichText wie bei den Seiten, Bilder über `/rich-images`); Vorschaubild
+        (`image`) ist das Titelbild (`cover`), sonst das erste Bild im Text. Datum ist der Zeitpunkt des Anlegens. Danach prüft der Server gleich, ob es
         Benachrichtigungen „News: neue Beiträge“ gibt.
       x-capability: manage_news
       requestBody:
@@ -1109,7 +1109,8 @@ paths:
               properties:
                 title: { type: string, maxLength: 150 }
                 body: { type: string, description: 'Für ältere Apps: formatierter Text als ein Textblock (wird bereinigt)' }
-                blocks: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Block' }, description: 'Inhalt aus Blöcken wie bei eigenen Seiten (hat Vorrang vor body); das erste Bild in einem Textblock für alle ist das Vorschaubild' }
+                blocks: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Block' }, description: 'Inhalt aus Blöcken wie bei eigenen Seiten (hat Vorrang vor body); ohne Titelbild ist das erste Bild in einem Textblock für alle das Vorschaubild' }
+                cover: { type: [string, 'null'], pattern: '^[a-f0-9]{32}$', description: 'Titelbild (Issue #351): Kennung eines Bildes aus `POST /rich-images` oder das bisherige `cover_uid`; null oder leer entfernt es. Vorschaubild der Liste und groß oben im Beitrag; ohne Titelbild das erste Bild im Text' }
       responses:
         '201':
           description: Angelegt
@@ -1142,7 +1143,7 @@ paths:
     patch:
       tags: [News]
       summary: Beitrag der App ändern (Titel, Text)
-      description: 'Nur mit der Quelle app (sonst 409 `not_in_app`); id ist eine Zahl. Mit updated_at (Stand, den die App geladen hat): 409 `conflict`, wenn jemand dazwischen gespeichert hat. Bilder, die nicht mehr im Text stehen, werden gelöscht. Das Datum bleibt.'
+      description: 'Nur mit der Quelle app (sonst 409 `not_in_app`); id ist eine Zahl. Mit updated_at (Stand, den die App geladen hat): 409 `conflict`, wenn jemand dazwischen gespeichert hat. Bilder, die weder im Text noch als Titelbild stehen, werden gelöscht. Das Datum bleibt.'
       x-capability: manage_news
       requestBody:
         required: true
@@ -1154,6 +1155,7 @@ paths:
                 title: { type: string, maxLength: 150 }
                 body: { type: string, description: 'Für ältere Apps, wie bei POST' }
                 blocks: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Block' }, description: 'wie bei POST' }
+                cover: { type: [string, 'null'], pattern: '^[a-f0-9]{32}$', description: 'wie bei POST; fehlt das Feld, bleibt das Titelbild' }
                 updated_at: { type: string, format: date-time }
       responses:
         '200':
@@ -8077,6 +8079,8 @@ components:
         link: { type: string, description: Adresse auf der Webseite; leer bei Beiträgen der App }
         content: { type: string, description: 'Nur bei der Einzelansicht; Quelle app: Text der Textblöcke für alle (für ältere Apps)' }
         blocks: { type: array, items: { $ref: '#/components/schemas/Block' }, description: 'Nur Einzelansicht, Quelle app: Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur für Mitglieder bzw. mit manage_news)' }
+        cover: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app: Adresse des Titelbilds (Issue #351)' }
+        cover_uid: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app: Kennung des Titelbilds, für PATCH' }
         updated_at: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app, mit manage_news: Stand für PATCH' }
         updated_by_name: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app, mit manage_news' }
 

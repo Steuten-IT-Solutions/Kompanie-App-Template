@@ -668,6 +668,10 @@ export interface NewsItem {
   content?: string;
   /** News in der App: Inhalt aus Blöcken, nur die für die Person sichtbaren; fehlt bei anderen Quellen und älteren Servern */
   blocks?: Block[];
+  /** News in der App: Titelbild (Issue #351), groß oben im Beitrag; fehlt bei anderen Quellen und älteren Servern */
+  cover?: string | null;
+  /** Kennung des Titelbilds, zum Bearbeiten */
+  cover_uid?: string | null;
   /** Nur für die Pflege der News in der App (manage_news): Stand für das Speichern (409 conflict) */
   updated_at?: string | null;
   updated_by_name?: string | null;
@@ -678,6 +682,8 @@ export interface NewsInput {
   title?: string;
   body?: string;
   blocks?: BlockInput[];
+  /** Titelbild: Kennung aus POST /rich-images oder cover_uid; null entfernt es (Issue #351) */
+  cover?: string | null;
   updated_at?: string | null;
 }
 
