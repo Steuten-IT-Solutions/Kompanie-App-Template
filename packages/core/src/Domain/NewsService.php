@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Domain;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
+use KompanieApp\Core\Domain\Blocks\Blocks;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Infra\RemoteNewsSource;
 use KompanieApp\Core\Port\NewsSource;
@@ -17,8 +18,9 @@ use KompanieApp\Core\Push\PushService;
  *
  * - Quelle des Adapters ($app->news): im WordPress-Plugin die Beiträge der eigenen Seite („site“), in der
  *   eigenständigen App eine fremde WordPress-Seite oder ein Feed (RemoteNewsSource: none, wordpress, rss).
- * - Quelle „app“: Beiträge werden in der App geschrieben (Tabelle app_news, AppNewsSource), mit formatiertem Text
- *   (RichText) und Bildern (rich_images, Besitzer news). Das erste Bild im Text ist das Vorschaubild der Liste.
+ * - Quelle „app“: Beiträge werden in der App geschrieben (Tabelle app_news, AppNewsSource), aus Blöcken wie eigene
+ *   Seiten (Domain\Blocks\Blocks: Text mit Bildern in rich_images, Besitzer news; Countdown …; je Block für alle oder
+ *   nur Mitglieder). body enthält den Text der Textblöcke für alle; das erste Bild darin ist das Vorschaubild der Liste.
  * - Entweder oder, kein Mischen: Eine Quelle bestimmt, was in der Liste steht. Beim Wechsel bleiben die Beiträge der
  *   App erhalten (nur nicht sichtbar), die Einstellungen eines Feeds ebenso; zurückwechseln zeigt sie wieder.
  * - Lesen wie bisher mit view_news (auch ohne Anmeldung, wenn Gast das Recht hat). Schreiben, ändern und löschen mit
@@ -109,27 +111,48 @@ final class NewsService
         if ($item === null) {
             throw ApiError::notFound('Beitrag nicht gefunden.');
         }
+        if ($this->inApp()) {
+            $row = $this->appSource()->row((int) $key);
+            $blocks = Blocks::decode($row['blocks'] ?? null, (string) ($row['body'] ?? ''));
+            $item['blocks'] = $this->app->blocks()->forViewer($blocks, $viewer, $this->isMember($viewer), $this->canManage($viewer));
+        }
         if ($this->canManage($viewer)) {
             $item += $this->appSource()->meta((int) $key);
         }
         return $item;
     }
 
-    /** Für Bilder eines Beitrags (RichImageService): sieht $viewer (null = ohne Anmeldung) die News der App? */
-    public function canSeeImage(?User $viewer, int $newsId): bool
+    /** Sieht $viewer Blöcke nur für Mitglieder? (Wer die News pflegt, sieht alles.) */
+    private function isMember(?User $viewer): bool
+    {
+        return $this->canManage($viewer) || BoardService::isRecipient($viewer);
+    }
+
+    /**
+     * Für Bilder eines Beitrags (RichImageService): sieht $viewer (null = ohne Anmeldung) die News der App und den Block,
+     * in dem das Bild steht?
+     */
+    public function canSeeImage(?User $viewer, int $newsId, ?string $uid = null): bool
     {
         if (!$this->inApp() || !$this->app->features()->enabled('news')) {
             return false;
         }
-        $viewer ??= $this->app->anonymous();
-        if (!$viewer->can(Capability::ViewNews) && !$viewer->can(Capability::ManageNews)) {
+        $who = $viewer ?? $this->app->anonymous();
+        if (!$who->can(Capability::ViewNews) && !$who->can(Capability::ManageNews)) {
             return false;
         }
-        return (int) $this->app->db->scalar('SELECT COUNT(*) FROM {app_news} WHERE id = ?', [$newsId]) > 0;
+        $row = $this->appSource()->row($newsId);
+        if ($row === null) {
+            return false;
+        }
+        if ($uid !== null && Blocks::imageOnlyForMembers(Blocks::decode($row['blocks'] ?? null, (string) ($row['body'] ?? '')), $uid)) {
+            return $this->isMember($viewer);
+        }
+        return true;
     }
 
     /**
-     * @param array<string, mixed> $in title (Pflicht), body
+     * @param array<string, mixed> $in title (Pflicht), blocks (oder body: ein Textblock)
      * @return array<string, mixed> der neue Beitrag wie item()
      */
     public function create(array $in, User $actor): array
@@ -138,15 +161,14 @@ final class NewsService
         if (!array_key_exists('title', $in)) {
             throw ApiError::invalid('Bitte einen Titel für den Beitrag angeben.');
         }
-        $data = $this->validate($in);
-        $body = $data['body'] ?? '';
+        [$data, $blocks] = $this->validate($in);
         $now = $this->app->time()->nowUtc();
         $db = $this->app->db;
-        $id = $db->transaction(function () use ($db, $data, $body, $actor, $now): int {
+        $id = $db->transaction(function () use ($db, $data, $blocks, $actor, $now): int {
             $id = $db->insert('app_news', ['body' => ''] + $data + ['created_by' => $actor->id, 'created_at' => $now, 'updated_by' => $actor->id, 'updated_at' => $now]);
-            // Bilder des Textes gehören danach dem Beitrag (dafür braucht es seine ID).
-            if ($body !== '') {
-                $db->update('app_news', ['body' => $this->app->richImages()->claim($actor, $body, RichImageService::OWNER_NEWS, $id)], ['id' => $id]);
+            // Bilder der Textblöcke gehören danach dem Beitrag (dafür braucht es seine ID).
+            if ($blocks !== null) {
+                $db->update('app_news', $this->app->blocks()->columns($blocks, $actor, RichImageService::OWNER_NEWS, $id), ['id' => $id]);
             }
             return $id;
         });
@@ -166,10 +188,10 @@ final class NewsService
             $by = $row['updated_by'] !== null ? $this->app->users->find((int) $row['updated_by'])?->name : null;
             throw new ApiError(409, 'conflict', ($by ?? 'Jemand') . ' hat den Beitrag inzwischen geändert. Bitte neu laden und deine Änderungen noch einmal eintragen.');
         }
-        $data = $this->validate($in);
-        if (isset($data['body'])) {
-            // Bilder, die nicht mehr im Text stehen, werden gelöscht (es gibt keinen Verlauf).
-            $data['body'] = $this->app->richImages()->claim($actor, $data['body'], RichImageService::OWNER_NEWS, $id, true);
+        [$data, $blocks] = $this->validate($in);
+        if ($blocks !== null) {
+            // Bilder, die in keinem Block mehr stehen, werden gelöscht (es gibt keinen Verlauf).
+            $data += $this->app->blocks()->columns($blocks, $actor, RichImageService::OWNER_NEWS, $id);
         }
         $this->app->db->update('app_news', $data + ['updated_by' => $actor->id, 'updated_at' => $this->app->time()->nowUtc()], ['id' => $id]);
         return $this->item((string) $id, $actor);
@@ -219,8 +241,10 @@ final class NewsService
     }
 
     /**
+     * Geprüfter Titel und die Blöcke (null: Inhalt nicht angegeben).
+     *
      * @param array<string, mixed> $in
-     * @return array<string, mixed>
+     * @return array{0: array<string, mixed>, 1: list<array<string, mixed>>|null}
      */
     private function validate(array $in): array
     {
@@ -235,17 +259,6 @@ final class NewsService
             }
             $data['title'] = $title;
         }
-        if (array_key_exists('body', $in)) {
-            if ($in['body'] !== null && !is_string($in['body'])) {
-                throw ApiError::invalid('Ungültiger Text.');
-            }
-            $html = RichText::sanitize((string) $in['body']);
-            $html = RichText::isEmpty($html) ? '' : $html;
-            if (strlen($html) > self::BODY_MAX) {
-                throw ApiError::invalid('Der Text ist zu lang.');
-            }
-            $data['body'] = $html;
-        }
-        return $data;
+        return [$data, $this->app->blocks()->fromInput($in, self::BODY_MAX)];
     }
 }

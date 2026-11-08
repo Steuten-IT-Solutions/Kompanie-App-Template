@@ -1764,6 +1764,16 @@ WHERE title IS NULL",
                 'mysql' => ['ALTER TABLE {app_pages} ADD COLUMN blocks mediumtext NULL'],
                 'sqlite' => ['ALTER TABLE {app_pages} ADD COLUMN blocks TEXT DEFAULT NULL'],
             ],
+            // News in der App aus Blöcken (wie eigene Seiten, Migration 51): Liste als JSON neben body.
+            52 => [
+                'mysql' => ['ALTER TABLE {app_news} ADD COLUMN blocks mediumtext NULL'],
+                'sqlite' => ['ALTER TABLE {app_news} ADD COLUMN blocks TEXT DEFAULT NULL'],
+            ],
+            // Nachrichten am Schwarzen Brett aus Blöcken (wie eigene Seiten, Migration 51): Liste als JSON neben body.
+            53 => [
+                'mysql' => ['ALTER TABLE {board_messages} ADD COLUMN blocks mediumtext NULL'],
+                'sqlite' => ['ALTER TABLE {board_messages} ADD COLUMN blocks TEXT DEFAULT NULL'],
+            ],
         ];
     }
 

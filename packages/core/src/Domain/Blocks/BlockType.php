@@ -9,7 +9,7 @@ use KompanieApp\Core\Auth\User;
 /**
  * Ein vorgefertigter Block (Issue Blöcke): eigene Seiten bestehen aus einer Liste von Blöcken. Jeder Typ prüft seine
  * Felder selbst und bereitet sie für den Lesenden auf. Neue Typen kommen in Blocks::types() dazu, in der App in
- * packages/frontend/src/blocks/registry.tsx.
+ * packages/frontend/src/blocks/ (blockDrafts, BlocksEditor, BlocksView).
  */
 interface BlockType
 {
@@ -34,9 +34,10 @@ interface BlockType
     public function render(array $data, ?User $viewer, bool $manager): ?array;
 
     /**
-     * Reiner Text, z. B. für E-Mails und Textauszüge; leer, wenn es nichts zu sagen gibt.
+     * Reiner Text für $viewer (null = ohne Anmeldung), z. B. für E-Mails und Textauszüge; leer, wenn es nichts zu sagen
+     * gibt.
      *
      * @param array<string, mixed> $data
      */
-    public function plain(array $data): string;
+    public function plain(array $data, ?User $viewer = null): string;
 }

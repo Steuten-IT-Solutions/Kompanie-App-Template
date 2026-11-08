@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, type ReactNode } from 'react';
 import { api, type BlockAudience, type PublicEvent } from '../api';
 import { Loading, lazyView } from '../ui';
 import { BLOCK_KINDS, moveBlock, newBlock, type BlockDraft, type BlockKind, type CountdownDraft } from './blockDrafts';
@@ -185,10 +185,16 @@ export default function BlocksEditor({
   value,
   onChange,
   idPrefix,
+  allLabel = 'Für alle, die die Seite sehen',
+  renderText,
 }: {
   value: BlockDraft[];
   onChange: (blocks: BlockDraft[]) => void;
   idPrefix: string;
+  /** Bezeichnung für audience all (z. B. „Für alle, die die Nachricht sehen“) */
+  allLabel?: string;
+  /** eigener Editor für Textblöcke (Schwarzes Brett: mit „Signatur einfügen“) */
+  renderText?: (props: { value: string; onChange: (html: string) => void; id: string }) => ReactNode;
 }) {
   const insert = (at: number, type: BlockKind) => onChange([...value.slice(0, at), newBlock(type), ...value.slice(at)]);
   const update = (i: number, b: BlockDraft) => onChange(value.map((x, j) => (j === i ? b : x)));
@@ -203,11 +209,11 @@ export default function BlocksEditor({
             <div className="block-edit-head">
               <strong>{label}</strong>
               <select
-                aria-label={`Sichtbar für (${label})`}
+                aria-label={`Zielgruppe des Blocks (${label})`}
                 value={b.audience}
                 onChange={(e) => update(i, { ...b, audience: e.target.value as BlockAudience })}
               >
-                <option value="all">Für alle, die die Seite sehen</option>
+                <option value="all">{allLabel}</option>
                 <option value="members">Nur Mitglieder</option>
               </select>
               <span className="block-edit-actions">
@@ -238,7 +244,9 @@ export default function BlocksEditor({
                 </button>
               </span>
             </div>
-            {b.type === 'text' ? (
+            {b.type === 'text' && renderText ? (
+              renderText({ value: b.html, onChange: (html) => update(i, { ...b, html }), id })
+            ) : b.type === 'text' ? (
               <Suspense fallback={<Loading shape="text" chunk />}>
                 <RichTextEditor value={b.html} onChange={(html) => update(i, { ...b, html })} label="Text" id={id} />
               </Suspense>

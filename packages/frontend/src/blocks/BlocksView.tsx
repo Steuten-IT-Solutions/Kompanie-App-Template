@@ -3,10 +3,10 @@ import RichTextView from '../richtext/RichTextView';
 import Countdown from './Countdown';
 
 /**
- * Inhalt aus Blöcken (eigene Seiten): jeder Block mit seiner Anzeige. Unbekannte Typen (Daten eines neueren Servers)
+ * Inhalt aus Blöcken (eigene Seiten, News, Schwarzes Brett): jeder Block mit seiner Anzeige. Unbekannte Typen (Daten eines neueren Servers)
  * übergeht die App; wer pflegt, sieht einen Hinweis.
  */
-export default function BlocksView({ blocks, manager }: { blocks: Block[]; manager?: boolean }) {
+export default function BlocksView({ blocks, manager, textClassName }: { blocks: Block[]; manager?: boolean; textClassName?: string }) {
   return (
     <div className="blocks">
       {blocks.map((b) => {
@@ -15,7 +15,7 @@ export default function BlocksView({ blocks, manager }: { blocks: Block[]; manag
         let view;
         switch (b.type) {
           case 'text':
-            view = <RichTextView html={b.html} />;
+            view = <RichTextView html={b.html} className={textClassName} />;
             break;
           case 'countdown':
             view = <Countdown block={b} />;

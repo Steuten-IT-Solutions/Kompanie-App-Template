@@ -215,4 +215,35 @@ final class NewsInAppTest extends TestCase
     {
         $this->assertContains('app_news', Backup::CORE_TABLES);
     }
+    /** Blöcke wie bei eigenen Seiten: Countdown, Block nur für Mitglieder (auch seine Bilder), ältere App mit body. */
+    public function testBlocks(): void
+    {
+        $this->useApp();
+        $png = imagecreatetruecolor(4, 3);
+        ob_start();
+        imagepng($png);
+        $bytes = (string) ob_get_clean();
+        $uid = $this->call('POST', '/rich-images', ['file' => ['name' => 'bild.png', 'data' => base64_encode($bytes)]])->data['uid'];
+        $item = $this->ok('POST', '/news', ['title' => 'Fest', 'blocks' => [
+            ['type' => 'text', 'html' => '<p>Kommt alle!</p>'],
+            ['type' => 'countdown', 'title' => 'Bis zum Fest', 'date' => '2027-06-12', 'time' => '14:00'],
+            ['type' => 'text', 'audience' => 'members', 'html' => '<p>Treffpunkt intern</p><img data-image="' . $uid . '">'],
+        ]]);
+        $this->assertSame(['text', 'countdown', 'text'], array_column($item['blocks'], 'type'));
+        $this->assertSame('<p>Kommt alle!</p>', $item['content'], 'content: nur Text für alle');
+        $this->assertSame('Kommt alle!', $this->ok('GET', '/news')[0]['excerpt'] ?? null);
+        $this->assertNull($this->ok('GET', '/news')[0]['image'] ?? null, 'Bild aus dem Mitglieder-Block nicht als Vorschau');
+
+        $guest = $this->call('GET', '/news/' . $item['id'], [], null);
+        $this->assertSame(['text', 'countdown'], array_column($guest->data['blocks'], 'type'), 'ohne Anmeldung ohne Mitglieder-Block');
+        $this->assertSame(3, count($this->call('GET', '/news/' . $item['id'], [], $this->member)->data['blocks']));
+        $this->assertSame(401, $this->app->richImages()->forDelivery(null, $uid)['status']);
+        $this->assertSame(200, $this->app->richImages()->forDelivery($this->users->find($this->member), $uid)['status']);
+
+        // Ältere App: nur body
+        $old = $this->ok('PATCH', '/news/' . $item['id'], ['body' => '<p>Neu</p>']);
+        $this->assertSame([['id' => 'b1', 'type' => 'text', 'audience' => 'all', 'html' => '<p>Neu</p>']], $old['blocks']);
+        $this->assertNull($this->app->richImages()->repository()->find($uid), 'Bild in keinem Block mehr: gelöscht');
+        $this->assertSame(400, $this->call('PATCH', '/news/' . $item['id'], ['blocks' => [['type' => 'video']]])->status);
+    }
 }

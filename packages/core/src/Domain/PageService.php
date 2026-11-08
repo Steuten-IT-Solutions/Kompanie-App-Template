@@ -208,9 +208,7 @@ final class PageService
      */
     private function content(array $blocks, User $actor, int $id): array
     {
-        $blocks = $this->app->blocks()->claim($blocks, $actor, RichImageService::OWNER_PAGE, $id);
-        $body = Blocks::publicBody($blocks);
-        return ['blocks' => Blocks::encode($blocks, $body), 'body' => $body];
+        return $this->app->blocks()->columns($blocks, $actor, RichImageService::OWNER_PAGE, $id);
     }
 
     /**
@@ -239,20 +237,7 @@ final class PageService
             }
             $data['audience'] = $in['audience'];
         }
-        $blocks = null;
-        if (array_key_exists('blocks', $in)) {
-            $blocks = $this->app->blocks()->validate($in['blocks'], self::BODY_MAX);
-        } elseif (array_key_exists('body', $in)) {
-            if ($in['body'] !== null && !is_string($in['body'])) {
-                throw ApiError::invalid('Ungültiger Text.');
-            }
-            $html = RichText::sanitize((string) $in['body']);
-            $html = RichText::isEmpty($html) ? '' : $html;
-            if (strlen($html) > self::BODY_MAX) {
-                throw ApiError::invalid('Der Text ist zu lang.');
-            }
-            $blocks = Blocks::fromBody($html);
-        }
+        $blocks = $this->app->blocks()->fromInput($in, self::BODY_MAX);
         return [$data, $blocks];
     }
 }

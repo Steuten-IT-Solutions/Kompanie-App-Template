@@ -14,6 +14,9 @@ import {
   type Attachment,
 } from '../api';
 import { AttachmentList, AttachmentsField } from '../attachments';
+import { blocksInput, draftsFrom, hasContent, newBlock, type BlockDraft } from '../blocks/blockDrafts';
+import BlocksEditor from '../blocks/BlocksEditor';
+import BlocksView from '../blocks/BlocksView';
 import { boardLoaded, boardVisible, canManagePolls, canPostBoard, pollsVisible, refreshBoard, useBoard } from '../board';
 import { ComposeEditor } from '../composeEditor';
 import { BoardMeta, pollEndText } from '../BoardBanner';
@@ -33,7 +36,8 @@ const sameIds = (a: number[], b: number[]): boolean => [...a].sort((x, y) => x -
 
 interface Draft {
   title: string;
-  text: string;
+  /** Inhalt aus Blöcken (ältere Entwürfe: text, beim Lesen ein Textblock) */
+  blocks: BlockDraft[];
   /** datetime-local (Ortszeit); leer = jetzt + 24 Stunden beim Öffnen */
   expires: string;
   /** intern (members, Standard), öffentlich (public), Kompanie (company) oder einzeln (person) */
@@ -49,9 +53,10 @@ interface Draft {
 function readDraft(): Draft | null {
   try {
     const raw = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null');
-    return raw && typeof raw === 'object' && typeof raw.title === 'string' && typeof raw.text === 'string'
+    return raw && typeof raw === 'object' && typeof raw.title === 'string' && (Array.isArray(raw.blocks) || typeof raw.text === 'string')
       ? ({
           ...raw,
+          blocks: Array.isArray(raw.blocks) ? raw.blocks : draftsFrom(undefined, raw.text),
           audience: AUDIENCES.includes(raw.audience) ? raw.audience : 'members',
           audience_ids: Array.isArray(raw.audience_ids) ? raw.audience_ids.filter((id: unknown) => typeof id === 'number') : [],
           attachments: Array.isArray(raw.attachments) ? raw.attachments : [],
@@ -79,10 +84,43 @@ function withSaved(draft: Draft): Draft {
 
 const defaultExpires = () => toLocalInput(new Date(Date.now() + DAY).toISOString());
 
-/** Editor mit „Signatur einfügen“ (wie bei E-Mails aus der Verwaltung); der Entwurf bleibt beim Sprung zur Signatur erhalten. */
-function Editor(props: { value: string; onChange: (html: string) => void; label: string; id: string; draft?: Draft }) {
-  const { draft, ...rest } = props;
-  return <ComposeEditor {...rest} returnTo="brett" saveDraft={draft ? () => saveDraft(draft) : undefined} />;
+/**
+ * Inhalt aus Blöcken; Textblöcke mit „Signatur einfügen“ (wie bei E-Mails aus der Verwaltung), der Entwurf bleibt beim
+ * Sprung zur Signatur erhalten.
+ */
+function ContentEditor(props: { value: BlockDraft[]; onChange: (blocks: BlockDraft[]) => void; id: string; draft?: Draft }) {
+  const { draft } = props;
+  return (
+    <BlocksEditor
+      value={props.value}
+      onChange={props.onChange}
+      idPrefix={props.id}
+      allLabel="Für alle, die die Nachricht sehen"
+      renderText={(p) => (
+        <ComposeEditor {...p} label="Text der Nachricht" returnTo="brett" saveDraft={draft ? () => saveDraft(draft) : undefined} />
+      )}
+    />
+  );
+}
+
+const emptyDraft = (): Draft => ({
+  title: '',
+  blocks: [newBlock('text')],
+  expires: defaultExpires(),
+  audience: 'members',
+  audience_ids: [],
+  push: true,
+  mail: true,
+  attachments: [],
+});
+
+/** Inhalt einer Nachricht: Blöcke (ältere Server: text als ein Textblock). */
+function MessageContent({ item, manager }: { item: { text: string; blocks?: BoardMessage['blocks'] }; manager?: boolean }) {
+  return item.blocks ? (
+    <BlocksView blocks={item.blocks} manager={manager} textClassName="board-text" />
+  ) : (
+    <RichTextView html={item.text} className="board-text" />
+  );
 }
 
 /** „Sichtbar bis“: Ortszeit des Geräts, nicht in der Vergangenheit, ohne Obergrenze. */
@@ -261,9 +299,7 @@ function mailText(mail: BoardMailSummary): string {
 function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
   const [draft, setDraft] = useState<Draft>(() => {
     const saved = readDraft();
-    return saved
-      ? { ...saved, expires: saved.expires || defaultExpires() }
-      : { title: '', text: '', expires: defaultExpires(), audience: 'members', audience_ids: [], push: true, mail: true, attachments: [] };
+    return saved ? { ...saved, expires: saved.expires || defaultExpires() } : emptyDraft();
   });
   const options = useAudiences();
   const [editorKey, setEditorKey] = useState(0);
@@ -298,7 +334,7 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
     e.preventDefault();
     setError(null);
     if (draft.title.trim() === '') return setError('Bitte einen Titel eingeben.');
-    if (draft.text.trim() === '') return setError('Bitte einen Text eingeben.');
+    if (!hasContent(draft.blocks)) return setError('Bitte einen Text eingeben oder einen Block einfügen.');
     const expires = fromLocalInput(draft.expires);
     if (!expires || Date.parse(expires) <= Date.now()) return setError('„Sichtbar bis“ muss in der Zukunft liegen.');
     if (draft.audience === 'company' && draft.audience_ids.length === 0) return setError('Bitte mindestens eine Kompanie auswählen.');
@@ -317,7 +353,7 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
     try {
       await api.postBoard({
         title: draft.title,
-        text: draft.text,
+        blocks: blocksInput(draft.blocks),
         expires_at: expires,
         audience: draft.audience,
         ...(targeted(draft.audience) ? { audience_ids: draft.audience_ids } : {}),
@@ -326,16 +362,7 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
         attachments: draft.attachments.map((a) => a.uid),
       });
       saveDraft(null);
-      setDraft({
-        title: '',
-        text: '',
-        expires: defaultExpires(),
-        audience: 'members',
-        audience_ids: [],
-        push: true,
-        mail: true,
-        attachments: [],
-      });
+      setDraft(emptyDraft());
       setEditorKey((k) => k + 1);
       onToast('Nachricht veröffentlicht');
       await refreshBoard();
@@ -354,15 +381,8 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
         <input className="board-title-input" value={draft.title} onChange={(e) => update({ title: e.target.value })} required />
       </label>
       <div className="field">
-        <span>Text</span>
-        <Editor
-          key={editorKey}
-          value={draft.text}
-          onChange={(text) => update({ text })}
-          label="Text der Nachricht"
-          id="board-new-text"
-          draft={draft}
-        />
+        <span>Inhalt</span>
+        <ContentEditor key={editorKey} value={draft.blocks} onChange={(blocks) => update({ blocks })} id="board-new-text" draft={draft} />
       </div>
       <AttachmentsField
         id="board-new-attachments"
@@ -403,7 +423,7 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
         von selbst.
       </p>
       {error && <p className="form-error small">{error}</p>}
-      <button className="btn btn-block" type="submit" disabled={busy || draft.title.trim() === '' || draft.text.trim() === ''}>
+      <button className="btn btn-block" type="submit" disabled={busy || draft.title.trim() === '' || !hasContent(draft.blocks)}>
         {busy ? 'Sendet …' : 'Veröffentlichen'}
       </button>
     </form>
@@ -491,7 +511,7 @@ function History({ id }: { id: number }) {
 function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolean; onToast: (msg: string) => void }) {
   const [edit, setEdit] = useState<{
     title: string;
-    text: string;
+    blocks: BlockDraft[];
     expires: string;
     audience: BoardAudience;
     audience_ids: number[];
@@ -522,7 +542,7 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
     if (!edit) return;
     const changes: {
       title?: string;
-      text?: string;
+      blocks?: ReturnType<typeof blocksInput>;
       expires_at?: string | null;
       audience?: BoardAudience;
       audience_ids?: number[];
@@ -541,7 +561,8 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
       changes.audience = edit.audience;
       if (targeted(edit.audience)) changes.audience_ids = edit.audience_ids;
     }
-    if (edit.text !== item.text) changes.text = edit.text;
+    const blocks = blocksInput(edit.blocks);
+    if (JSON.stringify(blocks) !== JSON.stringify(blocksInput(draftsFrom(item.blocks, item.text)))) changes.blocks = blocks;
     const uids = edit.attachments.map((a) => a.uid);
     if (uids.join() !== (item.attachments ?? []).map((a) => a.uid).join()) changes.attachments = uids;
     const expires = fromLocalInput(edit.expires);
@@ -556,7 +577,7 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
       {edit === null ? (
         <>
           <h3 className="board-title">{item.title}</h3>
-          <RichTextView html={item.text} className="board-text" />
+          <MessageContent item={item} manager={canPost} />
           <AttachmentList items={item.attachments} />
         </>
       ) : (
@@ -571,11 +592,10 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
             />
           </label>
           <div className="field">
-            <span>Text</span>
-            <Editor
-              value={item.text}
-              onChange={(text) => setEdit((d) => (d ? { ...d, text } : d))}
-              label="Text der Nachricht"
+            <span>Inhalt</span>
+            <ContentEditor
+              value={edit.blocks}
+              onChange={(blocks) => setEdit((d) => (d ? { ...d, blocks } : d))}
               id={`board-edit-${item.id}`}
             />
           </div>
@@ -610,7 +630,7 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
               onClick={() =>
                 setEdit({
                   title: item.title,
-                  text: item.text,
+                  blocks: draftsFrom(item.blocks, item.text),
                   expires: toLocalInput(item.expires_at),
                   audience: item.audience ?? 'members',
                   audience_ids: item.audience_ids ?? [],
@@ -640,7 +660,7 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
               Alle Änderungen stehen im Verlauf.
             </p>
             <div className="button-row">
-              <button className="btn" disabled={busy || edit.title.trim() === '' || edit.text.trim() === ''} onClick={save}>
+              <button className="btn" disabled={busy || edit.title.trim() === '' || !hasContent(edit.blocks)} onClick={save}>
                 Speichern
               </button>
               <button className="btn btn-secondary" disabled={busy} onClick={() => setEdit(null)}>
@@ -691,7 +711,7 @@ function Ended() {
                       : `abgelaufen · ${formatShortTime(m.expires_at)}`}
                   </span>
                   <h3 className="board-title">{m.title}</h3>
-                  <RichTextView html={m.text} className="board-text" />
+                  <MessageContent item={m} manager />
                   <AttachmentList items={m.attachments} />
                   <button className="btn btn-link" aria-expanded={shown === m.id} onClick={() => setShown(shown === m.id ? null : m.id)}>
                     {shown === m.id ? 'Verlauf ausblenden' : 'Verlauf'}

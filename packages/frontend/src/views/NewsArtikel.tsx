@@ -2,6 +2,7 @@ import DOMPurify from 'dompurify';
 import { useState } from 'react';
 import { api, config } from '../api';
 import { formatShortTime, newsDate } from '../format';
+import BlocksView from '../blocks/BlocksView';
 import RichTextView from '../richtext/RichTextView';
 import { navigate } from '../router';
 import { ErrorBox, lazyView, Loading, useAsync } from '../ui';
@@ -94,7 +95,9 @@ export default function NewsArtikel({ id, onToast }: { id: string; onToast: (msg
       {newsDate(n.date) && <div className="news-date">{newsDate(n.date)}</div>}
       <h2 className="news-headline">{n.title}</h2>
       {inApp ? (
-        <div className="news-content">{n.content ? <RichTextView html={n.content} /> : null}</div>
+        <div className="news-content">
+          {n.blocks ? <BlocksView blocks={n.blocks} manager={canWriteNews()} /> : n.content ? <RichTextView html={n.content} /> : null}
+        </div>
       ) : (
         <div className="news-content" dangerouslySetInnerHTML={{ __html: cleanHtml(n.content ?? '') }} />
       )}
