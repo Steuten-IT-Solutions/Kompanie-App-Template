@@ -100,8 +100,9 @@ final class LinkEventsBlocksTest extends TestCase
         $this->assertSame(3, $three['blocks'][0]['count']);
         $this->assertSame(400, $this->call('POST', '/pages', ['title' => 'X', 'blocks' => [['type' => 'events', 'count' => 21]]])->status);
         $this->assertSame(400, $this->call('POST', '/pages', ['title' => 'X', 'blocks' => [['type' => 'events', 'count' => 'viele']]])->status);
-        // Bereich Termine aus: leer
+        // Bereich Termine aus: Block fällt weg (für die Pflege leer)
         $this->app->features()->update(['events' => false]);
-        $this->assertSame([], $this->ok('GET', "/pages/{$page['id']}", [], null)['blocks'][0]['events']);
+        $this->assertSame([], $this->ok('GET', "/pages/{$page['id']}", [], null)['blocks']);
+        $this->assertSame([], $this->ok('GET', "/pages/{$page['id']}")['blocks'][0]['events']);
     }
 }

@@ -8910,7 +8910,7 @@ components:
             events:
               type: array
               readOnly: true
-              description: 'Nur in Antworten: die nächsten count Termine ab heute; leer, wenn der Bereich Termine aus ist oder die Person keine Termine sehen darf (view_events)'
+              description: 'Nur in Antworten: die nächsten count Termine ab heute; leer, wenn die Person keine Termine sehen darf (view_events). Ist der Bereich Termine aus, fehlt der Block (außer für die Pflege).'
               items:
                 type: object
                 properties:

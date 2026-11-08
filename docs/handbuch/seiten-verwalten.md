@@ -57,7 +57,7 @@ Webseiten öffnen sich in einem neuen Fenster, Seiten der App im selben.
 1. Füge einen Block **Nächste Termine** ein.
 2. Trage bei Bedarf eine **Überschrift** ein und wähle bei **Wie viele Termine**, wie viele erscheinen (1 bis 20).
 
-Der Block zeigt immer die nächsten Termine ab heute aus den {bereich.events}, mit Datum, Uhrzeit und Ort, darunter **Alle Termine**. Du musst ihn nie anpassen. Wer die {bereich.events} nicht sehen darf, sieht dort „Zurzeit keine anstehenden Termine.“
+Der Block zeigt immer die nächsten Termine ab heute aus den {bereich.events}, mit Datum, Uhrzeit und Ort, darunter **Alle Termine**. Du musst ihn nie anpassen. Wer die {bereich.events} nicht sehen darf, sieht dort „Zurzeit keine anstehenden Termine.“ Sind die {bereich.events} ausgeschaltet, fehlt der Block.
 
 ### Die Reihenfolge ändern
 Halte einen Eintrag am Griff links fest, ziehe ihn an die gewünschte Stelle und lass los. Die Reihenfolge ist sofort gespeichert. Am Computer geht es auch mit der Tastatur: Griff mit der Tab-Taste auswählen, dann Pfeil hoch oder runter. Die Reihenfolge gilt in der Standardnavigation; mit eurer eigenen Navigation bestimmt die dort den Platz jeder Seite.

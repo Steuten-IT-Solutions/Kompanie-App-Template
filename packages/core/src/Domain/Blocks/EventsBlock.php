@@ -9,8 +9,8 @@ use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 
 /**
- * Nächste Termine aus dem Bereich Termine: die nächsten count (1 bis MAX) ab heute, immer aktuell. Wer die Termine
- * nicht sehen darf (Bereich events aus oder ohne view_events), bekommt eine leere Liste.
+ * Nächste Termine aus dem Bereich Termine: die nächsten count (1 bis MAX) ab heute, immer aktuell. Ist der Bereich aus,
+ * fällt der Block weg (außer für die Pflege); wer die Termine nicht sehen darf (view_events), bekommt eine leere Liste.
  */
 final class EventsBlock implements BlockType
 {
@@ -38,6 +38,9 @@ final class EventsBlock implements BlockType
 
     public function render(array $data, ?User $viewer, bool $manager): ?array
     {
+        if (!$manager && !$this->app->features()->enabled('events')) {
+            return null;
+        }
         $events = array_map(static fn (array $e): array => [
             'id' => $e['id'],
             'title' => $e['title'],
