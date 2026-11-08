@@ -2624,6 +2624,41 @@ test.describe('Android', () => {
     await login(page, 'mitglied1');
     expect(await status()).toBeNull();
   });
+
+  test('Startseite: Hinweis schaltet Benachrichtigungen mit allen Arten ein, „Nicht jetzt“ blendet ihn aus', async ({ page }) => {
+    await fakePush(page);
+    await login(page, 'mitglied1');
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    const hint = page.locator('.push-hint');
+    await expect(hint).toContainText('Nichts mehr verpassen');
+    await hint.getByRole('button', { name: 'Nicht jetzt' }).click();
+    await expect(hint).toHaveCount(0);
+    await page.reload();
+    await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
+    await expect(hint).toHaveCount(0);
+
+    await page.evaluate(() => localStorage.removeItem('kompanie-push-hint-later'));
+    await page.reload();
+    await hint.getByRole('button', { name: 'Benachrichtigungen einschalten' }).click();
+    await expect(page.getByText('Benachrichtigungen sind an')).toBeVisible();
+    await expect(hint).toHaveCount(0);
+    await openKonto(page);
+    await page.getByRole('button', { name: 'Benachrichtigungen einstellen' }).click();
+    for (const label of [
+      'Punkte: neue Einträge',
+      'Schwarzes Brett: dringende Nachrichten',
+      'Termine: neue und geänderte',
+      'News: neue Beiträge',
+    ]) {
+      await expect(page.getByLabel(label)).toBeChecked();
+    }
+    await page.getByRole('button', { name: 'Benachrichtigungen ausschalten' }).click();
+    await expect(page.getByRole('button', { name: 'Benachrichtigungen einschalten' })).toBeVisible();
+    // Der Browser hat schon gefragt: kein Hinweis mehr, auch wenn sie jetzt aus sind.
+    await page.goto('/app/');
+    await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
+    await expect(hint).toHaveCount(0);
+  });
 });
 
 test('Tab-Wechsel zeigt sofort die zuletzt geladenen Daten', async ({ page }) => {
