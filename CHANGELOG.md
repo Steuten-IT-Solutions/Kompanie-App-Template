@@ -24,6 +24,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   letzten Stunde Minuten und Sekunden), auf Wunsch bis zu einem Ende einen Text wie „läuft“ und danach einen eigenen
   Text oder nichts mehr. Jeder Block hat ein eigenes *Für wen?*: Blöcke *Nur Mitglieder* samt ihren Bildern fehlen
   auch auf öffentlichen Seiten ohne Anmeldung. Bestehende Seiten bleiben unverändert (ein Textblock).
+- **Ämter: freie Namen mit Mitgliedern verknüpfen**: Unter *Ämter → Namen mit Mitgliedern verknüpfen* schlägt die App
+  vor, welche Personen ohne Profil schon als Mitglied (auch ohne Zugang), in der Mitgliederliste oder als Ehemalige
+  angelegt sind, mit denselben toleranten Namensregeln wie bei den Anfragen. Mit *Verknüpfen* gehören alle Einträge
+  mit diesem Namen zur gewählten Person; Titel, die das Amt vergibt, werden abgeglichen.
 - **Mitglieder ohne Zugang**: Unter *Mitglied anlegen* gibt es den Haken *Ohne Zugang (meldet sich noch nicht an)*.
   So tragt ihr Personen ein, die noch kein Konto haben, z. B. für Chroniken und Ämter. Sie sind gewöhnliche Mitglieder,
   lassen sich überall auswählen und tragen in der Mitgliederliste der Verwaltung die Marke *ohne Zugang*; ein

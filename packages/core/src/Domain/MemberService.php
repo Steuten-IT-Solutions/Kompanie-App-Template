@@ -611,23 +611,46 @@ final class MemberService
             return [];
         }
         $emails = $email !== '' ? $this->users->emails(array_keys($users)) : [];
-        [$f, $l] = [self::nameKey($first), self::nameKey($last)];
-        $rank = ['email' => 0, 'name' => 1, 'similar' => 2];
         $out = [];
         foreach ($users as $id => $u) {
-            [$uf, $ul] = [self::nameKey($u->firstName), self::nameKey($u->lastName)];
-            $match = match (true) {
-                $email !== '' && isset($emails[$id]) && $emails[$id] !== '' && mb_strtolower($emails[$id]) === mb_strtolower($email) => 'email',
-                $uf . $ul === $f . $l && $uf . $ul !== '' => 'name',
-                $ul !== '' && $ul === $l && $uf !== '' && $f !== '' && (str_starts_with($uf, $f) || str_starts_with($f, $uf)) => 'similar',
-                default => null,
-            };
+            $match = $email !== '' && isset($emails[$id]) && $emails[$id] !== '' && mb_strtolower($emails[$id]) === mb_strtolower($email)
+                ? 'email'
+                : self::nameMatch($first, $last, $u);
             if ($match !== null) {
                 $out[] = ['id' => $id, 'name' => $u->name, 'match' => $match];
             }
         }
-        usort($out, static fn (array $a, array $b): int => [$rank[$a['match']], mb_strtolower($a['name'])] <=> [$rank[$b['match']], mb_strtolower($b['name'])]);
-        return $out;
+        return self::sortMatches($out);
+    }
+
+    /**
+     * Passt der Name zu diesem Konto? name: gleich (ohne Unterschied bei Groß- und Kleinschreibung, Leerzeichen,
+     * Bindestrichen, ä/ae, ö/oe, ü/ue und ß/ss), similar: gleicher Nachname und ein Vorname beginnt mit dem anderen; sonst
+     * null. Auch für freie Namen in Amtszeiten (OfficeService::linkSuggestions).
+     */
+    public static function nameMatch(string $first, string $last, User $u): ?string
+    {
+        [$f, $l] = [self::nameKey($first), self::nameKey($last)];
+        [$uf, $ul] = [self::nameKey($u->firstName), self::nameKey($u->lastName)];
+        return match (true) {
+            $uf . $ul === $f . $l && $uf . $ul !== '' => 'name',
+            $ul !== '' && $ul === $l && $uf !== '' && $f !== '' && (str_starts_with($uf, $f) || str_starts_with($f, $uf)) => 'similar',
+            default => null,
+        };
+    }
+
+    /**
+     * Vorschläge, die besten zuerst (email, name, similar), dann nach Namen.
+     *
+     * @template T of array{name: string, match: string}
+     * @param list<T> $matches
+     * @return list<T>
+     */
+    public static function sortMatches(array $matches): array
+    {
+        $rank = ['email' => 0, 'name' => 1, 'similar' => 2];
+        usort($matches, static fn (array $a, array $b): int => [$rank[$a['match']] ?? 3, mb_strtolower($a['name'])] <=> [$rank[$b['match']] ?? 3, mb_strtolower($b['name'])]);
+        return $matches;
     }
 
     /**
