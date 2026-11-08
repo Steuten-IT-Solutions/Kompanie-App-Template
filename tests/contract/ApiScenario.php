@@ -1010,7 +1010,22 @@ final class ApiScenario
             $c->ok($s === 200 && isset($byId[$pubId]) && !isset($byId[$id]), "$label: nur die öffentliche Nachricht");
             $c->ok(isset($byId[$pubId]) && !array_key_exists('last_edit', $byId[$pubId]) && !array_key_exists('mail', $byId[$pubId]), "$label: ohne Angaben für Schreibende");
         }
+        // Einzeln: nur die ausgewählte Person (und post_board)
         $this->d->actAs($admin);
+        [$s, $opts] = $this->req('GET', '/board/audiences');
+        $c->ok($s === 200 && in_array($cand, array_column((array) ($opts['people'] ?? []), 'id'), true) && !in_array($guest, array_column((array) ($opts['people'] ?? []), 'id'), true), 'Auswahl Einzeln: wer das Brett liest, ohne Gäste');
+        $c->ok($this->req('POST', '/board', ['title' => 'Kptest', 'text' => 'x', 'audience' => 'person', 'audience_ids' => []])[0] === 400, 'Einzeln ohne Auswahl → 400');
+        $c->ok($this->req('POST', '/board', ['title' => 'Kptest', 'text' => 'x', 'audience' => 'person', 'audience_ids' => [$guest]])[0] === 400, 'Einzeln für Gast-Konto → 400');
+        [$s, $one] = $this->req('POST', '/board', ['title' => "Kptest einzeln $sfx", 'text' => '<p>Kptest nur du</p>', 'audience' => 'person', 'audience_ids' => [$cand], 'push' => false, 'mail' => false]);
+        $oneId = (int) ($one['id'] ?? 0);
+        $c->ok($s === 201 && ($one['audience'] ?? '') === 'person' && ($one['audience_ids'] ?? null) === [$cand], 'Nachricht für eine Person');
+        foreach ([[$cand, true, 'Ausgewählte Person'], [$m, false, 'Anderes Mitglied'], [null, false, 'Ohne Anmeldung'], [$admin, true, 'post_board']] as [$who, $sees, $label]) {
+            $this->d->actAs($who);
+            [, $d] = $this->req('GET', '/board');
+            $c->ok(in_array($oneId, array_column((array) ($d['items'] ?? []), 'id'), true) === $sees, "Einzeln: $label " . ($sees ? 'sieht sie' : 'sieht sie nicht'));
+        }
+        $this->d->actAs($admin);
+        $this->req('DELETE', "/board/$oneId");
         [$s, $edited] = $this->req('PATCH', "/board/$pubId", ['audience' => 'members']);
         $c->ok($s === 200 && ($edited['audience'] ?? '') === 'members', 'Sichtbarkeit geändert');
         $this->d->actAs(null);

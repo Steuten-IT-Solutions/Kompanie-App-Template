@@ -1752,6 +1752,12 @@ WHERE title IS NULL",
                 'mysql' => ["ALTER TABLE {board_messages} ADD COLUMN audience varchar(10) NOT NULL DEFAULT 'members'"],
                 'sqlite' => ["ALTER TABLE {board_messages} ADD COLUMN audience TEXT NOT NULL DEFAULT 'members'"],
             ],
+            // Schwarzes Brett nur für bestimmte Kompanien (audience company) oder Personen (audience person): deren IDs,
+            // durch Komma getrennt. NULL bei intern und öffentlich (und bei allen bestehenden Nachrichten).
+            50 => [
+                'mysql' => ['ALTER TABLE {board_messages} ADD COLUMN audience_ids text NULL'],
+                'sqlite' => ['ALTER TABLE {board_messages} ADD COLUMN audience_ids TEXT DEFAULT NULL'],
+            ],
         ];
     }
 

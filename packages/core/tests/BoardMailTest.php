@@ -167,6 +167,19 @@ final class BoardMailTest extends TestCase
         $this->assertSame(400, $this->call('POST', '/board', ['title' => 'T', 'text' => 'x', 'mail' => 'ja'])->status);
     }
 
+    public function testPersonMessageMailsOnlyThemAndTheAuthor(): void
+    {
+        $this->configure();
+        $item = $this->call('POST', '/board', ['title' => 'Nur du', 'text' => '<p>x</p>', 'push' => false, 'audience' => 'person', 'audience_ids' => [$this->cand]])->data;
+        $this->assertSame(2, $item['mail']['recipients'], 'die Person und der Verfasser');
+        $info = fn (array $query): int => $this->app->api()->handle(new Request('GET', '/board/mail', $query))->data['recipients'];
+        $this->assertSame(3, $info([]), 'ohne Auswahl: Verfasser, Mitglied, Anwärter');
+        $this->assertSame(2, $info(['audience' => 'person', 'audience_ids' => (string) $this->cand]), 'Zahl für das Formular');
+        $this->assertSame(1, $info(['audience' => 'person', 'audience_ids' => (string) $this->guest]), 'Gäste nie, nur der Verfasser');
+        $this->app->runTask(BoardMailService::TASK);
+        $this->assertSame(['admin@example.org', 'anwaerter@example.org'], $this->mailer->recipients());
+    }
+
     public function testEmbeddedImagesAndRealMimeStructure(): void
     {
         $this->configure();

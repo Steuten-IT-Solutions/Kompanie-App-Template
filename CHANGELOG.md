@@ -15,6 +15,15 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Neu
+
+- **Schwarzes Brett nur für eine Kompanie oder einzelne Personen**: Unter *Sichtbar für* gibt es neben *intern* und
+  *öffentlich* jetzt *Kompanie* (nur, wer einer der angehakten Kompanien zugeordnet ist; nur mit eingeschaltetem
+  Bereich Kompanien) und *Einzeln* (nur die angehakten Personen). Benachrichtigung und E-Mail gehen dann nur an sie.
+  Alle, die ans Brett schreiben dürfen, sehen auch diese Nachrichten. Die Auswahl lässt sich beim Bearbeiten ändern
+  und steht im Verlauf. Hinweis: Wer danach auf eine ältere Version zurückgeht, zeigt solche Nachrichten wieder allen
+  Mitgliedern und Anwärtern.
+
 ## [0.7.0] – 2026-11-07
 
 ### Neu
