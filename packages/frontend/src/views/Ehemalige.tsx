@@ -253,15 +253,6 @@ function RetentionCard({ onChanged }: { onChanged: () => void }) {
   return (
     <form className="form card settings-section" onSubmit={save} aria-labelledby="former-retention-title">
       <h3 id="former-retention-title">Aufbewahrungsfrist</h3>
-      <p className="muted small">
-        Personenbezogene Daten sollen nicht länger gespeichert werden als nötig. Ist eine Frist eingestellt, löscht die App bei Ehemaligen
-        so viele Jahre nach dem Ausscheiden endgültig die persönlichen Angaben: Adresse, Handynummer, E-Mail-Adresse, Anmeldung, Geburtstag,
-        Strafen, Anwesenheiten, Antworten in Umfragen, Benachrichtigungen, Signatur und Einstellungen. Für die Chronik bleiben Name, Eintrag
-        als ehemalig, Ämter, Punkte, Dienstgrad, Titel, Foto und Eintrittsjahr. Ohne Datum des Ausscheidens zählt der Tag des Eintragens.
-        Leer oder 0: aus.
-        {config?.variant === 'wordpress' &&
-          ' Der Benutzer der Webseite (Anmeldung, E-Mail-Adresse) bleibt in WordPress; ihn löscht oder ändert ein Administrator der Webseite unter Benutzer.'}
-      </p>
       <label className="field">
         <span>Jahre nach dem Ausscheiden</span>
         <input
@@ -439,11 +430,6 @@ export function NewFormer() {
         <legend>Foto (optional)</legend>
         <PhotoPicker name={`${name.first_name} ${name.last_name}`.trim()} value={photo} onChange={setPhoto} onError={setFormError} />
       </fieldset>
-      <p className="muted small">
-        Es entsteht ein Konto ohne Anmeldung, das gleich als ehemalig eingetragen ist. Wer schon ein Konto mit genau diesem Namen hat, wird
-        nicht noch einmal angelegt. Steht die Person in den {sec.offices} bisher nur mit ihrem Namen, wird der Eintrag mit ihrem Konto
-        verknüpft.
-      </p>
       {formError && (
         <p className="form-error" role="alert">
           {formError}
@@ -684,16 +670,6 @@ export function FormerImport({ onToast }: { onToast: (msg: string) => void }) {
         ‹ Einzeln anlegen
       </button>
       <h2 className="member-name">Ehemalige importieren</h2>
-      <p className="muted small">
-        Eine Zeile je Person, Spalten getrennt durch Semikolon (oder Tabulator, z. B. aus einer Tabellenkalkulation kopiert):{' '}
-        <code>vorname;nachname;eintritt;ausgeschieden;grund</code>. Daten als TT.MM.JJJJ oder nur das Jahr; Eintritt „Gründer“ für
-        Gründungsmitglieder. Grund: ausgetreten (auch leer), verstorben oder sonstiges. Bei Verstorbenen ist „ausgeschieden“ der Todestag.
-      </p>
-      <p className="muted small">
-        Für jede Person entsteht ein Konto, das gleich als ehemalig eingetragen ist (ohne Anmeldung). Wer schon ein Konto mit genau diesem
-        Namen hat, wird übersprungen; ein zweiter Import legt also nichts doppelt an. Steht eine Person in den {sec.offices} bisher nur mit
-        ihrem Namen, wird der Eintrag mit ihrem Konto verknüpft.
-      </p>
       <label className="field">
         <span>Tabelle</span>
         <textarea

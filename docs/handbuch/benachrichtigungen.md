@@ -8,7 +8,7 @@ Die App kann dich auf dem Handy oder am Computer benachrichtigen, wenn es etwas 
 ![Benachrichtigungen mit der Liste der Arten, alle angehakt](bild:benachrichtigungen)
 
 ## So öffnest du die Seite
-- Mit Konto: Tippe unten auf **Meins**, wähle oben im Menü **Konto** und tippe auf **Benachrichtigungen einstellen**.
+- Mit Konto: Tippe unten auf **Meins**, wähle oben im Menü **Konto** und tippe auf **Benachrichtigungen einstellen**. Hat dein Gerät noch keine Benachrichtigungen, siehst du außerdem auf der Startseite den Hinweis **Nichts mehr verpassen** (siehe unten).
 - Ohne Konto: Tippe unter **{bereich.events}** auf **Bei neuen Terminen benachrichtigen** oder unter **{bereich.news}** auf **Bei neuen Beiträgen benachrichtigen**.
 
 ## Was du hier siehst
@@ -26,6 +26,14 @@ Die App kann dich auf dem Handy oder am Computer benachrichtigen, wenn es etwas 
 5. Es erscheint „Benachrichtigungen sind an“. Mit **Testnachricht senden** prüfst du, ob alles ankommt.
 
 ![Benachrichtigungen ohne Konto: Termine, Erinnerung und News](bild:benachrichtigungen-gast)
+
+### Über den Hinweis auf der Startseite einschalten
+Angemeldet siehst du auf der Startseite den Hinweis **Nichts mehr verpassen**, solange dein Browser auf diesem Gerät noch nicht nach Benachrichtigungen gefragt hat.
+1. Tippe auf **Benachrichtigungen einschalten**.
+2. Dein Browser fragt, ob die Seite Benachrichtigungen senden darf. Tippe auf **Erlauben**.
+3. Es erscheint „Benachrichtigungen sind an“. Alle Arten, die es für dich gibt, sind eingeschaltet. Ändern kannst du sie wie unten beschrieben.
+
+Mit **Nicht jetzt** verschwindet der Hinweis auf diesem Gerät für 30 Tage. Einschalten kannst du die Benachrichtigungen ohne deine Zustimmung im Browser nicht; das kann auch die {kompanie.name} nicht für dich tun.
 
 ### Arten ändern
 1. Öffne die Seite.
@@ -73,7 +81,7 @@ Dort gibt es Benachrichtigungen nur in der installierten App (ab iOS 16.4), nich
 - Die Einstellung gilt nur für das Gerät, auf dem du sie vornimmst. Auf weiteren Geräten schaltest du sie dort ein.
 - Mit einem Konto bekommen höchstens 10 Geräte Benachrichtigungen. Schaltest du sie auf einem weiteren ein, fällt das am längsten eingerichtete weg.
 - Meldest du dich in der App ab, schaltet sie die Benachrichtigungen deines Kontos auf diesem Gerät aus. Endet die Anmeldung anders (z. B. abgelaufen), passiert das, sobald die App auf dem Gerät wieder geöffnet wird.
-- Schaltet die {kompanie.name} {bereich.board}, {bereich.polls} oder {bereich.birthdays} zum ersten Mal ein, kommt die neue Art auf Geräten, die schon Benachrichtigungen bekommen, einmalig von selbst dazu. **{bereich.board}: öffentliche Nachrichten** kommt so bei der ersten öffentlichen Nachricht dazu.
+- Gibt es für dich eine Art neu, z. B. weil die {kompanie.name} einen Bereich einschaltet oder du eine neue Rolle bekommst, kommt sie auf deinen Geräten mit Benachrichtigungen von selbst dazu (spätestens nach 15 Minuten, sofort, wenn du diese Seite öffnest). Arten, deren Haken du selbst entfernt hast, bleiben aus, auch wenn ein Bereich aus- und wieder eingeschaltet wird. **{bereich.board}: öffentliche Nachrichten** kommt bei der ersten öffentlichen Nachricht dazu.
 - Ohne Konto eingeschaltete Benachrichtigungen enden von selbst, wenn die App auf dem Gerät ein halbes Jahr lang nicht geöffnet wurde und keine Nachricht kam.
 
 ## Wenn nichts ankommt

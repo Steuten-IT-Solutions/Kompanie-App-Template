@@ -29,6 +29,8 @@ Mit diesem Passwort sind heruntergeladene Sicherungen und alle Sicherungen in Go
 2. Der Browser speichert eine Datei `sicherung-<Datum>.json` (verschlüsselt: `sicherung-<Datum>.json.enc`). Bewahre sie an einem sicheren Ort auf, nicht nur auf dem Server.
 
 ### Sicherungen in Google Drive einschalten
+Damit nach dem Verlust des Servers eine aktuelle Sicherung woanders liegt, legt die App regelmäßig eine Sicherung in einem eigenen Ordner im verbundenen Google Drive ab. Gib diesen Ordner nicht für andere frei.
+
 1. Verbinde die App unter **Google-Zugang** über **Mit Google verbinden** und setze dabei das Häkchen für eigene Dateien in Google Drive (siehe [Google-Zugang](seite:admin-google)).
 2. Empfohlen: Richte ein **Passwort für Sicherungen** ein (siehe oben). Dann gehen die Sicherungen verschlüsselt nach Google Drive; ohne Passwort unverschlüsselt (lesbar für jeden, der den Ordner öffnen kann).
 3. Schalte hier **Wöchentlich in Google Drive sichern** ein.

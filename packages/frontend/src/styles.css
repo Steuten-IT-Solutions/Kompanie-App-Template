@@ -301,6 +301,13 @@ h3,
   padding: 4px;
   font-size: 1.1rem;
 }
+/* Startseite: Benachrichtigungen einschalten (PushHint) */
+.push-hint p {
+  margin: 0 0 10px;
+}
+.push-hint .push-hint-later {
+  margin-top: 4px;
+}
 
 /* ------------------------------------------------------------------ */
 /* Bausteine                                                           */
@@ -2508,6 +2515,44 @@ code {
   font-size: 1.4rem;
   color: var(--accent-text);
 }
+/* Übersicht als Kacheln je Gruppe (Issue #348) */
+.settings-group + .settings-group {
+  margin-top: var(--space-5);
+}
+.settings-group-title {
+  margin: 0 0 var(--space-2);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.settings-tiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr));
+  gap: var(--space-2);
+}
+.settings-tiles > li {
+  display: flex;
+}
+.settings-tile {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 56px;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  cursor: pointer;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+.settings-tile .row-title {
+  overflow-wrap: break-word;
+}
 /* Kacheln der Einstellungen: Innenabstand und Abstand untereinander (auch ohne .form) */
 .settings-section {
   padding: 16px;
@@ -2806,6 +2851,16 @@ fieldset.rights-tree legend {
 }
 
 /* Was ist neu (Changelog) */
+.changelog-version > summary {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.changelog-title {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
 .changelog-text h4 {
   font-size: 0.95rem;
   margin: 14px 0 2px;

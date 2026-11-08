@@ -36,10 +36,6 @@ export default function GalleryAlbums({ onToast }: { onToast: (msg: string) => v
   return (
     <section className="card settings-section gallery-albums" id="einstellungen-galerie-alben">
       <h3>Alben und eigene Bilder</h3>
-      <p className="muted small">
-        Bilder lädst du hier in jedes Album hoch, auch in eines aus Google Drive. Der Server entfernt dabei Metadaten wie den Aufnahmeort.
-        Alben nur in der App legst du unten an; Alben aus Drive änderst du in Drive.
-      </p>
       {loading && !data && <Loading shape="text" />}
       {error && <ErrorBox message={error} onRetry={reload} />}
       {data && data.albums.length === 0 && <p className="muted small">Noch keine Alben.</p>}

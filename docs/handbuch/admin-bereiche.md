@@ -30,7 +30,7 @@ Unter einem Schalter steht außerdem, falls nötig:
 - Ausgeschaltete Bereiche behalten ihre Daten. Schaltest du sie wieder ein, ist alles wieder da.
 - {bereich.calendar}, {bereich.gallery}, {bereich.news} und {bereich.mail} erscheinen für die anderen erst, wenn sie auch eingerichtet sind ({bereich.mail}: Mailversand unter **E-Mail**).
 - Bereiche mit eigenen Aufgaben bringen beim Einschalten eine Rolle mit, zum Beispiel „{bereich.points} verwalten“. Gibt es schon eine Rolle mit diesem Namen, legt die App keine zweite an. Schaltest du den Bereich aus und hat niemand die Rolle, verschwindet sie wieder. {bereich.calendar}, {bereich.birthdays} und {bereich.directory} bringen keine eigene Rolle mit, {bereich.news} nur mit der Quelle **In der App schreiben** („{bereich.news} verwalten“, siehe [{bereich.news} einrichten](seite:admin-neuigkeiten)). Mehr unter [Rollen](seite:admin-rollen-und-mitglieder).
-- Schaltest du {bereich.board}, {bereich.polls} oder {bereich.birthdays} zum ersten Mal ein, bekommen Geräte, die schon für Benachrichtigungen angemeldet sind, diese Benachrichtigungen dazu.
+- Schaltest du einen Bereich mit eigenen Benachrichtigungen ein (z. B. {bereich.board}, {bereich.polls}, {bereich.birthdays} oder {bereich.news}), bekommen Geräte, die schon für Benachrichtigungen angemeldet sind, diese Benachrichtigungen dazu. Wer eine Art selbst abgeschaltet hat, bekommt sie nicht wieder.
 - Mit WordPress kannst du die Bereiche auch im WordPress-Backend auf der Seite der App ein- und ausschalten.
 
 ## Siehe auch

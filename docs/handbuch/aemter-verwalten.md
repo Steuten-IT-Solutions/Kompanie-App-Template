@@ -82,6 +82,7 @@ Steht jemand in Amtszeiten nur mit seinem Namen (**Ohne Profil**), ist aber inzw
 4. Tippe auf **Vorschau**, prüfe die Zeilen und tippe auf **Übernehmen**.
 
 ## Gut zu wissen
+- Gruppen ordnen die Ämter im Zeitstrahl, z. B. Verein und Dachverband. Mit **Amtszeiten gemeinsam** haben alle Ämter einer Gruppe dieselben Jahre und ein gemeinsames Gruppenbild (z. B. ein Königshaus); vorhandene Amtszeiten mit denselben Jahren fasst die App dabei zusammen.
 - Die Reihenfolge der Amtszeiten im Zeitstrahl ergibt sich von selbst: laufende zuerst, dann nach Jahren.
 - Löschen lässt sich nur eine leere Gruppe.
 - Beim Verknüpfen zählen Groß- und Kleinschreibung, Leerzeichen, Bindestriche und Umlaute (ä/ae, ö/oe, ü/ue, ß/ss) nicht. Ähnlich heißt: gleicher Nachname, und ein Vorname beginnt mit dem anderen (z. B. „Chris“ und „Christian“). Vorausgewählt ist eine Person nur bei gleichem Namen; verknüpft wird erst, wenn du auf **Verknüpfen** tippst. Steht die Person in einer Amtszeit schon, bleibt der freie Name dort stehen.

@@ -8,7 +8,7 @@ Hier verbindest du den {bereich.calendar} für Mitglieder mit eurem Google Kalen
 ![Die Seite Kalender in den Einstellungen](bild:admin-kalender)
 
 ## So öffnest du die Seite
-Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Kalender**. Im [Einrichtungsassistenten](seite:admin-einrichtung) steht derselbe Abschnitt im Schritt für den Kalender.
+Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und unter **Termine und Kalender** auf **Kalender**. Darunter steht, wenn der Bereich an ist, der Abschnitt **{bereich.birthdays}**. Im [Einrichtungsassistenten](seite:admin-einrichtung) steht derselbe Abschnitt im Schritt für den Kalender.
 
 ## Was du hier siehst
 - **Kalender für Mitglieder**: der Abschnitt mit einer kurzen Erklärung der beiden Wege.

@@ -127,10 +127,6 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <div>
-      <p className="muted small">
-        Die {sec.sponsors} erscheinen in dieser Reihenfolge mit Logo und Link; zum Ändern einen Eintrag am Griff links ziehen. Ohne Logo
-        steht dort der Name.
-      </p>
       {formError && (
         <p className="form-error" role="alert">
           {formError}
@@ -220,10 +216,6 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
         aria-label="Logo-Datei"
         onChange={(e) => uploadLogo(e.target.files?.[0] ?? null)}
       />
-      <p className="muted small">
-        Logo: PNG, JPG, WebP oder SVG, höchstens 2 MB. Bilder werden auf höchstens 512 Pixel verkleinert; am besten mit transparentem
-        Hintergrund. Links nur mit https://.
-      </p>
 
       <form className="form card" onSubmit={add}>
         <h3>Neuer Sponsor</h3>

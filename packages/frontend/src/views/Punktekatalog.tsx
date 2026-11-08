@@ -15,10 +15,6 @@ export default function Punktekatalog() {
 
   return (
     <div>
-      <p className="muted small">
-        So viele {sec.points} gibt es je Eintrag. Hat deine Rolle einen {sec.points}faktor, zählt ein Eintrag entsprechend weniger oder
-        mehr.
-      </p>
       <ul className="card-list">
         {items.map((c) => (
           <li key={c.id} className="card row">

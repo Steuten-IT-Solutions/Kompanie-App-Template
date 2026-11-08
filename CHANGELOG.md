@@ -8,7 +8,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - Jeder Pull Request nach `develop`, der etwas für die Nutzer der App ändert, ergänzt einen Eintrag unter
   `[Unveröffentlicht]`, im passenden Unterabschnitt: `Neu`, `Geändert`, `Behoben`, `Entfernt` oder `Sicherheit`.
   Interne Änderungen (Tests, CI, Werkzeuge zum Veröffentlichen) gehören nicht hierher.
-- Wer `VERSION` erhöht, macht aus `[Unveröffentlicht]` den Abschnitt `## [x.y.z] – JJJJ-MM-TT` und legt darüber einen
+- Ein Pull Request, der ein Thema fortführt (z. B. weitere Blöcke, mehr zum Schwarzen Brett), ändert den bestehenden
+  Eintrag zu diesem Thema, statt einen neuen anzulegen. Ein Eintrag beschreibt den Stand für die Admins, nicht die
+  einzelnen Schritte dorthin.
+- Wer `VERSION` erhöht, fasst vorher die Einträge unter `[Unveröffentlicht]` nach Thema zusammen und macht dann aus
+  `[Unveröffentlicht]` den Abschnitt `## [x.y.z] – JJJJ-MM-TT` und legt darüber einen
   neuen, leeren `[Unveröffentlicht]` an. Ein Release `develop → main` ist nur mit diesem Abschnitt möglich
   (`php scripts/changelog.php --check --require-version`).
 - Die Version ist die Kern-Version (`1.4.0`), nicht die einer Kompanie (`1.4.0.27`).
@@ -23,6 +27,35 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   (*Nur für Mitglieder* bzw. *Öffentlich zeigen*). Das dürfen alle, die die Einstellungen verwalten oder Einreichungen
   prüfen. Das Bild bekommt dabei eine neue Adresse, die alte liefert nichts mehr. Bilder aus Google Drive stellt
   weiterhin der Unterordner *intern* in Drive um.
+- **Inhalte aus Blöcken**: Eigene Seiten, Beiträge in den News, die in der App geschrieben werden, und Nachrichten am
+  Schwarzen Brett bestehen jetzt aus Blöcken, die ihr mit *+ Block einfügen* hinzufügt, mit ↑/↓ verschiebt und
+  entfernt. Jeder Block hat ein eigenes *Für wen?*: Blöcke *Nur Mitglieder* samt ihren Bildern fehlen auf öffentlichen
+  Seiten und Nachrichten ohne Anmeldung. Bestehende Inhalte bleiben unverändert (ein Textblock). Vorschaubild in der
+  Liste der News ist das erste Bild in einem Text für alle. Die Mail vom Brett enthält alle Blöcke, den Countdown als
+  Satz; der Verlauf zeigt Blöcke ebenso.
+- **Vorgefertigte Blöcke**: Neben *Text* gibt es
+  *Countdown* (bis zu einem Datum oder Termin, verschoben: zählt mit; immer zwei Angaben wie Tage und Stunden, auf
+  Wunsch bis zu einem Ende ein Text wie „läuft“ und danach ein eigener Text oder nichts),
+  *Knopf mit Link* (Webseite, E-Mail-Adresse, Telefonnummer oder Seite der App),
+  *Nächste Termine* (1 bis 20 ab heute, immer aktuell),
+  *Ansprechpartner* (wer ausgewählte Ämter gerade innehat, mit Foto; E-Mail-Adresse und Handynummer nur für alle, die
+  persönliche Angaben sehen dürfen),
+  *Hinweis-Kasten* (Info, Warnung oder Erfolg), *Trennlinie* (Linie oder Abstand),
+  *Ablauf* (Zeit und Programmpunkt untereinander, z. B. für ein Fest),
+  *Zahlen und Fakten* (kurze Kennzahlen wie „1848 gegründet“),
+  *Umfrage* (Stand und Weg zum Abstimmen, nur für alle, die an Umfragen teilnehmen dürfen),
+  *Album* (einige Vorschaubilder eines Albums; jeder sieht nur die Bilder, die er in der Galerie sehen darf),
+  *Dokument* (Datei aus den Dokumenten zum Öffnen und Herunterladen, nur für alle, die sie dort sehen dürfen),
+  *Sponsoren* (alle mit Logo und Link) und
+  *Karte zur Anfahrt* (ein Ort mit dem Knopf *Karte*, der ihn in der Karten-App des Geräts öffnet; es wird keine fremde
+  Karte eingebettet).
+- **Mitglieder ohne Zugang**: Unter *Mitglied anlegen* gibt es den Haken *Ohne Zugang (meldet sich noch nicht an)*.
+  So tragt ihr Personen ein, die noch kein Konto haben, z. B. für Chroniken und Ämter. Sie sind gewöhnliche Mitglieder,
+  lassen sich überall auswählen und tragen in der Mitgliederliste der Verwaltung die Marke *ohne Zugang*; ein
+  Startpasswort gibt es nicht. Einen Zugang bekommen sie später auf ihrer Seite mit *Zugang einrichten*
+  (Startpasswort) oder beim Freigeben ihrer eigenen Anfrage. Beim Import aus Excel oder CSV legt die neue Spalte
+  *Zugang* mit „nein“ Mitglieder ohne Zugang an (leer oder „ja“: wie bisher mit Startpasswort). Unter *Mehrere auf
+  einmal anlegen* gibt es je Person den Haken *Ohne Zugang*.
 - **Fehlermeldungen zuerst an die Admins**: Was jemand über *Fehler melden* schickt, geht nicht mehr gleich an die
   Betreuer der App, sondern landet unter *Verwaltung → Fehlermeldungen* (mit Zahl der offenen und einer
   Benachrichtigung). Dort schließt ihr eine Meldung mit Begründung, z. B. wenn ihr selbst helfen konntet, oder leitet
@@ -31,51 +64,25 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Personen; an die Betreuer geht er weiter nur mit Haken. Neues Recht *Fehlermeldungen bearbeiten*, das ihr an Rollen
   vergeben könnt (Admins haben es immer). *Fehler melden* gibt es jetzt auch in Apps ohne Empfänger für
   Fehlermeldungen; dort bleiben die Meldungen bei den Admins. Erledigte Meldungen werden nach 30 Tagen gelöscht.
+- **Hinweis zum Einschalten der Benachrichtigungen**: Angemeldete Mitglieder sehen auf der Startseite einen Hinweis
+  *Nichts mehr verpassen* mit dem Knopf *Benachrichtigungen einschalten*, solange ihr Browser auf diesem Gerät noch
+  nicht nach Benachrichtigungen gefragt hat. Ein Tippen fragt nach der Erlaubnis und schaltet alle Arten ein; *Nicht
+  jetzt* blendet den Hinweis für 30 Tage aus. Ohne Zustimmung der Person im Browser geht es technisch nicht.
+- **Neue Arten von Benachrichtigungen kommen von selbst dazu**: Bekommt jemand eine Art neu angeboten, z. B. nach einer
+  neuen Rolle (Bilder prüfen, Anfragen freigeben, Mitglied statt Gast) oder weil ihr einen Bereich wie News oder
+  Termine einschaltet, schaltet die App sie auf seinen Geräten mit Benachrichtigungen ein (spätestens nach
+  15 Minuten). Arten, die jemand selbst abgeschaltet hat, bleiben aus. Bei Geräten, die schon vor diesem Update
+  angemeldet waren, gilt das für alles, was ab jetzt neu dazukommt.
 - **Rolle und Zusatzrollen gleich beim Anlegen**: Wer Rollen vergeben darf, wählt beim Anlegen eines Mitglieds jetzt
   jede Rolle, die er auch danach unter *Konto und Rolle* vergeben dürfte (z. B. Vorstand), und hakt Zusatzrollen an.
   Das gilt für *Mitglied anlegen*, *Mehrere auf einmal anlegen* (Rolle und Zusatzrollen für alle), den Import aus
   Excel oder CSV (Spalte *Status* mit dem Namen der Rolle, neue Spalte *Zusatzrollen*, mit Komma getrennt) und das
   Freigeben von Anfragen (nur Rolle). Wer nur Mitglieder anlegen darf, wählt wie bisher Mitglied und die Rollen, die
   unter *Einstellungen → Rollen* für neue Konten freigegeben sind. Die Rechte prüft der Server.
-- **Mehrere auf einmal ohne Zugang**: Unter *Mehrere auf einmal anlegen* gibt es je Person den Haken *Ohne Zugang*.
-- **Eigene Seiten aus Blöcken, mit Countdown**: Eine eigene Seite besteht jetzt aus Blöcken, die ihr unter
-  *Inhalt* mit *+ Block einfügen* hinzufügt, mit ↑/↓ verschiebt und entfernt. Neben *Text* gibt es als ersten
-  vorgefertigten Block den *Countdown*: Er zählt bis zu einem Datum oder einem Termin aus den Terminen herunter
-  (verschoben: zählt mit), zeigt immer zwei Angaben (Tage und Stunden, am letzten Tag Stunden und Minuten, in der
-  letzten Stunde Minuten und Sekunden), auf Wunsch bis zu einem Ende einen Text wie „läuft“ und danach einen eigenen
-  Text oder nichts mehr. Jeder Block hat ein eigenes *Für wen?*: Blöcke *Nur Mitglieder* samt ihren Bildern fehlen
-  auch auf öffentlichen Seiten ohne Anmeldung. Bestehende Seiten bleiben unverändert (ein Textblock).
 - **Ämter: freie Namen mit Mitgliedern verknüpfen**: Unter *Ämter → Namen mit Mitgliedern verknüpfen* schlägt die App
   vor, welche Personen ohne Profil schon als Mitglied (auch ohne Zugang), in der Mitgliederliste oder als Ehemalige
   angelegt sind, mit denselben toleranten Namensregeln wie bei den Anfragen. Mit *Verknüpfen* gehören alle Einträge
   mit diesem Namen zur gewählten Person; Titel, die das Amt vergibt, werden abgeglichen.
-- **Blöcke auch in den News**: Beiträge, die in der App geschrieben werden, bestehen ebenfalls aus Blöcken, mit
-  Countdown und *Für wen?* je Block. Vorschaubild der Liste ist das erste Bild in einem Text für alle.
-- **Blöcke am Schwarzen Brett**: Auch Nachrichten am Brett bestehen aus Blöcken, mit Countdown und *Für wen?* je
-  Block; Blöcke *Nur Mitglieder* fehlen bei öffentlichen Nachrichten ohne Anmeldung. Die Mail enthält alle Blöcke, den
-  Countdown als Satz; der Verlauf zeigt Blöcke ebenso.
-- **Neue Blöcke: Knopf mit Link und Nächste Termine**: Ein *Knopf mit Link* führt zu einer Webseite, einer
-  E-Mail-Adresse, einer Telefonnummer oder einer Seite der App. *Nächste Termine* zeigt die nächsten 1 bis 20 Termine
-  ab heute, immer aktuell. Beide gibt es auf eigenen Seiten, in den News und am Schwarzen Brett.
-- **Neue Blöcke: Ansprechpartner, Hinweis-Kasten und Trennlinie**: *Ansprechpartner* zeigt, wer ausgewählte Ämter
-  gerade innehat, mit Foto; E-Mail-Adresse und Handynummer nur für alle, die persönliche Angaben sehen dürfen. Der
-  *Hinweis-Kasten* hebt einen kurzen Text als Info, Warnung oder Erfolg hervor, die *Trennlinie* gliedert mit Linie
-  oder Abstand.
-- **Neue Blöcke: Ablauf und Zahlen und Fakten**: Der *Ablauf* stellt Zeit und Programmpunkt untereinander, z. B.
-  für ein Fest; *Zahlen und Fakten* zeigt kurze Kennzahlen wie „1848 gegründet“ groß nebeneinander.
-- **Neue Blöcke: Umfrage und Album**: Die *Umfrage* zeigt eine Umfrage mit ihrem Stand und dem Weg zum Abstimmen,
-  nur für alle, die an Umfragen teilnehmen dürfen. Das *Album* zeigt einige Vorschaubilder eines Albums aus der
-  Galerie; jeder sieht nur die Bilder, die er auch in der Galerie sehen darf.
-- **Neue Blöcke: Dokument und Sponsoren**: Das *Dokument* bietet eine Datei aus den Dokumenten zum Öffnen und
-  Herunterladen an, nur für alle, die sie dort sehen dürfen. *Sponsoren* zeigt alle Sponsoren mit Logo und Link.
-- **Neuer Block: Karte zur Anfahrt**: zeigt einen Ort mit dem Knopf *Karte*, der ihn wie beim Ort eines Termins in
-  der Karten-App des Geräts öffnet. Es wird keine fremde Karte eingebettet.
-- **Mitglieder ohne Zugang**: Unter *Mitglied anlegen* gibt es den Haken *Ohne Zugang (meldet sich noch nicht an)*.
-  So tragt ihr Personen ein, die noch kein Konto haben, z. B. für Chroniken und Ämter. Sie sind gewöhnliche Mitglieder,
-  lassen sich überall auswählen und tragen in der Mitgliederliste der Verwaltung die Marke *ohne Zugang*; ein
-  Startpasswort gibt es nicht. Einen Zugang bekommen sie später auf ihrer Seite mit *Zugang einrichten*
-  (Startpasswort) oder beim Freigeben ihrer eigenen Anfrage. Beim Import aus Excel oder CSV legt die neue Spalte
-  *Zugang* mit „nein“ Mitglieder ohne Zugang an (leer oder „ja“: wie bisher mit Startpasswort).
 - **Anfragen mit einem Mitglied ohne Zugang verbinden**: Beim Freigeben einer Anfrage schlägt die App passende
   Mitglieder ohne Zugang vor (gleiche E-Mail-Adresse, gleicher oder ähnlicher Name, auch mit ä/ae oder Bindestrich),
   und ihr könnt jedes Mitglied ohne Zugang wählen. Mit *Freigeben und verbinden* bekommt das Mitglied Benutzername,
@@ -94,23 +101,35 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   herunterladen (… Bilder, ZIP)* jetzt rechts neben dem Titel ein runder Knopf mit Pfeil nach unten, wie beim
   Herunterladen eines einzelnen Bildes. Die Anzahl der Bilder und Videos zeigt er beim Darüberfahren mit der Maus;
   während des Ladens steht darunter „Lädt … von …“ mit *Abbrechen*.
-- **Banner des Schwarzen Bretts in einer Zeile**: Das Banner oben zeigt je Eintrag nur noch den Titel, ohne
-  Überschrift, Verfasser und Uhrzeit (die stehen am Brett). Ein Tipp auf den Titel öffnet die Nachricht; *+1 weitere*
-  und *Brett öffnen* erscheinen erst bei mehreren Einträgen. Auch laufende Umfragen stehen so in einer Zeile.
-- **Schreiben am Brett aufgeräumt**: Der Titel ist eine große Eingabe, *Sichtbar für*, *Sichtbar bis* und die
-  Versandwege stehen im eigenen Abschnitt *Sichtbarkeit und Versand*. Die Werkzeugleiste des Texteditors (auch bei
-  Neuigkeiten, eigenen Seiten und E-Mails) zeigt nur die häufigen Werkzeuge; Schriftart, Größe, Ausrichtung, Einzug,
-  Trennlinie, Tabelle und Weiteres liegen hinter **⋯**.
-- **Karten am Brett und in den Umfragen mit Innenrand**: Text klebt nicht mehr am Rand der Karte.
+- **Einstellungen neu geordnet**: Die Übersicht zeigt Kacheln in Gruppen (App, Mitglieder und Zugang,
+  Benachrichtigungen, Verbindungen, Termine und Kalender, Betrieb) statt einer langen Liste. *Zugang beantragen* steht
+  jetzt als Abschnitt unter *Rollen*, *Geburtstage* unter *Kalender*, zusammen mit der Benachrichtigung am Geburtstag
+  (bisher unter *Benachrichtigungen*). Alte Links auf die beiden Seiten führen an die neue Stelle.
+- **Rolle nur für alle, die Rollen vergeben**: Auf der Seite eines Mitglieds stehen Rolle, Zusatzrollen und
+  „mit Ausnahmen bei den Rechten“ nur noch für alle mit dem Recht *Rollen vergeben*; ebenso der Filter *nach Rolle* in
+  der Mitgliederliste. Die anderen sehen dort nur „Ehemalig“ oder „Ohne Zugang“, wenn das zutrifft. Die Zusatzrollen
+  schickt der Server auf der Seite eines Mitglieds nur noch mit diesem Recht.
+- **„Was ist neu“ kürzer**: Aufgeklappt ist nur noch die Vorabversion bzw. die installierte Version; ältere
+  Versionen stehen eingeklappt mit Datum und Anzahl der Änderungen darunter und öffnen sich beim Antippen.
+- **Erklärungen nur noch in der Hilfe**: Lange Erklärtexte oben auf vielen Seiten (z. B. Import, Ehemalige, Ämter,
+  Rollen, E-Mail, Google-Zugang, Datensicherung, Punktekatalog) sind aus der App entfernt; was dort stand, findet ihr
+  über den Knopf **?** im Handbuch der jeweiligen Seite. Warnungen und Hinweise auf etwas, das zu tun ist, bleiben.
+  Unter *Zustand und Updates* steht der Text zu einem Punkt nur noch, wenn dort etwas zu tun ist.
+- **Schwarzes Brett übersichtlicher**: Das Banner oben zeigt je Eintrag nur noch den Titel, ohne Überschrift,
+  Verfasser und Uhrzeit (die stehen am Brett); ein Tipp darauf öffnet die Nachricht, *+1 weitere* und *Brett öffnen*
+  erscheinen erst bei mehreren Einträgen. Auch laufende Umfragen stehen so in einer Zeile. Beim Schreiben ist der Titel
+  eine große Eingabe, *Sichtbar für*, *Sichtbar bis* und die Versandwege stehen im Abschnitt *Sichtbarkeit und
+  Versand*. Die Werkzeugleiste des Texteditors (auch bei Neuigkeiten, eigenen Seiten und E-Mails) zeigt nur die
+  häufigen Werkzeuge; Schriftart, Größe, Ausrichtung, Einzug, Trennlinie, Tabelle und Weiteres liegen hinter **⋯**.
 - **Gleichmäßigere Abstände**: Erklärtexte kleben nicht mehr an der ersten Karte darunter (z. B. bei Dienstgraden,
-  Navigation und Rollen), Umfragen stehen mit Abstand untereinander, unter *Umfragen verwalten* haben die Karten
-  einen Innenrand, beim Anlegen mehrerer Mitglieder stehen die Felder je Person mit Abstand in einem Rahmen, und die
-  Knöpfe *Ansehen* und *Bearbeiten* der Rollen stehen auf dem Handy nebeneinander.
+  Navigation und Rollen), Umfragen stehen mit Abstand untereinander, Karten am Brett, in den Umfragen und unter
+  *Umfragen verwalten* haben einen Innenrand, beim Anlegen mehrerer Mitglieder stehen die Felder je Person mit Abstand
+  in einem Rahmen, und die Knöpfe *Ansehen* und *Bearbeiten* der Rollen stehen auf dem Handy nebeneinander.
 - **Rückfragen im Fenster der App**: Fragen wie „Wirklich löschen?“, Eingaben (z. B. Grund beim Ablehnen eines
   Bildes, Adresse eines Links) und Hinweise erscheinen jetzt in einem eigenen Fenster der App statt im Fenster des
-  Browsers. Es sieht auf jedem Gerät gleich aus; Löschen und Entfernen steht auf einem roten Knopf.
-- **Fenster heben sich deutlicher ab**: Hinter einem Fenster ist die Seite stärker abgedunkelt und unscharf, das
-  Fenster hat oben eine Linie in der Farbe der Kompanie und einen kräftigeren Schatten.
+  Browsers. Es sieht auf jedem Gerät gleich aus; Löschen und Entfernen steht auf einem roten Knopf. Hinter einem Fenster ist die Seite
+  stärker abgedunkelt und unscharf, das Fenster hat oben eine Linie in der Farbe der Kompanie und einen kräftigeren
+  Schatten.
 - **Benachrichtigung vom Schwarzen Brett auch an den Verfasser**: Wer eine Nachricht mit *Benachrichtigung senden*
   schreibt, bekommt die Benachrichtigung jetzt selbst auch (auf seinen Geräten, auf denen die Art *Schwarzes Brett:
   dringende Nachrichten* eingeschaltet ist), wie schon bisher die Mail. Das gilt für intern, öffentlich, Kompanie und

@@ -169,6 +169,7 @@ final class Api
             try {
                 $sub = $push->own($user, $r->input('endpoint'), $user === null ? $r->input('auth') : null);
                 $push->seen($sub); // Die App wird auf dem Gerät noch genutzt: Gast-Abo verfällt nicht.
+                $sub = $push->addNewTypesTo($sub, $user); // neu angebotene Arten gleich einschalten
             } catch (ApiError) {
                 $sub = null;
             }

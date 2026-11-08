@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, config, toLogin, type RegistrationStatus } from '../api';
-import brand from '../generated/brand';
 import { normalizeEmail } from '../email';
 import { navigate } from '../router';
 import { EmailField, ErrorBox, Loading, useAsync } from '../ui';
@@ -130,11 +129,6 @@ function RegistrationForm() {
   return (
     <form className="form card registration-form" onSubmit={submit} noValidate>
       <h2 className="news-headline">Zugang beantragen</h2>
-      <p className="muted small">
-        Du gehörst zu {brand.name} und hast noch keinen Zugang zur App? Stell hier eine Anfrage. Die Admins geben sie frei, danach meldest
-        du dich mit deinem Benutzernamen und Passwort an.
-        {f.email_confirmation && ' Vorher bestätigst du deine E-Mail-Adresse über einen Link, den wir dir schicken.'}
-      </p>
       <div className="field-row">
         <label className="field">
           <span>Vorname</span>

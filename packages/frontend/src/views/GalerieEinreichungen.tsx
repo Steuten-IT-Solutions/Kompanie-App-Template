@@ -69,9 +69,6 @@ function Submit({ onToast }: { onToast: (msg: string) => void }) {
         }}
       >
         <h2>Bilder einreichen</h2>
-        <p className="muted small">
-          Eingereichte Bilder erscheinen erst, wenn jemand sie freigibt. Der Server entfernt dabei Metadaten wie den Aufnahmeort.
-        </p>
         {albums.length === 0 ? (
           <p className="muted small">Noch keine Alben, in die du einreichen kannst.</p>
         ) : (

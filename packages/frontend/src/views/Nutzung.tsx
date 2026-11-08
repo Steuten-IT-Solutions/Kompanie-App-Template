@@ -46,10 +46,6 @@ export default function Nutzung({ onToast }: { onToast: (msg: string) => void })
     <>
       <section className="card settings-section" aria-labelledby="usage-title">
         <h3 id="usage-title">Nutzung</h3>
-        <p className="muted small">
-          Wer die App wann nutzt. Gespeichert werden nur der Bereich, die Art (z. B. angesehen, angelegt) und die Uhrzeit, keine Inhalte und
-          keine IP-Adressen. Die Zahlen bleiben auf eurem Server.
-        </p>
         <div className="stats usage-stats">
           <StatCard label="Konten" value={String(o.users)} />
           <StatCard label="Aktiv (24 Std.)" value={String(o.active.d1)} />
@@ -143,10 +139,6 @@ function Areas({ overview }: { overview: ActivityOverview }) {
           ))}
         </ul>
       )}
-      <p className="small muted">
-        Zahl rechts: Nutzungen im Zeitraum. Mehrmals Ansehen innerhalb von 15 Minuten zählt einmal; was offline ohne Verbindung angesehen
-        wird, zählt nicht.
-      </p>
     </>
   );
 }

@@ -145,9 +145,11 @@ Laufend: Jeder Pull Request nach `develop`, der für die Nutzer etwas ändert, t
 [`CHANGELOG.md`](../CHANGELOG.md) unter `[Unveröffentlicht]` ein (Aufbau und Regeln stehen oben in der Datei).
 Admins sehen das Changelog in der App unter *Einstellungen → Was ist neu*; es wird mit der App gebaut
 (`scripts/changelog.php`). Wie die Doku zählt es nicht zum `coreCode`: Eine reine Änderung am Changelog ergibt
-keine neue Version, sie kommt mit der nächsten.
+keine neue Version, sie kommt mit der nächsten. Führt ein Pull Request ein Thema fort, ändert er den bestehenden
+Eintrag, statt einen neuen anzulegen; in der App sind ältere Versionen eingeklappt, die Liste soll trotzdem kurz bleiben.
 
-1. `VERSION` erhöhen und im selben Pull Request nach `develop` in `CHANGELOG.md` aus `[Unveröffentlicht]` den Abschnitt
+1. Die Einträge unter `[Unveröffentlicht]` nach Thema zusammenfassen (ein Eintrag je Thema, Stand für die Admins).
+   Dann `VERSION` erhöhen und im selben Pull Request nach `develop` in `CHANGELOG.md` aus `[Unveröffentlicht]` den Abschnitt
    `## [x.y.z] – JJJJ-MM-TT` machen (darüber ein neues, leeres `[Unveröffentlicht]`). Ohne diesen Abschnitt macht der
    Check **Changelog zur Version** den Release-PR rot (`php scripts/changelog.php --check --require-version`).
 2. Jeder Merge nach `develop` baut für jede Kompanie eine neue Version im Kanal `early`.

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, can, levelLabel, newAccountRoles, type MemberImportResult, type MemberImportRow } from '../api';
+import { api, can, levelLabel, type MemberImportResult, type MemberImportRow } from '../api';
 import brand from '../generated/brand';
 import { formatAddress } from '../address';
 import { formatYearOrDate } from '../format';
@@ -165,26 +165,9 @@ export function MemberImport({ onDone, doneLabel }: { onDone: () => void; doneLa
   }
 
   const errors = result?.rows.filter((r) => r.error).length ?? 0;
-  // Rollen, die der Importierende beim Anlegen vergeben darf (z. B. Mitglied, Anwärter, Vorstand)
-  const roles = newAccountRoles()
-    .map((r) => r.label)
-    .join(', ');
   const total = result ? result.new.active + result.new.former : 0;
   return (
     <div className="member-import office-import">
-      <p className="muted small">
-        Eine Zeile je Person, die erste Zeile enthält die Spaltennamen. Nötig ist nur <strong>Vorname</strong>; außerdem kennt die App
-        Nachname, Status ({roles} oder ehemalig; leer heißt {levelLabel('member')}), Benutzername, E-Mail, Handynummer, Adresse (Straße,
-        Hausnummer, Adresszusatz, PLZ, Ort, Land; leer heißt Deutschland), Geburtstag, Eintritt, Punkte, Dienstgrad, Titel sowie bei
-        Ehemaligen Ausgeschieden und Grund (ausgetreten, verstorben, sonstiges). Mit Zugang „nein“ entsteht ein Mitglied ohne Zugang (leer
-        heißt ja).{can('promote_users') && ' Zusatzrollen trägst du mit Komma getrennt in die Spalte Zusatzrollen ein.'} Daten als
-        TT.MM.JJJJ, den Eintritt auch nur als Jahr. Die Reihenfolge der Spalten ist egal, andere Spalten werden übergangen.
-      </p>
-      <p className="muted small">
-        Aktive bekommen ein Startpasswort, das nach dem Übernehmen einmal angezeigt wird, außer Mitglieder ohne Zugang. Ehemalige bekommen
-        ein Konto ohne Anmeldung. Wer schon ein Konto mit genau diesem Namen hat, wird übersprungen; ein zweiter Import legt also niemanden
-        doppelt an. Bitte die Datei danach löschen, wenn du sie nicht mehr brauchst.
-      </p>
       <button type="button" className="btn btn-link" onClick={downloadTemplate}>
         Vorlage herunterladen (CSV für Excel)
       </button>

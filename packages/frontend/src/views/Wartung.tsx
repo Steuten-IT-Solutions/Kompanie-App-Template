@@ -51,8 +51,13 @@ function StatusCard({ status }: { status: AdminStatus }) {
             <span className="status-dot" role="img" aria-label={LEVEL_TEXT[i.level]} />
             <span>
               <strong>{i.label}</strong>
-              <br />
-              <span className="small">{i.text}</span>
+              {/* Erklärungen stehen im Handbuch (Issue #343); in der App nur, was bei einem Problem zu tun ist */}
+              {(i.level === 'warn' || i.level === 'error') && (
+                <>
+                  <br />
+                  <span className="small">{i.text}</span>
+                </>
+              )}
             </span>
           </li>
         ))}
@@ -404,12 +409,6 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
             />
             <span>Vorabversionen erhalten (zum Testen)</span>
           </label>
-          {u.channel === 'early' && (
-            <p className="muted small">
-              Diese Installation bekommt jede neue Version, sobald sie gebaut ist, nicht erst nach der Freigabe für alle. Ausschalten: Sie
-              bleibt auf der jetzigen Version, bis eine neuere freigegeben ist.
-            </p>
-          )}
           {!u.autoAllowed && (
             <p className="muted small">
               Automatische Updates sind in dieser Installation gesperrt (z. B. in den Einstellungen von WordPress). Neue Versionen bitte
@@ -419,10 +418,6 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
           {olderVersions.length > 0 && (
             <details className="small">
               <summary>Auf eine ältere Version zurück</summary>
-              <p className="muted">
-                Hilft, wenn nach einem Update etwas nicht mehr klappt. Die jetzige Version wird danach übersprungen, bis eine neuere
-                erscheint.
-              </p>
               <label className="field">
                 <span>Version</span>
                 <select value={older} onChange={(e) => setOlder(e.target.value)}>
@@ -556,17 +551,17 @@ function Fehlerprotokoll({ status, onToast }: { status: AdminStatus; onToast: (m
   return (
     <section className="card settings-section" aria-labelledby="errorlog-title">
       <h3 id="errorlog-title">Fehlerprotokoll</h3>
-      <p className="small muted">
-        Die letzten Fehler dieser Installation mit Fehlertext (höchstens 14 Tage). Das Protokoll bleibt auf eurem Server. Wenn die Betreuer
-        der App bei einem Problem helfen sollen, kopiere es und schicke es ihnen
-        {status.support ? (
-          <>
-            {' '}
-            (<a href={supportHref(status.support)}>{status.support}</a>)
-          </>
-        ) : null}
-        . Vorher kurz durchsehen: Fehlertexte können Namen enthalten.
-      </p>
+      {log.length > 0 && (
+        <p className="small">
+          Vor dem Weitergeben kurz durchsehen: Fehlertexte können Namen enthalten.
+          {status.support && (
+            <>
+              {' '}
+              Betreuer der App: <a href={supportHref(status.support)}>{status.support}</a>
+            </>
+          )}
+        </p>
+      )}
       {log.length === 0 ? (
         <p className="small">Keine Fehler in den letzten 14 Tagen.</p>
       ) : (
@@ -775,12 +770,6 @@ function Datensicherung({
         <p className="small">
           Verschlüsselt herunterladen geht, sobald das Passwort unten mit „Passwort prüfen“ bestätigt ist: Mit einem vertippten Passwort
           ließe sich die Sicherung nicht wiederherstellen.
-        </p>
-      )}
-      {encrypted && (
-        <p className="muted small">
-          Bricht das Herunterladen ab, ist die Datei unvollständig (die App erkennt das beim Wiederherstellen); der Grund steht unter
-          Einstellungen → Zustand und Updates im Fehlerprotokoll.
         </p>
       )}
       <input
@@ -1046,12 +1035,6 @@ function DriveSicherung({ onToast, noSodium }: { onToast: (msg: string) => void;
   return (
     <section className="card settings-section" aria-labelledby="backup-drive-title">
       <h3 id="backup-drive-title">Sicherungen in Google Drive</h3>
-      <p className="muted small">
-        Damit nach dem Verlust des Servers eine aktuelle Sicherung woanders liegt: Die App legt einmal pro{' '}
-        {d.every_days === 7 ? 'Woche' : `${d.every_days} Tage`} eine Sicherung in einem eigenen Ordner im verbundenen Google-Konto ab und
-        behält die letzten {d.keep}. Ist oben ein Passwort für Sicherungen eingerichtet, gehen sie verschlüsselt dorthin; den Ordner
-        trotzdem bitte nicht freigeben.
-      </p>
       {!d.encrypted && (
         <p className="small">
           {noSodium
