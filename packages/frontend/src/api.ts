@@ -155,10 +155,48 @@ export interface PageSummary {
   updated_by_name?: string | null;
 }
 export interface PageDetail extends PageSummary {
-  /** Formatierter Text (bereinigt), Bilder als Adressen */
+  /** Text der Textblöcke für alle (für ältere Apps), Bilder als Adressen */
   body: string;
+  /** Inhalt aus Blöcken, nur die für die Person sichtbaren; fehlt bei älteren Servern */
+  blocks?: Block[];
 }
-export type PageInput = { title?: string; audience?: PageAudience; body?: string; updated_at?: string };
+export type PageInput = { title?: string; audience?: PageAudience; body?: string; blocks?: BlockInput[]; updated_at?: string };
+
+/** Vorgefertigte Blöcke (eigene Seiten): all für alle, die den Inhalt sehen; members nur für Mitglieder. */
+export type BlockAudience = 'all' | 'members';
+interface BlockBase {
+  id: string;
+  audience: BlockAudience;
+}
+export interface TextBlock extends BlockBase {
+  type: 'text';
+  /** Formatierter Text (bereinigt), Bilder als Adressen */
+  html: string;
+}
+export interface CountdownBlock extends BlockBase {
+  type: 'countdown';
+  title: string;
+  /** date: freies Datum; event: Termin aus dem Bereich Termine */
+  source: 'date' | 'event';
+  date?: string;
+  time?: string | null;
+  end_date?: string | null;
+  end_time?: string | null;
+  event_id?: number;
+  /** Titel des Termins; null, wenn er fehlt oder nicht sichtbar ist */
+  event_title?: string | null;
+  running_text: string;
+  after: 'text' | 'hide';
+  after_text: string;
+  /** Beginn und Ende in UTC (vom Server berechnet); starts_at null: wie nach dem Ende */
+  starts_at: string | null;
+  ends_at: string | null;
+}
+export type Block = TextBlock | CountdownBlock;
+/** Zum Speichern: wie gelesen, ohne die vom Server berechneten Felder (werden ignoriert). */
+export type BlockInput =
+  | (Omit<TextBlock, 'id'> & { id?: string })
+  | (Omit<CountdownBlock, 'id' | 'starts_at' | 'ends_at' | 'event_title'> & { id?: string });
 
 /** Einstellungen → Navigation (Issue #277): gespeicherte Navigation und was der Server erlaubt. */
 export interface NavigationAdmin {

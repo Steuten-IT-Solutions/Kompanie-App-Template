@@ -6206,3 +6206,110 @@ button.spotlight-person:focus-visible {
   overflow-wrap: anywhere;
   margin: 4px 0 8px;
 }
+
+/* Blöcke auf eigenen Seiten: Countdown und Bearbeiten */
+.page-article {
+  padding: 16px;
+}
+fieldset.block-source {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+fieldset.block-source legend {
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.blocks {
+  display: grid;
+  gap: 16px;
+}
+.block-badge {
+  margin: 0 0 6px;
+}
+.block-countdown {
+  text-align: center;
+  padding: 16px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+.form.card .block-countdown-title,
+.block-countdown-title {
+  margin: 0 0 10px;
+  font-family: var(--font-head);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ink);
+}
+.block-countdown-parts {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  font-variant-numeric: tabular-nums;
+}
+.block-countdown-part {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 72px;
+}
+.block-countdown-value {
+  font-family: var(--font-head);
+  font-size: 2.6rem;
+  line-height: 1.1;
+  font-weight: 700;
+  color: var(--primary-text);
+}
+.block-countdown-unit {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.block-countdown-when {
+  margin: 10px 0 0;
+}
+.block-countdown-text {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+.blocks-editor {
+  display: grid;
+  gap: 12px;
+}
+.block-edit {
+  display: grid;
+  gap: 10px;
+}
+.block-edit-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.block-edit-head select {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+.block-edit-actions {
+  display: flex;
+  gap: 6px;
+}
+.block-insert select {
+  width: 100%;
+}
+.block-preview {
+  display: grid;
+  gap: 4px;
+}

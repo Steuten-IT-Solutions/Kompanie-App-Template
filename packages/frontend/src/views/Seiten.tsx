@@ -1,5 +1,6 @@
 import { can, type PageSummary } from '../api';
 import brand from '../generated/brand';
+import BlocksView from '../blocks/BlocksView';
 import RichTextView from '../richtext/RichTextView';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
@@ -71,7 +72,17 @@ function PageView({ id }: { id: number }) {
               </button>
             </p>
           )}
-          {data.body ? <RichTextView html={data.body} /> : <p className="muted">Diese Seite hat noch keinen Text.</p>}
+          {data.blocks ? (
+            data.blocks.length > 0 ? (
+              <BlocksView blocks={data.blocks} manager={can('manage_pages')} />
+            ) : (
+              <p className="muted">Diese Seite hat noch keinen Inhalt.</p>
+            )
+          ) : data.body ? (
+            <RichTextView html={data.body} />
+          ) : (
+            <p className="muted">Diese Seite hat noch keinen Text.</p>
+          )}
         </article>
       )}
     </div>
