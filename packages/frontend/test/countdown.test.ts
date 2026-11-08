@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { countdownParts, countdownPhase, nextChange, nextDay, nextTick, unitLabel } from '../src/blocks/countdown.ts';
-import { blocksInput, draftsFrom, moveBlock, newBlock } from '../src/blocks/blockDrafts.ts';
+import { blocksInput, draftsFrom, hasContent, moveBlock, newBlock } from '../src/blocks/blockDrafts.ts';
 
 const S = 1000;
 const M = 60 * S;
@@ -107,4 +107,13 @@ test('Blöcke bearbeiten: aus älteren Servern, zum Speichern, Verschieben', () 
   assert.deepEqual(moveBlock([1, 2, 3], 0, 1), [2, 1, 3]);
   assert.deepEqual(moveBlock([1, 2, 3], 0, -1), [1, 2, 3]);
   assert.deepEqual(moveBlock([1, 2, 3], 2, -1), [1, 3, 2]);
+});
+
+test('Inhalt vorhanden: nicht nur leere Textblöcke (Schwarzes Brett)', () => {
+  const text = (html: string) => ({ ...newBlock('text'), html }) as ReturnType<typeof newBlock>;
+  assert.equal(hasContent([]), false);
+  assert.equal(hasContent([text(''), text('<p></p>'), text('<p>&nbsp; </p>')]), false);
+  assert.equal(hasContent([text('<p>Hallo</p>')]), true);
+  assert.equal(hasContent([text('<p><img data-image="ab"></p>')]), true);
+  assert.equal(hasContent([text(''), newBlock('countdown')]), true);
 });

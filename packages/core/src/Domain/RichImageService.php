@@ -227,7 +227,7 @@ final class RichImageService
         if ($viewer === null) {
             // Öffentliche Nachrichten am Brett auch ohne Anmeldung, aber nicht als öffentlich zwischengespeichert
             // (isPublic): Sie laufen ab und lassen sich wieder intern stellen.
-            return $img['owner_type'] === self::OWNER_BOARD ? $this->app->board()->canSeeImage(null, $img['owner_id']) : $this->isPublic($img);
+            return $img['owner_type'] === self::OWNER_BOARD ? $this->app->board()->canSeeImage(null, $img['owner_id'], $img['uid'] ?? null) : $this->isPublic($img);
         }
         return match ($img['owner_type']) {
             self::OWNER_COMPANY => $this->companyVisible($viewer),
@@ -235,7 +235,7 @@ final class RichImageService
             self::OWNER_NEWS => $this->app->newsService()->canSeeImage($viewer, $img['owner_id'], $img['uid'] ?? null),
             self::OWNER_OFFICE_GROUP_TERM, self::OWNER_OFFICE_HOLDER => $this->officesVisible($viewer),
             self::OWNER_DRAFT, self::OWNER_SIGNATURE => $viewer->id === $img['owner_id'],
-            self::OWNER_BOARD => $this->app->board()->canSeeImage($viewer, $img['owner_id']),
+            self::OWNER_BOARD => $this->app->board()->canSeeImage($viewer, $img['owner_id'], $img['uid'] ?? null),
             self::OWNER_MAIL => $this->app->mailings()->canSeeImage($viewer, $img['owner_id']),
             default => false,
         };

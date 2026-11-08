@@ -2059,7 +2059,8 @@ paths:
               type: object
               properties:
                 title: { type: string }
-                text: { type: string, description: Formatierter Inhalt (HTML), wird bereinigt }
+                blocks: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Block' }, description: 'Wie bei POST (hat Vorrang vor text). Bilder, die in keinem Block mehr stehen, bleiben für den Verlauf.' }
+                text: { type: string, description: 'Formatierter Inhalt (HTML), wird bereinigt (ältere Apps: danach ein Textblock)' }
                 expires_at: { type: string, description: 'Wie bei POST; muss in der Zukunft liegen' }
                 audience: { $ref: '#/components/schemas/BoardAudience' }
                 audience_ids:
@@ -6880,13 +6881,23 @@ components:
         created_at: { type: string, format: date-time }
     BoardInput:
       type: object
-      required: [title, text]
+      required: [title]
+      description: Mit blocks oder text; fehlt beides → 400.
       properties:
         title: { type: string, description: 'Titel (reiner Text, eine Zeile, keine Längengrenze); Banner, Benachrichtigung und Betreff der Mail. Leer → 400.' }
+        blocks:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/Block' }
+          description: |
+            Inhalt aus Blöcken wie bei eigenen Seiten; hat Vorrang vor text. Mindestens ein Block mit Inhalt (nicht nur
+            leere Textblöcke), sonst → 400. Blöcke mit audience members fehlen auch bei öffentlichen Nachrichten für alle
+            ohne view_board (samt ihren Bildern). Die Mail enthält alle Blöcke, andere als Text als Absatz mit ihrem reinen
+            Text. Text aller Textblöcke zusammen höchstens 1 000 000 Bytes.
         text:
           type: string
           description: |
-            Formatierter Inhalt (HTML), ohne Längengrenze. Der Server lässt nur eine Allowlist stehen (Absätze, Überschriften,
+            Formatierter Inhalt (HTML), ohne Längengrenze (ältere Apps; ohne blocks). Der Server lässt nur eine Allowlist stehen (Absätze, Überschriften,
             Hervorhebungen, Listen, Links mit https:/mailto:/tel:, Bilder über data-image, Trennlinie, einfache Tabellen,
             Inline-Styles für Schrift, Farben, Ausrichtung, Einzug). Ohne sichtbaren Inhalt → 400.
         expires_at:
@@ -6928,8 +6939,9 @@ components:
         kind: { type: string, enum: [message], description: 'Art des Eintrags; weitere können dazukommen' }
         id: { type: integer }
         title: { type: string }
-        text: { type: string, description: 'Bereinigter formatierter Inhalt (HTML); Bilder mit src (Adresse der App) und data-image' }
-        excerpt: { type: string, description: Reiner Textauszug (z. B. für den Text-Teil der Mail) }
+        text: { type: string, description: 'Bereinigter formatierter Inhalt (HTML) der Textblöcke für alle (für ältere Apps); Bilder mit src (Adresse der App) und data-image' }
+        blocks: { type: array, items: { $ref: '#/components/schemas/Block' }, description: 'Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur mit view_board bzw. post_board). Ältere Nachrichten: ein Textblock aus text.' }
+        excerpt: { type: string, description: 'Reiner Textauszug aller sichtbaren Blöcke' }
         author_name: { type: [string, 'null'], description: '„gelöschtes Konto“, wenn das Konto des Verfassers gelöscht wurde' }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time, description: 'Wechselt, wenn sich Titel, Inhalt oder Anhänge ändern' }
@@ -7045,6 +7057,7 @@ components:
         id: { type: integer }
         title: { type: string }
         text: { type: string }
+        blocks: { type: array, items: { $ref: '#/components/schemas/Block' }, description: Alle Blöcke }
         excerpt: { type: string }
         author_name: { type: [string, 'null'] }
         created_at: { type: string, format: date-time }
@@ -7064,7 +7077,7 @@ components:
         action: { type: string, enum: [created, title, content, expires, audience, attachments, deleted, mailed] }
         user_name: { type: [string, 'null'], description: '„gelöschtes Konto“, wenn es das Konto nicht mehr gibt' }
         at: { type: string, format: date-time }
-        before: { description: 'Vorheriger Stand (Titel, Inhalt als HTML, Enddatum, Sichtbarkeit, bei attachments die Dateinamen; bei deleted {expires_at}); null bei created und mailed. Sichtbarkeit: members, public oder „company: Namen“ bzw. „person: Namen“ (durch Komma getrennt)' }
+        before: { description: 'Vorheriger Stand (Titel, Inhalt als HTML (Blöcke außer Text als Absatz mit ihrem reinen Text, Blöcke nur für Mitglieder mit „Nur für Mitglieder:“ davor), Enddatum, Sichtbarkeit, bei attachments die Dateinamen; bei deleted {expires_at}); null bei created und mailed. Sichtbarkeit: members, public oder „company: Namen“ bzw. „person: Namen“ (durch Komma getrennt)' }
         after: { description: 'Neuer Stand; bei created {title, text, expires_at, audience, audience_ids?, audience_names?, attachments?}, bei attachments die Dateinamen, bei mailed {recipients}, bei deleted null' }
     SignatureResponse:
       type: object

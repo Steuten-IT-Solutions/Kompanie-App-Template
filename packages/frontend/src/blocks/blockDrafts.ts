@@ -64,6 +64,11 @@ export function blocksInput(drafts: BlockDraft[]): BlockInput[] {
   });
 }
 
+/** Hat der Inhalt etwas zu zeigen (nicht nur leere Textblöcke)? Wie die Prüfung am Schwarzen Brett auf dem Server. */
+export function hasContent(drafts: BlockDraft[]): boolean {
+  return drafts.some((b) => b.type !== 'text' || /<(img|hr|table)\b/i.test(b.html) || b.html.replace(/<[^>]*>|&nbsp;/g, '').trim() !== '');
+}
+
 /** Block an Stelle $from um $by verschieben (−1 nach oben, +1 nach unten). */
 export function moveBlock<T>(list: T[], from: number, by: number): T[] {
   const to = from + by;

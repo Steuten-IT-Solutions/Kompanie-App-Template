@@ -30,6 +30,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   mit diesem Namen zur gewählten Person; Titel, die das Amt vergibt, werden abgeglichen.
 - **Blöcke auch in den News**: Beiträge, die in der App geschrieben werden, bestehen ebenfalls aus Blöcken, mit
   Countdown und *Für wen?* je Block. Vorschaubild der Liste ist das erste Bild in einem Text für alle.
+- **Blöcke am Schwarzen Brett**: Auch Nachrichten am Brett bestehen aus Blöcken, mit Countdown und *Für wen?* je
+  Block; Blöcke *Nur Mitglieder* fehlen bei öffentlichen Nachrichten ohne Anmeldung. Die Mail enthält alle Blöcke, den
+  Countdown als Satz; der Verlauf zeigt Blöcke ebenso.
 - **Mitglieder ohne Zugang**: Unter *Mitglied anlegen* gibt es den Haken *Ohne Zugang (meldet sich noch nicht an)*.
   So tragt ihr Personen ein, die noch kein Konto haben, z. B. für Chroniken und Ämter. Sie sind gewöhnliche Mitglieder,
   lassen sich überall auswählen und tragen in der Mitgliederliste der Verwaltung die Marke *ohne Zugang*; ein

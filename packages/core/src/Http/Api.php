@@ -14,7 +14,6 @@ use KompanieApp\Core\Domain\BoardService;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Input;
 use KompanieApp\Core\Domain\PersonName;
-use KompanieApp\Core\Domain\RichText;
 use KompanieApp\Core\Domain\SignatureService;
 use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Text;
@@ -936,9 +935,10 @@ final class Api
                     throw ApiError::invalid($a->boardMail()->info()['reason'] ?? 'Der Mailversand ist nicht eingerichtet.');
                 }
                 // Vor dem Veröffentlichen: Passt die Mail zur Höchstgröße des Mailservers?
-                if ($mail && is_string($r->input('title')) && is_string($r->input('text'))) {
+                $mailHtml = $mail && is_string($r->input('title')) ? $a->board()->inputMailHtml($r->body, $this->user()) : null;
+                if ($mailHtml !== null) {
                     $files = $a->attachments()->resolve($this->user(), $r->input('attachments'), AttachmentService::OWNER_BOARD);
-                    $a->boardMail()->checkSize(Text::line($r->input('title')), RichText::sanitize($r->input('text')), $this->user(), $files);
+                    $a->boardMail()->checkSize(Text::line($r->input('title')), $mailHtml, $this->user(), $files);
                 }
                 $item = $a->board()->create($this->user(), $r->body);
                 $author = $this->user()->id;
@@ -962,8 +962,8 @@ final class Api
                 return $a->boardMail()->info($a->board()->readerIds(['audience' => $audience, 'audience_ids' => $ids]), $this->user()->id);
             }, 'board', $denyRights),
             // Verlauf (Issue #172): abgelaufene und gelöschte Nachrichten der letzten 30 Tage, Verlauf einer Nachricht
-            new Route('GET', '/board/history', Cap::PostBoard, fn () => $a->board()->ended(), 'board', $denyRights),
-            new Route('GET', '/board/{id}/history', Cap::PostBoard, fn (Request $r) => $a->board()->history($r->id()), 'board', $denyRights),
+            new Route('GET', '/board/history', Cap::PostBoard, fn () => $a->board()->ended($this->user()), 'board', $denyRights),
+            new Route('GET', '/board/{id}/history', Cap::PostBoard, fn (Request $r) => $a->board()->history($r->id(), $this->user()), 'board', $denyRights),
             new Route('PATCH', '/board/{id}', Cap::PostBoard, fn (Request $r) => $a->board()->update($this->user(), $r->id(), $r->body), 'board', $denyRights),
             new Route('DELETE', '/board/{id}', Cap::PostBoard, function (Request $r) use ($a) {
                 $a->board()->delete($this->user(), $r->id());

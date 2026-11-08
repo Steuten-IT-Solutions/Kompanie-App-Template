@@ -94,9 +94,9 @@ final class CountdownBlock implements BlockType
         return $out;
     }
 
-    public function plain(array $data): string
+    public function plain(array $data, ?User $viewer = null): string
     {
-        [$start, $end, $eventTitle] = $this->range($data, null);
+        [$start, $end, $eventTitle] = $this->range($data, $viewer);
         $title = (string) ($data['title'] ?? '') !== '' ? (string) $data['title'] : ($eventTitle ?? '');
         return match ($this->phase($start, $end)) {
             'before' => ($title !== '' ? $title . ': ' : 'Countdown bis ') . $this->when($data, $start),

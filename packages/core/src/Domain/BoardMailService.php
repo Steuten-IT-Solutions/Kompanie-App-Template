@@ -203,9 +203,10 @@ final class BoardMailService
                 $this->mark((int) $row['id'], self::CANCELLED, (int) $row['attempts'], null);
                 continue;
             }
-            $recipient = ['name' => (string) ($this->app->users->find((int) $row['user_id'])?->name ?? ''), 'email' => (string) $row['email']];
+            $user = $this->app->users->find((int) $row['user_id']);
+            $recipient = ['name' => (string) ($user?->name ?? ''), 'email' => (string) $row['email']];
             $files[$mid] ??= $this->app->attachments()->forMail($this->app->attachments()->of(AttachmentService::OWNER_BOARD, $mid));
-            $mail = $this->compose($mid, $message['title'], $message['body'], (string) $names->name($message['author_id']), $recipient, $files[$mid]);
+            $mail = $this->compose($mid, $message['title'], $this->app->board()->mailHtml($message, $user), (string) $names->name($message['author_id']), $recipient, $files[$mid]);
             $result = $mailer->send($mail);
             $attempts = (int) $row['attempts'] + 1;
             $stats['processed']++;

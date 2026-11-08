@@ -10,7 +10,7 @@ use KompanieApp\Core\Domain\RichText;
 use KompanieApp\Core\Http\ApiError;
 
 /**
- * Inhalte aus Blöcken (eigene Seiten, später News und Schwarzes Brett): eine geordnete Liste, jeder Block mit id, type,
+ * Inhalte aus Blöcken (eigene Seiten, News in der App, Schwarzes Brett): eine geordnete Liste, jeder Block mit id, type,
  * audience (all: alle, die den Inhalt sehen; members: nur Mitglieder) und den Feldern seines Typs (BlockType).
  *
  * Gespeichert als JSON in einer Spalte blocks neben der bisherigen Spalte body: {"v":1,"body":"<sha1 von body>",
@@ -118,14 +118,14 @@ final class Blocks
 
     /**
      * Spalten blocks und body zum Speichern; Bilder der Textblöcke gehören danach $ownerType/$ownerId, nicht mehr
-     * verwendete werden gelöscht.
+     * verwendete werden gelöscht ($prune; am Schwarzen Brett nicht, dort braucht sie der Verlauf).
      *
      * @param list<array<string, mixed>> $blocks
      * @return array{blocks: string, body: string}
      */
-    public function columns(array $blocks, User $actor, string $ownerType, int $ownerId): array
+    public function columns(array $blocks, User $actor, string $ownerType, int $ownerId, bool $prune = true): array
     {
-        $blocks = $this->claim($blocks, $actor, $ownerType, $ownerId);
+        $blocks = $this->claim($blocks, $actor, $ownerType, $ownerId, $prune);
         $body = self::publicBody($blocks);
         return ['blocks' => self::encode($blocks, $body), 'body' => $body];
     }
@@ -182,12 +182,12 @@ final class Blocks
 
     /**
      * Bilder der Textblöcke gehören danach $ownerType/$ownerId (RichImageService::claim je Block); Bilder des Besitzers,
-     * die in keinem Block mehr stehen, werden gelöscht.
+     * die in keinem Block mehr stehen, werden gelöscht (außer ohne $prune).
      *
      * @param list<array<string, mixed>> $blocks
      * @return list<array<string, mixed>>
      */
-    public function claim(array $blocks, User $actor, string $ownerType, int $ownerId): array
+    public function claim(array $blocks, User $actor, string $ownerType, int $ownerId, bool $prune = true): array
     {
         $keep = [];
         foreach ($blocks as $i => $b) {
@@ -198,7 +198,9 @@ final class Blocks
             $blocks[$i]['html'] = $html;
             array_push($keep, ...RichText::imageUids($html));
         }
-        $this->app->richImages()->prune($ownerType, $ownerId, $keep);
+        if ($prune) {
+            $this->app->richImages()->prune($ownerType, $ownerId, $keep);
+        }
         return $blocks;
     }
 
@@ -230,11 +232,12 @@ final class Blocks
     }
 
     /**
-     * Reiner Text aller Blöcke für alle (E-Mail, Textauszug), durch Leerzeilen getrennt.
+     * Reiner Text der Blöcke für $viewer (Blöcke nur für Mitglieder nur mit $member; E-Mail, Textauszug), durch
+     * Leerzeilen getrennt.
      *
      * @param list<array<string, mixed>> $blocks
      */
-    public function plain(array $blocks, bool $member): string
+    public function plain(array $blocks, bool $member, ?User $viewer = null): string
     {
         $types = $this->types();
         $parts = [];
@@ -243,12 +246,61 @@ final class Blocks
             if ($type === null || (($b['audience'] ?? 'all') === 'members' && !$member)) {
                 continue;
             }
-            $text = trim($type->plain($b));
+            $text = trim($type->plain($b, $viewer));
             if ($text !== '') {
                 $parts[] = $text;
             }
         }
         return implode("\n\n", $parts);
+    }
+
+    /**
+     * Formatierter Text der Blöcke für $viewer in einem Stück (E-Mail, Verlauf): Textblöcke wie gespeichert (mit den
+     * Bildern als data-image, RichImageService::render bzw. die Mail setzen sie ein), andere Blöcke als Absatz mit
+     * ihrem reinen Text. Blöcke nur für Mitglieder nur mit $member, mit $mark davor als solche gekennzeichnet.
+     *
+     * @param list<array<string, mixed>> $blocks
+     */
+    public function html(array $blocks, bool $member, ?User $viewer = null, bool $mark = false): string
+    {
+        $types = $this->types();
+        $html = '';
+        foreach ($blocks as $b) {
+            $type = $types[$b['type'] ?? ''] ?? null;
+            $members = ($b['audience'] ?? 'all') === 'members';
+            if ($type === null || ($members && !$member)) {
+                continue;
+            }
+            if ($type instanceof TextBlock) {
+                $part = (string) ($b['html'] ?? '');
+            } else {
+                $text = trim($type->plain($b, $viewer));
+                $part = $text === '' ? '' : '<p>' . nl2br(htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'), false) . '</p>';
+            }
+            if ($part !== '' && $members && $mark) {
+                $part = '<p><em>Nur für Mitglieder:</em></p>' . $part;
+            }
+            $html .= $part;
+        }
+        return $html;
+    }
+
+    /**
+     * Gespeicherter Inhalt in einem Feld (Verlauf am Schwarzen Brett): JSON wie encode (ohne Prüfung der Prüfsumme) als
+     * Blöcke, sonst null (dann ist der Wert der bisherige formatierte Text).
+     *
+     * @return list<array<string, mixed>>|null
+     */
+    public static function stored(?string $value): ?array
+    {
+        if ($value === null || !str_starts_with($value, '{"v":')) {
+            return null;
+        }
+        $data = json_decode($value, true);
+        if (!is_array($data) || !is_array($data['blocks'] ?? null)) {
+            return null;
+        }
+        return array_values(array_filter($data['blocks'], 'is_array'));
     }
 
     /**

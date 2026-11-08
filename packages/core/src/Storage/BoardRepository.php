@@ -15,7 +15,7 @@ use KompanieApp\Core\Storage\Sql\Connection;
  * audience_ids angehört) oder person (die Personen in audience_ids); fehlt die Spalte noch, gilt members.
  * audience_ids: IDs durch Komma getrennt, nur bei company und person.
  *
- * @phpstan-type BoardMessage array{id: int, title: string, body: string, author_id: int, created_at: string, updated_at: string, expires_at: string, deleted_at: string|null, deleted_by: int|null, audience: string, audience_ids: list<int>}
+ * @phpstan-type BoardMessage array{id: int, title: string, body: string, blocks: string|null, author_id: int, created_at: string, updated_at: string, expires_at: string, deleted_at: string|null, deleted_by: int|null, audience: string, audience_ids: list<int>}
  * @phpstan-type BoardRevision array{id: int, message_id: int, user_id: int, created_at: string, action: string, before_value: string|null, after_value: string|null}
  */
 final class BoardRepository
@@ -57,9 +57,9 @@ final class BoardRepository
     }
 
     /** @param list<int> $audienceIds Kompanien oder Personen (nur bei audience company und person) */
-    public function insert(string $title, string $body, int $authorId, string $now, string $expires, string $audience = 'members', array $audienceIds = []): int
+    public function insert(string $title, string $body, int $authorId, string $now, string $expires, string $audience = 'members', array $audienceIds = [], ?string $blocks = null): int
     {
-        return $this->db->insert('board_messages', ['title' => $title, 'body' => $body, 'author_id' => $authorId, 'created_at' => $now, 'updated_at' => $now, 'expires_at' => $expires, 'audience' => $audience, 'audience_ids' => self::ids($audienceIds)]);
+        return $this->db->insert('board_messages', ['title' => $title, 'body' => $body, 'blocks' => $blocks, 'author_id' => $authorId, 'created_at' => $now, 'updated_at' => $now, 'expires_at' => $expires, 'audience' => $audience, 'audience_ids' => self::ids($audienceIds)]);
     }
 
     /** IDs für die Spalte audience_ids (null ohne). @param list<int> $ids */
@@ -68,7 +68,7 @@ final class BoardRepository
         return $ids === [] ? null : implode(',', $ids);
     }
 
-    /** @param array<string, string|null> $values title, body, updated_at, expires_at, audience, audience_ids (ids()) */
+    /** @param array<string, string|null> $values title, body, blocks, updated_at, expires_at, audience, audience_ids (ids()) */
     public function update(int $id, array $values): void
     {
         if ($values !== []) {
@@ -188,6 +188,7 @@ final class BoardRepository
             'id' => (int) $r['id'],
             'title' => (string) ($r['title'] ?? ''),
             'body' => (string) $r['body'],
+            'blocks' => isset($r['blocks']) && $r['blocks'] !== '' ? (string) $r['blocks'] : null,
             'author_id' => (int) $r['author_id'],
             'created_at' => (string) $r['created_at'],
             'updated_at' => (string) $r['updated_at'],

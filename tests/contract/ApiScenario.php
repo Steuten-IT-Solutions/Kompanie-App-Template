@@ -1026,6 +1026,18 @@ final class ApiScenario
         }
         $this->d->actAs($admin);
         $this->req('DELETE', "/board/$oneId");
+        // Blöcke: nur für Mitglieder fehlen bei öffentlichen Nachrichten ohne Anmeldung
+        [$s, $d] = $this->req('PATCH', "/board/$pubId", ['blocks' => [
+            ['type' => 'text', 'html' => '<p>Kptest für alle</p>'],
+            ['type' => 'countdown', 'source' => 'date', 'date' => '2099-01-01'],
+            ['type' => 'text', 'audience' => 'members', 'html' => '<p>Kptest intern</p>'],
+        ]]);
+        $c->ok($s === 200 && array_column((array) ($d['blocks'] ?? []), 'type') === ['text', 'countdown', 'text'] && ($d['text'] ?? '') === '<p>Kptest für alle</p>', 'Nachricht aus Blöcken speichern');
+        $this->d->actAs(null);
+        $byId = array_column((array) ($this->req('GET', '/board')[1]['items'] ?? []), null, 'id');
+        $c->ok(array_column((array) ($byId[$pubId]['blocks'] ?? []), 'type') === ['text', 'countdown'], 'Brett ohne Anmeldung ohne Block nur für Mitglieder');
+        $this->d->actAs($admin);
+        $c->ok($this->req('PATCH', "/board/$pubId", ['blocks' => [['type' => 'text', 'html' => '<p></p>']]])[0] === 400, 'Nachricht nur aus leeren Blöcken → 400');
         [$s, $edited] = $this->req('PATCH', "/board/$pubId", ['audience' => 'members']);
         $c->ok($s === 200 && ($edited['audience'] ?? '') === 'members', 'Sichtbarkeit geändert');
         $this->d->actAs(null);

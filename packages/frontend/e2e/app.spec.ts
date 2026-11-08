@@ -4645,7 +4645,7 @@ test('Eigene Seiten aus Blöcken: Countdown einfügen, Block nur für Mitglieder
   await shot(page, 'seiten-countdown-bearbeiten');
   // Am Ende ein Text nur für Mitglieder
   await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('text');
-  await form.getByLabel('Sichtbar für (Text)').last().selectOption('members');
+  await form.getByLabel('Zielgruppe des Blocks (Text)').last().selectOption('members');
   await form.getByRole('textbox', { name: 'Text', exact: true }).last().fill('Treffpunkt intern.');
   await form.getByRole('button', { name: 'Anlegen' }).click();
   await expect(page.locator('.toast')).toHaveText('Seite angelegt');
@@ -5268,6 +5268,43 @@ test('Schwarzes Brett: öffentliche Nachricht auch ohne Anmeldung, interne nicht
     await admin.locator('.board-card', { hasText: text }).getByRole('button', { name: 'Löschen' }).click();
     await expect(admin.locator('.board-card', { hasText: text })).toHaveCount(0);
   }
+  await admin.close();
+});
+
+test('Schwarzes Brett aus Blöcken: Countdown und Text nur für Mitglieder, ohne Anmeldung nur der Countdown', async ({ page, browser }) => {
+  const id = Date.now().toString(36);
+  const title = `Festbeginn ${id}`;
+  const admin = await browser.newPage();
+  admin.on('dialog', (d) => void d.accept());
+  await login(admin, 'admin', ADMIN_PASSWORD);
+  await admin.goto('/app/#/brett');
+  const form = admin.locator('.board-form');
+  await form.getByLabel('Titel').fill(title);
+  await form.getByLabel('Text der Nachricht').fill('Alle sind eingeladen.');
+  await form.getByLabel('+ Block darunter einfügen').selectOption('countdown');
+  const next = new Date();
+  next.setFullYear(next.getFullYear() + 1);
+  const date = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
+  await form.getByLabel('Überschrift (optional)').fill('Bis zum Fest');
+  await form.locator('.block-countdown-fields input[type="date"]').first().fill(date);
+  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('text');
+  await form.getByLabel('Zielgruppe des Blocks (Text)').last().selectOption('members');
+  await form.getByLabel('Text der Nachricht').last().fill('Treffpunkt intern.');
+  await form.locator('.board-audience').selectOption('public');
+  await form.getByRole('button', { name: 'Veröffentlichen' }).click();
+  const card = admin.locator('.board-card', { hasText: title });
+  await expect(card.locator('.block-countdown')).toContainText('Bis zum Fest');
+  await expect(card).toContainText('Treffpunkt intern.');
+  await expect(card.locator('.block-badge')).toHaveText('nur Mitglieder');
+
+  await page.goto('/app/#/brett');
+  const pub = page.locator('.board-card', { hasText: title });
+  await expect(pub).toContainText('Alle sind eingeladen.');
+  await expect(pub.locator('.block-countdown-unit').first()).toHaveText(/^Tag/);
+  await expect(pub).not.toContainText('Treffpunkt intern.');
+
+  await card.getByRole('button', { name: 'Löschen' }).click();
+  await expect(card).toHaveCount(0);
   await admin.close();
 });
 

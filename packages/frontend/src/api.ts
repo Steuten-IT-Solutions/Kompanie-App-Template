@@ -949,8 +949,10 @@ export interface BoardMessage {
   id: number;
   /** Titel (reiner Text): Banner, Benachrichtigung, Betreff der Mail */
   title: string;
-  /** Bereinigter formatierter Inhalt (HTML, Bilder mit Adresse); Anzeige über RichTextView */
+  /** Bereinigter formatierter Inhalt (HTML, Bilder mit Adresse) der Textblöcke für alle (ältere Apps) */
   text: string;
+  /** Inhalt aus Blöcken, nur die sichtbaren (fehlt bei älteren Servern: text) */
+  blocks?: Block[];
   /** Reiner Textauszug */
   excerpt: string;
   /** null, wenn unbekannt; „gelöschtes Konto“, wenn das Konto gelöscht wurde */
@@ -982,6 +984,8 @@ export interface BoardEnded {
   id: number;
   title: string;
   text: string;
+  /** alle Blöcke (fehlt bei älteren Servern) */
+  blocks?: Block[];
   excerpt: string;
   author_name: string | null;
   created_at: string;
@@ -1037,8 +1041,10 @@ export interface BoardHistory {
 
 export interface BoardInput {
   title: string;
-  /** formatierter Inhalt (HTML) */
-  text: string;
+  /** Inhalt aus Blöcken (hat Vorrang vor text) */
+  blocks?: BlockInput[];
+  /** formatierter Inhalt (HTML), ältere Form */
+  text?: string;
   /** UTC (…Z); ohne Angabe 24 Stunden */
   expires_at?: string | null;
   /** ohne Angabe intern (members) */
@@ -2084,7 +2090,7 @@ export const api = {
   postBoard: (input: BoardInput) => request<BoardMessage>('POST', '/board', input),
   updateBoard: (
     id: number,
-    changes: Partial<Pick<BoardInput, 'title' | 'text' | 'expires_at' | 'audience' | 'audience_ids' | 'attachments'>>,
+    changes: Partial<Pick<BoardInput, 'title' | 'blocks' | 'text' | 'expires_at' | 'audience' | 'audience_ids' | 'attachments'>>,
   ) => request<BoardMessage>('PATCH', `/board/${id}`, changes),
   /** mit Kompanien oder Personen: Zahl der Empfänger einer Nachricht nur für diese */
   boardMailInfo: (audience?: BoardAudience, ids: number[] = []) =>

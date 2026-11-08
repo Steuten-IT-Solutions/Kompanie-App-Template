@@ -42,7 +42,7 @@ final class TextBlock implements BlockType
         return ['html' => $html === '' ? '' : $this->app->richImages()->render($html)];
     }
 
-    public function plain(array $data): string
+    public function plain(array $data, ?User $viewer = null): string
     {
         return RichText::excerpt((string) ($data['html'] ?? ''));
     }
