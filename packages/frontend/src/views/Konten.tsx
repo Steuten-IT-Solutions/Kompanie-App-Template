@@ -277,7 +277,7 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
     const count = created.length + withoutAccess.length;
     return (
       <div>
-        <h2 className="member-name no-print">{count === 1 ? '1 Mitglied angelegt' : `${count} Mitglieder angelegt`}</h2>
+        <h2 className="member-name no-print">{count === 1 ? '1 Konto angelegt' : `${count} Konten angelegt`}</h2>
         {failed.length > 0 && (
           <div className="form-error no-print" role="alert">
             Nicht angelegt:
