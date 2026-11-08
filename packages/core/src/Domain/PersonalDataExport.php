@@ -38,7 +38,7 @@ final class PersonalDataExport
      * Spalten je Tabelle, die nie in die Auskunft gehören (Schlüssel, Pseudonyme, Bildschirmfotos); je Tabelle, damit eine
      * gleich benannte Spalte anderswo nicht still fehlt. member_photos steht ganz unter person.photo.
      */
-    private const DROP_COLUMNS = ['poll_answers' => ['vote_ref'], 'push_subscriptions' => ['p256dh', 'auth'], 'bug_reports' => ['screenshot'], 'attachments' => ['file'], 'gallery_submissions' => ['file_key', 'md5']];
+    private const DROP_COLUMNS = ['poll_answers' => ['vote_ref'], 'push_subscriptions' => ['p256dh', 'auth'], 'bug_reports' => ['screenshot'], 'report_inbox' => ['screenshot'], 'attachments' => ['file'], 'gallery_submissions' => ['file_key', 'md5']];
     private const ACTIVITY_TABLES = ['activity', 'activity_last'];
     /**
      * Rechte für die Auskunft über andere: Sie enthält Punkte, Strafen, Dienstgrade, Titel, Anwesenheit, namentliche
@@ -85,7 +85,7 @@ final class PersonalDataExport
                 // bekommt sie.
                 $rows = [...$rows, ...$this->rows('poll_answers', 'SELECT * FROM {poll_answers} WHERE vote_ref = ? AND user_id IS NULL', [PollService::pseudonym($secret, $userId)])];
             }
-            if ($table === 'bug_reports' && !$self) {
+            if (($table === 'bug_reports' || $table === 'report_inbox') && !$self) {
                 // Wartende Fehlermeldungen sieht in der App niemand (sie gehen an die Betreuer); ihr Text kann Daten anderer
                 // enthalten: für andere nur, dass es sie gibt.
                 $rows = array_map(static fn (array $r): array => array_diff_key($r, ['report' => 1]), $rows);

@@ -104,6 +104,7 @@ import { MemberAvatar, PhotoPicker, preloadAvatar, ZoomableAvatar, type Prepared
 import { FORMER_SORTS, FormerImport, FormerList, FormerPanel, NewFormer, REASON_OPTIONS } from './Ehemalige';
 import { MemberImport } from './MitgliederImport';
 import { Anfragen } from './Anfragen';
+import { Meldungen } from './Meldungen';
 import { newlyDue } from '../promotionCheck';
 import { promotionsAllowed, refreshPromotions, setReached, useReached } from '../promotionsDue';
 
@@ -111,6 +112,7 @@ type Sub =
   | 'mitglieder'
   | 'ehemalige'
   | 'anfragen'
+  | 'meldungen'
   | 'punkte'
   | 'strafe'
   | 'katalog'
@@ -213,6 +215,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <FormerList />
       ) : active === 'anfragen' ? (
         <Anfragen onToast={onToast} />
+      ) : active === 'meldungen' ? (
+        <Meldungen onToast={onToast} />
       ) : (active === 'punkte' || active === 'strafe') && fromList !== null ? (
         <FromAttendance key={path.join('/')} listId={fromList} kind={active} onToast={onToast} />
       ) : active === 'punkte' ? (

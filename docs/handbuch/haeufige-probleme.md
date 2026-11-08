@@ -80,5 +80,5 @@ Dann sind Dateien mit Daten aus dem Internet abrufbar. Handle sofort.
 
 ## Nichts davon hilft
 - Ist unter der Ampel bei **Hilfe** eine Kontaktadresse hinterlegt, melde dich dort.
-- Oder melde den Fehler direkt aus der App, siehe [Fehler melden](seite:fehler-melden).
+- Oder melde den Fehler direkt aus der App, siehe [Fehler melden](seite:fehler-melden). Die Meldung geht zuerst an eure Admins.
 - Haben die Statusmeldungen eure Zustimmung, sehen die Betreuer schwere Fehler oft schon von selbst.

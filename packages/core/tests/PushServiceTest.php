@@ -113,12 +113,12 @@ final class PushServiceTest extends TestCase
         $member = $this->users->find($this->users->add('m', Roles::MEMBER));
         $guest = $this->users->find($this->users->add('g', Roles::GUEST));
         $p = $app->push();
-        $this->assertSame(['board', 'polls', 'birthdays', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'], $p->availableTypes($member));
+        $this->assertSame(['board', 'polls', 'birthdays', 'reports', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'], $p->availableTypes($member));
         $this->assertSame(['board_public', 'events', 'reminder', 'news'], $p->availableTypes(null), 'Gäste ohne Konto: nur Öffentliches');
-        $this->assertSame(['board_public', 'events', 'reminder', 'news'], $p->availableTypes($guest), 'Konto ohne Mitgliederbereich');
+        $this->assertSame(['board_public', 'reports', 'events', 'reminder', 'news'], $p->availableTypes($guest), 'Konto ohne Mitgliederbereich; Antworten auf Fehlermeldungen für alle Konten');
 
         $app->features()->update(['penalties' => false, 'news' => false, 'events' => false, 'ranks' => false, 'titles' => false, 'board' => false, 'polls' => false, 'birthdays' => false]);
-        $this->assertSame(['points', 'events', 'reminder'], $p->availableTypes($member), 'Termine aus dem Kalender');
+        $this->assertSame(['reports', 'points', 'events', 'reminder'], $p->availableTypes($member), 'Termine aus dem Kalender');
         $this->assertSame([], $p->availableTypes(null), 'ohne öffentliche Termine und News nichts für Gäste');
         $this->assertSame(0, $p->notifyAll('news', PushService::message('x', 'y', 'news')), 'ausgeschalteter Bereich: kein Versand');
     }

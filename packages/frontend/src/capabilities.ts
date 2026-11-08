@@ -206,6 +206,11 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         label: 'Rollen vergeben (nur Rollen mit eigenen Rechten, ohne diese beiden Rechte)',
         short: 'Rollen vergeben',
       },
+      {
+        key: 'review_reports',
+        label: 'Fehlermeldungen der Mitglieder sehen, mit Begründung schließen oder an die Betreuer der App weiterleiten',
+        short: 'Fehlermeldungen bearbeiten',
+      },
     ],
   },
 ];
