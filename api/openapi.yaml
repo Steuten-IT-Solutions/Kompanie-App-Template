@@ -1857,7 +1857,9 @@ paths:
       summary: Gültige Einträge am Schwarzen Brett, neueste zuerst (Issue #5, #172)
       description: |
         Öffentlich: Nachrichten mit `audience: public` sehen alle, auch ohne Anmeldung; interne (`audience: members`) nur
-        Konten mit `view_board` (Mitglieder und Anwärter) sowie alle mit `post_board`. Ohne `view_board` enthält die Liste
+        Konten mit `view_board` (Mitglieder und Anwärter) sowie alle mit `post_board`. Nachrichten mit `audience: company`
+        sehen nur Konten mit `view_board`, die einer der Kompanien aus `audience_ids` zugeordnet sind, mit `audience:
+        person` nur die ausgewählten Konten (sofern `view_board`); alle mit `post_board` sehen jede. Ohne `view_board` enthält die Liste
         daher nur öffentliche Nachrichten (vor dieser Version: 401 ohne Anmeldung, 403 ohne Recht). Nur Einträge, deren
         `expires_at` noch nicht erreicht ist und die nicht gelöscht wurden. Abgelaufene und gelöschte Nachrichten bleiben
         30 Tage im Verlauf (`GET /board/history`, nur `post_board`); danach löscht die Hintergrundaufgabe `board_cleanup`
@@ -1892,8 +1894,10 @@ paths:
         Verfasser“, Text = Titel, TTL bis `expires_at`, höchstens 28 Tage), sofern sie die Art für das Gerät eingeschaltet
         haben und `push` nicht false ist. Bei `audience: public` zusätzlich alle übrigen Geräte (Gäste ohne Konto, Konten
         ohne `view_board`) mit der Art `board_public`, außer dem Verfasser; jedes Gerät höchstens einmal. Bei der ersten
-        öffentlichen Nachricht bekommen bestehende Abos dieser Geräte die Art einmalig dazu. Mit `mail` zusätzlich je eine Mail an alle Mitglieder und Anwärter mit
-        Mailadresse, die den Empfang nicht abgeschaltet haben (auch an den Verfasser), im Hintergrund. Meldet der
+        öffentlichen Nachricht bekommen bestehende Abos dieser Geräte die Art einmalig dazu. Bei `audience: company` bzw.
+        `person` nur die Geräte der Konten, die die Nachricht lesen dürfen (siehe `GET /board`), außer dem Verfasser. Mit `mail` zusätzlich je eine Mail an alle Mitglieder und Anwärter mit
+        Mailadresse, die den Empfang nicht abgeschaltet haben (auch an den Verfasser), im Hintergrund; bei `company` und
+        `person` nur an die, die die Nachricht lesen dürfen, und den Verfasser. Meldet der
         Mailserver eine Höchstgröße und ist die fertige Mail größer, wird nichts veröffentlicht (400 mit Erklärung).
       x-capability: post_board
       requestBody:
@@ -1911,11 +1915,58 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /board/audiences:
+    get:
+      tags: [Schwarzes Brett]
+      summary: Auswahl „Kompanie“ und „Einzeln“ beim Schreiben
+      description: |
+        Aktive Kompanien (leer, wenn der Bereich Kompanien aus ist) und alle Konten, die das Brett lesen (`view_board`),
+        nach Namen.
+      x-capability: post_board
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [companies, people]
+                properties:
+                  companies:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name, short_name]
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+                        short_name: { type: string }
+                  people:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name]
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+        '403': { $ref: '#/components/responses/Error' }
+
   /board/mail:
     get:
       tags: [Schwarzes Brett]
       summary: Haken „E-Mail senden“ – eingerichtet, Zahl der Empfänger (Issue #172)
       x-capability: post_board
+      parameters:
+        - name: audience
+          in: query
+          required: false
+          schema: { type: string, enum: [members, public, company, person] }
+          description: 'Mit company oder person und audience_ids: Zahl der Empfänger einer Nachricht nur für diese'
+        - name: audience_ids
+          in: query
+          required: false
+          schema: { type: string }
+          description: 'IDs der Kompanien bzw. Konten, durch Komma getrennt'
       responses:
         '200':
           description: OK
@@ -1926,7 +1977,7 @@ paths:
                 required: [available, recipients, reason]
                 properties:
                   available: { type: boolean, description: 'Kompanieadresse und SMTP eingerichtet, PHPMailer vorhanden' }
-                  recipients: { type: integer, description: Zahl der Empfänger einer neuen Nachricht (ohne den Verfasser) }
+                  recipients: { type: integer, description: 'Zahl der Empfänger einer neuen Nachricht (samt Verfasser, sofern er Mails vom Brett bekommt)' }
                   reason: { type: [string, 'null'], description: 'Warum nicht verfügbar' }
                   server_max_size: { type: [integer, 'null'], description: 'Vom Mailserver gemeldete Höchstgröße (SIZE) in Bytes' }
         '403': { $ref: '#/components/responses/Error' }
@@ -2009,6 +2060,10 @@ paths:
                 text: { type: string, description: Formatierter Inhalt (HTML), wird bereinigt }
                 expires_at: { type: string, description: 'Wie bei POST; muss in der Zukunft liegen' }
                 audience: { $ref: '#/components/schemas/BoardAudience' }
+                audience_ids:
+                  type: array
+                  items: { type: integer }
+                  description: 'Bei company und person die Auswahl; ohne audience gilt sie für die bisherige Sichtbarkeit. Gleiche Sichtbarkeit ohne audience_ids: Auswahl bleibt.'
                 attachments:
                   type: array
                   items: { type: string }
@@ -6764,6 +6819,12 @@ components:
             Sichtbar bis: ISO 8601 mit Zeitzone (`Z` oder `±hh:mm`) oder `JJJJ-MM-TTTHH:MM` ohne Zeitzone (Zeitzone der
             Kompanie). Gespeichert in UTC. Muss in der Zukunft liegen, keine Obergrenze. Ohne Angabe 24 Stunden.
         audience: { $ref: '#/components/schemas/BoardAudience' }
+        audience_ids:
+          type: array
+          items: { type: integer }
+          description: |
+            Nur bei `audience: company` (IDs von Kompanien, Bereich Kompanien an) und `person` (IDs von Konten mit
+            `view_board`): mindestens eine; sonst → 400. Bei members und public ignoriert.
         push:
           type: boolean
           default: true
@@ -6777,9 +6838,13 @@ components:
           description: 'Kennungen von Anhängen (eigene Entwürfe aus `POST /attachments`); sonst → 400'
     BoardAudience:
       type: string
-      enum: [members, public]
+      enum: [members, public, company, person]
       default: members
-      description: 'Sichtbarkeit: members (intern, wer das Brett liest: view_board) oder public (alle, auch ohne Anmeldung). Andere Werte → 400.'
+      description: |
+        Sichtbarkeit: members (intern, wer das Brett liest: view_board), public (alle, auch ohne Anmeldung), company (wer
+        das Brett liest und einer der Kompanien aus audience_ids angehört) oder person (nur die Konten aus audience_ids).
+        Alle mit post_board sehen jede Nachricht. Andere Werte → 400. Ältere Clients zeigen company und person wie intern
+        an (der Server liefert sie trotzdem nur an die Berechtigten).
     BoardItem:
       type: object
       required: [kind, id, title, text, excerpt, author_name, created_at, updated_at, expires_at]
@@ -6794,6 +6859,11 @@ components:
         updated_at: { type: string, format: date-time, description: 'Wechselt, wenn sich Titel, Inhalt oder Anhänge ändern' }
         expires_at: { type: string, format: date-time, description: 'Sichtbar bis (UTC); standardmäßig 24 Stunden nach created_at' }
         audience: { $ref: '#/components/schemas/BoardAudience' }
+        audience_ids: { type: array, items: { type: integer }, description: 'Nur mit post_board, bei company und person: die Auswahl' }
+        audience_names:
+          type: array
+          items: { type: string }
+          description: 'Bei company: Namen der Kompanien (für alle, die die Nachricht lesen); bei person: Namen der Personen (nur mit post_board)'
         attachments: { type: array, items: { $ref: '#/components/schemas/Attachment' }, description: 'Dateianhänge; sehen alle, die die Nachricht sehen (bei öffentlichen auch ohne Anmeldung)' }
         last_edit:
           description: 'Nur mit post_board: wer zuletzt Titel, Inhalt, Enddatum oder Sichtbarkeit geändert hat (null: unverändert)'
@@ -6908,6 +6978,8 @@ components:
         deleted_by_name: { type: [string, 'null'] }
         active: { type: boolean, description: Noch sichtbar }
         audience: { $ref: '#/components/schemas/BoardAudience' }
+        audience_ids: { type: array, items: { type: integer }, description: Bei company und person }
+        audience_names: { type: array, items: { type: string }, description: 'Bei company und person: Namen der Auswahl' }
         attachments: { type: array, items: { $ref: '#/components/schemas/Attachment' } }
     BoardRevision:
       type: object
@@ -6916,8 +6988,8 @@ components:
         action: { type: string, enum: [created, title, content, expires, audience, attachments, deleted, mailed] }
         user_name: { type: [string, 'null'], description: '„gelöschtes Konto“, wenn es das Konto nicht mehr gibt' }
         at: { type: string, format: date-time }
-        before: { description: 'Vorheriger Stand (Titel, Inhalt als HTML, Enddatum, Sichtbarkeit, bei attachments die Dateinamen; bei deleted {expires_at}); null bei created und mailed' }
-        after: { description: 'Neuer Stand; bei created {title, text, expires_at, audience, attachments?}, bei attachments die Dateinamen, bei mailed {recipients}, bei deleted null' }
+        before: { description: 'Vorheriger Stand (Titel, Inhalt als HTML, Enddatum, Sichtbarkeit, bei attachments die Dateinamen; bei deleted {expires_at}); null bei created und mailed. Sichtbarkeit: members, public oder „company: Namen“ bzw. „person: Namen“ (durch Komma getrennt)' }
+        after: { description: 'Neuer Stand; bei created {title, text, expires_at, audience, audience_ids?, audience_names?, attachments?}, bei attachments die Dateinamen, bei mailed {recipients}, bei deleted null' }
     SignatureResponse:
       type: object
       required: [signature]

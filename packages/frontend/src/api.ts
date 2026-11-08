@@ -906,8 +906,15 @@ export interface BoardMessage {
   updated_at: string;
   /** Sichtbar bis (standardmäßig 24 Stunden nach created_at); danach blendet die App den Eintrag aus, auch offline */
   expires_at: string;
-  /** Sichtbarkeit: members (intern, wer das Brett liest) oder public (alle, auch ohne Anmeldung); fehlt bei älteren Servern (intern) */
+  /**
+   * Sichtbarkeit: members (intern, wer das Brett liest), public (alle, auch ohne Anmeldung), company (nur ausgewählte
+   * Kompanien) oder person (nur ausgewählte Personen); fehlt bei älteren Servern (intern)
+   */
   audience?: BoardAudience;
+  /** nur mit post_board, bei company und person: die ausgewählten Kompanien bzw. Konten */
+  audience_ids?: number[];
+  /** Namen der ausgewählten Kompanien (alle, die die Nachricht lesen) bzw. Personen (nur mit post_board) */
+  audience_names?: string[];
   /** Dateianhänge (fehlt bei älteren Servern) */
   attachments?: Attachment[];
   /** nur mit post_board: wer zuletzt geändert hat */
@@ -930,11 +937,21 @@ export interface BoardEnded {
   deleted_by_name: string | null;
   active: boolean;
   audience?: BoardAudience;
+  audience_ids?: number[];
+  audience_names?: string[];
   attachments?: Attachment[];
 }
 
-/** Sichtbarkeit einer Nachricht am Brett: intern (members) oder öffentlich (public) */
-export type BoardAudience = 'members' | 'public';
+/** Sichtbarkeit einer Nachricht am Brett: intern (members), öffentlich (public), Kompanie (company) oder einzeln (person) */
+export type BoardAudience = 'members' | 'public' | 'company' | 'person';
+
+/** Auswahl beim Schreiben (GET /board/audiences, post_board) */
+export interface BoardAudiences {
+  /** aktive Kompanien (leer, wenn der Bereich Kompanien aus ist) */
+  companies: { id: number; name: string; short_name: string }[];
+  /** Personen, die das Brett lesen, nach Namen */
+  people: { id: number; name: string }[];
+}
 
 export type BoardRevisionAction = 'created' | 'title' | 'content' | 'expires' | 'audience' | 'attachments' | 'deleted' | 'mailed';
 
@@ -972,6 +989,8 @@ export interface BoardInput {
   expires_at?: string | null;
   /** ohne Angabe intern (members) */
   audience?: BoardAudience;
+  /** bei company und person: ausgewählte Kompanien bzw. Konten (mindestens eine) */
+  audience_ids?: number[];
   push?: boolean;
   mail?: boolean;
   /** Kennungen der Anhänge (eigene Entwürfe aus uploadAttachment) */
@@ -2009,9 +2028,19 @@ export const api = {
   // Schwarzes Brett (Issue #5, #172)
   board: () => request<{ items: BoardItem[] }>('GET', '/board'),
   postBoard: (input: BoardInput) => request<BoardMessage>('POST', '/board', input),
-  updateBoard: (id: number, changes: Partial<Pick<BoardInput, 'title' | 'text' | 'expires_at' | 'audience' | 'attachments'>>) =>
-    request<BoardMessage>('PATCH', `/board/${id}`, changes),
-  boardMailInfo: () => request<BoardMailInfo>('GET', '/board/mail'),
+  updateBoard: (
+    id: number,
+    changes: Partial<Pick<BoardInput, 'title' | 'text' | 'expires_at' | 'audience' | 'audience_ids' | 'attachments'>>,
+  ) => request<BoardMessage>('PATCH', `/board/${id}`, changes),
+  /** mit Kompanien oder Personen: Zahl der Empfänger einer Nachricht nur für diese */
+  boardMailInfo: (audience?: BoardAudience, ids: number[] = []) =>
+    request<BoardMailInfo>(
+      'GET',
+      '/board/mail',
+      undefined,
+      audience === 'company' || audience === 'person' ? { audience, audience_ids: ids.join(',') } : undefined,
+    ),
+  boardAudiences: () => request<BoardAudiences>('GET', '/board/audiences'),
   boardHistory: (id: number) => request<BoardHistory>('GET', `/board/${id}/history`),
   boardEnded: () => request<{ items: BoardEnded[]; keep_days: number }>('GET', '/board/history'),
   // E-Mails aus der Verwaltung (send_mail)

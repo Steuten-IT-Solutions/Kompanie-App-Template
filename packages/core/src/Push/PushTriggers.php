@@ -83,7 +83,9 @@ final class PushTriggers
      * Öffentliche Nachrichten (audience public) gehen zusätzlich an Gäste und Konten ohne Brett; bei der ersten bekommen
      * bestehende Abos dieser Geräte die Art board_public einmalig dazu (PushService::offerTypeToExisting).
      *
-     * @param array{id: int, title: string, author_name: string|null, expires_at: string|null, audience?: string} $item neue Nachricht (BoardService::create)
+     * Nachrichten für Kompanien oder Personen gehen nur an deren Geräte (BoardService::readerIds).
+     *
+     * @param array{id: int, title: string, author_name: string|null, expires_at: string|null, audience?: string, audience_ids?: list<int>} $item neue Nachricht (BoardService::create)
      */
     public function boardPosted(array $item, int $authorId): int
     {
@@ -94,7 +96,8 @@ final class PushTriggers
         if ($public) {
             $this->push->offerTypeToExisting(PushService::TYPE_BOARD_PUBLIC);
         }
-        return $this->push->notifyBoard(PushService::message($title, $item['title'], 'brett/' . $item['id'], 'brett-' . $item['id']), $authorId, $ttl, $public);
+        $only = $this->app->board()->readerIds(['audience' => (string) ($item['audience'] ?? BoardService::AUDIENCE_MEMBERS), 'audience_ids' => $item['audience_ids'] ?? []]);
+        return $this->push->notifyBoard(PushService::message($title, $item['title'], 'brett/' . $item['id'], 'brett-' . $item['id']), $authorId, $ttl, $public, $only);
     }
 
     /**

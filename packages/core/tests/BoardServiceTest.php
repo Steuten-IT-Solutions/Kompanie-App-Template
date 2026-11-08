@@ -161,6 +161,104 @@ final class BoardServiceTest extends TestCase
         $this->assertSame(['Intern'], $titles(null));
     }
 
+    public function testCompanyAndPersonMessages(): void
+    {
+        $this->setUpApp(['board' => true, 'companies' => true]);
+        $other = $this->users->add('zweites', Roles::MEMBER);
+        $first = $this->call('POST', '/companies', ['name' => 'Erste Kompanie'])->data['id'];
+        $second = $this->call('POST', '/companies', ['name' => 'Zweite Kompanie'])->data['id'];
+        $gone = $this->call('POST', '/companies', ['name' => 'Aufgelöst'])->data['id'];
+        $this->call('PATCH', "/companies/{$gone}", ['active' => false]);
+        $repo = $this->app->companies()->repository();
+        $repo->replaceOfUser($this->m, [$first], '2026-10-20 10:00:00');
+        $repo->replaceOfUser($other, [$second], '2026-10-20 10:00:00');
+        $repo->replaceOfUser($this->guest, [$first], '2026-10-20 10:00:00');
+
+        // Auswahl beim Schreiben: aktive Kompanien, Personen, die das Brett lesen; nur mit post_board.
+        $options = $this->call('GET', '/board/audiences')->data;
+        $this->assertSame(['Erste Kompanie', 'Zweite Kompanie'], array_column($options['companies'], 'name'));
+        $people = array_column($options['people'], 'id');
+        $this->assertContains($this->m, $people);
+        $this->assertContains($this->cand, $people);
+        $this->assertNotContains($this->guest, $people, 'Gäste lesen das Brett nicht');
+        $this->assertSame(403, $this->as($this->m)->call('GET', '/board/audiences')->status);
+        $this->as($this->admin);
+
+        // Prüfung der Auswahl
+        foreach ([
+            'ohne Auswahl' => ['audience' => 'company'],
+            'leere Auswahl' => ['audience' => 'person', 'audience_ids' => []],
+            'unbekannte Kompanie' => ['audience' => 'company', 'audience_ids' => [999]],
+            'keine Zahl' => ['audience' => 'company', 'audience_ids' => ['1']],
+            'Person ohne Brett' => ['audience' => 'person', 'audience_ids' => [$this->guest]],
+            'unbekannte Person' => ['audience' => 'person', 'audience_ids' => [999]],
+        ] as $case => $extra) {
+            $this->assertSame(400, $this->call('POST', '/board', ['title' => 'T', 'text' => 'x'] + $extra)->status, $case);
+        }
+
+        $company = $this->post('<p>Nur die Erste</p>', 'Kompanie', ['audience' => 'company', 'audience_ids' => [$first, $first]]);
+        $this->assertSame(['company', [$first], ['Erste Kompanie']], [$company['audience'], $company['audience_ids'], $company['audience_names']]);
+        $person = $this->post('<p>Nur für dich</p>', 'Persönlich', ['audience' => 'person', 'audience_ids' => [$this->cand]]);
+        $this->assertSame(['person', [$this->cand], ['Anwaerter']], [$person['audience'], $person['audience_ids'], $person['audience_names']]);
+        $this->post('<p>Für alle</p>', 'Intern', ['audience' => 'members', 'audience_ids' => [$first]]);
+
+        $titles = fn (?int $user): array => array_column($this->as($user)->call('GET', '/board')->data['items'], 'title');
+        $this->assertSame(['Intern', 'Kompanie'], $titles($this->m), 'Mitglied der Kompanie');
+        $this->assertSame(['Intern'], $titles($other), 'andere Kompanie');
+        $this->assertSame(['Intern', 'Persönlich'], $titles($this->cand), 'die ausgewählte Person');
+        $this->assertSame([], $titles($this->guest), 'Gast-Konto nicht, auch wenn es der Kompanie zugeordnet ist');
+        $this->assertSame([], $titles(null));
+        $this->assertSame(['Intern', 'Persönlich', 'Kompanie'], $titles($this->admin), 'post_board sieht alle');
+
+        // Wer die Nachricht liest, sieht die Kompanien, aber nicht, wer sonst ausgewählt ist.
+        $seen = array_column($this->as($this->m)->call('GET', '/board')->data['items'], null, 'title');
+        $this->assertSame(['Erste Kompanie'], $seen['Kompanie']['audience_names']);
+        $this->assertArrayNotHasKey('audience_ids', $seen['Kompanie']);
+        $mine = array_column($this->as($this->cand)->call('GET', '/board')->data['items'], null, 'title')['Persönlich'];
+        $this->assertSame('person', $mine['audience']);
+        $this->assertArrayNotHasKey('audience_names', $mine);
+        $this->assertArrayNotHasKey('audience_ids', $mine);
+
+        // Bilder und Anhänge wie die Nachricht
+        $this->assertTrue($this->app->board()->canSeeImage($this->users->find($this->m), $company['id']));
+        $this->assertFalse($this->app->board()->canSeeImage($this->users->find($other), $company['id']));
+        $this->assertFalse($this->app->board()->canSeeImage($this->users->find($this->m), $person['id']));
+        $this->assertFalse($this->app->board()->canSeeImage(null, $company['id']));
+
+        // Ändern: andere Kompanie, dann Personen; ohne audience gilt die bisherige; im Verlauf mit Namen.
+        $this->as($this->admin);
+        $before = $company['updated_at'];
+        $changed = $this->call('PATCH', "/board/{$company['id']}", ['audience_ids' => [$second]])->data;
+        $this->assertSame(['company', [$second], $before], [$changed['audience'], $changed['audience_ids'], $changed['updated_at']]);
+        $this->assertSame(['Intern', 'Kompanie'], $titles($other));
+        $this->assertSame(['Intern'], $titles($this->m));
+        $this->as($this->admin);
+        $this->assertSame(400, $this->call('PATCH', "/board/{$company['id']}", ['audience' => 'person'])->status, 'Personen fehlen');
+        $this->assertSame(400, $this->call('PATCH', "/board/{$company['id']}", ['audience_ids' => [999]])->status);
+        $this->call('PATCH', "/board/{$company['id']}", ['audience' => 'person', 'audience_ids' => [$this->m, $other]]);
+        $this->assertSame(['Intern', 'Kompanie'], $titles($this->m));
+        $this->as($this->admin);
+        $unchanged = $this->call('PATCH', "/board/{$company['id']}", ['audience' => 'person'])->data;
+        $this->assertSame([$this->m, $other], $unchanged['audience_ids'], 'gleiche Sichtbarkeit ohne Auswahl: bleibt');
+        $public = $this->call('PATCH', "/board/{$company['id']}", ['audience' => 'public'])->data;
+        $this->assertSame('public', $public['audience']);
+        $this->assertArrayNotHasKey('audience_ids', $public);
+        $revisions = $this->call('GET', "/board/{$company['id']}/history")->data['revisions'];
+        $this->assertSame(['created', 'audience', 'audience', 'audience'], array_column($revisions, 'action'));
+        $this->assertSame(['Erste Kompanie'], $revisions[0]['after']['audience_names']);
+        $this->assertSame(['company: Erste Kompanie', 'company: Zweite Kompanie'], [$revisions[1]['before'], $revisions[1]['after']]);
+        $this->assertSame('person: Mitglied, Zweites', $revisions[2]['after']);
+        $this->assertSame('public', $revisions[3]['after']);
+
+        // Verlauf der beendeten Nachrichten mit Namen; Bereich Kompanien aus: keine Kompanien zur Auswahl.
+        $this->call('DELETE', "/board/{$person['id']}");
+        $ended = array_column($this->call('GET', '/board/history')->data['items'], null, 'id')[$person['id']];
+        $this->assertSame(['person', ['Anwaerter']], [$ended['audience'], $ended['audience_names']]);
+        $this->app->features()->update(['companies' => false]);
+        $this->assertSame([], $this->call('GET', '/board/audiences')->data['companies']);
+        $this->assertSame(400, $this->call('POST', '/board', ['title' => 'T', 'text' => 'x', 'audience' => 'company', 'audience_ids' => [$first]])->status);
+    }
+
     public function testFeatureOff(): void
     {
         $this->setUpApp(['board' => false]);
@@ -404,6 +502,33 @@ final class BoardServiceTest extends TestCase
         $this->app->db->execute('DELETE FROM {push_queue}');
         $this->call('PATCH', "/board/{$intern['id']}", ['audience' => 'public']);
         $this->assertSame([], $endpoints());
+    }
+
+    public function testCompanyAndPersonMessagesNotifyOnlyThem(): void
+    {
+        $this->setUpApp(['board' => true, 'events' => true, 'companies' => true]);
+        if (!$this->app->push()->supported()) {
+            $this->markTestSkipped('ohne Push-Unterstützung');
+        }
+        $other = $this->users->add('zweites', Roles::MEMBER);
+        $first = $this->call('POST', '/companies', ['name' => 'Erste Kompanie'])->data['id'];
+        $this->app->companies()->repository()->replaceOfUser($this->m, [$first], '2026-10-20 10:00:00');
+        $this->app->companies()->repository()->replaceOfUser($this->admin, [$first], '2026-10-20 10:00:00');
+        $this->subscribe($this->m, 'm');
+        $this->subscribe($other, 'zweites');
+        $this->subscribe($this->cand, 'anwaerter');
+        $this->subscribe($this->admin, 'admin');
+        $this->subscribe(null, 'gast');
+        $endpoints = fn (): array => array_map(
+            static fn (string $e): string => substr($e, strlen('https://fcm.googleapis.com/fcm/send/')),
+            array_column($this->app->db->select('SELECT s.endpoint FROM {push_queue} q JOIN {push_subscriptions} s ON s.id = q.subscription_id ORDER BY q.id'), 'endpoint'),
+        );
+
+        $this->post('Kompanie', 'Kompanie', ['audience' => 'company', 'audience_ids' => [$first]]);
+        $this->assertSame(['m'], $endpoints(), 'nur die Kompanie, nicht der Verfasser');
+        $this->app->db->execute('DELETE FROM {push_queue}');
+        $this->post('Einzeln', 'Einzeln', ['audience' => 'person', 'audience_ids' => [$this->cand, $other]]);
+        $this->assertSame(['zweites', 'anwaerter'], $endpoints());
     }
 
     public function testTtlNeverLongerThanTheMessage(): void
