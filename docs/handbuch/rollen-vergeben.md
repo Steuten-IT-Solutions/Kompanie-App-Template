@@ -16,7 +16,7 @@ Du siehst nur die Teile, für die du das Recht hast:
 - **Grundrolle** und **Zusatzrollen**: für alle, die Rollen vergeben dürfen. Sonst steht hier nur die Rolle zum Lesen.
 - **Rechte**: alle Rechte der Person, mit **Rechte speichern** (wer Rollen vergeben darf).
 - **Als {rolle.member} aufnehmen**: nur bei Rollen, die ein {rolle.admin} dafür freigegeben hat, z. B. Anwärter (wer Mitglieder anlegen darf).
-- **Passwort vergessen? Neues Startpasswort erzeugen** (wer Mitglieder anlegen darf).
+- **Passwort vergessen? Neues Startpasswort erzeugen** (wer Mitglieder anlegen darf). Bei einem Mitglied ohne Zugang steht hier stattdessen **Zugang einrichten**.
 - **Ehemalig** mit **Als ehemalig eintragen …** (wer Mitglieder anlegen darf).
 - **Konto** mit Benutzername, E-Mail und Handynummer, **Angaben ändern**, **Daten exportieren (Auskunft)** und **Konto löschen** (wer Mitglieder anlegen darf). Auf deiner eigenen Seite fehlt **Konto löschen**.
 
@@ -39,6 +39,11 @@ Du siehst nur die Teile, für die du das Recht hast:
 ### Ein neues Startpasswort erzeugen
 1. Tippe auf **Passwort vergessen? Neues Startpasswort erzeugen** und bestätige die Rückfrage.
 2. Gib das neue Startpasswort persönlich weiter. Es steht nur jetzt da; darunter steht der Link zur Installationsanleitung.
+
+### Einem Mitglied ohne Zugang einen Zugang geben
+1. Tippe auf **Zugang einrichten** und bestätige die Rückfrage.
+2. Die App zeigt die Zugangsdaten: den Link zum Installieren der App, Benutzername und Startpasswort. Gib sie persönlich weiter, z. B. mit **Ausdrucken** oder **Zugangsdaten kopieren**.
+3. Danach hat das Mitglied einen Zugang; die Marke **ohne Zugang** fällt weg. Stellt die Person selbst eine Anfrage, kannst du sie stattdessen unter **Verwaltung → Anfragen** beim Freigeben mit dem Mitglied verbinden.
 
 ### Angaben ändern oder das Konto löschen
 1. Tippe unter **Konto** auf **Angaben ändern**, ändere Vorname, Nachname, Benutzername, E-Mail oder Handynummer und tippe auf **Speichern**. E-Mail-Adresse und Handynummer kann die Person auch selbst unter **Meins → Konto** ändern. Änderst du deine eigene E-Mail-Adresse, gib zur Bestätigung dein **Aktuelles Passwort** ein.

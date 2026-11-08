@@ -553,6 +553,15 @@ select {
   margin-left: 6px;
   vertical-align: 2px;
 }
+.badge-no-access {
+  background: var(--line);
+  color: var(--ink-2);
+  margin-left: 6px;
+  vertical-align: 2px;
+}
+.no-access-panel {
+  margin-top: 12px;
+}
 .badge-level-guest {
   background: var(--line);
   color: var(--ink-2);

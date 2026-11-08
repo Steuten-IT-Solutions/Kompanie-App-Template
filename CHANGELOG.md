@@ -17,6 +17,17 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Mitglieder ohne Zugang**: Unter *Mitglied anlegen* gibt es den Haken *Ohne Zugang (meldet sich noch nicht an)*.
+  So tragt ihr Personen ein, die noch kein Konto haben, z. B. für Chroniken und Ämter. Sie sind gewöhnliche Mitglieder,
+  lassen sich überall auswählen und tragen in der Mitgliederliste der Verwaltung die Marke *ohne Zugang*; ein
+  Startpasswort gibt es nicht. Einen Zugang bekommen sie später auf ihrer Seite mit *Zugang einrichten*
+  (Startpasswort) oder beim Freigeben ihrer eigenen Anfrage. Beim Import aus Excel oder CSV legt die neue Spalte
+  *Zugang* mit „nein“ Mitglieder ohne Zugang an (leer oder „ja“: wie bisher mit Startpasswort).
+- **Anfragen mit einem Mitglied ohne Zugang verbinden**: Beim Freigeben einer Anfrage schlägt die App passende
+  Mitglieder ohne Zugang vor (gleiche E-Mail-Adresse, gleicher oder ähnlicher Name, auch mit ä/ae oder Bindestrich),
+  und ihr könnt jedes Mitglied ohne Zugang wählen. Mit *Freigeben und verbinden* bekommt das Mitglied Benutzername,
+  E-Mail-Adresse und Passwort aus der Anfrage; es entsteht kein zweites Konto, Rolle und Einträge bleiben. E-Mail-Adresse
+  und Benutzername eines Mitglieds ohne Zugang gelten im Formular *Zugang beantragen* als frei.
 - **Schwarzes Brett nur für eine Kompanie oder einzelne Personen**: Unter *Sichtbar für* gibt es neben *intern* und
   *öffentlich* jetzt *Kompanie* (nur, wer einer der angehakten Kompanien zugeordnet ist; nur mit eingeschaltetem
   Bereich Kompanien) und *Einzeln* (nur die angehakten Personen). Benachrichtigung und E-Mail gehen dann nur an sie.

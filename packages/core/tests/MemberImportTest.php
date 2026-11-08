@@ -70,7 +70,7 @@ final class MemberImportTest extends TestCase
         $d = $res->data;
         $this->assertSame(['last_name', 'first_name', 'email', 'status', 'birthday', 'joined', 'points', 'rank', 'titles', 'left', 'reason'], $d['columns']['used']);
         $this->assertSame([['column' => 'Telefon', 'reason' => 'unbekannte Spalte']], $d['columns']['ignored']);
-        $this->assertSame(['active' => 2, 'former' => 2], $d['new']);
+        $this->assertSame(['active' => 2, 'former' => 2, 'no_access' => 0], $d['new']);
         $this->assertSame([1, false, []], [$d['existing'], $d['applied'], $d['created']]);
         $rows = array_column($d['rows'], null, 'line');
         $this->assertSame(['id' => $this->m, 'name' => 'Erika Muster', 'former' => false], $rows[2]['existing']);
@@ -110,9 +110,37 @@ final class MemberImportTest extends TestCase
         // Ein zweiter Lauf legt niemanden doppelt an.
         $res = $this->import($csv, true);
         $this->assertSame(200, $res->status, (string) json_encode($res->data));
-        $this->assertSame([['active' => 0, 'former' => 0], 5, []], [$res->data['new'], $res->data['existing'], $res->data['created']]);
+        $this->assertSame([['active' => 0, 'former' => 0, 'no_access' => 0], 5, []], [$res->data['new'], $res->data['existing'], $res->data['created']]);
         $this->assertTrue(array_column($res->data['rows'], null, 'line')[6]['existing']['former']);
         $this->assertCount(6, $this->users->users);
+    }
+
+    public function testColumnAccessNoCreatesMembersWithoutAccess(): void
+    {
+        $csv = "Vorname;Nachname;Status;Zugang\n"
+            . "Jürgen;Ohne;;nein\n"
+            . "Anna;Mit;Mitglied;ja\n"
+            . "Bernd;Leer;;\n"
+            . "Otto;Alt;ehemalig;nein\n";
+        $d = $this->import($csv)->data;
+        $this->assertSame(['active' => 3, 'former' => 1, 'no_access' => 1], $d['new']);
+        $rows = array_column($d['rows'], null, 'line');
+        $this->assertTrue($rows[2]['no_access']);
+        $this->assertSame('', $rows[2]['username'], 'ohne Zugang kein Benutzername in der Vorschau');
+        $this->assertArrayNotHasKey('no_access', $rows[3]);
+
+        $res = $this->import($csv, true);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame(['Anna Mit', 'Bernd Leer'], array_column($res->data['created'], 'name'), 'Zugangsdaten nur mit Zugang');
+        $this->assertSame(1, $res->data['new']['no_access']);
+        $ids = $this->ids();
+        $this->assertTrue($this->app->members()->hasNoAccess($ids['Jürgen Ohne']));
+        $this->assertSame(Roles::MEMBER, $this->users->find($ids['Jürgen Ohne'])?->role);
+        $this->assertFalse($this->app->members()->hasNoAccess($ids['Anna Mit']));
+        $this->assertFalse($this->app->members()->hasNoAccess($ids['Otto Alt']), 'Ehemalige: Spalte ohne Bedeutung');
+
+        $bad = $this->import("Vorname;Zugang\nX;vielleicht\n")->data;
+        $this->assertStringContainsString('Zugang „vielleicht“ unbekannt', $bad['rows'][0]['error']);
     }
 
     public function testErrorsBlockApply(): void

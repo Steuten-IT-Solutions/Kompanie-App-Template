@@ -30,6 +30,7 @@ const TEMPLATE_HEADER = [
   'Titel',
   'Ausgeschieden',
   'Grund',
+  'Zugang',
 ];
 const TEMPLATE_ROWS = [
   [
@@ -51,9 +52,10 @@ const TEMPLATE_ROWS = [
     '',
     '',
     '',
+    'ja',
   ],
-  ['Max', 'Beispiel', 'Mitglied', '', '', '', '', '', '', '', '', '24.12.', '2025', '', '', '', '', ''],
-  ['Otto', 'Früher', 'ehemalig', '', '', '', '', '', '', '', '', '', 'Gründer', '', '', '', '2001', 'verstorben'],
+  ['Max', 'Beispiel', 'Mitglied', '', '', '', '', '', '', '', '', '24.12.', '2025', '', '', '', '', '', 'nein'],
+  ['Otto', 'Früher', 'ehemalig', '', '', '', '', '', '', '', '', '', 'Gründer', '', '', '', '2001', 'verstorben', ''],
 ];
 
 function downloadTemplate() {
@@ -131,11 +133,13 @@ export function MemberImport({ onDone, doneLabel }: { onDone: () => void; doneLa
   if (result?.applied) {
     // Nach dem Übernehmen zählt new, was wirklich angelegt wurde.
     const former = result.new.former;
+    const noAccess = result.new.no_access ?? 0;
     return (
       <div className="member-import">
         <h2 className="member-name no-print">Import übernommen</h2>
         <p role="status" className="no-print">
           {count(result.created.length, 'Konto', 'Konten')} mit Startpasswort angelegt
+          {noAccess > 0 && ` · ${count(noAccess, 'Mitglied', 'Mitglieder')} ohne Zugang`}
           {former > 0 && ` · ${count(former, 'Person', 'Personen')} als ehemalig`}
           {result.offices_linked > 0 && ` · ${result.offices_linked} Einträge in den ${sec.offices} verknüpft`}.
         </p>
@@ -167,13 +171,14 @@ export function MemberImport({ onDone, doneLabel }: { onDone: () => void; doneLa
         Eine Zeile je Person, die erste Zeile enthält die Spaltennamen. Nötig ist nur <strong>Vorname</strong>; außerdem kennt die App
         Nachname, Status ({roles} oder ehemalig; leer heißt {levelLabel('member')}), Benutzername, E-Mail, Handynummer, Adresse (Straße,
         Hausnummer, Adresszusatz, PLZ, Ort, Land; leer heißt Deutschland), Geburtstag, Eintritt, Punkte, Dienstgrad, Titel sowie bei
-        Ehemaligen Ausgeschieden und Grund (ausgetreten, verstorben, sonstiges). Daten als TT.MM.JJJJ, den Eintritt auch nur als Jahr. Die
-        Reihenfolge der Spalten ist egal, andere Spalten werden übergangen.
+        Ehemaligen Ausgeschieden und Grund (ausgetreten, verstorben, sonstiges). Mit Zugang „nein“ entsteht ein Mitglied ohne Zugang (leer
+        heißt ja). Daten als TT.MM.JJJJ, den Eintritt auch nur als Jahr. Die Reihenfolge der Spalten ist egal, andere Spalten werden
+        übergangen.
       </p>
       <p className="muted small">
-        Aktive bekommen ein Startpasswort, das nach dem Übernehmen einmal angezeigt wird. Ehemalige bekommen ein Konto ohne Anmeldung. Wer
-        schon ein Konto mit genau diesem Namen hat, wird übersprungen; ein zweiter Import legt also niemanden doppelt an. Bitte die Datei
-        danach löschen, wenn du sie nicht mehr brauchst.
+        Aktive bekommen ein Startpasswort, das nach dem Übernehmen einmal angezeigt wird, außer Mitglieder ohne Zugang. Ehemalige bekommen
+        ein Konto ohne Anmeldung. Wer schon ein Konto mit genau diesem Namen hat, wird übersprungen; ein zweiter Import legt also niemanden
+        doppelt an. Bitte die Datei danach löschen, wenn du sie nicht mehr brauchst.
       </p>
       <button type="button" className="btn btn-link" onClick={downloadTemplate}>
         Vorlage herunterladen (CSV für Excel)
@@ -215,7 +220,8 @@ export function MemberImport({ onDone, doneLabel }: { onDone: () => void; doneLa
       {result && (
         <section>
           <p role="status">
-            Neu: {count(result.new.active, 'Konto', 'Konten')} mit Anmeldung · {result.new.former} ehemalig · schon vorhanden:{' '}
+            Neu: {count(result.new.active - (result.new.no_access ?? 0), 'Konto', 'Konten')} mit Anmeldung
+            {(result.new.no_access ?? 0) > 0 && ` · ${result.new.no_access} ohne Zugang`} · {result.new.former} ehemalig · schon vorhanden:{' '}
             {result.existing}
           </p>
           {result.columns.ignored.length > 0 && (
@@ -239,6 +245,7 @@ export function MemberImport({ onDone, doneLabel }: { onDone: () => void; doneLa
                   <>
                     {' '}
                     <span className="badge badge-role">{r.status === 'former' ? 'Ehemalig' : levelLabel(r.level ?? 'member')}</span>
+                    {r.no_access && <span className="badge badge-no-access">ohne Zugang</span>}
                   </>
                 )}
                 {!r.existing && !r.error && rowSummary(r) && ` · ${rowSummary(r)}`}

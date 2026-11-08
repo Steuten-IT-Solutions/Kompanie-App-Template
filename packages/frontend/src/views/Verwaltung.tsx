@@ -472,6 +472,7 @@ function Members() {
             <div className="row-main">
               <div className="row-title">
                 {listName(m, order.sort)} <TitleBadges titles={m.titles} role={admitRole(m.level)} />
+                {m.no_access && <span className="badge badge-no-access">ohne Zugang</span>}
               </div>
               <div className="row-sub">
                 {/* Eintritt und Punkte nur, wenn danach sortiert ist, damit die Reihenfolge nachvollziehbar ist. */}
@@ -534,7 +535,7 @@ function roleLine(m: MemberDetail): string {
     : (m.extra_roles ?? []).length > 0
       ? `Rollen: ${roleLabels(m)}`
       : `Rolle: ${levelLabel(m.level)}`;
-  return role + (hasOverrides(m.rights) ? ' · mit Ausnahmen bei den Rechten' : '');
+  return role + (m.no_access ? ' · ohne Zugang' : '') + (hasOverrides(m.rights) ? ' · mit Ausnahmen bei den Rechten' : '');
 }
 
 /**
@@ -1133,7 +1134,7 @@ function MemberDetailView({
             Als {levelLabel('member')} aufnehmen
           </button>
         )}
-        {!m.former && <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />}
+        {!m.former && <ResetPassword id={m.id} name={m.name} level={m.level} noAccess={!!m.no_access} onToast={onToast} />}
         {/* Gäste gehören nicht zur Kompanie. */}
         {formerEditable && formerPanel(false)}
         {/* Das eigene Konto ohne Löschen; E-Mail auch unter Meins → Konto. */}
@@ -1411,27 +1412,64 @@ function RoleControl({
   );
 }
 
-/** Admins erzeugen ein neues Startpasswort, z. B. wenn jemand sein Passwort vergessen hat. */
-function ResetPassword({ id, name, level, onToast }: { id: number; name: string; level: Level; onToast: (msg: string) => void }) {
+/**
+ * Admins erzeugen ein neues Startpasswort, z. B. wenn jemand sein Passwort vergessen hat. Bei einem Mitglied ohne Zugang
+ * heißt das „Zugang einrichten“: Danach hat es Benutzername und Startpasswort.
+ */
+function ResetPassword({
+  id,
+  name,
+  level,
+  noAccess,
+  onToast,
+}: {
+  id: number;
+  name: string;
+  level: Level;
+  noAccess: boolean;
+  onToast: (msg: string) => void;
+}) {
   const [password, setPassword] = useState<string | null>(null);
+  const [created, setCreated] = useState<CreatedUser | null>(null);
   const [busy, setBusy] = useState(false);
   if (!can('create_users') || id === config?.user?.id || level === 'guest') return null;
   async function reset() {
     if (
       !window.confirm(
-        `Neues Startpasswort für ${name} erzeugen? Das bisherige Passwort gilt danach nicht mehr, alle Geräte werden abgemeldet.`,
+        noAccess
+          ? `Zugang für ${name} einrichten? Die App erzeugt ein Startpasswort, das du der Person weitergibst.`
+          : `Neues Startpasswort für ${name} erzeugen? Das bisherige Passwort gilt danach nicht mehr, alle Geräte werden abgemeldet.`,
       )
     ) {
       return;
     }
     setBusy(true);
     try {
-      setPassword((await api.resetPassword(id)).password);
+      const res = await api.resetPassword(id);
+      if (noAccess) {
+        setCreated({ id, name, username: res.username ?? '', email: '', level, password: res.password });
+      } else {
+        setPassword(res.password);
+      }
     } catch (e) {
       onToast((e as Error).message);
     } finally {
       setBusy(false);
     }
+  }
+  if (created) return <Credentials people={[created]} />;
+  if (noAccess) {
+    return (
+      <div className="no-access-panel">
+        <p className="muted small">
+          {name} hat noch keinen Zugang. Stellt die Person eine Anfrage, kannst du sie unter <strong>Anfragen</strong> mit diesem Mitglied
+          verbinden.
+        </p>
+        <button className="btn btn-secondary btn-block set-up-access" disabled={busy} onClick={reset}>
+          {busy ? 'Richtet ein …' : 'Zugang einrichten'}
+        </button>
+      </div>
+    );
   }
   if (password) {
     return (
@@ -1474,6 +1512,8 @@ function NewMember() {
   const [address, setAddress] = useState(EMPTY_ADDRESS);
   const [birthday, setBirthday] = useState(emptyBirthday());
   const [photo, setPhoto] = useState<PreparedPhoto | null>(null);
+  // Ohne Zugang: z. B. für Chroniken und Ämter, wenn die Person sich (noch) nicht anmeldet.
+  const [noAccess, setNoAccess] = useState(false);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [created, setCreated] = useState<CreatedUser | null>(null);
@@ -1489,7 +1529,7 @@ function NewMember() {
       setCreated(
         await api.createUser({
           ...trimName(name),
-          ...(username.trim() ? { username: username.trim() } : {}),
+          ...(username.trim() && !noAccess ? { username: username.trim() } : {}),
           ...(normalizeEmail(email) ? { email: normalizeEmail(email) } : {}),
           ...(normalizePhone(phone) ? { phone: normalizePhone(phone) } : {}),
           ...(addressInput(address) ? { address: addressInput(address) } : {}),
@@ -1498,6 +1538,7 @@ function NewMember() {
           ...(extras && canRanks() && rankOptions.some((r) => String(r.id) === rankId) ? { rank_id: Number(rankId) } : {}),
           ...(bday ? { birthday: birthdayString(bday) } : {}),
           ...(photo ? { photo: photo.file } : {}),
+          ...(noAccess ? { no_access: true } : {}),
         }),
       );
     } catch (err) {
@@ -1511,7 +1552,28 @@ function NewMember() {
     return (
       <div>
         <h2 className="member-name no-print">{created.name} ist angelegt</h2>
-        <Credentials people={[created]} onDone={() => navigate('verwaltung/mitglieder')} />
+        {created.no_access ? (
+          <div className="card created no-access-created">
+            {created.warning && (
+              <p className="form-error" role="alert">
+                {created.warning}
+              </p>
+            )}
+            <p>
+              Ohne Zugang: {created.name} meldet sich noch nicht an, steht aber wie jedes Mitglied in der Mitgliederliste und lässt sich z.
+              B. bei {sec.offices} auswählen.
+            </p>
+            <p className="muted small">
+              Einen Zugang bekommt {created.name} später beim Mitglied mit <strong>Zugang einrichten</strong> oder beim Freigeben einer
+              Anfrage unter <strong>Anfragen</strong> mit <strong>Mit diesem Mitglied verbinden</strong>.
+            </p>
+            <button className="btn btn-block" onClick={() => navigate('verwaltung/mitglieder')}>
+              ‹ Zur Mitgliederliste
+            </button>
+          </div>
+        ) : (
+          <Credentials people={[created]} onDone={() => navigate('verwaltung/mitglieder')} />
+        )}
         <button
           className="btn btn-secondary btn-block no-print"
           onClick={() => {
@@ -1525,6 +1587,7 @@ function NewMember() {
             setRankId('');
             setBirthday(emptyBirthday());
             setPhoto(null);
+            setNoAccess(false);
           }}
         >
           Weiteres Mitglied
@@ -1547,17 +1610,29 @@ function NewMember() {
         Aus Datei importieren (Excel oder CSV)
       </button>
       <NameFields value={name} onChange={setName} />
-      <label className="field">
-        <span>Benutzername (optional)</span>
-        <input
-          type="text"
-          autoComplete="off"
-          autoCapitalize="none"
-          placeholder="wird sonst aus dem Namen gebildet"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
+      <label className="toggle no-access-toggle">
+        <input type="checkbox" checked={noAccess} onChange={(e) => setNoAccess(e.target.checked)} />
+        Ohne Zugang (meldet sich noch nicht an)
       </label>
+      {noAccess && (
+        <p className="muted small">
+          Für Personen ohne Konto, z. B. in Chroniken und {sec.offices}. Es gibt kein Startpasswort; den Zugang richtest du später ein oder
+          verbindest das Mitglied mit seiner Anfrage.
+        </p>
+      )}
+      {!noAccess && (
+        <label className="field">
+          <span>Benutzername (optional)</span>
+          <input
+            type="text"
+            autoComplete="off"
+            autoCapitalize="none"
+            placeholder="wird sonst aus dem Namen gebildet"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+        </label>
+      )}
       <EmailField value={email} onChange={setEmail} />
       <PhoneField value={phone} onChange={setPhone} />
       <AddressFields value={address} onChange={setAddress} />
@@ -1603,7 +1678,8 @@ function NewMember() {
         <PhotoPicker name={`${name.first_name} ${name.last_name}`.trim()} value={photo} onChange={setPhoto} onError={setFormError} />
       </fieldset>
       <p className="muted small">
-        Das neue Konto bekommt ein zufälliges Startpasswort. Andere Rollen vergibt danach, wer Rollen vergeben darf.
+        {noAccess ? 'Ohne Zugang gibt es kein Startpasswort.' : 'Das neue Konto bekommt ein zufälliges Startpasswort.'} Andere Rollen
+        vergibt danach, wer Rollen vergeben darf.
       </p>
       {formError && (
         <p className="form-error" role="alert">
