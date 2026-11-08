@@ -23,6 +23,7 @@ import { addressInput, EMPTY_ADDRESS, isEmptyAddress, type Address } from '../ad
 import { BirthdayFields, birthdayString, canEnterBirthdays, emptyBirthday, readBirthday, type BirthdayValue } from '../birthdays';
 import { PhotoPicker, type PreparedPhoto } from '../memberPhoto';
 import { downloadPersonalData } from '../personalData';
+import { confirmAsk } from '../ask';
 
 /** Zugangsdaten als Text zum Weitergeben, mit dem Link zur Installationsanleitung (Issue #24). */
 export function credentialsText(c: { name: string; username: string; password?: string }): string {
@@ -188,9 +189,9 @@ export const validExtraRoles = (base: Level, keys: Level[]): Level[] => {
 };
 
 /** Vor dem Anlegen als Admin nachfragen (wie bei „Rollen vergeben“): Admins dürfen alles. */
-export function confirmNewAdmin(level: Level): boolean {
+export async function confirmNewAdmin(level: Level): Promise<boolean> {
   return (
-    level !== 'admin' || window.confirm(`Wirklich als ${levelLabel('admin')} anlegen? Admins dürfen alles, auch Einstellungen ändern.`)
+    level !== 'admin' || (await confirmAsk(`Wirklich als ${levelLabel('admin')} anlegen? Admins dürfen alles, auch Einstellungen ändern.`))
   );
 }
 
@@ -248,7 +249,7 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
       });
     }
     if (people.length === 0) return setFormError('Bitte mindestens einen Namen eintragen.');
-    if (!confirmNewAdmin(level)) return;
+    if (!(await confirmNewAdmin(level))) return;
     setBusy(true);
     try {
       const out = await api.createUsers(level, people, validExtraRoles(level, extraRoles));

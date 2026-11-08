@@ -7,6 +7,7 @@ import RichTextView from '../richtext/RichTextView';
 import { navigate } from '../router';
 import { ErrorBox, lazyView, Loading, useAsync } from '../ui';
 import { canWriteNews } from './News';
+import { confirmAsk } from '../ask';
 
 const NewsSchreiben = lazyView(() => import('./NewsSchreiben'));
 
@@ -75,7 +76,7 @@ export default function NewsArtikel({ id, onToast }: { id: string; onToast: (msg
     );
 
   async function remove() {
-    if (!window.confirm(`Beitrag „${n.title}“ samt seinen Bildern löschen?`)) return;
+    if (!(await confirmAsk(`Beitrag „${n.title}“ samt seinen Bildern löschen?`))) return;
     setBusy(true);
     setActionError(null);
     try {

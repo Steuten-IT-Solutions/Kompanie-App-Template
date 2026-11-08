@@ -16,6 +16,7 @@ import { filePayload, isEncryptedFile } from '../backupFile';
 import brand from '../generated/brand';
 import { ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
+import { confirmAsk } from '../ask';
 
 /**
  * Wartung für Admins: Ampel (Status), Updates mit Zurückrollen, Statusmeldungen (nur mit
@@ -240,7 +241,7 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
     } catch (err) {
       if (
         !(err instanceof ApiError && err.code === 'drive_backup_failed') ||
-        !window.confirm(`${err.message}\n\nTrotzdem aktualisieren?`)
+        !(await confirmAsk(`${err.message}\n\nTrotzdem aktualisieren?`))
       ) {
         throw err;
       }
@@ -358,7 +359,9 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
                 type="button"
                 className="btn btn-secondary"
                 disabled={!!busy}
-                onClick={() => window.confirm(`Neue Hauptversion ${u.majorVersion} jetzt einspielen?`) && install(u.majorVersion!, true)}
+                onClick={async () =>
+                  (await confirmAsk(`Neue Hauptversion ${u.majorVersion} jetzt einspielen?`)) && install(u.majorVersion!, true)
+                }
               >
                 Hauptversion einspielen
               </button>
@@ -391,11 +394,11 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
               type="checkbox"
               checked={u.channel === 'early'}
               disabled={!!busy}
-              onChange={(e) =>
+              onChange={async (e) =>
                 (!e.target.checked ||
-                  window.confirm(
+                  (await confirmAsk(
                     'Vorabversionen erhalten? Diese Installation bekommt dann jede neue Version, bevor sie für alle freigegeben ist – zum Testen, kann noch Fehler enthalten.',
-                  )) &&
+                  ))) &&
                 run('channel', async () => setU(await api.updateOptions({ channel: e.target.checked ? 'early' : 'stable' })))
               }
             />
@@ -435,8 +438,8 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
                 type="button"
                 className="btn btn-danger"
                 disabled={!!busy || !older}
-                onClick={() =>
-                  window.confirm(`Auf Version ${older} zurückgehen?`) &&
+                onClick={async () =>
+                  (await confirmAsk(`Auf Version ${older} zurückgehen?`)) &&
                   run('rollback', async () => {
                     await askWithoutDrive(older, (withoutDrive) => api.rollback(older, withoutDrive));
                   })
@@ -537,7 +540,7 @@ function Fehlerprotokoll({ status, onToast }: { status: AdminStatus; onToast: (m
   }
 
   async function clear() {
-    if (!window.confirm('Fehlerprotokoll leeren?')) return;
+    if (!(await confirmAsk('Fehlerprotokoll leeren?'))) return;
     setBusy(true);
     setError(null);
     try {
@@ -712,9 +715,9 @@ function Datensicherung({
     e.target.value = '';
     if (!file) return;
     if (
-      !window.confirm(
+      !(await confirmAsk(
         `Alle Daten der App durch die Sicherung „${file.name}“ ersetzen? Das lässt sich nur mit einer anderen Sicherung rückgängig machen.`,
-      )
+      ))
     )
       return;
     setError(null);
@@ -860,9 +863,9 @@ function Verschluesselung({
     }
   }
 
-  function remove() {
+  async function remove() {
     if (
-      window.confirm(
+      await confirmAsk(
         'Passwort für Sicherungen entfernen? Neue Sicherungen sind dann unverschlüsselt, auch die in Google Drive. Ältere verschlüsselte Sicherungen brauchen weiter das bisherige Passwort.',
       )
     )

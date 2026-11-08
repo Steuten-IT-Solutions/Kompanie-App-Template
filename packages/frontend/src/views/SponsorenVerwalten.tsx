@@ -5,6 +5,7 @@ import brand from '../generated/brand';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { SponsorLogo } from './Sponsoren';
+import { confirmAsk } from '../ask';
 
 const sec = brand.labels.sections;
 
@@ -189,8 +190,8 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
                       <button
                         className="btn btn-small btn-secondary"
                         disabled={busy}
-                        onClick={() =>
-                          window.confirm(`Logo von „${s.name}“ entfernen?`) && run(() => api.removeSponsorLogo(s.id), 'Logo entfernt')
+                        onClick={async () =>
+                          (await confirmAsk(`Logo von „${s.name}“ entfernen?`)) && run(() => api.removeSponsorLogo(s.id), 'Logo entfernt')
                         }
                       >
                         Logo entfernen
@@ -199,7 +200,7 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
                     <button
                       className="btn btn-small btn-danger"
                       disabled={busy}
-                      onClick={() => window.confirm(`„${s.name}“ löschen?`) && run(() => api.deleteSponsor(s.id), 'Gelöscht')}
+                      onClick={async () => (await confirmAsk(`„${s.name}“ löschen?`)) && run(() => api.deleteSponsor(s.id), 'Gelöscht')}
                     >
                       Löschen
                     </button>

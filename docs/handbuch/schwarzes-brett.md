@@ -20,12 +20,12 @@ Das Banner erscheint nur, solange es eine Nachricht gibt oder eine laufende Umfr
 - **Beendete {bereich.polls}**: öffnet die Liste aller {bereich.polls}, auch der beendeten.
 
 ## Das Banner oben auf jeder Seite
-Solange es gültige Einträge gibt, steht oben auf jeder Seite der App (außer auf dieser) ein farbiges Banner. Es zeigt die neueste Nachricht mit Namen, Uhrzeit und Titel; ein Tipp auf den Titel öffnet die ganze Nachricht. Sehr lange Titel kürzt das Banner mit „…“. Laufende {bereich.polls}, auf die du noch nicht geantwortet hast, stehen ebenfalls darin, jeweils mit dem Knopf **Teilnehmen**.
+Solange es gültige Einträge gibt, steht oben auf jeder Seite der App (außer auf dieser) ein farbiges Banner. Es zeigt in einer Zeile den Titel der neuesten Nachricht; ein Tipp auf den Titel öffnet die ganze Nachricht. Wer sie geschrieben hat und wann, steht hier auf der Seite des Bretts. Sehr lange Titel kürzt das Banner mit „…“. Laufende {bereich.polls}, auf die du noch nicht geantwortet hast, stehen ebenfalls darin, jeweils mit dem Knopf **Teilnehmen**.
 
 ![Das Banner mit einer Nachricht und dem Knopf +1 weitere](bild:schwarzes-brett-banner)
 
 - **+1 weitere** (bzw. **+2 weitere** …): klappt die übrigen Einträge auf. **Weniger anzeigen** klappt sie wieder zu.
-- **Brett öffnen**: öffnet diese Seite.
+- **Brett öffnen**: öffnet diese Seite. Der Knopf steht neben **+1 weitere**; mit nur einem Eintrag führt der Titel hierher.
 - **×**: blendet den Eintrag auf diesem Gerät aus.
 
 ![Das aufgeklappte Banner mit einer Nachricht und einer Umfrage](bild:schwarzes-brett-banner-mehr)

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api, type GalleryAdminAlbum } from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
+import { confirmAsk } from '../ask';
 
 /**
  * Alben der App und hochgeladene Bilder (Issue #285), unter Einstellungen → Galerie: Album anlegen (nur in der App),
@@ -198,7 +199,7 @@ function AlbumUploads({
                 className="btn btn-small btn-danger"
                 disabled={busy}
                 onClick={async () => {
-                  if (!window.confirm(`Bild „${p.name}“ löschen?`)) return;
+                  if (!(await confirmAsk(`Bild „${p.name}“ löschen?`))) return;
                   if (await run(() => api.deleteGalleryPhoto(p.id), 'Bild gelöscht')) {
                     reload();
                     onChanged();
@@ -236,7 +237,7 @@ function AlbumUploads({
               className="btn btn-small btn-danger"
               disabled={busy}
               onClick={async () => {
-                if (!window.confirm(`Album „${album.title}“ mit allen Bildern darin löschen?`)) return;
+                if (!(await confirmAsk(`Album „${album.title}“ mit allen Bildern darin löschen?`))) return;
                 if (await run(() => api.deleteGalleryAlbum(album.id), 'Album gelöscht')) {
                   onDeleted();
                   onChanged();

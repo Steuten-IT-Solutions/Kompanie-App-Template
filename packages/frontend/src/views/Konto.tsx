@@ -17,6 +17,7 @@ import { downloadPersonalData } from '../personalData';
 import { previewRole } from '../preview';
 import { saveTheme, THEME_LABELS, useTheme, type ThemeChoice } from '../theme';
 import { sources } from '../viewData';
+import { confirmAsk } from '../ask';
 
 const MIN_LENGTH = 8;
 
@@ -98,7 +99,7 @@ function SignatureCard({ onToast }: { onToast: (msg: string) => void }) {
   }
 
   async function remove() {
-    if (!window.confirm('Signatur löschen? Nachrichten, in die du sie schon eingefügt hast, bleiben unverändert.')) return;
+    if (!(await confirmAsk('Signatur löschen? Nachrichten, in die du sie schon eingefügt hast, bleiben unverändert.'))) return;
     setBusy(true);
     try {
       await api.deleteSignature();

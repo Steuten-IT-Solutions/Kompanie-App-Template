@@ -106,6 +106,7 @@ import { MemberImport } from './MitgliederImport';
 import { Anfragen } from './Anfragen';
 import { newlyDue } from '../promotionCheck';
 import { promotionsAllowed, refreshPromotions, setReached, useReached } from '../promotionsDue';
+import { confirmAsk, promptAsk } from '../ask';
 
 type Sub =
   | 'mitglieder'
@@ -1134,8 +1135,8 @@ function MemberDetailView({
           <button
             className="btn btn-block promote-candidate"
             disabled={busy}
-            onClick={() =>
-              window.confirm(`${m.name} als ${levelLabel('member')} aufnehmen?`) &&
+            onClick={async () =>
+              (await confirmAsk(`${m.name} als ${levelLabel('member')} aufnehmen?`)) &&
               run(() => api.promote(m.id), `${m.name} ist jetzt ${levelLabel('member')}`)
             }
           >
@@ -1246,8 +1247,8 @@ function PointEntries({ entries, busy, run }: { entries: PointEntry[]; busy: boo
               <button
                 className="btn btn-small btn-danger"
                 disabled={busy}
-                onClick={() =>
-                  window.confirm(`Eintrag „${p.reason}“ (${formatPoints(p.points)}) wirklich stornieren?`) &&
+                onClick={async () =>
+                  (await confirmAsk(`Eintrag „${p.reason}“ (${formatPoints(p.points)}) wirklich stornieren?`)) &&
                   run(() => api.deletePoints(p.id), 'Storniert')
                 }
               >
@@ -1293,8 +1294,8 @@ function PenaltyEntries({ entries, busy, run }: { entries: Penalty[]; busy: bool
               <button
                 className="btn btn-small btn-danger"
                 disabled={busy}
-                onClick={() =>
-                  window.confirm(`Eintrag „${p.reason}“ (${formatEuro(p.amount_cents)}) wirklich stornieren?`) &&
+                onClick={async () =>
+                  (await confirmAsk(`Eintrag „${p.reason}“ (${formatEuro(p.amount_cents)}) wirklich stornieren?`)) &&
                   run(() => api.deletePenalty(p.id), 'Storniert')
                 }
               >
@@ -1361,11 +1362,11 @@ function RoleControl({
       setBusy(false);
     }
   }
-  function change(next: Level) {
+  async function change(next: Level) {
     if (next === level) return;
     if (
       next === 'admin' &&
-      !window.confirm(`Wirklich zum ${levelLabel('admin')} machen? Admins dürfen alles, auch Einstellungen ändern.`)
+      !(await confirmAsk(`Wirklich zum ${levelLabel('admin')} machen? Admins dürfen alles, auch Einstellungen ändern.`))
     ) {
       return;
     }
@@ -1443,11 +1444,11 @@ function ResetPassword({
   if (!can('create_users') || id === config?.user?.id || level === 'guest') return null;
   async function reset() {
     if (
-      !window.confirm(
+      !(await confirmAsk(
         noAccess
           ? `Zugang für ${name} einrichten? Die App erzeugt ein Startpasswort, das du der Person weitergibst.`
           : `Neues Startpasswort für ${name} erzeugen? Das bisherige Passwort gilt danach nicht mehr, alle Geräte werden abgemeldet.`,
-      )
+      ))
     ) {
       return;
     }
@@ -1533,7 +1534,7 @@ function NewMember() {
     if (!name.first_name.trim()) return setFormError('Bitte einen Vornamen angeben.');
     const bday = canEnterBirthdays() ? readBirthday(birthday) : null;
     if (typeof bday === 'string') return setFormError(bday);
-    if (!confirmNewAdmin(level)) return;
+    if (!(await confirmNewAdmin(level))) return;
     setBusy(true);
     try {
       setCreated(
@@ -2163,8 +2164,8 @@ function Catalog({ onToast }: { onToast: (msg: string) => void }) {
                 <button
                   className="btn btn-small btn-secondary"
                   disabled={busy}
-                  onClick={() => {
-                    const next = window.prompt(`${sec.points} für „${c.title}“`, String(c.points));
+                  onClick={async () => {
+                    const next = await promptAsk(`${sec.points} für „${c.title}“`, String(c.points));
                     if (next === null) return;
                     const n = Number(next);
                     if (!Number.isInteger(n)) return onToast('Bitte eine ganze Zahl angeben.');

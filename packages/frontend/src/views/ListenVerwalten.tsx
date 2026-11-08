@@ -11,6 +11,7 @@ import { sortRowsByName, splitName } from '../memberSort';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
+import { confirmAsk } from '../ask';
 
 const sec = brand.labels.sections;
 
@@ -183,7 +184,7 @@ function ListOverview({ onToast }: { onToast: Toast }) {
                   <button
                     className="btn btn-small btn-danger"
                     disabled={busy}
-                    onClick={() => window.confirm(`Liste „${l.title}“ löschen?`) && run(() => api.deleteList(l.id), 'Gelöscht')}
+                    onClick={async () => (await confirmAsk(`Liste „${l.title}“ löschen?`)) && run(() => api.deleteList(l.id), 'Gelöscht')}
                   >
                     Löschen
                   </button>
@@ -331,8 +332,8 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
     }
   }
 
-  function leave() {
-    if (!dirty || window.confirm('Änderungen verwerfen?')) navigate('verwaltung/listen');
+  async function leave() {
+    if (!dirty || (await confirmAsk('Änderungen verwerfen?'))) navigate('verwaltung/listen');
   }
 
   const deleted = draft.rows.filter((r) => r.kind === 'member' && r.deleted).length;

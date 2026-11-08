@@ -7,6 +7,13 @@
   --tabbar-h: 66px;
   --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --warn-deep: color-mix(in srgb, var(--warn-surface) 78%, black);
+  /* Abstandsstufen (Issue #344): zwischen Zeilen in einer Karte 1–2, zwischen Elementen 3, zwischen Karten und im
+     Rand einer Karte 4, zwischen Abschnitten 5. Neue Abstände bitte nur mit diesen Stufen. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -248,6 +255,12 @@ h3,
   color: #5a3a06;
   border-bottom: 1px solid var(--line-strong);
 }
+/* Höchstens zwei Hinweise übereinander (Issue #347): Steht schon das Brett oder der Wartungsmodus oben, wartet der
+   Hinweis zum Installieren, bis sie weg sind. */
+.board-banner ~ .install-hint,
+.maintenance-banner ~ .install-hint {
+  display: none;
+}
 .install-hint {
   display: flex;
   gap: 10px;
@@ -456,6 +469,16 @@ h3,
 .small {
   font-size: 0.85rem;
   margin: 0;
+}
+/* Erklärtext (klein, ohne eigenen Rand) direkt vor einer Liste, einem Umschalter oder einer Karte: Abstand wie
+   zwischen zwei Elementen, damit der Text nicht an der ersten Karte klebt (Issue #344). */
+p.small + :is(.card-list, .card, .segmented, .poll-list, .empty, .btn-block),
+p.small + p.small:not(.muted) {
+  margin-top: var(--space-3);
+}
+/* Badges (Titel, Rolle) im Titel einer Zeile sind höher als Text: die Zeile darunter etwas absetzen. */
+.row-title:has(.badge) + .row-sub {
+  margin-top: var(--space-1);
 }
 .chevron {
   color: var(--accent-dark);
@@ -1081,19 +1104,30 @@ button.member-date {
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  /* Seite dahinter abgedunkelt und unscharf: Das Fenster hebt sich klar ab (Issue #342) */
   background: rgb(0 0 0 / 55%);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+/* Rückfragen (ask.tsx) liegen über allem, auch über der vergrößerten Bildansicht (.lightbox, z-index 50). */
+.sheet-backdrop.sheet-top {
+  z-index: 60;
 }
 .sheet {
   display: flex;
   flex-direction: column;
   width: 100%;
   max-width: 640px;
-  max-height: calc(92vh / var(--kompanie-zoom, 1));
+  /* Oben bleibt immer ein Streifen der Seite sichtbar: ein Fenster, keine neue Seite */
+  max-height: calc(85vh / var(--kompanie-zoom, 1));
   border-radius: 18px 18px 0 0;
-  border-top: 2px solid var(--accent);
+  border-top: 3px solid var(--accent);
+  /* Seitenfarbe, damit Karten im Fenster sich abheben; der Kopf ist abgesetzt */
   background: var(--bg);
   color: var(--ink);
-  box-shadow: 0 -8px 30px rgb(0 0 0 / 35%);
+  box-shadow:
+    0 -10px 40px rgb(0 0 0 / 45%),
+    0 0 0 1px rgb(0 0 0 / 8%);
 }
 .sheet-head {
   display: flex;
@@ -1101,6 +1135,8 @@ button.member-date {
   gap: 12px;
   padding: 14px 14px 10px 18px;
   border-bottom: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 18px 18px 0 0;
 }
 .sheet-title {
   flex: 1;
@@ -1115,7 +1151,7 @@ button.member-date {
   height: 40px;
   border: 0;
   border-radius: 999px;
-  background: var(--card);
+  background: var(--bg);
   color: var(--ink);
   font-size: 1.2rem;
   cursor: pointer;
@@ -1138,6 +1174,34 @@ button.member-date {
     border-radius: 18px;
     border: 2px solid var(--accent);
   }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .sheet-backdrop {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: rgb(0 0 0 / 65%);
+  }
+}
+/* Rückfragen der App (ask.tsx) statt der Fenster des Browsers */
+.ask-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ask-message {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: break-word;
+}
+.ask-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.btn-danger-solid {
+  background: var(--danger);
+  color: #fff;
 }
 /* Foto ersetzen und entfernen in der vergrößerten Ansicht, unter dem Bild */
 .member-photo-zoom .member-photo {
@@ -3469,7 +3533,19 @@ fieldset.rights-tree legend {
   overflow-wrap: anywhere;
 }
 .bulk-row {
-  margin-bottom: 12px;
+  /* Felder einer Person mit demselben Abstand wie im übrigen Formular (Issue #344) */
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.bulk-row > legend {
+  padding: 0 var(--space-2);
+  font-weight: 650;
 }
 .bulk-link {
   margin-bottom: 14px;
@@ -3612,6 +3688,8 @@ fieldset.rights-tree legend {
   gap: 8px;
   justify-content: flex-end;
   margin-left: auto;
+  /* Rutschen die Knöpfe unter den Text, nehmen sie die ganze Zeile und stehen nebeneinander statt untereinander */
+  flex: 1 0 auto;
 }
 
 /* ------------------------------------------------------------------ */
@@ -3619,7 +3697,8 @@ fieldset.rights-tree legend {
 /* ------------------------------------------------------------------ */
 
 .board-banner {
-  padding: 8px 16px 4px;
+  /* Kompakt (Issue #347): je Eintrag eine Zeile mit Titel und ×, darunter nur bei mehreren „+N weitere“ */
+  padding: 2px 8px 2px 16px;
   background: var(--warn-surface);
   color: var(--on-warn);
   border-bottom: 1px solid var(--warn-deep);
@@ -3627,23 +3706,32 @@ fieldset.rights-tree legend {
 }
 .board-entry {
   display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  padding: 4px 0;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: 40px;
 }
 .board-entry + .board-entry {
   border-top: 1px solid color-mix(in srgb, var(--on-warn) 30%, transparent);
-  padding-top: 8px;
 }
 .board-entry-body {
   flex: 1;
   min-width: 0;
-}
-.board-entry-head {
   display: flex;
-  flex-wrap: wrap;
-  gap: 2px 8px;
-  align-items: baseline;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+.board-entry-body > .board-banner-title,
+.board-entry-body > .board-text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+.board-poll-open {
+  flex: none;
 }
 .board-banner .board-meta {
   font-size: 0.8rem;
@@ -3669,7 +3757,12 @@ fieldset.rights-tree legend {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 4px 12px;
+  gap: 0 var(--space-3);
+  padding-right: var(--space-2);
+}
+/* Mit nur einem Eintrag bleibt das Banner eine Zeile: Der Titel führt schon zum Brett. */
+.board-banner:not(:has(.board-more)) .board-banner-foot {
+  display: none;
 }
 .board-banner-foot .btn-link,
 .board-banner-collapsed .btn-link {
@@ -3689,6 +3782,36 @@ fieldset.rights-tree legend {
 .board-page-title {
   margin: 18px 0 10px;
   font-size: 1rem;
+}
+/* Karten am Brett und Umfragen mit Innenrand (Issue #344/#347) */
+.board-card {
+  padding: var(--space-4);
+}
+.board-card > :first-child {
+  margin-top: 0;
+}
+.board-card > :last-child {
+  margin-bottom: 0;
+}
+/* Abschnitt innerhalb eines Formulars, z. B. „Sichtbarkeit und Versand“ am Brett */
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.form-section > h4 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+.form-section .toggle + .toggle {
+  margin-top: calc(-1 * var(--space-2));
+}
+/* Titel der Nachricht als große, klare Eingabe */
+.board-title-input {
+  font-size: 1.15rem;
+  font-weight: 600;
 }
 .board-card .board-meta {
   font-size: 0.85rem;
@@ -4041,6 +4164,43 @@ fieldset.board-targets legend {
 }
 .poll-manage-link {
   margin-bottom: 10px;
+}
+/* Umfragen untereinander mit Abstand; „Umfragen verwalten“: Karten mit Innenrand (Issue #344) */
+.poll-list,
+.poll-admin {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.poll-list > h2,
+.poll-admin > h2 {
+  margin: var(--space-3) 0 0;
+}
+.poll-card {
+  padding: var(--space-4);
+}
+.poll-card > :first-child {
+  margin-top: 0;
+}
+.poll-card > :last-child {
+  margin-bottom: 0;
+}
+.poll-admin > .form.card {
+  margin-bottom: 0;
+}
+/* Fieldset ohne eigene Klasse im Formular: Felder darin mit demselben Abstand wie im Formular */
+.form fieldset:not([class]) {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.form fieldset:not([class]) > legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
 }
 .poll-option-edit {
   display: flex;
@@ -5723,35 +5883,11 @@ button.spotlight-person:focus-visible {
     align-items: center;
     padding: 0;
   }
-  .board-entry + .board-entry {
-    padding-top: 2px;
+  .board-entry {
+    min-height: 0;
   }
-  .board-entry-body {
+  .board-banner:not(:has(.board-more)) .board-banner-foot {
     display: flex;
-    align-items: center;
-    gap: 4px 12px;
-  }
-  .board-entry-head {
-    flex: none;
-    flex-wrap: nowrap;
-  }
-  .board-entry-body > .board-banner-title,
-  .board-entry-body > .board-text {
-    flex: 1;
-    min-width: 0;
-    margin: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-  .board-poll-open {
-    flex: none;
-  }
-  /* Auf kleinen Handys hat der Titel Vorrang vor Name und Uhrzeit */
-  @media (max-width: 760px) {
-    .board-banner .board-entry-head .board-meta {
-      display: none;
-    }
   }
   .board-dismiss {
     min-height: 32px;

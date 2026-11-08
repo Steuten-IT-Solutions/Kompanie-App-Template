@@ -9,7 +9,7 @@ Hier schreibst du eine dringende Nachricht ans {bereich.board}, z. B. „Trainin
 ![Die Seite des {bereich.board}s mit dem Formular Neue Nachricht](bild:schwarzes-brett-schreiben)
 
 ## So öffnest du die Seite
-Tippe unten auf **Verwaltung** und dann auf **{bereich.board}**. Ist das deine einzige Aufgabe in der Verwaltung, öffnet **Verwaltung** gleich diese Seite. Steht schon eine Nachricht am Brett, führt auch **Brett öffnen und bearbeiten** im Banner hierher.
+Tippe unten auf **Verwaltung** und dann auf **{bereich.board}**. Ist das deine einzige Aufgabe in der Verwaltung, öffnet **Verwaltung** gleich diese Seite. Steht schon eine Nachricht am Brett, führt auch ein Tipp auf ihren Titel im Banner hierher.
 
 ## Was du hier siehst
 - **‹ Verwaltung**: zurück zur Startseite der Verwaltung (nur, wenn du dort mehrere Aufgaben hast).
@@ -40,9 +40,9 @@ Mit der Leiste über dem Text gestaltest du die Nachricht wie in einem Mailprogr
 ## So gehst du vor
 ### Eine Nachricht veröffentlichen
 1. Gib unter **Neue Nachricht** einen **Titel** ein. Er steht im Banner, in der Benachrichtigung und als Betreff der Mail.
-2. Schreibe darunter unter **Inhalt** den Text und gestalte ihn mit der Werkzeugleiste. Weitere Blöcke fügst du mit **+ Block einfügen** (am Ende) oder **+ Block darunter einfügen** hinzu, z. B. einen **Countdown** (siehe unten), verschiebst sie mit **↑** und **↓** und nimmst sie mit **Entfernen** heraus.
+2. Schreibe darunter unter **Inhalt** den Text und gestalte ihn mit der Werkzeugleiste. Sie zeigt die häufigen Werkzeuge (Fett, Kursiv, Unterstrichen, Textfarbe, Listen, Link, Bild, Rückgängig); hinter **⋯** findest du Schriftart, Größe, Durchgestrichen, Hintergrundfarbe, Formatierung entfernen, Ausrichtung, Einzug, Trennlinie und Tabelle. Weitere Blöcke fügst du mit **+ Block einfügen** (am Ende) oder **+ Block darunter einfügen** hinzu, z. B. einen **Countdown** (siehe unten), verschiebst sie mit **↑** und **↓** und nimmst sie mit **Entfernen** heraus.
 3. Willst du Dateien mitschicken, tippe unter **Anhänge** auf **Datei anhängen** und wähle eine oder mehrere Dateien. Erlaubt ist jede Art von Datei; mit **×** nimmst du eine wieder heraus.
-4. Wähle bei **Sichtbar für**, wer die Nachricht sieht:
+4. Im Abschnitt **Sichtbarkeit und Versand** wählst du bei **Sichtbar für**, wer die Nachricht sieht:
    - **Intern** (vorgegeben): {rolle.member} und alle mit dem internen Kalender (z. B. Anwärter).
    - **Öffentlich**: alle, auch Besucher ohne Anmeldung.
    - **Kompanie**: nur, wer das Brett liest und einer der ausgewählten {bereich.companies} zugeordnet ist. Setze darunter bei einer oder mehreren {bereich.companies} den Haken. Diese Auswahl gibt es nur, wenn die {kompanie.name} den Bereich {bereich.companies} nutzt und dort {bereich.companies} angelegt sind; wer zu welcher gehört, legt fest, wer {bereich.companies} verwaltet.

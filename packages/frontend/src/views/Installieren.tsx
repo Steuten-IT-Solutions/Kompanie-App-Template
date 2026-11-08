@@ -14,6 +14,7 @@ import {
   type Platform,
 } from '../install';
 import { shareLink } from '../share';
+import { promptAsk } from '../ask';
 
 /*
  * Schritt-für-Schritt-Anleitung „App aufs Handy holen“ – mit großen Bildern,
@@ -228,7 +229,7 @@ function CopyLink() {
       await navigator.clipboard.writeText(url);
       setCopied(true);
     } catch {
-      window.prompt('Adresse kopieren:', url);
+      await promptAsk('Zum Kopieren markieren:', url, { title: 'Adresse kopieren', okLabel: 'Fertig' });
     }
   }
   return (

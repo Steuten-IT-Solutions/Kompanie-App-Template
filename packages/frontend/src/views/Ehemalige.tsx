@@ -33,6 +33,7 @@ import {
   type MemberSort,
 } from '../memberSort';
 import { sources } from '../viewData';
+import { confirmAsk } from '../ask';
 
 const sec = brand.labels.sections;
 
@@ -237,7 +238,7 @@ function RetentionCard({ onChanged }: { onChanged: () => void }) {
           due > 0
             ? `Beim nächsten Lauf (spätestens in einem Tag) werden bei ${due} Ehemaligen die persönlichen Angaben endgültig gelöscht: ${names(preview.due)}. Das lässt sich nicht rückgängig machen. Speichern?`
             : `Bei Ehemaligen ${years} Jahre nach dem Ausscheiden die persönlichen Angaben endgültig löschen? Zurzeit ist niemand fällig. Speichern?`;
-        if (!window.confirm(question)) return;
+        if (!(await confirmAsk(question))) return;
       }
       setData(await api.setFormerRetention(data)); // auch in den Zwischenspeicher, neu geladen wird wie sonst
       setForm(null);
@@ -527,7 +528,7 @@ export function FormerPanel({
     const deleted = former?.personal_deleted
       ? ` Die persönlichen Angaben wurden nach Ablauf der Aufbewahrungsfrist gelöscht${loginDeleted ? ', auch Benutzername und E-Mail-Adresse' : ''}.`
       : '';
-    if (!former || !window.confirm(`${name} wieder aufnehmen (als ${levelLabel(former.previous_level)})?${deleted}`)) return;
+    if (!former || !(await confirmAsk(`${name} wieder aufnehmen (als ${levelLabel(former.previous_level)})?${deleted}`))) return;
     setBusy(true);
     try {
       await api.reactivate(id);

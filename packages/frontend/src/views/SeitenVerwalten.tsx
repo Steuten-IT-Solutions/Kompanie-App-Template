@@ -7,6 +7,7 @@ import { Empty, ErrorBox, lazyView, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { AudienceBadge } from './Seiten';
 import { blocksInput, draftsFrom, newBlock, type BlockDraft } from '../blocks/blockDrafts';
+import { confirmAsk } from '../ask';
 
 const BlocksEditor = lazyView(() => import('../blocks/BlocksEditor'));
 
@@ -120,8 +121,8 @@ function PageEditor({ id, onDone, onToast }: { id: number; onDone: (saved: boole
           <button
             className="btn btn-secondary"
             type="button"
-            onClick={() => {
-              if (!window.confirm('Neu laden? Deine Änderungen gehen dabei verloren.')) return;
+            onClick={async () => {
+              if (!(await confirmAsk('Neu laden? Deine Änderungen gehen dabei verloren.'))) return;
               setConflict(false);
               setFormError(null);
               setLoaded(null);
@@ -247,8 +248,8 @@ export function PageAdmin({ onToast }: { onToast: (msg: string) => void }) {
                     <button
                       className="btn btn-small btn-danger"
                       disabled={busy}
-                      onClick={() =>
-                        window.confirm(`Seite „${p.title}“ samt ihren Bildern löschen?`) && run(() => api.deletePage(p.id), 'Gelöscht')
+                      onClick={async () =>
+                        (await confirmAsk(`Seite „${p.title}“ samt ihren Bildern löschen?`)) && run(() => api.deletePage(p.id), 'Gelöscht')
                       }
                     >
                       Löschen

@@ -22,6 +22,7 @@ import {
 } from '../navigation';
 import { targetLabels } from '../navLabels';
 import { ErrorBox, Loading, useAsync } from '../ui';
+import { confirmAsk } from '../ask';
 
 /** Bereiche der App, ohne die ein Punkt der Navigation für niemanden erscheint. */
 const FEATURES: Record<FixedTarget, Feature[]> = {
@@ -265,8 +266,8 @@ function Editor({
           type="button"
           className="btn btn-block btn-secondary"
           disabled={busy}
-          onClick={() => {
-            if (window.confirm('Die eigene Navigation wird gelöscht. Danach gilt wieder die Standardnavigation.')) void save(null);
+          onClick={async () => {
+            if (await confirmAsk('Die eigene Navigation wird gelöscht. Danach gilt wieder die Standardnavigation.')) void save(null);
           }}
         >
           Standardnavigation wiederherstellen

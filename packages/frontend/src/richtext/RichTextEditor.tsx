@@ -18,6 +18,7 @@ import { api, type RichImageLimits } from '../api';
 import { formatBytes } from '../format';
 import { Indent } from './indent';
 import { cleanPastedHtml, isOfficeHtml, rtfImages } from './wordPaste';
+import { alertAsk, promptAsk } from '../ask';
 
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 /** Anfangsbreite eingefügter Bilder (nur die Anzeige; gespeichert wird das Bild mit höchstens 2048 Pixeln an der längeren Kante, die Breite ist änderbar). */
@@ -128,9 +129,10 @@ function Button({
 function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() => void) | null; signature?: SignatureAction }) {
   const style = editor.getAttributes('textStyle') as { fontFamily?: string; fontSize?: string; color?: string; backgroundColor?: string };
   const inTable = editor.isActive('table');
-  const setLink = () => {
+  const [more, setMore] = useState(false);
+  const setLink = async () => {
     const current = (editor.getAttributes('link').href as string | undefined) ?? '';
-    const input = window.prompt('Adresse des Links (https://…, E-Mail-Adresse oder Telefonnummer). Leer entfernt den Link.', current);
+    const input = await promptAsk('Adresse des Links (https://…, E-Mail-Adresse oder Telefonnummer). Leer entfernt den Link.', current);
     if (input === null) return;
     if (input.trim() === '') {
       editor.chain().focus().extendMarkRange('link').unsetLink().run();
@@ -138,7 +140,7 @@ function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() 
     }
     const href = normalizeLink(input);
     if (href === null) {
-      window.alert('Erlaubt sind Adressen mit https://, E-Mail-Adressen und Telefonnummern.');
+      await alertAsk('Erlaubt sind Adressen mit https://, E-Mail-Adressen und Telefonnummern.');
       return;
     }
     if (editor.state.selection.empty && !editor.isActive('link')) {
@@ -154,37 +156,6 @@ function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() 
   return (
     <div className="rich-toolbar" role="toolbar" aria-label="Formatierung">
       <div className="rich-group">
-        <select
-          className="rich-select"
-          aria-label="Schriftart"
-          value={FONTS.some(([v]) => v === style.fontFamily) ? style.fontFamily : ''}
-          onChange={(e) =>
-            e.target.value ? editor.chain().focus().setFontFamily(e.target.value).run() : editor.chain().focus().unsetFontFamily().run()
-          }
-        >
-          {FONTS.map(([v, l]) => (
-            <option key={l} value={v}>
-              {l}
-            </option>
-          ))}
-        </select>
-        <select
-          className="rich-select rich-size"
-          aria-label="Schriftgröße"
-          value={SIZES.includes(style.fontSize ?? '') ? style.fontSize : ''}
-          onChange={(e) =>
-            e.target.value ? editor.chain().focus().setFontSize(e.target.value).run() : editor.chain().focus().unsetFontSize().run()
-          }
-        >
-          <option value="">Größe</option>
-          {SIZES.map((s) => (
-            <option key={s} value={s}>
-              {s.replace('pt', '')}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="rich-group">
         <Button editor={editor} label="Fett" active={editor.isActive('bold')} onClick={(e) => e.chain().focus().toggleBold().run()}>
           <b>F</b>
         </Button>
@@ -199,14 +170,6 @@ function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() 
         >
           <u>U</u>
         </Button>
-        <Button
-          editor={editor}
-          label="Durchgestrichen"
-          active={editor.isActive('strike')}
-          onClick={(e) => e.chain().focus().toggleStrike().run()}
-        >
-          <s>S</s>
-        </Button>
         <label className="rich-tool rich-color" title="Textfarbe">
           <span aria-hidden="true" style={{ borderBottomColor: style.color ?? 'currentColor' }}>
             A
@@ -218,40 +181,8 @@ function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() 
             onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
           />
         </label>
-        <label className="rich-tool rich-color" title="Hintergrundfarbe (markieren)">
-          <span aria-hidden="true" className="rich-highlight" style={{ backgroundColor: style.backgroundColor ?? 'transparent' }}>
-            ab
-          </span>
-          <input
-            type="color"
-            aria-label="Hintergrundfarbe"
-            value={toHex(style.backgroundColor) ?? '#ffff00'}
-            onChange={(e) => editor.chain().focus().setBackgroundColor(e.target.value).run()}
-          />
-        </label>
-        <Button editor={editor} label="Formatierung entfernen" onClick={(e) => e.chain().focus().unsetAllMarks().unsetTextAlign().run()}>
-          ⌫
-        </Button>
       </div>
       <div className="rich-group">
-        {(
-          [
-            ['left', 'Linksbündig', '⇤'],
-            ['center', 'Zentriert', '↔'],
-            ['right', 'Rechtsbündig', '⇥'],
-            ['justify', 'Blocksatz', '≡'],
-          ] as const
-        ).map(([align, label, icon]) => (
-          <Button
-            key={align}
-            editor={editor}
-            label={label}
-            active={editor.isActive({ textAlign: align })}
-            onClick={(e) => e.chain().focus().setTextAlign(align).run()}
-          >
-            {icon}
-          </Button>
-        ))}
         <Button
           editor={editor}
           label="Aufzählung"
@@ -268,14 +199,6 @@ function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() 
         >
           1.
         </Button>
-        <Button editor={editor} label="Einzug verkleinern" onClick={(e) => e.chain().focus().outdent().run()}>
-          ⇠
-        </Button>
-        <Button editor={editor} label="Einzug vergrößern" onClick={(e) => e.chain().focus().indent().run()}>
-          ⇢
-        </Button>
-      </div>
-      <div className="rich-group">
         <Button editor={editor} label="Link" active={editor.isActive('link')} onClick={setLink}>
           🔗
         </Button>
@@ -283,35 +206,6 @@ function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() 
           <Button editor={editor} label="Bild einfügen" onClick={onImage}>
             🖼
           </Button>
-        )}
-        <Button editor={editor} label="Trennlinie" onClick={(e) => e.chain().focus().setHorizontalRule().run()}>
-          ―
-        </Button>
-        <Button
-          editor={editor}
-          label="Tabelle einfügen"
-          onClick={(e) => e.chain().focus().insertTable({ rows: 2, cols: 2, withHeaderRow: false }).run()}
-        >
-          ▦
-        </Button>
-        {inTable && (
-          <>
-            <Button editor={editor} label="Zeile darunter einfügen" onClick={(e) => e.chain().focus().addRowAfter().run()}>
-              +Z
-            </Button>
-            <Button editor={editor} label="Spalte rechts einfügen" onClick={(e) => e.chain().focus().addColumnAfter().run()}>
-              +S
-            </Button>
-            <Button editor={editor} label="Zeile löschen" onClick={(e) => e.chain().focus().deleteRow().run()}>
-              −Z
-            </Button>
-            <Button editor={editor} label="Spalte löschen" onClick={(e) => e.chain().focus().deleteColumn().run()}>
-              −S
-            </Button>
-            <Button editor={editor} label="Tabelle löschen" onClick={(e) => e.chain().focus().deleteTable().run()}>
-              ✕▦
-            </Button>
-          </>
         )}
       </div>
       <div className="rich-group">
@@ -321,7 +215,139 @@ function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() 
         <Button editor={editor} label="Wiederholen" disabled={!editor.can().redo()} onClick={(e) => e.chain().focus().redo().run()}>
           ↷
         </Button>
+        <button
+          type="button"
+          className={`rich-tool rich-more${more ? ' active' : ''}`}
+          aria-label="Weitere Werkzeuge"
+          title="Weitere Werkzeuge"
+          aria-expanded={more}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => setMore(!more)}
+        >
+          ⋯
+        </button>
       </div>
+      {/* Seltener gebraucht (Issue #347): hinter „⋯“, damit die Leiste auf dem Handy kurz bleibt */}
+      {more && (
+        <>
+          <div className="rich-group">
+            <select
+              className="rich-select"
+              aria-label="Schriftart"
+              value={FONTS.some(([v]) => v === style.fontFamily) ? style.fontFamily : ''}
+              onChange={(e) =>
+                e.target.value ? editor.chain().focus().setFontFamily(e.target.value).run() : editor.chain().focus().unsetFontFamily().run()
+              }
+            >
+              {FONTS.map(([v, l]) => (
+                <option key={l} value={v}>
+                  {l}
+                </option>
+              ))}
+            </select>
+            <select
+              className="rich-select rich-size"
+              aria-label="Schriftgröße"
+              value={SIZES.includes(style.fontSize ?? '') ? style.fontSize : ''}
+              onChange={(e) =>
+                e.target.value ? editor.chain().focus().setFontSize(e.target.value).run() : editor.chain().focus().unsetFontSize().run()
+              }
+            >
+              <option value="">Größe</option>
+              {SIZES.map((s) => (
+                <option key={s} value={s}>
+                  {s.replace('pt', '')}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="rich-group">
+            <Button
+              editor={editor}
+              label="Durchgestrichen"
+              active={editor.isActive('strike')}
+              onClick={(e) => e.chain().focus().toggleStrike().run()}
+            >
+              <s>S</s>
+            </Button>
+            <label className="rich-tool rich-color" title="Hintergrundfarbe (markieren)">
+              <span aria-hidden="true" className="rich-highlight" style={{ backgroundColor: style.backgroundColor ?? 'transparent' }}>
+                ab
+              </span>
+              <input
+                type="color"
+                aria-label="Hintergrundfarbe"
+                value={toHex(style.backgroundColor) ?? '#ffff00'}
+                onChange={(e) => editor.chain().focus().setBackgroundColor(e.target.value).run()}
+              />
+            </label>
+            <Button
+              editor={editor}
+              label="Formatierung entfernen"
+              onClick={(e) => e.chain().focus().unsetAllMarks().unsetTextAlign().run()}
+            >
+              ⌫
+            </Button>
+          </div>
+          <div className="rich-group">
+            {(
+              [
+                ['left', 'Linksbündig', '⇤'],
+                ['center', 'Zentriert', '↔'],
+                ['right', 'Rechtsbündig', '⇥'],
+                ['justify', 'Blocksatz', '≡'],
+              ] as const
+            ).map(([align, label, icon]) => (
+              <Button
+                key={align}
+                editor={editor}
+                label={label}
+                active={editor.isActive({ textAlign: align })}
+                onClick={(e) => e.chain().focus().setTextAlign(align).run()}
+              >
+                {icon}
+              </Button>
+            ))}
+            <Button editor={editor} label="Einzug verkleinern" onClick={(e) => e.chain().focus().outdent().run()}>
+              ⇠
+            </Button>
+            <Button editor={editor} label="Einzug vergrößern" onClick={(e) => e.chain().focus().indent().run()}>
+              ⇢
+            </Button>
+          </div>
+          <div className="rich-group">
+            <Button editor={editor} label="Trennlinie" onClick={(e) => e.chain().focus().setHorizontalRule().run()}>
+              ―
+            </Button>
+            <Button
+              editor={editor}
+              label="Tabelle einfügen"
+              onClick={(e) => e.chain().focus().insertTable({ rows: 2, cols: 2, withHeaderRow: false }).run()}
+            >
+              ▦
+            </Button>
+          </div>
+        </>
+      )}
+      {inTable && (
+        <div className="rich-group">
+          <Button editor={editor} label="Zeile darunter einfügen" onClick={(e) => e.chain().focus().addRowAfter().run()}>
+            +Z
+          </Button>
+          <Button editor={editor} label="Spalte rechts einfügen" onClick={(e) => e.chain().focus().addColumnAfter().run()}>
+            +S
+          </Button>
+          <Button editor={editor} label="Zeile löschen" onClick={(e) => e.chain().focus().deleteRow().run()}>
+            −Z
+          </Button>
+          <Button editor={editor} label="Spalte löschen" onClick={(e) => e.chain().focus().deleteColumn().run()}>
+            −S
+          </Button>
+          <Button editor={editor} label="Tabelle löschen" onClick={(e) => e.chain().focus().deleteTable().run()}>
+            ✕▦
+          </Button>
+        </div>
+      )}
       {signature &&
         (signature.html !== null ? (
           <button

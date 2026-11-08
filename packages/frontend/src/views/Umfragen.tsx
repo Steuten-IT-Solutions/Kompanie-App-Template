@@ -6,6 +6,7 @@ import brand from '../generated/brand';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { prefetchOnTap, sources } from '../viewData';
+import { confirmAsk } from '../ask';
 
 // Umfragen (Issue #4): #/umfragen (alle, auch beendete), #/umfragen/<id> (antworten, ändern, zurückziehen, Ergebnisse)
 // und #/umfragen/verwalten (anlegen, ändern, beenden, löschen; nur mit manage_polls). Laufende Umfragen stehen am
@@ -175,8 +176,8 @@ function AnswerForm({ poll, onChanged, onToast }: { poll: Poll; onChanged: (p: P
               className="btn btn-secondary"
               type="button"
               disabled={busy}
-              onClick={() =>
-                window.confirm('Antwort wirklich zurückziehen?') && run(() => api.withdrawVote(poll.id), 'Antwort zurückgezogen')
+              onClick={async () =>
+                (await confirmAsk('Antwort wirklich zurückziehen?')) && run(() => api.withdrawVote(poll.id), 'Antwort zurückgezogen')
               }
             >
               Zurückziehen
@@ -286,7 +287,7 @@ function PollForm({ poll, onSaved, onCancel }: { poll?: Poll; onSaved: (p: Poll,
     if (title.trim() === '') return setError('Bitte eine Frage eingeben.');
     if (type !== 'text' && options.filter((o) => o.trim() !== '').length < 2)
       return setError('Bitte mindestens zwei Antwortmöglichkeiten eingeben.');
-    if (!poll && !window.confirm('Umfrage jetzt veröffentlichen? Alle Mitglieder werden benachrichtigt.')) return;
+    if (!poll && !(await confirmAsk('Umfrage jetzt veröffentlichen? Alle Mitglieder werden benachrichtigt.'))) return;
     const data: PollInput = { title, description, ends_at: fromLocalInput(endsAt) };
     if (!locked) Object.assign(data, { type, anonymous, results, ...(type !== 'text' ? { options } : {}) });
     setBusy(true);
@@ -465,8 +466,8 @@ function ManagedPoll({ poll, onChanged, onToast }: { poll: Poll; onChanged: () =
             <button
               className="btn btn-secondary"
               disabled={busy}
-              onClick={() =>
-                window.confirm('Umfrage jetzt beenden? Danach kann niemand mehr antworten.') &&
+              onClick={async () =>
+                (await confirmAsk('Umfrage jetzt beenden? Danach kann niemand mehr antworten.')) &&
                 run(() => api.closePoll(poll.id), 'Umfrage beendet')
               }
             >
@@ -477,7 +478,9 @@ function ManagedPoll({ poll, onChanged, onToast }: { poll: Poll; onChanged: () =
         <button
           className="btn btn-danger"
           disabled={busy}
-          onClick={() => window.confirm('Umfrage mit allen Antworten löschen?') && run(() => api.deletePoll(poll.id), 'Umfrage gelöscht')}
+          onClick={async () =>
+            (await confirmAsk('Umfrage mit allen Antworten löschen?')) && run(() => api.deletePoll(poll.id), 'Umfrage gelöscht')
+          }
         >
           Löschen
         </button>

@@ -6,6 +6,7 @@ import { api, can, config, type Birthday, type ProfileVisibility } from './api';
 import { PROFILE_OPTIONS, profileChoice, profileHint, ProfileSelect } from './joinYear';
 import brand from './generated/brand';
 import { ErrorBox, useAsync } from './ui';
+import { confirmAsk } from './ask';
 
 export { birthdaysVisible } from './upcomingBirthdays';
 export { ownBirthday } from './viewData';
@@ -163,7 +164,7 @@ export function OwnBirthdayCard({ onToast }: { onToast: (msg: string) => void })
   }
 
   async function remove() {
-    if (!window.confirm('Deinen Geburtstag entfernen?')) return;
+    if (!(await confirmAsk('Deinen Geburtstag entfernen?'))) return;
     setBusy(true);
     try {
       await api.deleteMyBirthday();
@@ -291,8 +292,8 @@ export function MemberBirthday({
                   type="button"
                   className="btn btn-secondary"
                   disabled={busy}
-                  onClick={() =>
-                    window.confirm('Geburtstag entfernen?') &&
+                  onClick={async () =>
+                    (await confirmAsk('Geburtstag entfernen?')) &&
                     run(async () => {
                       await api.deleteMemberBirthday(id);
                       setValue(toBirthdayValue(null));
