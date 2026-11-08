@@ -1720,6 +1720,10 @@ test('Galerie: Knöpfe zum Herunterladen für ein Bild und das Album als ZIP, nu
 
     await page.goto(`/app/#/galerie/${albumId}`);
     const zipButton = page.getByRole('button', { name: 'Album herunterladen (1 Bild, ZIP)' });
+    // Runder Icon-Knopf neben dem Titel wie in der Großansicht: Anzahl nur im Namen und Tooltip, nicht als Text
+    await expect(zipButton).toHaveText('');
+    await expect(zipButton).toHaveAttribute('title', 'Album herunterladen (1 Bild, ZIP)');
+    await expect(page.locator('.album-head h2 + .album-download-btn svg')).toBeVisible();
     const [zip] = await Promise.all([page.waitForEvent('download'), zipButton.click()]);
     expect(zip.suggestedFilename()).toBe(`${title} 2026.zip`);
     const bytes = readFileSync((await zip.path())!);

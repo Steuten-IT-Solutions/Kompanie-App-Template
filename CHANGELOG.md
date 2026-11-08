@@ -74,6 +74,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Album herunterladen als kleiner Knopf**: In einem Album der Galerie steht statt des großen Knopfs *Album
+  herunterladen (… Bilder, ZIP)* jetzt rechts neben dem Titel ein runder Knopf mit Pfeil nach unten, wie beim
+  Herunterladen eines einzelnen Bildes. Die Anzahl der Bilder und Videos zeigt er beim Darüberfahren mit der Maus;
+  während des Ladens steht darunter „Lädt … von …“ mit *Abbrechen*.
 - **Einstellungen neu geordnet**: Die Übersicht zeigt Kacheln in Gruppen (App, Mitglieder und Zugang,
   Benachrichtigungen, Verbindungen, Termine und Kalender, Betrieb) statt einer langen Liste. *Zugang beantragen* steht
   jetzt als Abschnitt unter *Rollen*, *Geburtstage* unter *Kalender*, zusammen mit der Benachrichtigung am Geburtstag
@@ -94,10 +98,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   eine große Eingabe, *Sichtbar für*, *Sichtbar bis* und die Versandwege stehen im Abschnitt *Sichtbarkeit und
   Versand*. Die Werkzeugleiste des Texteditors (auch bei Neuigkeiten, eigenen Seiten und E-Mails) zeigt nur die
   häufigen Werkzeuge; Schriftart, Größe, Ausrichtung, Einzug, Trennlinie, Tabelle und Weiteres liegen hinter **⋯**.
-- **Gleichmäßigere Abstände**: Karten am Brett und in den Umfragen haben einen Innenrand, Erklärtexte kleben nicht mehr an der ersten Karte darunter (z. B. bei Dienstgraden,
-  Navigation und Rollen), Umfragen stehen mit Abstand untereinander, unter *Umfragen verwalten* haben die Karten
-  einen Innenrand, beim Anlegen mehrerer Mitglieder stehen die Felder je Person mit Abstand in einem Rahmen, und die
-  Knöpfe *Ansehen* und *Bearbeiten* der Rollen stehen auf dem Handy nebeneinander.
+- **Gleichmäßigere Abstände**: Erklärtexte kleben nicht mehr an der ersten Karte darunter (z. B. bei Dienstgraden,
+  Navigation und Rollen), Umfragen stehen mit Abstand untereinander, Karten am Brett, in den Umfragen und unter
+  *Umfragen verwalten* haben einen Innenrand, beim Anlegen mehrerer Mitglieder stehen die Felder je Person mit Abstand
+  in einem Rahmen, und die Knöpfe *Ansehen* und *Bearbeiten* der Rollen stehen auf dem Handy nebeneinander.
 - **Rückfragen im Fenster der App**: Fragen wie „Wirklich löschen?“, Eingaben (z. B. Grund beim Ablehnen eines
   Bildes, Adresse eines Links) und Hinweise erscheinen jetzt in einem eigenen Fenster der App statt im Fenster des
   Browsers. Es sieht auf jedem Gerät gleich aus; Löschen und Entfernen steht auf einem roten Knopf. Hinter einem Fenster ist die Seite
