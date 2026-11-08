@@ -5221,6 +5221,40 @@ test('Schwarzes Brett: öffentliche Nachricht auch ohne Anmeldung, interne nicht
   await admin.close();
 });
 
+test('Schwarzes Brett: Nachricht nur für ausgewählte Personen (Einzeln)', async ({ page }) => {
+  const title = `Nur für dich ${Date.now().toString(36)}`;
+  const dialogs: string[] = [];
+  page.on('dialog', (d) => {
+    dialogs.push(d.message());
+    void d.accept();
+  });
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/brett');
+  const form = page.locator('.board-form');
+  await form.getByLabel('Titel').fill(title);
+  await form.getByLabel('Text der Nachricht').fill('Persönliche Nachricht.');
+  await form.getByLabel('Sichtbar für').selectOption('person');
+  const picker = form.locator('.board-targets-person');
+  await expect(picker).toBeVisible();
+  // Ohne Auswahl: Hinweis statt Veröffentlichen
+  await form.getByRole('button', { name: 'Veröffentlichen' }).click();
+  await expect(form.locator('.form-error')).toHaveText('Bitte mindestens eine Person auswählen.');
+  const first = picker.locator('label.toggle').first();
+  const name = (await first.innerText()).trim();
+  await first.getByRole('checkbox').check();
+  await expect(picker.locator('legend')).toContainText('1 ausgewählt');
+  const posted = page.waitForResponse((r) => r.url().includes('/board') && r.request().method() === 'POST');
+  await form.getByRole('button', { name: 'Veröffentlichen' }).click();
+  expect((await posted).status()).toBe(201);
+  expect(dialogs.at(-1)).toContain(`Sichtbar für: nur ${name}`);
+  const card = page.locator('.board-card', { hasText: title });
+  await expect(card.locator('.board-audience-person')).toHaveText(`nur für ${name}`);
+
+  // Aufräumen
+  await card.getByRole('button', { name: 'Löschen' }).click();
+  await expect(page.locator('.board-card', { hasText: title })).toHaveCount(0);
+});
+
 test('Schwarzes Brett: Verlauf mit vorher/nachher, gelöschte Nachrichten mit Konto und Zeitpunkt', async ({ page }) => {
   page.on('dialog', (d) => d.accept());
   const title = `Verlauf ${Date.now().toString(36)}`;

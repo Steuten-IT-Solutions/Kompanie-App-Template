@@ -3,6 +3,7 @@ import {
   api,
   config,
   type BoardAudience,
+  type BoardAudiences,
   type BoardEnded,
   type BoardHistory,
   type BoardMailInfo,
@@ -26,14 +27,19 @@ import { Empty, ErrorBox, Loading } from '../ui';
 /** Entwurf der neuen Nachricht (auf diesem Gerät): geht beim Sprung zur Signatur-Einrichtung nicht verloren. */
 const DRAFT_KEY = 'kompanie-board-draft';
 const DAY = 24 * 60 * 60 * 1000;
+const AUDIENCES: BoardAudience[] = ['members', 'public', 'company', 'person'];
+const targeted = (audience?: BoardAudience): boolean => audience === 'company' || audience === 'person';
+const sameIds = (a: number[], b: number[]): boolean => [...a].sort((x, y) => x - y).join() === [...b].sort((x, y) => x - y).join();
 
 interface Draft {
   title: string;
   text: string;
   /** datetime-local (Ortszeit); leer = jetzt + 24 Stunden beim Öffnen */
   expires: string;
-  /** intern (members, Standard) oder öffentlich (public) */
+  /** intern (members, Standard), öffentlich (public), Kompanie (company) oder einzeln (person) */
   audience: BoardAudience;
+  /** bei Kompanie und einzeln: ausgewählte Kompanien bzw. Personen */
+  audience_ids: number[];
   push: boolean;
   mail: boolean;
   /** schon hochgeladene Anhänge (Entwürfe auf dem Server, 7 Tage gültig) */
@@ -46,7 +52,8 @@ function readDraft(): Draft | null {
     return raw && typeof raw === 'object' && typeof raw.title === 'string' && typeof raw.text === 'string'
       ? ({
           ...raw,
-          audience: raw.audience === 'public' ? 'public' : 'members',
+          audience: AUDIENCES.includes(raw.audience) ? raw.audience : 'members',
+          audience_ids: Array.isArray(raw.audience_ids) ? raw.audience_ids.filter((id: unknown) => typeof id === 'number') : [],
           attachments: Array.isArray(raw.attachments) ? raw.attachments : [],
         } as Draft)
       : null;
@@ -95,29 +102,149 @@ function ExpiresField({ value, onChange }: { value: string; onChange: (v: string
   );
 }
 
-/** Wer die Nachricht sieht: intern (wer das Brett liest) oder öffentlich (alle, auch ohne Anmeldung). */
-function AudienceField({ value, onChange }: { value: BoardAudience; onChange: (v: BoardAudience) => void }) {
+/** Kompanien und Personen zur Auswahl (einmal je Seitenaufruf geladen; nur mit post_board). */
+let audiencesRequest: Promise<BoardAudiences> | null = null;
+function useAudiences(): BoardAudiences | null {
+  const [data, setData] = useState<BoardAudiences | null>(null);
+  useEffect(() => {
+    audiencesRequest ??= api.boardAudiences().catch((err: unknown) => {
+      audiencesRequest = null;
+      throw err;
+    });
+    audiencesRequest.then(setData, () => setData({ companies: [], people: [] }));
+  }, []);
+  return data;
+}
+
+/** Ab so vielen Einträgen gibt es ein Suchfeld über der Auswahl. */
+const SEARCH_FROM = 8;
+
+/** Häkchen für Kompanien bzw. Personen (mindestens eine). */
+function TargetPicker(props: {
+  kind: 'company' | 'person';
+  items: { id: number; name: string }[];
+  ids: number[];
+  onChange: (ids: number[]) => void;
+}) {
+  const { kind, items, ids, onChange } = props;
+  const [search, setSearch] = useState('');
+  const term = search.trim().toLocaleLowerCase('de');
+  const shown = term === '' ? items : items.filter((i) => ids.includes(i.id) || i.name.toLocaleLowerCase('de').includes(term));
+  const label = kind === 'company' ? brand.labels.sections.companies : 'Personen';
   return (
-    <label className="field">
-      <span>Sichtbar für</span>
-      <select className="board-audience" value={value} onChange={(e) => onChange(e.target.value === 'public' ? 'public' : 'members')}>
-        <option value="members">Intern: Mitglieder und alle mit dem internen Kalender</option>
-        <option value="public">Öffentlich: alle, auch ohne Anmeldung</option>
-      </select>
-    </label>
+    <fieldset className={`field board-targets board-targets-${kind}`}>
+      <legend>
+        {label} auswählen{ids.length > 0 ? ` (${ids.length} ausgewählt)` : ''}
+      </legend>
+      {items.length >= SEARCH_FROM && (
+        <input
+          type="search"
+          className="board-targets-search"
+          placeholder="Suchen …"
+          aria-label={`${label} suchen`}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      )}
+      <div className="board-targets-list">
+        {shown.map((i) => (
+          <label key={i.id} className="toggle">
+            <input
+              type="checkbox"
+              checked={ids.includes(i.id)}
+              onChange={(e) => onChange(e.target.checked ? [...ids, i.id] : ids.filter((id) => id !== i.id))}
+            />
+            <span>{i.name}</span>
+          </label>
+        ))}
+        {shown.length === 0 && <p className="muted small">Keine Treffer.</p>}
+      </div>
+    </fieldset>
   );
 }
 
-/** Kennzeichen „öffentlich“ an einer Nachricht (interne tragen keins). */
-export function AudienceBadge({ audience }: { audience?: BoardAudience }) {
-  return audience === 'public' ? <span className="badge badge-open board-public">öffentlich</span> : null;
+/**
+ * Wer die Nachricht sieht: intern (wer das Brett liest), öffentlich (alle, auch ohne Anmeldung), Kompanie (wer das Brett
+ * liest und einer der ausgewählten Kompanien angehört) oder einzeln (nur die ausgewählten Personen). „Kompanie“ gibt es
+ * nur, wenn der Bereich Kompanien an ist und Kompanien angelegt sind.
+ */
+function AudienceField(props: { value: BoardAudience; ids: number[]; onChange: (audience: BoardAudience, ids: number[]) => void }) {
+  const { value, ids, onChange } = props;
+  const options = useAudiences();
+  const companies = options?.companies ?? [];
+  const people = options?.people ?? [];
+  return (
+    <>
+      <label className="field">
+        <span>Sichtbar für</span>
+        <select
+          className="board-audience"
+          value={value}
+          onChange={(e) => {
+            const next = AUDIENCES.find((a) => a === e.target.value) ?? 'members';
+            onChange(next, next === value ? ids : []);
+          }}
+        >
+          <option value="members">Intern: Mitglieder und alle mit dem internen Kalender</option>
+          <option value="public">Öffentlich: alle, auch ohne Anmeldung</option>
+          {(companies.length > 0 || value === 'company') && (
+            <option value="company">Kompanie: nur Mitglieder ausgewählter {brand.labels.sections.companies}</option>
+          )}
+          {(people.length > 0 || value === 'person') && <option value="person">Einzeln: nur ausgewählte Personen</option>}
+        </select>
+      </label>
+      {value === 'company' && <TargetPicker kind="company" items={companies} ids={ids} onChange={(next) => onChange(value, next)} />}
+      {value === 'person' && <TargetPicker kind="person" items={people} ids={ids} onChange={(next) => onChange(value, next)} />}
+    </>
+  );
+}
+
+/** Kennzeichen an einer Nachricht: öffentlich, für welche Kompanien, einzeln (interne tragen keins). */
+export function AudienceBadge({ item }: { item: { audience?: BoardAudience; audience_names?: string[] } }) {
+  const names = item.audience_names ?? [];
+  if (item.audience === 'public') return <span className="badge badge-open board-public">öffentlich</span>;
+  if (item.audience === 'company') {
+    return (
+      <span className="badge badge-open board-audience-company">
+        nur {names.length > 0 ? names.join(', ') : brand.labels.sections.companies}
+      </span>
+    );
+  }
+  if (item.audience === 'person') {
+    return (
+      <span className="badge badge-open board-audience-person">{names.length > 0 ? `nur für ${names.join(', ')}` : 'nur für dich'}</span>
+    );
+  }
+  return null;
+}
+
+/** „Sichtbar für“ in der Bestätigung: mit den Namen der Auswahl. */
+function audienceText(audience: BoardAudience, ids: number[], options: BoardAudiences | null): string {
+  if (audience === 'public') return 'alle, auch ohne Anmeldung (öffentlich)';
+  if (audience === 'members') return 'intern';
+  const items: { id: number; name: string }[] = (audience === 'company' ? options?.companies : options?.people) ?? [];
+  const names = ids.map((id) => items.find((i) => i.id === id)?.name ?? `#${id}`).join(', ');
+  return audience === 'company' ? `nur ${brand.labels.sections.companies} ${names}` : `nur ${names}`;
 }
 
 /** Wer beim Veröffentlichen eine Benachrichtigung bekommt. */
 function pushAudienceText(audience: BoardAudience): string {
+  if (audience === 'company') return 'die Mitglieder der ausgewählten Kompanien, die das Brett lesen';
+  if (audience === 'person') return 'die ausgewählten Personen';
   return audience === 'public'
     ? 'alle Mitglieder, alle mit dem internen Kalender (z. B. Anwärter) und alle anderen Geräte, die öffentliche Nachrichten vom Brett eingeschaltet haben (auch ohne Anmeldung)'
     : 'alle Mitglieder und alle mit dem internen Kalender (z. B. Anwärter)';
+}
+
+/** Verlauf: members, public oder „company: Namen“ bzw. „person: Namen“ (BoardService::audienceText). */
+function audienceRevisionText(value: string): string {
+  if (value === 'public') return 'öffentlich';
+  if (value === 'members') return 'intern';
+  const [kind, ...rest] = value.split(':');
+  const names = rest.join(':').trim();
+  if (kind === 'company') return `Kompanie: ${names || '–'}`;
+  if (kind === 'person') return `einzeln: ${names || '–'}`;
+  return value;
 }
 
 const capitalize = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
@@ -136,16 +263,27 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
     const saved = readDraft();
     return saved
       ? { ...saved, expires: saved.expires || defaultExpires() }
-      : { title: '', text: '', expires: defaultExpires(), audience: 'members', push: true, mail: true, attachments: [] };
+      : { title: '', text: '', expires: defaultExpires(), audience: 'members', audience_ids: [], push: true, mail: true, attachments: [] };
   });
+  const options = useAudiences();
   const [editorKey, setEditorKey] = useState(0);
   const [mailInfo, setMailInfo] = useState<BoardMailInfo | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Zahl der Empfänger der Mail passt zur Auswahl „Sichtbar für“.
+  const idsKey = draft.audience_ids.join();
   useEffect(() => {
-    api.boardMailInfo().then(setMailInfo, () => setMailInfo(null));
-  }, []);
+    let current = true;
+    api.boardMailInfo(draft.audience, draft.audience_ids).then(
+      (info) => current && setMailInfo(info),
+      () => current && setMailInfo(null),
+    );
+    return () => {
+      current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.audience, idsKey]);
 
   const update = (changes: Partial<Draft>) => {
     setDraft((d) => {
@@ -163,10 +301,12 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
     if (draft.text.trim() === '') return setError('Bitte einen Text eingeben.');
     const expires = fromLocalInput(draft.expires);
     if (!expires || Date.parse(expires) <= Date.now()) return setError('„Sichtbar bis“ muss in der Zukunft liegen.');
+    if (draft.audience === 'company' && draft.audience_ids.length === 0) return setError('Bitte mindestens eine Kompanie auswählen.');
+    if (draft.audience === 'person' && draft.audience_ids.length === 0) return setError('Bitte mindestens eine Person auswählen.');
     const lines = [
       `Nachricht „${draft.title.trim()}“ jetzt veröffentlichen?`,
       '',
-      `Sichtbar für: ${draft.audience === 'public' ? 'alle, auch ohne Anmeldung (öffentlich)' : 'intern'}`,
+      `Sichtbar für: ${audienceText(draft.audience, draft.audience_ids, options)}`,
       `Sichtbar bis: ${formatUntil(expires)}`,
       `Benachrichtigung: ${draft.push ? `an ${pushAudienceText(draft.audience)}` : 'keine'}`,
       `E-Mail: ${mailOn ? `an ${mailInfo?.recipients ?? 0} Empfänger` : 'keine'}`,
@@ -180,12 +320,22 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
         text: draft.text,
         expires_at: expires,
         audience: draft.audience,
+        ...(targeted(draft.audience) ? { audience_ids: draft.audience_ids } : {}),
         push: draft.push,
         mail: mailOn,
         attachments: draft.attachments.map((a) => a.uid),
       });
       saveDraft(null);
-      setDraft({ title: '', text: '', expires: defaultExpires(), audience: 'members', push: true, mail: true, attachments: [] });
+      setDraft({
+        title: '',
+        text: '',
+        expires: defaultExpires(),
+        audience: 'members',
+        audience_ids: [],
+        push: true,
+        mail: true,
+        attachments: [],
+      });
       setEditorKey((k) => k + 1);
       onToast('Nachricht veröffentlicht');
       await refreshBoard();
@@ -220,7 +370,11 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
         onAdd={(a) => setDraft((d) => withSaved({ ...d, attachments: [...d.attachments, a] }))}
         onRemove={(uid) => setDraft((d) => withSaved({ ...d, attachments: d.attachments.filter((a) => a.uid !== uid) }))}
       />
-      <AudienceField value={draft.audience} onChange={(audience) => update({ audience })} />
+      <AudienceField
+        value={draft.audience}
+        ids={draft.audience_ids}
+        onChange={(audience, audience_ids) => update({ audience, audience_ids })}
+      />
       <ExpiresField value={draft.expires} onChange={(expires) => update({ expires })} />
       <label className="toggle">
         <input type="checkbox" className="board-push" checked={draft.push} onChange={(e) => update({ push: e.target.checked })} />
@@ -240,6 +394,8 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
       <p className="muted small">
         {draft.audience === 'public' &&
           'Öffentlich: Alle sehen die Nachricht samt Anhängen und deinem Namen, auch ohne Anmeldung. Die E-Mail geht trotzdem nur an Mitglieder und alle mit dem internen Kalender. '}
+        {targeted(draft.audience) &&
+          'Nur die Auswahl sieht die Nachricht (und alle, die ans Brett schreiben dürfen); Benachrichtigung und E-Mail gehen nur an sie. '}
         {draft.push
           ? `${capitalize(pushAudienceText(draft.audience))} bekommen sofort eine Benachrichtigung mit dem Titel.`
           : 'Ohne Benachrichtigung: Die Nachricht erscheint nur in der App.'}{' '}
@@ -278,7 +434,7 @@ function History({ id }: { id: number }) {
     if (v === null || v === undefined) return null;
     if (r.action === 'expires') return <span>{formatUntil(String(v))}</span>;
     if (r.action === 'title') return <span>{String(v)}</span>;
-    if (r.action === 'audience') return <span>{v === 'public' ? 'öffentlich' : 'intern'}</span>;
+    if (r.action === 'audience') return <span>{audienceRevisionText(String(v))}</span>;
     if (r.action === 'content') return <RichTextView html={String(v)} className="board-rev-content" />;
     if (r.action === 'attachments') return <span>{Array.isArray(v) && v.length > 0 ? v.join(', ') : 'keine'}</span>;
     return null;
@@ -338,6 +494,7 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
     text: string;
     expires: string;
     audience: BoardAudience;
+    audience_ids: number[];
     attachments: Attachment[];
   } | null>(null);
   const [history, setHistory] = useState(false);
@@ -363,9 +520,27 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
 
   function save() {
     if (!edit) return;
-    const changes: { title?: string; text?: string; expires_at?: string | null; audience?: BoardAudience; attachments?: string[] } = {};
+    const changes: {
+      title?: string;
+      text?: string;
+      expires_at?: string | null;
+      audience?: BoardAudience;
+      audience_ids?: number[];
+      attachments?: string[];
+    } = {};
     if (edit.title !== item.title) changes.title = edit.title;
-    if (edit.audience !== (item.audience ?? 'members')) changes.audience = edit.audience;
+    if (targeted(edit.audience) && edit.audience_ids.length === 0) {
+      return setError(
+        edit.audience === 'company' ? 'Bitte mindestens eine Kompanie auswählen.' : 'Bitte mindestens eine Person auswählen.',
+      );
+    }
+    if (
+      edit.audience !== (item.audience ?? 'members') ||
+      (targeted(edit.audience) && !sameIds(edit.audience_ids, item.audience_ids ?? []))
+    ) {
+      changes.audience = edit.audience;
+      if (targeted(edit.audience)) changes.audience_ids = edit.audience_ids;
+    }
     if (edit.text !== item.text) changes.text = edit.text;
     const uids = edit.attachments.map((a) => a.uid);
     if (uids.join() !== (item.attachments ?? []).map((a) => a.uid).join()) changes.attachments = uids;
@@ -377,7 +552,7 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
 
   return (
     <article className={`card board-card ${focused ? 'focused' : ''}`} data-focus-id={item.id}>
-      <BoardMeta item={item} /> {(canPost || boardVisible()) && <AudienceBadge audience={item.audience} />}
+      <BoardMeta item={item} /> {(canPost || boardVisible()) && <AudienceBadge item={item} />}
       {edit === null ? (
         <>
           <h3 className="board-title">{item.title}</h3>
@@ -410,7 +585,11 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
             onAdd={(a) => setEdit((d) => (d ? { ...d, attachments: [...d.attachments, a] } : d))}
             onRemove={(uid) => setEdit((d) => (d ? { ...d, attachments: d.attachments.filter((a) => a.uid !== uid) } : d))}
           />
-          <AudienceField value={edit.audience} onChange={(audience) => setEdit({ ...edit, audience })} />
+          <AudienceField
+            value={edit.audience}
+            ids={edit.audience_ids}
+            onChange={(audience, audience_ids) => setEdit({ ...edit, audience, audience_ids })}
+          />
           <ExpiresField value={edit.expires} onChange={(expires) => setEdit({ ...edit, expires })} />
         </div>
       )}
@@ -434,6 +613,7 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
                   text: item.text,
                   expires: toLocalInput(item.expires_at),
                   audience: item.audience ?? 'members',
+                  audience_ids: item.audience_ids ?? [],
                   attachments: item.attachments ?? [],
                 })
               }
@@ -456,8 +636,8 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
         ) : (
           <>
             <p className="muted small">
-              Ändern verschickt keine neue Benachrichtigung und keine neue E-Mail, auch nicht, wenn die Nachricht öffentlich wird. Alle
-              Änderungen stehen im Verlauf.
+              Ändern verschickt keine neue Benachrichtigung und keine neue E-Mail, auch nicht, wenn sich ändert, wer die Nachricht sieht.
+              Alle Änderungen stehen im Verlauf.
             </p>
             <div className="button-row">
               <button className="btn" disabled={busy || edit.title.trim() === '' || edit.text.trim() === ''} onClick={save}>
@@ -503,7 +683,7 @@ function Ended() {
             ) : (
               data.items.map((m) => (
                 <article key={m.id} className="card board-card board-ended-card">
-                  <AudienceBadge audience={m.audience} />
+                  <AudienceBadge item={m} />
                   <span className="board-meta">
                     {m.author_name ?? 'Unbekannt'} · {formatShortTime(m.created_at)} ·{' '}
                     {m.deleted_at

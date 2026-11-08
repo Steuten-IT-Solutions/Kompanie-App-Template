@@ -913,8 +913,8 @@ final class Api
                 return ['deleted' => true];
             }, 'documents', $denyRights),
 
-            // Schwarzes Brett (Issue #5): öffentliche Nachrichten lesen alle (auch ohne Anmeldung), interne view_board
-            // (BoardService::canRead); post_board schreibt, ändert und löscht (und liest daher auch); nur beim Schreiben
+            // Schwarzes Brett (Issue #5): öffentliche Nachrichten lesen alle (auch ohne Anmeldung), interne view_board,
+            // die für Kompanien oder Personen nur diese (BoardService::canRead); post_board schreibt, ändert und löscht (und liest daher auch); nur beim Schreiben
             // eine Benachrichtigung
             new Route('GET', '/board', $P, fn () => $a->board()->list($a->viewer()), 'board'),
             new Route('POST', '/board', Cap::PostBoard, function (Request $r) use ($a) {
@@ -949,8 +949,15 @@ final class Api
                 }
                 return Response::created($item);
             }, 'board', $denyRights),
+            // Auswahl „Kompanie“ und „Einzeln“ beim Schreiben: Kompanien und Personen, die das Brett lesen
+            new Route('GET', '/board/audiences', Cap::PostBoard, fn () => $a->board()->audiences(), 'board', $denyRights),
             // Haken „E-Mail senden“: eingerichtet? Wie viele Empfänger?
-            new Route('GET', '/board/mail', Cap::PostBoard, fn () => $a->boardMail()->info(), 'board', $denyRights),
+            // Mit ?audience=company|person&audience_ids=1,2 die Empfänger einer Nachricht nur für diese.
+            new Route('GET', '/board/mail', Cap::PostBoard, function (Request $r) use ($a) {
+                $audience = is_string($r->query['audience'] ?? null) ? $r->query['audience'] : BoardService::AUDIENCE_MEMBERS;
+                $ids = array_values(array_map('intval', array_filter(explode(',', is_string($r->query['audience_ids'] ?? null) ? $r->query['audience_ids'] : ''), 'ctype_digit')));
+                return $a->boardMail()->info($a->board()->readerIds(['audience' => $audience, 'audience_ids' => $ids]), $this->user()->id);
+            }, 'board', $denyRights),
             // Verlauf (Issue #172): abgelaufene und gelöschte Nachrichten der letzten 30 Tage, Verlauf einer Nachricht
             new Route('GET', '/board/history', Cap::PostBoard, fn () => $a->board()->ended(), 'board', $denyRights),
             new Route('GET', '/board/{id}/history', Cap::PostBoard, fn (Request $r) => $a->board()->history($r->id()), 'board', $denyRights),

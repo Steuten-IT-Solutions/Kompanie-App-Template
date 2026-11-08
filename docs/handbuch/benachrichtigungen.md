@@ -51,7 +51,7 @@ Für alle, die das {bereich.board} sonst nicht sehen (z. B. ohne Konto):
 - **{bereich.board}: öffentliche Nachrichten**: sobald jemand eine öffentliche Nachricht ans {bereich.board} schreibt (außer er schaltet die Benachrichtigung dabei ab).
 
 Für {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter):
-- **{bereich.board}: dringende Nachrichten**: sobald jemand eine Nachricht ans {bereich.board} schreibt, interne wie öffentliche (außer er schaltet die Benachrichtigung dabei ab).
+- **{bereich.board}: dringende Nachrichten**: sobald jemand eine Nachricht ans {bereich.board} schreibt, interne wie öffentliche (außer er schaltet die Benachrichtigung dabei ab). Nachrichten nur für bestimmte {bereich.companies} oder Personen bekommst du nur, wenn sie für dich bestimmt sind.
 
 Nur für {rolle.member}:
 - **{bereich.polls}: neue Umfrage und Erinnerung**: bei jeder neuen Umfrage und 24 Stunden vor ihrem Ende, wenn du noch nicht geantwortet hast.

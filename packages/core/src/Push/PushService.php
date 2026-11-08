@@ -573,13 +573,19 @@ final class PushService
      * Schwarzes Brett (Issue #5): an alle Geräte der Empfänger mit dem Typ, außer denen des Verfassers. Dringend
      * (Urgency high) und nur so lange zustellbar, wie die Nachricht gilt, höchstens MAX_TTL (Issue #172).
      * Öffentliche Nachrichten ($public) zusätzlich an alle Geräte mit der Art board_public (Gäste und Konten ohne
-     * view_board); jedes Gerät bekommt die Nachricht höchstens einmal.
+     * view_board); jedes Gerät bekommt die Nachricht höchstens einmal. Mit $only (Nachricht für Kompanien oder Personen)
+     * nur an die Geräte dieser Konten, sofern sie das Brett lesen.
      *
      * @param Message $message
      * @param int $ttl Sekunden bis zum Ablauf der Nachricht (höchstens MAX_TTL)
+     * @param list<int>|null $only Konto-IDs (BoardService::readerIds) oder null ohne Einschränkung
      */
-    public function notifyBoard(array $message, int $authorId, int $ttl, bool $public = false): int
+    public function notifyBoard(array $message, int $authorId, int $ttl, bool $public = false, ?array $only = null): int
     {
+        if ($only !== null) {
+            $allowed = array_flip($only);
+            return $this->notifyAudience(self::TYPE_BOARD, $message, static fn (int $uid): bool => $uid !== $authorId && isset($allowed[$uid]), 'high', $ttl, self::MAX_TTL);
+        }
         if (!$public) {
             return $this->notifyAudience(self::TYPE_BOARD, $message, static fn (int $uid): bool => $uid !== $authorId, 'high', $ttl, self::MAX_TTL);
         }
