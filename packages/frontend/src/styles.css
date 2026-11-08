@@ -6313,3 +6313,28 @@ fieldset.block-source legend {
   display: grid;
   gap: 4px;
 }
+
+/* Blöcke „Knopf mit Link“ und „Nächste Termine“ */
+.block-button {
+  margin: 12px 0;
+}
+.block-events h3 {
+  margin: 0 0 8px;
+}
+.block-events-list {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+}
+.block-events-list li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.block-events-list li:last-child {
+  border-bottom: 0;
+}
+.block-events-when {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--muted);
+}

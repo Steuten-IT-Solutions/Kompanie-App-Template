@@ -33,6 +33,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Blöcke am Schwarzen Brett**: Auch Nachrichten am Brett bestehen aus Blöcken, mit Countdown und *Für wen?* je
   Block; Blöcke *Nur Mitglieder* fehlen bei öffentlichen Nachrichten ohne Anmeldung. Die Mail enthält alle Blöcke, den
   Countdown als Satz; der Verlauf zeigt Blöcke ebenso.
+- **Neue Blöcke: Knopf mit Link und Nächste Termine**: Ein *Knopf mit Link* führt zu einer Webseite, einer
+  E-Mail-Adresse, einer Telefonnummer oder einer Seite der App. *Nächste Termine* zeigt die nächsten 1 bis 20 Termine
+  ab heute, immer aktuell. Beide gibt es auf eigenen Seiten, in den News und am Schwarzen Brett.
 - **Mitglieder ohne Zugang**: Unter *Mitglied anlegen* gibt es den Haken *Ohne Zugang (meldet sich noch nicht an)*.
   So tragt ihr Personen ein, die noch kein Konto haben, z. B. für Chroniken und Ämter. Sie sind gewöhnliche Mitglieder,
   lassen sich überall auswählen und tragen in der Mitgliederliste der Verwaltung die Marke *ohne Zugang*; ein

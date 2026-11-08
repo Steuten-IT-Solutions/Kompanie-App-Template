@@ -1,15 +1,88 @@
 import { Suspense, useEffect, useState, type ReactNode } from 'react';
 import { api, type BlockAudience, type PublicEvent } from '../api';
 import { Loading, lazyView } from '../ui';
-import { BLOCK_KINDS, moveBlock, newBlock, type BlockDraft, type BlockKind, type CountdownDraft } from './blockDrafts';
+import {
+  BLOCK_KINDS,
+  moveBlock,
+  newBlock,
+  type BlockDraft,
+  type BlockKind,
+  type ButtonDraft,
+  type CountdownDraft,
+  type EventsDraft,
+} from './blockDrafts';
 import Countdown from './Countdown';
 import { previewRange } from './countdown';
 
 const RichTextEditor = lazyView(() => import('../richtext/RichTextEditor'));
 
-/** Grenzen wie auf dem Server (CountdownBlock::TITLE_MAX, TEXT_MAX). */
+/** Grenzen wie auf dem Server (CountdownBlock::TITLE_MAX, TEXT_MAX, ButtonBlock::LABEL_MAX, EventsBlock::MAX). */
 const TITLE_MAX = 100;
 const TEXT_MAX = 200;
+const LABEL_MAX = 60;
+const EVENTS_MAX = 20;
+
+function ButtonFields({ block, onChange }: { block: ButtonDraft; onChange: (b: ButtonDraft) => void }) {
+  const set = (patch: Partial<ButtonDraft>) => onChange({ ...block, ...patch });
+  return (
+    <div className="block-button-fields">
+      <label className="field">
+        <span>Beschriftung</span>
+        <input
+          type="text"
+          maxLength={LABEL_MAX}
+          value={block.label}
+          placeholder="z. B. Jetzt anmelden"
+          onChange={(e) => set({ label: e.target.value })}
+          required
+        />
+      </label>
+      <label className="field">
+        <span>Ziel</span>
+        <input type="text" inputMode="url" value={block.url} onChange={(e) => set({ url: e.target.value })} required />
+        <span className="muted small">
+          Eine Adresse mit https://, eine E-Mail-Adresse mit mailto:, eine Telefonnummer mit tel: oder eine Seite der App wie #/termine.
+        </span>
+      </label>
+      <label className="field">
+        <span>Aussehen</span>
+        <select value={block.style} onChange={(e) => set({ style: e.target.value as ButtonDraft['style'] })}>
+          <option value="primary">Hervorgehoben</option>
+          <option value="secondary">Zurückhaltend</option>
+        </select>
+      </label>
+    </div>
+  );
+}
+
+function EventsFields({ block, onChange }: { block: EventsDraft; onChange: (b: EventsDraft) => void }) {
+  const set = (patch: Partial<EventsDraft>) => onChange({ ...block, ...patch });
+  return (
+    <div className="block-events-fields">
+      <label className="field">
+        <span>Überschrift (optional)</span>
+        <input
+          type="text"
+          maxLength={TITLE_MAX}
+          value={block.title}
+          placeholder="z. B. Unsere nächsten Termine"
+          onChange={(e) => set({ title: e.target.value })}
+        />
+      </label>
+      <label className="field">
+        <span>Wie viele Termine</span>
+        <input
+          type="number"
+          min={1}
+          max={EVENTS_MAX}
+          value={block.count}
+          onChange={(e) => set({ count: Math.max(1, Math.min(EVENTS_MAX, Number(e.target.value) || 1)) })}
+        />
+        <span className="muted small">Die App zeigt immer die nächsten Termine ab heute aus den Terminen.</span>
+      </label>
+    </div>
+  );
+}
 
 /** Auswahl „+ Block einfügen“ an einer Stelle der Liste. */
 function InsertBlock({ onInsert, label = '+ Block einfügen' }: { onInsert: (type: BlockKind) => void; label?: string }) {
@@ -250,6 +323,10 @@ export default function BlocksEditor({
               <Suspense fallback={<Loading shape="text" chunk />}>
                 <RichTextEditor value={b.html} onChange={(html) => update(i, { ...b, html })} label="Text" id={id} />
               </Suspense>
+            ) : b.type === 'button' ? (
+              <ButtonFields block={b} onChange={(c) => update(i, c)} />
+            ) : b.type === 'events' ? (
+              <EventsFields block={b} onChange={(c) => update(i, c)} />
             ) : (
               <CountdownFields block={b} onChange={(c) => update(i, c)} idPrefix={id} />
             )}

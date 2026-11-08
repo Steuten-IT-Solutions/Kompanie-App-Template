@@ -1,4 +1,5 @@
-import type { Block } from '../api';
+import type { Block, ButtonBlock, EventsBlock } from '../api';
+import { formatEventWhen } from '../format';
 import RichTextView from '../richtext/RichTextView';
 import Countdown from './Countdown';
 
@@ -20,6 +21,12 @@ export default function BlocksView({ blocks, manager, textClassName }: { blocks:
           case 'countdown':
             view = <Countdown block={b} />;
             break;
+          case 'button':
+            view = <LinkButton block={b} />;
+            break;
+          case 'events':
+            view = <NextEvents block={b} />;
+            break;
           default:
             view = manager ? <p className="muted small">Dieser Block wird von dieser Version der App nicht unterstützt.</p> : null;
         }
@@ -32,5 +39,46 @@ export default function BlocksView({ blocks, manager, textClassName }: { blocks:
         );
       })}
     </div>
+  );
+}
+
+/** Knopf mit Link: Seiten der App im selben Fenster, Webseiten in einem neuen. */
+function LinkButton({ block }: { block: ButtonBlock }) {
+  const external = block.url.startsWith('https://');
+  return (
+    <p className="block-button">
+      <a
+        className={`btn${block.style === 'secondary' ? ' btn-secondary' : ''}`}
+        href={block.url}
+        {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+      >
+        {block.label}
+      </a>
+    </p>
+  );
+}
+
+/** Nächste Termine (vom Server, immer aktuell), mit Link zu allen Terminen. */
+function NextEvents({ block }: { block: EventsBlock }) {
+  return (
+    <section className="block-events">
+      {block.title && <h3>{block.title}</h3>}
+      {block.events.length === 0 ? (
+        <p className="muted">Zurzeit keine anstehenden Termine.</p>
+      ) : (
+        <ul className="block-events-list">
+          {block.events.map((e) => (
+            <li key={e.id}>
+              <span className="block-events-when">{formatEventWhen(e)}</span>
+              <strong className="block-events-title">{e.title}</strong>
+              {e.location && <span className="muted small"> · {e.location}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      <a className="btn btn-link block-events-all" href="#/termine">
+        Alle Termine
+      </a>
+    </section>
   );
 }

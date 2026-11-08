@@ -22,6 +22,10 @@ Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum 
 2. Gib einen **Titel** ein und schreibe unter **Inhalt** den Text. Bilder fügst du über das Bildsymbol im Text ein. Weitere Blöcke fügst du mit **+ Block einfügen** (am Ende) oder **+ Block darunter einfügen** hinzu, verschiebst sie mit **↑** und **↓** und nimmst sie mit **Entfernen** heraus.
 3. Tippe auf **Veröffentlichen**. Der Beitrag steht sofort oben in der Liste, für alle, die die {bereich.news} lesen dürfen, auch ohne Anmeldung.
 
+### Einen Knopf oder die nächsten Termine einfügen
+- **Knopf mit Link**: Trage eine **Beschriftung** und ein **Ziel** ein: eine Webseite mit https://, eine E-Mail-Adresse mit mailto:, eine Telefonnummer mit tel: oder eine Seite der App wie #/termine. Bei **Aussehen** wählst du **Hervorgehoben** oder **Zurückhaltend**.
+- **Nächste Termine**: Wähle eine **Überschrift** und **Wie viele Termine** (1 bis 20). Der Block zeigt immer die nächsten Termine ab heute aus den {bereich.events}.
+
 ### Einen Countdown einfügen
 1. Wähle bei **+ Block einfügen** **Countdown**.
 2. Trage bei Bedarf eine **Überschrift** ein und wähle bei **Zählt bis** ein **Datum** (mit **Uhrzeit**) oder einen **Termin** aus den {bereich.events}. Ein verschobener Termin zählt von selbst mit.

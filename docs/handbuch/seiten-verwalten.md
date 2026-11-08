@@ -4,7 +4,7 @@ reihenfolge: 58
 rechte: [manage_pages]
 bereiche: [pages]
 ---
-Hier legst du eigene Seiten an, zum Beispiel Geschichte, Festprogramm oder Anfahrt. Eine Seite besteht aus Blöcken: formatiertem Text mit Bildern und vorgefertigten Blöcken wie einem **Countdown**. Du bestimmst, für wen jede Seite ist und in welcher Reihenfolge die Seiten erscheinen. Jede Seite ist ein eigener Punkt der Navigation.
+Hier legst du eigene Seiten an, zum Beispiel Geschichte, Festprogramm oder Anfahrt. Eine Seite besteht aus Blöcken: formatiertem Text mit Bildern und vorgefertigten Blöcken wie einem **Countdown**, einem **Knopf mit Link** oder den **nächsten Terminen**. Du bestimmst, für wen jede Seite ist und in welcher Reihenfolge die Seiten erscheinen. Jede Seite ist ein eigener Punkt der Navigation.
 
 ## So öffnest du die Seite
 Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{bereich.pages}**. Mit **‹ Einrichtungen** kommst du zurück. Auf jeder Seite führt dich außerdem der Knopf **{bereich.pages} verwalten** hierher.
@@ -31,7 +31,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{
 Hat jemand anderes die Seite gespeichert, während du sie bearbeitet hast, speichert die App deine Fassung nicht und sagt, wer sie geändert hat. Kopiere dann deine Änderungen, tippe auf **Neu laden** und trage sie noch einmal ein. Beim Neu laden gehen deine Änderungen verloren.
 
 ### Blöcke einfügen, verschieben und entfernen
-- Wähle bei **+ Block einfügen** die Art des Blocks: **Text** oder **Countdown**. Mit **+ Block darunter einfügen** kommt der neue Block direkt unter einen bestehenden.
+- Wähle bei **+ Block einfügen** die Art des Blocks: **Text**, **Countdown**, **Knopf mit Link** oder **Nächste Termine**. Mit **+ Block darunter einfügen** kommt der neue Block direkt unter einen bestehenden.
 - Mit **↑** und **↓** verschiebst du einen Block nach oben oder unten, mit **Entfernen** nimmst du ihn heraus.
 - Bei jedem Block wählst du, für wen er ist: **Für alle, die die Seite sehen** oder **Nur Mitglieder**. So kann eine öffentliche Seite einzelne Teile nur für Mitglieder enthalten, zum Beispiel einen internen Treffpunkt. Ohne Anmeldung und für Gäste fehlen diese Blöcke samt ihren Bildern.
 - Erst **Speichern** (bzw. **Anlegen**) übernimmt die Änderungen.
@@ -44,6 +44,20 @@ Ein Countdown zählt bis zu einem Zeitpunkt herunter und zeigt immer zwei Angabe
 4. Optional: Gib ein Ende an (**Ende am**, **Ende um**; beim Termin kommt es aus dem Termin) und einen **Text, solange es läuft**, zum Beispiel „Das Fest läuft!“. Er steht zwischen Beginn und Ende statt der Zahlen.
 5. Wähle bei **Danach**, ob nach dem Ende der **Text danach** erscheint (**Text zeigen**) oder der Block verschwindet (**Block ausblenden**).
 6. Unter **Vorschau** siehst du, wie der Countdown gerade aussieht. Tippe dann auf **Speichern**.
+
+### Einen Knopf mit Link einfügen
+1. Füge einen Block **Knopf mit Link** ein.
+2. Trage die **Beschriftung** ein, zum Beispiel „Jetzt anmelden“ (höchstens 60 Zeichen).
+3. Trage bei **Ziel** ein, wohin der Knopf führt: eine Webseite mit https://, eine E-Mail-Adresse mit mailto: (z. B. mailto:vorstand@example.org), eine Telefonnummer mit tel: oder eine Seite der App wie #/termine.
+4. Wähle bei **Aussehen** **Hervorgehoben** oder **Zurückhaltend**.
+
+Webseiten öffnen sich in einem neuen Fenster, Seiten der App im selben.
+
+### Die nächsten Termine zeigen
+1. Füge einen Block **Nächste Termine** ein.
+2. Trage bei Bedarf eine **Überschrift** ein und wähle bei **Wie viele Termine**, wie viele erscheinen (1 bis 20).
+
+Der Block zeigt immer die nächsten Termine ab heute aus den {bereich.events}, mit Datum, Uhrzeit und Ort, darunter **Alle Termine**. Du musst ihn nie anpassen. Wer die {bereich.events} nicht sehen darf, sieht dort „Zurzeit keine anstehenden Termine.“
 
 ### Die Reihenfolge ändern
 Halte einen Eintrag am Griff links fest, ziehe ihn an die gewünschte Stelle und lass los. Die Reihenfolge ist sofort gespeichert. Am Computer geht es auch mit der Tastatur: Griff mit der Tab-Taste auswählen, dann Pfeil hoch oder runter. Die Reihenfolge gilt in der Standardnavigation; mit eurer eigenen Navigation bestimmt die dort den Platz jeder Seite.

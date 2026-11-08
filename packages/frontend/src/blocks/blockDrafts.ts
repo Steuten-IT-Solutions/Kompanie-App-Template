@@ -1,15 +1,19 @@
 // Blöcke beim Bearbeiten (ohne React, für Tests): neue Blöcke, aus der Antwort des Servers, Verschieben.
-import type { Block, BlockAudience, BlockInput, CountdownBlock, TextBlock } from '../api';
+import type { Block, BlockAudience, BlockInput, ButtonBlock, CountdownBlock, EventsBlock, TextBlock } from '../api';
 
 export type TextDraft = Omit<TextBlock, never>;
 export type CountdownDraft = Omit<CountdownBlock, 'starts_at' | 'ends_at' | 'event_title'> & { event_title?: string | null };
-export type BlockDraft = TextDraft | CountdownDraft;
+export type ButtonDraft = ButtonBlock;
+export type EventsDraft = Omit<EventsBlock, 'events'>;
+export type BlockDraft = TextDraft | CountdownDraft | ButtonDraft | EventsDraft;
 export type BlockKind = BlockDraft['type'];
 
 /** Blöcke, die man einfügen kann, mit Bezeichnung und Erklärung (Reihenfolge der Auswahl). */
 export const BLOCK_KINDS: { type: BlockKind; label: string; hint: string }[] = [
   { type: 'text', label: 'Text', hint: 'Formatierter Text mit Bildern' },
   { type: 'countdown', label: 'Countdown', hint: 'Zählt bis zu einem Datum oder Termin herunter' },
+  { type: 'button', label: 'Knopf mit Link', hint: 'Führt zu einer Webseite, Mail, Telefonnummer oder Seite der App' },
+  { type: 'events', label: 'Nächste Termine', hint: 'Die nächsten Termine, immer aktuell' },
 ];
 
 let counter = 0;
@@ -37,13 +41,19 @@ export function newBlock(type: BlockKind, audience: BlockAudience = 'all'): Bloc
       after_text: '',
     };
   }
+  if (type === 'button') return { id, type, audience, label: '', url: 'https://', style: 'primary' };
+  if (type === 'events') return { id, type, audience, title: '', count: 3 };
   return { id, type: 'text', audience, html: '' };
 }
 
 /** Blöcke einer geladenen Seite zum Bearbeiten; ältere Server liefern nur body (ein Textblock). */
 export function draftsFrom(blocks: Block[] | undefined, body: string): BlockDraft[] {
   if (!blocks) return body ? [{ id: newBlockId(), type: 'text', audience: 'all', html: body }] : [];
-  return blocks.map((b) => {
+  return blocks.map((b): BlockDraft => {
+    if (b.type === 'events') {
+      const { events: _e, ...rest } = b;
+      return rest;
+    }
     if (b.type !== 'countdown') return b;
     const { starts_at: _s, ends_at: _e, ...rest } = b;
     return { ...rest, time: rest.time ?? '', end_date: rest.end_date ?? '', end_time: rest.end_time ?? '', date: rest.date ?? '' };

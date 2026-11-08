@@ -55,13 +55,17 @@ Mit der Leiste über dem Text gestaltest du die Nachricht wie in einem Mailprogr
 
 ![Eine neue Nachricht im Formular, bereit zum Veröffentlichen](bild:schwarzes-brett-schreiben-neu)
 
+### Einen Knopf oder die nächsten Termine einfügen
+- **Knopf mit Link**: Trage eine **Beschriftung** und ein **Ziel** ein: eine Webseite mit https://, eine E-Mail-Adresse mit mailto:, eine Telefonnummer mit tel: oder eine Seite der App wie #/termine. Bei **Aussehen** wählst du **Hervorgehoben** oder **Zurückhaltend**.
+- **Nächste Termine**: Wähle eine **Überschrift** und **Wie viele Termine** (1 bis 20). Der Block zeigt immer die nächsten Termine ab heute aus den {bereich.events}.
+
 ### Einen Countdown einfügen
 1. Wähle bei **+ Block einfügen** **Countdown**.
 2. Trage bei Bedarf eine **Überschrift** ein und wähle bei **Zählt bis** ein **Datum** (mit **Uhrzeit**) oder einen **Termin** aus den {bereich.events}. Ein verschobener Termin zählt von selbst mit.
 3. Optional: ein Ende (**Ende am**, **Ende um**) mit einem **Text, solange es läuft**, und bei **Danach** einen **Text danach** oder **Block ausblenden**.
 4. Die **Vorschau** zeigt, wie der Countdown gerade aussieht. Er zeigt immer zwei Angaben: Tage und Stunden, am letzten Tag Stunden und Minuten, in der letzten Stunde Minuten und Sekunden.
 
-In der Mail steht der Countdown als Satz, z. B. „Countdown bis 10.03.2027, 18:00 Uhr“, so wie er beim Versand gerade aussieht.
+In der Mail steht ein Knopf als „Beschriftung: Ziel“, die nächsten Termine als Liste und der Countdown als Satz, z. B. „Countdown bis 10.03.2027, 18:00 Uhr“, so wie er beim Versand gerade aussieht.
 
 ### Deine Signatur einfügen
 1. Tippe beim Schreiben in einem Textblock auf **Signatur einfügen**. Sie steht dann am Ende dieses Texts.
