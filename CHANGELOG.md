@@ -76,6 +76,23 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Banner des Schwarzen Bretts in einer Zeile**: Das Banner oben zeigt je Eintrag nur noch den Titel, ohne
+  Überschrift, Verfasser und Uhrzeit (die stehen am Brett). Ein Tipp auf den Titel öffnet die Nachricht; *+1 weitere*
+  und *Brett öffnen* erscheinen erst bei mehreren Einträgen. Auch laufende Umfragen stehen so in einer Zeile.
+- **Schreiben am Brett aufgeräumt**: Der Titel ist eine große Eingabe, *Sichtbar für*, *Sichtbar bis* und die
+  Versandwege stehen im eigenen Abschnitt *Sichtbarkeit und Versand*. Die Werkzeugleiste des Texteditors (auch bei
+  Neuigkeiten, eigenen Seiten und E-Mails) zeigt nur die häufigen Werkzeuge; Schriftart, Größe, Ausrichtung, Einzug,
+  Trennlinie, Tabelle und Weiteres liegen hinter **⋯**.
+- **Karten am Brett und in den Umfragen mit Innenrand**: Text klebt nicht mehr am Rand der Karte.
+- **Gleichmäßigere Abstände**: Erklärtexte kleben nicht mehr an der ersten Karte darunter (z. B. bei Dienstgraden,
+  Navigation und Rollen), Umfragen stehen mit Abstand untereinander, unter *Umfragen verwalten* haben die Karten
+  einen Innenrand, beim Anlegen mehrerer Mitglieder stehen die Felder je Person mit Abstand in einem Rahmen, und die
+  Knöpfe *Ansehen* und *Bearbeiten* der Rollen stehen auf dem Handy nebeneinander.
+- **Rückfragen im Fenster der App**: Fragen wie „Wirklich löschen?“, Eingaben (z. B. Grund beim Ablehnen eines
+  Bildes, Adresse eines Links) und Hinweise erscheinen jetzt in einem eigenen Fenster der App statt im Fenster des
+  Browsers. Es sieht auf jedem Gerät gleich aus; Löschen und Entfernen steht auf einem roten Knopf.
+- **Fenster heben sich deutlicher ab**: Hinter einem Fenster ist die Seite stärker abgedunkelt und unscharf, das
+  Fenster hat oben eine Linie in der Farbe der Kompanie und einen kräftigeren Schatten.
 - **Benachrichtigung vom Schwarzen Brett auch an den Verfasser**: Wer eine Nachricht mit *Benachrichtigung senden*
   schreibt, bekommt die Benachrichtigung jetzt selbst auch (auf seinen Geräten, auf denen die Art *Schwarzes Brett:
   dringende Nachrichten* eingeschaltet ist), wie schon bisher die Mail. Das gilt für intern, öffentlich, Kompanie und

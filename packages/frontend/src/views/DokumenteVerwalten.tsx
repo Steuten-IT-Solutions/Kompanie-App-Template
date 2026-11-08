@@ -7,6 +7,7 @@ import { navigate } from '../router';
 import { Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
 import { docGroupKey, groupDocuments, groupKey } from '../documents';
 import { ACCEPT, DocGroupSection, DocSortSelect, typeLabel, useDocSort, useOpenGroups, VISIBILITY_LABELS } from './Dokumente';
+import { confirmAsk, promptAsk } from '../ask';
 
 const sec = brand.labels.sections;
 
@@ -279,8 +280,9 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
                         <button
                           className="btn btn-small btn-danger"
                           disabled={busy}
-                          onClick={() =>
-                            window.confirm(`„${doc.title}“ wirklich löschen?`) && run(() => api.deleteDocument(doc.id), 'Dokument gelöscht')
+                          onClick={async () =>
+                            (await confirmAsk(`„${doc.title}“ wirklich löschen?`)) &&
+                            run(() => api.deleteDocument(doc.id), 'Dokument gelöscht')
                           }
                         >
                           Löschen
@@ -326,8 +328,8 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
                   <button
                     className="btn btn-small btn-secondary"
                     disabled={busy}
-                    onClick={() => {
-                      const next = window.prompt('Neuer Name der Kategorie', c.title);
+                    onClick={async () => {
+                      const next = await promptAsk('Neuer Name der Kategorie', c.title);
                       if (next !== null && next.trim()) run(() => api.updateDocCategory(c.id, next.trim()), 'Kategorie umbenannt');
                     }}
                   >
@@ -336,12 +338,12 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
                   <button
                     className="btn btn-small btn-danger"
                     disabled={busy}
-                    onClick={() =>
-                      window.confirm(
+                    onClick={async () =>
+                      (await confirmAsk(
                         count === 0
                           ? `Kategorie „${c.title}“ löschen?`
                           : `Kategorie „${c.title}“ löschen? ${count === 1 ? 'Das Dokument steht' : `Die ${count} Dokumente stehen`} danach ohne Kategorie da.`,
-                      ) && run(() => api.deleteDocCategory(c.id), 'Kategorie gelöscht')
+                      )) && run(() => api.deleteDocCategory(c.id), 'Kategorie gelöscht')
                     }
                   >
                     Löschen

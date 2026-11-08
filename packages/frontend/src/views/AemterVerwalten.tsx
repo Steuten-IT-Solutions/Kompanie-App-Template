@@ -23,6 +23,7 @@ import { MemberAvatar } from '../memberPhoto';
 import { navigate } from '../router';
 import { Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
 import { nameWithCompanions, termYears } from './Aemter';
+import { confirmAsk } from '../ask';
 
 const sec = brand.labels.sections;
 
@@ -364,7 +365,9 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
                     <button
                       className="btn btn-small btn-danger"
                       disabled={busy}
-                      onClick={() => window.confirm(`Gruppe „${g.title}“ löschen?`) && run(() => api.deleteOfficeGroup(g.id), 'Gelöscht')}
+                      onClick={async () =>
+                        (await confirmAsk(`Gruppe „${g.title}“ löschen?`)) && run(() => api.deleteOfficeGroup(g.id), 'Gelöscht')
+                      }
                     >
                       Löschen
                     </button>
@@ -469,7 +472,9 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
                 <button
                   className="btn btn-small btn-danger"
                   disabled={busy || editing !== null}
-                  onClick={() => window.confirm(`Amtszeit ${termYears(t)} löschen?`) && run(() => api.deleteOfficeTerm(t.id), 'Gelöscht')}
+                  onClick={async () =>
+                    (await confirmAsk(`Amtszeit ${termYears(t)} löschen?`)) && run(() => api.deleteOfficeTerm(t.id), 'Gelöscht')
+                  }
                 >
                   Löschen
                 </button>
@@ -550,7 +555,7 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
             onClick={async () => {
               const n = office.terms.length;
               const what = n === 0 ? '' : n === 1 ? ' mit seiner Amtszeit' : ` mit allen ${n} Amtszeiten`;
-              if (window.confirm(`„${office.title}“${what} löschen?`) && (await run(() => api.deleteOffice(office.id), 'Amt gelöscht')))
+              if ((await confirmAsk(`„${office.title}“${what} löschen?`)) && (await run(() => api.deleteOffice(office.id), 'Amt gelöscht')))
                 navigate('verwaltung/aemter');
             }}
           >
@@ -725,8 +730,8 @@ function JointTermAdmin({
                   <button
                     className="btn btn-small btn-danger"
                     disabled={busy}
-                    onClick={() =>
-                      window.confirm(`Gemeinsame Amtszeit ${termYears(gt)} mit allen Amtszeiten darin und dem Bild löschen?`) &&
+                    onClick={async () =>
+                      (await confirmAsk(`Gemeinsame Amtszeit ${termYears(gt)} mit allen Amtszeiten darin und dem Bild löschen?`)) &&
                       run(() => api.deleteOfficeGroupTerm(gt.id), 'Gelöscht')
                     }
                   >
@@ -1232,7 +1237,7 @@ function LinkCard({ suggestion: s, onToast, onDone }: { suggestion: OfficeLinkSu
   async function link() {
     if (
       !person ||
-      !window.confirm(`„${s.name}“ in ${s.entries === 1 ? 'einer Amtszeit' : `${s.entries} Einträgen`} mit ${person.name} verknüpfen?`)
+      !(await confirmAsk(`„${s.name}“ in ${s.entries === 1 ? 'einer Amtszeit' : `${s.entries} Einträgen`} mit ${person.name} verknüpfen?`))
     ) {
       return;
     }

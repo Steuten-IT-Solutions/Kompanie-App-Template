@@ -5,6 +5,7 @@ import { formatShortTime } from '../format';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
+import { promptAsk } from '../ask';
 
 // Inventar (Issue #6): Liste nach Material gruppiert (Summe über alle Orte, je Einheit), aufklappbar zu den Einträgen je
 // Ort; anlegen, ändern, −/+, umlagern, löschen; Verlauf je Eintrag und gesamt. Nur mit manage_inventory.
@@ -214,8 +215,8 @@ function Entry({ item, onToast, onChanged }: { item: InventoryItem; onToast: (ms
     }
   }
 
-  function remove() {
-    const reason = window.prompt(`„${item.title}“ in ${item.location} löschen? Grund (optional):`, '');
+  async function remove() {
+    const reason = await promptAsk(`„${item.title}“ in ${item.location} löschen? Grund (optional):`, '');
     if (reason === null) return;
     void run(() => api.deleteInventory(item.id, reason), 'Eintrag gelöscht');
   }

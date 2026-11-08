@@ -26,6 +26,7 @@ import { useFocusEntry } from '../focus';
 import { formatShortTime, formatUntil, fromLocalInput, toLocalInput } from '../format';
 import RichTextView from '../richtext/RichTextView';
 import { Empty, ErrorBox, Loading } from '../ui';
+import { confirmAsk } from '../ask';
 
 /** Entwurf der neuen Nachricht (auf diesem Gerät): geht beim Sprung zur Signatur-Einrichtung nicht verloren. */
 const DRAFT_KEY = 'kompanie-board-draft';
@@ -348,7 +349,7 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
       `E-Mail: ${mailOn ? `an ${mailInfo?.recipients ?? 0} Empfänger` : 'keine'}`,
     ];
     if (draft.attachments.length > 0) lines.push(`Anhänge: ${draft.attachments.map((a) => a.name).join(', ')}`);
-    if (!window.confirm(lines.join('\n'))) return;
+    if (!(await confirmAsk(lines.join('\n')))) return;
     setBusy(true);
     try {
       await api.postBoard({
@@ -390,38 +391,42 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
         onAdd={(a) => setDraft((d) => withSaved({ ...d, attachments: [...d.attachments, a] }))}
         onRemove={(uid) => setDraft((d) => withSaved({ ...d, attachments: d.attachments.filter((a) => a.uid !== uid) }))}
       />
-      <AudienceField
-        value={draft.audience}
-        ids={draft.audience_ids}
-        onChange={(audience, audience_ids) => update({ audience, audience_ids })}
-      />
-      <ExpiresField value={draft.expires} onChange={(expires) => update({ expires })} />
-      <label className="toggle">
-        <input type="checkbox" className="board-push" checked={draft.push} onChange={(e) => update({ push: e.target.checked })} />
-        <span>Benachrichtigung senden</span>
-      </label>
-      <label className="toggle">
-        <input
-          type="checkbox"
-          className="board-mail"
-          checked={mailOn}
-          disabled={!mailInfo?.available}
-          onChange={(e) => update({ mail: e.target.checked })}
+      {/* Wer, wie lange, auf welchem Weg (Issue #347): eigener Abschnitt unter Text und Anhängen */}
+      <section className="form-section board-options" aria-labelledby="board-new-options">
+        <h4 id="board-new-options">Sichtbarkeit und Versand</h4>
+        <AudienceField
+          value={draft.audience}
+          ids={draft.audience_ids}
+          onChange={(audience, audience_ids) => update({ audience, audience_ids })}
         />
-        <span>E-Mail senden{mailInfo?.available ? ` (an ${mailInfo.recipients} Empfänger)` : ''}</span>
-      </label>
-      {mailInfo && !mailInfo.available && <p className="muted small">{mailInfo.reason}</p>}
-      <p className="muted small">
-        {draft.audience === 'public' &&
-          'Öffentlich: Alle sehen die Nachricht samt Anhängen und deinem Namen, auch ohne Anmeldung. Die E-Mail geht trotzdem nur an Mitglieder und alle mit dem internen Kalender. '}
-        {targeted(draft.audience) &&
-          'Nur die Auswahl sieht die Nachricht (und alle, die ans Brett schreiben dürfen); Benachrichtigung und E-Mail gehen nur an sie. '}
-        {draft.push
-          ? `${capitalize(pushAudienceText(draft.audience))} bekommen sofort eine Benachrichtigung mit dem Titel.`
-          : 'Ohne Benachrichtigung: Die Nachricht erscheint nur in der App.'}{' '}
-        Der Titel steht oben auf jeder Seite der App, bis zum gewählten Ende (standardmäßig 24 Stunden); danach verschwindet die Nachricht
-        von selbst.
-      </p>
+        <ExpiresField value={draft.expires} onChange={(expires) => update({ expires })} />
+        <label className="toggle">
+          <input type="checkbox" className="board-push" checked={draft.push} onChange={(e) => update({ push: e.target.checked })} />
+          <span>Benachrichtigung senden</span>
+        </label>
+        <label className="toggle">
+          <input
+            type="checkbox"
+            className="board-mail"
+            checked={mailOn}
+            disabled={!mailInfo?.available}
+            onChange={(e) => update({ mail: e.target.checked })}
+          />
+          <span>E-Mail senden{mailInfo?.available ? ` (an ${mailInfo.recipients} Empfänger)` : ''}</span>
+        </label>
+        {mailInfo && !mailInfo.available && <p className="muted small">{mailInfo.reason}</p>}
+        <p className="muted small">
+          {draft.audience === 'public' &&
+            'Öffentlich: Alle sehen die Nachricht samt Anhängen und deinem Namen, auch ohne Anmeldung. Die E-Mail geht trotzdem nur an Mitglieder und alle mit dem internen Kalender. '}
+          {targeted(draft.audience) &&
+            'Nur die Auswahl sieht die Nachricht (und alle, die ans Brett schreiben dürfen); Benachrichtigung und E-Mail gehen nur an sie. '}
+          {draft.push
+            ? `${capitalize(pushAudienceText(draft.audience))} bekommen sofort eine Benachrichtigung mit dem Titel.`
+            : 'Ohne Benachrichtigung: Die Nachricht erscheint nur in der App.'}{' '}
+          Der Titel steht oben auf jeder Seite der App, bis zum gewählten Ende (standardmäßig 24 Stunden); danach verschwindet die Nachricht
+          von selbst.
+        </p>
+      </section>
       {error && <p className="form-error small">{error}</p>}
       <button className="btn btn-block" type="submit" disabled={busy || draft.title.trim() === '' || !hasContent(draft.blocks)}>
         {busy ? 'Sendet …' : 'Veröffentlichen'}
@@ -644,8 +649,8 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
             <button
               className="btn btn-danger"
               disabled={busy}
-              onClick={() =>
-                window.confirm(`Nachricht „${item.title}“ jetzt löschen?`) && run(() => api.deleteBoard(item.id), 'Nachricht gelöscht')
+              onClick={async () =>
+                (await confirmAsk(`Nachricht „${item.title}“ jetzt löschen?`)) && run(() => api.deleteBoard(item.id), 'Nachricht gelöscht')
               }
             >
               Löschen

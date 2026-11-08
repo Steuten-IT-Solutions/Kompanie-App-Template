@@ -31,6 +31,7 @@ import { MaintenanceCard } from '../maintenance';
 import { navigate } from '../router';
 import { formatBytes, formatUntil } from '../format';
 import { menuSources, prefetchOnTap, sources, usePrefetchMenu } from '../viewData';
+import { confirmAsk } from '../ask';
 
 const sec = brand.labels.sections;
 
@@ -717,7 +718,7 @@ function Bereiche({ onToast }: { onToast: (msg: string) => void }) {
     const name = list.find((f) => f.key === key)?.label ?? key;
     if (
       !on &&
-      !window.confirm(`„${name}“ wird für alle ausgeblendet. Die Daten bleiben erhalten und sind beim Wiedereinschalten wieder da.`)
+      !(await confirmAsk(`„${name}“ wird für alle ausgeblendet. Die Daten bleiben erhalten und sind beim Wiedereinschalten wieder da.`))
     )
       return;
     setBusy(true);
@@ -852,7 +853,11 @@ export function GoogleAccess({ settings, onSaved, onToast }: SectionProps) {
   }
 
   async function disconnect() {
-    if (!window.confirm('Verbindung zu Google trennen? Galerie und Kalender lesen danach nur noch über ein Dienstkonto, falls hinterlegt.'))
+    if (
+      !(await confirmAsk(
+        'Verbindung zu Google trennen? Galerie und Kalender lesen danach nur noch über ein Dienstkonto, falls hinterlegt.',
+      ))
+    )
       return;
     setConnectError(null);
     try {
@@ -972,7 +977,7 @@ export function GoogleAccess({ settings, onSaved, onToast }: SectionProps) {
               <button
                 type="button"
                 className="btn btn-link"
-                onClick={() => window.confirm('Schlüssel des Dienstkontos entfernen?') && save({ drive_service_account: '' })}
+                onClick={async () => (await confirmAsk('Schlüssel des Dienstkontos entfernen?')) && save({ drive_service_account: '' })}
               >
                 Schlüssel entfernen
               </button>
@@ -1163,8 +1168,8 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
           <button
             type="button"
             className="btn btn-link"
-            onClick={() =>
-              window.confirm('Kalender wirklich entfernen?') &&
+            onClick={async () =>
+              (await confirmAsk('Kalender wirklich entfernen?')) &&
               save({ calendar_ics_url: '', calendar_ids: '', google_api_key: '' }, () => setIds(''))
             }
           >
@@ -1221,14 +1226,14 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
       title={sec.gallery}
       busy={busy}
       error={error}
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
         if (
           source === 'server' &&
           (g.source ?? 'drive') === 'drive' &&
-          !window.confirm(
+          !(await confirmAsk(
             'Nur noch der eigene Server? Alben und Bilder aus Google Drive verschwinden aus der App; hochgeladene Bilder bleiben.',
-          )
+          ))
         )
           return;
         save(

@@ -14,6 +14,7 @@ import brand from '../generated/brand';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { prefetchOnTap, sources } from '../viewData';
+import { confirmAsk } from '../ask';
 
 const sec = brand.labels.sections;
 const STATUSES: AttendanceStatus[] = ['present', 'excused', 'absent'];
@@ -218,7 +219,7 @@ function Editor({
   }
 
   async function remove() {
-    if (!window.confirm(`Anwesenheitsliste „${list.title}“ wirklich löschen? Gebuchte ${sec.points} bleiben erhalten.`)) return;
+    if (!(await confirmAsk(`Anwesenheitsliste „${list.title}“ wirklich löschen? Gebuchte ${sec.points} bleiben erhalten.`))) return;
     setBusy(true);
     try {
       await api.deleteAttendance(list.id);

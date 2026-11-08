@@ -34,7 +34,8 @@ export function pollEndText(poll: { ends_at: string | null }): string {
 
 /**
  * Banner oben auf jeder Seite (Issue #5): die neueste gültige Nachricht mit ihrem Titel (Issue #172; ein Klick öffnet sie
- * am Brett), weitere aufklappbar („+N weitere“). Dazu für
+ * am Brett), weitere aufklappbar („+N weitere“). Kompakt (Issue #347): je Eintrag eine Zeile nur mit dem Titel, ohne
+ * Bereichsname, Verfasser und Uhrzeit. Dazu für
  * Mitglieder laufende Umfragen, die sie noch nicht beantwortet haben (Issue #4; beantwortete stehen nur auf der Seite
  * des Bretts). „×“ blendet einen Eintrag auf diesem Gerät aus, bis er geändert wird. Sind alle ausgeblendet, bleibt eine
  * schmale Zeile mit dem Weg zum Brett, solange es gültige Einträge gibt. Unbekannte Arten überspringt das Banner.
@@ -67,9 +68,6 @@ export default function BoardBanner() {
         item.kind === 'message' ? (
           <article className="board-entry" key={`${item.kind}-${item.id}`}>
             <div className="board-entry-body">
-              <div className="board-entry-head">
-                <strong>{sec.board}</strong> <BoardMeta item={item} />
-              </div>
               <BoardTitle item={item} />
             </div>
             <button className="btn btn-link board-dismiss" onClick={() => dismiss(item)} aria-label="Nachricht ausblenden">
@@ -79,10 +77,10 @@ export default function BoardBanner() {
         ) : (
           <article className="board-entry board-entry-poll" key={`${item.kind}-${item.id}`}>
             <div className="board-entry-body">
-              <div className="board-entry-head">
-                <strong>{sec.polls}</strong> <span className="board-meta">{pollEndText(item)}</span>
-              </div>
-              <p className="board-text">{item.title}</p>
+              <p className="board-text" title={`${item.title} (${pollEndText(item)})`}>
+                <span className="visually-hidden">{sec.polls}: </span>
+                {item.title}
+              </p>
               <button className="btn btn-small board-poll-open" onClick={() => navigate(`umfragen/${item.id}`)}>
                 Teilnehmen
               </button>

@@ -23,6 +23,7 @@ import {
 } from './blockDrafts';
 import Countdown from './Countdown';
 import { previewRange } from './countdown';
+import { confirmAsk } from '../ask';
 
 const RichTextEditor = lazyView(() => import('../richtext/RichTextEditor'));
 
@@ -721,7 +722,7 @@ export default function BlocksEditor({
                 <button
                   type="button"
                   className="btn btn-small btn-danger"
-                  onClick={() => window.confirm(`Block „${label}“ entfernen?`) && onChange(value.filter((_, j) => j !== i))}
+                  onClick={async () => (await confirmAsk(`Block „${label}“ entfernen?`)) && onChange(value.filter((_, j) => j !== i))}
                 >
                   Entfernen
                 </button>

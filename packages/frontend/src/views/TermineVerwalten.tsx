@@ -4,6 +4,7 @@ import { formatEventWhen } from '../format';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
+import { confirmAsk } from '../ask';
 
 const EMPTY: EventInput = {
   title: '',
@@ -70,7 +71,7 @@ export default function TermineVerwalten({ onToast }: { onToast: (msg: string) =
   }
 
   async function remove(ev: PublicEvent) {
-    if (!window.confirm(`Termin „${ev.title}“ wirklich löschen?`)) return;
+    if (!(await confirmAsk(`Termin „${ev.title}“ wirklich löschen?`))) return;
     try {
       await api.deleteEvent(ev.id);
       onToast('Termin gelöscht');

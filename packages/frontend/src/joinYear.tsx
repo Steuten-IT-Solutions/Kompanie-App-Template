@@ -7,6 +7,7 @@ import { api, can, config, type JoinYear, type ProfileVisibility } from './api';
 import { editYearOrDate, formatYearOrDate } from './format';
 import brand from './generated/brand';
 import { ErrorBox, useAsync } from './ui';
+import { confirmAsk } from './ask';
 
 const sec = brand.labels.sections;
 
@@ -130,7 +131,7 @@ export function OwnJoinYearCard({ onToast }: { onToast: (msg: string) => void })
   }
 
   async function remove() {
-    if (!window.confirm('Deinen Eintritt entfernen?')) return;
+    if (!(await confirmAsk('Deinen Eintritt entfernen?'))) return;
     setBusy(true);
     try {
       await api.deleteMyJoinYear();
@@ -231,8 +232,8 @@ export function MemberJoinYear({
               type="button"
               className="btn btn-secondary"
               disabled={busy}
-              onClick={() =>
-                window.confirm('Eintritt entfernen?') &&
+              onClick={async () =>
+                (await confirmAsk('Eintritt entfernen?')) &&
                 run(async () => {
                   await api.deleteMemberJoinYear(id);
                   setValue('');

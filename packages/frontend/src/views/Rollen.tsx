@@ -7,6 +7,7 @@ import { useDragSort, useSaveQueue } from '../dragSort';
 import brand from '../generated/brand';
 import { PUBLIC_PREVIEW, startPreview } from '../preview';
 import { ErrorBox, Loading, useAsync } from '../ui';
+import { confirmAsk } from '../ask';
 
 const sec = brand.labels.sections;
 
@@ -310,13 +311,13 @@ function RoleForm({
     void run(() => (role ? api.updateRole(role.key, data) : api.createRole(data)), role ? 'Rolle gespeichert' : 'Rolle angelegt');
   }
 
-  function remove() {
+  async function remove() {
     if (!role) return;
     const others =
       role.users > 0
         ? ` Die ${role.users === 1 ? 'Person bekommt' : `${role.users} Personen bekommen`} stattdessen die Rolle „${roles.find((r) => r.key === replacement)?.label}“.`
         : '';
-    if (!window.confirm(`Rolle „${role.label}“ löschen?${others}`)) return;
+    if (!(await confirmAsk(`Rolle „${role.label}“ löschen?${others}`))) return;
     void run(() => api.deleteRole(role.key, role.users > 0 ? replacement : undefined), 'Rolle gelöscht');
   }
 
