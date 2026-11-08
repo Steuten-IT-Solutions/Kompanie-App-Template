@@ -6,16 +6,18 @@ import brand from '../generated/brand';
 import { Empty, ErrorBox, lazyView, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { AudienceBadge } from './Seiten';
+import { blocksInput, draftsFrom, newBlock, type BlockDraft } from '../blocks/blockDrafts';
 
-const RichTextEditor = lazyView(() => import('../richtext/RichTextEditor'));
+const BlocksEditor = lazyView(() => import('../blocks/BlocksEditor'));
 
 const sec = brand.labels.sections;
 
 /** Grenze wie auf dem Server (PageService::TITLE_MAX). */
 const TITLE_MAX = 100;
 
-type Draft = { title: string; audience: PageAudience; body: string };
-const EMPTY: Draft = { title: '', audience: 'members', body: '' };
+type Draft = { title: string; audience: PageAudience; blocks: BlockDraft[] };
+/** Neue Seiten beginnen mit einem leeren Textblock. */
+const empty = (): Draft => ({ title: '', audience: 'members', blocks: [newBlock('text')] });
 
 function PageFields({
   draft,
@@ -50,8 +52,9 @@ function PageFields({
         </select>
       </label>
       <div className="field">
+        <span>Inhalt</span>
         <Suspense fallback={<Loading shape="text" chunk />}>
-          <RichTextEditor value={draft.body} onChange={(html) => set({ body: html })} label="Text" id={`${idPrefix}-body`} />
+          <BlocksEditor value={draft.blocks} onChange={(blocks) => set({ blocks })} idPrefix={idPrefix} />
         </Suspense>
       </div>
     </>
@@ -61,13 +64,13 @@ function PageFields({
 /** Eine Seite bearbeiten: lädt den Text und den Stand; hat jemand dazwischen gespeichert, sagt der Server 409 conflict. */
 function PageEditor({ id, onDone, onToast }: { id: number; onDone: (saved: boolean) => void; onToast: (msg: string) => void }) {
   const [loaded, setLoaded] = useState<PageDetail | null>(null);
-  const [draft, setDraft] = useState<Draft>(EMPTY);
+  const [draft, setDraft] = useState<Draft>(empty);
   const [editorKey, setEditorKey] = useState(0);
   const { error, reload } = useAsync(
     () =>
       api.page(id).then((p) => {
         setLoaded(p);
-        setDraft({ title: p.title, audience: p.audience, body: p.body });
+        setDraft({ title: p.title, audience: p.audience, blocks: draftsFrom(p.blocks, p.body) });
         setEditorKey((k) => k + 1);
         return p;
       }),
@@ -83,7 +86,12 @@ function PageEditor({ id, onDone, onToast }: { id: number; onDone: (saved: boole
     setBusy(true);
     setFormError(null);
     try {
-      await api.updatePage(id, { title: draft.title.trim(), audience: draft.audience, body: draft.body, updated_at: loaded.updated_at });
+      await api.updatePage(id, {
+        title: draft.title.trim(),
+        audience: draft.audience,
+        blocks: blocksInput(draft.blocks),
+        updated_at: loaded.updated_at,
+      });
       onToast('Gespeichert');
       onDone(true);
     } catch (err) {
@@ -132,12 +140,12 @@ function PageEditor({ id, onDone, onToast }: { id: number; onDone: (saved: boole
 }
 
 /**
- * Verwaltung → Einrichtungen → Seiten (Issue #287): eigene Seiten anlegen, bearbeiten (Titel, für wen, Text mit Bildern),
+ * Verwaltung → Einrichtungen → Seiten (Issue #287): eigene Seiten anlegen, bearbeiten (Titel, für wen, Inhalt aus Blöcken),
  * Reihenfolge per Griff, löschen.
  */
 export function PageAdmin({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(sources.pages.load, sources.pages.deps, sources.pages.key);
-  const [draft, setDraft] = useState<Draft>(EMPTY);
+  const [draft, setDraft] = useState<Draft>(empty);
   const [newKey, setNewKey] = useState(0);
   const [editing, setEditing] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -161,8 +169,13 @@ export function PageAdmin({ onToast }: { onToast: (msg: string) => void }) {
 
   async function add(e: FormEvent) {
     e.preventDefault();
-    if (await run(() => api.createPage({ title: draft.title.trim(), audience: draft.audience, body: draft.body }), 'Seite angelegt')) {
-      setDraft(EMPTY);
+    if (
+      await run(
+        () => api.createPage({ title: draft.title.trim(), audience: draft.audience, blocks: blocksInput(draft.blocks) }),
+        'Seite angelegt',
+      )
+    ) {
+      setDraft(empty());
       setNewKey((k) => k + 1);
     }
   }

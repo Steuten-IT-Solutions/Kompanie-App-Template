@@ -1,0 +1,110 @@
+// Countdown-Block (src/blocks/countdown.ts): Phasen, immer zwei Angaben, Einzahl/Mehrzahl, nächster Zeitpunkt zum
+// Neuzeichnen; Blöcke beim Bearbeiten (src/blocks/blockDrafts.ts).
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { countdownParts, countdownPhase, nextChange, nextDay, nextTick, unitLabel } from '../src/blocks/countdown.ts';
+import { blocksInput, draftsFrom, moveBlock, newBlock } from '../src/blocks/blockDrafts.ts';
+
+const S = 1000;
+const M = 60 * S;
+const H = 60 * M;
+const D = 24 * H;
+
+test('Phasen: vor dem Beginn, läuft bis zum Ende, danach; ohne Beginn wie danach', () => {
+  const start = '2027-06-12T12:00:00Z';
+  const end = '2027-06-13T00:00:00Z';
+  const t = Date.parse(start);
+  assert.equal(countdownPhase(t - 1, start, end), 'before');
+  assert.equal(countdownPhase(t, start, end), 'running');
+  assert.equal(countdownPhase(Date.parse(end) - 1, start, end), 'running');
+  assert.equal(countdownPhase(Date.parse(end), start, end), 'after');
+  assert.equal(countdownPhase(t, start, null), 'after', 'ohne Ende gleich danach');
+  assert.equal(countdownPhase(t, null, null), 'after');
+});
+
+test('immer zwei Angaben: Tage und Stunden, Stunden und Minuten, Minuten und Sekunden', () => {
+  assert.deepEqual(countdownParts(3 * D + 5 * H + 59 * M), [
+    { value: 3, unit: 'day' },
+    { value: 5, unit: 'hour' },
+  ]);
+  assert.deepEqual(countdownParts(D), [
+    { value: 1, unit: 'day' },
+    { value: 0, unit: 'hour' },
+  ]);
+  assert.deepEqual(
+    countdownParts(D - 1),
+    [
+      { value: 1, unit: 'day' },
+      { value: 0, unit: 'hour' },
+    ],
+    'angebrochene Sekunde zählt voll: noch genau 1 Tag',
+  );
+  assert.deepEqual(countdownParts(D - S), [
+    { value: 23, unit: 'hour' },
+    { value: 59, unit: 'minute' },
+  ]);
+  assert.deepEqual(countdownParts(H), [
+    { value: 1, unit: 'hour' },
+    { value: 0, unit: 'minute' },
+  ]);
+  assert.deepEqual(countdownParts(H - S), [
+    { value: 59, unit: 'minute' },
+    { value: 59, unit: 'second' },
+  ]);
+  assert.deepEqual(countdownParts(400), [
+    { value: 0, unit: 'minute' },
+    { value: 1, unit: 'second' },
+  ]);
+  assert.deepEqual(countdownParts(-5), [
+    { value: 0, unit: 'minute' },
+    { value: 0, unit: 'second' },
+  ]);
+});
+
+test('Einzahl und Mehrzahl', () => {
+  assert.equal(unitLabel(1, 'day'), 'Tag');
+  assert.equal(unitLabel(0, 'day'), 'Tage');
+  assert.equal(unitLabel(2, 'hour'), 'Stunden');
+  assert.equal(unitLabel(1, 'minute'), 'Minute');
+  assert.equal(unitLabel(1, 'second'), 'Sekunde');
+  assert.equal(unitLabel(30, 'second'), 'Sekunden');
+});
+
+test('neu zeichnen: je Sekunde unter einer Stunde, sonst je Minute, nie über die Stundengrenze', () => {
+  assert.equal(nextTick(10 * M + 1500), 500);
+  assert.equal(nextTick(H), 1000);
+  assert.equal(nextTick(2 * H + 30 * S), 30 * S);
+  assert.equal(nextTick(H + 20 * S), 20 * S, 'bis genau eine Stunde, dann Sekunden');
+  const now = Date.parse('2027-06-12T11:00:00Z');
+  assert.equal(nextChange(now, '2027-06-12T12:00:00Z', null), 1000);
+  assert.equal(nextChange(now, '2027-06-12T10:00:00Z', '2027-06-12T13:00:00Z'), 2 * H, 'läuft: bis zum Ende');
+  assert.equal(nextChange(now, '2027-06-12T10:00:00Z', null), null, 'danach: nichts mehr');
+});
+
+test('Folgetag auch über Monats- und Jahresgrenzen', () => {
+  assert.equal(nextDay('2027-03-27'), '2027-03-28');
+  assert.equal(nextDay('2027-02-28'), '2027-03-01');
+  assert.equal(nextDay('2027-12-31'), '2028-01-01');
+});
+
+test('Blöcke bearbeiten: aus älteren Servern, zum Speichern, Verschieben', () => {
+  assert.equal(draftsFrom(undefined, '').length, 0);
+  const [only] = draftsFrom(undefined, '<p>Alt</p>');
+  assert.equal(only.type, 'text');
+  assert.equal(only.type === 'text' && only.html, '<p>Alt</p>');
+
+  const c = newBlock('countdown');
+  assert.match(c.id, /^[a-z0-9]{1,16}$/);
+  const [input] = blocksInput([{ ...c, type: 'countdown', date: '2027-06-12' } as typeof c]);
+  assert.deepEqual(
+    { time: (input as { time: unknown }).time, end_date: (input as { end_date: unknown }).end_date },
+    { time: null, end_date: null },
+    'leere Uhrzeit und leeres Enddatum als null',
+  );
+  const [ev] = blocksInput([{ ...c, source: 'event', event_id: 7, date: '2027-06-12' } as typeof c]);
+  assert.equal('date' in ev, false, 'beim Termin kein eigenes Datum');
+
+  assert.deepEqual(moveBlock([1, 2, 3], 0, 1), [2, 1, 3]);
+  assert.deepEqual(moveBlock([1, 2, 3], 0, -1), [1, 2, 3]);
+  assert.deepEqual(moveBlock([1, 2, 3], 2, -1), [1, 3, 2]);
+});
