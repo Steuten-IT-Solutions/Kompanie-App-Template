@@ -21,7 +21,7 @@ import { useDragSort, useSaveQueue } from '../dragSort';
 import brand from '../generated/brand';
 import { MemberAvatar } from '../memberPhoto';
 import { navigate } from '../router';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
 import { nameWithCompanions, termYears } from './Aemter';
 
 const sec = brand.labels.sections;
@@ -1326,8 +1326,7 @@ function OfficeImport({ onToast }: { onToast: Toast }) {
       </label>
       <label className="field">
         <span>Oder Datei wählen (CSV)</span>
-        <input
-          type="file"
+        <FileInput
           accept=".csv,.txt,text/csv,text/plain"
           onChange={async (e) => {
             const file = e.target.files?.[0];

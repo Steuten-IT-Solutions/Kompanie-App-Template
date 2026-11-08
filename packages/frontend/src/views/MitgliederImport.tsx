@@ -7,6 +7,7 @@ import { toCsv } from '../lists';
 import { readSheet } from '../sheet';
 import { Credentials } from './Konten';
 import { formerSummary } from './Ehemalige';
+import { FileInput } from '../ui';
 
 const sec = brand.labels.sections;
 
@@ -189,8 +190,7 @@ export function MemberImport({ onDone, doneLabel }: { onDone: () => void; doneLa
       </button>
       <label className="field">
         <span>Datei wählen (Excel .xlsx oder CSV)</span>
-        <input
-          type="file"
+        <FileInput
           accept=".xlsx,.csv,.txt,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           onChange={(e) => pick(e.target.files?.[0])}
         />

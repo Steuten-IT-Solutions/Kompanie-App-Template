@@ -12,7 +12,7 @@ Jede Seite ist ein eigener Punkt der Navigation mit ihrem Titel: Tippe unten auf
 ## Was du hier siehst
 - Oben steht der Titel der Seite, darunter ihr Inhalt.
 - Ein **Countdown** zählt bis zu einem Fest oder Termin herunter, mit zwei Angaben (z. B. Tage und Stunden) und dem Datum darunter. Läuft das Ereignis, steht dort ein Text, danach ein Abschlusstext oder nichts mehr.
-- Wer die Seiten pflegt, sieht bei Seiten nur für Mitglieder den Hinweis **nur Mitglieder** und den Knopf **{bereich.pages} verwalten**.
+- Wer die Seiten pflegt, sieht bei Seiten nur für Mitglieder den Hinweis **nur Mitglieder** und oben den Knopf **{bereich.pages} verwalten**.
 
 ## Gut zu wissen
 - Manche Seiten sind für alle da, auch ohne Anmeldung, andere nur für Mitglieder. Seiten, die du nicht lesen darfst, siehst du gar nicht. Auch einzelne Teile einer Seite können nur für Mitglieder sein; ohne Anmeldung fehlen sie.

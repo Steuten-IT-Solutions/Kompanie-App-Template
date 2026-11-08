@@ -378,7 +378,7 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
       <h3>Neue Nachricht</h3>
       <label className="field">
         <span>Titel</span>
-        <input className="board-title-input" value={draft.title} onChange={(e) => update({ title: e.target.value })} required />
+        <input type="text" className="board-title-input" value={draft.title} onChange={(e) => update({ title: e.target.value })} required />
       </label>
       <div className="field">
         <span>Inhalt</span>
@@ -585,6 +585,7 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
           <label className="field">
             <span>Titel</span>
             <input
+              type="text"
               className="board-title-input"
               value={edit.title}
               onChange={(e) => setEdit({ ...edit, title: e.target.value })}

@@ -506,11 +506,18 @@ function MailForm({
       />
       <label className="field">
         <span>Absendername</span>
-        <input value={form.from_name} onChange={set('from_name')} placeholder={settings.from_name_default} />
+        <input type="text" value={form.from_name} onChange={set('from_name')} placeholder={settings.from_name_default} />
       </label>
       <label className="field">
         <span>Mailserver (SMTP)</span>
-        <input className="mail-host" value={form.host} onChange={set('host')} placeholder="smtp.beispiel.de" autoComplete="off" />
+        <input
+          type="text"
+          className="mail-host"
+          value={form.host}
+          onChange={set('host')}
+          placeholder="smtp.beispiel.de"
+          autoComplete="off"
+        />
       </label>
       <div className="field-row">
         <label className="field">
@@ -528,7 +535,7 @@ function MailForm({
       </div>
       <label className="field">
         <span>Benutzername</span>
-        <input value={form.user} onChange={set('user')} autoComplete="off" />
+        <input type="text" value={form.user} onChange={set('user')} autoComplete="off" />
       </label>
       <label className="field">
         <span>Passwort{settings.password_set ? ' (gespeichert – leer lassen, um es zu behalten)' : ''}</span>
