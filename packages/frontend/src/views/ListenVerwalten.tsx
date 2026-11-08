@@ -144,10 +144,6 @@ function ListOverview({ onToast }: { onToast: Toast }) {
 
   return (
     <div>
-      <p className="muted small">
-        Listen zum Ausdrucken oder als CSV für Excel, z. B. Unterschriften- oder Teilnehmerlisten. Titel und Spalten wählst du selbst; die
-        Mitglieder kommen mit „Mitglieder aktualisieren“ in die Liste.
-      </p>
       {formError && (
         <p className="form-error" role="alert">
           {formError}
@@ -495,10 +491,6 @@ function ColumnEditor({
   return (
     <section className="card form">
       <h3>Spalten</h3>
-      <p className="muted small">
-        Datenspalten füllt die App mit den Angaben der Mitglieder, leere Spalten bleiben zum Ausfüllen auf Papier. Zum Umsortieren eine
-        Spalte am Griff ziehen.
-      </p>
       <ul className="card-list list-columns">
         {columns.map((c, i) => (
           <li key={i} {...sort.itemProps(i, 'card row list-column')}>

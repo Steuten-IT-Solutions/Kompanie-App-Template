@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { api, config, type EventInput, type PublicEvent } from '../api';
+import { api, type EventInput, type PublicEvent } from '../api';
 import { formatEventWhen } from '../format';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
@@ -86,16 +86,6 @@ export default function TermineVerwalten({ onToast }: { onToast: (msg: string) =
       <button className="btn btn-link back" onClick={() => navigate('termine')}>
         ‹ Zu den Terminen
       </button>
-      <p className="muted small">
-        Diese Termine sehen Gäste in der App.
-        {config?.variant === 'wordpress' && (
-          <>
-            {' '}
-            Auf der Webseite zeigt sie der Shortcode <code>[kompanie_termine]</code>.
-          </>
-        )}
-        {config?.features.calendar && ' Mitglieder sehen weiterhin den Kalender mit allen Terminen.'}
-      </p>
 
       {editing !== null ? (
         <form className="form card event-form" onSubmit={submit}>

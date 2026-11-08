@@ -86,6 +86,20 @@ final class ExtraRolesTest extends TestCase
         $this->assertFalse(array_column($config['roles'], 'extra', 'key')[Roles::MEMBER]);
     }
 
+    public function testDetailShowsExtraRolesOnlyToThoseWhoAssignRoles(): void
+    {
+        $m = $this->users->add('kassenwart', Roles::MEMBER);
+        $this->setRoles($m, ['penalties']);
+        $viewer = $this->users->add('punktewart', 'points');
+        $this->users->current = $viewer;
+        $res = $this->call('GET', "/members/$m");
+        $this->assertSame(200, $res->status, json_encode($res->data) ?: '');
+        $this->assertSame([], $res->data['extra_roles'], 'ohne promote_users keine Zusatzrollen (Issue #349)');
+        $this->assertNull($res->data['rights']);
+        $this->users->current = $this->admin;
+        $this->assertSame(['penalties'], $this->call('GET', "/members/$m")->data['extra_roles']);
+    }
+
     public function testOnlyOwnRolesOnTopOfAMemberBaseRole(): void
     {
         $m = $this->users->add('m', Roles::MEMBER);

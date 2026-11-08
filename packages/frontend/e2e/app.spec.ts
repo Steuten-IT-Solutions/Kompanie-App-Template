@@ -565,8 +565,9 @@ test.describe('ohne Service Worker, Daten zurückgehalten', () => {
     await expect(page.locator('[data-loading]')).not.toHaveCount(0);
     await expect(page.locator('.member-name')).toHaveText('Mitglied1');
     await expect(page.locator('.member-step')).toContainText('1 / 2');
-    // Kopf schon aus der Mitgliederliste (Rolle, Kacheln), obwohl die Daten der Person noch zurückgehalten werden
-    await expect(page.locator('.member-level')).toContainText('Rolle');
+    // Kopf schon aus der Mitgliederliste (Kacheln), obwohl die Daten der Person noch zurückgehalten werden. Die Rolle
+    // sieht nur, wer Rollen vergibt (Issue #349); der Verwalter darf das nicht.
+    await expect(page.locator('.member-level')).toHaveCount(0);
     await expect(page.locator('.member-stats')).toBeVisible();
     await swipe(page, -200);
     await expect(page.locator('.member-name')).toHaveText('Mitglied2');
@@ -575,7 +576,7 @@ test.describe('ohne Service Worker, Daten zurückgehalten', () => {
     release();
     await expect(page.locator('[data-loading]')).toHaveCount(0);
     await expect(page.locator('.member-name')).toHaveText('Mitglied2');
-    await expect(page.locator('.member-level').first()).toContainText('Rolle');
+    await expect(page.locator('.member-level')).toHaveCount(0);
   });
 
   test('Mitglied: Lädt die Seite noch, wischt auch die leere Fläche unter dem Gerüst', async ({ page }) => {
@@ -3672,10 +3673,20 @@ test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nich
     .click();
   await expect(page).toHaveURL(/#\/einstellungen\/neuerungen$/);
   for (const v of changelog.versionen) {
-    await expect(page.getByRole('heading', { name: new RegExp(`^Version ${v.version.replace(/\./g, '\\.')}\\b`) })).toBeVisible();
+    await expect(
+      page.locator('.changelog-version > summary', { hasText: new RegExp(`Version ${v.version.replace(/\./g, '\\.')}(?![.\\d])`) }),
+    ).toBeVisible();
   }
   await expect(page.getByRole('heading', { name: /^Vorabversion/ })).toHaveCount(changelog.unveroeffentlicht ? 1 : 0);
   await expect(page.locator('.changelog-text h4').first()).toBeVisible();
+  // Aufgeklappt nur die Vorabversion bzw. eine Version, ältere eingeklappt (Issue #352)
+  await expect(page.locator('details.changelog-version[open]')).toHaveCount(changelog.unveroeffentlicht ? 0 : 1);
+  if (changelog.versionen.length > 1) {
+    const last = page.locator('details.changelog-version').last();
+    await expect(last.locator('.changelog-text')).toBeHidden();
+    await last.locator('summary').click();
+    await expect(last.locator('.changelog-text')).toBeVisible();
+  }
   await shot(page, '19-was-ist-neu');
 
   await login(page, 'mitglied1');

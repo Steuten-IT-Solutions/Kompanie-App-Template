@@ -393,10 +393,6 @@ function Compose({ options, onSent, onToast }: { options: MailOptions; onSent: (
           Cc und Bcc hinzufügen
         </button>
       )}
-      <p className="muted small">
-        Alle Empfänger in An und Cc sehen sich gegenseitig, wie in einem Mailprogramm. Wer in Bcc steht, ist für niemanden sichtbar; für
-        große Gruppen deshalb besser Bcc verwenden. Jede Adresse bekommt die Mail nur einmal.
-      </p>
       <label className="field">
         <span>Betreff</span>
         <input
@@ -617,10 +613,6 @@ function Groups({ onToast }: { onToast: (msg: string) => void }) {
     <div className="mail-groups">
       {back}
       <h2 className="board-page-title">Mailgruppen</h2>
-      <p className="muted small">
-        Gruppen lassen sich beim Schreiben wie Rollen auswählen. Wer dazugehört, ermittelt die App erst beim Senden; ausgeschiedene
-        Mitglieder (Ehemalige) bekommen nie eine Mail.
-      </p>
       <ul className="card-list">
         {options.groups.map((g) => (
           <li key={g.key} className="card row mail-group-item">

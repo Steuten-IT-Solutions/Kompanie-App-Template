@@ -153,10 +153,6 @@ function OfficeOverview({
 
   return (
     <div>
-      <p className="muted small">
-        Wer welches Amt wann hatte, auch frühere Inhaber ohne Konto. Der Zeitstrahl ist für alle sichtbar, auch ohne Anmeldung. Ein Amt kann
-        mit einem {sec.titles} verknüpft werden: Wer es gerade hat, bekommt ihn automatisch.
-      </p>
       <div className="button-row">
         <button className="btn btn-secondary" onClick={() => navigate('verwaltung/aemter/import')}>
           Tabelle importieren
@@ -284,12 +280,6 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
   return (
     <section>
       <h3 className="section-title">Gruppen</h3>
-      <p className="muted small">
-        Die Gruppen ordnen die Ämter im Zeitstrahl, z. B. Verein und Dachverband. Zum Ändern der Reihenfolge am Griff ziehen. Mit
-        „Amtszeiten gemeinsam“ haben alle Ämter einer Gruppe dieselben Jahre und ein Gruppenbild, z. B. ein Königshaus; vorhandene
-        Amtszeiten mit denselben Jahren werden dabei zusammengefasst. Die Bezeichnung steht über der Gruppe (z. B. „Königshäuser“), die
-        Einzahl über einer einzelnen gemeinsamen Amtszeit (z. B. „Königshaus 2026–2028“).
-      </p>
       <FormError error={error} />
       {list.length > 0 && (
         <ul className="card-list">
@@ -541,9 +531,6 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
             <option value="">Ohne Gruppe</option>
           </select>
         </label>
-        <p className="muted small">
-          Die Einzahl steht auf der Seite einer Person bei ihren Amtszeiten. Leer: der Name des verknüpften Titels, sonst die Bezeichnung.
-        </p>
         <div className="button-row">
           <button className="btn" type="submit" disabled={busy}>
             Speichern
@@ -596,10 +583,6 @@ function TitleLink({ office, onToast, reload }: { office: Office; onToast: Toast
   return (
     <section className="card form">
       <h3>{sec.titles} vergeben</h3>
-      <p className="muted small">
-        Wer eine laufende Amtszeit hat (mit Konto, als Mitglied), bekommt den {sec.titles} automatisch; wer keine mehr hat, verliert ihn.
-        Von Hand lässt er sich dann nicht mehr vergeben. Lösen ändert an den vergebenen nichts.
-      </p>
       {!allowed ? (
         <p className="muted small">
           {office.linked_title ? `Verknüpft mit „${office.linked_title}“. ` : ''}Ändern kann das, wer {sec.titles} verwalten darf.
@@ -1210,10 +1193,6 @@ function OfficeLink({ onToast }: { onToast: Toast }) {
       <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/aemter')}>
         ‹ Alle {sec.offices}
       </button>
-      <p className="muted small">
-        Personen, die in Amtszeiten nur mit ihrem Namen stehen, aber als Mitglied, Ehemaliger oder in der Mitgliederliste angelegt sind.
-        Verknüpfst du sie, stehen im Zeitstrahl ihr Konto und ihr Foto, und Ämter mit {sec.titles} vergeben ihn.
-      </p>
       {list.length === 0 ? (
         <Empty>Keine Vorschläge: Kein freier Name passt zu einer Person in der App.</Empty>
       ) : (
@@ -1312,12 +1291,6 @@ function OfficeImport({ onToast }: { onToast: Toast }) {
         ‹ Alle {sec.offices}
       </button>
       <h2 className="member-name">Tabelle importieren</h2>
-      <p className="muted small">
-        Eine Zeile je Amtszeit, Spalten getrennt durch Semikolon (oder Tabulator, z. B. aus einer Tabellenkalkulation kopiert):{' '}
-        <code>gruppe;amt;beginn;ende;art;personen;zusatz;ehrung</code>. Ende „heute“ heißt: läuft noch; Ende leer: ein einzelnes Jahr. Art
-        ist meist leer („zeitraum“ oder „zeitpunkt“ erzwingt sie). Mehrere Personen mit „&amp;“ trennen. Ehrung „ja“ markiert die Zeile als
-        Ehrung; leer oder „nein“: keine Ehrung. Ohne diese Spalte (7 Spalten) entstehen keine Ehrungen, auch nicht bei „zeitpunkt“.
-      </p>
       <label className="field">
         <span>Tabelle</span>
         <textarea

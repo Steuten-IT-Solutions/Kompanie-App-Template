@@ -8271,6 +8271,11 @@ components:
         - $ref: '#/components/schemas/MemberSummary'
         - type: object
           properties:
+            extra_roles:
+              allOf: [{ $ref: '#/components/schemas/ExtraRoles' }]
+              description: |
+                Zusatzrollen nur für Personen mit Recht promote_users, sonst leer (Issue #349). Die Liste
+                (`GET /members`) enthält sie weiter, weil der Punktefaktor beim Buchen davon abhängt.
             point_list:
               type: array
               items: { $ref: '#/components/schemas/PointEntry' }

@@ -63,10 +63,6 @@ export default function RechteMatrix({
 
   return (
     <div className="rights-matrix-view">
-      <p className="small muted">
-        Je Zeile ein Recht, je Spalte eine Rolle. Der Haken in der Zeile einer Gruppe setzt alle Rechte der Gruppe für diese Rolle. Gast
-        gilt auch für alle, die die App ohne Anmeldung öffnen.
-      </p>
       <div className="rights-matrix-scroll">
         <table className="rights-matrix">
           <thead>
