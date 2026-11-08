@@ -17,7 +17,8 @@ Tippe unten auf **Verwaltung**, dann auf **Mitglieder** und über der Liste auf 
 - **Vorname** und **Nachname**.
 - **Ohne Zugang (meldet sich noch nicht an)**: für Personen ohne Konto (siehe unten). Dann fehlt das Feld für den Benutzernamen.
 - **Benutzername (optional)**, **E-Mail (optional)**, **Handynummer (optional)** und **Adresse (optional)** mit Land, Straße, Nr., Adresszusatz, PLZ und Ort.
-- **Rolle**: nur, wenn ein {rolle.admin} weitere Rollen für neue Konten freigegeben hat (z. B. Anwärter). Sonst werden neue Konten {rolle.member}.
+- **Rolle**: die Rollen, die du vergeben darfst. Darfst du **Rollen vergeben**, sind das alle Rollen, die du auch danach unter **Konto und Rolle** vergeben dürftest (z. B. Vorstand); sonst {rolle.member} und die Rollen, die ein {rolle.admin} für neue Konten freigegeben hat (z. B. Anwärter). Gibt es nur {rolle.member}, fehlt die Auswahl. {rolle.admin} können in der eigenständigen Version auch {rolle.admin} anlegen; die App fragt dann nach.
+- **Zusatzrollen (optional)**: nur, wenn du Rollen vergeben darfst und die gewählte Rolle zur Kompanie gehört. Hake die Zusatzrollen an, die die Person gleich bekommen soll.
 - **{bereich.points} (Anfangsbestand, optional)** mit **Stand vom** und **{begriff.rank} (optional)**: nur für {rolle.member} und nur, wenn du auch {bereich.points} bzw. {bereich.ranks} verwalten darfst. Gedacht für die Übernahme bestehender Mitglieder.
 - **Geburtstag (optional)** mit Tag, Monat und Jahr: nur, wenn die Kompanie {bereich.birthdays} nutzt.
 - **Foto (optional)** mit **Foto auswählen**.
@@ -49,7 +50,7 @@ So trägst du eine Person ein, die noch kein Konto hat, z. B. weil sie in einer 
 - Handynummer und Adresse prüft die App wie unter **Meins → Konto**, z. B. ob die Postleitzahl zum Land passt. Ist etwas ungültig, wird das Konto nicht angelegt.
 - Persönliche Angaben (E-Mail-Adresse, Handynummer, Adresse, Geburtstag) trägst du beim Anlegen ein; danach sieht sie auf der Seite des Mitglieds nur, wer das Recht **Persönliche Angaben sehen** hat, und ändern darf sie, wer **Persönliche Angaben pflegen** hat. Die E-Mail-Adresse siehst du weiter unter **Konto und Rolle**. Tippst du dort auf die Adresse, zeigt die Karten-App den Ort: Auf Android wählst du die App aus (z. B. Google Maps oder Waze), auf iPhone und Mac öffnet sich Apple Karten, am PC Google Maps.
 - Das Startpasswort steht **nur dieses eine Mal** da. Eine E-Mail verschickt die App nicht. **Teilen …** gibt es nur, wenn dein Gerät es kann.
-- Andere Rollen vergibt danach, wer Rollen vergeben darf (unter **Konto und Rolle** auf der Seite des Mitglieds).
+- Rolle und Zusatzrollen lassen sich danach unter **Konto und Rolle** auf der Seite des Mitglieds ändern, von allen, die Rollen vergeben dürfen.
 - Ist **Zugang beantragen** eingeschaltet, können Personen ihren Zugang auch selbst beantragen; du gibst ihn dann nur noch frei (siehe [Anfragen auf einen Zugang](seite:anfragen-freigeben)).
 - Ein Mitglied ohne Zugang bekommt keine Benachrichtigungen aufs Handy. E-Mails an alle Mitglieder bekommt es nur, wenn eine E-Mail-Adresse eingetragen ist. Eine Person, die schon ausgeschieden ist, trägst du besser als ehemalig ein (siehe [Ehemalige](seite:ehemalige-mitglieder)).
 - Wie die neue Person die App aufs Handy holt und sich anmeldet, steht unter [App installieren](seite:app-installieren) und [Mein Konto](seite:anmelden-und-konto).

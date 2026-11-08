@@ -4498,10 +4498,12 @@ paths:
         Kleinschreibung egal): vorname (Pflicht), nachname (auch name), status (auch rolle), benutzername, e-mail,
         handynummer (auch handy, mobil), straße, hausnummer, adresszusatz, plz, ort, land (Name oder ISO-Code, leer = DE;
         Prüfung wie `AddressInput`), geburtstag, eintritt, punkte, dienstgrad, titel (mit Komma getrennt), ausgeschieden,
-        grund, zugang (auch anmeldung: leer/ja wie bisher, nein = Mitglied ohne Zugang wie `no_access` bei `POST /users`,
+        grund, zusatzrollen (Bezeichnungen mit Komma getrennt, wie `extra_roles` bei `POST /users`; ohne promote_users
+        übergangen), zugang (auch anmeldung: leer/ja wie bisher, nein = Mitglied ohne Zugang wie `no_access` bei `POST /users`,
         ohne Startpasswort und nicht in `created`, gezählt in `new.no_access`; bei Ehemaligen ohne Bedeutung). Unbekannte Spalten und
         Spalten zu ausgeschalteten Bereichen bzw. ohne das Recht dazu stehen in `columns.ignored`.
-        status: leer, „Mitglied“ oder die Bezeichnung einer Rolle, die sich beim Anlegen wählen lässt; „ehemalig“ legt ein
+        status: leer, „Mitglied“ oder die Bezeichnung einer Rolle, die die Person beim Anlegen vergeben darf (wie `level`
+        bei `POST /users`; eine andere Rolle ist ein Fehler der Zeile); „ehemalig“ legt ein
         Konto ohne Anmeldung an, das gleich als ehemalig eingetragen ist (wie `/members/former/import`; eintritt
         „Gründer“, ausgeschieden und grund nur dann). Punkte, Dienstgrad (Bezeichnung) und Titel (Bezeichnungen) nur für
         Rollen mit Mitgliederbereich. Geburtstag als TT.MM.JJJJ, TT.MM. oder JJJJ-MM-TT; Eintritt als TT.MM.JJJJ oder Jahr.
@@ -4893,11 +4895,13 @@ paths:
   /users:
     post:
       tags: [Verwaltung]
-      summary: Mitglied anlegen (oder mit einer Rolle für neue Konten, z. B. Anwärter)
+      summary: Mitglied anlegen (oder mit einer anderen Rolle, die die Person vergeben darf, z. B. Anwärter)
       description: |
-        Erzeugt ein zufälliges Startpasswort, das nur in dieser Antwort steht. Es wird keine E-Mail verschickt. `level`:
-        `member` oder eine Rolle mit `new_accounts` (`/config` → `roles`), sonst 400. Wer kein Admin ist, nur Rollen mit
-        höchstens `member` bzw. `calendar` und `view_intern` oder mit Rechten, die er selbst weitergeben darf (sonst 403).
+        Erzeugt ein zufälliges Startpasswort, das nur in dieser Antwort steht. Es wird keine E-Mail verschickt. `level`: eine
+        Rolle, die die Person vergeben darf (`/config` → `user.create_roles`, RoleService::canCreateAs): `member` und Rollen
+        mit `new_accounts` (wer kein Admin ist, nur mit höchstens `member` bzw. `calendar` und `view_intern` oder mit Rechten,
+        die er selbst weitergeben darf); mit `promote_users` außerdem jede Rolle, die sie auch mit `PATCH
+        /members/{id}/role` vergeben dürfte; `admin` nur Admins in der eigenständigen Version. Unbekannte Rolle 400, sonst 403.
       x-capability: create_users
       requestBody:
         required: true
@@ -4914,7 +4918,7 @@ paths:
                 email: { type: string, format: email }
                 phone: { type: string, maxLength: 30, description: 'Handynummer (optional), Prüfung wie bei `PATCH /me/account`' }
                 address: { $ref: '#/components/schemas/AddressInput' }
-                level: { allOf: [{ $ref: '#/components/schemas/Level' }], default: member, description: 'member oder eine Rolle mit new_accounts' }
+                level: { allOf: [{ $ref: '#/components/schemas/Level' }], default: member, description: 'Eine Rolle aus `/config` → `user.create_roles` (siehe `POST /users`)' }
                 initial_points: { type: integer, minimum: 0, description: 'Anfangsbestand (nur Mitglieder, Bereich Punkte und Recht manage_points)' }
                 initial_points_date: { type: string, format: date, description: Datum der Buchung (Standard heute) }
                 rank_id: { type: integer, description: 'Dienstgrad (Bereich Dienstgrade, Recht manage_ranks); mit Punkten muss der Anfangsbestand die Schwelle erreichen' }
@@ -4923,6 +4927,12 @@ paths:
                   description: Foto (optional), vorab geprüft wie bei `PUT /members/{id}/photo`
                   allOf:
                     - $ref: '#/components/schemas/PhotoFile'
+                extra_roles:
+                  allOf: [{ $ref: '#/components/schemas/ExtraRoles' }]
+                  description: >-
+                    Zusatzrollen (optional, Issue #66): nur mit promote_users, nur eigene Rollen, die die Person auch mit `PATCH
+                    /members/{id}/role` vergeben dürfte (`/config` → `user.create_extra_roles`), und nur zu einer Grundrolle,
+                    die zur Kompanie gehört (`roles[].company`); sonst 400 bzw. 403.
                 no_access:
                   type: boolean
                   description: >-
@@ -5070,7 +5080,7 @@ paths:
   /users/bulk:
     post:
       tags: [Verwaltung]
-      summary: Mehrere Mitglieder (bzw. mit einer Rolle für neue Konten) auf einmal anlegen (Issue #24)
+      summary: Mehrere Mitglieder (bzw. mit einer anderen Rolle, die die Person vergeben darf) auf einmal anlegen (Issue #24)
       description: |
         Höchstens 50. Erst werden alle Einträge geprüft (Namen, Benutzernamen und E-Mail auch untereinander,
         Handynummer, Adresse, Anfangspunkte, Dienstgrad, Geburtstag, Foto); bei einem Fehler wird keiner angelegt, die Meldung nennt die Zeile.
@@ -5086,7 +5096,8 @@ paths:
               type: object
               required: [people]
               properties:
-                level: { allOf: [{ $ref: '#/components/schemas/Level' }], default: member, description: 'member oder eine Rolle mit new_accounts' }
+                level: { allOf: [{ $ref: '#/components/schemas/Level' }], default: member, description: 'Eine Rolle aus `/config` → `user.create_roles` (siehe `POST /users`)' }
+                extra_roles: { allOf: [{ $ref: '#/components/schemas/ExtraRoles' }], description: 'Zusatzrollen für alle (wie bei `POST /users`)' }
                 people:
                   type: array
                   maxItems: 50
@@ -5106,9 +5117,10 @@ paths:
                       rank_id: { type: integer }
                       birthday: { $ref: '#/components/schemas/BirthdayString' }
                       photo: { $ref: '#/components/schemas/PhotoFile' }
+                      no_access: { type: boolean, description: 'Ohne Zugang anlegen wie bei `POST /users`; kein Startpasswort' }
       responses:
         '201':
-          description: Ergebnis je Person (angelegt mit Startpasswort oder mit Grund nicht)
+          description: Ergebnis je Person (angelegt mit Startpasswort bzw. ohne Zugang oder mit Grund nicht)
           content:
             application/json:
               schema:
@@ -7579,7 +7591,8 @@ components:
         label: { type: string }
         points_factor: { type: number, description: 'Gilt beim Buchen von Punkten, z. B. 0.5; bei mehreren Rollen der kleinste' }
         extra: { type: boolean, description: 'Als Zusatzrolle vergebbar (eigene Rollen; nicht guest, member, admin)' }
-        new_accounts: { type: boolean, description: 'Beim Anlegen von Konten wählbar (POST /users): immer bei member, sonst nach Einstellung' }
+        company: { type: boolean, description: 'Gehört zur Kompanie (Recht member, nicht admin): nur zu solchen Grundrollen gibt es Zusatzrollen' }
+        new_accounts: { type: boolean, description: 'Beim Anlegen von Konten für alle mit create_users wählbar: immer bei member, sonst nach Einstellung (wer Rollen vergeben darf, siehe user.create_roles)' }
         promotable: { type: boolean, description: 'Personen mit dieser Rolle lassen sich mit create_users als Mitglied aufnehmen (POST /members/{id}/promote), z. B. Anwärter' }
 
     RoleAdmin:
@@ -7619,6 +7632,14 @@ components:
         level: { $ref: '#/components/schemas/Level' }
         extra_roles: { $ref: '#/components/schemas/ExtraRoles' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
+        create_roles:
+          type: array
+          items: { $ref: '#/components/schemas/Level' }
+          description: 'Nur mit create_users: Rollen, die die Person beim Anlegen vergeben darf (`POST /users`, `/users/bulk`, Import, Anfragen freigeben)'
+        create_extra_roles:
+          type: array
+          items: { $ref: '#/components/schemas/Level' }
+          description: 'Nur mit create_users: Zusatzrollen, die die Person beim Anlegen vergeben darf (`extra_roles`; leer ohne promote_users)'
         capabilities:
           type: array
           items:
@@ -8280,6 +8301,7 @@ components:
               founder: { type: boolean }
               left_on: { $ref: '#/components/schemas/FormerDate' }
               no_access: { type: boolean, description: 'Spalte zugang „nein“: Mitglied ohne Zugang; fehlt sonst' }
+              extra_roles: { type: array, items: { type: string }, description: 'Spalte zusatzrollen: Bezeichnungen der Zusatzrollen; fehlt ohne' }
               existing:
                 description: Konto mit genau diesem Namen gibt es schon (wird übersprungen)
                 type: object
@@ -9058,6 +9080,7 @@ components:
         username: { type: string }
         email: { type: string }
         level: { $ref: '#/components/schemas/Level' }
+        extra_roles: { allOf: [{ $ref: '#/components/schemas/ExtraRoles' }], description: 'Zusatzrollen, wenn welche mitgeschickt wurden; fehlt sonst' }
         warning: { type: string, description: 'Konto angelegt, aber Anfangspunkte, Dienstgrad, Geburtstag bzw. Foto nicht übernommen' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
         password: { type: string, description: Startpasswort; steht nur in dieser Antwort; fehlt bei no_access }

@@ -17,6 +17,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Rolle und Zusatzrollen gleich beim Anlegen**: Wer Rollen vergeben darf, wählt beim Anlegen eines Mitglieds jetzt
+  jede Rolle, die er auch danach unter *Konto und Rolle* vergeben dürfte (z. B. Vorstand), und hakt Zusatzrollen an.
+  Das gilt für *Mitglied anlegen*, *Mehrere auf einmal anlegen* (Rolle und Zusatzrollen für alle), den Import aus
+  Excel oder CSV (Spalte *Status* mit dem Namen der Rolle, neue Spalte *Zusatzrollen*, mit Komma getrennt) und das
+  Freigeben von Anfragen (nur Rolle). Wer nur Mitglieder anlegen darf, wählt wie bisher Mitglied und die Rollen, die
+  unter *Einstellungen → Rollen* für neue Konten freigegeben sind. Die Rechte prüft der Server.
+- **Mehrere auf einmal ohne Zugang**: Unter *Mehrere auf einmal anlegen* gibt es je Person den Haken *Ohne Zugang*.
 - **Eigene Seiten aus Blöcken, mit Countdown**: Eine eigene Seite besteht jetzt aus Blöcken, die ihr unter
   *Inhalt* mit *+ Block einfügen* hinzufügt, mit ↑/↓ verschiebt und entfernt. Neben *Text* gibt es als ersten
   vorgefertigten Block den *Countdown*: Er zählt bis zu einem Datum oder einem Termin aus den Terminen herunter

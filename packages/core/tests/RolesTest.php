@@ -219,8 +219,7 @@ final class RolesTest extends TestCase
         $users->current = $admin;
         $call = static fn (string $method, string $path, array $body = []) => $app->api()->handle(new Request($method, $path, [], $body));
         $friend = $app->roles()->create(['label' => 'Freunde', 'capabilities' => ['calendar']])['key'];
-        $this->assertSame(400, $call('POST', '/users', ['name' => 'Fritz', 'level' => $friend])->status, 'nicht freigegeben');
-        $this->assertSame(400, $call('POST', '/users', ['name' => 'Fritz', 'level' => Roles::ADMIN])->status);
+        $this->assertSame(400, $call('POST', '/users', ['name' => 'Fritz', 'level' => 'gibtsnicht'])->status, 'unbekannte Rolle');
         $this->assertSame(400, $call('POST', '/admin/roles', ['label' => 'X', 'capabilities' => ['member'], 'promotable' => true])->status, 'nur ohne Mitgliederbereich');
         $this->assertSame(400, $call('POST', '/admin/roles', ['label' => 'X', 'new_accounts' => 'ja'])->status);
         $this->assertSame(400, $call('PATCH', "/admin/roles/$friend", ['promotable' => true, 'capabilities' => ['member']])->status);

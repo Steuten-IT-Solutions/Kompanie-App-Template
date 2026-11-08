@@ -597,18 +597,21 @@ final class RoleService
 
     /**
      * Für /config: Schlüssel, Bezeichnung, Punktefaktor (die Bezeichnungen braucht die App überall), ob die Rolle als
-     * Zusatzrolle taugt (Issue #66), ob neue Konten sie bekommen können und ob sie sich zum Mitglied machen lässt.
+     * Zusatzrolle taugt (Issue #66), ob sie zur Kompanie gehört (dann gibt es Zusatzrollen zu ihr), ob neue Konten sie
+     * bekommen können und ob sie sich zum Mitglied machen lässt.
      *
-     * @return array<int, array{key: string, label: string, points_factor: float, extra: bool, new_accounts: bool, promotable: bool}>
+     * @return array<int, array{key: string, label: string, points_factor: float, extra: bool, company: bool, new_accounts: bool, promotable: bool}>
      */
     public function publicList(): array
     {
         return array_values(array_map(
-            static fn (array $r): array => [
+            fn (array $r): array => [
                 'key' => $r['key'],
                 'label' => $r['label'],
                 'points_factor' => $r['points_factor'],
                 'extra' => self::canBeExtra($r['key']),
+                // Gehört zur Kompanie (Mitgliederbereich, nicht Admin): nur dazu gibt es Zusatzrollen
+                'company' => $this->allowsExtraRoles($r['key']),
                 'new_accounts' => $r['key'] === Roles::MEMBER || $r['new_accounts'],
                 'promotable' => $r['promotable'],
             ],
@@ -1024,18 +1027,56 @@ final class RoleService
     }
 
     /**
-     * Rollen, die $actor neuen Konten geben darf (Mitglieder anlegen): Mitglied und die eigenen Rollen, die der Admin
-     * dafür freigegeben hat. Wer kein Admin ist, nur solche mit höchstens dem Mitgliederbereich bzw. dem Kalender oder
-     * mit Rechten, die er selbst weitergeben darf (canHandle): Konten anlegen soll keine weiteren Rechte verschaffen.
+     * Rollen, die $actor neuen Konten geben darf (Mitglieder anlegen, einzeln, mehrere, Import, Anfragen freigeben):
+     * - Mitglied und die eigenen Rollen, die der Admin dafür freigegeben hat (new_accounts, z. B. Anwärter). Wer kein
+     *   Admin ist, nur solche mit höchstens dem Mitgliederbereich bzw. dem Kalender oder mit Rechten, die er selbst
+     *   weitergeben darf (canHandle): Konten anlegen soll keine weiteren Rechte verschaffen.
+     * - Jede andere Rolle, die $actor der Person gleich danach auch über „Rollen vergeben“ geben dürfte (promote_users
+     *   und canHandle): Anlegen mit Rolle ist dann nur ein Schritt statt zwei. Admin nur, wenn $actor Admin ist und die
+     *   App Admins ernennen kann (eigenständige Version; bei WordPress im WP-Backend).
      */
     public function canCreateAs(User $actor, string $key): bool
     {
         $role = $this->find($key);
-        if ($role === null || ($key !== Roles::MEMBER && !$role['new_accounts'])) {
+        if ($role === null) {
             return false;
         }
-        $basic = array_filter($this->capabilities($key), static fn (Capability $c): bool => !$c->isView() && $c !== Capability::Member) === [];
-        return $actor->isAdmin() || $basic || $this->canHandle($actor, $key);
+        if ($key === Roles::ADMIN) {
+            return $actor->isAdmin() && $this->users->canAssignAdmin();
+        }
+        if ($key === Roles::MEMBER || $role['new_accounts']) {
+            $basic = array_filter($this->capabilities($key), static fn (Capability $c): bool => !$c->isView() && $c !== Capability::Member) === [];
+            if ($actor->isAdmin() || $basic || $this->canHandle($actor, $key)) {
+                return true;
+            }
+        }
+        return $actor->can(Capability::PromoteUsers) && $this->canHandle($actor, $key);
+    }
+
+    /**
+     * Schlüssel der Rollen, die $actor neuen Konten geben darf (canCreateAs), in der Reihenfolge der Rollen; für die
+     * Auswahl beim Anlegen.
+     *
+     * @return list<string>
+     */
+    public function creatableRoles(User $actor): array
+    {
+        return array_values(array_filter(array_keys($this->all()), fn (string $key): bool => $this->canCreateAs($actor, $key)));
+    }
+
+    /**
+     * Schlüssel der Rollen, die $actor neuen Konten als Zusatzrolle geben darf (Issue #66): eigene Rollen, die er auch
+     * über „Rollen vergeben“ vergeben dürfte (promote_users und canHandle). Ob die Grundrolle Zusatzrollen zulässt,
+     * sagt allowsExtraRoles (in /config: roles[].company).
+     *
+     * @return list<string>
+     */
+    public function creatableExtraRoles(User $actor): array
+    {
+        if (!$actor->can(Capability::PromoteUsers)) {
+            return [];
+        }
+        return array_values(array_filter(array_keys($this->all()), fn (string $key): bool => self::canBeExtra($key) && $this->canHandle($actor, $key)));
     }
 
     /** Lässt sich die Rolle von denen mit „Mitglieder anlegen“ zum Mitglied machen (z. B. Anwärter, Issue #23)? */

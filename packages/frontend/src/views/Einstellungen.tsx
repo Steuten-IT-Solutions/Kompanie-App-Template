@@ -7,7 +7,7 @@ import {
   applyBirthdayUpcomingDays,
   applyFeatures,
   applyRegistration,
-  newAccountRoles,
+  registrationRoles,
   newsTitle,
   refreshRoles,
   type AdminSettings,
@@ -295,7 +295,7 @@ function RegistrationSection({ onToast }: { onToast: (msg: string) => void }) {
   if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const s = data!;
-  const roles = newAccountRoles();
+  const roles = registrationRoles();
 
   async function save(change: { enabled?: boolean; default_role?: string }) {
     setBusy(true);

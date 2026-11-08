@@ -732,8 +732,9 @@ final class ApiScenario
             $this->users[] = $u['id'];
         }
         $c->ok($s === 201 && ($u['level'] ?? '') === $this->anw, 'Konto als Anwärter anlegen');
-        $c->ok($this->req('POST', '/users', ['name' => 'X', 'level' => 'admin'])[0] === 400, 'Neues Konto als Admin → 400');
-        $c->ok($this->req('POST', '/users', ['name' => 'X', 'level' => $this->leitung])[0] === 400, 'Rolle nicht für neue Konten freigegeben → 400');
+        $c->ok($this->req('POST', '/users', ['name' => 'X', 'level' => 'admin'])[0] === 403, 'Neues Konto als Admin ohne Admin-Rechte → 403');
+        $c->ok($this->req('POST', '/users', ['name' => 'X', 'level' => $this->leitung])[0] === 403, 'Rolle nicht für neue Konten freigegeben, ohne Rollen vergeben → 403');
+        $c->ok($this->req('POST', '/users', ['name' => 'X', 'level' => 'gibtsnicht'])[0] === 400, 'Unbekannte Rolle → 400');
         $c->ok($this->req('POST', '/members/' . ($u['id'] ?? 0) . '/password')[0] === 200, 'Passwort eines Anwärters zurücksetzen');
         $list = array_column((array) $this->req('GET', '/members')[1], 'level', 'id');
         $withCand = array_column((array) $this->req('GET', '/members', [], ['candidates' => '1'])[1], 'level', 'id');

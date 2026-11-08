@@ -1,5 +1,17 @@
 import { useState, type FormEvent } from 'react';
-import { api, config, newAccountRoles, type AccountProfile, type BulkResult, type CreatedUser, type Level, type NewPerson } from '../api';
+import {
+  api,
+  config,
+  levelLabel,
+  newAccountExtraRoles,
+  newAccountRoles,
+  type AccountProfile,
+  type BulkResult,
+  type CreatedUser,
+  type Level,
+  type NewPerson,
+  type RoleInfo,
+} from '../api';
 import brand from '../generated/brand';
 import { todayYmd } from '../format';
 import { installUrl } from '../install';
@@ -113,14 +125,25 @@ export function Credentials({
   );
 }
 
-type Row = NewPerson & { points: string; bday: BirthdayValue; picture: PreparedPhoto | null; postal: Address };
+type Row = NewPerson & { points: string; bday: BirthdayValue; picture: PreparedPhoto | null; postal: Address; noAccess: boolean };
 
 /**
- * Rolle neuer Konten: Mitglied oder eine eigene Rolle, die der Admin dafür freigegeben hat (Einstellungen → Rollen,
- * z. B. Anwärter). Ohne freigegebene Rollen keine Auswahl: Neue Konten sind dann Mitglieder.
+ * Rolle neuer Konten: die Rollen, die der Anlegende vergeben darf (newAccountRoles: Mitglied, die Rollen „für neue Konten“,
+ * z. B. Anwärter, und mit „Rollen vergeben“ jede Rolle, die er auch danach vergeben dürfte). Nur eine Rolle: keine
+ * Auswahl, neue Konten sind dann Mitglieder.
  */
-export function NewAccountRole({ label, value, onChange }: { label: string; value: Level; onChange: (level: Level) => void }) {
-  const roles = newAccountRoles();
+export function NewAccountRole({
+  label,
+  value,
+  onChange,
+  roles = newAccountRoles(),
+}: {
+  label: string;
+  value: Level;
+  onChange: (level: Level) => void;
+  /** Statt aller Rollen, die der Benutzer vergeben darf (z. B. ohne Admin beim Freigeben) */
+  roles?: RoleInfo[];
+}) {
   if (roles.length < 2) return null;
   return (
     <label className="field">
@@ -136,6 +159,41 @@ export function NewAccountRole({ label, value, onChange }: { label: string; valu
   );
 }
 
+/**
+ * Zusatzrollen neuer Konten (Issue #66): nur für alle, die Rollen vergeben dürfen, nur Rollen, die sie vergeben dürfen,
+ * und nur zu einer Grundrolle, die zur Kompanie gehört (newAccountExtraRoles). Sonst nichts.
+ */
+export function NewAccountExtraRoles({ base, value, onChange }: { base: Level; value: Level[]; onChange: (keys: Level[]) => void }) {
+  const roles = newAccountExtraRoles(base);
+  if (roles.length === 0) return null;
+  const toggle = (key: Level, on: boolean) => onChange(roles.map((r) => r.key).filter((k) => (k === key ? on : value.includes(k))));
+  return (
+    <fieldset className="field role-control extra-roles">
+      <legend className="field-label">Zusatzrollen (optional)</legend>
+      <p className="muted small">Die Person hat die Rechte aller ihrer Rollen zusammen.</p>
+      {roles.map((r) => (
+        <label key={r.key} className="toggle">
+          <input type="checkbox" checked={value.includes(r.key)} onChange={(e) => toggle(r.key, e.target.checked)} />
+          {r.label}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
+/** Nur die Zusatzrollen, die zur Grundrolle passen (nach einem Wechsel der Grundrolle). */
+export const validExtraRoles = (base: Level, keys: Level[]): Level[] => {
+  const allowed = newAccountExtraRoles(base).map((r) => r.key);
+  return keys.filter((k) => allowed.includes(k));
+};
+
+/** Vor dem Anlegen als Admin nachfragen (wie bei „Rollen vergeben“): Admins dürfen alles. */
+export function confirmNewAdmin(level: Level): boolean {
+  return (
+    level !== 'admin' || window.confirm(`Wirklich als ${levelLabel('admin')} anlegen? Admins dürfen alles, auch Einstellungen ändern.`)
+  );
+}
+
 const emptyRow = (): Row => ({
   first_name: '',
   last_name: '',
@@ -146,16 +204,18 @@ const emptyRow = (): Row => ({
   points: '',
   bday: emptyBirthday(),
   picture: null,
+  noAccess: false,
 });
 
 /**
- * Mehrere Mitglieder auf einmal anlegen (Issue #24): je Zeile Vor- und Nachname, optional Benutzername, E-Mail,
- * Handynummer, Adresse (aufklappbar), Anfangspunkte, Geburtstag und Foto; Rolle für alle. Der Server prüft erst alles; bei einem Fehler wird keiner angelegt. Die Fotos (im
+ * Mehrere Mitglieder auf einmal anlegen (Issue #24): je Zeile Vor- und Nachname, „Ohne Zugang“, optional Benutzername,
+ * E-Mail, Handynummer, Adresse (aufklappbar), Anfangspunkte, Geburtstag und Foto; Rolle für alle. Der Server prüft erst alles; bei einem Fehler wird keiner angelegt. Die Fotos (im
  * Browser schon gelesen und verkleinert) kommen danach einzeln: Alle in einer Anfrage würden zu groß für viele Server.
  */
 export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
   const [rows, setRows] = useState([emptyRow(), emptyRow(), emptyRow()]);
   const [level, setLevel] = useState<Level>('member');
+  const [extraRoles, setExtraRoles] = useState<Level[]>([]);
   const [date, setDate] = useState(todayYmd());
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -178,22 +238,24 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
       if (typeof bday === 'string') return setFormError(`Zeile ${i + 1} (${`${name.first_name} ${name.last_name}`.trim()}): ${bday}`);
       people.push({
         ...name,
-        ...(r.username?.trim() ? { username: r.username.trim() } : {}),
+        ...(r.username?.trim() && !r.noAccess ? { username: r.username.trim() } : {}),
         ...(r.email && normalizeEmail(r.email) ? { email: normalizeEmail(r.email) } : {}),
         ...(r.phone && normalizePhone(r.phone) ? { phone: normalizePhone(r.phone) } : {}),
         ...(addressInput(r.postal) ? { address: addressInput(r.postal) } : {}),
         ...(points && Number(r.points) > 0 ? { initial_points: Number(r.points), initial_points_date: date } : {}),
         ...(bday ? { birthday: birthdayString(bday) } : {}),
+        ...(r.noAccess ? { no_access: true } : {}),
       });
     }
     if (people.length === 0) return setFormError('Bitte mindestens einen Namen eintragen.');
+    if (!confirmNewAdmin(level)) return;
     setBusy(true);
     try {
-      const out = await api.createUsers(level, people);
+      const out = await api.createUsers(level, people, validExtraRoles(level, extraRoles));
       // Ein Ergebnis je Person, in derselben Reihenfolge (angelegt oder mit Grund nicht).
       for (const [i, r] of out.entries()) {
         const picture = pictures[i];
-        if (!picture || !('password' in r)) continue;
+        if (!picture || 'error' in r) continue;
         try {
           r.photo_url = (await api.uploadMemberPhoto(r.id, picture.file)).photo_url;
         } catch (err) {
@@ -210,10 +272,12 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
 
   if (results) {
     const created = results.filter((r): r is CreatedUser => 'password' in r);
+    const withoutAccess = results.filter((r): r is CreatedUser => !('error' in r) && !!r.no_access);
     const failed = results.filter((r): r is Extract<BulkResult, { error: string }> => 'error' in r);
+    const count = created.length + withoutAccess.length;
     return (
       <div>
-        <h2 className="member-name no-print">{created.length === 1 ? '1 Konto angelegt' : `${created.length} Konten angelegt`}</h2>
+        <h2 className="member-name no-print">{count === 1 ? '1 Konto angelegt' : `${count} Konten angelegt`}</h2>
         {failed.length > 0 && (
           <div className="form-error no-print" role="alert">
             Nicht angelegt:
@@ -226,7 +290,27 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
             </ul>
           </div>
         )}
-        <Credentials people={created} onDone={() => navigate('verwaltung/mitglieder')} />
+        {withoutAccess.length > 0 && (
+          <div className="card created no-access-created no-print">
+            <p>
+              Ohne Zugang: {withoutAccess.map((p) => p.name).join(', ')}. Sie melden sich noch nicht an; einen Zugang gibt es später beim
+              Mitglied mit <strong>Zugang einrichten</strong> oder beim Freigeben einer Anfrage.
+            </p>
+            {withoutAccess
+              .filter((p) => p.warning)
+              .map((p) => (
+                <p key={p.id} className="form-error" role="alert">
+                  {p.name}: {p.warning}
+                </p>
+              ))}
+            {created.length === 0 && (
+              <button className="btn btn-block" onClick={() => navigate('verwaltung/mitglieder')}>
+                ‹ Zur Mitgliederliste
+              </button>
+            )}
+          </div>
+        )}
+        {created.length > 0 && <Credentials people={created} onDone={() => navigate('verwaltung/mitglieder')} />}
       </div>
     );
   }
@@ -237,21 +321,28 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
         ‹ Einzeln anlegen
       </button>
       <NewAccountRole label="Rolle für alle" value={level} onChange={setLevel} />
+      <NewAccountExtraRoles base={level} value={validExtraRoles(level, extraRoles)} onChange={setExtraRoles} />
       {rows.map((r, i) => (
         <fieldset key={i} className="fieldset bulk-row">
           <legend>Person {i + 1}</legend>
           <NameFields value={r} onChange={(n) => update(i, n)} required={false} />
+          <label className="toggle no-access-toggle">
+            <input type="checkbox" checked={r.noAccess} onChange={(e) => update(i, { noAccess: e.target.checked })} />
+            Ohne Zugang (meldet sich noch nicht an)
+          </label>
           <div className="field-row">
-            <label className="field">
-              <span>Benutzername (optional)</span>
-              <input
-                type="text"
-                autoComplete="off"
-                autoCapitalize="none"
-                value={r.username}
-                onChange={(e) => update(i, { username: e.target.value })}
-              />
-            </label>
+            {!r.noAccess && (
+              <label className="field">
+                <span>Benutzername (optional)</span>
+                <input
+                  type="text"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  value={r.username}
+                  onChange={(e) => update(i, { username: e.target.value })}
+                />
+              </label>
+            )}
             <EmailField value={r.email ?? ''} onChange={(email) => update(i, { email })} />
           </div>
           <PhoneField value={r.phone ?? ''} onChange={(phone) => update(i, { phone })} />

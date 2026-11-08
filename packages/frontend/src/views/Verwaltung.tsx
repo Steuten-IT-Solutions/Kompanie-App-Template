@@ -55,7 +55,15 @@ import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeV
 import { installUrl } from '../install';
 import { useDragSort, useSaveQueue } from '../dragSort';
 import { PenaltyRow } from './Strafen';
-import { AccountPanel, BulkNewMembers, Credentials, NewAccountRole } from './Konten';
+import {
+  AccountPanel,
+  BulkNewMembers,
+  confirmNewAdmin,
+  Credentials,
+  NewAccountExtraRoles,
+  NewAccountRole,
+  validExtraRoles,
+} from './Konten';
 import { TitleBadges } from '../TitleBadges';
 import { MemberTitles, TitleList } from './TitelVerwalten';
 import { OfficeAdmin } from './AemterVerwalten';
@@ -1498,6 +1506,7 @@ function ResetPassword({
 function NewMember() {
   const [name, setName] = useState(emptyName());
   const [level, setLevel] = useState<Level>('member');
+  const [extraRoles, setExtraRoles] = useState<Level[]>([]);
   // Übernahme bestehender Mitglieder: Anfangspunkte (mit Punkte verwalten) und Dienstgrad (mit Dienstgrade verwalten).
   const [initialPoints, setInitialPoints] = useState('');
   const [initialDate, setInitialDate] = useState(todayYmd());
@@ -1524,6 +1533,7 @@ function NewMember() {
     if (!name.first_name.trim()) return setFormError('Bitte einen Vornamen angeben.');
     const bday = canEnterBirthdays() ? readBirthday(birthday) : null;
     if (typeof bday === 'string') return setFormError(bday);
+    if (!confirmNewAdmin(level)) return;
     setBusy(true);
     try {
       setCreated(
@@ -1534,6 +1544,7 @@ function NewMember() {
           ...(normalizePhone(phone) ? { phone: normalizePhone(phone) } : {}),
           ...(addressInput(address) ? { address: addressInput(address) } : {}),
           level,
+          ...(validExtraRoles(level, extraRoles).length > 0 ? { extra_roles: validExtraRoles(level, extraRoles) } : {}),
           ...(extras && canPoints() && pointsNum > 0 ? { initial_points: pointsNum, initial_points_date: initialDate } : {}),
           ...(extras && canRanks() && rankOptions.some((r) => String(r.id) === rankId) ? { rank_id: Number(rankId) } : {}),
           ...(bday ? { birthday: birthdayString(bday) } : {}),
@@ -1637,6 +1648,7 @@ function NewMember() {
       <PhoneField value={phone} onChange={setPhone} />
       <AddressFields value={address} onChange={setAddress} />
       <NewAccountRole label="Rolle" value={level} onChange={setLevel} />
+      <NewAccountExtraRoles base={level} value={validExtraRoles(level, extraRoles)} onChange={setExtraRoles} />
       {extras && canPoints() && (
         <>
           <label className="field">
@@ -1678,8 +1690,8 @@ function NewMember() {
         <PhotoPicker name={`${name.first_name} ${name.last_name}`.trim()} value={photo} onChange={setPhoto} onError={setFormError} />
       </fieldset>
       <p className="muted small">
-        {noAccess ? 'Ohne Zugang gibt es kein Startpasswort.' : 'Das neue Konto bekommt ein zufälliges Startpasswort.'} Andere Rollen
-        vergibt danach, wer Rollen vergeben darf.
+        {noAccess ? 'Ohne Zugang gibt es kein Startpasswort.' : 'Das neue Konto bekommt ein zufälliges Startpasswort.'}
+        {!can('promote_users') && ' Andere Rollen vergibt danach, wer Rollen vergeben darf.'}
       </p>
       {formError && (
         <p className="form-error" role="alert">

@@ -88,7 +88,8 @@ function RequestCard({
   const [linkTo, setLinkTo] = useState(strong ? String(strong.id) : '');
   const others = noAccess.filter((p) => !matches.some((m) => m.id === p.id));
   const linkName = noAccess.find((p) => String(p.id) === linkTo)?.name ?? matches.find((m) => String(m.id) === linkTo)?.name;
-  const roles = newAccountRoles();
+  // Admin nie über eine Anfrage (wie der Server)
+  const roles = newAccountRoles().filter((x) => x.key !== 'admin');
   const [level, setLevel] = useState<Level>(roles.some((x) => x.key === defaultRole) ? defaultRole : 'member');
   const [username, setUsername] = useState(r.username);
   const [rejecting, setRejecting] = useState(false);
@@ -178,7 +179,7 @@ function RequestCard({
       {linkTo ? (
         <p className="muted small">Das Mitglied behält seine Rolle und alle Einträge, z. B. in Chroniken und Listen.</p>
       ) : (
-        <NewAccountRole label="Rolle" value={level} onChange={setLevel} />
+        <NewAccountRole label="Rolle" value={level} onChange={setLevel} roles={roles} />
       )}
       {rejecting && (
         <label className="field">

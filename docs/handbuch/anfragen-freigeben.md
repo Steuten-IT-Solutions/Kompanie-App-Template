@@ -14,7 +14,7 @@ Je Anfrage eine Karte mit:
 - Der **Nachricht** der Person, wenn sie eine geschrieben hat.
 - **Mitglied ohne Zugang verbinden?**: nur, wenn es Mitglieder ohne Zugang gibt. Die App schlägt vor, wer passen könnte, mit dem Grund (**gleiche E-Mail-Adresse**, **gleicher Name** oder **ähnlicher Name**). Darunter kannst du jedes andere Mitglied ohne Zugang wählen.
 - **Benutzername**: der gewünschte Benutzername. Du kannst ihn ändern.
-- **Rolle**: nur, wenn es mehr als eine Rolle für neue Konten gibt. Vorausgewählt ist die Rolle, die ein {rolle.admin} dafür eingestellt hat. Du siehst nur Rollen, die du vergeben darfst; {rolle.admin} lässt sich hier nie vergeben.
+- **Rolle**: die Rollen, die du beim Anlegen vergeben darfst (siehe [Mitglied anlegen](seite:mitglieder-anlegen)). Vorausgewählt ist die Rolle, die ein {rolle.admin} dafür eingestellt hat. {rolle.admin} lässt sich hier nie vergeben.
 - **Freigeben** und **Ablehnen …**.
 
 ## So gehst du vor
