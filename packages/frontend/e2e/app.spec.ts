@@ -1113,7 +1113,7 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   await expect(page.locator('.meins-menu')).toBeVisible();
 });
 
-/** Navigation per API zurücksetzen (null = Standardnavigation), falls ein Test mittendrin scheitert. */
+/** Navigation per API zurücksetzen (Standardnavigation, ohne eigene Namen und Startseiten), falls ein Test mittendrin scheitert. */
 async function resetNavigation(page: Page) {
   await page.evaluate(async () => {
     const cfg = window.KOMPANIE_CONFIG!;
@@ -1121,7 +1121,7 @@ async function resetNavigation(page: Page) {
       method: 'PUT',
       headers: { [cfg.csrf.header]: cfg.csrf.token, 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ navigation: null }),
+      body: JSON.stringify({ navigation: null, names: {}, start: {}, show_labels: true }),
     });
   });
 }
@@ -1181,6 +1181,70 @@ test('Navigation einrichten (Issue #277): Untermenü umbenennen, Termine hineins
     await expect(page.getByText('Standardnavigation wiederhergestellt')).toBeVisible();
     await expect(tabbar.getByRole('button', { name: 'Intern' })).toBeVisible();
     await expect(tabbar.getByRole('button', { name: 'Termine' })).toBeVisible();
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD).catch(() => undefined);
+    await resetNavigation(page).catch(() => undefined);
+  }
+});
+
+test('Navigation (Issue #362): Galerie umbenennen mit eigenem Symbol, Startseite für Gäste, nur Symbole', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  try {
+    await adminMenu(page, 'Einstellungen');
+    await page
+      .locator('.settings-link')
+      .filter({ has: page.getByText('Navigation', { exact: true }) })
+      .click();
+    const card = page.locator('#einstellungen-navigation');
+    const row = card.locator('.row-main').filter({ has: page.getByLabel('Platz von Galerie') });
+    await row.getByText('Umbenennen').click();
+    // Erst das Symbol: Mit dem neuen Namen heißt auch die Zeile anders („Platz von Fotos“).
+    await row.getByLabel('Symbol').selectOption({ label: 'Kamera' });
+    await row.getByLabel('Eigener Name (leer = Standard)').fill('Fotos');
+    await card.getByLabel('Ohne Anmeldung').selectOption({ label: 'Fotos' });
+    await card.getByRole('button', { name: 'Navigation speichern' }).click();
+    await expect(page.getByText('Navigation gespeichert')).toBeVisible();
+    // Unverändert aus der Standardnavigation: Sie bleibt, nur mit dem neuen Namen.
+    await expect(card.getByText('Zurzeit gilt die Standardnavigation', { exact: false })).toBeVisible();
+
+    // Nach dem Neuladen heißt der Bereich überall „Fotos“; die Adresse bleibt #/galerie.
+    const tabbar = page.locator('.tabbar');
+    await expect(tabbar.getByRole('button', { name: 'Fotos' })).toBeVisible();
+    await expect(tabbar.getByRole('button', { name: 'Galerie' })).toHaveCount(0);
+    await tabbar.getByRole('button', { name: 'Fotos' }).click();
+    await expect(page).toHaveURL(/#\/galerie$/);
+    await expect(page.locator('.topbar-title')).toHaveText('Fotos');
+
+    // Gast: Die App öffnet auf der eingestellten Startseite.
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await expect(page).toHaveURL(/#\/galerie$/);
+    await expect(tabbar.getByRole('button', { name: 'Fotos' })).toHaveAttribute('aria-current', 'page');
+
+    // Nur Symbole: Die Namen stehen weiter am Knopf (für Screenreader), aber nicht mehr sichtbar darunter.
+    await login(page, 'admin', ADMIN_PASSWORD);
+    await adminMenu(page, 'Einstellungen');
+    await page
+      .locator('.settings-link')
+      .filter({ has: page.getByText('Navigation', { exact: true }) })
+      .click();
+    await card.getByLabel('Namen unter den Symbolen zeigen').uncheck();
+    await card.getByRole('button', { name: 'Navigation speichern' }).click();
+    await expect(page.locator('.tabbar.tabbar-icons')).toBeVisible();
+    await expect(tabbar.getByRole('button', { name: 'Meins' })).toBeVisible();
+    await expect(tabbar.getByText('Meins', { exact: true })).toBeHidden();
+
+    // Standardnavigation wiederherstellen setzt alles zurück.
+    await adminMenu(page, 'Einstellungen');
+    await page
+      .locator('.settings-link')
+      .filter({ has: page.getByText('Navigation', { exact: true }) })
+      .click();
+    await card.getByRole('button', { name: 'Standardnavigation wiederherstellen' }).click();
+    await askOk(page);
+    await expect(page.getByText('Standardnavigation wiederhergestellt')).toBeVisible();
+    await expect(tabbar.getByRole('button', { name: 'Galerie' })).toBeVisible();
+    await expect(page.locator('.tabbar.tabbar-icons')).toHaveCount(0);
   } finally {
     await login(page, 'admin', ADMIN_PASSWORD).catch(() => undefined);
     await resetNavigation(page).catch(() => undefined);
@@ -2844,7 +2908,7 @@ test.describe('Vorabladen (Issue #104)', () => {
   }
 
   /** Termine sind geladen (mit oder ohne öffentliche Termine, je nachdem, welche Tests vorher liefen). */
-  const startPageLoaded = (page: Page) => expect(page.getByText(/Tag der offenen Tür|Keine anstehenden Termine/)).toBeVisible();
+  const startPageLoaded = (page: Page) => expect(page.getByText(/Tag der offenen Tür|Zurzeit steht nichts an/)).toBeVisible();
 
   /** Datensparmodus (navigator.connection.saveData) wie in Chrome auf Android */
   const saveData = (page: Page) =>
@@ -4843,7 +4907,7 @@ test('Eigene Seiten: Knopf mit Link und Nächste Termine, Gast sieht beide', asy
   await form.locator('.block-button-fields input[inputmode="url"]').fill('#/termine');
   await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('events');
   await form.getByLabel('Überschrift (optional)').fill('Demnächst');
-  await form.getByLabel('Wie viele Termine').fill('2');
+  await form.getByLabel('Wie viele Einträge').fill('2');
   await form.getByRole('button', { name: 'Anlegen' }).click();
   await expect(page.locator('.toast')).toHaveText('Seite angelegt');
   const row = page.locator('.page-admin-list .row', { hasText: title });

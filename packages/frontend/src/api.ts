@@ -8,7 +8,7 @@ import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
 import { noteError } from './lastError';
 import { rememberRoute } from './share';
-import type { NavigationSetting } from './navigation';
+import type { NavigationSetting, NavNames, NavStart } from './navigation';
 
 /** Schlüssel einer Rolle: guest, member, admin, früher fest (organizer, manager, candidate) oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
@@ -138,6 +138,14 @@ export interface AppConfig {
   maintenance?: MaintenanceInfo;
   /** Einrichtbare Navigation (Issue #277): null bzw. fehlt = Standardnavigation */
   navigation?: NavigationSetting | null;
+  /** Eigene Namen und Symbole (Issue #362), je Bereich, eigener Seite oder „intern“ (leer kann als [] kommen) */
+  navigation_names?: NavNames;
+  /** Startseiten (Issue #362) für Gäste und Angemeldete */
+  navigation_start?: NavStart;
+  /** Namen unter den Symbolen der Tab-Leiste (Issue #362); fehlt = ja */
+  navigation_labels?: boolean;
+  /** Eigene Namen als Abschnitte (brand.labels.sections), übernimmt generated/brand.ts beim Laden */
+  section_labels?: Record<string, string>;
   /** Eigene Seiten (Issue #287), die die Person lesen darf, in ihrer Reihenfolge; fehlt bei älteren Servern */
   pages?: { id: number; title: string }[];
   /** News werden in der App geschrieben (Quelle „In der App“); fehlt bei älteren Servern */
@@ -332,9 +340,12 @@ export type BlockInput =
 /** Einstellungen → Navigation (Issue #277): gespeicherte Navigation und was der Server erlaubt. */
 export interface NavigationAdmin {
   navigation: NavigationSetting | null;
+  /** Issue #362: eigene Namen und Symbole, Startseiten, Namen in der Leiste */
+  names: NavNames;
+  start: NavStart;
+  show_labels: boolean;
   targets: string[];
   icons: string[];
-  max_main: number;
   max_menu_items: number;
   label_max: number;
 }
@@ -2477,7 +2488,8 @@ export const api = {
   setActivityPersonal: (personal: boolean) => request<{ personal: boolean }>('PUT', '/admin/activity/settings', { personal }),
   maintenance: () => request<MaintenanceState>('GET', '/admin/maintenance'),
   navigation: () => request<NavigationAdmin>('GET', '/admin/navigation'),
-  saveNavigation: (navigation: NavigationSetting | null) => request<NavigationAdmin>('PUT', '/admin/navigation', { navigation }),
+  saveNavigation: (body: { navigation: NavigationSetting | null; names?: NavNames; start?: NavStart; show_labels?: boolean }) =>
+    request<NavigationAdmin>('PUT', '/admin/navigation', body),
   setMaintenance: (on: boolean, reason?: string) =>
     request<MaintenanceState>('POST', '/admin/maintenance', reason === undefined ? { on } : { on, reason }),
   /** Laufzeit-Konfiguration neu laden (z. B. „Erneut versuchen“ auf der Wartungsseite). */

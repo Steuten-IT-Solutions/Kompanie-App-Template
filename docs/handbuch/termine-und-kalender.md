@@ -39,7 +39,7 @@ Bist du angemeldet, stellst du das unter **Meins** → **Konto** → **Benachric
 
 ## Gut zu wissen
 - Vergangene Termine verschwinden von selbst aus der Liste. Ein mehrtägiger Termin bleibt bis zu seinem letzten Tag stehen.
-- Gibt es keine kommenden Termine, steht dort „Keine anstehenden Termine.“
+- Gibt es keine kommenden Termine, steht dort „Zurzeit steht nichts an.“
 - Die öffentlichen Termine trägt ein, wer bei der {kompanie.name} dafür zuständig ist. Fehlt ein Termin, wende dich an die Verantwortlichen.
 
 ## Siehe auch

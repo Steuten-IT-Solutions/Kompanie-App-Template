@@ -56,7 +56,7 @@ Oben schaltest du zwischen **Rollen** (die Liste) und **Wer sieht was** (die Üb
 Jedes Recht gilt für sich; keines schließt ein anderes ein. Die Rechte stehen in diesen Gruppen:
 - **Tabs und Navigation**: öffentliche {bereich.events}, {bereich.news}, die öffentlichen Alben der {bereich.gallery} und **Intern** (die Knöpfe unter **Intern** gesammelt unter einem Knopf, siehe [Intern](seite:intern)).
 - **Mitgliederbereich**: **Gehört zur Kompanie** (die Person bekommt {bereich.points}, {bereich.penalties} und {bereich.ranks} und steht in Listen und in der {bereich.attendance}), die eigenen {bereich.points}, {bereich.penalties}, den eigenen {begriff.rank} und die eigene {bereich.attendance} in **Meins**, den internen Kalender, die internen Bilder der {bereich.gallery}, die {bereich.birthdays} der anderen und das Teilnehmen an {bereich.polls}.
-- **Intern**: je Knopf unter **Intern** ein Recht: {bereich.directory}, {bereich.offices}, Ehemalige, {bereich.documents}, {bereich.board} lesen, {bereich.ranks} und {bereich.points}katalog.
+- **Intern**: je Knopf unter **Intern** ein Recht: {bereich.directory}, {bereich.offices}, Ehemalige, {bereich.documents}, {bereich.board} lesen, {bereich.ranks} und {bereich.catalog}.
 - **Inhalte verwalten** und **Kompanie verwalten**: je Bereich mit eigenen Aufgaben ein Recht, zum Beispiel **{bereich.points} vergeben, Katalog pflegen** oder **Öffentliche {bereich.events} pflegen**.
 - **Mitglieder und Rollen**: **Persönliche Angaben sehen** (Adresse, Handynummer, E-Mail-Adresse und Geburtsdatum der Mitglieder auf ihrer Seite in der Verwaltung), **Persönliche Angaben pflegen** (diese Angaben ändern), **Mitglieder anlegen und Startpasswörter erzeugen** und **Rollen vergeben**.
 

@@ -61,7 +61,7 @@ export function adminTabs(): AdminTab[] {
       },
       { id: 'punkte', label: `${sec.points} +`, on: points },
       { id: 'strafe', label: `${sec.penalties} +`, on: canPenalties() },
-      { id: 'katalog', label: `${sec.points}katalog`, on: points, group: SETUP },
+      { id: 'katalog', label: sec.catalog, on: points, group: SETUP },
       { id: 'dienstgrade', label: sec.ranks, on: canRanks(), group: SETUP },
       { id: 'befoerderungen', label: 'Beförderungen', on: canRanks() && !!config?.features.points },
       { id: 'titel', label: sec.titles, on: canTitles(), group: SETUP },

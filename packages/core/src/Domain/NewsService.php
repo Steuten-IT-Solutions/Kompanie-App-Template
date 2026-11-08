@@ -282,7 +282,7 @@ final class NewsService
     private function requireInApp(): void
     {
         if (!$this->inApp()) {
-            throw new ApiError(409, 'not_in_app', 'Die News kommen hier nicht aus der App. Ein Admin kann das unter Einstellungen → Neuigkeiten ändern.');
+            throw new ApiError(409, 'not_in_app', 'Die Beiträge kommen hier nicht aus der App. Ein Admin kann das unter Einstellungen → Neuigkeiten ändern.');
         }
     }
 

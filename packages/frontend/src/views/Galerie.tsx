@@ -105,7 +105,7 @@ function Overview() {
     return (
       <>
         {actions}
-        <Empty>Noch keine Bilder in der Galerie.</Empty>
+        <Empty>Noch keine Bilder.</Empty>
       </>
     );
 

@@ -178,7 +178,7 @@ final class GallerySubmissionTest extends TestCase
         $this->assertSame([], $this->stored());
         $this->users->current = $this->sub;
         $mine = array_column($this->ok('GET', '/gallery/submissions')['submissions'], null, 'id');
-        $this->assertSame(['rejected', 'Wieder aus der Galerie entfernt.'], [$mine[$a['id']]['status'], $mine[$a['id']]['reason']]);
+        $this->assertSame(['rejected', 'Wieder entfernt.'], [$mine[$a['id']]['status'], $mine[$a['id']]['reason']]);
     }
 
     public function testOwnApprovalNeedsBothRightsAndAdminDeleteMarksRemoved(): void

@@ -24,7 +24,7 @@ Tippe unten auf **{bereich.gallery}**.
 ## Gut zu wissen
 - Manche Bilder sind nur für {rolle.member} bestimmt. Du siehst sie nur, wenn du als {rolle.member} angemeldet bist. Ohne Anmeldung fehlen sie einfach, ebenso Alben, die nur solche Bilder enthalten. Wie du dich anmeldest: [Anmelden](seite:anmelden).
 - Die Bilder kommen aus einem Ordner, den die {kompanie.name} pflegt; die App gleicht ihn regelmäßig ab. Neue Alben erscheinen deshalb nicht sofort.
-- Gibt es noch keine Bilder, steht dort „Noch keine Bilder in der Galerie.“
+- Gibt es noch keine Bilder, steht dort „Noch keine Bilder.“
 - Fehlt ein Album oder ein Bild, wende dich an die Verantwortlichen der {kompanie.name}.
 
 ## Siehe auch

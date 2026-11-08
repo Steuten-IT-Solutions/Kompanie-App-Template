@@ -22,7 +22,7 @@ export function SponsorLogo({ sponsor }: { sponsor: Sponsor }) {
 export default function Sponsoren() {
   const { data, error, loading, reload } = useAsync(sources.sponsors.load, sources.sponsors.deps, sources.sponsors.key);
   if (loading && !data) return <Loading />;
-  if (error || !data) return <ErrorBox message={error ?? 'Die Sponsoren konnten nicht geladen werden.'} onRetry={reload} />;
+  if (error || !data) return <ErrorBox message={error ?? 'Die Einträge konnten nicht geladen werden.'} onRetry={reload} />;
   return (
     <div>
       {can('manage_sponsors') && (

@@ -21,6 +21,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Navigation: Bereiche umbenennen, Symbole wählen, Startseite festlegen**: Unter *Einstellungen → Navigation* gebt
+  ihr jedem Bereich, jeder eigenen Seite und dem Untermenü *Intern* der Standardnavigation einen eigenen Namen und ein
+  eigenes Symbol (dazu gibt es zehn neue, allgemeine Symbole). Der Name gilt überall in der App: in der Leiste, in den
+  Überschriften, in der Verwaltung, in Benachrichtigungen, Mails und in der Hilfe; bei eigenen Seiten nur in der Leiste.
+  Die Startseite beim Öffnen der App wählt ihr getrennt für Gäste und für Angemeldete. Unten in der Leiste dürfen jetzt
+  beliebig viele Punkte stehen; Schrift und Symbole werden mit der Zahl kleiner, und auf Wunsch zeigt die Leiste nur
+  Symbole. *Standardnavigation wiederherstellen* setzt all das zusammen zurück. Feste Sätze wie „Keine anstehenden
+  Termine“ sind dafür neutral formuliert („Zurzeit steht nichts an.“), Benachrichtigungen heißen z. B. „Termine: neu“.
 - **Galerie: Videos hochladen und einreichen**: Unter *Einstellungen → Galerie* lassen sich jetzt neben Bildern auch
   Videos als MP4 oder WebM in jedes Album hochladen, mit höchstens 1 GB je Video. Wer Bilder einreichen darf, reicht
   ebenso Videos ein (*Bilder und Videos einreichen*); beim Prüfen spielt ihr ein Video vor der Freigabe ab. Die App lädt

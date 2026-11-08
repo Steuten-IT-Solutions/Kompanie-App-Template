@@ -581,7 +581,7 @@ final class PushServiceTest extends TestCase
         $this->assertSame(1, $app->pushTriggers()->checkCalendar(), 'Ort geändert');
         $app->push()->processQueue();
         $msgs = array_map(fn (array $c): array => self::decrypt((string) $c['body'], $d), $this->pushes());
-        $this->assertSame(['Neuer Termin', 'Termin geändert'], array_column($msgs, 'title'));
+        $this->assertSame(['Termine: neu', 'Termine: geändert'], array_column($msgs, 'title'));
         $this->assertSame('Probe umbenannt – Ort: Halle → Sporthalle', $msgs[1]['body'], 'nur die Änderung, nicht der ganze Termin');
         // Issue #190: Ziel ist der Termin mit der Kennung aus dem Kalender.
         $ids = array_column($app->calendar()->events(), 'id', 'title');
@@ -629,7 +629,7 @@ final class PushServiceTest extends TestCase
         $this->assertSame(2, $app->push()->repository()->counts()['queued'], 'Datum geändert');
         $app->push()->processQueue();
         $msg = self::decrypt((string) $this->pushes()[0]['body'], $g);
-        $this->assertSame('Neuer Termin', $msg['title']);
+        $this->assertSame('Termine: neu', $msg['title']);
         $this->assertSame('Sommerfest – Sa 07.11.2026 – Festplatz', $msg['body']);
         $this->assertSame('termine/termin/p' . $id, $msg['route'], 'öffentlicher Termin mit „p“ wie in der Liste (Issue #190)');
     }

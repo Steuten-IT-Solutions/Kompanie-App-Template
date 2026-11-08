@@ -11,12 +11,12 @@ import { ErrorBoundary, lazyView, Loading } from './ui';
 import { birthdaysVisible } from './upcomingBirthdays';
 import { forgetPushOnLogout } from './push';
 import { endPreview, previewRole, PUBLIC_PREVIEW, stopPreview } from './preview';
-import { navigate, useRoute, viewKey } from './router';
+import { navigate, redirect, useRoute, viewKey } from './router';
 import { focusId } from './focus';
 import { AdminBack, adminTabs } from './adminNav';
 import { MenuBack, InternMenu } from './internNav';
-import { targetLabels } from './navLabels';
-import { buildNav, isPageTarget, menuOf, pageTarget, type NavEntry, type NavTarget } from './navigation';
+import { targetIcons, targetLabels } from './navLabels';
+import { buildNav, isPageTarget, menuOf, pageTarget, startOf, tabbarClass, type NavEntry, type NavTarget } from './navigation';
 import { helpSlug } from './helpSlug';
 import { setReportOrigin } from './lastError';
 import { shareLink, shareUrl } from './share';
@@ -136,7 +136,7 @@ const tabLabels = (): Record<Tab | 'menue', string> => ({
   kompanien: sec.companies,
   sponsoren: sec.sponsors,
   seiten: sec.pages,
-  intern: 'Intern',
+  intern: sec.intern,
   // Untermenü der einrichtbaren Navigation: Titel ist sein Name (App)
   menue: 'Menü',
   ...internLabels(),
@@ -151,7 +151,7 @@ function internLabels(): Record<InternView, string> {
     dokumente: sec.documents,
     brett: sec.board,
     dienstgrade: sec.ranks,
-    punktekatalog: `${sec.points}katalog`,
+    punktekatalog: sec.catalog,
   };
 }
 
@@ -195,6 +195,23 @@ function ThemeButton() {
   );
 }
 
+/** Neutrale Symbole ohne festen Bereich (Einstellungen → Navigation, Issue #362); Löcher über evenodd. */
+const NEUTRAL_ICONS: Record<string, string | undefined> = {
+  info: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 5h2v2h-2V7zm0 4h2v6h-2v-6z',
+  karte: 'M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 4.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z',
+  musik: 'M9 3v10.6A3.5 3.5 0 1 0 11 17V8h7V3H9z',
+  pokal:
+    'M6 3h12v2h3v3a4 4 0 0 1-4 4h-.3A5 5 0 0 1 13 14.9V18h3v3H8v-3h3v-3.1A5 5 0 0 1 7.3 12H7a4 4 0 0 1-4-4V5h3V3zM5 7v1a2 2 0 0 0 1 1.7V7H5zm13 0v2.7A2 2 0 0 0 19 8V7h-1z',
+  glocke:
+    'M12 2a1.5 1.5 0 0 0-1.5 1.5v.6A6 6 0 0 0 6 10v5l-2 2v1h16v-1l-2-2v-5a6 6 0 0 0-4.5-5.9v-.6A1.5 1.5 0 0 0 12 2zm-2 18a2 2 0 0 0 4 0h-4z',
+  fahne: 'M5 2h2v20H5V2zm3 1h11l-2.5 4.5L19 12H8V3z',
+  kamera:
+    'M9 4 7.5 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3.5L15 4H9zm3 4.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9zm0 2a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z',
+  haus: 'M12 3 2 12h3v8h5v-6h4v6h5v-8h3L12 3z',
+  buch: 'M3 5a3 3 0 0 1 3-3h13v16H6a1 1 0 0 0 0 2h13v2H6a3 3 0 0 1-3-3V5zm5 1v2h8V6H8z',
+  uhr: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm-1 3v6l5 3 1-1.7-4-2.3V7h-2z',
+};
+
 function Icon({ name }: { name: string }) {
   const paths: Record<string, string> = {
     termine: 'M7 2v2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zm-2 7h14v10H5V9z',
@@ -223,9 +240,10 @@ function Icon({ name }: { name: string }) {
   // Symbole der Untermenüs (Einstellungen → Navigation): Ordner wie „Intern“, Stern wie „Meins“
   paths.ordner = paths.intern;
   paths.stern = paths.meins;
+  const own = NEUTRAL_ICONS[name];
   return (
     <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-      <path d={paths[name] ?? paths.intern} fill="currentColor" />
+      {own ? <path d={own} fill="currentColor" fillRule="evenodd" /> : <path d={paths[name] ?? paths.intern} fill="currentColor" />}
     </svg>
   );
 }
@@ -403,6 +421,9 @@ export default function App({ notice = null }: { notice?: string | null }) {
     intern: can('view_intern'),
     label: (t: NavTarget) => targetLabels()[t] ?? t,
     pages: (config?.pages ?? []).map((p) => pageTarget(p.id)),
+    // Eigene Namen und Symbole (Einstellungen → Navigation, Issue #362)
+    icons: targetIcons(),
+    internLabel: sec.intern,
   });
   allowed.intern = navEntries.some((e) => e.key === 'intern');
   // „Meins“ ganz rechts, die Verwaltung davor.
@@ -412,8 +433,12 @@ export default function App({ notice = null }: { notice?: string | null }) {
   const tabs: NavEntry[] = [...navEntries, ...fixed];
   const requested = path[0] as View;
   allowed.menue = requested === 'menue' && navEntries.some((e) => e.key === `menue/${path[1]}`);
-  // Neue Installation ohne Bereiche: Der Admin landet direkt in der Einrichtung.
-  const start: string = tabs[0]?.key ?? (config?.setupPending && allowed.einrichtung ? 'einrichtung' : 'installieren');
+  // Startseite (Issue #362): eingestellt für Gäste bzw. Angemeldete, wenn sie in der Leiste der Person steht, sonst der
+  // erste Punkt. Neue Installation ohne Bereiche: Der Admin landet direkt in der Einrichtung.
+  const startKey = startOf(tabs, user ? config?.navigation_start?.member : config?.navigation_start?.guest);
+  const start: string = startKey ?? (config?.setupPending && allowed.einrichtung ? 'einrichtung' : 'installieren');
+  // Tab der Startseite (bei einem Bereich in einem Untermenü das Untermenü): Begrüßung und Hinweise stehen dort.
+  const homeTab = tabs.find((t) => t.key === startKey || t.children?.includes(startKey as NavTarget))?.key;
   const valid = VIEWS.includes(requested) && allowed[requested];
   const tab: View = valid ? requested : (start.split('/')[0] as View);
   // Untermenü (Intern oder eingerichtet), das gerade offen ist bzw. in dem der Bereich steht
@@ -454,6 +479,12 @@ export default function App({ notice = null }: { notice?: string | null }) {
     window.addEventListener(CONFIG_CHANGED, changed);
     return () => window.removeEventListener(CONFIG_CHANGED, changed);
   }, []);
+  // Ohne Adresse eine andere Startseite als der erste Punkt (Issue #362): dorthin, ohne Eintrag im Verlauf. Geteilte Links,
+  // Benachrichtigungen und die gemerkte Seite vor der Anmeldung haben eine Adresse und bleiben, wo sie hinführen.
+  const startRedirect = rawPath.length === 0 && startKey !== undefined && startKey !== tabs[0]?.key ? startKey : null;
+  useEffect(() => {
+    if (startRedirect) redirect(startRedirect);
+  }, [startRedirect]);
 
   // Daten eines Tabs; „Intern“ zeigt zuerst nur seine Knöpfe, geladen werden die Bereiche dahinter.
   const sourcesOf = (t: NavEntry) => (t.children ? t.children.flatMap((v) => tabSources(v)) : tabSources(t.key as TabId));
@@ -628,10 +659,10 @@ export default function App({ notice = null }: { notice?: string | null }) {
                 )}
               </div>
             )}
-            {!user && brand.guestWelcome && activeTab === tabs[0]?.key && <p className="guest-welcome card">{brand.guestWelcome}</p>}
+            {!user && brand.guestWelcome && activeTab === homeTab && <p className="guest-welcome card">{brand.guestWelcome}</p>}
             {/* Rückweg ins Untermenü über dem Inhalt, wie „‹ Verwaltung“ (vor allen Bereichen, die darin stehen können) */}
             {parentMenu && menuStart && <MenuBack to={parentMenu.key} label={parentMenu.label} />}
-            {canRegister && !loginFirst && activeTab === tabs[0]?.key && !path[1] && (
+            {canRegister && !loginFirst && activeTab === homeTab && !path[1] && (
               <p className="registration-hint muted small">
                 Du gehörst dazu und hast noch keinen Zugang?{' '}
                 <button type="button" className="btn btn-link inline-link" onClick={() => navigate('registrieren')}>
@@ -639,7 +670,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
                 </button>
               </p>
             )}
-            {user && !config.setupPending && activeTab === tabs[0]?.key && !path[1] && <PushHint onToast={showToast} />}
+            {user && !config.setupPending && activeTab === homeTab && !path[1] && <PushHint onToast={showToast} />}
             {tab === 'termine' &&
               (path[1] === 'verwalten' && features?.events && can('manage_events') ? (
                 <TermineVerwalten onToast={showToast} />
@@ -694,7 +725,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
       )}
 
       {tabs.length > 1 && (
-        <nav className="tabbar" aria-label="Hauptnavigation">
+        <nav className={tabbarClass(tabs.length, config?.navigation_labels !== false)} aria-label="Hauptnavigation">
           {tabs.map((t) => (
             <button
               key={t.key}
