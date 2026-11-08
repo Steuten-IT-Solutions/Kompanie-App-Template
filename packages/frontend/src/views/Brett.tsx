@@ -661,10 +661,6 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
           </div>
         ) : (
           <>
-            <p className="muted small">
-              Ändern verschickt keine neue Benachrichtigung und keine neue E-Mail, auch nicht, wenn sich ändert, wer die Nachricht sieht.
-              Alle Änderungen stehen im Verlauf.
-            </p>
             <div className="button-row">
               <button className="btn" disabled={busy || edit.title.trim() === '' || !hasContent(edit.blocks)} onClick={save}>
                 Speichern

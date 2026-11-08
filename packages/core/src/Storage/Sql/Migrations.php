@@ -1821,6 +1821,13 @@ WHERE title IS NULL",
                     'CREATE INDEX IF NOT EXISTS {report_inbox}_status ON {report_inbox} (status)',
                 ],
             ],
+            // Benachrichtigungen: Arten, die ein Gerät schon angeboten bekam (PushService::addNewTypes). Später neu
+            // angebotene Arten (z. B. nach einer neuen Rolle) schaltet die App ein, bewusst abgeschaltete bleiben aus.
+            // NULL bei bestehenden Abos: Beim ersten Abgleich gilt das gerade Angebotene als bekannt.
+            55 => [
+                'mysql' => ['ALTER TABLE {push_subscriptions} ADD COLUMN offered varchar(255) DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {push_subscriptions} ADD COLUMN offered TEXT DEFAULT NULL'],
+            ],
         ];
     }
 

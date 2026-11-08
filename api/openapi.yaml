@@ -802,6 +802,8 @@ paths:
       description: |
         POST, damit die Push-Adresse nicht in Protokollen von Adressen landet. Mit `auth` gibt das Gerät außerdem ein
         Abo frei, das einem anderen, hier nicht mehr angemeldeten Konto gehört (die App fragt dazu beim Start nach).
+        Arten, die das Abo jetzt neu angeboten bekommt (z. B. nach einer neuen Rolle), schaltet der Server dabei ein;
+        selbst abgeschaltete bleiben aus. Ohne `endpoint` nur die möglichen Arten (Hinweis auf der Startseite).
       requestBody:
         content:
           application/json:
@@ -8271,6 +8273,11 @@ components:
         - $ref: '#/components/schemas/MemberSummary'
         - type: object
           properties:
+            extra_roles:
+              allOf: [{ $ref: '#/components/schemas/ExtraRoles' }]
+              description: |
+                Zusatzrollen nur für Personen mit Recht promote_users, sonst leer (Issue #349). Die Liste
+                (`GET /members`) enthält sie weiter, weil der Punktefaktor beim Buchen davon abhängt.
             point_list:
               type: array
               items: { $ref: '#/components/schemas/PointEntry' }

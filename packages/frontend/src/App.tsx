@@ -5,6 +5,7 @@ import brand from './generated/brand';
 import logoUrl from './generated/logo-small.webp';
 import { detectPlatform, isStandalone, promptInstall, useCanPrompt } from './install';
 import BoardBanner from './BoardBanner';
+import PushHint from './PushHint';
 import { boardReadable, boardVisible, canManagePolls, canPostBoard, pollsVisible } from './board';
 import { ErrorBoundary, lazyView, Loading } from './ui';
 import { birthdaysVisible } from './upcomingBirthdays';
@@ -638,6 +639,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
                 </button>
               </p>
             )}
+            {user && !config.setupPending && activeTab === tabs[0]?.key && !path[1] && <PushHint onToast={showToast} />}
             {tab === 'termine' &&
               (path[1] === 'verwalten' && features?.events && can('manage_events') ? (
                 <TermineVerwalten onToast={showToast} />

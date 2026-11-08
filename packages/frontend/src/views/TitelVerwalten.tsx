@@ -86,10 +86,6 @@ export function TitleList({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <div>
-      <p className="muted small">
-        Ehrentitel und Ämter, unabhängig von {sec.ranks} und {sec.points}. Ein Mitglied kann mehrere haben; du vergibst sie in den
-        Mitgliedsdetails. Die Reihenfolge hier gilt auch für die Anzeige; zum Ändern einen Titel am Griff links ziehen.
-      </p>
       {formError && (
         <p className="form-error" role="alert">
           {formError}

@@ -22,12 +22,6 @@ export default function Dienstgrade() {
 
   return (
     <div>
-      {withPoints && (
-        <p className="muted small">
-          Rechts steht, ab wie vielen {sec.points} ein {rank} erreichbar ist. Befördert wird nicht automatisch, sondern von den
-          Verantwortlichen.
-        </p>
-      )}
       <ul className="card-list rank-list">
         {ranks.map((r) => (
           <li key={r.id} className={`card row${r.id === mine ? ' rank-mine' : ''}`}>

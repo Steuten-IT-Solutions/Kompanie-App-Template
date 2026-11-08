@@ -12,7 +12,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Zustand und
 
 ## Was du hier siehst
 ### Zustand der App
-Eine Ampel mit einer Zeile je Thema. Jede Zeile sagt in einem kurzen Text, was los ist und was zu tun ist.
+Eine Ampel mit einer Zeile je Thema. Jede Zeile sagt in einem kurzen Text, was los ist und was zu tun ist. Ist alles in Ordnung oder ein Thema nicht eingerichtet, steht nur der Name des Themas da; den kurzen Text zeigt die App, wenn etwas zu tun ist (gelb oder rot). Was die einzelnen Themen bedeuten, steht hier darunter.
 - **Updates**: ob die App aktuell ist, ob ein Update ansteht oder fehlgeschlagen ist.
 - **{bereich.gallery}**: wann der letzte Abgleich mit Google Drive war, ob er geklappt hat und ob Bilder noch aufbereitet werden oder sich nicht laden ließen.
 - **Kalender**: ob und wie der Kalender eingerichtet ist und ob die Verbindung mit Google ihn lesen darf.

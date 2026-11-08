@@ -310,7 +310,7 @@ function Members() {
   // Filter und Sortierung zunächst eingeklappt; beim Zurückkommen wie verlassen.
   const [filtersOpen, setFiltersOpen] = useState(restore?.filtersOpen ?? false);
   // Filter nach Rolle: Grundrolle oder Zusatzrolle (Issue #66). Gäste lassen sich auch ohne Häkchen wählen.
-  const [role, setRole] = useState<Level>(restore?.role ?? '');
+  const [role, setRole] = useState<Level>(canPromote ? (restore?.role ?? '') : '');
   const loadGuests = showGuests || (canPromote && role === 'guest');
   // Rollen nur mit dem Kalender (z. B. Anwärter) immer: Sie stehen in der Liste und zählen im Zähler oben mit.
   const { data, error, loading, reload } = useAsync(() => api.members(loadGuests, true), [loadGuests], 'members');
@@ -413,7 +413,7 @@ function Members() {
         </span>
       </button>
       <div id="member-filters" className="member-filters" hidden={!filtersOpen}>
-        {roleOptions.length > 1 && (
+        {canPromote && roleOptions.length > 1 && (
           <select className="role-filter" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Nach Rolle filtern">
             <option value="">Alle Rollen</option>
             {roleOptions.map((r) => (
@@ -541,8 +541,12 @@ function rankEditable(m: MemberDetail): boolean {
   return !!m.rank && (m.member || !!m.rank.rank);
 }
 
-/** Zeile unter Abzeichen und Foto: Rolle(n) bzw. ehemalig. */
+/**
+ * Zeile unter Abzeichen und Foto: Rolle(n) bzw. ehemalig. Die Rolle nur für die, die Rollen vergeben (Issue #349);
+ * sonst bleiben „Ehemalig“ und „Ohne Zugang“.
+ */
 function roleLine(m: MemberDetail): string {
+  if (!can('promote_users')) return [m.former ? 'Ehemalig' : '', m.no_access ? 'Ohne Zugang' : ''].filter(Boolean).join(' · ');
   const role = m.former
     ? `Ehemalig (zuvor ${levelLabel(m.former.previous_level)})`
     : (m.extra_roles ?? []).length > 0
@@ -567,6 +571,7 @@ function previewFromLists(id: number, former: boolean): MemberPreview | null {
 
 /** Rollenzeile aus der Liste (ohne den Hinweis auf Ausnahmen bei den Rechten, den kennt erst die Seite). */
 function previewRoleLine(p: MemberPreview): string {
+  if (!can('promote_users')) return p.previous_level ? 'Ehemalig' : '';
   if (p.previous_level) return `Ehemalig (zuvor ${levelLabel(p.previous_level)})`;
   if (!p.level) return '';
   return p.extra_roles.length > 0
@@ -599,7 +604,9 @@ function MemberPreviewHead({ p, onOpen }: { p: MemberPreview; onOpen?: (sheet: '
           !p.rank_title && <span className="skeleton-box" style={{ width: 96, height: 96, borderRadius: '50%' }} />
         )}
       </div>
-      <p className="muted small member-level">{role || <span className="skeleton-text" style={{ width: '16ch' }} />}</p>
+      {(role || can('promote_users')) && (
+        <p className="muted small member-level">{role || <span className="skeleton-text" style={{ width: '16ch' }} />}</p>
+      )}
       {(canPoints() || canPenalties()) && (
         <div className="stats member-stats">
           {canPoints() && (
@@ -718,7 +725,7 @@ function MemberPeek({
               )}
             </div>
           )}
-          <p className="muted small member-level">{roleLine(m)}</p>
+          {roleLine(m) && <p className="muted small member-level">{roleLine(m)}</p>}
           {(canPoints() || canPenalties()) && (
             <div className="stats member-stats">
               {canPoints() && <StatCard label={sec.points} value={(m.points ?? 0).toLocaleString('de-DE')} tone="good" onClick={none} />}
@@ -1019,7 +1026,7 @@ function MemberDetailView({
           )}
         </div>
       )}
-      <p className="muted small member-level">{roleLine(m)}</p>
+      {roleLine(m) && <p className="muted small member-level">{roleLine(m)}</p>}
 
       {(canPoints() || canPenalties()) && (
         <div className="stats member-stats">
@@ -1350,7 +1357,9 @@ function RoleControl({
       {extra.length > 0 && <p className="muted small member-level">Zusatzrollen: {extra.map(levelLabel).join(', ')}</p>}
     </>
   );
-  if (!can('promote_users') || (level === 'admin' && !adminsHere) || id === config?.user?.id) {
+  // Ohne das Recht steht die Rolle nirgends auf der Seite (Issue #349).
+  if (!can('promote_users')) return null;
+  if ((level === 'admin' && !adminsHere) || id === config?.user?.id) {
     return readOnly;
   }
   async function save(action: () => Promise<unknown>, msg: string) {
@@ -1630,12 +1639,6 @@ function NewMember() {
         <input type="checkbox" checked={noAccess} onChange={(e) => setNoAccess(e.target.checked)} />
         Ohne Zugang (meldet sich noch nicht an)
       </label>
-      {noAccess && (
-        <p className="muted small">
-          Für Personen ohne Konto, z. B. in Chroniken und {sec.offices}. Es gibt kein Startpasswort; den Zugang richtest du später ein oder
-          verbindest das Mitglied mit seiner Anfrage.
-        </p>
-      )}
       {!noAccess && (
         <label className="field">
           <span>Benutzername (optional)</span>

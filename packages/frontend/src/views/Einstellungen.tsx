@@ -36,25 +36,29 @@ import { confirmAsk } from '../ask';
 const sec = brand.labels.sections;
 
 /** Seiten der Einstellungen: Adresse (#/einstellungen/<id>), Titel und ein Satz für die Übersicht. */
+/** Gruppen der Übersicht (Issue #348): Kacheln je Gruppe statt einer langen Liste. */
+const GROUPS = ['App', 'Mitglieder und Zugang', 'Benachrichtigungen', 'Verbindungen', 'Termine und Kalender', 'Betrieb'] as const;
+
 const PAGES = [
-  { id: 'bereiche', title: 'Bereiche', text: 'Welche Bereiche die App für alle hat.' },
-  { id: 'navigation', title: 'Navigation', text: 'Welche Bereiche unten in der Leiste stehen, auch in Untermenüs.' },
-  { id: 'rollen', title: 'Rollen', text: 'Wer was in der App darf.' },
-  { id: 'zugang', title: 'Zugang beantragen', text: 'Ob Personen selbst einen Zugang beantragen können, den ihr dann freigebt.' },
-  { id: 'benachrichtigungen', title: 'Benachrichtigungen', text: 'Angemeldete Geräte und Uhrzeit der Erinnerung.' },
-  { id: 'geburtstage', title: sec.birthdays, text: `Wie lange vorher anstehende ${sec.birthdays} bei den ${sec.events} erscheinen.` },
-  { id: 'email', title: 'E-Mail', text: `Kompanieadresse und Mailserver, z. B. für Nachrichten aus „${sec.board}“.` },
-  { id: 'google', title: 'Google-Zugang', text: `Verbindung zu Google für ${sec.gallery} und Kalender.` },
-  { id: 'galerie', title: sec.gallery, text: 'Fotoalben aus einem Ordner in Google Drive.' },
-  { id: 'kalender', title: 'Kalender', text: 'Kalender für Mitglieder aus Google Kalender oder per iCal.' },
-  { id: 'news', title: newsTitle(), text: `Woher die ${newsTitle()} kommen.` },
-  { id: 'rechtliches', title: 'Impressum und Datenschutz', text: 'Links auf Impressum und Datenschutzerklärung, für alle sichtbar.' },
-  { id: 'nutzung', title: 'Nutzung', text: 'Wer die App wann nutzt und welche Bereiche.' },
-  { id: 'zustand', title: 'Zustand und Updates', text: 'Ampel je Bereich, installierte Version und Updates.' },
-  { id: 'datensicherung', title: 'Datensicherung', text: 'Sicherung herunterladen oder einspielen.' },
-  { id: 'wartung', title: 'Wartungsmodus', text: 'Die App vorübergehend nur für Admins öffnen.' },
-  { id: 'neuerungen', title: 'Was ist neu', text: 'Änderungen von Version zu Version.' },
+  { id: 'bereiche', group: 'App', title: 'Bereiche' },
+  { id: 'navigation', group: 'App', title: 'Navigation' },
+  { id: 'rechtliches', group: 'App', title: 'Impressum und Datenschutz' },
+  { id: 'rollen', group: 'Mitglieder und Zugang', title: 'Rollen' },
+  { id: 'benachrichtigungen', group: 'Benachrichtigungen', title: 'Benachrichtigungen' },
+  { id: 'email', group: 'Verbindungen', title: 'E-Mail' },
+  { id: 'google', group: 'Verbindungen', title: 'Google-Zugang' },
+  { id: 'galerie', group: 'Verbindungen', title: sec.gallery },
+  { id: 'news', group: 'Verbindungen', title: newsTitle() },
+  { id: 'kalender', group: 'Termine und Kalender', title: 'Kalender' },
+  { id: 'zustand', group: 'Betrieb', title: 'Zustand und Updates' },
+  { id: 'datensicherung', group: 'Betrieb', title: 'Datensicherung' },
+  { id: 'wartung', group: 'Betrieb', title: 'Wartungsmodus' },
+  { id: 'nutzung', group: 'Betrieb', title: 'Nutzung' },
+  { id: 'neuerungen', group: 'Betrieb', title: 'Was ist neu' },
 ] as const;
+
+/** Frühere eigene Seiten, jetzt Abschnitt einer anderen (Links aus Handbuch, Hinweisen und Lesezeichen gehen weiter). */
+const MOVED: Record<string, string> = { zugang: 'rollen', geburtstage: 'kalender' };
 
 /**
  * Einstellungen für Admins (beide Varianten): eine Übersicht, jede Gruppe auf einer eigenen Seite. Geheime Werte zeigt
@@ -64,11 +68,13 @@ const PAGES = [
 export default function Einstellungen({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
   // Rückkehr von Google landet auf #/einstellungen?google=1: gleich zur Seite Google-Zugang (sie liest ?google=1).
   const [fromGoogle] = useState(() => !path[0] && new URLSearchParams(window.location.search).has('google'));
+  const moved = path[0] ? MOVED[path[0]] : undefined;
   useEffect(() => {
     if (fromGoogle) window.location.replace('#/einstellungen/google');
-  }, [fromGoogle]);
+    else if (moved) window.location.replace(`#/einstellungen/${moved}`);
+  }, [fromGoogle, moved]);
   const page = PAGES.find((p) => p.id === path[0]);
-  if (fromGoogle && !page) return <Loading shape="form" />;
+  if ((fromGoogle || moved) && !page) return <Loading shape="form" />;
   if (!page) return <Overview />;
   return (
     <div className="settings">
@@ -77,10 +83,13 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
       </button>
       {page.id === 'bereiche' && <Bereiche onToast={onToast} />}
       {page.id === 'navigation' && <NavigationEinstellen onToast={onToast} />}
-      {page.id === 'rollen' && <Rollen onToast={onToast} />}
-      {page.id === 'zugang' && <RegistrationSection onToast={onToast} />}
+      {page.id === 'rollen' && (
+        <>
+          <Rollen onToast={onToast} />
+          <RegistrationSection onToast={onToast} />
+        </>
+      )}
       {page.id === 'benachrichtigungen' && <PushSettings onToast={onToast} />}
-      {page.id === 'geburtstage' && <BirthdaySettingsSection onToast={onToast} />}
       {page.id === 'email' && <MailSection onToast={onToast} />}
       {page.id === 'nutzung' && <Nutzung onToast={onToast} />}
       {page.id === 'zustand' && <Wartung part="zustand" onToast={onToast} />}
@@ -90,50 +99,54 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
       {(page.id === 'google' || page.id === 'kalender' || page.id === 'galerie' || page.id === 'news' || page.id === 'rechtliches') && (
         <Verbindung page={page.id} onToast={onToast} />
       )}
+      {page.id === 'kalender' && config?.features.birthdays && <BirthdaySettingsSection onToast={onToast} />}
     </div>
   );
 }
 
 /**
- * Übersicht: je Seite eine Zeile; Neuigkeiten nur, wenn der Server die Quelle einstellen lässt (ältere WordPress-Server
- * nicht), Geburtstage nur mit dem Bereich.
+ * Übersicht (Issue #348): Kacheln, nach Gruppen geordnet; Neuigkeiten nur, wenn der Server die Quelle einstellen lässt
+ * (ältere WordPress-Server nicht), Nutzung nur mit dem Recht.
  */
 function Overview() {
   // Erst nach dem Laden zeigen (beim nächsten Öffnen sofort aus dem Speicher): Sonst rückt „Neuigkeiten“ nachträglich
-  // ein und schiebt die Zeilen darunter weg.
+  // ein und schiebt die Kacheln darunter weg.
   const { data, loading } = useAsync(sources.settings.load, sources.settings.deps, sources.settings.key);
-  const pages = PAGES.filter(
-    (p) =>
-      (p.id !== 'news' || !!data?.news) &&
-      (p.id !== 'nutzung' || can('view_activity')) &&
-      (p.id !== 'geburtstage' || !!config?.features.birthdays),
-  );
+  const pages = PAGES.filter((p) => (p.id !== 'news' || !!data?.news) && (p.id !== 'nutzung' || can('view_activity')));
   usePrefetchMenu(
     'einstellungen',
     pages.map((p) => p.id),
   );
   if (loading && !data) return <Loading />;
   return (
-    <ul className="card-list settings-overview">
-      {pages.map((p) => (
-        <li key={p.id}>
-          <button
-            type="button"
-            className="card row clickable settings-link"
-            onClick={() => navigate(`einstellungen/${p.id}`)}
-            {...prefetchOnTap(...menuSources('einstellungen', p.id))}
-          >
-            <span className="row-main">
-              <span className="row-title">{p.title}</span>
-              <span className="row-sub">{p.text}</span>
-            </span>
-            <span className="settings-chevron" aria-hidden="true">
-              ›
-            </span>
-          </button>
-        </li>
-      ))}
-    </ul>
+    <div className="settings-overview">
+      {GROUPS.map((g) => {
+        const list = pages.filter((p) => p.group === g);
+        if (list.length === 0) return null;
+        return (
+          <section key={g} className="settings-group" aria-label={g}>
+            <h3 className="settings-group-title">{g}</h3>
+            <ul className="settings-tiles">
+              {list.map((p) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    className="card settings-link settings-tile"
+                    onClick={() => navigate(`einstellungen/${p.id}`)}
+                    {...prefetchOnTap(...menuSources('einstellungen', p.id))}
+                  >
+                    <span className="row-title">{p.title}</span>
+                    <span className="settings-chevron" aria-hidden="true">
+                      ›
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+      })}
+    </div>
   );
 }
 
@@ -198,8 +211,8 @@ function PushLog({ log }: { log: PushAdmin['log'] }) {
 }
 
 /**
- * Benachrichtigungen: wie viele Geräte angemeldet sind, wann die Erinnerung an Termine am nächsten Tag kommt und ob und ab
- * wann am Geburtstag benachrichtigt wird.
+ * Benachrichtigungen: wie viele Geräte angemeldet sind und wann die Erinnerung an Termine am nächsten Tag kommt. Ob und ab
+ * wann am Geburtstag benachrichtigt wird, steht bei den Geburtstagen (BirthdayNotify, Issue #348).
  */
 function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.pushAdmin(), [], 'admin/push');
@@ -243,31 +256,6 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
           <HourOptions />
         </select>
       </label>
-      {p.birthdays && (
-        <>
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={p.birthdays.enabled}
-              disabled={busy}
-              onChange={(e) => save(() => api.setBirthdayNotify({ birthday_notify: e.target.checked }))}
-            />
-            Am Geburtstag eines Mitglieds alle anderen benachrichtigen
-          </label>
-          {p.birthdays.enabled && (
-            <label className="field">
-              <span>Benachrichtigung am Geburtstag ab</span>
-              <select
-                value={p.birthdays.hour}
-                disabled={busy}
-                onChange={(e) => save(() => api.setBirthdayNotify({ birthday_hour: Number(e.target.value) }))}
-              >
-                <HourOptions />
-              </select>
-            </label>
-          )}
-        </>
-      )}
       <PushLog log={p.log} />
       {saveError && (
         <p className="form-error" role="alert">
@@ -284,7 +272,6 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
 /** Bis zu so vielen Tagen im Voraus zeigt die Karte „Anstehende Geburtstage“ einen Geburtstag (wie im Kern). */
 const UPCOMING_DAYS_MAX = 30;
 
-/** Geburtstage (Issue #1): wie viele Tage im Voraus die Karte „Anstehende Geburtstage“ bei den Terminen einen zeigt. */
 /**
  * Zugang beantragen (Issue #314): ein- und ausschalten, Rolle, die beim Freigeben vorgeschlagen ist, Link zum Weitergeben.
  * Ohne Mailversand geht es auch; dann bestätigt niemand seine Adresse, und das Ergebnis sieht die Person beim Anmelden.
@@ -320,10 +307,6 @@ function RegistrationSection({ onToast }: { onToast: (msg: string) => void }) {
         <input type="checkbox" checked={s.enabled} disabled={busy} onChange={(e) => save({ enabled: e.target.checked })} />
         <span>Personen können selbst einen Zugang beantragen</span>
       </label>
-      <p className="small muted">
-        Die Anfrage wartet, bis jemand mit dem Recht „Mitglieder anlegen“ sie unter Verwaltung → Anfragen freigibt oder ablehnt. Erst dann
-        entsteht das Konto.
-      </p>
       {roles.length > 1 && (
         <label className="field">
           <span>Vorgeschlagene Rolle beim Freigeben</span>
@@ -368,6 +351,62 @@ function RegistrationSection({ onToast }: { onToast: (msg: string) => void }) {
   );
 }
 
+/** Benachrichtigung am Geburtstag (Issue #348): bei den übrigen Einstellungen zu Geburtstagen statt unter Benachrichtigungen. */
+function BirthdayNotify({ onToast }: { onToast: (msg: string) => void }) {
+  const { data, error, loading, reload, setData } = useAsync(() => api.pushAdmin(), [], 'admin/push');
+  const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  if (loading && !data) return <Loading shape="text" />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+  const p = data!;
+  if (!p.birthdays) return null;
+
+  async function save(change: () => ReturnType<typeof api.pushAdmin>) {
+    setBusy(true);
+    setSaveError(null);
+    try {
+      setData(await change());
+      onToast('Gespeichert');
+    } catch (err) {
+      setSaveError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <label className="toggle">
+        <input
+          type="checkbox"
+          checked={p.birthdays.enabled}
+          disabled={busy}
+          onChange={(e) => save(() => api.setBirthdayNotify({ birthday_notify: e.target.checked }))}
+        />
+        Am Geburtstag eines Mitglieds alle anderen benachrichtigen
+      </label>
+      {p.birthdays.enabled && (
+        <label className="field">
+          <span>Benachrichtigung am Geburtstag ab</span>
+          <select
+            value={p.birthdays.hour}
+            disabled={busy}
+            onChange={(e) => save(() => api.setBirthdayNotify({ birthday_hour: Number(e.target.value) }))}
+          >
+            <HourOptions />
+          </select>
+        </label>
+      )}
+      {saveError && (
+        <p className="form-error" role="alert">
+          {saveError}
+        </p>
+      )}
+    </>
+  );
+}
+
+/** Geburtstage (Issue #1): wie viele Tage im Voraus die Karte „Anstehende Geburtstage“ bei den Terminen einen zeigt. */
 function BirthdaySettingsSection({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.birthdaySettings(), [], 'admin/birthdays');
   const [busy, setBusy] = useState(false);
@@ -409,10 +448,7 @@ function BirthdaySettingsSection({ onToast }: { onToast: (msg: string) => void }
           {saveError}
         </p>
       )}
-      <p className="small muted">
-        So lange vorher erscheint ein Geburtstag oben bei den {sec.events} unter „Anstehende {sec.birthdays}“, für alle, die {sec.birthdays}{' '}
-        sehen.
-      </p>
+      <BirthdayNotify onToast={onToast} />
     </section>
   );
 }
@@ -488,11 +524,6 @@ function MailForm({
   return (
     <form className="card settings-section form" id="einstellungen-email" onSubmit={save}>
       <h3>E-Mail</h3>
-      <p className="small muted">
-        Über diese Adresse verschickt die App Mails, z. B. Nachrichten aus „{sec.board}“ an die Mitglieder. Antworten und nicht zustellbare
-        Mails gehen an diese Adresse. Die Zugangsdaten stehen beim Anbieter des Postfachs (Hoster oder Mailanbieter) unter „SMTP“ oder
-        „Postausgangsserver“.
-      </p>
       {settings.unavailable && (
         <p className="form-error" role="alert">
           {settings.unavailable}
@@ -544,11 +575,6 @@ function MailForm({
       </label>
       <details>
         <summary>Versand in Portionen</summary>
-        <p className="small muted">
-          Manche Hoster erlauben nur eine bestimmte Zahl Mails pro Stunde. Dann hier eine Portionsgröße und eine Pause eintragen. 0
-          bedeutet: alle auf einmal bzw. ohne Pause. Die App versucht es alle 15 Minuten; eine Pause dauert deshalb mindestens bis zum
-          nächsten Lauf.
-        </p>
         <div className="field-row">
           <label className="field">
             <span>Mails je Portion</span>
@@ -880,11 +906,6 @@ export function GoogleAccess({ settings, onSaved, onToast }: SectionProps) {
   return (
     <section className="card settings-section" id="einstellungen-google">
       <h3>Google-Zugang</h3>
-      <p className="muted small">
-        Über diesen Zugang liest die App den Galerie-Ordner aus Google Drive und private Google Kalender (nur lesen). Empfohlen:{' '}
-        <strong>Mit Google verbinden</strong> über einen eigenen OAuth-Client. Wie du ihn anlegst, steht in der Hilfe unter „Google
-        einrichten“.
-      </p>
       {result && (
         <p className={result.ok ? 'small' : 'form-error small'} role={result.ok ? 'status' : 'alert'}>
           {result.ok ? '✓ ' : ''}
@@ -949,10 +970,6 @@ export function GoogleAccess({ settings, onSaved, onToast }: SectionProps) {
           <button className="btn btn-block" type="submit" disabled={connecting}>
             {connecting ? 'Weiter zu Google …' : 'Speichern und mit Google verbinden'}
           </button>
-          <p className="muted small">
-            Danach meldest du dich bei Google mit dem Konto an, das den Galerie-Ordner und den Kalender sehen kann. Zeigt Google „Google hat
-            diese App nicht überprüft“, wähle „Erweitert“ und dann „Weiter zu …“ und setze beide Häkchen (Google Drive und Google Kalender).
-          </p>
         </form>
       )}
       {connectError && (
@@ -962,10 +979,6 @@ export function GoogleAccess({ settings, onSaved, onToast }: SectionProps) {
       )}
       <details open={!!g.service_account_email && !g.connected}>
         <summary>Alternative: Dienstkonto mit JSON-Schlüssel</summary>
-        <p className="muted small">
-          Nur nötig, wenn du nicht „Mit Google verbinden“ nutzt. Den Galerie-Ordner (Betrachter) und ggf. den Kalender („Alle Termindetails
-          sehen“) für die Adresse des Dienstkontos freigeben.
-        </p>
         {g.service_account_email && (
           <div className="small">
             Dienstkonto: <code>{g.service_account_email}</code>
@@ -1097,12 +1110,6 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
         save({ ...(url.trim() ? { calendar_ics_url: url.trim() } : {}), calendar_ids: ids.trim(), ...cache }, () => setUrl(''));
       }}
     >
-      <p className="muted small">
-        Zwei Wege: Für einen privaten Google Kalender die <strong>Kalender-ID</strong> eintragen; gelesen wird über den <GoogleLink />{' '}
-        (Verbindung mit Erlaubnis für den Kalender oder Dienstkonto, für das der Kalender freigegeben ist). Oder ohne Google-Zugang die{' '}
-        <strong>geheime Adresse im iCal-Format</strong> einfügen. Sind Kalender-IDs eingetragen und darf der Google-Zugang den Kalender
-        lesen, gelten sie vor der iCal-Adresse.
-      </p>
       <p className="small">{status}</p>
       {c.connection_needs_calendar_access && (
         <p className="small">
@@ -1271,10 +1278,6 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
       )}
       {source === 'drive' && (
         <>
-          <p className="muted small">
-            Hier den Link zum Galerie-Ordner in Google Drive eintragen. Darin je Jahr ein Ordner, darin je Album ein Ordner; Bilder im
-            Unterordner <em>intern</em> sehen nur Mitglieder.
-          </p>
           <p className="small">
             {access ? (
               <>
@@ -1355,15 +1358,6 @@ function FailedPhotos({ count, disabled, onRetry }: { count: number; disabled: b
   return (
     <details className="gallery-failed" onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary>{count === 1 ? '1 Bild ließ sich nicht laden' : `${count} Bilder ließen sich nicht laden`} – anzeigen</summary>
-      <p className="small muted">
-        Kann der Server ein Format nicht lesen (z. B. RAW, TIFF, HEIC), nimmt die App das in RAW-Dateien eingebettete JPEG oder das
-        Vorschaubild von Google. Hier stehen Bilder, bei denen auch das nicht ging, z. B. beschädigte Dateien. Abhilfe: das Bild als JPG in
-        denselben Ordner in Google Drive legen (das alte entfernen); der nächste Abgleich nimmt es neu auf.
-      </p>
-      <p className="small muted">
-        Videos zeigt die Galerie als MP4 oder WebM. Andere Formate (z. B. MOV, AVI) stehen hier als „nicht unterstützt“. Abhilfe: das Video
-        als MP4 speichern und in denselben Ordner legen.
-      </p>
       {error && (
         <p className="form-error small" role="alert">
           {error}
@@ -1470,10 +1464,6 @@ export function News({ settings, onSaved, onToast }: SectionProps) {
         save({ news_source: source, ...(needsUrl ? { news_url: url.trim() } : {}) });
       }}
     >
-      <p className="muted small">
-        Die {newsTitle()} kommen von einer Webseite oder einem Feed, oder ihr schreibt sie direkt in der App. Es gilt immer eine Quelle;
-        beim Wechsel bleiben die Beiträge der anderen erhalten und erscheinen wieder, wenn ihr zurückwechselt.
-      </p>
       <label className="field">
         <span>Quelle</span>
         <select value={source} onChange={(e) => setSource(e.target.value as NewsSourceType)}>
@@ -1496,12 +1486,6 @@ export function News({ settings, onSaved, onToast }: SectionProps) {
             onChange={(e) => setUrl(e.target.value)}
           />
         </label>
-      )}
-      {source === 'app' && (
-        <p className="muted small">
-          Beiträge schreibt, wer das Recht „{sec.news} schreiben“ hat (Standardrolle „{sec.news} verwalten“), direkt unter {sec.news} mit{' '}
-          <strong>Neuer Beitrag</strong>.
-        </p>
       )}
       {(n.source === 'wordpress' || n.source === 'rss') &&
         (unsaved ? (
@@ -1544,10 +1528,6 @@ export function Legal({ settings, onSaved, onToast }: SectionProps) {
         save({ legal_imprint_url: imprint.trim(), legal_privacy_url: privacy.trim() });
       }}
     >
-      <p className="muted small">
-        Trage die Adressen eures Impressums und eurer Datenschutzerklärung ein, z. B. die Seiten auf eurer Webseite. Die App zeigt die Links
-        allen, auch ohne Anmeldung: auf der Anmeldeseite, im Konto und in der Hilfe.
-      </p>
       <label className="field">
         <span>Impressum</span>
         <input
@@ -1568,10 +1548,6 @@ export function Legal({ settings, onSaved, onToast }: SectionProps) {
           onChange={(e) => setPrivacy(e.target.value)}
         />
       </label>
-      <p className="muted small">
-        Was die App an Daten verarbeitet (für eure Datenschutzerklärung), steht in der Hilfe unter „Impressum und Datenschutz“. Ein leeres
-        Feld entfernt den Link.
-      </p>
     </Section>
   );
 }

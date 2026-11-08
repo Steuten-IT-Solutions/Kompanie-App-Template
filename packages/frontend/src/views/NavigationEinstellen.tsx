@@ -166,10 +166,6 @@ function Editor({
   return (
     <section className="card settings-section" id="einstellungen-navigation">
       <h3>Navigation</h3>
-      <p className="small muted">
-        Welche Bereiche unten in der Leiste stehen, in welcher Reihenfolge, und welche ihr in Untermenüs zusammenfasst. Jede Person sieht
-        davon nur, was sie sehen darf. Verwaltung und Meins stehen immer ganz rechts.
-      </p>
       <p className="small">
         {custom
           ? 'Zurzeit gilt eure eigene Navigation.'
