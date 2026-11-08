@@ -9,7 +9,7 @@ use KompanieApp\Core\Storage\Sql\Connection;
 /**
  * Abos für Web Push (user_id 0 = Gast) und die Warteschlange für den Versand (Issue #19).
  *
- * @phpstan-type Subscription array{id: int, user_id: int, endpoint: string, p256dh: string, auth: string, types: list<string>, details: bool, updated_at: string}
+ * @phpstan-type Subscription array{id: int, user_id: int, endpoint: string, p256dh: string, auth: string, types: list<string>, offered: list<string>|null, details: bool, updated_at: string}
  * @phpstan-type QueueItem array{id: int, subscription_id: int, payload: string, urgency: string, ttl: int, attempts: int,
  *     created_at: string, endpoint: ?string, p256dh: ?string, auth: ?string}
  */
@@ -73,8 +73,11 @@ final class PushRepository
         ];
     }
 
-    /** @param list<string> $types */
-    public function insert(int $userId, string $endpoint, string $p256dh, string $auth, array $types, bool $details, string $now): int
+    /**
+     * @param list<string> $types
+     * @param list<string>|null $offered Arten, die das Gerät angeboten bekam (null = unbekannt)
+     */
+    public function insert(int $userId, string $endpoint, string $p256dh, string $auth, array $types, bool $details, string $now, ?array $offered = null): int
     {
         return $this->db->insert('push_subscriptions', [
             'user_id' => $userId,
@@ -83,24 +86,37 @@ final class PushRepository
             'p256dh' => $p256dh,
             'auth' => $auth,
             'types' => implode(',', $types),
+            'offered' => $offered === null ? null : implode(',', $offered),
             'details' => $details ? 1 : 0,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
     }
 
-    /** @param array{user_id?: int, p256dh?: string, auth?: string, types?: list<string>, details?: bool} $values */
+    /** @param array{user_id?: int, p256dh?: string, auth?: string, types?: list<string>, offered?: list<string>, details?: bool} $values */
     public function update(int $id, array $values, string $now): void
     {
         $row = ['updated_at' => $now];
         foreach ($values as $key => $value) {
             $row[$key] = match ($key) {
-                'types' => implode(',', (array) $value),
+                'types', 'offered' => implode(',', (array) $value),
                 'details' => $value ? 1 : 0,
                 default => $value,
             };
         }
         $this->db->update('push_subscriptions', $row, ['id' => $id]);
+    }
+
+    /**
+     * Arten und angebotene Arten ändern, ohne updated_at (das zählt als „zuletzt genutzt“, z. B. für den Verfall der
+     * Gast-Abos).
+     *
+     * @param list<string> $types
+     * @param list<string> $offered
+     */
+    public function setTypes(int $id, array $types, array $offered): void
+    {
+        $this->db->update('push_subscriptions', ['types' => implode(',', $types), 'offered' => implode(',', $offered)], ['id' => $id]);
     }
 
     public function delete(int $id): void
@@ -223,6 +239,7 @@ final class PushRepository
     private static function format(array $r): array
     {
         $types = (string) ($r['types'] ?? '');
+        $offered = isset($r['offered']) ? (string) $r['offered'] : null;
         return [
             'id' => (int) $r['id'],
             'user_id' => (int) $r['user_id'],
@@ -230,6 +247,7 @@ final class PushRepository
             'p256dh' => (string) $r['p256dh'],
             'auth' => (string) $r['auth'],
             'types' => $types === '' ? [] : explode(',', $types),
+            'offered' => $offered === null ? null : ($offered === '' ? [] : explode(',', $offered)),
             'details' => (bool) $r['details'],
             'updated_at' => (string) ($r['updated_at'] ?? ''),
         ];

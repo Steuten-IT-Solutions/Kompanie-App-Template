@@ -17,6 +17,15 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Hinweis zum Einschalten der Benachrichtigungen**: Angemeldete Mitglieder sehen auf der Startseite einen Hinweis
+  *Nichts mehr verpassen* mit dem Knopf *Benachrichtigungen einschalten*, solange ihr Browser auf diesem Gerät noch
+  nicht nach Benachrichtigungen gefragt hat. Ein Tippen fragt nach der Erlaubnis und schaltet alle Arten ein; *Nicht
+  jetzt* blendet den Hinweis für 30 Tage aus. Ohne Zustimmung der Person im Browser geht es technisch nicht.
+- **Neue Arten von Benachrichtigungen kommen von selbst dazu**: Bekommt jemand eine Art neu angeboten, z. B. nach einer
+  neuen Rolle (Bilder prüfen, Anfragen freigeben, Mitglied statt Gast) oder weil ihr einen Bereich wie News oder
+  Termine einschaltet, schaltet die App sie auf seinen Geräten mit Benachrichtigungen ein (spätestens nach
+  15 Minuten). Arten, die jemand selbst abgeschaltet hat, bleiben aus. Bei Geräten, die schon vor diesem Update
+  angemeldet waren, gilt das für alles, was ab jetzt neu dazukommt.
 - **Rolle und Zusatzrollen gleich beim Anlegen**: Wer Rollen vergeben darf, wählt beim Anlegen eines Mitglieds jetzt
   jede Rolle, die er auch danach unter *Konto und Rolle* vergeben dürfte (z. B. Vorstand), und hakt Zusatzrollen an.
   Das gilt für *Mitglied anlegen*, *Mehrere auf einmal anlegen* (Rolle und Zusatzrollen für alle), den Import aus

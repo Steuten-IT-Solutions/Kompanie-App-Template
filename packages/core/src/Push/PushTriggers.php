@@ -210,6 +210,8 @@ final class PushTriggers
         if (!$this->push->supported()) {
             return 0;
         }
+        // Vor dem Versand: Arten, die Geräte neu angeboten bekommen (neue Rolle, Bereich), einschalten.
+        $this->push->addNewTypes();
         $count = 0;
         if ($this->app->features()->enabled('calendar') && $this->app->calendar()->isConfigured()) {
             $count += $this->checkCalendar();

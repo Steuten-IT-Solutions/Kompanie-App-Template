@@ -1774,6 +1774,13 @@ WHERE title IS NULL",
                 'mysql' => ['ALTER TABLE {board_messages} ADD COLUMN blocks mediumtext NULL'],
                 'sqlite' => ['ALTER TABLE {board_messages} ADD COLUMN blocks TEXT DEFAULT NULL'],
             ],
+            // Benachrichtigungen: Arten, die ein Gerät schon angeboten bekam (PushService::addNewTypes). Später neu
+            // angebotene Arten (z. B. nach einer neuen Rolle) schaltet die App ein, bewusst abgeschaltete bleiben aus.
+            // NULL bei bestehenden Abos: Beim ersten Abgleich gilt das gerade Angebotene als bekannt.
+            54 => [
+                'mysql' => ['ALTER TABLE {push_subscriptions} ADD COLUMN offered varchar(255) DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {push_subscriptions} ADD COLUMN offered TEXT DEFAULT NULL'],
+            ],
         ];
     }
 

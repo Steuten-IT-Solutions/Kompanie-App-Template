@@ -159,6 +159,64 @@ final class PushServiceTest extends TestCase
         $this->assertTrue($p->unsubscribe(null, $d['endpoint'], $d['keys']['auth']));
     }
 
+    /** Standardmäßig an: Neu angebotene Arten (neue Rolle, Bereich) kommen dazu, selbst abgeschaltete bleiben aus. */
+    public function testNewlyOfferedTypesSwitchOnButOptOutsStayOff(): void
+    {
+        $app = $this->app();
+        $p = $app->push();
+        $id = $this->users->add('neu', Roles::GUEST);
+        $d = self::device('neu');
+        $p->subscribe($this->users->find($id), $d['endpoint'], $d['keys'], null, null, '');
+        $sub = $p->update($this->users->find($id), $d['endpoint'], null, ['board_public', 'events', 'reminder'], null);
+        $this->assertSame(['board_public', 'events', 'reminder'], $sub['types'], 'News selbst abgeschaltet');
+        $this->assertSame(0, $p->addNewTypes(), 'ohne Änderung nichts zu tun');
+
+        $this->users->setRole($id, Roles::MEMBER);
+        $this->assertSame(1, $p->addNewTypes());
+        $sub = $p->repository()->byEndpoint($d['endpoint']);
+        $this->assertNotNull($sub);
+        $this->assertSame(['board', 'board_public', 'polls', 'birthdays', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder'], $sub['types'], 'neue Arten der Rolle an, News bleibt aus');
+        $this->assertSame(0, $p->addNewTypes(), 'nur einmal');
+
+        // Bereich aus und wieder an: Die Art kennt das Gerät schon, abgeschaltet bleibt abgeschaltet.
+        $p->update($this->users->find($id), $d['endpoint'], null, ['board', 'events'], null);
+        $app->features()->update(['polls' => false]);
+        $app->features()->update(['polls' => true]);
+        $p->addNewTypes();
+        $this->assertSame(['board', 'events'], $p->repository()->byEndpoint($d['endpoint'])['types'] ?? null);
+
+        // Ein Bereich, den es beim Anmelden des Geräts nicht gab, kommt dazu (auch ohne erstes Einschalten).
+        $app->features()->update(['news' => false]);
+        $other = self::device('ohne-news');
+        $p->subscribe($this->users->find($id), $other['endpoint'], $other['keys'], ['events'], null, '');
+        $app->features()->update(['news' => true]);
+        $sub = $p->addNewTypesTo($p->own($this->users->find($id), $other['endpoint'], null), $this->users->find($id));
+        $this->assertSame(['events', 'news'], $sub['types']);
+        $this->assertSame(['events', 'news'], $p->repository()->byEndpoint($other['endpoint'])['types'] ?? null);
+    }
+
+    /** Abos von vor der Regel: Was gerade angeboten wird, gilt als bekannt; erst später Neues kommt dazu. */
+    public function testOlderSubscriptionsKeepTheirChoice(): void
+    {
+        $app = $this->app();
+        $p = $app->push();
+        $id = $this->users->add('alt', Roles::GUEST);
+        $d = self::device('alt');
+        $p->repository()->insert($id, $d['endpoint'], $d['keys']['p256dh'], $d['keys']['auth'], ['events'], false, $app->time()->nowUtc());
+        $legacy = $p->repository()->byEndpoint($d['endpoint']);
+        $this->assertNotNull($legacy);
+        $this->assertNull($legacy['offered']);
+        $this->assertSame(0, $p->addNewTypes());
+        $sub = $p->repository()->byEndpoint($d['endpoint']);
+        $this->assertSame(['events'], $sub['types'] ?? null, 'News und Erinnerung bleiben aus (vielleicht abgeschaltet)');
+        $this->assertSame(['events', 'board_public', 'reminder', 'news'], $sub['offered'] ?? null);
+
+        $this->users->setRole($id, Roles::MEMBER);
+        $app->push()->addNewTypes();
+        $this->assertContains('polls', $p->repository()->byEndpoint($d['endpoint'])['types'] ?? []);
+        $this->assertNotContains('news', $p->repository()->byEndpoint($d['endpoint'])['types'] ?? []);
+    }
+
     public function testDeviceMovesToAnotherAccountOnlyWithItsSecret(): void
     {
         $app = $this->app();
