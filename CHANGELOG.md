@@ -76,6 +76,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Album herunterladen als kleiner Knopf**: In einem Album der Galerie steht statt des großen Knopfs *Album
+  herunterladen (… Bilder, ZIP)* jetzt rechts neben dem Titel ein runder Knopf mit Pfeil nach unten, wie beim
+  Herunterladen eines einzelnen Bildes. Die Anzahl der Bilder und Videos zeigt er beim Darüberfahren mit der Maus;
+  während des Ladens steht darunter „Lädt … von …“ mit *Abbrechen*.
 - **Banner des Schwarzen Bretts in einer Zeile**: Das Banner oben zeigt je Eintrag nur noch den Titel, ohne
   Überschrift, Verfasser und Uhrzeit (die stehen am Brett). Ein Tipp auf den Titel öffnet die Nachricht; *+1 weitere*
   und *Brett öffnen* erscheinen erst bei mehreren Einträgen. Auch laufende Umfragen stehen so in einer Zeile.
