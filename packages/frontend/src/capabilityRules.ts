@@ -2,7 +2,7 @@
 // Haken einzeln und je Gruppe. Dieselben Regeln wie Capability::requires und RoleService im Kern.
 import type { Capability } from './api';
 
-/** Rechte zum Sehen: bei Gast und Mitglied änderbar (wie Capability::isView im Kern). */
+/** Rechte zum Sehen: bei Gast änderbar (wie Capability::isView im Kern). */
 const VIEW: Capability[] = [
   'calendar',
   'view_intern',
@@ -42,10 +42,9 @@ export function requires(c: Capability): Capability | null {
   return isView(c) || c === 'member' ? null : 'member';
 }
 
-/** Was eine feste Rolle haben kann: Gast nur Rechte zum Sehen ohne Voraussetzung, Mitglied Rechte zum Sehen. */
+/** Was eine feste Rolle haben kann: Gast nur Rechte zum Sehen ohne Voraussetzung, Mitglied jedes Recht. */
 export function allowedFor(role: string, c: Capability): boolean {
   if (role === 'guest') return isView(c) && requires(c) === null;
-  if (role === 'member') return isView(c);
   return true;
 }
 
@@ -82,8 +81,8 @@ export function groupState(isOn: (c: Capability) => boolean, keys: Capability[])
 }
 
 /**
- * Gesperrte Haken einer Rolle: Admin hat alle Rechte; bei Gast und Mitglied nur Rechte zum Sehen änderbar (allowedFor),
- * Mitglied gehört immer zur Kompanie.
+ * Gesperrte Haken einer Rolle: Admin hat alle Rechte; bei Gast nur Rechte zum Sehen änderbar (allowedFor), Mitglied
+ * gehört immer zur Kompanie.
  */
 export function lockedFor(role: string, system: boolean, c: Capability): boolean {
   if (role === 'admin') return true;

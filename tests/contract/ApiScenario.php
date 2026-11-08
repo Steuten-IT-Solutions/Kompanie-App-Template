@@ -367,7 +367,8 @@ final class ApiScenario
         $this->d->actAs($this->m1);
         $c->ok($this->req('GET', '/catalog')[0] === 403 && $this->req('GET', '/ranks')[0] === 200, 'Mitglied: Katalog 403, Dienstgrade weiter 200');
         $this->d->actAs($admin);
-        $c->ok($this->req('PATCH', '/admin/roles/member', ['capabilities' => [...$memberCaps, 'manage_points']])[0] === 400, 'Mitglied: nur Rechte zum Sehen → 400');
+        $c->ok($this->req('PATCH', '/admin/roles/member', ['capabilities' => [...$memberCaps, 'manage_points']])[0] === 200, 'Mitglied: auch Rechte zum Verwalten');
+        $c->ok($this->req('PATCH', '/admin/roles/member', ['capabilities' => $memberCaps])[0] === 200, 'Mitglied wieder wie vorher');
         $c->ok($this->req('PATCH', '/admin/roles/member', ['capabilities' => array_values(array_diff($memberCaps, ['member']))])[0] === 400, 'Mitglied ohne Mitgliedschaft → 400');
         $c->ok($this->req('PATCH', '/admin/roles/guest', ['capabilities' => [...$guestCaps, 'member']])[0] === 400, 'Gast mit Mitgliedschaft → 400');
         [$s] = $this->req('PATCH', '/admin/roles/guest', ['capabilities' => [...array_values(array_diff($guestCaps, ['view_directory'])), 'view_ranks']]);

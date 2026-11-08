@@ -291,7 +291,9 @@ final class RolesTest extends TestCase
         $this->assertSame(200, $app->api()->handle(new Request('GET', '/documents'))->status);
         $users->current = $admin;
         $this->assertSame(400, $patch(Roles::MEMBER, ['capabilities' => ['view_events']])->status, 'Mitglied gehört immer zur Kompanie');
-        $this->assertSame(400, $patch(Roles::MEMBER, ['capabilities' => ['member', 'manage_points']])->status, 'nur Rechte zum Sehen');
+        $this->assertSame(200, $patch(Roles::MEMBER, ['capabilities' => ['member', 'submit_gallery']])->status, 'Mitglied: auch Rechte zum Verwalten');
+        $this->assertSame([Capability::Member, Capability::SubmitGallery], $app->roles()->capabilities(Roles::MEMBER));
+        $this->assertSame(400, $patch(Roles::GUEST, ['capabilities' => ['submit_gallery']])->status, 'Gast: nur Rechte zum Sehen');
         $this->assertSame(400, $patch(Roles::GUEST, ['capabilities' => ['member']])->status, 'Gast gehört nicht zur Kompanie');
         $this->assertSame(400, $patch(Roles::GUEST, ['capabilities' => ['view_own_points']])->status, 'eigene Punkte nur für Mitglieder');
         $this->assertSame(400, $patch(Roles::ADMIN, ['capabilities' => []])->status, 'Admin hat alle');

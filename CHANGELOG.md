@@ -115,6 +115,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Rolle Mitglied: auch Rechte zum Verwalten**: Unter *Einstellungen → Rollen* lässt sich der Rolle Mitglied jetzt
+  jedes Recht geben, nicht mehr nur Rechte zum Sehen, z. B. *Bilder und Videos einreichen*. Jedes Mitglied bekommt es
+  dann, auch jedes neue Konto. Wer Mitglieder anlegen darf, kann weiterhin Konten mit der Rolle Mitglied anlegen.
+
 - **Kompanien: Mitglieder nur mit dem Bereich Mitglieder**: Die Seiten der Kompanien zeigen ihre Mitglieder jetzt
   nur noch, wenn der Bereich *Mitglieder* eingeschaltet ist, und dann für die Rollen mit dem Recht *Mitglieder*. So
   schaltest du die Mitgliederlisten unter *Einstellungen → Bereiche* zentral ein oder aus und legst unter *Einstellungen → Rollen*
