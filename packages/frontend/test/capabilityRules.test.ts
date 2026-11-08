@@ -57,10 +57,12 @@ test('Gast: nur Rechte zum Sehen ohne Voraussetzung, nie Mitglied', () => {
   assert.deepEqual(orderedCaps(toggleForRole('guest', true, set(), ['view_own_points', 'view_news'], true)), ['view_news']);
 });
 
-test('Mitglied gehört immer zur Kompanie und hat nur Rechte zum Sehen; Admin alles gesperrt', () => {
+test('Mitglied gehört immer zur Kompanie und kann jedes Recht bekommen; Admin alles gesperrt', () => {
   assert.equal(lockedFor('member', true, 'member'), true);
   assert.equal(lockedFor('member', true, 'view_own_points'), false);
-  assert.equal(lockedFor('member', true, 'manage_points'), true);
+  assert.equal(lockedFor('member', true, 'manage_points'), false);
+  assert.equal(lockedFor('member', true, 'submit_gallery'), false);
+  assert.deepEqual(orderedCaps(toggleForRole('member', true, set('member'), ['submit_gallery'], true)), ['member', 'submit_gallery']);
   assert.equal(lockedFor('admin', true, 'view_news'), true);
   assert.equal(lockedFor('r1', false, 'manage_points'), false, 'eigene Rollen: alles');
   assert.deepEqual(orderedCaps(toggleForRole('member', true, set('member', 'view_catalog'), ['view_catalog'], false)), ['member']);

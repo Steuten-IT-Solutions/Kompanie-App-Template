@@ -318,7 +318,7 @@ function RoleForm({
           {admin
             ? 'Admins dürfen alles; die Rechte lassen sich nicht ändern.'
             : key === 'member'
-              ? 'Rolle neuer Konten; gehört immer zur Kompanie. Einstellen lässt sich, was Mitglieder sehen; Rechte zum Verwalten bekommen sie über eigene Rollen.'
+              ? 'Rolle neuer Konten; gehört immer zur Kompanie. Was du hier anhakst, bekommt jedes Mitglied, auch Rechte zum Verwalten.'
               : 'Gilt für Gäste und für alle, die die App ohne Anmeldung öffnen. Einstellen lässt sich, was sie sehen.'}
         </p>
       )}

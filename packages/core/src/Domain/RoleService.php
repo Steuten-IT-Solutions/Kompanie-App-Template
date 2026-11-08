@@ -1028,9 +1028,10 @@ final class RoleService
 
     /**
      * Rollen, die $actor neuen Konten geben darf (Mitglieder anlegen, einzeln, mehrere, Import, Anfragen freigeben):
-     * - Mitglied und die eigenen Rollen, die der Admin dafür freigegeben hat (new_accounts, z. B. Anwärter). Wer kein
-     *   Admin ist, nur solche mit höchstens dem Mitgliederbereich bzw. dem Kalender oder mit Rechten, die er selbst
-     *   weitergeben darf (canHandle): Konten anlegen soll keine weiteren Rechte verschaffen.
+     * - Mitglied immer (die Rolle neuer Konten, ihre Rechte legt der Admin fest).
+     * - Die eigenen Rollen, die der Admin dafür freigegeben hat (new_accounts, z. B. Anwärter). Wer kein Admin ist, nur
+     *   solche mit höchstens Rechten zum Sehen oder mit Rechten, die er selbst weitergeben darf (canHandle): Konten
+     *   anlegen soll keine weiteren Rechte verschaffen.
      * - Jede andere Rolle, die $actor der Person gleich danach auch über „Rollen vergeben“ geben dürfte (promote_users
      *   und canHandle): Anlegen mit Rolle ist dann nur ein Schritt statt zwei. Admin nur, wenn $actor Admin ist und die
      *   App Admins ernennen kann (eigenständige Version; bei WordPress im WP-Backend).
@@ -1044,7 +1045,12 @@ final class RoleService
         if ($key === Roles::ADMIN) {
             return $actor->isAdmin() && $this->users->canAssignAdmin();
         }
-        if ($key === Roles::MEMBER || $role['new_accounts']) {
+        // Mitglied ist die Rolle jedes neuen Kontos (auch ohne Wahl, MemberService::prepare); welche Rechte sie hat,
+        // legt der Admin für alle neuen Konten fest.
+        if ($key === Roles::MEMBER) {
+            return true;
+        }
+        if ($role['new_accounts']) {
             $basic = array_filter($this->capabilities($key), static fn (Capability $c): bool => !$c->isView() && $c !== Capability::Member) === [];
             if ($actor->isAdmin() || $basic || $this->canHandle($actor, $key)) {
                 return true;
@@ -1282,7 +1288,7 @@ final class RoleService
 
     /**
      * Gespeicherte Rechte einer festen Rolle: Admin keine (er hat ohnehin alle), Gast nur Rechte zum Sehen ohne
-     * Voraussetzung, Mitglied immer member und sonst nur Rechte zum Sehen.
+     * Voraussetzung, Mitglied immer member und dazu jedes vergebbare Recht.
      *
      * @param string[] $caps
      * @return string[]
@@ -1292,7 +1298,7 @@ final class RoleService
         if ($key === Roles::ADMIN) {
             return [];
         }
-        $out = array_filter(Roles::from($caps), static fn (Capability $c): bool => $c->isView() && ($key === Roles::MEMBER || $c->requires() === null));
+        $out = array_filter(Roles::from($caps), static fn (Capability $c): bool => $key === Roles::MEMBER ? in_array($c, Roles::GRANTABLE, true) : $c->isView() && $c->requires() === null);
         return self::ordered([...self::values($out), ...($key === Roles::MEMBER ? [Capability::Member->value] : [])]);
     }
 
@@ -1321,9 +1327,9 @@ final class RoleService
             if ($system === Roles::MEMBER && !isset($out[Capability::Member->value])) {
                 throw ApiError::invalid('Mitglieder gehören immer zur Kompanie.');
             }
-            foreach ($out as $c) {
-                if ($c !== Capability::Member->value && !Capability::from($c)->isView()) {
-                    throw ApiError::invalid('Gast und Mitglied haben nur Rechte zum Sehen; zum Verwalten bitte eine eigene Rolle anlegen.');
+            foreach ($system === Roles::GUEST ? $out : [] as $c) {
+                if (!Capability::from($c)->isView()) {
+                    throw ApiError::invalid('Gäste haben nur Rechte zum Sehen; zum Verwalten bitte eine Rolle geben.');
                 }
             }
         }

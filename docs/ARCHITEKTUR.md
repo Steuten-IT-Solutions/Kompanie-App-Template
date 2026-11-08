@@ -487,7 +487,7 @@ Unabhängig vom Adapter kann der Admin als Quelle „In der App schreiben“ wä
   | Rolle | Rechte |
   |---|---|
   | `guest` (Gast) | anfangs `Roles::PUBLIC_DEFAULTS` und `ADDED_VIEW`; nur Rechte zum Sehen ohne Voraussetzung änderbar; gilt auch ohne Anmeldung |
-  | `member` (Mitglied) | anfangs `Roles::MEMBER_DEFAULTS` und `ADDED_VIEW`; immer `member`, sonst nur Rechte zum Sehen änderbar – Rolle neuer Konten; Punktefaktor änderbar |
+  | `member` (Mitglied) | anfangs `Roles::MEMBER_DEFAULTS` und `ADDED_VIEW`; immer `member`, dazu jedes vergebbare Recht – Rolle neuer Konten; Punktefaktor änderbar |
   | `admin` (Admin) | alle; Punktefaktor änderbar |
 
   Reihenfolge überall (Auswahl, Zusatzrollen; Zähler umgekehrt, von unten nach oben) so, wie der Admin alle Rollen per Ziehen ordnet (`PUT /admin/roles/order`, auch die festen); anfangs `guest`, `member`, eigene Rollen, `admin`. Neue Rollen kommen ans Ende, vor `admin`, wenn der dort steht.
