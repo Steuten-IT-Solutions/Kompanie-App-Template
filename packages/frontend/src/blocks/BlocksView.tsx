@@ -1,4 +1,5 @@
-import type { Block, ButtonBlock, ContactsBlock, EventsBlock, NoticeBlock } from '../api';
+import type { AlbumBlock, Block, ButtonBlock, ContactsBlock, EventsBlock, FactsBlock, NoticeBlock, PollBlock, ScheduleBlock } from '../api';
+import { formatUntil } from '../format';
 import { MemberAvatar } from '../memberPhoto';
 import { formatEventWhen } from '../format';
 import RichTextView from '../richtext/RichTextView';
@@ -33,6 +34,18 @@ export default function BlocksView({ blocks, manager, textClassName }: { blocks:
             break;
           case 'notice':
             view = <Notice block={b} />;
+            break;
+          case 'schedule':
+            view = <Schedule block={b} />;
+            break;
+          case 'facts':
+            view = <Facts block={b} />;
+            break;
+          case 'poll':
+            view = <PollCard block={b} />;
+            break;
+          case 'album':
+            view = <AlbumPreview block={b} />;
             break;
           case 'divider':
             view = b.style === 'space' ? <div className="block-space" aria-hidden="true" /> : <hr className="block-divider" />;
@@ -128,5 +141,75 @@ function Notice({ block }: { block: NoticeBlock }) {
       {block.title && <strong className="block-notice-title">{block.title}</strong>}
       <p>{block.text}</p>
     </aside>
+  );
+}
+
+/** Ablauf: Zeit links, Programmpunkt rechts. */
+function Schedule({ block }: { block: ScheduleBlock }) {
+  return (
+    <section className="block-schedule">
+      {block.title && <h3>{block.title}</h3>}
+      <dl className="block-schedule-list">
+        {block.items.map((i, n) => (
+          <div key={n} className="block-schedule-item">
+            <dt>{i.time}</dt>
+            <dd>{i.text}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+/** Zahlen und Fakten nebeneinander (auf schmalen Geräten umbrechend). */
+function Facts({ block }: { block: FactsBlock }) {
+  return (
+    <section className="block-facts">
+      {block.title && <h3>{block.title}</h3>}
+      <ul className="block-facts-list">
+        {block.items.map((i, n) => (
+          <li key={n}>
+            <strong className="block-facts-value">{i.value}</strong>
+            <span className="block-facts-label">{i.label}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** Umfrage: Titel und Stand mit dem Weg zum Abstimmen bzw. zur Antwort. */
+function PollCard({ block }: { block: PollBlock }) {
+  const p = block.poll;
+  if (!p) return <p className="muted small">Diese Umfrage gibt es nicht mehr.</p>;
+  return (
+    <section className="block-poll card">
+      <span className="muted small">
+        Umfrage · {p.status === 'ended' ? 'beendet' : p.ends_at ? `bis ${formatUntil(p.ends_at)}` : 'läuft'}
+      </span>
+      <strong className="block-poll-title">{p.title}</strong>
+      <a className={`btn${p.has_voted || p.status === 'ended' ? ' btn-secondary' : ''}`} href={`#/umfragen/${p.id}`}>
+        {p.has_voted || p.status === 'ended' ? 'Antwort und Ergebnis ansehen' : 'Teilnehmen'}
+      </a>
+    </section>
+  );
+}
+
+/** Album: einige Vorschaubilder, ein Tipp öffnet das Album in der Galerie. */
+function AlbumPreview({ block }: { block: AlbumBlock }) {
+  const a = block.album;
+  if (!a) return <p className="muted small">Dieses Album gibt es nicht mehr oder es ist leer.</p>;
+  return (
+    <section className="block-album">
+      <h3>{a.title}</h3>
+      <a className="block-album-grid" href={`#/galerie/${a.id}`} aria-label={`Album ${a.title} öffnen`}>
+        {a.photos.map((p) => (
+          <img key={p.id} src={p.thumb} alt="" loading="lazy" width={p.width} height={p.height} />
+        ))}
+      </a>
+      <a className="btn btn-link" href={`#/galerie/${a.id}`}>
+        Alle {a.total} im Album ansehen
+      </a>
+    </section>
   );
 }

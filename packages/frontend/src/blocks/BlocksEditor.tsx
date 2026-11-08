@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useState, type ReactNode } from 'react';
-import { api, type BlockAudience, type Office, type PublicEvent } from '../api';
+import { api, type BlockAudience, type GalleryAlbumSummary, type Office, type Poll, type PublicEvent } from '../api';
 import { Loading, lazyView } from '../ui';
 import {
   BLOCK_KINDS,
@@ -12,7 +12,11 @@ import {
   type CountdownDraft,
   type DividerDraft,
   type EventsDraft,
+  type FactsDraft,
   type NoticeDraft,
+  type ScheduleDraft,
+  type PollDraft,
+  type AlbumDraft,
 } from './blockDrafts';
 import Countdown from './Countdown';
 import { previewRange } from './countdown';
@@ -105,6 +109,231 @@ function NoticeFields({ block, onChange }: { block: NoticeDraft; onChange: (b: N
           <option value="warning">Warnung</option>
           <option value="success">Erfolg</option>
         </select>
+      </label>
+    </div>
+  );
+}
+
+const SCHEDULE_MAX = 50;
+const FACTS_MAX = 12;
+
+/** Zeilen einer Liste (Ablauf, Zahlen) bearbeiten: hinzufügen, entfernen. */
+function RowsEditor<T>({
+  rows,
+  onChange,
+  empty,
+  max,
+  addLabel,
+  render,
+}: {
+  rows: T[];
+  onChange: (rows: T[]) => void;
+  empty: T;
+  max: number;
+  addLabel: string;
+  render: (row: T, set: (r: T) => void, n: number) => ReactNode;
+}) {
+  return (
+    <div className="block-rows">
+      {rows.map((r, n) => (
+        <div key={n} className="block-row field-row">
+          {render(r, (next) => onChange(rows.map((x, j) => (j === n ? next : x))), n)}
+          <button
+            type="button"
+            className="btn btn-small btn-secondary"
+            aria-label={`Zeile ${n + 1} entfernen`}
+            disabled={rows.length === 1}
+            onClick={() => onChange(rows.filter((_, j) => j !== n))}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="btn btn-small btn-secondary"
+        disabled={rows.length >= max}
+        onClick={() => onChange([...rows, { ...empty }])}
+      >
+        {addLabel}
+      </button>
+    </div>
+  );
+}
+
+function ScheduleFields({ block, onChange }: { block: ScheduleDraft; onChange: (b: ScheduleDraft) => void }) {
+  return (
+    <div className="block-schedule-fields">
+      <label className="field">
+        <span>Überschrift (optional)</span>
+        <input type="text" maxLength={TITLE_MAX} value={block.title} onChange={(e) => onChange({ ...block, title: e.target.value })} />
+      </label>
+      <RowsEditor
+        rows={block.items}
+        onChange={(items) => onChange({ ...block, items })}
+        empty={{ time: '', text: '' }}
+        max={SCHEDULE_MAX}
+        addLabel="+ Programmpunkt"
+        render={(r, set, n) => (
+          <>
+            <label className="field block-row-short">
+              <span>Zeit</span>
+              <input
+                type="text"
+                maxLength={20}
+                value={r.time}
+                placeholder="14:00"
+                aria-label={`Zeit ${n + 1}`}
+                onChange={(e) => set({ ...r, time: e.target.value })}
+              />
+            </label>
+            <label className="field">
+              <span>Programmpunkt</span>
+              <input
+                type="text"
+                maxLength={200}
+                value={r.text}
+                aria-label={`Programmpunkt ${n + 1}`}
+                onChange={(e) => set({ ...r, text: e.target.value })}
+                required
+              />
+            </label>
+          </>
+        )}
+      />
+    </div>
+  );
+}
+
+function FactsFields({ block, onChange }: { block: FactsDraft; onChange: (b: FactsDraft) => void }) {
+  return (
+    <div className="block-facts-fields">
+      <label className="field">
+        <span>Überschrift (optional)</span>
+        <input type="text" maxLength={TITLE_MAX} value={block.title} onChange={(e) => onChange({ ...block, title: e.target.value })} />
+      </label>
+      <RowsEditor
+        rows={block.items}
+        onChange={(items) => onChange({ ...block, items })}
+        empty={{ value: '', label: '' }}
+        max={FACTS_MAX}
+        addLabel="+ Zahl"
+        render={(r, set, n) => (
+          <>
+            <label className="field block-row-short">
+              <span>Wert</span>
+              <input
+                type="text"
+                maxLength={20}
+                value={r.value}
+                placeholder="1848"
+                aria-label={`Wert ${n + 1}`}
+                onChange={(e) => set({ ...r, value: e.target.value })}
+                required
+              />
+            </label>
+            <label className="field">
+              <span>Bezeichnung</span>
+              <input
+                type="text"
+                maxLength={60}
+                value={r.label}
+                placeholder="gegründet"
+                aria-label={`Bezeichnung ${n + 1}`}
+                onChange={(e) => set({ ...r, label: e.target.value })}
+                required
+              />
+            </label>
+          </>
+        )}
+      />
+    </div>
+  );
+}
+
+/** Liste einmal je Sitzung laden (ohne Recht oder Bereich: leer). */
+function cached<T>(load: () => Promise<T[]>): () => Promise<T[]> {
+  let p: Promise<T[]> | null = null;
+  return () =>
+    (p ??= load().catch(() => {
+      p = null;
+      return [];
+    }));
+}
+const allPolls = cached<Poll>(() => api.polls());
+const allAlbums = cached<GalleryAlbumSummary & { year: string }>(() =>
+  api.gallery().then((g) => g.years.flatMap((y) => y.albums.map((a) => ({ ...a, year: y.year })))),
+);
+
+function useList<T>(load: () => Promise<T[]>): T[] | null {
+  const [list, setList] = useState<T[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void load().then((l) => alive && setList(l));
+    return () => {
+      alive = false;
+    };
+  }, [load]);
+  return list;
+}
+
+function PollFields({ block, onChange }: { block: PollDraft; onChange: (b: PollDraft) => void }) {
+  const list = useList(allPolls);
+  return (
+    <label className="field">
+      <span>Umfrage</span>
+      {list === null ? (
+        <Loading shape="text" />
+      ) : (
+        <select value={block.poll_id || ''} onChange={(e) => onChange({ ...block, poll_id: Number(e.target.value) || 0 })} required>
+          <option value="">Umfrage wählen</option>
+          {block.poll_id > 0 && !list.some((p) => p.id === block.poll_id) && (
+            <option value={block.poll_id}>{block.poll_title ?? `Umfrage ${block.poll_id}`}</option>
+          )}
+          {list.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.title}
+              {p.status === 'ended' ? ' (beendet)' : ''}
+            </option>
+          ))}
+        </select>
+      )}
+      <span className="muted small">Sichtbar nur für alle, die an Umfragen teilnehmen dürfen; für andere fehlt der Block.</span>
+    </label>
+  );
+}
+
+function AlbumFields({ block, onChange }: { block: AlbumDraft; onChange: (b: AlbumDraft) => void }) {
+  const list = useList(allAlbums);
+  return (
+    <div className="block-album-fields">
+      <label className="field">
+        <span>Album</span>
+        {list === null ? (
+          <Loading shape="text" />
+        ) : (
+          <select value={block.album_id || ''} onChange={(e) => onChange({ ...block, album_id: Number(e.target.value) || 0 })} required>
+            <option value="">Album wählen</option>
+            {block.album_id > 0 && !list.some((a) => a.id === block.album_id) && (
+              <option value={block.album_id}>{block.album_title ?? `Album ${block.album_id}`}</option>
+            )}
+            {list.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.title} ({a.year})
+              </option>
+            ))}
+          </select>
+        )}
+      </label>
+      <label className="field">
+        <span>Wie viele Bilder</span>
+        <input
+          type="number"
+          min={1}
+          max={12}
+          value={block.count}
+          onChange={(e) => onChange({ ...block, count: Math.max(1, Math.min(12, Number(e.target.value) || 1)) })}
+        />
       </label>
     </div>
   );
@@ -433,6 +662,14 @@ export default function BlocksEditor({
               <NoticeFields block={b} onChange={(c) => update(i, c)} />
             ) : b.type === 'divider' ? (
               <DividerFields block={b} onChange={(c) => update(i, c)} />
+            ) : b.type === 'schedule' ? (
+              <ScheduleFields block={b} onChange={(c) => update(i, c)} />
+            ) : b.type === 'facts' ? (
+              <FactsFields block={b} onChange={(c) => update(i, c)} />
+            ) : b.type === 'poll' ? (
+              <PollFields block={b} onChange={(c) => update(i, c)} />
+            ) : b.type === 'album' ? (
+              <AlbumFields block={b} onChange={(c) => update(i, c)} />
             ) : (
               <CountdownFields block={b} onChange={(c) => update(i, c)} idPrefix={id} />
             )}

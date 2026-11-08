@@ -28,6 +28,10 @@ Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum 
 - **Ansprechpartner**: Hake bei **Ämter** die Ämter an, deren Inhaber erscheinen sollen. E-Mail-Adresse und Handynummer sehen nur Personen, die persönliche Angaben sehen dürfen.
 - **Hinweis-Kasten**: ein kurzer **Hinweis**, farbig als **Info**, **Warnung** oder **Erfolg**.
 - **Trennlinie**: eine **Linie** oder **Nur Abstand** zwischen zwei Blöcken.
+- **Ablauf**: je Zeile eine **Zeit** und ein **Programmpunkt**, z. B. für den Ablauf eines Festes.
+- **Zahlen und Fakten**: je Zeile ein **Wert** und eine **Bezeichnung**, groß nebeneinander.
+- **Umfrage**: Wähle bei **Umfrage** eine aus den {bereich.polls}. Der Block zeigt Titel und Stand mit **Teilnehmen**, wer schon abgestimmt hat, sieht **Antwort und Ergebnis ansehen**. Wer nicht an Umfragen teilnehmen darf, sieht den Block nicht.
+- **Album**: Wähle bei **Album** eines aus der {bereich.gallery} und **Wie viele Bilder** (1 bis 12). Jeder sieht nur die Bilder, die er auch in der {bereich.gallery} sehen darf.
 
 ### Einen Countdown einfügen
 1. Wähle bei **+ Block einfügen** **Countdown**.
