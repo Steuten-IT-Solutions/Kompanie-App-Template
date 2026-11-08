@@ -8874,6 +8874,8 @@ components:
         - $ref: '#/components/schemas/BlockDivider'
         - $ref: '#/components/schemas/BlockSchedule'
         - $ref: '#/components/schemas/BlockFacts'
+        - $ref: '#/components/schemas/BlockPoll'
+        - $ref: '#/components/schemas/BlockAlbum'
       discriminator:
         propertyName: type
         mapping:
@@ -8886,6 +8888,8 @@ components:
           divider: '#/components/schemas/BlockDivider'
           schedule: '#/components/schemas/BlockSchedule'
           facts: '#/components/schemas/BlockFacts'
+          poll: '#/components/schemas/BlockPoll'
+          album: '#/components/schemas/BlockAlbum'
     BlockBase:
       type: object
       required: [type]
@@ -9036,6 +9040,58 @@ components:
                 properties:
                   value: { type: string, minLength: 1, maxLength: 20, description: 'z. B. 1848 oder 250+' }
                   label: { type: string, minLength: 1, maxLength: 60 }
+    BlockPoll:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [poll_id]
+          properties:
+            type: { type: string, const: poll }
+            poll_id: { type: integer, description: 'Umfrage aus dem Bereich Umfragen (muss beim Speichern existieren)' }
+            poll:
+              readOnly: true
+              description: 'Nur in Antworten: Stand für die lesende Person. Der Block fehlt ganz, wenn Umfragen ausgeschaltet sind oder die Person nicht teilnehmen darf; mit manage_pages kommt er dann mit poll null.'
+              oneOf:
+                - type: 'null'
+                - type: object
+                  required: [id, title, status, has_voted]
+                  properties:
+                    id: { type: integer }
+                    title: { type: string }
+                    status: { type: string }
+                    ends_at: { type: [string, 'null'], format: date-time }
+                    has_voted: { type: boolean }
+    BlockAlbum:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [album_id]
+          properties:
+            type: { type: string, const: album }
+            album_id: { type: integer, description: 'Album aus der Galerie (muss beim Speichern existieren)' }
+            count: { type: integer, minimum: 1, maximum: 12, default: 6, description: 'Wie viele Vorschaubilder' }
+            album:
+              readOnly: true
+              description: 'Nur in Antworten: Vorschau mit den Bildern, die die Person in der Galerie sehen darf (interne nur mit view_gallery_internal). Der Block fehlt ganz, wenn die Galerie ausgeschaltet ist oder nichts sichtbar ist; mit manage_pages kommt er dann mit album null.'
+              oneOf:
+                - type: 'null'
+                - type: object
+                  required: [id, title, total, photos]
+                  properties:
+                    id: { type: integer }
+                    title: { type: string }
+                    year: { type: string }
+                    total: { type: integer, description: 'Sichtbare Einträge (Bilder und Videos) im Album' }
+                    photos:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id: { type: integer }
+                          thumb: { type: string }
+                          large: { type: string }
+                          width: { type: integer }
+                          height: { type: integer }
 
     Title:
       type: object

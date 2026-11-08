@@ -10,6 +10,8 @@ import type {
   EventsBlock,
   FactsBlock,
   NoticeBlock,
+  PollBlock,
+  AlbumBlock,
   ScheduleBlock,
   TextBlock,
 } from '../api';
@@ -23,6 +25,8 @@ export type NoticeDraft = NoticeBlock;
 export type DividerDraft = DividerBlock;
 export type ScheduleDraft = ScheduleBlock;
 export type FactsDraft = FactsBlock;
+export type PollDraft = Omit<PollBlock, 'poll'> & { poll_title?: string };
+export type AlbumDraft = Omit<AlbumBlock, 'album'> & { album_title?: string };
 export type BlockDraft =
   | TextDraft
   | CountdownDraft
@@ -32,7 +36,9 @@ export type BlockDraft =
   | NoticeDraft
   | DividerDraft
   | ScheduleDraft
-  | FactsDraft;
+  | FactsDraft
+  | PollDraft
+  | AlbumDraft;
 export type BlockKind = BlockDraft['type'];
 
 /** Blöcke, die man einfügen kann, mit Bezeichnung und Erklärung (Reihenfolge der Auswahl). */
@@ -46,6 +52,8 @@ export const BLOCK_KINDS: { type: BlockKind; label: string; hint: string }[] = [
   { type: 'divider', label: 'Trennlinie', hint: 'Linie oder Abstand zwischen Blöcken' },
   { type: 'schedule', label: 'Ablauf', hint: 'Uhrzeit und Programmpunkt untereinander' },
   { type: 'facts', label: 'Zahlen und Fakten', hint: 'Kurze Kennzahlen nebeneinander' },
+  { type: 'poll', label: 'Umfrage', hint: 'Eine Umfrage zum Mitmachen einbinden' },
+  { type: 'album', label: 'Album', hint: 'Einige Bilder aus einem Album der Galerie' },
 ];
 
 let counter = 0;
@@ -80,6 +88,8 @@ export function newBlock(type: BlockKind, audience: BlockAudience = 'all'): Bloc
   if (type === 'divider') return { id, type, audience, style: 'line' };
   if (type === 'schedule') return { id, type, audience, title: '', items: [{ time: '', text: '' }] };
   if (type === 'facts') return { id, type, audience, title: '', items: [{ value: '', label: '' }] };
+  if (type === 'poll') return { id, type, audience, poll_id: 0 };
+  if (type === 'album') return { id, type, audience, album_id: 0, count: 6 };
   return { id, type: 'text', audience, html: '' };
 }
 
@@ -95,6 +105,14 @@ export function draftsFrom(blocks: Block[] | undefined, body: string): BlockDraf
       const { offices: _o, ...rest } = b;
       return rest;
     }
+    if (b.type === 'poll') {
+      const { poll, ...rest } = b;
+      return { ...rest, poll_title: poll?.title };
+    }
+    if (b.type === 'album') {
+      const { album, ...rest } = b;
+      return { ...rest, album_title: album?.title };
+    }
     if (b.type !== 'countdown') return b;
     const { starts_at: _s, ends_at: _e, ...rest } = b;
     return { ...rest, time: rest.time ?? '', end_date: rest.end_date ?? '', end_time: rest.end_time ?? '', date: rest.date ?? '' };
@@ -103,7 +121,15 @@ export function draftsFrom(blocks: Block[] | undefined, body: string): BlockDraf
 
 /** Zum Speichern: leere Uhrzeiten als null, beim Termin ohne eigenes Datum. */
 export function blocksInput(drafts: BlockDraft[]): BlockInput[] {
-  return drafts.map((b) => {
+  return drafts.map((b): BlockInput => {
+    if (b.type === 'poll') {
+      const { poll_title: _t, ...rest } = b;
+      return rest;
+    }
+    if (b.type === 'album') {
+      const { album_title: _t, ...rest } = b;
+      return rest;
+    }
     if (b.type !== 'countdown') return b;
     const { event_title: _t, ...rest } = b;
     if (rest.source === 'event') {

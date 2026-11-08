@@ -147,3 +147,26 @@ test('Ablauf und Zahlen: neue Blöcke mit einer leeren Zeile', () => {
     { id: '', type: 'facts', audience: 'all', title: '', items: [{ value: '', label: '' }] },
   );
 });
+
+test('Umfrage und Album: Titel vom Server nur für die Auswahl, nicht zum Speichern', () => {
+  assert.deepEqual({ ...newBlock('poll'), id: '' }, { id: '', type: 'poll', audience: 'all', poll_id: 0 });
+  assert.deepEqual({ ...newBlock('album'), id: '' }, { id: '', type: 'album', audience: 'all', album_id: 0, count: 6 });
+  const drafts = draftsFrom(
+    [
+      {
+        id: 'p1',
+        type: 'poll',
+        audience: 'members',
+        poll_id: 3,
+        poll: { id: 3, title: 'Grillfest?', status: 'open', ends_at: null, has_voted: false },
+      },
+      { id: 'a1', type: 'album', audience: 'all', album_id: 5, count: 4, album: null },
+    ],
+    '',
+  );
+  assert.equal((drafts[0] as { poll_title?: string }).poll_title, 'Grillfest?');
+  assert.deepEqual(blocksInput(drafts), [
+    { id: 'p1', type: 'poll', audience: 'members', poll_id: 3 },
+    { id: 'a1', type: 'album', audience: 'all', album_id: 5, count: 4 },
+  ]);
+});

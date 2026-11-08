@@ -31,7 +31,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{
 Hat jemand anderes die Seite gespeichert, während du sie bearbeitet hast, speichert die App deine Fassung nicht und sagt, wer sie geändert hat. Kopiere dann deine Änderungen, tippe auf **Neu laden** und trage sie noch einmal ein. Beim Neu laden gehen deine Änderungen verloren.
 
 ### Blöcke einfügen, verschieben und entfernen
-- Wähle bei **+ Block einfügen** die Art des Blocks: **Text**, **Countdown**, **Knopf mit Link**, **Nächste Termine**, **Ansprechpartner**, **Hinweis-Kasten**, **Trennlinie**, **Ablauf** oder **Zahlen und Fakten**. Mit **+ Block darunter einfügen** kommt der neue Block direkt unter einen bestehenden.
+- Wähle bei **+ Block einfügen** die Art des Blocks: **Text**, **Countdown**, **Knopf mit Link**, **Nächste Termine**, **Ansprechpartner**, **Hinweis-Kasten**, **Trennlinie**, **Ablauf**, **Zahlen und Fakten**, **Umfrage** oder **Album**. Mit **+ Block darunter einfügen** kommt der neue Block direkt unter einen bestehenden.
 - Mit **↑** und **↓** verschiebst du einen Block nach oben oder unten, mit **Entfernen** nimmst du ihn heraus.
 - Bei jedem Block wählst du, für wen er ist: **Für alle, die die Seite sehen** oder **Nur Mitglieder**. So kann eine öffentliche Seite einzelne Teile nur für Mitglieder enthalten, zum Beispiel einen internen Treffpunkt. Ohne Anmeldung und für Gäste fehlen diese Blöcke samt ihren Bildern.
 - Erst **Speichern** (bzw. **Anlegen**) übernimmt die Änderungen.
@@ -72,6 +72,11 @@ Der Block zeigt, wer das Amt gerade innehat, mit Foto wie in den Ämtern. E-Mail
 ### Einen Ablauf oder Zahlen eintragen
 - **Ablauf**: Trage je Zeile eine **Zeit** (frei, z. B. „14:00“ oder „ab 20 Uhr“, optional) und den **Programmpunkt** ein. Mit **+ Programmpunkt** kommt eine Zeile dazu, mit **×** nimmst du eine heraus (höchstens 50).
 - **Zahlen und Fakten**: Trage je Zeile einen **Wert** (z. B. „1848“) und eine **Bezeichnung** (z. B. „gegründet“) ein. Mit **+ Zahl** kommt eine dazu (höchstens 12). Die Zahlen stehen groß nebeneinander.
+
+### Eine Umfrage oder ein Album zeigen
+- **Umfrage**: Wähle bei **Umfrage** eine aus den {bereich.polls}. Der Block zeigt Titel, bis wann sie läuft, und **Teilnehmen**; wer schon abgestimmt hat oder wenn sie beendet ist, steht dort **Antwort und Ergebnis ansehen**. Abgestimmt wird in den {bereich.polls}. Wer nicht an Umfragen teilnehmen darf (z. B. ohne Anmeldung), sieht den Block nicht.
+- **Album**: Wähle bei **Album** eines aus der {bereich.gallery} und bei **Wie viele Bilder** 1 bis 12 Vorschaubilder. Ein Tipp öffnet das Album. Jeder sieht nur Bilder, die er auch in der {bereich.gallery} sehen darf; interne Bilder also nur Mitglieder mit dem Recht dazu. Ist nichts sichtbar, fehlt der Block.
+- Sind die {bereich.polls} oder die {bereich.gallery} ausgeschaltet, fehlt der Block für alle außer denen, die Seiten verwalten.
 
 ### Die Reihenfolge ändern
 Halte einen Eintrag am Griff links fest, ziehe ihn an die gewünschte Stelle und lass los. Die Reihenfolge ist sofort gespeichert. Am Computer geht es auch mit der Tastatur: Griff mit der Tab-Taste auswählen, dann Pfeil hoch oder runter. Die Reihenfolge gilt in der Standardnavigation; mit eurer eigenen Navigation bestimmt die dort den Platz jeder Seite.

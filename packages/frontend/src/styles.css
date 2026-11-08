@@ -6443,6 +6443,32 @@ fieldset.block-source legend {
 .block-facts-label {
   color: var(--muted);
 }
+/* Blöcke „Umfrage“ und „Album“ */
+.block-poll {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+.block-poll-title {
+  font-size: 1.1rem;
+}
+.block-album h3 {
+  margin: 0 0 8px;
+}
+.block-album-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 6px;
+}
+.block-album-grid img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--radius-sm, 6px);
+  display: block;
+}
 .block-rows {
   display: flex;
   flex-direction: column;

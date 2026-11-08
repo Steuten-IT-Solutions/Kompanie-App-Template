@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useState, type ReactNode } from 'react';
-import { api, type BlockAudience, type Office, type PublicEvent } from '../api';
+import { api, type BlockAudience, type GalleryAlbumSummary, type Office, type Poll, type PublicEvent } from '../api';
 import { Loading, lazyView } from '../ui';
 import {
   BLOCK_KINDS,
@@ -15,6 +15,8 @@ import {
   type FactsDraft,
   type NoticeDraft,
   type ScheduleDraft,
+  type PollDraft,
+  type AlbumDraft,
 } from './blockDrafts';
 import Countdown from './Countdown';
 import { previewRange } from './countdown';
@@ -245,6 +247,94 @@ function FactsFields({ block, onChange }: { block: FactsDraft; onChange: (b: Fac
           </>
         )}
       />
+    </div>
+  );
+}
+
+/** Liste einmal je Sitzung laden (ohne Recht oder Bereich: leer). */
+function cached<T>(load: () => Promise<T[]>): () => Promise<T[]> {
+  let p: Promise<T[]> | null = null;
+  return () =>
+    (p ??= load().catch(() => {
+      p = null;
+      return [];
+    }));
+}
+const allPolls = cached<Poll>(() => api.polls());
+const allAlbums = cached<GalleryAlbumSummary & { year: string }>(() =>
+  api.gallery().then((g) => g.years.flatMap((y) => y.albums.map((a) => ({ ...a, year: y.year })))),
+);
+
+function useList<T>(load: () => Promise<T[]>): T[] | null {
+  const [list, setList] = useState<T[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void load().then((l) => alive && setList(l));
+    return () => {
+      alive = false;
+    };
+  }, [load]);
+  return list;
+}
+
+function PollFields({ block, onChange }: { block: PollDraft; onChange: (b: PollDraft) => void }) {
+  const list = useList(allPolls);
+  return (
+    <label className="field">
+      <span>Umfrage</span>
+      {list === null ? (
+        <Loading shape="text" />
+      ) : (
+        <select value={block.poll_id || ''} onChange={(e) => onChange({ ...block, poll_id: Number(e.target.value) || 0 })} required>
+          <option value="">Umfrage wählen</option>
+          {block.poll_id > 0 && !list.some((p) => p.id === block.poll_id) && (
+            <option value={block.poll_id}>{block.poll_title ?? `Umfrage ${block.poll_id}`}</option>
+          )}
+          {list.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.title}
+              {p.status === 'ended' ? ' (beendet)' : ''}
+            </option>
+          ))}
+        </select>
+      )}
+      <span className="muted small">Sichtbar nur für alle, die an Umfragen teilnehmen dürfen; für andere fehlt der Block.</span>
+    </label>
+  );
+}
+
+function AlbumFields({ block, onChange }: { block: AlbumDraft; onChange: (b: AlbumDraft) => void }) {
+  const list = useList(allAlbums);
+  return (
+    <div className="block-album-fields">
+      <label className="field">
+        <span>Album</span>
+        {list === null ? (
+          <Loading shape="text" />
+        ) : (
+          <select value={block.album_id || ''} onChange={(e) => onChange({ ...block, album_id: Number(e.target.value) || 0 })} required>
+            <option value="">Album wählen</option>
+            {block.album_id > 0 && !list.some((a) => a.id === block.album_id) && (
+              <option value={block.album_id}>{block.album_title ?? `Album ${block.album_id}`}</option>
+            )}
+            {list.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.title} ({a.year})
+              </option>
+            ))}
+          </select>
+        )}
+      </label>
+      <label className="field">
+        <span>Wie viele Bilder</span>
+        <input
+          type="number"
+          min={1}
+          max={12}
+          value={block.count}
+          onChange={(e) => onChange({ ...block, count: Math.max(1, Math.min(12, Number(e.target.value) || 1)) })}
+        />
+      </label>
     </div>
   );
 }
@@ -576,6 +666,10 @@ export default function BlocksEditor({
               <ScheduleFields block={b} onChange={(c) => update(i, c)} />
             ) : b.type === 'facts' ? (
               <FactsFields block={b} onChange={(c) => update(i, c)} />
+            ) : b.type === 'poll' ? (
+              <PollFields block={b} onChange={(c) => update(i, c)} />
+            ) : b.type === 'album' ? (
+              <AlbumFields block={b} onChange={(c) => update(i, c)} />
             ) : (
               <CountdownFields block={b} onChange={(c) => update(i, c)} idPrefix={id} />
             )}

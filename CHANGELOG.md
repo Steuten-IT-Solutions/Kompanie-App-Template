@@ -49,6 +49,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   oder Abstand.
 - **Neue Blöcke: Ablauf und Zahlen und Fakten**: Der *Ablauf* stellt Zeit und Programmpunkt untereinander, z. B.
   für ein Fest; *Zahlen und Fakten* zeigt kurze Kennzahlen wie „1848 gegründet“ groß nebeneinander.
+- **Neue Blöcke: Umfrage und Album**: Die *Umfrage* zeigt eine Umfrage mit ihrem Stand und dem Weg zum Abstimmen,
+  nur für alle, die an Umfragen teilnehmen dürfen. Das *Album* zeigt einige Vorschaubilder eines Albums aus der
+  Galerie; jeder sieht nur die Bilder, die er auch in der Galerie sehen darf.
 - **Mitglieder ohne Zugang**: Unter *Mitglied anlegen* gibt es den Haken *Ohne Zugang (meldet sich noch nicht an)*.
   So tragt ihr Personen ein, die noch kein Konto haben, z. B. für Chroniken und Ämter. Sie sind gewöhnliche Mitglieder,
   lassen sich überall auswählen und tragen in der Mitgliederliste der Verwaltung die Marke *ohne Zugang*; ein
