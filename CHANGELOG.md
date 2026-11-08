@@ -118,6 +118,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Benachrichtigungen, Zuletzt verschickt**: Die Liste unter *Einstellungen → Benachrichtigungen* ist jetzt nach
+  Zeit sortiert, das Neueste oben, statt nach Art.
 - **Eigene Seiten**: Der Text einer Seite klebt nicht mehr am Rand ihrer Karte.
 - **Darstellung**: Lange Wörter in Kacheln, Überschriften und Knöpfen werden richtig getrennt (z. B. nicht mehr
   „Punktekatalo-g“); *Sicherung wiederherstellen* ragt nicht mehr über den Rand; Zurück-Knöpfe in Formularen stehen

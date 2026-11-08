@@ -376,9 +376,9 @@ final class PushServiceTest extends TestCase
         $log = $p->logStatus();
         $labels = $p->types();
         $this->assertSame([
-            ['type' => 'penalties', 'label' => $labels['penalties']['label'], 'at' => '2026-10-19T10:00:00+02:00', 'devices' => 1],
             ['type' => 'points', 'label' => $labels['points']['label'], 'at' => '2026-10-19T10:05:00+02:00', 'devices' => 2],
-        ], $log['types'], 'in der Reihenfolge der Arten, Zeit in der Zeitzone der Kompanie');
+            ['type' => 'penalties', 'label' => $labels['penalties']['label'], 'at' => '2026-10-19T10:00:00+02:00', 'devices' => 1],
+        ], $log['types'], 'neueste zuerst, Zeit in der Zeitzone der Kompanie');
         $this->assertSame(['at' => '2026-10-19T10:05:00+02:00', 'count' => 3], $log['accepted']);
         $this->assertNull($log['rejected']);
         $this->assertSame($log, $p->adminStatus()['log']);
@@ -394,6 +394,11 @@ final class PushServiceTest extends TestCase
         $this->assertSame(2, $log['rejected']['count'] ?? null);
         $this->assertSame('2026-10-19T11:05:00+02:00', $log['rejected']['at'] ?? null);
         $this->assertContains($log['rejected']['reason'] ?? null, ['HTTP 400', 'Gerät beim Push-Dienst abgemeldet (HTTP 410)']);
+
+        // Später wieder Strafen: Strafen rücken wieder nach oben.
+        $this->clock->at = $this->clock->now()->modify('+1 minute');
+        $app->pushTriggers()->penaltiesAdded([['id' => 4, 'user_id' => $m->id, 'amount_cents' => 100, 'reason' => 'x']]);
+        $this->assertSame(['penalties', 'points'], array_column($p->logStatus()['types'], 'type'));
 
         // Ausgeschalteter Bereich: seine Art erscheint nicht mehr.
         $app->features()->update(['penalties' => false]);

@@ -938,7 +938,7 @@ final class PushService
     }
 
     /**
-     * Protokoll für die Einstellungen: je angebotener Art (in der Reihenfolge von types()) der letzte Versand, dazu die
+     * Protokoll für die Einstellungen: je angebotener Art der letzte Versand, neueste zuerst, dazu die
      * letzte angenommene und die letzte abgelehnte Nachricht; Zeitpunkte als ISO 8601 in der Zeitzone der Kompanie.
      *
      * @return array{types: list<array{type: string, label: string, at: string, devices: int}>, accepted: array{at: string, count: int}|null, rejected: array{at: string, count: int, reason: string}|null}
@@ -949,13 +949,17 @@ final class PushService
         $log = is_array($log) ? $log : [];
         $time = $this->app->time();
         $iso = static fn (mixed $at): string => $time->format((int) $at, 'c');
-        $types = [];
+        $sent = [];
         foreach ($this->types() as $key => $type) {
             $entry = $log['types'][$key] ?? null;
             if (is_array($entry) && is_numeric($entry['at'] ?? null) && $this->active($type)) {
-                $types[] = ['type' => $key, 'label' => $type['label'], 'at' => $iso($entry['at']), 'devices' => (int) ($entry['devices'] ?? 0)];
+                $sent[] = ['at' => (int) $entry['at'], 'item' => ['type' => $key, 'label' => $type['label'], 'at' => $iso($entry['at']), 'devices' => (int) ($entry['devices'] ?? 0)]];
             }
         }
+        // Neueste zuerst; nach der Unix-Zeit, nicht nach dem Text (Sommer- und Winterzeit). usort ist stabil: bei
+        // gleicher Zeit bleibt die Reihenfolge von types().
+        usort($sent, static fn (array $a, array $b): int => $b['at'] <=> $a['at']);
+        $types = array_column($sent, 'item');
         $accepted = $log['accepted'] ?? null;
         $rejected = $log['rejected'] ?? null;
         return [
