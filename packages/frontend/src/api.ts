@@ -270,7 +270,14 @@ export type Block =
   | PollBlock
   | AlbumBlock
   | DocumentBlock
-  | SponsorsBlock;
+  | SponsorsBlock
+  | MapBlock;
+/** Karte zur Anfahrt: Ort als Text, die App öffnet ihn in der Karten-App des Geräts */
+export interface MapBlock extends BlockBase {
+  type: 'map';
+  title: string;
+  place: string;
+}
 /** Dokument zum Herunterladen (vom Server); null nur für die Pflege, wenn es fehlt oder nicht sichtbar ist */
 export interface DocumentBlock extends BlockBase {
   type: 'document';
@@ -316,7 +323,8 @@ export type BlockInput =
   | (Omit<PollBlock, 'id' | 'poll'> & { id?: string })
   | (Omit<AlbumBlock, 'id' | 'album'> & { id?: string })
   | (Omit<DocumentBlock, 'id' | 'document'> & { id?: string })
-  | (Omit<SponsorsBlock, 'id' | 'sponsors'> & { id?: string });
+  | (Omit<SponsorsBlock, 'id' | 'sponsors'> & { id?: string })
+  | (Omit<MapBlock, 'id'> & { id?: string });
 
 /** Einstellungen → Navigation (Issue #277): gespeicherte Navigation und was der Server erlaubt. */
 export interface NavigationAdmin {

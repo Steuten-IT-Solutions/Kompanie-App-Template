@@ -6,12 +6,14 @@ import type {
   DocumentBlock,
   EventsBlock,
   FactsBlock,
+  MapBlock,
   NoticeBlock,
   PollBlock,
   ScheduleBlock,
   SponsorsBlock,
 } from '../api';
 import { useState } from 'react';
+import { mapLinkTarget, mapPlatform, mapSearchUrl } from '../address';
 import { safeFileName } from '../downloadFiles';
 import { formatBytes, formatDate, formatUntil } from '../format';
 import { saveFile } from '../saveFile';
@@ -67,6 +69,9 @@ export default function BlocksView({ blocks, manager, textClassName }: { blocks:
             break;
           case 'sponsors':
             view = <SponsorsRow block={b} />;
+            break;
+          case 'map':
+            view = <MapPlace block={b} />;
             break;
           case 'divider':
             view = b.style === 'space' ? <div className="block-space" aria-hidden="true" /> : <hr className="block-divider" />;
@@ -306,6 +311,22 @@ function SponsorsRow({ block }: { block: SponsorsBlock }) {
           );
         })}
       </ul>
+    </section>
+  );
+}
+
+/** Karte zur Anfahrt: Ort und ein Knopf, der ihn in der Karten-App zeigt (wie beim Ort eines Termins). */
+function MapPlace({ block }: { block: MapBlock }) {
+  const map = mapSearchUrl(block.place, mapPlatform());
+  return (
+    <section className="block-map card">
+      {block.title && <h3>{block.title}</h3>}
+      <p className="block-map-place">{block.place}</p>
+      {map && (
+        <a className="btn btn-secondary" href={map} {...mapLinkTarget(map)}>
+          Karte
+        </a>
+      )}
     </section>
   );
 }
