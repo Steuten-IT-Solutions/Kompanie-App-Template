@@ -405,7 +405,8 @@ final class Api
 
     /**
      * Kompanien (Issue #280) mit ihren Mitgliedern wie in der Mitgliederliste: Foto, Titel und Dienstgrad dazu (ohne
-     * Geburtstag und Eintritt). Wer die Namen sieht, regelt CompanyService::list (view_directory).
+     * Geburtstag und Eintritt). Wer die Namen sieht, regelt CompanyService::list (Bereich directory
+     * und view_directory).
      *
      * @return list<array<string, mixed>>
      */

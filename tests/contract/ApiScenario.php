@@ -1438,7 +1438,7 @@ final class ApiScenario
 
     /**
      * Kompanien (Issue #280): Liste für alle mit view_companies, Pflege und Zuordnung mit manage_companies, Logo mit eigener
-     * Adresse, Mitglieder einer Kompanie nur mit Mitgliederliste, Kompanien je Person in der Mitgliederliste.
+     * Adresse, Mitglieder einer Kompanie nur mit dem Bereich Mitgliederliste (und view_directory), Kompanien je Person in der Mitgliederliste.
      */
     private function companies(): void
     {
@@ -1468,6 +1468,12 @@ final class ApiScenario
         $c->ok($s === 200 && array_column((array) ($d['companies'] ?? []), 'id') === [$mine[1], $mine[0]], 'Person zwei Kompanien zuordnen (Reihenfolge der Liste)');
         [$s, $d] = $this->req('PATCH', "/companies/{$mine[1]}", ['active' => false]);
         $c->ok($s === 200 && ($d['active'] ?? null) === false && ($d['member_ids'] ?? null) === [$m], 'Als aufgelöst markieren, Zuordnung bleibt');
+        $byId = array_column((array) $this->req('GET', '/companies')[1], null, 'id');
+        $c->ok(array_column((array) ($byId[$mine[0]]['members'] ?? []), 'id') === [$m] && ($byId[$mine[0]]['member_count'] ?? null) === 1, 'Mitglieder der Kompanie mit Mitgliederliste');
+        $this->req('PUT', '/admin/features', ['directory' => false]);
+        $byId = array_column((array) $this->req('GET', '/companies')[1], null, 'id');
+        $c->ok(!array_key_exists('members', (array) ($byId[$mine[0]] ?? [])) && !array_key_exists('member_count', (array) ($byId[$mine[0]] ?? [])) && ($byId[$mine[0]]['member_ids'] ?? null) === [$m], 'Mitgliederliste aus → keine Mitglieder auf der Kompanieseite, Zuordnung bleibt');
+        $this->req('PUT', '/admin/features', ['directory' => true]);
         $dir = array_column((array) $this->req('GET', '/directory')[1], null, 'id');
         $c->ok(array_column((array) ($dir[$m]['companies'] ?? []), 'id') === [$mine[1], $mine[0]], 'Kompanien in der Mitgliederliste');
         [, $roles] = $this->req('GET', '/admin/roles');

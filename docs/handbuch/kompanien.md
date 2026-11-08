@@ -34,7 +34,7 @@ Tippe unten auf **{bereich.companies}**. Steht der Punkt nicht unten, findest du
 4. Mit **‹ Alle {bereich.companies}** oben (oder „Zurück“ im Browser) kommst du wieder zur Liste, an dieselbe Stelle und mit derselben Suche.
 
 ## Gut zu wissen
-- Die Mitglieder einer Kompanie siehst du nur, wenn du das Recht hast, die Mitgliederliste zu sehen. Das gilt auch, wenn es keine eigene Mitgliederliste gibt (z. B. in einer Bruderschaft). Die Seite einer Person gibt es dann nur, wenn ihr {bereich.offices} nutzt.
+- Die Mitglieder einer Kompanie siehst du nur, wenn eure App den Bereich **{bereich.directory}** nutzt und du das Recht hast, ihn zu sehen. Ohne diesen Bereich zeigen auch die Seiten der Kompanien keine Mitglieder.
 - {bereich.offices} gehören zu den Personen, nicht zu einer Kompanie. Sie stehen unter **{bereich.offices}**, nicht auf der Seite der Kompanie.
 - Unter **{bereich.directory}** kannst du die Liste nach Kompanie filtern; auf der Seite einer Person stehen ihre Kompanien; ein Tipp darauf öffnet die Seite der Kompanie.
 - Gibt es noch keine Einträge, steht dort „Noch keine {bereich.companies}.“
