@@ -18,7 +18,8 @@ use KompanieApp\Core\Storage\Sql\Schema;
  *
  * Wiederherstellen ersetzt den Inhalt der Tabellen. Spalten, die die Datenbank nicht kennt
  * (Sicherung einer neueren Version), werden ausgelassen; fehlende bekommen ihren Standardwert.
- * Galeriebilder sind nicht enthalten; sie werden nach dem Wiederherstellen neu aus Drive erzeugt.
+ * Galeriebilder sind nicht enthalten; sie werden nach dem Wiederherstellen neu aus Drive erzeugt. In der App hochgeladene
+ * Bilder sind enthalten, in der App hochgeladene Videos (Issue #350) wegen ihrer Größe nicht.
  * Die Dateien der Dokumente und die Abzeichen der Dienstgrade stehen unter files (Pfad in der geschützten Dateiablage,
  * Inhalt als Base64; nur Dateien, auf die eine Zeile verweist). Die Fotos der Mitglieder liegen in der Datenbank
  * (member_photos) und sind deshalb enthalten.
@@ -207,6 +208,10 @@ final class Backup
                 $referenced = $dir !== 'abzeichen'
                     ? in_array($name, $wanted[$dir], true)
                     : array_filter($wanted['abzeichen'], static fn (string $b): bool => str_starts_with($name, $b . '-') || str_starts_with($name, $b . '.')) !== [];
+                // Videos der Galerie (Issue #350, bis 1 GB) nicht: Eine Sicherung wird beim Wiederherstellen als Ganzes gelesen.
+                if ($dir === 'einreichungen' && preg_match('/\.(mp4|webm)$/', $name) === 1) {
+                    continue;
+                }
                 if (!$referenced || !is_file($file) || !self::validFileName($name)) {
                     continue;
                 }

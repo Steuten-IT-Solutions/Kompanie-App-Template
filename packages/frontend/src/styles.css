@@ -6464,6 +6464,35 @@ button.spotlight-person:focus-visible {
   border-radius: 6px;
   background: var(--line);
 }
+/* Video (Issue #350): Standbild mit ▶ darüber, ohne Standbild nur ▶ */
+.gallery-upload-video {
+  position: relative;
+  flex: 0 0 56px;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  background: var(--line);
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+.gallery-upload-video img {
+  position: absolute;
+  inset: 0;
+}
+.gallery-upload-video img + span {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding-left: 2px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 0.8rem;
+}
 .gallery-upload .small {
   flex: 1;
   min-width: 0;
@@ -6525,6 +6554,13 @@ button.spotlight-person:focus-visible {
   padding: 0;
   display: grid;
   gap: 12px;
+}
+.gallery-review-item video {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  border-radius: 8px;
+  background: #000;
 }
 .gallery-review-item img {
   display: block;

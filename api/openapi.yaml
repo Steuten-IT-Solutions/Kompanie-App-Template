@@ -1307,6 +1307,141 @@ paths:
                     items: { $ref: '#/components/schemas/GallerySubmission' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /gallery/video-uploads:
+    post:
+      tags: [Galerie]
+      summary: Video hochladen, Schritt 1 von 3 (Issue #350)
+      description: |
+        Legt eine Sitzung zum Hochladen an. MP4 (Kasten ftyp, kein QuickTime) oder WebM, höchstens max_bytes (1 GB).
+        Danach die Datei in Stücken von höchstens chunk_size Bytes an /gallery/video-uploads/chunk schicken (chunk_size
+        richtet sich nach post_max_size des Servers), zum Schluss /gallery/video-uploads/finish. Die Datei bleibt
+        unverändert. Zweck album braucht manage_settings (direkt ins Album), Zweck submission submit_gallery (als
+        Einreichung). Prüft vorher, ob auf dem Server genug Platz frei ist (400).
+      x-capability: 'manage_settings oder submit_gallery (je nach purpose)'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [album_id, name, size]
+              properties:
+                album_id: { type: integer }
+                name: { type: string, description: 'Dateiname mit Endung .mp4 oder .webm' }
+                size: { type: integer, description: Größe in Bytes }
+                purpose: { type: string, enum: [album, submission], default: album }
+      responses:
+        '201':
+          description: Sitzung angelegt
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, chunk_size, max_bytes]
+                properties:
+                  id: { type: string, description: Kennung der Sitzung (32 Hex-Zeichen) }
+                  chunk_size: { type: integer, description: Größte Länge eines Stücks in Bytes (vor Base64) }
+                  max_bytes: { type: integer }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /gallery/video-uploads/chunk:
+    post:
+      tags: [Galerie]
+      summary: Video hochladen, Schritt 2 von 3, ein Stück
+      description: 'Stücke in Reihenfolge (offset = bisher angekommene Bytes). Das letzte Stück darf noch einmal kommen (Antwort verloren); es zählt nur einmal. Nur die Person, die die Sitzung angelegt hat.'
+      x-capability: 'manage_settings oder submit_gallery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upload, offset, data]
+              properties:
+                upload: { type: string }
+                offset: { type: integer }
+                data: { type: string, description: Inhalt als Base64 }
+      responses:
+        '200':
+          description: Angekommen
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [received]
+                properties:
+                  received: { type: integer, description: Bisher angekommene Bytes }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /gallery/video-uploads/finish:
+    post:
+      tags: [Galerie]
+      summary: Video hochladen, Schritt 3 von 3, abschließen
+      description: |
+        Übernimmt die vollständige Datei in die Ablage. Zweck album: Video im Album (Antwort wie beim Hochladen von
+        Bildern), Zweck submission: offene Einreichung (consent muss true sein, Benachrichtigung wie bei Bildern).
+        Das Standbild (JPEG aus dem Browser) wird neu kodiert und ist die Vorschau; ohne erscheint das Video mit ▶.
+      x-capability: 'manage_settings oder submit_gallery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upload]
+              properties:
+                upload: { type: string }
+                poster: { type: [string, 'null'], description: 'Standbild als JPEG in Base64, auch als data:-Adresse' }
+                width: { type: integer }
+                height: { type: integer }
+                duration: { type: number, description: Dauer in Sekunden }
+                intern: { type: boolean, description: 'Nur Zweck album: nur für Mitglieder' }
+                consent: { type: boolean, description: 'Nur Zweck submission: muss true sein' }
+      responses:
+        '201':
+          description: Hochgeladen
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/GalleryAdminAlbumDetail'
+                  - $ref: '#/components/schemas/GallerySubmission'
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /gallery/video-uploads/cancel:
+    post:
+      tags: [Galerie]
+      summary: Video hochladen abbrechen
+      description: 'Löscht die Sitzung und das Angekommene. Liegengebliebene Sitzungen löscht der Server nach einem Tag.'
+      x-capability: 'manage_settings oder submit_gallery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upload]
+              properties:
+                upload: { type: string }
+      responses:
+        '200':
+          description: Abgebrochen
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [cancelled]
+                properties:
+                  cancelled: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /gallery/photos/{id}:
     parameters:
       - $ref: '#/components/parameters/Id'
@@ -7635,6 +7770,8 @@ components:
         user_id: { type: integer, description: Nur beim Prüfen }
         user_name: { type: string, description: Nur beim Prüfen }
         intern: { type: [boolean, 'null'], description: 'Nur beim Prüfen: ob das freigegebene Bild in der Galerie intern ist; null ohne Bild' }
+        type: { type: string, enum: [image, video], description: 'video: MP4 oder WebM (Issue #350), thumb ist dann das Standbild' }
+        video: { type: string, description: 'Nur beim Prüfen offener Videos: Adresse zum Abspielen vor der Freigabe (<App>/foto/<id der Einreichung>/einreichung, Range, nur mit review_gallery)' }
     GalleryAlbumInput:
       type: object
       properties:
@@ -7662,12 +7799,13 @@ components:
           type: array
           items:
             type: object
-            required: [id, name, intern, thumb, status, error]
+            required: [id, type, name, intern, thumb, status, error]
             properties:
               id: { type: integer }
+              type: { type: string, enum: [image, video] }
               name: { type: string }
               intern: { type: boolean }
-              thumb: { type: string, description: Adresse des Vorschaubilds }
+              thumb: { type: string, description: 'Adresse des Vorschaubilds; leer bei einem Video ohne Standbild' }
               status: { type: string, enum: [pending, ready, error] }
               error: { type: string }
     AdminSettings:

@@ -2519,6 +2519,21 @@ export const api = {
   setGalleryPhotoIntern: (id: number, intern: boolean) =>
     request<{ id: number; intern: boolean }>('PATCH', `/gallery/photos/${id}`, { intern }),
   // Einreichungen (Issue #286)
+  // Videos in Stücken hochladen (Issue #350), siehe videoUpload.ts
+  startVideoUpload: (input: { album_id: number; name: string; size: number; purpose: 'album' | 'submission' }) =>
+    request<{ id: string; chunk_size: number; max_bytes: number }>('POST', '/gallery/video-uploads', input),
+  videoUploadChunk: (upload: string, offset: number, data: string) =>
+    request<{ received: number }>('POST', '/gallery/video-uploads/chunk', { upload, offset, data }),
+  finishVideoUpload: <T extends GalleryAdminAlbumDetail | GallerySubmission>(input: {
+    upload: string;
+    poster: string | null;
+    width: number;
+    height: number;
+    duration: number;
+    intern?: boolean;
+    consent?: boolean;
+  }) => request<T>('POST', '/gallery/video-uploads/finish', input),
+  cancelVideoUpload: (upload: string) => request<{ cancelled: boolean }>('POST', '/gallery/video-uploads/cancel', { upload }),
   gallerySubmissions: () => request<GallerySubmissionsOwn>('GET', '/gallery/submissions'),
   submitGalleryPhoto: async (albumId: number, file: File) =>
     request<GallerySubmission>('POST', '/gallery/submissions', { album_id: albumId, file: await encodeFile(file), consent: true }),
@@ -2980,7 +2995,7 @@ export interface AdminSettings {
 /** Bild der Galerie, das sich nicht aufbereiten ließ (Einstellungen → Galerie). */
 export type GallerySourceType = 'drive' | 'server';
 
-/** Eingereichtes Bild (Issue #286); user_id und user_name nur beim Prüfen */
+/** Eingereichtes Bild oder Video (Issue #286, #350); user_id und user_name nur beim Prüfen */
 export interface GallerySubmission {
   id: number;
   album_id: number;
@@ -2992,6 +3007,9 @@ export interface GallerySubmission {
   reviewed_at: string | null;
   thumb: string | null;
   photo_id: number | null;
+  type: 'image' | 'video';
+  /** nur beim Prüfen offener Videos: zum Ansehen vor der Freigabe */
+  video?: string;
   user_id?: number;
   user_name?: string;
   /** nur beim Prüfen: ob das freigegebene Bild in der Galerie intern ist (null ohne Bild) */
@@ -3023,7 +3041,8 @@ export interface GalleryAdminAlbumDetail {
   title: string;
   year: string;
   source: 'drive' | 'app';
-  uploads: { id: number; name: string; intern: boolean; thumb: string; status: string; error: string }[];
+  /** thumb '' bei einem Video ohne Standbild */
+  uploads: { id: number; type: 'image' | 'video'; name: string; intern: boolean; thumb: string; status: string; error: string }[];
 }
 
 export interface FailedPhoto {

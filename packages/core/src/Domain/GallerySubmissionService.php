@@ -22,6 +22,8 @@ use KompanieApp\Core\Storage\GallerySubmissionRepository as Repo;
  *   einreichende Person erfährt das Ergebnis. Wer beide Rechte hat, darf auch eigene freigeben.
  * - Abgelehnte Bilder löscht der Server sofort (die Zeile mit dem Grund bleibt für die Person sichtbar). Offene
  *   Einreichungen bleiben, bis jemand sie bearbeitet; die Person kann sie zurückziehen.
+ * - Videos (MP4, WebM bis 1 GB, Issue #350) kommen in Stücken über VideoUploadService, unverändert; die Vorschau
+ *   ist das Standbild aus dem Browser. Prüfende sehen das Video vor der Freigabe (deliverVideo).
  * - Freigegebene lassen sich wieder entfernen (das Bild verschwindet, die Einreichung gilt als abgelehnt).
  * - Konto gelöscht (UserData::purge): alle Zeilen der Person verschwinden, freigegebene Bilder bleiben ohne Verknüpfung.
  *   Die Dateien offener Einreichungen löscht userDeleted(); was ohne App gelöscht wurde (WordPress-Netzwerk), räumt
@@ -38,6 +40,8 @@ final class GallerySubmissionService
     private const ORPHAN_AGE = 3600;
     /** Einmalig: Standardrolle „Galerie verwalten“ und die neuen Benachrichtigungen bei eingeschalteter Galerie. */
     public const SETUP_SETTING = 'gallery_submissions_setup';
+    /** „Größe“ in Environment::photoUrl für das Video einer offenen Einreichung (Adresse foto/<Einreichung>/einreichung). */
+    public const VIDEO_SIZE = 'einreichung';
 
     public function __construct(private readonly App $app)
     {
@@ -108,8 +112,26 @@ final class GallerySubmissionService
             throw ApiError::invalid('Bitte bestätigen, dass du die Rechte an den Bildern hast und die erkennbaren Personen einverstanden sind.');
         }
         $id = Input::integer($albumId) ?? 0;
-        $album = (new GalleryRepository($this->app->db))->album($id) ?? throw ApiError::notFound('Album nicht gefunden.');
-        $stored = $this->app->galleryUploads()->store($id, $file, self::THUMB_EDGE);
+        $this->album($id);
+        return $this->insertStored($user, $id, $this->app->galleryUploads()->store($id, $file, self::THUMB_EDGE));
+    }
+
+    /** @return array<string, mixed> */
+    public function album(int $id): array
+    {
+        return (new GalleryRepository($this->app->db))->album($id) ?? throw ApiError::notFound('Album nicht gefunden.');
+    }
+
+    /**
+     * Eine abgelegte Datei (Bild aus store() oder Video aus VideoUploadService, Issue #350) als offene Einreichung
+     * aufnehmen und die Prüfenden benachrichtigen. Klappt das nicht, wird die Datei gelöscht.
+     *
+     * @param array{key: string, name: string, width: int, height: int, md5: string, bytes: int, thumb: string|null, duration_ms?: int} $stored
+     * @return array<string, mixed> die Einreichung
+     */
+    public function insertStored(User $user, int $id, array $stored): array
+    {
+        $album = $this->album($id);
         $now = $this->app->time()->nowUtc();
         $repo = $this->repo();
         try {
@@ -123,6 +145,7 @@ final class GallerySubmissionService
                 'bytes' => $stored['bytes'],
                 'md5' => $stored['md5'],
                 'thumb' => $stored['thumb'],
+                'duration_ms' => max(0, (int) ($stored['duration_ms'] ?? 0)),
                 'status' => Repo::PENDING,
                 'consent_at' => $now,
                 'created_at' => $now,
@@ -168,6 +191,7 @@ final class GallerySubmissionService
             'height' => (int) $s['height'],
             'md5' => (string) $s['md5'],
             'bytes' => (int) $s['bytes'],
+            'duration_ms' => (int) ($s['duration_ms'] ?? 0),
         ], $intern);
         $this->repo()->update($id, ['status' => Repo::APPROVED, 'reviewed_by' => $actor->id, 'reviewed_at' => $this->app->time()->nowUtc(), 'photo_id' => $photoId, 'reason' => '']);
         $this->notifySubmitter($s, true, '');
@@ -259,6 +283,38 @@ final class GallerySubmissionService
         return $removed;
     }
 
+    /** @param array<string, mixed> $s */
+    private static function isVideo(array $s): bool
+    {
+        return isset(VideoUploadService::TYPES[strtolower(pathinfo((string) ($s['file_key'] ?? ''), PATHINFO_EXTENSION))]);
+    }
+
+    /**
+     * Video einer offenen Einreichung zum Ansehen vor der Freigabe (Issue #350), Adresse photoUrl(<Einreichung>,
+     * VIDEO_SIZE), Antwort wie GalleryService::deliverVideo. Nur für Prüfende ($mayReview: [darf prüfen, angemeldet]).
+     *
+     * @param \Closure(): array{0: bool, 1: bool} $mayReview
+     * @return array<string, mixed>
+     */
+    public function deliverVideo(int $id, ?string $range, \Closure $mayReview, ?\Closure $begin = null, ?\Closure $write = null): array
+    {
+        [$allowed, $loggedIn] = $mayReview();
+        if (!$allowed) {
+            return ['status' => $loggedIn ? 403 : 401];
+        }
+        $s = $this->repo()->find($id);
+        if ($s === null || (string) $s['status'] !== Repo::PENDING || !self::isVideo($s)) {
+            return ['status' => 404];
+        }
+        $key = (string) $s['file_key'];
+        $file = $this->app->gallery()->media()->path($key);
+        if ($file === null) {
+            return ['status' => 404];
+        }
+        $mime = VideoUploadService::TYPES[strtolower(pathinfo($key, PATHINFO_EXTENSION))];
+        return $this->app->gallery()->deliverFile($file, $mime, '"s' . md5($key) . '"', true, $range, $begin, $write);
+    }
+
     /** @return array<string, mixed> */
     private function pending(int $id): array
     {
@@ -312,7 +368,12 @@ final class GallerySubmissionService
             'reviewed_at' => $s['reviewed_at'] ?? null,
             'thumb' => is_string($s['thumb'] ?? null) && $s['thumb'] !== '' ? 'data:image/jpeg;base64,' . $s['thumb'] : null,
             'photo_id' => isset($s['photo_id']) ? (int) $s['photo_id'] : null,
+            'type' => self::isVideo($s) ? 'video' : 'image',
         ];
+        if ($forReview && self::isVideo($s) && (string) ($s['status'] ?? '') === Repo::PENDING) {
+            // Zum Ansehen vor der Freigabe (nur mit review_gallery, siehe deliverVideo)
+            $out['video'] = $this->app->env->photoUrl((int) $s['id'], self::VIDEO_SIZE);
+        }
         if ($forReview) {
             // Freigegebene: ob das Bild in der Galerie intern ist (umstellbar mit PATCH /gallery/photos/{id})
             $out['intern'] = isset($s['photo_is_intern']) ? (bool) (int) $s['photo_is_intern'] : null;

@@ -1834,6 +1834,11 @@ WHERE title IS NULL",
                 'mysql' => ['ALTER TABLE {app_news} ADD COLUMN cover varchar(32) NULL'],
                 'sqlite' => ['ALTER TABLE {app_news} ADD COLUMN cover TEXT DEFAULT NULL'],
             ],
+            // Eingereichte Videos (Issue #350): Dauer in Millisekunden, wie photos.duration_ms (0 bei Bildern).
+            57 => [
+                'mysql' => ['ALTER TABLE {gallery_submissions} ADD COLUMN duration_ms int(11) NOT NULL DEFAULT 0'],
+                'sqlite' => ['ALTER TABLE {gallery_submissions} ADD COLUMN duration_ms INTEGER NOT NULL DEFAULT 0'],
+            ],
         ];
     }
 
