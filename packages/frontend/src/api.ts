@@ -532,6 +532,8 @@ export interface MemberSummary {
   extra_roles?: Level[];
   /** Recht „Gehört zur Kompanie“; false bei Anwärtern, Rollen nur mit Kalender und Gästen */
   member: boolean;
+  /** Mitglied ohne Zugang (meldet sich noch nicht an); nur für wer Mitglieder anlegt, fehlt sonst */
+  no_access?: boolean;
   /** Gruppe im Zähler wie in der Anwesenheit (Einstellungen → Rollen); null bei Gästen, fehlt bei älteren Servern */
   group?: Level | null;
   /** Dienstgrad (nur mit Bereich Dienstgrade) */
@@ -1643,8 +1645,10 @@ export interface CreatedUser {
   warning?: string;
   /** Foto, wenn eines mitgeschickt wurde */
   photo_url?: string | null;
-  /** Startpasswort – steht nur in dieser einen Antwort. */
-  password: string;
+  /** Startpasswort – steht nur in dieser einen Antwort; fehlt bei einem Mitglied ohne Zugang. */
+  password?: string;
+  /** Mitglied ohne Zugang angelegt (meldet sich noch nicht an, kein Startpasswort) */
+  no_access?: boolean;
 }
 
 /** Ergebnis je Person beim Anlegen mehrerer (Issue #24): angelegt oder mit Grund nicht. */
@@ -1922,7 +1926,8 @@ export const api = {
   /** Rechte einer Person zusätzlich zur Rolle geben bzw. entziehen; leere Listen: wie die Rolle. */
   setRights: (id: number, grant: Capability[], revoke: Capability[]) =>
     request<MemberRights>('PUT', `/members/${id}/rights`, { grant, revoke }),
-  resetPassword: (id: number) => request<{ password: string }>('POST', `/members/${id}/password`),
+  /** Neues Startpasswort; bei einem Mitglied ohne Zugang „Zugang einrichten“ (danach hat es einen). */
+  resetPassword: (id: number) => request<{ password: string; username?: string }>('POST', `/members/${id}/password`),
   /** Ändert das eigene Passwort; danach gilt eine neue Sitzung, daher Token erneuern. */
   changePassword: async (current_password: string, new_password: string) => {
     await request<{ changed: boolean }>('POST', '/me/password', { current_password, new_password });
@@ -1964,6 +1969,8 @@ export const api = {
       rank_id?: number;
       birthday?: string;
       photo?: EncodedFile;
+      /** Ohne Zugang anlegen: kein Startpasswort, später „Zugang einrichten“ oder mit einer Anfrage verbinden */
+      no_access?: boolean;
     },
   ) => request<CreatedUser>('POST', '/users', data),
   /** Foto eines Mitglieds hochladen bzw. ersetzen (vorher mit preparePhoto verkleinert). */
@@ -2317,8 +2324,9 @@ export const api = {
   registrationStatus: (username: string, password: string) =>
     request<RegistrationStatus>('POST', '/registration/status', { username, password }),
   registrations: () => request<RegistrationList>('GET', '/registrations'),
-  approveRegistration: (id: number, data: { level?: Level; username?: string }) =>
-    request<{ member: { id: number; name: string; username: string; level: Level }; mailed: boolean }>(
+  /** Freigeben: neues Konto, oder mit user_id das Mitglied ohne Zugang mit der Anfrage verbinden */
+  approveRegistration: (id: number, data: { level?: Level; username?: string; user_id?: number }) =>
+    request<{ member: { id: number; name: string; username: string; level: Level }; mailed: boolean; linked?: boolean }>(
       'POST',
       `/registrations/${id}/approve`,
       data,
@@ -2381,12 +2389,23 @@ export interface RegistrationRequest {
   created_at: string;
   email_confirmed: boolean;
   expires_at: string;
+  /** Mitglieder ohne Zugang, die passen könnten (beste zuerst); fehlt bei älteren Servern */
+  matches?: RegistrationMatch[];
+}
+
+/** Vorschlag zum Verbinden: gleiche E-Mail-Adresse, gleicher Name oder ähnlicher Name (gleicher Nachname, Vorname beginnt gleich) */
+export interface RegistrationMatch {
+  id: number;
+  name: string;
+  match: 'email' | 'name' | 'similar';
 }
 
 export interface RegistrationList {
   requests: RegistrationRequest[];
   default_role: Level;
   email_confirmation: boolean;
+  /** Alle Mitglieder ohne Zugang zum Auswählen; fehlt bei älteren Servern */
+  no_access_members?: { id: number; name: string }[];
 }
 
 export interface RegistrationSettings {

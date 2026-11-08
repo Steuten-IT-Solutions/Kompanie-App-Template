@@ -3,7 +3,7 @@ titel: Mitglied anlegen
 reihenfolge: 70
 rechte: [create_users]
 ---
-Hier legst du ein neues Konto für eine Person an. Die App erzeugt dabei ein Startpasswort, das du der Person persönlich weitergibst.
+Hier legst du ein neues Konto für eine Person an. Die App erzeugt dabei ein Startpasswort, das du der Person persönlich weitergibst. Meldet sich die Person (noch) nicht an, legst du sie **ohne Zugang** an, z. B. um sie in Chroniken und bei {bereich.offices} auszuwählen.
 
 ![Formular „Mitglied anlegen“](bild:mitglieder-anlegen)
 
@@ -14,7 +14,9 @@ Tippe unten auf **Verwaltung**, dann auf **Mitglieder** und über der Liste auf 
 - **‹ Alle Mitglieder**: zurück zur Liste.
 - **Mehrere auf einmal anlegen**: eine Liste für mehrere Personen (siehe [Mehrere Mitglieder anlegen](seite:mitglieder-mehrere-anlegen)).
 - **Aus Datei importieren (Excel oder CSV)**: eine bestehende Mitgliederliste übernehmen (siehe [Mitglieder importieren](seite:mitglieder-import)).
-- **Vorname** und **Nachname**, **Benutzername (optional)**, **E-Mail (optional)**, **Handynummer (optional)** und **Adresse (optional)** mit Land, Straße, Nr., Adresszusatz, PLZ und Ort.
+- **Vorname** und **Nachname**.
+- **Ohne Zugang (meldet sich noch nicht an)**: für Personen ohne Konto (siehe unten). Dann fehlt das Feld für den Benutzernamen.
+- **Benutzername (optional)**, **E-Mail (optional)**, **Handynummer (optional)** und **Adresse (optional)** mit Land, Straße, Nr., Adresszusatz, PLZ und Ort.
 - **Rolle**: nur, wenn ein {rolle.admin} weitere Rollen für neue Konten freigegeben hat (z. B. Anwärter). Sonst werden neue Konten {rolle.member}.
 - **{bereich.points} (Anfangsbestand, optional)** mit **Stand vom** und **{begriff.rank} (optional)**: nur für {rolle.member} und nur, wenn du auch {bereich.points} bzw. {bereich.ranks} verwalten darfst. Gedacht für die Übernahme bestehender Mitglieder.
 - **Geburtstag (optional)** mit Tag, Monat und Jahr: nur, wenn die Kompanie {bereich.birthdays} nutzt.
@@ -31,6 +33,16 @@ Tippe unten auf **Verwaltung**, dann auf **Mitglieder** und über der Liste auf 
 
 ![Zugangsdaten nach dem Anlegen](bild:mitglieder-anlegen-zugangsdaten)
 
+### Ein Mitglied ohne Zugang anlegen
+So trägst du eine Person ein, die noch kein Konto hat, z. B. weil sie in einer Chronik steht, ein Amt hat oder die App nicht nutzt.
+1. Trage **Vorname** und **Nachname** ein.
+2. Setze den Haken bei **Ohne Zugang (meldet sich noch nicht an)**.
+3. Trage die übrigen Angaben ein, wenn du sie hast, und tippe auf **Mitglied anlegen**. Es gibt kein Startpasswort.
+4. Die Person ist ein ganz normales Mitglied: Sie steht in der Mitgliederliste und lässt sich überall auswählen, z. B. bei {bereich.offices}. In der Mitgliederliste der Verwaltung trägt sie die Marke **ohne Zugang**.
+5. Später bekommt sie einen Zugang auf einem von zwei Wegen:
+   - Stellt sie selbst eine Anfrage auf einen Zugang, verbindest du die Anfrage beim Freigeben mit ihr (siehe [Anfragen auf einen Zugang](seite:anfragen-freigeben)). Dann entsteht kein zweites Konto.
+   - Oder du tippst auf ihrer Seite unter **Konto und Rolle** auf **Zugang einrichten** und gibst ihr die Zugangsdaten weiter (siehe [Konto und Rolle](seite:rollen-vergeben)).
+
 ## Gut zu wissen
 - Nur der Vorname ist Pflicht; ohne Nachnamen geht es z. B. für ein Konto wie „Kassenwart“.
 - Ohne Benutzernamen bildet die App ihn aus dem Namen. Ein Benutzername darf nur Buchstaben (a–z), Ziffern sowie . _ - @ enthalten. Benutzername und E-Mail dürfen nicht schon vergeben sein.
@@ -39,6 +51,7 @@ Tippe unten auf **Verwaltung**, dann auf **Mitglieder** und über der Liste auf 
 - Das Startpasswort steht **nur dieses eine Mal** da. Eine E-Mail verschickt die App nicht. **Teilen …** gibt es nur, wenn dein Gerät es kann.
 - Andere Rollen vergibt danach, wer Rollen vergeben darf (unter **Konto und Rolle** auf der Seite des Mitglieds).
 - Ist **Zugang beantragen** eingeschaltet, können Personen ihren Zugang auch selbst beantragen; du gibst ihn dann nur noch frei (siehe [Anfragen auf einen Zugang](seite:anfragen-freigeben)).
+- Ein Mitglied ohne Zugang bekommt keine Benachrichtigungen aufs Handy. E-Mails an alle Mitglieder bekommt es nur, wenn eine E-Mail-Adresse eingetragen ist. Eine Person, die schon ausgeschieden ist, trägst du besser als ehemalig ein (siehe [Ehemalige](seite:ehemalige-mitglieder)).
 - Wie die neue Person die App aufs Handy holt und sich anmeldet, steht unter [App installieren](seite:app-installieren) und [Mein Konto](seite:anmelden-und-konto).
 - Bitte lade ein Foto nur mit dem Einverständnis der Person hoch. Erlaubt sind JPG, PNG und WebP.
 

@@ -30,6 +30,11 @@ final class UserSettings
         });
     }
 
+    public function delete(int $userId, string $name): void
+    {
+        $this->db->execute('DELETE FROM {user_settings} WHERE user_id = ? AND name = ?', [$userId, $name]);
+    }
+
     /** @return array<int, string> Benutzer-ID => Wert, für alle Konten mit Eintrag */
     public function all(string $name): array
     {

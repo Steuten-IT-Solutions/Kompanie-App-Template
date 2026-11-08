@@ -13,12 +13,12 @@ import { PhotoPicker, type PreparedPhoto } from '../memberPhoto';
 import { downloadPersonalData } from '../personalData';
 
 /** Zugangsdaten als Text zum Weitergeben, mit dem Link zur Installationsanleitung (Issue #24). */
-export function credentialsText(c: { name: string; username: string; password: string }): string {
+export function credentialsText(c: { name: string; username: string; password?: string }): string {
   return [
     `${brand.name} – Zugang für ${c.name}`,
     `App installieren: ${installUrl()}`,
     `Benutzername: ${c.username}`,
-    `Passwort: ${c.password}`,
+    `Passwort: ${c.password ?? ''}`,
     'Bitte nach der ersten Anmeldung unter „Meins → Konto“ ein eigenes Passwort setzen.',
   ].join('\n');
 }

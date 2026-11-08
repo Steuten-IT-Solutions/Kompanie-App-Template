@@ -4602,6 +4602,7 @@ paths:
         neues Startpasswort, das nur in dieser Antwort steht. Alle Geräte des Mitglieds
         werden abgemeldet. Wer kein Admin ist, darf das nur bei Anwärtern (auch eigenen Rollen nur mit dem Kalender)
         und Mitgliedern, deren Rechte er selbst hat (ohne create_users und promote_users), nicht bei Gästen und Admins.
+        Bei einem Mitglied ohne Zugang („Zugang einrichten“) hat es danach einen (`no_access` fällt weg).
       x-capability: create_users
       responses:
         '200':
@@ -4613,6 +4614,7 @@ paths:
                 required: [password]
                 properties:
                   password: { type: string }
+                  username: { type: string, description: Benutzername zum Weitergeben }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
@@ -4789,6 +4791,12 @@ paths:
                   description: Foto (optional), vorab geprüft wie bei `PUT /members/{id}/photo`
                   allOf:
                     - $ref: '#/components/schemas/PhotoFile'
+                no_access:
+                  type: boolean
+                  description: >-
+                    Ohne Zugang anlegen (z. B. für Chroniken): gewöhnliches Konto mit einem Passwort, das niemand erfährt; kein
+                    Startpasswort in der Antwort. Zugang später mit `POST /members/{id}/password` oder beim Freigeben einer
+                    Anfrage (`POST /registrations/{id}/approve` mit `user_id`).
       responses:
         '201':
           description: Angelegt
@@ -4822,14 +4830,34 @@ paths:
                         last_name: { type: string }
                         email: { type: string }
                         username: { type: string }
-                        username_taken: { type: boolean, description: Benutzername inzwischen vergeben; beim Freigeben einen anderen wählen }
-                        email_taken: { type: boolean, description: Zur Adresse gibt es inzwischen ein Konto; Freigeben geht nicht }
+                        username_taken: { type: boolean, description: Benutzername inzwischen vergeben (nicht von einem Mitglied ohne Zugang); beim Freigeben einen anderen wählen }
+                        email_taken: { type: boolean, description: Zur Adresse gibt es inzwischen ein Konto (nicht ein Mitglied ohne Zugang); Freigeben geht nicht }
                         message: { type: string }
                         created_at: { type: string, format: date-time }
                         email_confirmed: { type: boolean, description: Adresse per Link bestätigt (nur mit Mailversand) }
                         expires_at: { type: string, format: date-time, description: Danach wird die Anfrage gelöscht }
+                        matches:
+                          description: >-
+                            Mitglieder ohne Zugang, die passen könnten, beste zuerst: gleiche E-Mail-Adresse (email), gleicher
+                            Name ohne Unterschied bei Groß- und Kleinschreibung, Leerzeichen, Bindestrichen und Umlauten (name),
+                            gleicher Nachname und ein Vorname beginnt mit dem anderen (similar). Nur Vorschläge.
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id: { type: integer }
+                              name: { type: string }
+                              match: { type: string, enum: [email, name, similar] }
                   default_role: { type: string, description: Vorgeschlagene Rolle (Einstellungen → Zugang beantragen) }
                   email_confirmation: { type: boolean }
+                  no_access_members:
+                    description: Alle Mitglieder ohne Zugang (ohne Ehemalige) zum Auswählen, nach Namen
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
         '403': { $ref: '#/components/responses/Error' }
 
   /registrations/{id}/approve:
@@ -4839,6 +4867,8 @@ paths:
       description: |
         Legt das Konto mit dem Passwort aus der Anfrage an, mit denselben Prüfungen wie POST /users (Rolle, die man
         vergeben darf; Benutzername und E-Mail-Adresse frei). Mit Mailversand bekommt die Person eine Mail (`mailed`).
+        Mit `user_id` entsteht kein Konto: Das Mitglied ohne Zugang bekommt Benutzername, E-Mail-Adresse und Passwort
+        aus der Anfrage und behält Name, Rolle und alle Einträge (`linked`). Nur bei Mitgliedern ohne Zugang (sonst 400).
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }
       requestBody:
@@ -4849,6 +4879,7 @@ paths:
               properties:
                 level: { type: string, description: Rolle; ohne Angabe die vorgeschlagene }
                 username: { type: string, description: Anderer Benutzername, wenn der gewünschte vergeben ist }
+                user_id: { type: integer, description: Mit diesem Mitglied ohne Zugang verbinden statt ein Konto anzulegen; level gilt dann nicht }
       responses:
         '200':
           description: Freigegeben
@@ -4868,6 +4899,7 @@ paths:
                       email: { type: string }
                       level: { type: string }
                   mailed: { type: boolean }
+                  linked: { type: boolean, description: Mit einem Mitglied ohne Zugang verbunden (user_id) }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
@@ -7824,6 +7856,9 @@ components:
         joined_on:
           description: Eintritt als JJJJ-MM-TT oder nur das Jahr JJJJ (unabhängig von der Anzeige auf der eigenen Seite), leer ohne Eintrag; nur mit Recht create_users
           type: string
+        no_access:
+          description: 'Mitglied ohne Zugang (meldet sich noch nicht an, z. B. für Chroniken angelegt); nur mit Recht create_users, auch in GET /members/{id}'
+          type: boolean
 
     DirectoryEntry:
       type: object
@@ -8814,4 +8849,5 @@ components:
         level: { $ref: '#/components/schemas/Level' }
         warning: { type: string, description: 'Konto angelegt, aber Anfangspunkte, Dienstgrad, Geburtstag bzw. Foto nicht übernommen' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
-        password: { type: string, description: Startpasswort; steht nur in dieser Antwort }
+        password: { type: string, description: Startpasswort; steht nur in dieser Antwort; fehlt bei no_access }
+        no_access: { type: boolean, description: 'Mitglied ohne Zugang angelegt (kein Startpasswort); fehlt sonst' }
