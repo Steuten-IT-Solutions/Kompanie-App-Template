@@ -2606,7 +2606,7 @@ test.describe('Android', () => {
         return (await res.json()).subscription;
       }, device);
     await expect.poll(status).toEqual({
-      types: ['board', 'polls', 'birthdays', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'],
+      types: ['board', 'polls', 'birthdays', 'reports', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'],
       details: true,
     });
 
