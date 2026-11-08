@@ -546,8 +546,10 @@ final class Api
                 'logoutUrl' => $a->authenticator->logoutUrl(),
             ],
             'features' => $features,
-            // Fehlermeldungen an die Betreuer der App (Issue #64): ohne Empfänger kein Knopf „Fehler melden“
-            'reports' => $a->bugReports()->available(),
+            // Fehlermeldungen (Issue #64): gehen zuerst an die Admins, darum immer möglich (Knopf „Fehler melden“);
+            // openReports: offene Meldungen für alle mit review_reports (Zähler in der Verwaltung), sonst null
+            'reports' => true,
+            'openReports' => $user !== null && $this->can(Cap::ReviewReports) ? $a->bugReports()->openCount() : null,
             // Zugang beantragen (Issue #314): Link „Zugang beantragen“ für Gäste; pendingRegistrations: offene Anfragen
             // für alle, die freigeben (Zähler in der Verwaltung), sonst null
             'registration' => $a->registrations()->enabled(),
@@ -695,6 +697,12 @@ final class Api
             // Fehlermeldungen (Issue #64): auch ohne Anmeldung; Zeitfalle, Honeypot und Begrenzung im Dienst
             new Route('GET', '/reports/form', $P, fn () => $a->bugReports()->form($a->authContext->currentUser())),
             new Route('POST', '/reports', $P, fn (Request $r) => Response::created($a->bugReports()->submit($a->authContext->currentUser(), $r->body, $r->client))),
+            // Eigene Meldungen mit Stand; Eingang der Admins: schließen mit Begründung oder an die Betreuer weiterleiten
+            new Route('GET', '/reports/mine', $L, fn () => $a->bugReports()->mine($this->user())),
+            new Route('GET', '/reports/review', Cap::ReviewReports, fn () => $a->bugReports()->review()),
+            new Route('GET', '/reports/review/{id}/screenshot', Cap::ReviewReports, fn (Request $r) => $a->bugReports()->screenshotOf($r->id())),
+            new Route('POST', '/reports/review/{id}/close', Cap::ReviewReports, fn (Request $r) => $a->bugReports()->close($this->user(), $r->id(), $r->input('reason'))),
+            new Route('POST', '/reports/review/{id}/forward', Cap::ReviewReports, fn (Request $r) => $a->bugReports()->forward($this->user(), $r->id())),
             // Selbstregistrierung (Issue #314): Zugang beantragen (auch ohne Anmeldung; Zeitfalle, Honeypot und Begrenzung
             // im Dienst), E-Mail-Adresse bestätigen, Stand der Anfrage
             new Route('GET', '/registration/form', $P, fn () => $a->registrations()->form()),

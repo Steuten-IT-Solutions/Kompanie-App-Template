@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { devices, expect, test, type Locator, type Page, type Request } from '@playwright/test';
 import { strToU8, zipSync } from 'fflate';
+import { askCancel, askOk, autoAsk } from './ask';
 
 // E2E-Tests gegen eine Test-Instanz mit der Beispielkonfiguration (config/kompanie.example.json):
 // Der Bereich Strafen heißt dort „Kasse“. Die Testdaten legen die eigene Rolle „Spieß“ an (Punkte, Kasse, Termine). Die App liegt unter /app/.
@@ -314,8 +315,8 @@ test('Mitglied: Punkte-Kachel vergibt Punkte nur an diese Person, Einträge im s
   await expect(sheet.getByLabel('Grund')).toHaveValue('');
   await expect(page.locator('.member-stats .stat', { hasText: 'Punkte' }).locator('.stat-value')).toHaveText(String(before + 3));
   // Wieder stornieren, damit die Summen anderer Tests stimmen
-  page.once('dialog', (d) => d.accept());
   await sheet.locator('.row', { hasText: 'E2E Kachel' }).getByRole('button', { name: 'Stornieren' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Storniert');
   await sheet.getByRole('button', { name: 'Schließen' }).click();
   await expect(sheet).toHaveCount(0);
@@ -744,8 +745,8 @@ test('Admin legt ein Mitglied an und setzt sein Passwort zurück', async ({ page
   // Standard-Sortierung nach Nachname: „Nachname, Vorname“.
   await page.locator('.row', { hasText: 'Testperson, Neue' }).first().click();
   await memberAccount(page);
-  page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: /Neues Startpasswort erzeugen/ }).click();
+  await askOk(page);
   const fresh = (await page.getByTestId('reset-password').textContent())!.trim();
   expect(fresh).toHaveLength(12);
   expect(fresh).not.toBe(password);
@@ -982,8 +983,8 @@ test('Fotos: beim Anlegen mitgeben (einzeln und mehrere), in Liste und Details, 
   await expect(page.getByRole('button', { name: 'Foto entfernen' })).toHaveCount(0);
   await page.getByRole('button', { name: /vergrößern/ }).click();
   await expect(zoom.getByRole('button', { name: 'Foto ersetzen' })).toBeVisible();
-  page.once('dialog', (d) => d.accept());
   await zoom.getByRole('button', { name: 'Foto entfernen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toContainText('Foto entfernt');
   await expect(zoom).toHaveCount(0);
   await expect(page.locator('.member-rank-line .member-avatar-initials')).toBeVisible();
@@ -1094,8 +1095,8 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   await expect(page.locator('.row', { hasText: `${last}, Anna` }).locator('.badge-candidate')).toHaveText('Anwärter');
   await page.locator('.row', { hasText: `${last}, Anna` }).click();
   await memberAccount(page);
-  page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Als Mitglied aufnehmen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText(`${name} ist jetzt Mitglied`);
   await expect(page.getByRole('button', { name: 'Als Mitglied aufnehmen' })).toHaveCount(0);
 
@@ -1167,8 +1168,8 @@ test('Navigation einrichten (Issue #277): Untermenü umbenennen, Termine hineins
       .locator('.settings-link')
       .filter({ has: page.getByText('Navigation', { exact: true }) })
       .click();
-    page.once('dialog', (d) => d.accept());
     await card.getByRole('button', { name: 'Standardnavigation wiederherstellen' }).click();
+    await askOk(page);
     await expect(page.getByText('Standardnavigation wiederhergestellt')).toBeVisible();
     await expect(tabbar.getByRole('button', { name: 'Intern' })).toBeVisible();
     await expect(tabbar.getByRole('button', { name: 'Termine' })).toBeVisible();
@@ -1437,11 +1438,11 @@ test('Ämter: pflegen in der Verwaltung, Zeitstrahl öffentlich im Tab Mitgliede
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.goto('/app/#/verwaltung/aemter');
   await page.getByRole('button', { name: office, exact: true }).click();
-  page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Amt löschen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
-  page.once('dialog', (d) => d.accept());
   await page.locator('.row', { hasText: group }).getByRole('button', { name: 'Löschen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Gelöscht');
   const deleted = await page.evaluate(async (formerId) => {
     const cfg = window.KOMPANIE_CONFIG!;
@@ -1512,8 +1513,8 @@ test('Ämter: Haken „Ehrung“ an der Amtszeit, einzelnes Jahr ohne Ehrung (Is
 
   await page.goto('/app/#/verwaltung/aemter');
   await page.getByRole('button', { name: office, exact: true }).click();
-  page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Amt löschen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
 });
 
@@ -1578,17 +1579,17 @@ test('Ämter: gemeinsame Amtszeiten einer Gruppe mit Gruppenbild, öffentlich al
 
   // Aufräumen: gemeinsame Amtszeit, Ämter und Gruppe löschen
   await page.goto('/app/#/verwaltung/aemter');
-  page.once('dialog', (d) => d.accept());
   await page.locator('.office-admin-group', { hasText: group }).locator('.joint-admin').getByRole('button', { name: 'Löschen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Gelöscht');
   for (const office of offices) {
     await page.getByRole('button', { name: office, exact: true }).click();
-    page.once('dialog', (d) => d.accept());
     await page.getByRole('button', { name: 'Amt löschen' }).click();
+    await askOk(page);
     await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
   }
-  page.once('dialog', (d) => d.accept());
   await page.locator('li.card', { hasText: group }).getByRole('button', { name: 'Löschen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Gelöscht');
 });
 
@@ -1637,8 +1638,8 @@ test('Ämter: Foto für eine Person ohne Profil, öffentlich im Zeitstrahl, Übe
 
   await page.goto('/app/#/verwaltung/aemter');
   await page.getByRole('button', { name: office, exact: true }).click();
-  page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Amt löschen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
 });
 
@@ -1663,8 +1664,8 @@ test('Galerie: Album nur in der App anlegen, Bilder hochladen, ändern und lösc
   await expect(item.locator('.gallery-upload')).toHaveCount(2);
   await expect(item).toContainText('2 hochgeladen');
   await expect(item.locator('.gallery-upload', { hasText: 'foto.jpg' })).toBeVisible();
-  page.once('dialog', (d) => void d.accept());
   await item.locator('.gallery-upload', { hasText: 'zweites.jpg' }).getByRole('button', { name: 'Löschen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Bild gelöscht');
   await expect(item.locator('.gallery-upload')).toHaveCount(1);
 
@@ -1673,8 +1674,8 @@ test('Galerie: Album nur in der App anlegen, Bilder hochladen, ändern und lösc
   await expect(page.locator('.toast')).toHaveText('Gespeichert');
   await expect(section.locator('.gallery-album-head', { hasText: `${title} neu` })).toBeVisible();
 
-  page.once('dialog', (d) => void d.accept());
   await item.getByRole('button', { name: 'Album löschen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Album gelöscht');
   await expect(section.locator('.gallery-album-item', { hasText: title })).toHaveCount(0);
 });
@@ -1718,6 +1719,10 @@ test('Galerie: Knöpfe zum Herunterladen für ein Bild und das Album als ZIP, nu
 
     await page.goto(`/app/#/galerie/${albumId}`);
     const zipButton = page.getByRole('button', { name: 'Album herunterladen (1 Bild, ZIP)' });
+    // Runder Icon-Knopf neben dem Titel wie in der Großansicht: Anzahl nur im Namen und Tooltip, nicht als Text
+    await expect(zipButton).toHaveText('');
+    await expect(zipButton).toHaveAttribute('title', 'Album herunterladen (1 Bild, ZIP)');
+    await expect(page.locator('.album-head h2 + .album-download-btn svg')).toBeVisible();
     const [zip] = await Promise.all([page.waitForEvent('download'), zipButton.click()]);
     expect(zip.suggestedFilename()).toBe(`${title} 2026.zip`);
     const bytes = readFileSync((await zip.path())!);
@@ -1772,8 +1777,8 @@ test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)',
   await expect(items).toHaveCount(2);
   await items.filter({ hasText: 'foto.jpg' }).getByRole('button', { name: 'Öffentlich freigeben' }).click();
   await expect(page.locator('.toast')).toHaveText('Freigegeben');
-  page.once('dialog', (d) => void d.accept('Unscharf'));
   await items.filter({ hasText: 'zweites.jpg' }).getByRole('button', { name: 'Ablehnen' }).click();
+  await askOk(page, 'Unscharf');
   await expect(page.locator('.toast')).toHaveText('Abgelehnt');
   await expect(items).toHaveCount(0);
   await expect(page.locator('.gallery-upload', { hasText: title })).toHaveCount(1);
@@ -2211,8 +2216,8 @@ test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, C
   await page.emulateMedia({ media: 'screen', colorScheme: 'light' });
 
   // Kopieren und löschen (WordPress behält die Daten zwischen den Läufen); die leeren Zeilen von eben verwerfen
-  page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: /Alle Listen/ }).click();
+  await askOk(page);
   await expect(page).toHaveURL(/#\/verwaltung\/listen$/);
   await expect(page).toHaveTitle('Musterkompanie Beispielstadt');
   await page.locator('.row', { hasText: title }).first().getByRole('button', { name: 'Kopieren' }).click();
@@ -2222,11 +2227,11 @@ test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, C
   await expect.poll(() => gapBetween(page.locator('.card-list'), page.locator('form.card', { hasText: 'Neue Liste' }))).toBe(16);
   await shotsNarrowAndWide(page, '40d-listen-uebersicht');
   for (const t of [`${title} (Kopie)`, title]) {
-    page.once('dialog', (d) => d.accept());
     await page
       .locator('.row', { has: page.locator('.row-title', { hasText: new RegExp(`^${t.replace(/[()]/g, '\\$&')}$`) }) })
       .getByRole('button', { name: 'Löschen' })
       .click();
+    await askOk(page);
     await expect(page.locator('.toast')).toHaveText('Gelöscht');
   }
   await expect(page.locator('.row', { hasText: title })).toHaveCount(0);
@@ -2606,7 +2611,7 @@ test.describe('Android', () => {
         return (await res.json()).subscription;
       }, device);
     await expect.poll(status).toEqual({
-      types: ['board', 'polls', 'birthdays', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'],
+      types: ['board', 'polls', 'birthdays', 'reports', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'],
       details: true,
     });
 
@@ -2957,8 +2962,8 @@ test('Admin gibt einem Mitglied einzeln ein Recht und nimmt es wieder', async ({
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
   await expect(page.locator('.member-level')).toContainText('mit Ausnahmen bei den Rechten');
   await memberAccount(page);
-  page.once('dialog', (d) => d.accept());
   await rechte.getByRole('button', { name: 'Wie die Rolle' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Rechte wie die Rolle');
   await expect(rechte.getByLabel('Öffentliche Termine pflegen')).not.toBeChecked();
 
@@ -3002,8 +3007,8 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
     .filter({ has: page.getByText('Rollen', { exact: true }) })
     .click();
   await rollen.getByRole('button', { name: 'Kassenwart bearbeiten' }).click();
-  page.once('dialog', (d) => d.accept());
   await rollen.getByRole('button', { name: 'Löschen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Rolle gelöscht');
   await expect(rollen.locator('.row', { hasText: 'Kassenwart' })).toHaveCount(0);
 });
@@ -3568,11 +3573,9 @@ test('Admin wird durch die Einrichtung geführt', async ({ page }) => {
 
   // Ausschalten nur nach Rückfrage; Abbrechen lässt den Bereich an.
   await page.goto('/app/#/einstellungen/bereiche');
-  page.once('dialog', (d) => {
-    expect(d.message()).toContain('Die Daten bleiben erhalten');
-    void d.dismiss();
-  });
   await bereiche.getByRole('checkbox', { name: /^Galerie/ }).click();
+  await expect(page.locator('.ask-message')).toContainText('Die Daten bleiben erhalten');
+  await askCancel(page);
   await expect(bereiche.getByRole('checkbox', { name: /^Galerie/ })).toBeChecked();
 
   // Wer kein Admin ist, kommt nicht an die Bereiche.
@@ -3918,12 +3921,14 @@ test('Hilfe: Seiten passend zu Rechten, Bereichen und Variante, mit eigenen Beze
   }
 });
 
-test('Fehler melden: Gast und Mitglied, mit Bildschirmfoto und angezeigten Angaben', async ({ page }) => {
+test('Fehler melden: Gast und Mitglied, Eingang der Admins (schließen, weiterleiten)', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/#/termine');
-  // Nur mit Empfänger (reportUrl); die eigenständige Testinstallation hat einen simulierten (tests/standalone/MockHttp.php).
+  // Weiterleiten nur mit Empfänger (reportUrl); die eigenständige Testinstallation hat einen simulierten
+  // (tests/standalone/MockHttp.php).
   const available = await page.evaluate(() => !!window.KOMPANIE_CONFIG?.reports);
   test.skip(!available, 'Fehlermeldungen in dieser Testinstallation nicht eingerichtet');
+  test.setTimeout(180_000);
   const details = page.locator('.report-details');
   // 1x1-PNG
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
@@ -3935,18 +3940,19 @@ test('Fehler melden: Gast und Mitglied, mit Bildschirmfoto und angezeigten Angab
   await expect(details).toContainText('#/termine');
   await expect(details).toContainText('ohne Anmeldung');
   await expect(details.locator('dd').last()).toHaveText('keine');
-  await expect(page.getByText('Meinen Namen mitschicken')).toHaveCount(0);
+  await expect(page.getByText(/Meinen Namen/)).toHaveCount(0);
   await expect(page.locator('input[name="website"]')).not.toBeInViewport();
   await page.getByRole('button', { name: 'Meldung senden' }).click();
   await expect(page.locator('.form-error')).toHaveText('Bitte beschreibe kurz, was nicht klappt.');
-  await page.getByLabel('Was klappt nicht? (Pflicht)').fill(`Gast-Test ${Date.now()}`);
+  const guestText = `Gast-Test ${Date.now()}`;
+  await page.getByLabel('Was klappt nicht? (Pflicht)').fill(guestText);
   await page.getByRole('button', { name: 'Meldung senden' }).click();
   await expect(page.locator('.form-error')).toContainText('Bitte bestätige');
   await page.getByLabel('Bildschirmfoto').setInputFiles({ name: 'bild.png', mimeType: 'image/png', buffer: png });
   await expect(page.getByAltText('Gewähltes Bildschirmfoto')).toBeVisible();
   await page.getByLabel(/Ich bin einverstanden/).check();
   await expect(page.getByLabel(/Ich bin einverstanden/)).toBeChecked();
-  await expect(page.locator('.report-consent')).toContainText('Steuten IT Solutions');
+  await expect(page.locator('.report-consent')).toContainText('an die Admins');
   await expect(page.locator('.report-consent')).toContainText('dem Bildschirmfoto');
   await page.getByRole('button', { name: 'Meldung senden' }).click();
   await expect(page.getByRole('heading', { name: 'Danke, deine Meldung ist angekommen' })).toBeVisible({ timeout: 15_000 });
@@ -3961,21 +3967,56 @@ test('Fehler melden: Gast und Mitglied, mit Bildschirmfoto und angezeigten Angab
   await expect(details).toContainText('#/news/gibt-es-nicht');
   await expect(details.locator('dd').last()).not.toHaveText('keine');
   await expect(details).not.toContainText('ohne Anmeldung');
-  await expect(details).not.toContainText('Mitglied1');
-  await page.getByText('Meinen Namen mitschicken').click();
+  // Den Namen sehen die Admins immer; der Haken gilt fürs Weiterleiten an die Betreuer.
   await expect(details).toContainText('Mitglied1');
+  // Ohne Empfänger (forward: false) gibt es keinen Haken; der Name bleibt dann ohnehin bei den Admins.
+  const forward = await page.getByText('Meinen Namen beim Weiterleiten an die Betreuer mitschicken').count();
+  await expect(details).toContainText(forward > 0 ? 'sehen nur die Admins' : 'sehen die Admins');
+  if (forward > 0) {
+    await page.getByText('Meinen Namen beim Weiterleiten an die Betreuer mitschicken').click();
+    await expect(details).toContainText('geht beim Weiterleiten mit');
+  }
   const text = `Mitglied-Test ${Date.now()}`;
   await page.getByLabel('Was klappt nicht? (Pflicht)').fill(text);
   await page.getByLabel('Was hast du erwartet? (freiwillig)').fill('Eine Neuigkeit');
   await page.getByLabel(/Ich bin einverstanden/).check();
   await page.getByRole('button', { name: 'Meldung senden' }).click();
   await expect(page.getByRole('heading', { name: 'Danke, deine Meldung ist angekommen' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.my-reports')).toContainText(text);
+  await expect(page.locator('.my-reports')).toContainText('offen');
+
+  // Admin: Gastmeldung mit Begründung schließen, Meldung des Mitglieds weiterleiten
+  await login(page, 'admin', ADMIN_PASSWORD);
+  // Der Knopf trägt die Zahl der offenen Meldungen, z. B. „Fehlermeldungen (2)“.
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page
+    .locator('.admin-tiles')
+    .getByRole('button', { name: /^Fehlermeldungen \(\d+\)$/ })
+    .click();
+  const guestCard = page.locator('.report-review', { hasText: guestText });
+  await expect(guestCard).toContainText('Ohne Anmeldung');
+  await guestCard.getByRole('button', { name: 'Bildschirmfoto anzeigen' }).click();
+  await expect(guestCard.getByAltText('Bildschirmfoto zur Meldung')).toBeVisible();
+  await guestCard.getByRole('button', { name: 'Schließen …' }).click();
+  await guestCard.getByRole('button', { name: 'Schließen', exact: true }).click();
+  await expect(guestCard.locator('.form-error')).toContainText('Bitte schreibe kurz');
+  await guestCard.getByLabel(/Begründung/).fill('Bitte die App neu laden.');
+  await guestCard.getByRole('button', { name: 'Schließen', exact: true }).click();
+  await expect(page.locator('.toast')).toHaveText('Meldung geschlossen');
+  await expect(guestCard).toContainText('geschlossen von');
+  const memberCard = page.locator('.report-review', { hasText: text });
+  await expect(memberCard).toContainText('Mitglied1');
+  if (forward > 0) {
+    page.once('dialog', (d) => d.accept());
+    await memberCard.getByRole('button', { name: 'An die Betreuer weiterleiten' }).click();
+    await expect(page.locator('.toast')).toHaveText('Meldung weitergeleitet');
+    await expect(memberCard).toContainText('an die Betreuer weitergeleitet');
+  }
 
   // Eigenständig: Die Hintergrundaufgabe schickt die Meldung an den simulierten Empfänger (mit Namen, signiert). Ohne
   // Cronjob startet die Aufgabe über den Selbstaufruf, höchstens einmal pro Minute: Das kann etwas dauern.
-  test.setTimeout(180_000);
   const log = process.env.KOMPANIE_DATA_DIR ? `${process.env.KOMPANIE_DATA_DIR}/mock-reports.jsonl` : '';
-  if (STANDALONE && log) {
+  if (STANDALONE && log && forward > 0) {
     await expect
       .poll(
         async () => {
@@ -4117,8 +4158,8 @@ test('Admin verbindet die App mit Google (Google simuliert) und trennt wieder', 
   await page.goto('/app/#/einstellungen/google');
   await shot(page, '18b-google-zugang');
 
-  page.once('dialog', (d) => void d.accept());
   await google.getByRole('button', { name: 'Verbindung trennen' }).click();
+  await askOk(page);
   await expect(google.getByRole('button', { name: 'Speichern und mit Google verbinden' })).toBeVisible();
   await expect(google.getByLabel('Client-ID')).toHaveValue('1-e2e.apps.googleusercontent.com');
 });
@@ -4337,8 +4378,8 @@ test('Punktekatalog und Dienstgrade per Ziehen am Griff umsortieren, Schwellen w
   await expect.poll(rankOrder).toEqual([ranks[0], ranks[2], ranks[1]]);
   // Aufräumen
   for (const title of ranks) {
-    page.once('dialog', (d) => void d.accept());
     await page.locator('.card-list .row', { hasText: title }).getByRole('button', { name: 'Löschen' }).click();
+    await askOk(page);
     await expect(page.locator('.toast')).toHaveText('Gelöscht');
   }
 });
@@ -4448,11 +4489,11 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast öffnet die Seite
     await login(page, 'admin', ADMIN_PASSWORD);
     await adminMenu(page, 'Kompanien');
     for (const name of ['Testkompanie', 'Alte Garde']) {
-      page.once('dialog', (d) => d.accept());
       await page
         .locator('.row', { has: page.getByText(name, { exact: true }) })
         .getByRole('button', { name: 'Löschen' })
         .click();
+      await askOk(page);
       await expect(page.locator('.toast')).toHaveText('Gelöscht');
       await expect(page.locator('.toast')).toHaveCount(0);
     }
@@ -4499,11 +4540,11 @@ test('Sponsoren (Issue #279): anlegen mit Link und Logo, Gast sieht sie ohne Anm
   } finally {
     await login(page, 'admin', ADMIN_PASSWORD);
     await adminMenu(page, 'Sponsoren');
-    page.once('dialog', (d) => d.accept());
     await page
       .locator('.row', { has: page.getByText('Bäckerei Test', { exact: true }) })
       .getByRole('button', { name: 'Löschen' })
       .click();
+    await askOk(page);
     await expect(page.locator('.toast')).toHaveText('Gelöscht');
   }
 });
@@ -4562,8 +4603,8 @@ test('News in der App: Quelle wählen, Beitrag schreiben, Gast liest ihn, bearbe
     await login(page, 'admin', ADMIN_PASSWORD);
     await page.goto('/app/#/news');
     await page.locator('.news-card', { hasText: 'Schützenfest am Samstag, 14 Uhr' }).click();
-    page.once('dialog', (d) => d.accept());
     await page.getByRole('button', { name: 'Löschen' }).click();
+    await askOk(page);
     await expect(page.locator('.toast')).toHaveText('Beitrag gelöscht');
     await expect(page.locator('.news-card', { hasText: 'Schützenfest' })).toHaveCount(0);
   } finally {
@@ -4652,8 +4693,8 @@ test('Eigene Seiten (Issue #287): anlegen öffentlich und nur für Mitglieder, j
     await login(page, 'admin', ADMIN_PASSWORD);
     await adminMenu(page, 'Seiten');
     for (const title of ['Anfahrt und Parken', 'Uniform']) {
-      page.once('dialog', (d) => d.accept());
       await row(title).getByRole('button', { name: 'Löschen' }).click();
+      await askOk(page);
       await expect(page.locator('.toast')).toHaveText('Gelöscht');
       await expect(row(title)).toHaveCount(0);
     }
@@ -4704,8 +4745,8 @@ test('Eigene Seiten aus Blöcken: Countdown einfügen, Block nur für Mitglieder
   } finally {
     await login(page, 'admin', ADMIN_PASSWORD);
     await adminMenu(page, 'Seiten');
-    page.once('dialog', (d) => d.accept());
     await row.getByRole('button', { name: 'Löschen' }).click();
+    await askOk(page);
     await expect(page.locator('.toast')).toHaveText('Gelöscht');
   }
 });
@@ -4740,8 +4781,8 @@ test('Eigene Seiten: Knopf mit Link und Nächste Termine, Gast sieht beide', asy
   } finally {
     await login(page, 'admin', ADMIN_PASSWORD);
     await adminMenu(page, 'Seiten');
-    page.once('dialog', (d) => d.accept());
     await row.getByRole('button', { name: 'Löschen' }).click();
+    await askOk(page);
     await expect(page.locator('.toast')).toHaveText('Gelöscht');
   }
 });
@@ -4778,8 +4819,8 @@ test('Eigene Seiten: Hinweis-Kasten, Trennlinie, Ablauf und Zahlen', async ({ pa
     await expect(article.locator('.block-facts-list li')).toHaveText('1848gegründet');
   } finally {
     await adminMenu(page, 'Seiten');
-    page.once('dialog', (d) => d.accept());
     await row.getByRole('button', { name: 'Löschen' }).click();
+    await askOk(page);
     await expect(page.locator('.toast')).toHaveText('Gelöscht');
   }
 });
@@ -4814,17 +4855,17 @@ test('Eigene Seiten: Block Sponsoren zeigt die Sponsoren mit Link', async ({ pag
       await expect(link).toHaveAttribute('rel', 'sponsored noopener noreferrer');
     } finally {
       await adminMenu(page, 'Seiten');
-      page.once('dialog', (d) => d.accept());
       await row.getByRole('button', { name: 'Löschen' }).click();
+      await askOk(page);
       await expect(page.locator('.toast')).toHaveText('Gelöscht');
     }
   } finally {
     await adminMenu(page, 'Sponsoren');
-    page.once('dialog', (d) => d.accept());
     await page
       .locator('.row', { has: page.getByText(name, { exact: true }) })
       .getByRole('button', { name: 'Löschen' })
       .click();
+    await askOk(page);
   }
 });
 
@@ -4854,8 +4895,8 @@ test('Eigene Seiten: Karte zur Anfahrt öffnet den Ort in der Karten-App', async
     await expect(link).toHaveAttribute('target', '_blank');
   } finally {
     await adminMenu(page, 'Seiten');
-    page.once('dialog', (d) => d.accept());
     await row.getByRole('button', { name: 'Löschen' }).click();
+    await askOk(page);
     await expect(page.locator('.toast')).toHaveText('Gelöscht');
   }
 });
@@ -5265,10 +5306,7 @@ test('Schwarzes Brett: Banner mit Titel auf allen Seiten, ausblenden, „+1 weit
   // Admin schreibt (Recht post_board) über „Verwaltung“ → „Schwarzes Brett“; die Verwaltung bleibt markiert.
   const admin = await browser.newPage();
   const dialogs: string[] = [];
-  admin.on('dialog', (d) => {
-    dialogs.push(d.message());
-    void d.accept();
-  });
+  autoAsk(admin, dialogs);
   await login(admin, 'admin', ADMIN_PASSWORD);
   await openKonto(admin);
   await expect(admin.getByRole('button', { name: 'Nachricht schreiben' })).toHaveCount(0);
@@ -5308,7 +5346,8 @@ test('Schwarzes Brett: Banner mit Titel auf allen Seiten, ausblenden, „+1 weit
   const banner = page.locator('.board-banner');
   await expect(banner).toContainText(first);
   await expect(banner).not.toContainText('Halle ist gesperrt.');
-  await expect(banner).toContainText(/admin ·/i);
+  // Kompakt (Issue #347): nur der Titel, ohne Verfasser und Uhrzeit
+  await expect(banner).not.toContainText(/admin ·/i);
   const tabs = page.locator('.tabbar button');
   for (let i = 0; i < (await tabs.count()); i++) {
     await tabs.nth(i).click();
@@ -5411,10 +5450,7 @@ test('Schwarzes Brett: öffentliche Nachricht auch ohne Anmeldung, interne nicht
   const intern = `Nur intern ${id}`;
   const admin = await browser.newPage();
   const dialogs: string[] = [];
-  admin.on('dialog', (d) => {
-    dialogs.push(d.message());
-    void d.accept();
-  });
+  autoAsk(admin, dialogs);
   await login(admin, 'admin', ADMIN_PASSWORD);
   await admin.goto('/app/#/brett');
   const form = admin.locator('.board-form');
@@ -5460,7 +5496,7 @@ test('Schwarzes Brett aus Blöcken: Countdown und Text nur für Mitglieder, ohne
   const id = Date.now().toString(36);
   const title = `Festbeginn ${id}`;
   const admin = await browser.newPage();
-  admin.on('dialog', (d) => void d.accept());
+  autoAsk(admin);
   await login(admin, 'admin', ADMIN_PASSWORD);
   await admin.goto('/app/#/brett');
   const form = admin.locator('.board-form');
@@ -5496,10 +5532,7 @@ test('Schwarzes Brett aus Blöcken: Countdown und Text nur für Mitglieder, ohne
 test('Schwarzes Brett: Nachricht nur für ausgewählte Personen (Einzeln)', async ({ page }) => {
   const title = `Nur für dich ${Date.now().toString(36)}`;
   const dialogs: string[] = [];
-  page.on('dialog', (d) => {
-    dialogs.push(d.message());
-    void d.accept();
-  });
+  autoAsk(page, dialogs);
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.goto('/app/#/brett');
   const form = page.locator('.board-form');
@@ -5528,7 +5561,7 @@ test('Schwarzes Brett: Nachricht nur für ausgewählte Personen (Einzeln)', asyn
 });
 
 test('Schwarzes Brett: Verlauf mit vorher/nachher, gelöschte Nachrichten mit Konto und Zeitpunkt', async ({ page }) => {
-  page.on('dialog', (d) => d.accept());
+  autoAsk(page);
   const title = `Verlauf ${Date.now().toString(36)}`;
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.goto('/app/#/brett');
@@ -5562,7 +5595,7 @@ test('Schwarzes Brett: Verlauf mit vorher/nachher, gelöschte Nachrichten mit Ko
 test('Schwarzes Brett: Signatur einrichten (Sprung ins Konto, Entwurf bleibt), einfügen, Änderung wirkt nicht auf die Nachricht', async ({
   page,
 }) => {
-  page.on('dialog', (d) => d.accept());
+  autoAsk(page);
   const id = Date.now().toString(36);
   await login(page, 'admin', ADMIN_PASSWORD);
   // Ausgangslage: keine Signatur
@@ -5626,6 +5659,7 @@ test('Schwarzes Brett: Signatur einrichten (Sprung ins Konto, Entwurf bleibt), e
     .locator('.board-card', { hasText: `Mit Signatur ${id}` })
     .getByRole('button', { name: 'Löschen' })
     .click();
+  await expect(page.locator('.toast')).toHaveText('Nachricht gelöscht');
 });
 
 test('Einstellungen → E-Mail: Kompanieadresse und Mailserver speichern, Passwort nie angezeigt', async ({ page }) => {
@@ -5655,10 +5689,7 @@ test('E-Mails: an Rolle, Mitglied und freie Adressen (An, Cc, Bcc) mit dem Edito
 }) => {
   const id = Date.now().toString(36);
   const dialogs: string[] = [];
-  page.on('dialog', (d) => {
-    dialogs.push(d.message());
-    void d.accept();
-  });
+  autoAsk(page, dialogs);
   await login(page, 'admin', ADMIN_PASSWORD);
   // Ohne Mailversand gibt es den Bereich noch nicht (wie Kalender oder Galerie ohne Einrichtung)
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
@@ -5778,7 +5809,7 @@ test('E-Mails: an Rolle, Mitglied und freie Adressen (An, Cc, Bcc) mit dem Edito
 
 test('Anhänge: am Brett anhängen, Mitglied lädt herunter, beim Bearbeiten ändern (Verlauf); an einer E-Mail', async ({ page, browser }) => {
   const id = Date.now().toString(36);
-  page.on('dialog', (d) => void d.accept());
+  autoAsk(page);
   await login(page, 'admin', ADMIN_PASSWORD);
   await adminMenu(page, 'Schwarzes Brett');
   const form = page.locator('.board-form');
@@ -5860,7 +5891,7 @@ test('Schwarzes Brett: Enddatum in der Ortszeit eines Geräts in New York, gespe
 }) => {
   const context = await browser.newContext({ ...devices['iPhone 13'], locale: 'de-DE', timezoneId: 'America/New_York' });
   const ny = await context.newPage();
-  ny.on('dialog', (d) => d.accept());
+  autoAsk(ny);
   const title = `Zeitzone ${Date.now().toString(36)}`;
   await login(ny, 'admin', ADMIN_PASSWORD);
   await ny.goto('/app/#/brett');
@@ -5876,11 +5907,12 @@ test('Schwarzes Brett: Enddatum in der Ortszeit eines Geräts in New York, gespe
   await expect(ny.locator('.board-card', { hasText: title }).locator('.board-until')).toContainText('15. Jan. 2031, 10:00 Uhr');
 
   await login(page, 'admin', ADMIN_PASSWORD);
-  page.on('dialog', (d) => d.accept());
+  autoAsk(page);
   await page.goto('/app/#/brett');
   const card = page.locator('.board-card', { hasText: title });
   await expect(card.locator('.board-until')).toContainText('15. Jan. 2031, 16:00 Uhr');
   await card.getByRole('button', { name: 'Löschen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Nachricht gelöscht');
   await context.close();
 });
 
@@ -5891,7 +5923,7 @@ test('Umfragen: anlegen, Mitglied sieht sie im Banner, antwortet, sieht das Erge
   const title = `Grillfest ${Date.now().toString(36)}: Samstag oder Sonntag?`;
   // Admin (Recht manage_polls) legt über „Verwaltung“ → „Umfragen“ an.
   const admin = await browser.newPage();
-  admin.on('dialog', (d) => d.accept());
+  autoAsk(admin);
   await login(admin, 'admin', ADMIN_PASSWORD);
   await adminMenu(admin, 'Umfragen');
   await expect(admin.locator('.topbar-title')).toHaveText('Umfragen');
@@ -5975,7 +6007,7 @@ test('Geburtstage: Mitglied trägt seinen ein, ein anderes sieht ihn unter „An
   // In drei Tagen (Zeitzone des Browsers; die der Kompanie verschiebt das höchstens um einen Tag, bleibt also in 7 Tagen).
   const in3 = new Date(Date.now() + 3 * 86400 * 1000);
   const member = await browser.newPage();
-  member.on('dialog', (d) => d.accept());
+  autoAsk(member);
   await login(member, 'mitglied1');
   await openKonto(member);
   const card = member.locator('.birthday-card');
@@ -6059,7 +6091,7 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
 
   // Mitglied2 zeigt den Geburtstag allen (mit Alter) und das Eintrittsjahr nur Mitgliedern.
   const member = await browser.newPage();
-  member.on('dialog', (d) => d.accept());
+  autoAsk(member);
   await login(member, 'mitglied2');
   await openKonto(member);
   const birthday = member.locator('.birthday-card');
@@ -6125,7 +6157,7 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
 
 test('Inventar: anlegen, umlagern, Menge mit Grund ändern, Verlauf zeigt alle Schritte mit Namen', async ({ page }) => {
   const title = `Bierbank ${Date.now().toString(36)}`;
-  page.on('dialog', (d) => d.accept());
+  autoAsk(page);
   // Mitglieder ohne das Recht sehen das Inventar nicht.
   await login(page, 'mitglied1');
   await page.goto('/app/#/inventar');
@@ -6233,8 +6265,8 @@ test('Wartungsmodus: Admin schaltet mit Begründung ein, Mitglied sieht die Wart
   const card = page.locator('.settings-section', { hasText: 'Wartungsmodus' });
   await card.getByLabel(/Begründung/).fill('Umstellung auf die neue App,\nbis ca. 18 Uhr');
   await expect(card.getByText('43/500 Zeichen')).toBeVisible();
-  page.once('dialog', (d) => d.accept());
   await card.getByRole('button', { name: 'Wartungsmodus einschalten' }).click();
+  await askOk(page);
   await expect(page.locator('.maintenance-banner')).toContainText('Wartungsmodus aktiv – nur Admins können die App nutzen.');
   await expect(page.locator('.maintenance-banner')).toContainText('bis ca. 18 Uhr');
   await shot(page, '31-wartungsmodus-admin');
@@ -6299,9 +6331,9 @@ test('Nutzung: Admin sieht aktive Konten, Nutzung je Bereich und den Verlauf ein
 
   // Ausschalten löscht die Einträge je Person; die Liste der Mitglieder verschwindet, gezählt wird weiter.
   const schalter = page.getByLabel('Nutzung je Person erfassen (wer, wann, welcher Bereich)');
-  page.once('dialog', (d) => d.accept());
   // Der Schalter folgt dem Server (erst nach der Antwort umgelegt): klicken, dann auf den neuen Stand warten.
   await schalter.click();
+  await askOk(page);
   await expect(schalter).not.toBeChecked();
   await expect(page.getByText('Ausgeschaltet: Die App zählt nur noch')).toBeVisible();
   await expect(members).toHaveCount(0);

@@ -230,6 +230,12 @@ final class App
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Einreichungen der Galerie nicht eingerichtet: ' . $e->getMessage());
         }
+        // Fehlermeldungen zuerst an die Admins: Benachrichtigungen dazu einmalig auf bestehenden Geräten einschalten
+        try {
+            $this->bugReports()->initialize();
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Eingang der Fehlermeldungen nicht eingerichtet: ' . $e->getMessage());
+        }
         // Die laufende Version festhalten: Fehlt später die Datei VERSION, weiß der Installer trotzdem,
         // welche Hauptversion installiert ist (auch nach einem abgebrochenen oder händischen Wechsel).
         // Reine Hilfsinformation: Ein Fehler beim Schreiben darf keinen Aufruf scheitern lassen.
@@ -280,8 +286,9 @@ final class App
             PollService::TASK => $this->features()->enabled('polls'),
             // Geburtstage: stündlich, benachrichtigt aber erst ab der eingestellten Stunde (Standard 7 Uhr) Ortszeit und je Geburtstag einmal am Tag.
             BirthdayService::TASK => $this->features()->enabled('birthdays'),
-            // Fehlermeldungen (Issue #64): stündlich als Rückfall, nach dem Einreihen vorgezogen; nur mit Empfänger.
-            BugReportService::TASK => $this->bugReports()->available(),
+            // Fehlermeldungen (Issue #64): stündlich als Rückfall, nach dem Weiterleiten vorgezogen; räumt auch ohne
+            // Empfänger den Eingang auf (erledigte Meldungen nach 30 Tagen).
+            BugReportService::TASK => true,
             // Sicherung in Google Drive: täglich prüfen, wöchentlich hochladen.
             BackupUploadService::TASK => $this->backupUpload()->active(),
             // Nutzungsauswertung (Issue #175): täglich Einträge je Person nach 90 Tagen und Pseudonyme nach 31 Tagen löschen.

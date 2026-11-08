@@ -17,6 +17,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Fehlermeldungen zuerst an die Admins**: Was jemand über *Fehler melden* schickt, geht nicht mehr gleich an die
+  Betreuer der App, sondern landet unter *Verwaltung → Fehlermeldungen* (mit Zahl der offenen und einer
+  Benachrichtigung). Dort schließt ihr eine Meldung mit Begründung, z. B. wenn ihr selbst helfen konntet, oder leitet
+  sie an die Betreuer weiter; erst dann wird daraus ein Eintrag bei ihnen. Wer angemeldet meldet, sieht unter
+  *Deine Meldungen* den Stand und eure Begründung und wird benachrichtigt. Die Admins sehen den Namen angemeldeter
+  Personen; an die Betreuer geht er weiter nur mit Haken. Neues Recht *Fehlermeldungen bearbeiten*, das ihr an Rollen
+  vergeben könnt (Admins haben es immer). *Fehler melden* gibt es jetzt auch in Apps ohne Empfänger für
+  Fehlermeldungen; dort bleiben die Meldungen bei den Admins. Erledigte Meldungen werden nach 30 Tagen gelöscht.
 - **Hinweis zum Einschalten der Benachrichtigungen**: Angemeldete Mitglieder sehen auf der Startseite einen Hinweis
   *Nichts mehr verpassen* mit dem Knopf *Benachrichtigungen einschalten*, solange ihr Browser auf diesem Gerät noch
   nicht nach Benachrichtigungen gefragt hat. Ein Tippen fragt nach der Erlaubnis und schaltet alle Arten ein; *Nicht
@@ -85,6 +93,27 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Album herunterladen als kleiner Knopf**: In einem Album der Galerie steht statt des großen Knopfs *Album
+  herunterladen (… Bilder, ZIP)* jetzt rechts neben dem Titel ein runder Knopf mit Pfeil nach unten, wie beim
+  Herunterladen eines einzelnen Bildes. Die Anzahl der Bilder und Videos zeigt er beim Darüberfahren mit der Maus;
+  während des Ladens steht darunter „Lädt … von …“ mit *Abbrechen*.
+- **Banner des Schwarzen Bretts in einer Zeile**: Das Banner oben zeigt je Eintrag nur noch den Titel, ohne
+  Überschrift, Verfasser und Uhrzeit (die stehen am Brett). Ein Tipp auf den Titel öffnet die Nachricht; *+1 weitere*
+  und *Brett öffnen* erscheinen erst bei mehreren Einträgen. Auch laufende Umfragen stehen so in einer Zeile.
+- **Schreiben am Brett aufgeräumt**: Der Titel ist eine große Eingabe, *Sichtbar für*, *Sichtbar bis* und die
+  Versandwege stehen im eigenen Abschnitt *Sichtbarkeit und Versand*. Die Werkzeugleiste des Texteditors (auch bei
+  Neuigkeiten, eigenen Seiten und E-Mails) zeigt nur die häufigen Werkzeuge; Schriftart, Größe, Ausrichtung, Einzug,
+  Trennlinie, Tabelle und Weiteres liegen hinter **⋯**.
+- **Karten am Brett und in den Umfragen mit Innenrand**: Text klebt nicht mehr am Rand der Karte.
+- **Gleichmäßigere Abstände**: Erklärtexte kleben nicht mehr an der ersten Karte darunter (z. B. bei Dienstgraden,
+  Navigation und Rollen), Umfragen stehen mit Abstand untereinander, unter *Umfragen verwalten* haben die Karten
+  einen Innenrand, beim Anlegen mehrerer Mitglieder stehen die Felder je Person mit Abstand in einem Rahmen, und die
+  Knöpfe *Ansehen* und *Bearbeiten* der Rollen stehen auf dem Handy nebeneinander.
+- **Rückfragen im Fenster der App**: Fragen wie „Wirklich löschen?“, Eingaben (z. B. Grund beim Ablehnen eines
+  Bildes, Adresse eines Links) und Hinweise erscheinen jetzt in einem eigenen Fenster der App statt im Fenster des
+  Browsers. Es sieht auf jedem Gerät gleich aus; Löschen und Entfernen steht auf einem roten Knopf.
+- **Fenster heben sich deutlicher ab**: Hinter einem Fenster ist die Seite stärker abgedunkelt und unscharf, das
+  Fenster hat oben eine Linie in der Farbe der Kompanie und einen kräftigeren Schatten.
 - **Benachrichtigung vom Schwarzen Brett auch an den Verfasser**: Wer eine Nachricht mit *Benachrichtigung senden*
   schreibt, bekommt die Benachrichtigung jetzt selbst auch (auf seinen Geräten, auf denen die Art *Schwarzes Brett:
   dringende Nachrichten* eingeschaltet ist), wie schon bisher die Mail. Das gilt für intern, öffentlich, Kompanie und

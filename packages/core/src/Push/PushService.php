@@ -95,6 +95,9 @@ final class PushService
     public const TYPE_GALLERY_SUBMISSIONS = 'gallery_submissions';
     /** Selbstregistrierung (Issue #314): neue Anfrage auf einen Zugang an alle, die freigeben (create_users). */
     public const TYPE_REGISTRATIONS = 'registrations';
+    /** Fehlermeldungen: neue Meldungen an alle mit review_reports, Antwort (geschlossen, weitergeleitet) an die meldende Person. */
+    public const TYPE_REPORTS_REVIEW = 'reports_review';
+    public const TYPE_REPORTS = 'reports';
 
     /** Push-Dienste der Browser (wie im Projekt-Cockpit). */
     private const PUSH_HOSTS = ['/^fcm\.googleapis\.com$/', '/(^|\.)push\.services\.mozilla\.com$/', '/(^|\.)push\.apple\.com$/', '/(^|\.)notify\.windows\.com$/'];
@@ -173,7 +176,8 @@ final class PushService
 
     /**
      * Typen mit Bezeichnung, Bereichen (einer davon muss eingeschaltet sein) und wer sie bekommt: Konten mit diesem
-     * Recht (Wert einer Capability, z. B. view_board wie BoardService::isRecipient), all = alle einschließlich Gästen.
+     * Recht (Wert einer Capability, z. B. view_board wie BoardService::isRecipient), all = alle einschließlich Gästen,
+     * account = alle Angemeldeten.
      * Ohne Bereiche (features leer) gilt stattdessen active, z. B. „Zugang beantragen“ eingeschaltet.
      *
      * @return array<string, array{label: string, features: list<string>, audience: string, active?: bool}>
@@ -189,6 +193,8 @@ final class PushService
             self::TYPE_GALLERY_REVIEW => ['label' => $c->sectionLabel('gallery', 'Galerie') . ': neue Bilder zum Prüfen', 'features' => ['gallery'], 'audience' => 'review_gallery'],
             self::TYPE_GALLERY_SUBMISSIONS => ['label' => $c->sectionLabel('gallery', 'Galerie') . ': deine Bilder freigegeben oder abgelehnt', 'features' => ['gallery'], 'audience' => 'submit_gallery'],
             self::TYPE_REGISTRATIONS => ['label' => 'Zugang beantragt: neue Anfragen', 'features' => [], 'audience' => 'create_users', 'active' => $this->app->registrations()->enabled()],
+            self::TYPE_REPORTS_REVIEW => ['label' => 'Fehlermeldungen: neue Meldungen', 'features' => [], 'audience' => 'review_reports', 'active' => true],
+            self::TYPE_REPORTS => ['label' => 'Fehlermeldungen: Antwort auf deine Meldung', 'features' => [], 'audience' => 'account', 'active' => true],
             self::TYPE_PENALTIES => ['label' => $c->sectionLabel('penalties', 'Strafen') . ': neue Einträge', 'features' => ['penalties'], 'audience' => 'view_own_penalties'],
             self::TYPE_POINTS => ['label' => $c->sectionLabel('points', 'Punkte') . ': neue Einträge', 'features' => ['points'], 'audience' => 'view_own_points'],
             self::TYPE_RANKS => ['label' => $c->rankLabel() . ': Beförderung oder Änderung', 'features' => ['ranks'], 'audience' => 'view_own_rank'],
@@ -646,10 +652,13 @@ final class PushService
         return $this->enqueue($type, $items, $urgency, min($maxTtl, self::MAX_TTL, $ttl));
     }
 
-    /** @param string $audience all oder der Wert des Rechts, das die Empfänger brauchen (types()) */
+    /** @param string $audience all, account oder der Wert des Rechts, das die Empfänger brauchen (types()) */
     private function inAudience(string $audience, ?User $user): bool
     {
-        return $audience === 'all' || ($user !== null && $user->id > 0 && $user->can(Capability::from($audience)));
+        if ($audience === 'all') {
+            return true;
+        }
+        return $user !== null && $user->id > 0 && ($audience === 'account' || $user->can(Capability::from($audience)));
     }
 
     /**

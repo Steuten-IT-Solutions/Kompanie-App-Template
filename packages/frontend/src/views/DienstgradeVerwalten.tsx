@@ -10,6 +10,7 @@ import { RankHistory } from './Dienstgrad';
 import { isDue } from '../promotionCheck';
 import { notePromotions } from '../promotionsDue';
 import { sources } from '../viewData';
+import { confirmAsk } from '../ask';
 
 const rank = brand.labels.rank;
 const sec = brand.labels.sections;
@@ -233,7 +234,7 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
                       <button
                         className="btn btn-small btn-danger"
                         disabled={busy}
-                        onClick={() => window.confirm(`„${r.title}“ löschen?`) && run(() => api.deleteRank(r.id), 'Gelöscht')}
+                        onClick={async () => (await confirmAsk(`„${r.title}“ löschen?`)) && run(() => api.deleteRank(r.id), 'Gelöscht')}
                       >
                         Löschen
                       </button>
@@ -250,8 +251,8 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
                           <button
                             className="btn btn-small btn-danger"
                             disabled={busy}
-                            onClick={() =>
-                              window.confirm(`Abzeichen von „${r.title}“ entfernen?`) &&
+                            onClick={async () =>
+                              (await confirmAsk(`Abzeichen von „${r.title}“ entfernen?`)) &&
                               run(() => api.removeRankBadge(r.id), 'Abzeichen entfernt')
                             }
                           >

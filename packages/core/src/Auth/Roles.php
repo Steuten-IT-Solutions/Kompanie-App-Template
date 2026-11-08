@@ -136,6 +136,7 @@ final class Roles
         Capability::ManagePersonal,
         Capability::CreateUsers,
         Capability::PromoteUsers,
+        Capability::ReviewReports,
     ];
 
     /**

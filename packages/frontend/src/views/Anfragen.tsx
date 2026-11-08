@@ -11,6 +11,7 @@ import {
 import { formatDate } from '../format';
 import { ErrorBox, Loading, useAsync } from '../ui';
 import { NewAccountRole } from './Konten';
+import { confirmAsk } from '../ask';
 
 /**
  * Verwaltung → Anfragen (Issue #314): Anfragen auf einen Zugang freigeben (Konto mit gewählter Rolle und dem Passwort aus
@@ -107,12 +108,12 @@ function RequestCard({
       setBusy(false);
     }
   }
-  const approve = () => {
+  const approve = async () => {
     if (
       linkTo &&
-      !window.confirm(
+      !(await confirmAsk(
         `Anfrage von ${r.name} mit dem Mitglied ${linkName ?? ''} verbinden? Es bekommt Benutzername und Passwort aus der Anfrage.`,
-      )
+      ))
     ) {
       return;
     }

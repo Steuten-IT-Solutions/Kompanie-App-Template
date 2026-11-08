@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api, type GallerySubmission } from '../api';
 import { navigate } from '../router';
 import { Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
+import { confirmAsk, promptAsk } from '../ask';
 
 /**
  * Bilder für die Galerie einreichen (submit_gallery) und Einreichungen prüfen (review_gallery), Issue #286. Unter
@@ -128,7 +129,7 @@ function Submit({ onToast }: { onToast: (msg: string) => void }) {
                     type="button"
                     className="btn btn-small btn-secondary"
                     onClick={async () => {
-                      if (!window.confirm(`Einreichung „${s.name}“ zurückziehen?`)) return;
+                      if (!(await confirmAsk(`Einreichung „${s.name}“ zurückziehen?`))) return;
                       try {
                         await api.withdrawGallerySubmission(s.id);
                         onToast('Zurückgezogen');
@@ -213,8 +214,8 @@ function Review({ onToast }: { onToast: (msg: string) => void }) {
                   type="button"
                   className="btn btn-small btn-danger"
                   disabled={busy}
-                  onClick={() => {
-                    const reason = window.prompt(`Warum kommt „${s.name}“ nicht in die Galerie?`);
+                  onClick={async () => {
+                    const reason = await promptAsk(`Warum kommt „${s.name}“ nicht in die Galerie?`);
                     if (reason === null) return;
                     void run(() => api.rejectGallerySubmission(s.id, reason), 'Abgelehnt');
                   }}
@@ -240,8 +241,8 @@ function Review({ onToast }: { onToast: (msg: string) => void }) {
                   type="button"
                   className="btn btn-small btn-danger"
                   disabled={busy}
-                  onClick={() => {
-                    if (!window.confirm(`Bild „${s.name}“ wieder aus der Galerie entfernen?`)) return;
+                  onClick={async () => {
+                    if (!(await confirmAsk(`Bild „${s.name}“ wieder aus der Galerie entfernen?`))) return;
                     void run(() => api.removeGallerySubmission(s.id), 'Entfernt');
                   }}
                 >

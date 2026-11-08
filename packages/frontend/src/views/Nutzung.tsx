@@ -3,6 +3,7 @@ import { api, type ActivityAction, type ActivityEntry, type ActivityOverview } f
 import { formatDate, todayYmd } from '../format';
 import { toCsv } from '../lists';
 import { ErrorBox, Loading, Sheet, StatCard, useAsync } from '../ui';
+import { confirmAsk } from '../ask';
 
 const ACTION_TEXT: Record<ActivityAction, string> = {
   view: 'angesehen',
@@ -284,9 +285,9 @@ function PersonalSwitch({
   async function change(on: boolean) {
     if (
       !on &&
-      !window.confirm(
+      !(await confirmAsk(
         'Nutzung nicht mehr je Person erfassen? Alle bisherigen Einträge mit Namen werden sofort gelöscht, auch „zuletzt aktiv“.',
-      )
+      ))
     )
       return;
     setBusy(true);

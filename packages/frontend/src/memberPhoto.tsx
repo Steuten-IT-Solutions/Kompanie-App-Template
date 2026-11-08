@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { api, type EncodedFile } from './api';
 import { badgeSrc, preloadImage } from './RankBadge';
 import { Sheet } from './ui';
+import { confirmAsk } from './ask';
 
 /**
  * Fotos der Mitglieder. Hochladen, ersetzen und entfernen nur, wer Mitglieder anlegen darf; sehen die Person selbst
@@ -145,7 +146,8 @@ function PhotoZoom({ url, name, actions, onClose }: { url: string; name: string;
   }, [url]);
   useEffect(() => {
     closeRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    // Esc schließt erst eine offene Rückfrage darüber (ask.tsx), nicht gleich die Ansicht.
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !document.querySelector('.sheet-top') && onClose();
     document.addEventListener('keydown', onKey);
     const overflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -338,7 +340,7 @@ export function MemberPhotoPanel({
   }
 
   async function remove() {
-    if (!window.confirm(`Foto von ${name} entfernen?`)) return;
+    if (!(await confirmAsk(`Foto von ${name} entfernen?`))) return;
     setBusy(true);
     try {
       await api.removeMemberPhoto(id);

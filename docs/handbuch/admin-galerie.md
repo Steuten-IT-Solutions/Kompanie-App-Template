@@ -49,7 +49,7 @@ Bei einem Album der App änderst du darunter **Titel des Albums** und **Jahr des
 
 ### Herunterladen erlauben
 1. Setze den Haken **Knöpfe zum Herunterladen zeigen** und tippe auf **Speichern**.
-2. In jedem Album steht dann **Album herunterladen (… Bilder · … Videos, ZIP)**, in der Großansicht oben rechts neben **✕** ein Knopf mit Pfeil nach unten.
+2. In jedem Album steht dann rechts neben dem Titel ein runder Knopf mit Pfeil nach unten (ganzes Album als ZIP), in der Großansicht oben rechts neben **✕** derselbe Knopf für das einzelne Bild oder Video.
 3. Zum Abschalten nimmst du den Haken wieder heraus und tippst auf **Speichern**.
 
 ### Bilder ansehen, die sich nicht laden ließen
