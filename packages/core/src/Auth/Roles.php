@@ -9,8 +9,8 @@ namespace KompanieApp\Core\Auth;
  *
  * Welche Rollen es gibt und welche Rechte sie haben, entscheidet der Admin der Kompanie in der App
  * (Domain\RoleService). Fest sind guest (gilt auch ohne Anmeldung), member (Mitglied, Rolle neuer Konten) und admin
- * (alle Rechte); sie lassen sich umbenennen (Mitglied und Admin bekommen auch einen Punktefaktor), bei Gast auch die
- * Rechte zum Sehen, bei Mitglied alle vergebbaren Rechte. Weitere
+ * (alle Rechte); sie lassen sich umbenennen (Mitglied und Admin bekommen auch einen Punktefaktor), bei Gast und
+ * Mitglied auch die Rechte (alle vergebbaren, Gast nie member). Weitere
  * Standardrollen bringen die Bereiche mit, wenn der Admin sie einschaltet (Domain\Features, z. B. „Punkte verwalten“).
  * Anwärter (Issue #23) legt der Admin als eigene Rolle an, z. B. nur mit dem internen Kalender.
  */
@@ -54,8 +54,8 @@ final class Roles
 
     /**
      * Feste Rollen in der Reihenfolge der Anzeige: Schlüssel => Rechte, wie bei der Ersteinrichtung. Die Bezeichnungen
-     * kommen dann aus kompanie.json (labels.roles). Admin hat immer alle Rechte; bei Gast lassen sich die Rechte zum
-     * Sehen ändern (Capability::isView), bei Mitglied jedes vergebbare; Mitglied hat immer member, Gast nie.
+     * kommen dann aus kompanie.json (labels.roles). Admin hat immer alle Rechte; bei Gast und Mitglied lässt sich jedes
+     * vergebbare Recht geben; Mitglied hat immer member, Gast nie (bei ihm entfällt diese Voraussetzung).
      *
      * @var array<string, string[]>
      */
@@ -186,7 +186,7 @@ final class Roles
         return array_values(array_unique([...$values, ...self::PUBLIC_DEFAULTS, ...$add]));
     }
 
-    /** Fest: nicht löschbar (umbenennen geht; bei Gast lassen sich die Rechte zum Sehen ändern, bei Mitglied alle vergebbaren). */
+    /** Fest: nicht löschbar (umbenennen geht; bei Gast und Mitglied lassen sich die Rechte ändern). */
     public static function isSystem(string $key): bool
     {
         return isset(self::TEMPLATES[$key]);
