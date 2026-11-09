@@ -24,6 +24,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.8.2] – 2026-11-09
+
 ### Geändert
 
 - Der Countdown-Block zählt jetzt nach dem Kalender in der Zeitzone der App. Bisher fehlte bei einem Countdown über
