@@ -5,23 +5,31 @@
 
 declare(strict_types=1);
 
+/** Verweis auf eine Seite der App: app:<ansicht>/<unterseite>… (Adresse ohne #/, nur Kleinbuchstaben, Ziffern, -). */
+const KOMPANIE_APP_LINK = '#^app:([a-z0-9-]+(?:/[a-z0-9-]+)*)$#';
+
 /**
  * Markdown (kleine Auswahl) → HTML. Alles wird maskiert; Platzhalter bleiben als Text stehen.
  * $link bildet seite:name auf eine Adresse ab, $image bild:name auf die Adresse eines Bildes. Ein Bild steht als eigene
  * Zeile: ![Beschreibung](bild:name). Ohne $image (oder wenn es null liefert) entfällt das Bild.
+ * Mit $appLinks wird [Text](app:einstellungen/rollen) ein Verweis auf diese Seite der App (#/einstellungen/rollen);
+ * ohne bleibt nur der Text (das Handbuch steht auch auf GitHub Pages, wo es die App nicht gibt).
  */
-function kompanie_markdown(string $md, callable $link, ?callable $image = null): string
+function kompanie_markdown(string $md, callable $link, ?callable $image = null, bool $appLinks = false): string
 {
     $h = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    $inline = static function (string $s) use ($h, $link): string {
+    $inline = static function (string $s) use ($h, $link, $appLinks): string {
         $s = $h($s);
         $s = (string) preg_replace_callback('/`([^`]+)`/', static fn (array $m): string => '<code>' . $m[1] . '</code>', $s);
         $s = (string) preg_replace('/\*\*(.+?)\*\*/', '<strong>$1</strong>', $s);
         $s = (string) preg_replace('/(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])/', '<em>$1</em>', $s);
-        return (string) preg_replace_callback('/\[([^\]]+)\]\(([^)\s]+)\)/', static function (array $m) use ($link): string {
+        return (string) preg_replace_callback('/\[([^\]]+)\]\(([^)\s]+)\)/', static function (array $m) use ($link, $appLinks): string {
             $url = html_entity_decode($m[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
             if (str_starts_with($url, 'seite:')) {
                 return '<a href="' . htmlspecialchars($link(substr($url, 6)), ENT_QUOTES) . '" data-seite="' . htmlspecialchars(substr($url, 6), ENT_QUOTES) . '">' . $m[1] . '</a>';
+            }
+            if ($appLinks && preg_match(KOMPANIE_APP_LINK, $url, $a)) {
+                return '<a href="#/' . $a[1] . '">' . $m[1] . '</a>';
             }
             if (!preg_match('#^https://#', $url)) {
                 return $m[1]; // nur https-Verweise

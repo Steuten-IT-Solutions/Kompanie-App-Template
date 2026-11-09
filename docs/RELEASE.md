@@ -143,7 +143,8 @@ Veröffentlichte Versionen werden nie ersetzt; neue müssen neuer sein als alle 
 
 Laufend: Jeder Pull Request nach `develop`, der für die Nutzer etwas ändert, trägt das in
 [`CHANGELOG.md`](../CHANGELOG.md) unter `[Unveröffentlicht]` ein (Aufbau und Regeln stehen oben in der Datei).
-Admins sehen das Changelog in der App unter *Einstellungen → Was ist neu*; es wird mit der App gebaut
+Wege in der App stehen dort als Verweis, z. B. `[Einstellungen → Rollen](app:einstellungen/rollen)`; in der App öffnet
+ein Antippen die Seite. Admins sehen das Changelog in der App unter *Einstellungen → Was ist neu*; es wird mit der App gebaut
 (`scripts/changelog.php`). Wie die Doku zählt es nicht zum `coreCode`: Eine reine Änderung am Changelog ergibt
 keine neue Version, sie kommt mit der nächsten. Führt ein Pull Request ein Thema fort, ändert er den bestehenden
 Eintrag, statt einen neuen anzulegen; in der App sind ältere Versionen eingeklappt, die Liste soll trotzdem kurz bleiben.
