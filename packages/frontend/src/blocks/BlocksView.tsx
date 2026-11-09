@@ -19,6 +19,7 @@ import { formatBytes, formatDate, formatUntil } from '../format';
 import { saveFile } from '../saveFile';
 import { MemberAvatar } from '../memberPhoto';
 import { formatEventWhen } from '../format';
+import { officeSingular } from '../officeName';
 import RichTextView from '../richtext/RichTextView';
 import Countdown from './Countdown';
 
@@ -146,7 +147,7 @@ function Contacts({ block }: { block: ContactsBlock }) {
               <li key={`${o.id}-${i}`} className="block-contact">
                 {h && <MemberAvatar url={h.photo_url} name={h.name} size="medium" />}
                 <span className="block-contact-text">
-                  <span className="muted small">{o.title}</span>
+                  <span className="muted small">{officeSingular(o)}</span>
                   <strong>{h ? h.name : 'zurzeit nicht besetzt'}</strong>
                   {h?.email && <a href={`mailto:${h.email}`}>{h.email}</a>}
                   {h?.phone && <a href={`tel:${h.phone.replace(/\s+/g, '')}`}>{h.phone}</a>}

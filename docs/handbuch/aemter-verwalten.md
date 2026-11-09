@@ -102,7 +102,7 @@ Nutzt die Kompanie {bereich.titles}, kannst du im Amt unter **{bereich.titles} v
 - Wer eine laufende Amtszeit hat (mit Konto, als {rolle.member}), bekommt den Titel automatisch; wer keine laufende mehr hat, verliert ihn. Einzelne Jahre und beendete Amtszeiten vergeben keinen Titel, mit oder ohne Haken **Ehrung**.
 - Von Hand lässt sich ein verknüpfter Titel nicht mehr vergeben oder entfernen. Ein Titel gehört zu höchstens einem Amt.
 - **Verknüpfung lösen** ändert an den vergebenen Titeln nichts; danach vergibst du sie wieder von Hand.
-- Auf der Seite einer Person steht bei ihren Amtszeiten die **Einzahl** des Amts („Kapitän“ statt „Kapitäne“). Ist keine eingetragen, steht dort der Name des verknüpften Titels, sonst die Bezeichnung. Benenne das Amt also in der Mehrzahl („Kompaniekönige“) und trage die Einzahl („Kompaniekönig“) ein oder gib sie dem Titel.
+- Auf der Seite einer Person, auf den Karten gemeinsamer Amtszeiten und beim Antippen eines Balkens in der Jahresansicht steht die **Einzahl** des Amts („Kapitän“ statt „Kapitäne“). Ist keine eingetragen, steht dort der Name des verknüpften Titels, sonst die Bezeichnung. Benenne das Amt also in der Mehrzahl („Kompaniekönige“) und trage die Einzahl („Kompaniekönig“) ein oder gib sie dem Titel.
 
 ## Siehe auch
 - [{bereich.offices}](seite:aemter)

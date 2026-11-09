@@ -6,6 +6,7 @@ import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { lanes, yearRange } from '../yearGrid';
+import { officeSingular } from '../officeName';
 
 const sec = brand.labels.sections;
 
@@ -308,7 +309,7 @@ function OfficeCard({ office, open, onToggle }: { office: Office; open: boolean;
 
 /**
  * Gruppe mit gemeinsamen Amtszeiten (Issue #282): je Amtszeit eine Karte mit Gruppenbild und allen Personen mit ihren
- * Ämtern, die laufende oben als „aktuell“.
+ * Ämtern (in der Einzahl, „Prinz“ statt „Prinzen“), die laufende oben als „aktuell“.
  */
 export function JointTerms({
   terms,
@@ -342,7 +343,7 @@ export function JointTerms({
               <dl className="joint-term-offices">
                 {rows.map((r) => (
                   <div key={r.office.id}>
-                    <dt>{r.office.title}</dt>
+                    <dt>{officeSingular(r.office)}</dt>
                     <dd>
                       <Holders holders={r.holders} to={memberPath} />
                     </dd>
@@ -454,7 +455,7 @@ export function YearGrid({
       );
       for (const { term, lane, first, last } of bars) {
         const names = term.holders.map((h) => h.name).join(', ');
-        const label = `${o.title}: ${termYears(term)} · ${term.holders.map(nameWithCompanions).join(', ')}${term.note ? ` · ${term.note}` : ''}${term.honor ? ' · Ehrung' : ''}`;
+        const label = `${officeSingular(o)}: ${termYears(term)} · ${term.holders.map(nameWithCompanions).join(', ')}${term.note ? ` · ${term.note}` : ''}${term.honor ? ' · Ehrung' : ''}`;
         const style: CSSProperties = { gridColumn: column + lane, gridRow: `${row(last)} / ${row(first) + 1}` };
         cells.push(
           <div
@@ -634,7 +635,7 @@ export function personEntries(data: OfficesOverview | null | undefined, userId: 
   const out: TimelineEntry[] = [];
   for (const o of data?.offices ?? []) {
     for (const t of o.terms) {
-      const office = o.holder_title || o.title;
+      const office = officeSingular(o);
       if (t.holders.some((h) => h.user_id === userId)) {
         out.push({ key: t.id, term: t, office });
       } else if (t.holders.some((h) => h.companions?.some((c) => c.user_id === userId))) {
