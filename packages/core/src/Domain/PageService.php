@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Domain;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
+use KompanieApp\Core\Domain\Blocks\Blocks;
 use KompanieApp\Core\Http\ApiError;
 
 /**
@@ -18,6 +19,8 @@ use KompanieApp\Core\Http\ApiError;
  * - Pflegen mit manage_pages (Standardrolle „Seiten verwalten“); wer pflegt, sieht alle Seiten.
  * - In der Navigation steht jede Seite als eigener Punkt „seiten/<id>“ (NavigationService), den der Admin in die
  *   Leiste oder ein Untermenü schiebt; gelöschte Seiten fallen dort heraus.
+ * - Inhalt aus Blöcken (Domain\Blocks\Blocks, Spalte blocks): Text, Countdown …, jeder Block für alle oder nur
+ *   Mitglieder. body enthält weiter den Text der Textblöcke für alle (ältere Versionen und Apps).
  * - Speichern mit updated_at (Stand, den die App geladen hat): 409 conflict, wenn jemand dazwischen gespeichert hat
  *   (wie bei den Listen). Reihenfolge per Ziehen (sort).
  */
@@ -49,11 +52,26 @@ final class PageService
         return BoardService::isRecipient($viewer);
     }
 
-    /** Für Bilder der Seite (RichImageService): sieht $viewer die Seite? */
-    public function canSeeImage(?User $viewer, int $pageId): bool
+    /**
+     * Für Bilder der Seite (RichImageService): sieht $viewer die Seite und den Block, in dem das Bild steht? Ein Bild
+     * nur in Blöcken für Mitglieder sehen auch auf einer öffentlichen Seite nur Mitglieder.
+     */
+    public function canSeeImage(?User $viewer, int $pageId, ?string $uid = null): bool
     {
         $page = $this->row($pageId);
-        return $page !== null && $this->canRead($viewer, (string) $page['audience']);
+        if ($page === null || !$this->canRead($viewer, (string) $page['audience'])) {
+            return false;
+        }
+        if ($uid === null || !Blocks::imageOnlyForMembers(Blocks::decode($page['blocks'] ?? null, (string) ($page['body'] ?? '')), $uid)) {
+            return true;
+        }
+        return $this->isMember($viewer);
+    }
+
+    /** Sieht $viewer Blöcke für Mitglieder? (Wer pflegt, sieht alles.) */
+    private function isMember(?User $viewer): bool
+    {
+        return $this->canManage($viewer) || BoardService::isRecipient($viewer);
     }
 
     /** @return list<array<string, mixed>> sichtbare Seiten in ihrer Reihenfolge (ohne Text) */
@@ -83,16 +101,19 @@ final class PageService
             throw ApiError::notFound('Seite nicht gefunden.');
         }
         $body = (string) ($p['body'] ?? '');
+        $manager = $this->canManage($viewer);
+        $blocks = Blocks::decode($p['blocks'] ?? null, $body);
         return [
             'id' => (int) $p['id'],
             'title' => (string) $p['title'],
             'audience' => (string) $p['audience'],
             'body' => $body === '' ? '' : $this->app->richImages()->render($body),
-        ] + ($this->canManage($viewer) ? $this->meta($p) : []);
+            'blocks' => $this->app->blocks()->forViewer($blocks, $viewer, $this->isMember($viewer), $manager),
+        ] + ($manager ? $this->meta($p) : []);
     }
 
     /**
-     * @param array<string, mixed> $in title (Pflicht), body, audience
+     * @param array<string, mixed> $in title (Pflicht), blocks (oder body: ein Textblock), audience
      * @return array<string, mixed>
      */
     public function create(array $in, User $actor): array
@@ -100,16 +121,15 @@ final class PageService
         if (!array_key_exists('title', $in)) {
             throw ApiError::invalid('Bitte einen Titel für die Seite angeben.');
         }
-        $data = $this->validate($in);
-        $body = $data['body'] ?? '';
+        [$data, $blocks] = $this->validate($in);
         $now = $this->app->time()->nowUtc();
         $db = $this->app->db;
-        $id = $db->transaction(function () use ($db, $data, $body, $actor, $now): int {
+        $id = $db->transaction(function () use ($db, $data, $blocks, $actor, $now): int {
             $sort = (int) $db->scalar('SELECT COALESCE(MAX(sort), 0) FROM {app_pages}') + 10;
             $id = $db->insert('app_pages', ['body' => ''] + $data + ['audience' => 'members', 'sort' => $sort, 'updated_by' => $actor->id, 'updated_at' => $now]);
-            // Bilder des Textes gehören danach der Seite (dafür braucht es ihre ID).
-            if ($body !== '') {
-                $db->update('app_pages', ['body' => $this->app->richImages()->claim($actor, $body, RichImageService::OWNER_PAGE, $id)], ['id' => $id]);
+            // Bilder der Textblöcke gehören danach der Seite (dafür braucht es ihre ID).
+            if ($blocks !== null) {
+                $db->update('app_pages', $this->content($blocks, $actor, $id), ['id' => $id]);
             }
             return $id;
         });
@@ -128,10 +148,10 @@ final class PageService
             $by = $page['updated_by'] !== null ? $this->app->users->find((int) $page['updated_by'])?->name : null;
             throw new ApiError(409, 'conflict', ($by ?? 'Jemand') . ' hat die Seite inzwischen geändert. Bitte die Seite neu laden und deine Änderungen noch einmal eintragen.');
         }
-        $data = $this->validate($in);
-        if (isset($data['body'])) {
-            // Bilder, die nicht mehr im Text stehen, werden gelöscht (es gibt keinen Verlauf).
-            $data['body'] = $this->app->richImages()->claim($actor, $data['body'], RichImageService::OWNER_PAGE, $id, true);
+        [$data, $blocks] = $this->validate($in);
+        if ($blocks !== null) {
+            // Bilder, die in keinem Block mehr stehen, werden gelöscht (es gibt keinen Verlauf).
+            $data += $this->content($blocks, $actor, $id);
         }
         $this->app->db->update('app_pages', $data + ['updated_by' => $actor->id, 'updated_at' => $this->app->time()->nowUtc()], ['id' => $id]);
         return $this->get($id, $actor);
@@ -181,8 +201,22 @@ final class PageService
     }
 
     /**
+     * Spalten blocks und body für gespeicherte Blöcke (Bilder gehören danach der Seite).
+     *
+     * @param list<array<string, mixed>> $blocks
+     * @return array{blocks: string, body: string}
+     */
+    private function content(array $blocks, User $actor, int $id): array
+    {
+        return $this->app->blocks()->columns($blocks, $actor, RichImageService::OWNER_PAGE, $id);
+    }
+
+    /**
+     * Geprüfte Spalten (ohne Inhalt) und die Blöcke (null: Inhalt nicht angegeben). blocks hat Vorrang; nur body
+     * (ältere App) ergibt einen Textblock.
+     *
      * @param array<string, mixed> $in
-     * @return array<string, mixed>
+     * @return array{0: array<string, mixed>, 1: list<array<string, mixed>>|null}
      */
     private function validate(array $in): array
     {
@@ -203,17 +237,7 @@ final class PageService
             }
             $data['audience'] = $in['audience'];
         }
-        if (array_key_exists('body', $in)) {
-            if ($in['body'] !== null && !is_string($in['body'])) {
-                throw ApiError::invalid('Ungültiger Text.');
-            }
-            $html = RichText::sanitize((string) $in['body']);
-            $html = RichText::isEmpty($html) ? '' : $html;
-            if (strlen($html) > self::BODY_MAX) {
-                throw ApiError::invalid('Der Text ist zu lang.');
-            }
-            $data['body'] = $html;
-        }
-        return $data;
+        $blocks = $this->app->blocks()->fromInput($in, self::BODY_MAX);
+        return [$data, $blocks];
     }
 }

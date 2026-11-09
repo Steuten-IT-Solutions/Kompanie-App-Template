@@ -173,7 +173,7 @@ export default function Benachrichtigungen({ onToast }: { onToast: (msg: string)
           ? 'Dieses Gerät bekommt Benachrichtigungen zu:'
           : config?.user
             ? 'Lass dich auf diesem Gerät benachrichtigen, wenn es Neues für dich gibt.'
-            : 'Lass dich benachrichtigen, wenn es neue Termine oder Neuigkeiten gibt – ganz ohne Konto.'}
+            : 'Lass dich benachrichtigen, wenn es etwas Neues gibt – ganz ohne Konto.'}
       </p>
       <div className="push-types">
         {status.types.map((t) => (

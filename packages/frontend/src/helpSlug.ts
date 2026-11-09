@@ -89,6 +89,7 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
         {
           bereiche: 'admin-bereiche',
           navigation: 'admin-navigation',
+          rechtliches: 'admin-rechtliches',
           rollen: 'admin-rollen-und-mitglieder',
           zugang: 'admin-zugang',
           benachrichtigungen: 'admin-benachrichtigungen',
@@ -131,6 +132,7 @@ function adminSlug([sub, arg, page]: string[], ctx: HelpContext): string | null 
     'neu-mehrere': 'mitglieder-mehrere-anlegen',
     import: 'mitglieder-import',
     anfragen: 'anfragen-freigeben',
+    meldungen: 'fehlermeldungen-bearbeiten',
   };
   // „Einrichtungen“ sammelt nur Knöpfe der Startseite; ihre Anleitung steht dort.
   if (!sub || sub === 'einrichtungen') return 'verwaltung';

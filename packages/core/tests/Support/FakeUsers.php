@@ -147,6 +147,14 @@ final class FakeUsers implements UserDirectory, AuthContext, Authenticator
         $this->users[$id]['password'] = password_hash($password, PASSWORD_DEFAULT);
     }
 
+    public function setPasswordHash(int $id, string $passwordHash): void
+    {
+        if (password_get_info($passwordHash)['algo'] === null) {
+            throw new \DomainException('Ungültiger Passwort-Hash.');
+        }
+        $this->users[$id]['password'] = $passwordHash;
+    }
+
     public function loginExists(string $login): bool
     {
         foreach ($this->users as $u) {

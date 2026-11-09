@@ -220,22 +220,22 @@ final class RichImageService
      * auch ohne Anmeldung, BoardService::canSeeImage), Bilder in E-Mails alle mit send_mail (MailingService::canSeeImage), Bilder einer
      * Kompanie wie die Liste, Gruppenbilder und Fotos freier Namen der Ämter wie die Ämter (alle auch ohne Anmeldung, s. isPublic).
      *
-     * @param array{owner_type: string, owner_id: int, user_id: int} $img
+     * @param array{owner_type: string, owner_id: int, user_id: int, uid?: string} $img
      */
     public function canView(?User $viewer, array $img): bool
     {
         if ($viewer === null) {
             // Öffentliche Nachrichten am Brett auch ohne Anmeldung, aber nicht als öffentlich zwischengespeichert
             // (isPublic): Sie laufen ab und lassen sich wieder intern stellen.
-            return $img['owner_type'] === self::OWNER_BOARD ? $this->app->board()->canSeeImage(null, $img['owner_id']) : $this->isPublic($img);
+            return $img['owner_type'] === self::OWNER_BOARD ? $this->app->board()->canSeeImage(null, $img['owner_id'], $img['uid'] ?? null) : $this->isPublic($img);
         }
         return match ($img['owner_type']) {
             self::OWNER_COMPANY => $this->companyVisible($viewer),
-            self::OWNER_PAGE => $this->app->pages()->canSeeImage($viewer, $img['owner_id']),
-            self::OWNER_NEWS => $this->app->newsService()->canSeeImage($viewer, $img['owner_id']),
+            self::OWNER_PAGE => $this->app->pages()->canSeeImage($viewer, $img['owner_id'], $img['uid'] ?? null),
+            self::OWNER_NEWS => $this->app->newsService()->canSeeImage($viewer, $img['owner_id'], $img['uid'] ?? null),
             self::OWNER_OFFICE_GROUP_TERM, self::OWNER_OFFICE_HOLDER => $this->officesVisible($viewer),
             self::OWNER_DRAFT, self::OWNER_SIGNATURE => $viewer->id === $img['owner_id'],
-            self::OWNER_BOARD => $this->app->board()->canSeeImage($viewer, $img['owner_id']),
+            self::OWNER_BOARD => $this->app->board()->canSeeImage($viewer, $img['owner_id'], $img['uid'] ?? null),
             self::OWNER_MAIL => $this->app->mailings()->canSeeImage($viewer, $img['owner_id']),
             default => false,
         };
@@ -244,14 +244,14 @@ final class RichImageService
     /**
      * Sieht man das Bild ohne Anmeldung (Rechte der Rolle guest)? Nur bei öffentlichen Besitzern.
      *
-     * @param array{owner_type: string, owner_id: int, user_id: int} $img
+     * @param array{owner_type: string, owner_id: int, user_id: int, uid?: string} $img
      */
     public function isPublic(array $img): bool
     {
         return match ($img['owner_type']) {
             self::OWNER_COMPANY => $this->companyVisible($this->app->anonymous()),
-            self::OWNER_PAGE => $this->app->pages()->canSeeImage(null, $img['owner_id']),
-            self::OWNER_NEWS => $this->app->newsService()->canSeeImage(null, $img['owner_id']),
+            self::OWNER_PAGE => $this->app->pages()->canSeeImage(null, $img['owner_id'], $img['uid'] ?? null),
+            self::OWNER_NEWS => $this->app->newsService()->canSeeImage(null, $img['owner_id'], $img['uid'] ?? null),
             self::OWNER_OFFICE_GROUP_TERM, self::OWNER_OFFICE_HOLDER => $this->officesVisible($this->app->anonymous()),
             default => false,
         };

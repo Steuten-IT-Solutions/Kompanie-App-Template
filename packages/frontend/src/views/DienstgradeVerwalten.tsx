@@ -10,6 +10,7 @@ import { RankHistory } from './Dienstgrad';
 import { isDue } from '../promotionCheck';
 import { notePromotions } from '../promotionsDue';
 import { sources } from '../viewData';
+import { confirmAsk } from '../ask';
 
 const rank = brand.labels.rank;
 const sec = brand.labels.sections;
@@ -169,13 +170,6 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <div>
-      <p className="muted small">
-        Vom niedrigsten zum höchsten {rank}.{' '}
-        {points
-          ? `Mit ${sec.points}schwelle: befördern erst ab der Schwelle, degradieren jederzeit. Ohne Schwelle frei.`
-          : `Befördern und degradieren geht frei; mit dem Bereich ${sec.points} kommen ${sec.points}schwellen dazu.`}
-        {list.length > 1 && ` Zum Umsortieren einen ${rank} am Griff links ziehen; die Schwellen müssen mit der Reihenfolge steigen.`}
-      </p>
       {missing && (
         <p className="small">
           Noch nicht alle {sec.ranks} haben eine {sec.points}schwelle; für diese gelten keine Regeln zu {sec.points}.
@@ -233,7 +227,7 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
                       <button
                         className="btn btn-small btn-danger"
                         disabled={busy}
-                        onClick={() => window.confirm(`„${r.title}“ löschen?`) && run(() => api.deleteRank(r.id), 'Gelöscht')}
+                        onClick={async () => (await confirmAsk(`„${r.title}“ löschen?`)) && run(() => api.deleteRank(r.id), 'Gelöscht')}
                       >
                         Löschen
                       </button>
@@ -250,8 +244,8 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
                           <button
                             className="btn btn-small btn-danger"
                             disabled={busy}
-                            onClick={() =>
-                              window.confirm(`Abzeichen von „${r.title}“ entfernen?`) &&
+                            onClick={async () =>
+                              (await confirmAsk(`Abzeichen von „${r.title}“ entfernen?`)) &&
                               run(() => api.removeRankBadge(r.id), 'Abzeichen entfernt')
                             }
                           >
@@ -285,10 +279,6 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
         aria-label="Abzeichen-Datei"
         onChange={(e) => uploadBadge(e.target.files?.[0] ?? null)}
       />
-      <p className="muted small">
-        Abzeichen: PNG, JPG, WebP oder SVG, höchstens 1 MB. Am besten mit transparentem Hintergrund, der hell wie dunkel wirkt (siehe
-        Vorschau).
-      </p>
 
       <form className="form card" onSubmit={add}>
         <h3>Neuer {rank}</h3>

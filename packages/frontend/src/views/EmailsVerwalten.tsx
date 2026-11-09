@@ -16,6 +16,7 @@ import { formatShortTime } from '../format';
 import RichTextView from '../richtext/RichTextView';
 import { navigate } from '../router';
 import { ErrorBox, Loading } from '../ui';
+import { confirmAsk } from '../ask';
 
 /** Entwurf der E-Mail (auf diesem Gerät): geht beim Sprung zur Signatur-Einrichtung und beim Verlassen nicht verloren. */
 const DRAFT_KEY = 'kompanie-mail-draft';
@@ -361,7 +362,7 @@ function Compose({ options, onSent, onToast }: { options: MailOptions; onSent: (
       ];
       if (draft.attachments.length > 0) lines.push(`Anhänge: ${draft.attachments.map((a) => a.name).join(', ')}`);
       if (p.skipped.length > 0) lines.push('', `Ohne Mailadresse (bekommen nichts): ${p.skipped.join(', ')}`);
-      if (!window.confirm(lines.join('\n'))) return;
+      if (!(await confirmAsk(lines.join('\n')))) return;
       await api.sendMail({ subject: draft.subject, text: draft.text, attachments: draft.attachments.map((a) => a.uid), ...selection });
       saveDraft(null);
       setDraft(emptyDraft());
@@ -392,10 +393,6 @@ function Compose({ options, onSent, onToast }: { options: MailOptions; onSent: (
           Cc und Bcc hinzufügen
         </button>
       )}
-      <p className="muted small">
-        Alle Empfänger in An und Cc sehen sich gegenseitig, wie in einem Mailprogramm. Wer in Bcc steht, ist für niemanden sichtbar; für
-        große Gruppen deshalb besser Bcc verwenden. Jede Adresse bekommt die Mail nur einmal.
-      </p>
       <label className="field">
         <span>Betreff</span>
         <input
@@ -616,10 +613,6 @@ function Groups({ onToast }: { onToast: (msg: string) => void }) {
     <div className="mail-groups">
       {back}
       <h2 className="board-page-title">Mailgruppen</h2>
-      <p className="muted small">
-        Gruppen lassen sich beim Schreiben wie Rollen auswählen. Wer dazugehört, ermittelt die App erst beim Senden; ausgeschiedene
-        Mitglieder (Ehemalige) bekommen nie eine Mail.
-      </p>
       <ul className="card-list">
         {options.groups.map((g) => (
           <li key={g.key} className="card row mail-group-item">
@@ -650,8 +643,8 @@ function Groups({ onToast }: { onToast: (msg: string) => void }) {
                   <button
                     className="btn btn-small btn-danger"
                     disabled={busy}
-                    onClick={() =>
-                      window.confirm(`Mailgruppe „${g.label}“ löschen?`) && void run(() => api.deleteMailGroup(g.key), 'Gelöscht')
+                    onClick={async () =>
+                      (await confirmAsk(`Mailgruppe „${g.label}“ löschen?`)) && void run(() => api.deleteMailGroup(g.key), 'Gelöscht')
                     }
                   >
                     Löschen

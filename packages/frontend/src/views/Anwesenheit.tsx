@@ -14,6 +14,7 @@ import brand from '../generated/brand';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { prefetchOnTap, sources } from '../viewData';
+import { confirmAsk } from '../ask';
 
 const sec = brand.labels.sections;
 const STATUSES: AttendanceStatus[] = ['present', 'excused', 'absent'];
@@ -67,7 +68,7 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
           {typeof events === 'string' ? (
             <ErrorBox message={events} onRetry={reload} />
           ) : events.length === 0 ? (
-            <Empty>Keine Termine in den letzten 90 Tagen.</Empty>
+            <Empty>In den letzten 90 Tagen stand nichts an.</Empty>
           ) : (
             <>
               <ul className="card-list attendance-events">
@@ -107,7 +108,7 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
 
       <form className="form card free-event" onSubmit={createFree}>
         <h3>Freier Termin</h3>
-        <p className="muted small">Für Termine, die nicht im Kalender stehen, z. B. einen spontanen Arbeitsdienst.</p>
+        <p className="muted small">Für Anlässe, die nicht im Kalender stehen, z. B. einen spontanen Arbeitsdienst.</p>
         <div className="field-row">
           <label className="field">
             <span>Titel</span>
@@ -218,7 +219,7 @@ function Editor({
   }
 
   async function remove() {
-    if (!window.confirm(`Anwesenheitsliste „${list.title}“ wirklich löschen? Gebuchte ${sec.points} bleiben erhalten.`)) return;
+    if (!(await confirmAsk(`Anwesenheitsliste „${list.title}“ wirklich löschen? Gebuchte ${sec.points} bleiben erhalten.`))) return;
     setBusy(true);
     try {
       await api.deleteAttendance(list.id);

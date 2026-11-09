@@ -17,7 +17,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Kompanieliste (Issue #280): Liste für alle mit view_companies, Pflege und Zuordnung mit manage_companies, Mitglieder
- * nur mit view_directory, Logo, keine Verknüpfung mit Ämtern, Löschen der Person, Sicherung.
+ * nur mit Bereich Mitgliederliste und view_directory, Logo, keine Verknüpfung mit Ämtern, Löschen der Person, Sicherung.
  */
 final class CompanyTest extends TestCase
 {
@@ -147,13 +147,12 @@ final class CompanyTest extends TestCase
         $this->assertArrayNotHasKey('members', $anon, 'ohne view_directory keine Namen');
         $this->assertArrayNotHasKey('member_count', $anon);
 
-        // Auch ohne Bereich Mitgliederliste (z. B. Bruderschaft): Namen für alle mit view_directory, auch Gäste
+        // Gast mit view_directory sieht die Namen, wenn der Bereich Mitgliederliste an ist
         $this->users->current = $this->admin;
         $this->app->roles()->update(Roles::GUEST, ['capabilities' => ['view_news', 'view_companies', 'view_directory']]);
-        $this->app->features()->update(['directory' => false]);
         $this->users->current = null;
         $list = array_column($this->call('GET', '/companies')->data, null, 'id');
-        $this->assertSame(['Admin', 'Anna'], array_column($list[$a]['members'], 'name'), 'Gast mit view_directory, ohne Mitgliederliste');
+        $this->assertSame(['Admin', 'Anna'], array_column($list[$a]['members'], 'name'), 'Gast mit view_directory');
         // Wie in der Mitgliederliste (Foto, Titel, Dienstgrad), aber ohne Geburtstag, Eintritt und Kompanien
         $keys = array_keys($list[$a]['members'][0]);
         foreach (['id', 'name', 'photo_url'] as $key) {
@@ -162,7 +161,17 @@ final class CompanyTest extends TestCase
         foreach (['birthday', 'join_year', 'join_date', 'companies', 'email', 'phone'] as $key) {
             $this->assertNotContains($key, $keys);
         }
+
+        // Bereich Mitgliederliste aus: keine Mitglieder auf den Kompanieseiten, auch nicht mit view_directory
         $this->users->current = $this->admin;
+        $this->app->features()->update(['directory' => false]);
+        foreach ([null, $this->member, $this->admin] as $viewer) {
+            $this->users->current = $viewer;
+            $list = array_column($this->call('GET', '/companies')->data, null, 'id');
+            $this->assertArrayNotHasKey('members', $list[$a], 'ohne Bereich Mitgliederliste keine Namen');
+            $this->assertArrayNotHasKey('member_count', $list[$a]);
+        }
+        $this->assertSame([$this->admin, $this->member], $list[$a]['member_ids'], 'Zuordnung bleibt, Verwaltung sieht sie');
         $this->app->features()->update(['directory' => true]);
 
         // Personen löschen: Zuordnung weg

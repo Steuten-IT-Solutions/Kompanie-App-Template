@@ -7,6 +7,7 @@ import { useDragSort, useSaveQueue } from '../dragSort';
 import brand from '../generated/brand';
 import { PUBLIC_PREVIEW, startPreview } from '../preview';
 import { ErrorBox, Loading, useAsync } from '../ui';
+import { confirmAsk } from '../ask';
 
 const sec = brand.labels.sections;
 
@@ -69,13 +70,6 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
   return (
     <section className="card settings-section" id="einstellungen-rollen">
       <h3>Rollen</h3>
-      <p className="small muted">
-        Jede Person hat eine Grundrolle und auf Wunsch weitere eigene Rollen als Zusatzrollen; sie hat dann die Rechte aller ihrer Rollen
-        zusammen. Hier legst du fest, welche Rollen es gibt und was sie dürfen. Die Reihenfolge gilt überall, wo Rollen stehen, auch in den
-        Zählern; zum Ändern eine Rolle am Griff links ziehen.{' '}
-        {config?.features.points &&
-          `Der ${sec.points}faktor gilt beim Buchen, z. B. ×0,5 für junge Mitglieder; bei mehreren Rollen der kleinste.`}
-      </p>
       <nav className="segmented role-views" aria-label="Ansicht">
         {(
           [
@@ -158,10 +152,6 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
             </button>
           )}
           <div className="role-preview">
-            <p className="small muted">
-              „Ansehen“ zeigt die App, wie eine Person mit genau dieser Rolle sie sieht (ohne Zusatzrollen) – mit deinen eigenen Daten, nur
-              zum Ansehen. Beenden über das Banner oben.
-            </p>
             <button type="button" className="btn btn-secondary btn-block" onClick={() => startPreview(PUBLIC_PREVIEW)}>
               App ohne Anmeldung ansehen
             </button>
@@ -209,9 +199,6 @@ function AttendanceGroups({ roles, onToast }: { roles: RoleAdmin[]; onToast: (ms
   return (
     <form className="form attendance-group-form" onSubmit={save}>
       <h4>{sec.attendance}: Gruppen im Zähler</h4>
-      <p className="small muted">
-        Als was zählt jede Rolle in den Listen? „Eigene Gruppe“ zeigt sie gesondert, sonst zählt sie bei der gewählten Rolle mit.
-      </p>
       {groups.map((g) => (
         <label key={g.key} className="field field-inline">
           <span>{g.label}</span>
@@ -310,13 +297,13 @@ function RoleForm({
     void run(() => (role ? api.updateRole(role.key, data) : api.createRole(data)), role ? 'Rolle gespeichert' : 'Rolle angelegt');
   }
 
-  function remove() {
+  async function remove() {
     if (!role) return;
     const others =
       role.users > 0
         ? ` Die ${role.users === 1 ? 'Person bekommt' : `${role.users} Personen bekommen`} stattdessen die Rolle „${roles.find((r) => r.key === replacement)?.label}“.`
         : '';
-    if (!window.confirm(`Rolle „${role.label}“ löschen?${others}`)) return;
+    if (!(await confirmAsk(`Rolle „${role.label}“ löschen?${others}`))) return;
     void run(() => api.deleteRole(role.key, role.users > 0 ? replacement : undefined), 'Rolle gelöscht');
   }
 
@@ -331,15 +318,22 @@ function RoleForm({
           {admin
             ? 'Admins dürfen alles; die Rechte lassen sich nicht ändern.'
             : key === 'member'
-              ? 'Rolle neuer Konten; gehört immer zur Kompanie. Einstellen lässt sich, was Mitglieder sehen; Rechte zum Verwalten bekommen sie über eigene Rollen.'
-              : 'Gilt für Gäste und für alle, die die App ohne Anmeldung öffnen. Einstellen lässt sich, was sie sehen.'}
+              ? 'Rolle neuer Konten; gehört immer zur Kompanie. Was du hier anhakst, bekommt jedes Mitglied, auch Rechte zum Verwalten.'
+              : 'Gilt für Gäste und für alle, die die App ohne Anmeldung öffnen. Gäste gehören nie zur Kompanie.'}
         </p>
       )}
-      {key === 'guest' && (capabilities.has('view_documents') || capabilities.has('view_birthdays') || capabilities.has('view_board')) && (
+      {key === 'guest' && [...capabilities].some((c) => !isView(c)) && (
         <p className="small rights-warning" role="note">
-          Achtung: Was Gast sieht, sieht jeder, der die App öffnet – auch ohne Konto.
+          Achtung: Was Gast darf, darf jeder, der die App öffnet – auch ohne Konto, z. B. Inhalte ändern oder löschen.
         </p>
       )}
+      {key === 'guest' &&
+        [...capabilities].every((c) => isView(c)) &&
+        (capabilities.has('view_documents') || capabilities.has('view_birthdays') || capabilities.has('view_board')) && (
+          <p className="small rights-warning" role="note">
+            Achtung: Was Gast sieht, sieht jeder, der die App öffnet – auch ohne Konto.
+          </p>
+        )}
       <RightsTree
         legend="Rechte"
         isOn={(c) => admin || capabilities.has(c)}
@@ -351,7 +345,7 @@ function RoleForm({
           <legend className="field-label">Konten</legend>
           <label className="toggle feature-toggle">
             <input type="checkbox" checked={newAccounts} onChange={(e) => setNewAccounts(e.target.checked)} />
-            <span>Beim Anlegen neuer Konten wählbar (sonst sind neue Konten {levelLabel('member')})</span>
+            <span>Beim Anlegen neuer Konten wählbar (auch für alle, die nur Mitglieder anlegen dürfen)</span>
           </label>
           <label className="toggle feature-toggle">
             <input

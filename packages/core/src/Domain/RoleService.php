@@ -306,12 +306,13 @@ final class RoleService
      * 400, wenn ein Recht seine Voraussetzung nicht hat (Capability::requires).
      *
      * @param string[] $values
+     * @param bool $withoutMember Voraussetzung „Mitglied der Kompanie“ nicht prüfen (Gast gehört nie zur Kompanie)
      */
-    private static function checkRequired(array $values): void
+    private static function checkRequired(array $values, bool $withoutMember = false): void
     {
         foreach ($values as $v) {
             $needed = Capability::from($v)->requires();
-            if ($needed !== null && !in_array($needed->value, $values, true)) {
+            if ($needed !== null && !($withoutMember && $needed === Capability::Member) && !in_array($needed->value, $values, true)) {
                 throw self::missingRequired($needed);
             }
         }
@@ -597,18 +598,21 @@ final class RoleService
 
     /**
      * Für /config: Schlüssel, Bezeichnung, Punktefaktor (die Bezeichnungen braucht die App überall), ob die Rolle als
-     * Zusatzrolle taugt (Issue #66), ob neue Konten sie bekommen können und ob sie sich zum Mitglied machen lässt.
+     * Zusatzrolle taugt (Issue #66), ob sie zur Kompanie gehört (dann gibt es Zusatzrollen zu ihr), ob neue Konten sie
+     * bekommen können und ob sie sich zum Mitglied machen lässt.
      *
-     * @return array<int, array{key: string, label: string, points_factor: float, extra: bool, new_accounts: bool, promotable: bool}>
+     * @return array<int, array{key: string, label: string, points_factor: float, extra: bool, company: bool, new_accounts: bool, promotable: bool}>
      */
     public function publicList(): array
     {
         return array_values(array_map(
-            static fn (array $r): array => [
+            fn (array $r): array => [
                 'key' => $r['key'],
                 'label' => $r['label'],
                 'points_factor' => $r['points_factor'],
                 'extra' => self::canBeExtra($r['key']),
+                // Gehört zur Kompanie (Mitgliederbereich, nicht Admin): nur dazu gibt es Zusatzrollen
+                'company' => $this->allowsExtraRoles($r['key']),
                 'new_accounts' => $r['key'] === Roles::MEMBER || $r['new_accounts'],
                 'promotable' => $r['promotable'],
             ],
@@ -1024,18 +1028,62 @@ final class RoleService
     }
 
     /**
-     * Rollen, die $actor neuen Konten geben darf (Mitglieder anlegen): Mitglied und die eigenen Rollen, die der Admin
-     * dafür freigegeben hat. Wer kein Admin ist, nur solche mit höchstens dem Mitgliederbereich bzw. dem Kalender oder
-     * mit Rechten, die er selbst weitergeben darf (canHandle): Konten anlegen soll keine weiteren Rechte verschaffen.
+     * Rollen, die $actor neuen Konten geben darf (Mitglieder anlegen, einzeln, mehrere, Import, Anfragen freigeben):
+     * - Mitglied immer (die Rolle neuer Konten, ihre Rechte legt der Admin fest).
+     * - Die eigenen Rollen, die der Admin dafür freigegeben hat (new_accounts, z. B. Anwärter). Wer kein Admin ist, nur
+     *   solche mit höchstens Rechten zum Sehen oder mit Rechten, die er selbst weitergeben darf (canHandle): Konten
+     *   anlegen soll keine weiteren Rechte verschaffen.
+     * - Jede andere Rolle, die $actor der Person gleich danach auch über „Rollen vergeben“ geben dürfte (promote_users
+     *   und canHandle): Anlegen mit Rolle ist dann nur ein Schritt statt zwei. Admin nur, wenn $actor Admin ist und die
+     *   App Admins ernennen kann (eigenständige Version; bei WordPress im WP-Backend).
      */
     public function canCreateAs(User $actor, string $key): bool
     {
         $role = $this->find($key);
-        if ($role === null || ($key !== Roles::MEMBER && !$role['new_accounts'])) {
+        if ($role === null) {
             return false;
         }
-        $basic = array_filter($this->capabilities($key), static fn (Capability $c): bool => !$c->isView() && $c !== Capability::Member) === [];
-        return $actor->isAdmin() || $basic || $this->canHandle($actor, $key);
+        if ($key === Roles::ADMIN) {
+            return $actor->isAdmin() && $this->users->canAssignAdmin();
+        }
+        // Mitglied ist die Rolle jedes neuen Kontos (auch ohne Wahl, MemberService::prepare); welche Rechte sie hat,
+        // legt der Admin für alle neuen Konten fest.
+        if ($key === Roles::MEMBER) {
+            return true;
+        }
+        if ($role['new_accounts']) {
+            $basic = array_filter($this->capabilities($key), static fn (Capability $c): bool => !$c->isView() && $c !== Capability::Member) === [];
+            if ($actor->isAdmin() || $basic || $this->canHandle($actor, $key)) {
+                return true;
+            }
+        }
+        return $actor->can(Capability::PromoteUsers) && $this->canHandle($actor, $key);
+    }
+
+    /**
+     * Schlüssel der Rollen, die $actor neuen Konten geben darf (canCreateAs), in der Reihenfolge der Rollen; für die
+     * Auswahl beim Anlegen.
+     *
+     * @return list<string>
+     */
+    public function creatableRoles(User $actor): array
+    {
+        return array_values(array_filter(array_keys($this->all()), fn (string $key): bool => $this->canCreateAs($actor, $key)));
+    }
+
+    /**
+     * Schlüssel der Rollen, die $actor neuen Konten als Zusatzrolle geben darf (Issue #66): eigene Rollen, die er auch
+     * über „Rollen vergeben“ vergeben dürfte (promote_users und canHandle). Ob die Grundrolle Zusatzrollen zulässt,
+     * sagt allowsExtraRoles (in /config: roles[].company).
+     *
+     * @return list<string>
+     */
+    public function creatableExtraRoles(User $actor): array
+    {
+        if (!$actor->can(Capability::PromoteUsers)) {
+            return [];
+        }
+        return array_values(array_filter(array_keys($this->all()), fn (string $key): bool => self::canBeExtra($key) && $this->canHandle($actor, $key)));
     }
 
     /** Lässt sich die Rolle von denen mit „Mitglieder anlegen“ zum Mitglied machen (z. B. Anwärter, Issue #23)? */
@@ -1240,8 +1288,8 @@ final class RoleService
     }
 
     /**
-     * Gespeicherte Rechte einer festen Rolle: Admin keine (er hat ohnehin alle), Gast nur Rechte zum Sehen ohne
-     * Voraussetzung, Mitglied immer member und sonst nur Rechte zum Sehen.
+     * Gespeicherte Rechte einer festen Rolle: Admin keine (er hat ohnehin alle), Gast jedes vergebbare Recht außer
+     * member, Mitglied immer member und dazu jedes vergebbare Recht.
      *
      * @param string[] $caps
      * @return string[]
@@ -1251,7 +1299,7 @@ final class RoleService
         if ($key === Roles::ADMIN) {
             return [];
         }
-        $out = array_filter(Roles::from($caps), static fn (Capability $c): bool => $c->isView() && ($key === Roles::MEMBER || $c->requires() === null));
+        $out = array_filter(Roles::from($caps), static fn (Capability $c): bool => in_array($c, Roles::GRANTABLE, true) && ($key === Roles::MEMBER || $c !== Capability::Member));
         return self::ordered([...self::values($out), ...($key === Roles::MEMBER ? [Capability::Member->value] : [])]);
     }
 
@@ -1280,13 +1328,10 @@ final class RoleService
             if ($system === Roles::MEMBER && !isset($out[Capability::Member->value])) {
                 throw ApiError::invalid('Mitglieder gehören immer zur Kompanie.');
             }
-            foreach ($out as $c) {
-                if ($c !== Capability::Member->value && !Capability::from($c)->isView()) {
-                    throw ApiError::invalid('Gast und Mitglied haben nur Rechte zum Sehen; zum Verwalten bitte eine eigene Rolle anlegen.');
-                }
-            }
         }
-        self::checkRequired(array_keys($out));
+        // Gast gehört nie zur Kompanie: Bei ihm entfällt die Voraussetzung „Mitglied der Kompanie“ (Entscheidung vom
+        // 08.11.2026: keine Sperren für Rechte einer Rolle).
+        self::checkRequired(array_keys($out), $system === Roles::GUEST);
         return self::ordered(array_keys($out));
     }
 

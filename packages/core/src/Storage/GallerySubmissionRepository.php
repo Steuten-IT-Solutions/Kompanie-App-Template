@@ -52,12 +52,18 @@ final class GallerySubmissionRepository
         ));
     }
 
-    /** @return list<array<string, mixed>> Einreichungen mit diesem Status, mit Vorschau; offene älteste zuerst, sonst neueste */
+    /**
+     * Einreichungen mit diesem Status, mit Vorschau; offene älteste zuerst, sonst neueste. photo_is_intern: ob das
+     * Bild in der Galerie intern ist (NULL ohne Bild).
+     *
+     * @return list<array<string, mixed>>
+     */
     public function withStatus(string $status, int $limit = 200): array
     {
         $order = $status === self::PENDING ? 'ASC' : 'DESC';
         return array_values($this->db->select(
-            'SELECT s.*, a.title AS album_title, a.year AS album_year FROM {gallery_submissions} s LEFT JOIN {albums} a ON a.id = s.album_id
+            'SELECT s.*, a.title AS album_title, a.year AS album_year, p.is_intern AS photo_is_intern FROM {gallery_submissions} s
+             LEFT JOIN {albums} a ON a.id = s.album_id LEFT JOIN {photos} p ON p.id = s.photo_id
              WHERE s.status = ? ORDER BY s.id ' . $order . ' LIMIT ' . $limit,
             [$status],
         ));

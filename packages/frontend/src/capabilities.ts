@@ -38,7 +38,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
       { key: 'view_gallery', label: `${sec.gallery}: öffentliche Alben`, short: sec.gallery, features: ['gallery'] },
       { key: 'view_companies', label: sec.companies, short: sec.companies, features: ['companies'] },
       { key: 'view_sponsors', label: sec.sponsors, short: sec.sponsors, features: ['sponsors'] },
-      { key: 'view_intern', label: '„Intern“: die Knöpfe unter „Intern“ gesammelt unter einem Knopf', short: 'Intern' },
+      { key: 'view_intern', label: `„${sec.intern}“: die Knöpfe darunter gesammelt unter einem Knopf`, short: sec.intern },
     ],
   },
   {
@@ -73,8 +73,8 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
   },
   {
     key: 'intern',
-    label: 'Intern',
-    hint: 'Je Knopf unter „Intern“ (in der Standardnavigation; ohne „Intern“ stehen Mitglieder und Dokumente unten als eigene Knöpfe).',
+    label: sec.intern,
+    hint: `Je Knopf unter „${sec.intern}“ (in der Standardnavigation; ohne „${sec.intern}“ stehen ${sec.directory} und ${sec.documents} unten als eigene Knöpfe).`,
     items: [
       { key: 'view_directory', label: sec.directory, short: sec.directory, features: ['directory'] },
       { key: 'view_offices', label: sec.offices, short: sec.offices, features: ['offices'] },
@@ -82,7 +82,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
       { key: 'view_documents', label: sec.documents, short: sec.documents, features: ['documents'] },
       { key: 'view_board', label: `${sec.board} lesen`, short: sec.board, features: ['board'] },
       { key: 'view_ranks', label: sec.ranks, short: sec.ranks, features: ['ranks'] },
-      { key: 'view_catalog', label: `${sec.points}katalog`, short: `${sec.points}katalog`, features: ['points'] },
+      { key: 'view_catalog', label: sec.catalog, short: sec.catalog, features: ['points'] },
     ],
   },
   {
@@ -130,8 +130,8 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
       },
       {
         key: 'submit_gallery',
-        label: `${sec.gallery}: Bilder einreichen, eigene Einreichungen sehen und zurückziehen`,
-        short: 'Bilder einreichen',
+        label: `${sec.gallery}: Bilder und Videos einreichen, eigene Einreichungen sehen und zurückziehen`,
+        short: 'Bilder und Videos einreichen',
         features: ['gallery'],
       },
       {
@@ -205,6 +205,11 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         key: 'promote_users',
         label: 'Rollen vergeben (nur Rollen mit eigenen Rechten, ohne diese beiden Rechte)',
         short: 'Rollen vergeben',
+      },
+      {
+        key: 'review_reports',
+        label: 'Fehlermeldungen der Mitglieder sehen, mit Begründung schließen oder an die Betreuer der App weiterleiten',
+        short: 'Fehlermeldungen bearbeiten',
       },
     ],
   },

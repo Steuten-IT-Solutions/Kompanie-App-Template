@@ -244,6 +244,25 @@ final class WpUsers implements UserDirectory, AuthContext
         clean_user_cache($id);
     }
 
+    /** Wie setPassword(), mit dem Hash aus einer freigegebenen Selbstregistrierung (wie createWithPasswordHash). */
+    public function setPasswordHash(int $id, string $passwordHash): void
+    {
+        global $wpdb;
+        if (password_get_info($passwordHash)['algo'] === null) {
+            throw new \DomainException('Ungültiger Passwort-Hash.');
+        }
+        $actor = get_current_user_id();
+        if ($actor !== 0 && $actor !== $id) {
+            $may = $this->needsWpRight($id) ? current_user_can('edit_user', $id) : $this->actorMay('edit_user', $id, Capability::CreateUsers);
+            if (!$may || $this->find($id) === null) {
+                throw new \DomainException('Das Passwort dieses Benutzers darfst du in WordPress nicht ändern.');
+            }
+        }
+        $wpdb->update($wpdb->users, ['user_pass' => $passwordHash, 'user_activation_key' => ''], ['ID' => $id]);
+        \WP_Session_Tokens::get_instance($id)->destroy_all();
+        clean_user_cache($id);
+    }
+
     public function loginExists(string $login): bool
     {
         return (bool) username_exists($login);

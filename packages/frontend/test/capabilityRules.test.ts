@@ -48,19 +48,25 @@ test('Haken einer Gruppe: alle, einige, keine', () => {
   );
 });
 
-test('Gast: nur Rechte zum Sehen ohne Voraussetzung, nie Mitglied', () => {
+test('Gast: jedes Recht außer Mitglied, ohne die Voraussetzung Mitglied', () => {
   assert.equal(lockedFor('guest', true, 'view_documents'), false);
   assert.equal(lockedFor('guest', true, 'member'), true);
-  assert.equal(lockedFor('guest', true, 'view_own_points'), true);
-  assert.equal(lockedFor('guest', true, 'manage_events'), true);
-  // Eigene Punkte brächten member mit: Das kommt bei Gast nicht dazu.
-  assert.deepEqual(orderedCaps(toggleForRole('guest', true, set(), ['view_own_points', 'view_news'], true)), ['view_news']);
+  assert.equal(lockedFor('guest', true, 'view_own_points'), false);
+  assert.equal(lockedFor('guest', true, 'manage_events'), false);
+  assert.equal(lockedFor('guest', true, 'submit_gallery'), false);
+  // Einreichen brächte member mit: Das kommt bei Gast nicht dazu, das Recht bleibt.
+  assert.deepEqual(orderedCaps(toggleForRole('guest', true, set(), ['submit_gallery', 'view_news'], true)), [
+    'view_news',
+    'submit_gallery',
+  ]);
 });
 
-test('Mitglied gehört immer zur Kompanie und hat nur Rechte zum Sehen; Admin alles gesperrt', () => {
+test('Mitglied gehört immer zur Kompanie und kann jedes Recht bekommen; Admin alles gesperrt', () => {
   assert.equal(lockedFor('member', true, 'member'), true);
   assert.equal(lockedFor('member', true, 'view_own_points'), false);
-  assert.equal(lockedFor('member', true, 'manage_points'), true);
+  assert.equal(lockedFor('member', true, 'manage_points'), false);
+  assert.equal(lockedFor('member', true, 'submit_gallery'), false);
+  assert.deepEqual(orderedCaps(toggleForRole('member', true, set('member'), ['submit_gallery'], true)), ['member', 'submit_gallery']);
   assert.equal(lockedFor('admin', true, 'view_news'), true);
   assert.equal(lockedFor('r1', false, 'manage_points'), false, 'eigene Rollen: alles');
   assert.deepEqual(orderedCaps(toggleForRole('member', true, set('member', 'view_catalog'), ['view_catalog'], false)), ['member']);

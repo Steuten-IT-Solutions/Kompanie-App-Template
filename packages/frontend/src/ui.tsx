@@ -1,4 +1,17 @@
-import { Component, lazy, useCallback, useEffect, useId, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
+import {
+  Component,
+  lazy,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type Ref,
+} from 'react';
 import { createPortal } from 'react-dom';
 import type { MemberSummary, PersonName } from './api';
 import { cacheKey as keyOf, DATA_UPDATED, dataCache, pendingPrefetch, takeFresh } from './dataCache';
@@ -217,11 +230,31 @@ export function FoldSection({
  * Fenster über der Seite (auf dem Handy von unten, am Computer mittig) mit Überschrift und ✕. Schließen mit ✕, Escape
  * oder Tippen daneben. Im body, damit Wischen auf der Seite darunter nicht greift (swipe.ts) und nichts die Optik erbt.
  */
-export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Sheet({
+  title,
+  onClose,
+  children,
+  top = false,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+  /** Über allem anderen, auch über der vergrößerten Bildansicht (Rückfragen, ask.tsx). */
+  top?: boolean;
+}) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+  // Aktuelles onClose ohne neuen Effekt: Sonst sprang der Fokus bei jedem Neuzeichnen (z. B. Tippen) auf „Schließen“.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
     closeRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      // Liegen zwei Fenster übereinander (z. B. eine Rückfrage aus einem Fenster heraus), schließt Esc nur das obere.
+      const all = document.querySelectorAll('.sheet-backdrop, .lightbox');
+      if (all[all.length - 1] === backdropRef.current) onCloseRef.current();
+    };
     document.addEventListener('keydown', onKey);
     const overflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -234,9 +267,13 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
       document.body.style.overflow = overflow;
       root.overscrollBehaviorX = overscroll;
     };
-  }, [onClose]);
+  }, []);
   return createPortal(
-    <div className="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      ref={backdropRef}
+      className={top ? 'sheet-backdrop sheet-top' : 'sheet-backdrop'}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div className="sheet" role="dialog" aria-modal="true" aria-label={title}>
         <div className="sheet-head">
           <h2 className="sheet-title">{title}</h2>
@@ -684,5 +721,52 @@ function ContactField({
       </label>
       {left && problem ? <p className="field-note form-error">{problem}</p> : note}
     </div>
+  );
+}
+
+/**
+ * Datei-Auswahl mit eigenem Knopf „Datei auswählen“ und dem Namen der gewählten Datei. Das eingebaute Feld des Browsers
+ * beschriftet sich in der Sprache des Browsers („Choose File“) und sieht je Gerät anders aus; es bleibt hier unsichtbar
+ * und erledigt nur die Auswahl (auch `required`, `accept`, `multiple`).
+ */
+export function FileInput({
+  inputRef,
+  ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'className'> & { inputRef?: Ref<HTMLInputElement> }) {
+  const own = useRef<HTMLInputElement | null>(null);
+  const [, changed] = useState(0);
+  // Aus dem Feld selbst gelesen: Leert die Ansicht es (value = ''), zeigt die nächste Darstellung wieder „Keine Datei“.
+  const names = Array.from(own.current?.files ?? []).map((f) => f.name);
+  const setRef = (el: HTMLInputElement | null) => {
+    own.current = el;
+    if (typeof inputRef === 'function') inputRef(el);
+    else if (inputRef) (inputRef as { current: HTMLInputElement | null }).current = el;
+  };
+  return (
+    <span className="file-input">
+      <input
+        {...props}
+        ref={setRef}
+        type="file"
+        className="visually-hidden"
+        tabIndex={-1}
+        onChange={(e) => {
+          changed((n) => n + 1);
+          props.onChange?.(e);
+        }}
+      />
+      <button type="button" className="btn btn-secondary btn-small" disabled={props.disabled} onClick={() => own.current?.click()}>
+        {props.multiple ? 'Dateien auswählen' : 'Datei auswählen'}
+      </button>
+      <span className="file-input-name">
+        {names.length === 0
+          ? props.multiple
+            ? 'Keine Dateien ausgewählt'
+            : 'Keine Datei ausgewählt'
+          : names.length === 1
+            ? names[0]
+            : `${names.length} Dateien ausgewählt`}
+      </span>
+    </span>
   );
 }

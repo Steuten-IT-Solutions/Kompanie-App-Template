@@ -72,6 +72,14 @@ interface UserDirectory
     /** Setzt ein neues Passwort und meldet alle Sitzungen des Benutzers ab. */
     public function setPassword(int $id, string $password): void;
 
+    /**
+     * Setzt ein Passwort als fertigen Hash (password_hash, z. B. aus einer freigegebenen Selbstregistrierung) und meldet alle
+     * Sitzungen des Benutzers ab.
+     *
+     * @throws \DomainException wenn es so nicht geht (z. B. fehlende Rechte in WordPress, ungültiger Hash)
+     */
+    public function setPasswordHash(int $id, string $passwordHash): void;
+
     public function loginExists(string $login): bool;
 
     public function emailExists(string $email): bool;

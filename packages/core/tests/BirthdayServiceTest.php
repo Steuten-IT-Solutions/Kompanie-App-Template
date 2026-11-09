@@ -564,10 +564,10 @@ final class BirthdayServiceTest extends TestCase
         $this->subscribe($this->m, 'm');
         $this->subscribe($this->cand, 'a');
         $types = fn (): array => array_column($this->app->push()->repository()->all(), 'types', 'endpoint');
-        $this->assertSame(['events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/m']);
+        $this->assertSame(['reports', 'events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/m']);
         $this->app->features()->update(['birthdays' => true]);
-        $this->assertSame(['birthdays', 'events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/m']);
-        $this->assertSame(['events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/a'], 'Anwärter nicht');
+        $this->assertSame(['birthdays', 'reports', 'events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/m']);
+        $this->assertSame(['reports', 'events', 'reminder'], $types()['https://fcm.googleapis.com/fcm/send/a'], 'Anwärter nicht');
         $this->app->push()->update($this->users->find($this->m), 'https://fcm.googleapis.com/fcm/send/m', null, ['events'], null);
         $this->app->features()->update(['birthdays' => false]);
         $this->app->features()->update(['birthdays' => true]);

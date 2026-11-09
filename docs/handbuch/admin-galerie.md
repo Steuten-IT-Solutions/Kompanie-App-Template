@@ -39,17 +39,20 @@ Lege in Google Drive einen Galerie-Ordner an. Darin kommt je Jahr ein Ordner und
 1. Wähle bei **Quelle** **Eigener Server (nur Alben der App)** und tippe auf **Speichern**. War vorher Google Drive eingetragen, verschwinden dessen Alben und Bilder aus der App; hochgeladene Bilder bleiben. Wechselst du zurück, holt der nächste Abgleich sie wieder.
 2. Lege unter **Neues Album in der App** ein Album an: **Titel** und **Jahr** eintragen, **Album anlegen** tippen.
 
-### Bilder hochladen
+### Bilder und Videos hochladen
 1. Tippe unter **Alben und eigene Bilder** auf ein Album. Es klappt auf. Das geht mit Alben aus der App und aus Google Drive.
-2. Setze den Haken **Nur für Mitglieder (intern)**, wenn die Bilder nur Mitglieder sehen sollen.
-3. Tippe auf **Bilder hochladen** und wähle ein oder mehrere Bilder (JPG, PNG oder WebP). Die App zeigt, wie viele schon oben sind.
-4. Die Bilder erscheinen kurz darauf in der {bereich.gallery}. Mit **Löschen** neben einem Bild nimmst du es wieder heraus.
+2. Setze den Haken **Nur für Mitglieder (intern)**, wenn die Bilder und Videos nur Mitglieder sehen sollen.
+3. Tippe auf **Bilder oder Videos hochladen** und wähle eine oder mehrere Dateien: Bilder als JPG, PNG oder WebP, Videos als MP4 oder WebM mit höchstens 1 GB je Video. Die App zeigt, wie viele schon oben sind, bei einem Video auch in Prozent, z. B. „Lädt … 40 %“. Lass die Seite dabei offen.
+4. Bilder und Videos erscheinen kurz darauf in der {bereich.gallery}. Mit **Löschen** daneben nimmst du sie wieder heraus.
+
+### Ein hochgeladenes Bild intern oder öffentlich stellen
+Setze oder entferne neben dem Bild den Haken **intern**. Mit Haken sehen es nur {rolle.member}, ohne alle. Das Bild wird kurz neu aufbereitet und hat danach eine neue Adresse. Wer es vorher schon angesehen oder gespeichert hat, behält diese Kopie. Dasselbe geht in der Großansicht der {bereich.gallery}. Bilder aus Google Drive stellst du in Drive um: in den Unterordner `intern` des Albums verschieben oder heraus.
 
 Bei einem Album der App änderst du darunter **Titel des Albums** und **Jahr des Albums** (**Album speichern**) oder löschst es mit **Album löschen** samt allen Bildern darin.
 
 ### Herunterladen erlauben
 1. Setze den Haken **Knöpfe zum Herunterladen zeigen** und tippe auf **Speichern**.
-2. In jedem Album steht dann **Album herunterladen (… Bilder · … Videos, ZIP)**, in der Großansicht oben rechts neben **✕** ein Knopf mit Pfeil nach unten.
+2. In jedem Album steht dann rechts neben dem Titel ein runder Knopf mit Pfeil nach unten (ganzes Album als ZIP), in der Großansicht oben rechts neben **✕** derselbe Knopf für das einzelne Bild oder Video.
 3. Zum Abschalten nimmst du den Haken wieder heraus und tippst auf **Speichern**.
 
 ### Bilder ansehen, die sich nicht laden ließen
@@ -59,12 +62,13 @@ Bei einem Album der App änderst du darunter **Titel des Albums** und **Jahr des
 
 ## Gut zu wissen
 - Beim Hochladen entfernt der Server Metadaten wie Aufnahmeort (GPS) und Kamera und speichert das Bild neu als JPG mit höchstens 8192 Pixeln an der längeren Kante. Wie groß ein Bild sein darf, hängt vom Webspace ab; ist es zu groß, sagt die App, woran es liegt.
-- Hochgeladene Bilder liegen auf dem eigenen Server und sind in der [Sicherung](seite:admin-updates-und-sicherung) enthalten. Die App setzt keine Grenze für den Speicherplatz; wie viel belegt ist, steht hier und unter [Zustand und Updates](seite:admin-zustand).
+- Hochgeladene Bilder liegen auf dem eigenen Server und sind in der [Sicherung](seite:admin-updates-und-sicherung) enthalten. Hochgeladene Videos liegen ebenfalls dort, sind aber wegen ihrer Größe nicht in der Sicherung; bewahre ihre Originale selbst auf. Die App setzt keine Grenze für den Speicherplatz; wie viel belegt ist, steht hier und unter [Zustand und Updates](seite:admin-zustand).
 - Der Abgleich mit Google Drive ändert und löscht keine hochgeladenen Bilder. Verschwindet ein Album aus Drive, in das du Bilder hochgeladen hast, bleibt es mit diesen Bildern.
-- Mitglieder mit dem Recht *Bilder einreichen* schlagen Bilder für jedes Album vor; wer *Einreichungen prüfen* hat, gibt sie frei. Beide Rechte vergibst du unter [Rollen](seite:admin-rollen-und-mitglieder); mit der {bereich.gallery} entsteht die Rolle *{bereich.gallery} verwalten* mit dem Recht zum Prüfen. Freigegebene Bilder stehen hier wie hochgeladene.
+- Mitglieder mit dem Recht *Bilder und Videos einreichen* schlagen Bilder und Videos für jedes Album vor; wer *Einreichungen prüfen* hat, gibt sie frei. Beide Rechte vergibst du unter [Rollen](seite:admin-rollen-und-mitglieder); mit der {bereich.gallery} entsteht die Rolle *{bereich.gallery} verwalten* mit dem Recht zum Prüfen. Freigegebene Bilder stehen hier wie hochgeladene.
 - Was beim Abgleich nicht fertig wird, bereitet die App stündlich im Hintergrund weiter auf. Neue Bilder in Google Drive kommen ebenso stündlich dazu.
 - Videos zeigt die {bereich.gallery} als MP4 oder WebM. Andere Formate (z. B. MOV vom iPhone, AVI) stehen in der Liste als „Videoformat nicht unterstützt“. Abhilfe: das Video als MP4 speichern (viele Handys bieten das beim Teilen oder Exportieren an) und in denselben Ordner legen.
-- Die App speichert Videos nicht auf dem Server, sie spielt sie beim Ansehen aus Google Drive ab. Nur ihr Vorschaubild kommt von Google und liegt neben den Bildern.
+- Videos aus Google Drive speichert die App nicht auf dem Server, sie spielt sie beim Ansehen aus Google Drive ab. Nur ihr Vorschaubild kommt von Google und liegt neben den Bildern.
+- In der App hochgeladene Videos liegen auf dem eigenen Server, die App wandelt sie nicht um. Damit auch große Videos unter der Grenze des Webspace je Anfrage bleiben, lädt die App sie in Stücken hoch. Als Vorschaubild nimmt der Browser beim Hochladen ein Standbild aus der ersten Sekunde. Kann er das Video nicht abspielen, erscheint es ohne Vorschaubild mit ▶. Bricht das Hochladen ab, löscht der Server das Angefangene spätestens nach einem Tag. Ist auf dem Server zu wenig Platz frei, sagt die App das vorher.
 - Videos starten schneller, wenn sie „fürs Web optimiert“ gespeichert sind. Viele Handys legen das Inhaltsverzeichnis eines Videos ans Ende der Datei; dann muss der Browser vor dem Start erst dorthin springen. Abhilfe: das Video vor dem Hochladen mit einem Programm wie HandBrake (Häkchen „Web Optimized“) neu speichern. Kurze Videos und eine kleinere Auflösung (z. B. 1080p statt 4K) laden ebenfalls schneller.
 - Kann der Server ein Format nicht lesen (z. B. RAW, TIFF, HEIC), nimmt die App das in RAW-Dateien eingebettete JPEG oder das Vorschaubild von Google. In der Liste bleiben vor allem beschädigte Dateien.
 - Heruntergeladen wird jedes Bild als JPG in voller Auflösung (höchstens 8192 Pixel), ohne Metadaten wie den Aufnahmeort. Videos kommen unverändert aus Google Drive; die App reicht sie dabei Stück für Stück durch, wie beim Abspielen, und speichert sie nicht. Das ZIP entsteht im Browser; über 4 GB nutzt die App die Erweiterung ZIP64. Ältere Programme zum Entpacken kennen sie manchmal nicht; dann hilft z. B. 7-Zip. Der Webspace liefert dabei wie beim Abspielen nur kleine Stücke, seine Zeitgrenzen spielen also keine Rolle. Interne Bilder und Videos laden nur {rolle.member} herunter, so wie nur sie sie sehen. Wer eine Datei heruntergeladen hat, kann es weitergeben; schalte die Knöpfe nur ein, wenn das für eure Bilder in Ordnung ist.

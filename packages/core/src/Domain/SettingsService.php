@@ -279,7 +279,7 @@ final class SettingsService
     {
         $g = $this->app->gallery();
         if (!$g->isConfigured()) {
-            throw new ApiError(503, 'not_configured', 'Die Galerie ist noch nicht eingerichtet.');
+            throw new ApiError(503, 'not_configured', 'Die Bilder sind noch nicht eingerichtet.');
         }
         if (function_exists('set_time_limit')) {
             @set_time_limit(120);

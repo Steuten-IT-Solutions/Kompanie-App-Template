@@ -19,6 +19,10 @@
  *   ## [1.2.0] – 2026-11-03
  *   ### Neu | Geändert | Behoben | Entfernt | Sicherheit
  *   - Eintrag (**fett**, *kursiv*, `Code`, [Text](https://…); Fortsetzung eingerückt)
+ *
+ * Wege in der App stehen als Verweis dorthin: [Einstellungen → Rollen](app:einstellungen/rollen) wird in der App ein
+ * Link auf #/einstellungen/rollen. Ein Weg nur als Text (*Einstellungen → …*, *Verwaltung → …*) ist ein Fehler. Ob es
+ * die Seite gibt, prüft packages/frontend/test/changelogLinks.test.ts.
  */
 
 declare(strict_types=1);
@@ -50,7 +54,16 @@ function load(string $file, string $coreVersion): array
     $sections = [];
     $kind = null;
     $kindHasItems = true;
-    $closeKind = static function (int $n) use (&$kind, &$kindHasItems, &$errors, &$sections, &$current): void {
+    // Ein Eintrag samt eingerückter Fortsetzung (ein Weg kann über zwei Zeilen gehen): Zeile, Text
+    $entry = null;
+    $closeEntry = static function () use (&$entry, &$errors): void {
+        if ($entry !== null) {
+            $errors = [...$errors, ...appLinkErrors($entry[0], $entry[1])];
+        }
+        $entry = null;
+    };
+    $closeKind = static function (int $n) use (&$kind, &$kindHasItems, &$errors, &$sections, &$current, $closeEntry): void {
+        $closeEntry();
         if ($kind !== null && !$kindHasItems) {
             $errors[] = "Zeile $n: „### {$kind}“ in [{$sections[$current]['name']}] hat keine Einträge";
         }
@@ -102,8 +115,12 @@ function load(string $file, string $coreVersion): array
             $errors[] = "Zeile $n: Eintrag ohne Unterabschnitt (### " . implode(', ### ', KINDS) . ')';
         } elseif (preg_match('/^- \S/u', $t)) {
             $kindHasItems = true;
+            $closeEntry();
+            $entry = [$n, $t];
         } elseif (!preg_match('/^\s{2,}\S/u', $t)) {
             $errors[] = "Zeile $n: Einträge als Liste mit „- “ (Fortsetzung eingerückt)";
+        } elseif ($entry !== null) {
+            $entry[1] .= ' ' . trim($t);
         }
         if (str_contains($t, '](seite:')) {
             $errors[] = "Zeile $n: Verweise auf Handbuchseiten (seite:) gibt es im Changelog nicht";
@@ -141,10 +158,33 @@ function load(string $file, string $coreVersion): array
     return [$unreleased, $versions, $errors];
 }
 
-/** HTML eines Abschnitts: Unterabschnitte als h4 (die Version selbst ist in der App die h3). */
+/**
+ * Verweise in die App in einem Eintrag (ab Zeile $n): app:-Adressen müssen gültig sein, und Wege wie
+ * *Einstellungen → Rollen* stehen als Verweis [Einstellungen → Rollen](app:einstellungen/rollen), nicht nur als Text.
+ *
+ * @return string[]
+ */
+function appLinkErrors(int $n, string $text): array
+{
+    $errors = [];
+    preg_match_all('/\]\((app:[^)\s]*)\)/u', $text, $links);
+    foreach ($links[1] as $url) {
+        if (!preg_match(KOMPANIE_APP_LINK, $url)) {
+            $errors[] = "Eintrag in Zeile $n: ungültiger Verweis „{$url}“ (so: app:einstellungen/rollen, Adresse der Seite ohne #/)";
+        }
+    }
+    $plain = (string) preg_replace('/\[[^\]]+\]\([^)\s]+\)/u', '', $text);
+    preg_match_all('/\*((?:Einstellungen|Verwaltung) →[^*]*)\*/u', $plain, $paths);
+    foreach ($paths[1] as $path) {
+        $errors[] = "Eintrag in Zeile $n: „{$path}“ als Verweis in die App schreiben: [{$path}](app:…) mit der Adresse der Seite, z. B. app:einstellungen/rollen";
+    }
+    return $errors;
+}
+
+/** HTML eines Abschnitts: Unterabschnitte als h4 (die Version selbst ist in der App die h3), Wege als Verweise in die App. */
 function html(string $markdown): string
 {
-    $html = kompanie_markdown($markdown, static fn (string $s): string => '#');
+    $html = kompanie_markdown($markdown, static fn (string $s): string => '#', null, true);
     return str_replace(['<h3>', '</h3>'], ['<h4>', '</h4>'], $html);
 }
 

@@ -30,7 +30,7 @@ Bist du angemeldet, stellst du das unter **Meins** → **Konto** → **Benachric
 
 ## Gut zu wissen
 - Die Beiträge kommen von einer Quelle, die ein {rolle.admin} festlegt: von der Webseite der {kompanie.name}, aus einem Feed oder direkt aus der App.
-- Gibt es noch keine Beiträge, steht dort „Noch keine Neuigkeiten.“
+- Gibt es noch keine Beiträge, steht dort „Noch keine Beiträge.“
 
 ## Siehe auch
 - [Einen Beitrag lesen](seite:neuigkeiten-beitrag)

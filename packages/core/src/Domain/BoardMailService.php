@@ -54,13 +54,19 @@ final class BoardMailService
         return $this->app->features()->enabled('board') && $this->app->mail()->configured();
     }
 
-    /** @return array{available: bool, recipients: int, reason: string|null} für das Formular „Neue Nachricht“ */
-    public function info(): array
+    /**
+     * Für das Formular „Neue Nachricht“; mit $only (BoardService::readerIds der gewählten Kompanien oder Personen) und
+     * $authorId die Zahl der Empfänger einer solchen Nachricht.
+     *
+     * @param list<int>|null $only
+     * @return array{available: bool, recipients: int, reason: string|null}
+     */
+    public function info(?array $only = null, int $authorId = 0): array
     {
         $available = $this->available();
         return [
             'available' => $available,
-            'recipients' => $available ? count($this->recipients()) : 0,
+            'recipients' => $available ? count($this->recipients($only, $authorId)) : 0,
             'reason' => $available ? null : ($this->app->mail()->unavailable() ?? 'Der Mailversand ist noch nicht eingerichtet (Einstellungen → E-Mail).'),
             'server_max_size' => $this->app->mail()->serverMaxSize(),
         ];
@@ -83,15 +89,18 @@ final class BoardMailService
 
     /**
      * Empfänger: Konto-ID => [Name, Adresse]. Auch der Verfasser, wie alle anderen nur ohne „Mails vom Brett“ abgeschaltet.
+     * Mit $only (Nachricht für Kompanien oder Personen, BoardService::readerIds) nur diese Konten und der Verfasser.
      *
+     * @param list<int>|null $only
      * @return array<int, array{name: string, email: string}>
      */
-    public function recipients(): array
+    public function recipients(?array $only = null, int $authorId = 0): array
     {
+        $allowed = $only === null ? null : array_flip([...$only, $authorId]);
         $optOut = array_filter((new UserSettings($this->app->db))->all(self::SETTING_OPT), static fn (string $v): bool => $v === '0');
         $users = array_filter(
             $this->app->users->list(false),
-            static fn (User $u): bool => !isset($optOut[$u->id]) && BoardService::isRecipient($u),
+            static fn (User $u): bool => !isset($optOut[$u->id]) && BoardService::isRecipient($u) && ($allowed === null || isset($allowed[$u->id])),
         );
         $emails = $this->app->users->emails(array_values(array_map(static fn (User $u): int => $u->id, $users)));
         $out = [];
@@ -136,7 +145,7 @@ final class BoardMailService
         if (!$this->available()) {
             throw ApiError::invalid('Der Mailversand ist nicht eingerichtet.');
         }
-        $recipients = $this->recipients();
+        $recipients = $this->recipients($this->app->board()->readerIdsOf($messageId), $author->id);
         $now = $this->app->time()->nowUtc();
         $this->app->db->transaction(function () use ($recipients, $messageId, $now): void {
             foreach ($recipients as $userId => $r) {
@@ -194,9 +203,10 @@ final class BoardMailService
                 $this->mark((int) $row['id'], self::CANCELLED, (int) $row['attempts'], null);
                 continue;
             }
-            $recipient = ['name' => (string) ($this->app->users->find((int) $row['user_id'])?->name ?? ''), 'email' => (string) $row['email']];
+            $user = $this->app->users->find((int) $row['user_id']);
+            $recipient = ['name' => (string) ($user?->name ?? ''), 'email' => (string) $row['email']];
             $files[$mid] ??= $this->app->attachments()->forMail($this->app->attachments()->of(AttachmentService::OWNER_BOARD, $mid));
-            $mail = $this->compose($mid, $message['title'], $message['body'], (string) $names->name($message['author_id']), $recipient, $files[$mid]);
+            $mail = $this->compose($mid, $message['title'], $this->app->board()->mailHtml($message, $user), (string) $names->name($message['author_id']), $recipient, $files[$mid]);
             $result = $mailer->send($mail);
             $attempts = (int) $row['attempts'] + 1;
             $stats['processed']++;

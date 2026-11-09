@@ -11,6 +11,7 @@ import { sortRowsByName, splitName } from '../memberSort';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
+import { confirmAsk } from '../ask';
 
 const sec = brand.labels.sections;
 
@@ -143,10 +144,6 @@ function ListOverview({ onToast }: { onToast: Toast }) {
 
   return (
     <div>
-      <p className="muted small">
-        Listen zum Ausdrucken oder als CSV für Excel, z. B. Unterschriften- oder Teilnehmerlisten. Titel und Spalten wählst du selbst; die
-        Mitglieder kommen mit „Mitglieder aktualisieren“ in die Liste.
-      </p>
       {formError && (
         <p className="form-error" role="alert">
           {formError}
@@ -183,7 +180,7 @@ function ListOverview({ onToast }: { onToast: Toast }) {
                   <button
                     className="btn btn-small btn-danger"
                     disabled={busy}
-                    onClick={() => window.confirm(`Liste „${l.title}“ löschen?`) && run(() => api.deleteList(l.id), 'Gelöscht')}
+                    onClick={async () => (await confirmAsk(`Liste „${l.title}“ löschen?`)) && run(() => api.deleteList(l.id), 'Gelöscht')}
                   >
                     Löschen
                   </button>
@@ -331,8 +328,8 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
     }
   }
 
-  function leave() {
-    if (!dirty || window.confirm('Änderungen verwerfen?')) navigate('verwaltung/listen');
+  async function leave() {
+    if (!dirty || (await confirmAsk('Änderungen verwerfen?'))) navigate('verwaltung/listen');
   }
 
   const deleted = draft.rows.filter((r) => r.kind === 'member' && r.deleted).length;
@@ -494,10 +491,6 @@ function ColumnEditor({
   return (
     <section className="card form">
       <h3>Spalten</h3>
-      <p className="muted small">
-        Datenspalten füllt die App mit den Angaben der Mitglieder, leere Spalten bleiben zum Ausfüllen auf Papier. Zum Umsortieren eine
-        Spalte am Griff ziehen.
-      </p>
       <ul className="card-list list-columns">
         {columns.map((c, i) => (
           <li key={i} {...sort.itemProps(i, 'card row list-column')}>

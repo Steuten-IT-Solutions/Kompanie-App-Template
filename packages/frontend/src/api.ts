@@ -8,7 +8,7 @@ import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
 import { noteError } from './lastError';
 import { rememberRoute } from './share';
-import type { NavigationSetting } from './navigation';
+import type { NavigationSetting, NavNames, NavStart } from './navigation';
 
 /** Schlüssel einer Rolle: guest, member, admin, früher fest (organizer, manager, candidate) oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
@@ -58,6 +58,7 @@ export type Capability =
   | 'manage_personal'
   | 'create_users'
   | 'promote_users'
+  | 'review_reports'
   | 'view_activity'
   | 'manage_settings';
 export type Feature =
@@ -95,6 +96,10 @@ export interface AppUser {
   capabilities: Capability[];
   /** Eigenes Foto (128 Pixel), null ohne; fehlt bei älteren Servern */
   photo_url?: string | null;
+  /** Rollen, die die Person beim Anlegen vergeben darf (nur mit create_users); fehlt bei älteren Servern */
+  create_roles?: Level[];
+  /** Zusatzrollen, die die Person beim Anlegen vergeben darf (nur mit create_users) */
+  create_extra_roles?: Level[];
 }
 
 export interface AppConfig {
@@ -111,8 +116,10 @@ export interface AppConfig {
   handbookUrl?: string | null;
   /** Links auf Impressum und Datenschutzerklärung der Kompanie (Einstellungen → Impressum und Datenschutz); null ohne */
   legal?: { imprint: string | null; privacy: string | null };
-  /** „Fehler melden“ möglich (Issue #64): Die App hat einen Empfänger für Fehlermeldungen */
+  /** „Fehler melden“ möglich (Issue #64); Meldungen gehen zuerst an die Admins */
   reports?: boolean;
+  /** Offene Fehlermeldungen; nur für Angemeldete mit review_reports, sonst null */
+  openReports?: number | null;
   /** Zugang beantragen (Issue #314) eingeschaltet: Link „Zugang beantragen“ für Gäste; fehlt bei älteren Servern */
   registration?: boolean;
   /** Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null */
@@ -131,6 +138,14 @@ export interface AppConfig {
   maintenance?: MaintenanceInfo;
   /** Einrichtbare Navigation (Issue #277): null bzw. fehlt = Standardnavigation */
   navigation?: NavigationSetting | null;
+  /** Eigene Namen und Symbole (Issue #362), je Bereich, eigener Seite oder „intern“ (leer kann als [] kommen) */
+  navigation_names?: NavNames;
+  /** Startseiten (Issue #362) für Gäste und Angemeldete */
+  navigation_start?: NavStart;
+  /** Namen unter den Symbolen der Tab-Leiste (Issue #362); fehlt = ja */
+  navigation_labels?: boolean;
+  /** Eigene Namen als Abschnitte (brand.labels.sections), übernimmt generated/brand.ts beim Laden */
+  section_labels?: Record<string, string>;
   /** Eigene Seiten (Issue #287), die die Person lesen darf, in ihrer Reihenfolge; fehlt bei älteren Servern */
   pages?: { id: number; title: string }[];
   /** News werden in der App geschrieben (Quelle „In der App“); fehlt bei älteren Servern */
@@ -151,17 +166,187 @@ export interface PageSummary {
   updated_by_name?: string | null;
 }
 export interface PageDetail extends PageSummary {
-  /** Formatierter Text (bereinigt), Bilder als Adressen */
+  /** Text der Textblöcke für alle (für ältere Apps), Bilder als Adressen */
   body: string;
+  /** Inhalt aus Blöcken, nur die für die Person sichtbaren; fehlt bei älteren Servern */
+  blocks?: Block[];
 }
-export type PageInput = { title?: string; audience?: PageAudience; body?: string; updated_at?: string };
+export type PageInput = { title?: string; audience?: PageAudience; body?: string; blocks?: BlockInput[]; updated_at?: string };
+
+/** Vorgefertigte Blöcke (eigene Seiten): all für alle, die den Inhalt sehen; members nur für Mitglieder. */
+export type BlockAudience = 'all' | 'members';
+interface BlockBase {
+  id: string;
+  audience: BlockAudience;
+}
+export interface TextBlock extends BlockBase {
+  type: 'text';
+  /** Formatierter Text (bereinigt), Bilder als Adressen */
+  html: string;
+}
+export interface CountdownBlock extends BlockBase {
+  type: 'countdown';
+  title: string;
+  /** date: freies Datum; event: Termin aus dem Bereich Termine */
+  source: 'date' | 'event';
+  date?: string;
+  time?: string | null;
+  end_date?: string | null;
+  end_time?: string | null;
+  event_id?: number;
+  /** Titel des Termins; null, wenn er fehlt oder nicht sichtbar ist */
+  event_title?: string | null;
+  running_text: string;
+  after: 'text' | 'hide';
+  after_text: string;
+  /** Beginn und Ende in UTC (vom Server berechnet); starts_at null: wie nach dem Ende */
+  starts_at: string | null;
+  ends_at: string | null;
+}
+/** Knopf mit Link: https:, mailto:, tel: oder eine Seite der App (#/…) */
+export interface ButtonBlock extends BlockBase {
+  type: 'button';
+  label: string;
+  url: string;
+  style: 'primary' | 'secondary';
+}
+/** Termin im Block „Nächste Termine“ (wie PublicEvent, ohne Beschreibung) */
+export interface BlockEvent {
+  id: number;
+  title: string;
+  start_date: string;
+  start_time: string | null;
+  end_date: string | null;
+  end_time: string | null;
+  all_day: boolean;
+  start: string;
+  end: string;
+  location: string;
+}
+/** Nächste Termine: die nächsten count ab heute (vom Server, immer aktuell; leer ohne Recht auf Termine) */
+export interface EventsBlock extends BlockBase {
+  type: 'events';
+  title: string;
+  count: number;
+  events: BlockEvent[];
+}
+/** Person im Block „Ansprechpartner“: E-Mail und Handynummer nur mit view_personal */
+export interface BlockContact {
+  name: string;
+  photo_url: string | null;
+  email?: string;
+  phone?: string;
+}
+/** Ansprechpartner: ausgewählte Ämter mit den Inhabern ihrer laufenden Amtszeit (vom Server) */
+export interface ContactsBlock extends BlockBase {
+  type: 'contacts';
+  title: string;
+  office_ids: number[];
+  /** holder_title: Einzahl des Amts wie in GET /offices, fehlt bei älteren Servern */
+  offices: { id: number; title: string; holder_title?: string | null; holders: BlockContact[] }[];
+}
+/** Hinweis-Kasten: kurzer reiner Text, farbig */
+export interface NoticeBlock extends BlockBase {
+  type: 'notice';
+  title: string;
+  text: string;
+  tone: 'info' | 'warning' | 'success';
+}
+/** Trennlinie oder Abstand */
+export interface DividerBlock extends BlockBase {
+  type: 'divider';
+  style: 'line' | 'space';
+}
+/** Ablauf/Zeitplan: Zeit (freier kurzer Text) und Programmpunkt */
+export interface ScheduleBlock extends BlockBase {
+  type: 'schedule';
+  title: string;
+  items: { time: string; text: string }[];
+}
+/** Zahlen/Fakten: Wert und Bezeichnung nebeneinander */
+export interface FactsBlock extends BlockBase {
+  type: 'facts';
+  title: string;
+  items: { value: string; label: string }[];
+}
+export type Block =
+  | TextBlock
+  | CountdownBlock
+  | ButtonBlock
+  | EventsBlock
+  | ContactsBlock
+  | NoticeBlock
+  | DividerBlock
+  | ScheduleBlock
+  | FactsBlock
+  | PollBlock
+  | AlbumBlock
+  | DocumentBlock
+  | SponsorsBlock
+  | MapBlock;
+/** Karte zur Anfahrt: Ort als Text, die App öffnet ihn in der Karten-App des Geräts */
+export interface MapBlock extends BlockBase {
+  type: 'map';
+  title: string;
+  place: string;
+}
+/** Dokument zum Herunterladen (vom Server); null nur für die Pflege, wenn es fehlt oder nicht sichtbar ist */
+export interface DocumentBlock extends BlockBase {
+  type: 'document';
+  document_id: number;
+  document: { id: number; title: string; ext: string; kind: 'pdf' | 'image' | 'file'; size: number; date: string; url: string } | null;
+}
+/** Sponsoren mit Logo und Link in ihrer Reihenfolge (vom Server) */
+export interface SponsorsBlock extends BlockBase {
+  type: 'sponsors';
+  title: string;
+  sponsors: Sponsor[];
+}
+/** Umfrage einbinden: Stand der Umfrage (vom Server); null nur für die Pflege, wenn sie fehlt */
+export interface PollBlock extends BlockBase {
+  type: 'poll';
+  poll_id: number;
+  poll: { id: number; title: string; status: 'running' | 'ended'; ends_at: string | null; has_voted: boolean } | null;
+}
+/** Album: einige Bilder mit Weg zum Album (vom Server); null nur für die Pflege, wenn es nichts zu sehen gibt */
+export interface AlbumBlock extends BlockBase {
+  type: 'album';
+  album_id: number;
+  count: number;
+  album: {
+    id: number;
+    title: string;
+    year: string;
+    total: number;
+    photos: { id: number; thumb: string; large: string; width: number; height: number }[];
+  } | null;
+}
+/** Zum Speichern: wie gelesen, ohne die vom Server berechneten Felder (werden ignoriert). */
+export type BlockInput =
+  | (Omit<TextBlock, 'id'> & { id?: string })
+  | (Omit<CountdownBlock, 'id' | 'starts_at' | 'ends_at' | 'event_title'> & { id?: string })
+  | (Omit<ButtonBlock, 'id'> & { id?: string })
+  | (Omit<EventsBlock, 'id' | 'events'> & { id?: string })
+  | (Omit<ContactsBlock, 'id' | 'offices'> & { id?: string })
+  | (Omit<NoticeBlock, 'id'> & { id?: string })
+  | (Omit<DividerBlock, 'id'> & { id?: string })
+  | (Omit<ScheduleBlock, 'id'> & { id?: string })
+  | (Omit<FactsBlock, 'id'> & { id?: string })
+  | (Omit<PollBlock, 'id' | 'poll'> & { id?: string })
+  | (Omit<AlbumBlock, 'id' | 'album'> & { id?: string })
+  | (Omit<DocumentBlock, 'id' | 'document'> & { id?: string })
+  | (Omit<SponsorsBlock, 'id' | 'sponsors'> & { id?: string })
+  | (Omit<MapBlock, 'id'> & { id?: string });
 
 /** Einstellungen → Navigation (Issue #277): gespeicherte Navigation und was der Server erlaubt. */
 export interface NavigationAdmin {
   navigation: NavigationSetting | null;
+  /** Issue #362: eigene Namen und Symbole, Startseiten, Namen in der Leiste */
+  names: NavNames;
+  start: NavStart;
+  show_labels: boolean;
   targets: string[];
   icons: string[];
-  max_main: number;
   max_menu_items: number;
   label_max: number;
 }
@@ -260,6 +445,13 @@ export function applyPendingRegistrations(count: number): void {
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
+/** Zahl der offenen Fehlermeldungen nach dem Schließen oder Weiterleiten: Zähler in der Verwaltung. */
+export function applyOpenReports(count: number): void {
+  if (!config || config.openReports == null) return;
+  config.openReports = count;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
 /** Übernimmt die Einstellung „Zugang beantragen“ in die geladene Konfiguration (nach dem Speichern). */
 export function applyRegistration(enabled: boolean): void {
   if (!config) return;
@@ -280,6 +472,8 @@ export interface RoleInfo {
   points_factor: number;
   /** Als Zusatzrolle vergebbar (eigene Rollen, nicht Gast, Mitglied, Admin; Issue #66) */
   extra?: boolean;
+  /** Gehört zur Kompanie (Recht member, nicht Admin): nur dazu gibt es Zusatzrollen; fehlt bei älteren Servern */
+  company?: boolean;
   /** Beim Anlegen von Konten wählbar (Mitglied immer, eigene Rollen nach Einstellung) */
   new_accounts?: boolean;
   /** Wer Mitglieder anlegen darf, macht Personen dieser Rolle zum Mitglied (z. B. Anwärter) */
@@ -307,8 +501,25 @@ export type RoleInput = {
 
 export const roleInfo = (level: Level): RoleInfo | undefined => config?.roles?.find((r) => r.key === level);
 
-/** Rollen, die neue Konten bekommen können (Mitglied und freigegebene eigene Rollen), in der Reihenfolge der Rollen. */
-export const newAccountRoles = (): RoleInfo[] => (config?.roles ?? []).filter((r) => r.key === 'member' || r.new_accounts);
+/**
+ * Rollen, die der angemeldete Benutzer neuen Konten geben darf (create_roles vom Server: Mitglied, die Rollen für neue
+ * Konten und, wer Rollen vergeben darf, die Rollen, die er vergeben dürfte), in der Reihenfolge der Rollen. Ältere
+ * Server ohne create_roles: Mitglied und die freigegebenen eigenen Rollen.
+ */
+export const newAccountRoles = (): RoleInfo[] => {
+  const allowed = config?.user?.create_roles;
+  return (config?.roles ?? []).filter((r) => (allowed ? allowed.includes(r.key) : r.key === 'member' || r.new_accounts));
+};
+
+/** Zusatzrollen, die der angemeldete Benutzer neuen Konten mit der Grundrolle base geben darf (leer: keine Auswahl). */
+export const newAccountExtraRoles = (base: Level): RoleInfo[] => {
+  const allowed = config?.user?.create_extra_roles ?? [];
+  if (!roleInfo(base)?.company) return [];
+  return (config?.roles ?? []).filter((r) => r.extra && r.key !== base && allowed.includes(r.key));
+};
+
+/** Rollen, die neue Konten über die Freigabe in Einstellungen → Rollen bekommen können (Mitglied und „für neue Konten“). */
+export const registrationRoles = (): RoleInfo[] => (config?.roles ?? []).filter((r) => r.key === 'member' || r.new_accounts);
 
 export const levelLabel = (level: Level): string =>
   roleInfo(level)?.label ?? (brand.labels.roles as Record<string, string | undefined>)[level] ?? level;
@@ -341,14 +552,20 @@ export async function refreshRoles(): Promise<RoleAdmin[] | null> {
 /** Übernimmt geänderte Rollen in die geladene Konfiguration (Bezeichnungen überall in der App). */
 export function applyRoles(list: RoleAdmin[]): void {
   if (!config) return;
-  config.roles = list.map(({ key, label, points_factor, system, new_accounts, promotable }) => ({
+  config.roles = list.map(({ key, label, points_factor, system, new_accounts, promotable, capabilities }) => ({
     key,
     label,
     points_factor,
     extra: !system,
+    company: key !== 'admin' && capabilities.includes('member'),
     new_accounts,
     promotable,
   }));
+  // Admins dürfen beim Anlegen jede Rolle vergeben (Admin nur in der eigenständigen Version): neue Rollen gleich mit.
+  if (config.user?.level === 'admin' && config.user.create_roles) {
+    config.user.create_roles = list.map((r) => r.key).filter((k) => k !== 'admin' || config?.variant === 'standalone');
+    config.user.create_extra_roles = list.filter((r) => !r.system).map((r) => r.key);
+  }
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -461,6 +678,12 @@ export interface NewsItem {
   /** Adresse auf der Webseite; leer bei Beiträgen, die in der App geschrieben wurden */
   link: string;
   content?: string;
+  /** News in der App: Inhalt aus Blöcken, nur die für die Person sichtbaren; fehlt bei anderen Quellen und älteren Servern */
+  blocks?: Block[];
+  /** News in der App: Titelbild (Issue #351), groß oben im Beitrag; fehlt bei anderen Quellen und älteren Servern */
+  cover?: string | null;
+  /** Kennung des Titelbilds, zum Bearbeiten */
+  cover_uid?: string | null;
   /** Nur für die Pflege der News in der App (manage_news): Stand für das Speichern (409 conflict) */
   updated_at?: string | null;
   updated_by_name?: string | null;
@@ -470,6 +693,9 @@ export interface NewsItem {
 export interface NewsInput {
   title?: string;
   body?: string;
+  blocks?: BlockInput[];
+  /** Titelbild: Kennung aus POST /rich-images oder cover_uid; null entfernt es (Issue #351) */
+  cover?: string | null;
   updated_at?: string | null;
 }
 
@@ -505,6 +731,8 @@ export interface GalleryPhoto {
   width: number;
   height: number;
   intern: boolean;
+  /** in der App hochgeladen: intern/öffentlich lässt sich in der App umstellen (aus Drive nur über den Ordner); fehlt bei älteren Servern */
+  upload?: boolean;
   name: string;
   /** false: noch nicht aufbereitet; die Adressen erzeugen das Bild oder liefern vorerst einen Platzhalter */
   ready: boolean;
@@ -532,6 +760,8 @@ export interface MemberSummary {
   extra_roles?: Level[];
   /** Recht „Gehört zur Kompanie“; false bei Anwärtern, Rollen nur mit Kalender und Gästen */
   member: boolean;
+  /** Mitglied ohne Zugang (meldet sich noch nicht an); nur für wer Mitglieder anlegt, fehlt sonst */
+  no_access?: boolean;
   /** Gruppe im Zähler wie in der Anwesenheit (Einstellungen → Rollen); null bei Gästen, fehlt bei älteren Servern */
   group?: Level | null;
   /** Dienstgrad (nur mit Bereich Dienstgrade) */
@@ -712,6 +942,16 @@ export interface FormerImportResult {
 }
 
 /** Zeile der Vorschau beim Import der Mitglieder (POST /members/import) */
+/** Freier Name in Amtszeiten mit Personen, die passen könnten (beste zuerst) */
+export interface OfficeLinkSuggestion {
+  name: string;
+  /** Zahl der Einträge (Inhaber und Begleitpersonen) mit diesem Namen */
+  entries: number;
+  /** bis zu fünf Amtszeiten, z. B. „König 1999“ */
+  terms: string[];
+  candidates: { id: number; name: string; match: 'name' | 'similar'; former: boolean }[];
+}
+
 export interface MemberImportRow {
   line: number;
   name: string;
@@ -736,6 +976,10 @@ export interface MemberImportRow {
   reason?: FormerReason;
   founder?: boolean;
   left_on?: string;
+  /** Spalte Zugang „nein“: Mitglied ohne Zugang (kein Startpasswort) */
+  no_access?: boolean;
+  /** Spalte Zusatzrollen: Bezeichnungen; fehlt ohne */
+  extra_roles?: string[];
   /** Konto mit genau diesem Namen gibt es schon: wird übersprungen */
   existing?: { id: number; name: string; former: boolean };
   error?: string;
@@ -745,7 +989,8 @@ export interface MemberImportResult {
   columns: { used: string[]; ignored: { column: string; reason: string }[] };
   rows: MemberImportRow[];
   /** Vorschau: was angelegt würde; nach dem Übernehmen: was angelegt wurde */
-  new: { active: number; former: number };
+  /** active zählt alle Aktiven, no_access davon die ohne Zugang (fehlt bei älteren Servern) */
+  new: { active: number; former: number; no_access?: number };
   existing: number;
   offices_linked: number;
   applied: boolean;
@@ -893,8 +1138,10 @@ export interface BoardMessage {
   id: number;
   /** Titel (reiner Text): Banner, Benachrichtigung, Betreff der Mail */
   title: string;
-  /** Bereinigter formatierter Inhalt (HTML, Bilder mit Adresse); Anzeige über RichTextView */
+  /** Bereinigter formatierter Inhalt (HTML, Bilder mit Adresse) der Textblöcke für alle (ältere Apps) */
   text: string;
+  /** Inhalt aus Blöcken, nur die sichtbaren (fehlt bei älteren Servern: text) */
+  blocks?: Block[];
   /** Reiner Textauszug */
   excerpt: string;
   /** null, wenn unbekannt; „gelöschtes Konto“, wenn das Konto gelöscht wurde */
@@ -904,8 +1151,15 @@ export interface BoardMessage {
   updated_at: string;
   /** Sichtbar bis (standardmäßig 24 Stunden nach created_at); danach blendet die App den Eintrag aus, auch offline */
   expires_at: string;
-  /** Sichtbarkeit: members (intern, wer das Brett liest) oder public (alle, auch ohne Anmeldung); fehlt bei älteren Servern (intern) */
+  /**
+   * Sichtbarkeit: members (intern, wer das Brett liest), public (alle, auch ohne Anmeldung), company (nur ausgewählte
+   * Kompanien) oder person (nur ausgewählte Personen); fehlt bei älteren Servern (intern)
+   */
   audience?: BoardAudience;
+  /** nur mit post_board, bei company und person: die ausgewählten Kompanien bzw. Konten */
+  audience_ids?: number[];
+  /** Namen der ausgewählten Kompanien (alle, die die Nachricht lesen) bzw. Personen (nur mit post_board) */
+  audience_names?: string[];
   /** Dateianhänge (fehlt bei älteren Servern) */
   attachments?: Attachment[];
   /** nur mit post_board: wer zuletzt geändert hat */
@@ -919,6 +1173,8 @@ export interface BoardEnded {
   id: number;
   title: string;
   text: string;
+  /** alle Blöcke (fehlt bei älteren Servern) */
+  blocks?: Block[];
   excerpt: string;
   author_name: string | null;
   created_at: string;
@@ -928,11 +1184,21 @@ export interface BoardEnded {
   deleted_by_name: string | null;
   active: boolean;
   audience?: BoardAudience;
+  audience_ids?: number[];
+  audience_names?: string[];
   attachments?: Attachment[];
 }
 
-/** Sichtbarkeit einer Nachricht am Brett: intern (members) oder öffentlich (public) */
-export type BoardAudience = 'members' | 'public';
+/** Sichtbarkeit einer Nachricht am Brett: intern (members), öffentlich (public), Kompanie (company) oder einzeln (person) */
+export type BoardAudience = 'members' | 'public' | 'company' | 'person';
+
+/** Auswahl beim Schreiben (GET /board/audiences, post_board) */
+export interface BoardAudiences {
+  /** aktive Kompanien (leer, wenn der Bereich Kompanien aus ist) */
+  companies: { id: number; name: string; short_name: string }[];
+  /** Personen, die das Brett lesen, nach Namen */
+  people: { id: number; name: string }[];
+}
 
 export type BoardRevisionAction = 'created' | 'title' | 'content' | 'expires' | 'audience' | 'attachments' | 'deleted' | 'mailed';
 
@@ -964,12 +1230,16 @@ export interface BoardHistory {
 
 export interface BoardInput {
   title: string;
-  /** formatierter Inhalt (HTML) */
-  text: string;
+  /** Inhalt aus Blöcken (hat Vorrang vor text) */
+  blocks?: BlockInput[];
+  /** formatierter Inhalt (HTML), ältere Form */
+  text?: string;
   /** UTC (…Z); ohne Angabe 24 Stunden */
   expires_at?: string | null;
   /** ohne Angabe intern (members) */
   audience?: BoardAudience;
+  /** bei company und person: ausgewählte Kompanien bzw. Konten (mindestens eine) */
+  audience_ids?: number[];
   push?: boolean;
   mail?: boolean;
   /** Kennungen der Anhänge (eigene Entwürfe aus uploadAttachment) */
@@ -1643,8 +1913,10 @@ export interface CreatedUser {
   warning?: string;
   /** Foto, wenn eines mitgeschickt wurde */
   photo_url?: string | null;
-  /** Startpasswort – steht nur in dieser einen Antwort. */
-  password: string;
+  /** Startpasswort – steht nur in dieser einen Antwort; fehlt bei einem Mitglied ohne Zugang. */
+  password?: string;
+  /** Mitglied ohne Zugang angelegt (meldet sich noch nicht an, kein Startpasswort) */
+  no_access?: boolean;
 }
 
 /** Ergebnis je Person beim Anlegen mehrerer (Issue #24): angelegt oder mit Grund nicht. */
@@ -1668,6 +1940,10 @@ export interface NewPerson extends PersonName {
   birthday?: string;
   /** Foto (JPG, PNG oder WebP als Base64) */
   photo?: EncodedFile;
+  /** Ohne Zugang anlegen: kein Startpasswort */
+  no_access?: boolean;
+  /** Zusatzrollen (nur mit promote_users) */
+  extra_roles?: Level[];
 }
 
 export interface AccountProfile extends PersonName {
@@ -1922,13 +2198,15 @@ export const api = {
   /** Rechte einer Person zusätzlich zur Rolle geben bzw. entziehen; leere Listen: wie die Rolle. */
   setRights: (id: number, grant: Capability[], revoke: Capability[]) =>
     request<MemberRights>('PUT', `/members/${id}/rights`, { grant, revoke }),
-  resetPassword: (id: number) => request<{ password: string }>('POST', `/members/${id}/password`),
+  /** Neues Startpasswort; bei einem Mitglied ohne Zugang „Zugang einrichten“ (danach hat es einen). */
+  resetPassword: (id: number) => request<{ password: string; username?: string }>('POST', `/members/${id}/password`),
   /** Ändert das eigene Passwort; danach gilt eine neue Sitzung, daher Token erneuern. */
   changePassword: async (current_password: string, new_password: string) => {
     await request<{ changed: boolean }>('POST', '/me/password', { current_password, new_password });
     await refreshCsrf();
   },
-  createUsers: (level: Level, people: NewPerson[]) => request<BulkResult[]>('POST', '/users/bulk', { level, people }),
+  createUsers: (level: Level, people: NewPerson[], extraRoles: Level[] = []) =>
+    request<BulkResult[]>('POST', '/users/bulk', { level, people, ...(extraRoles.length > 0 ? { extra_roles: extraRoles } : {}) }),
   account: (id: number) => request<AccountProfile>('GET', `/members/${id}/account`),
   /** Eigene E-Mail-Adresse, Handynummer und Adresse; eine neue E-Mail-Adresse nur mit dem aktuellen Passwort. */
   ownAccount: () => request<OwnAccount>('GET', '/me/account'),
@@ -1964,6 +2242,10 @@ export const api = {
       rank_id?: number;
       birthday?: string;
       photo?: EncodedFile;
+      /** Ohne Zugang anlegen: kein Startpasswort, später „Zugang einrichten“ oder mit einer Anfrage verbinden */
+      no_access?: boolean;
+      /** Zusatzrollen (nur mit promote_users und Rollen, die man vergeben darf) */
+      extra_roles?: Level[];
     },
   ) => request<CreatedUser>('POST', '/users', data),
   /** Foto eines Mitglieds hochladen bzw. ersetzen (vorher mit preparePhoto verkleinert). */
@@ -2002,9 +2284,19 @@ export const api = {
   // Schwarzes Brett (Issue #5, #172)
   board: () => request<{ items: BoardItem[] }>('GET', '/board'),
   postBoard: (input: BoardInput) => request<BoardMessage>('POST', '/board', input),
-  updateBoard: (id: number, changes: Partial<Pick<BoardInput, 'title' | 'text' | 'expires_at' | 'audience' | 'attachments'>>) =>
-    request<BoardMessage>('PATCH', `/board/${id}`, changes),
-  boardMailInfo: () => request<BoardMailInfo>('GET', '/board/mail'),
+  updateBoard: (
+    id: number,
+    changes: Partial<Pick<BoardInput, 'title' | 'blocks' | 'text' | 'expires_at' | 'audience' | 'audience_ids' | 'attachments'>>,
+  ) => request<BoardMessage>('PATCH', `/board/${id}`, changes),
+  /** mit Kompanien oder Personen: Zahl der Empfänger einer Nachricht nur für diese */
+  boardMailInfo: (audience?: BoardAudience, ids: number[] = []) =>
+    request<BoardMailInfo>(
+      'GET',
+      '/board/mail',
+      undefined,
+      audience === 'company' || audience === 'person' ? { audience, audience_ids: ids.join(',') } : undefined,
+    ),
+  boardAudiences: () => request<BoardAudiences>('GET', '/board/audiences'),
   boardHistory: (id: number) => request<BoardHistory>('GET', `/board/${id}/history`),
   boardEnded: () => request<{ items: BoardEnded[]; keep_days: number }>('GET', '/board/history'),
   // E-Mails aus der Verwaltung (send_mail)
@@ -2144,6 +2436,10 @@ export const api = {
   updateOfficeTerm: (id: number, data: OfficeTermInput) => request<OfficeTerm>('PATCH', `/office-terms/${id}`, data),
   deleteOfficeTerm: (id: number) => request<{ deleted: boolean }>('DELETE', `/office-terms/${id}`),
   importOffices: (csv: string, apply: boolean, link = true) => request<OfficeImportResult>('POST', '/offices/import', { csv, apply, link }),
+  /** Freie Namen in Amtszeiten, die zu Mitgliedern oder Ehemaligen passen (nur Vorschläge) */
+  officeLinkSuggestions: () => request<OfficeLinkSuggestion[]>('GET', '/offices/link-suggestions'),
+  /** Einen freien Namen in allen Amtszeiten mit dem Konto verknüpfen */
+  linkOfficeName: (name: string, user_id: number) => request<{ linked: number }>('POST', '/offices/link', { name, user_id }),
 
   // Listen (Issue #121): nur mit manage_lists
   lists: () => request<PrintListSummary[]>('GET', '/lists'),
@@ -2193,7 +2489,8 @@ export const api = {
   setActivityPersonal: (personal: boolean) => request<{ personal: boolean }>('PUT', '/admin/activity/settings', { personal }),
   maintenance: () => request<MaintenanceState>('GET', '/admin/maintenance'),
   navigation: () => request<NavigationAdmin>('GET', '/admin/navigation'),
-  saveNavigation: (navigation: NavigationSetting | null) => request<NavigationAdmin>('PUT', '/admin/navigation', { navigation }),
+  saveNavigation: (body: { navigation: NavigationSetting | null; names?: NavNames; start?: NavStart; show_labels?: boolean }) =>
+    request<NavigationAdmin>('PUT', '/admin/navigation', body),
   setMaintenance: (on: boolean, reason?: string) =>
     request<MaintenanceState>('POST', '/admin/maintenance', reason === undefined ? { on } : { on, reason }),
   /** Laufzeit-Konfiguration neu laden (z. B. „Erneut versuchen“ auf der Wartungsseite). */
@@ -2231,7 +2528,25 @@ export const api = {
   uploadGalleryPhoto: async (albumId: number, file: File, intern: boolean) =>
     request<GalleryAdminAlbumDetail>('POST', `/admin/gallery/albums/${albumId}/photos`, { file: await encodeFile(file), intern }),
   deleteGalleryPhoto: (id: number) => request<{ deleted: boolean }>('DELETE', `/admin/gallery/photos/${id}`),
+  /** Hochgeladenes Bild oder Video nachträglich intern oder öffentlich stellen (manage_settings oder review_gallery) */
+  setGalleryPhotoIntern: (id: number, intern: boolean) =>
+    request<{ id: number; intern: boolean }>('PATCH', `/gallery/photos/${id}`, { intern }),
   // Einreichungen (Issue #286)
+  // Videos in Stücken hochladen (Issue #350), siehe videoUpload.ts
+  startVideoUpload: (input: { album_id: number; name: string; size: number; purpose: 'album' | 'submission' }) =>
+    request<{ id: string; chunk_size: number; max_bytes: number }>('POST', '/gallery/video-uploads', input),
+  videoUploadChunk: (upload: string, offset: number, data: string) =>
+    request<{ received: number }>('POST', '/gallery/video-uploads/chunk', { upload, offset, data }),
+  finishVideoUpload: <T extends GalleryAdminAlbumDetail | GallerySubmission>(input: {
+    upload: string;
+    poster: string | null;
+    width: number;
+    height: number;
+    duration: number;
+    intern?: boolean;
+    consent?: boolean;
+  }) => request<T>('POST', '/gallery/video-uploads/finish', input),
+  cancelVideoUpload: (upload: string) => request<{ cancelled: boolean }>('POST', '/gallery/video-uploads/cancel', { upload }),
   gallerySubmissions: () => request<GallerySubmissionsOwn>('GET', '/gallery/submissions'),
   submitGalleryPhoto: async (albumId: number, file: File) =>
     request<GallerySubmission>('POST', '/gallery/submissions', { album_id: albumId, file: await encodeFile(file), consent: true }),
@@ -2248,6 +2563,15 @@ export const api = {
   checkUpdates: () => request<UpdateStatus>('POST', '/admin/update/check'),
   installUpdate: (version: string, major = false, withoutDrive = false) =>
     request<{ installed: string }>('POST', '/admin/update/install', { version, major, without_drive: withoutDrive }),
+  // Update-Paket hochladen statt herunterladen, siehe updateUpload.ts
+  startUpdateUpload: (size: number) =>
+    request<{ id: string; chunk_size: number; max_bytes: number }>('POST', '/admin/update/upload', { size }),
+  updateUploadChunk: (upload: string, offset: number, data: string) =>
+    request<{ received: number }>('POST', '/admin/update/upload/chunk', { upload, offset, data }),
+  checkUpdateUpload: (upload: string) => request<UpdateUploadInfo>('POST', '/admin/update/upload/check', { upload }),
+  installUpdateUpload: (upload: string, major = false, withoutDrive = false) =>
+    request<{ installed: string }>('POST', '/admin/update/upload/install', { upload, major, without_drive: withoutDrive }),
+  cancelUpdateUpload: (upload: string) => request<{ cancelled: boolean }>('POST', '/admin/update/upload/cancel', { upload }),
   installHeldUpdate: () => request<{ installed: string }>('POST', '/admin/update/held', {}),
   dismissHeldUpdate: () => request<UpdateStatus>('DELETE', '/admin/update/held'),
   rollback: (version: string, withoutDrive = false) =>
@@ -2317,8 +2641,9 @@ export const api = {
   registrationStatus: (username: string, password: string) =>
     request<RegistrationStatus>('POST', '/registration/status', { username, password }),
   registrations: () => request<RegistrationList>('GET', '/registrations'),
-  approveRegistration: (id: number, data: { level?: Level; username?: string }) =>
-    request<{ member: { id: number; name: string; username: string; level: Level }; mailed: boolean }>(
+  /** Freigeben: neues Konto, oder mit user_id das Mitglied ohne Zugang mit der Anfrage verbinden */
+  approveRegistration: (id: number, data: { level?: Level; username?: string; user_id?: number }) =>
+    request<{ member: { id: number; name: string; username: string; level: Level }; mailed: boolean; linked?: boolean }>(
       'POST',
       `/registrations/${id}/approve`,
       data,
@@ -2329,7 +2654,49 @@ export const api = {
   setRegistrationSettings: (data: { enabled?: boolean; default_role?: Level }) =>
     request<RegistrationSettings>('PUT', '/admin/registration', data),
   sendReport: (data: ReportInput) => request<{ queued: boolean }>('POST', '/reports', data),
+  myReports: () => request<MyReport[]>('GET', '/reports/mine'),
+  reviewReports: () => request<{ forward: boolean; reports: ReviewReport[] }>('GET', '/reports/review'),
+  reportScreenshot: (id: number) => request<{ type: string; data: string }>('GET', `/reports/review/${id}/screenshot`),
+  closeReport: (id: number, reason: string) => request<ReviewReport>('POST', `/reports/review/${id}/close`, { reason }),
+  forwardReport: (id: number) => request<ReviewReport>('POST', `/reports/review/${id}/forward`),
 };
+
+export type ReportStatus = 'open' | 'closed' | 'forwarded';
+
+/** Eigene Fehlermeldung mit Stand (GET /reports/mine) */
+export interface MyReport {
+  id: number;
+  status: ReportStatus;
+  description: string;
+  /** Unix-Zeit */
+  created: number;
+  reason: string | null;
+  reviewed_at: number | null;
+}
+
+/** Fehlermeldung im Eingang der Admins (review_reports) */
+export interface ReviewReport {
+  id: number;
+  status: ReportStatus;
+  description: string;
+  expected: string;
+  page: string;
+  version: string;
+  variant: string;
+  user_agent: string;
+  role: string;
+  last_error: string | null;
+  user_id: number | null;
+  name: string | null;
+  /** Name geht beim Weiterleiten an die Betreuer mit */
+  share_name: boolean;
+  /** Bildschirmfoto vorhanden (nur offene) */
+  screenshot: boolean;
+  created: number;
+  reason: string | null;
+  reviewed_by: string | null;
+  reviewed_at: number | null;
+}
 
 /** Formular „Fehler melden“: Zeitmarke (Zeitfalle) und die Angaben, die der Server beifügt. */
 export interface ReportForm {
@@ -2338,6 +2705,8 @@ export interface ReportForm {
   minSeconds: number;
   /** Höchstgröße des Bildschirmfotos in Bytes */
   maxBytes: number;
+  /** Die Admins können Meldungen an die Betreuer weiterleiten; fehlt bei älteren Servern */
+  forward?: boolean;
   details: { version: string; role: string };
 }
 
@@ -2381,12 +2750,23 @@ export interface RegistrationRequest {
   created_at: string;
   email_confirmed: boolean;
   expires_at: string;
+  /** Mitglieder ohne Zugang, die passen könnten (beste zuerst); fehlt bei älteren Servern */
+  matches?: RegistrationMatch[];
+}
+
+/** Vorschlag zum Verbinden: gleiche E-Mail-Adresse, gleicher Name oder ähnlicher Name (gleicher Nachname, Vorname beginnt gleich) */
+export interface RegistrationMatch {
+  id: number;
+  name: string;
+  match: 'email' | 'name' | 'similar';
 }
 
 export interface RegistrationList {
   requests: RegistrationRequest[];
   default_role: Level;
   email_confirmation: boolean;
+  /** Alle Mitglieder ohne Zugang zum Auswählen; fehlt bei älteren Servern */
+  no_access_members?: { id: number; name: string }[];
 }
 
 export interface RegistrationSettings {
@@ -2419,6 +2799,8 @@ export type PushType =
   | 'gallery_review'
   | 'gallery_submissions'
   | 'registrations'
+  | 'reports_review'
+  | 'reports'
   | 'penalties'
   | 'points'
   | 'ranks'
@@ -2538,6 +2920,18 @@ export interface UpdateStatus {
   progress: UpdateProgress | null;
 }
 
+/** Erkanntes Update-Paket (hochgeladen) */
+export interface UpdateUploadInfo {
+  version: string;
+  current: string;
+  /** neue Hauptversion: einspielen nur nach Bestätigung */
+  major: boolean;
+  /** älter als die installierte: Zurückrollen */
+  older: boolean;
+  /** schon für alle freigegeben (stable) */
+  released: boolean;
+}
+
 export type UpdateStep = 'download' | 'backup' | 'drive' | 'install';
 export interface UpdateProgress {
   version: string;
@@ -2635,7 +3029,7 @@ export interface AdminSettings {
 /** Bild der Galerie, das sich nicht aufbereiten ließ (Einstellungen → Galerie). */
 export type GallerySourceType = 'drive' | 'server';
 
-/** Eingereichtes Bild (Issue #286); user_id und user_name nur beim Prüfen */
+/** Eingereichtes Bild oder Video (Issue #286, #350); user_id und user_name nur beim Prüfen */
 export interface GallerySubmission {
   id: number;
   album_id: number;
@@ -2647,8 +3041,13 @@ export interface GallerySubmission {
   reviewed_at: string | null;
   thumb: string | null;
   photo_id: number | null;
+  type: 'image' | 'video';
+  /** nur beim Prüfen offener Videos: zum Ansehen vor der Freigabe */
+  video?: string;
   user_id?: number;
   user_name?: string;
+  /** nur beim Prüfen: ob das freigegebene Bild in der Galerie intern ist (null ohne Bild) */
+  intern?: boolean | null;
 }
 
 export interface GallerySubmissionsOwn {
@@ -2676,7 +3075,8 @@ export interface GalleryAdminAlbumDetail {
   title: string;
   year: string;
   source: 'drive' | 'app';
-  uploads: { id: number; name: string; intern: boolean; thumb: string; status: string; error: string }[];
+  /** thumb '' bei einem Video ohne Standbild */
+  uploads: { id: number; type: 'image' | 'video'; name: string; intern: boolean; thumb: string; status: string; error: string }[];
 }
 
 export interface FailedPhoto {

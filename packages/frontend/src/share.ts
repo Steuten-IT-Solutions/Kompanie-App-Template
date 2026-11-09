@@ -28,7 +28,9 @@ export async function shareLink(url: string, title: string, onToast: (msg: strin
     await navigator.clipboard.writeText(url);
     onToast('Link kopiert');
   } catch {
-    window.prompt('Link kopieren:', url);
+    // Erst hier laden: share.ts bleibt ohne Browser-Abhängigkeiten testbar
+    const { promptAsk } = await import('./ask');
+    await promptAsk('Zum Kopieren markieren:', url, { title: 'Link kopieren', okLabel: 'Fertig' });
   }
 }
 

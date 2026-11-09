@@ -2,10 +2,12 @@ import DOMPurify from 'dompurify';
 import { useState } from 'react';
 import { api, config } from '../api';
 import { formatShortTime, newsDate } from '../format';
+import BlocksView from '../blocks/BlocksView';
 import RichTextView from '../richtext/RichTextView';
 import { navigate } from '../router';
 import { ErrorBox, lazyView, Loading, useAsync } from '../ui';
 import { canWriteNews } from './News';
+import { confirmAsk } from '../ask';
 
 const NewsSchreiben = lazyView(() => import('./NewsSchreiben'));
 
@@ -74,7 +76,7 @@ export default function NewsArtikel({ id, onToast }: { id: string; onToast: (msg
     );
 
   async function remove() {
-    if (!window.confirm(`Beitrag „${n.title}“ samt seinen Bildern löschen?`)) return;
+    if (!(await confirmAsk(`Beitrag „${n.title}“ samt seinen Bildern löschen?`))) return;
     setBusy(true);
     setActionError(null);
     try {
@@ -90,11 +92,15 @@ export default function NewsArtikel({ id, onToast }: { id: string; onToast: (msg
   return (
     <article className="news-article">
       {back}
-      {!inApp && n.image && <img className="news-hero" src={n.image} alt="" />}
+      {inApp
+        ? n.cover && <img className="news-hero" src={n.cover} alt="" />
+        : n.image && <img className="news-hero" src={n.image} alt="" />}
       {newsDate(n.date) && <div className="news-date">{newsDate(n.date)}</div>}
       <h2 className="news-headline">{n.title}</h2>
       {inApp ? (
-        <div className="news-content">{n.content ? <RichTextView html={n.content} /> : null}</div>
+        <div className="news-content">
+          {n.blocks ? <BlocksView blocks={n.blocks} manager={canWriteNews()} /> : n.content ? <RichTextView html={n.content} /> : null}
+        </div>
       ) : (
         <div className="news-content" dangerouslySetInnerHTML={{ __html: cleanHtml(n.content ?? '') }} />
       )}

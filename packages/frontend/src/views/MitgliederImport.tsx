@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, levelLabel, newAccountRoles, type MemberImportResult, type MemberImportRow } from '../api';
+import { api, can, levelLabel, type MemberImportResult, type MemberImportRow } from '../api';
 import brand from '../generated/brand';
 import { formatAddress } from '../address';
 import { formatYearOrDate } from '../format';
@@ -7,6 +7,7 @@ import { toCsv } from '../lists';
 import { readSheet } from '../sheet';
 import { Credentials } from './Konten';
 import { formerSummary } from './Ehemalige';
+import { FileInput } from '../ui';
 
 const sec = brand.labels.sections;
 
@@ -30,6 +31,7 @@ const TEMPLATE_HEADER = [
   'Titel',
   'Ausgeschieden',
   'Grund',
+  'Zugang',
 ];
 const TEMPLATE_ROWS = [
   [
@@ -51,13 +53,18 @@ const TEMPLATE_ROWS = [
     '',
     '',
     '',
+    'ja',
   ],
-  ['Max', 'Beispiel', 'Mitglied', '', '', '', '', '', '', '', '', '24.12.', '2025', '', '', '', '', ''],
-  ['Otto', 'Früher', 'ehemalig', '', '', '', '', '', '', '', '', '', 'Gründer', '', '', '', '2001', 'verstorben'],
+  ['Max', 'Beispiel', 'Mitglied', '', '', '', '', '', '', '', '', '24.12.', '2025', '', '', '', '', '', 'nein'],
+  ['Otto', 'Früher', 'ehemalig', '', '', '', '', '', '', '', '', '', 'Gründer', '', '', '', '2001', 'verstorben', ''],
 ];
 
 function downloadTemplate() {
-  const blob = new Blob([toCsv(TEMPLATE_HEADER, TEMPLATE_ROWS)], { type: 'text/csv;charset=utf-8' });
+  // Zusatzrollen nur für alle, die Rollen vergeben dürfen (sonst übergeht der Server die Spalte mit Hinweis).
+  const extra = can('promote_users');
+  const header = extra ? [...TEMPLATE_HEADER, 'Zusatzrollen'] : TEMPLATE_HEADER;
+  const rows = extra ? TEMPLATE_ROWS.map((r) => [...r, '']) : TEMPLATE_ROWS;
+  const blob = new Blob([toCsv(header, rows)], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'mitglieder-vorlage.csv';
@@ -131,11 +138,13 @@ export function MemberImport({ onDone, doneLabel }: { onDone: () => void; doneLa
   if (result?.applied) {
     // Nach dem Übernehmen zählt new, was wirklich angelegt wurde.
     const former = result.new.former;
+    const noAccess = result.new.no_access ?? 0;
     return (
       <div className="member-import">
         <h2 className="member-name no-print">Import übernommen</h2>
         <p role="status" className="no-print">
           {count(result.created.length, 'Konto', 'Konten')} mit Startpasswort angelegt
+          {noAccess > 0 && ` · ${count(noAccess, 'Mitglied', 'Mitglieder')} ohne Zugang`}
           {former > 0 && ` · ${count(former, 'Person', 'Personen')} als ehemalig`}
           {result.offices_linked > 0 && ` · ${result.offices_linked} Einträge in den ${sec.offices} verknüpft`}.
         </p>
@@ -156,32 +165,15 @@ export function MemberImport({ onDone, doneLabel }: { onDone: () => void; doneLa
   }
 
   const errors = result?.rows.filter((r) => r.error).length ?? 0;
-  // Rollen, die sich beim Anlegen wählen lassen (z. B. Mitglied, Anwärter)
-  const roles = newAccountRoles()
-    .map((r) => r.label)
-    .join(', ');
   const total = result ? result.new.active + result.new.former : 0;
   return (
     <div className="member-import office-import">
-      <p className="muted small">
-        Eine Zeile je Person, die erste Zeile enthält die Spaltennamen. Nötig ist nur <strong>Vorname</strong>; außerdem kennt die App
-        Nachname, Status ({roles} oder ehemalig; leer heißt {levelLabel('member')}), Benutzername, E-Mail, Handynummer, Adresse (Straße,
-        Hausnummer, Adresszusatz, PLZ, Ort, Land; leer heißt Deutschland), Geburtstag, Eintritt, Punkte, Dienstgrad, Titel sowie bei
-        Ehemaligen Ausgeschieden und Grund (ausgetreten, verstorben, sonstiges). Daten als TT.MM.JJJJ, den Eintritt auch nur als Jahr. Die
-        Reihenfolge der Spalten ist egal, andere Spalten werden übergangen.
-      </p>
-      <p className="muted small">
-        Aktive bekommen ein Startpasswort, das nach dem Übernehmen einmal angezeigt wird. Ehemalige bekommen ein Konto ohne Anmeldung. Wer
-        schon ein Konto mit genau diesem Namen hat, wird übersprungen; ein zweiter Import legt also niemanden doppelt an. Bitte die Datei
-        danach löschen, wenn du sie nicht mehr brauchst.
-      </p>
       <button type="button" className="btn btn-link" onClick={downloadTemplate}>
         Vorlage herunterladen (CSV für Excel)
       </button>
       <label className="field">
         <span>Datei wählen (Excel .xlsx oder CSV)</span>
-        <input
-          type="file"
+        <FileInput
           accept=".xlsx,.csv,.txt,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           onChange={(e) => pick(e.target.files?.[0])}
         />
@@ -215,7 +207,8 @@ export function MemberImport({ onDone, doneLabel }: { onDone: () => void; doneLa
       {result && (
         <section>
           <p role="status">
-            Neu: {count(result.new.active, 'Konto', 'Konten')} mit Anmeldung · {result.new.former} ehemalig · schon vorhanden:{' '}
+            Neu: {count(result.new.active - (result.new.no_access ?? 0), 'Konto', 'Konten')} mit Anmeldung
+            {(result.new.no_access ?? 0) > 0 && ` · ${result.new.no_access} ohne Zugang`} · {result.new.former} ehemalig · schon vorhanden:{' '}
             {result.existing}
           </p>
           {result.columns.ignored.length > 0 && (
@@ -239,6 +232,12 @@ export function MemberImport({ onDone, doneLabel }: { onDone: () => void; doneLa
                   <>
                     {' '}
                     <span className="badge badge-role">{r.status === 'former' ? 'Ehemalig' : levelLabel(r.level ?? 'member')}</span>
+                    {r.extra_roles?.map((label) => (
+                      <span key={label} className="badge badge-role">
+                        {label}
+                      </span>
+                    ))}
+                    {r.no_access && <span className="badge badge-no-access">ohne Zugang</span>}
                   </>
                 )}
                 {!r.existing && !r.error && rowSummary(r) && ` · ${rowSummary(r)}`}

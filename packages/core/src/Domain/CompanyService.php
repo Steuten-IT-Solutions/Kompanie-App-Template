@@ -18,9 +18,10 @@ use KompanieApp\Core\Storage\CompanyRepository;
  * - Aufgelöste Kompanien (active false) bleiben als „ehemalig“ in der Liste.
  * - Ämter gehören zu Personen, nicht zu Kompanien: Die frühere Verknüpfung mit einer Gruppe der Ämter (Spalte
  *   office_group_id) wertet die App nicht mehr aus; die Spalte bleibt für das Zurückrollen.
- * - Personen sind optional zugeordnet, auch mehreren Kompanien (eindeutig ist das Paar). Sehen darf sie, wer die
- *   Mitgliederliste sehen darf (view_directory, auch Gäste und auch, wenn der Bereich directory aus ist), nur Personen,
- *   die dort stehen würden, nur mit Namen.
+ * - Personen sind optional zugeordnet, auch mehreren Kompanien (eindeutig ist das Paar). Sehen darf sie nur, wenn der
+ *   Bereich directory (Mitgliederliste) an ist, wer die Mitgliederliste sehen darf (view_directory, auch Gäste), nur
+ *   Personen, die dort stehen würden, nur mit Namen. Ist der Bereich aus, gibt es keine Mitgliederliste, auch nicht
+ *   auf den Seiten der Kompanien.
  * - Feste Zahl von Abfragen für die Liste, unabhängig von der Zahl der Kompanien und Personen.
  *
  * @phpstan-import-type Company from CompanyRepository
@@ -46,7 +47,7 @@ final class CompanyService
 
     /**
      * Alle Kompanien in ihrer Reihenfolge, für $viewer (null: ohne Anmeldung). Mitglieder (members, member_count) nur
-     * mit view_directory; wer Kompanien verwaltet, bekommt dazu die IDs aller
+     * mit dem Bereich directory und view_directory; wer Kompanien verwaltet, bekommt dazu die IDs aller
      * Zugeordneten.
      *
      * @return list<array<string, mixed>>
@@ -55,8 +56,8 @@ final class CompanyService
     {
         $who = $viewer ?? $this->app->anonymous();
         $manager = $viewer !== null && $viewer->can(Capability::ManageCompanies);
-        // Auch ohne Bereich directory (z. B. Bruderschaft ohne eigene Mitgliederliste): Namen mit view_directory.
-        $directory = $who->can(Capability::ViewDirectory);
+        // Mitgliederliste: zentral der Bereich directory, wer sie sieht, das Recht view_directory (wie GET /directory).
+        $directory = $this->app->features()->enabled('directory') && $who->can(Capability::ViewDirectory);
         $assignments = $this->repository()->assignments();
         $byCompany = [];
         foreach ($assignments as $userId => $ids) {

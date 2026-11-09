@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+import { askOk } from '../ask';
 import type { Gruppe } from './fotograf';
 
 // Fotos für das Handbuch, Teil „admin“ (siehe gruppen.ts): Einstellungen, Einrichtungsassistent, Vorschau als Rolle und
@@ -60,8 +61,9 @@ const gruppe: Gruppe = async (f) => {
   await f.foto('admin-benachrichtigungen');
 
   // Geburtstage: Vorlauf der Karte „Anstehende Geburtstage“
-  await f.oeffnen('einstellungen/geburtstage');
-  await f.foto('admin-geburtstage');
+  // (Abschnitt unter „Kalender“, Issue #348)
+  await f.oeffnen('einstellungen/kalender');
+  await ausschnitt('admin-geburtstage', '#einstellungen-geburtstage');
 
   // E-Mail: Kompanieadresse und Mailserver (Beispielwerte, nicht gespeichert)
   await f.oeffnen('einstellungen/email');
@@ -152,8 +154,8 @@ const gruppe: Gruppe = async (f) => {
     .getByLabel('Begründung (optional, erscheint auf der Wartungsseite)')
     .fill('Umstellung auf die neue Mitgliederliste, bis ca. 18 Uhr.');
   await f.foto('admin-wartungsmodus');
-  page.once('dialog', (d) => void d.accept());
   await knopf('Wartungsmodus einschalten').click();
+  await askOk(page);
   await expect(page.locator('.maintenance-banner')).toBeVisible();
   await expect(page.locator('.toast')).toHaveCount(0, { timeout: 10_000 });
   await f.foto('admin-wartungsmodus-banner');

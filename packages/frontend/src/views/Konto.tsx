@@ -17,6 +17,7 @@ import { downloadPersonalData } from '../personalData';
 import { previewRole } from '../preview';
 import { saveTheme, THEME_LABELS, useTheme, type ThemeChoice } from '../theme';
 import { sources } from '../viewData';
+import { confirmAsk } from '../ask';
 
 const MIN_LENGTH = 8;
 
@@ -98,7 +99,7 @@ function SignatureCard({ onToast }: { onToast: (msg: string) => void }) {
   }
 
   async function remove() {
-    if (!window.confirm('Signatur löschen? Nachrichten, in die du sie schon eingefügt hast, bleiben unverändert.')) return;
+    if (!(await confirmAsk('Signatur löschen? Nachrichten, in die du sie schon eingefügt hast, bleiben unverändert.'))) return;
     setBusy(true);
     try {
       await api.deleteSignature();
@@ -115,11 +116,6 @@ function SignatureCard({ onToast }: { onToast: (msg: string) => void }) {
   return (
     <section className="card account-card signature-card" id="signatur" ref={ref}>
       <h3>Signatur</h3>
-      <p className="muted small">
-        Frei gestaltet wie in einem Mailprogramm, mit Text und Bildern. Beim Schreiben einer Nachricht (Bereich „
-        {brand.labels.sections.board}“) fügst du sie mit „Signatur einfügen“ am Ende ein; spätere Änderungen hier ändern schon geschriebene
-        Nachrichten nicht.
-      </p>
       {saved === undefined && !error ? (
         <Loading shape="text" />
       ) : draft !== null ? (
@@ -257,9 +253,6 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
 
       <div className="card account-card">
         <h3>Darstellung</h3>
-        <p className="muted small">
-          Hell, dunkel oder wie auf dem Gerät eingestellt. Gilt nur auf diesem Gerät; umschalten geht auch oben mit dem Knopf neben „?“.
-        </p>
         <nav className="segmented theme-choice" aria-label="Darstellung">
           {(Object.keys(THEME_LABELS) as ThemeChoice[]).map((choice) => (
             <button
@@ -333,9 +326,6 @@ function MyDataCard() {
   return (
     <div className="card account-card">
       <h3>Meine Daten</h3>
-      <p className="muted small">
-        Alles, was die App über dich gespeichert hat, als Datei (JSON) zum Herunterladen, z. B. für eine Auskunft nach der DSGVO.
-      </p>
       <button
         className="btn btn-secondary btn-block"
         disabled={busy}

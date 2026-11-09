@@ -11,9 +11,11 @@ use KompanieApp\Core\Storage\Sql\Connection;
  * Vorzeitig gelöschte Nachrichten bleiben mit deleted_at/deleted_by stehen (expires_at = Zeitpunkt des Löschens), bis
  * BoardService::cleanup sie nach der Aufbewahrung des Verlaufs endgültig entfernt. body ist bereinigter formatierter
  * Inhalt (RichText), title reiner Text (NULL nur bei Nachrichten, die eine ältere Version geschrieben hat). audience:
- * public (alle, auch ohne Anmeldung) oder members (wer das Brett liest); fehlt die Spalte noch, gilt members.
+ * public (alle, auch ohne Anmeldung), members (wer das Brett liest), company (wer davon einer der Kompanien in
+ * audience_ids angehört) oder person (die Personen in audience_ids); fehlt die Spalte noch, gilt members.
+ * audience_ids: IDs durch Komma getrennt, nur bei company und person.
  *
- * @phpstan-type BoardMessage array{id: int, title: string, body: string, author_id: int, created_at: string, updated_at: string, expires_at: string, deleted_at: string|null, deleted_by: int|null, audience: string}
+ * @phpstan-type BoardMessage array{id: int, title: string, body: string, blocks: string|null, author_id: int, created_at: string, updated_at: string, expires_at: string, deleted_at: string|null, deleted_by: int|null, audience: string, audience_ids: list<int>}
  * @phpstan-type BoardRevision array{id: int, message_id: int, user_id: int, created_at: string, action: string, before_value: string|null, after_value: string|null}
  */
 final class BoardRepository
@@ -54,12 +56,19 @@ final class BoardRepository
         )));
     }
 
-    public function insert(string $title, string $body, int $authorId, string $now, string $expires, string $audience = 'members'): int
+    /** @param list<int> $audienceIds Kompanien oder Personen (nur bei audience company und person) */
+    public function insert(string $title, string $body, int $authorId, string $now, string $expires, string $audience = 'members', array $audienceIds = [], ?string $blocks = null): int
     {
-        return $this->db->insert('board_messages', ['title' => $title, 'body' => $body, 'author_id' => $authorId, 'created_at' => $now, 'updated_at' => $now, 'expires_at' => $expires, 'audience' => $audience]);
+        return $this->db->insert('board_messages', ['title' => $title, 'body' => $body, 'blocks' => $blocks, 'author_id' => $authorId, 'created_at' => $now, 'updated_at' => $now, 'expires_at' => $expires, 'audience' => $audience, 'audience_ids' => self::ids($audienceIds)]);
     }
 
-    /** @param array<string, string> $values title, body, updated_at, expires_at, audience */
+    /** IDs für die Spalte audience_ids (null ohne). @param list<int> $ids */
+    public static function ids(array $ids): ?string
+    {
+        return $ids === [] ? null : implode(',', $ids);
+    }
+
+    /** @param array<string, string|null> $values title, body, blocks, updated_at, expires_at, audience, audience_ids (ids()) */
     public function update(int $id, array $values): void
     {
         if ($values !== []) {
@@ -179,13 +188,15 @@ final class BoardRepository
             'id' => (int) $r['id'],
             'title' => (string) ($r['title'] ?? ''),
             'body' => (string) $r['body'],
+            'blocks' => isset($r['blocks']) && $r['blocks'] !== '' ? (string) $r['blocks'] : null,
             'author_id' => (int) $r['author_id'],
             'created_at' => (string) $r['created_at'],
             'updated_at' => (string) $r['updated_at'],
             'expires_at' => (string) $r['expires_at'],
             'deleted_at' => isset($r['deleted_at']) && $r['deleted_at'] !== '' ? (string) $r['deleted_at'] : null,
             'deleted_by' => isset($r['deleted_by']) ? (int) $r['deleted_by'] : null,
-            'audience' => ($r['audience'] ?? null) === 'public' ? 'public' : 'members',
+            'audience' => in_array($r['audience'] ?? null, ['public', 'company', 'person'], true) ? (string) $r['audience'] : 'members',
+            'audience_ids' => array_values(array_map('intval', array_filter(explode(',', (string) ($r['audience_ids'] ?? '')), static fn (string $v): bool => ctype_digit($v)))),
         ];
     }
 }

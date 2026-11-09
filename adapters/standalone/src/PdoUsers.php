@@ -139,6 +139,15 @@ final class PdoUsers implements UserDirectory
         $this->sessions?->destroyAllFor($id);
     }
 
+    public function setPasswordHash(int $id, string $passwordHash): void
+    {
+        if (password_get_info($passwordHash)['algo'] === null) {
+            throw new \DomainException('Ungültiger Passwort-Hash.');
+        }
+        $this->db->update('users', ['password_hash' => $passwordHash, 'updated_at' => gmdate('Y-m-d H:i:s')], ['id' => $id]);
+        $this->sessions?->destroyAllFor($id);
+    }
+
     /** Hash nach einer Änderung des Verfahrens (z. B. höhere Kosten) erneuern. */
     public function rehashIfNeeded(int $id, string $password, string $hash): void
     {

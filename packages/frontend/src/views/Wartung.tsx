@@ -16,6 +16,8 @@ import { filePayload, isEncryptedFile } from '../backupFile';
 import brand from '../generated/brand';
 import { ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
+import { confirmAsk } from '../ask';
+import { UPDATE_ACCEPT, uploadUpdatePackage } from '../updateUpload';
 
 /**
  * Wartung für Admins: Ampel (Status), Updates mit Zurückrollen, Statusmeldungen (nur mit
@@ -50,8 +52,13 @@ function StatusCard({ status }: { status: AdminStatus }) {
             <span className="status-dot" role="img" aria-label={LEVEL_TEXT[i.level]} />
             <span>
               <strong>{i.label}</strong>
-              <br />
-              <span className="small">{i.text}</span>
+              {/* Erklärungen stehen im Handbuch (Issue #343); in der App nur, was bei einem Problem zu tun ist */}
+              {(i.level === 'warn' || i.level === 'error') && (
+                <>
+                  <br />
+                  <span className="small">{i.text}</span>
+                </>
+              )}
             </span>
           </li>
         ))}
@@ -139,6 +146,9 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
   const [error, setError] = useState<string | null>(null);
   const [older, setOlder] = useState('');
   const [showPayload, setShowPayload] = useState(false);
+  /** Anteil des hochgeladenen Update-Pakets (0 bis 1); null: es wird keins hochgeladen */
+  const [uploadShare, setUploadShare] = useState<number | null>(null);
+  const packageInput = useRef<HTMLInputElement>(null);
   /** Fortschritt des laufenden Updates; undefined: keins läuft */
   const [progress, setProgress] = useState<UpdateProgress | null | undefined>(status.updates.running ? status.updates.progress : undefined);
   const alive = useRef(true);
@@ -240,12 +250,43 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
     } catch (err) {
       if (
         !(err instanceof ApiError && err.code === 'drive_backup_failed') ||
-        !window.confirm(`${err.message}\n\nTrotzdem aktualisieren?`)
+        !(await confirmAsk(`${err.message}\n\nTrotzdem aktualisieren?`))
       ) {
         throw err;
       }
       await follow(version, fn(true));
     }
+  }
+
+  /** Update-Paket hochladen, erkennen (Version aus der signierten Liste), nach Rückfrage einspielen. */
+  async function installPackage(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    await run('package', async () => {
+      let id: string;
+      try {
+        id = await uploadUpdatePackage(file, setUploadShare);
+      } finally {
+        setUploadShare(null);
+      }
+      try {
+        const info = await api.checkUpdateUpload(id);
+        const notes = [
+          info.older && `Das ist eine ältere Version als die installierte (${info.current}).`,
+          !info.released && 'Diese Version ist noch nicht für alle freigegeben (Vorabversion).',
+          info.major && 'Das ist eine neue Hauptversion: Zurück geht es danach nur mit unserer Hilfe.',
+        ].filter(Boolean);
+        if (!(await confirmAsk([`Version ${info.version} aus „${file.name}“ einspielen?`, ...notes].join('\n\n')))) {
+          void api.cancelUpdateUpload(id).catch(() => undefined);
+          return;
+        }
+        await askWithoutDrive(info.version, (withoutDrive) => api.installUpdateUpload(id, info.major, withoutDrive));
+      } catch (err) {
+        void api.cancelUpdateUpload(id).catch(() => undefined);
+        throw err;
+      }
+    });
   }
 
   const install = (version: string, major = false) =>
@@ -358,7 +399,9 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
                 type="button"
                 className="btn btn-secondary"
                 disabled={!!busy}
-                onClick={() => window.confirm(`Neue Hauptversion ${u.majorVersion} jetzt einspielen?`) && install(u.majorVersion!, true)}
+                onClick={async () =>
+                  (await confirmAsk(`Neue Hauptversion ${u.majorVersion} jetzt einspielen?`)) && install(u.majorVersion!, true)
+                }
               >
                 Hauptversion einspielen
               </button>
@@ -391,22 +434,22 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
               type="checkbox"
               checked={u.channel === 'early'}
               disabled={!!busy}
-              onChange={(e) =>
-                (!e.target.checked ||
-                  window.confirm(
+              onChange={async (e) => {
+                // Vor der Rückfrage lesen: Während sie offen ist, setzt React den Haken auf den alten Stand zurück.
+                const early = e.target.checked;
+                if (
+                  early &&
+                  !(await confirmAsk(
                     'Vorabversionen erhalten? Diese Installation bekommt dann jede neue Version, bevor sie für alle freigegeben ist – zum Testen, kann noch Fehler enthalten.',
-                  )) &&
-                run('channel', async () => setU(await api.updateOptions({ channel: e.target.checked ? 'early' : 'stable' })))
-              }
+                  ))
+                ) {
+                  return;
+                }
+                await run('channel', async () => setU(await api.updateOptions({ channel: early ? 'early' : 'stable' })));
+              }}
             />
             <span>Vorabversionen erhalten (zum Testen)</span>
           </label>
-          {u.channel === 'early' && (
-            <p className="muted small">
-              Diese Installation bekommt jede neue Version, sobald sie gebaut ist, nicht erst nach der Freigabe für alle. Ausschalten: Sie
-              bleibt auf der jetzigen Version, bis eine neuere freigegeben ist.
-            </p>
-          )}
           {!u.autoAllowed && (
             <p className="muted small">
               Automatische Updates sind in dieser Installation gesperrt (z. B. in den Einstellungen von WordPress). Neue Versionen bitte
@@ -416,10 +459,6 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
           {olderVersions.length > 0 && (
             <details className="small">
               <summary>Auf eine ältere Version zurück</summary>
-              <p className="muted">
-                Hilft, wenn nach einem Update etwas nicht mehr klappt. Die jetzige Version wird danach übersprungen, bis eine neuere
-                erscheint.
-              </p>
               <label className="field">
                 <span>Version</span>
                 <select value={older} onChange={(e) => setOlder(e.target.value)}>
@@ -435,8 +474,8 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
                 type="button"
                 className="btn btn-danger"
                 disabled={!!busy || !older}
-                onClick={() =>
-                  window.confirm(`Auf Version ${older} zurückgehen?`) &&
+                onClick={async () =>
+                  (await confirmAsk(`Auf Version ${older} zurückgehen?`)) &&
                   run('rollback', async () => {
                     await askWithoutDrive(older, (withoutDrive) => api.rollback(older, withoutDrive));
                   })
@@ -446,6 +485,23 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
               </button>
             </details>
           )}
+          <details className="small">
+            <summary>Update-Paket hochladen</summary>
+            <p>
+              Statt das Update vom Server laden zu lassen, kannst du das Paket hier hochladen, z. B.{' '}
+              <code>{`kompanie-app-${config?.variant ?? 'standalone'}.zip`}</code> aus den Releases deiner App. Eingespielt wird nur ein
+              unverändertes Paket, das in der geprüften Update-Liste steht, auch eine Vorabversion oder eine ältere Version. Vorher wird wie
+              immer gesichert.
+            </p>
+            <button type="button" className="btn btn-secondary" disabled={!!busy} onClick={() => packageInput.current?.click()}>
+              {busy === 'package'
+                ? uploadShare !== null
+                  ? `Wird hochgeladen … ${Math.round(uploadShare * 100)} %`
+                  : 'Wird eingespielt …'
+                : 'Paket wählen …'}
+            </button>
+            <input ref={packageInput} type="file" accept={UPDATE_ACCEPT} hidden onChange={(e) => void installPackage(e)} />
+          </details>
         </>
       )}
       {status.statusReports.available && (
@@ -537,7 +593,7 @@ function Fehlerprotokoll({ status, onToast }: { status: AdminStatus; onToast: (m
   }
 
   async function clear() {
-    if (!window.confirm('Fehlerprotokoll leeren?')) return;
+    if (!(await confirmAsk('Fehlerprotokoll leeren?'))) return;
     setBusy(true);
     setError(null);
     try {
@@ -553,17 +609,17 @@ function Fehlerprotokoll({ status, onToast }: { status: AdminStatus; onToast: (m
   return (
     <section className="card settings-section" aria-labelledby="errorlog-title">
       <h3 id="errorlog-title">Fehlerprotokoll</h3>
-      <p className="small muted">
-        Die letzten Fehler dieser Installation mit Fehlertext (höchstens 14 Tage). Das Protokoll bleibt auf eurem Server. Wenn die Betreuer
-        der App bei einem Problem helfen sollen, kopiere es und schicke es ihnen
-        {status.support ? (
-          <>
-            {' '}
-            (<a href={supportHref(status.support)}>{status.support}</a>)
-          </>
-        ) : null}
-        . Vorher kurz durchsehen: Fehlertexte können Namen enthalten.
-      </p>
+      {log.length > 0 && (
+        <p className="small">
+          Vor dem Weitergeben kurz durchsehen: Fehlertexte können Namen enthalten.
+          {status.support && (
+            <>
+              {' '}
+              Betreuer der App: <a href={supportHref(status.support)}>{status.support}</a>
+            </>
+          )}
+        </p>
+      )}
       {log.length === 0 ? (
         <p className="small">Keine Fehler in den letzten 14 Tagen.</p>
       ) : (
@@ -712,9 +768,9 @@ function Datensicherung({
     e.target.value = '';
     if (!file) return;
     if (
-      !window.confirm(
+      !(await confirmAsk(
         `Alle Daten der App durch die Sicherung „${file.name}“ ersetzen? Das lässt sich nur mit einer anderen Sicherung rückgängig machen.`,
-      )
+      ))
     )
       return;
     setError(null);
@@ -751,7 +807,7 @@ function Datensicherung({
         auf dem Server aufbewahren. Vor jedem Update sichert die App automatisch auf dem Server und, wenn die Sicherungen in Google Drive
         eingeschaltet sind, auch dort.
       </p>
-      <div className="button-row">
+      <div className="button-row single">
         <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void download()}>
           {encrypted
             ? 'Sicherung verschlüsselt herunterladen'
@@ -772,12 +828,6 @@ function Datensicherung({
         <p className="small">
           Verschlüsselt herunterladen geht, sobald das Passwort unten mit „Passwort prüfen“ bestätigt ist: Mit einem vertippten Passwort
           ließe sich die Sicherung nicht wiederherstellen.
-        </p>
-      )}
-      {encrypted && (
-        <p className="muted small">
-          Bricht das Herunterladen ab, ist die Datei unvollständig (die App erkennt das beim Wiederherstellen); der Grund steht unter
-          Einstellungen → Zustand und Updates im Fehlerprotokoll.
         </p>
       )}
       <input
@@ -860,9 +910,9 @@ function Verschluesselung({
     }
   }
 
-  function remove() {
+  async function remove() {
     if (
-      window.confirm(
+      await confirmAsk(
         'Passwort für Sicherungen entfernen? Neue Sicherungen sind dann unverschlüsselt, auch die in Google Drive. Ältere verschlüsselte Sicherungen brauchen weiter das bisherige Passwort.',
       )
     )
@@ -1043,12 +1093,6 @@ function DriveSicherung({ onToast, noSodium }: { onToast: (msg: string) => void;
   return (
     <section className="card settings-section" aria-labelledby="backup-drive-title">
       <h3 id="backup-drive-title">Sicherungen in Google Drive</h3>
-      <p className="muted small">
-        Damit nach dem Verlust des Servers eine aktuelle Sicherung woanders liegt: Die App legt einmal pro{' '}
-        {d.every_days === 7 ? 'Woche' : `${d.every_days} Tage`} eine Sicherung in einem eigenen Ordner im verbundenen Google-Konto ab und
-        behält die letzten {d.keep}. Ist oben ein Passwort für Sicherungen eingerichtet, gehen sie verschlüsselt dorthin; den Ordner
-        trotzdem bitte nicht freigeben.
-      </p>
       {!d.encrypted && (
         <p className="small">
           {noSodium

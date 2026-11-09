@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { devices, expect, test, type Locator, type Page, type Request } from '@playwright/test';
 import { strToU8, zipSync } from 'fflate';
+import { askCancel, askOk, autoAsk } from './ask';
 
 // E2E-Tests gegen eine Test-Instanz mit der Beispielkonfiguration (config/kompanie.example.json):
 // Der Bereich Strafen heißt dort „Kasse“. Die Testdaten legen die eigene Rolle „Spieß“ an (Punkte, Kasse, Termine). Die App liegt unter /app/.
@@ -314,8 +315,8 @@ test('Mitglied: Punkte-Kachel vergibt Punkte nur an diese Person, Einträge im s
   await expect(sheet.getByLabel('Grund')).toHaveValue('');
   await expect(page.locator('.member-stats .stat', { hasText: 'Punkte' }).locator('.stat-value')).toHaveText(String(before + 3));
   // Wieder stornieren, damit die Summen anderer Tests stimmen
-  page.once('dialog', (d) => d.accept());
   await sheet.locator('.row', { hasText: 'E2E Kachel' }).getByRole('button', { name: 'Stornieren' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Storniert');
   await sheet.getByRole('button', { name: 'Schließen' }).click();
   await expect(sheet).toHaveCount(0);
@@ -564,8 +565,9 @@ test.describe('ohne Service Worker, Daten zurückgehalten', () => {
     await expect(page.locator('[data-loading]')).not.toHaveCount(0);
     await expect(page.locator('.member-name')).toHaveText('Mitglied1');
     await expect(page.locator('.member-step')).toContainText('1 / 2');
-    // Kopf schon aus der Mitgliederliste (Rolle, Kacheln), obwohl die Daten der Person noch zurückgehalten werden
-    await expect(page.locator('.member-level')).toContainText('Rolle');
+    // Kopf schon aus der Mitgliederliste (Kacheln), obwohl die Daten der Person noch zurückgehalten werden. Die Rolle
+    // sieht nur, wer Rollen vergibt (Issue #349); der Verwalter darf das nicht.
+    await expect(page.locator('.member-level')).toHaveCount(0);
     await expect(page.locator('.member-stats')).toBeVisible();
     await swipe(page, -200);
     await expect(page.locator('.member-name')).toHaveText('Mitglied2');
@@ -574,7 +576,7 @@ test.describe('ohne Service Worker, Daten zurückgehalten', () => {
     release();
     await expect(page.locator('[data-loading]')).toHaveCount(0);
     await expect(page.locator('.member-name')).toHaveText('Mitglied2');
-    await expect(page.locator('.member-level').first()).toContainText('Rolle');
+    await expect(page.locator('.member-level')).toHaveCount(0);
   });
 
   test('Mitglied: Lädt die Seite noch, wischt auch die leere Fläche unter dem Gerüst', async ({ page }) => {
@@ -744,8 +746,8 @@ test('Admin legt ein Mitglied an und setzt sein Passwort zurück', async ({ page
   // Standard-Sortierung nach Nachname: „Nachname, Vorname“.
   await page.locator('.row', { hasText: 'Testperson, Neue' }).first().click();
   await memberAccount(page);
-  page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: /Neues Startpasswort erzeugen/ }).click();
+  await askOk(page);
   const fresh = (await page.getByTestId('reset-password').textContent())!.trim();
   expect(fresh).toHaveLength(12);
   expect(fresh).not.toBe(password);
@@ -900,6 +902,13 @@ test('Konten: das eigene Konto in der Verwaltung ändern, ohne Löschen', async 
 });
 
 /** Kleines gültiges PNG (1 × 1 Pixel) zum Hochladen. */
+/** Kurzes WebM-Video (2 Sekunden, 160 × 90), Issue #350 */
+const WEBM = {
+  name: 'clip.webm',
+  mimeType: 'video/webm',
+  buffer: readFileSync(new URL('../../../tests/fixtures/galerie-video.webm', import.meta.url)),
+};
+
 const PNG = {
   name: 'foto.png',
   mimeType: 'image/png',
@@ -982,8 +991,8 @@ test('Fotos: beim Anlegen mitgeben (einzeln und mehrere), in Liste und Details, 
   await expect(page.getByRole('button', { name: 'Foto entfernen' })).toHaveCount(0);
   await page.getByRole('button', { name: /vergrößern/ }).click();
   await expect(zoom.getByRole('button', { name: 'Foto ersetzen' })).toBeVisible();
-  page.once('dialog', (d) => d.accept());
   await zoom.getByRole('button', { name: 'Foto entfernen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toContainText('Foto entfernt');
   await expect(zoom).toHaveCount(0);
   await expect(page.locator('.member-rank-line .member-avatar-initials')).toBeVisible();
@@ -1094,8 +1103,8 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   await expect(page.locator('.row', { hasText: `${last}, Anna` }).locator('.badge-candidate')).toHaveText('Anwärter');
   await page.locator('.row', { hasText: `${last}, Anna` }).click();
   await memberAccount(page);
-  page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Als Mitglied aufnehmen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText(`${name} ist jetzt Mitglied`);
   await expect(page.getByRole('button', { name: 'Als Mitglied aufnehmen' })).toHaveCount(0);
 
@@ -1104,7 +1113,7 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   await expect(page.locator('.meins-menu')).toBeVisible();
 });
 
-/** Navigation per API zurücksetzen (null = Standardnavigation), falls ein Test mittendrin scheitert. */
+/** Navigation per API zurücksetzen (Standardnavigation, ohne eigene Namen und Startseiten), falls ein Test mittendrin scheitert. */
 async function resetNavigation(page: Page) {
   await page.evaluate(async () => {
     const cfg = window.KOMPANIE_CONFIG!;
@@ -1112,7 +1121,7 @@ async function resetNavigation(page: Page) {
       method: 'PUT',
       headers: { [cfg.csrf.header]: cfg.csrf.token, 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ navigation: null }),
+      body: JSON.stringify({ navigation: null, names: {}, start: {}, show_labels: true }),
     });
   });
 }
@@ -1167,11 +1176,75 @@ test('Navigation einrichten (Issue #277): Untermenü umbenennen, Termine hineins
       .locator('.settings-link')
       .filter({ has: page.getByText('Navigation', { exact: true }) })
       .click();
-    page.once('dialog', (d) => d.accept());
     await card.getByRole('button', { name: 'Standardnavigation wiederherstellen' }).click();
+    await askOk(page);
     await expect(page.getByText('Standardnavigation wiederhergestellt')).toBeVisible();
     await expect(tabbar.getByRole('button', { name: 'Intern' })).toBeVisible();
     await expect(tabbar.getByRole('button', { name: 'Termine' })).toBeVisible();
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD).catch(() => undefined);
+    await resetNavigation(page).catch(() => undefined);
+  }
+});
+
+test('Navigation (Issue #362): Galerie umbenennen mit eigenem Symbol, Startseite für Gäste, nur Symbole', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  try {
+    await adminMenu(page, 'Einstellungen');
+    await page
+      .locator('.settings-link')
+      .filter({ has: page.getByText('Navigation', { exact: true }) })
+      .click();
+    const card = page.locator('#einstellungen-navigation');
+    const row = card.locator('.row-main').filter({ has: page.getByLabel('Platz von Galerie') });
+    await row.getByText('Umbenennen').click();
+    // Erst das Symbol: Mit dem neuen Namen heißt auch die Zeile anders („Platz von Fotos“).
+    await row.getByLabel('Symbol').selectOption({ label: 'Kamera' });
+    await row.getByLabel('Eigener Name (leer = Standard)').fill('Fotos');
+    await card.getByLabel('Ohne Anmeldung').selectOption({ label: 'Fotos' });
+    await card.getByRole('button', { name: 'Navigation speichern' }).click();
+    await expect(page.getByText('Navigation gespeichert')).toBeVisible();
+    // Unverändert aus der Standardnavigation: Sie bleibt, nur mit dem neuen Namen.
+    await expect(card.getByText('Zurzeit gilt die Standardnavigation', { exact: false })).toBeVisible();
+
+    // Nach dem Neuladen heißt der Bereich überall „Fotos“; die Adresse bleibt #/galerie.
+    const tabbar = page.locator('.tabbar');
+    await expect(tabbar.getByRole('button', { name: 'Fotos' })).toBeVisible();
+    await expect(tabbar.getByRole('button', { name: 'Galerie' })).toHaveCount(0);
+    await tabbar.getByRole('button', { name: 'Fotos' }).click();
+    await expect(page).toHaveURL(/#\/galerie$/);
+    await expect(page.locator('.topbar-title')).toHaveText('Fotos');
+
+    // Gast: Die App öffnet auf der eingestellten Startseite.
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await expect(page).toHaveURL(/#\/galerie$/);
+    await expect(tabbar.getByRole('button', { name: 'Fotos' })).toHaveAttribute('aria-current', 'page');
+
+    // Nur Symbole: Die Namen stehen weiter am Knopf (für Screenreader), aber nicht mehr sichtbar darunter.
+    await login(page, 'admin', ADMIN_PASSWORD);
+    await adminMenu(page, 'Einstellungen');
+    await page
+      .locator('.settings-link')
+      .filter({ has: page.getByText('Navigation', { exact: true }) })
+      .click();
+    await card.getByLabel('Namen unter den Symbolen zeigen').uncheck();
+    await card.getByRole('button', { name: 'Navigation speichern' }).click();
+    await expect(page.locator('.tabbar.tabbar-icons')).toBeVisible();
+    await expect(tabbar.getByRole('button', { name: 'Meins' })).toBeVisible();
+    await expect(tabbar.getByText('Meins', { exact: true })).toBeHidden();
+
+    // Standardnavigation wiederherstellen setzt alles zurück.
+    await adminMenu(page, 'Einstellungen');
+    await page
+      .locator('.settings-link')
+      .filter({ has: page.getByText('Navigation', { exact: true }) })
+      .click();
+    await card.getByRole('button', { name: 'Standardnavigation wiederherstellen' }).click();
+    await askOk(page);
+    await expect(page.getByText('Standardnavigation wiederhergestellt')).toBeVisible();
+    await expect(tabbar.getByRole('button', { name: 'Galerie' })).toBeVisible();
+    await expect(page.locator('.tabbar.tabbar-icons')).toHaveCount(0);
   } finally {
     await login(page, 'admin', ADMIN_PASSWORD).catch(() => undefined);
     await resetNavigation(page).catch(() => undefined);
@@ -1437,11 +1510,11 @@ test('Ämter: pflegen in der Verwaltung, Zeitstrahl öffentlich im Tab Mitgliede
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.goto('/app/#/verwaltung/aemter');
   await page.getByRole('button', { name: office, exact: true }).click();
-  page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Amt löschen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
-  page.once('dialog', (d) => d.accept());
   await page.locator('.row', { hasText: group }).getByRole('button', { name: 'Löschen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Gelöscht');
   const deleted = await page.evaluate(async (formerId) => {
     const cfg = window.KOMPANIE_CONFIG!;
@@ -1512,8 +1585,8 @@ test('Ämter: Haken „Ehrung“ an der Amtszeit, einzelnes Jahr ohne Ehrung (Is
 
   await page.goto('/app/#/verwaltung/aemter');
   await page.getByRole('button', { name: office, exact: true }).click();
-  page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Amt löschen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
 });
 
@@ -1565,6 +1638,26 @@ test('Ämter: gemeinsame Amtszeiten einer Gruppe mit Gruppenbild, öffentlich al
   await expect(admin.locator('li.card')).toContainText(`${offices[0]}: ${holders[0]}`);
   await expect(admin.locator('li.card')).toContainText(`${offices[1]}: ${holders[1]}`);
 
+  // Einzahl des ersten Amts: steht auf der Karte statt seiner Bezeichnung
+  const officeSingular = `König ${n}`;
+  const patched = await page.evaluate(
+    async ({ title, singular }) => {
+      const cfg = window.KOMPANIE_CONFIG!;
+      const headers = { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token };
+      const all = await (await fetch(cfg.apiBase + 'offices', { credentials: 'same-origin' })).json();
+      const o = (all.offices as { id: number; title: string }[]).find((x) => x.title === title)!;
+      const r = await fetch(cfg.apiBase + `offices/${o.id}`, {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers,
+        body: JSON.stringify({ singular }),
+      });
+      return r.status;
+    },
+    { title: offices[0], singular: officeSingular },
+  );
+  expect(patched).toBeLessThan(300);
+
   // Öffentlich: eine Karte je gemeinsame Amtszeit mit Bild und den Personen je Amt
   await page.goto('/app/#/mitglieder/aemter');
   await expect(page.locator('.office-group h2', { hasText: group })).toBeVisible();
@@ -1573,22 +1666,23 @@ test('Ämter: gemeinsame Amtszeiten einer Gruppe mit Gruppenbild, öffentlich al
   await expect(card.locator('.joint-term-title')).toContainText('aktuell');
   await expect(card.locator('img.joint-term-image')).toBeVisible();
   expect(await card.locator('img.joint-term-image').evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
-  await expect(card.locator('.joint-term-offices > div', { hasText: offices[0] }).locator('dd')).toContainText(holders[0]);
+  await expect(card.locator('.joint-term-offices > div', { hasText: officeSingular }).locator('dd')).toContainText(holders[0]);
+  await expect(card.locator('.joint-term-offices dt', { hasText: offices[0] })).toHaveCount(0);
   await expect(card.locator('.joint-term-offices > div', { hasText: offices[1] }).locator('dd')).toContainText(holders[1]);
 
   // Aufräumen: gemeinsame Amtszeit, Ämter und Gruppe löschen
   await page.goto('/app/#/verwaltung/aemter');
-  page.once('dialog', (d) => d.accept());
   await page.locator('.office-admin-group', { hasText: group }).locator('.joint-admin').getByRole('button', { name: 'Löschen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Gelöscht');
   for (const office of offices) {
     await page.getByRole('button', { name: office, exact: true }).click();
-    page.once('dialog', (d) => d.accept());
     await page.getByRole('button', { name: 'Amt löschen' }).click();
+    await askOk(page);
     await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
   }
-  page.once('dialog', (d) => d.accept());
   await page.locator('li.card', { hasText: group }).getByRole('button', { name: 'Löschen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Gelöscht');
 });
 
@@ -1637,8 +1731,8 @@ test('Ämter: Foto für eine Person ohne Profil, öffentlich im Zeitstrahl, Übe
 
   await page.goto('/app/#/verwaltung/aemter');
   await page.getByRole('button', { name: office, exact: true }).click();
-  page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: 'Amt löschen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
 });
 
@@ -1658,13 +1752,47 @@ test('Galerie: Album nur in der App anlegen, Bilder hochladen, ändern und lösc
   await expect(item).toContainText('nur in der App · 0 hochgeladen');
 
   // Zwei Bilder auf einmal, eines davon später löschen
-  await item.getByLabel(`Bilder in ${title} hochladen`).setInputFiles([PNG, { ...PNG, name: 'zweites.png' }]);
+  await item.getByLabel(`Bilder oder Videos in ${title} hochladen`).setInputFiles([PNG, { ...PNG, name: 'zweites.png' }]);
   await expect(page.locator('.toast')).toHaveText('2 Bilder hochgeladen');
   await expect(item.locator('.gallery-upload')).toHaveCount(2);
   await expect(item).toContainText('2 hochgeladen');
+
+  // Ein Video (Issue #350): in Stücken hochgeladen, mit Standbild als Vorschau, in der Galerie abspielbar
+  await item.getByLabel(`Bilder oder Videos in ${title} hochladen`).setInputFiles([WEBM]);
+  await expect(page.locator('.toast')).toHaveText('1 Video hochgeladen');
+  await expect(item.locator('.gallery-upload')).toHaveCount(3);
+  const albumId = await page.evaluate(async (title) => {
+    const cfg = window.KOMPANIE_CONFIG!;
+    const res = await fetch(cfg.apiBase + 'admin/gallery/albums', {
+      credentials: 'same-origin',
+      headers: { [cfg.csrf.header]: cfg.csrf.token },
+    });
+    return ((await res.json()) as { albums: { id: number; title: string }[] }).albums.find((a) => a.title === title)!.id;
+  }, title);
+  const video = await page.evaluate(async (id) => {
+    const cfg = window.KOMPANIE_CONFIG!;
+    const album = (await (
+      await fetch(cfg.apiBase + `gallery/${id}`, { credentials: 'same-origin', headers: { [cfg.csrf.header]: cfg.csrf.token } })
+    ).json()) as {
+      photos: { type: string; video?: string; mime?: string; width: number; height: number; duration?: number }[];
+    };
+    const v = album.photos.find((p) => p.type === 'video')!;
+    const res = await fetch(v.video!, { headers: { Range: 'bytes=0-3' } });
+    return {
+      status: res.status,
+      bytes: [...new Uint8Array(await res.arrayBuffer())],
+      mime: v.mime,
+      size: [v.width, v.height],
+      duration: v.duration,
+    };
+  }, albumId);
+  expect(video).toEqual({ status: 206, bytes: [0x1a, 0x45, 0xdf, 0xa3], mime: 'video/webm', size: [160, 90], duration: 2 });
+  await item.locator('.gallery-upload', { hasText: 'clip.webm' }).getByRole('button', { name: 'Löschen' }).click();
+  await askOk(page);
+  await expect(page.locator('.toast')).toHaveText('Video gelöscht');
   await expect(item.locator('.gallery-upload', { hasText: 'foto.jpg' })).toBeVisible();
-  page.once('dialog', (d) => void d.accept());
   await item.locator('.gallery-upload', { hasText: 'zweites.jpg' }).getByRole('button', { name: 'Löschen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Bild gelöscht');
   await expect(item.locator('.gallery-upload')).toHaveCount(1);
 
@@ -1673,8 +1801,8 @@ test('Galerie: Album nur in der App anlegen, Bilder hochladen, ändern und lösc
   await expect(page.locator('.toast')).toHaveText('Gespeichert');
   await expect(section.locator('.gallery-album-head', { hasText: `${title} neu` })).toBeVisible();
 
-  page.once('dialog', (d) => void d.accept());
   await item.getByRole('button', { name: 'Album löschen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Album gelöscht');
   await expect(section.locator('.gallery-album-item', { hasText: title })).toHaveCount(0);
 });
@@ -1718,6 +1846,10 @@ test('Galerie: Knöpfe zum Herunterladen für ein Bild und das Album als ZIP, nu
 
     await page.goto(`/app/#/galerie/${albumId}`);
     const zipButton = page.getByRole('button', { name: 'Album herunterladen (1 Bild, ZIP)' });
+    // Runder Icon-Knopf neben dem Titel wie in der Großansicht: Anzahl nur im Namen und Tooltip, nicht als Text
+    await expect(zipButton).toHaveText('');
+    await expect(zipButton).toHaveAttribute('title', 'Album herunterladen (1 Bild, ZIP)');
+    await expect(page.locator('.album-head h2 + .album-download-btn svg')).toBeVisible();
     const [zip] = await Promise.all([page.waitForEvent('download'), zipButton.click()]);
     expect(zip.suggestedFilename()).toBe(`${title} 2026.zip`);
     const bytes = readFileSync((await zip.path())!);
@@ -1753,30 +1885,51 @@ test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)',
   expect(albumId).toBeGreaterThan(0);
 
   await page.goto('/app/#/galerie');
-  await page.getByRole('button', { name: 'Bilder einreichen' }).click();
-  const form = page.locator('form', { hasText: 'Bilder einreichen' });
+  await page.getByRole('button', { name: 'Bilder und Videos einreichen' }).click();
+  const form = page.locator('form', { hasText: 'Bilder und Videos einreichen' });
   await form.getByLabel('Album').selectOption({ label: `2026 · ${title}` });
-  await form.getByLabel('Bilder (JPG, PNG oder WebP)').setInputFiles([PNG, { ...PNG, name: 'zweites.png' }]);
+  await form.getByLabel('Bilder oder Videos').setInputFiles([PNG, { ...PNG, name: 'zweites.png' }, WEBM]);
   await expect(form.getByRole('button', { name: 'Einreichen' })).toBeDisabled();
-  await form.getByLabel('Ich habe die Rechte an den Bildern, und die erkennbaren Personen sind einverstanden.').check();
+  await form.getByLabel('Ich habe die Rechte an den Bildern und Videos, und die erkennbaren Personen sind einverstanden.').check();
   await form.getByRole('button', { name: 'Einreichen' }).click();
-  await expect(page.locator('.toast')).toHaveText('2 Bilder eingereicht');
+  await expect(page.locator('.toast')).toHaveText('2 Bilder und 1 Video eingereicht');
   const mine = page.locator('.gallery-upload', { hasText: title });
-  await expect(mine).toHaveCount(2);
+  await expect(mine).toHaveCount(3);
   await expect(mine.first()).toContainText('wartet auf Freigabe');
+  // Standbild als Vorschau des Videos
+  await expect(mine.filter({ hasText: 'clip.webm' }).getByRole('img', { name: 'Video clip.webm' }).locator('img')).toHaveCount(1);
 
-  // Prüfen: eines öffentlich freigeben, eines mit Grund ablehnen
+  // Prüfen: das Video vorher ansehen und ablehnen, ein Bild öffentlich freigeben, eines mit Grund ablehnen
   await page.getByRole('button', { name: '‹ Alle Alben' }).click();
   await page.getByRole('button', { name: 'Einreichungen prüfen' }).click();
   const items = page.locator('.gallery-review-item', { hasText: title });
+  await expect(items).toHaveCount(3);
+  const clip = items.filter({ hasText: 'clip.webm' }).locator('video');
+  await expect(clip).toHaveAttribute('poster', /^data:image\/jpeg;base64,/);
+  expect(await clip.evaluate(async (v: HTMLVideoElement) => (await fetch(v.src, { headers: { Range: 'bytes=0-3' } })).status)).toBe(206);
+  await items.filter({ hasText: 'clip.webm' }).getByRole('button', { name: 'Ablehnen' }).click();
+  await askOk(page, 'Zu dunkel');
+  await expect(page.locator('.toast')).toHaveText('Abgelehnt');
   await expect(items).toHaveCount(2);
   await items.filter({ hasText: 'foto.jpg' }).getByRole('button', { name: 'Öffentlich freigeben' }).click();
   await expect(page.locator('.toast')).toHaveText('Freigegeben');
-  page.once('dialog', (d) => void d.accept('Unscharf'));
   await items.filter({ hasText: 'zweites.jpg' }).getByRole('button', { name: 'Ablehnen' }).click();
+  await askOk(page, 'Unscharf');
   await expect(page.locator('.toast')).toHaveText('Abgelehnt');
   await expect(items).toHaveCount(0);
   await expect(page.locator('.gallery-upload', { hasText: title })).toHaveCount(1);
+
+  // Nachträglich intern stellen: Haken unter „Zuletzt freigegeben“, bleibt nach dem Neuladen gesetzt
+  const intern = page
+    .locator('.gallery-upload', { hasText: title })
+    .getByRole('checkbox', { name: 'foto.jpg nur für Mitglieder (intern)' });
+  await expect(intern).not.toBeChecked();
+  await intern.check();
+  await expect(page.locator('.toast')).toHaveText('Jetzt nur für Mitglieder');
+  await page.reload();
+  await expect(
+    page.locator('.gallery-upload', { hasText: title }).getByRole('checkbox', { name: 'foto.jpg nur für Mitglieder (intern)' }),
+  ).toBeChecked();
 
   await page.goto('/app/#/galerie/einreichen');
   await expect(page.locator('.gallery-upload', { hasText: 'zweites.jpg' })).toContainText('nicht freigegeben: Unscharf');
@@ -2211,8 +2364,8 @@ test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, C
   await page.emulateMedia({ media: 'screen', colorScheme: 'light' });
 
   // Kopieren und löschen (WordPress behält die Daten zwischen den Läufen); die leeren Zeilen von eben verwerfen
-  page.once('dialog', (d) => d.accept());
   await page.getByRole('button', { name: /Alle Listen/ }).click();
+  await askOk(page);
   await expect(page).toHaveURL(/#\/verwaltung\/listen$/);
   await expect(page).toHaveTitle('Musterkompanie Beispielstadt');
   await page.locator('.row', { hasText: title }).first().getByRole('button', { name: 'Kopieren' }).click();
@@ -2222,11 +2375,11 @@ test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, C
   await expect.poll(() => gapBetween(page.locator('.card-list'), page.locator('form.card', { hasText: 'Neue Liste' }))).toBe(16);
   await shotsNarrowAndWide(page, '40d-listen-uebersicht');
   for (const t of [`${title} (Kopie)`, title]) {
-    page.once('dialog', (d) => d.accept());
     await page
       .locator('.row', { has: page.locator('.row-title', { hasText: new RegExp(`^${t.replace(/[()]/g, '\\$&')}$`) }) })
       .getByRole('button', { name: 'Löschen' })
       .click();
+    await askOk(page);
     await expect(page.locator('.toast')).toHaveText('Gelöscht');
   }
   await expect(page.locator('.row', { hasText: title })).toHaveCount(0);
@@ -2606,7 +2759,7 @@ test.describe('Android', () => {
         return (await res.json()).subscription;
       }, device);
     await expect.poll(status).toEqual({
-      types: ['board', 'polls', 'birthdays', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'],
+      types: ['board', 'polls', 'birthdays', 'reports', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'],
       details: true,
     });
 
@@ -2617,6 +2770,41 @@ test.describe('Android', () => {
     expect(await page.evaluate(() => localStorage.getItem('fake-push-sub'))).toBeNull();
     await login(page, 'mitglied1');
     expect(await status()).toBeNull();
+  });
+
+  test('Startseite: Hinweis schaltet Benachrichtigungen mit allen Arten ein, „Nicht jetzt“ blendet ihn aus', async ({ page }) => {
+    await fakePush(page);
+    await login(page, 'mitglied1');
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    const hint = page.locator('.push-hint');
+    await expect(hint).toContainText('Nichts mehr verpassen');
+    await hint.getByRole('button', { name: 'Nicht jetzt' }).click();
+    await expect(hint).toHaveCount(0);
+    await page.reload();
+    await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
+    await expect(hint).toHaveCount(0);
+
+    await page.evaluate(() => localStorage.removeItem('kompanie-push-hint-later'));
+    await page.reload();
+    await hint.getByRole('button', { name: 'Benachrichtigungen einschalten' }).click();
+    await expect(page.getByText('Benachrichtigungen sind an')).toBeVisible();
+    await expect(hint).toHaveCount(0);
+    await openKonto(page);
+    await page.getByRole('button', { name: 'Benachrichtigungen einstellen' }).click();
+    for (const label of [
+      'Punkte: neue Einträge',
+      'Schwarzes Brett: dringende Nachrichten',
+      'Termine: neue und geänderte',
+      'News: neue Beiträge',
+    ]) {
+      await expect(page.getByLabel(label)).toBeChecked();
+    }
+    await page.getByRole('button', { name: 'Benachrichtigungen ausschalten' }).click();
+    await expect(page.getByRole('button', { name: 'Benachrichtigungen einschalten' })).toBeVisible();
+    // Der Browser hat schon gefragt: kein Hinweis mehr, auch wenn sie jetzt aus sind.
+    await page.goto('/app/');
+    await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
+    await expect(hint).toHaveCount(0);
   });
 });
 
@@ -2741,7 +2929,7 @@ test.describe('Vorabladen (Issue #104)', () => {
   }
 
   /** Termine sind geladen (mit oder ohne öffentliche Termine, je nachdem, welche Tests vorher liefen). */
-  const startPageLoaded = (page: Page) => expect(page.getByText(/Tag der offenen Tür|Keine anstehenden Termine/)).toBeVisible();
+  const startPageLoaded = (page: Page) => expect(page.getByText(/Tag der offenen Tür|Zurzeit steht nichts an/)).toBeVisible();
 
   /** Datensparmodus (navigator.connection.saveData) wie in Chrome auf Android */
   const saveData = (page: Page) =>
@@ -2922,8 +3110,8 @@ test('Admin gibt einem Mitglied einzeln ein Recht und nimmt es wieder', async ({
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
   await expect(page.locator('.member-level')).toContainText('mit Ausnahmen bei den Rechten');
   await memberAccount(page);
-  page.once('dialog', (d) => d.accept());
   await rechte.getByRole('button', { name: 'Wie die Rolle' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Rechte wie die Rolle');
   await expect(rechte.getByLabel('Öffentliche Termine pflegen')).not.toBeChecked();
 
@@ -2967,8 +3155,8 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
     .filter({ has: page.getByText('Rollen', { exact: true }) })
     .click();
   await rollen.getByRole('button', { name: 'Kassenwart bearbeiten' }).click();
-  page.once('dialog', (d) => d.accept());
   await rollen.getByRole('button', { name: 'Löschen' }).click();
+  await askOk(page);
   await expect(page.locator('.toast')).toHaveText('Rolle gelöscht');
   await expect(rollen.locator('.row', { hasText: 'Kassenwart' })).toHaveCount(0);
 });
@@ -3533,11 +3721,9 @@ test('Admin wird durch die Einrichtung geführt', async ({ page }) => {
 
   // Ausschalten nur nach Rückfrage; Abbrechen lässt den Bereich an.
   await page.goto('/app/#/einstellungen/bereiche');
-  page.once('dialog', (d) => {
-    expect(d.message()).toContain('Die Daten bleiben erhalten');
-    void d.dismiss();
-  });
   await bereiche.getByRole('checkbox', { name: /^Galerie/ }).click();
+  await expect(page.locator('.ask-message')).toContainText('Die Daten bleiben erhalten');
+  await askCancel(page);
   await expect(bereiche.getByRole('checkbox', { name: /^Galerie/ })).toBeChecked();
 
   // Wer kein Admin ist, kommt nicht an die Bereiche.
@@ -3669,10 +3855,28 @@ test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nich
     .click();
   await expect(page).toHaveURL(/#\/einstellungen\/neuerungen$/);
   for (const v of changelog.versionen) {
-    await expect(page.getByRole('heading', { name: new RegExp(`^Version ${v.version.replace(/\./g, '\\.')}\\b`) })).toBeVisible();
+    await expect(
+      page.locator('.changelog-version > summary', { hasText: new RegExp(`Version ${v.version.replace(/\./g, '\\.')}(?![.\\d])`) }),
+    ).toBeVisible();
   }
   await expect(page.getByRole('heading', { name: /^Vorabversion/ })).toHaveCount(changelog.unveroeffentlicht ? 1 : 0);
-  await expect(page.locator('.changelog-text h4').first()).toBeVisible();
+  // Text der aufgeklappten Fassung: Vorabversion oder die installierte bzw. neueste Version (bei WordPress im Test
+  // meldet das Plugin 0.1.0, dann ist diese aufgeklappt und nicht die erste Version der Liste)
+  await expect(
+    page.locator('section.changelog-version .changelog-text h4, details.changelog-version[open] .changelog-text h4').first(),
+  ).toBeVisible();
+  // Aufgeklappt nur die Vorabversion bzw. eine Version, ältere eingeklappt (Issue #352)
+  await expect(page.locator('details.changelog-version[open]')).toHaveCount(changelog.unveroeffentlicht ? 0 : 1);
+  if (changelog.versionen.length > 1) {
+    // Die letzte eingeklappte Version (bei WordPress im Test ist die letzte Version 0.1.0 die installierte, also offen)
+    const versions = page.locator('details.changelog-version');
+    const closed = await versions.evaluateAll((els) => els.map((el) => (el as HTMLDetailsElement).open).lastIndexOf(false));
+    expect(closed).toBeGreaterThanOrEqual(0);
+    const last = versions.nth(closed);
+    await expect(last.locator('.changelog-text')).toBeHidden();
+    await last.locator('summary').click();
+    await expect(last.locator('.changelog-text')).toBeVisible();
+  }
   await shot(page, '19-was-ist-neu');
 
   await login(page, 'mitglied1');
@@ -3883,12 +4087,14 @@ test('Hilfe: Seiten passend zu Rechten, Bereichen und Variante, mit eigenen Beze
   }
 });
 
-test('Fehler melden: Gast und Mitglied, mit Bildschirmfoto und angezeigten Angaben', async ({ page }) => {
+test('Fehler melden: Gast und Mitglied, Eingang der Admins (schließen, weiterleiten)', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/#/termine');
-  // Nur mit Empfänger (reportUrl); die eigenständige Testinstallation hat einen simulierten (tests/standalone/MockHttp.php).
+  // Weiterleiten nur mit Empfänger (reportUrl); die eigenständige Testinstallation hat einen simulierten
+  // (tests/standalone/MockHttp.php).
   const available = await page.evaluate(() => !!window.KOMPANIE_CONFIG?.reports);
   test.skip(!available, 'Fehlermeldungen in dieser Testinstallation nicht eingerichtet');
+  test.setTimeout(180_000);
   const details = page.locator('.report-details');
   // 1x1-PNG
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
@@ -3900,18 +4106,19 @@ test('Fehler melden: Gast und Mitglied, mit Bildschirmfoto und angezeigten Angab
   await expect(details).toContainText('#/termine');
   await expect(details).toContainText('ohne Anmeldung');
   await expect(details.locator('dd').last()).toHaveText('keine');
-  await expect(page.getByText('Meinen Namen mitschicken')).toHaveCount(0);
+  await expect(page.getByText(/Meinen Namen/)).toHaveCount(0);
   await expect(page.locator('input[name="website"]')).not.toBeInViewport();
   await page.getByRole('button', { name: 'Meldung senden' }).click();
   await expect(page.locator('.form-error')).toHaveText('Bitte beschreibe kurz, was nicht klappt.');
-  await page.getByLabel('Was klappt nicht? (Pflicht)').fill(`Gast-Test ${Date.now()}`);
+  const guestText = `Gast-Test ${Date.now()}`;
+  await page.getByLabel('Was klappt nicht? (Pflicht)').fill(guestText);
   await page.getByRole('button', { name: 'Meldung senden' }).click();
   await expect(page.locator('.form-error')).toContainText('Bitte bestätige');
   await page.getByLabel('Bildschirmfoto').setInputFiles({ name: 'bild.png', mimeType: 'image/png', buffer: png });
   await expect(page.getByAltText('Gewähltes Bildschirmfoto')).toBeVisible();
   await page.getByLabel(/Ich bin einverstanden/).check();
   await expect(page.getByLabel(/Ich bin einverstanden/)).toBeChecked();
-  await expect(page.locator('.report-consent')).toContainText('Steuten IT Solutions');
+  await expect(page.locator('.report-consent')).toContainText('an die Admins');
   await expect(page.locator('.report-consent')).toContainText('dem Bildschirmfoto');
   await page.getByRole('button', { name: 'Meldung senden' }).click();
   await expect(page.getByRole('heading', { name: 'Danke, deine Meldung ist angekommen' })).toBeVisible({ timeout: 15_000 });
@@ -3926,21 +4133,56 @@ test('Fehler melden: Gast und Mitglied, mit Bildschirmfoto und angezeigten Angab
   await expect(details).toContainText('#/news/gibt-es-nicht');
   await expect(details.locator('dd').last()).not.toHaveText('keine');
   await expect(details).not.toContainText('ohne Anmeldung');
-  await expect(details).not.toContainText('Mitglied1');
-  await page.getByText('Meinen Namen mitschicken').click();
+  // Den Namen sehen die Admins immer; der Haken gilt fürs Weiterleiten an die Betreuer.
   await expect(details).toContainText('Mitglied1');
+  // Ohne Empfänger (forward: false) gibt es keinen Haken; der Name bleibt dann ohnehin bei den Admins.
+  const forward = await page.getByText('Meinen Namen beim Weiterleiten an die Betreuer mitschicken').count();
+  await expect(details).toContainText(forward > 0 ? 'sehen nur die Admins' : 'sehen die Admins');
+  if (forward > 0) {
+    await page.getByText('Meinen Namen beim Weiterleiten an die Betreuer mitschicken').click();
+    await expect(details).toContainText('geht beim Weiterleiten mit');
+  }
   const text = `Mitglied-Test ${Date.now()}`;
   await page.getByLabel('Was klappt nicht? (Pflicht)').fill(text);
   await page.getByLabel('Was hast du erwartet? (freiwillig)').fill('Eine Neuigkeit');
   await page.getByLabel(/Ich bin einverstanden/).check();
   await page.getByRole('button', { name: 'Meldung senden' }).click();
   await expect(page.getByRole('heading', { name: 'Danke, deine Meldung ist angekommen' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.my-reports')).toContainText(text);
+  await expect(page.locator('.my-reports')).toContainText('offen');
+
+  // Admin: Gastmeldung mit Begründung schließen, Meldung des Mitglieds weiterleiten
+  await login(page, 'admin', ADMIN_PASSWORD);
+  // Der Knopf trägt die Zahl der offenen Meldungen, z. B. „Fehlermeldungen (2)“.
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page
+    .locator('.admin-tiles')
+    .getByRole('button', { name: /^Fehlermeldungen \(\d+\)$/ })
+    .click();
+  const guestCard = page.locator('.report-review', { hasText: guestText });
+  await expect(guestCard).toContainText('Ohne Anmeldung');
+  await guestCard.getByRole('button', { name: 'Bildschirmfoto anzeigen' }).click();
+  await expect(guestCard.getByAltText('Bildschirmfoto zur Meldung')).toBeVisible();
+  await guestCard.getByRole('button', { name: 'Schließen …' }).click();
+  await guestCard.getByRole('button', { name: 'Schließen', exact: true }).click();
+  await expect(guestCard.locator('.form-error')).toContainText('Bitte schreibe kurz');
+  await guestCard.getByLabel(/Begründung/).fill('Bitte die App neu laden.');
+  await guestCard.getByRole('button', { name: 'Schließen', exact: true }).click();
+  await expect(page.locator('.toast')).toHaveText('Meldung geschlossen');
+  await expect(guestCard).toContainText('geschlossen von');
+  const memberCard = page.locator('.report-review', { hasText: text });
+  await expect(memberCard).toContainText('Mitglied1');
+  if (forward > 0) {
+    page.once('dialog', (d) => d.accept());
+    await memberCard.getByRole('button', { name: 'An die Betreuer weiterleiten' }).click();
+    await expect(page.locator('.toast')).toHaveText('Meldung weitergeleitet');
+    await expect(memberCard).toContainText('an die Betreuer weitergeleitet');
+  }
 
   // Eigenständig: Die Hintergrundaufgabe schickt die Meldung an den simulierten Empfänger (mit Namen, signiert). Ohne
   // Cronjob startet die Aufgabe über den Selbstaufruf, höchstens einmal pro Minute: Das kann etwas dauern.
-  test.setTimeout(180_000);
   const log = process.env.KOMPANIE_DATA_DIR ? `${process.env.KOMPANIE_DATA_DIR}/mock-reports.jsonl` : '';
-  if (STANDALONE && log) {
+  if (STANDALONE && log && forward > 0) {
     await expect
       .poll(
         async () => {
@@ -4082,8 +4324,8 @@ test('Admin verbindet die App mit Google (Google simuliert) und trennt wieder', 
   await page.goto('/app/#/einstellungen/google');
   await shot(page, '18b-google-zugang');
 
-  page.once('dialog', (d) => void d.accept());
   await google.getByRole('button', { name: 'Verbindung trennen' }).click();
+  await askOk(page);
   await expect(google.getByRole('button', { name: 'Speichern und mit Google verbinden' })).toBeVisible();
   await expect(google.getByLabel('Client-ID')).toHaveValue('1-e2e.apps.googleusercontent.com');
 });
@@ -4302,8 +4544,8 @@ test('Punktekatalog und Dienstgrade per Ziehen am Griff umsortieren, Schwellen w
   await expect.poll(rankOrder).toEqual([ranks[0], ranks[2], ranks[1]]);
   // Aufräumen
   for (const title of ranks) {
-    page.once('dialog', (d) => void d.accept());
     await page.locator('.card-list .row', { hasText: title }).getByRole('button', { name: 'Löschen' }).click();
+    await askOk(page);
     await expect(page.locator('.toast')).toHaveText('Gelöscht');
   }
 });
@@ -4413,11 +4655,11 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast öffnet die Seite
     await login(page, 'admin', ADMIN_PASSWORD);
     await adminMenu(page, 'Kompanien');
     for (const name of ['Testkompanie', 'Alte Garde']) {
-      page.once('dialog', (d) => d.accept());
       await page
         .locator('.row', { has: page.getByText(name, { exact: true }) })
         .getByRole('button', { name: 'Löschen' })
         .click();
+      await askOk(page);
       await expect(page.locator('.toast')).toHaveText('Gelöscht');
       await expect(page.locator('.toast')).toHaveCount(0);
     }
@@ -4464,11 +4706,11 @@ test('Sponsoren (Issue #279): anlegen mit Link und Logo, Gast sieht sie ohne Anm
   } finally {
     await login(page, 'admin', ADMIN_PASSWORD);
     await adminMenu(page, 'Sponsoren');
-    page.once('dialog', (d) => d.accept());
     await page
       .locator('.row', { has: page.getByText('Bäckerei Test', { exact: true }) })
       .getByRole('button', { name: 'Löschen' })
       .click();
+    await askOk(page);
     await expect(page.locator('.toast')).toHaveText('Gelöscht');
   }
 });
@@ -4494,7 +4736,7 @@ test('News in der App: Quelle wählen, Beitrag schreiben, Gast liest ihn, bearbe
     await page.goto('/app/#/news');
     await page.getByRole('button', { name: 'Neuer Beitrag' }).click();
     const form = page.locator('form.news-editor');
-    await form.getByLabel('Titel').fill('Schützenfest am Samstag');
+    await form.getByLabel('Titel', { exact: true }).fill('Schützenfest am Samstag');
     await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Wir treffen uns um 14 Uhr am Festplatz.');
     await form.getByRole('button', { name: 'Veröffentlichen' }).click();
     await expect(page.locator('.toast')).toHaveText('Beitrag veröffentlicht');
@@ -4507,10 +4749,15 @@ test('News in der App: Quelle wählen, Beitrag schreiben, Gast liest ihn, bearbe
     await page.getByRole('button', { name: 'Bearbeiten' }).click();
     const edit = page.locator('form.news-editor');
     await expect(edit.getByRole('textbox', { name: 'Text', exact: true })).toContainText('Festplatz');
-    await edit.getByLabel('Titel').fill('Schützenfest am Samstag, 14 Uhr');
+    await edit.getByLabel('Titel', { exact: true }).fill('Schützenfest am Samstag, 14 Uhr');
+    // Titelbild (Issue #351): Vorschau im Format der Karte, danach groß oben im Beitrag und in der Liste
+    await expect(page.locator('.news-hero')).toHaveCount(0);
+    await edit.getByLabel('Titelbild').setInputFiles(PNG);
+    await expect(edit.locator('.news-cover-preview img')).toBeVisible();
     await edit.getByRole('button', { name: 'Speichern' }).click();
     await expect(page.locator('.toast')).toHaveText('Gespeichert');
     await expect(page.locator('.news-headline')).toHaveText('Schützenfest am Samstag, 14 Uhr');
+    await expect(page.locator('.news-hero')).toBeVisible();
 
     // Ohne Anmeldung: lesen ja, schreiben nein
     await page.context().clearCookies();
@@ -4518,6 +4765,7 @@ test('News in der App: Quelle wählen, Beitrag schreiben, Gast liest ihn, bearbe
     await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
     await page.locator('.tabbar').getByRole('button', { name: 'News' }).click();
     await expect(page.locator('.news-card').first()).toContainText('Schützenfest am Samstag, 14 Uhr');
+    await expect(page.locator('.news-card').first().locator('.news-image')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Neuer Beitrag' })).toHaveCount(0);
     await page.locator('.news-card').first().click();
     await expect(page.locator('.news-content')).toContainText('Festplatz');
@@ -4527,8 +4775,8 @@ test('News in der App: Quelle wählen, Beitrag schreiben, Gast liest ihn, bearbe
     await login(page, 'admin', ADMIN_PASSWORD);
     await page.goto('/app/#/news');
     await page.locator('.news-card', { hasText: 'Schützenfest am Samstag, 14 Uhr' }).click();
-    page.once('dialog', (d) => d.accept());
     await page.getByRole('button', { name: 'Löschen' }).click();
+    await askOk(page);
     await expect(page.locator('.toast')).toHaveText('Beitrag gelöscht');
     await expect(page.locator('.news-card', { hasText: 'Schützenfest' })).toHaveCount(0);
   } finally {
@@ -4617,11 +4865,211 @@ test('Eigene Seiten (Issue #287): anlegen öffentlich und nur für Mitglieder, j
     await login(page, 'admin', ADMIN_PASSWORD);
     await adminMenu(page, 'Seiten');
     for (const title of ['Anfahrt und Parken', 'Uniform']) {
-      page.once('dialog', (d) => d.accept());
       await row(title).getByRole('button', { name: 'Löschen' }).click();
+      await askOk(page);
       await expect(page.locator('.toast')).toHaveText('Gelöscht');
       await expect(row(title)).toHaveCount(0);
     }
+  }
+});
+
+test('Eigene Seiten aus Blöcken: Countdown einfügen, Block nur für Mitglieder, Gast sieht Countdown ohne den Block', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Seiten');
+  const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neue Seite' }) });
+  await form.getByLabel('Titel').fill('Festprogramm');
+  await form.getByLabel('Für wen?').selectOption({ label: 'Alle, auch ohne Anmeldung' });
+  await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Herzlich willkommen.');
+  // Countdown darunter, ein Jahr im Voraus
+  await form.getByLabel('+ Block darunter einfügen').selectOption('countdown');
+  const next = new Date();
+  next.setFullYear(next.getFullYear() + 1);
+  const date = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
+  await form.getByLabel('Überschrift (optional)').fill('Bis zum Fest');
+  await form.locator('.block-countdown-fields input[type="date"]').first().fill(date);
+  await form.getByLabel('Uhrzeit (optional)').fill('14:00');
+  await expect(form.locator('.block-preview .block-countdown')).toContainText('Tage');
+  await form.locator('.block-countdown-fields').scrollIntoViewIfNeeded();
+  await shot(page, 'seiten-countdown-bearbeiten');
+  // Am Ende ein Text nur für Mitglieder
+  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('text');
+  await form.getByLabel('Zielgruppe des Blocks (Text)').last().selectOption('members');
+  await form.getByRole('textbox', { name: 'Text', exact: true }).last().fill('Treffpunkt intern.');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Seite angelegt');
+  await shot(page, 'seiten-bloecke');
+  const row = page.locator('.page-admin-list .row', { hasText: 'Festprogramm' });
+  try {
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await page.locator('.tabbar').getByRole('button', { name: 'Festprogramm' }).click();
+    const article = page.locator('.page-article');
+    await expect(article).toContainText('Herzlich willkommen.');
+    await expect(article.locator('.block-countdown')).toContainText('Bis zum Fest');
+    await expect(article.locator('.block-countdown-unit').first()).toHaveText(/^Tag/);
+    await expect(article).not.toContainText('Treffpunkt intern.');
+    await shot(page, 'seiten-countdown');
+
+    await login(page, 'mitglied1');
+    await page.goto('/app/#/seiten');
+    await page.getByRole('button', { name: 'Festprogramm' }).first().click();
+    await expect(page.locator('.page-article')).toContainText('Treffpunkt intern.');
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD);
+    await adminMenu(page, 'Seiten');
+    await row.getByRole('button', { name: 'Löschen' }).click();
+    await askOk(page);
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  }
+});
+
+test('Eigene Seiten: Knopf mit Link und Nächste Termine, Gast sieht beide', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Seiten');
+  const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neue Seite' }) });
+  const title = `Mitmachen ${Date.now().toString(36)}`;
+  await form.getByLabel('Titel').fill(title);
+  await form.getByLabel('Für wen?').selectOption({ label: 'Alle, auch ohne Anmeldung' });
+  await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Sei dabei.');
+  await form.getByLabel('+ Block darunter einfügen').selectOption('button');
+  await form.getByLabel('Beschriftung').fill('Zu den Terminen');
+  await form.locator('.block-button-fields input[inputmode="url"]').fill('#/termine');
+  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('events');
+  await form.getByLabel('Überschrift (optional)').fill('Demnächst');
+  await form.getByLabel('Wie viele Einträge').fill('2');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Seite angelegt');
+  const row = page.locator('.page-admin-list .row', { hasText: title });
+  try {
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await page.locator('.tabbar').getByRole('button', { name: title }).click();
+    const article = page.locator('.page-article');
+    await expect(article.getByRole('link', { name: 'Zu den Terminen' })).toHaveAttribute('href', '#/termine');
+    await expect(article.locator('.block-events h3')).toHaveText('Demnächst');
+    expect(await article.locator('.block-events-list li').count()).toBeLessThanOrEqual(2);
+    await article.getByRole('link', { name: 'Zu den Terminen' }).click();
+    await expect(page).toHaveURL(/#\/termine$/);
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD);
+    await adminMenu(page, 'Seiten');
+    await row.getByRole('button', { name: 'Löschen' }).click();
+    await askOk(page);
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  }
+});
+
+test('Eigene Seiten: Hinweis-Kasten, Trennlinie, Ablauf und Zahlen', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Seiten');
+  const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neue Seite' }) });
+  const title = `Hinweise ${Date.now().toString(36)}`;
+  await form.getByLabel('Titel').fill(title);
+  await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Oben.');
+  await form.getByLabel('+ Block darunter einfügen').selectOption('notice');
+  await form.getByLabel('Hinweis', { exact: true }).fill('Halle gesperrt.');
+  await form.locator('.block-notice-fields select').selectOption('warning');
+  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('divider');
+  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('schedule');
+  await form.getByLabel('Zeit 1').fill('14:00');
+  await form.getByLabel('Programmpunkt 1').fill('Treffen');
+  await form.getByRole('button', { name: '+ Programmpunkt' }).click();
+  await form.getByLabel('Programmpunkt 2').fill('Umzug');
+  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('facts');
+  await form.getByLabel('Wert 1').fill('1848');
+  await form.getByLabel('Bezeichnung 1').fill('gegründet');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Seite angelegt');
+  const row = page.locator('.page-admin-list .row', { hasText: title });
+  try {
+    await page.goto('/app/#/seiten');
+    await page.getByRole('button', { name: title }).first().click();
+    const article = page.locator('.page-article');
+    await expect(article.locator('.block-notice-warning')).toHaveText('Halle gesperrt.');
+    await expect(article.locator('hr.block-divider')).toHaveCount(1);
+    await expect(article.locator('.block-schedule-item')).toHaveText(['14:00Treffen', 'Umzug']);
+    await expect(article.locator('.block-facts-list li')).toHaveText('1848gegründet');
+  } finally {
+    await adminMenu(page, 'Seiten');
+    await row.getByRole('button', { name: 'Löschen' }).click();
+    await askOk(page);
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  }
+});
+
+test('Eigene Seiten: Block Sponsoren zeigt die Sponsoren mit Link', async ({ page }) => {
+  const name = `Getränke ${Date.now().toString(36)}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Sponsoren');
+  const sponsorForm = page.locator('form', { has: page.getByRole('heading', { name: 'Neuer Sponsor' }) });
+  await sponsorForm.getByLabel('Name').fill(name);
+  await sponsorForm.getByLabel('Link (optional)').fill('https://getraenke.example/');
+  await sponsorForm.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Sponsor angelegt');
+  const title = `Dank ${Date.now().toString(36)}`;
+  try {
+    await adminMenu(page, 'Seiten');
+    const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neue Seite' }) });
+    await form.getByLabel('Titel').fill(title);
+    await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Oben.');
+    await form.getByLabel('+ Block darunter einfügen').selectOption('sponsors');
+    await form.locator('.block-edit').last().getByLabel('Überschrift (optional)').fill('Mit Dank an');
+    await form.getByRole('button', { name: 'Anlegen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Seite angelegt');
+    const row = page.locator('.page-admin-list .row', { hasText: title });
+    try {
+      await page.goto('/app/#/seiten');
+      await page.getByRole('button', { name: title }).first().click();
+      const block = page.locator('.page-article .block-sponsors');
+      await expect(block.locator('h3')).toHaveText('Mit Dank an');
+      const link = block.locator('a', { hasText: name });
+      await expect(link).toHaveAttribute('href', 'https://getraenke.example/');
+      await expect(link).toHaveAttribute('rel', 'sponsored noopener noreferrer');
+    } finally {
+      await adminMenu(page, 'Seiten');
+      await row.getByRole('button', { name: 'Löschen' }).click();
+      await askOk(page);
+      await expect(page.locator('.toast')).toHaveText('Gelöscht');
+    }
+  } finally {
+    await adminMenu(page, 'Sponsoren');
+    await page
+      .locator('.row', { has: page.getByText(name, { exact: true }) })
+      .getByRole('button', { name: 'Löschen' })
+      .click();
+    await askOk(page);
+  }
+});
+
+test('Eigene Seiten: Karte zur Anfahrt öffnet den Ort in der Karten-App', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Seiten');
+  const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neue Seite' }) });
+  const title = `Anfahrt ${Date.now().toString(36)}`;
+  await form.getByLabel('Titel').fill(title);
+  await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Oben.');
+  await form.getByLabel('+ Block darunter einfügen').selectOption('map');
+  await form.locator('.block-map-fields input').nth(1).fill('Am Markt 1, 12345 Musterstadt');
+  await form.getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Seite angelegt');
+  const row = page.locator('.page-admin-list .row', { hasText: title });
+  try {
+    await page.goto('/app/#/seiten');
+    await page.getByRole('button', { name: title }).first().click();
+    const block = page.locator('.page-article .block-map');
+    await expect(block.locator('.block-map-place')).toHaveText('Am Markt 1, 12345 Musterstadt');
+    // Welche Karten-App, hängt vom Gerät ab (wie bei Terminen); https-Links öffnen in einem neuen Tab
+    const link = block.getByRole('link', { name: 'Karte' });
+    await expect(link).toHaveAttribute(
+      'href',
+      /^https:\/\/(maps\.apple\.com\/\?q=|www\.google\.com\/maps\/search\/\?api=1&query=)Am%20Markt%201%2C%2012345%20Musterstadt$/,
+    );
+    await expect(link).toHaveAttribute('target', '_blank');
+  } finally {
+    await adminMenu(page, 'Seiten');
+    await row.getByRole('button', { name: 'Löschen' }).click();
+    await askOk(page);
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
   }
 });
 
@@ -5030,10 +5478,7 @@ test('Schwarzes Brett: Banner mit Titel auf allen Seiten, ausblenden, „+1 weit
   // Admin schreibt (Recht post_board) über „Verwaltung“ → „Schwarzes Brett“; die Verwaltung bleibt markiert.
   const admin = await browser.newPage();
   const dialogs: string[] = [];
-  admin.on('dialog', (d) => {
-    dialogs.push(d.message());
-    void d.accept();
-  });
+  autoAsk(admin, dialogs);
   await login(admin, 'admin', ADMIN_PASSWORD);
   await openKonto(admin);
   await expect(admin.getByRole('button', { name: 'Nachricht schreiben' })).toHaveCount(0);
@@ -5073,7 +5518,8 @@ test('Schwarzes Brett: Banner mit Titel auf allen Seiten, ausblenden, „+1 weit
   const banner = page.locator('.board-banner');
   await expect(banner).toContainText(first);
   await expect(banner).not.toContainText('Halle ist gesperrt.');
-  await expect(banner).toContainText(/admin ·/i);
+  // Kompakt (Issue #347): nur der Titel, ohne Verfasser und Uhrzeit
+  await expect(banner).not.toContainText(/admin ·/i);
   const tabs = page.locator('.tabbar button');
   for (let i = 0; i < (await tabs.count()); i++) {
     await tabs.nth(i).click();
@@ -5176,10 +5622,7 @@ test('Schwarzes Brett: öffentliche Nachricht auch ohne Anmeldung, interne nicht
   const intern = `Nur intern ${id}`;
   const admin = await browser.newPage();
   const dialogs: string[] = [];
-  admin.on('dialog', (d) => {
-    dialogs.push(d.message());
-    void d.accept();
-  });
+  autoAsk(admin, dialogs);
   await login(admin, 'admin', ADMIN_PASSWORD);
   await admin.goto('/app/#/brett');
   const form = admin.locator('.board-form');
@@ -5221,8 +5664,76 @@ test('Schwarzes Brett: öffentliche Nachricht auch ohne Anmeldung, interne nicht
   await admin.close();
 });
 
+test('Schwarzes Brett aus Blöcken: Countdown und Text nur für Mitglieder, ohne Anmeldung nur der Countdown', async ({ page, browser }) => {
+  const id = Date.now().toString(36);
+  const title = `Festbeginn ${id}`;
+  const admin = await browser.newPage();
+  autoAsk(admin);
+  await login(admin, 'admin', ADMIN_PASSWORD);
+  await admin.goto('/app/#/brett');
+  const form = admin.locator('.board-form');
+  await form.getByLabel('Titel').fill(title);
+  await form.getByLabel('Text der Nachricht').fill('Alle sind eingeladen.');
+  await form.getByLabel('+ Block darunter einfügen').selectOption('countdown');
+  const next = new Date();
+  next.setFullYear(next.getFullYear() + 1);
+  const date = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
+  await form.getByLabel('Überschrift (optional)').fill('Bis zum Fest');
+  await form.locator('.block-countdown-fields input[type="date"]').first().fill(date);
+  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('text');
+  await form.getByLabel('Zielgruppe des Blocks (Text)').last().selectOption('members');
+  await form.getByLabel('Text der Nachricht').last().fill('Treffpunkt intern.');
+  await form.locator('.board-audience').selectOption('public');
+  await form.getByRole('button', { name: 'Veröffentlichen' }).click();
+  const card = admin.locator('.board-card', { hasText: title });
+  await expect(card.locator('.block-countdown')).toContainText('Bis zum Fest');
+  await expect(card).toContainText('Treffpunkt intern.');
+  await expect(card.locator('.block-badge')).toHaveText('nur Mitglieder');
+
+  await page.goto('/app/#/brett');
+  const pub = page.locator('.board-card', { hasText: title });
+  await expect(pub).toContainText('Alle sind eingeladen.');
+  await expect(pub.locator('.block-countdown-unit').first()).toHaveText(/^Tag/);
+  await expect(pub).not.toContainText('Treffpunkt intern.');
+
+  await card.getByRole('button', { name: 'Löschen' }).click();
+  await expect(card).toHaveCount(0);
+  await admin.close();
+});
+
+test('Schwarzes Brett: Nachricht nur für ausgewählte Personen (Einzeln)', async ({ page }) => {
+  const title = `Nur für dich ${Date.now().toString(36)}`;
+  const dialogs: string[] = [];
+  autoAsk(page, dialogs);
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/brett');
+  const form = page.locator('.board-form');
+  await form.getByLabel('Titel').fill(title);
+  await form.getByLabel('Text der Nachricht').fill('Persönliche Nachricht.');
+  await form.getByLabel('Sichtbar für').selectOption('person');
+  const picker = form.locator('.board-targets-person');
+  await expect(picker).toBeVisible();
+  // Ohne Auswahl: Hinweis statt Veröffentlichen
+  await form.getByRole('button', { name: 'Veröffentlichen' }).click();
+  await expect(form.locator('.form-error')).toHaveText('Bitte mindestens eine Person auswählen.');
+  const first = picker.locator('label.toggle').first();
+  const name = (await first.innerText()).trim();
+  await first.getByRole('checkbox').check();
+  await expect(picker.locator('legend')).toContainText('1 ausgewählt');
+  const posted = page.waitForResponse((r) => r.url().includes('/board') && r.request().method() === 'POST');
+  await form.getByRole('button', { name: 'Veröffentlichen' }).click();
+  expect((await posted).status()).toBe(201);
+  expect(dialogs.at(-1)).toContain(`Sichtbar für: nur ${name}`);
+  const card = page.locator('.board-card', { hasText: title });
+  await expect(card.locator('.board-audience-person')).toHaveText(`nur für ${name}`);
+
+  // Aufräumen
+  await card.getByRole('button', { name: 'Löschen' }).click();
+  await expect(page.locator('.board-card', { hasText: title })).toHaveCount(0);
+});
+
 test('Schwarzes Brett: Verlauf mit vorher/nachher, gelöschte Nachrichten mit Konto und Zeitpunkt', async ({ page }) => {
-  page.on('dialog', (d) => d.accept());
+  autoAsk(page);
   const title = `Verlauf ${Date.now().toString(36)}`;
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.goto('/app/#/brett');
@@ -5256,7 +5767,7 @@ test('Schwarzes Brett: Verlauf mit vorher/nachher, gelöschte Nachrichten mit Ko
 test('Schwarzes Brett: Signatur einrichten (Sprung ins Konto, Entwurf bleibt), einfügen, Änderung wirkt nicht auf die Nachricht', async ({
   page,
 }) => {
-  page.on('dialog', (d) => d.accept());
+  autoAsk(page);
   const id = Date.now().toString(36);
   await login(page, 'admin', ADMIN_PASSWORD);
   // Ausgangslage: keine Signatur
@@ -5320,6 +5831,7 @@ test('Schwarzes Brett: Signatur einrichten (Sprung ins Konto, Entwurf bleibt), e
     .locator('.board-card', { hasText: `Mit Signatur ${id}` })
     .getByRole('button', { name: 'Löschen' })
     .click();
+  await expect(page.locator('.toast')).toHaveText('Nachricht gelöscht');
 });
 
 test('Einstellungen → E-Mail: Kompanieadresse und Mailserver speichern, Passwort nie angezeigt', async ({ page }) => {
@@ -5349,10 +5861,7 @@ test('E-Mails: an Rolle, Mitglied und freie Adressen (An, Cc, Bcc) mit dem Edito
 }) => {
   const id = Date.now().toString(36);
   const dialogs: string[] = [];
-  page.on('dialog', (d) => {
-    dialogs.push(d.message());
-    void d.accept();
-  });
+  autoAsk(page, dialogs);
   await login(page, 'admin', ADMIN_PASSWORD);
   // Ohne Mailversand gibt es den Bereich noch nicht (wie Kalender oder Galerie ohne Einrichtung)
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
@@ -5472,7 +5981,7 @@ test('E-Mails: an Rolle, Mitglied und freie Adressen (An, Cc, Bcc) mit dem Edito
 
 test('Anhänge: am Brett anhängen, Mitglied lädt herunter, beim Bearbeiten ändern (Verlauf); an einer E-Mail', async ({ page, browser }) => {
   const id = Date.now().toString(36);
-  page.on('dialog', (d) => void d.accept());
+  autoAsk(page);
   await login(page, 'admin', ADMIN_PASSWORD);
   await adminMenu(page, 'Schwarzes Brett');
   const form = page.locator('.board-form');
@@ -5554,7 +6063,7 @@ test('Schwarzes Brett: Enddatum in der Ortszeit eines Geräts in New York, gespe
 }) => {
   const context = await browser.newContext({ ...devices['iPhone 13'], locale: 'de-DE', timezoneId: 'America/New_York' });
   const ny = await context.newPage();
-  ny.on('dialog', (d) => d.accept());
+  autoAsk(ny);
   const title = `Zeitzone ${Date.now().toString(36)}`;
   await login(ny, 'admin', ADMIN_PASSWORD);
   await ny.goto('/app/#/brett');
@@ -5570,11 +6079,12 @@ test('Schwarzes Brett: Enddatum in der Ortszeit eines Geräts in New York, gespe
   await expect(ny.locator('.board-card', { hasText: title }).locator('.board-until')).toContainText('15. Jan. 2031, 10:00 Uhr');
 
   await login(page, 'admin', ADMIN_PASSWORD);
-  page.on('dialog', (d) => d.accept());
+  autoAsk(page);
   await page.goto('/app/#/brett');
   const card = page.locator('.board-card', { hasText: title });
   await expect(card.locator('.board-until')).toContainText('15. Jan. 2031, 16:00 Uhr');
   await card.getByRole('button', { name: 'Löschen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Nachricht gelöscht');
   await context.close();
 });
 
@@ -5585,7 +6095,7 @@ test('Umfragen: anlegen, Mitglied sieht sie im Banner, antwortet, sieht das Erge
   const title = `Grillfest ${Date.now().toString(36)}: Samstag oder Sonntag?`;
   // Admin (Recht manage_polls) legt über „Verwaltung“ → „Umfragen“ an.
   const admin = await browser.newPage();
-  admin.on('dialog', (d) => d.accept());
+  autoAsk(admin);
   await login(admin, 'admin', ADMIN_PASSWORD);
   await adminMenu(admin, 'Umfragen');
   await expect(admin.locator('.topbar-title')).toHaveText('Umfragen');
@@ -5669,7 +6179,7 @@ test('Geburtstage: Mitglied trägt seinen ein, ein anderes sieht ihn unter „An
   // In drei Tagen (Zeitzone des Browsers; die der Kompanie verschiebt das höchstens um einen Tag, bleibt also in 7 Tagen).
   const in3 = new Date(Date.now() + 3 * 86400 * 1000);
   const member = await browser.newPage();
-  member.on('dialog', (d) => d.accept());
+  autoAsk(member);
   await login(member, 'mitglied1');
   await openKonto(member);
   const card = member.locator('.birthday-card');
@@ -5753,7 +6263,7 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
 
   // Mitglied2 zeigt den Geburtstag allen (mit Alter) und das Eintrittsjahr nur Mitgliedern.
   const member = await browser.newPage();
-  member.on('dialog', (d) => d.accept());
+  autoAsk(member);
   await login(member, 'mitglied2');
   await openKonto(member);
   const birthday = member.locator('.birthday-card');
@@ -5819,7 +6329,7 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
 
 test('Inventar: anlegen, umlagern, Menge mit Grund ändern, Verlauf zeigt alle Schritte mit Namen', async ({ page }) => {
   const title = `Bierbank ${Date.now().toString(36)}`;
-  page.on('dialog', (d) => d.accept());
+  autoAsk(page);
   // Mitglieder ohne das Recht sehen das Inventar nicht.
   await login(page, 'mitglied1');
   await page.goto('/app/#/inventar');
@@ -5927,8 +6437,8 @@ test('Wartungsmodus: Admin schaltet mit Begründung ein, Mitglied sieht die Wart
   const card = page.locator('.settings-section', { hasText: 'Wartungsmodus' });
   await card.getByLabel(/Begründung/).fill('Umstellung auf die neue App,\nbis ca. 18 Uhr');
   await expect(card.getByText('43/500 Zeichen')).toBeVisible();
-  page.once('dialog', (d) => d.accept());
   await card.getByRole('button', { name: 'Wartungsmodus einschalten' }).click();
+  await askOk(page);
   await expect(page.locator('.maintenance-banner')).toContainText('Wartungsmodus aktiv – nur Admins können die App nutzen.');
   await expect(page.locator('.maintenance-banner')).toContainText('bis ca. 18 Uhr');
   await shot(page, '31-wartungsmodus-admin');
@@ -5963,6 +6473,111 @@ test('Wartungsmodus: Admin schaltet mit Begründung ein, Mitglied sieht die Wart
   await member.close();
 });
 
+test('Vorabversionen erhalten: nach dem Bestätigen der Rückfrage wird der Vorab-Kanal gespeichert', async ({ page }) => {
+  // Die Testinstallation bekommt keine Updates über die App: Zustand so beantworten, als wäre sie dafür eingerichtet.
+  let channel: 'early' | 'stable' = 'stable';
+  const sent: unknown[] = [];
+  await page.route('**/admin/status', async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    body.updates = { ...body.updates, configured: true, channel };
+    await route.fulfill({ response: res, json: body });
+  });
+  await page.route('**/admin/update', async (route) => {
+    if (route.request().method() !== 'PATCH') return route.continue();
+    const data = route.request().postDataJSON() as { channel?: 'early' | 'stable' };
+    sent.push(data);
+    if (data.channel) channel = data.channel;
+    const res = await route.fetch({ method: 'GET' });
+    const body = await res.json();
+    await route.fulfill({ response: res, json: { ...body, configured: true, channel } });
+  });
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Einstellungen');
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Zustand und Updates', { exact: true }) })
+    .click();
+  const box = page.getByLabel('Vorabversionen erhalten (zum Testen)');
+  await expect(box).not.toBeChecked();
+
+  // Abbrechen: nichts gespeichert, Haken bleibt aus
+  await box.click();
+  await askCancel(page);
+  await expect(box).not.toBeChecked();
+  expect(sent).toEqual([]);
+
+  // Bestätigen: Vorab-Kanal gespeichert, Haken bleibt gesetzt
+  await box.click();
+  await askOk(page);
+  await expect(box).toBeChecked();
+  await expect(page.getByText('(Vorab-Kanal)')).toBeVisible();
+  expect(sent).toEqual([{ channel: 'early' }]);
+
+  // Ausschalten braucht keine Rückfrage
+  await box.click();
+  await expect(box).not.toBeChecked();
+  expect(sent).toEqual([{ channel: 'early' }, { channel: 'stable' }]);
+});
+
+test('Update-Paket hochladen: in Stücken, Version aus der Datei zeigen, nach Bestätigung einspielen', async ({ page }) => {
+  // Die Testinstallation bekommt keine Updates über die App: Zustand und Hochladen so beantworten, als wäre sie eingerichtet.
+  await page.route('**/admin/status', async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    body.updates = { ...body.updates, configured: true };
+    await route.fulfill({ response: res, json: body });
+  });
+  const chunks: number[] = [];
+  const calls: string[] = [];
+  let received = 0;
+  await page.route('**/admin/update/upload**', async (route) => {
+    const url = route.request().url();
+    const data = route.request().postDataJSON() as Record<string, unknown>;
+    if (url.endsWith('/upload')) {
+      calls.push(`start ${data.size}`);
+      return route.fulfill({ status: 201, json: { id: 'a'.repeat(32), chunk_size: 4, max_bytes: 100 } });
+    }
+    if (url.endsWith('/chunk')) {
+      chunks.push(data.offset as number);
+      received = (data.offset as number) + atob(data.data as string).length;
+      return route.fulfill({ json: { received } });
+    }
+    calls.push(`${url.split('/').pop()} ${JSON.stringify(data)}`);
+    if (url.endsWith('/check')) {
+      return route.fulfill({ json: { version: '9.9.9.1', current: '0.1.0.1', major: false, older: false, released: false } });
+    }
+    if (url.endsWith('/install')) return route.fulfill({ json: { installed: '9.9.9.1' } });
+    return route.fulfill({ json: { cancelled: true } });
+  });
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Einstellungen');
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Zustand und Updates', { exact: true }) })
+    .click();
+  await page.getByText('Update-Paket hochladen').click();
+  const input = page.locator('input[type=file][accept*=".zip"]');
+  const pkg = { name: 'kompanie-app-standalone.zip', mimeType: 'application/zip', buffer: Buffer.from('PK\x03\x04abcdef') };
+
+  // Abbrechen: Sitzung gelöscht, nichts eingespielt
+  await input.setInputFiles(pkg);
+  await expect(page.locator('.ask-dialog')).toContainText('Version 9.9.9.1 aus „kompanie-app-standalone.zip“ einspielen?');
+  await expect(page.locator('.ask-dialog')).toContainText('noch nicht für alle freigegeben (Vorabversion)');
+  await askCancel(page);
+  await expect.poll(() => calls.at(-1)).toBe(`cancel {"upload":"${'a'.repeat(32)}"}`);
+  expect(chunks).toEqual([0, 4, 8]);
+  expect(calls.filter((c) => c.startsWith('install'))).toEqual([]);
+
+  // Bestätigen: eingespielt, die App lädt neu
+  chunks.length = 0;
+  await input.setInputFiles(pkg);
+  await askOk(page);
+  await expect(page.getByText('Version 9.9.9.1 ist eingespielt.')).toBeVisible();
+  expect(calls).toContain(`install {"upload":"${'a'.repeat(32)}","major":false,"without_drive":false}`);
+  expect(chunks).toEqual([0, 4, 8]);
+});
+
 test('Nutzung: Admin sieht aktive Konten, Nutzung je Bereich und den Verlauf einer Person, schaltet die Erfassung je Person aus und an', async ({
   page,
   browser,
@@ -5993,9 +6608,9 @@ test('Nutzung: Admin sieht aktive Konten, Nutzung je Bereich und den Verlauf ein
 
   // Ausschalten löscht die Einträge je Person; die Liste der Mitglieder verschwindet, gezählt wird weiter.
   const schalter = page.getByLabel('Nutzung je Person erfassen (wer, wann, welcher Bereich)');
-  page.once('dialog', (d) => d.accept());
   // Der Schalter folgt dem Server (erst nach der Antwort umgelegt): klicken, dann auf den neuen Stand warten.
   await schalter.click();
+  await askOk(page);
   await expect(schalter).not.toBeChecked();
   await expect(page.getByText('Ausgeschaltet: Die App zählt nur noch')).toBeVisible();
   await expect(members).toHaveCount(0);

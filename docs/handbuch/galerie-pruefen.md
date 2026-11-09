@@ -1,24 +1,27 @@
 ---
-titel: Eingereichte Bilder prüfen
+titel: Eingereichte Bilder und Videos prüfen
 reihenfolge: 39
 rechte: [review_gallery]
 bereiche: [gallery]
 ---
-Hier siehst du die Bilder, die Mitglieder für die {bereich.gallery} eingereicht haben, und entscheidest, ob sie hineinkommen.
+Hier siehst du die Bilder und Videos, die Mitglieder für die {bereich.gallery} eingereicht haben, und entscheidest, ob sie hineinkommen.
 
 ## So öffnest du die Seite
 Tippe unten auf **{bereich.gallery}** und oben auf **Einreichungen prüfen**. Mit **‹ Alle Alben** kommst du zurück.
 
 ## Was du hier siehst
-- **Offene Einreichungen**, die ältesten zuerst: das Bild, sein Name, das Album und wer es eingereicht hat.
-- **Zuletzt freigegeben**: die zuletzt freigegebenen Bilder.
+- **Offene Einreichungen**, die ältesten zuerst: das Bild oder Video, sein Name, das Album und wer es eingereicht hat. Ein Video spielst du hier mit ▶ ab, bevor du entscheidest.
+- **Zuletzt freigegeben**: die zuletzt freigegebenen Bilder und Videos, mit dem Haken **intern** bei Bildern nur für {rolle.member}.
 
 ## So gehst du vor
-### Ein Bild freigeben
+### Ein Bild oder Video freigeben
 Tippe auf **Öffentlich freigeben** (alle sehen es) oder auf **Nur für Mitglieder freigeben** (nur {rolle.member} sehen es). Das Bild erscheint kurz darauf im Album.
 
-### Ein Bild ablehnen
-Tippe auf **Ablehnen** und schreibe kurz, warum. Der Server löscht das Bild sofort; die Person sieht den Grund.
+### Ein Bild oder Video ablehnen
+Tippe auf **Ablehnen** und schreibe kurz, warum. Der Server löscht die Datei sofort; die Person sieht den Grund.
+
+### Ein freigegebenes Bild intern oder öffentlich stellen
+Setze oder entferne unter **Zuletzt freigegeben** den Haken **intern**. Mit Haken sehen es nur {rolle.member}, ohne alle. Wer es vorher schon angesehen oder gespeichert hat, behält diese Kopie. Dasselbe geht in der Großansicht der {bereich.gallery}.
 
 ### Ein freigegebenes Bild wieder entfernen
 Tippe unter **Zuletzt freigegeben** auf **Wieder entfernen** und bestätige. Das Bild verschwindet aus der {bereich.gallery}.

@@ -137,6 +137,7 @@ const PATHS = [
   ...[
     'bereiche',
     'navigation',
+    'rechtliches',
     'rollen',
     'zugang',
     'google',
@@ -217,6 +218,7 @@ test('Eine eigene Seite je Bildschirm', () => {
     [['verwaltung', 'ehemalige', 'neu'], 'ehemalige-anlegen'],
     [['einstellungen', 'kalender'], 'admin-kalender'],
     [['einstellungen', 'neuerungen'], 'admin-neuerungen'],
+    [['einstellungen', 'rechtliches'], 'admin-rechtliches'],
     [['einstellungen', 'zugang'], 'admin-zugang'],
     [['verwaltung', 'anfragen'], 'anfragen-freigeben'],
     [['registrieren', 'bestaetigen', 'abc'], 'zugang-beantragen'],

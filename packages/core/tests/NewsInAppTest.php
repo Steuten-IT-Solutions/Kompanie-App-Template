@@ -184,6 +184,54 @@ final class NewsInAppTest extends TestCase
         $this->assertNull($this->app->richImages()->repository()->find($uid), 'nicht mehr im Text: gelöscht');
     }
 
+    public function testCoverImage(): void
+    {
+        $this->useApp();
+        $upload = function (): string {
+            $png = imagecreatetruecolor(4, 3);
+            ob_start();
+            imagepng($png);
+            return (string) $this->call('POST', '/rich-images', ['file' => ['name' => 'bild.png', 'data' => base64_encode((string) ob_get_clean())]])->data['uid'];
+        };
+        $inText = $upload();
+        $cover = $upload();
+        $url = fn (string $uid): string => 'https://example.org/app/bild/' . $uid;
+
+        $item = $this->ok('POST', '/news', ['title' => 'Mit Titelbild', 'body' => '<p>Text</p><img data-image="' . $inText . '">', 'cover' => $cover]);
+        $this->assertSame($url($cover), $item['image'], 'Titelbild vor dem ersten Bild im Text (Issue #351)');
+        $this->assertSame($url($cover), $item['cover']);
+        $this->assertSame($cover, $item['cover_uid']);
+        $this->assertSame($url($cover), $this->ok('GET', '/news')[0]['image'], 'auch in der Liste');
+        $this->assertSame(200, $this->app->richImages()->forDelivery(null, $cover)['status'], 'öffentlich wie der Beitrag');
+
+        // Text ändern, Titelbild bleibt (Feld fehlt)
+        $this->ok('PATCH', '/news/' . $item['id'], ['body' => '<p>ohne Bild</p>']);
+        $this->assertNotNull($this->app->richImages()->repository()->find($cover), 'Titelbild bleibt');
+        $this->assertNull($this->app->richImages()->repository()->find($inText));
+        $this->assertSame($cover, $this->ok('GET', '/news/' . $item['id'])['cover_uid']);
+
+        // Unbekannte Kennung
+        $res = $this->call('PATCH', '/news/' . $item['id'], ['cover' => str_repeat('a', 32)]);
+        $this->assertSame(400, $res->status);
+        $this->assertSame(400, $this->call('PATCH', '/news/' . $item['id'], ['cover' => '../x'])->status);
+
+        // Titelbild ersetzen: das alte wird gelöscht
+        $next = $upload();
+        $this->assertSame($url($next), $this->ok('PATCH', '/news/' . $item['id'], ['cover' => $next])['image']);
+        $this->assertNull($this->app->richImages()->repository()->find($cover));
+
+        // Entfernen: wieder das erste Bild im Text bzw. keins
+        $after = $this->ok('PATCH', '/news/' . $item['id'], ['cover' => null]);
+        $this->assertNull($after['cover']);
+        $this->assertNull($after['image']);
+        $this->assertNull($this->app->richImages()->repository()->find($next));
+
+        // Fremder Entwurf: nicht übernehmen
+        $other = $upload();
+        $this->app->richImages()->repository()->setOwner($other, 'draft', $this->member);
+        $this->assertSame(400, $this->call('PATCH', '/news/' . $item['id'], ['cover' => $other])->status);
+    }
+
     public function testPushForNewPostsOnly(): void
     {
         $this->app->settings->set(PushService::NEWS_SETTING, ['ids' => ['5', '6'], 'newest' => '2030-01-01T00:00:00Z']);
@@ -214,5 +262,36 @@ final class NewsInAppTest extends TestCase
     public function testBackupContainsNews(): void
     {
         $this->assertContains('app_news', Backup::CORE_TABLES);
+    }
+    /** Blöcke wie bei eigenen Seiten: Countdown, Block nur für Mitglieder (auch seine Bilder), ältere App mit body. */
+    public function testBlocks(): void
+    {
+        $this->useApp();
+        $png = imagecreatetruecolor(4, 3);
+        ob_start();
+        imagepng($png);
+        $bytes = (string) ob_get_clean();
+        $uid = $this->call('POST', '/rich-images', ['file' => ['name' => 'bild.png', 'data' => base64_encode($bytes)]])->data['uid'];
+        $item = $this->ok('POST', '/news', ['title' => 'Fest', 'blocks' => [
+            ['type' => 'text', 'html' => '<p>Kommt alle!</p>'],
+            ['type' => 'countdown', 'title' => 'Bis zum Fest', 'date' => '2027-06-12', 'time' => '14:00'],
+            ['type' => 'text', 'audience' => 'members', 'html' => '<p>Treffpunkt intern</p><img data-image="' . $uid . '">'],
+        ]]);
+        $this->assertSame(['text', 'countdown', 'text'], array_column($item['blocks'], 'type'));
+        $this->assertSame('<p>Kommt alle!</p>', $item['content'], 'content: nur Text für alle');
+        $this->assertSame('Kommt alle!', $this->ok('GET', '/news')[0]['excerpt'] ?? null);
+        $this->assertNull($this->ok('GET', '/news')[0]['image'] ?? null, 'Bild aus dem Mitglieder-Block nicht als Vorschau');
+
+        $guest = $this->call('GET', '/news/' . $item['id'], [], null);
+        $this->assertSame(['text', 'countdown'], array_column($guest->data['blocks'], 'type'), 'ohne Anmeldung ohne Mitglieder-Block');
+        $this->assertSame(3, count($this->call('GET', '/news/' . $item['id'], [], $this->member)->data['blocks']));
+        $this->assertSame(401, $this->app->richImages()->forDelivery(null, $uid)['status']);
+        $this->assertSame(200, $this->app->richImages()->forDelivery($this->users->find($this->member), $uid)['status']);
+
+        // Ältere App: nur body
+        $old = $this->ok('PATCH', '/news/' . $item['id'], ['body' => '<p>Neu</p>']);
+        $this->assertSame([['id' => 'b1', 'type' => 'text', 'audience' => 'all', 'html' => '<p>Neu</p>']], $old['blocks']);
+        $this->assertNull($this->app->richImages()->repository()->find($uid), 'Bild in keinem Block mehr: gelöscht');
+        $this->assertSame(400, $this->call('PATCH', '/news/' . $item['id'], ['blocks' => [['type' => 'video']]])->status);
     }
 }

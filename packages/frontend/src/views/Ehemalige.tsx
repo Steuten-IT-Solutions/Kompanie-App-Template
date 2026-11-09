@@ -17,7 +17,7 @@ import brand from '../generated/brand';
 import { editYearOrDate, formatEuro, formatYearOrDate } from '../format';
 import { navigate } from '../router';
 import { readSheet } from '../sheet';
-import { Empty, emptyName, ErrorBox, Loading, NameFields, trimName, useAsync } from '../ui';
+import { Empty, emptyName, ErrorBox, FileInput, Loading, NameFields, trimName, useAsync } from '../ui';
 import { MemberAvatar, PhotoPicker, type PreparedPhoto } from '../memberPhoto';
 import {
   MEMBER_SORT_LABELS,
@@ -33,6 +33,7 @@ import {
   type MemberSort,
 } from '../memberSort';
 import { sources } from '../viewData';
+import { confirmAsk } from '../ask';
 
 const sec = brand.labels.sections;
 
@@ -237,7 +238,7 @@ function RetentionCard({ onChanged }: { onChanged: () => void }) {
           due > 0
             ? `Beim nächsten Lauf (spätestens in einem Tag) werden bei ${due} Ehemaligen die persönlichen Angaben endgültig gelöscht: ${names(preview.due)}. Das lässt sich nicht rückgängig machen. Speichern?`
             : `Bei Ehemaligen ${years} Jahre nach dem Ausscheiden die persönlichen Angaben endgültig löschen? Zurzeit ist niemand fällig. Speichern?`;
-        if (!window.confirm(question)) return;
+        if (!(await confirmAsk(question))) return;
       }
       setData(await api.setFormerRetention(data)); // auch in den Zwischenspeicher, neu geladen wird wie sonst
       setForm(null);
@@ -252,15 +253,6 @@ function RetentionCard({ onChanged }: { onChanged: () => void }) {
   return (
     <form className="form card settings-section" onSubmit={save} aria-labelledby="former-retention-title">
       <h3 id="former-retention-title">Aufbewahrungsfrist</h3>
-      <p className="muted small">
-        Personenbezogene Daten sollen nicht länger gespeichert werden als nötig. Ist eine Frist eingestellt, löscht die App bei Ehemaligen
-        so viele Jahre nach dem Ausscheiden endgültig die persönlichen Angaben: Adresse, Handynummer, E-Mail-Adresse, Anmeldung, Geburtstag,
-        Strafen, Anwesenheiten, Antworten in Umfragen, Benachrichtigungen, Signatur und Einstellungen. Für die Chronik bleiben Name, Eintrag
-        als ehemalig, Ämter, Punkte, Dienstgrad, Titel, Foto und Eintrittsjahr. Ohne Datum des Ausscheidens zählt der Tag des Eintragens.
-        Leer oder 0: aus.
-        {config?.variant === 'wordpress' &&
-          ' Der Benutzer der Webseite (Anmeldung, E-Mail-Adresse) bleibt in WordPress; ihn löscht oder ändert ein Administrator der Webseite unter Benutzer.'}
-      </p>
       <label className="field">
         <span>Jahre nach dem Ausscheiden</span>
         <input
@@ -438,11 +430,6 @@ export function NewFormer() {
         <legend>Foto (optional)</legend>
         <PhotoPicker name={`${name.first_name} ${name.last_name}`.trim()} value={photo} onChange={setPhoto} onError={setFormError} />
       </fieldset>
-      <p className="muted small">
-        Es entsteht ein Konto ohne Anmeldung, das gleich als ehemalig eingetragen ist. Wer schon ein Konto mit genau diesem Namen hat, wird
-        nicht noch einmal angelegt. Steht die Person in den {sec.offices} bisher nur mit ihrem Namen, wird der Eintrag mit ihrem Konto
-        verknüpft.
-      </p>
       {formError && (
         <p className="form-error" role="alert">
           {formError}
@@ -527,7 +514,7 @@ export function FormerPanel({
     const deleted = former?.personal_deleted
       ? ` Die persönlichen Angaben wurden nach Ablauf der Aufbewahrungsfrist gelöscht${loginDeleted ? ', auch Benutzername und E-Mail-Adresse' : ''}.`
       : '';
-    if (!former || !window.confirm(`${name} wieder aufnehmen (als ${levelLabel(former.previous_level)})?${deleted}`)) return;
+    if (!former || !(await confirmAsk(`${name} wieder aufnehmen (als ${levelLabel(former.previous_level)})?${deleted}`))) return;
     setBusy(true);
     try {
       await api.reactivate(id);
@@ -683,16 +670,6 @@ export function FormerImport({ onToast }: { onToast: (msg: string) => void }) {
         ‹ Einzeln anlegen
       </button>
       <h2 className="member-name">Ehemalige importieren</h2>
-      <p className="muted small">
-        Eine Zeile je Person, Spalten getrennt durch Semikolon (oder Tabulator, z. B. aus einer Tabellenkalkulation kopiert):{' '}
-        <code>vorname;nachname;eintritt;ausgeschieden;grund</code>. Daten als TT.MM.JJJJ oder nur das Jahr; Eintritt „Gründer“ für
-        Gründungsmitglieder. Grund: ausgetreten (auch leer), verstorben oder sonstiges. Bei Verstorbenen ist „ausgeschieden“ der Todestag.
-      </p>
-      <p className="muted small">
-        Für jede Person entsteht ein Konto, das gleich als ehemalig eingetragen ist (ohne Anmeldung). Wer schon ein Konto mit genau diesem
-        Namen hat, wird übersprungen; ein zweiter Import legt also nichts doppelt an. Steht eine Person in den {sec.offices} bisher nur mit
-        ihrem Namen, wird der Eintrag mit ihrem Konto verknüpft.
-      </p>
       <label className="field">
         <span>Tabelle</span>
         <textarea
@@ -706,8 +683,7 @@ export function FormerImport({ onToast }: { onToast: (msg: string) => void }) {
       </label>
       <label className="field">
         <span>Oder Datei wählen (Excel .xlsx oder CSV)</span>
-        <input
-          type="file"
+        <FileInput
           accept=".xlsx,.csv,.txt,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           onChange={async (e) => {
             const file = e.target.files?.[0];

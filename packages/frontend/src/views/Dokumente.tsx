@@ -275,7 +275,7 @@ export default function Dokumente({ docId, onToast }: { docId?: number; onToast:
           {brand.labels.sections.documents} verwalten
         </button>
       )}
-      {docs.length === 0 ? <Empty>Es sind noch keine Dokumente hinterlegt.</Empty> : <DocSortSelect value={sort} onChange={setSort} />}
+      {docs.length === 0 ? <Empty>Es sind noch keine Dateien hinterlegt.</Empty> : <DocSortSelect value={sort} onChange={setSort} />}
       {groups.map((g) => (
         <DocGroupSection key={groupKey(g)} group={g} open={isOpen(groupKey(g))} onToggle={() => toggle(groupKey(g))}>
           <ul className="card-list">

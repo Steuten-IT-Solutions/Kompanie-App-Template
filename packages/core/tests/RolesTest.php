@@ -219,8 +219,7 @@ final class RolesTest extends TestCase
         $users->current = $admin;
         $call = static fn (string $method, string $path, array $body = []) => $app->api()->handle(new Request($method, $path, [], $body));
         $friend = $app->roles()->create(['label' => 'Freunde', 'capabilities' => ['calendar']])['key'];
-        $this->assertSame(400, $call('POST', '/users', ['name' => 'Fritz', 'level' => $friend])->status, 'nicht freigegeben');
-        $this->assertSame(400, $call('POST', '/users', ['name' => 'Fritz', 'level' => Roles::ADMIN])->status);
+        $this->assertSame(400, $call('POST', '/users', ['name' => 'Fritz', 'level' => 'gibtsnicht'])->status, 'unbekannte Rolle');
         $this->assertSame(400, $call('POST', '/admin/roles', ['label' => 'X', 'capabilities' => ['member'], 'promotable' => true])->status, 'nur ohne Mitgliederbereich');
         $this->assertSame(400, $call('POST', '/admin/roles', ['label' => 'X', 'new_accounts' => 'ja'])->status);
         $this->assertSame(400, $call('PATCH', "/admin/roles/$friend", ['promotable' => true, 'capabilities' => ['member']])->status);
@@ -292,9 +291,15 @@ final class RolesTest extends TestCase
         $this->assertSame(200, $app->api()->handle(new Request('GET', '/documents'))->status);
         $users->current = $admin;
         $this->assertSame(400, $patch(Roles::MEMBER, ['capabilities' => ['view_events']])->status, 'Mitglied gehört immer zur Kompanie');
-        $this->assertSame(400, $patch(Roles::MEMBER, ['capabilities' => ['member', 'manage_points']])->status, 'nur Rechte zum Sehen');
+        $this->assertSame(200, $patch(Roles::MEMBER, ['capabilities' => ['member', 'submit_gallery']])->status, 'Mitglied: auch Rechte zum Verwalten');
+        $this->assertSame([Capability::Member, Capability::SubmitGallery], $app->roles()->capabilities(Roles::MEMBER));
+        $this->assertSame(200, $patch(Roles::GUEST, ['capabilities' => ['view_news', 'submit_gallery']])->status, 'Gast: auch Rechte zum Verwalten, ohne Mitglied');
+        $this->assertSame([Capability::ViewNews, Capability::SubmitGallery], $app->roles()->capabilities(Roles::GUEST));
+        $users->current = null;
+        $this->assertTrue($app->viewer()->can(Capability::SubmitGallery), 'gilt auch ohne Anmeldung');
+        $users->current = $admin;
+        $this->assertSame(200, $patch(Roles::GUEST, ['capabilities' => ['view_news', 'view_documents']])->status);
         $this->assertSame(400, $patch(Roles::GUEST, ['capabilities' => ['member']])->status, 'Gast gehört nicht zur Kompanie');
-        $this->assertSame(400, $patch(Roles::GUEST, ['capabilities' => ['view_own_points']])->status, 'eigene Punkte nur für Mitglieder');
         $this->assertSame(400, $patch(Roles::ADMIN, ['capabilities' => []])->status, 'Admin hat alle');
         $again = TestApp::create(TestApp::connection(), settings: $app->settings, features: false);
         $this->assertSame([Capability::ViewNews, Capability::ViewDocuments], $again->roles()->capabilities(Roles::GUEST), 'gespeichert');

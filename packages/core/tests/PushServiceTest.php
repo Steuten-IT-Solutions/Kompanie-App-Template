@@ -113,12 +113,12 @@ final class PushServiceTest extends TestCase
         $member = $this->users->find($this->users->add('m', Roles::MEMBER));
         $guest = $this->users->find($this->users->add('g', Roles::GUEST));
         $p = $app->push();
-        $this->assertSame(['board', 'polls', 'birthdays', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'], $p->availableTypes($member));
+        $this->assertSame(['board', 'polls', 'birthdays', 'reports', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'], $p->availableTypes($member));
         $this->assertSame(['board_public', 'events', 'reminder', 'news'], $p->availableTypes(null), 'Gäste ohne Konto: nur Öffentliches');
-        $this->assertSame(['board_public', 'events', 'reminder', 'news'], $p->availableTypes($guest), 'Konto ohne Mitgliederbereich');
+        $this->assertSame(['board_public', 'reports', 'events', 'reminder', 'news'], $p->availableTypes($guest), 'Konto ohne Mitgliederbereich; Antworten auf Fehlermeldungen für alle Konten');
 
         $app->features()->update(['penalties' => false, 'news' => false, 'events' => false, 'ranks' => false, 'titles' => false, 'board' => false, 'polls' => false, 'birthdays' => false]);
-        $this->assertSame(['points', 'events', 'reminder'], $p->availableTypes($member), 'Termine aus dem Kalender');
+        $this->assertSame(['reports', 'points', 'events', 'reminder'], $p->availableTypes($member), 'Termine aus dem Kalender');
         $this->assertSame([], $p->availableTypes(null), 'ohne öffentliche Termine und News nichts für Gäste');
         $this->assertSame(0, $p->notifyAll('news', PushService::message('x', 'y', 'news')), 'ausgeschalteter Bereich: kein Versand');
     }
@@ -157,6 +157,64 @@ final class PushServiceTest extends TestCase
         $this->assertSame(['news'], $p->update(null, $d['endpoint'], $d['keys']['auth'], ['news', 'penalties'], null)['types'], 'nur erlaubte Typen');
         $this->assertFalse($p->unsubscribe(null, $d['endpoint'], WebPushCrypto::b64uEncode(random_bytes(16))));
         $this->assertTrue($p->unsubscribe(null, $d['endpoint'], $d['keys']['auth']));
+    }
+
+    /** Standardmäßig an: Neu angebotene Arten (neue Rolle, Bereich) kommen dazu, selbst abgeschaltete bleiben aus. */
+    public function testNewlyOfferedTypesSwitchOnButOptOutsStayOff(): void
+    {
+        $app = $this->app();
+        $p = $app->push();
+        $id = $this->users->add('neu', Roles::GUEST);
+        $d = self::device('neu');
+        $p->subscribe($this->users->find($id), $d['endpoint'], $d['keys'], null, null, '');
+        $sub = $p->update($this->users->find($id), $d['endpoint'], null, ['board_public', 'events', 'reminder'], null);
+        $this->assertSame(['board_public', 'events', 'reminder'], $sub['types'], 'News selbst abgeschaltet');
+        $this->assertSame(0, $p->addNewTypes(), 'ohne Änderung nichts zu tun');
+
+        $this->users->setRole($id, Roles::MEMBER);
+        $this->assertSame(1, $p->addNewTypes());
+        $sub = $p->repository()->byEndpoint($d['endpoint']);
+        $this->assertNotNull($sub);
+        $this->assertSame(['board', 'board_public', 'polls', 'birthdays', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder'], $sub['types'], 'neue Arten der Rolle an, News bleibt aus');
+        $this->assertSame(0, $p->addNewTypes(), 'nur einmal');
+
+        // Bereich aus und wieder an: Die Art kennt das Gerät schon, abgeschaltet bleibt abgeschaltet.
+        $p->update($this->users->find($id), $d['endpoint'], null, ['board', 'events'], null);
+        $app->features()->update(['polls' => false]);
+        $app->features()->update(['polls' => true]);
+        $p->addNewTypes();
+        $this->assertSame(['board', 'events'], $p->repository()->byEndpoint($d['endpoint'])['types'] ?? null);
+
+        // Ein Bereich, den es beim Anmelden des Geräts nicht gab, kommt dazu (auch ohne erstes Einschalten).
+        $app->features()->update(['news' => false]);
+        $other = self::device('ohne-news');
+        $p->subscribe($this->users->find($id), $other['endpoint'], $other['keys'], ['events'], null, '');
+        $app->features()->update(['news' => true]);
+        $sub = $p->addNewTypesTo($p->own($this->users->find($id), $other['endpoint'], null), $this->users->find($id));
+        $this->assertSame(['events', 'news'], $sub['types']);
+        $this->assertSame(['events', 'news'], $p->repository()->byEndpoint($other['endpoint'])['types'] ?? null);
+    }
+
+    /** Abos von vor der Regel: Was gerade angeboten wird, gilt als bekannt; erst später Neues kommt dazu. */
+    public function testOlderSubscriptionsKeepTheirChoice(): void
+    {
+        $app = $this->app();
+        $p = $app->push();
+        $id = $this->users->add('alt', Roles::GUEST);
+        $d = self::device('alt');
+        $p->repository()->insert($id, $d['endpoint'], $d['keys']['p256dh'], $d['keys']['auth'], ['events'], false, $app->time()->nowUtc());
+        $legacy = $p->repository()->byEndpoint($d['endpoint']);
+        $this->assertNotNull($legacy);
+        $this->assertNull($legacy['offered']);
+        $this->assertSame(0, $p->addNewTypes());
+        $sub = $p->repository()->byEndpoint($d['endpoint']);
+        $this->assertSame(['events'], $sub['types'] ?? null, 'News und Erinnerung bleiben aus (vielleicht abgeschaltet)');
+        $this->assertSame(['events', 'board_public', 'reports', 'reminder', 'news'], $sub['offered'] ?? null);
+
+        $this->users->setRole($id, Roles::MEMBER);
+        $app->push()->addNewTypes();
+        $this->assertContains('polls', $p->repository()->byEndpoint($d['endpoint'])['types'] ?? []);
+        $this->assertNotContains('news', $p->repository()->byEndpoint($d['endpoint'])['types'] ?? []);
     }
 
     public function testDeviceMovesToAnotherAccountOnlyWithItsSecret(): void
@@ -376,9 +434,9 @@ final class PushServiceTest extends TestCase
         $log = $p->logStatus();
         $labels = $p->types();
         $this->assertSame([
-            ['type' => 'penalties', 'label' => $labels['penalties']['label'], 'at' => '2026-10-19T10:00:00+02:00', 'devices' => 1],
             ['type' => 'points', 'label' => $labels['points']['label'], 'at' => '2026-10-19T10:05:00+02:00', 'devices' => 2],
-        ], $log['types'], 'in der Reihenfolge der Arten, Zeit in der Zeitzone der Kompanie');
+            ['type' => 'penalties', 'label' => $labels['penalties']['label'], 'at' => '2026-10-19T10:00:00+02:00', 'devices' => 1],
+        ], $log['types'], 'neueste zuerst, Zeit in der Zeitzone der Kompanie');
         $this->assertSame(['at' => '2026-10-19T10:05:00+02:00', 'count' => 3], $log['accepted']);
         $this->assertNull($log['rejected']);
         $this->assertSame($log, $p->adminStatus()['log']);
@@ -394,6 +452,11 @@ final class PushServiceTest extends TestCase
         $this->assertSame(2, $log['rejected']['count'] ?? null);
         $this->assertSame('2026-10-19T11:05:00+02:00', $log['rejected']['at'] ?? null);
         $this->assertContains($log['rejected']['reason'] ?? null, ['HTTP 400', 'Gerät beim Push-Dienst abgemeldet (HTTP 410)']);
+
+        // Später wieder Strafen: Strafen rücken wieder nach oben.
+        $this->clock->at = $this->clock->now()->modify('+1 minute');
+        $app->pushTriggers()->penaltiesAdded([['id' => 4, 'user_id' => $m->id, 'amount_cents' => 100, 'reason' => 'x']]);
+        $this->assertSame(['penalties', 'points'], array_column($p->logStatus()['types'], 'type'));
 
         // Ausgeschalteter Bereich: seine Art erscheint nicht mehr.
         $app->features()->update(['penalties' => false]);
@@ -518,7 +581,7 @@ final class PushServiceTest extends TestCase
         $this->assertSame(1, $app->pushTriggers()->checkCalendar(), 'Ort geändert');
         $app->push()->processQueue();
         $msgs = array_map(fn (array $c): array => self::decrypt((string) $c['body'], $d), $this->pushes());
-        $this->assertSame(['Neuer Termin', 'Termin geändert'], array_column($msgs, 'title'));
+        $this->assertSame(['Termine: neu', 'Termine: geändert'], array_column($msgs, 'title'));
         $this->assertSame('Probe umbenannt – Ort: Halle → Sporthalle', $msgs[1]['body'], 'nur die Änderung, nicht der ganze Termin');
         // Issue #190: Ziel ist der Termin mit der Kennung aus dem Kalender.
         $ids = array_column($app->calendar()->events(), 'id', 'title');
@@ -566,7 +629,7 @@ final class PushServiceTest extends TestCase
         $this->assertSame(2, $app->push()->repository()->counts()['queued'], 'Datum geändert');
         $app->push()->processQueue();
         $msg = self::decrypt((string) $this->pushes()[0]['body'], $g);
-        $this->assertSame('Neuer Termin', $msg['title']);
+        $this->assertSame('Termine: neu', $msg['title']);
         $this->assertSame('Sommerfest – Sa 07.11.2026 – Festplatz', $msg['body']);
         $this->assertSame('termine/termin/p' . $id, $msg['route'], 'öffentlicher Termin mit „p“ wie in der Liste (Issue #190)');
     }

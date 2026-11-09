@@ -7,6 +7,13 @@
   --tabbar-h: 66px;
   --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --warn-deep: color-mix(in srgb, var(--warn-surface) 78%, black);
+  /* Abstandsstufen (Issue #344): zwischen Zeilen in einer Karte 1–2, zwischen Elementen 3, zwischen Karten und im
+     Rand einer Karte 4, zwischen Abschnitten 5. Neue Abstände bitte nur mit diesen Stufen. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -36,6 +43,25 @@ input,
 select {
   font: inherit;
   color: inherit;
+}
+
+/* Lange Wörter in Überschriften, Kacheln und Titeln nach deutschen Regeln trennen (lang="de"), statt sie an
+   beliebiger Stelle umzubrechen (overflow-wrap: anywhere greift erst, wenn keine Trennstelle passt). */
+h1,
+h2,
+h3,
+.btn,
+.row-title,
+.event-title,
+.page-tile,
+.member-tile-label,
+.sheet-title,
+.album-title,
+.news-headline,
+.office-title,
+.rank-card-title {
+  hyphens: auto;
+  -webkit-hyphens: auto;
 }
 
 /* ------------------------------------------------------------------ */
@@ -229,6 +255,12 @@ select {
   color: #5a3a06;
   border-bottom: 1px solid var(--line-strong);
 }
+/* Höchstens zwei Hinweise übereinander (Issue #347): Steht schon das Brett oder der Wartungsmodus oben, wartet der
+   Hinweis zum Installieren, bis sie weg sind. */
+.board-banner ~ .install-hint,
+.maintenance-banner ~ .install-hint {
+  display: none;
+}
 .install-hint {
   display: flex;
   gap: 10px;
@@ -268,6 +300,13 @@ select {
   color: inherit;
   padding: 4px;
   font-size: 1.1rem;
+}
+/* Startseite: Benachrichtigungen einschalten (PushHint) */
+.push-hint p {
+  margin: 0 0 10px;
+}
+.push-hint .push-hint-later {
+  margin-top: 4px;
 }
 
 /* ------------------------------------------------------------------ */
@@ -418,6 +457,13 @@ select {
   gap: 6px;
   margin-top: 10px;
 }
+/* Vorlage im Punktekatalog: Wert rechts neben dem Titel, damit beide Knöpfe darunter in eine Reihe passen */
+.catalog-row-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
 .pos {
   color: var(--good);
 }
@@ -430,6 +476,20 @@ select {
 .small {
   font-size: 0.85rem;
   margin: 0;
+}
+/* Erklärtext (klein, ohne eigenen Rand) direkt vor einer Liste, einem Umschalter oder einer Karte: Abstand wie
+   zwischen zwei Elementen, damit der Text nicht an der ersten Karte klebt (Issue #344). */
+p.small + :is(.card-list, .card, .segmented, .poll-list, .empty, .btn-block),
+p.small + p.small:not(.muted) {
+  margin-top: var(--space-3);
+}
+/* Badges (Titel, Rolle) im Titel einer Zeile sind höher als Text: die Zeile darunter etwas absetzen. */
+.row-title:has(.badge) + .row-sub {
+  margin-top: var(--space-1);
+}
+/* Art eines Punkts (z. B. „Eigene Seite“) hinter dem Namen in derselben Zeile: nicht direkt an den Namen kleben. */
+.row-title + .row-kind {
+  margin-left: var(--space-2);
 }
 .chevron {
   color: var(--accent-dark);
@@ -553,6 +613,15 @@ select {
   margin-left: 6px;
   vertical-align: 2px;
 }
+.badge-no-access {
+  background: var(--line);
+  color: var(--ink-2);
+  margin-left: 6px;
+  vertical-align: 2px;
+}
+.no-access-panel {
+  margin-top: 12px;
+}
 .badge-level-guest {
   background: var(--line);
   color: var(--ink-2);
@@ -650,6 +719,10 @@ select {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
   margin: 14px 0;
+}
+/* Knöpfe dürfen schmaler als ihr längstes Wort werden (Trennung statt Überlauf über den Rand) */
+.button-row > * {
+  min-width: 0;
 }
 
 /* Gerüst der Seite beim Laden (skeleton.tsx): ohne eigene Box, damit es im Raster bzw. Flex des Bereichs genauso
@@ -1042,19 +1115,30 @@ button.member-date {
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  /* Seite dahinter abgedunkelt und unscharf: Das Fenster hebt sich klar ab (Issue #342) */
   background: rgb(0 0 0 / 55%);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+/* Rückfragen (ask.tsx) liegen über allem, auch über der vergrößerten Bildansicht (.lightbox, z-index 50). */
+.sheet-backdrop.sheet-top {
+  z-index: 60;
 }
 .sheet {
   display: flex;
   flex-direction: column;
   width: 100%;
   max-width: 640px;
-  max-height: calc(92vh / var(--kompanie-zoom, 1));
+  /* Oben bleibt immer ein Streifen der Seite sichtbar: ein Fenster, keine neue Seite */
+  max-height: calc(85vh / var(--kompanie-zoom, 1));
   border-radius: 18px 18px 0 0;
-  border-top: 2px solid var(--accent);
+  border-top: 3px solid var(--accent);
+  /* Seitenfarbe, damit Karten im Fenster sich abheben; der Kopf ist abgesetzt */
   background: var(--bg);
   color: var(--ink);
-  box-shadow: 0 -8px 30px rgb(0 0 0 / 35%);
+  box-shadow:
+    0 -10px 40px rgb(0 0 0 / 45%),
+    0 0 0 1px rgb(0 0 0 / 8%);
 }
 .sheet-head {
   display: flex;
@@ -1062,6 +1146,8 @@ button.member-date {
   gap: 12px;
   padding: 14px 14px 10px 18px;
   border-bottom: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 18px 18px 0 0;
 }
 .sheet-title {
   flex: 1;
@@ -1076,7 +1162,7 @@ button.member-date {
   height: 40px;
   border: 0;
   border-radius: 999px;
-  background: var(--card);
+  background: var(--bg);
   color: var(--ink);
   font-size: 1.2rem;
   cursor: pointer;
@@ -1100,6 +1186,34 @@ button.member-date {
     border: 2px solid var(--accent);
   }
 }
+@media (prefers-reduced-transparency: reduce) {
+  .sheet-backdrop {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: rgb(0 0 0 / 65%);
+  }
+}
+/* Rückfragen der App (ask.tsx) statt der Fenster des Browsers */
+.ask-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ask-message {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: break-word;
+}
+.ask-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.btn-danger-solid {
+  background: var(--danger);
+  color: #fff;
+}
 /* Foto ersetzen und entfernen in der vergrößerten Ansicht, unter dem Bild */
 .member-photo-zoom .member-photo {
   justify-content: center;
@@ -1107,6 +1221,8 @@ button.member-date {
 }
 .back {
   margin-bottom: 4px;
+  /* In Formularen (Flex-Spalte) nicht über die ganze Breite gezogen und dadurch mittig, sondern links wie überall */
+  align-self: flex-start;
 }
 /* Mitglied in der Verwaltung bzw. Seite einer Person im Tab „Mitglieder“: zurück zur Liste, daneben vorheriges und
    nächstes (auch per Wischen). */
@@ -1249,6 +1365,48 @@ button.member-date {
   display: flex;
   gap: 10px;
 }
+/* Eingabefelder nebeneinander auf einer Höhe, auch wenn eine Beschriftung zweizeilig umbricht */
+/* Hinweise unter einem Feld (span.small/.muted) sind keine Beschriftung: nicht fett und nicht in Großbuchstaben */
+.field > span.small,
+.field > span.muted,
+.field > span.form-error {
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.field > span.small {
+  font-size: 0.85rem;
+}
+.field > span.muted {
+  color: var(--muted);
+}
+.field > span.form-error {
+  color: var(--danger);
+  font-weight: 600;
+}
+/* Datei-Auswahl (ui.tsx, FileInput): Knopf und Dateiname nebeneinander */
+.field > span.file-input,
+.file-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ink);
+  position: relative;
+}
+.file-input-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.field-row > .field > span:first-child {
+  flex: 1;
+}
 .field.narrow {
   flex: 0 0 96px;
 }
@@ -1260,6 +1418,7 @@ input[type='search'],
 input[type='email'],
 input[type='password'],
 input[type='tel'],
+input:not([type]),
 select {
   width: 100%;
   padding: 10px 12px;
@@ -1576,6 +1735,15 @@ code {
 }
 .more {
   margin-top: 14px;
+}
+/* Titelbild beim Schreiben im Format der Karte in der Liste (Issue #351) */
+.news-cover-preview {
+  overflow: hidden;
+  max-width: 420px;
+  margin: 4px 0 8px;
+}
+.news-cover-preview .news-image {
+  border-bottom: 0;
 }
 .news-article .news-hero {
   width: 100%;
@@ -1898,6 +2066,14 @@ code {
   color: var(--accent-light);
   font-family: var(--font-head);
   letter-spacing: 0.08em;
+}
+.lb-count .lb-intern {
+  margin-left: 0.75em;
+  border: 0;
+  background: rgb(255 255 255 / 14%);
+  color: #fff;
+  letter-spacing: normal;
+  font-family: inherit;
 }
 @media (min-width: 560px) {
   .album-grid {
@@ -2283,7 +2459,10 @@ code {
   font-size: 0.92rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  overflow-wrap: anywhere;
+  /* Lange Wörter nach deutschen Regeln trennen (lang="de"), nicht an beliebiger Stelle („Punktekatalo-g“) */
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  overflow-wrap: break-word;
   transition: transform 0.08s ease;
 }
 .admin-tile:active {
@@ -2348,6 +2527,44 @@ code {
 .settings-chevron {
   font-size: 1.4rem;
   color: var(--accent-text);
+}
+/* Übersicht als Kacheln je Gruppe (Issue #348) */
+.settings-group + .settings-group {
+  margin-top: var(--space-5);
+}
+.settings-group-title {
+  margin: 0 0 var(--space-2);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.settings-tiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr));
+  gap: var(--space-2);
+}
+.settings-tiles > li {
+  display: flex;
+}
+.settings-tile {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 56px;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  cursor: pointer;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+.settings-tile .row-title {
+  overflow-wrap: break-word;
 }
 /* Kacheln der Einstellungen: Innenabstand und Abstand untereinander (auch ohne .form) */
 .settings-section {
@@ -2647,6 +2864,16 @@ fieldset.rights-tree legend {
 }
 
 /* Was ist neu (Changelog) */
+.changelog-version > summary {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.changelog-title {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
 .changelog-text h4 {
   font-size: 0.95rem;
   margin: 14px 0 2px;
@@ -2719,6 +2946,50 @@ fieldset.rights-tree legend {
 }
 .report-done {
   padding: 16px;
+}
+/* Eigene Meldungen unter dem Formular und Eingang der Admins (Verwaltung → Fehlermeldungen) */
+.my-reports {
+  margin-top: 16px;
+  padding: 16px;
+}
+.my-reports ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.report-text {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  margin: 6px 0;
+}
+.report-review .report-meta {
+  margin: 8px 0;
+}
+.report-review .report-meta dl {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+}
+.report-review .report-meta dt {
+  font-weight: 700;
+  color: var(--ink-2);
+  margin-top: 6px;
+}
+.report-review .report-meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.report-shot-full {
+  display: block;
+  max-width: 100%;
+  margin: 8px 0;
+  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+}
+.reports-review h3.section-title {
+  margin-top: 20px;
 }
 
 /* Dienstgrade: eigener Dienstgrad als Karte mit Akzentlinie und Fortschrittsbalken */
@@ -2823,6 +3094,16 @@ fieldset.rights-tree legend {
   width: 128px;
   height: 128px;
   font-size: 2.2rem;
+}
+/* Foto beim Anlegen (Mitglied, ehemalige Person): Foto und Knöpfe mittig untereinander */
+.new-member-photo .photo-picker {
+  flex-direction: column;
+}
+.new-member-photo .photo-picker .button-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 0;
 }
 .member-photo,
 .photo-picker {
@@ -3366,13 +3647,82 @@ fieldset.rights-tree legend {
     letter-spacing: 0.02em;
   }
 }
+/* Beliebig viele Punkte (Issue #362): ab 8 Tabs Schrift und Symbol in Stufen kleiner (Klassen aus App.tsx tabbarClass).
+ * Nicht in der Leiste am linken Rand (Querformat, flach): Dort stehen die Tabs untereinander und lassen sich rollen. */
+@media (orientation: portrait), (min-height: 521px) {
+  .tabbar.tabs-8 button {
+    flex: 1 1 0;
+    gap: 2px;
+    font-size: 0.52rem;
+    letter-spacing: 0;
+  }
+  .tabbar.tabs-8 button svg {
+    width: 20px;
+    height: 20px;
+  }
+  .tabbar.tabs-10 button {
+    font-size: 0.48rem;
+  }
+  .tabbar.tabs-10 button svg {
+    width: 18px;
+    height: 18px;
+  }
+  .tabbar.tabs-12 button {
+    font-size: 0.44rem;
+  }
+  .tabbar.tabs-12 button svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+/* Breiter Bildschirm: genug Platz für die Schrift von sieben Tabs, nur die Symbole bleiben etwas kleiner. */
+@media (min-width: 900px) and ((orientation: portrait) or (min-height: 521px)) {
+  .tabbar.tabs-8 button {
+    font-size: 0.58rem;
+  }
+}
+/* Nur Symbole (Einstellungen → Navigation): Der Name steht weiter als aria-label am Knopf. */
+.tabbar.tabbar-icons button span {
+  display: none;
+}
+.tabbar.tabbar-icons button svg {
+  width: 24px;
+  height: 24px;
+}
+.tabbar.tabbar-icons.tabs-12 button svg {
+  width: 20px;
+  height: 20px;
+}
+/* Einstellungen → Navigation: Umbenennen je Bereich */
+.nav-rename {
+  margin-top: 6px;
+}
+.nav-rename summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.nav-rename .field {
+  margin-top: 8px;
+}
 
 /* Konten (Issue #24): Zugangsdaten, mehrere anlegen, Druckzettel */
 .credentials-url {
   overflow-wrap: anywhere;
 }
 .bulk-row {
-  margin-bottom: 12px;
+  /* Felder einer Person mit demselben Abstand wie im übrigen Formular (Issue #344) */
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.bulk-row > legend {
+  padding: 0 var(--space-2);
+  font-weight: 650;
 }
 .bulk-link {
   margin-bottom: 14px;
@@ -3515,6 +3865,8 @@ fieldset.rights-tree legend {
   gap: 8px;
   justify-content: flex-end;
   margin-left: auto;
+  /* Rutschen die Knöpfe unter den Text, nehmen sie die ganze Zeile und stehen nebeneinander statt untereinander */
+  flex: 1 0 auto;
 }
 
 /* ------------------------------------------------------------------ */
@@ -3522,7 +3874,8 @@ fieldset.rights-tree legend {
 /* ------------------------------------------------------------------ */
 
 .board-banner {
-  padding: 8px 16px 4px;
+  /* Kompakt (Issue #347): je Eintrag eine Zeile mit Titel und ×, darunter nur bei mehreren „+N weitere“ */
+  padding: 2px 8px 2px 16px;
   background: var(--warn-surface);
   color: var(--on-warn);
   border-bottom: 1px solid var(--warn-deep);
@@ -3530,23 +3883,32 @@ fieldset.rights-tree legend {
 }
 .board-entry {
   display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  padding: 4px 0;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: 40px;
 }
 .board-entry + .board-entry {
   border-top: 1px solid color-mix(in srgb, var(--on-warn) 30%, transparent);
-  padding-top: 8px;
 }
 .board-entry-body {
   flex: 1;
   min-width: 0;
-}
-.board-entry-head {
   display: flex;
-  flex-wrap: wrap;
-  gap: 2px 8px;
-  align-items: baseline;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+.board-entry-body > .board-banner-title,
+.board-entry-body > .board-text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+.board-poll-open {
+  flex: none;
 }
 .board-banner .board-meta {
   font-size: 0.8rem;
@@ -3572,7 +3934,12 @@ fieldset.rights-tree legend {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 4px 12px;
+  gap: 0 var(--space-3);
+  padding-right: var(--space-2);
+}
+/* Mit nur einem Eintrag bleibt das Banner eine Zeile: Der Titel führt schon zum Brett. */
+.board-banner:not(:has(.board-more)) .board-banner-foot {
+  display: none;
 }
 .board-banner-foot .btn-link,
 .board-banner-collapsed .btn-link {
@@ -3592,6 +3959,36 @@ fieldset.rights-tree legend {
 .board-page-title {
   margin: 18px 0 10px;
   font-size: 1rem;
+}
+/* Karten am Brett und Umfragen mit Innenrand (Issue #344/#347) */
+.board-card {
+  padding: var(--space-4);
+}
+.board-card > :first-child {
+  margin-top: 0;
+}
+.board-card > :last-child {
+  margin-bottom: 0;
+}
+/* Abschnitt innerhalb eines Formulars, z. B. „Sichtbarkeit und Versand“ am Brett */
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+.form-section > h4 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+.form-section .toggle + .toggle {
+  margin-top: calc(-1 * var(--space-2));
+}
+/* Titel der Nachricht als große, klare Eingabe */
+.board-title-input {
+  font-size: 1.15rem;
+  font-weight: 600;
 }
 .board-card .board-meta {
   font-size: 0.85rem;
@@ -3660,6 +4057,27 @@ fieldset.rights-tree legend {
 }
 .board-ended {
   margin-top: 12px;
+}
+/* Sichtbar für: Kompanien bzw. Personen auswählen */
+fieldset.board-targets {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+fieldset.board-targets legend {
+  padding: 0;
+  margin-bottom: 4px;
+}
+.board-targets-search {
+  margin-bottom: 6px;
+}
+.board-targets-list {
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 /* ------------------------------------------------------------------ */
@@ -3923,6 +4341,43 @@ fieldset.rights-tree legend {
 }
 .poll-manage-link {
   margin-bottom: 10px;
+}
+/* Umfragen untereinander mit Abstand; „Umfragen verwalten“: Karten mit Innenrand (Issue #344) */
+.poll-list,
+.poll-admin {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.poll-list > h2,
+.poll-admin > h2 {
+  margin: var(--space-3) 0 0;
+}
+.poll-card {
+  padding: var(--space-4);
+}
+.poll-card > :first-child {
+  margin-top: 0;
+}
+.poll-card > :last-child {
+  margin-bottom: 0;
+}
+.poll-admin > .form.card {
+  margin-bottom: 0;
+}
+/* Fieldset ohne eigene Klasse im Formular: Felder darin mit demselben Abstand wie im Formular */
+.form fieldset:not([class]) {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.form fieldset:not([class]) > legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
 }
 .poll-option-edit {
   display: flex;
@@ -5605,35 +6060,11 @@ button.spotlight-person:focus-visible {
     align-items: center;
     padding: 0;
   }
-  .board-entry + .board-entry {
-    padding-top: 2px;
+  .board-entry {
+    min-height: 0;
   }
-  .board-entry-body {
+  .board-banner:not(:has(.board-more)) .board-banner-foot {
     display: flex;
-    align-items: center;
-    gap: 4px 12px;
-  }
-  .board-entry-head {
-    flex: none;
-    flex-wrap: nowrap;
-  }
-  .board-entry-body > .board-banner-title,
-  .board-entry-body > .board-text {
-    flex: 1;
-    min-width: 0;
-    margin: 0;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-  .board-poll-open {
-    flex: none;
-  }
-  /* Auf kleinen Handys hat der Titel Vorrang vor Name und Uhrzeit */
-  @media (max-width: 760px) {
-    .board-banner .board-entry-head .board-meta {
-      display: none;
-    }
   }
   .board-dismiss {
     min-height: 32px;
@@ -6094,6 +6525,35 @@ button.spotlight-person:focus-visible {
   border-radius: 6px;
   background: var(--line);
 }
+/* Video (Issue #350): Standbild mit ▶ darüber, ohne Standbild nur ▶ */
+.gallery-upload-video {
+  position: relative;
+  flex: 0 0 56px;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  background: var(--line);
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+.gallery-upload-video img {
+  position: absolute;
+  inset: 0;
+}
+.gallery-upload-video img + span {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding-left: 2px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 0.8rem;
+}
 .gallery-upload .small {
   flex: 1;
   min-width: 0;
@@ -6107,12 +6567,61 @@ button.spotlight-person:focus-visible {
 .album-download {
   margin-bottom: 12px;
 }
+/* Albumtitel mit rundem Knopf zum Herunterladen rechts daneben (wie in der Großansicht) */
+.album-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.album-head .member-name {
+  min-width: 0;
+}
+.album-download-btn {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin-top: 2px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line-strong);
+  background: transparent;
+  color: var(--accent-text);
+  cursor: pointer;
+}
+.album-download-btn:hover {
+  background: color-mix(in srgb, var(--accent-text) 10%, transparent);
+}
+.album-download-btn:disabled {
+  cursor: default;
+}
+.album-download-btn .album-download-busy {
+  width: 22px;
+  height: 22px;
+}
+.album-download-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.album-download-progress p {
+  margin: 0;
+}
 .gallery-review-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
   gap: 12px;
+}
+.gallery-review-item video {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  border-radius: 8px;
+  background: #000;
 }
 .gallery-review-item img {
   display: block;
@@ -6175,4 +6684,319 @@ button.spotlight-person:focus-visible {
   display: block;
   overflow-wrap: anywhere;
   margin: 4px 0 8px;
+}
+
+/* Blöcke auf eigenen Seiten: Countdown und Bearbeiten */
+.page-article {
+  padding: 16px;
+}
+fieldset.block-source {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+fieldset.block-source legend {
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.blocks {
+  display: grid;
+  gap: 16px;
+}
+.block-badge {
+  margin: 0 0 6px;
+}
+.block-countdown {
+  text-align: center;
+  padding: 16px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+.form.card .block-countdown-title,
+.block-countdown-title {
+  margin: 0 0 10px;
+  font-family: var(--font-head);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ink);
+}
+.block-countdown-parts {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  font-variant-numeric: tabular-nums;
+}
+.block-countdown-part {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 72px;
+}
+.block-countdown-value {
+  font-family: var(--font-head);
+  font-size: 2.6rem;
+  line-height: 1.1;
+  font-weight: 700;
+  color: var(--primary-text);
+}
+.block-countdown-unit {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.block-countdown-when {
+  margin: 10px 0 0;
+}
+.block-countdown-text {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+.blocks-editor {
+  display: grid;
+  gap: 12px;
+}
+.block-edit {
+  display: grid;
+  gap: 10px;
+}
+.block-edit-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.block-edit-head select {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+.block-edit-actions {
+  display: flex;
+  gap: 6px;
+}
+.block-insert select {
+  width: 100%;
+}
+.block-preview {
+  display: grid;
+  gap: 4px;
+}
+
+/* Blöcke „Knopf mit Link“ und „Nächste Termine“ */
+.block-button {
+  margin: 12px 0;
+}
+.block-events h3 {
+  margin: 0 0 8px;
+}
+.block-events-list {
+  list-style: none;
+  margin: 0 0 4px;
+  padding: 0;
+}
+.block-events-list li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.block-events-list li:last-child {
+  border-bottom: 0;
+}
+.block-events-when {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+/* Blöcke „Ansprechpartner“, „Hinweis-Kasten“ und „Trennlinie“ */
+.block-contacts h3 {
+  margin: 0 0 8px;
+}
+.block-contacts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.block-contact {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.block-contact-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.block-notice {
+  margin: 12px 0;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border-left: 4px solid var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--card));
+}
+.block-notice p {
+  margin: 0;
+  white-space: pre-line;
+}
+.block-notice-title {
+  display: block;
+  margin-bottom: 4px;
+}
+.block-notice-warning {
+  border-left-color: var(--warn-deep);
+  background: color-mix(in srgb, var(--warn-surface) 30%, var(--card));
+}
+.block-notice-success {
+  border-left-color: #2e7d32;
+  background: color-mix(in srgb, #2e7d32 12%, var(--card));
+}
+.block-divider {
+  border: 0;
+  border-top: 1px solid var(--line-strong);
+  margin: 20px 0;
+}
+.block-space {
+  height: 24px;
+}
+.block-offices {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Blöcke „Ablauf“ und „Zahlen und Fakten“ */
+.block-schedule h3,
+.block-facts h3 {
+  margin: 0 0 8px;
+}
+.block-schedule-list {
+  margin: 0;
+}
+.block-schedule-item {
+  display: grid;
+  grid-template-columns: minmax(4.5em, max-content) 1fr;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.block-schedule-item:last-child {
+  border-bottom: 0;
+}
+.block-schedule-item dt {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.block-schedule-item dd {
+  margin: 0;
+}
+.block-facts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  text-align: center;
+}
+.block-facts-value {
+  display: block;
+  font-family: var(--font-head);
+  font-size: 2rem;
+  line-height: 1.1;
+  color: var(--primary-text);
+}
+.block-facts-label {
+  color: var(--muted);
+}
+/* Blöcke „Umfrage“ und „Album“ */
+.block-poll {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+.block-poll-title {
+  font-size: 1.1rem;
+}
+.block-album h3 {
+  margin: 0 0 8px;
+}
+.block-album-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 6px;
+}
+.block-album-grid img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--radius-sm, 6px);
+  display: block;
+}
+/* Blöcke „Dokument“ und „Sponsoren“ */
+.block-document {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.block-sponsors h3 {
+  margin: 0 0 8px;
+}
+.block-sponsors-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+.block-sponsors-list .sponsor-logo {
+  display: block;
+  max-height: 64px;
+  max-width: 160px;
+  width: auto;
+  height: auto;
+}
+/* Block „Karte zur Anfahrt“ */
+.block-map {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+.block-map h3,
+.block-map-place {
+  margin: 0;
+}
+.block-map-place {
+  white-space: pre-line;
+}
+.block-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+.block-row {
+  width: 100%;
+  align-items: flex-end;
+}
+.block-row-short {
+  flex: 0 0 7em;
 }

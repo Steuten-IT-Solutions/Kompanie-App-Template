@@ -27,6 +27,10 @@ use KompanieApp\Core\Push\PushService;
  * - Mit Mailversand verrät das Formular nicht, ob es zu einer E-Mail-Adresse schon ein Konto gibt: Die Antwort ist immer
  *   „Bitte bestätige deine E-Mail-Adresse“, die Mail sagt dann, dass es schon ein Konto gibt. Ohne Mailversand ginge das
  *   nicht (die Person erführe nie etwas); dort sagt es das Formular.
+ * - Mitglieder ohne Zugang (MemberService::NO_ACCESS, z. B. für Chroniken angelegt): Ihre E-Mail-Adresse und ihr
+ *   Benutzername gelten im Formular als frei, damit sich die Person selbst registrieren kann. Beim Freigeben schlägt die
+ *   App passende Mitglieder ohne Zugang vor (MemberService::noAccessMatches); mit user_id verbindet approve() den Antrag mit
+ *   diesem Mitglied statt ein zweites Konto anzulegen (MemberService::linkRegistration).
  * - Fristen (Aufgabe registrations, stündlich): unbestätigte Anträge nach CONFIRM_HOURS, unbearbeitete nach PENDING_DAYS,
  *   Ablehnungen nach REJECTED_DAYS gelöscht.
  */
@@ -168,11 +172,12 @@ final class RegistrationService
 
         $this->limit($client);
         $nowUtc = gmdate('Y-m-d H:i:s', $now);
-        if ($this->app->users->loginExists($login) || $this->openWithLogin($login, $nowUtc)) {
+        $free = $this->noAccessContacts();
+        if (($this->app->users->loginExists($login) && !isset($free['logins'][mb_strtolower($login)])) || $this->openWithLogin($login, $nowUtc)) {
             throw ApiError::invalid('Dieser Benutzername ist schon vergeben. Bitte einen anderen wählen.');
         }
         $name = PersonName::join($first, $last);
-        $emailTaken = $this->app->users->emailExists($email);
+        $emailTaken = $this->app->users->emailExists($email) && !isset($free['emails'][mb_strtolower($email)]);
         $pendingSame = $this->db()->scalar(
             'SELECT COUNT(*) FROM {registration_requests} WHERE status = ? AND LOWER(email) = LOWER(?) AND expires_at >= ?',
             [self::PENDING, $email, $nowUtc],
@@ -326,6 +331,27 @@ final class RegistrationService
         return null;
     }
 
+    /**
+     * Benutzernamen und E-Mail-Adressen der Mitglieder ohne Zugang (klein), die im Formular als frei gelten.
+     *
+     * @return array{logins: array<string, true>, emails: array<string, true>}
+     */
+    private function noAccessContacts(): array
+    {
+        $out = ['logins' => [], 'emails' => []];
+        foreach (array_keys($this->app->members()->noAccessMembers()) as $id) {
+            $p = $this->app->users->profile($id);
+            if ($p === null) {
+                continue;
+            }
+            $out['logins'][mb_strtolower($p['login'])] = true;
+            if ($p['email'] !== '') {
+                $out['emails'][mb_strtolower($p['email'])] = true;
+            }
+        }
+        return $out;
+    }
+
     private function openWithLogin(string $login, string $nowUtc): bool
     {
         return (int) $this->db()->scalar(
@@ -364,9 +390,10 @@ final class RegistrationService
     /* ---------------------------------------------------------------- */
 
     /**
-     * Anträge, die auf Freigabe warten (älteste zuerst), mit der vorgeschlagenen Rolle.
+     * Anträge, die auf Freigabe warten (älteste zuerst), mit der vorgeschlagenen Rolle, je Antrag passenden Mitgliedern
+     * ohne Zugang (matches) und allen Mitgliedern ohne Zugang zum Auswählen (no_access_members).
      *
-     * @return array{requests: list<array<string, mixed>>, default_role: string, email_confirmation: bool}
+     * @return array{requests: list<array<string, mixed>>, default_role: string, email_confirmation: bool, no_access_members: list<array{id: int, name: string}>}
      */
     public function pending(): array
     {
@@ -374,6 +401,8 @@ final class RegistrationService
             'SELECT * FROM {registration_requests} WHERE status = ? AND expires_at >= ? ORDER BY id',
             [self::PENDING, $this->app->time()->nowUtc()],
         );
+        $members = $this->app->members();
+        $free = $this->noAccessContacts();
         return [
             'requests' => array_map(fn (array $r): array => [
                 'id' => (int) $r['id'],
@@ -382,16 +411,19 @@ final class RegistrationService
                 'name' => PersonName::join((string) $r['first_name'], (string) $r['last_name']),
                 'email' => (string) $r['email'],
                 'username' => (string) $r['login'],
-                'username_taken' => $this->app->users->loginExists((string) $r['login']),
-                'email_taken' => $this->app->users->emailExists((string) $r['email']),
+                // Benutzername bzw. Adresse eines Mitglieds ohne Zugang gilt als frei: Die Anfrage lässt sich mit ihm verbinden.
+                'username_taken' => $this->app->users->loginExists((string) $r['login']) && !isset($free['logins'][mb_strtolower((string) $r['login'])]),
+                'email_taken' => $this->app->users->emailExists((string) $r['email']) && !isset($free['emails'][mb_strtolower((string) $r['email'])]),
                 'message' => (string) ($r['message'] ?? ''),
                 'created_at' => Time::utcToIso((string) $r['created_at']),
                 // Mit Mailversand bestätigt; ohne war die Adresse nie geprüft.
                 'email_confirmed' => $r['confirmed_at'] !== null,
                 'expires_at' => Time::utcToIso((string) $r['expires_at']),
+                'matches' => $members->noAccessMatches((string) $r['first_name'], (string) $r['last_name'], (string) $r['email']),
             ], $rows),
             'default_role' => $this->defaultRole(),
             'email_confirmation' => $this->withMail(),
+            'no_access_members' => array_values(array_map(static fn (User $u): array => ['id' => $u->id, 'name' => $u->name], $members->noAccessMembers())),
         ];
     }
 
@@ -414,21 +446,31 @@ final class RegistrationService
      * Freigeben: Konto mit der gewählten Rolle (level, sonst die vorgeschlagene) und dem Passwort aus dem Antrag anlegen.
      * Gleiche Prüfungen wie beim Anlegen (MemberService::prepare: Rolle, die $actor vergeben darf, Benutzername und
      * E-Mail-Adresse frei); ein anderer Benutzername (username) geht, wenn der gewünschte inzwischen vergeben ist.
+     * Mit user_id: statt ein Konto anzulegen den Antrag mit diesem Mitglied ohne Zugang verbinden (die Rolle bleibt).
      *
-     * @param array<string, mixed> $in level, username
-     * @return array{member: array<string, mixed>, mailed: bool}
+     * @param array<string, mixed> $in level, username, user_id
+     * @return array{member: array<string, mixed>, mailed: bool, linked: bool}
      */
     public function approve(User $actor, int $id, array $in): array
     {
         $row = $this->pendingRow($id);
         $username = is_string($in['username'] ?? null) && trim($in['username']) !== '' ? trim($in['username']) : (string) $row['login'];
+        $linkTo = Input::integer($in['user_id'] ?? null);
+        if ($linkTo !== null && $linkTo > 0) {
+            return $this->approveLinked($actor, $row, $linkTo, $username);
+        }
+        $level = is_string($in['level'] ?? null) && $in['level'] !== '' ? $in['level'] : $this->defaultRole();
+        // Admin nie über eine Anfrage: Wer sich selbst meldet, ist noch niemandem bekannt.
+        if ($level === Roles::ADMIN) {
+            throw ApiError::invalid(sprintf('Beim Freigeben lässt sich „%s“ nicht vergeben.', $this->app->roles()->label(Roles::ADMIN)));
+        }
         $taken = [];
         $prepared = $this->app->members()->prepare([
             'first_name' => (string) $row['first_name'],
             'last_name' => (string) $row['last_name'],
             'username' => $username,
             'email' => (string) $row['email'],
-            'level' => is_string($in['level'] ?? null) && $in['level'] !== '' ? $in['level'] : $this->defaultRole(),
+            'level' => $level,
         ], $taken, $actor);
         // Erst den Antrag beanspruchen (gleichzeitige Freigabe durch zwei Personen), dann das Konto anlegen.
         if ($this->db()->execute('DELETE FROM {registration_requests} WHERE id = ? AND status = ?', [$id, self::PENDING]) !== 1) {
@@ -442,17 +484,48 @@ final class RegistrationService
             $this->db()->insert('registration_requests', $row);
             throw $e;
         }
-        $mailed = false;
-        if ($this->withMail() && $prepared['email'] !== '') {
-            $mailed = $this->send($prepared['email'], $prepared['name'], $this->subject('Dein Zugang ist freigegeben'), [
-                'Hallo ' . $prepared['first_name'] . ',',
-                sprintf('dein Zugang zur App „%s“ ist freigegeben. Du kannst dich jetzt mit dem Passwort aus deiner Anfrage anmelden.', $this->appName()),
-                'Benutzername: ' . $prepared['login'] . ' (oder deine E-Mail-Adresse)',
-                'Zur App: ' . $this->app->env->appUrl(),
-                'So holst du die App auf dein Handy: ' . $this->app->env->appUrl() . '#/installieren',
-            ]);
+        return ['member' => $member, 'mailed' => $this->mailApproved($prepared['email'], $prepared['name'], $prepared['first_name'], $prepared['login']), 'linked' => false];
+    }
+
+    /**
+     * Freigeben und mit einem Mitglied ohne Zugang verbinden (MemberService::linkRegistration). Wie beim Anlegen erst den
+     * Antrag beanspruchen; scheitert das Verbinden, ist er wieder da.
+     *
+     * @param array<string, mixed> $row
+     * @return array{member: array<string, mixed>, mailed: bool, linked: bool}
+     */
+    private function approveLinked(User $actor, array $row, int $userId, string $username): array
+    {
+        $members = $this->app->members();
+        if (!$members->hasNoAccess($userId)) {
+            throw ApiError::invalid('Dieses Mitglied hat schon einen Zugang. Verbinden lässt sich nur ein Mitglied ohne Zugang.');
         }
-        return ['member' => $member, 'mailed' => $mailed];
+        if ($this->db()->execute('DELETE FROM {registration_requests} WHERE id = ? AND status = ?', [(int) $row['id'], self::PENDING]) !== 1) {
+            throw ApiError::notFound('Diese Anfrage hat gerade schon jemand bearbeitet.');
+        }
+        try {
+            $member = $members->linkRegistration($actor, $userId, $username, (string) $row['email'], (string) $row['password_hash']);
+        } catch (\Throwable $e) {
+            unset($row['id']);
+            $this->db()->insert('registration_requests', $row);
+            throw $e;
+        }
+        return ['member' => $member, 'mailed' => $this->mailApproved($member['email'], $member['name'], $member['first_name'], $member['username']), 'linked' => true];
+    }
+
+    /** Mail „Dein Zugang ist freigegeben“ (nur mit Mailversand); true, wenn sie raus ist. */
+    private function mailApproved(string $email, string $name, string $first, string $login): bool
+    {
+        if (!$this->withMail() || $email === '') {
+            return false;
+        }
+        return $this->send($email, $name, $this->subject('Dein Zugang ist freigegeben'), [
+            'Hallo ' . $first . ',',
+            sprintf('dein Zugang zur App „%s“ ist freigegeben. Du kannst dich jetzt mit dem Passwort aus deiner Anfrage anmelden.', $this->appName()),
+            'Benutzername: ' . $login . ' (oder deine E-Mail-Adresse)',
+            'Zur App: ' . $this->app->env->appUrl(),
+            'So holst du die App auf dein Handy: ' . $this->app->env->appUrl() . '#/installieren',
+        ]);
     }
 
     /**

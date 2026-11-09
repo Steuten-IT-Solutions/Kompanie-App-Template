@@ -20,7 +20,7 @@ use KompanieApp\Core\Domain\RankService;
  * - neue Neuigkeiten (Abgleich mit dem letzten Stand): an alle Abonnenten;
  * - Erinnerung an die Termine von morgen, einmal am Tag ab der eingestellten Uhrzeit;
  * - Dienstgrad geändert bzw. Titel neu verliehen: nur an das betroffene Mitglied;
- * - neue Nachricht am Schwarzen Brett (Issue #5): an alle Mitglieder und Anwärter außer dem Verfasser, bei öffentlichen
+ * - neue Nachricht am Schwarzen Brett (Issue #5): an alle Mitglieder und Anwärter samt Verfasser, bei öffentlichen
  *   Nachrichten auch an Gäste und Konten ohne Brett (Art board_public), dringend und höchstens bis zum Ablauf der
  *   Nachricht zustellbar; Ändern löst nichts aus (auch nicht, wenn eine Nachricht öffentlich wird);
  * - neue Umfrage (Issue #4): an alle Mitglieder außer dem, der sie angelegt hat; Erinnerung 24 Stunden vor dem Ende an
@@ -83,7 +83,9 @@ final class PushTriggers
      * Öffentliche Nachrichten (audience public) gehen zusätzlich an Gäste und Konten ohne Brett; bei der ersten bekommen
      * bestehende Abos dieser Geräte die Art board_public einmalig dazu (PushService::offerTypeToExisting).
      *
-     * @param array{id: int, title: string, author_name: string|null, expires_at: string|null, audience?: string} $item neue Nachricht (BoardService::create)
+     * Nachrichten für Kompanien oder Personen gehen nur an deren Geräte (BoardService::readerIds) und die des Verfassers.
+     *
+     * @param array{id: int, title: string, author_name: string|null, expires_at: string|null, audience?: string, audience_ids?: list<int>} $item neue Nachricht (BoardService::create)
      */
     public function boardPosted(array $item, int $authorId): int
     {
@@ -94,7 +96,8 @@ final class PushTriggers
         if ($public) {
             $this->push->offerTypeToExisting(PushService::TYPE_BOARD_PUBLIC);
         }
-        return $this->push->notifyBoard(PushService::message($title, $item['title'], 'brett/' . $item['id'], 'brett-' . $item['id']), $authorId, $ttl, $public);
+        $only = $this->app->board()->readerIds(['audience' => (string) ($item['audience'] ?? BoardService::AUDIENCE_MEMBERS), 'audience_ids' => $item['audience_ids'] ?? []]);
+        return $this->push->notifyBoard(PushService::message($title, $item['title'], 'brett/' . $item['id'], 'brett-' . $item['id']), $authorId, $ttl, $public, $only);
     }
 
     /**
@@ -192,8 +195,8 @@ final class PushTriggers
             return 0;
         }
         $message = $before !== null
-            ? PushService::message('Termin geändert', $this->changeBody($before, $event), self::eventRoute('p' . $event['id']), 'termin-p' . $event['id'])
-            : PushService::message('Neuer Termin', $this->eventBody($event), self::eventRoute('p' . $event['id']), 'termin-p' . $event['id']);
+            ? PushService::message($this->eventsTitle('geändert'), $this->changeBody($before, $event), self::eventRoute('p' . $event['id']), 'termin-p' . $event['id'])
+            : PushService::message($this->eventsTitle('neu'), $this->eventBody($event), self::eventRoute('p' . $event['id']), 'termin-p' . $event['id']);
         return $this->push->notifyAll(PushService::TYPE_EVENTS, $message, false);
     }
 
@@ -207,6 +210,8 @@ final class PushTriggers
         if (!$this->push->supported()) {
             return 0;
         }
+        // Vor dem Versand: Arten, die Geräte neu angeboten bekommen (neue Rolle, Bereich), einschalten.
+        $this->push->addNewTypes();
         $count = 0;
         if ($this->app->features()->enabled('calendar') && $this->app->calendar()->isConfigured()) {
             $count += $this->checkCalendar();
@@ -272,10 +277,10 @@ final class PushTriggers
         $count = 0;
         if (count($diff['new']) >= 4) {
             $titles = implode(', ', array_map(static fn (array $e): string => (string) $e['title'], array_slice($diff['new'], 0, 3)));
-            $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message('Neue Termine', sprintf('%d neue Termine im Kalender, z. B. %s', count($diff['new']), $titles), 'termine', 'termine-neu'), true);
+            $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message($this->eventsTitle('neu'), sprintf('%d neue Einträge, z. B. %s', count($diff['new']), $titles), 'termine', 'termine-neu'), true);
         } else {
             foreach ($diff['new'] as $ev) {
-                $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message('Neuer Termin', $this->eventBody($ev), self::eventRoute((string) $ev['id']), 'termin-' . $ev['id']), true);
+                $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message($this->eventsTitle('neu'), $this->eventBody($ev), self::eventRoute((string) $ev['id']), 'termin-' . $ev['id']), true);
             }
         }
         foreach ($diff['changed'] as ['event' => $ev, 'before' => $sig]) {
@@ -284,7 +289,7 @@ final class PushTriggers
                 ? ['start' => $sig[0], 'end' => (string) $sig[1], 'location' => (string) $sig[2], 'all_day' => strlen($sig[0]) === 10]
                 : null;
             $body = $before !== null ? $this->changeBody($before, $ev) : $this->eventBody($ev);
-            $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message('Termin geändert', $body, self::eventRoute((string) $ev['id']), 'termin-' . $ev['id']), true);
+            $count += $this->push->notifyAll(PushService::TYPE_EVENTS, PushService::message($this->eventsTitle('geändert'), $body, self::eventRoute((string) $ev['id']), 'termin-' . $ev['id']), true);
         }
         return $count;
     }
@@ -525,5 +530,11 @@ final class PushTriggers
     private static function euro(int $cents): string
     {
         return number_format($cents / 100, 2, ',', '.') . ' €';
+    }
+
+    /** Titel einer Benachrichtigung zu Terminen, neutral mit dem Namen des Bereichs (Issue #362), z. B. „Termine: neu“. */
+    private function eventsTitle(string $what): string
+    {
+        return $this->app->config->sectionLabel('events', 'Termine') . ': ' . $what;
     }
 }

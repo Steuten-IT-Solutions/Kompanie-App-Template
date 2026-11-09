@@ -22,7 +22,7 @@ Welche Bereiche unten stehen, hängt davon ab, welche die {kompanie.name} nutzt 
 - **{bereich.events}**, **{bereich.news}** und **{bereich.gallery}**: für alle, auch ohne Anmeldung.
 - **{bereich.directory}**: für alle, wenn die {kompanie.name} die Liste nutzt. Nutzt sie nur die {bereich.offices}, heißt der Knopf **{bereich.offices}**.
 - **{bereich.documents}**: nur für angemeldete {rolle.member}.
-- **Intern**: Für {rolle.member} (und wer das Recht **Intern** hat) stehen {bereich.directory} und {bereich.documents} nicht einzeln unten, sondern zusammen unter **Intern**. {rolle.member} finden dort außerdem das {bereich.board}, die {bereich.ranks} und den {bereich.points}katalog, wenn die {kompanie.name} sie nutzt.
+- **Intern**: Für {rolle.member} (und wer das Recht **Intern** hat) stehen {bereich.directory} und {bereich.documents} nicht einzeln unten, sondern zusammen unter **Intern**. {rolle.member} finden dort außerdem das {bereich.board}, die {bereich.ranks} und den {bereich.catalog}, wenn die {kompanie.name} sie nutzt.
 - **Verwaltung**: nur, wenn du eine Aufgabe in der Verwaltung hast, z. B. {bereich.points} vergeben.
 - **Meins** (ganz rechts): deine eigenen Daten und dein Konto, sobald du angemeldet bist.
 
@@ -42,7 +42,7 @@ Die Hilfe zeigt dir nur die Seiten, die zu deinen Aufgaben und zu den Bereichen 
 ### Einen Bildschirm als Link verschicken
 1. Öffne den Bildschirm, den du zeigen möchtest.
 2. Tippe oben auf das Teilen-Symbol.
-3. Auf dem Handy öffnet sich das Teilen-Menü, z. B. für WhatsApp oder E-Mail. Am Computer kopiert die App den Link; es erscheint „Link kopiert“.
+3. Auf dem Handy öffnet sich das Teilen-Menü, z. B. für WhatsApp oder E-Mail. Am Computer kopiert die App den Link; es erscheint „Link kopiert“. Geht das Kopieren nicht, zeigt die App den Link in einem Fenster zum Markieren und Kopieren.
 
 Wer den Link öffnet, landet direkt auf diesem Bildschirm. Ist er nur für Angemeldete, bittet die App zuerst um die Anmeldung und öffnet ihn danach. Jede Person sieht dabei nur, was sie sehen darf; sonst öffnet die App ihre Startseite. Ein aufgeklappter Termin oder eine gewählte Sortierung gehört nicht zum Link.
 
@@ -61,14 +61,15 @@ Fest einstellen kannst du die Darstellung unter **Meins** → **Konto**, siehe [
 
 ## Hinweise oben auf der Seite
 Unter der Kopfleiste erscheinen manchmal Hinweise:
-- **Die App aufs Handy holen**: Tippe auf **So geht's** für die bebilderte Anleitung oder, wenn dein Browser es anbietet, auf **Installieren**. Mit **✕** blendest du den Hinweis aus. Mehr dazu unter [Die App aufs Handy holen](seite:app-installieren).
-- **{bereich.board}**: Angemeldete {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter) sehen hier dringende Nachrichten der Kompanie, {rolle.member} außerdem {bereich.polls}, die sie noch nicht beantwortet haben. Mit **×** blendest du einen Eintrag auf diesem Gerät aus, mit **Brett öffnen** siehst du alle.
+- **Die App aufs Handy holen**: Tippe auf **So geht's** für die bebilderte Anleitung oder, wenn dein Browser es anbietet, auf **Installieren**. Mit **✕** blendest du den Hinweis aus. Steht oben schon eine Nachricht vom {bereich.board} oder der Hinweis auf die Wartung, wartet dieser Hinweis, bis sie weg ist. Mehr dazu unter [Die App aufs Handy holen](seite:app-installieren).
+- **{bereich.board}**: Angemeldete {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter) sehen hier dringende Nachrichten der Kompanie, {rolle.member} außerdem {bereich.polls}, die sie noch nicht beantwortet haben. Ein Tipp auf den Titel öffnet die Nachricht am Brett, mit **×** blendest du einen Eintrag auf diesem Gerät aus.
 - **Offline – angezeigt werden die zuletzt geladenen Daten.**: Du hast gerade keine Internetverbindung. Was du zuletzt geladen hast, bleibt sichtbar.
 - **Diese Seite ist erst nach der Anmeldung zu sehen.**: Du hast einen Link auf einen Bildschirm für Angemeldete geöffnet. Tippe auf **Anmelden**.
 
 ![Hinweis „Die App aufs Handy holen“ mit dem Knopf „So geht's“](bild:app-ueberblick-hinweis)
 
 ## Gut zu wissen
+- Fragt die App nach, bevor sie etwas tut (z. B. „Wirklich löschen?“), öffnet sich ein eigenes Fenster der App mit **Abbrechen** und **OK**. Der Rest der Seite ist dabei abgedunkelt. Löschen und Entfernen steht auf einem roten Knopf. **Abbrechen**, **✕** oder die Taste Esc ändern nichts.
 - Wird die App gerade gewartet, siehst du statt der Inhalte nur einen Hinweis darauf. Mit **Erneut versuchen** prüfst du, ob sie wieder da ist.
 - Die Bezeichnungen der Bereiche (z. B. **{bereich.events}**) legt jede Kompanie selbst fest. Deshalb können sie bei dir anders heißen als in anderen Apps.
 

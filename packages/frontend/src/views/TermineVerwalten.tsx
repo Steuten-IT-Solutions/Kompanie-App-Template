@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from 'react';
-import { api, config, type EventInput, type PublicEvent } from '../api';
+import { api, type EventInput, type PublicEvent } from '../api';
 import { formatEventWhen } from '../format';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
+import { confirmAsk } from '../ask';
 
 const EMPTY: EventInput = {
   title: '',
@@ -70,7 +71,7 @@ export default function TermineVerwalten({ onToast }: { onToast: (msg: string) =
   }
 
   async function remove(ev: PublicEvent) {
-    if (!window.confirm(`Termin „${ev.title}“ wirklich löschen?`)) return;
+    if (!(await confirmAsk(`Termin „${ev.title}“ wirklich löschen?`))) return;
     try {
       await api.deleteEvent(ev.id);
       onToast('Termin gelöscht');
@@ -85,16 +86,6 @@ export default function TermineVerwalten({ onToast }: { onToast: (msg: string) =
       <button className="btn btn-link back" onClick={() => navigate('termine')}>
         ‹ Zu den Terminen
       </button>
-      <p className="muted small">
-        Diese Termine sehen Gäste in der App.
-        {config?.variant === 'wordpress' && (
-          <>
-            {' '}
-            Auf der Webseite zeigt sie der Shortcode <code>[kompanie_termine]</code>.
-          </>
-        )}
-        {config?.features.calendar && ' Mitglieder sehen weiterhin den Kalender mit allen Terminen.'}
-      </p>
 
       {editing !== null ? (
         <form className="form card event-form" onSubmit={submit}>
@@ -156,13 +147,13 @@ export default function TermineVerwalten({ onToast }: { onToast: (msg: string) =
         </button>
       )}
 
-      <h2 className="section-title">Kommende öffentliche Termine</h2>
+      <h2 className="section-title">Kommend und öffentlich</h2>
       {loading && !data ? (
         <Loading shape="text" />
       ) : error ? (
         <ErrorBox message={error} onRetry={reload} />
       ) : (data ?? []).length === 0 ? (
-        <Empty>Noch keine öffentlichen Termine.</Empty>
+        <Empty>Noch keine öffentlichen Einträge.</Empty>
       ) : (
         <ul className="card-list">
           {(data ?? []).map((ev) => (

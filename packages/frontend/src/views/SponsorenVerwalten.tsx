@@ -5,6 +5,7 @@ import brand from '../generated/brand';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { SponsorLogo } from './Sponsoren';
+import { confirmAsk } from '../ask';
 
 const sec = brand.labels.sections;
 
@@ -121,15 +122,11 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
   const sort = useDragSort(data ?? [], reorder, editing !== null);
 
   if (loading && !data) return <Loading />;
-  if (error || !data) return <ErrorBox message={error ?? 'Die Sponsoren konnten nicht geladen werden.'} onRetry={reload} />;
+  if (error || !data) return <ErrorBox message={error ?? 'Die Einträge konnten nicht geladen werden.'} onRetry={reload} />;
   const list = data;
 
   return (
     <div>
-      <p className="muted small">
-        Die {sec.sponsors} erscheinen in dieser Reihenfolge mit Logo und Link; zum Ändern einen Eintrag am Griff links ziehen. Ohne Logo
-        steht dort der Name.
-      </p>
       {formError && (
         <p className="form-error" role="alert">
           {formError}
@@ -189,8 +186,8 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
                       <button
                         className="btn btn-small btn-secondary"
                         disabled={busy}
-                        onClick={() =>
-                          window.confirm(`Logo von „${s.name}“ entfernen?`) && run(() => api.removeSponsorLogo(s.id), 'Logo entfernt')
+                        onClick={async () =>
+                          (await confirmAsk(`Logo von „${s.name}“ entfernen?`)) && run(() => api.removeSponsorLogo(s.id), 'Logo entfernt')
                         }
                       >
                         Logo entfernen
@@ -199,7 +196,7 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
                     <button
                       className="btn btn-small btn-danger"
                       disabled={busy}
-                      onClick={() => window.confirm(`„${s.name}“ löschen?`) && run(() => api.deleteSponsor(s.id), 'Gelöscht')}
+                      onClick={async () => (await confirmAsk(`„${s.name}“ löschen?`)) && run(() => api.deleteSponsor(s.id), 'Gelöscht')}
                     >
                       Löschen
                     </button>
@@ -219,10 +216,6 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
         aria-label="Logo-Datei"
         onChange={(e) => uploadLogo(e.target.files?.[0] ?? null)}
       />
-      <p className="muted small">
-        Logo: PNG, JPG, WebP oder SVG, höchstens 2 MB. Bilder werden auf höchstens 512 Pixel verkleinert; am besten mit transparentem
-        Hintergrund. Links nur mit https://.
-      </p>
 
       <form className="form card" onSubmit={add}>
         <h3>Neuer Sponsor</h3>

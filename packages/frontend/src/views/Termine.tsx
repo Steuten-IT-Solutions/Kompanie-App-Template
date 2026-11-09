@@ -77,7 +77,7 @@ function EventList({ focus }: { focus?: string }) {
       <>
         {birthdays}
         {manage}
-        <Empty>Keine anstehenden Termine.</Empty>
+        <Empty>Zurzeit steht nichts an.</Empty>
         {notify}
       </>
     );

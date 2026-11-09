@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { api, type GalleryAdminAlbum } from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
+import { confirmAsk } from '../ask';
+import { InternToggle } from '../galleryIntern';
+import { VIDEO_ACCEPT, countFiles, isVideoFile, uploadAlbumVideo } from '../videoUpload';
 
 /**
  * Alben der App und hochgeladene Bilder (Issue #285), unter Einstellungen → Galerie: Album anlegen (nur in der App),
- * Bilder in jedes Album hochladen, auch in eines aus Google Drive, hochgeladene Bilder löschen. Alben aus Drive ändert
- * man in Drive.
+ * Bilder und Videos (Issue #350) in jedes Album hochladen, auch in eines aus Google Drive, hochgeladene löschen. Alben
+ * aus Drive ändert man in Drive.
  */
 export default function GalleryAlbums({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload } = useAsync(api.galleryAlbums, []);
@@ -34,10 +37,6 @@ export default function GalleryAlbums({ onToast }: { onToast: (msg: string) => v
   return (
     <section className="card settings-section gallery-albums" id="einstellungen-galerie-alben">
       <h3>Alben und eigene Bilder</h3>
-      <p className="muted small">
-        Bilder lädst du hier in jedes Album hoch, auch in eines aus Google Drive. Der Server entfernt dabei Metadaten wie den Aufnahmeort.
-        Alben nur in der App legst du unten an; Alben aus Drive änderst du in Drive.
-      </p>
       {loading && !data && <Loading shape="text" />}
       {error && <ErrorBox message={error} onRetry={reload} />}
       {data && data.albums.length === 0 && <p className="muted small">Noch keine Alben.</p>}
@@ -125,11 +124,22 @@ function AlbumUploads({
     let done = 0;
     try {
       for (const f of files) {
-        setProgress(`Lädt ${done + 1} von ${files.length} …`);
-        setData(await api.uploadGalleryPhoto(album.id, f, intern));
+        const step = files.length > 1 ? ` ${done + 1} von ${files.length}` : '';
+        setProgress(`Lädt${step} …`);
+        if (isVideoFile(f)) {
+          setData(
+            await uploadAlbumVideo(f, {
+              albumId: album.id,
+              intern,
+              onProgress: (share) => setProgress(`Lädt${step} … ${Math.floor(share * 100)} %`),
+            }),
+          );
+        } else {
+          setData(await api.uploadGalleryPhoto(album.id, f, intern));
+        }
         done++;
       }
-      onToast(done === 1 ? 'Bild hochgeladen' : `${done} Bilder hochgeladen`);
+      onToast(`${countFiles(files)} hochgeladen`);
     } catch (e) {
       setActionError(`${done > 0 ? `${done} hochgeladen, dann: ` : ''}${(e as Error).message}`);
     } finally {
@@ -163,13 +173,13 @@ function AlbumUploads({
         <span>Nur für Mitglieder (intern)</span>
       </label>
       <label className="btn btn-secondary">
-        {busy && progress ? progress : 'Bilder hochladen'}
+        {busy && progress ? progress : 'Bilder oder Videos hochladen'}
         <input
           type="file"
-          accept=".jpg,.jpeg,.png,.webp"
+          accept={`.jpg,.jpeg,.png,.webp,${VIDEO_ACCEPT}`}
           multiple
           hidden
-          aria-label={`Bilder in ${album.title} hochladen`}
+          aria-label={`Bilder oder Videos in ${album.title} hochladen`}
           disabled={busy}
           onChange={(e) => {
             const files = Array.from(e.target.files ?? []);
@@ -178,6 +188,7 @@ function AlbumUploads({
           }}
         />
       </label>
+      <p className="small muted">Bilder als JPG, PNG oder WebP, Videos als MP4 oder WebM bis 1 GB.</p>
       {actionError && (
         <p className="form-error small" role="alert">
           {actionError}
@@ -187,19 +198,38 @@ function AlbumUploads({
         <ul className="gallery-upload-list">
           {data.uploads.map((p) => (
             <li key={p.id} className="gallery-upload">
-              <img src={p.thumb} alt={p.name} loading="lazy" />
+              {p.thumb ? (
+                <img src={p.thumb} alt={p.name} loading="lazy" />
+              ) : (
+                <span className="gallery-upload-video" role="img" aria-label={p.name}>
+                  ▶
+                </span>
+              )}
               <span className="small">
                 {p.name}
-                {p.intern && ' (intern)'}
                 {p.status === 'error' && ` · ${p.error || 'ließ sich nicht aufbereiten'}`}
               </span>
+              <InternToggle
+                checked={p.intern}
+                name={p.name}
+                disabled={busy}
+                onChange={async (next) => {
+                  const ok = await run(() => api.setGalleryPhotoIntern(p.id, next), next ? 'Jetzt nur für Mitglieder' : 'Jetzt öffentlich');
+                  if (ok) {
+                    reload();
+                    onChanged();
+                  }
+                  return ok;
+                }}
+              />
               <button
                 type="button"
                 className="btn btn-small btn-danger"
                 disabled={busy}
                 onClick={async () => {
-                  if (!window.confirm(`Bild „${p.name}“ löschen?`)) return;
-                  if (await run(() => api.deleteGalleryPhoto(p.id), 'Bild gelöscht')) {
+                  const what = p.type === 'video' ? 'Video' : 'Bild';
+                  if (!(await confirmAsk(`${what} „${p.name}“ löschen?`))) return;
+                  if (await run(() => api.deleteGalleryPhoto(p.id), `${what} gelöscht`)) {
                     reload();
                     onChanged();
                   }
@@ -236,7 +266,7 @@ function AlbumUploads({
               className="btn btn-small btn-danger"
               disabled={busy}
               onClick={async () => {
-                if (!window.confirm(`Album „${album.title}“ mit allen Bildern darin löschen?`)) return;
+                if (!(await confirmAsk(`Album „${album.title}“ mit allen Bildern darin löschen?`))) return;
                 if (await run(() => api.deleteGalleryAlbum(album.id), 'Album gelöscht')) {
                   onDeleted();
                   onChanged();

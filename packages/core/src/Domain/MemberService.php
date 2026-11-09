@@ -12,14 +12,26 @@ use KompanieApp\Core\Port\Authenticator;
 use KompanieApp\Core\Port\Cache;
 use KompanieApp\Core\Port\UserDirectory;
 use KompanieApp\Core\Storage\MemberContactRepository;
+use KompanieApp\Core\Storage\UserSettings;
 
-/** Mitglieder, Rollen und Passwörter. */
+/**
+ * Mitglieder, Rollen und Passwörter.
+ *
+ * Mitglieder ohne Zugang: Wer Konten anlegt, kann ein Mitglied ohne Zugang anlegen (no_access), z. B. für Chroniken und
+ * Ämter, wenn die Person sich (noch) nicht anmeldet. Es ist ein gewöhnliches Konto mit einem zufälligen Passwort, das
+ * niemand erfährt (wie beim Import der Ehemaligen), gemerkt in user_settings (NO_ACCESS). Den Zugang bekommt es später mit
+ * „Zugang einrichten“ (resetPassword: Startpasswort) oder beim Freigeben einer Selbstregistrierung (linkRegistration:
+ * Benutzername, E-Mail-Adresse und Passwort aus dem Antrag, kein zweites Konto). Meldet sich die Person an (z. B. über
+ * „Passwort vergessen“ in WordPress), fällt die Markierung von selbst weg (me).
+ */
 final class MemberService
 {
     /** WordPress speichert höchstens 100 Zeichen (user_email); vorab prüfen, damit Mehrere-Anlegen nicht mittendrin scheitert. */
     public const EMAIL_MAX = 100;
     /** Handynummer: so lang wie die Spalte in member_contacts */
     public const PHONE_MAX = 30;
+    /** Eintrag in user_settings: Mitglied ohne Zugang (Wert 1) */
+    public const NO_ACCESS = 'no_access';
 
     public function __construct(
         private readonly UserDirectory $users,
@@ -31,7 +43,28 @@ final class MemberService
         private readonly ?\Closure $formerRole = null,
         private readonly ?MemberContactRepository $contacts = null,
         private readonly ?Time $time = null,
+        private readonly ?UserSettings $settings = null,
     ) {
+    }
+
+    /** Hat dieses Konto (noch) keinen Zugang? */
+    public function hasNoAccess(int $id): bool
+    {
+        return $this->settings?->get($id, self::NO_ACCESS) === '1';
+    }
+
+    /** @return array<int, true> IDs der Konten ohne Zugang */
+    public function noAccessIds(): array
+    {
+        if ($this->settings === null) {
+            return [];
+        }
+        return array_map(static fn (): bool => true, array_filter($this->settings->all(self::NO_ACCESS), static fn (string $v): bool => $v === '1'));
+    }
+
+    private function grantAccess(int $id): void
+    {
+        $this->settings?->delete($id, self::NO_ACCESS);
     }
 
     /** Grundrolle vor dem Ausscheiden, wenn die Person ehemalig ist; sonst null. */
@@ -53,6 +86,10 @@ final class MemberService
     /** @return array<string, mixed> */
     public function me(User $user): array
     {
+        if ($this->hasNoAccess($user->id)) {
+            // Angemeldet, also hat die Person inzwischen einen Zugang (z. B. Passwort über WordPress zurückgesetzt).
+            $this->grantAccess($user->id);
+        }
         return [
             'id' => $user->id,
             'name' => $user->name,
@@ -75,6 +112,7 @@ final class MemberService
     {
         $totals = $this->scores->totalsByUser();
         [$points, $penalties] = self::visibleParts($viewer);
+        $noAccess = $viewer === null || $viewer->can(Capability::CreateUsers) ? $this->noAccessIds() : null;
         $out = [];
         // Anwärter haben immer eine Rolle in der App: list(false) enthält sie schon (bei WordPress nicht alle Konten laden).
         $users = $this->users->list($includeGuests);
@@ -100,7 +138,7 @@ final class MemberService
                 'member' => $u->isMember(),
                 'points' => $points ? ($totals[$u->id]['points'] ?? 0) : null,
                 'open_cents' => $penalties ? ($totals[$u->id]['open_cents'] ?? 0) : null,
-            ];
+            ] + ($noAccess !== null ? ['no_access' => isset($noAccess[$u->id])] : []);
         }
         return $out;
     }
@@ -175,7 +213,8 @@ final class MemberService
             'first_name' => $u->firstName,
             'last_name' => $u->lastName,
             'level' => $u->role,
-            'extra_roles' => $this->roles?->extraRolesOf($u) ?? [],
+            // Zusatzrollen nur für die, die Rollen vergeben (Issue #349); die Grundrolle braucht die App auch sonst.
+            'extra_roles' => $viewer === null || $viewer->can(Capability::PromoteUsers) ? ($this->roles?->extraRolesOf($u) ?? []) : [],
             'member' => $u->isMember(),
             'points' => $points ? $this->scores->pointsTotal($u->id) : null,
             'open_cents' => $penalties ? $this->scores->openCents($u->id) : null,
@@ -183,7 +222,7 @@ final class MemberService
             'penalties' => $penalties ? $this->scores->penaltiesFor($u->id) : [],
             // Ausnahmen bei den Rechten: nur für die, die sie ändern dürfen.
             'rights' => $viewer !== null ? $this->roles?->overridesView($viewer, $u) : null,
-        ];
+        ] + ($viewer === null || $viewer->can(Capability::CreateUsers) ? ['no_access' => $this->hasNoAccess($u->id)] : []);
     }
 
     /** Interner Kalender ohne Mitgliederbereich: Anwärter oder eine eigene Rolle nur mit dem Kalender. */
@@ -341,16 +380,17 @@ final class MemberService
 
     /**
      * Legt ein Konto mit zufälligem Startpasswort an, als Mitglied oder mit einer Rolle für neue Konten (z. B. Anwärter).
-     * Das Passwort steht nur in dieser Antwort; es wird keine E-Mail verschickt.
+     * Das Passwort steht nur in dieser Antwort; es wird keine E-Mail verschickt. Mit no_access ohne Zugang: kein
+     * Startpasswort (siehe oben).
      *
-     * @param array<string, mixed> $in first_name, last_name (oder name), username, email, level (Rolle)
+     * @param array<string, mixed> $in first_name, last_name (oder name), username, email, level (Rolle), extra_roles, no_access
      * @param User|null $actor wer anlegt (null: intern, z. B. Einrichtung)
      * @return array<string, mixed>
      */
     public function create(array $in, ?User $actor = null): array
     {
         $taken = [];
-        return $this->insert($this->prepare($in, $taken, $actor));
+        return $this->insert($this->prepare($in, $taken, $actor), Input::bool($in['no_access'] ?? null));
     }
 
     /**
@@ -360,10 +400,10 @@ final class MemberService
      * Beim Anlegen lassen sich alle persönlichen Angaben eintragen (phone, address), auch ohne view_personal: Eingeben ist
      * nicht Sehen, danach zeigt sie nur noch view_personal.
      *
-     * @param array<string, mixed> $in first_name, last_name (oder name), username, email, phone, address, level
+     * @param array<string, mixed> $in first_name, last_name (oder name), username, email, phone, address, level, extra_roles
      * @param array<string, true> $taken
      * @param User|null $actor wer anlegt (null: intern); bestimmt, welche Rollen neue Konten bekommen dürfen
-     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, level: string, phone: string, address: array<string, string>|null}
+     * @return array{name: string, first_name: string, last_name: string, login: string, email: string, level: string, phone: string, address: array<string, string>|null, extra_roles: list<string>}
      */
     public function prepare(array $in, array &$taken, ?User $actor = null): array
     {
@@ -372,13 +412,19 @@ final class MemberService
         $level = $in['level'] ?? Roles::MEMBER;
         if ($level !== Roles::MEMBER) {
             $role = is_string($level) ? $this->roles?->find($level) : null;
-            if ($role === null || !$role['new_accounts']) {
+            if ($role === null) {
+                throw ApiError::invalid('Diese Rolle gibt es nicht.');
+            }
+            // Ohne $actor (intern) nur die Rollen für neue Konten; sonst, was $actor vergeben darf (RoleService::canCreateAs).
+            if ($actor === null && !$role['new_accounts']) {
                 throw ApiError::invalid('Diese Rolle lässt sich beim Anlegen nicht wählen; andere Rollen danach vergeben.');
             }
             if ($actor !== null && !$this->roles?->canCreateAs($actor, $level)) {
                 throw ApiError::forbidden(sprintf('Konten mit der Rolle „%s“ darfst du nicht anlegen.', $role['label']));
             }
         }
+
+        $extraRoles = $this->newExtraRoles($actor, (string) $level, $in['extra_roles'] ?? null);
 
         $login = trim(is_string($in['username'] ?? null) ? $in['username'] : '');
         $isTaken = fn (string $l): bool => isset($taken['login:' . mb_strtolower($l)]) || $this->users->loginExists($l);
@@ -410,7 +456,51 @@ final class MemberService
         $phone = self::phoneInput($in['phone'] ?? null);
         $address = Address::parse($in['address'] ?? null);
         $taken['login:' . mb_strtolower($login)] = true;
-        return ['name' => $name, 'first_name' => $first, 'last_name' => $last, 'login' => $login, 'email' => $email, 'level' => (string) $level, 'phone' => $phone, 'address' => $address];
+        return ['name' => $name, 'first_name' => $first, 'last_name' => $last, 'login' => $login, 'email' => $email, 'level' => (string) $level, 'phone' => $phone, 'address' => $address, 'extra_roles' => $extraRoles];
+    }
+
+    /**
+     * Zusatzrollen eines neuen Kontos (Issue #66) prüfen: wie bei „Rollen vergeben“ (checkExtraRoles) nur eigene Rollen,
+     * nur zu einer Grundrolle, die zur Kompanie gehört, und nur Rollen, die $actor vergeben darf (promote_users und
+     * RoleService::canHandle). Ohne $actor (intern) keine.
+     *
+     * @param mixed $raw Liste von Schlüsseln; null oder leer = keine
+     * @return list<string> in der Reihenfolge der Rollen
+     */
+    private function newExtraRoles(?User $actor, string $base, mixed $raw): array
+    {
+        if ($raw === null || $raw === [] || $raw === '') {
+            return [];
+        }
+        if ($this->roles === null || $actor === null) {
+            throw ApiError::invalid('Zusatzrollen lassen sich hier beim Anlegen nicht vergeben.');
+        }
+        if (!is_array($raw)) {
+            throw ApiError::invalid('Zusatzrollen bitte als Liste angeben.');
+        }
+        $wanted = [];
+        foreach ($raw as $key) {
+            if (!is_string($key) || !$this->roles->exists($key)) {
+                throw ApiError::invalid('Unbekannte Zusatzrolle.');
+            }
+            if (!RoleService::canBeExtra($key)) {
+                throw ApiError::invalid(sprintf('„%s“ ist nur als Grundrolle möglich, nicht als Zusatzrolle.', $this->roles->label($key)));
+            }
+            $wanted[$key] = true;
+        }
+        unset($wanted[$base]);
+        if ($wanted === []) {
+            return [];
+        }
+        if (!$this->roles->allowsExtraRoles($base)) {
+            throw ApiError::invalid(sprintf('Zusatzrollen gibt es nur zu einer Grundrolle, die zur Kompanie gehört, nicht zu „%s“.', $this->roles->label($base)));
+        }
+        foreach (array_keys($wanted) as $key) {
+            if (!$actor->can(Capability::PromoteUsers) || !$this->roles->canHandle($actor, $key)) {
+                throw ApiError::forbidden(sprintf('Die Zusatzrolle „%s“ darfst du nicht vergeben.', $this->roles->label($key)));
+            }
+        }
+        return array_values(array_filter(array_keys($this->roles->all()), static fn (string $k): bool => isset($wanted[$k])));
     }
 
     /**
@@ -447,21 +537,41 @@ final class MemberService
 
     /**
      * Konto mit zufälligem Startpasswort anlegen (geprüft mit prepare()), danach Handynummer und Adresse. Scheitern die,
-     * ist das Konto trotzdem angelegt; dann steht ein Hinweis in warning.
+     * ist das Konto trotzdem angelegt; dann steht ein Hinweis in warning. Mit $noAccess ohne Zugang: Das Passwort erfährt
+     * niemand, die Antwort hat no_access statt password.
      *
-     * @param array{name: string, first_name: string, last_name: string, login: string, email: string, level: string, phone?: string, address?: array<string, string>|null} $p
+     * @param array{name: string, first_name: string, last_name: string, login: string, email: string, level: string, phone?: string, address?: array<string, string>|null, extra_roles?: list<string>} $p
      * @return array<string, mixed>
      */
-    public function insert(array $p): array
+    public function insert(array $p, bool $noAccess = false): array
     {
         ['name' => $name, 'first_name' => $first, 'last_name' => $last, 'login' => $login, 'email' => $email, 'level' => $level] = $p;
-        $password = Passwords::readable(12);
+        if ($noAccess && $this->settings === null) {
+            throw new \LogicException('Mitglieder ohne Zugang brauchen UserSettings.');
+        }
+        $password = $noAccess ? bin2hex(random_bytes(24)) : Passwords::readable(12);
         try {
             $id = $this->users->create($first, $last, $login, $email, $password, $level);
         } catch (\DomainException $e) {
             throw ApiError::invalid($e->getMessage());
         }
-        $out = ['id' => $id, 'name' => $name, 'first_name' => $first, 'last_name' => $last, 'username' => $login, 'email' => $email, 'level' => $level, 'password' => $password];
+        $out = ['id' => $id, 'name' => $name, 'first_name' => $first, 'last_name' => $last, 'username' => $login, 'email' => $email, 'level' => $level];
+        $extra = $p['extra_roles'] ?? [];
+        if ($extra !== [] && $this->roles !== null) {
+            try {
+                $this->roles->setExtraRoles($id, $extra);
+                $out['extra_roles'] = $extra;
+            } catch (\Throwable $e) {
+                error_log('Kompanie-App: Zusatzrollen nicht übernommen: ' . $e->getMessage());
+                $out['warning'] = 'Angelegt, aber die Zusatzrollen fehlen noch. Bitte unter „Konto und Rolle“ nachtragen.';
+            }
+        }
+        if ($noAccess) {
+            $this->settings?->set($id, self::NO_ACCESS, '1');
+            $out['no_access'] = true;
+        } else {
+            $out['password'] = $password;
+        }
         $phone = $p['phone'] ?? '';
         $address = $p['address'] ?? null;
         if ($phone !== '' || $address !== null) {
@@ -469,7 +579,7 @@ final class MemberService
                 $this->storeContacts($id, $phone !== '' ? $phone : null, $address ?? false);
             } catch (\Throwable $e) {
                 error_log('Kompanie-App: Handynummer bzw. Adresse nicht übernommen: ' . $e->getMessage());
-                $out['warning'] = 'Angelegt, aber Handynummer bzw. Adresse fehlen noch. Bitte in den Mitgliedsdetails nachtragen.';
+                $out['warning'] = trim(($out['warning'] ?? '') . ' Angelegt, aber Handynummer bzw. Adresse fehlen noch. Bitte in den Mitgliedsdetails nachtragen.');
             }
         }
         return $out;
@@ -492,7 +602,12 @@ final class MemberService
         return ['id' => $id, 'name' => $p['name'], 'first_name' => $p['first_name'], 'last_name' => $p['last_name'], 'username' => $p['login'], 'email' => $p['email'], 'level' => $p['level']];
     }
 
-    /** Neues Startpasswort für ein Mitglied; meldet alle seine Geräte ab. */
+    /**
+     * Neues Startpasswort für ein Mitglied; meldet alle seine Geräte ab. Bei einem Mitglied ohne Zugang: „Zugang
+     * einrichten“ (danach hat es einen). Mit dem Benutzernamen, damit die Person beides bekommt.
+     *
+     * @return array{password: string, username: string}
+     */
     public function resetPassword(User $actor, int $id): array
     {
         if ($actor->id === $id) {
@@ -512,7 +627,114 @@ final class MemberService
         } catch (\DomainException $e) {
             throw ApiError::forbidden($e->getMessage());
         }
-        return ['password' => $password];
+        $this->grantAccess($id);
+        return ['password' => $password, 'username' => (string) ($this->users->profile($id)['login'] ?? '')];
+    }
+
+    /**
+     * Mitglied ohne Zugang mit einer freigegebenen Selbstregistrierung verbinden: Es bekommt Benutzername, E-Mail-Adresse
+     * und Passwort aus dem Antrag; Name, Rolle und alle Daten (Ämter, Kompanien, Punkte …) bleiben. Geprüft wie beim
+     * Ändern der Angaben (updateProfile). Lässt sich der Benutzername nicht ändern (WordPress ohne Recht), bleibt der alte.
+     *
+     * @return array{id: int, name: string, first_name: string, last_name: string, username: string, email: string, level: string}
+     */
+    public function linkRegistration(User $actor, int $id, string $login, string $email, string $passwordHash): array
+    {
+        $target = $this->users->find($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        if (!$this->hasNoAccess($id)) {
+            throw ApiError::invalid('Dieses Mitglied hat schon einen Zugang. Verbinden lässt sich nur ein Mitglied ohne Zugang.');
+        }
+        $this->denyFormer($target);
+        $this->guardAccount($actor, $target, 'Dieses Mitglied darfst du nicht mit der Anfrage verbinden.');
+        $in = ['email' => $email] + ($this->users->canChangeLogin() ? ['username' => $login] : []);
+        $profile = $this->updateProfile($actor, $id, $in);
+        try {
+            $this->users->setPasswordHash($id, $passwordHash);
+        } catch (\DomainException $e) {
+            throw ApiError::forbidden($e->getMessage());
+        }
+        $this->grantAccess($id);
+        return ['id' => $id, 'name' => $target->name, 'first_name' => $target->firstName, 'last_name' => $target->lastName, 'username' => $profile['login'], 'email' => $profile['email'], 'level' => $target->role];
+    }
+
+    /**
+     * Mitglieder ohne Zugang (ohne Ehemalige), die zu einer Anfrage passen könnten, die besten zuerst: gleiche E-Mail-Adresse,
+     * gleicher Name (ohne Unterschied bei Groß- und Kleinschreibung, Leerzeichen, Bindestrichen, ä/ae, ö/oe, ü/ue und ß/ss)
+     * oder gleicher Nachname und ein Vorname beginnt mit dem anderen („Chris“/„Christian“). Nur Vorschläge: Verbunden wird
+     * erst, wenn jemand es bestätigt.
+     *
+     * @return list<array{id: int, name: string, match: string}> match: email, name oder similar
+     */
+    public function noAccessMatches(string $first, string $last, string $email): array
+    {
+        $users = $this->noAccessMembers();
+        if ($users === []) {
+            return [];
+        }
+        $emails = $email !== '' ? $this->users->emails(array_keys($users)) : [];
+        $out = [];
+        foreach ($users as $id => $u) {
+            $match = $email !== '' && isset($emails[$id]) && $emails[$id] !== '' && mb_strtolower($emails[$id]) === mb_strtolower($email)
+                ? 'email'
+                : self::nameMatch($first, $last, $u);
+            if ($match !== null) {
+                $out[] = ['id' => $id, 'name' => $u->name, 'match' => $match];
+            }
+        }
+        return self::sortMatches($out);
+    }
+
+    /**
+     * Passt der Name zu diesem Konto? name: gleich (ohne Unterschied bei Groß- und Kleinschreibung, Leerzeichen,
+     * Bindestrichen, ä/ae, ö/oe, ü/ue und ß/ss), similar: gleicher Nachname und ein Vorname beginnt mit dem anderen; sonst
+     * null. Auch für freie Namen in Amtszeiten (OfficeService::linkSuggestions).
+     */
+    public static function nameMatch(string $first, string $last, User $u): ?string
+    {
+        [$f, $l] = [self::nameKey($first), self::nameKey($last)];
+        [$uf, $ul] = [self::nameKey($u->firstName), self::nameKey($u->lastName)];
+        return match (true) {
+            $uf . $ul === $f . $l && $uf . $ul !== '' => 'name',
+            $ul !== '' && $ul === $l && $uf !== '' && $f !== '' && (str_starts_with($uf, $f) || str_starts_with($f, $uf)) => 'similar',
+            default => null,
+        };
+    }
+
+    /**
+     * Vorschläge, die besten zuerst (email, name, similar), dann nach Namen.
+     *
+     * @template T of array{name: string, match: string}
+     * @param list<T> $matches
+     * @return list<T>
+     */
+    public static function sortMatches(array $matches): array
+    {
+        $rank = ['email' => 0, 'name' => 1, 'similar' => 2];
+        usort($matches, static fn (array $a, array $b): int => [$rank[$a['match']] ?? 3, mb_strtolower($a['name'])] <=> [$rank[$b['match']] ?? 3, mb_strtolower($b['name'])]);
+        return $matches;
+    }
+
+    /**
+     * Alle Mitglieder ohne Zugang (ohne Ehemalige), nach Namen; zum Auswählen, wenn kein Vorschlag passt.
+     *
+     * @return array<int, User>
+     */
+    public function noAccessMembers(): array
+    {
+        $ids = array_keys($this->noAccessIds());
+        if ($ids === []) {
+            return [];
+        }
+        $users = array_filter($this->users->findMany($ids), fn (User $u): bool => $this->formerRole($u) === null);
+        uasort($users, static fn (User $a, User $b): int => strcasecmp($a->name, $b->name));
+        return $users;
+    }
+
+    /** Name zum Vergleichen: klein, Umlaute ausgeschrieben, nur Buchstaben und Ziffern. */
+    private static function nameKey(string $name): string
+    {
+        $s = strtr(mb_strtolower(trim($name)), ['ä' => 'ae', 'ö' => 'oe', 'ü' => 'ue', 'ß' => 'ss', 'é' => 'e', 'è' => 'e', 'á' => 'a', 'à' => 'a', 'ó' => 'o', 'ç' => 'c']);
+        return (string) preg_replace('/[^\p{L}\p{N}]+/u', '', $s);
     }
 
     /**

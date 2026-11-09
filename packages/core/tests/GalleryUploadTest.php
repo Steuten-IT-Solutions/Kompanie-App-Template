@@ -141,6 +141,59 @@ final class GalleryUploadTest extends TestCase
         $this->assertSame([], $this->ok('GET', '/admin/gallery/albums')['albums']);
     }
 
+    /**
+     * Nachträglich intern oder öffentlich stellen: PATCH /gallery/photos/{id} mit manage_settings oder review_gallery.
+     * Öffentliche Größen verschwinden aus dem öffentlichen Verzeichnis, die alte Adresse liefert nichts mehr.
+     */
+    public function testSwitchInternAfterUpload(): void
+    {
+        $this->ok('PATCH', '/admin/settings', ['gallery_source' => 'server']);
+        $id = (int) $this->ok('POST', '/admin/gallery/albums', ['title' => 'Fest', 'year' => 2026])['id'];
+        $this->ok('POST', "/admin/gallery/albums/{$id}/photos", ['file' => $this->file('Offen.jpg')]);
+        $gallery = $this->app->gallery();
+        $gallery->processPending(30);
+        $guest = $gallery->album($id, false);
+        $this->assertNotNull($guest);
+        $photo = $guest['photos'][0];
+        $this->assertTrue($photo['upload'], 'hochgeladen: umstellbar');
+        $this->assertFalse($photo['intern']);
+        $publicFile = str_replace('https://example.org/media/', $this->dir . '/public/', (string) $photo['thumb']);
+        $this->assertFileExists($publicFile, 'öffentlich: direkt vom Webserver');
+        $photoId = (int) $photo['id'];
+
+        // Ungültige Angaben
+        $this->assertSame(400, $this->call('PATCH', "/gallery/photos/{$photoId}", [])->status, 'intern fehlt');
+        $this->assertSame(400, $this->call('PATCH', "/gallery/photos/{$photoId}", ['intern' => 'ja'])->status, 'nur true oder false');
+        $this->assertSame(404, $this->call('PATCH', '/gallery/photos/999', ['intern' => true])->status);
+
+        // Intern: öffentliche Dateien weg, Gäste sehen es nicht mehr, Mitglieder schon
+        $this->assertSame(['id' => $photoId, 'intern' => true], $this->ok('PATCH', "/gallery/photos/{$photoId}", ['intern' => true]));
+        $this->assertFileDoesNotExist($publicFile, 'alte öffentliche Adresse liefert nichts mehr');
+        $this->assertNull($gallery->album($id, false), 'Gäste sehen das Album nicht mehr');
+        $gallery->processPending(30);
+        $member = $gallery->album($id, true);
+        $this->assertNotNull($member);
+        $this->assertTrue($member['photos'][0]['intern']);
+        $this->assertTrue($member['photos'][0]['ready'], 'neu aufbereitet');
+        $this->assertStringNotContainsString('https://example.org/media/', (string) $member['photos'][0]['thumb'], 'intern nur über die App');
+        $this->assertSame(401, $gallery->photoForDelivery($photoId, 'thumb', false, false)['status'], 'ohne Anmeldung kein internes Bild');
+        $this->assertCount(1, $this->stored(), 'Original bleibt in der Ablage');
+        $this->assertSame(['id' => $photoId, 'intern' => true], $this->ok('PATCH', "/gallery/photos/{$photoId}", ['intern' => true]), 'unverändert');
+
+        // Wieder öffentlich, diesmal durch jemanden, der nur prüft (review_gallery)
+        $reviewer = $this->users->add('pruefer', Roles::MEMBER);
+        $this->users->current = $this->m;
+        $this->assertSame(403, $this->call('PATCH', "/gallery/photos/{$photoId}", ['intern' => false])->status, 'ohne Recht');
+        $this->app->roles()->setOverrides($this->users->find($this->admin), $reviewer, ['review_gallery'], []);
+        $this->users->current = $reviewer;
+        $this->assertSame(['id' => $photoId, 'intern' => false], $this->ok('PATCH', "/gallery/photos/{$photoId}", ['intern' => false]));
+        $gallery->processPending(30);
+        $again = $gallery->album($id, false);
+        $this->assertNotNull($again);
+        $this->assertFalse($again['photos'][0]['intern']);
+        $this->assertNotSame($photo['thumb'], $again['photos'][0]['thumb'], 'neue Adresse (neuer file_key)');
+    }
+
     /** Knöpfe zum Herunterladen: Einstellung gallery_downloads, Vorgabe aus; das Album meldet sie der App. */
     public function testDownloadButtonsSetting(): void
     {

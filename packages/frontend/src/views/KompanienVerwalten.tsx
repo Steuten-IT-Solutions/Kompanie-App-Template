@@ -5,6 +5,7 @@ import brand from '../generated/brand';
 import { Empty, ErrorBox, lazyView, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { CompanyLogo } from './Kompanien';
+import { confirmAsk } from '../ask';
 
 const RichTextEditor = lazyView(() => import('../richtext/RichTextEditor'));
 
@@ -285,10 +286,6 @@ export function CompanyAdmin({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <div>
-      <p className="muted small">
-        Die {sec.companies} erscheinen in dieser Reihenfolge, aufgelöste unten als „ehemalig“; zum Ändern einen Eintrag am Griff links
-        ziehen.
-      </p>
       {formError && (
         <p className="form-error" role="alert">
           {formError}
@@ -368,8 +365,8 @@ export function CompanyAdmin({ onToast }: { onToast: (msg: string) => void }) {
                       <button
                         className="btn btn-small btn-secondary"
                         disabled={busy}
-                        onClick={() =>
-                          window.confirm(`Logo von „${c.name}“ entfernen?`) && run(() => api.removeCompanyLogo(c.id), 'Logo entfernt')
+                        onClick={async () =>
+                          (await confirmAsk(`Logo von „${c.name}“ entfernen?`)) && run(() => api.removeCompanyLogo(c.id), 'Logo entfernt')
                         }
                       >
                         Logo entfernen
@@ -378,10 +375,10 @@ export function CompanyAdmin({ onToast }: { onToast: (msg: string) => void }) {
                     <button
                       className="btn btn-small btn-danger"
                       disabled={busy}
-                      onClick={() =>
-                        window.confirm(
+                      onClick={async () =>
+                        (await confirmAsk(
                           `„${c.name}“ löschen? Die Zuordnungen der Mitglieder gehen verloren. Aufgelöste besser als „aufgelöst“ markieren.`,
-                        ) && run(() => api.deleteCompany(c.id), 'Gelöscht')
+                        )) && run(() => api.deleteCompany(c.id), 'Gelöscht')
                       }
                     >
                       Löschen
@@ -402,9 +399,6 @@ export function CompanyAdmin({ onToast }: { onToast: (msg: string) => void }) {
         aria-label="Logo-Datei"
         onChange={(e) => uploadLogo(e.target.files?.[0] ?? null)}
       />
-      <p className="muted small">
-        Logo: PNG, JPG, WebP oder SVG, höchstens 2 MB. Bilder werden auf höchstens 512 Pixel verkleinert. Links nur mit https://.
-      </p>
 
       <form className="form card" onSubmit={add}>
         <h3>Neue Kompanie</h3>

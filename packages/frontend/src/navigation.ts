@@ -28,7 +28,7 @@ export const isPageTarget = (t: string): t is PageTarget => /^seiten\/[1-9][0-9]
 /** Symbol eines Bereichs (eigene Seiten haben alle dasselbe). */
 export const targetIcon = (t: string): string => (isPageTarget(t) ? 'seiten' : t);
 
-/** Symbole für Untermenüs (wie NavigationService::ICONS). */
+/** Symbole für Untermenüs und Bereiche (wie NavigationService::ICONS); ab „info“ neutrale ohne festen Bereich (Issue #362). */
 export const NAV_ICONS = [
   'ordner',
   'termine',
@@ -43,11 +43,29 @@ export const NAV_ICONS = [
   'punktekatalog',
   'seiten',
   'stern',
+  'info',
+  'karte',
+  'musik',
+  'pokal',
+  'glocke',
+  'fahne',
+  'kamera',
+  'haus',
+  'buch',
+  'uhr',
 ] as const;
 export type NavIcon = (typeof NAV_ICONS)[number];
 
-/** Höchstens so viele Hauptpunkte neben „Verwaltung“ und „Meins“ (wie NavigationService::MAX_MAIN). */
+/**
+ * Standardnavigation: höchstens so viele Hauptpunkte neben „Verwaltung“ und „Meins“, der Rest steht unter „Intern“. Eine
+ * eigene Navigation hat keine Grenze (Issue #362): Die Tab-Leiste verkleinert Schrift und Symbole, je mehr unten stehen.
+ */
 export const NAV_MAX_MAIN = 5;
+
+/** Eigener Name und eigenes Symbol (Einstellungen → Navigation, Issue #362) je Bereich, eigener Seite oder „intern“. */
+export type NavNames = Record<string, { label?: string; icon?: string } | undefined>;
+/** Startseite beim Öffnen der App, getrennt für Gäste und Angemeldete (Issue #362); fehlt = erster Punkt der Leiste. */
+export type NavStart = { guest?: string; member?: string };
 
 export type NavMenuSetting = { label: string; icon: string; items: string[] };
 /** Gespeicherte Einstellung (/config navigation): Hauptpunkte und ausgeblendete Bereiche. */
@@ -77,6 +95,10 @@ export interface NavContext {
   label: (target: NavTarget) => string;
   /** Eigene Seiten in ihrer Reihenfolge (seiten/<id>), die es gibt; fehlt = keine. */
   pages?: PageTarget[];
+  /** Eigene Symbole (Issue #362), je Bereich bzw. „intern“; fehlt = das feste Symbol. */
+  icons?: Partial<Record<string, string>>;
+  /** Name des Untermenüs „Intern“ der Standardnavigation (umbenennbar, Issue #362); fehlt = „Intern“. */
+  internLabel?: string;
 }
 
 const isTarget = (id: unknown): id is NavTarget =>
@@ -84,7 +106,7 @@ const isTarget = (id: unknown): id is NavTarget =>
 
 /** Punkte der Tab-Leiste (ohne „Verwaltung“ und „Meins“); ein Untermenü ohne sichtbaren Bereich entfällt. */
 export function buildNav(setting: NavigationSetting | null | undefined, ctx: NavContext): NavEntry[] {
-  const view = (t: NavTarget): NavEntry => ({ key: t, label: ctx.label(t), icon: targetIcon(t), children: null });
+  const view = (t: NavTarget): NavEntry => ({ key: t, label: ctx.label(t), icon: ctx.icons?.[t] ?? targetIcon(t), children: null });
   const pages = ctx.pages ?? [];
   if (!setting) {
     // Standard: Mitglieder und Dokumente mit dem Recht „Intern“ dort gesammelt, sonst je ein eigener Tab.
@@ -93,7 +115,12 @@ export function buildNav(setting: NavigationSetting | null | undefined, ctx: Nav
     if (ctx.intern && intern.length > 0) {
       // Wie draftOf: Passen nicht alle unten hin, kommen die letzten vorne ins Untermenü.
       const overflow = main.splice(NAV_MAX_MAIN - 1).map((e) => e.key as NavTarget);
-      main.push({ key: 'intern', label: 'Intern', icon: 'intern', children: [...overflow, ...intern] });
+      main.push({
+        key: 'intern',
+        label: ctx.internLabel ?? 'Intern',
+        icon: ctx.icons?.intern ?? 'intern',
+        children: [...overflow, ...intern],
+      });
     } else main.push(...OWN_TABS.filter(ctx.visible).map(view));
     return main;
   }
@@ -131,12 +158,13 @@ export function draftOf(
   setting: NavigationSetting | null | undefined,
   on: (t: NavTarget) => boolean = () => true,
   pages: PageTarget[] = [],
+  internLabel = 'Intern',
 ): NavigationSetting {
   if (setting)
     return { items: setting.items.map((i) => (typeof i === 'string' ? i : { ...i, items: [...i.items] })), hidden: [...setting.hidden] };
   const main: NavTarget[] = ['termine', 'news', 'galerie', ...OPTIONAL_MAIN.filter(on), ...pages.filter(on)];
   const overflow = main.splice(NAV_MAX_MAIN - 1);
-  return { items: [...main, { label: 'Intern', icon: 'ordner', items: [...overflow, ...INTERN_TARGETS] }], hidden: [] };
+  return { items: [...main, { label: internLabel, icon: 'ordner', items: [...overflow, ...INTERN_TARGETS] }], hidden: [] };
 }
 
 /** Bereiche, die im Entwurf nirgends stehen (neu dazugekommen): Sie erscheinen hinten in der Leiste. */
@@ -197,7 +225,6 @@ export function removeMenu(draft: NavigationSetting, index: number): NavigationS
 
 /** Prüfung vor dem Speichern (wie der Server); null = in Ordnung. */
 export function draftError(draft: NavigationSetting, labelMax = 24): string | null {
-  if (draft.items.length > NAV_MAX_MAIN) return `Unten passen höchstens ${NAV_MAX_MAIN} Hauptpunkte neben Verwaltung und Meins.`;
   for (const i of draft.items) {
     if (typeof i === 'string') continue;
     if (!i.label.trim()) return 'Jedes Untermenü braucht einen Namen.';
@@ -205,4 +232,47 @@ export function draftError(draft: NavigationSetting, labelMax = 24): string | nu
     if (i.items.length === 0) return `Das Untermenü „${i.label.trim()}“ braucht mindestens einen Bereich.`;
   }
   return null;
+}
+
+/** Punkte, die als Startseite gehen (Issue #362): was in der Leiste steht, für Angemeldete auch „Meins“ (wie der Server). */
+export function startChoices(draft: NavigationSetting | null, member: boolean, pages: PageTarget[] = []): string[] {
+  const out: string[] = [];
+  if (!draft) {
+    out.push('termine', 'news', 'galerie', 'kompanien', 'sponsoren', ...pages, 'intern', ...INTERN_TARGETS);
+  } else {
+    let menus = 0;
+    for (const item of draft.items) {
+      if (typeof item === 'string') out.push(item);
+      else {
+        menus++;
+        out.push(`menue/${menus}`, ...item.items);
+      }
+    }
+    out.push(...unplaced(draft, pages));
+  }
+  if (member) out.push('meins');
+  return out;
+}
+
+/**
+ * Startseite der Person (Issue #362): die eingestellte, wenn sie in ihrer Leiste steht (als Tab oder in einem Untermenü),
+ * sonst der erste Punkt. „intern“ und „menue/<n>“ stehen für ein Untermenü.
+ */
+export function startOf(tabs: NavEntry[], wanted: string | undefined): string | undefined {
+  if (wanted && tabs.some((t) => t.key === wanted || t.children?.includes(wanted as NavTarget))) return wanted;
+  return tabs[0]?.key;
+}
+
+/**
+ * Pfad der Ansicht, die tatsächlich gezeigt wird: der aufgerufene, wenn er gilt, sonst der der Startseite. Ohne das
+ * öffnete eine eigene Seite als Startseite (seiten/<id>) die Übersicht aller Seiten statt der Seite.
+ */
+export function viewPath(path: string[], valid: boolean, start: string): string[] {
+  return valid ? path : start.split('/');
+}
+
+/** Klassen der Tab-Leiste (Issue #362): Stufen nach Zahl der Tabs (styles.css) und ob unten Namen stehen. */
+export function tabbarClass(count: number, labels: boolean): string {
+  const step = count >= 12 ? ' tabs-8 tabs-10 tabs-12' : count >= 10 ? ' tabs-8 tabs-10' : count >= 8 ? ' tabs-8' : '';
+  return `tabbar${step}${labels ? '' : ' tabbar-icons'}`;
 }

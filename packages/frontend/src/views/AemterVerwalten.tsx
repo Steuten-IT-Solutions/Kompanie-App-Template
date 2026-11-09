@@ -9,6 +9,7 @@ import {
   type OfficeGroupTermInput,
   type OfficeHolder,
   type OfficeImportResult,
+  type OfficeLinkSuggestion,
   type OfficePersonInput,
   type OfficesOverview,
   type OfficeTerm,
@@ -20,8 +21,9 @@ import { useDragSort, useSaveQueue } from '../dragSort';
 import brand from '../generated/brand';
 import { MemberAvatar } from '../memberPhoto';
 import { navigate } from '../router';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
 import { nameWithCompanions, termYears } from './Aemter';
+import { confirmAsk } from '../ask';
 
 const sec = brand.labels.sections;
 
@@ -60,11 +62,13 @@ function FormError({ error }: { error: string | null }) {
 /**
  * Verwaltung → Ämter (Issue #112, manage_offices): Gruppen und Ämter anlegen, sortieren, umbenennen; je Amt die
  * Amtszeiten und die Verknüpfung mit einem Titel; Import einer Tabelle für die Ersterfassung.
- * verwaltung/aemter, verwaltung/aemter/<id>, verwaltung/aemter/import
+ * Freie Namen lassen sich auf Vorschlag mit Mitgliedern oder Ehemaligen verknüpfen.
+ * verwaltung/aemter, verwaltung/aemter/<id>, verwaltung/aemter/import, verwaltung/aemter/verknuepfen
  */
 export function OfficeAdmin({ path, onToast }: { path: string[]; onToast: Toast }) {
   const { data, error, loading, reload, setData } = useAsync(api.offices, [], 'offices');
   if (path[0] === 'import') return <OfficeImport onToast={onToast} />;
+  if (path[0] === 'verknuepfen') return <OfficeLink onToast={onToast} />;
   if (loading && !data) return <Loading />;
   if (error && !data) return <ErrorBox message={error} onRetry={reload} />;
   const overview = data!;
@@ -149,16 +153,15 @@ function OfficeOverview({
 
   return (
     <div>
-      <p className="muted small">
-        Wer welches Amt wann hatte, auch frühere Inhaber ohne Konto. Der Zeitstrahl ist für alle sichtbar, auch ohne Anmeldung. Ein Amt kann
-        mit einem {sec.titles} verknüpft werden: Wer es gerade hat, bekommt ihn automatisch.
-      </p>
       <div className="button-row">
         <button className="btn btn-secondary" onClick={() => navigate('verwaltung/aemter/import')}>
           Tabelle importieren
         </button>
         <button className="btn btn-secondary" onClick={() => navigate('mitglieder/aemter')}>
           Zeitstrahl ansehen
+        </button>
+        <button className="btn btn-secondary" onClick={() => navigate('verwaltung/aemter/verknuepfen')}>
+          Namen mit Mitgliedern verknüpfen
         </button>
       </div>
       <FormError error={error} />
@@ -277,12 +280,6 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
   return (
     <section>
       <h3 className="section-title">Gruppen</h3>
-      <p className="muted small">
-        Die Gruppen ordnen die Ämter im Zeitstrahl, z. B. Verein und Dachverband. Zum Ändern der Reihenfolge am Griff ziehen. Mit
-        „Amtszeiten gemeinsam“ haben alle Ämter einer Gruppe dieselben Jahre und ein Gruppenbild, z. B. ein Königshaus; vorhandene
-        Amtszeiten mit denselben Jahren werden dabei zusammengefasst. Die Bezeichnung steht über der Gruppe (z. B. „Königshäuser“), die
-        Einzahl über einer einzelnen gemeinsamen Amtszeit (z. B. „Königshaus 2026–2028“).
-      </p>
       <FormError error={error} />
       {list.length > 0 && (
         <ul className="card-list">
@@ -358,7 +355,9 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
                     <button
                       className="btn btn-small btn-danger"
                       disabled={busy}
-                      onClick={() => window.confirm(`Gruppe „${g.title}“ löschen?`) && run(() => api.deleteOfficeGroup(g.id), 'Gelöscht')}
+                      onClick={async () =>
+                        (await confirmAsk(`Gruppe „${g.title}“ löschen?`)) && run(() => api.deleteOfficeGroup(g.id), 'Gelöscht')
+                      }
                     >
                       Löschen
                     </button>
@@ -463,7 +462,9 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
                 <button
                   className="btn btn-small btn-danger"
                   disabled={busy || editing !== null}
-                  onClick={() => window.confirm(`Amtszeit ${termYears(t)} löschen?`) && run(() => api.deleteOfficeTerm(t.id), 'Gelöscht')}
+                  onClick={async () =>
+                    (await confirmAsk(`Amtszeit ${termYears(t)} löschen?`)) && run(() => api.deleteOfficeTerm(t.id), 'Gelöscht')
+                  }
                 >
                   Löschen
                 </button>
@@ -530,9 +531,6 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
             <option value="">Ohne Gruppe</option>
           </select>
         </label>
-        <p className="muted small">
-          Die Einzahl steht auf der Seite einer Person bei ihren Amtszeiten. Leer: der Name des verknüpften Titels, sonst die Bezeichnung.
-        </p>
         <div className="button-row">
           <button className="btn" type="submit" disabled={busy}>
             Speichern
@@ -544,7 +542,7 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
             onClick={async () => {
               const n = office.terms.length;
               const what = n === 0 ? '' : n === 1 ? ' mit seiner Amtszeit' : ` mit allen ${n} Amtszeiten`;
-              if (window.confirm(`„${office.title}“${what} löschen?`) && (await run(() => api.deleteOffice(office.id), 'Amt gelöscht')))
+              if ((await confirmAsk(`„${office.title}“${what} löschen?`)) && (await run(() => api.deleteOffice(office.id), 'Amt gelöscht')))
                 navigate('verwaltung/aemter');
             }}
           >
@@ -585,10 +583,6 @@ function TitleLink({ office, onToast, reload }: { office: Office; onToast: Toast
   return (
     <section className="card form">
       <h3>{sec.titles} vergeben</h3>
-      <p className="muted small">
-        Wer eine laufende Amtszeit hat (mit Konto, als Mitglied), bekommt den {sec.titles} automatisch; wer keine mehr hat, verliert ihn.
-        Von Hand lässt er sich dann nicht mehr vergeben. Lösen ändert an den vergebenen nichts.
-      </p>
       {!allowed ? (
         <p className="muted small">
           {office.linked_title ? `Verknüpft mit „${office.linked_title}“. ` : ''}Ändern kann das, wer {sec.titles} verwalten darf.
@@ -719,8 +713,8 @@ function JointTermAdmin({
                   <button
                     className="btn btn-small btn-danger"
                     disabled={busy}
-                    onClick={() =>
-                      window.confirm(`Gemeinsame Amtszeit ${termYears(gt)} mit allen Amtszeiten darin und dem Bild löschen?`) &&
+                    onClick={async () =>
+                      (await confirmAsk(`Gemeinsame Amtszeit ${termYears(gt)} mit allen Amtszeiten darin und dem Bild löschen?`)) &&
                       run(() => api.deleteOfficeGroupTerm(gt.id), 'Gelöscht')
                     }
                   >
@@ -1180,6 +1174,91 @@ const IMPORT_EXAMPLE =
  * Tabelle importieren (Ersterfassung): einfügen oder Datei wählen, Vorschau mit Fehlern je Zeile, dann übernehmen.
  * Vorhandene Gruppen und Ämter werden nach Namen gefunden; was es schon gibt, wird übersprungen.
  */
+const LINK_MATCH: Record<OfficeLinkSuggestion['candidates'][number]['match'], string> = {
+  name: 'gleicher Name',
+  similar: 'ähnlicher Name',
+};
+
+/**
+ * Freie Namen in Amtszeiten mit Mitgliedern oder Ehemaligen verknüpfen: Die App schlägt passende Personen vor
+ * (tolerant bei Umlauten, Bindestrichen und Leerzeichen); verknüpft wird erst nach Bestätigung.
+ */
+function OfficeLink({ onToast }: { onToast: Toast }) {
+  const { data, error, loading, reload } = useAsync(api.officeLinkSuggestions, [], 'office-link-suggestions');
+  if (loading && !data) return <Loading />;
+  if (error && !data) return <ErrorBox message={error} onRetry={reload} />;
+  const list = data ?? [];
+  return (
+    <div className="office-link">
+      <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/aemter')}>
+        ‹ Alle {sec.offices}
+      </button>
+      {list.length === 0 ? (
+        <Empty>Keine Vorschläge: Kein freier Name passt zu einer Person in der App.</Empty>
+      ) : (
+        <ul className="card-list">
+          {list.map((s) => (
+            <li key={s.name}>
+              <LinkCard suggestion={s} onToast={onToast} onDone={reload} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function LinkCard({ suggestion: s, onToast, onDone }: { suggestion: OfficeLinkSuggestion; onToast: Toast; onDone: () => void }) {
+  const [choice, setChoice] = useState(s.candidates[0]?.match === 'name' ? String(s.candidates[0].id) : '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const person = s.candidates.find((c) => String(c.id) === choice);
+  async function link() {
+    if (
+      !person ||
+      !(await confirmAsk(`„${s.name}“ in ${s.entries === 1 ? 'einer Amtszeit' : `${s.entries} Einträgen`} mit ${person.name} verknüpfen?`))
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.linkOfficeName(s.name, person.id);
+      onToast(`${res.linked === 1 ? '1 Eintrag' : `${res.linked} Einträge`} mit ${person.name} verknüpft`);
+      onDone();
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="card office-link-card">
+      <div className="row-title">{s.name}</div>
+      <div className="row-sub">
+        {s.entries === 1 ? '1 Eintrag' : `${s.entries} Einträge`}: {s.terms.join(', ')}
+        {s.entries > s.terms.length && ' …'}
+      </div>
+      <fieldset className="fieldset">
+        <legend>Verknüpfen mit</legend>
+        {s.candidates.map((c) => (
+          <label key={c.id} className="toggle">
+            <input type="radio" name={`link-${s.name}`} checked={choice === String(c.id)} onChange={() => setChoice(String(c.id))} />
+            {c.name}{' '}
+            <span className="muted small">
+              ({LINK_MATCH[c.match]}
+              {c.former ? ', ehemalig' : ''})
+            </span>
+          </label>
+        ))}
+      </fieldset>
+      <FormError error={error} />
+      <button type="button" className="btn" disabled={busy || !person} onClick={link}>
+        {busy ? 'Verknüpft …' : 'Verknüpfen'}
+      </button>
+    </div>
+  );
+}
+
 function OfficeImport({ onToast }: { onToast: Toast }) {
   const [csv, setCsv] = useState('');
   const [link, setLink] = useState(true);
@@ -1212,12 +1291,6 @@ function OfficeImport({ onToast }: { onToast: Toast }) {
         ‹ Alle {sec.offices}
       </button>
       <h2 className="member-name">Tabelle importieren</h2>
-      <p className="muted small">
-        Eine Zeile je Amtszeit, Spalten getrennt durch Semikolon (oder Tabulator, z. B. aus einer Tabellenkalkulation kopiert):{' '}
-        <code>gruppe;amt;beginn;ende;art;personen;zusatz;ehrung</code>. Ende „heute“ heißt: läuft noch; Ende leer: ein einzelnes Jahr. Art
-        ist meist leer („zeitraum“ oder „zeitpunkt“ erzwingt sie). Mehrere Personen mit „&amp;“ trennen. Ehrung „ja“ markiert die Zeile als
-        Ehrung; leer oder „nein“: keine Ehrung. Ohne diese Spalte (7 Spalten) entstehen keine Ehrungen, auch nicht bei „zeitpunkt“.
-      </p>
       <label className="field">
         <span>Tabelle</span>
         <textarea
@@ -1231,8 +1304,7 @@ function OfficeImport({ onToast }: { onToast: Toast }) {
       </label>
       <label className="field">
         <span>Oder Datei wählen (CSV)</span>
-        <input
-          type="file"
+        <FileInput
           accept=".csv,.txt,text/csv,text/plain"
           onChange={async (e) => {
             const file = e.target.files?.[0];

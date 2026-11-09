@@ -483,8 +483,7 @@ paths:
       summary: Formular „Fehler melden“ öffnen (auch ohne Anmeldung)
       description: |
         Zeitmarke für die Zeitfalle (frühestens `minSeconds`, spätestens 6 Stunden später absenden) und die Angaben,
-        die der Server der Meldung beifügt. Ohne Empfänger (reportUrl) 404 `reports_unavailable`. Format der
-        Weitergabe an die Betreuer: docs/FEHLERMELDUNGEN.md.
+        die der Server der Meldung beifügt. Format der Weitergabe an die Betreuer: docs/FEHLERMELDUNGEN.md.
       security: []
       responses:
         '200':
@@ -493,28 +492,29 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [token, minSeconds, maxBytes, details]
+                required: [token, minSeconds, maxBytes, forward, details]
                 properties:
                   token: { type: string, description: 'Zeitpunkt.HMAC; beim Absenden mitschicken' }
                   minSeconds: { type: integer }
                   maxBytes: { type: integer, description: Höchstgröße des Bildschirmfotos (dekodiert) }
+                  forward: { type: boolean, description: 'Ob die Admins Meldungen an die Betreuer weiterleiten können (reportUrl in update.json)' }
                   details:
                     type: object
                     required: [version, role]
                     properties:
                       version: { type: string }
                       role: { type: string, description: 'Bezeichnung der Rolle oder „ohne Anmeldung“' }
-        '404': { $ref: '#/components/responses/Error' }
 
   /reports:
     post:
       tags: [Fehlermeldungen]
       summary: Fehler melden (auch ohne Anmeldung)
       description: |
-        Reiht die Meldung für den Versand an die Betreuer der App ein; 201 erst, wenn sie gespeichert ist. Die
+        Legt die Meldung in den Eingang der Admins (alle mit review_reports bekommen eine Benachrichtigung); 201 erst,
+        wenn sie gespeichert ist. An die Betreuer der App geht sie erst, wenn ein Admin sie weiterleitet. Die
         Einwilligung (`consent: true`) ist Pflicht. Begrenzt je Anfragendem (IPv6: je /64) und Stunde, je Installation
-        und Tag und durch die Größe der Warteschlange. Ist `website` (verstecktes Feld) gefüllt, antwortet der Server
-        wie bei Erfolg, speichert aber nichts.
+        und Tag und durch die Zahl offener Meldungen (höchstens 100, sonst 503 `reports_full`). Ist `website`
+        (verstecktes Feld) gefüllt, antwortet der Server wie bei Erfolg, speichert aber nichts.
       security: []
       requestBody:
         required: true
@@ -531,7 +531,7 @@ paths:
                 page: { type: string, maxLength: 200, description: 'Seite in der App, z. B. #/termine/verwalten' }
                 userAgent: { type: string, maxLength: 400 }
                 lastError: { type: [string, 'null'], maxLength: 500, description: Letzte Fehlermeldung der App }
-                includeName: { type: boolean, description: Nur angemeldet; dann geht der Name mit }
+                includeName: { type: boolean, description: 'Nur angemeldet; dann geht der Name beim Weiterleiten an die Betreuer mit (die Admins sehen ihn immer)' }
                 screenshot:
                   type: [object, 'null']
                   properties:
@@ -540,7 +540,7 @@ paths:
                 website: { type: string, description: Verstecktes Feld; muss leer bleiben }
       responses:
         '201':
-          description: Gespeichert, wird im Hintergrund versandt
+          description: Gespeichert, wartet auf die Admins
           content:
             application/json:
               schema:
@@ -548,8 +548,123 @@ paths:
                 properties:
                   queued: { type: boolean }
         '400': { $ref: '#/components/responses/Error' }
-        '404': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+
+  /reports/mine:
+    get:
+      tags: [Fehlermeldungen]
+      summary: Eigene Fehlermeldungen mit Stand (angemeldet)
+      description: Meldungen, die die Person angemeldet geschickt hat, die neuesten zuerst; erledigte bis 30 Tage nach dem Bearbeiten.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [id, status, description, created, reason, reviewed_at]
+                  properties:
+                    id: { type: integer }
+                    status: { type: string, enum: [open, closed, forwarded] }
+                    description: { type: string }
+                    created: { type: integer, description: Unix-Zeit des Meldens }
+                    reason: { type: [string, 'null'], description: 'Begründung beim Schließen; sonst null' }
+                    reviewed_at: { type: [integer, 'null'], description: Unix-Zeit des Schließens bzw. Weiterleitens }
+        '401': { $ref: '#/components/responses/Error' }
+
+  /reports/review:
+    get:
+      tags: [Fehlermeldungen]
+      summary: Eingang der Fehlermeldungen (offene zuerst, dann die erledigten der letzten 30 Tage)
+      x-capability: review_reports
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [forward, reports]
+                properties:
+                  forward: { type: boolean, description: 'Weiterleiten möglich (Empfänger eingerichtet)' }
+                  reports:
+                    type: array
+                    items: { $ref: '#/components/schemas/ReviewReport' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /reports/review/{id}/screenshot:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Fehlermeldungen]
+      summary: Bildschirmfoto einer offenen Meldung
+      x-capability: review_reports
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [type, data]
+                properties:
+                  type: { type: string, enum: [image/png, image/jpeg, image/webp] }
+                  data: { type: string, description: Base64 }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /reports/review/{id}/close:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Fehlermeldungen]
+      summary: Meldung mit Begründung schließen
+      description: Das Bildschirmfoto wird gelöscht; wer angemeldet gemeldet hat, sieht die Begründung und wird benachrichtigt.
+      x-capability: review_reports
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        '200':
+          description: Geschlossen
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewReport' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /reports/review/{id}/forward:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Fehlermeldungen]
+      summary: Meldung an die Betreuer der App weiterleiten
+      description: |
+        Reiht die Meldung für den Versand ein (docs/FEHLERMELDUNGEN.md); beim Empfänger entsteht daraus ein Issue. Der
+        Name geht nur mit, wenn die Person „Meinen Namen mitschicken“ gewählt hat. Wer angemeldet gemeldet hat, wird
+        benachrichtigt. 409 `reports_not_forwardable` ohne Empfänger, 409 `report_done` bei schon bearbeiteten
+        Meldungen, 503 `reports_full` bei voller Warteschlange.
+      x-capability: review_reports
+      responses:
+        '200':
+          description: Weitergeleitet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewReport' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
 
   /registration/form:
@@ -687,6 +802,8 @@ paths:
       description: |
         POST, damit die Push-Adresse nicht in Protokollen von Adressen landet. Mit `auth` gibt das Gerät außerdem ein
         Abo frei, das einem anderen, hier nicht mehr angemeldeten Konto gehört (die App fragt dazu beim Start nach).
+        Arten, die das Abo jetzt neu angeboten bekommt (z. B. nach einer neuen Rolle), schaltet der Server dabei ein;
+        selbst abgeschaltete bleiben aus. Ohne `endpoint` nur die möglichen Arten (Hinweis auf der Startseite).
       requestBody:
         content:
           application/json:
@@ -980,8 +1097,8 @@ paths:
       summary: Beitrag in der App schreiben (nur mit der Quelle app)
       description: |
         Nur wenn die News in der App geschrieben werden (Einstellung `news_source` = `app`, siehe `/admin/settings`),
-        sonst 409 `not_in_app`. Der Text ist formatiert (RichText wie bei den Seiten, Bilder über `/rich-images`); das erste
-        Bild ist das Vorschaubild (`image`). Datum ist der Zeitpunkt des Anlegens. Danach prüft der Server gleich, ob es
+        sonst 409 `not_in_app`. Der Text ist formatiert (RichText wie bei den Seiten, Bilder über `/rich-images`); Vorschaubild
+        (`image`) ist das Titelbild (`cover`), sonst das erste Bild im Text. Datum ist der Zeitpunkt des Anlegens. Danach prüft der Server gleich, ob es
         Benachrichtigungen „News: neue Beiträge“ gibt.
       x-capability: manage_news
       requestBody:
@@ -993,7 +1110,9 @@ paths:
               required: [title]
               properties:
                 title: { type: string, maxLength: 150 }
-                body: { type: string, description: Formatierter Text (wird bereinigt) }
+                body: { type: string, description: 'Für ältere Apps: formatierter Text als ein Textblock (wird bereinigt)' }
+                blocks: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Block' }, description: 'Inhalt aus Blöcken wie bei eigenen Seiten (hat Vorrang vor body); ohne Titelbild ist das erste Bild in einem Textblock für alle das Vorschaubild' }
+                cover: { type: [string, 'null'], pattern: '^[a-f0-9]{32}$', description: 'Titelbild (Issue #351): Kennung eines Bildes aus `POST /rich-images` oder das bisherige `cover_uid`; null oder leer entfernt es. Vorschaubild der Liste und groß oben im Beitrag; ohne Titelbild das erste Bild im Text' }
       responses:
         '201':
           description: Angelegt
@@ -1026,7 +1145,7 @@ paths:
     patch:
       tags: [News]
       summary: Beitrag der App ändern (Titel, Text)
-      description: 'Nur mit der Quelle app (sonst 409 `not_in_app`); id ist eine Zahl. Mit updated_at (Stand, den die App geladen hat): 409 `conflict`, wenn jemand dazwischen gespeichert hat. Bilder, die nicht mehr im Text stehen, werden gelöscht. Das Datum bleibt.'
+      description: 'Nur mit der Quelle app (sonst 409 `not_in_app`); id ist eine Zahl. Mit updated_at (Stand, den die App geladen hat): 409 `conflict`, wenn jemand dazwischen gespeichert hat. Bilder, die weder im Text noch als Titelbild stehen, werden gelöscht. Das Datum bleibt.'
       x-capability: manage_news
       requestBody:
         required: true
@@ -1036,7 +1155,9 @@ paths:
               type: object
               properties:
                 title: { type: string, maxLength: 150 }
-                body: { type: string }
+                body: { type: string, description: 'Für ältere Apps, wie bei POST' }
+                blocks: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Block' }, description: 'wie bei POST' }
+                cover: { type: [string, 'null'], pattern: '^[a-f0-9]{32}$', description: 'wie bei POST; fehlt das Feld, bleibt das Titelbild' }
                 updated_at: { type: string, format: date-time }
       responses:
         '200':
@@ -1185,6 +1306,178 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/GallerySubmission' }
         '403': { $ref: '#/components/responses/Error' }
+
+  /gallery/video-uploads:
+    post:
+      tags: [Galerie]
+      summary: Video hochladen, Schritt 1 von 3 (Issue #350)
+      description: |
+        Legt eine Sitzung zum Hochladen an. MP4 (Kasten ftyp, kein QuickTime) oder WebM, höchstens max_bytes (1 GB).
+        Danach die Datei in Stücken von höchstens chunk_size Bytes an /gallery/video-uploads/chunk schicken (chunk_size
+        richtet sich nach post_max_size des Servers), zum Schluss /gallery/video-uploads/finish. Die Datei bleibt
+        unverändert. Zweck album braucht manage_settings (direkt ins Album), Zweck submission submit_gallery (als
+        Einreichung). Prüft vorher, ob auf dem Server genug Platz frei ist (400).
+      x-capability: 'manage_settings oder submit_gallery (je nach purpose)'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [album_id, name, size]
+              properties:
+                album_id: { type: integer }
+                name: { type: string, description: 'Dateiname mit Endung .mp4 oder .webm' }
+                size: { type: integer, description: Größe in Bytes }
+                purpose: { type: string, enum: [album, submission], default: album }
+      responses:
+        '201':
+          description: Sitzung angelegt
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, chunk_size, max_bytes]
+                properties:
+                  id: { type: string, description: Kennung der Sitzung (32 Hex-Zeichen) }
+                  chunk_size: { type: integer, description: Größte Länge eines Stücks in Bytes (vor Base64) }
+                  max_bytes: { type: integer }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /gallery/video-uploads/chunk:
+    post:
+      tags: [Galerie]
+      summary: Video hochladen, Schritt 2 von 3, ein Stück
+      description: 'Stücke in Reihenfolge (offset = bisher angekommene Bytes). Das letzte Stück darf noch einmal kommen (Antwort verloren); es zählt nur einmal. Nur die Person, die die Sitzung angelegt hat.'
+      x-capability: 'manage_settings oder submit_gallery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upload, offset, data]
+              properties:
+                upload: { type: string }
+                offset: { type: integer }
+                data: { type: string, description: Inhalt als Base64 }
+      responses:
+        '200':
+          description: Angekommen
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [received]
+                properties:
+                  received: { type: integer, description: Bisher angekommene Bytes }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /gallery/video-uploads/finish:
+    post:
+      tags: [Galerie]
+      summary: Video hochladen, Schritt 3 von 3, abschließen
+      description: |
+        Übernimmt die vollständige Datei in die Ablage. Zweck album: Video im Album (Antwort wie beim Hochladen von
+        Bildern), Zweck submission: offene Einreichung (consent muss true sein, Benachrichtigung wie bei Bildern).
+        Das Standbild (JPEG aus dem Browser) wird neu kodiert und ist die Vorschau; ohne erscheint das Video mit ▶.
+      x-capability: 'manage_settings oder submit_gallery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upload]
+              properties:
+                upload: { type: string }
+                poster: { type: [string, 'null'], description: 'Standbild als JPEG in Base64, auch als data:-Adresse' }
+                width: { type: integer }
+                height: { type: integer }
+                duration: { type: number, description: Dauer in Sekunden }
+                intern: { type: boolean, description: 'Nur Zweck album: nur für Mitglieder' }
+                consent: { type: boolean, description: 'Nur Zweck submission: muss true sein' }
+      responses:
+        '201':
+          description: Hochgeladen
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/GalleryAdminAlbumDetail'
+                  - $ref: '#/components/schemas/GallerySubmission'
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /gallery/video-uploads/cancel:
+    post:
+      tags: [Galerie]
+      summary: Video hochladen abbrechen
+      description: 'Löscht die Sitzung und das Angekommene. Liegengebliebene Sitzungen löscht der Server nach einem Tag.'
+      x-capability: 'manage_settings oder submit_gallery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upload]
+              properties:
+                upload: { type: string }
+      responses:
+        '200':
+          description: Abgebrochen
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [cancelled]
+                properties:
+                  cancelled: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /gallery/photos/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Galerie]
+      summary: Hochgeladenes Bild oder Video intern oder öffentlich stellen
+      description: |
+        Nur Bilder und Videos, die in der App hochgeladen oder über Einreichungen freigegeben wurden (`upload: true`);
+        Bilder aus Google Drive stellt der Ordner „intern“ in Drive um (400). Bei einem Wechsel löscht der Server die
+        aufbereiteten Größen (öffentliche lagen als statische Dateien vor), vergibt neue Adressen und bereitet im
+        Hintergrund neu auf; die alten öffentlichen Adressen liefern danach nichts mehr. Das Original bleibt.
+      x-capability: 'manage_settings oder review_gallery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [intern]
+              properties:
+                intern: { type: boolean, description: Nur für Mitglieder }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, intern]
+                properties:
+                  id: { type: integer }
+                  intern: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
 
   /gallery/review/{id}/approve:
     parameters:
@@ -1857,7 +2150,9 @@ paths:
       summary: Gültige Einträge am Schwarzen Brett, neueste zuerst (Issue #5, #172)
       description: |
         Öffentlich: Nachrichten mit `audience: public` sehen alle, auch ohne Anmeldung; interne (`audience: members`) nur
-        Konten mit `view_board` (Mitglieder und Anwärter) sowie alle mit `post_board`. Ohne `view_board` enthält die Liste
+        Konten mit `view_board` (Mitglieder und Anwärter) sowie alle mit `post_board`. Nachrichten mit `audience: company`
+        sehen nur Konten mit `view_board`, die einer der Kompanien aus `audience_ids` zugeordnet sind, mit `audience:
+        person` nur die ausgewählten Konten (sofern `view_board`); alle mit `post_board` sehen jede. Ohne `view_board` enthält die Liste
         daher nur öffentliche Nachrichten (vor dieser Version: 401 ohne Anmeldung, 403 ohne Recht). Nur Einträge, deren
         `expires_at` noch nicht erreicht ist und die nicht gelöscht wurden. Abgelaufene und gelöschte Nachrichten bleiben
         30 Tage im Verlauf (`GET /board/history`, nur `post_board`); danach löscht die Hintergrundaufgabe `board_cleanup`
@@ -1888,12 +2183,14 @@ paths:
       summary: Nachricht ans Schwarze Brett schreiben
       description: |
         Sichtbar bis `expires_at` (ohne Angabe 24 Stunden ab jetzt; keine Obergrenze). Alle Mitglieder und Anwärter
-        außer dem Verfasser bekommen eine Benachrichtigung (Art `board`, Urgency high, Überschrift „Schwarzes Brett:
+        samt Verfasser bekommen eine Benachrichtigung (Art `board`, Urgency high, Überschrift „Schwarzes Brett:
         Verfasser“, Text = Titel, TTL bis `expires_at`, höchstens 28 Tage), sofern sie die Art für das Gerät eingeschaltet
         haben und `push` nicht false ist. Bei `audience: public` zusätzlich alle übrigen Geräte (Gäste ohne Konto, Konten
-        ohne `view_board`) mit der Art `board_public`, außer dem Verfasser; jedes Gerät höchstens einmal. Bei der ersten
-        öffentlichen Nachricht bekommen bestehende Abos dieser Geräte die Art einmalig dazu. Mit `mail` zusätzlich je eine Mail an alle Mitglieder und Anwärter mit
-        Mailadresse, die den Empfang nicht abgeschaltet haben (auch an den Verfasser), im Hintergrund. Meldet der
+        ohne `view_board`) mit der Art `board_public`; jedes Gerät höchstens einmal. Bei der ersten
+        öffentlichen Nachricht bekommen bestehende Abos dieser Geräte die Art einmalig dazu. Bei `audience: company` bzw.
+        `person` nur die Geräte der Konten, die die Nachricht lesen dürfen (siehe `GET /board`), und die des Verfassers. Mit `mail` zusätzlich je eine Mail an alle Mitglieder und Anwärter mit
+        Mailadresse, die den Empfang nicht abgeschaltet haben (auch an den Verfasser), im Hintergrund; bei `company` und
+        `person` nur an die, die die Nachricht lesen dürfen, und den Verfasser. Meldet der
         Mailserver eine Höchstgröße und ist die fertige Mail größer, wird nichts veröffentlicht (400 mit Erklärung).
       x-capability: post_board
       requestBody:
@@ -1911,11 +2208,58 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /board/audiences:
+    get:
+      tags: [Schwarzes Brett]
+      summary: Auswahl „Kompanie“ und „Einzeln“ beim Schreiben
+      description: |
+        Aktive Kompanien (leer, wenn der Bereich Kompanien aus ist) und alle Konten, die das Brett lesen (`view_board`),
+        nach Namen.
+      x-capability: post_board
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [companies, people]
+                properties:
+                  companies:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name, short_name]
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+                        short_name: { type: string }
+                  people:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name]
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+        '403': { $ref: '#/components/responses/Error' }
+
   /board/mail:
     get:
       tags: [Schwarzes Brett]
       summary: Haken „E-Mail senden“ – eingerichtet, Zahl der Empfänger (Issue #172)
       x-capability: post_board
+      parameters:
+        - name: audience
+          in: query
+          required: false
+          schema: { type: string, enum: [members, public, company, person] }
+          description: 'Mit company oder person und audience_ids: Zahl der Empfänger einer Nachricht nur für diese'
+        - name: audience_ids
+          in: query
+          required: false
+          schema: { type: string }
+          description: 'IDs der Kompanien bzw. Konten, durch Komma getrennt'
       responses:
         '200':
           description: OK
@@ -1926,7 +2270,7 @@ paths:
                 required: [available, recipients, reason]
                 properties:
                   available: { type: boolean, description: 'Kompanieadresse und SMTP eingerichtet, PHPMailer vorhanden' }
-                  recipients: { type: integer, description: Zahl der Empfänger einer neuen Nachricht (ohne den Verfasser) }
+                  recipients: { type: integer, description: 'Zahl der Empfänger einer neuen Nachricht (samt Verfasser, sofern er Mails vom Brett bekommt)' }
                   reason: { type: [string, 'null'], description: 'Warum nicht verfügbar' }
                   server_max_size: { type: [integer, 'null'], description: 'Vom Mailserver gemeldete Höchstgröße (SIZE) in Bytes' }
         '403': { $ref: '#/components/responses/Error' }
@@ -2006,9 +2350,14 @@ paths:
               type: object
               properties:
                 title: { type: string }
-                text: { type: string, description: Formatierter Inhalt (HTML), wird bereinigt }
+                blocks: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Block' }, description: 'Wie bei POST (hat Vorrang vor text). Bilder, die in keinem Block mehr stehen, bleiben für den Verlauf.' }
+                text: { type: string, description: 'Formatierter Inhalt (HTML), wird bereinigt (ältere Apps: danach ein Textblock)' }
                 expires_at: { type: string, description: 'Wie bei POST; muss in der Zukunft liegen' }
                 audience: { $ref: '#/components/schemas/BoardAudience' }
+                audience_ids:
+                  type: array
+                  items: { type: integer }
+                  description: 'Bei company und person die Auswahl; ohne audience gilt sie für die bisherige Sichtbarkeit. Gleiche Sichtbarkeit ohne audience_ids: Auswahl bleibt.'
                 attachments:
                   type: array
                   items: { type: string }
@@ -3136,7 +3485,8 @@ paths:
               properties:
                 title: { type: string, maxLength: 100 }
                 audience: { type: string, enum: [public, members], default: members }
-                body: { type: string, description: 'Formatierter Text (wird bereinigt, höchstens 200000 Bytes); Bilder aus POST /rich-images als <img data-image="<uid>">' }
+                blocks: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Block' }, description: 'Inhalt aus Blöcken; hat Vorrang vor body. Vom Server berechnete Felder (starts_at, ends_at, event_title) werden ignoriert, fehlende oder doppelte id neu vergeben.' }
+                body: { type: string, description: 'Für ältere Apps: formatierter Text als ein Textblock (wird bereinigt, höchstens 200000 Bytes); Bilder aus POST /rich-images als <img data-image="<uid>">' }
       responses:
         '201':
           description: Angelegt
@@ -3203,7 +3553,8 @@ paths:
               properties:
                 title: { type: string, maxLength: 100 }
                 audience: { type: string, enum: [public, members] }
-                body: { type: string }
+                blocks: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Block' }, description: 'wie bei POST' }
+                body: { type: string, description: 'Für ältere Apps, wie bei POST' }
                 updated_at: { type: string, format: date-time }
       responses:
         '200':
@@ -3732,6 +4083,77 @@ paths:
                 items: { $ref: '#/components/schemas/OfficeRef' }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+
+  /offices/link-suggestions:
+    get:
+      tags: [Ämter]
+      summary: Vorschläge, freie Namen in Amtszeiten mit Personen zu verknüpfen (manage_offices)
+      description: |
+        Freie Namen (Inhaber und Begleitpersonen ohne Konto), die zu Mitgliedern, Personen der Mitgliederliste (z. B.
+        Anwärter) oder Ehemaligen passen: gleicher Name ohne Unterschied bei Groß- und Kleinschreibung, Leerzeichen,
+        Bindestrichen und Umlauten (`name`) oder gleicher Nachname und ein Vorname beginnt mit dem anderen (`similar`). Je
+        Name (Groß- und Kleinschreibung und Leerzeichen egal) die Zahl der Einträge, bis zu fünf Amtszeiten und die Personen,
+        die besten zuerst. Nur Vorschläge; nur Namen mit mindestens einer passenden Person.
+      x-capability: manage_offices
+      responses:
+        '200':
+          description: Nach Namen
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [name, entries, terms, candidates]
+                  properties:
+                    name: { type: string }
+                    entries: { type: integer }
+                    terms: { type: array, items: { type: string }, description: 'z. B. „König 1999“, „Vorsitz 2001–2005“, „Vorsitz seit 2020“' }
+                    candidates:
+                      type: array
+                      items:
+                        type: object
+                        required: [id, name, match, former]
+                        properties:
+                          id: { type: integer }
+                          name: { type: string }
+                          match: { type: string, enum: [name, similar] }
+                          former: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /offices/link:
+    post:
+      tags: [Ämter]
+      summary: Einen freien Namen in allen Amtszeiten mit einem Konto verknüpfen (manage_offices)
+      description: |
+        Wie beim Import: Jeder Inhaber und jede Begleitperson ohne Konto mit diesem Namen (Groß- und Kleinschreibung und
+        Leerzeichen egal) bekommt das Konto; steht die Person in der Amtszeit schon, bleibt der Eintrag frei. Nur Mitglieder,
+        Personen der Mitgliederliste oder Ehemalige (sonst 400). Danach werden verknüpfte Titel abgeglichen. 404, wenn
+        nichts zu verknüpfen ist.
+      x-capability: manage_offices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, user_id]
+              properties:
+                name: { type: string }
+                user_id: { type: integer }
+      responses:
+        '200':
+          description: Verknüpft
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [linked]
+                properties:
+                  linked: { type: integer, description: Zahl der verknüpften Einträge }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
 
   /offices/import:
     post:
@@ -4367,9 +4789,12 @@ paths:
         Kleinschreibung egal): vorname (Pflicht), nachname (auch name), status (auch rolle), benutzername, e-mail,
         handynummer (auch handy, mobil), straße, hausnummer, adresszusatz, plz, ort, land (Name oder ISO-Code, leer = DE;
         Prüfung wie `AddressInput`), geburtstag, eintritt, punkte, dienstgrad, titel (mit Komma getrennt), ausgeschieden,
-        grund. Unbekannte Spalten und
+        grund, zusatzrollen (Bezeichnungen mit Komma getrennt, wie `extra_roles` bei `POST /users`; ohne promote_users
+        übergangen), zugang (auch anmeldung: leer/ja wie bisher, nein = Mitglied ohne Zugang wie `no_access` bei `POST /users`,
+        ohne Startpasswort und nicht in `created`, gezählt in `new.no_access`; bei Ehemaligen ohne Bedeutung). Unbekannte Spalten und
         Spalten zu ausgeschalteten Bereichen bzw. ohne das Recht dazu stehen in `columns.ignored`.
-        status: leer, „Mitglied“ oder die Bezeichnung einer Rolle, die sich beim Anlegen wählen lässt; „ehemalig“ legt ein
+        status: leer, „Mitglied“ oder die Bezeichnung einer Rolle, die die Person beim Anlegen vergeben darf (wie `level`
+        bei `POST /users`; eine andere Rolle ist ein Fehler der Zeile); „ehemalig“ legt ein
         Konto ohne Anmeldung an, das gleich als ehemalig eingetragen ist (wie `/members/former/import`; eintritt
         „Gründer“, ausgeschieden und grund nur dann). Punkte, Dienstgrad (Bezeichnung) und Titel (Bezeichnungen) nur für
         Rollen mit Mitgliederbereich. Geburtstag als TT.MM.JJJJ, TT.MM. oder JJJJ-MM-TT; Eintritt als TT.MM.JJJJ oder Jahr.
@@ -4602,6 +5027,7 @@ paths:
         neues Startpasswort, das nur in dieser Antwort steht. Alle Geräte des Mitglieds
         werden abgemeldet. Wer kein Admin ist, darf das nur bei Anwärtern (auch eigenen Rollen nur mit dem Kalender)
         und Mitgliedern, deren Rechte er selbst hat (ohne create_users und promote_users), nicht bei Gästen und Admins.
+        Bei einem Mitglied ohne Zugang („Zugang einrichten“) hat es danach einen (`no_access` fällt weg).
       x-capability: create_users
       responses:
         '200':
@@ -4613,6 +5039,7 @@ paths:
                 required: [password]
                 properties:
                   password: { type: string }
+                  username: { type: string, description: Benutzername zum Weitergeben }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
@@ -4759,11 +5186,13 @@ paths:
   /users:
     post:
       tags: [Verwaltung]
-      summary: Mitglied anlegen (oder mit einer Rolle für neue Konten, z. B. Anwärter)
+      summary: Mitglied anlegen (oder mit einer anderen Rolle, die die Person vergeben darf, z. B. Anwärter)
       description: |
-        Erzeugt ein zufälliges Startpasswort, das nur in dieser Antwort steht. Es wird keine E-Mail verschickt. `level`:
-        `member` oder eine Rolle mit `new_accounts` (`/config` → `roles`), sonst 400. Wer kein Admin ist, nur Rollen mit
-        höchstens `member` bzw. `calendar` und `view_intern` oder mit Rechten, die er selbst weitergeben darf (sonst 403).
+        Erzeugt ein zufälliges Startpasswort, das nur in dieser Antwort steht. Es wird keine E-Mail verschickt. `level`: eine
+        Rolle, die die Person vergeben darf (`/config` → `user.create_roles`, RoleService::canCreateAs): `member` und Rollen
+        mit `new_accounts` (wer kein Admin ist, nur mit höchstens `member` bzw. `calendar` und `view_intern` oder mit Rechten,
+        die er selbst weitergeben darf); mit `promote_users` außerdem jede Rolle, die sie auch mit `PATCH
+        /members/{id}/role` vergeben dürfte; `admin` nur Admins in der eigenständigen Version. Unbekannte Rolle 400, sonst 403.
       x-capability: create_users
       requestBody:
         required: true
@@ -4780,7 +5209,7 @@ paths:
                 email: { type: string, format: email }
                 phone: { type: string, maxLength: 30, description: 'Handynummer (optional), Prüfung wie bei `PATCH /me/account`' }
                 address: { $ref: '#/components/schemas/AddressInput' }
-                level: { allOf: [{ $ref: '#/components/schemas/Level' }], default: member, description: 'member oder eine Rolle mit new_accounts' }
+                level: { allOf: [{ $ref: '#/components/schemas/Level' }], default: member, description: 'Eine Rolle aus `/config` → `user.create_roles` (siehe `POST /users`)' }
                 initial_points: { type: integer, minimum: 0, description: 'Anfangsbestand (nur Mitglieder, Bereich Punkte und Recht manage_points)' }
                 initial_points_date: { type: string, format: date, description: Datum der Buchung (Standard heute) }
                 rank_id: { type: integer, description: 'Dienstgrad (Bereich Dienstgrade, Recht manage_ranks); mit Punkten muss der Anfangsbestand die Schwelle erreichen' }
@@ -4789,6 +5218,18 @@ paths:
                   description: Foto (optional), vorab geprüft wie bei `PUT /members/{id}/photo`
                   allOf:
                     - $ref: '#/components/schemas/PhotoFile'
+                extra_roles:
+                  allOf: [{ $ref: '#/components/schemas/ExtraRoles' }]
+                  description: >-
+                    Zusatzrollen (optional, Issue #66): nur mit promote_users, nur eigene Rollen, die die Person auch mit `PATCH
+                    /members/{id}/role` vergeben dürfte (`/config` → `user.create_extra_roles`), und nur zu einer Grundrolle,
+                    die zur Kompanie gehört (`roles[].company`); sonst 400 bzw. 403.
+                no_access:
+                  type: boolean
+                  description: >-
+                    Ohne Zugang anlegen (z. B. für Chroniken): gewöhnliches Konto mit einem Passwort, das niemand erfährt; kein
+                    Startpasswort in der Antwort. Zugang später mit `POST /members/{id}/password` oder beim Freigeben einer
+                    Anfrage (`POST /registrations/{id}/approve` mit `user_id`).
       responses:
         '201':
           description: Angelegt
@@ -4822,14 +5263,34 @@ paths:
                         last_name: { type: string }
                         email: { type: string }
                         username: { type: string }
-                        username_taken: { type: boolean, description: Benutzername inzwischen vergeben; beim Freigeben einen anderen wählen }
-                        email_taken: { type: boolean, description: Zur Adresse gibt es inzwischen ein Konto; Freigeben geht nicht }
+                        username_taken: { type: boolean, description: Benutzername inzwischen vergeben (nicht von einem Mitglied ohne Zugang); beim Freigeben einen anderen wählen }
+                        email_taken: { type: boolean, description: Zur Adresse gibt es inzwischen ein Konto (nicht ein Mitglied ohne Zugang); Freigeben geht nicht }
                         message: { type: string }
                         created_at: { type: string, format: date-time }
                         email_confirmed: { type: boolean, description: Adresse per Link bestätigt (nur mit Mailversand) }
                         expires_at: { type: string, format: date-time, description: Danach wird die Anfrage gelöscht }
+                        matches:
+                          description: >-
+                            Mitglieder ohne Zugang, die passen könnten, beste zuerst: gleiche E-Mail-Adresse (email), gleicher
+                            Name ohne Unterschied bei Groß- und Kleinschreibung, Leerzeichen, Bindestrichen und Umlauten (name),
+                            gleicher Nachname und ein Vorname beginnt mit dem anderen (similar). Nur Vorschläge.
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id: { type: integer }
+                              name: { type: string }
+                              match: { type: string, enum: [email, name, similar] }
                   default_role: { type: string, description: Vorgeschlagene Rolle (Einstellungen → Zugang beantragen) }
                   email_confirmation: { type: boolean }
+                  no_access_members:
+                    description: Alle Mitglieder ohne Zugang (ohne Ehemalige) zum Auswählen, nach Namen
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
         '403': { $ref: '#/components/responses/Error' }
 
   /registrations/{id}/approve:
@@ -4839,6 +5300,8 @@ paths:
       description: |
         Legt das Konto mit dem Passwort aus der Anfrage an, mit denselben Prüfungen wie POST /users (Rolle, die man
         vergeben darf; Benutzername und E-Mail-Adresse frei). Mit Mailversand bekommt die Person eine Mail (`mailed`).
+        Mit `user_id` entsteht kein Konto: Das Mitglied ohne Zugang bekommt Benutzername, E-Mail-Adresse und Passwort
+        aus der Anfrage und behält Name, Rolle und alle Einträge (`linked`). Nur bei Mitgliedern ohne Zugang (sonst 400).
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }
       requestBody:
@@ -4849,6 +5312,7 @@ paths:
               properties:
                 level: { type: string, description: Rolle; ohne Angabe die vorgeschlagene }
                 username: { type: string, description: Anderer Benutzername, wenn der gewünschte vergeben ist }
+                user_id: { type: integer, description: Mit diesem Mitglied ohne Zugang verbinden statt ein Konto anzulegen; level gilt dann nicht }
       responses:
         '200':
           description: Freigegeben
@@ -4868,6 +5332,7 @@ paths:
                       email: { type: string }
                       level: { type: string }
                   mailed: { type: boolean }
+                  linked: { type: boolean, description: Mit einem Mitglied ohne Zugang verbunden (user_id) }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
@@ -4906,7 +5371,7 @@ paths:
   /users/bulk:
     post:
       tags: [Verwaltung]
-      summary: Mehrere Mitglieder (bzw. mit einer Rolle für neue Konten) auf einmal anlegen (Issue #24)
+      summary: Mehrere Mitglieder (bzw. mit einer anderen Rolle, die die Person vergeben darf) auf einmal anlegen (Issue #24)
       description: |
         Höchstens 50. Erst werden alle Einträge geprüft (Namen, Benutzernamen und E-Mail auch untereinander,
         Handynummer, Adresse, Anfangspunkte, Dienstgrad, Geburtstag, Foto); bei einem Fehler wird keiner angelegt, die Meldung nennt die Zeile.
@@ -4922,7 +5387,8 @@ paths:
               type: object
               required: [people]
               properties:
-                level: { allOf: [{ $ref: '#/components/schemas/Level' }], default: member, description: 'member oder eine Rolle mit new_accounts' }
+                level: { allOf: [{ $ref: '#/components/schemas/Level' }], default: member, description: 'Eine Rolle aus `/config` → `user.create_roles` (siehe `POST /users`)' }
+                extra_roles: { allOf: [{ $ref: '#/components/schemas/ExtraRoles' }], description: 'Zusatzrollen für alle (wie bei `POST /users`)' }
                 people:
                   type: array
                   maxItems: 50
@@ -4942,9 +5408,10 @@ paths:
                       rank_id: { type: integer }
                       birthday: { $ref: '#/components/schemas/BirthdayString' }
                       photo: { $ref: '#/components/schemas/PhotoFile' }
+                      no_access: { type: boolean, description: 'Ohne Zugang anlegen wie bei `POST /users`; kein Startpasswort' }
       responses:
         '201':
-          description: Ergebnis je Person (angelegt mit Startpasswort oder mit Grund nicht)
+          description: Ergebnis je Person (angelegt mit Startpasswort bzw. ohne Zugang oder mit Grund nicht)
           content:
             application/json:
               schema:
@@ -5346,6 +5813,8 @@ paths:
         Issue #277. Nur Darstellung: Die App zeigt jedem nur die Bereiche, die er sehen darf; die Routen prüfen wie bisher.
         „Verwaltung“ und „Meins“ stehen immer am Ende und sind nicht einstellbar. Jeder Bereich darf höchstens einmal
         vorkommen (Hauptpunkt, in einem Untermenü oder unter hidden). Bereiche, die nirgends stehen, hängt die App hinten an.
+        Die Zahl der Hauptpunkte ist frei (Issue #362). names, start und show_labels sind optional; fehlen sie, bleiben sie,
+        wie sie sind. Die App setzt mit „Standardnavigation wiederherstellen“ alles zurück (navigation null, names {}, start {}, show_labels true).
       x-capability: manage_settings
       requestBody:
         required: true
@@ -5360,6 +5829,9 @@ paths:
                   oneOf:
                     - $ref: '#/components/schemas/Navigation'
                     - type: 'null'
+                names: { $ref: '#/components/schemas/NavigationNames' }
+                start: { $ref: '#/components/schemas/NavigationStart' }
+                show_labels: { type: boolean }
       responses:
         '200':
           description: Neuer Stand
@@ -6071,6 +6543,165 @@ paths:
         '502': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
 
+  /admin/update/upload:
+    post:
+      tags: [Wartung]
+      summary: Update-Paket hochladen statt herunterladen (Sitzung anlegen)
+      description: |
+        Danach die Datei in Stücken an `/admin/update/upload/chunk` schicken, mit `/admin/update/upload/check` erkennen
+        und mit `/admin/update/upload/install` einspielen. Eingespielt wird nur ein Paket, das genau so (SHA-256 und
+        Größe) für diese Installation in der signierten Update-Liste steht.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [size]
+              properties:
+                size: { type: integer, description: Größe der Datei in Bytes }
+      responses:
+        '201':
+          description: Sitzung angelegt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  chunk_size: { type: integer, description: Größe eines Stücks (Rohdaten) }
+                  max_bytes: { type: integer }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/update/upload/chunk:
+    post:
+      tags: [Wartung]
+      summary: Ein Stück des Update-Pakets anhängen
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upload, offset, data]
+              properties:
+                upload: { type: string }
+                offset: { type: integer }
+                data: { type: string, description: Stück als Base64 }
+      responses:
+        '200':
+          description: Angekommen
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received: { type: integer }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/update/upload/check:
+    post:
+      tags: [Wartung]
+      summary: Hochgeladenes Paket erkennen (Version aus der signierten Update-Liste)
+      description: Lädt vorher die Update-Liste neu (ist sie nicht erreichbar, gilt die zuletzt geprüfte). Bei einem Fehler ist die Sitzung gelöscht.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upload]
+              properties:
+                upload: { type: string }
+      responses:
+        '200':
+          description: Erkannt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version: { type: string }
+                  current: { type: string }
+                  major: { type: boolean, description: Neue Hauptversion (einspielen nur mit `major` true) }
+                  older: { type: boolean, description: Älter als die installierte (Zurückrollen) }
+                  released: { type: boolean, description: Schon für alle freigegeben (stable) }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/update/upload/install:
+    post:
+      tags: [Wartung]
+      summary: Hochgeladenes Paket einspielen
+      description: |
+        Wie `/admin/update/install`, aber mit der hochgeladenen Datei und in jedem Kanal. Scheitert nur die Sicherung
+        in Google Drive (409 `drive_backup_failed`), bleibt die Datei für den zweiten Aufruf mit `without_drive` true;
+        sonst ist die Sitzung danach gelöscht.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upload]
+              properties:
+                upload: { type: string }
+                major: { type: boolean, default: false }
+                without_drive: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Eingespielt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  installed: { type: string }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+
+  /admin/update/upload/cancel:
+    post:
+      tags: [Wartung]
+      summary: Hochladen abbrechen (Sitzung und Datei löschen)
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upload]
+              properties:
+                upload: { type: string }
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cancelled: { type: boolean }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
   /admin/update/held:
     post:
       tags: [Wartung]
@@ -6575,7 +7206,7 @@ components:
                 type: object
                 description: >-
                   Protokoll des Versands. Zeitpunkte als ISO 8601 in der Zeitzone der Kompanie. types: je angebotener Art der
-                  letzte Versand (devices = Geräte, für die die Nachricht in die Warteschlange ging; 0 = niemand hat die Art
+                  letzte Versand, neueste zuerst (devices = Geräte, für die die Nachricht in die Warteschlange ging; 0 = niemand hat die Art
                   abonniert). accepted/rejected: zuletzt vom Push-Dienst angenommen bzw. endgültig abgelehnt (null = noch nie).
                 required: [types, accepted, rejected]
                 properties:
@@ -6717,13 +7348,23 @@ components:
         created_at: { type: string, format: date-time }
     BoardInput:
       type: object
-      required: [title, text]
+      required: [title]
+      description: Mit blocks oder text; fehlt beides → 400.
       properties:
         title: { type: string, description: 'Titel (reiner Text, eine Zeile, keine Längengrenze); Banner, Benachrichtigung und Betreff der Mail. Leer → 400.' }
+        blocks:
+          type: array
+          maxItems: 50
+          items: { $ref: '#/components/schemas/Block' }
+          description: |
+            Inhalt aus Blöcken wie bei eigenen Seiten; hat Vorrang vor text. Mindestens ein Block mit Inhalt (nicht nur
+            leere Textblöcke), sonst → 400. Blöcke mit audience members fehlen auch bei öffentlichen Nachrichten für alle
+            ohne view_board (samt ihren Bildern). Die Mail enthält alle Blöcke, andere als Text als Absatz mit ihrem reinen
+            Text. Text aller Textblöcke zusammen höchstens 1 000 000 Bytes.
         text:
           type: string
           description: |
-            Formatierter Inhalt (HTML), ohne Längengrenze. Der Server lässt nur eine Allowlist stehen (Absätze, Überschriften,
+            Formatierter Inhalt (HTML), ohne Längengrenze (ältere Apps; ohne blocks). Der Server lässt nur eine Allowlist stehen (Absätze, Überschriften,
             Hervorhebungen, Listen, Links mit https:/mailto:/tel:, Bilder über data-image, Trennlinie, einfache Tabellen,
             Inline-Styles für Schrift, Farben, Ausrichtung, Einzug). Ohne sichtbaren Inhalt → 400.
         expires_at:
@@ -6732,6 +7373,12 @@ components:
             Sichtbar bis: ISO 8601 mit Zeitzone (`Z` oder `±hh:mm`) oder `JJJJ-MM-TTTHH:MM` ohne Zeitzone (Zeitzone der
             Kompanie). Gespeichert in UTC. Muss in der Zukunft liegen, keine Obergrenze. Ohne Angabe 24 Stunden.
         audience: { $ref: '#/components/schemas/BoardAudience' }
+        audience_ids:
+          type: array
+          items: { type: integer }
+          description: |
+            Nur bei `audience: company` (IDs von Kompanien, Bereich Kompanien an) und `person` (IDs von Konten mit
+            `view_board`): mindestens eine; sonst → 400. Bei members und public ignoriert.
         push:
           type: boolean
           default: true
@@ -6745,9 +7392,13 @@ components:
           description: 'Kennungen von Anhängen (eigene Entwürfe aus `POST /attachments`); sonst → 400'
     BoardAudience:
       type: string
-      enum: [members, public]
+      enum: [members, public, company, person]
       default: members
-      description: 'Sichtbarkeit: members (intern, wer das Brett liest: view_board) oder public (alle, auch ohne Anmeldung). Andere Werte → 400.'
+      description: |
+        Sichtbarkeit: members (intern, wer das Brett liest: view_board), public (alle, auch ohne Anmeldung), company (wer
+        das Brett liest und einer der Kompanien aus audience_ids angehört) oder person (nur die Konten aus audience_ids).
+        Alle mit post_board sehen jede Nachricht. Andere Werte → 400. Ältere Clients zeigen company und person wie intern
+        an (der Server liefert sie trotzdem nur an die Berechtigten).
     BoardItem:
       type: object
       required: [kind, id, title, text, excerpt, author_name, created_at, updated_at, expires_at]
@@ -6755,13 +7406,19 @@ components:
         kind: { type: string, enum: [message], description: 'Art des Eintrags; weitere können dazukommen' }
         id: { type: integer }
         title: { type: string }
-        text: { type: string, description: 'Bereinigter formatierter Inhalt (HTML); Bilder mit src (Adresse der App) und data-image' }
-        excerpt: { type: string, description: Reiner Textauszug (z. B. für den Text-Teil der Mail) }
+        text: { type: string, description: 'Bereinigter formatierter Inhalt (HTML) der Textblöcke für alle (für ältere Apps); Bilder mit src (Adresse der App) und data-image' }
+        blocks: { type: array, items: { $ref: '#/components/schemas/Block' }, description: 'Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur mit view_board bzw. post_board). Ältere Nachrichten: ein Textblock aus text.' }
+        excerpt: { type: string, description: 'Reiner Textauszug aller sichtbaren Blöcke' }
         author_name: { type: [string, 'null'], description: '„gelöschtes Konto“, wenn das Konto des Verfassers gelöscht wurde' }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time, description: 'Wechselt, wenn sich Titel, Inhalt oder Anhänge ändern' }
         expires_at: { type: string, format: date-time, description: 'Sichtbar bis (UTC); standardmäßig 24 Stunden nach created_at' }
         audience: { $ref: '#/components/schemas/BoardAudience' }
+        audience_ids: { type: array, items: { type: integer }, description: 'Nur mit post_board, bei company und person: die Auswahl' }
+        audience_names:
+          type: array
+          items: { type: string }
+          description: 'Bei company: Namen der Kompanien (für alle, die die Nachricht lesen); bei person: Namen der Personen (nur mit post_board)'
         attachments: { type: array, items: { $ref: '#/components/schemas/Attachment' }, description: 'Dateianhänge; sehen alle, die die Nachricht sehen (bei öffentlichen auch ohne Anmeldung)' }
         last_edit:
           description: 'Nur mit post_board: wer zuletzt Titel, Inhalt, Enddatum oder Sichtbarkeit geändert hat (null: unverändert)'
@@ -6867,6 +7524,7 @@ components:
         id: { type: integer }
         title: { type: string }
         text: { type: string }
+        blocks: { type: array, items: { $ref: '#/components/schemas/Block' }, description: Alle Blöcke }
         excerpt: { type: string }
         author_name: { type: [string, 'null'] }
         created_at: { type: string, format: date-time }
@@ -6876,6 +7534,8 @@ components:
         deleted_by_name: { type: [string, 'null'] }
         active: { type: boolean, description: Noch sichtbar }
         audience: { $ref: '#/components/schemas/BoardAudience' }
+        audience_ids: { type: array, items: { type: integer }, description: Bei company und person }
+        audience_names: { type: array, items: { type: string }, description: 'Bei company und person: Namen der Auswahl' }
         attachments: { type: array, items: { $ref: '#/components/schemas/Attachment' } }
     BoardRevision:
       type: object
@@ -6884,8 +7544,8 @@ components:
         action: { type: string, enum: [created, title, content, expires, audience, attachments, deleted, mailed] }
         user_name: { type: [string, 'null'], description: '„gelöschtes Konto“, wenn es das Konto nicht mehr gibt' }
         at: { type: string, format: date-time }
-        before: { description: 'Vorheriger Stand (Titel, Inhalt als HTML, Enddatum, Sichtbarkeit, bei attachments die Dateinamen; bei deleted {expires_at}); null bei created und mailed' }
-        after: { description: 'Neuer Stand; bei created {title, text, expires_at, audience, attachments?}, bei attachments die Dateinamen, bei mailed {recipients}, bei deleted null' }
+        before: { description: 'Vorheriger Stand (Titel, Inhalt als HTML (Blöcke außer Text als Absatz mit ihrem reinen Text, Blöcke nur für Mitglieder mit „Nur für Mitglieder:“ davor), Enddatum, Sichtbarkeit, bei attachments die Dateinamen; bei deleted {expires_at}); null bei created und mailed. Sichtbarkeit: members, public oder „company: Namen“ bzw. „person: Namen“ (durch Komma getrennt)' }
+        after: { description: 'Neuer Stand; bei created {title, text, expires_at, audience, audience_ids?, audience_names?, attachments?}, bei attachments die Dateinamen, bei mailed {recipients}, bei deleted null' }
     SignatureResponse:
       type: object
       required: [signature]
@@ -7026,7 +7686,7 @@ components:
                   name: { type: string, description: Nur bei namentlichen Umfragen }
     PushType:
       type: string
-      enum: [board, board_public, polls, birthdays, gallery_review, gallery_submissions, registrations, penalties, points, ranks, titles, events, reminder, news]
+      enum: [board, board_public, polls, birthdays, gallery_review, gallery_submissions, registrations, reports_review, reports, penalties, points, ranks, titles, events, reminder, news]
       description: '`board` (Schwarzes Brett, Issue #5) nur für Mitglieder und Anwärter (view_board); dringend (Urgency high), TTL höchstens bis zum Ablauf der Nachricht. `board_public`: öffentliche Nachrichten am Brett für alle anderen (Gäste ohne Konto, Konten ohne view_board), sonst wie `board`. `polls` (Umfragen, Issue #4) nur für Mitglieder: neue Umfrage und Erinnerung 24 Stunden vor dem Ende an alle ohne Antwort. `birthdays` (Geburtstage, Issue #1) nur für Mitglieder: am Tag selbst ab 7 Uhr (Zeitzone der Kompanie), nicht an das Geburtstagskind, nur für sichtbare Geburtstage; TTL bis Mitternacht.'
     PushSubscribe:
       type: object
@@ -7161,8 +7821,7 @@ components:
       properties:
         items:
           type: array
-          maxItems: 5
-          description: 'Hauptpunkte in ihrer Reihenfolge (ohne Verwaltung und Meins): ein Bereich oder ein Untermenü (eine Ebene)'
+          description: 'Hauptpunkte in ihrer Reihenfolge (ohne Verwaltung und Meins), beliebig viele (Issue #362): ein Bereich oder ein Untermenü (eine Ebene)'
           items:
             oneOf:
               - $ref: '#/components/schemas/NavigationTarget'
@@ -7170,7 +7829,7 @@ components:
                 required: [label, icon, items]
                 properties:
                   label: { type: string, minLength: 1, maxLength: 24, description: Name des Untermenüs (Klartext) }
-                  icon: { type: string, enum: [ordner, termine, news, galerie, kompanien, sponsoren, mitglieder, dokumente, brett, dienstgrade, punktekatalog, stern] }
+                  icon: { $ref: '#/components/schemas/NavigationIcon' }
                   items: { type: array, minItems: 1, maxItems: 12, items: { $ref: '#/components/schemas/NavigationTarget' } }
         hidden:
           type: array
@@ -7182,18 +7841,38 @@ components:
       anyOf:
         - enum: [termine, news, galerie, kompanien, sponsoren, mitglieder, dokumente, brett, dienstgrade, punktekatalog]
         - pattern: '^seiten/[1-9][0-9]{0,9}$'
+    NavigationIcon:
+      type: string
+      description: 'Symbol eines Untermenüs oder Bereichs; ab info neutrale Symbole ohne festen Bereich (Issue #362)'
+      enum: [ordner, termine, news, galerie, kompanien, sponsoren, mitglieder, dokumente, brett, dienstgrade, punktekatalog, seiten, stern, info, karte, musik, pokal, glocke, fahne, kamera, haus, buch, uhr]
+    NavigationNames:
+      type: object
+      description: 'Eigene Namen und Symbole (Issue #362) je Bereich (NavigationTarget) oder intern (Untermenü der Standardnavigation). Der Name gilt überall, wo die App den Bereich nennt; bei eigenen Seiten nur in der Leiste. Leer kommt als [] an.'
+      additionalProperties:
+        type: object
+        properties:
+          label: { type: string, minLength: 1, maxLength: 24 }
+          icon: { $ref: '#/components/schemas/NavigationIcon' }
+    NavigationStart:
+      type: object
+      description: 'Startseite beim Öffnen der App (Issue #362): ein Punkt der Navigation (Bereich, eigene Seite, menue/<n>, intern nur in der Standardnavigation), für Angemeldete auch meins. Fehlt = erster Punkt der Leiste. Leer kommt als [] an.'
+      properties:
+        guest: { type: string }
+        member: { type: string }
     NavigationAdmin:
       type: object
-      required: [navigation, targets, icons, max_main, max_menu_items, label_max]
+      required: [navigation, names, start, show_labels, targets, icons, max_menu_items, label_max]
       properties:
         navigation:
           description: Gespeicherte Navigation; null = Standardnavigation
           oneOf:
             - $ref: '#/components/schemas/Navigation'
             - type: 'null'
+        names: { $ref: '#/components/schemas/NavigationNames' }
+        start: { $ref: '#/components/schemas/NavigationStart' }
+        show_labels: { type: boolean, description: 'Namen unter den Symbolen der Leiste' }
         targets: { type: array, items: { $ref: '#/components/schemas/NavigationTarget' } }
-        icons: { type: array, items: { type: string } }
-        max_main: { type: integer }
+        icons: { type: array, items: { $ref: '#/components/schemas/NavigationIcon' } }
         max_menu_items: { type: integer }
         label_max: { type: integer }
     Maintenance:
@@ -7234,6 +7913,29 @@ components:
             Nur WordPress: `use_login_page` (400).
         message: { type: string, description: Für Menschen lesbar, in der Sprache der Kompanie }
 
+    ReviewReport:
+      type: object
+      description: Fehlermeldung im Eingang der Admins (review_reports)
+      required: [id, status, description, expected, page, version, variant, user_agent, role, last_error, user_id, name, share_name, screenshot, created, reason, reviewed_by, reviewed_at]
+      properties:
+        id: { type: integer }
+        status: { type: string, enum: [open, closed, forwarded] }
+        description: { type: string }
+        expected: { type: string }
+        page: { type: string }
+        version: { type: string }
+        variant: { type: string }
+        user_agent: { type: string }
+        role: { type: string, description: 'Bezeichnung der Rolle beim Melden oder „ohne Anmeldung“' }
+        last_error: { type: [string, 'null'] }
+        user_id: { type: [integer, 'null'], description: 'Wer gemeldet hat; null ohne Anmeldung' }
+        name: { type: [string, 'null'], description: 'Name der meldenden Person (angemeldet); null ohne Anmeldung' }
+        share_name: { type: boolean, description: 'Name geht beim Weiterleiten an die Betreuer mit' }
+        screenshot: { type: boolean, description: 'Bildschirmfoto vorhanden (nur bei offenen Meldungen)' }
+        created: { type: integer, description: Unix-Zeit des Meldens }
+        reason: { type: [string, 'null'], description: Begründung beim Schließen }
+        reviewed_by: { type: [string, 'null'], description: Name der Person, die geschlossen bzw. weitergeleitet hat }
+        reviewed_at: { type: [integer, 'null'] }
     GallerySubmission:
       type: object
       required: [id, album_id, album, name, status, reason, created_at, reviewed_at, thumb, photo_id]
@@ -7250,6 +7952,9 @@ components:
         photo_id: { type: [integer, 'null'] }
         user_id: { type: integer, description: Nur beim Prüfen }
         user_name: { type: string, description: Nur beim Prüfen }
+        intern: { type: [boolean, 'null'], description: 'Nur beim Prüfen: ob das freigegebene Bild in der Galerie intern ist; null ohne Bild' }
+        type: { type: string, enum: [image, video], description: 'video: MP4 oder WebM (Issue #350), thumb ist dann das Standbild' }
+        video: { type: string, description: 'Nur beim Prüfen offener Videos: Adresse zum Abspielen vor der Freigabe (<App>/foto/<id der Einreichung>/einreichung, Range, nur mit review_gallery)' }
     GalleryAlbumInput:
       type: object
       properties:
@@ -7277,12 +7982,13 @@ components:
           type: array
           items:
             type: object
-            required: [id, name, intern, thumb, status, error]
+            required: [id, type, name, intern, thumb, status, error]
             properties:
               id: { type: integer }
+              type: { type: string, enum: [image, video] }
               name: { type: string }
               intern: { type: boolean }
-              thumb: { type: string, description: Adresse des Vorschaubilds }
+              thumb: { type: string, description: 'Adresse des Vorschaubilds; leer bei einem Video ohne Standbild' }
               status: { type: string, enum: [pending, ready, error] }
               error: { type: string }
     AdminSettings:
@@ -7386,7 +8092,8 @@ components:
         label: { type: string }
         points_factor: { type: number, description: 'Gilt beim Buchen von Punkten, z. B. 0.5; bei mehreren Rollen der kleinste' }
         extra: { type: boolean, description: 'Als Zusatzrolle vergebbar (eigene Rollen; nicht guest, member, admin)' }
-        new_accounts: { type: boolean, description: 'Beim Anlegen von Konten wählbar (POST /users): immer bei member, sonst nach Einstellung' }
+        company: { type: boolean, description: 'Gehört zur Kompanie (Recht member, nicht admin): nur zu solchen Grundrollen gibt es Zusatzrollen' }
+        new_accounts: { type: boolean, description: 'Beim Anlegen von Konten für alle mit create_users wählbar: immer bei member, sonst nach Einstellung (wer Rollen vergeben darf, siehe user.create_roles)' }
         promotable: { type: boolean, description: 'Personen mit dieser Rolle lassen sich mit create_users als Mitglied aufnehmen (POST /members/{id}/promote), z. B. Anwärter' }
 
     RoleAdmin:
@@ -7397,7 +8104,7 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, view_activity, manage_settings] }
+              items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports, view_activity, manage_settings] }
               description: 'Rechte der Rolle, jedes für sich (member schließt nichts ein); bei admin alle; vergebbar sind alle außer view_activity und manage_settings. Rechte zum Verwalten und view_own_* nur zusammen mit member. guest gilt auch ohne Anmeldung.'
             users: { type: integer, description: 'Anzahl der Personen mit dieser Rolle, als Grundrolle oder als Zusatzrolle' }
             extra_users: { type: integer, description: Davon als Zusatzrolle }
@@ -7410,7 +8117,7 @@ components:
         label: { type: string, maxLength: 30 }
         capabilities:
           type: array
-          items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users] }
+          items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports] }
           description: 'Jedes Recht für sich. Rechte zum Verwalten und view_own_* nur zusammen mit member; die übrigen Rechte zum Sehen gehen auch allein (wie bei Anwärtern). guest: nur Rechte zum Sehen ohne member; member: immer member, sonst nur Rechte zum Sehen; admin: nicht änderbar.'
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
         new_accounts: { type: boolean, description: 'Nur eigene Rollen: beim Anlegen von Konten wählbar' }
@@ -7426,11 +8133,19 @@ components:
         level: { $ref: '#/components/schemas/Level' }
         extra_roles: { $ref: '#/components/schemas/ExtraRoles' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
+        create_roles:
+          type: array
+          items: { $ref: '#/components/schemas/Level' }
+          description: 'Nur mit create_users: Rollen, die die Person beim Anlegen vergeben darf (`POST /users`, `/users/bulk`, Import, Anfragen freigeben)'
+        create_extra_roles:
+          type: array
+          items: { $ref: '#/components/schemas/Level' }
+          description: 'Nur mit create_users: Zusatzrollen, die die Person beim Anlegen vergeben darf (`extra_roles`; leer ohne promote_users)'
         capabilities:
           type: array
           items:
             type: string
-            enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, view_activity, manage_settings]
+            enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports, view_activity, manage_settings]
           description: 'Wirksame Rechte aller Rollen zusammen (Grundrolle und Zusatzrollen); member bringt calendar mit.'
 
     ErrorLog:
@@ -7524,7 +8239,8 @@ components:
           properties:
             imprint: { type: [string, 'null'] }
             privacy: { type: [string, 'null'] }
-        reports: { type: boolean, description: 'Fehlermeldungen an die Betreuer möglich (reportUrl in update.json, Issue #64); sonst kein Knopf „Fehler melden“' }
+        reports: { type: boolean, description: 'Fehler melden möglich (Knopf „Fehler melden“); Meldungen gehen zuerst an die Admins' }
+        openReports: { type: [integer, 'null'], description: 'Offene Fehlermeldungen; nur für Angemeldete mit review_reports, sonst null' }
         registration: { type: boolean, description: 'Zugang beantragen eingeschaltet (Issue #314): Link „Zugang beantragen“ für Gäste' }
         pendingRegistrations: { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null' }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
@@ -7535,6 +8251,13 @@ components:
           oneOf:
             - $ref: '#/components/schemas/Navigation'
             - type: 'null'
+        navigation_names: { $ref: '#/components/schemas/NavigationNames' }
+        navigation_start: { $ref: '#/components/schemas/NavigationStart' }
+        navigation_labels: { type: boolean, description: 'Namen unter den Symbolen der Leiste (Issue #362)' }
+        section_labels:
+          type: object
+          description: 'Eigene Namen als Abschnitte der Bezeichnungen (z. B. gallery, catalog, intern), gehen vor kompanie.json (Issue #362). Leer kommt als [] an.'
+          additionalProperties: { type: string }
         newsInApp:
           type: boolean
           description: 'News werden in der App geschrieben (Quelle app, Bereich news an); wer manage_news hat, sieht die Knöpfe dazu'
@@ -7722,7 +8445,10 @@ components:
         excerpt: { type: string }
         image: { type: [string, 'null'] }
         link: { type: string, description: Adresse auf der Webseite; leer bei Beiträgen der App }
-        content: { type: string, description: Nur bei der Einzelansicht }
+        content: { type: string, description: 'Nur bei der Einzelansicht; Quelle app: Text der Textblöcke für alle (für ältere Apps)' }
+        blocks: { type: array, items: { $ref: '#/components/schemas/Block' }, description: 'Nur Einzelansicht, Quelle app: Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur für Mitglieder bzw. mit manage_news)' }
+        cover: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app: Adresse des Titelbilds (Issue #351)' }
+        cover_uid: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app: Kennung des Titelbilds, für PATCH' }
         updated_at: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app, mit manage_news: Stand für PATCH' }
         updated_by_name: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app, mit manage_news' }
 
@@ -7781,6 +8507,7 @@ components:
         width: { type: integer }
         height: { type: integer }
         intern: { type: boolean }
+        upload: { type: boolean, description: 'In der App hochgeladen (auch über Einreichungen): intern/öffentlich mit PATCH /gallery/photos/{id} umstellbar' }
         name: { type: string }
         ready:
           type: boolean
@@ -7824,6 +8551,9 @@ components:
         joined_on:
           description: Eintritt als JJJJ-MM-TT oder nur das Jahr JJJJ (unabhängig von der Anzeige auf der eigenen Seite), leer ohne Eintrag; nur mit Recht create_users
           type: string
+        no_access:
+          description: 'Mitglied ohne Zugang (meldet sich noch nicht an, z. B. für Chroniken angelegt); nur mit Recht create_users, auch in GET /members/{id}'
+          type: boolean
 
     DirectoryEntry:
       type: object
@@ -7914,6 +8644,11 @@ components:
         - $ref: '#/components/schemas/MemberSummary'
         - type: object
           properties:
+            extra_roles:
+              allOf: [{ $ref: '#/components/schemas/ExtraRoles' }]
+              description: |
+                Zusatzrollen nur für Personen mit Recht promote_users, sonst leer (Issue #349). Die Liste
+                (`GET /members`) enthält sie weiter, weil der Punktefaktor beim Buchen davon abhängt.
             point_list:
               type: array
               items: { $ref: '#/components/schemas/PointEntry' }
@@ -8051,7 +8786,7 @@ components:
           type: object
           required: [used, ignored]
           properties:
-            used: { type: array, items: { type: string }, description: 'erkannte Spalten (first_name, last_name, status, username, email, birthday, joined, points, rank, titles, left, reason)' }
+            used: { type: array, items: { type: string }, description: 'erkannte Spalten (first_name, last_name, status, username, email, birthday, joined, points, rank, titles, left, reason, access)' }
             ignored:
               type: array
               items:
@@ -8082,6 +8817,8 @@ components:
               reason: { $ref: '#/components/schemas/FormerReason' }
               founder: { type: boolean }
               left_on: { $ref: '#/components/schemas/FormerDate' }
+              no_access: { type: boolean, description: 'Spalte zugang „nein“: Mitglied ohne Zugang; fehlt sonst' }
+              extra_roles: { type: array, items: { type: string }, description: 'Spalte zusatzrollen: Bezeichnungen der Zusatzrollen; fehlt ohne' }
               existing:
                 description: Konto mit genau diesem Namen gibt es schon (wird übersprungen)
                 type: object
@@ -8097,6 +8834,7 @@ components:
           properties:
             active: { type: integer }
             former: { type: integer }
+            no_access: { type: integer, description: Davon ohne Zugang (in active enthalten) }
         existing: { type: integer }
         offices_linked: { type: integer }
         applied: { type: boolean }
@@ -8108,7 +8846,7 @@ components:
     GrantableCapability:
       type: string
       description: Recht, das sich einer Rolle oder einer Person geben lässt (alle außer `manage_settings`).
-      enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users]
+      enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports]
 
     MemberRights:
       type: object
@@ -8636,9 +9374,293 @@ components:
       allOf:
         - $ref: '#/components/schemas/PageSummary'
         - type: object
-          required: [body]
+          required: [body, blocks]
           properties:
-            body: { type: string, description: 'Formatierter Text (bereinigt wie RichText), Bilder mit Adresse (`<App>/bild/<uid>`); leer ohne Text' }
+            body: { type: string, description: 'Für ältere Apps: Text aller Textblöcke für alle (bereinigt wie RichText), Bilder mit Adresse (`<App>/bild/<uid>`); leer ohne Text' }
+            blocks: { type: array, items: { $ref: '#/components/schemas/Block' }, description: 'Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur für Mitglieder bzw. mit manage_pages). Bestehende Seiten: ein Textblock aus body. Leere Textblöcke nur mit manage_pages.' }
+
+    Block:
+      description: 'Vorgefertigter Block (eigene Seiten, News in der App, Schwarzes Brett). Unbekannte type lehnt der Server beim Speichern ab (400 invalid); die App übergeht sie beim Anzeigen.'
+      oneOf:
+        - $ref: '#/components/schemas/BlockText'
+        - $ref: '#/components/schemas/BlockCountdown'
+        - $ref: '#/components/schemas/BlockButton'
+        - $ref: '#/components/schemas/BlockEvents'
+        - $ref: '#/components/schemas/BlockContacts'
+        - $ref: '#/components/schemas/BlockNotice'
+        - $ref: '#/components/schemas/BlockDivider'
+        - $ref: '#/components/schemas/BlockSchedule'
+        - $ref: '#/components/schemas/BlockFacts'
+        - $ref: '#/components/schemas/BlockPoll'
+        - $ref: '#/components/schemas/BlockAlbum'
+        - $ref: '#/components/schemas/BlockDocument'
+        - $ref: '#/components/schemas/BlockSponsors'
+        - $ref: '#/components/schemas/BlockMap'
+      discriminator:
+        propertyName: type
+        mapping:
+          text: '#/components/schemas/BlockText'
+          countdown: '#/components/schemas/BlockCountdown'
+          button: '#/components/schemas/BlockButton'
+          events: '#/components/schemas/BlockEvents'
+          contacts: '#/components/schemas/BlockContacts'
+          notice: '#/components/schemas/BlockNotice'
+          divider: '#/components/schemas/BlockDivider'
+          schedule: '#/components/schemas/BlockSchedule'
+          facts: '#/components/schemas/BlockFacts'
+          poll: '#/components/schemas/BlockPoll'
+          album: '#/components/schemas/BlockAlbum'
+          document: '#/components/schemas/BlockDocument'
+          sponsors: '#/components/schemas/BlockSponsors'
+          map: '#/components/schemas/BlockMap'
+    BlockBase:
+      type: object
+      required: [type]
+      properties:
+        id: { type: string, pattern: '^[a-z0-9]{1,16}$', description: 'Kennung des Blocks in der Seite (in Antworten immer gesetzt)' }
+        type: { type: string }
+        audience: { type: string, enum: [all, members], default: all, description: 'all: alle, die die Seite sehen; members: nur Mitglieder (view_board), auch auf öffentlichen Seiten. Bilder in members-Blöcken sind ohne Anmeldung nicht abrufbar.' }
+    BlockText:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [html]
+          properties:
+            type: { type: string, const: text }
+            html: { type: string, description: 'Formatierter Text (bereinigt wie RichText); in Antworten Bilder mit Adresse, beim Speichern als <img data-image="<uid>">. Alle Textblöcke zusammen höchstens 200000 Bytes.' }
+    BlockCountdown:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [source]
+          properties:
+            type: { type: string, const: countdown }
+            title: { type: string, maxLength: 100, description: 'Überschrift (optional; beim Termin sonst dessen Titel)' }
+            source: { type: string, enum: [date, event], default: date, description: 'date: eigenes Datum; event: Termin aus dem Bereich Termine (verschoben: zählt mit)' }
+            date: { type: string, format: date, description: 'Beginn bei source date (Pflicht), in der Zeitzone der Installation' }
+            time: { type: [string, 'null'], pattern: '^\d{2}:\d{2}$', description: 'Uhrzeit des Beginns; ohne: 0:00 Uhr' }
+            end_date: { type: [string, 'null'], format: date, description: 'Ende (optional); nur Datum: bis zum Ende dieses Tages' }
+            end_time: { type: [string, 'null'], pattern: '^\d{2}:\d{2}$', description: 'Uhrzeit des Endes (ohne end_date: am Tag des Beginns); muss nach dem Beginn liegen' }
+            event_id: { type: integer, description: 'Termin bei source event (Pflicht, muss existieren)' }
+            running_text: { type: string, maxLength: 200, description: 'Text zwischen Beginn und Ende' }
+            after: { type: string, enum: [text, hide], default: text, description: 'Nach dem Ende (ohne Ende: nach dem Beginn): after_text zeigen oder Block ausblenden' }
+            after_text: { type: string, maxLength: 200 }
+            starts_at: { type: [string, 'null'], format: date-time, readOnly: true, description: 'Nur in Antworten: Beginn in UTC; null, wenn der Termin fehlt oder für die Person nicht sichtbar ist (Bereich events, view_events): dann wie nach dem Ende' }
+            ends_at: { type: [string, 'null'], format: date-time, readOnly: true, description: 'Nur in Antworten: Ende in UTC; null ohne Ende' }
+            event_title: { type: [string, 'null'], readOnly: true, description: 'Nur in Antworten bei source event: Titel des Termins, null wenn nicht sichtbar' }
+    BlockButton:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [label, url]
+          properties:
+            type: { type: string, const: button }
+            label: { type: string, minLength: 1, maxLength: 60, description: Beschriftung }
+            url: { type: string, maxLength: 2000, description: 'Ziel: https://…, mailto:…, tel:… (Leerzeichen werden entfernt) oder eine Seite der App (#/…); sonst 400. In Mails als „Beschriftung: Ziel“, Seiten der App mit voller Adresse.' }
+            style: { type: string, enum: [primary, secondary], default: primary, description: 'primary: hervorgehoben; secondary: zurückhaltend' }
+    BlockEvents:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          properties:
+            type: { type: string, const: events }
+            title: { type: string, maxLength: 100, description: Überschrift (optional) }
+            count: { type: integer, minimum: 1, maximum: 20, default: 3, description: Wie viele der nächsten Termine }
+            events:
+              type: array
+              readOnly: true
+              description: 'Nur in Antworten: die nächsten count Termine ab heute; leer, wenn die Person keine Termine sehen darf (view_events). Ist der Bereich Termine aus, fehlt der Block (außer für die Pflege).'
+              items:
+                type: object
+                properties:
+                  id: { type: integer }
+                  title: { type: string }
+                  start_date: { type: string, format: date }
+                  start_time: { type: [string, 'null'] }
+                  end_date: { type: [string, 'null'], format: date }
+                  end_time: { type: [string, 'null'] }
+                  all_day: { type: boolean }
+                  start: { type: string, description: 'Wie bei GET /events (ganztägig: Datum; Ende exklusiv)' }
+                  end: { type: string }
+                  location: { type: string }
+    BlockContacts:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [office_ids]
+          properties:
+            type: { type: string, const: contacts }
+            title: { type: string, maxLength: 100, description: Überschrift (optional) }
+            office_ids: { type: array, minItems: 1, maxItems: 20, items: { type: integer }, description: 'Ämter in der Reihenfolge der Anzeige (müssen existieren; doppelte zählen einmal); gelöschte fallen beim Lesen weg' }
+            offices:
+              type: array
+              readOnly: true
+              description: 'Nur in Antworten: je Amt die Inhaber der laufenden Amtszeiten (Name und Foto wie GET /offices). Leer ohne view_offices; ist der Bereich Ämter aus, fehlt der Block (außer für die Pflege).'
+              items:
+                type: object
+                properties:
+                  id: { type: integer }
+                  title: { type: string }
+                  holder_title: { type: [string, 'null'], description: 'Einzahl des Amts wie in GET /offices (eigene Einzahl oder verknüpfter Titel), null ohne' }
+                  holders:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string }
+                        photo_url: { type: [string, 'null'] }
+                        email: { type: string, description: 'Nur mit view_personal und wenn GET /offices das Konto zeigt' }
+                        phone: { type: string, description: wie email }
+    BlockNotice:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [text]
+          properties:
+            type: { type: string, const: notice }
+            title: { type: string, maxLength: 100 }
+            text: { type: string, minLength: 1, maxLength: 1000, description: 'Reiner Text, Zeilenumbrüche bleiben' }
+            tone: { type: string, enum: [info, warning, success], default: info }
+    BlockDivider:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          properties:
+            type: { type: string, const: divider }
+            style: { type: string, enum: [line, space], default: line, description: 'line: Trennlinie; space: nur Abstand. In Mails nichts.' }
+    BlockSchedule:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [items]
+          properties:
+            type: { type: string, const: schedule }
+            title: { type: string, maxLength: 100 }
+            items:
+              type: array
+              minItems: 1
+              maxItems: 50
+              items:
+                type: object
+                required: [text]
+                properties:
+                  time: { type: string, maxLength: 20, description: 'Freier kurzer Text, z. B. 14:00 oder „ab 20 Uhr“ (optional)' }
+                  text: { type: string, minLength: 1, maxLength: 200 }
+    BlockFacts:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [items]
+          properties:
+            type: { type: string, const: facts }
+            title: { type: string, maxLength: 100 }
+            items:
+              type: array
+              minItems: 1
+              maxItems: 12
+              items:
+                type: object
+                required: [value, label]
+                properties:
+                  value: { type: string, minLength: 1, maxLength: 20, description: 'z. B. 1848 oder 250+' }
+                  label: { type: string, minLength: 1, maxLength: 60 }
+    BlockPoll:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [poll_id]
+          properties:
+            type: { type: string, const: poll }
+            poll_id: { type: integer, description: 'Umfrage aus dem Bereich Umfragen (muss beim Speichern existieren)' }
+            poll:
+              readOnly: true
+              description: 'Nur in Antworten: Stand für die lesende Person. Der Block fehlt ganz, wenn Umfragen ausgeschaltet sind oder die Person nicht teilnehmen darf; mit manage_pages kommt er dann mit poll null.'
+              oneOf:
+                - type: 'null'
+                - type: object
+                  required: [id, title, status, has_voted]
+                  properties:
+                    id: { type: integer }
+                    title: { type: string }
+                    status: { type: string }
+                    ends_at: { type: [string, 'null'], format: date-time }
+                    has_voted: { type: boolean }
+    BlockAlbum:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [album_id]
+          properties:
+            type: { type: string, const: album }
+            album_id: { type: integer, description: 'Album aus der Galerie (muss beim Speichern existieren)' }
+            count: { type: integer, minimum: 1, maximum: 12, default: 6, description: 'Wie viele Vorschaubilder' }
+            album:
+              readOnly: true
+              description: 'Nur in Antworten: Vorschau mit den Bildern, die die Person in der Galerie sehen darf (interne nur mit view_gallery_internal). Der Block fehlt ganz, wenn die Galerie ausgeschaltet ist oder nichts sichtbar ist; mit manage_pages kommt er dann mit album null.'
+              oneOf:
+                - type: 'null'
+                - type: object
+                  required: [id, title, total, photos]
+                  properties:
+                    id: { type: integer }
+                    title: { type: string }
+                    year: { type: string }
+                    total: { type: integer, description: 'Sichtbare Einträge (Bilder und Videos) im Album' }
+                    photos:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id: { type: integer }
+                          thumb: { type: string }
+                          large: { type: string }
+                          width: { type: integer }
+                          height: { type: integer }
+    BlockDocument:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [document_id]
+          properties:
+            type: { type: string, const: document }
+            document_id: { type: integer, description: 'Dokument aus dem Bereich Dokumente (muss beim Speichern existieren)' }
+            document:
+              readOnly: true
+              description: 'Nur in Antworten. Der Block fehlt ganz, wenn Dokumente ausgeschaltet sind oder die Person das Dokument dort nicht sehen darf (view_documents, bei visibility managers manage_documents; ohne Anmeldung mit den Rechten von Gast); mit manage_pages kommt er dann mit document null. Die Datei prüft die Rechte beim Abruf erneut.'
+              oneOf:
+                - type: 'null'
+                - type: object
+                  required: [id, title, ext, kind, size, date, url]
+                  properties:
+                    id: { type: integer }
+                    title: { type: string }
+                    ext: { type: string }
+                    kind: { type: string, enum: [pdf, image, file] }
+                    size: { type: integer }
+                    date: { type: string, format: date }
+                    url: { type: string }
+    BlockSponsors:
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          properties:
+            type: { type: string, const: sponsors }
+            title: { type: string, maxLength: 100 }
+            sponsors:
+              readOnly: true
+              type: array
+              items: { $ref: '#/components/schemas/Sponsor' }
+              description: 'Nur in Antworten: alle Sponsoren in ihrer Reihenfolge. Der Block fehlt ganz, wenn Sponsoren ausgeschaltet sind, die Person sie nicht sehen darf (view_sponsors) oder es keine gibt; mit manage_pages kommt er dann mit leerer Liste.'
+    BlockMap:
+      description: 'Karte zur Anfahrt: keine eingebettete Karte, die App zeigt den Ort mit einem Knopf, der ihn in der Karten-App des Geräts öffnet (geo: auf Android, Apple Karten, sonst Google Maps).'
+      allOf:
+        - $ref: '#/components/schemas/BlockBase'
+        - type: object
+          required: [place]
+          properties:
+            type: { type: string, const: map }
+            title: { type: string, maxLength: 100 }
+            place: { type: string, minLength: 1, maxLength: 200, description: 'Ort oder Adresse als freier Text, wie der Ort eines Termins' }
 
     Title:
       type: object
@@ -8812,6 +9834,8 @@ components:
         username: { type: string }
         email: { type: string }
         level: { $ref: '#/components/schemas/Level' }
+        extra_roles: { allOf: [{ $ref: '#/components/schemas/ExtraRoles' }], description: 'Zusatzrollen, wenn welche mitgeschickt wurden; fehlt sonst' }
         warning: { type: string, description: 'Konto angelegt, aber Anfangspunkte, Dienstgrad, Geburtstag bzw. Foto nicht übernommen' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
-        password: { type: string, description: Startpasswort; steht nur in dieser Antwort }
+        password: { type: string, description: Startpasswort; steht nur in dieser Antwort; fehlt bei no_access }
+        no_access: { type: boolean, description: 'Mitglied ohne Zugang angelegt (kein Startpasswort); fehlt sonst' }

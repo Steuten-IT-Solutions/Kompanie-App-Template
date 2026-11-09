@@ -13,9 +13,23 @@ final class KompanieConfig
     private const ROLE_LABELS = ['guest' => 'Gast', 'candidate' => 'Anwärter', 'member' => 'Mitglied', 'organizer' => 'Verwalter', 'manager' => 'Leitung', 'admin' => 'Admin'];
     private const SECTION_LABELS = ['events' => 'Termine', 'news' => 'News', 'gallery' => 'Galerie', 'points' => 'Punkte', 'penalties' => 'Strafen', 'ranks' => 'Dienstgrade', 'titles' => 'Titel', 'attendance' => 'Anwesenheit', 'documents' => 'Dokumente', 'board' => 'Schwarzes Brett', 'polls' => 'Umfragen', 'birthdays' => 'Geburtstage', 'inventory' => 'Inventar', 'directory' => 'Mitglieder', 'offices' => 'Ämter', 'lists' => 'Listen', 'mail' => 'E-Mails', 'sponsors' => 'Sponsoren', 'companies' => 'Kompanien', 'pages' => 'Seiten'];
 
+    /** @var (\Closure(): array<string, string>)|null eigene Bereichsnamen der Installation (Einstellungen → Navigation) */
+    private ?\Closure $sectionOverrides = null;
+
     /** @param array<string, mixed> $data */
     public function __construct(private readonly array $data)
     {
+    }
+
+    /**
+     * Eigene Bereichsnamen der Installation (Issue #362): gehen vor kompanie.json und den Standardnamen. Die App setzt das
+     * beim Start (App::__construct); gelesen wird erst bei Bedarf, damit die Einstellungen nicht vorab geladen werden.
+     *
+     * @param \Closure(): array<string, string> $overrides Abschnitt (z. B. "gallery") → Name
+     */
+    public function overrideSections(\Closure $overrides): void
+    {
+        $this->sectionOverrides = $overrides;
     }
 
     public static function fromFile(string $file): self
@@ -63,6 +77,25 @@ final class KompanieConfig
 
     public function sectionLabel(string $section, ?string $default = null): string
     {
+        $own = $this->sectionOverrides !== null ? ($this->sectionOverrides)() : [];
+        if (($own[$section] ?? '') !== '') {
+            return $own[$section];
+        }
+        return $this->configuredSectionLabel($section, $default);
+    }
+
+    /**
+     * Name eines Bereichs aus kompanie.json bzw. der Standard, ohne eigene Namen der Installation. „catalog“ (Punktekatalog)
+     * und „intern“ (Untermenü der Standardnavigation) stehen nicht in kompanie.json: der Katalog heißt nach den Punkten.
+     */
+    public function configuredSectionLabel(string $section, ?string $default = null): string
+    {
+        if ($section === 'catalog') {
+            return $this->configuredSectionLabel('points') . 'katalog';
+        }
+        if ($section === 'intern') {
+            return 'Intern';
+        }
         $labels = $this->data['labels']['sections'] ?? [];
         return is_array($labels) && is_string($labels[$section] ?? null) && $labels[$section] !== ''
             ? $labels[$section]

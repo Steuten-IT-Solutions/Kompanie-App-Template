@@ -20,6 +20,7 @@ use KompanieApp\Core\Update\SignedEnvelope;
 use KompanieApp\Core\Update\StatusReporter;
 use KompanieApp\Core\Update\UpdateList;
 use KompanieApp\Core\Update\UpdateService;
+use KompanieApp\Core\Update\UpdateUpload;
 use PHPUnit\Framework\TestCase;
 
 final class UpdateServiceTest extends TestCase
@@ -542,6 +543,86 @@ final class UpdateServiceTest extends TestCase
         $this->assertFalse($s1->status()['running']);
         $s1->install('1.0.0.3');
         $this->assertSame('1.0.0.3', end($this->installed)[0]);
+    }
+
+    /** Hochgeladenes Paket: nur, was genau so in der signierten Liste steht; auch early im Kanal stable, ohne Download. */
+    public function testUploadedPackageMustBeInTheSignedList(): void
+    {
+        $this->publish(['1.0.0.1', '1.0.0.2', '1.0.0.3'], ['1.0.0.1']);
+        $s = $this->service('1.0.0.1');
+        $s->check();
+        $file = $this->dir . '/upload.zip';
+        @mkdir($this->dir, 0777, true);
+
+        // Neu erschienene Version: die Liste wird vorher neu geladen
+        $this->publish(['1.0.0.1', '1.0.0.2', '1.0.0.3', '1.0.0.4'], ['1.0.0.1']);
+        file_put_contents($file, 'ZIP-1.0.0.4');
+        $this->assertSame(['version' => '1.0.0.4', 'current' => '1.0.0.1', 'major' => false, 'older' => false, 'released' => false], $s->identifyUpload($file));
+
+        // Liste gerade nicht erreichbar: die zuletzt geprüfte gilt
+        $good = $this->listJson;
+        $this->listJson = 'kaputt';
+        file_put_contents($file, 'ZIP-1.0.0.2');
+        $this->assertSame('1.0.0.2', $s->identifyUpload($file)['version']);
+        $this->listJson = $good;
+
+        $calls = count($this->http->calls);
+        $this->assertSame('1.0.0.2', $s->installUpload($file));
+        $this->assertSame([['1.0.0.2', 'ZIP-1.0.0.2']], $this->installed, 'early auch im Kanal stable, weil ausdrücklich hochgeladen');
+        $this->assertSame([], array_filter(array_slice($this->http->calls, $calls), static fn (array $c): bool => str_contains($c['url'], '/dl/')), 'nichts heruntergeladen');
+        $this->assertFileExists($file, 'die Datei löscht der Aufrufer');
+        $this->assertTrue($this->settings->get('update_last')['ok']);
+
+        // Verändert, fremd, schon installiert, zurückgezogen
+        file_put_contents($file, 'ZIP-1.0.0.2 verändert');
+        $this->assertThrows(fn () => $s->identifyUpload($file), 'nicht in der signierten Update-Liste');
+        file_put_contents($file, 'ZIP-1.0.0.1');
+        $this->assertThrows(fn () => $this->service('1.0.0.1')->identifyUpload($file), 'schon installiert');
+        $this->publish(['1.0.0.1', '1.0.0.2', '1.0.0.3', '1.0.0.4'], ['1.0.0.1'], ['1.0.0.3']);
+        file_put_contents($file, 'ZIP-1.0.0.3');
+        $this->assertThrows(fn () => $s->identifyUpload($file), 'zurückgezogen');
+        $this->assertCount(1, $this->installed);
+
+        // Ältere Version: Zurückrollen, die verlassene wird danach übersprungen
+        file_put_contents($file, 'ZIP-1.0.0.1');
+        $s2 = $this->service('1.0.0.2');
+        $this->assertTrue($s2->identifyUpload($file)['older']);
+        $s2->installUpload($file);
+        $this->assertSame('rollback', $this->settings->get('update_last')['kind']);
+        $this->assertSame('1.0.0.2', $this->settings->get('update_skip'));
+
+        // Neue Hauptversion nur mit Bestätigung
+        $this->publish(['1.0.0.2', '2.0.0.1'], ['2.0.0.1']);
+        file_put_contents($file, 'ZIP-2.0.0.1');
+        $s3 = $this->service('1.0.0.2');
+        $this->assertTrue($s3->identifyUpload($file)['major']);
+        $this->assertThrows(fn () => $s3->installUpload($file), 'ausdrückliche Bestätigung');
+        $s3->installUpload($file, true);
+        $this->assertSame('2.0.0.1', end($this->installed)[0]);
+    }
+
+    /** Hochladen in Stücken: Reihenfolge, Wiederholung des letzten Stücks, nur ZIP, vollständig, Aufräumen. */
+    public function testUploadInChunks(): void
+    {
+        $up = new UpdateUpload(new LocalFileStorage("{$this->dir}/p", 'https://x/', "{$this->dir}/i", ''), new Time(new FixedClock()));
+        $this->assertThrows(fn () => $up->start(0), 'leer');
+        $this->assertThrows(fn () => $up->start(UpdateUpload::MAX_BYTES + 1), 'höchstens');
+        $session = $up->start(10);
+        $id = $session['id'];
+        $this->assertThrows(fn () => $up->chunk($id, 0, base64_encode('NOZIP')), 'kein Update-Paket');
+        $this->assertSame(['received' => 6], $up->chunk($id, 0, base64_encode("PK\x03\x04ab")));
+        $this->assertSame(['received' => 6], $up->chunk($id, 0, base64_encode("PK\x03\x04ab")), 'letztes Stück noch einmal');
+        $this->assertThrows(fn () => $up->file($id), 'noch nicht vollständig');
+        $this->assertThrows(fn () => $up->chunk($id, 2, base64_encode('cd')), 'erwartet ab Byte 6');
+        $this->assertThrows(fn () => $up->chunk($id, 6, base64_encode('cdefg')), 'größer als angekündigt');
+        $up->chunk($id, 6, base64_encode('cdef'));
+        $path = $up->file($id);
+        $this->assertSame("PK\x03\x04abcdef", file_get_contents($path));
+        $this->assertStringStartsWith("{$this->dir}/i/", $path, 'im geschützten Bereich');
+        $up->remove($id);
+        $this->assertFileDoesNotExist($path);
+        $this->assertThrows(fn () => $up->chunk($id, 0, base64_encode('PK')), 'gibt es nicht');
+        $this->assertThrows(fn () => $up->file('../../etc/passwd'), 'gibt es nicht');
     }
 
     private function assertThrows(callable $fn, string $message): void

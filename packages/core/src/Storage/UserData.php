@@ -44,6 +44,8 @@ final class UserData
         'member_contacts' => 'user_id',
         // Fehlermeldungen (Issue #64) mit Namen, die noch nicht versandt sind; ohne Namen steht dort 0.
         'bug_reports' => 'user_id',
+        // Fehlermeldungen im Eingang der Admins, die die Person angemeldet geschickt hat
+        'report_inbox' => 'user_id',
         // Schwarzes Brett (Issue #172): Signatur, Einstellungen des Kontos, Mails an sie (mit Adresse)
         'user_signatures' => 'user_id',
         'user_settings' => 'user_id',

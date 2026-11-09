@@ -5,6 +5,7 @@ import brand from '../generated/brand';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
+import { confirmAsk } from '../ask';
 
 const sec = brand.labels.sections;
 
@@ -85,10 +86,6 @@ export function TitleList({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <div>
-      <p className="muted small">
-        Ehrentitel und Ämter, unabhängig von {sec.ranks} und {sec.points}. Ein Mitglied kann mehrere haben; du vergibst sie in den
-        Mitgliedsdetails. Die Reihenfolge hier gilt auch für die Anzeige; zum Ändern einen Titel am Griff links ziehen.
-      </p>
       {formError && (
         <p className="form-error" role="alert">
           {formError}
@@ -163,7 +160,7 @@ export function TitleList({ onToast }: { onToast: (msg: string) => void }) {
                       <button
                         className="btn btn-small btn-danger"
                         disabled={busy}
-                        onClick={() => window.confirm(`„${t.title}“ löschen?`) && run(() => api.deleteTitle(t.id), 'Gelöscht')}
+                        onClick={async () => (await confirmAsk(`„${t.title}“ löschen?`)) && run(() => api.deleteTitle(t.id), 'Gelöscht')}
                       >
                         Löschen
                       </button>

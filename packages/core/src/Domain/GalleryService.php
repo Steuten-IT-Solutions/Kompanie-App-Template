@@ -639,6 +639,9 @@ final class GalleryService
      */
     private function generateVideo(array $photo): bool
     {
+        if (self::isUpload($photo)) {
+            return $this->generateUploadedVideo($photo);
+        }
         if (!$this->source::isPlayableVideo((string) ($photo['mime'] ?? ''))) {
             $this->repo->updatePhoto((int) $photo['id'], ['status' => GalleryRepository::FAILED, 'error' => self::UNSUPPORTED_VIDEO, 'attempts' => self::MAX_ATTEMPTS]);
             return false;
@@ -650,6 +653,31 @@ final class GalleryService
             return false;
         }
         // Maße des Videos aus Drive behalten; nur ohne sie die des Vorschaubilds.
+        return $this->markReady($photo, (int) $photo['width'] > 0 ? null : $size);
+    }
+
+    /**
+     * In der App hochgeladenes Video (Issue #350): beide Größen aus dem Standbild, das der Browser beim Hochladen
+     * mitgeschickt hat. Ohne Standbild ist es gleich fertig (Kachel mit ▶); fehlt das Video selbst, gilt es als
+     * fehlgeschlagen.
+     */
+    private function generateUploadedVideo(array $photo): bool
+    {
+        $key = self::uploadKey($photo);
+        if ($this->media()->path($key) === null) {
+            return $this->markFailed($photo, 'Die hochgeladene Datei fehlt.');
+        }
+        $poster = $this->media()->posterPath($key);
+        $size = null;
+        if ($poster !== null) {
+            $this->repo->updatePhoto((int) $photo['id'], ['attempts' => (int) ($photo['attempts'] ?? 0) + 1]);
+            try {
+                $size = $this->render($photo, $poster);
+            } catch (\Throwable) {
+                $size = null; // Standbild unlesbar: ohne Vorschaubild
+            }
+        }
+        // Maße des Videos behalten (aus dem Browser); nur ohne sie die des Standbilds.
         return $this->markReady($photo, (int) $photo['width'] > 0 ? null : $size);
     }
 
@@ -879,6 +907,14 @@ final class GalleryService
                 return ['status' => $loggedIn ? 403 : 401];
             }
         }
+        if (self::isUpload($photo)) {
+            // In der App hochgeladen (Issue #350): aus der eigenen Ablage
+            $file = $this->media()->path(self::uploadKey($photo));
+            if ($file === null) {
+                return ['status' => 404];
+            }
+            return $this->deliverFile($file, (string) $photo['mime'], '"v' . md5((string) $photo['md5']) . '"', $intern, $range, $begin, $write);
+        }
         $total = (int) $photo['bytes'];
         $span = self::byteRange($range, $total);
         if ($span === null) {
@@ -921,6 +957,63 @@ final class GalleryService
         }
         if ($head === null) {
             return ['status' => 502];
+        }
+        return $streaming ? $head + ['sent' => true] : $head + ['body' => $body];
+    }
+
+    /**
+     * Ein Ausschnitt einer Videodatei auf dem eigenen Server (Issue #350), Antwort wie bei deliverVideo (206, höchstens
+     * VIDEO_CHUNK Bytes, 416 hinter dem Ende). Die Rechte prüft der Aufrufer.
+     *
+     * @param (\Closure(array{status: int, contentRange: string, length: int, mime: string, etag: string, intern: bool}): void)|null $begin
+     * @param (\Closure(string): bool)|null $write
+     * @return array{status: int, body?: string, sent?: bool, length?: int, contentRange?: string, mime?: string, etag?: string, intern?: bool, retryAfter?: int}
+     */
+    public function deliverFile(string $file, string $mime, string $etag, bool $intern, ?string $range, ?\Closure $begin = null, ?\Closure $write = null): array
+    {
+        $total = (int) @filesize($file);
+        if ($total < 1) {
+            return ['status' => 404];
+        }
+        $span = self::byteRange($range, $total);
+        if ($span === null) {
+            return ['status' => 416, 'contentRange' => 'bytes */' . $total];
+        }
+        [$start, $end] = $span;
+        $end = min($end, $start + self::VIDEO_CHUNK - 1);
+        $fp = @fopen($file, 'rb');
+        if ($fp === false || fseek($fp, $start) !== 0) {
+            return ['status' => 404];
+        }
+        $head = [
+            'status' => 206,
+            'contentRange' => 'bytes ' . $start . '-' . $end . '/' . $total,
+            'length' => $end - $start + 1,
+            'mime' => $mime,
+            'etag' => $etag,
+            'intern' => $intern,
+        ];
+        $streaming = $begin !== null && $write !== null;
+        $body = '';
+        try {
+            if ($streaming) {
+                $begin($head);
+            }
+            $left = $end - $start + 1;
+            while ($left > 0 && !feof($fp)) {
+                $chunk = fread($fp, min(262144, $left));
+                if ($chunk === false || $chunk === '') {
+                    break;
+                }
+                $left -= strlen($chunk);
+                if (!$streaming) {
+                    $body .= $chunk;
+                } elseif (!$write($chunk)) {
+                    break; // Der Browser hat aufgelegt.
+                }
+            }
+        } finally {
+            fclose($fp);
         }
         return $streaming ? $head + ['sent' => true] : $head + ['body' => $body];
     }
@@ -1174,8 +1267,8 @@ final class GalleryService
         return $out;
     }
 
-    /** Vorschaubild; null bei einem fertigen Video ohne Vorschaubild (Drive hatte keines). */
-    private function thumbUrl(array $photo, string $size = 'thumb'): ?string
+    /** Vorschaubild; null bei einem fertigen Video ohne Vorschaubild (Drive hatte keines, kein Standbild). */
+    public function thumbUrl(array $photo, string $size = 'thumb'): ?string
     {
         if (self::isVideoRow($photo) && $photo['status'] === GalleryRepository::READY && !is_file($this->path($photo, $size))) {
             return null;
@@ -1213,6 +1306,8 @@ final class GalleryService
                 'width' => (int) $ph['width'],
                 'height' => (int) $ph['height'],
                 'intern' => (bool) (int) $ph['is_intern'],
+                // in der App hochgeladen: intern/öffentlich in der App umstellbar (aus Drive nur über den Ordner)
+                'upload' => self::isUpload($ph),
                 'name' => (string) $ph['name'],
                 'ready' => $ph['status'] === GalleryRepository::READY,
             ] : [
@@ -1225,6 +1320,8 @@ final class GalleryService
                 'width' => (int) $ph['width'],
                 'height' => (int) $ph['height'],
                 'intern' => (bool) (int) $ph['is_intern'],
+                // in der App hochgeladen: intern/öffentlich in der App umstellbar (aus Drive nur über den Ordner)
+                'upload' => self::isUpload($ph),
                 'name' => (string) $ph['name'],
                 // noch nicht aufbereitet: Die Adressen erzeugen das Bild oder liefern vorerst einen Platzhalter (202)
                 'ready' => $ph['status'] === GalleryRepository::READY,

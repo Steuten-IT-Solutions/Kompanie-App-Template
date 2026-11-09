@@ -1,15 +1,15 @@
 ---
-titel: "{bereich.points}katalog"
+titel: "{bereich.catalog}"
 reihenfolge: 50
 rechte: [manage_points]
 bereiche: [points]
 ---
-Im {bereich.points}katalog legst du häufige Anlässe mit ihrer Punktzahl als Vorlage an, z. B. „Arbeitsdienst – 4“. Beim Vergeben wählst du dann nur noch die Vorlage, statt Punktzahl und Grund jedes Mal einzutippen.
+Im {bereich.catalog} legst du häufige Anlässe mit ihrer Punktzahl als Vorlage an, z. B. „Arbeitsdienst – 4“. Beim Vergeben wählst du dann nur noch die Vorlage, statt Punktzahl und Grund jedes Mal einzutippen.
 
-![Der {bereich.points}katalog mit aktiven und deaktivierten Vorlagen](bild:punktekatalog)
+![Der {bereich.catalog} mit aktiven und deaktivierten Vorlagen](bild:punktekatalog)
 
 ## So öffnest du die Seite
-Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{bereich.points}katalog**. Mit **‹ Einrichtungen** kommst du zurück.
+Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{bereich.catalog}**. Mit **‹ Einrichtungen** kommst du zurück.
 
 ## Was du hier siehst
 - **Neue Vorlage** und **{bereich.points}**: das Formular für eine neue Vorlage, mit dem Knopf **Hinzufügen**.

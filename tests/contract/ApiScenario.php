@@ -367,7 +367,8 @@ final class ApiScenario
         $this->d->actAs($this->m1);
         $c->ok($this->req('GET', '/catalog')[0] === 403 && $this->req('GET', '/ranks')[0] === 200, 'Mitglied: Katalog 403, Dienstgrade weiter 200');
         $this->d->actAs($admin);
-        $c->ok($this->req('PATCH', '/admin/roles/member', ['capabilities' => [...$memberCaps, 'manage_points']])[0] === 400, 'Mitglied: nur Rechte zum Sehen → 400');
+        $c->ok($this->req('PATCH', '/admin/roles/member', ['capabilities' => [...$memberCaps, 'manage_points']])[0] === 200, 'Mitglied: auch Rechte zum Verwalten');
+        $c->ok($this->req('PATCH', '/admin/roles/member', ['capabilities' => $memberCaps])[0] === 200, 'Mitglied wieder wie vorher');
         $c->ok($this->req('PATCH', '/admin/roles/member', ['capabilities' => array_values(array_diff($memberCaps, ['member']))])[0] === 400, 'Mitglied ohne Mitgliedschaft → 400');
         $c->ok($this->req('PATCH', '/admin/roles/guest', ['capabilities' => [...$guestCaps, 'member']])[0] === 400, 'Gast mit Mitgliedschaft → 400');
         [$s] = $this->req('PATCH', '/admin/roles/guest', ['capabilities' => [...array_values(array_diff($guestCaps, ['view_directory'])), 'view_ranks']]);
@@ -732,8 +733,9 @@ final class ApiScenario
             $this->users[] = $u['id'];
         }
         $c->ok($s === 201 && ($u['level'] ?? '') === $this->anw, 'Konto als Anwärter anlegen');
-        $c->ok($this->req('POST', '/users', ['name' => 'X', 'level' => 'admin'])[0] === 400, 'Neues Konto als Admin → 400');
-        $c->ok($this->req('POST', '/users', ['name' => 'X', 'level' => $this->leitung])[0] === 400, 'Rolle nicht für neue Konten freigegeben → 400');
+        $c->ok($this->req('POST', '/users', ['name' => 'X', 'level' => 'admin'])[0] === 403, 'Neues Konto als Admin ohne Admin-Rechte → 403');
+        $c->ok($this->req('POST', '/users', ['name' => 'X', 'level' => $this->leitung])[0] === 403, 'Rolle nicht für neue Konten freigegeben, ohne Rollen vergeben → 403');
+        $c->ok($this->req('POST', '/users', ['name' => 'X', 'level' => 'gibtsnicht'])[0] === 400, 'Unbekannte Rolle → 400');
         $c->ok($this->req('POST', '/members/' . ($u['id'] ?? 0) . '/password')[0] === 200, 'Passwort eines Anwärters zurücksetzen');
         $list = array_column((array) $this->req('GET', '/members')[1], 'level', 'id');
         $withCand = array_column((array) $this->req('GET', '/members', [], ['candidates' => '1'])[1], 'level', 'id');
@@ -1010,7 +1012,34 @@ final class ApiScenario
             $c->ok($s === 200 && isset($byId[$pubId]) && !isset($byId[$id]), "$label: nur die öffentliche Nachricht");
             $c->ok(isset($byId[$pubId]) && !array_key_exists('last_edit', $byId[$pubId]) && !array_key_exists('mail', $byId[$pubId]), "$label: ohne Angaben für Schreibende");
         }
+        // Einzeln: nur die ausgewählte Person (und post_board)
         $this->d->actAs($admin);
+        [$s, $opts] = $this->req('GET', '/board/audiences');
+        $c->ok($s === 200 && in_array($cand, array_column((array) ($opts['people'] ?? []), 'id'), true) && !in_array($guest, array_column((array) ($opts['people'] ?? []), 'id'), true), 'Auswahl Einzeln: wer das Brett liest, ohne Gäste');
+        $c->ok($this->req('POST', '/board', ['title' => 'Kptest', 'text' => 'x', 'audience' => 'person', 'audience_ids' => []])[0] === 400, 'Einzeln ohne Auswahl → 400');
+        $c->ok($this->req('POST', '/board', ['title' => 'Kptest', 'text' => 'x', 'audience' => 'person', 'audience_ids' => [$guest]])[0] === 400, 'Einzeln für Gast-Konto → 400');
+        [$s, $one] = $this->req('POST', '/board', ['title' => "Kptest einzeln $sfx", 'text' => '<p>Kptest nur du</p>', 'audience' => 'person', 'audience_ids' => [$cand], 'push' => false, 'mail' => false]);
+        $oneId = (int) ($one['id'] ?? 0);
+        $c->ok($s === 201 && ($one['audience'] ?? '') === 'person' && ($one['audience_ids'] ?? null) === [$cand], 'Nachricht für eine Person');
+        foreach ([[$cand, true, 'Ausgewählte Person'], [$m, false, 'Anderes Mitglied'], [null, false, 'Ohne Anmeldung'], [$admin, true, 'post_board']] as [$who, $sees, $label]) {
+            $this->d->actAs($who);
+            [, $d] = $this->req('GET', '/board');
+            $c->ok(in_array($oneId, array_column((array) ($d['items'] ?? []), 'id'), true) === $sees, "Einzeln: $label " . ($sees ? 'sieht sie' : 'sieht sie nicht'));
+        }
+        $this->d->actAs($admin);
+        $this->req('DELETE', "/board/$oneId");
+        // Blöcke: nur für Mitglieder fehlen bei öffentlichen Nachrichten ohne Anmeldung
+        [$s, $d] = $this->req('PATCH', "/board/$pubId", ['blocks' => [
+            ['type' => 'text', 'html' => '<p>Kptest für alle</p>'],
+            ['type' => 'countdown', 'source' => 'date', 'date' => '2099-01-01'],
+            ['type' => 'text', 'audience' => 'members', 'html' => '<p>Kptest intern</p>'],
+        ]]);
+        $c->ok($s === 200 && array_column((array) ($d['blocks'] ?? []), 'type') === ['text', 'countdown', 'text'] && ($d['text'] ?? '') === '<p>Kptest für alle</p>', 'Nachricht aus Blöcken speichern');
+        $this->d->actAs(null);
+        $byId = array_column((array) ($this->req('GET', '/board')[1]['items'] ?? []), null, 'id');
+        $c->ok(array_column((array) ($byId[$pubId]['blocks'] ?? []), 'type') === ['text', 'countdown'], 'Brett ohne Anmeldung ohne Block nur für Mitglieder');
+        $this->d->actAs($admin);
+        $c->ok($this->req('PATCH', "/board/$pubId", ['blocks' => [['type' => 'text', 'html' => '<p></p>']]])[0] === 400, 'Nachricht nur aus leeren Blöcken → 400');
         [$s, $edited] = $this->req('PATCH', "/board/$pubId", ['audience' => 'members']);
         $c->ok($s === 200 && ($edited['audience'] ?? '') === 'members', 'Sichtbarkeit geändert');
         $this->d->actAs(null);
@@ -1410,7 +1439,7 @@ final class ApiScenario
 
     /**
      * Kompanien (Issue #280): Liste für alle mit view_companies, Pflege und Zuordnung mit manage_companies, Logo mit eigener
-     * Adresse, Mitglieder einer Kompanie nur mit Mitgliederliste, Kompanien je Person in der Mitgliederliste.
+     * Adresse, Mitglieder einer Kompanie nur mit dem Bereich Mitgliederliste (und view_directory), Kompanien je Person in der Mitgliederliste.
      */
     private function companies(): void
     {
@@ -1440,6 +1469,12 @@ final class ApiScenario
         $c->ok($s === 200 && array_column((array) ($d['companies'] ?? []), 'id') === [$mine[1], $mine[0]], 'Person zwei Kompanien zuordnen (Reihenfolge der Liste)');
         [$s, $d] = $this->req('PATCH', "/companies/{$mine[1]}", ['active' => false]);
         $c->ok($s === 200 && ($d['active'] ?? null) === false && ($d['member_ids'] ?? null) === [$m], 'Als aufgelöst markieren, Zuordnung bleibt');
+        $byId = array_column((array) $this->req('GET', '/companies')[1], null, 'id');
+        $c->ok(array_column((array) ($byId[$mine[0]]['members'] ?? []), 'id') === [$m] && ($byId[$mine[0]]['member_count'] ?? null) === 1, 'Mitglieder der Kompanie mit Mitgliederliste');
+        $this->req('PUT', '/admin/features', ['directory' => false]);
+        $byId = array_column((array) $this->req('GET', '/companies')[1], null, 'id');
+        $c->ok(!array_key_exists('members', (array) ($byId[$mine[0]] ?? [])) && !array_key_exists('member_count', (array) ($byId[$mine[0]] ?? [])) && ($byId[$mine[0]]['member_ids'] ?? null) === [$m], 'Mitgliederliste aus → keine Mitglieder auf der Kompanieseite, Zuordnung bleibt');
+        $this->req('PUT', '/admin/features', ['directory' => true]);
         $dir = array_column((array) $this->req('GET', '/directory')[1], null, 'id');
         $c->ok(array_column((array) ($dir[$m]['companies'] ?? []), 'id') === [$mine[1], $mine[0]], 'Kompanien in der Mitgliederliste');
         [, $roles] = $this->req('GET', '/admin/roles');
@@ -1521,6 +1556,15 @@ final class ApiScenario
         $c->ok($s === 200 && ($d['title'] ?? '') === 'Kptest Beitrag geändert', 'Mit aktuellem Stand speichern');
         [$s, $d] = $this->req('PATCH', '/news/' . $id, ['title' => 'Zu spät', 'updated_at' => '2000-01-01T00:00:00Z']);
         $c->ok($s === 409 && ($d['code'] ?? '') === 'conflict', 'Veralteter Stand → 409 conflict');
+        [$s, $d] = $this->req('PATCH', '/news/' . $id, ['blocks' => [
+            ['type' => 'text', 'html' => '<p>Kptest offen</p>'],
+            ['type' => 'countdown', 'date' => '2099-06-12'],
+            ['type' => 'text', 'audience' => 'members', 'html' => '<p>Kptest intern</p>'],
+        ]]);
+        $c->ok($s === 200 && count((array) ($d['blocks'] ?? [])) === 3 && ($d['content'] ?? '') === '<p>Kptest offen</p>', 'Beitrag aus Blöcken speichern');
+        $this->d->actAs(null);
+        $c->ok(array_column((array) ($this->req('GET', '/news/' . $id)[1]['blocks'] ?? []), 'type') === ['text', 'countdown'], 'Ohne Anmeldung ohne Block nur für Mitglieder');
+        $this->d->actAs($admin);
         $c->ok($this->req('DELETE', '/news/' . $id)[0] === 200 && $this->req('GET', '/news/' . $id)[0] === 404, 'Beitrag löschen');
         [$s] = $this->req('PATCH', '/admin/settings', ['news_source' => $before]);
         [$s2, $d] = $this->req('POST', '/news', ['title' => 'X']);
@@ -1567,6 +1611,26 @@ final class ApiScenario
         [, $d] = $this->req('GET', '/admin/navigation');
         $c->ok(($d['navigation']['items'][1]['items'] ?? null) === ['seiten/' . ($pub['id'] ?? 0)], 'Gelöschte Seite fällt aus der Navigation');
         $this->req('PUT', '/admin/navigation', ['navigation' => null]);
+        // Blöcke: Text und Countdown, ein Block nur für Mitglieder; body nur mit dem Text für alle
+        [$s, $d] = $this->req('PATCH', '/pages/' . ($pub['id'] ?? 0), ['blocks' => [
+            ['type' => 'text', 'html' => '<p>Kptest offen</p>'],
+            ['type' => 'countdown', 'title' => 'Kptest bis zum Fest', 'date' => '2099-06-12', 'time' => '14:00'],
+            ['type' => 'text', 'audience' => 'members', 'html' => '<p>Kptest intern</p>'],
+        ]]);
+        $c->ok($s === 200 && array_column((array) ($d['blocks'] ?? []), 'type') === ['text', 'countdown', 'text'] && ($d['body'] ?? '') === '<p>Kptest offen</p>', 'Seite aus Blöcken speichern');
+        $c->ok(($d['blocks'][1]['starts_at'] ?? '') === '2099-06-12T12:00:00Z', 'Countdown: Ortszeit der Installation als UTC');
+        $c->ok($this->req('PATCH', '/pages/' . ($pub['id'] ?? 0), ['blocks' => [['type' => 'video']]])[0] === 400, 'Unbekannter Block → 400');
+        $c->ok($this->req('PATCH', '/pages/' . ($pub['id'] ?? 0), ['blocks' => [['type' => 'button', 'label' => 'X', 'url' => 'javascript:alert(1)']]])[0] === 400, 'Knopf mit unsicherem Ziel → 400');
+        [$s, $k] = $this->req('POST', '/pages', ['title' => 'Kptest Knopf', 'blocks' => [['type' => 'button', 'label' => 'Termine', 'url' => '#/termine'], ['type' => 'events', 'count' => 2]]]);
+        $c->ok($s === 201 && ($k['blocks'][0]['url'] ?? '') === '#/termine' && is_array($k['blocks'][1]['events'] ?? null) && count($k['blocks'][1]['events']) <= 2, 'Knopf und Nächste Termine');
+        $this->req('DELETE', '/pages/' . ($k['id'] ?? 0));
+        $this->d->actAs(null);
+        [, $d] = $this->req('GET', '/pages/' . ($pub['id'] ?? 0));
+        $c->ok(array_column((array) ($d['blocks'] ?? []), 'type') === ['text', 'countdown'], 'Ohne Anmeldung ohne Block nur für Mitglieder');
+        $this->d->actAs($m);
+        [, $d] = $this->req('GET', '/pages/' . ($pub['id'] ?? 0));
+        $c->ok(count((array) ($d['blocks'] ?? [])) === 3, 'Mitglied sieht auch den Block für Mitglieder');
+        $this->d->actAs($admin);
         $c->ok($this->req('DELETE', '/pages/' . ($pub['id'] ?? 0))[0] === 200 && $this->req('GET', '/pages/' . ($mem['id'] ?? 0))[0] === 404, 'Aufräumen: Seiten löschen');
     }
 
@@ -1844,7 +1908,7 @@ final class ApiScenario
         // Mitglieder aus einer Tabelle, mit Ehemaligen (POST /members/import)
         $csv = "Nachname;Vorname;Status;E-Mail;Eintritt;Ausgeschieden;Telefon\nImport$sfx;Kptest;;kptest$sfx@example.org;1999;;0\nAlt$sfx;Kptest;ehemalig;;Gründer;2001;\n";
         [$s, $d] = $this->req('POST', '/members/import', ['csv' => $csv]);
-        $c->ok($s === 200 && ($d['new'] ?? null) === ['active' => 1, 'former' => 1] && ($d['columns']['ignored'][0]['column'] ?? '') === 'Telefon', 'Mitglieder-Import: Vorschau');
+        $c->ok($s === 200 && ($d['new'] ?? null) === ['active' => 1, 'former' => 1, 'no_access' => 0] && ($d['columns']['ignored'][0]['column'] ?? '') === 'Telefon', 'Mitglieder-Import: Vorschau');
         [$s, $d] = $this->req('POST', '/members/import', ['csv' => $csv, 'apply' => true]);
         $created = (array) ($d['created'] ?? []);
         foreach ($created as $u) {
@@ -1857,6 +1921,19 @@ final class ApiScenario
         $c->ok($s === 200 && count($created) === 1 && ($created[0]['password'] ?? '') !== '' && count($former) === 1 && ($former[0]['founder'] ?? false) === true, 'Mitglieder-Import: Mitglied mit Startpasswort, Ehemaliger ohne');
         [$s, $d] = $this->req('POST', '/members/import', ['csv' => $csv, 'apply' => true]);
         $c->ok($s === 200 && ($d['existing'] ?? 0) === 2 && ($d['created'] ?? null) === [], 'Mitglieder-Import: zweiter Lauf legt nichts doppelt an');
+        // Mitglied ohne Zugang (z. B. für Chroniken): kein Startpasswort, später „Zugang einrichten“
+        [$s, $d] = $this->req('POST', '/users', ['first_name' => 'Kptest', 'last_name' => "Ohne$sfx", 'no_access' => true]);
+        $noAccess = (int) ($d['id'] ?? 0);
+        if ($noAccess > 0) {
+            $this->users[] = $noAccess;
+        }
+        $c->ok($s === 201 && ($d['no_access'] ?? false) === true && !isset($d['password']), 'Mitglied ohne Zugang anlegen: ohne Startpasswort');
+        [, $d] = $this->req('GET', "/members/$noAccess");
+        $c->ok(($d['no_access'] ?? null) === true, 'Mitglied ohne Zugang: Marke in den Details');
+        [$s, $d] = $this->req('POST', "/members/$noAccess/password");
+        $c->ok($s === 200 && ($d['password'] ?? '') !== '' && ($d['username'] ?? '') !== '', 'Zugang einrichten: Startpasswort mit Benutzername');
+        [, $d] = $this->req('GET', "/members/$noAccess");
+        $c->ok(($d['no_access'] ?? null) === false, 'Nach „Zugang einrichten“ hat das Mitglied Zugang');
     }
 
     private function events(): void

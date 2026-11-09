@@ -1,5 +1,6 @@
-import type { Sponsor } from '../api';
+import { can, type Sponsor } from '../api';
 import brand from '../generated/brand';
+import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 
@@ -21,9 +22,14 @@ export function SponsorLogo({ sponsor }: { sponsor: Sponsor }) {
 export default function Sponsoren() {
   const { data, error, loading, reload } = useAsync(sources.sponsors.load, sources.sponsors.deps, sources.sponsors.key);
   if (loading && !data) return <Loading />;
-  if (error || !data) return <ErrorBox message={error ?? 'Die Sponsoren konnten nicht geladen werden.'} onRetry={reload} />;
+  if (error || !data) return <ErrorBox message={error ?? 'Die Einträge konnten nicht geladen werden.'} onRetry={reload} />;
   return (
     <div>
+      {can('manage_sponsors') && (
+        <button type="button" className="btn btn-secondary btn-block manage-events" onClick={() => navigate('verwaltung/sponsoren')}>
+          {sec.sponsors} verwalten
+        </button>
+      )}
       {data.length === 0 ? (
         <Empty>Noch keine {sec.sponsors}.</Empty>
       ) : (

@@ -12,7 +12,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Zustand und
 
 ## Was du hier siehst
 ### Zustand der App
-Eine Ampel mit einer Zeile je Thema. Jede Zeile sagt in einem kurzen Text, was los ist und was zu tun ist.
+Eine Ampel mit einer Zeile je Thema. Jede Zeile sagt in einem kurzen Text, was los ist und was zu tun ist. Ist alles in Ordnung oder ein Thema nicht eingerichtet, steht nur der Name des Themas da; den kurzen Text zeigt die App, wenn etwas zu tun ist (gelb oder rot). Was die einzelnen Themen bedeuten, steht hier darunter.
 - **Updates**: ob die App aktuell ist, ob ein Update ansteht oder fehlgeschlagen ist.
 - **{bereich.gallery}**: wann der letzte Abgleich mit Google Drive war, ob er geklappt hat und ob Bilder noch aufbereitet werden oder sich nicht laden ließen.
 - **Kalender**: ob und wie der Kalender eingerichtet ist und ob die Verbindung mit Google ihn lesen darf.
@@ -31,6 +31,7 @@ Die Farben: **Grün** heißt alles in Ordnung. **Gelb** heißt, etwas sollte erl
 - **Nach Updates suchen** und **Zustand neu laden**.
 - **Updates automatisch einspielen (empfohlen)** und **Vorabversionen erhalten (zum Testen)**.
 - **Auf eine ältere Version zurück**: zum Aufklappen, wenn es frühere Versionen gibt.
+- **Update-Paket hochladen**: zum Aufklappen, wenn du ein Update als Datei einspielen willst.
 - **Statusmeldungen an die Betreuer der App senden**: nur, wenn eure App Statusmeldungen vorsieht.
 
 ### Fehlerprotokoll
@@ -72,6 +73,14 @@ Eine neue Hauptversion spielt die App nie automatisch ein. Vorher sichert sie di
 3. Tippe auf **Zurückrollen** und bestätige die Rückfrage.
 
 Die Version, von der du kommst, spielt die App danach nicht mehr automatisch ein, erst wieder die nächste neuere.
+
+### Ein Update als Datei hochladen
+So spielst du eine bestimmte Version ein, ohne dass der Server sie selbst lädt, z. B. eine Vorabversion zum Testen oder wenn der Server die Pakete nicht laden kann.
+1. Lade das Paket der Version herunter: `kompanie-app-standalone.zip` für die eigenständige App, `kompanie-app-wordpress.zip` für das WordPress-Plugin (von der Download-Seite eurer App oder von den Betreuern). Pack es nicht aus.
+2. Tippe auf **Update-Paket hochladen** und dann auf **Paket wählen …** und wähle die Datei. Ein Zähler zeigt, wie weit das Hochladen ist.
+3. Die App sagt, welche Version in der Datei steckt, und ob sie älter als die installierte oder noch nicht für alle freigegeben ist. Bestätige die Rückfrage.
+
+Danach geht es weiter wie beim normalen Update: erst sichern, dann einspielen, dann lädt die App neu. Die App spielt nur ein unverändertes Paket ein, das in der geprüften Update-Liste eurer App steht. Eine veränderte Datei, ein Paket einer anderen App oder eine zurückgezogene Version lehnt sie ab.
 
 ### Das Fehlerprotokoll an die Betreuer schicken
 1. Sieh das Protokoll kurz durch: Fehlertexte können Namen oder Inhalte enthalten.

@@ -28,7 +28,9 @@ use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Domain\GallerySubmissionService;
 use KompanieApp\Core\Domain\NewsService;
 use KompanieApp\Core\Domain\PageService;
+use KompanieApp\Core\Domain\Blocks\Blocks;
 use KompanieApp\Core\Domain\GalleryUploadService;
+use KompanieApp\Core\Domain\VideoUploadService;
 use KompanieApp\Core\Domain\GoogleConnect;
 use KompanieApp\Core\Domain\JoinYearService;
 use KompanieApp\Core\Domain\MemberImportService;
@@ -84,6 +86,7 @@ use KompanieApp\Core\Storage\CatalogRepository;
 use KompanieApp\Core\Storage\EventRepository;
 use KompanieApp\Core\Storage\GalleryRepository;
 use KompanieApp\Core\Storage\MemberContactRepository;
+use KompanieApp\Core\Storage\UserSettings;
 use KompanieApp\Core\Storage\MemberRoleRepository;
 use KompanieApp\Core\Storage\PenaltyRepository;
 use KompanieApp\Core\Storage\PointRepository;
@@ -95,6 +98,7 @@ use KompanieApp\Core\Telemetry\Detail;
 use KompanieApp\Core\Telemetry\Telemetry;
 use KompanieApp\Core\Update\StatusReporter;
 use KompanieApp\Core\Update\UpdateService;
+use KompanieApp\Core\Update\UpdateUpload;
 
 /**
  * Setzt den Kern aus den Umsetzungen der Ports zusammen, die ein Adapter liefert.
@@ -172,6 +176,11 @@ final class App
         $this->preview = new Preview($authContext, fn (): RoleService => $this->roles());
         $this->authContext = $this->preview;
         $this->env = new PreviewEnvironment($env, $this->preview);
+        // Eigene Bereichsnamen der Installation (Issue #362) gehen überall vor kompanie.json.
+        $config->overrideSections(fn (): array => $this->navigation()->sectionOverrides(
+            $this->features()->enabled('directory'),
+            $this->features()->enabled('offices'),
+        ));
     }
 
     /**
@@ -228,6 +237,12 @@ final class App
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Einreichungen der Galerie nicht eingerichtet: ' . $e->getMessage());
         }
+        // Fehlermeldungen zuerst an die Admins: Benachrichtigungen dazu einmalig auf bestehenden Geräten einschalten
+        try {
+            $this->bugReports()->initialize();
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Eingang der Fehlermeldungen nicht eingerichtet: ' . $e->getMessage());
+        }
         // Die laufende Version festhalten: Fehlt später die Datei VERSION, weiß der Installer trotzdem,
         // welche Hauptversion installiert ist (auch nach einem abgebrochenen oder händischen Wechsel).
         // Reine Hilfsinformation: Ein Fehler beim Schreiben darf keinen Aufruf scheitern lassen.
@@ -278,8 +293,9 @@ final class App
             PollService::TASK => $this->features()->enabled('polls'),
             // Geburtstage: stündlich, benachrichtigt aber erst ab der eingestellten Stunde (Standard 7 Uhr) Ortszeit und je Geburtstag einmal am Tag.
             BirthdayService::TASK => $this->features()->enabled('birthdays'),
-            // Fehlermeldungen (Issue #64): stündlich als Rückfall, nach dem Einreihen vorgezogen; nur mit Empfänger.
-            BugReportService::TASK => $this->bugReports()->available(),
+            // Fehlermeldungen (Issue #64): stündlich als Rückfall, nach dem Weiterleiten vorgezogen; räumt auch ohne
+            // Empfänger den Eingang auf (erledigte Meldungen nach 30 Tagen).
+            BugReportService::TASK => true,
             // Sicherung in Google Drive: täglich prüfen, wöchentlich hochladen.
             BackupUploadService::TASK => $this->backupUpload()->active(),
             // Nutzungsauswertung (Issue #175): täglich Einträge je Person nach 90 Tagen und Pseudonyme nach 31 Tagen löschen.
@@ -327,12 +343,14 @@ final class App
             } elseif ($task === GalleryService::PROCESS_TASK && $this->features()->enabled('gallery')) {
                 $this->gallery()->runProcessTask(25);
                 $this->gallerySubmissions()->pruneOrphans();
+                $this->videoUploads()->prune();
             } elseif ($task === CalendarService::TASK && $this->features()->enabled('calendar')) {
                 $error = $this->calendar()->refreshIfStale();
                 if ($error !== null) {
                     $this->telemetry()->record(Code::CalendarFetch, Detail::of($this->calendar()->source(), Detail::fromMessage($error)), $error);
                 }
             } elseif ($task === UpdateService::TASK) {
+                $this->updateUploads()->prune();
                 $this->updates()->runTask();
             } elseif ($task === StatusReporter::TASK) {
                 $this->statusReporter()->runTask();
@@ -686,6 +704,7 @@ final class App
             fn (User $user): ?string => $this->formerMembers()->previousRole($user),
             $this->memberContacts(),
             $this->time(),
+            new UserSettings($this->db),
         ));
     }
 
@@ -828,6 +847,24 @@ final class App
     public function pages(): PageService
     {
         return $this->service(PageService::class, fn () => new PageService($this));
+    }
+
+    /** Vorgefertigte Blöcke (eigene Seiten): Typen, Prüfung, Ausgabe. */
+    public function blocks(): Blocks
+    {
+        return $this->service(Blocks::class, fn () => new Blocks($this));
+    }
+
+    /** Update-Paket in Stücken hochladen (statt es herunterzuladen) */
+    public function updateUploads(): UpdateUpload
+    {
+        return $this->service(UpdateUpload::class, fn () => new UpdateUpload($this->files, $this->time()));
+    }
+
+    /** Videos in Stücken hochladen (Issue #350) */
+    public function videoUploads(): VideoUploadService
+    {
+        return $this->service(VideoUploadService::class, fn () => new VideoUploadService($this));
     }
 
     public function gallerySubmissions(): GallerySubmissionService

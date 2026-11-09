@@ -7,6 +7,8 @@ namespace KompanieApp\Core\Domain;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
+use KompanieApp\Core\Domain\Blocks\Blocks;
+use KompanieApp\Core\Domain\Blocks\TextBlock;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Storage\BoardRepository;
 
@@ -17,6 +19,10 @@ use KompanieApp\Core\Storage\BoardRepository;
  *   alle, auch ohne Anmeldung, wie bei eigenen Seiten). Das wählt, wer schreibt; ändern lässt es sich, solange sie gilt.
  *   Bestehende Nachrichten sind intern. Öffentlich sichtbar sind nur Titel, Inhalt, Anhänge, Zeiten und der Name des
  *   Verfassers; wer zuletzt geändert hat, der Mailversand und der Verlauf bleiben bei post_board.
+ * - Enger als intern: nur für bestimmte Kompanien (audience company: wer das Brett liest und einer davon angehört,
+ *   Kompanieliste) oder für bestimmte Personen (audience person: nur diese, sofern sie das Brett lesen). Die IDs stehen in
+ *   audience_ids (mindestens eine). Alle mit post_board sehen auch diese Nachrichten (sie dürfen sie ändern und löschen).
+ *   Benachrichtigung und Mail gehen nur an die, die die Nachricht lesen dürfen (readerIds).
  *
  * - Schreiben, ändern und vorzeitig löschen darf, wer das Recht post_board hat (nicht nur, wer sie geschrieben hat).
  * - Jede Nachricht hat einen Titel (reiner Text, ohne Längengrenze; Banner, Push und Betreff der Mail) und formatierten
@@ -45,11 +51,17 @@ final class BoardService
 {
     public const LIFETIME = 86400;
     public const HISTORY_KEEP_DAYS = 30;
+    /** Höchstlänge des Texts aller Textblöcke zusammen (Bytes; mit Blöcken, Domain\Blocks\Blocks). */
+    public const BODY_MAX = 1000000;
     public const TASK = 'board_cleanup';
     public const KIND_MESSAGE = 'message';
     public const AUDIENCE_PUBLIC = 'public';
     public const AUDIENCE_MEMBERS = 'members';
-    public const AUDIENCES = [self::AUDIENCE_MEMBERS, self::AUDIENCE_PUBLIC];
+    public const AUDIENCE_COMPANY = 'company';
+    public const AUDIENCE_PERSON = 'person';
+    public const AUDIENCES = [self::AUDIENCE_MEMBERS, self::AUDIENCE_PUBLIC, self::AUDIENCE_COMPANY, self::AUDIENCE_PERSON];
+    /** Sichtbarkeiten mit ausgewählten Kompanien bzw. Personen (audience_ids) */
+    public const TARGETED = [self::AUDIENCE_COMPANY, self::AUDIENCE_PERSON];
 
     public const REV_CREATED = 'created';
     public const REV_TITLE = 'title';
@@ -61,6 +73,8 @@ final class BoardService
     public const REV_AUDIENCE = 'audience';
 
     private ?BoardRepository $repo = null;
+    /** @var array<int, list<int>> Konto => Kompanien (für canRead, je Anfrage einmal gelesen) */
+    private array $companiesOf = [];
 
     public function __construct(private readonly App $app)
     {
@@ -81,12 +95,74 @@ final class BoardService
     }
 
     /**
-     * Darf $viewer (null = ohne Anmeldung) eine Nachricht mit dieser audience lesen? Öffentliche alle, interne die
-     * Empfänger (isRecipient), alle mit post_board ohnehin.
+     * Darf $viewer (null = ohne Anmeldung) diese Nachricht lesen? Öffentliche alle, interne die Empfänger (isRecipient),
+     * die für Kompanien die Empfänger, die einer davon angehören, die für Personen nur diese (sofern Empfänger); alle mit
+     * post_board ohnehin. Die einzige Stelle für diese Regel (Liste, Bilder, Anhänge).
+     *
+     * @param array{audience: string, audience_ids: list<int>} $message
      */
-    public static function canRead(?User $viewer, string $audience): bool
+    public function canRead(?User $viewer, array $message): bool
     {
-        return $audience === self::AUDIENCE_PUBLIC || self::isRecipient($viewer) || ($viewer !== null && $viewer->can(Capability::PostBoard));
+        if ($message['audience'] === self::AUDIENCE_PUBLIC || ($viewer !== null && $viewer->can(Capability::PostBoard))) {
+            return true;
+        }
+        if (!self::isRecipient($viewer)) {
+            return false;
+        }
+        /** @var User $viewer */
+        return match ($message['audience']) {
+            self::AUDIENCE_PERSON => in_array($viewer->id, $message['audience_ids'], true),
+            self::AUDIENCE_COMPANY => array_intersect($message['audience_ids'], $this->companiesOf[$viewer->id] ??= $this->app->companies()->repository()->companyIdsOf($viewer->id)) !== [],
+            default => true,
+        };
+    }
+
+    /**
+     * Wer eine Nachricht für Kompanien oder Personen bekommt (Benachrichtigung, Mail): Konto-IDs vor der Prüfung auf
+     * isRecipient, die Push und Mail ohnehin machen; null bei intern und öffentlich (keine Einschränkung).
+     *
+     * @param array{audience: string, audience_ids: list<int>} $message
+     * @return list<int>|null
+     */
+    public function readerIds(array $message): ?array
+    {
+        return match ($message['audience']) {
+            self::AUDIENCE_PERSON => $message['audience_ids'],
+            self::AUDIENCE_COMPANY => array_values(array_unique(array_merge([], ...array_map(fn (int $id): array => $this->app->companies()->repository()->memberIdsOf($id), $message['audience_ids'])))),
+            default => null,
+        };
+    }
+
+    /** readerIds einer gültigen Nachricht über ihre ID (null auch, wenn es sie nicht mehr gibt). @return list<int>|null */
+    public function readerIdsOf(int $id): ?array
+    {
+        $message = $this->repository()->find($id);
+        return $message === null ? null : $this->readerIds($message);
+    }
+
+    /**
+     * Auswahl beim Schreiben (GET /board/audiences, post_board): Kompanien (nur bei eingeschaltetem Bereich Kompanien,
+     * ohne aufgelöste) und Personen, die das Brett lesen (isRecipient), nach Namen.
+     *
+     * @return array{companies: list<array{id: int, name: string, short_name: string}>, people: list<array{id: int, name: string}>}
+     */
+    public function audiences(): array
+    {
+        $companies = [];
+        if ($this->app->features()->enabled(CompanyService::FEATURE)) {
+            foreach ($this->app->companies()->repository()->all() as $c) {
+                if ($c['active']) {
+                    $companies[] = ['id' => $c['id'], 'name' => $c['name'], 'short_name' => $c['short_name']];
+                }
+            }
+        }
+        $people = [];
+        foreach ($this->app->users->list(false) as $u) {
+            if (self::isRecipient($u)) {
+                $people[] = ['id' => $u->id, 'name' => $u->name];
+            }
+        }
+        return ['companies' => $companies, 'people' => $people];
     }
 
     /**
@@ -98,43 +174,47 @@ final class BoardService
      */
     public function list(?User $viewer = null): array
     {
-        $active = array_values(array_filter($this->repository()->active($this->app->time()->nowUtc()), static fn (array $m): bool => self::canRead($viewer, $m['audience'])));
+        $active = array_values(array_filter($this->repository()->active($this->app->time()->nowUtc()), fn (array $m): bool => $this->canRead($viewer, $m)));
         $editor = $viewer !== null && $viewer->can(Capability::PostBoard);
         $ids = array_column($active, 'id');
         $edits = $editor ? $this->repository()->lastEdits($ids) : [];
         $mails = $editor ? $this->app->boardMail()->summaries($ids) : [];
         $names = (new UserNames($this->app->users))->prime([...array_column($active, 'author_id'), ...array_column($edits, 'user_id')]);
         $files = $this->app->attachments()->many(AttachmentService::OWNER_BOARD, $ids);
-        $messages = array_map(fn (array $m): array => $this->format($m, $names, $editor, $edits[$m['id']] ?? null, $mails[$m['id']] ?? null, $files[$m['id']] ?? []), $active);
+        $targets = $this->targetNames($active, $names);
+        $messages = array_map(fn (array $m): array => $this->format($m, $names, $editor, $edits[$m['id']] ?? null, $mails[$m['id']] ?? null, $files[$m['id']] ?? [], $targets, $viewer), $active);
         return ['items' => [...$messages, ...$this->app->polls()->boardItems($viewer)]];
     }
 
     /**
      * Neue Nachricht.
      *
-     * @param array<string, mixed> $in title, text (formatierter Inhalt), expires_at (optional, ISO 8601), audience (members
-     *                                 Standard, oder public)
+     * @param array<string, mixed> $in title, blocks (Inhalt aus Blöcken, Domain\Blocks\Blocks) oder text (formatierter
+     *                                 Inhalt, ältere App), expires_at (optional, ISO 8601), audience (members Standard,
+     *                                 public, company oder person), audience_ids (bei company und person)
      * @return BoardItem
      */
     public function create(User $author, array $in): array
     {
         $title = self::validTitle($in['title'] ?? null);
-        $body = self::validBody($in['text'] ?? null);
+        $blocks = $this->validContent($in);
         $audience = self::validAudience($in['audience'] ?? self::AUDIENCE_MEMBERS);
+        $audienceIds = $this->validTargets($audience, $in['audience_ids'] ?? null);
         $nowTs = $this->app->time()->timestamp();
         $now = gmdate('Y-m-d H:i:s', $nowTs);
         $expires = array_key_exists('expires_at', $in) && $in['expires_at'] !== null && $in['expires_at'] !== ''
             ? $this->validExpires($in['expires_at'])
             : gmdate('Y-m-d H:i:s', $nowTs + self::LIFETIME);
         $files = $this->app->attachments()->resolve($author, $in['attachments'] ?? null, AttachmentService::OWNER_BOARD);
-        $id = $this->app->db->transaction(function () use ($author, $title, $body, $now, $expires, $files, $audience): int {
-            $id = $this->repository()->insert($title, $body, $author->id, $now, $expires, $audience);
-            $claimed = $this->app->richImages()->claim($author, $body, RichImageService::OWNER_BOARD, $id);
-            if ($claimed !== $body) {
-                $this->repository()->update($id, ['body' => $claimed]);
-            }
+        $id = $this->app->db->transaction(function () use ($author, $title, $blocks, $now, $expires, $files, $audience, $audienceIds): int {
+            $id = $this->repository()->insert($title, Blocks::publicBody($blocks), $author->id, $now, $expires, $audience, $audienceIds);
+            $columns = $this->app->blocks()->columns($blocks, $author, RichImageService::OWNER_BOARD, $id, false);
+            $this->repository()->update($id, $columns);
             $this->app->attachments()->assign($files, AttachmentService::OWNER_BOARD, $id);
-            $snapshot = ['title' => $title, 'body' => $claimed, 'expires_at' => $expires, 'audience' => $audience];
+            $snapshot = ['title' => $title, 'body' => self::contentValue($columns), 'expires_at' => $expires, 'audience' => $audience];
+            if ($audienceIds !== []) {
+                $snapshot['audience_ids'] = $audienceIds;
+            }
             if ($files !== []) {
                 $snapshot['attachments'] = array_map(static fn (array $f): string => (string) $f['name'], $files);
             }
@@ -151,23 +231,30 @@ final class BoardService
      * updated_at unverändert (ausgeblendet bleibt ausgeblendet), ebenso eine neue Sichtbarkeit. Eine Benachrichtigung
      * gibt es beim Ändern nie, auch nicht, wenn eine Nachricht öffentlich wird.
      *
-     * @param array<string, mixed> $in title, text, expires_at, audience, attachments (alle Anhänge danach: Kennungen)
+     * @param array<string, mixed> $in title, blocks oder text, expires_at, audience, audience_ids (bei company und person; ohne
+     *                                 audience für die bisherige), attachments (alle Anhänge danach: Kennungen)
      * @return BoardItem
      */
     public function update(User $actor, int $id, array $in): array
     {
         $message = $this->active($id);
         $values = [];
+        $audienceIds = $message['audience_ids'];
         if (array_key_exists('title', $in)) {
             $title = self::validTitle($in['title']);
             if ($title !== $message['title']) {
                 $values['title'] = $title;
             }
         }
-        if (array_key_exists('text', $in)) {
-            $body = $this->app->richImages()->claim($actor, self::validBody($in['text']), RichImageService::OWNER_BOARD, $id);
-            if ($body !== $message['body']) {
-                $values['body'] = $body;
+        $content = array_key_exists('blocks', $in) || array_key_exists('text', $in);
+        $contentBefore = null;
+        if ($content) {
+            // Bilder nicht mehr verwendeter Fassungen bleiben (Verlauf), bis die Nachricht gelöscht wird (cleanup).
+            $columns = $this->app->blocks()->columns($this->validContent($in), $actor, RichImageService::OWNER_BOARD, $id, false);
+            if (self::contentValue($columns) !== self::contentValue($message)) {
+                $values['body'] = $columns['body'];
+                $values['blocks'] = $columns['blocks'];
+                $contentBefore = self::contentValue($message);
             }
         }
         if (array_key_exists('expires_at', $in)) {
@@ -176,14 +263,18 @@ final class BoardService
                 $values['expires_at'] = $expires;
             }
         }
-        if (array_key_exists('audience', $in)) {
-            $audience = self::validAudience($in['audience']);
-            if ($audience !== $message['audience']) {
+        if (array_key_exists('audience', $in) || array_key_exists('audience_ids', $in)) {
+            $audience = array_key_exists('audience', $in) ? self::validAudience($in['audience']) : $message['audience'];
+            // Gleiche Sichtbarkeit ohne neue Auswahl: die bisherigen Kompanien bzw. Personen bleiben.
+            $ids = !array_key_exists('audience_ids', $in) && $audience === $message['audience'] ? $message['audience_ids'] : $this->validTargets($audience, $in['audience_ids'] ?? null);
+            if ($audience !== $message['audience'] || $ids !== $message['audience_ids']) {
                 $values['audience'] = $audience;
+                $values['audience_ids'] = BoardRepository::ids($ids);
+                $audienceIds = $ids;
             }
         }
-        if (!array_key_exists('title', $in) && !array_key_exists('text', $in) && !array_key_exists('expires_at', $in) && !array_key_exists('attachments', $in) && !array_key_exists('audience', $in)) {
-            throw ApiError::invalid('Bitte Titel, Text, Anhänge, Enddatum oder Sichtbarkeit angeben.');
+        if (!array_key_exists('title', $in) && !$content && !array_key_exists('expires_at', $in) && !array_key_exists('attachments', $in) && !array_key_exists('audience', $in) && !array_key_exists('audience_ids', $in)) {
+            throw ApiError::invalid('Bitte Titel, Inhalt, Anhänge, Enddatum oder Sichtbarkeit angeben.');
         }
         // Anhänge: die genannten Kennungen sind danach genau die Anhänge (neue Entwürfe kommen dazu, fehlende gehen).
         $files = null;
@@ -207,7 +298,7 @@ final class BoardService
             }
             $values['updated_at'] = $updated;
         }
-        $this->app->db->transaction(function () use ($id, $values, $message, $actor, $now, $files, $before): void {
+        $this->app->db->transaction(function () use ($id, $values, $message, $actor, $now, $files, $before, $audienceIds, $contentBefore): void {
             if ($values !== []) {
                 $this->repository()->update($id, $values);
             }
@@ -220,13 +311,14 @@ final class BoardService
                 $this->repository()->addRevision($id, $actor->id, $now, self::REV_TITLE, $message['title'], $values['title']);
             }
             if (isset($values['body'])) {
-                $this->repository()->addRevision($id, $actor->id, $now, self::REV_CONTENT, $message['body'], $values['body']);
+                $this->repository()->addRevision($id, $actor->id, $now, self::REV_CONTENT, $contentBefore, self::contentValue(['body' => (string) $values['body'], 'blocks' => $values['blocks'] ?? null]));
             }
             if (isset($values['expires_at'])) {
                 $this->repository()->addRevision($id, $actor->id, $now, self::REV_EXPIRES, $message['expires_at'], $values['expires_at']);
             }
             if (isset($values['audience'])) {
-                $this->repository()->addRevision($id, $actor->id, $now, self::REV_AUDIENCE, $message['audience'], $values['audience']);
+                $after = ['audience' => (string) $values['audience'], 'audience_ids' => $audienceIds];
+                $this->repository()->addRevision($id, $actor->id, $now, self::REV_AUDIENCE, self::audienceValue($message), self::audienceValue($after));
             }
         });
         return $this->one($id, $actor);
@@ -255,14 +347,28 @@ final class BoardService
      *
      * @return array{message: array<string, mixed>, revisions: list<array<string, mixed>>, mail: array<string, mixed>|null}
      */
-    public function history(int $id): array
+    public function history(int $id, ?User $viewer = null): array
     {
         $message = $this->repository()->find($id) ?? throw ApiError::notFound('Diese Nachricht gibt es nicht mehr.');
         $revisions = $this->repository()->revisions([$id])[$id] ?? [];
         $names = (new UserNames($this->app->users))->prime([$message['author_id'], $message['deleted_by'], ...array_column($revisions, 'user_id')]);
+        // Namen auch für die Sichtbarkeiten im Verlauf
+        $shown = [$message];
+        foreach ($revisions as $r) {
+            if ($r['action'] === self::REV_AUDIENCE) {
+                $shown[] = self::parseAudience($r['before_value']);
+                $shown[] = self::parseAudience($r['after_value']);
+            } elseif ($r['action'] === self::REV_CREATED) {
+                $created = json_decode((string) $r['after_value'], true);
+                if (is_array($created) && is_string($created['audience'] ?? null) && is_array($created['audience_ids'] ?? null)) {
+                    $shown[] = ['audience' => $created['audience'], 'audience_ids' => array_values(array_filter($created['audience_ids'], 'is_int'))];
+                }
+            }
+        }
+        $targets = $this->targetNames($shown, $names);
         return [
-            'message' => $this->formatEnded($message, $names),
-            'revisions' => array_map(fn (array $r): array => $this->formatRevision($r, $names), $revisions),
+            'message' => $this->formatEnded($message, $names, null, $targets, $viewer),
+            'revisions' => array_map(fn (array $r): array => $this->formatRevision($r, $names, $targets, $viewer), $revisions),
             'mail' => $this->app->boardMail()->summaries([$id])[$id] ?? null,
             'mail_log' => $this->app->boardMail()->log($id),
         ];
@@ -274,20 +380,21 @@ final class BoardService
      *
      * @return array{items: list<array<string, mixed>>, keep_days: int}
      */
-    public function ended(): array
+    public function ended(?User $viewer = null): array
     {
         $nowTs = $this->app->time()->timestamp();
         $ended = $this->repository()->ended(gmdate('Y-m-d H:i:s', $nowTs), gmdate('Y-m-d H:i:s', $nowTs - self::HISTORY_KEEP_DAYS * 86400));
         $names = (new UserNames($this->app->users))->prime([...array_column($ended, 'author_id'), ...array_column($ended, 'deleted_by')]);
         $files = $this->app->attachments()->many(AttachmentService::OWNER_BOARD, array_column($ended, 'id'));
-        return ['items' => array_map(fn (array $m): array => $this->formatEnded($m, $names, $files[$m['id']] ?? []), $ended), 'keep_days' => self::HISTORY_KEEP_DAYS];
+        $targets = $this->targetNames($ended, $names);
+        return ['items' => array_map(fn (array $m): array => $this->formatEnded($m, $names, $files[$m['id']] ?? [], $targets, $viewer), $ended), 'keep_days' => self::HISTORY_KEEP_DAYS];
     }
 
     /**
      * Bild oder Anhang einer Nachricht ansehen (RichImageService::canView, AttachmentService::canView): solange sie gilt
      * wie die Nachricht selbst (öffentliche auch ohne Anmeldung, $viewer null), danach (im Verlauf) nur mit post_board.
      */
-    public function canSeeImage(?User $viewer, int $messageId): bool
+    public function canSeeImage(?User $viewer, int $messageId, ?string $uid = null): bool
     {
         if (!$this->app->features()->enabled('board')) {
             return false;
@@ -296,7 +403,37 @@ final class BoardService
             return $this->repository()->find($messageId) !== null;
         }
         $message = $this->repository()->findActive($messageId, $this->app->time()->nowUtc());
-        return $message !== null && self::canRead($viewer, $message['audience']);
+        if ($message === null || !$this->canRead($viewer, $message)) {
+            return false;
+        }
+        // Bilder in Blöcken nur für Mitglieder: auch bei öffentlichen Nachrichten nur für Empfänger
+        return $uid === null || self::isRecipient($viewer) || !Blocks::imageOnlyForMembers(Blocks::decode($message['blocks'], $message['body']), $uid);
+    }
+
+    /**
+     * Formatierter Inhalt einer Nachricht in einem Stück für die Mail an $recipient (alle Blöcke, auch die nur für
+     * Mitglieder: Mails gehen nur an Empfänger, isRecipient), Bilder als data-image.
+     *
+     * @param array{body: string, blocks: string|null} $message
+     */
+    public function mailHtml(array $message, ?User $recipient = null): string
+    {
+        return $this->app->blocks()->html(Blocks::decode($message['blocks'], $message['body']), true, $recipient);
+    }
+
+    /**
+     * Wie mailHtml für eine Anfrage vor dem Speichern (Prüfung der Mailgröße); null bei ungültigem Inhalt (den meldet
+     * create).
+     *
+     * @param array<string, mixed> $in
+     */
+    public function inputMailHtml(array $in, User $author): ?string
+    {
+        try {
+            return $this->app->blocks()->html($this->validContent($in), true, $author);
+        } catch (ApiError) {
+            return null;
+        }
     }
 
     /**
@@ -329,7 +466,9 @@ final class BoardService
         $editor = $viewer !== null && $viewer->can(Capability::PostBoard);
         $edit = $editor ? ($this->repository()->lastEdits([$id])[$id] ?? null) : null;
         $mail = $editor ? ($this->app->boardMail()->summaries([$id])[$id] ?? null) : null;
-        return $this->format($this->active($id), new UserNames($this->app->users), $editor, $edit, $mail, $this->app->attachments()->of(AttachmentService::OWNER_BOARD, $id));
+        $message = $this->active($id);
+        $names = new UserNames($this->app->users);
+        return $this->format($message, $names, $editor, $edit, $mail, $this->app->attachments()->of(AttachmentService::OWNER_BOARD, $id), $this->targetNames([$message], $names), $viewer);
     }
 
     /**
@@ -337,16 +476,21 @@ final class BoardService
      * @param array{user_id: int, created_at: string}|null $edit
      * @param array<string, mixed>|null $mail
      * @param list<array<string, mixed>> $files Anhänge
+     * @param array{companies: array<int, string>} $targets Namen der Kompanien (targetNames)
      * @return BoardItem
      */
-    private function format(array $m, UserNames $names, bool $editor = false, ?array $edit = null, ?array $mail = null, array $files = []): array
+    private function format(array $m, UserNames $names, bool $editor = false, ?array $edit = null, ?array $mail = null, array $files = [], array $targets = ['companies' => []], ?User $viewer = null): array
     {
+        $member = $editor || self::isRecipient($viewer);
+        $blocks = Blocks::decode($m['blocks'], $m['body']);
         $out = [
             'kind' => self::KIND_MESSAGE,
             'id' => $m['id'],
             'title' => $m['title'],
+            // text: Textblöcke für alle (ältere App); blocks: alle Blöcke, die $viewer sieht
             'text' => $this->app->richImages()->render($m['body']),
-            'excerpt' => RichText::excerpt($m['body']),
+            'blocks' => $this->app->blocks()->forViewer($blocks, $viewer, $member, $editor),
+            'excerpt' => $this->app->blocks()->plain($blocks, $member, $viewer),
             'author_name' => $names->name($m['author_id']),
             'created_at' => Time::utcToIso($m['created_at']),
             'updated_at' => Time::utcToIso($m['updated_at']),
@@ -354,6 +498,14 @@ final class BoardService
             'audience' => $m['audience'],
             'attachments' => array_map(fn (array $f): array => $this->app->attachments()->format($f), $files),
         ];
+        // Für wen: Kompanien sehen alle, die die Nachricht lesen; ausgewählte Personen nur post_board (Empfänger sehen nur,
+        // dass sie für sie bestimmt ist).
+        if ($m['audience'] === self::AUDIENCE_COMPANY || ($editor && $m['audience'] === self::AUDIENCE_PERSON)) {
+            $out['audience_names'] = $this->namesOf($m, $names, $targets);
+        }
+        if ($editor && in_array($m['audience'], self::TARGETED, true)) {
+            $out['audience_ids'] = $m['audience_ids'];
+        }
         if ($editor) {
             $out['last_edit'] = $edit === null ? null : ['name' => $names->name($edit['user_id']), 'at' => Time::utcToIso($edit['created_at'])];
             $out['mail'] = $mail;
@@ -364,16 +516,19 @@ final class BoardService
     /**
      * @param BoardMessage $m
      * @param list<array<string, mixed>>|null $files Anhänge (ohne Angabe gelesen)
+     * @param array{companies: array<int, string>} $targets Namen der Kompanien (targetNames)
      * @return array<string, mixed>
      */
-    private function formatEnded(array $m, UserNames $names, ?array $files = null): array
+    private function formatEnded(array $m, UserNames $names, ?array $files = null, array $targets = ['companies' => []], ?User $viewer = null): array
     {
         $files ??= $this->app->attachments()->of(AttachmentService::OWNER_BOARD, $m['id']);
-        return [
+        $blocks = Blocks::decode($m['blocks'], $m['body']);
+        $out = [
             'id' => $m['id'],
             'title' => $m['title'],
             'text' => $this->app->richImages()->render($m['body']),
-            'excerpt' => RichText::excerpt($m['body']),
+            'blocks' => $this->app->blocks()->forViewer($blocks, $viewer, true, true),
+            'excerpt' => $this->app->blocks()->plain($blocks, true, $viewer),
             'author_name' => $names->name($m['author_id']),
             'created_at' => Time::utcToIso($m['created_at']),
             'updated_at' => Time::utcToIso($m['updated_at']),
@@ -384,25 +539,103 @@ final class BoardService
             'audience' => $m['audience'],
             'attachments' => array_map(fn (array $f): array => $this->app->attachments()->format($f), $files),
         ];
+        // Nur für post_board (Verlauf)
+        if (in_array($m['audience'], self::TARGETED, true)) {
+            $out['audience_ids'] = $m['audience_ids'];
+            $out['audience_names'] = $this->namesOf($m, $names, $targets);
+        }
+        return $out;
+    }
+
+    /**
+     * Namen der Kompanien aus den Nachrichten in einer Abfrage (nur wenn eine für Kompanien dabei ist); die Namen der
+     * Personen holt $names in einer Abfrage dazu.
+     *
+     * @param list<array{audience: string, audience_ids: list<int>}> $messages
+     * @return array{companies: array<int, string>}
+     */
+    private function targetNames(array $messages, UserNames $names): array
+    {
+        $companies = false;
+        $people = [];
+        foreach ($messages as $m) {
+            if ($m['audience'] === self::AUDIENCE_COMPANY) {
+                $companies = true;
+            } elseif ($m['audience'] === self::AUDIENCE_PERSON) {
+                $people = [...$people, ...$m['audience_ids']];
+            }
+        }
+        if ($people !== []) {
+            $names->prime($people);
+        }
+        if (!$companies) {
+            return ['companies' => []];
+        }
+        return ['companies' => array_column($this->app->companies()->repository()->all(), 'name', 'id')];
+    }
+
+    /**
+     * Namen der ausgewählten Kompanien bzw. Personen (gelöschte fehlen).
+     *
+     * @param array{audience: string, audience_ids: list<int>} $m
+     * @param array{companies: array<int, string>} $targets
+     * @return list<string>
+     */
+    private function namesOf(array $m, UserNames $names, array $targets): array
+    {
+        $out = [];
+        foreach ($m['audience_ids'] as $id) {
+            $name = $m['audience'] === self::AUDIENCE_COMPANY ? ($targets['companies'][$id] ?? null) : $names->name($id);
+            if ($name !== null && $name !== '') {
+                $out[] = $name;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Sichtbarkeit im Verlauf: members und public wie bisher, für Kompanien und Personen „company:1,2“ bzw. „person:5“.
+     *
+     * @param array{audience: string, audience_ids?: list<int>} $m
+     */
+    private static function audienceValue(array $m): string
+    {
+        $ids = $m['audience_ids'] ?? [];
+        return in_array($m['audience'], self::TARGETED, true) ? $m['audience'] . ':' . implode(',', $ids) : $m['audience'];
+    }
+
+    /** @return array{audience: string, audience_ids: list<int>} Gegenstück zu audienceValue */
+    private static function parseAudience(?string $value): array
+    {
+        [$audience, $ids] = array_pad(explode(':', (string) $value, 2), 2, '');
+        return [
+            'audience' => in_array($audience, self::AUDIENCES, true) ? $audience : self::AUDIENCE_MEMBERS,
+            'audience_ids' => array_values(array_map('intval', array_filter(explode(',', $ids), static fn (string $v): bool => ctype_digit($v)))),
+        ];
     }
 
     /**
      * Ein Verlaufseintrag für die App: Inhalte mit Bildadressen, Zeiten als ISO 8601.
      *
+     * Sichtbarkeit (audience): members, public, company oder person; bei den beiden letzten mit den Namen dahinter
+     * („company: Erste, Zweite“), damit der Verlauf auch nach dem Löschen einer Kompanie lesbar bleibt, solange es geht.
+     *
      * @param BoardRevision $r
+     * @param array{companies: array<int, string>} $targets
      * @return array<string, mixed>
      */
-    private function formatRevision(array $r, UserNames $names): array
+    private function formatRevision(array $r, UserNames $names, array $targets = ['companies' => []], ?User $viewer = null): array
     {
-        $value = function (?string $v) use ($r): mixed {
+        $value = function (?string $v) use ($r, $names, $targets, $viewer): mixed {
             if ($v === null) {
                 return null;
             }
             return match ($r['action']) {
-                self::REV_CONTENT => $this->app->richImages()->render($v),
+                self::REV_CONTENT => $this->contentHtml($v, $viewer),
                 self::REV_EXPIRES => Time::utcToIso($v),
-                self::REV_TITLE, self::REV_AUDIENCE => $v,
-                default => $this->decode($v),
+                self::REV_TITLE => $v,
+                self::REV_AUDIENCE => $this->audienceText(self::parseAudience($v), $names, $targets),
+                default => $this->decode($v, $names, $targets, $viewer),
             };
         };
         return [
@@ -415,15 +648,33 @@ final class BoardService
         ];
     }
 
-    /** @return array<string, mixed>|null JSON-Momentaufnahme (erstellt, gelöscht, versendet) für die App */
-    private function decode(string $json): ?array
+    /**
+     * @param array{audience: string, audience_ids: list<int>} $m
+     * @param array{companies: array<int, string>} $targets
+     */
+    private function audienceText(array $m, UserNames $names, array $targets): string
+    {
+        if (!in_array($m['audience'], self::TARGETED, true)) {
+            return $m['audience'];
+        }
+        return $m['audience'] . ': ' . implode(', ', $this->namesOf($m, $names, $targets));
+    }
+
+    /**
+     * @param array{companies: array<int, string>} $targets
+     * @return array<string, mixed>|null JSON-Momentaufnahme (erstellt, gelöscht, versendet) für die App
+     */
+    private function decode(string $json, UserNames $names, array $targets, ?User $viewer = null): ?array
     {
         $data = json_decode($json, true);
         if (!is_array($data)) {
             return null;
         }
+        if (is_string($data['audience'] ?? null) && in_array($data['audience'], self::TARGETED, true) && is_array($data['audience_ids'] ?? null)) {
+            $data['audience_names'] = $this->namesOf(['audience' => $data['audience'], 'audience_ids' => array_values(array_filter($data['audience_ids'], 'is_int'))], $names, $targets);
+        }
         if (isset($data['body']) && is_string($data['body'])) {
-            $data['text'] = $this->app->richImages()->render($data['body']);
+            $data['text'] = $this->contentHtml($data['body'], $viewer);
             unset($data['body']);
         }
         if (isset($data['expires_at']) && is_string($data['expires_at'])) {
@@ -447,6 +698,46 @@ final class BoardService
         return $title;
     }
 
+    /**
+     * Inhalt aus einer Anfrage: blocks (hat Vorrang) oder text (ältere App, ein Textblock); mindestens ein Block mit
+     * Inhalt.
+     *
+     * @param array<string, mixed> $in
+     * @return list<array<string, mixed>>
+     */
+    private function validContent(array $in): array
+    {
+        if (!array_key_exists('blocks', $in)) {
+            return Blocks::fromBody(self::validBody($in['text'] ?? null));
+        }
+        $blocks = $this->app->blocks()->validate($in['blocks'], self::BODY_MAX);
+        foreach ($blocks as $b) {
+            if ($b['type'] !== TextBlock::TYPE || $b['html'] !== '') {
+                return $blocks;
+            }
+        }
+        throw ApiError::invalid('Bitte einen Text eingeben oder einen Block einfügen.');
+    }
+
+    /**
+     * Inhalt für den Verlauf (REV_CONTENT, Momentaufnahme bei REV_CREATED): nur ein Textblock für alle wie bisher als
+     * formatierter Text, sonst die Blöcke (Blocks::encode).
+     *
+     * @param array{body: string, blocks: string|null} $m
+     */
+    private static function contentValue(array $m): string
+    {
+        $blocks = Blocks::decode($m['blocks'], $m['body']);
+        return $blocks === Blocks::fromBody($m['body']) ? $m['body'] : Blocks::encode($blocks, $m['body']);
+    }
+
+    /** Inhalt aus dem Verlauf (contentValue) als formatierter Text mit Bildern. */
+    private function contentHtml(string $value, ?User $viewer): string
+    {
+        $blocks = Blocks::stored($value);
+        return $this->app->richImages()->render($blocks === null ? $value : $this->app->blocks()->html($blocks, true, $viewer, true));
+    }
+
     private static function validBody(mixed $text): string
     {
         if (!is_string($text)) {
@@ -462,9 +753,53 @@ final class BoardService
     private static function validAudience(mixed $audience): string
     {
         if (!is_string($audience) || !in_array($audience, self::AUDIENCES, true)) {
-            throw ApiError::invalid('Sichtbarkeit muss „members“ (intern) oder „public“ (öffentlich) sein.');
+            throw ApiError::invalid('Sichtbarkeit muss „members“ (intern), „public“ (öffentlich), „company“ (Kompanie) oder „person“ (einzeln) sein.');
         }
         return $audience;
+    }
+
+    /**
+     * Ausgewählte Kompanien (company: vorhanden, Bereich Kompanien an) bzw. Personen (person: lesen das Brett) als
+     * sortierte, eindeutige Liste; bei intern und öffentlich immer leer (eine Angabe wird ignoriert).
+     *
+     * @return list<int>
+     */
+    private function validTargets(string $audience, mixed $ids): array
+    {
+        if (!in_array($audience, self::TARGETED, true)) {
+            return [];
+        }
+        $company = $audience === self::AUDIENCE_COMPANY;
+        $what = $company ? 'mindestens eine Kompanie' : 'mindestens eine Person';
+        if (!is_array($ids) || $ids === []) {
+            throw ApiError::invalid('Bitte ' . $what . ' auswählen.');
+        }
+        $out = [];
+        foreach ($ids as $id) {
+            if (!is_int($id) || $id <= 0) {
+                throw ApiError::invalid('audience_ids muss eine Liste von IDs sein.');
+            }
+            $out[$id] = $id;
+        }
+        $out = array_values($out);
+        sort($out);
+        if ($company) {
+            if (!$this->app->features()->enabled(CompanyService::FEATURE)) {
+                throw ApiError::invalid(sprintf('Der Bereich %s ist ausgeschaltet.', $this->app->config->sectionLabel('companies', 'Kompanien')));
+            }
+            $known = array_column($this->app->companies()->repository()->all(), 'id');
+            if (array_diff($out, $known) !== []) {
+                throw ApiError::invalid('Diese Kompanie gibt es nicht.');
+            }
+        } else {
+            $users = $this->app->users->findMany($out);
+            foreach ($out as $id) {
+                if (!self::isRecipient($users[$id] ?? null)) {
+                    throw ApiError::invalid('Nachrichten am Brett lassen sich nur Personen freigeben, die das Brett lesen.');
+                }
+            }
+        }
+        return $out;
     }
 
     /** Enddatum: gültiger Zeitpunkt (Time::parseToUtc) in der Zukunft; keine Obergrenze. */

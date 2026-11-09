@@ -55,7 +55,15 @@ import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeV
 import { installUrl } from '../install';
 import { useDragSort, useSaveQueue } from '../dragSort';
 import { PenaltyRow } from './Strafen';
-import { AccountPanel, BulkNewMembers, Credentials, NewAccountRole } from './Konten';
+import {
+  AccountPanel,
+  BulkNewMembers,
+  confirmNewAdmin,
+  Credentials,
+  NewAccountExtraRoles,
+  NewAccountRole,
+  validExtraRoles,
+} from './Konten';
 import { TitleBadges } from '../TitleBadges';
 import { MemberTitles, TitleList } from './TitelVerwalten';
 import { OfficeAdmin } from './AemterVerwalten';
@@ -96,13 +104,16 @@ import { MemberAvatar, PhotoPicker, preloadAvatar, ZoomableAvatar, type Prepared
 import { FORMER_SORTS, FormerImport, FormerList, FormerPanel, NewFormer, REASON_OPTIONS } from './Ehemalige';
 import { MemberImport } from './MitgliederImport';
 import { Anfragen } from './Anfragen';
+import { Meldungen } from './Meldungen';
 import { newlyDue } from '../promotionCheck';
 import { promotionsAllowed, refreshPromotions, setReached, useReached } from '../promotionsDue';
+import { confirmAsk, promptAsk } from '../ask';
 
 type Sub =
   | 'mitglieder'
   | 'ehemalige'
   | 'anfragen'
+  | 'meldungen'
   | 'punkte'
   | 'strafe'
   | 'katalog'
@@ -205,6 +216,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <FormerList />
       ) : active === 'anfragen' ? (
         <Anfragen onToast={onToast} />
+      ) : active === 'meldungen' ? (
+        <Meldungen onToast={onToast} />
       ) : (active === 'punkte' || active === 'strafe') && fromList !== null ? (
         <FromAttendance key={path.join('/')} listId={fromList} kind={active} onToast={onToast} />
       ) : active === 'punkte' ? (
@@ -297,7 +310,7 @@ function Members() {
   // Filter und Sortierung zunächst eingeklappt; beim Zurückkommen wie verlassen.
   const [filtersOpen, setFiltersOpen] = useState(restore?.filtersOpen ?? false);
   // Filter nach Rolle: Grundrolle oder Zusatzrolle (Issue #66). Gäste lassen sich auch ohne Häkchen wählen.
-  const [role, setRole] = useState<Level>(restore?.role ?? '');
+  const [role, setRole] = useState<Level>(canPromote ? (restore?.role ?? '') : '');
   const loadGuests = showGuests || (canPromote && role === 'guest');
   // Rollen nur mit dem Kalender (z. B. Anwärter) immer: Sie stehen in der Liste und zählen im Zähler oben mit.
   const { data, error, loading, reload } = useAsync(() => api.members(loadGuests, true), [loadGuests], 'members');
@@ -400,7 +413,7 @@ function Members() {
         </span>
       </button>
       <div id="member-filters" className="member-filters" hidden={!filtersOpen}>
-        {roleOptions.length > 1 && (
+        {canPromote && roleOptions.length > 1 && (
           <select className="role-filter" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Nach Rolle filtern">
             <option value="">Alle Rollen</option>
             {roleOptions.map((r) => (
@@ -472,6 +485,7 @@ function Members() {
             <div className="row-main">
               <div className="row-title">
                 {listName(m, order.sort)} <TitleBadges titles={m.titles} role={admitRole(m.level)} />
+                {m.no_access && <span className="badge badge-no-access">ohne Zugang</span>}
               </div>
               <div className="row-sub">
                 {/* Eintritt und Punkte nur, wenn danach sortiert ist, damit die Reihenfolge nachvollziehbar ist. */}
@@ -527,14 +541,18 @@ function rankEditable(m: MemberDetail): boolean {
   return !!m.rank && (m.member || !!m.rank.rank);
 }
 
-/** Zeile unter Abzeichen und Foto: Rolle(n) bzw. ehemalig. */
+/**
+ * Zeile unter Abzeichen und Foto: Rolle(n) bzw. ehemalig. Die Rolle nur für die, die Rollen vergeben (Issue #349);
+ * sonst bleiben „Ehemalig“ und „Ohne Zugang“.
+ */
 function roleLine(m: MemberDetail): string {
+  if (!can('promote_users')) return [m.former ? 'Ehemalig' : '', m.no_access ? 'Ohne Zugang' : ''].filter(Boolean).join(' · ');
   const role = m.former
     ? `Ehemalig (zuvor ${levelLabel(m.former.previous_level)})`
     : (m.extra_roles ?? []).length > 0
       ? `Rollen: ${roleLabels(m)}`
       : `Rolle: ${levelLabel(m.level)}`;
-  return role + (hasOverrides(m.rights) ? ' · mit Ausnahmen bei den Rechten' : '');
+  return role + (m.no_access ? ' · ohne Zugang' : '') + (hasOverrides(m.rights) ? ' · mit Ausnahmen bei den Rechten' : '');
 }
 
 /**
@@ -553,6 +571,7 @@ function previewFromLists(id: number, former: boolean): MemberPreview | null {
 
 /** Rollenzeile aus der Liste (ohne den Hinweis auf Ausnahmen bei den Rechten, den kennt erst die Seite). */
 function previewRoleLine(p: MemberPreview): string {
+  if (!can('promote_users')) return p.previous_level ? 'Ehemalig' : '';
   if (p.previous_level) return `Ehemalig (zuvor ${levelLabel(p.previous_level)})`;
   if (!p.level) return '';
   return p.extra_roles.length > 0
@@ -585,7 +604,9 @@ function MemberPreviewHead({ p, onOpen }: { p: MemberPreview; onOpen?: (sheet: '
           !p.rank_title && <span className="skeleton-box" style={{ width: 96, height: 96, borderRadius: '50%' }} />
         )}
       </div>
-      <p className="muted small member-level">{role || <span className="skeleton-text" style={{ width: '16ch' }} />}</p>
+      {(role || can('promote_users')) && (
+        <p className="muted small member-level">{role || <span className="skeleton-text" style={{ width: '16ch' }} />}</p>
+      )}
       {(canPoints() || canPenalties()) && (
         <div className="stats member-stats">
           {canPoints() && (
@@ -704,7 +725,7 @@ function MemberPeek({
               )}
             </div>
           )}
-          <p className="muted small member-level">{roleLine(m)}</p>
+          {roleLine(m) && <p className="muted small member-level">{roleLine(m)}</p>}
           {(canPoints() || canPenalties()) && (
             <div className="stats member-stats">
               {canPoints() && <StatCard label={sec.points} value={(m.points ?? 0).toLocaleString('de-DE')} tone="good" onClick={none} />}
@@ -1005,7 +1026,7 @@ function MemberDetailView({
           )}
         </div>
       )}
-      <p className="muted small member-level">{roleLine(m)}</p>
+      {roleLine(m) && <p className="muted small member-level">{roleLine(m)}</p>}
 
       {(canPoints() || canPenalties()) && (
         <div className="stats member-stats">
@@ -1125,15 +1146,15 @@ function MemberDetailView({
           <button
             className="btn btn-block promote-candidate"
             disabled={busy}
-            onClick={() =>
-              window.confirm(`${m.name} als ${levelLabel('member')} aufnehmen?`) &&
+            onClick={async () =>
+              (await confirmAsk(`${m.name} als ${levelLabel('member')} aufnehmen?`)) &&
               run(() => api.promote(m.id), `${m.name} ist jetzt ${levelLabel('member')}`)
             }
           >
             Als {levelLabel('member')} aufnehmen
           </button>
         )}
-        {!m.former && <ResetPassword id={m.id} name={m.name} level={m.level} onToast={onToast} />}
+        {!m.former && <ResetPassword id={m.id} name={m.name} level={m.level} noAccess={!!m.no_access} onToast={onToast} />}
         {/* Gäste gehören nicht zur Kompanie. */}
         {formerEditable && formerPanel(false)}
         {/* Das eigene Konto ohne Löschen; E-Mail auch unter Meins → Konto. */}
@@ -1237,8 +1258,8 @@ function PointEntries({ entries, busy, run }: { entries: PointEntry[]; busy: boo
               <button
                 className="btn btn-small btn-danger"
                 disabled={busy}
-                onClick={() =>
-                  window.confirm(`Eintrag „${p.reason}“ (${formatPoints(p.points)}) wirklich stornieren?`) &&
+                onClick={async () =>
+                  (await confirmAsk(`Eintrag „${p.reason}“ (${formatPoints(p.points)}) wirklich stornieren?`)) &&
                   run(() => api.deletePoints(p.id), 'Storniert')
                 }
               >
@@ -1284,8 +1305,8 @@ function PenaltyEntries({ entries, busy, run }: { entries: Penalty[]; busy: bool
               <button
                 className="btn btn-small btn-danger"
                 disabled={busy}
-                onClick={() =>
-                  window.confirm(`Eintrag „${p.reason}“ (${formatEuro(p.amount_cents)}) wirklich stornieren?`) &&
+                onClick={async () =>
+                  (await confirmAsk(`Eintrag „${p.reason}“ (${formatEuro(p.amount_cents)}) wirklich stornieren?`)) &&
                   run(() => api.deletePenalty(p.id), 'Storniert')
                 }
               >
@@ -1336,7 +1357,9 @@ function RoleControl({
       {extra.length > 0 && <p className="muted small member-level">Zusatzrollen: {extra.map(levelLabel).join(', ')}</p>}
     </>
   );
-  if (!can('promote_users') || (level === 'admin' && !adminsHere) || id === config?.user?.id) {
+  // Ohne das Recht steht die Rolle nirgends auf der Seite (Issue #349).
+  if (!can('promote_users')) return null;
+  if ((level === 'admin' && !adminsHere) || id === config?.user?.id) {
     return readOnly;
   }
   async function save(action: () => Promise<unknown>, msg: string) {
@@ -1352,11 +1375,11 @@ function RoleControl({
       setBusy(false);
     }
   }
-  function change(next: Level) {
+  async function change(next: Level) {
     if (next === level) return;
     if (
       next === 'admin' &&
-      !window.confirm(`Wirklich zum ${levelLabel('admin')} machen? Admins dürfen alles, auch Einstellungen ändern.`)
+      !(await confirmAsk(`Wirklich zum ${levelLabel('admin')} machen? Admins dürfen alles, auch Einstellungen ändern.`))
     ) {
       return;
     }
@@ -1411,27 +1434,64 @@ function RoleControl({
   );
 }
 
-/** Admins erzeugen ein neues Startpasswort, z. B. wenn jemand sein Passwort vergessen hat. */
-function ResetPassword({ id, name, level, onToast }: { id: number; name: string; level: Level; onToast: (msg: string) => void }) {
+/**
+ * Admins erzeugen ein neues Startpasswort, z. B. wenn jemand sein Passwort vergessen hat. Bei einem Mitglied ohne Zugang
+ * heißt das „Zugang einrichten“: Danach hat es Benutzername und Startpasswort.
+ */
+function ResetPassword({
+  id,
+  name,
+  level,
+  noAccess,
+  onToast,
+}: {
+  id: number;
+  name: string;
+  level: Level;
+  noAccess: boolean;
+  onToast: (msg: string) => void;
+}) {
   const [password, setPassword] = useState<string | null>(null);
+  const [created, setCreated] = useState<CreatedUser | null>(null);
   const [busy, setBusy] = useState(false);
   if (!can('create_users') || id === config?.user?.id || level === 'guest') return null;
   async function reset() {
     if (
-      !window.confirm(
-        `Neues Startpasswort für ${name} erzeugen? Das bisherige Passwort gilt danach nicht mehr, alle Geräte werden abgemeldet.`,
-      )
+      !(await confirmAsk(
+        noAccess
+          ? `Zugang für ${name} einrichten? Die App erzeugt ein Startpasswort, das du der Person weitergibst.`
+          : `Neues Startpasswort für ${name} erzeugen? Das bisherige Passwort gilt danach nicht mehr, alle Geräte werden abgemeldet.`,
+      ))
     ) {
       return;
     }
     setBusy(true);
     try {
-      setPassword((await api.resetPassword(id)).password);
+      const res = await api.resetPassword(id);
+      if (noAccess) {
+        setCreated({ id, name, username: res.username ?? '', email: '', level, password: res.password });
+      } else {
+        setPassword(res.password);
+      }
     } catch (e) {
       onToast((e as Error).message);
     } finally {
       setBusy(false);
     }
+  }
+  if (created) return <Credentials people={[created]} />;
+  if (noAccess) {
+    return (
+      <div className="no-access-panel">
+        <p className="muted small">
+          {name} hat noch keinen Zugang. Stellt die Person eine Anfrage, kannst du sie unter <strong>Anfragen</strong> mit diesem Mitglied
+          verbinden.
+        </p>
+        <button className="btn btn-secondary btn-block set-up-access" disabled={busy} onClick={reset}>
+          {busy ? 'Richtet ein …' : 'Zugang einrichten'}
+        </button>
+      </div>
+    );
   }
   if (password) {
     return (
@@ -1460,6 +1520,7 @@ function ResetPassword({ id, name, level, onToast }: { id: number; name: string;
 function NewMember() {
   const [name, setName] = useState(emptyName());
   const [level, setLevel] = useState<Level>('member');
+  const [extraRoles, setExtraRoles] = useState<Level[]>([]);
   // Übernahme bestehender Mitglieder: Anfangspunkte (mit Punkte verwalten) und Dienstgrad (mit Dienstgrade verwalten).
   const [initialPoints, setInitialPoints] = useState('');
   const [initialDate, setInitialDate] = useState(todayYmd());
@@ -1474,6 +1535,8 @@ function NewMember() {
   const [address, setAddress] = useState(EMPTY_ADDRESS);
   const [birthday, setBirthday] = useState(emptyBirthday());
   const [photo, setPhoto] = useState<PreparedPhoto | null>(null);
+  // Ohne Zugang: z. B. für Chroniken und Ämter, wenn die Person sich (noch) nicht anmeldet.
+  const [noAccess, setNoAccess] = useState(false);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [created, setCreated] = useState<CreatedUser | null>(null);
@@ -1484,20 +1547,23 @@ function NewMember() {
     if (!name.first_name.trim()) return setFormError('Bitte einen Vornamen angeben.');
     const bday = canEnterBirthdays() ? readBirthday(birthday) : null;
     if (typeof bday === 'string') return setFormError(bday);
+    if (!(await confirmNewAdmin(level))) return;
     setBusy(true);
     try {
       setCreated(
         await api.createUser({
           ...trimName(name),
-          ...(username.trim() ? { username: username.trim() } : {}),
+          ...(username.trim() && !noAccess ? { username: username.trim() } : {}),
           ...(normalizeEmail(email) ? { email: normalizeEmail(email) } : {}),
           ...(normalizePhone(phone) ? { phone: normalizePhone(phone) } : {}),
           ...(addressInput(address) ? { address: addressInput(address) } : {}),
           level,
+          ...(validExtraRoles(level, extraRoles).length > 0 ? { extra_roles: validExtraRoles(level, extraRoles) } : {}),
           ...(extras && canPoints() && pointsNum > 0 ? { initial_points: pointsNum, initial_points_date: initialDate } : {}),
           ...(extras && canRanks() && rankOptions.some((r) => String(r.id) === rankId) ? { rank_id: Number(rankId) } : {}),
           ...(bday ? { birthday: birthdayString(bday) } : {}),
           ...(photo ? { photo: photo.file } : {}),
+          ...(noAccess ? { no_access: true } : {}),
         }),
       );
     } catch (err) {
@@ -1511,7 +1577,28 @@ function NewMember() {
     return (
       <div>
         <h2 className="member-name no-print">{created.name} ist angelegt</h2>
-        <Credentials people={[created]} onDone={() => navigate('verwaltung/mitglieder')} />
+        {created.no_access ? (
+          <div className="card created no-access-created">
+            {created.warning && (
+              <p className="form-error" role="alert">
+                {created.warning}
+              </p>
+            )}
+            <p>
+              Ohne Zugang: {created.name} meldet sich noch nicht an, steht aber wie jedes Mitglied in der Mitgliederliste und lässt sich z.
+              B. bei {sec.offices} auswählen.
+            </p>
+            <p className="muted small">
+              Einen Zugang bekommt {created.name} später beim Mitglied mit <strong>Zugang einrichten</strong> oder beim Freigeben einer
+              Anfrage unter <strong>Anfragen</strong> mit <strong>Mit diesem Mitglied verbinden</strong>.
+            </p>
+            <button className="btn btn-block" onClick={() => navigate('verwaltung/mitglieder')}>
+              ‹ Zur Mitgliederliste
+            </button>
+          </div>
+        ) : (
+          <Credentials people={[created]} onDone={() => navigate('verwaltung/mitglieder')} />
+        )}
         <button
           className="btn btn-secondary btn-block no-print"
           onClick={() => {
@@ -1525,6 +1612,7 @@ function NewMember() {
             setRankId('');
             setBirthday(emptyBirthday());
             setPhoto(null);
+            setNoAccess(false);
           }}
         >
           Weiteres Mitglied
@@ -1547,21 +1635,28 @@ function NewMember() {
         Aus Datei importieren (Excel oder CSV)
       </button>
       <NameFields value={name} onChange={setName} />
-      <label className="field">
-        <span>Benutzername (optional)</span>
-        <input
-          type="text"
-          autoComplete="off"
-          autoCapitalize="none"
-          placeholder="wird sonst aus dem Namen gebildet"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
+      <label className="toggle no-access-toggle">
+        <input type="checkbox" checked={noAccess} onChange={(e) => setNoAccess(e.target.checked)} />
+        Ohne Zugang (meldet sich noch nicht an)
       </label>
+      {!noAccess && (
+        <label className="field">
+          <span>Benutzername (optional)</span>
+          <input
+            type="text"
+            autoComplete="off"
+            autoCapitalize="none"
+            placeholder="wird sonst aus dem Namen gebildet"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+        </label>
+      )}
       <EmailField value={email} onChange={setEmail} />
       <PhoneField value={phone} onChange={setPhone} />
       <AddressFields value={address} onChange={setAddress} />
       <NewAccountRole label="Rolle" value={level} onChange={setLevel} />
+      <NewAccountExtraRoles base={level} value={validExtraRoles(level, extraRoles)} onChange={setExtraRoles} />
       {extras && canPoints() && (
         <>
           <label className="field">
@@ -1603,7 +1698,8 @@ function NewMember() {
         <PhotoPicker name={`${name.first_name} ${name.last_name}`.trim()} value={photo} onChange={setPhoto} onError={setFormError} />
       </fieldset>
       <p className="muted small">
-        Das neue Konto bekommt ein zufälliges Startpasswort. Andere Rollen vergibt danach, wer Rollen vergeben darf.
+        {noAccess ? 'Ohne Zugang gibt es kein Startpasswort.' : 'Das neue Konto bekommt ein zufälliges Startpasswort.'}
+        {!can('promote_users') && ' Andere Rollen vergibt danach, wer Rollen vergeben darf.'}
       </p>
       {formError && (
         <p className="form-error" role="alert">
@@ -2064,14 +2160,19 @@ function Catalog({ onToast }: { onToast: (msg: string) => void }) {
           <li key={c.id} {...sort.itemProps(i, `card row ${c.active ? '' : 'inactive'}`)}>
             {list.length > 1 && sort.handle(i, c.title)}
             <div className="row-main">
-              <div className="row-title">{c.title}</div>
-              <div className="row-sub">{c.active ? 'aktiv' : 'deaktiviert'}</div>
-              <div className="row-actions">
+              <div className="catalog-row-top">
+                <div>
+                  <div className="row-title">{c.title}</div>
+                  <div className="row-sub">{c.active ? 'aktiv' : 'deaktiviert'}</div>
+                </div>
+                <div className="row-value pos">{formatPoints(c.points)}</div>
+              </div>
+              <div className="row-actions catalog-row-actions">
                 <button
                   className="btn btn-small btn-secondary"
                   disabled={busy}
-                  onClick={() => {
-                    const next = window.prompt(`${sec.points} für „${c.title}“`, String(c.points));
+                  onClick={async () => {
+                    const next = await promptAsk(`${sec.points} für „${c.title}“`, String(c.points));
                     if (next === null) return;
                     const n = Number(next);
                     if (!Number.isInteger(n)) return onToast('Bitte eine ganze Zahl angeben.');
@@ -2089,7 +2190,6 @@ function Catalog({ onToast }: { onToast: (msg: string) => void }) {
                 </button>
               </div>
             </div>
-            <div className="row-value pos">{formatPoints(c.points)}</div>
           </li>
         ))}
         {(data ?? []).length === 0 && <Empty>Noch keine Vorlagen. Lege oben die erste an.</Empty>}

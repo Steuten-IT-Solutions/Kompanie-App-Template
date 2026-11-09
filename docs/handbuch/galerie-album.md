@@ -17,13 +17,13 @@ Tippe unten auf **{bereich.gallery}** und dann auf ein Album.
 - **Titel und Jahr** des Albums.
 - **Vorschaubilder**: alle Bilder und Videos des Albums, die du sehen darfst. Bilder und Videos nur für {rolle.member} tragen ein Schloss 🔒.
 - **Videos** erkennst du am ▶ in der Mitte, unten links steht ihre Länge, z. B. „1:02“.
-- **Album herunterladen (… Bilder · … Videos, ZIP)**: nur, wenn die {kompanie.name} das Herunterladen erlaubt.
+- **Knopf mit Pfeil nach unten** rechts neben dem Titel: lädt das ganze Album als ZIP herunter; nur, wenn die {kompanie.name} das Herunterladen erlaubt.
 
 ## So gehst du vor
 ### Ein Bild groß ansehen
 1. Tippe auf ein Vorschaubild. Es öffnet sich groß, auf dunklem Hintergrund, und nach einem Moment in voller Auflösung.
 2. Zum nächsten oder vorherigen Bild wischst du zur Seite oder tippst auf **›** bzw. **‹**. Am Computer gehen auch die Pfeiltasten. Beim Wischen folgt das Bild deinem Finger, daneben siehst du schon das nächste. Ziehst du nur ein kleines Stück, bleibt das Bild stehen. Ist ein Bild vergrößert, verschiebt Wischen das Bild, statt zu blättern.
-3. Unten steht, das wievielte Bild es ist, z. B. „3 / 3“, bei internen Bildern mit „intern“.
+3. Unten steht, das wievielte Bild es ist, z. B. „3 / 3“, bei internen Bildern mit „intern“. Wer Einreichungen prüft oder die Einstellungen verwaltet, findet daneben bei Bildern, die in der App hochgeladen wurden, **Nur für Mitglieder** bzw. **Öffentlich zeigen**: Das stellt das Bild intern oder öffentlich.
 4. Tippe auf **✕** oben rechts, um das Bild zu schließen. Am Computer geht auch die Escape-Taste, auf dem Handy auch die Zurück-Taste oder -Geste. Das Album zeigt dann die Stelle mit dem zuletzt angesehenen Bild.
 
 ![Bild in der Großansicht mit Pfeilen zum Blättern und dem Knopf ✕](bild:galerie-album-bild)
@@ -36,7 +36,7 @@ Tippe unten auf **{bereich.gallery}** und dann auf ein Album.
 ### Bilder und Videos herunterladen
 Das geht nur, wenn die {kompanie.name} es erlaubt; sonst fehlen die Knöpfe.
 - **Ein Bild oder Video:** Öffne es groß und tippe oben rechts neben **✕** auf den Knopf mit dem Pfeil nach unten. Bei einem Video steht darunter, wie weit es geladen ist, z. B. „Video wird geladen … 40 %“. Am Computer landet die Datei bei den Downloads, auf dem iPhone öffnet sich das Teilen-Menü, dort tippst du auf **Bild sichern**, **Video sichern** oder **In Dateien sichern**.
-- **Das ganze Album:** Tippe über den Vorschaubildern auf **Album herunterladen (… Bilder · … Videos, ZIP)**. Der Knopf zeigt, wie viele Dateien schon geladen sind, z. B. „Lädt 12 von 40 …“; mit **Abbrechen** hörst du auf. Am Ende speichert die App eine ZIP-Datei mit allen Bildern und Videos, benannt nach Titel und Jahr des Albums.
+- **Das ganze Album:** Tippe rechts neben dem Titel des Albums auf den runden Knopf mit dem Pfeil nach unten (wie in der Großansicht). Am Computer zeigt er, wenn du mit der Maus darauf zeigst, wie viele Bilder und Videos im ZIP landen. Während des Ladens dreht sich im Knopf ein Ring, darunter steht, wie viele Dateien schon geladen sind, z. B. „Lädt 12 von 40 …“; mit **Abbrechen** hörst du auf. Am Ende speichert die App eine ZIP-Datei mit allen Bildern und Videos, benannt nach Titel und Jahr des Albums.
 
 ### Ein Bild vergrößern
 1. Zieh das Bild mit zwei Fingern auseinander (bis zu vierfach) oder tippe doppelt darauf (zweifach).

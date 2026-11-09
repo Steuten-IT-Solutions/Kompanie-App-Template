@@ -19,6 +19,7 @@ use KompanieApp\Core\Storage\GalleryRepository;
  *   (ServerLimits), kodiert neu als JPEG ohne Metadaten (kein GPS-Ort) mit höchstens ORIGINAL_EDGE Pixeln und legt das
  *   Ergebnis im MediaStore ab (photos.source = upload, drive_file_id „upload:<Schlüssel>“). Aufbereitet werden sie wie
  *   Bilder aus Drive (thumb, large, Original).
+ * - Videos (MP4, WebM, Issue #350) kommen in Stücken über VideoUploadService und bleiben unverändert.
  * - Der Abgleich mit Drive ändert und löscht keine hochgeladenen Bilder und keine Alben, in denen welche liegen.
  */
 final class GalleryUploadService
@@ -62,9 +63,11 @@ final class GalleryUploadService
             'source' => (string) $album['source'] === 'app' ? 'app' : 'drive',
             'uploads' => array_map(static fn (array $p): array => [
                 'id' => (int) $p['id'],
+                'type' => (string) $p['media'] === 'video' ? 'video' : 'image',
                 'name' => (string) $p['name'],
                 'intern' => (bool) (int) $p['is_intern'],
-                'thumb' => $gallery->url($p, 'thumb'),
+                // '' bei einem Video ohne Standbild
+                'thumb' => (string) $gallery->thumbUrl($p),
                 'status' => (string) $p['status'],
                 'error' => (string) $p['error'],
             ], $this->repo()->uploads($id)),
@@ -210,11 +213,14 @@ final class GalleryUploadService
     /**
      * Ein abgelegtes Bild ins Album aufnehmen; aufbereitet wird es danach im Hintergrund wie Bilder aus Drive.
      *
-     * @param array{key: string, name: string, width: int, height: int, md5: string, bytes: int} $stored aus store()
+     * Videos (Issue #350) erkennt es an der Endung des Schlüssels (mp4, webm).
+     *
+     * @param array{key: string, name: string, width: int, height: int, md5: string, bytes: int, duration_ms?: int} $stored aus store() oder VideoUploadService
      * @return int ID des Bilds
      */
     public function insertPhoto(int $albumId, array $stored, bool $intern): int
     {
+        $mime = VideoUploadService::TYPES[strtolower(pathinfo($stored['key'], PATHINFO_EXTENSION))] ?? null;
         $id = $this->repo()->insertPhoto([
             'album_id' => $albumId,
             'drive_file_id' => GalleryService::UPLOAD_PREFIX . $stored['key'],
@@ -227,13 +233,46 @@ final class GalleryUploadService
             'file_key' => bin2hex(random_bytes(16)),
             'status' => GalleryRepository::PENDING,
             'error' => '',
-            'media' => 'image',
-            'mime' => 'image/jpeg',
+            'media' => $mime !== null ? 'video' : 'image',
+            'mime' => $mime ?? 'image/jpeg',
             'bytes' => $stored['bytes'],
+            'duration_ms' => $mime !== null ? max(0, (int) ($stored['duration_ms'] ?? 0)) : 0,
             'source' => 'upload',
         ]);
         $this->app->scheduler->runSoon(GalleryService::PROCESS_TASK);
         return $id;
+    }
+
+    /**
+     * Ein hochgeladenes Bild oder Video nachträglich intern (nur für Mitglieder) oder öffentlich stellen. Die
+     * aufbereiteten Größen liegen bei öffentlichen Bildern im öffentlichen Verzeichnis: Sie werden gelöscht und mit
+     * neuem file_key im Hintergrund neu erzeugt, damit alte öffentliche Adressen sofort nichts mehr liefern. Das
+     * Original im MediaStore bleibt, wo es ist. Bilder aus Drive stellt der Ordner „intern“ in Drive um.
+     *
+     * @return array{id: int, intern: bool}
+     */
+    public function setIntern(int $id, mixed $intern): array
+    {
+        if (!is_bool($intern)) {
+            throw ApiError::invalid('Bitte angeben, ob das Bild intern sein soll (intern: true oder false).');
+        }
+        $repo = $this->repo();
+        $photo = $repo->photo($id) ?? throw ApiError::notFound('Bild nicht gefunden.');
+        if (!GalleryService::isUpload($photo)) {
+            throw ApiError::invalid('Bilder aus Google Drive stellst du in Drive um: in den Ordner „intern“ des Albums verschieben oder heraus.');
+        }
+        if ((bool) (int) $photo['is_intern'] !== $intern) {
+            $this->app->gallery()->deleteFiles($photo);
+            $repo->updatePhoto($id, [
+                'is_intern' => $intern ? 1 : 0,
+                'file_key' => bin2hex(random_bytes(16)),
+                'status' => GalleryRepository::PENDING,
+                'error' => '',
+                'attempts' => 0,
+            ]);
+            $this->app->scheduler->runSoon(GalleryService::PROCESS_TASK);
+        }
+        return ['id' => $id, 'intern' => $intern];
     }
 
     /** Ein hochgeladenes Bild löschen (Bilder aus Drive kämen beim nächsten Abgleich wieder). */

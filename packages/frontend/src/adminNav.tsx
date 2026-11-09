@@ -53,9 +53,15 @@ export function adminTabs(): AdminTab[] {
         label: config?.pendingRegistrations ? `Anfragen (${config.pendingRegistrations})` : 'Anfragen',
         on: can('create_users') && (!!config?.registration || (config?.pendingRegistrations ?? 0) > 0),
       },
+      // Fehlermeldungen aus der App: mit Zahl der offenen
+      {
+        id: 'meldungen',
+        label: config?.openReports ? `Fehlermeldungen (${config.openReports})` : 'Fehlermeldungen',
+        on: can('review_reports'),
+      },
       { id: 'punkte', label: `${sec.points} +`, on: points },
       { id: 'strafe', label: `${sec.penalties} +`, on: canPenalties() },
-      { id: 'katalog', label: `${sec.points}katalog`, on: points, group: SETUP },
+      { id: 'katalog', label: sec.catalog, on: points, group: SETUP },
       { id: 'dienstgrade', label: sec.ranks, on: canRanks(), group: SETUP },
       { id: 'befoerderungen', label: 'Beförderungen', on: canRanks() && !!config?.features.points },
       { id: 'titel', label: sec.titles, on: canTitles(), group: SETUP },
@@ -219,6 +225,13 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
       <circle cx="10" cy="8" r="3.5" />
       <path d="M3.5 20c0-3.6 2.9-6 6.5-6 1.6 0 3 .5 4.1 1.3" />
       <path d="M18.5 14v6M15.5 17h6" />
+    </>
+  ),
+  // Fehlermeldungen: Sprechblase mit Ausrufezeichen
+  meldungen: (
+    <>
+      <path d="M4 5h16v11H9l-5 4z" />
+      <path d="M12 8v4M12 14.5h.01" />
     </>
   ),
   punkte: <path d="M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6L12 16.3l-5.4 3 1.3-6-4.6-4.1 6.1-.6z" />,

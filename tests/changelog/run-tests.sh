@@ -24,6 +24,8 @@ Einleitung mit [Link](https://example.org).
 - **Fett** und `Code` <script>alert(1)</script>
   mit Fortsetzung
 - [Verweis](https://example.org) und [kein Verweis](javascript:alert)
+- Unter [Einstellungen → Rollen](app:einstellungen/rollen) und [Verwaltung →
+  Einrichtungen → Ämter](app:verwaltung/aemter) etwas Neues
 ### Behoben
 - Etwas
 
@@ -81,6 +83,25 @@ OUT="$(check offen.md --version=1.2.0 --require-version || true)"
 grep -qF '[Unveröffentlicht] ist nicht leer' <<< "$OUT" || fail "Nicht leeres Unveröffentlicht zum Release nicht erkannt: $OUT"
 ok "Zum Release: fehlender Abschnitt zur Kern-Version und nicht leeres „Unveröffentlicht“ werden gemeldet"
 
+# Wege in der App als Verweis (app:…), nicht nur als Text
+cat > "$T/wege.md" <<'MD'
+# Changelog
+
+## [Unveröffentlicht]
+### Neu
+- Unter *Einstellungen → Navigation* etwas
+- Lange Zeile mit *Verwaltung →
+  Einrichtungen → Ämter* über zwei Zeilen
+- Verweis [falsch](app:#/einstellungen) und [leer](app:)
+- Richtig: [Einstellungen → Rollen](app:einstellungen/rollen), nur *Einstellungen* kursiv geht
+MD
+OUT="$(check wege.md --version=1.2.0 || true)"
+for want in 'Eintrag in Zeile 5: „Einstellungen → Navigation“ als Verweis in die App schreiben' 'Eintrag in Zeile 6: „Verwaltung → Einrichtungen → Ämter“ als Verweis' 'Eintrag in Zeile 8: ungültiger Verweis „app:#/einstellungen“' 'Eintrag in Zeile 8: ungültiger Verweis „app:“'; do
+  grep -qF "$want" <<< "$OUT" || fail "Fehler nicht erkannt: $want – $OUT"
+done
+[ "$(grep -c 'Eintrag in Zeile' <<< "$OUT")" = 4 ] || fail "Richtiger Verweis abgelehnt: $OUT"
+ok "Wege nur als Text und ungültige Verweise in die App werden gemeldet"
+
 if php scripts/changelog.php --app="$T/x.json" --src="$T/kaputt.md" --version=1.1.0 2> /dev/null; then fail "Fehlerhaftes Changelog ausgegeben"; fi
 [ ! -e "$T/x.json" ] || fail "Datei trotz Fehler geschrieben"
 ok "Fehlerhaftes Changelog wird nicht ausgegeben"
@@ -96,13 +117,13 @@ if (array_column($d["versionen"], "version") !== ["1.2.0", "1.1.0"]) $fail("Vers
 if ($d["versionen"][1]["datum"] !== "2026-11-01") $fail("Datum fehlt");
 if ($d["unveroeffentlicht"] !== null) $fail("Leeres Unveröffentlicht muss null sein");
 $h = $d["versionen"][0]["html"];
-foreach (["<h4>Neu</h4>", "<h4>Behoben</h4>", "<strong>Fett</strong>", "<code>Code</code>", "&lt;script&gt;", "mit Fortsetzung</li>", "<a href=\"https://example.org\"", "kein Verweis"] as $w) {
+foreach (["<h4>Neu</h4>", "<h4>Behoben</h4>", "<strong>Fett</strong>", "<code>Code</code>", "&lt;script&gt;", "mit Fortsetzung</li>", "<a href=\"https://example.org\"", "kein Verweis", "<a href=\"#/einstellungen/rollen\">Einstellungen → Rollen</a>", "<a href=\"#/verwaltung/aemter\">Verwaltung → Einrichtungen → Ämter</a>"] as $w) {
     if (!str_contains($h, $w)) $fail("HTML ohne $w: $h");
 }
 if (str_contains($h, "<script") || str_contains($h, "javascript:") || str_contains($h, "<h3>")) $fail("HTML nicht sauber: $h");
 if (!str_contains((string) $o["unveroeffentlicht"], "Noch offen")) $fail("Unveröffentlicht fehlt");
 ' "$T/gut.json" "$T/offen.json" || fail "Ausgabe für die App"
-ok "Ausgabe für die App: Versionen, Datum, maskiertes HTML, nur https-Verweise, Unveröffentlicht"
+ok "Ausgabe für die App: Versionen, Datum, maskiertes HTML, nur https-Verweise und Verweise in die App, Unveröffentlicht"
 
 echo
 echo "$pass bestanden, 0 fehlgeschlagen"

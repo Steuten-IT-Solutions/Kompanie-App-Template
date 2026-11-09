@@ -4,9 +4,10 @@ import { api, type DocCategory, type DocumentInfo, type DocumentMeta, type DocVi
 import brand from '../generated/brand';
 import { formatBytes, formatDate, todayYmd } from '../format';
 import { navigate } from '../router';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
 import { docGroupKey, groupDocuments, groupKey } from '../documents';
 import { ACCEPT, DocGroupSection, DocSortSelect, typeLabel, useDocSort, useOpenGroups, VISIBILITY_LABELS } from './Dokumente';
+import { confirmAsk, promptAsk } from '../ask';
 
 const sec = brand.labels.sections;
 
@@ -204,7 +205,7 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
         <h3>Dokument hochladen</h3>
         <label className="field">
           <span>Datei</span>
-          <input ref={fileInput} type="file" accept={ACCEPT} onChange={(e) => chooseFile(e.target.files?.[0] ?? null)} />
+          <FileInput inputRef={fileInput} accept={ACCEPT} onChange={(e) => chooseFile(e.target.files?.[0] ?? null)} />
         </label>
         <MetaFields meta={meta} categories={categories} onChange={setMeta} />
         <p className="muted small">PDF, Word, Excel, PowerPoint, OpenDocument, JPG oder PNG, höchstens {formatBytes(maxBytes)}.</p>
@@ -221,8 +222,8 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
       {/* Unsichtbares Dateifeld für „Neue Fassung“. */}
       <input ref={replaceInput} type="file" accept={ACCEPT} hidden onChange={(e) => replace(e.target.files?.[0] ?? null)} />
 
-      <h3 className="section-title">Dokumente</h3>
-      {docs.length === 0 ? <Empty>Noch keine Dokumente.</Empty> : <DocSortSelect value={sort} onChange={setSort} />}
+      <h3 className="section-title">{sec.documents}</h3>
+      {docs.length === 0 ? <Empty>Noch keine Dateien.</Empty> : <DocSortSelect value={sort} onChange={setSort} />}
       {groupDocuments(docs, categories, sort).map((g) => {
         const key = groupKey(g);
         // Während ein Dokument bearbeitet wird, bleibt seine Kategorie offen.
@@ -279,8 +280,9 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
                         <button
                           className="btn btn-small btn-danger"
                           disabled={busy}
-                          onClick={() =>
-                            window.confirm(`„${doc.title}“ wirklich löschen?`) && run(() => api.deleteDocument(doc.id), 'Dokument gelöscht')
+                          onClick={async () =>
+                            (await confirmAsk(`„${doc.title}“ wirklich löschen?`)) &&
+                            run(() => api.deleteDocument(doc.id), 'Dokument gelöscht')
                           }
                         >
                           Löschen
@@ -326,8 +328,8 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
                   <button
                     className="btn btn-small btn-secondary"
                     disabled={busy}
-                    onClick={() => {
-                      const next = window.prompt('Neuer Name der Kategorie', c.title);
+                    onClick={async () => {
+                      const next = await promptAsk('Neuer Name der Kategorie', c.title);
                       if (next !== null && next.trim()) run(() => api.updateDocCategory(c.id, next.trim()), 'Kategorie umbenannt');
                     }}
                   >
@@ -336,12 +338,12 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
                   <button
                     className="btn btn-small btn-danger"
                     disabled={busy}
-                    onClick={() =>
-                      window.confirm(
+                    onClick={async () =>
+                      (await confirmAsk(
                         count === 0
                           ? `Kategorie „${c.title}“ löschen?`
                           : `Kategorie „${c.title}“ löschen? ${count === 1 ? 'Das Dokument steht' : `Die ${count} Dokumente stehen`} danach ohne Kategorie da.`,
-                      ) && run(() => api.deleteDocCategory(c.id), 'Kategorie gelöscht')
+                      )) && run(() => api.deleteDocCategory(c.id), 'Kategorie gelöscht')
                     }
                   >
                     Löschen
@@ -351,7 +353,7 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
             </li>
           );
         })}
-        {categories.length === 0 && <Empty>Noch keine Kategorien. Dokumente ohne Kategorie stehen in einer gemeinsamen Liste.</Empty>}
+        {categories.length === 0 && <Empty>Noch keine Kategorien. Dateien ohne Kategorie stehen in einer gemeinsamen Liste.</Empty>}
       </ul>
     </div>
   );

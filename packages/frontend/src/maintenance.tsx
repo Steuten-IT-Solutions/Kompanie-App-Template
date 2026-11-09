@@ -4,6 +4,7 @@ import brand from './generated/brand';
 import logoUrl from './generated/logo-small.webp';
 import { ErrorBox, Loading, useAsync } from './ui';
 import { sources } from './viewData';
+import { confirmAsk } from './ask';
 
 /** Höchstlänge der Begründung (wie MaintenanceService::REASON_MAX im Kern). */
 export const REASON_MAX = 500;
@@ -96,7 +97,7 @@ export function MaintenanceCard({ onToast }: { onToast: (msg: string) => void })
   const text = reason ?? m.reason;
 
   async function save(on: boolean, message: string) {
-    if (on && !m.on && !window.confirm('Alle außer Admins können die App dann nicht mehr nutzen. Wartungsmodus einschalten?')) return;
+    if (on && !m.on && !(await confirmAsk('Alle außer Admins können die App dann nicht mehr nutzen. Wartungsmodus einschalten?'))) return;
     setBusy(true);
     setSaveError(null);
     try {
@@ -115,10 +116,6 @@ export function MaintenanceCard({ onToast }: { onToast: (msg: string) => void })
   return (
     <section className="card settings-section" aria-labelledby="maintenance-title">
       <h3 id="maintenance-title">Wartungsmodus</h3>
-      <p className="muted small">
-        Solange er an ist, sehen alle außer Admins nur eine Wartungsseite, z. B. während einer Datenübernahme. Offline gespeicherte Daten
-        bleiben auf den Handys. Hintergrundaufgaben außer Updates pausieren; Benachrichtigungen gehen nach dem Ende raus.
-      </p>
       <label className="field">
         <span>Begründung (optional, erscheint auf der Wartungsseite)</span>
         <textarea rows={3} maxLength={REASON_MAX} value={text} onChange={(e) => setReason(e.target.value)} />

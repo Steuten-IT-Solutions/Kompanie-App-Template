@@ -14,18 +14,18 @@ Hast du unten **Intern**, tippe dort auf den Knopf **{bereich.board}**. Oder tip
 Das Banner erscheint nur, solange es eine Nachricht gibt oder eine laufende Umfrage, auf die du noch nicht geantwortet hast.
 
 ## Was du hier siehst
-- **Aktuelle Nachrichten**: jede Nachricht mit dem Namen der Person, die sie geschrieben hat, der Uhrzeit (bei einer geänderten Nachricht mit „(geändert)“), dem Hinweis **öffentlich** bei Nachrichten, die alle sehen, dem Titel, dem vollständigen Text mit Bildern, den Anhängen (📎, ein Tipp lädt die Datei herunter) und **Sichtbar bis** mit Tag und Uhrzeit. Gibt es keine, steht dort **Zurzeit gibt es keine Nachrichten.**
+- **Aktuelle Nachrichten**: jede Nachricht mit dem Namen der Person, die sie geschrieben hat, der Uhrzeit (bei einer geänderten Nachricht mit „(geändert)“), dem Hinweis **öffentlich** bei Nachrichten, die alle sehen, **nur …** mit den {bereich.companies} bei Nachrichten nur für bestimmte {bereich.companies}, **nur für dich** bei Nachrichten, die nur du und wenige andere bekommen, dem Titel, dem vollständigen Text mit Bildern, den Anhängen (📎, ein Tipp lädt die Datei herunter) und **Sichtbar bis** mit Tag und Uhrzeit. Gibt es keine, steht dort **Zurzeit gibt es keine Nachrichten.**
 - **Laufende {bereich.polls}**: nur für {rolle.member}, wenn die {kompanie.name} {bereich.polls} nutzt. Jede Umfrage mit ihrem Ende, der Frage und dem Hinweis **offen** (noch nicht geantwortet) oder **beantwortet**.
 - **Teilnehmen** bzw. **Antwort ansehen**: öffnet die Umfrage. Dort antwortest du oder siehst deine Antwort und die Ergebnisse.
 - **Beendete {bereich.polls}**: öffnet die Liste aller {bereich.polls}, auch der beendeten.
 
 ## Das Banner oben auf jeder Seite
-Solange es gültige Einträge gibt, steht oben auf jeder Seite der App (außer auf dieser) ein farbiges Banner. Es zeigt die neueste Nachricht mit Namen, Uhrzeit und Titel; ein Tipp auf den Titel öffnet die ganze Nachricht. Sehr lange Titel kürzt das Banner mit „…“. Laufende {bereich.polls}, auf die du noch nicht geantwortet hast, stehen ebenfalls darin, jeweils mit dem Knopf **Teilnehmen**.
+Solange es gültige Einträge gibt, steht oben auf jeder Seite der App (außer auf dieser) ein farbiges Banner. Es zeigt in einer Zeile den Titel der neuesten Nachricht; ein Tipp auf den Titel öffnet die ganze Nachricht. Wer sie geschrieben hat und wann, steht hier auf der Seite des Bretts. Sehr lange Titel kürzt das Banner mit „…“. Laufende {bereich.polls}, auf die du noch nicht geantwortet hast, stehen ebenfalls darin, jeweils mit dem Knopf **Teilnehmen**.
 
 ![Das Banner mit einer Nachricht und dem Knopf +1 weitere](bild:schwarzes-brett-banner)
 
 - **+1 weitere** (bzw. **+2 weitere** …): klappt die übrigen Einträge auf. **Weniger anzeigen** klappt sie wieder zu.
-- **Brett öffnen**: öffnet diese Seite.
+- **Brett öffnen**: öffnet diese Seite. Der Knopf steht neben **+1 weitere**; mit nur einem Eintrag führt der Titel hierher.
 - **×**: blendet den Eintrag auf diesem Gerät aus.
 
 ![Das aufgeklappte Banner mit einer Nachricht und einer Umfrage](bild:schwarzes-brett-banner-mehr)
@@ -47,7 +47,7 @@ Hast du alle Einträge ausgeblendet, bleibt oben eine schmale Zeile, z. B. **{be
 - Bei einer neuen Nachricht bekommst du eine Benachrichtigung mit ihrem Titel, wenn du die Art **{bereich.board}: dringende Nachrichten** für dein Gerät eingeschaltet hast (siehe [Benachrichtigungen](seite:benachrichtigungen)). Wer schreibt, kann die Benachrichtigung auch weglassen. Wird eine Nachricht nur geändert, kommt keine neue Benachrichtigung.
 - Hat die {kompanie.name} den Mailversand eingerichtet, kommen neue Nachrichten auch per Mail an deine hinterlegte Adresse. Abschalten kannst du das unter **Meins → Konto** mit dem Schalter bei **Benachrichtigungen**. Beim Ändern kommt keine neue Mail.
 - Das {bereich.board} sehen {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter). {bereich.polls} gibt es nur für {rolle.member}.
-- Nachrichten mit dem Hinweis **öffentlich** sehen alle, auch Besucher ohne Anmeldung: im Banner und auf dieser Seite, mit Anhängen und dem Namen der Person, die sie geschrieben hat. Interne Nachrichten sehen nur {rolle.member} und Personen mit dem internen Kalender. Besucher ohne Anmeldung finden das {bereich.board} nicht in der Navigation, sondern über das Banner; bei eingeschalteter Art **{bereich.board}: öffentliche Nachrichten** bekommen sie zu neuen öffentlichen Nachrichten eine Benachrichtigung.
+- Nachrichten mit dem Hinweis **öffentlich** sehen alle, auch Besucher ohne Anmeldung: im Banner und auf dieser Seite, mit Anhängen und dem Namen der Person, die sie geschrieben hat. Interne Nachrichten sehen nur {rolle.member} und Personen mit dem internen Kalender. Nachrichten für bestimmte {bereich.companies} sehen von ihnen nur die, die einer dieser {bereich.companies} zugeordnet sind, Nachrichten für einzelne Personen nur diese; dazu immer alle, die ans Brett schreiben dürfen. Besucher ohne Anmeldung finden das {bereich.board} nicht in der Navigation, sondern über das Banner; bei eingeschalteter Art **{bereich.board}: öffentliche Nachrichten** bekommen sie zu neuen öffentlichen Nachrichten eine Benachrichtigung.
 
 ## Siehe auch
 - [Benachrichtigungen](seite:benachrichtigungen)

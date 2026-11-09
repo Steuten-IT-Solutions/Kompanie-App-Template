@@ -14,7 +14,6 @@ use KompanieApp\Core\Domain\BoardService;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Input;
 use KompanieApp\Core\Domain\PersonName;
-use KompanieApp\Core\Domain\RichText;
 use KompanieApp\Core\Domain\SignatureService;
 use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Text;
@@ -24,6 +23,7 @@ use KompanieApp\Core\Storage\Sql\DatabaseException;
 use KompanieApp\Core\Telemetry\Code;
 use KompanieApp\Core\Telemetry\Detail;
 use KompanieApp\Core\Update\StatusReporter;
+use KompanieApp\Core\Update\UpdateService;
 
 /**
  * Die Routentabelle der API (siehe api/openapi.yaml) und ihre Ausführung.
@@ -170,6 +170,7 @@ final class Api
             try {
                 $sub = $push->own($user, $r->input('endpoint'), $user === null ? $r->input('auth') : null);
                 $push->seen($sub); // Die App wird auf dem Gerät noch genutzt: Gast-Abo verfällt nicht.
+                $sub = $push->addNewTypesTo($sub, $user); // neu angebotene Arten gleich einschalten
             } catch (ApiError) {
                 $sub = null;
             }
@@ -188,11 +189,12 @@ final class Api
     /**
      * Mehrere Konten anlegen: alle Einträge vorab prüfen (Namen, Benutzernamen und E-Mail auch untereinander,
      * Anfangspunkte, Dienstgrad); bei einem Fehler wird keiner angelegt und die Meldung nennt die Zeile. Scheitert danach
-     * doch eines (z. B. Datenbank), steht es mit Grund im Ergebnis.
+     * doch eines (z. B. Datenbank), steht es mit Grund im Ergebnis. Mit no_access je Person ohne Zugang (kein
+     * Startpasswort, im Ergebnis no_access statt password; MemberService::insert). Rolle und Zusatzrollen gelten für alle.
      *
      * @return list<array<string, mixed>>
      */
-    private function createUsers(mixed $level, mixed $people): array
+    private function createUsers(mixed $level, mixed $people, mixed $extraRoles = null): array
     {
         $level = $level ?? Roles::MEMBER;
         if (!is_array($people) || $people === []) {
@@ -206,7 +208,7 @@ final class Api
         foreach (array_values($people) as $i => $p) {
             $p = is_array($p) ? $p : [];
             try {
-                $prepared = $this->app->members()->prepare(['level' => $level] + $p, $taken, $this->user());
+                $prepared = $this->app->members()->prepare(['level' => $level, 'extra_roles' => $extraRoles] + $p, $taken, $this->user());
                 $initial = $this->app->ranks()->prepareInitial($this->user(), $p);
                 if (($initial['points'] > 0 || $initial['rank'] !== null) && $level !== Roles::MEMBER) {
                     throw ApiError::invalid('Anfangspunkte und Dienstgrad gibt es nur für Mitglieder.');
@@ -219,12 +221,12 @@ final class Api
                 $who = $label !== '' ? ' (' . $label . ')' : '';
                 throw new ApiError($e->status, $e->errorCode, sprintf('Zeile %d%s: %s', $i + 1, $who, $e->getMessage()));
             }
-            $plans[] = [$prepared, $initial, $birthday, $photo];
+            $plans[] = [$prepared, $initial, $birthday, $photo, Input::bool($p['no_access'] ?? null)];
         }
         $out = [];
-        foreach ($plans as [$prepared, $initial, $birthday, $photo]) {
+        foreach ($plans as [$prepared, $initial, $birthday, $photo, $noAccess]) {
             try {
-                $created = $this->app->members()->insert($prepared);
+                $created = $this->app->members()->insert($prepared, $noAccess);
             } catch (\Throwable $e) {
                 $out[] = ['name' => $prepared['name'], 'username' => $prepared['login'], 'error' => $e instanceof ApiError ? $e->getMessage() : 'Konnte nicht angelegt werden.'];
                 continue;
@@ -404,7 +406,8 @@ final class Api
 
     /**
      * Kompanien (Issue #280) mit ihren Mitgliedern wie in der Mitgliederliste: Foto, Titel und Dienstgrad dazu (ohne
-     * Geburtstag und Eintritt). Wer die Namen sieht, regelt CompanyService::list (view_directory).
+     * Geburtstag und Eintritt). Wer die Namen sieht, regelt CompanyService::list (Bereich directory
+     * und view_directory).
      *
      * @return list<array<string, mixed>>
      */
@@ -545,8 +548,10 @@ final class Api
                 'logoutUrl' => $a->authenticator->logoutUrl(),
             ],
             'features' => $features,
-            // Fehlermeldungen an die Betreuer der App (Issue #64): ohne Empfänger kein Knopf „Fehler melden“
-            'reports' => $a->bugReports()->available(),
+            // Fehlermeldungen (Issue #64): gehen zuerst an die Admins, darum immer möglich (Knopf „Fehler melden“);
+            // openReports: offene Meldungen für alle mit review_reports (Zähler in der Verwaltung), sonst null
+            'reports' => true,
+            'openReports' => $user !== null && $this->can(Cap::ReviewReports) ? $a->bugReports()->openCount() : null,
             // Zugang beantragen (Issue #314): Link „Zugang beantragen“ für Gäste; pendingRegistrations: offene Anfragen
             // für alle, die freigeben (Zähler in der Verwaltung), sonst null
             'registration' => $a->registrations()->enabled(),
@@ -558,14 +563,21 @@ final class Api
             // Bezeichnungen und Punktefaktor der Rollen (vom Admin in der App festgelegt)
             'roles' => $a->roles()->publicList(),
             // level ist die Grundrolle; extra_roles die Zusatzrollen (Issue #66), capabilities alle Rechte zusammen
-            // photo_url: eigenes Foto (Konto), null ohne
-            'user' => $user !== null ? $user->toArray() + ['extra_roles' => $a->roles()->extraRolesOf($user), 'photo_url' => $a->memberPhotos()->url($user->id)] : null,
+            // photo_url: eigenes Foto (Konto), null ohne; create_roles bzw. create_extra_roles: Grund- bzw. Zusatzrollen, die
+            // die Person beim Anlegen vergeben darf (RoleService::canCreateAs, creatableExtraRoles), nur mit create_users
+            'user' => $user !== null ? $user->toArray() + ['extra_roles' => $a->roles()->extraRolesOf($user), 'photo_url' => $a->memberPhotos()->url($user->id)]
+                + ($this->can(Cap::CreateUsers) ? ['create_roles' => $a->roles()->creatableRoles($user), 'create_extra_roles' => $a->roles()->creatableExtraRoles($user)] : []) : null,
             // Rechte ohne Anmeldung (die der Rolle Gast): Was die App dann zeigt
             'guestCapabilities' => array_map(static fn (Cap $c): string => $c->value, $a->roles()->guestCapabilities()),
             // Nur für Admins: Einrichtungsassistent beim ersten Öffnen anbieten.
             'maintenance' => self::maintenanceInfo($a->maintenance()->state()),
             // Einrichtbare Navigation (Issue #277): null = Standardnavigation; nur Darstellung, die Rechte prüfen die Routen
             'navigation' => $a->navigation()->get(),
+            // Eigene Namen, Symbole und Startseiten (Issue #362); section_labels = die Namen als Abschnitte (brand.labels.sections)
+            'navigation_names' => self::jsonObject($a->navigation()->names()),
+            'navigation_start' => self::jsonObject($a->navigation()->start()),
+            'navigation_labels' => $a->navigation()->showLabels(),
+            'section_labels' => self::jsonObject($a->navigation()->sectionOverrides($a->features()->enabled('directory'), $a->features()->enabled('offices'))),
             // News in der App geschrieben (Quelle „app“): Wer manage_news hat, sieht dort Knöpfe zum Schreiben und Ändern
             'newsInApp' => ($features['news'] ?? false) && $a->newsService()->inApp(),
             // Eigene Seiten (Issue #287), die die Person lesen darf: für die Kacheln unter „Seiten“ (ohne Text)
@@ -599,6 +611,17 @@ final class Api
             'imprint' => $legal['imprint_url'] !== '' ? $legal['imprint_url'] : null,
             'privacy' => $legal['privacy_url'] !== '' ? $legal['privacy_url'] : null,
         ];
+    }
+
+    /**
+     * Leere Zuordnung als JSON-Objekt ({}) statt Liste ([]), wie in api/openapi.yaml.
+     *
+     * @param array<mixed> $map
+     * @return array<mixed>|\stdClass
+     */
+    private static function jsonObject(array $map): array|\stdClass
+    {
+        return $map === [] ? new \stdClass() : $map;
     }
 
     /** https://…/updates.json → https://…/handbuch/ (dort liegt die Seite der Kompanie); sonst null. */
@@ -692,6 +715,12 @@ final class Api
             // Fehlermeldungen (Issue #64): auch ohne Anmeldung; Zeitfalle, Honeypot und Begrenzung im Dienst
             new Route('GET', '/reports/form', $P, fn () => $a->bugReports()->form($a->authContext->currentUser())),
             new Route('POST', '/reports', $P, fn (Request $r) => Response::created($a->bugReports()->submit($a->authContext->currentUser(), $r->body, $r->client))),
+            // Eigene Meldungen mit Stand; Eingang der Admins: schließen mit Begründung oder an die Betreuer weiterleiten
+            new Route('GET', '/reports/mine', $L, fn () => $a->bugReports()->mine($this->user())),
+            new Route('GET', '/reports/review', Cap::ReviewReports, fn () => $a->bugReports()->review()),
+            new Route('GET', '/reports/review/{id}/screenshot', Cap::ReviewReports, fn (Request $r) => $a->bugReports()->screenshotOf($r->id())),
+            new Route('POST', '/reports/review/{id}/close', Cap::ReviewReports, fn (Request $r) => $a->bugReports()->close($this->user(), $r->id(), $r->input('reason'))),
+            new Route('POST', '/reports/review/{id}/forward', Cap::ReviewReports, fn (Request $r) => $a->bugReports()->forward($this->user(), $r->id())),
             // Selbstregistrierung (Issue #314): Zugang beantragen (auch ohne Anmeldung; Zeitfalle, Honeypot und Begrenzung
             // im Dienst), E-Mail-Adresse bestätigen, Stand der Anfrage
             new Route('GET', '/registration/form', $P, fn () => $a->registrations()->form()),
@@ -750,6 +779,18 @@ final class Api
                 $a->gallerySubmissions()->withdraw($this->user(), $r->id());
                 return ['deleted' => true];
             }, 'gallery'),
+            // Videos in Stücken hochladen (Issue #350): ins Album (manage_settings) oder als Einreichung (submit_gallery)
+            new Route('POST', '/gallery/video-uploads', [Cap::ManageSettings, Cap::SubmitGallery], fn (Request $r) => Response::created(
+                $a->videoUploads()->start($this->user(), $r->body, $this->can(Cap::ManageSettings), $this->can(Cap::SubmitGallery)),
+            ), 'gallery'),
+            new Route('POST', '/gallery/video-uploads/chunk', [Cap::ManageSettings, Cap::SubmitGallery], fn (Request $r) => $a->videoUploads()->chunk($this->user(), $r->input('upload'), $r->input('offset'), $r->input('data')), 'gallery'),
+            new Route('POST', '/gallery/video-uploads/finish', [Cap::ManageSettings, Cap::SubmitGallery], fn (Request $r) => Response::created($a->videoUploads()->finish($this->user(), $r->body)), 'gallery'),
+            new Route('POST', '/gallery/video-uploads/cancel', [Cap::ManageSettings, Cap::SubmitGallery], function (Request $r) use ($a) {
+                $a->videoUploads()->cancel($this->user(), $r->input('upload'));
+                return ['cancelled' => true];
+            }, 'gallery'),
+            // Hochgeladene Bilder und Videos nachträglich intern oder öffentlich stellen (Alben, Prüfen, Großansicht)
+            new Route('PATCH', '/gallery/photos/{id}', [Cap::ManageSettings, Cap::ReviewGallery], fn (Request $r) => $a->galleryUploads()->setIntern($r->id(), $r->input('intern')), 'gallery'),
             new Route('GET', '/gallery/review', Cap::ReviewGallery, fn () => $a->gallerySubmissions()->review(), 'gallery'),
             new Route('POST', '/gallery/review/{id}/approve', Cap::ReviewGallery, fn (Request $r) => $a->gallerySubmissions()->approve($this->user(), $r->id(), Input::bool($r->input('intern'))), 'gallery'),
             new Route('POST', '/gallery/review/{id}/reject', Cap::ReviewGallery, fn (Request $r) => $a->gallerySubmissions()->reject($this->user(), $r->id(), $r->input('reason')), 'gallery'),
@@ -827,6 +868,9 @@ final class Api
             new Route('POST', '/offices', Cap::ManageOffices, fn (Request $r) => Response::created($a->offices()->createOffice($r->body)), 'offices', $denyRights),
             new Route('PUT', '/offices/order', Cap::ManageOffices, fn (Request $r) => $a->offices()->reorderOffices($r->input('ids')), 'offices', $denyRights),
             // Import (Ersterfassung): ohne apply nur die Vorschau
+            // Freie Namen in Amtszeiten mit Konten verknüpfen: Vorschläge (tolerant bei Namen) und Verknüpfen eines Namens
+            new Route('GET', '/offices/link-suggestions', Cap::ManageOffices, fn () => $a->offices()->linkSuggestions(), 'offices', $denyRights),
+            new Route('POST', '/offices/link', Cap::ManageOffices, fn (Request $r) => $a->offices()->linkName($r->input('name'), $r->input('user_id')), 'offices', $denyRights),
             new Route('POST', '/offices/import', Cap::ManageOffices, fn (Request $r) => $a->offices()->import(
                 $r->input('csv'),
                 $r->input('link') === null ? true : Input::bool($r->input('link')),
@@ -913,8 +957,8 @@ final class Api
                 return ['deleted' => true];
             }, 'documents', $denyRights),
 
-            // Schwarzes Brett (Issue #5): öffentliche Nachrichten lesen alle (auch ohne Anmeldung), interne view_board
-            // (BoardService::canRead); post_board schreibt, ändert und löscht (und liest daher auch); nur beim Schreiben
+            // Schwarzes Brett (Issue #5): öffentliche Nachrichten lesen alle (auch ohne Anmeldung), interne view_board,
+            // die für Kompanien oder Personen nur diese (BoardService::canRead); post_board schreibt, ändert und löscht (und liest daher auch); nur beim Schreiben
             // eine Benachrichtigung
             new Route('GET', '/board', $P, fn () => $a->board()->list($a->viewer()), 'board'),
             new Route('POST', '/board', Cap::PostBoard, function (Request $r) use ($a) {
@@ -933,9 +977,10 @@ final class Api
                     throw ApiError::invalid($a->boardMail()->info()['reason'] ?? 'Der Mailversand ist nicht eingerichtet.');
                 }
                 // Vor dem Veröffentlichen: Passt die Mail zur Höchstgröße des Mailservers?
-                if ($mail && is_string($r->input('title')) && is_string($r->input('text'))) {
+                $mailHtml = $mail && is_string($r->input('title')) ? $a->board()->inputMailHtml($r->body, $this->user()) : null;
+                if ($mailHtml !== null) {
                     $files = $a->attachments()->resolve($this->user(), $r->input('attachments'), AttachmentService::OWNER_BOARD);
-                    $a->boardMail()->checkSize(Text::line($r->input('title')), RichText::sanitize($r->input('text')), $this->user(), $files);
+                    $a->boardMail()->checkSize(Text::line($r->input('title')), $mailHtml, $this->user(), $files);
                 }
                 $item = $a->board()->create($this->user(), $r->body);
                 $author = $this->user()->id;
@@ -949,11 +994,18 @@ final class Api
                 }
                 return Response::created($item);
             }, 'board', $denyRights),
+            // Auswahl „Kompanie“ und „Einzeln“ beim Schreiben: Kompanien und Personen, die das Brett lesen
+            new Route('GET', '/board/audiences', Cap::PostBoard, fn () => $a->board()->audiences(), 'board', $denyRights),
             // Haken „E-Mail senden“: eingerichtet? Wie viele Empfänger?
-            new Route('GET', '/board/mail', Cap::PostBoard, fn () => $a->boardMail()->info(), 'board', $denyRights),
+            // Mit ?audience=company|person&audience_ids=1,2 die Empfänger einer Nachricht nur für diese.
+            new Route('GET', '/board/mail', Cap::PostBoard, function (Request $r) use ($a) {
+                $audience = is_string($r->query['audience'] ?? null) ? $r->query['audience'] : BoardService::AUDIENCE_MEMBERS;
+                $ids = array_values(array_map('intval', array_filter(explode(',', is_string($r->query['audience_ids'] ?? null) ? $r->query['audience_ids'] : ''), 'ctype_digit')));
+                return $a->boardMail()->info($a->board()->readerIds(['audience' => $audience, 'audience_ids' => $ids]), $this->user()->id);
+            }, 'board', $denyRights),
             // Verlauf (Issue #172): abgelaufene und gelöschte Nachrichten der letzten 30 Tage, Verlauf einer Nachricht
-            new Route('GET', '/board/history', Cap::PostBoard, fn () => $a->board()->ended(), 'board', $denyRights),
-            new Route('GET', '/board/{id}/history', Cap::PostBoard, fn (Request $r) => $a->board()->history($r->id()), 'board', $denyRights),
+            new Route('GET', '/board/history', Cap::PostBoard, fn () => $a->board()->ended($this->user()), 'board', $denyRights),
+            new Route('GET', '/board/{id}/history', Cap::PostBoard, fn (Request $r) => $a->board()->history($r->id(), $this->user()), 'board', $denyRights),
             new Route('PATCH', '/board/{id}', Cap::PostBoard, fn (Request $r) => $a->board()->update($this->user(), $r->id(), $r->body), 'board', $denyRights),
             new Route('DELETE', '/board/{id}', Cap::PostBoard, function (Request $r) use ($a) {
                 $a->board()->delete($this->user(), $r->id());
@@ -1213,7 +1265,7 @@ final class Api
             new Route('POST', '/registrations/{id}/approve', Cap::CreateUsers, fn (Request $r) => $a->registrations()->approve($this->user(), $r->id(), $r->body), null, $denyUsers),
             new Route('POST', '/registrations/{id}/reject', Cap::CreateUsers, fn (Request $r) => $a->registrations()->reject($r->id(), $r->input('reason')), null, $denyUsers),
             // Mehrere auf einmal (Issue #24): erst alle prüfen; bei einem Fehler wird keiner angelegt.
-            new Route('POST', '/users/bulk', Cap::CreateUsers, fn (Request $r) => Response::created($this->createUsers($r->input('level'), $r->input('people'))), null, $denyUsers),
+            new Route('POST', '/users/bulk', Cap::CreateUsers, fn (Request $r) => Response::created($this->createUsers($r->input('level'), $r->input('people'), $r->input('extra_roles'))), null, $denyUsers),
 
             // Einstellungen (Admins)
             // Nutzungsauswertung (Issue #175): nur Admins (view_activity); Erfassung je Person schalten mit den Einstellungen.
@@ -1223,12 +1275,7 @@ final class Api
             new Route('GET', '/admin/maintenance', Cap::ManageSettings, fn () => $a->maintenance()->state() + ['log' => $a->maintenance()->log()], null, $denySettings),
             new Route('POST', '/admin/maintenance', Cap::ManageSettings, fn (Request $r) => $a->maintenance()->set($r->input('on'), $r->body['reason'] ?? null, $this->user()) + ['log' => $a->maintenance()->log()], null, $denySettings),
             new Route('GET', '/admin/navigation', Cap::ManageSettings, fn () => $a->navigation()->describe(), null, $denySettings),
-            new Route('PUT', '/admin/navigation', Cap::ManageSettings, function (Request $r) use ($a) {
-                if (!array_key_exists('navigation', $r->body)) {
-                    throw ApiError::invalid('Bitte die Navigation angeben (null für die Standardnavigation).');
-                }
-                return $a->navigation()->set($r->body['navigation']);
-            }, null, $denySettings),
+            new Route('PUT', '/admin/navigation', Cap::ManageSettings, fn (Request $r) => $a->navigation()->save((array) $r->body), null, $denySettings),
             new Route('GET', '/admin/settings', Cap::ManageSettings, fn () => $a->settingsService()->get(), null, $denySettings),
             // Zugang beantragen (Issue #314): ein/aus und vorgeschlagene Rolle
             new Route('GET', '/admin/registration', Cap::ManageSettings, fn () => $a->registrations()->settings(), null, $denySettings),
@@ -1327,6 +1374,40 @@ final class Api
             new Route('POST', '/admin/update/install', Cap::ManageSettings, function (Request $r) use ($a) {
                 $a->updates()->install(is_string($r->input('version')) ? $r->input('version') : '', 'manual', Input::bool($r->input('major')), Input::bool($r->input('without_drive')));
                 return ['installed' => $r->input('version')];
+            }, null, $denySettings),
+            // Update-Paket hochladen statt herunterladen: in Stücken, dann erkennen (muss in der signierten Liste stehen) und einspielen.
+            new Route('POST', '/admin/update/upload', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->updates()->configured() || throw ApiError::invalid('Diese Installation bekommt keine Updates über die App.');
+                return Response::created($a->updateUploads()->start($r->input('size')));
+            }, null, $denySettings),
+            new Route('POST', '/admin/update/upload/chunk', Cap::ManageSettings, fn (Request $r) => $a->updateUploads()->chunk($r->input('upload'), $r->input('offset'), $r->input('data')), null, $denySettings),
+            new Route('POST', '/admin/update/upload/check', Cap::ManageSettings, function (Request $r) use ($a) {
+                $uploads = $a->updateUploads();
+                try {
+                    return $a->updates()->identifyUpload($uploads->file($r->input('upload')));
+                } catch (ApiError $e) {
+                    $uploads->remove($r->input('upload'));
+                    throw $e;
+                }
+            }, null, $denySettings),
+            new Route('POST', '/admin/update/upload/install', Cap::ManageSettings, function (Request $r) use ($a) {
+                $uploads = $a->updateUploads();
+                $upload = $r->input('upload');
+                try {
+                    $version = $a->updates()->installUpload($uploads->file($upload), Input::bool($r->input('major')), Input::bool($r->input('without_drive')));
+                } catch (ApiError $e) {
+                    // Nach „Trotzdem aktualisieren?“ (Sicherung in Google Drive gescheitert) noch einmal mit derselben Datei
+                    if ($e->errorCode !== UpdateService::DRIVE_FAILED) {
+                        $uploads->remove($upload);
+                    }
+                    throw $e;
+                }
+                $uploads->remove($upload);
+                return ['installed' => $version];
+            }, null, $denySettings),
+            new Route('POST', '/admin/update/upload/cancel', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->updateUploads()->remove($r->input('upload'));
+                return ['cancelled' => true];
             }, null, $denySettings),
             // Automatisches Update, zurückgestellt, weil die Sicherung in Google Drive scheiterte: trotzdem einspielen oder verwerfen.
             new Route('POST', '/admin/update/held', Cap::ManageSettings, function () use ($a) {

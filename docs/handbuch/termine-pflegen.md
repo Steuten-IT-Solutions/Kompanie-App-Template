@@ -14,7 +14,7 @@ Tippe unten auf **{bereich.events}** und dann oben auf **Öffentliche Termine ve
 ## Was du hier siehst
 - **‹ Zu den Terminen**: zurück zu **{bereich.events}**.
 - **+ Öffentlichen Termin anlegen**: öffnet das Formular für einen neuen Termin.
-- **Kommende öffentliche Termine**: alle kommenden Termine mit Datum, Uhrzeit und Ort, jeder mit **Bearbeiten** und **Löschen**.
+- **Kommend und öffentlich**: alle kommenden Termine mit Datum, Uhrzeit und Ort, jeder mit **Bearbeiten** und **Löschen**.
 
 ## So gehst du vor
 ### Einen Termin anlegen
@@ -39,7 +39,7 @@ Tippe unten auf **{bereich.events}** und dann oben auf **Öffentliche Termine ve
 ## Gut zu wissen
 - Vergangene Termine verschwinden von selbst aus der Liste.
 - Nutzt die {kompanie.name} auch ihren internen Kalender, sehen angemeldete {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter) unter **{bereich.events}** stattdessen diesen Kalender. Trag öffentliche Termine, die auch sie sehen sollen, deshalb zusätzlich dort ein. Die internen Termine kommen nicht von hier, sondern aus diesem Kalender.
-- Wer Benachrichtigungen für {bereich.events} eingeschaltet hat und die öffentlichen Termine sieht (z. B. Gäste), bekommt bei einem neuen Termin „Neuer Termin“. Änderst du später Datum, Uhrzeit oder Ort, kommt „Termin geändert“. Änderungen nur am Titel oder an der Beschreibung lösen keine Benachrichtigung aus, und für vergangene Termine kommt nichts.
+- Wer Benachrichtigungen für {bereich.events} eingeschaltet hat und die öffentlichen Termine sieht (z. B. Gäste), bekommt bei einem neuen Termin „{bereich.events}: neu“. Änderst du später Datum, Uhrzeit oder Ort, kommt „{bereich.events}: geändert“. Änderungen nur am Titel oder an der Beschreibung lösen keine Benachrichtigung aus, und für vergangene Termine kommt nichts.
 
 > **Für Fortgeschrittene:** Läuft die App über eine WordPress-Webseite, zeigt der Shortcode `[kompanie_termine]` die öffentlichen Termine auch auf der Webseite.
 

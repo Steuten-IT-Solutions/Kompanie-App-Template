@@ -18,9 +18,24 @@ interface MediaStore
      */
     public function put(int $albumId, string $source, string $extension): string;
 
+    /**
+     * Wie put(), übernimmt die Datei aber (verschiebt statt zu kopieren, für große Videos, Issue #350). $source gibt es
+     * danach nicht mehr.
+     *
+     * @return string Schlüssel
+     */
+    public function adopt(int $albumId, string $source, string $extension): string;
+
+    /** Standbild (JPEG) zu einem Video ablegen oder ersetzen; delete() und move() nehmen es mit. */
+    public function putPoster(string $key, string $source): void;
+
+    /** Pfad des Standbilds zu $key; null ohne. */
+    public function posterPath(string $key): ?string;
+
     /** Absoluter Pfad zum Lesen; null, wenn es die Datei nicht gibt. */
     public function path(string $key): ?string;
 
+    /** Löscht die Datei samt Standbild. */
     public function delete(string $key): void;
 
     /** Ordnet die Datei einem anderen Album zu; liefert den neuen Schlüssel. */

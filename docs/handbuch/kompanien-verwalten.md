@@ -46,7 +46,7 @@ Tippe auf **Löschen** und bestätige. Logo und alle Zuordnungen der Mitglieder 
 - In die **Beschreibung** kannst du Text von eurer Webseite kopieren. Farben, die auf dem Hintergrund schlecht lesbar wären (z. B. dunkle Schrift im dunklen Design), zeigt die App in ihrer normalen Schriftfarbe; sehr große Zeilenabstände setzt sie beim Anzeigen auf normal. Gespeichert bleibt der Text so, wie du ihn eingegeben hast.
 - Links müssen mit `https://` beginnen. Das Gründungsjahr liegt zwischen 1800 und dem laufenden Jahr.
 - Bilder in der Beschreibung sieht jeder, der die {bereich.companies} sieht, auch ohne Anmeldung. Sehr große Bilder werden auf höchstens 2048 Pixel an der längeren Kante verkleinert.
-- Wer die {bereich.companies} sieht, legt das Recht „{bereich.companies}“ in den Rollen fest; in neuen Installationen sehen sie alle, auch ohne Anmeldung. Wer welcher Kompanie angehört, sieht nur, wer **{bereich.directory}** sehen darf.
+- Wer die {bereich.companies} sieht, legt das Recht „{bereich.companies}“ in den Rollen fest; in neuen Installationen sehen sie alle, auch ohne Anmeldung. Wer welcher Kompanie angehört, steht auf den Seiten der Kompanien nur, wenn der Bereich **{bereich.directory}** eingeschaltet ist, und dann nur für Rollen mit dem Recht „{bereich.directory}“. So schaltest du die Mitgliederlisten zentral ein oder aus und legst je Rolle fest, wer sie sieht. Zuordnen kannst du Personen auch, wenn der Bereich aus ist.
 - {bereich.companies} und Zuordnungen sind Teil der Datensicherung.
 
 ## Siehe auch

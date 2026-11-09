@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api, type Capability, type MemberRights } from '../api';
 import { requires, toggleMany } from '../capabilities';
 import { RightsTree } from '../rightsTree';
+import { confirmAsk } from '../ask';
 
 /** Rechte nach den Rollen und Ausnahmen; was seine Voraussetzung nicht hat, fällt weg (wie RoleService::effective). */
 function effective(r: MemberRights): Set<Capability> {
@@ -89,10 +90,10 @@ export function MemberRightsPanel({
             <button
               className="btn btn-secondary"
               disabled={busy}
-              onClick={() =>
-                window.confirm(
+              onClick={async () =>
+                (await confirmAsk(
                   `Alle Ausnahmen von ${name} entfernen? Dann gelten nur die Rechte ${plural ? 'der Rollen' : 'der Rolle'}.`,
-                ) && save([], [], 'Rechte wie die Rolle')
+                )) && save([], [], 'Rechte wie die Rolle')
               }
             >
               Wie die Rolle

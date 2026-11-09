@@ -1,19 +1,210 @@
 # Changelog
 
 Was sich in der Kompanie-App von Version zu Version ändert, in Worten für Admins. Admins sehen diese Liste auch in der
-App unter *Einstellungen → Was ist neu*, jeweils passend zur installierten Version.
+App unter [Einstellungen → Was ist neu](app:einstellungen/neuerungen), jeweils passend zur installierten Version.
 
 Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 - Jeder Pull Request nach `develop`, der etwas für die Nutzer der App ändert, ergänzt einen Eintrag unter
   `[Unveröffentlicht]`, im passenden Unterabschnitt: `Neu`, `Geändert`, `Behoben`, `Entfernt` oder `Sicherheit`.
   Interne Änderungen (Tests, CI, Werkzeuge zum Veröffentlichen) gehören nicht hierher.
-- Wer `VERSION` erhöht, macht aus `[Unveröffentlicht]` den Abschnitt `## [x.y.z] – JJJJ-MM-TT` und legt darüber einen
+- Ein Pull Request, der ein Thema fortführt (z. B. weitere Blöcke, mehr zum Schwarzen Brett), ändert den bestehenden
+  Eintrag zu diesem Thema, statt einen neuen anzulegen. Ein Eintrag beschreibt den Stand für die Admins, nicht die
+  einzelnen Schritte dorthin.
+- Wer `VERSION` erhöht, fasst vorher die Einträge unter `[Unveröffentlicht]` nach Thema zusammen und macht dann aus
+  `[Unveröffentlicht]` den Abschnitt `## [x.y.z] – JJJJ-MM-TT` und legt darüber einen
   neuen, leeren `[Unveröffentlicht]` an. Ein Release `develop → main` ist nur mit diesem Abschnitt möglich
   (`php scripts/changelog.php --check --require-version`).
+- Wo ein Eintrag sagt, wo man etwas findet oder einstellt, steht der Weg als Verweis in die App:
+  `[Einstellungen → Rollen](app:einstellungen/rollen)`, mit der Adresse der Seite ohne `#/` (in der App z. B.
+  `#/einstellungen/rollen`, `#/verwaltung/aemter`). In der App lässt sich der Weg antippen und öffnet die Seite. Ein Weg
+  nur als Text (`*Einstellungen → …*`, `*Verwaltung → …*`) lehnt die Prüfung ab, ebenso ein Verweis auf eine Seite, die
+  es nicht gibt (`packages/frontend/test/changelogLinks.test.ts`).
 - Die Version ist die Kern-Version (`1.4.0`), nicht die einer Kompanie (`1.4.0.27`).
 
 ## [Unveröffentlicht]
+
+## [0.8.0] – 2026-11-09
+
+### Neu
+
+- **Update als Datei hochladen**: Unter [Einstellungen → Zustand und Updates](app:einstellungen/zustand) lässt sich bei
+  *Update-Paket hochladen* ein Update-Paket (ZIP-Datei) direkt in der App hochladen und einspielen, ohne Zugang zum
+  Server. Die App zeigt vorher, welche Version es ist, und spielt nur unveränderte Pakete aus der geprüften Update-Liste
+  ein, auch eine Vorabversion oder eine ältere Version. Wie immer wird vorher gesichert.
+- **Navigation: Bereiche umbenennen, Symbole wählen, Startseite festlegen**: Unter [Einstellungen → Navigation](app:einstellungen/navigation) gebt
+  ihr jedem Bereich, jeder eigenen Seite und dem Untermenü *Intern* der Standardnavigation einen eigenen Namen und ein
+  eigenes Symbol (dazu gibt es zehn neue, allgemeine Symbole). Der Name gilt überall in der App: in der Leiste, in den
+  Überschriften, in der Verwaltung, in Benachrichtigungen, Mails und in der Hilfe; bei eigenen Seiten nur in der Leiste.
+  Die Startseite beim Öffnen der App wählt ihr getrennt für Gäste und für Angemeldete. Unten in der Leiste dürfen jetzt
+  beliebig viele Punkte stehen; Schrift und Symbole werden mit der Zahl kleiner, und auf Wunsch zeigt die Leiste nur
+  Symbole. *Standardnavigation wiederherstellen* setzt all das zusammen zurück. Feste Sätze wie „Keine anstehenden
+  Termine“ sind dafür neutral formuliert („Zurzeit steht nichts an.“), Benachrichtigungen heißen z. B. „Termine: neu“.
+- **Galerie: Videos hochladen und einreichen**: Unter [Einstellungen → Galerie](app:einstellungen/galerie) lassen sich jetzt neben Bildern auch
+  Videos als MP4 oder WebM in jedes Album hochladen, mit höchstens 1 GB je Video. Wer Bilder einreichen darf, reicht
+  ebenso Videos ein (*Bilder und Videos einreichen*); beim Prüfen spielt ihr ein Video vor der Freigabe ab. Die App lädt
+  Videos in Stücken hoch, damit auch große Handyvideos unter der Grenze des Webspace bleiben, und zeigt den Fortschritt
+  in Prozent. Videos liegen auf dem eigenen Server und werden nicht umgewandelt; als Vorschaubild dient ein Standbild
+  aus der ersten Sekunde. In der Sicherung sind diese Videos wegen ihrer Größe nicht enthalten.
+- **Galerie: hochgeladene Bilder nachträglich intern oder öffentlich stellen**: Bilder, die in der App hochgeladen
+  oder über Einreichungen freigegeben wurden, lassen sich jetzt jederzeit umstellen: unter [Einstellungen → Galerie](app:einstellungen/galerie)
+  mit dem Haken *intern* neben dem Bild, beim Prüfen unter *Zuletzt freigegeben* und in der Großansicht der Galerie
+  (*Nur für Mitglieder* bzw. *Öffentlich zeigen*). Das dürfen alle, die die Einstellungen verwalten oder Einreichungen
+  prüfen. Das Bild bekommt dabei eine neue Adresse, die alte liefert nichts mehr. Bilder aus Google Drive stellt
+  weiterhin der Unterordner *intern* in Drive um.
+- **Inhalte aus Blöcken**: Eigene Seiten, Beiträge in den News, die in der App geschrieben werden, und Nachrichten am
+  Schwarzen Brett bestehen jetzt aus Blöcken, die ihr mit *+ Block einfügen* hinzufügt, mit ↑/↓ verschiebt und
+  entfernt. Jeder Block hat ein eigenes *Für wen?*: Blöcke *Nur Mitglieder* samt ihren Bildern fehlen auf öffentlichen
+  Seiten und Nachrichten ohne Anmeldung. Bestehende Inhalte bleiben unverändert (ein Textblock). Ohne Titelbild ist
+  das Vorschaubild in der Liste der News das erste Bild in einem Text für alle. Die Mail vom Brett enthält alle
+  Blöcke, den Countdown als Satz; der Verlauf zeigt Blöcke ebenso.
+- **Vorgefertigte Blöcke**: Neben *Text* gibt es
+  *Countdown* (bis zu einem Datum oder Termin, verschoben: zählt mit; immer zwei Angaben wie Tage und Stunden, auf
+  Wunsch bis zu einem Ende ein Text wie „läuft“ und danach ein eigener Text oder nichts),
+  *Knopf mit Link* (Webseite, E-Mail-Adresse, Telefonnummer oder Seite der App),
+  *Nächste Termine* (1 bis 20 ab heute, immer aktuell),
+  *Ansprechpartner* (wer ausgewählte Ämter gerade innehat, mit Foto; E-Mail-Adresse und Handynummer nur für alle, die
+  persönliche Angaben sehen dürfen),
+  *Hinweis-Kasten* (Info, Warnung oder Erfolg), *Trennlinie* (Linie oder Abstand),
+  *Ablauf* (Zeit und Programmpunkt untereinander, z. B. für ein Fest),
+  *Zahlen und Fakten* (kurze Kennzahlen wie „1848 gegründet“),
+  *Umfrage* (Stand und Weg zum Abstimmen, nur für alle, die an Umfragen teilnehmen dürfen),
+  *Album* (einige Vorschaubilder eines Albums; jeder sieht nur die Bilder, die er in der Galerie sehen darf),
+  *Dokument* (Datei aus den Dokumenten zum Öffnen und Herunterladen, nur für alle, die sie dort sehen dürfen),
+  *Sponsoren* (alle mit Logo und Link) und
+  *Karte zur Anfahrt* (ein Ort mit dem Knopf *Karte*, der ihn in der Karten-App des Geräts öffnet; es wird keine fremde
+  Karte eingebettet).
+- **Titelbild für Neuigkeiten**: Beim Schreiben eines Beitrags in der App gibt es das Feld *Titelbild (optional)* mit
+  Vorschau im Format der Liste. Das Titelbild steht in der Liste über dem Beitrag und groß oben im Beitrag; ohne
+  Titelbild bleibt wie bisher das erste Bild im Text das Vorschaubild. Neuigkeiten von einer Webseite oder einem Feed
+  zeigen weiter ihr mitgeliefertes Bild.
+- **Mitglieder ohne Zugang**: Unter *Mitglied anlegen* gibt es den Haken *Ohne Zugang (meldet sich noch nicht an)*.
+  So tragt ihr Personen ein, die noch kein Konto haben, z. B. für Chroniken und Ämter. Sie sind gewöhnliche Mitglieder,
+  lassen sich überall auswählen und tragen in der Mitgliederliste der Verwaltung die Marke *ohne Zugang*; ein
+  Startpasswort gibt es nicht. Einen Zugang bekommen sie später auf ihrer Seite mit *Zugang einrichten*
+  (Startpasswort) oder beim Freigeben ihrer eigenen Anfrage. Beim Import aus Excel oder CSV legt die neue Spalte
+  *Zugang* mit „nein“ Mitglieder ohne Zugang an (leer oder „ja“: wie bisher mit Startpasswort). Unter *Mehrere auf
+  einmal anlegen* gibt es je Person den Haken *Ohne Zugang*.
+- **Fehlermeldungen zuerst an die Admins**: Was jemand über *Fehler melden* schickt, geht nicht mehr gleich an die
+  Betreuer der App, sondern landet unter [Verwaltung → Fehlermeldungen](app:verwaltung/meldungen) (mit Zahl der offenen und einer
+  Benachrichtigung). Dort schließt ihr eine Meldung mit Begründung, z. B. wenn ihr selbst helfen konntet, oder leitet
+  sie an die Betreuer weiter; erst dann wird daraus ein Eintrag bei ihnen. Wer angemeldet meldet, sieht unter
+  *Deine Meldungen* den Stand und eure Begründung und wird benachrichtigt. Die Admins sehen den Namen angemeldeter
+  Personen; an die Betreuer geht er weiter nur mit Haken. Neues Recht *Fehlermeldungen bearbeiten*, das ihr an Rollen
+  vergeben könnt (Admins haben es immer). *Fehler melden* gibt es jetzt auch in Apps ohne Empfänger für
+  Fehlermeldungen; dort bleiben die Meldungen bei den Admins. Erledigte Meldungen werden nach 30 Tagen gelöscht.
+- **Hinweis zum Einschalten der Benachrichtigungen**: Angemeldete Mitglieder sehen auf der Startseite einen Hinweis
+  *Nichts mehr verpassen* mit dem Knopf *Benachrichtigungen einschalten*, solange ihr Browser auf diesem Gerät noch
+  nicht nach Benachrichtigungen gefragt hat. Ein Tippen fragt nach der Erlaubnis und schaltet alle Arten ein; *Nicht
+  jetzt* blendet den Hinweis für 30 Tage aus. Ohne Zustimmung der Person im Browser geht es technisch nicht.
+- **Neue Arten von Benachrichtigungen kommen von selbst dazu**: Bekommt jemand eine Art neu angeboten, z. B. nach einer
+  neuen Rolle (Bilder prüfen, Anfragen freigeben, Mitglied statt Gast) oder weil ihr einen Bereich wie News oder
+  Termine einschaltet, schaltet die App sie auf seinen Geräten mit Benachrichtigungen ein (spätestens nach
+  15 Minuten). Arten, die jemand selbst abgeschaltet hat, bleiben aus. Bei Geräten, die schon vor diesem Update
+  angemeldet waren, gilt das für alles, was ab jetzt neu dazukommt.
+- **Rolle und Zusatzrollen gleich beim Anlegen**: Wer Rollen vergeben darf, wählt beim Anlegen eines Mitglieds jetzt
+  jede Rolle, die er auch danach unter *Konto und Rolle* vergeben dürfte (z. B. Vorstand), und hakt Zusatzrollen an.
+  Das gilt für *Mitglied anlegen*, *Mehrere auf einmal anlegen* (Rolle und Zusatzrollen für alle), den Import aus
+  Excel oder CSV (Spalte *Status* mit dem Namen der Rolle, neue Spalte *Zusatzrollen*, mit Komma getrennt) und das
+  Freigeben von Anfragen (nur Rolle). Wer nur Mitglieder anlegen darf, wählt wie bisher Mitglied und die Rollen, die
+  unter [Einstellungen → Rollen](app:einstellungen/rollen) für neue Konten freigegeben sind. Die Rechte prüft der Server.
+- **Ämter: freie Namen mit Mitgliedern verknüpfen**: Unter *Ämter → Namen mit Mitgliedern verknüpfen* schlägt die App
+  vor, welche Personen ohne Profil schon als Mitglied (auch ohne Zugang), in der Mitgliederliste oder als Ehemalige
+  angelegt sind, mit denselben toleranten Namensregeln wie bei den Anfragen. Mit *Verknüpfen* gehören alle Einträge
+  mit diesem Namen zur gewählten Person; Titel, die das Amt vergibt, werden abgeglichen.
+- **Anfragen mit einem Mitglied ohne Zugang verbinden**: Beim Freigeben einer Anfrage schlägt die App passende
+  Mitglieder ohne Zugang vor (gleiche E-Mail-Adresse, gleicher oder ähnlicher Name, auch mit ä/ae oder Bindestrich),
+  und ihr könnt jedes Mitglied ohne Zugang wählen. Mit *Freigeben und verbinden* bekommt das Mitglied Benutzername,
+  E-Mail-Adresse und Passwort aus der Anfrage; es entsteht kein zweites Konto, Rolle und Einträge bleiben. E-Mail-Adresse
+  und Benutzername eines Mitglieds ohne Zugang gelten im Formular *Zugang beantragen* als frei.
+- **Schwarzes Brett nur für eine Kompanie oder einzelne Personen**: Unter *Sichtbar für* gibt es neben *intern* und
+  *öffentlich* jetzt *Kompanie* (nur, wer einer der angehakten Kompanien zugeordnet ist; nur mit eingeschaltetem
+  Bereich Kompanien) und *Einzeln* (nur die angehakten Personen). Benachrichtigung und E-Mail gehen dann nur an sie.
+  Alle, die ans Brett schreiben dürfen, sehen auch diese Nachrichten. Die Auswahl lässt sich beim Bearbeiten ändern
+  und steht im Verlauf. Hinweis: Wer danach auf eine ältere Version zurückgeht, zeigt solche Nachrichten wieder allen
+  Mitgliedern und Anwärtern.
+- **Was ist neu: Wege direkt antippen**: Nennt eine Änderung, wo ihr etwas findet oder einstellt (z. B.
+  [Einstellungen → Rollen](app:einstellungen/rollen)), ist dieser Weg unter
+  [Einstellungen → Was ist neu](app:einstellungen/neuerungen) jetzt ein Verweis und öffnet gleich die Seite, auch bei
+  älteren Versionen. Wege zu Seiten, die inzwischen umgezogen sind, führen auf die heutige Seite.
+
+### Geändert
+
+- **Ämter in der Einzahl**: Auf den Karten gemeinsamer Amtszeiten (z. B. „Königshaus 2026–2028“) und beim Antippen
+  eines Balkens in der Jahresansicht steht jetzt die Einzahl des Amts („Prinz“ statt „Prinzen“), wie schon auf der
+  Seite einer Person. Ebenso im Block *Ansprechpartner* über jeder Person und in der Mail vom Brett, wenn das Amt nur
+  eine Person hat. Ohne Einzahl bleibt die Bezeichnung.
+- **Rollen Mitglied und Gast: auch Rechte zum Verwalten**: Unter [Einstellungen → Rollen](app:einstellungen/rollen) lässt sich den Rollen
+  Mitglied und Gast jetzt jedes Recht geben, nicht mehr nur Rechte zum Sehen, z. B. *Bilder und Videos einreichen*.
+  Jede Person mit der Rolle bekommt es dann, bei Mitglied auch jedes neue Konto. Gast gehört weiter nie zur Kompanie;
+  Rechte, die sonst *Gehört zur Kompanie* voraussetzen, gehen bei Gast auch ohne. Was Gast darf, darf jeder, der die
+  App ohne Anmeldung öffnet; die App weist darauf hin. Wer Mitglieder anlegen darf, kann weiterhin Konten mit der Rolle
+  Mitglied anlegen.
+- **Kompanien: Mitglieder nur mit dem Bereich Mitglieder**: Die Seiten der Kompanien zeigen ihre Mitglieder jetzt
+  nur noch, wenn der Bereich *Mitglieder* eingeschaltet ist, und dann für die Rollen mit dem Recht *Mitglieder*. So
+  schaltest du die Mitgliederlisten unter [Einstellungen → Bereiche](app:einstellungen/bereiche) zentral ein oder aus und legst unter [Einstellungen → Rollen](app:einstellungen/rollen)
+  fest, wer sie sieht. Bisher erschienen die Mitglieder auf den Kompanieseiten auch bei ausgeschaltetem Bereich, und
+  das Recht ließ sich dann nicht ändern. Die Zuordnungen bleiben erhalten.
+- **Album herunterladen als kleiner Knopf**: In einem Album der Galerie steht statt des großen Knopfs *Album
+  herunterladen (… Bilder, ZIP)* jetzt rechts neben dem Titel ein runder Knopf mit Pfeil nach unten, wie beim
+  Herunterladen eines einzelnen Bildes. Die Anzahl der Bilder und Videos zeigt er beim Darüberfahren mit der Maus;
+  während des Ladens steht darunter „Lädt … von …“ mit *Abbrechen*.
+- **Einstellungen neu geordnet**: Die Übersicht zeigt Kacheln in Gruppen (App, Mitglieder und Zugang,
+  Benachrichtigungen, Verbindungen, Termine und Kalender, Betrieb) statt einer langen Liste. *Zugang beantragen* steht
+  jetzt als Abschnitt unter *Rollen*, *Geburtstage* unter *Kalender*, zusammen mit der Benachrichtigung am Geburtstag
+  (bisher unter *Benachrichtigungen*). Alte Links auf die beiden Seiten führen an die neue Stelle.
+- **Rolle nur für alle, die Rollen vergeben**: Auf der Seite eines Mitglieds stehen Rolle, Zusatzrollen und
+  „mit Ausnahmen bei den Rechten“ nur noch für alle mit dem Recht *Rollen vergeben*; ebenso der Filter *nach Rolle* in
+  der Mitgliederliste. Die anderen sehen dort nur „Ehemalig“ oder „Ohne Zugang“, wenn das zutrifft. Die Zusatzrollen
+  schickt der Server auf der Seite eines Mitglieds nur noch mit diesem Recht.
+- **„Was ist neu“ kürzer**: Aufgeklappt ist nur noch die Vorabversion bzw. die installierte Version; ältere
+  Versionen stehen eingeklappt mit Datum und Anzahl der Änderungen darunter und öffnen sich beim Antippen.
+- **Erklärungen nur noch in der Hilfe**: Lange Erklärtexte oben auf vielen Seiten (z. B. Import, Ehemalige, Ämter,
+  Rollen, E-Mail, Google-Zugang, Datensicherung, Punktekatalog) sind aus der App entfernt; was dort stand, findet ihr
+  über den Knopf **?** im Handbuch der jeweiligen Seite. Warnungen und Hinweise auf etwas, das zu tun ist, bleiben.
+  Unter *Zustand und Updates* steht der Text zu einem Punkt nur noch, wenn dort etwas zu tun ist.
+- **Schwarzes Brett übersichtlicher**: Das Banner oben zeigt je Eintrag nur noch den Titel, ohne Überschrift,
+  Verfasser und Uhrzeit (die stehen am Brett); ein Tipp darauf öffnet die Nachricht, *+1 weitere* und *Brett öffnen*
+  erscheinen erst bei mehreren Einträgen. Auch laufende Umfragen stehen so in einer Zeile. Beim Schreiben ist der Titel
+  eine große Eingabe, *Sichtbar für*, *Sichtbar bis* und die Versandwege stehen im Abschnitt *Sichtbarkeit und
+  Versand*. Die Werkzeugleiste des Texteditors (auch bei Neuigkeiten, eigenen Seiten und E-Mails) zeigt nur die
+  häufigen Werkzeuge; Schriftart, Größe, Ausrichtung, Einzug, Trennlinie, Tabelle und Weiteres liegen hinter **⋯**.
+- **Gleichmäßigere Abstände**: Erklärtexte kleben nicht mehr an der ersten Karte darunter (z. B. bei Dienstgraden,
+  Navigation und Rollen), Umfragen stehen mit Abstand untereinander, Karten am Brett, in den Umfragen und unter
+  *Umfragen verwalten* haben einen Innenrand, beim Anlegen mehrerer Mitglieder stehen die Felder je Person mit Abstand
+  in einem Rahmen, und die Knöpfe *Ansehen* und *Bearbeiten* der Rollen stehen auf dem Handy nebeneinander.
+- **Rückfragen im Fenster der App**: Fragen wie „Wirklich löschen?“, Eingaben (z. B. Grund beim Ablehnen eines
+  Bildes, Adresse eines Links) und Hinweise erscheinen jetzt in einem eigenen Fenster der App statt im Fenster des
+  Browsers. Es sieht auf jedem Gerät gleich aus; Löschen und Entfernen steht auf einem roten Knopf. Hinter einem Fenster ist die Seite
+  stärker abgedunkelt und unscharf, das Fenster hat oben eine Linie in der Farbe der Kompanie und einen kräftigeren
+  Schatten.
+- **Benachrichtigung vom Schwarzen Brett auch an den Verfasser**: Wer eine Nachricht mit *Benachrichtigung senden*
+  schreibt, bekommt die Benachrichtigung jetzt selbst auch (auf seinen Geräten, auf denen die Art *Schwarzes Brett:
+  dringende Nachrichten* eingeschaltet ist), wie schon bisher die Mail. Das gilt für intern, öffentlich, Kompanie und
+  Einzeln, auch wenn der Verfasser selbst nicht ausgewählt ist.
+- **Datei auswählen auf Deutsch**: Beim Hochladen von Dokumenten, beim Import von Mitgliedern, Ehemaligen und Ämtern,
+  beim Einreichen von Bildern und beim Fehlermelden steht jetzt überall ein eigener Knopf *Datei auswählen* mit dem
+  Namen der gewählten Datei, statt des Feldes des Browsers (je nach Gerät z. B. „Choose File“).
+- **„… verwalten“ immer oben**: Bei den eigenen Seiten steht der Knopf jetzt oben wie bei Terminen und Dokumenten;
+  bei Sponsoren und Kompanien gibt es ihn neu, für alle, die sie pflegen dürfen.
+- **Punktekatalog verwalten**: *Wert ändern* und *Deaktivieren* stehen in einer Reihe, die Punkte neben dem Titel.
+
+### Behoben
+
+- **Vorabversionen erhalten**: Der Haken unter [Einstellungen → Zustand und Updates](app:einstellungen/zustand) bleibt nach
+  dem Bestätigen der Rückfrage gesetzt, und die Installation bekommt wieder Vorabversionen. Bisher war er danach wieder
+  aus, und der Kanal blieb bei den freigegebenen Versionen.
+- **Hilfe zu Impressum und Datenschutz**: Der Knopf *?* auf der Seite *Impressum und Datenschutz* der Einstellungen
+  öffnet jetzt deren Anleitung statt der Übersicht der Einstellungen.
+- **Benachrichtigungen, Zuletzt verschickt**: Die Liste unter [Einstellungen → Benachrichtigungen](app:einstellungen/benachrichtigungen) ist jetzt nach
+  Zeit sortiert, das Neueste oben, statt nach Art.
+- **Eigene Seiten**: Der Text einer Seite klebt nicht mehr am Rand ihrer Karte.
+- **Darstellung**: Lange Wörter in Kacheln, Überschriften und Knöpfen werden richtig getrennt (z. B. nicht mehr
+  „Punktekatalo-g“); *Sicherung wiederherstellen* ragt nicht mehr über den Rand; Zurück-Knöpfe in Formularen stehen
+  links statt mittig; Eingabefelder nebeneinander stehen auf einer Höhe, auch bei zweizeiliger Beschriftung; Foto und
+  Knopf beim Anlegen von Mitgliedern und Ehemaligen sind mittig.
+- **Eingabefelder**: Einige Felder (Titel am Schwarzen Brett, Absendername und Mailserver, Name eines Untermenüs)
+  waren grau statt wie alle anderen; Hinweise unter einem Feld sind nicht mehr fett und in Großbuchstaben.
 
 ## [0.7.0] – 2026-11-07
 
@@ -40,7 +231,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Einzahl bekommen (z. B. „Königshaus“). Über einer einzelnen gemeinsamen Amtszeit steht dann „Königshaus 2026–2028“
   statt „Königshäuser 2026–2028“. Einzutragen in der Verwaltung der Ämter unter *Gruppen → Bearbeiten*; ohne Einzahl
   bleibt es wie bisher.
-- **News direkt in der App schreiben**: Unter *Einstellungen → Neuigkeiten* gibt es die Quelle *In der App schreiben*,
+- **News direkt in der App schreiben**: Unter [Einstellungen → Neuigkeiten](app:einstellungen/news) gibt es die Quelle *In der App schreiben*,
   mit WordPress und ohne. Dann steht unter News der Knopf *Neuer Beitrag*: Titel und formatierter Text mit Bildern,
   das erste Bild erscheint auch in der Liste. Beiträge lassen sich später bearbeiten und löschen; wer News abonniert
   hat, bekommt bei einem neuen Beitrag eine Benachrichtigung. Schreiben darf, wer das neue Recht *News schreiben* hat;
@@ -48,9 +239,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   eines Feeds und der App werden nicht gemischt; beim Wechsel bleibt alles gespeichert. Wer die News von der Webseite
   oder aus einem Feed bezieht, merkt nichts davon.
 - **Zugang beantragen**: Personen können ihren Zugang zur App jetzt selbst beantragen, ihr müsst nicht mehr jedes
-  Konto selbst anlegen. Eingeschaltet wird das unter *Einstellungen → Zugang beantragen* (bis dahin bleibt es aus).
+  Konto selbst anlegen. Eingeschaltet wird das unter [Einstellungen → Zugang beantragen](app:einstellungen/rollen) (bis dahin bleibt es aus).
   Die Person füllt ein Formular mit Name, E-Mail-Adresse, Benutzername und Passwort aus; die Anfrage erscheint unter
-  *Verwaltung → Anfragen*. Freigeben oder ablehnen darf, wer Mitglieder anlegen darf, Admins also immer. Erst mit
+  [Verwaltung → Anfragen](app:verwaltung/anfragen). Freigeben oder ablehnen darf, wer Mitglieder anlegen darf, Admins also immer. Erst mit
   der Freigabe entsteht das Konto, mit der dort gewählten Rolle (Admin lässt sich dabei nicht vergeben) und dem
   Passwort aus der Anfrage. Ist der Mailversand eingerichtet, bestätigt die Person zuerst ihre E-Mail-Adresse und
   erfährt das Ergebnis per Mail. Ohne Mailversand sieht sie es bei der Anmeldung oder unter *Stand meiner Anfrage*.
@@ -107,14 +298,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
-- **Bilder und Videos aus der Galerie herunterladen**: Unter *Einstellungen → Galerie* schaltest du mit *Knöpfe zum
+- **Bilder und Videos aus der Galerie herunterladen**: Unter [Einstellungen → Galerie](app:einstellungen/galerie) schaltest du mit *Knöpfe zum
   Herunterladen zeigen* ein, dass alle, die die Galerie sehen, jedes Bild und Video in der Großansicht und jedes Album
   als ZIP-Datei herunterladen können, Bilder in voller Auflösung, Videos unverändert. Große Alben passen auch über
   4 GB in ein ZIP (ZIP64). Vorgabe: aus.
-- **Eigene Seiten**: Mit dem neuen Bereich *Seiten* (unter *Einstellungen → Bereiche*) legt ihr unter *Verwaltung →
-  Einrichtungen → Seiten* freie Seiten wie Geschichte, Festprogramm oder Anfahrt an, mit formatiertem Text und
+- **Eigene Seiten**: Mit dem neuen Bereich *Seiten* (unter [Einstellungen → Bereiche](app:einstellungen/bereiche)) legt ihr unter [Verwaltung →
+  Einrichtungen → Seiten](app:verwaltung/seiten) freie Seiten wie Geschichte, Festprogramm oder Anfahrt an, mit formatiertem Text und
   Bildern. Je Seite wählst du, ob sie alle sehen, auch ohne Anmeldung, oder nur Mitglieder. Jede Seite ist ein eigener
-  Punkt der Navigation, den du unter *Einstellungen → Navigation* in die Leiste oder ein Untermenü schiebst; ohne eigene
+  Punkt der Navigation, den du unter [Einstellungen → Navigation](app:einstellungen/navigation) in die Leiste oder ein Untermenü schiebst; ohne eigene
   Navigation stehen die Seiten in der Reihenfolge, die du per Ziehen festlegst, nach den Bereichen. Speichert jemand
   dazwischen, überschreibt die App seine Fassung nicht. Mit dem Bereich gibt es die Rolle *Seiten verwalten*.
 - **Bilder für die Galerie einreichen**: Mitglieder mit dem neuen Recht *Bilder einreichen* schlagen unter *Galerie →
@@ -123,45 +314,45 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Einreichungen prüfen* öffentlich oder nur für Mitglieder frei oder lehnt sie mit Grund ab; die Person erfährt das
   Ergebnis. Abgelehnte Bilder löscht der Server sofort. Mit der Galerie gibt es die neue Rolle *Galerie verwalten*
   (mit dem Recht zum Prüfen), auch bei Installationen mit schon eingeschalteter Galerie.
-- **Galerie ohne Google Drive und eigene Bilder**: Unter *Einstellungen → Galerie* wählst du als Quelle *Google
+- **Galerie ohne Google Drive und eigene Bilder**: Unter [Einstellungen → Galerie](app:einstellungen/galerie) wählst du als Quelle *Google
   Drive* oder *eigener Server*. Mit beiden Quellen legst du dort Alben nur in der App an und lädst Bilder (JPG, PNG,
   WebP) in jedes Album hoch, auch in eines aus Drive, öffentlich oder nur für Mitglieder. Der Server entfernt beim
   Hochladen Metadaten wie den Aufnahmeort. Der Abgleich mit Drive lässt hochgeladene Bilder in Ruhe, und die Sicherung
   enthält sie. Mit *eigener Server* braucht die Galerie keinen Google-Zugang.
 
-- **Fotos für Personen ohne Konto in den Ämtern**: Unter *Verwaltung → Einrichtungen → Ämter* lädst du bei einer
+- **Fotos für Personen ohne Konto in den Ämtern**: Unter [Verwaltung → Einrichtungen → Ämter](app:verwaltung/aemter) lädst du bei einer
   Amtszeit für Personen ohne Profil (z. B. frühere Mitglieder oder Hofdamen) ein Foto hoch. Steht derselbe Name schon
   mit Foto in einer früheren Amtszeit, bietet die App an, es zu übernehmen. Die Fotos sind wie die Ämter für alle
   sichtbar; bei Mitgliedern bleibt das Foto ihres Profils maßgeblich.
 - **Gemeinsame Amtszeiten mit Gruppenbild**: Haben alle Ämter einer Gruppe dieselben Jahre, z. B. ein Königshaus oder
-  ein Vorstand, schaltest du unter *Verwaltung → Einrichtungen → Ämter* bei der Gruppe *Amtszeiten gemeinsam* ein.
+  ein Vorstand, schaltest du unter [Verwaltung → Einrichtungen → Ämter](app:verwaltung/aemter) bei der Gruppe *Amtszeiten gemeinsam* ein.
   Dann trägst du Jahre, Gruppenbild und die Personen aller Ämter in einem Formular ein; vorhandene Amtszeiten mit
   denselben Jahren fasst die App beim Einschalten zusammen. Unter *Ämter* steht je gemeinsame Amtszeit eine Karte mit
   dem Bild und wer welches Amt hatte, für alle sichtbar wie die Ämter. Ausschalten behält alle Daten.
-- **Kompanien**: Der neue Bereich *Kompanien* (unter *Einstellungen → Bereiche* einschalten) zeigt eure Kompanien mit
+- **Kompanien**: Der neue Bereich *Kompanien* (unter [Einstellungen → Bereiche](app:einstellungen/bereiche) einschalten) zeigt eure Kompanien mit
   Logo in eurer Reihenfolge, für alle, auch ohne Anmeldung. Jede Karte klappt auf und zeigt Beschreibung (auch mit
   Bildern), Gründungsjahr, Links zur Webseite und zur App der Kompanie, die laufenden Ämter einer verknüpften Gruppe der Ämter
   und die Mitglieder (die nur, wer die Mitgliederliste sieht). Aufgelöste Kompanien stehen unten als „ehemalig“.
-  Gepflegt werden sie unter *Verwaltung → Einrichtungen → Kompanien*; Mitglieder ordnest du dort oder auf der Seite
+  Gepflegt werden sie unter [Verwaltung → Einrichtungen → Kompanien](app:verwaltung/kompanien); Mitglieder ordnest du dort oder auf der Seite
   der Person in der Verwaltung zu, auch zu mehreren Kompanien. In der Mitgliederliste stehen die Kompanien auf der
   Seite der Person, und die Liste lässt sich nach Kompanie filtern. Dazu kommt die Rolle *Kompanien verwalten*. Passen
   in der Standardnavigation nicht alle Punkte in die Leiste, stehen Kompanien und Sponsoren unter *Intern*.
-- **Sponsoren**: Der neue Bereich *Sponsoren* (unter *Einstellungen → Bereiche* einschalten) zeigt eure Sponsoren mit
-  Logo und Link in eurer Reihenfolge, für alle, auch ohne Anmeldung. Gepflegt werden sie unter *Verwaltung →
-  Einrichtungen → Sponsoren*: anlegen, Link und Logo (PNG, JPG, WebP oder SVG) hinzufügen, per Ziehen ordnen. Dazu kommt
-  die Rolle *Sponsoren verwalten*. Wer die Sponsoren sieht, legst du unter *Einstellungen → Rollen* mit dem Haken
+- **Sponsoren**: Der neue Bereich *Sponsoren* (unter [Einstellungen → Bereiche](app:einstellungen/bereiche) einschalten) zeigt eure Sponsoren mit
+  Logo und Link in eurer Reihenfolge, für alle, auch ohne Anmeldung. Gepflegt werden sie unter [Verwaltung →
+  Einrichtungen → Sponsoren](app:verwaltung/sponsoren): anlegen, Link und Logo (PNG, JPG, WebP oder SVG) hinzufügen, per Ziehen ordnen. Dazu kommt
+  die Rolle *Sponsoren verwalten*. Wer die Sponsoren sieht, legst du unter [Einstellungen → Rollen](app:einstellungen/rollen) mit dem Haken
   *Sponsoren* fest.
-- **Navigation einrichten**: Unter *Einstellungen → Navigation* legst du fest, welche Bereiche unten in der Leiste
+- **Navigation einrichten**: Unter [Einstellungen → Navigation](app:einstellungen/navigation) legst du fest, welche Bereiche unten in der Leiste
   stehen und in welcher Reihenfolge, fasst Bereiche zu Untermenüs mit eigenem Namen und Symbol zusammen (wie *Intern*)
   oder blendest sie aus. *Verwaltung* und *Meins* stehen immer ganz rechts. Jede Person sieht weiter nur, was sie sehen
   darf. Solange du nichts speicherst, bleibt die Navigation wie bisher; *Standardnavigation wiederherstellen* führt
   jederzeit dorthin zurück.
-- **Impressum und Datenschutz**: Unter *Einstellungen → Impressum und Datenschutz* (und im Einrichtungsassistenten) trägst
+- **Impressum und Datenschutz**: Unter [Einstellungen → Impressum und Datenschutz](app:einstellungen/rechtliches) (und im Einrichtungsassistenten) trägst
   du die Links auf euer Impressum und eure Datenschutzerklärung ein, z. B. auf eurer Webseite. Die App zeigt sie allen,
   auch ohne Anmeldung: auf der Anmeldeseite, unten im Konto und unten in der Hilfe. Solange einer fehlt, ist die Zeile
   *Impressum und Datenschutz* unter *Zustand und Updates* gelb. Die Hilfe listet, welche Daten die App verarbeitet, als
   Hilfe für eure Datenschutzerklärung.
-- **Nachvollziehen, was an Benachrichtigungen verschickt wurde**: Unter *Einstellungen → Benachrichtigungen* steht
+- **Nachvollziehen, was an Benachrichtigungen verschickt wurde**: Unter [Einstellungen → Benachrichtigungen](app:einstellungen/benachrichtigungen) steht
   jetzt für jede Art, wann sie zuletzt verschickt wurde und an wie viele Geräte, dazu wann der Push-Dienst zuletzt eine
   Nachricht angenommen oder abgelehnt hat (mit Grund). So siehst du ohne Blick in die Datenbank, ob eine Benachrichtigung
   verschickt wurde oder ob niemand sie eingeschaltet hatte.
@@ -175,7 +366,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Dienstgrad, Foto, Rolle, Punkte und Offen sofort da (aus der Mitgliederliste); der Rest der Seite folgt, sobald ihre
   Daten geladen sind. Die übrigen Personen lädt die App jetzt zu zwölft in einer Anfrage vor statt einzeln, und ohne
   dabei auf Fotos und Abzeichen zu warten; so sind auch weiter entfernte Seiten deutlich früher bereit.
-- **Listen öffnen schneller**: Öffnest du unter *Verwaltung → Listen* eine Liste erneut, steht sie sofort da und wird im
+- **Listen öffnen schneller**: Öffnest du unter [Verwaltung → Listen](app:verwaltung/listen) eine Liste erneut, steht sie sofort da und wird im
   Hintergrund aktualisiert, wie die übrigen Seiten der App. Hat jemand sie inzwischen geändert, zeigt die App gleich
   danach den neuen Stand.
 - **Benachrichtigungen mit hoher Dringlichkeit**: Alle Benachrichtigungen gehen jetzt mit hoher Dringlichkeit an den
@@ -194,7 +385,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
-- **Fortschritt beim Update**: Während ein Update läuft, zeigt *Einstellungen → Updates* einen Fortschrittsbalken mit
+- **Fortschritt beim Update**: Während ein Update läuft, zeigt [Einstellungen → Updates](app:einstellungen/zustand) einen Fortschrittsbalken mit
   dem aktuellen Schritt (Paket laden, Daten sichern, Sicherung in Google Drive, einspielen), beim Sichern und Hochladen
   auch in MB. Die Größe der Sicherung ist dabei aus der letzten geschätzt („ca.“). Läuft beim Öffnen der Seite
   schon ein Update (z. B. das automatische), wird es ebenso angezeigt.
@@ -208,27 +399,27 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Beim Anlegen alles eintragen**: Beim Anlegen einzelner und mehrerer Mitglieder und beim Import lassen sich jetzt
   auch Handynummer und Adresse eintragen (im Import mit den Spalten Handynummer, Straße, Hausnummer, Adresszusatz, PLZ,
   Ort und Land).
-- **Adresse, Handynummer und E-Mail in Listen**: Unter *Verwaltung → Listen* gibt es die Datenspalten Adresse (die ganze
+- **Adresse, Handynummer und E-Mail in Listen**: Unter [Verwaltung → Listen](app:verwaltung/listen) gibt es die Datenspalten Adresse (die ganze
   Anschrift in einer Spalte), Straße und Nr., PLZ, Ort, Land, Handynummer und E-Mail, auch im CSV-Export. Mit den
   einzelnen Spalten lassen sich aus der CSV Serienbriefe und Adressetiketten erstellen. Die Werte sieht nur, wer das
   Recht „Persönliche Angaben sehen“ hat. Die Handynummer steht in der CSV als „0049 …“, damit Excel sie unverändert
   übernimmt.
-- **Vorlauf der anstehenden Geburtstage einstellbar**: Unter *Einstellungen → Geburtstage* legen Admins fest, wie viele
+- **Vorlauf der anstehenden Geburtstage einstellbar**: Unter [Einstellungen → Geburtstage](app:einstellungen/kalender) legen Admins fest, wie viele
   Tage vorher ein Geburtstag oben bei den Terminen unter „Anstehende Geburtstage“ erscheint (nur am Tag selbst bis 30
   Tage vorher, anfangs wie bisher 7 Tage).
-- **Verschlüsselte Sicherungen**: Unter *Einstellungen → Datensicherung* lässt sich ein **Passwort für Sicherungen**
+- **Verschlüsselte Sicherungen**: Unter [Einstellungen → Datensicherung](app:einstellungen/datensicherung) lässt sich ein **Passwort für Sicherungen**
   einrichten. Heruntergeladene Sicherungen und alle Sicherungen in Google Drive sind damit verschlüsselt; wer die Datei
   findet, kann ohne das Passwort nichts darin lesen. Die App speichert das Passwort nicht: **Ist es verloren, lässt
   sich keine verschlüsselte Sicherung mehr wiederherstellen.** Beim Wiederherstellen fragt die App danach.
 - **Meine Daten herunterladen (Auskunft nach DSGVO)**: Unter *Konto → Meine Daten* lädt jede Person alles herunter,
   was die App über sie gespeichert hat. Wer jeden darin enthaltenen Bereich auch in der App sehen darf (in der Regel
-  Admins), kann das auch für eine Person tun (*Verwaltung → Mitglied → Daten exportieren (Auskunft)*), dann ohne
+  Admins), kann das auch für eine Person tun ([Verwaltung → Mitglied → Daten exportieren (Auskunft)](app:verwaltung/mitglieder)), dann ohne
   Antworten in anonymen Umfragen.
-- **Aufbewahrungsfrist für Ehemalige**: Admins können unter *Verwaltung → Ehemalige* einstellen, nach wie vielen Jahren
+- **Aufbewahrungsfrist für Ehemalige**: Admins können unter [Verwaltung → Ehemalige](app:verwaltung/ehemalige) einstellen, nach wie vielen Jahren
   seit dem Ausscheiden die App die persönlichen Angaben von Ehemaligen löscht (Kontaktdaten, Anmeldung, Geburtstag,
   Strafen, Anwesenheiten u. a.). Für die Chronik bleiben Name, Ämter, Punkte, Dienstgrad, Titel, Foto und Eintrittsjahr.
   Voreingestellt ist aus; eine Vorschau zeigt, wen es trifft.
-- **Listen als PDF-Datei**: *Verwaltung → Listen → PDF herunterladen* speichert die Liste direkt als PDF, ohne
+- **Listen als PDF-Datei**: [Verwaltung → Listen → PDF herunterladen](app:verwaltung/listen) speichert die Liste direkt als PDF, ohne
   Druckdialog. *Drucken* gibt es weiterhin als eigenen Knopf.
 - **Listen: Breite „automatisch“**: Eine Spalte kann so breit sein wie ihr längster Inhalt bzw. ihre Überschrift; die
   übrigen Spalten teilen sich den Rest.
@@ -272,12 +463,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   PC weiter Google Maps.
 - Handynummer und Geburtsdatum anderer sieht und ändert nicht mehr jeder, der Mitglieder anlegen darf, sondern nur,
   wer die neuen Rechte für persönliche Angaben hat. Rollen, die bisher „Mitglieder anlegen“ hatten, bekommen beide
-  Rechte beim Update automatisch; wer sie nicht braucht, dem nimmt der Admin sie unter *Einstellungen → Rollen* weg.
+  Rechte beim Update automatisch; wer sie nicht braucht, dem nimmt der Admin sie unter [Einstellungen → Rollen](app:einstellungen/rollen) weg.
 - Auf der Seite eines Mitglieds in der Verwaltung steht der Geburtstag jetzt bei **Persönliche Angaben** (ohne das Recht
   dazu weiter bei Eintritt und Austritt), und **Persönliche Angaben** stehen unter den Ämtern, über *Konto und Rolle*.
   Antippen der Adresse zeigt den Ort in der Karten-App: auf Android mit Auswahl der App, auf iPhone und Mac in Apple
   Karten, am PC in Google Maps.
-- **Sicherungen in Google Drive verschlüsselt**, sobald unter *Einstellungen → Datensicherung* ein Passwort für
+- **Sicherungen in Google Drive verschlüsselt**, sobald unter [Einstellungen → Datensicherung](app:einstellungen/datensicherung) ein Passwort für
   Sicherungen eingerichtet ist (ohne Passwort wie bisher unverschlüsselt). Ältere, unverschlüsselte Sicherungen im Ordner
   löscht die App, sobald die erste verschlüsselte dort liegt und das Passwort einmal mit *Passwort prüfen* (oder einer
   Wiederherstellung) bestätigt ist.
@@ -319,12 +510,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Sicherheit
 
-- **Mitgliederfotos folgen den Rechten von Gast**: Hat ein Admin unter *Einstellungen → Rollen* der Rolle **Gast** die
+- **Mitgliederfotos folgen den Rechten von Gast**: Hat ein Admin unter [Einstellungen → Rollen](app:einstellungen/rollen) der Rolle **Gast** die
   Mitgliederliste bzw. die Ehemaligen weggenommen, waren die Fotos darin trotzdem ohne Anmeldung abrufbar. Jetzt sind
   sie nur noch öffentlich, wenn Gast die Liste sehen darf. Die Originalauflösung gibt es nur noch nach der Anmeldung.
 - **HTTPS (eigenständige Version)**: Über HTTPS schickt die App jetzt HSTS mit (der Browser öffnet sie danach nur noch
   verschlüsselt), wenn sie im Hauptverzeichnis ihrer Adresse liegt; in einem Unterordner nur mit `'hsts' => true` in
-  `config.php`, weil es sonst auch für die übrigen Seiten unter derselben Adresse gälte. Läuft die App über `http://`, warnen der Installer und *Einstellungen → Zustand und Updates*.
+  `config.php`, weil es sonst auch für die übrigen Seiten unter derselben Adresse gälte. Läuft die App über `http://`, warnen der Installer und [Einstellungen → Zustand und Updates](app:einstellungen/zustand).
 - **WordPress**: Die App-Seite lässt sich nicht mehr in fremde Seiten einbetten (Schutz vor Clickjacking).
 - **Keine E-Mail-Adressen im Fehlerprotokoll des Servers**, wenn eine Mail nicht zugestellt werden kann.
 - **Cronjob**: Der Schlüssel lässt sich jetzt auch im Header `X-Kompanie-Cron-Key` senden, dann steht er nicht im
@@ -339,11 +530,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   jeden Teil des Mitgliederbereichs (eigene Punkte, Strafen, Dienstgrad und Anwesenheit, interner Kalender, interne
   Bilder, Geburtstage, Umfragen) gibt es jetzt ein eigenes Recht. Der Server prüft es: Wer es nicht hat, sieht den
   Knopf nicht und kommt auch über einen Link nicht an die Daten.
-- **Übersicht „Wer sieht was“**: Unter *Einstellungen → Rollen* zeigt eine Tabelle alle Rechte für alle Rollen auf
+- **Übersicht „Wer sieht was“**: Unter [Einstellungen → Rollen](app:einstellungen/rollen) zeigt eine Tabelle alle Rechte für alle Rollen auf
   einen Blick. Die Haken lassen sich dort direkt setzen und gemeinsam speichern.
 - **Gast und Mitglied einstellbar**: Bei den festen Rollen **Gast** und **Mitglied** lässt sich jetzt einstellen, was
   sie sehen. **Gast** gilt auch für alle, die die App ohne Anmeldung öffnen, und für die Shortcodes auf der Webseite.
-- **E-Mails: Mailgruppen**: Unter *Verwaltung → E-Mails → Mailgruppen verwalten* lassen sich Empfängergruppen aus
+- **E-Mails: Mailgruppen**: Unter [Verwaltung → E-Mails → Mailgruppen verwalten](app:verwaltung/mail/gruppen) lassen sich Empfängergruppen aus
   Rollen, einzelnen Mitgliedern und freien Adressen anlegen (z. B. Vorstand) und beim Schreiben wie eine Rolle auswählen.
   Zwei Standardgruppen pflegt die App selbst: **Alle Mitglieder** (alle, die zur Kompanie gehören, auch Admins und eigene
   Rollen wie Spieß, ohne Anwärter) und **Alle Konten** (alle außer Gästen). Bisher erreichte eine Mail an die Rolle
@@ -360,7 +551,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Server, auch beim Zurückrollen (bisher nur bei Änderungen an der Datenbank und vor einer neuen Hauptversion). Sind
   die Sicherungen in Google Drive eingeschaltet, kommt dieselbe Sicherung zusätzlich in den Ordner dort; die letzten
   fünf bleiben. Klappt nur die Sicherung in Google Drive nicht, fragt die App nach, ob sie trotzdem aktualisieren soll.
-  Ein automatisches Update wird in diesem Fall zurückgestellt: Unter *Einstellungen → Zustand und Updates* steht der
+  Ein automatisches Update wird in diesem Fall zurückgestellt: Unter [Einstellungen → Zustand und Updates](app:einstellungen/zustand) steht der
   Grund mit **Trotzdem aktualisieren** und **Abbrechen**, die Ampel wird gelb, und am nächsten Tag versucht es die App
   wieder.
 - **Rechte in Gruppen**: Die Rechte einer Rolle und einer einzelnen Person stehen jetzt in Gruppen (Tabs und
@@ -426,9 +617,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Schwarzes Brett per E-Mail**: Neue Nachrichten gehen auf Wunsch (Haken **E-Mail senden**, standardmäßig an) auch als
   Mail an alle Mitglieder und Anwärter mit hinterlegter Adresse, jede einzeln, mit dem Titel als Betreff und den Bildern
   in der Mail. Jede Person kann das unter *Meins → Konto* abschalten. Absender ist die Kompanieadresse, die Admins
-  unter *Einstellungen → E-Mail* mit dem Mailserver (SMTP) eintragen, prüfen und mit einer Testmail ausprobieren.
+  unter [Einstellungen → E-Mail](app:einstellungen/email) mit dem Mailserver (SMTP) eintragen, prüfen und mit einer Testmail ausprobieren.
 - **E-Mails aus der Verwaltung**: Der neue Bereich **E-Mails** (Recht „E-Mails versenden“, Standardrolle „E-Mails
-  verwalten“) erscheint unter *Verwaltung*, sobald der Mailversand unter *Einstellungen → E-Mail* eingerichtet ist.
+  verwalten“) erscheint unter *Verwaltung*, sobald der Mailversand unter [Einstellungen → E-Mail](app:einstellungen/email) eingerichtet ist.
   Empfänger wählt man wie in einem Mailprogramm in **An**, **Cc** und **Bcc**: ganze Rollen, einzelne Mitglieder oder
   beliebige Adressen. Der Text entsteht im selben Editor wie am Schwarzen Brett, mit **Signatur einfügen**. Jede Adresse
   bekommt die Mail einmal; An und Cc sehen sich gegenseitig, Bcc sieht niemand. Vor dem Senden nennt eine Rückfrage die
@@ -449,7 +640,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   in der App und auf der Webseite (`[kompanie_galerie]`). Antippen spielt sie ab. Videos im Ordner `intern` sehen wie
   Bilder nur Mitglieder. Die App spielt sie direkt aus Google Drive ab und speichert sie nicht; der Ordner muss dafür
   nicht freigegeben werden. Unterstützt sind MP4 und WebM; andere Formate (z. B. MOV, AVI) stehen unter
-  *Einstellungen → Galerie* in der Liste „ließen sich nicht laden“ als nicht unterstützt.
+  [Einstellungen → Galerie](app:einstellungen/galerie) in der Liste „ließen sich nicht laden“ als nicht unterstützt.
 - **Ämter nach Jahren**: Auf breiten Bildschirmen zeigt der Schalter „Jahre“ im Tab Ämter alle Ämter nebeneinander,
   eine Spalte je Amt und eine Zeile je Jahr. So sieht man auf einen Blick, wer wann welches Amt hatte.
 - **Ämter: Einzahl, Hinweis bei Titeln, einzelnes Amt auf der Webseite**: Ein Amt hat jetzt ein Feld für die Einzahl
@@ -468,12 +659,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Dokumente, Abzeichen und Benachrichtigungen in der Datensicherung**: Die Sicherung enthält jetzt auch die Dateien
   der Dokumente und die Abzeichen der Dienstgrade sowie die Anmeldungen der Geräte für Benachrichtigungen. Nach dem
   Wiederherstellen auf einem neuen Server lassen sich die Dokumente öffnen, und Benachrichtigungen kommen weiter an.
-- **Sicherungen in Google Drive**: Unter *Einstellungen → Datensicherung* legt die App auf Wunsch einmal pro Woche eine
+- **Sicherungen in Google Drive**: Unter [Einstellungen → Datensicherung](app:einstellungen/datensicherung) legt die App auf Wunsch einmal pro Woche eine
   Sicherung in einem eigenen Ordner im verbundenen Google-Konto ab und behält die letzten acht. So liegt auch nach dem
   Verlust des Servers eine aktuelle Sicherung woanders. Dafür einmal unter *Google-Zugang* die Verbindung trennen und
   neu verbinden und dabei das Häkchen für eigene Dateien in Google Drive setzen.
-- **Mitglieder aus Excel oder CSV übernehmen**: In der Ersteinrichtung und unter *Verwaltung → Mitglied anlegen →
-  Aus Datei importieren* legt die App alle Personen einer Mitgliederliste auf einmal an, mit Status (Mitglied, eine
+- **Mitglieder aus Excel oder CSV übernehmen**: In der Ersteinrichtung und unter [Verwaltung → Mitglied anlegen →
+  Aus Datei importieren](app:verwaltung/import) legt die App alle Personen einer Mitgliederliste auf einmal an, mit Status (Mitglied, eine
   andere Rolle wie Anwärter oder ehemalig), E-Mail, Geburtstag, Eintritt und auf Wunsch Punkten, Dienstgrad und Titeln.
   Die Vorschau zeigt Fehler je Zeile, danach stehen die Zugangsdaten zum Ausdrucken bereit; Ehemalige bekommen ein Konto
   ohne Anmeldung. Wer schon ein Konto mit demselben Namen hat, wird übersprungen.
@@ -484,7 +675,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Ganze Liste vorgeladen**: Auf der Seite einer Person lädt die App jetzt nacheinander alle Personen der Liste vor,
   zuerst die direkten Nachbarn, dann immer weiter nach außen. Ist eine Seite beim Wischen doch noch nicht geladen,
   steht ihr Name schon da, darunter das Gerüst, und man kann gleich weiterwischen.
-- **Ehemalige einzeln anlegen**: Unter *Verwaltung → Ehemalige* steht jetzt **+ Ehemalige Person anlegen**, aufgebaut wie
+- **Ehemalige einzeln anlegen**: Unter [Verwaltung → Ehemalige](app:verwaltung/ehemalige) steht jetzt **+ Ehemalige Person anlegen**, aufgebaut wie
   **+ Mitglied anlegen**: Name, Grund, Eintritt, Ausscheiden, Gründungsmitglied und auf Wunsch Geburtstag und Foto. Es
   entsteht ein Konto ohne Anmeldung, das gleich als ehemalig eingetragen ist. **Tabelle importieren (z. B. Chronik)**
   steht jetzt oben in diesem Formular.
@@ -500,7 +691,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Platzhalterbild für Mitglieder ohne Foto auf der Webseite** (WordPress): Im WP-Admin unter *Einstellungen* auf der
   Seite der App lässt sich ein Bild aus der Mediathek wählen, z. B. eine Silhouette oder das Logo. `[kompanie_mitglieder]`
   zeigt es bei Personen ohne Foto statt der Anfangsbuchstaben. In der App bleiben die Anfangsbuchstaben.
-- **Nutzung der App auswerten**: Unter *Einstellungen → Nutzung* sehen Admins, wie viele Konten in den letzten 24
+- **Nutzung der App auswerten**: Unter [Einstellungen → Nutzung](app:einstellungen/nutzung) sehen Admins, wie viele Konten in den letzten 24
   Stunden, 7 und 30 Tagen aktiv waren, wie viele Personen je Tag die App genutzt haben und welche Bereiche wie oft
   genutzt werden, für einen frei wählbaren Zeitraum. Dazu alle, die im Zeitraum aktiv waren, mit dem Zeitpunkt ihrer
   letzten Nutzung und ihrem Verlauf; ein Schalter zeigt stattdessen, wer seit 30 Tagen nicht da war. Außerdem alles
@@ -513,7 +704,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   nach einem Moment durch die Originalauflösung ersetzt (App und Webseite). In der Galerie entsteht sie aus dem
   Original in Google Drive, wenn jemand das Bild zum ersten Mal öffnet. Mitgliedsfotos lädt die App jetzt bis
   4096 Pixel hoch; vorhandene Fotos haben die volle Auflösung erst, wenn sie neu hochgeladen werden.
-- **Kalender: Aktualisierung einstellbar**: Unter *Einstellungen → Kalender* (und mit WordPress auch im Backend) legt
+- **Kalender: Aktualisierung einstellbar**: Unter [Einstellungen → Kalender](app:einstellungen/kalender) (und mit WordPress auch im Backend) legt
   ihr fest, nach wie vielen Minuten die App neue Termine bei Google holt (1 bis 1440, Standard 15). Kürzere Zeiten
   zeigen Änderungen wie gelöschte Termine schneller; Speichern und „Kalender testen“ laden sofort neu.
 - **Punktekatalog und Dienstgrade per Ziehen sortieren**: Wie bei Titeln hat jeder Eintrag links einen Griff. Mit
@@ -534,7 +725,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   sondern gesammelt unter **Intern**, für alle mit dem neuen Recht **Intern**. Die Seite zeigt wie die Verwaltung je
   Bereich einen Knopf; **‹ Intern** führt zurück. Mitglieder haben das Recht immer (es gehört zum Mitgliederbereich);
   eigenen Rollen ohne Mitgliederbereich, z. B. Anwärtern, und einzelnen Personen können Admins es unter
-  *Einstellungen → Rollen* bzw. bei den Rechten einer Person geben. Wer es nicht hat, z. B. Gäste, behält die Knöpfe
+  [Einstellungen → Rollen](app:einstellungen/rollen) bzw. bei den Rechten einer Person geben. Wer es nicht hat, z. B. Gäste, behält die Knöpfe
   einzeln. Das Recht ändert nur die Navigation: Dokumente sieht weiter nur, wer den Mitgliederbereich hat. Alte Links
   auf Mitglieder und Dokumente funktionieren weiter.
 - **Benachrichtigung zum Schwarzen Brett**: Sie zeigt jetzt den Titel der Nachricht statt des ganzen Texts und wird,
@@ -544,7 +735,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Statusmeldungen mit Nutzungszahlen**: Wenn ihr den Statusmeldungen zugestimmt habt, enthält das stündliche
   Lebenszeichen jetzt auch Zahlen ohne Namen: wie viele Konten es gibt, wie viele in den letzten 24 Stunden, 7 und 30
   Tagen aktiv waren und wie viele Personen welchen Bereich in den letzten 30 Tagen genutzt haben. Was genau gesendet
-  wird, steht wie bisher unter *Einstellungen → Zustand und Updates*; dort lassen sich die Statusmeldungen auch
+  wird, steht wie bisher unter [Einstellungen → Zustand und Updates](app:einstellungen/zustand); dort lassen sich die Statusmeldungen auch
   ausschalten.
 - **Keine Daten der App in Suchmaschinen**: Alle Antworten der Schnittstelle, auch die öffentliche Mitgliederliste und
   die Ämter, tragen jetzt den Hinweis `noindex` für Suchmaschinen, wie schon die App-Seite und die Fotos.
@@ -619,8 +810,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Netz, in der Vorschau „App als Rolle ansehen“ und im Wartungsmodus lädt die App nichts im Voraus.
 - **Anwesenheitsliste ohne Rollen-Abzeichen**: Hinter den Namen stehen keine Rollen (etwa Admin, Vorstand, Gast) mehr,
   wie überall sonst in der App auch.
-- **Eigenes Konto auch in der Verwaltung ändern**: Auf der eigenen Seite unter *Verwaltung → Mitglieder → Konto und
-  Rolle* gibt es jetzt auch den Bereich „Konto“ mit **Angaben ändern**, etwa für die eigene Handynummer als Admin.
+- **Eigenes Konto auch in der Verwaltung ändern**: Auf der eigenen Seite unter [Verwaltung → Mitglieder → Konto und
+  Rolle](app:verwaltung/mitglieder) gibt es jetzt auch den Bereich „Konto“ mit **Angaben ändern**, etwa für die eigene Handynummer als Admin.
   Löschen lässt sich das eigene Konto dort nicht. Eine neue eigene E-Mail-Adresse verlangt hier wie unter *Meins →
   Konto* das aktuelle Passwort.
 - **Mail vom Schwarzen Brett auch an den Verfasser**: Wer eine Nachricht mit „E-Mail senden“ veröffentlicht, bekommt
@@ -634,7 +825,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Bildern war sie größer, als PHP erlaubt (z. B. 256 MB), und das Update wurde nicht eingespielt. Jetzt schreibt die App
   die Sicherung Stück für Stück in die Datei und braucht dafür nur wenige MB, egal wie groß sie ist. Ebenso beim
   wöchentlichen Hochladen nach Google Drive, das große Sicherungen jetzt in Stücken überträgt, und bei
-  *Einstellungen → Datensicherung → Sicherung herunterladen*: Der Server schickt die Datei jetzt direkt Stück für
+  [Einstellungen → Datensicherung → Sicherung herunterladen](app:einstellungen/datensicherung): Der Server schickt die Datei jetzt direkt Stück für
   Stück an den Browser, statt sie erst ganz zusammenzubauen. Hinweis: Das gilt ab dieser Version; das Update auf
   diese Version führt noch die bisherige aus.
 - **Änderungen von anderen Geräten kamen manchmal nicht an**: Fragte die App gerade im Hintergrund nach neuen Daten,
@@ -651,7 +842,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Altes Icon nach einem Update**: Hatte das Handy das Icon am Tag vor einem Update schon geladen, speicherte die App
   beim Update manchmal das alte Icon (z. B. für Benachrichtigungen) und zeigte es bis zum nächsten Update. Jetzt fragt
   sie dafür immer beim Server nach.
-- **Doppelpunkt bei den Empfängern einer E-Mail**: In der Ansicht einer gesendeten E-Mail (*Verwaltung → E-Mails*)
+- **Doppelpunkt bei den Empfängern einer E-Mail**: In der Ansicht einer gesendeten E-Mail ([Verwaltung → E-Mails](app:verwaltung/mail))
   steht jetzt „An:“, „Cc:“ und „Bcc:“ statt „An“, „Cc“ und „Bcc“.
 
 ### Behoben
@@ -679,7 +870,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   in den Farben der Kompanie und mit denselben öffentlichen Angaben wie die App. `[kompanie_aemter gruppe="…"]` zeigt
   nur die Ämter einer Gruppe. So steht alles nur noch an einer Stelle, in der App.
 - **Listen** (neuer Bereich, anfangs aus): Listen zum Ausdrucken, als PDF oder als CSV für Excel, z. B.
-  Unterschriften-, Teilnehmer- oder Abhaklisten, unter *Verwaltung → Listen* mit dem neuen Recht dafür. Titel und
+  Unterschriften-, Teilnehmer- oder Abhaklisten, unter [Verwaltung → Listen](app:verwaltung/listen) mit dem neuen Recht dafür. Titel und
   Spalten wählt man selbst: Angaben der Mitglieder (Name, Dienstgrad, Titel, Punkte …, jeweils nur, soweit man sie in
   der App sehen darf) oder leere Spalten zum Ausfüllen, auch mit Kästchen. „Mitglieder aktualisieren“ legt Zeilen für
   alle Mitglieder an und entfernt ausgeschiedene; eigene Zeilen kommen von Hand dazu. Der Ausdruck ist gestaltet wie
@@ -689,13 +880,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Darüber steht die Anzahl je Gruppe. Ein Tipp auf eine Person öffnet ihre Seite mit ihren Ämtern.
 - **Ämter** (neuer Bereich): Gruppen, Ämter und Amtszeiten in Jahren mit einem oder mehreren Inhabern, als Konto oder
   freier Name. Die Chronik ist öffentlich und steht im Tab „Mitglieder“ als Ehrentafel. Pflege unter
-  *Verwaltung → Ämter* mit dem neuen Recht dafür, mit CSV-Import für die Ersterfassung. Ein Amt kann einen Titel
+  [Verwaltung → Ämter](app:verwaltung/aemter) mit dem neuen Recht dafür, mit CSV-Import für die Ersterfassung. Ein Amt kann einen Titel
   automatisch vergeben und wieder entziehen.
 - **Ehemalige Mitglieder**: Wer ausscheidet, wird als ehemalig eingetragen statt gelöscht. Das Konto behält alle Daten,
   erscheint aber nicht mehr in Listen, Umfragen, Geburtstagen und Benachrichtigungen; in der eigenständigen Version ist
   die Anmeldung gesperrt. „Wieder aufnehmen“ stellt die Rollen wieder her. Ehemalige lassen sich aus einer Chronik
   (CSV, mit Vorschau) importieren und werden dabei mit gleichnamigen Einträgen in den Ämtern verknüpft. Die Liste steht
-  unter *Verwaltung → Ehemalige*.
+  unter [Verwaltung → Ehemalige](app:verwaltung/ehemalige).
 - **Ehemalige in der Mitgliederliste**: Neuer Tab „Ehemalige“ rechts neben „Ämter“, für alle sichtbar wie die
   Mitgliederliste: Foto, Name, Dienstgrad und Titel, dazu nur „Gründungsmitglied“ und die Jahre von Eintritt und
   Ausscheiden, nie der Grund. In den Ämtern öffnet der Name einer ehemaligen Person ihre Seite.
@@ -707,7 +898,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Meins → Übersicht**: Foto, Name, Rollen, Dienstgrad, Punkte und offene Strafen auf einen Blick, dazu die eigenen
   Titel als Kachel.
 - **Fotos vergrößern**: Ein Tipp auf ein Mitgliedsfoto zeigt es groß und scharf (auch bei hoher Pixeldichte).
-- **Rollen ordnen**: Alle Rollen, auch Gast, Mitglied und Admin, lassen sich unter *Einstellungen → Rollen* per Ziehen
+- **Rollen ordnen**: Alle Rollen, auch Gast, Mitglied und Admin, lassen sich unter [Einstellungen → Rollen](app:einstellungen/rollen) per Ziehen
   sortieren, z. B. Anwärter zwischen Gast und Mitglied. Admins haben einen eigenen Punktefaktor.
 
 ### Geändert

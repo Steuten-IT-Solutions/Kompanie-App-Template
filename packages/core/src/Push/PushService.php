@@ -25,11 +25,14 @@ use KompanieApp\Core\Storage\PushRepository;
  *   einmal am Tag. Was er einreiht, geht im selben Lauf raus (App::runTask).
  *
  * - Alle Nachrichten mit Urgency high (URGENCY).
- * - Schwarzes Brett (Issue #5): an alle Empfänger außer dem Verfasser, mit einer TTL höchstens bis zum
+ * - Schwarzes Brett (Issue #5): an alle Empfänger samt Verfasser, mit einer TTL höchstens bis zum
  *   Ablauf der Nachricht.
  * - Umfragen (Issue #4): neue Umfrage an alle Mitglieder außer dem, der sie angelegt hat; Erinnerung 24 Stunden vor dem
  *   Ende an alle Mitglieder ohne Antwort; TTL höchstens bis zum Ende.
  * - Geburtstage (Issue #1): am Tag selbst an alle Mitglieder außer dem Geburtstagskind; TTL höchstens bis Mitternacht.
+ * - Standardmäßig an: Neue Abos bekommen alle angebotenen Arten. Jedes Abo merkt sich, welche Arten es schon angeboten
+ *   bekam (offered); kommt später eine Art dazu (neue Rolle, Bereich eingeschaltet), schaltet addNewTypes sie ein.
+ *   Arten, die jemand selbst abgeschaltet hat, bleiben aus.
  *
  * Die Nachricht enthält Titel, Text, Ziel in der App (route) und tag; das Symbol setzt der Service Worker. Optional
  * image: vollständige Adresse eines Bildes (Abzeichen bei Beförderungen, Issue #17), das der Service Worker als Bild
@@ -92,6 +95,9 @@ final class PushService
     public const TYPE_GALLERY_SUBMISSIONS = 'gallery_submissions';
     /** Selbstregistrierung (Issue #314): neue Anfrage auf einen Zugang an alle, die freigeben (create_users). */
     public const TYPE_REGISTRATIONS = 'registrations';
+    /** Fehlermeldungen: neue Meldungen an alle mit review_reports, Antwort (geschlossen, weitergeleitet) an die meldende Person. */
+    public const TYPE_REPORTS_REVIEW = 'reports_review';
+    public const TYPE_REPORTS = 'reports';
 
     /** Push-Dienste der Browser (wie im Projekt-Cockpit). */
     private const PUSH_HOSTS = ['/^fcm\.googleapis\.com$/', '/(^|\.)push\.services\.mozilla\.com$/', '/(^|\.)push\.apple\.com$/', '/(^|\.)notify\.windows\.com$/'];
@@ -170,7 +176,8 @@ final class PushService
 
     /**
      * Typen mit Bezeichnung, Bereichen (einer davon muss eingeschaltet sein) und wer sie bekommt: Konten mit diesem
-     * Recht (Wert einer Capability, z. B. view_board wie BoardService::isRecipient), all = alle einschließlich Gästen.
+     * Recht (Wert einer Capability, z. B. view_board wie BoardService::isRecipient), all = alle einschließlich Gästen,
+     * account = alle Angemeldeten.
      * Ohne Bereiche (features leer) gilt stattdessen active, z. B. „Zugang beantragen“ eingeschaltet.
      *
      * @return array<string, array{label: string, features: list<string>, audience: string, active?: bool}>
@@ -186,6 +193,8 @@ final class PushService
             self::TYPE_GALLERY_REVIEW => ['label' => $c->sectionLabel('gallery', 'Galerie') . ': neue Bilder zum Prüfen', 'features' => ['gallery'], 'audience' => 'review_gallery'],
             self::TYPE_GALLERY_SUBMISSIONS => ['label' => $c->sectionLabel('gallery', 'Galerie') . ': deine Bilder freigegeben oder abgelehnt', 'features' => ['gallery'], 'audience' => 'submit_gallery'],
             self::TYPE_REGISTRATIONS => ['label' => 'Zugang beantragt: neue Anfragen', 'features' => [], 'audience' => 'create_users', 'active' => $this->app->registrations()->enabled()],
+            self::TYPE_REPORTS_REVIEW => ['label' => 'Fehlermeldungen: neue Meldungen', 'features' => [], 'audience' => 'review_reports', 'active' => true],
+            self::TYPE_REPORTS => ['label' => 'Fehlermeldungen: Antwort auf deine Meldung', 'features' => [], 'audience' => 'account', 'active' => true],
             self::TYPE_PENALTIES => ['label' => $c->sectionLabel('penalties', 'Strafen') . ': neue Einträge', 'features' => ['penalties'], 'audience' => 'view_own_penalties'],
             self::TYPE_POINTS => ['label' => $c->sectionLabel('points', 'Punkte') . ': neue Einträge', 'features' => ['points'], 'audience' => 'view_own_points'],
             self::TYPE_RANKS => ['label' => $c->rankLabel() . ': Beförderung oder Änderung', 'features' => ['ranks'], 'audience' => 'view_own_rank'],
@@ -285,10 +294,12 @@ final class PushService
         $same = $existing !== null && $existing['user_id'] === $userId;
         $types = $types !== null ? self::cleanTypes($types, $allowed) : ($same ? self::cleanTypes($existing['types'], $allowed) : $allowed);
         self::requireTypes($types);
+        // Alles Angebotene hat die Person gesehen (und ggf. abgewählt); ein bisher anderes Konto fängt neu an.
+        $offered = $same ? self::union($existing['offered'] ?? [], $allowed) : $allowed;
         $details = $details !== null ? (bool) $details : ($same && $existing['details']);
         $now = $this->app->time()->nowUtc();
         if ($existing !== null) {
-            $repo->update($existing['id'], ['user_id' => $userId, 'p256dh' => $p256dhText, 'auth' => $authText, 'types' => $types, 'details' => $details], $now);
+            $repo->update($existing['id'], ['user_id' => $userId, 'p256dh' => $p256dhText, 'auth' => $authText, 'types' => $types, 'offered' => $offered, 'details' => $details], $now);
             if (!$same) {
                 $repo->clearQueueFor($existing['id']); // Nachrichten für das vorige Konto nicht mehr zustellen
             }
@@ -296,7 +307,7 @@ final class PushService
             if ($userId === 0) {
                 $this->guestLimit($client);
             }
-            $repo->insert($userId, $endpoint, $p256dhText, $authText, $types, $details, $now);
+            $repo->insert($userId, $endpoint, $p256dhText, $authText, $types, $details, $now, $offered);
             if ($userId > 0) {
                 $subs = $repo->forUser($userId);
                 foreach (array_slice($subs, 0, max(0, count($subs) - self::MAX_PER_USER)) as $old) {
@@ -332,7 +343,9 @@ final class PushService
         $sub = $this->own($user, $endpoint, $auth);
         $values = [];
         if ($types !== null) {
-            $values['types'] = self::requireTypes(self::cleanTypes($types, $this->availableTypes($user)));
+            $allowed = $this->availableTypes($user);
+            $values['types'] = self::requireTypes(self::cleanTypes($types, $allowed));
+            $values['offered'] = self::union($sub['offered'] ?? [], $allowed);
         }
         if ($details !== null) {
             $values['details'] = (bool) $details;
@@ -570,18 +583,25 @@ final class PushService
     }
 
     /**
-     * Schwarzes Brett (Issue #5): an alle Geräte der Empfänger mit dem Typ, außer denen des Verfassers. Dringend
-     * (Urgency high) und nur so lange zustellbar, wie die Nachricht gilt, höchstens MAX_TTL (Issue #172).
-     * Öffentliche Nachrichten ($public) zusätzlich an alle Geräte mit der Art board_public (Gäste und Konten ohne
-     * view_board); jedes Gerät bekommt die Nachricht höchstens einmal.
+     * Schwarzes Brett (Issue #5): an alle Geräte der Empfänger mit dem Typ, auch an die des Verfassers (so sieht er,
+     * dass die Nachricht raus ist und wie sie ankommt). Dringend (Urgency high) und nur so lange zustellbar, wie die
+     * Nachricht gilt, höchstens MAX_TTL (Issue #172). Öffentliche Nachrichten ($public) zusätzlich an alle Geräte mit
+     * der Art board_public (Gäste und Konten ohne view_board); jedes Gerät bekommt die Nachricht höchstens einmal. Mit
+     * $only (Nachricht für Kompanien oder Personen) nur an die Geräte dieser Konten und des Verfassers, sofern sie das
+     * Brett lesen.
      *
      * @param Message $message
      * @param int $ttl Sekunden bis zum Ablauf der Nachricht (höchstens MAX_TTL)
+     * @param list<int>|null $only Konto-IDs (BoardService::readerIds) oder null ohne Einschränkung
      */
-    public function notifyBoard(array $message, int $authorId, int $ttl, bool $public = false): int
+    public function notifyBoard(array $message, int $authorId, int $ttl, bool $public = false, ?array $only = null): int
     {
+        if ($only !== null) {
+            $allowed = array_flip([...$only, $authorId]);
+            return $this->notifyAudience(self::TYPE_BOARD, $message, static fn (int $uid): bool => isset($allowed[$uid]), 'high', $ttl, self::MAX_TTL);
+        }
         if (!$public) {
-            return $this->notifyAudience(self::TYPE_BOARD, $message, static fn (int $uid): bool => $uid !== $authorId, 'high', $ttl, self::MAX_TTL);
+            return $this->notifyAudience(self::TYPE_BOARD, $message, static fn (int $uid): bool => true, 'high', $ttl, self::MAX_TTL);
         }
         if (!$this->typeEnabled(self::TYPE_BOARD) || $ttl <= 0) {
             return 0;
@@ -589,8 +609,7 @@ final class PushService
         $json = $this->json($message);
         $items = [];
         $members = [];
-        $subs = array_values(array_filter($this->repository()->all(), static fn (array $sub): bool => $sub['user_id'] !== $authorId
-            && (in_array(self::TYPE_BOARD, $sub['types'], true) || in_array(self::TYPE_BOARD_PUBLIC, $sub['types'], true))));
+        $subs = array_values(array_filter($this->repository()->all(), static fn (array $sub): bool => in_array(self::TYPE_BOARD, $sub['types'], true) || in_array(self::TYPE_BOARD_PUBLIC, $sub['types'], true)));
         $accounts = $this->accountsOf($subs);
         foreach ($subs as $sub) {
             $uid = $sub['user_id'];
@@ -633,10 +652,13 @@ final class PushService
         return $this->enqueue($type, $items, $urgency, min($maxTtl, self::MAX_TTL, $ttl));
     }
 
-    /** @param string $audience all oder der Wert des Rechts, das die Empfänger brauchen (types()) */
+    /** @param string $audience all, account oder der Wert des Rechts, das die Empfänger brauchen (types()) */
     private function inAudience(string $audience, ?User $user): bool
     {
-        return $audience === 'all' || ($user !== null && $user->id > 0 && $user->can(Capability::from($audience)));
+        if ($audience === 'all') {
+            return true;
+        }
+        return $user !== null && $user->id > 0 && ($audience === 'account' || $user->can(Capability::from($audience)));
     }
 
     /**
@@ -655,7 +677,6 @@ final class PushService
         }
         $this->app->settings->set($setting, true);
         $now = $this->app->time()->nowUtc();
-        $order = array_flip(array_keys($this->types()));
         $recipients = [];
         $count = 0;
         // Gäste (ID 0) nur bei Arten für alle (z. B. öffentliche Nachrichten am Brett).
@@ -666,14 +687,94 @@ final class PushService
             $uid = $sub['user_id'];
             $recipients[$uid] ??= $this->offered($type, $definition['audience'], $accounts[$uid] ?? null);
             if ($recipients[$uid]) {
-                // In der üblichen Reihenfolge der Arten (wie bei neuen Abos).
-                $types = [...$sub['types'], $type];
-                usort($types, static fn (string $a, string $b): int => ($order[$a] ?? 999) <=> ($order[$b] ?? 999));
-                $this->repository()->update($sub['id'], ['types' => $types], $now);
+                $values = ['types' => $this->sorted([...$sub['types'], $type])];
+                if ($sub['offered'] !== null) {
+                    $values['offered'] = self::union($sub['offered'], [$type]);
+                }
+                $this->repository()->update($sub['id'], $values, $now);
                 $count++;
             }
         }
         return $count;
+    }
+
+    /**
+     * Arten, die ein Abo jetzt neu angeboten bekäme (z. B. nach einer neuen Rolle oder einem eingeschalteten Bereich),
+     * einschalten: alles, was es angeboten bekommt und noch nicht kannte (offered). Abgeschaltete Arten kennt es schon,
+     * sie bleiben aus. Abos ohne offered (vor dieser Regel angelegt) übernehmen beim ersten Abgleich das gerade
+     * Angebotene als bekannt, ohne etwas einzuschalten: Ob dort eine Art fehlt, weil jemand sie abgeschaltet hat, ist
+     * nicht mehr zu erkennen. Schreibt nur bei einer Änderung und lässt updated_at (Verfall der Gast-Abos) unberührt.
+     * Läuft mit dem Abgleich alle 15 Minuten (PushTriggers::watch) und beim Öffnen der Benachrichtigungen.
+     *
+     * @return int Zahl der Abos, die eine Art dazubekommen haben
+     */
+    public function addNewTypes(): int
+    {
+        $subs = $this->repository()->all();
+        $accounts = $this->accountsOf($subs);
+        $available = [];
+        $count = 0;
+        foreach ($subs as $sub) {
+            $uid = $sub['user_id'];
+            if ($uid > 0 && !isset($accounts[$uid])) {
+                continue; // Konto gibt es nicht mehr; das Abo räumt das Löschen des Kontos auf.
+            }
+            $available[$uid] ??= $this->availableTypes($uid > 0 ? $accounts[$uid] : null);
+            $before = $sub['types'];
+            $count += $this->applyNewTypes($sub, $available[$uid])['types'] !== $before ? 1 : 0;
+        }
+        return $count;
+    }
+
+    /**
+     * Wie addNewTypes für das Abo dieses Geräts (beim Öffnen der Benachrichtigungen, damit es gleich stimmt).
+     *
+     * @param Subscription $sub
+     * @return Subscription
+     */
+    public function addNewTypesTo(array $sub, ?User $user): array
+    {
+        return $this->applyNewTypes($sub, $this->availableTypes($user));
+    }
+
+    /**
+     * @param Subscription $sub
+     * @param list<string> $available angebotene Arten des Kontos
+     * @return Subscription
+     */
+    private function applyNewTypes(array $sub, array $available): array
+    {
+        $known = $sub['offered'];
+        $new = $known === null ? [] : array_values(array_diff($available, $known, $sub['types']));
+        $offered = self::union($known ?? $sub['types'], $available);
+        if ($new === [] && $known !== null && array_diff($offered, $known) === []) {
+            return $sub;
+        }
+        $types = $new === [] ? $sub['types'] : $this->sorted([...$sub['types'], ...$new]);
+        $this->repository()->setTypes($sub['id'], $types, $offered);
+        return ['types' => $types, 'offered' => $offered] + $sub;
+    }
+
+    /**
+     * @param list<string> $types
+     * @return list<string> in der üblichen Reihenfolge der Arten (wie bei neuen Abos)
+     */
+    private function sorted(array $types): array
+    {
+        $order = array_flip(array_keys($this->types()));
+        $types = array_values(array_unique($types));
+        usort($types, static fn (string $a, string $b): int => ($order[$a] ?? 999) <=> ($order[$b] ?? 999));
+        return $types;
+    }
+
+    /**
+     * @param list<string> $a
+     * @param list<string> $b
+     * @return list<string>
+     */
+    private static function union(array $a, array $b): array
+    {
+        return array_values(array_unique([...$a, ...$b]));
     }
 
     private function typeEnabled(string $type): bool
@@ -923,7 +1024,7 @@ final class PushService
     }
 
     /**
-     * Protokoll für die Einstellungen: je angebotener Art (in der Reihenfolge von types()) der letzte Versand, dazu die
+     * Protokoll für die Einstellungen: je angebotener Art der letzte Versand, neueste zuerst, dazu die
      * letzte angenommene und die letzte abgelehnte Nachricht; Zeitpunkte als ISO 8601 in der Zeitzone der Kompanie.
      *
      * @return array{types: list<array{type: string, label: string, at: string, devices: int}>, accepted: array{at: string, count: int}|null, rejected: array{at: string, count: int, reason: string}|null}
@@ -934,13 +1035,17 @@ final class PushService
         $log = is_array($log) ? $log : [];
         $time = $this->app->time();
         $iso = static fn (mixed $at): string => $time->format((int) $at, 'c');
-        $types = [];
+        $sent = [];
         foreach ($this->types() as $key => $type) {
             $entry = $log['types'][$key] ?? null;
             if (is_array($entry) && is_numeric($entry['at'] ?? null) && $this->active($type)) {
-                $types[] = ['type' => $key, 'label' => $type['label'], 'at' => $iso($entry['at']), 'devices' => (int) ($entry['devices'] ?? 0)];
+                $sent[] = ['at' => (int) $entry['at'], 'item' => ['type' => $key, 'label' => $type['label'], 'at' => $iso($entry['at']), 'devices' => (int) ($entry['devices'] ?? 0)]];
             }
         }
+        // Neueste zuerst; nach der Unix-Zeit, nicht nach dem Text (Sommer- und Winterzeit). usort ist stabil: bei
+        // gleicher Zeit bleibt die Reihenfolge von types().
+        usort($sent, static fn (array $a, array $b): int => $b['at'] <=> $a['at']);
+        $types = array_column($sent, 'item');
         $accepted = $log['accepted'] ?? null;
         $rejected = $log['rejected'] ?? null;
         return [

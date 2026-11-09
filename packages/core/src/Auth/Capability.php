@@ -111,6 +111,11 @@ enum Capability: string
     /** Rollen vergeben. */
     case PromoteUsers = 'promote_users';
     /**
+     * Fehlermeldungen der App sehen (mit Namen angemeldeter Personen und Bildschirmfoto), mit Begründung schließen oder
+     * an die Betreuer der App weiterleiten (BugReportService).
+     */
+    case ReviewReports = 'review_reports';
+    /**
      * Nutzungsauswertung ansehen: wer wann welchen Bereich genutzt hat (Issue #175). Nur Admins; nicht an Rollen vergebbar
      * (Roles::GRANTABLE), solange offen ist, wer außer dem Admin die Auswertung je Person sehen darf.
      */
@@ -122,7 +127,8 @@ enum Capability: string
      * Recht, das dieses voraussetzt: Eigene Punkte, Strafen, Dienstgrad und Anwesenheit sowie alles zum Verwalten gibt es
      * nur für Mitglieder (sonst sähe die Person ihre Mitglieder nicht bzw. hätte nichts Eigenes). Persönliche Angaben
      * pflegt nur, wer sie sieht (manage_personal → view_personal → member). Die einzige Stelle für diese Regel; die App
-     * hat sie in capabilityRules.ts (requires) noch einmal.
+     * hat sie in capabilityRules.ts (requires) noch einmal. Bei der Rolle Gast entfällt die Voraussetzung member
+     * (RoleService::validCapabilities).
      */
     public function requires(): ?self
     {
@@ -136,8 +142,7 @@ enum Capability: string
     }
 
     /**
-     * Rechte zum Sehen (Tabs, Knöpfe unter „Intern“, eigene Daten): Diese lassen sich auch bei Gast und Mitglied
-     * einstellen (Roles::VIEW); Gast gilt dabei auch ohne Anmeldung.
+     * Rechte zum Sehen (Tabs, Knöpfe unter „Intern“, eigene Daten); Gast gilt dabei auch ohne Anmeldung.
      */
     public function isView(): bool
     {
