@@ -5,6 +5,10 @@
  * kann man nicht mehr von „Gross“ unterscheiden. Statt jede Plakette, Überschrift und Schaltfläche einzeln anzupassen,
  * ersetzt ein Beobachter app-weit in solchen Texten „ß“ durch „ẞ“. Angezeigt wird ohnehin in Großbuchstaben, der Text
  * sieht also sonst gleich aus. Eingabefelder und bearbeitbare Bereiche bleiben unberührt.
+ *
+ * Feste Wörter der Oberfläche auf Feldern und Schaltflächen („Straße“, „Schließen“) bleiben ebenfalls, wie sie sind
+ * („STRASSE“ ist korrekt): Ihr Text ist der Name, unter dem Screenreader und Tests das Feld oder die Schaltfläche finden.
+ * Es geht um Namen und Inhalte, etwa in Plaketten und Überschriften.
  */
 
 const SHARP_S = /ß/g;
@@ -23,7 +27,7 @@ export interface SharpSNode {
 }
 
 export interface SharpSElement extends SharpSNode {
-  closest(selector: string): unknown;
+  closest(selector: string): SharpSElement | null;
 }
 
 const TEXT_NODE = 3;
@@ -31,6 +35,10 @@ const ELEMENT_NODE = 1;
 
 /** Bereiche, deren Text Nutzer bearbeiten oder der kein sichtbarer Text ist. */
 const SKIP = 'textarea, input, script, style, [contenteditable]:not([contenteditable="false"])';
+/** Beschriftungen von Feldern: immer feste Wörter. */
+const LABEL = 'label, legend';
+/** Schaltflächen: nur ausgenommen, wenn sie selbst in Großbuchstaben stehen (nicht eine Plakette in einer Zeile). */
+const CONTROL = 'button, [role="button"], [role="tab"]';
 
 /**
  * Ersetzt „ß“ durch „ẞ“ in allen Texten unter `node`, deren Element in Großbuchstaben erscheint (`isUpper`).
@@ -40,7 +48,9 @@ export function fixSharpS(node: SharpSNode, isUpper: (el: SharpSElement) => bool
   if (!node.textContent?.includes('ß')) return 0;
   if (node.nodeType === TEXT_NODE) {
     const el = node.parentElement;
-    if (!el || el.closest(SKIP) || !isUpper(el)) return 0;
+    if (!el || el.closest(SKIP) || el.closest(LABEL) || !isUpper(el)) return 0;
+    const control = el.closest(CONTROL);
+    if (control && isUpper(control)) return 0;
     node.nodeValue = caps(node.nodeValue ?? '');
     return 1;
   }

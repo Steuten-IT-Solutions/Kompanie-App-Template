@@ -26,14 +26,21 @@ class FakeElement implements SharpSElement {
     }
     return this;
   }
-  /** Nur die Auswahl, die sharpS.ts nutzt: Eingabefelder und bearbeitbare Bereiche. */
+  /** Nur die Auswahlen, die sharpS.ts nutzt: Tags (erstes Wort von `cls`), Rollen, bearbeitbare Bereiche. */
+  matches(selector: string): boolean {
+    return selector.split(', ').some((part) => {
+      if (part.startsWith('[contenteditable]')) {
+        const ce = this.attrs.contenteditable;
+        return ce !== undefined && ce !== 'false';
+      }
+      const role = /^\[role="(\w+)"\]$/.exec(part);
+      if (role) return this.attrs.role === role[1];
+      assert.match(part, /^[a-z]+$/);
+      return this.cls.split(' ')[0] === part;
+    });
+  }
   closest(selector: string): FakeElement | null {
-    assert.match(selector, /contenteditable/);
-    for (let el: FakeElement | null = this; el; el = el.parentElement) {
-      if (['textarea', 'input', 'script', 'style'].includes(el.cls)) return el;
-      const ce = el.attrs.contenteditable;
-      if (ce !== undefined && ce !== 'false') return el;
-    }
+    for (let el: FakeElement | null = this; el; el = el.parentElement) if (el.matches(selector)) return el;
     return null;
   }
 }
@@ -100,6 +107,26 @@ test('Eingaben und bearbeitbare Bereiche bleiben unberührt', () => {
   const shown = new FakeText('Groß');
   new FakeElement('upper', { contenteditable: 'false' }).append(shown);
   assert.equal(fixSharpS(shown, isUpper), 1);
+});
+
+test('Beschriftungen und Schaltflächen in Großbuchstaben bleiben, Plaketten in einer Zeile nicht', () => {
+  const label = new FakeText('Straße');
+  new FakeElement('label field').append(new FakeElement('span upper').append(label));
+  const button = new FakeText('Schließen');
+  new FakeElement('button upper').append(button);
+  const tab = new FakeText('Grüße');
+  new FakeElement('div upper', { role: 'tab' }).append(tab);
+  for (const t of [label, button, tab]) assert.equal(fixSharpS(t, isUpper), 0);
+  assert.deepEqual(
+    [label, button, tab].map((t) => t.nodeValue),
+    ['Straße', 'Schließen', 'Grüße'],
+  );
+
+  // Eine Zeile, die als Ganzes eine Schaltfläche ist, mit einer Plakette darin.
+  const badge = new FakeText('Groß');
+  new FakeElement('button row').append(new FakeElement('span badge upper').append(badge));
+  assert.equal(fixSharpS(badge, isUpper), 1);
+  assert.equal(badge.nodeValue, 'Groẞ');
 });
 
 test('ohne ß: kein Element wird geprüft', () => {

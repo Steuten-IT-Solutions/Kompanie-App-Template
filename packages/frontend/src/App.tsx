@@ -4,6 +4,7 @@ import brand from './generated/brand';
 import logoUrl from './generated/logo-small.webp';
 import { detectPlatform, isStandalone, promptInstall, useCanPrompt } from './install';
 import BoardBanner from './BoardBanner';
+import { caps } from './sharpS';
 import PushHint from './PushHint';
 import { boardReadable, boardVisible, canManagePolls, canPostBoard, pollsVisible } from './board';
 import { ErrorBoundary, lazyView, Loading } from './ui';
@@ -738,7 +739,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
               aria-current={activeTab === t.key ? 'page' : undefined}
             >
               <Icon name={t.icon} />
-              <span>{t.label}</span>
+              <span>{caps(t.label)}</span>
             </button>
           ))}
         </nav>
