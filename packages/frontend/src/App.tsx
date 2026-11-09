@@ -16,7 +16,7 @@ import { focusId } from './focus';
 import { AdminBack, adminTabs } from './adminNav';
 import { MenuBack, InternMenu } from './internNav';
 import { targetIcons, targetLabels } from './navLabels';
-import { buildNav, isPageTarget, menuOf, pageTarget, startOf, tabbarClass, type NavEntry, type NavTarget } from './navigation';
+import { buildNav, isPageTarget, menuOf, pageTarget, startOf, tabbarClass, viewPath, type NavEntry, type NavTarget } from './navigation';
 import { helpSlug } from './helpSlug';
 import { setReportOrigin } from './lastError';
 import { shareLink, shareUrl } from './share';
@@ -440,7 +440,9 @@ export default function App({ notice = null }: { notice?: string | null }) {
   // Tab der Startseite (bei einem Bereich in einem Untermenü das Untermenü): Begrüßung und Hinweise stehen dort.
   const homeTab = tabs.find((t) => t.key === startKey || t.children?.includes(startKey as NavTarget))?.key;
   const valid = VIEWS.includes(requested) && allowed[requested];
-  const tab: View = valid ? requested : (start.split('/')[0] as View);
+  // Gezeigte Ansicht: der Aufruf oder die Startseite (eine eigene Seite als Startseite ist seiten/<id>)
+  const route = viewPath(path, valid, start);
+  const tab = route[0] as View;
   // Untermenü (Intern oder eingerichtet), das gerade offen ist bzw. in dem der Bereich steht
   const menuKey = valid ? (tab === 'intern' ? 'intern' : `menue/${path[1]}`) : start;
   const openMenu = tab === 'intern' || tab === 'menue' ? navEntries.find((e) => e.key === menuKey) : undefined;
@@ -453,7 +455,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
   // auf ihrer ersten Seite, Unterseiten (ein Dokument, eine Person, Dokumente verwalten) haben ihren eigenen Rückweg.
   // Wer am Brett schreibt, hat es in der Verwaltung (adminView), auch wenn er es über das Untermenü öffnet.
   // Eine eigene Seite ist ihr eigener Punkt der Navigation (seiten/<id>).
-  const navKey: string = tab === 'seiten' && /^\d+$/.test(path[1] ?? '') ? pageTarget(Number(path[1])) : tab;
+  const navKey: string = tab === 'seiten' && /^\d+$/.test(route[1] ?? '') ? pageTarget(Number(route[1])) : tab;
   const parentMenu = adminView ? undefined : menuOf(navEntries, navKey);
   const menuStart =
     tab === 'brett' ||
@@ -688,7 +690,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
               ))}
             {tab === 'kompanien' && <Kompanien id={companyId} />}
             {tab === 'sponsoren' && <Sponsoren />}
-            {tab === 'seiten' && <Seiten id={/^\d+$/.test(path[1] ?? '') ? Number(path[1]) : null} />}
+            {tab === 'seiten' && <Seiten id={/^\d+$/.test(route[1] ?? '') ? Number(route[1]) : null} />}
             {openMenu?.children && (
               <InternMenu label={openMenu.label} tabs={openMenu.children.map((v) => ({ id: v, label: targetLabels()[v] ?? v }))} />
             )}

@@ -263,6 +263,14 @@ export function startOf(tabs: NavEntry[], wanted: string | undefined): string | 
   return tabs[0]?.key;
 }
 
+/**
+ * Pfad der Ansicht, die tatsächlich gezeigt wird: der aufgerufene, wenn er gilt, sonst der der Startseite. Ohne das
+ * öffnete eine eigene Seite als Startseite (seiten/<id>) die Übersicht aller Seiten statt der Seite.
+ */
+export function viewPath(path: string[], valid: boolean, start: string): string[] {
+  return valid ? path : start.split('/');
+}
+
 /** Klassen der Tab-Leiste (Issue #362): Stufen nach Zahl der Tabs (styles.css) und ob unten Namen stehen. */
 export function tabbarClass(count: number, labels: boolean): string {
   const step = count >= 12 ? ' tabs-8 tabs-10 tabs-12' : count >= 10 ? ' tabs-8 tabs-10' : count >= 8 ? ' tabs-8' : '';
