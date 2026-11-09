@@ -24,6 +24,22 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.8.2] – 2026-11-09
+
+### Geändert
+
+- Der Countdown-Block zählt jetzt nach dem Kalender in der Zeitzone der App. Bisher fehlte bei einem Countdown über
+  die Umstellung auf Sommerzeit eine Stunde (z. B. 227 Tage 1 Stunde statt 2 Stunden bis zu einem Termin im Juni),
+  weil er die tatsächlich vergehende Zeit gezählt hat.
+- Kompanieliste: Die Logos der Kompanien werden nicht mehr mit abgerundeten Ecken angezeigt, sondern so, wie sie
+  hochgeladen sind. Logos mit eigenem Hintergrund (z. B. weiß) haben jetzt eckige Ecken.
+
+### Behoben
+
+- Namen und Inhalte in Großbuchstaben (Plaketten, Überschriften, Leiste unten) zeigen ein „ß“ jetzt als großes „ẞ“
+  statt als „SS“, z. B. „NUR FÜR ERIKA GROẞ“ im Verlauf des Schwarzen Bretts. Namen mit „ß“ und „ss“ bleiben so
+  unterscheidbar. Feste Beschriftungen von Feldern und Knöpfen bleiben wie bisher („STRASSE“).
+
 ## [0.8.1] – 2026-11-09
 
 ### Geändert

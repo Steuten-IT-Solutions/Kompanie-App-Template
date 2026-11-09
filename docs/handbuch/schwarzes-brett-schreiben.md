@@ -73,7 +73,7 @@ Mit der Leiste über dem Text gestaltest du die Nachricht wie in einem Mailprogr
 1. Wähle bei **+ Block einfügen** **Countdown**.
 2. Trage bei Bedarf eine **Überschrift** ein und wähle bei **Zählt bis** ein **Datum** (mit **Uhrzeit**) oder einen **Termin** aus den {bereich.events}. Ein verschobener Termin zählt von selbst mit.
 3. Optional: ein Ende (**Ende am**, **Ende um**) mit einem **Text, solange es läuft**, und bei **Danach** einen **Text danach** oder **Block ausblenden**.
-4. Die **Vorschau** zeigt, wie der Countdown gerade aussieht. Er zeigt immer zwei Angaben: Tage und Stunden, am letzten Tag Stunden und Minuten, in der letzten Stunde Minuten und Sekunden.
+4. Die **Vorschau** zeigt, wie der Countdown gerade aussieht. Er zeigt immer zwei Angaben: Tage und Stunden, am letzten Tag Stunden und Minuten, in der letzten Stunde Minuten und Sekunden. Er zählt nach dem Kalender in der Zeitzone eurer App: Liegt bis dahin eine Zeitumstellung, zeigt er die Restzeit wie auf der Uhr, also z. B. von 21:47 Uhr bis 0:00 Uhr immer 2 Stunden 13 Minuten.
 
 In der Mail steht ein Knopf als „Beschriftung: Ziel“, die nächsten Termine als Liste und der Countdown als Satz, z. B. „Countdown bis 10.03.2027, 18:00 Uhr“, so wie er beim Versand gerade aussieht.
 

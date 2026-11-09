@@ -1,10 +1,10 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, can, config, CONFIG_CHANGED, toLogin, newsTitle, type Capability } from './api';
-import { caps } from './format';
 import brand from './generated/brand';
 import logoUrl from './generated/logo-small.webp';
 import { detectPlatform, isStandalone, promptInstall, useCanPrompt } from './install';
 import BoardBanner from './BoardBanner';
+import { caps } from './sharpS';
 import PushHint from './PushHint';
 import { boardReadable, boardVisible, canManagePolls, canPostBoard, pollsVisible } from './board';
 import { ErrorBoundary, lazyView, Loading } from './ui';
@@ -567,13 +567,13 @@ export default function App({ notice = null }: { notice?: string | null }) {
     <header className="topbar">
       <img src={logoUrl} alt="" className="logo" />
       <div className="topbar-text">
-        <div className="topbar-title">{caps(title)}</div>
+        <div className="topbar-title">{title}</div>
         <div className="topbar-sub">{user ? greeting(user.name) : brand.name}</div>
       </div>
       {!['anmelden', 'einrichtung'].includes(tab) && !(tab === 'registrieren' && path[1] === 'bestaetigen') && (
         <button
           className="btn btn-link topbar-share"
-          onClick={() => void shareLink(pageUrl, `${brand.shortName}: ${caps(title)}`, showToast)}
+          onClick={() => void shareLink(pageUrl, `${brand.shortName}: ${title}`, showToast)}
           aria-label="Link zu dieser Seite teilen"
           title="Link zu dieser Seite teilen"
         >
