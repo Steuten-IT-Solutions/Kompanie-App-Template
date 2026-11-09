@@ -24,6 +24,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.8.1] – 2026-11-09
+
 ### Geändert
 
 - **Webadressen ohne https:// eingeben**: Bei [Verwaltung → Einrichtungen → Kompanien](app:verwaltung/kompanien) (Webseite,
