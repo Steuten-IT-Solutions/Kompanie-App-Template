@@ -32,6 +32,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - Kompanieliste: Die Logos der Kompanien werden nicht mehr mit abgerundeten Ecken angezeigt, sondern so, wie sie
   hochgeladen sind. Logos mit eigenem Hintergrund (z. B. weiß) haben jetzt eckige Ecken.
 
+### Behoben
+
+- Namen und Inhalte in Großbuchstaben (Plaketten, Überschriften, Leiste unten) zeigen ein „ß“ jetzt als großes „ẞ“
+  statt als „SS“, z. B. „NUR FÜR ERIKA GROẞ“ im Verlauf des Schwarzen Bretts. Namen mit „ß“ und „ss“ bleiben so
+  unterscheidbar. Feste Beschriftungen von Feldern und Knöpfen bleiben wie bisher („STRASSE“).
+
 ## [0.8.1] – 2026-11-09
 
 ### Geändert
