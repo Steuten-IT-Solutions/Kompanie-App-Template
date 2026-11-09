@@ -486,7 +486,7 @@ Unabhängig vom Adapter kann der Admin als Quelle „In der App schreiben“ wä
 
   | Rolle | Rechte |
   |---|---|
-  | `guest` (Gast) | anfangs `Roles::PUBLIC_DEFAULTS` und `ADDED_VIEW`; nur Rechte zum Sehen ohne Voraussetzung änderbar; gilt auch ohne Anmeldung |
+  | `guest` (Gast) | anfangs `Roles::PUBLIC_DEFAULTS` und `ADDED_VIEW`; jedes vergebbare Recht außer `member` (die Voraussetzung `member` entfällt); gilt auch ohne Anmeldung |
   | `member` (Mitglied) | anfangs `Roles::MEMBER_DEFAULTS` und `ADDED_VIEW`; immer `member`, dazu jedes vergebbare Recht – Rolle neuer Konten; Punktefaktor änderbar |
   | `admin` (Admin) | alle; Punktefaktor änderbar |
 

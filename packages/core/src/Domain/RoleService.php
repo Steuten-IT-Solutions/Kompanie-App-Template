@@ -306,12 +306,13 @@ final class RoleService
      * 400, wenn ein Recht seine Voraussetzung nicht hat (Capability::requires).
      *
      * @param string[] $values
+     * @param bool $withoutMember Voraussetzung „Mitglied der Kompanie“ nicht prüfen (Gast gehört nie zur Kompanie)
      */
-    private static function checkRequired(array $values): void
+    private static function checkRequired(array $values, bool $withoutMember = false): void
     {
         foreach ($values as $v) {
             $needed = Capability::from($v)->requires();
-            if ($needed !== null && !in_array($needed->value, $values, true)) {
+            if ($needed !== null && !($withoutMember && $needed === Capability::Member) && !in_array($needed->value, $values, true)) {
                 throw self::missingRequired($needed);
             }
         }
@@ -1287,8 +1288,8 @@ final class RoleService
     }
 
     /**
-     * Gespeicherte Rechte einer festen Rolle: Admin keine (er hat ohnehin alle), Gast nur Rechte zum Sehen ohne
-     * Voraussetzung, Mitglied immer member und dazu jedes vergebbare Recht.
+     * Gespeicherte Rechte einer festen Rolle: Admin keine (er hat ohnehin alle), Gast jedes vergebbare Recht außer
+     * member, Mitglied immer member und dazu jedes vergebbare Recht.
      *
      * @param string[] $caps
      * @return string[]
@@ -1298,7 +1299,7 @@ final class RoleService
         if ($key === Roles::ADMIN) {
             return [];
         }
-        $out = array_filter(Roles::from($caps), static fn (Capability $c): bool => $key === Roles::MEMBER ? in_array($c, Roles::GRANTABLE, true) : $c->isView() && $c->requires() === null);
+        $out = array_filter(Roles::from($caps), static fn (Capability $c): bool => in_array($c, Roles::GRANTABLE, true) && ($key === Roles::MEMBER || $c !== Capability::Member));
         return self::ordered([...self::values($out), ...($key === Roles::MEMBER ? [Capability::Member->value] : [])]);
     }
 
@@ -1327,13 +1328,10 @@ final class RoleService
             if ($system === Roles::MEMBER && !isset($out[Capability::Member->value])) {
                 throw ApiError::invalid('Mitglieder gehören immer zur Kompanie.');
             }
-            foreach ($system === Roles::GUEST ? $out : [] as $c) {
-                if (!Capability::from($c)->isView()) {
-                    throw ApiError::invalid('Gäste haben nur Rechte zum Sehen; zum Verwalten bitte eine Rolle geben.');
-                }
-            }
         }
-        self::checkRequired(array_keys($out));
+        // Gast gehört nie zur Kompanie: Bei ihm entfällt die Voraussetzung „Mitglied der Kompanie“ (Entscheidung vom
+        // 08.11.2026: keine Sperren für Rechte einer Rolle).
+        self::checkRequired(array_keys($out), $system === Roles::GUEST);
         return self::ordered(array_keys($out));
     }
 

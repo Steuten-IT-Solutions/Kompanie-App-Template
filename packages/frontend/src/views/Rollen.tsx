@@ -319,14 +319,21 @@ function RoleForm({
             ? 'Admins dürfen alles; die Rechte lassen sich nicht ändern.'
             : key === 'member'
               ? 'Rolle neuer Konten; gehört immer zur Kompanie. Was du hier anhakst, bekommt jedes Mitglied, auch Rechte zum Verwalten.'
-              : 'Gilt für Gäste und für alle, die die App ohne Anmeldung öffnen. Einstellen lässt sich, was sie sehen.'}
+              : 'Gilt für Gäste und für alle, die die App ohne Anmeldung öffnen. Gäste gehören nie zur Kompanie.'}
         </p>
       )}
-      {key === 'guest' && (capabilities.has('view_documents') || capabilities.has('view_birthdays') || capabilities.has('view_board')) && (
+      {key === 'guest' && [...capabilities].some((c) => !isView(c)) && (
         <p className="small rights-warning" role="note">
-          Achtung: Was Gast sieht, sieht jeder, der die App öffnet – auch ohne Konto.
+          Achtung: Was Gast darf, darf jeder, der die App öffnet – auch ohne Konto, z. B. Inhalte ändern oder löschen.
         </p>
       )}
+      {key === 'guest' &&
+        [...capabilities].every((c) => isView(c)) &&
+        (capabilities.has('view_documents') || capabilities.has('view_birthdays') || capabilities.has('view_board')) && (
+          <p className="small rights-warning" role="note">
+            Achtung: Was Gast sieht, sieht jeder, der die App öffnet – auch ohne Konto.
+          </p>
+        )}
       <RightsTree
         legend="Rechte"
         isOn={(c) => admin || capabilities.has(c)}
