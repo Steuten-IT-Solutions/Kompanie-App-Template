@@ -17,6 +17,7 @@ import type { MemberSummary, PersonName } from './api';
 import { cacheKey as keyOf, DATA_UPDATED, dataCache, pendingPrefetch, takeFresh } from './dataCache';
 import { noteError } from './lastError';
 import { emailProblem, emailSuggestion, normalizeEmail, tidyEmail } from './email';
+import { linkProblem, normalizeLink, tidyLink } from './link';
 import { composePhone, COUNTRIES, normalizePhone, OTHER, phoneHint, phoneProblem, splitPhone, tidyPhone } from './phone';
 import {
   ADDRESS_COUNTRIES,
@@ -498,6 +499,26 @@ export function EmailField({ label = 'E-Mail (optional)', ...props }: ContactFie
 }
 
 /**
+ * Webadresse für einen Link nach außen (link.ts): Tastatur mit / und .com, ohne Großschreibung und Autokorrektur. Ohne
+ * Schema wird beim Verlassen https:// ergänzt, danach steht am Feld, was nicht stimmt; eine ungültige Adresse hält das
+ * Formular an. Kein type="url", sonst lehnt der Browser „beispiel.de“ mit eigener Meldung ab. Beim Speichern trotzdem
+ * normalizeLink() verwenden, falls das Feld nicht verlassen wurde.
+ */
+export function LinkField({ placeholder = 'beispiel.de', ...props }: ContactFieldProps & { label: string }) {
+  return (
+    <ContactField
+      {...props}
+      placeholder={placeholder}
+      type="text"
+      inputMode="url"
+      tidy={tidyLink}
+      normalize={normalizeLink}
+      problem={linkProblem}
+    />
+  );
+}
+
+/**
  * Handynummer: Ländervorwahl aus einer Auswahl, daneben die Nummer mit Telefontastatur, wie man sie gewohnt ist
  * (0171 1234567). value ist die ganze Nummer, international geschrieben (phone.ts, z. B. +49 171 1234567). Eine
  * internationale Nummer im Feld (+31 …, 0031 …) stellt beim Verlassen die Auswahl um.
@@ -679,12 +700,14 @@ function ContactField({
   className,
   disabled,
   type,
+  inputMode = type,
   tidy,
   normalize,
   problem: check,
   note,
 }: ContactFieldProps & {
-  type: 'email';
+  type: 'email' | 'text';
+  inputMode?: 'email' | 'url' | 'text';
   tidy: (s: string) => string;
   normalize: (s: string) => string;
   problem: (s: string) => string | null;
@@ -701,7 +724,7 @@ function ContactField({
         <input
           ref={ref}
           type={type}
-          inputMode={type}
+          inputMode={inputMode}
           autoComplete={autoComplete}
           autoCapitalize="none"
           autoCorrect="off"

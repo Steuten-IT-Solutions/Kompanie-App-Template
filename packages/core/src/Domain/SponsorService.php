@@ -206,7 +206,6 @@ final class SponsorService
     /** Leer oder eine https-Adresse. */
     private static function validUrl(mixed $raw): string
     {
-        $message = 'Bitte einen Link angeben, der mit https:// beginnt, oder das Feld leer lassen.';
-        return Input::httpsUrl($raw, $message);
+        return Input::httpsUrl($raw, 'Link');
     }
 }

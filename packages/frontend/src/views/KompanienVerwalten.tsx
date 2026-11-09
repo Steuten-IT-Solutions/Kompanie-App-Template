@@ -2,7 +2,8 @@ import { Suspense, useRef, useState, type FormEvent } from 'react';
 import { api, type Company, type CompanyInput, type CompanyRef } from '../api';
 import { useDragSort, useSaveQueue } from '../dragSort';
 import brand from '../generated/brand';
-import { Empty, ErrorBox, lazyView, Loading, useAsync } from '../ui';
+import { Empty, ErrorBox, lazyView, LinkField, Loading, useAsync } from '../ui';
+import { normalizeLink } from '../link';
 import { sources } from '../viewData';
 import { CompanyLogo } from './Kompanien';
 import { confirmAsk } from '../ask';
@@ -58,8 +59,8 @@ function inputOf(d: Draft): CompanyInput {
     short_name: d.short_name.trim(),
     founded_year: year === '' ? null : Number(year),
     description: d.description,
-    website_url: d.website_url.trim(),
-    app_url: d.app_url.trim(),
+    website_url: normalizeLink(d.website_url),
+    app_url: normalizeLink(d.app_url),
     active: d.active,
   };
 }
@@ -115,20 +116,8 @@ function CompanyFields({
           />
         </Suspense>
       </div>
-      <label className="field">
-        <span>Webseite (optional)</span>
-        <input
-          type="url"
-          inputMode="url"
-          placeholder="https://"
-          value={draft.website_url}
-          onChange={(e) => set({ website_url: e.target.value })}
-        />
-      </label>
-      <label className="field">
-        <span>App der Kompanie (optional)</span>
-        <input type="url" inputMode="url" placeholder="https://" value={draft.app_url} onChange={(e) => set({ app_url: e.target.value })} />
-      </label>
+      <LinkField label="Webseite (optional)" value={draft.website_url} onChange={(v) => set({ website_url: v })} />
+      <LinkField label="App der Kompanie (optional)" value={draft.app_url} onChange={(v) => set({ app_url: v })} />
       <label className="toggle">
         <input type="checkbox" checked={!draft.active} onChange={(e) => set({ active: !e.target.checked })} />
         <span>Aufgelöst (steht als „ehemalig“ unten in der Liste)</span>

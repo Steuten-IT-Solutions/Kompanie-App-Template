@@ -352,12 +352,11 @@ final class CompanyService
             }
             $data['description'] = $html;
         }
-        $message = 'Bitte einen Link angeben, der mit https:// beginnt, oder das Feld leer lassen.';
         if (array_key_exists('website_url', $in)) {
-            $data['website_url'] = Input::httpsUrl($in['website_url'], $message);
+            $data['website_url'] = Input::httpsUrl($in['website_url'], 'Webseite');
         }
         if (array_key_exists('app_url', $in)) {
-            $data['app_url'] = Input::httpsUrl($in['app_url'], $message);
+            $data['app_url'] = Input::httpsUrl($in['app_url'], 'App der Kompanie');
         }
         if (array_key_exists('active', $in)) {
             if (!is_bool($in['active'])) {

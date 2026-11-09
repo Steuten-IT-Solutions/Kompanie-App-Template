@@ -4559,10 +4559,14 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast öffnet die Seite
   await form.getByLabel('Name', { exact: true }).fill('Testkompanie');
   await form.getByLabel(/^Kurzname/).fill('TK');
   await form.getByLabel(/^Gründungsjahr/).fill('1905');
+  // Eigene Meldung am Feld statt „Gib eine URL ein.“ des Browsers; ohne Schema ergänzt die App https://
   await form.getByLabel(/^Webseite/).fill('http://kompanie.example/');
   await form.getByRole('button', { name: 'Anlegen' }).click();
-  await expect(page.getByRole('alert')).toContainText('https://');
-  await form.getByLabel(/^Webseite/).fill('https://kompanie.example/');
+  await expect(form.locator('.field-note.form-error')).toHaveText('Bitte eine sichere Adresse mit https:// angeben, nicht http://.');
+  await form.getByLabel(/^App der Kompanie/).fill('kompanie.example/app');
+  await form.getByLabel(/^App der Kompanie/).blur();
+  await expect(form.getByLabel(/^App der Kompanie/)).toHaveValue('https://kompanie.example/app');
+  await form.getByLabel(/^Webseite/).fill('kompanie.example/');
   const description = form.getByRole('textbox', { name: 'Beschreibung (optional)' });
   await description.fill('Gegründet zum Schützenfest.');
   // Von einer Webseite eingefügt: dunkle Schrift mit großem Zeilenabstand (im dunklen Design schlecht lesbar)
@@ -4678,8 +4682,8 @@ test('Sponsoren (Issue #279): anlegen mit Link und Logo, Gast sieht sie ohne Anm
   await form.getByLabel('Name').fill('Bäckerei Test');
   await form.getByLabel('Link (optional)').fill('http://baeckerei.example/');
   await form.getByRole('button', { name: 'Anlegen' }).click();
-  await expect(page.getByRole('alert')).toContainText('https://');
-  await form.getByLabel('Link (optional)').fill('https://baeckerei.example/');
+  await expect(form.locator('.field-note.form-error')).toContainText('https://');
+  await form.getByLabel('Link (optional)').fill('baeckerei.example/');
   await form.getByRole('button', { name: 'Anlegen' }).click();
   await expect(page.locator('.toast')).toHaveText('Sponsor angelegt');
   const row = page.locator('.row', { has: page.getByText('Bäckerei Test', { exact: true }) });
