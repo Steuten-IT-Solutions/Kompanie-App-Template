@@ -14,6 +14,7 @@ import { skeletons } from './skeleton';
 import { checkPushOnStart } from './push';
 import { takeRememberedRoute } from './share';
 import { watchRuntimeErrors } from './lastError';
+import { watchSharpS } from './sharpS';
 // Gewählte Schrift aus kompanie.json, lokal gebündelt (kein Abruf bei Google).
 import './generated/fonts';
 import './generated/theme.css';
@@ -46,6 +47,8 @@ if (isStandalone() && window.location.hash.startsWith('#/installieren')) {
 
 // Letzte Fehlermeldung für „Fehler melden“ (Issue #64)
 watchRuntimeErrors();
+// Großes ẞ statt „SS“ in Plaketten, Überschriften und Schaltflächen in Großbuchstaben.
+watchSharpS();
 
 /**
  * Gerüste der Seiten vom Gerät (skeleton.tsx), getrennt nach Version und Benutzer. Höchstens kurz darauf warten: Ein

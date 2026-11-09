@@ -24,6 +24,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Behoben
+
+- Texte in Großbuchstaben (Plaketten, Überschriften, Schaltflächen) zeigen ein „ß“ jetzt als großes „ẞ“ statt als
+  „SS“, z. B. „NUR FÜR ERIKA GROẞ“ im Verlauf des Schwarzen Bretts. Namen mit „ß“ und „ss“ bleiben so unterscheidbar.
+
 ## [0.8.1] – 2026-11-09
 
 ### Geändert

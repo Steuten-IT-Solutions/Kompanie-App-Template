@@ -9,7 +9,7 @@ import {
   type AttendanceDetail,
   type AttendanceStatus,
 } from '../api';
-import { caps, formatDate, formatEventWhen, roleCount, todayYmd } from '../format';
+import { formatDate, formatEventWhen, roleCount, todayYmd } from '../format';
 import brand from '../generated/brand';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
@@ -350,7 +350,7 @@ function GroupCounts({ list }: { list: AttendanceDetail }) {
     <ul className="attendance-groups small muted">
       {rows.map((s) => (
         <li key={s}>
-          <strong>{caps(ATTENDANCE_LABELS[s])}:</strong> {list.counts_by_group[s].map((g) => roleCount(g.label, g.count)).join(' · ')}
+          <strong>{ATTENDANCE_LABELS[s]}:</strong> {list.counts_by_group[s].map((g) => roleCount(g.label, g.count)).join(' · ')}
         </li>
       ))}
     </ul>
