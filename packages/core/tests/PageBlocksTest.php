@@ -76,6 +76,7 @@ final class PageBlocksTest extends TestCase
         $this->assertSame('<p>Willkommen</p>', $page['body'], 'body: nur Text für alle');
         $this->assertSame('2027-06-12T12:00:00Z', $page['blocks'][1]['starts_at'], 'Sommerzeit: 14:00 Uhr = 12:00 UTC');
         $this->assertNull($page['blocks'][1]['ends_at']);
+        $this->assertSame('Europe/Berlin', $page['blocks'][1]['timezone'], 'Zeitzone der Installation für die Kalenderzählung');
 
         $id = $page['id'];
         $this->assertSame(['text', 'countdown'], self::types($this->ok('GET', "/pages/$id", [], null)), 'ohne Anmeldung ohne Mitglieder-Block');

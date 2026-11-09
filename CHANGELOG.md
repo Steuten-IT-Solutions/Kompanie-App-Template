@@ -24,6 +24,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Geändert
+
+- Der Countdown-Block zählt jetzt nach dem Kalender in der Zeitzone der App. Bisher fehlte bei einem Countdown über
+  die Umstellung auf Sommerzeit eine Stunde (z. B. 227 Tage 1 Stunde statt 2 Stunden bis zu einem Termin im Juni),
+  weil er die tatsächlich vergehende Zeit gezählt hat.
+
 ## [0.8.1] – 2026-11-09
 
 ### Geändert

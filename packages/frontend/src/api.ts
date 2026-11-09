@@ -202,6 +202,8 @@ export interface CountdownBlock extends BlockBase {
   /** Beginn und Ende in UTC (vom Server berechnet); starts_at null: wie nach dem Ende */
   starts_at: string | null;
   ends_at: string | null;
+  /** Zeitzone der Installation (z. B. Europe/Berlin): Restzeit nach Kalender in dieser Zone; fehlt in der Vorschau */
+  timezone?: string;
 }
 /** Knopf mit Link: https:, mailto:, tel: oder eine Seite der App (#/…) */
 export interface ButtonBlock extends BlockBase {

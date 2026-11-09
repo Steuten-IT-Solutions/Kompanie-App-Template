@@ -14,7 +14,9 @@ use KompanieApp\Core\Http\ApiError;
  * Countdown bis zu einem Zeitpunkt: freies Datum (source date) oder ein Termin aus dem Bereich Termine (source event).
  *
  * - Datum und Uhrzeit gelten in der Zeitzone der Installation (Clock::timezone()); ausgegeben werden starts_at und
- *   ends_at in UTC, damit jedes Gerät gleich zählt. Ohne Uhrzeit: 0:00 Uhr; Ende nur mit Datum: Ende dieses Tages.
+ *   ends_at in UTC, damit jedes Gerät gleich zählt, dazu timezone (Name der Zeitzone). Die App zählt damit nach
+ *   Kalender in dieser Zeitzone: Eine Zeitumstellung bis zum Beginn ändert die angezeigte Restzeit nicht.
+ *   Ohne Uhrzeit: 0:00 Uhr; Ende nur mit Datum: Ende dieses Tages.
  * - Zwischen Beginn und Ende steht running_text („läuft“), danach after_text oder (after hide) nichts mehr.
  * - Bei einem Termin kommen Beginn und Ende aus dem Termin; verschoben zählt der Countdown mit. Gelöscht oder für den
  *   Lesenden nicht sichtbar (Bereich events, view_events): wie nach dem Ende.
@@ -83,7 +85,11 @@ final class CountdownBlock implements BlockType
     public function render(array $data, ?User $viewer, bool $manager): ?array
     {
         [$start, $end, $eventTitle] = $this->range($data, $viewer);
-        $out = $data + ['starts_at' => self::iso($start), 'ends_at' => self::iso($end)];
+        $out = $data + [
+            'starts_at' => self::iso($start),
+            'ends_at' => self::iso($end),
+            'timezone' => $this->app->time()->timezone()->getName(),
+        ];
         if (($data['source'] ?? '') === 'event') {
             $out['event_title'] = $eventTitle;
         }
