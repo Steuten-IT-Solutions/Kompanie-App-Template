@@ -6465,6 +6465,53 @@ test('Wartungsmodus: Admin schaltet mit Begründung ein, Mitglied sieht die Wart
   await member.close();
 });
 
+test('Vorabversionen erhalten: nach dem Bestätigen der Rückfrage wird der Vorab-Kanal gespeichert', async ({ page }) => {
+  // Die Testinstallation bekommt keine Updates über die App: Zustand so beantworten, als wäre sie dafür eingerichtet.
+  let channel: 'early' | 'stable' = 'stable';
+  const sent: unknown[] = [];
+  await page.route('**/admin/status', async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    body.updates = { ...body.updates, configured: true, channel };
+    await route.fulfill({ response: res, json: body });
+  });
+  await page.route('**/admin/update', async (route) => {
+    if (route.request().method() !== 'PATCH') return route.continue();
+    const data = route.request().postDataJSON() as { channel?: 'early' | 'stable' };
+    sent.push(data);
+    if (data.channel) channel = data.channel;
+    const res = await route.fetch({ method: 'GET' });
+    const body = await res.json();
+    await route.fulfill({ response: res, json: { ...body, configured: true, channel } });
+  });
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Einstellungen');
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Zustand und Updates', { exact: true }) })
+    .click();
+  const box = page.getByLabel('Vorabversionen erhalten (zum Testen)');
+  await expect(box).not.toBeChecked();
+
+  // Abbrechen: nichts gespeichert, Haken bleibt aus
+  await box.click();
+  await askCancel(page);
+  await expect(box).not.toBeChecked();
+  expect(sent).toEqual([]);
+
+  // Bestätigen: Vorab-Kanal gespeichert, Haken bleibt gesetzt
+  await box.click();
+  await askOk(page);
+  await expect(box).toBeChecked();
+  await expect(page.getByText('(Vorab-Kanal)')).toBeVisible();
+  expect(sent).toEqual([{ channel: 'early' }]);
+
+  // Ausschalten braucht keine Rückfrage
+  await box.click();
+  await expect(box).not.toBeChecked();
+  expect(sent).toEqual([{ channel: 'early' }, { channel: 'stable' }]);
+});
+
 test('Nutzung: Admin sieht aktive Konten, Nutzung je Bereich und den Verlauf einer Person, schaltet die Erfassung je Person aus und an', async ({
   page,
   browser,
