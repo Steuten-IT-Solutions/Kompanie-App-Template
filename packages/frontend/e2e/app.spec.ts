@@ -3860,11 +3860,19 @@ test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nich
     ).toBeVisible();
   }
   await expect(page.getByRole('heading', { name: /^Vorabversion/ })).toHaveCount(changelog.unveroeffentlicht ? 1 : 0);
-  await expect(page.locator('.changelog-text h4').first()).toBeVisible();
+  // Text der aufgeklappten Fassung: Vorabversion oder die installierte bzw. neueste Version (bei WordPress im Test
+  // meldet das Plugin 0.1.0, dann ist diese aufgeklappt und nicht die erste Version der Liste)
+  await expect(
+    page.locator('section.changelog-version .changelog-text h4, details.changelog-version[open] .changelog-text h4').first(),
+  ).toBeVisible();
   // Aufgeklappt nur die Vorabversion bzw. eine Version, ältere eingeklappt (Issue #352)
   await expect(page.locator('details.changelog-version[open]')).toHaveCount(changelog.unveroeffentlicht ? 0 : 1);
   if (changelog.versionen.length > 1) {
-    const last = page.locator('details.changelog-version').last();
+    // Die letzte eingeklappte Version (bei WordPress im Test ist die letzte Version 0.1.0 die installierte, also offen)
+    const versions = page.locator('details.changelog-version');
+    const closed = await versions.evaluateAll((els) => els.map((el) => (el as HTMLDetailsElement).open).lastIndexOf(false));
+    expect(closed).toBeGreaterThanOrEqual(0);
+    const last = versions.nth(closed);
     await expect(last.locator('.changelog-text')).toBeHidden();
     await last.locator('summary').click();
     await expect(last.locator('.changelog-text')).toBeVisible();
