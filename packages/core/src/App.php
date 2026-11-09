@@ -98,6 +98,7 @@ use KompanieApp\Core\Telemetry\Detail;
 use KompanieApp\Core\Telemetry\Telemetry;
 use KompanieApp\Core\Update\StatusReporter;
 use KompanieApp\Core\Update\UpdateService;
+use KompanieApp\Core\Update\UpdateUpload;
 
 /**
  * Setzt den Kern aus den Umsetzungen der Ports zusammen, die ein Adapter liefert.
@@ -349,6 +350,7 @@ final class App
                     $this->telemetry()->record(Code::CalendarFetch, Detail::of($this->calendar()->source(), Detail::fromMessage($error)), $error);
                 }
             } elseif ($task === UpdateService::TASK) {
+                $this->updateUploads()->prune();
                 $this->updates()->runTask();
             } elseif ($task === StatusReporter::TASK) {
                 $this->statusReporter()->runTask();
@@ -851,6 +853,12 @@ final class App
     public function blocks(): Blocks
     {
         return $this->service(Blocks::class, fn () => new Blocks($this));
+    }
+
+    /** Update-Paket in Stücken hochladen (statt es herunterzuladen) */
+    public function updateUploads(): UpdateUpload
+    {
+        return $this->service(UpdateUpload::class, fn () => new UpdateUpload($this->files, $this->time()));
     }
 
     /** Videos in Stücken hochladen (Issue #350) */

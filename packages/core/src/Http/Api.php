@@ -23,6 +23,7 @@ use KompanieApp\Core\Storage\Sql\DatabaseException;
 use KompanieApp\Core\Telemetry\Code;
 use KompanieApp\Core\Telemetry\Detail;
 use KompanieApp\Core\Update\StatusReporter;
+use KompanieApp\Core\Update\UpdateService;
 
 /**
  * Die Routentabelle der API (siehe api/openapi.yaml) und ihre Ausführung.
@@ -1373,6 +1374,40 @@ final class Api
             new Route('POST', '/admin/update/install', Cap::ManageSettings, function (Request $r) use ($a) {
                 $a->updates()->install(is_string($r->input('version')) ? $r->input('version') : '', 'manual', Input::bool($r->input('major')), Input::bool($r->input('without_drive')));
                 return ['installed' => $r->input('version')];
+            }, null, $denySettings),
+            // Update-Paket hochladen statt herunterladen: in Stücken, dann erkennen (muss in der signierten Liste stehen) und einspielen.
+            new Route('POST', '/admin/update/upload', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->updates()->configured() || throw ApiError::invalid('Diese Installation bekommt keine Updates über die App.');
+                return Response::created($a->updateUploads()->start($r->input('size')));
+            }, null, $denySettings),
+            new Route('POST', '/admin/update/upload/chunk', Cap::ManageSettings, fn (Request $r) => $a->updateUploads()->chunk($r->input('upload'), $r->input('offset'), $r->input('data')), null, $denySettings),
+            new Route('POST', '/admin/update/upload/check', Cap::ManageSettings, function (Request $r) use ($a) {
+                $uploads = $a->updateUploads();
+                try {
+                    return $a->updates()->identifyUpload($uploads->file($r->input('upload')));
+                } catch (ApiError $e) {
+                    $uploads->remove($r->input('upload'));
+                    throw $e;
+                }
+            }, null, $denySettings),
+            new Route('POST', '/admin/update/upload/install', Cap::ManageSettings, function (Request $r) use ($a) {
+                $uploads = $a->updateUploads();
+                $upload = $r->input('upload');
+                try {
+                    $version = $a->updates()->installUpload($uploads->file($upload), Input::bool($r->input('major')), Input::bool($r->input('without_drive')));
+                } catch (ApiError $e) {
+                    // Nach „Trotzdem aktualisieren?“ (Sicherung in Google Drive gescheitert) noch einmal mit derselben Datei
+                    if ($e->errorCode !== UpdateService::DRIVE_FAILED) {
+                        $uploads->remove($upload);
+                    }
+                    throw $e;
+                }
+                $uploads->remove($upload);
+                return ['installed' => $version];
+            }, null, $denySettings),
+            new Route('POST', '/admin/update/upload/cancel', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->updateUploads()->remove($r->input('upload'));
+                return ['cancelled' => true];
             }, null, $denySettings),
             // Automatisches Update, zurückgestellt, weil die Sicherung in Google Drive scheiterte: trotzdem einspielen oder verwerfen.
             new Route('POST', '/admin/update/held', Cap::ManageSettings, function () use ($a) {

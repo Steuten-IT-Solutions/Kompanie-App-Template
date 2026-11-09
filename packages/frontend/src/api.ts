@@ -2563,6 +2563,15 @@ export const api = {
   checkUpdates: () => request<UpdateStatus>('POST', '/admin/update/check'),
   installUpdate: (version: string, major = false, withoutDrive = false) =>
     request<{ installed: string }>('POST', '/admin/update/install', { version, major, without_drive: withoutDrive }),
+  // Update-Paket hochladen statt herunterladen, siehe updateUpload.ts
+  startUpdateUpload: (size: number) =>
+    request<{ id: string; chunk_size: number; max_bytes: number }>('POST', '/admin/update/upload', { size }),
+  updateUploadChunk: (upload: string, offset: number, data: string) =>
+    request<{ received: number }>('POST', '/admin/update/upload/chunk', { upload, offset, data }),
+  checkUpdateUpload: (upload: string) => request<UpdateUploadInfo>('POST', '/admin/update/upload/check', { upload }),
+  installUpdateUpload: (upload: string, major = false, withoutDrive = false) =>
+    request<{ installed: string }>('POST', '/admin/update/upload/install', { upload, major, without_drive: withoutDrive }),
+  cancelUpdateUpload: (upload: string) => request<{ cancelled: boolean }>('POST', '/admin/update/upload/cancel', { upload }),
   installHeldUpdate: () => request<{ installed: string }>('POST', '/admin/update/held', {}),
   dismissHeldUpdate: () => request<UpdateStatus>('DELETE', '/admin/update/held'),
   rollback: (version: string, withoutDrive = false) =>
@@ -2909,6 +2918,18 @@ export interface UpdateStatus {
   running: boolean;
   /** Nur während running: Schritt des laufenden Updates für die Fortschrittsanzeige */
   progress: UpdateProgress | null;
+}
+
+/** Erkanntes Update-Paket (hochgeladen) */
+export interface UpdateUploadInfo {
+  version: string;
+  current: string;
+  /** neue Hauptversion: einspielen nur nach Bestätigung */
+  major: boolean;
+  /** älter als die installierte: Zurückrollen */
+  older: boolean;
+  /** schon für alle freigegeben (stable) */
+  released: boolean;
 }
 
 export type UpdateStep = 'download' | 'backup' | 'drive' | 'install';

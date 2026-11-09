@@ -6543,6 +6543,165 @@ paths:
         '502': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
 
+  /admin/update/upload:
+    post:
+      tags: [Wartung]
+      summary: Update-Paket hochladen statt herunterladen (Sitzung anlegen)
+      description: |
+        Danach die Datei in Stücken an `/admin/update/upload/chunk` schicken, mit `/admin/update/upload/check` erkennen
+        und mit `/admin/update/upload/install` einspielen. Eingespielt wird nur ein Paket, das genau so (SHA-256 und
+        Größe) für diese Installation in der signierten Update-Liste steht.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [size]
+              properties:
+                size: { type: integer, description: Größe der Datei in Bytes }
+      responses:
+        '201':
+          description: Sitzung angelegt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  chunk_size: { type: integer, description: Größe eines Stücks (Rohdaten) }
+                  max_bytes: { type: integer }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/update/upload/chunk:
+    post:
+      tags: [Wartung]
+      summary: Ein Stück des Update-Pakets anhängen
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upload, offset, data]
+              properties:
+                upload: { type: string }
+                offset: { type: integer }
+                data: { type: string, description: Stück als Base64 }
+      responses:
+        '200':
+          description: Angekommen
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received: { type: integer }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/update/upload/check:
+    post:
+      tags: [Wartung]
+      summary: Hochgeladenes Paket erkennen (Version aus der signierten Update-Liste)
+      description: Lädt vorher die Update-Liste neu (ist sie nicht erreichbar, gilt die zuletzt geprüfte). Bei einem Fehler ist die Sitzung gelöscht.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upload]
+              properties:
+                upload: { type: string }
+      responses:
+        '200':
+          description: Erkannt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version: { type: string }
+                  current: { type: string }
+                  major: { type: boolean, description: Neue Hauptversion (einspielen nur mit `major` true) }
+                  older: { type: boolean, description: Älter als die installierte (Zurückrollen) }
+                  released: { type: boolean, description: Schon für alle freigegeben (stable) }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/update/upload/install:
+    post:
+      tags: [Wartung]
+      summary: Hochgeladenes Paket einspielen
+      description: |
+        Wie `/admin/update/install`, aber mit der hochgeladenen Datei und in jedem Kanal. Scheitert nur die Sicherung
+        in Google Drive (409 `drive_backup_failed`), bleibt die Datei für den zweiten Aufruf mit `without_drive` true;
+        sonst ist die Sitzung danach gelöscht.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upload]
+              properties:
+                upload: { type: string }
+                major: { type: boolean, default: false }
+                without_drive: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Eingespielt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  installed: { type: string }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+
+  /admin/update/upload/cancel:
+    post:
+      tags: [Wartung]
+      summary: Hochladen abbrechen (Sitzung und Datei löschen)
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upload]
+              properties:
+                upload: { type: string }
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cancelled: { type: boolean }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
   /admin/update/held:
     post:
       tags: [Wartung]
