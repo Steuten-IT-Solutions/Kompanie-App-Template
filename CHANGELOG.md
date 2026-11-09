@@ -24,6 +24,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Geändert
+
+- Kompanieliste: Die Logos der Kompanien werden nicht mehr mit abgerundeten Ecken angezeigt, sondern so, wie sie
+  hochgeladen sind. Logos mit eigenem Hintergrund (z. B. weiß) haben jetzt eckige Ecken.
+
 ## [0.8.1] – 2026-11-09
 
 ### Geändert
