@@ -60,6 +60,9 @@ final class Input
         }
         // Auch Umlaute in Adresse oder Pfad zulassen (z. B. https://bürger-verein.de/fest).
         $parts = parse_url($url);
+        if ($parts === false) {
+            throw ApiError::invalid($invalid);
+        }
         $scheme = strtolower((string) ($parts['scheme'] ?? ''));
         if (!in_array($scheme, ['http', 'https'], true) || ($parts['host'] ?? '') === '' || preg_match('/[\s"<>\x00-\x1F\x7F]/u', $url)) {
             throw ApiError::invalid($message);
@@ -70,13 +73,71 @@ final class Input
         return $url;
     }
 
-    /** Wie url(), aber nur https (Sponsoren, Kompanien); leer bleibt leer. */
-    public static function httpsUrl(mixed $value, string $message): string
+    /** Höchstlänge eines Links (Spalten VARCHAR(255)). */
+    public const URL_MAX = 255;
+
+    /**
+     * Webadresse für einen Link nach außen (Sponsoren, Kompanien): nur https, leer bleibt leer. Ohne Schema wird
+     * https:// ergänzt (beispiel.de/app → https://beispiel.de/app), wie das Feld in der App es beim Verlassen tut
+     * (frontend/src/link.ts, dieselben Regeln). Der Rechner braucht eine Endung (beispiel.de, nicht beispiel), Umlaute
+     * sind erlaubt. $field ist die Beschriftung des Felds für die Fehlermeldung.
+     */
+    public static function httpsUrl(mixed $value, string $field): string
     {
-        $url = self::url($value, $message);
-        if ($url !== '' && strtolower((string) parse_url($url, PHP_URL_SCHEME)) !== 'https') {
-            throw ApiError::invalid($message);
+        $url = self::withScheme(trim(is_string($value) ? $value : ''));
+        if ($url === '') {
+            return '';
         }
-        return $url;
+        $invalid = sprintf('„%s“ ist keine gültige Webadresse. Beispiel: beispiel.de oder https://beispiel.de/seite', $field);
+        if (preg_match('/[\s"<>\x00-\x1F\x7F]/u', $url)) {
+            throw ApiError::invalid($invalid);
+        }
+        $parts = parse_url($url);
+        if ($parts === false) {
+            throw ApiError::invalid($invalid);
+        }
+        $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+        if ($scheme === 'http') {
+            throw ApiError::invalid(sprintf('„%s“ muss mit https:// beginnen (sichere Verbindung), nicht mit http://.', $field));
+        }
+        if (
+            $scheme !== 'https'
+            || isset($parts['user'])
+            || isset($parts['pass'])
+            || !self::isDomain((string) ($parts['host'] ?? ''))
+        ) {
+            throw ApiError::invalid($invalid);
+        }
+        if (mb_strlen($url) > self::URL_MAX) {
+            throw ApiError::invalid(sprintf('„%s“ ist zu lang (höchstens %d Zeichen).', $field, self::URL_MAX));
+        }
+        return 'https' . substr($url, strlen($scheme));
+    }
+
+    /** https:// vor eine Adresse ohne Schema; „beispiel.de:8080“ ist eine Adresse mit Port, kein Schema. */
+    private static function withScheme(string $url): string
+    {
+        if ($url === '' || preg_match('/^[a-z][a-z0-9+.-]*:(?!\d)/i', $url)) {
+            return $url;
+        }
+        return 'https://' . ltrim($url, '/');
+    }
+
+    /** Rechnername mit Endung: Teile aus Buchstaben (auch Umlaute), Ziffern und Bindestrichen, Endung aus Buchstaben. */
+    private static function isDomain(string $host): bool
+    {
+        if ($host === '' || mb_strlen($host) > 253) {
+            return false;
+        }
+        $labels = explode('.', $host);
+        if (count($labels) < 2) {
+            return false;
+        }
+        foreach ($labels as $label) {
+            if (mb_strlen($label) > 63 || preg_match('/^[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?$/u', $label) !== 1) {
+                return false;
+            }
+        }
+        return preg_match('/^(?:\p{L}{2,}|xn--[a-z0-9-]+)$/ui', $labels[count($labels) - 1]) === 1;
     }
 }

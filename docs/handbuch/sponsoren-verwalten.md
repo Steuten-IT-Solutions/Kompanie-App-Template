@@ -39,7 +39,7 @@ Tippe auf **Löschen** und bestätige. Sein Logo ist damit ebenfalls weg.
 
 ## Gut zu wissen
 - Logos: PNG, JPG, WebP oder SVG, höchstens 2 MB. Bilder werden auf höchstens 512 Pixel an der längeren Kante verkleinert, nie vergrößert. Am besten eignet sich ein Logo mit transparentem Hintergrund; angezeigt wird es auf einer hellen Kachel.
-- Der Link muss mit `https://` beginnen.
+- Beim **Link** reicht die Adresse ohne `https://`, z. B. `beispiel.de`; die App ergänzt `https://` beim Verlassen des Felds. Unsichere Adressen mit `http://` nimmt sie nicht an.
 - Der Name hat höchstens 100 Zeichen. Er ist zugleich die Beschreibung des Logos für Bildschirmleser.
 - Wer die {bereich.sponsors} sieht, legt das Recht „{bereich.sponsors}“ in den Rollen fest; in neuen Installationen sehen sie alle, auch ohne Anmeldung.
 - Die {bereich.sponsors} samt Logos sind Teil der Datensicherung.
