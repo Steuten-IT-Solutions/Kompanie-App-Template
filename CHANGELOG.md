@@ -24,6 +24,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.8.0] – 2026-11-09
+
 ### Neu
 
 - **Update als Datei hochladen**: Unter [Einstellungen → Zustand und Updates](app:einstellungen/zustand) lässt sich bei
@@ -138,7 +140,6 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Rechte, die sonst *Gehört zur Kompanie* voraussetzen, gehen bei Gast auch ohne. Was Gast darf, darf jeder, der die
   App ohne Anmeldung öffnet; die App weist darauf hin. Wer Mitglieder anlegen darf, kann weiterhin Konten mit der Rolle
   Mitglied anlegen.
-
 - **Kompanien: Mitglieder nur mit dem Bereich Mitglieder**: Die Seiten der Kompanien zeigen ihre Mitglieder jetzt
   nur noch, wenn der Bereich *Mitglieder* eingeschaltet ist, und dann für die Rollen mit dem Recht *Mitglieder*. So
   schaltest du die Mitgliederlisten unter [Einstellungen → Bereiche](app:einstellungen/bereiche) zentral ein oder aus und legst unter [Einstellungen → Rollen](app:einstellungen/rollen)
