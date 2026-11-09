@@ -1638,6 +1638,26 @@ test('Ämter: gemeinsame Amtszeiten einer Gruppe mit Gruppenbild, öffentlich al
   await expect(admin.locator('li.card')).toContainText(`${offices[0]}: ${holders[0]}`);
   await expect(admin.locator('li.card')).toContainText(`${offices[1]}: ${holders[1]}`);
 
+  // Einzahl des ersten Amts: steht auf der Karte statt seiner Bezeichnung
+  const officeSingular = `König ${n}`;
+  const patched = await page.evaluate(
+    async ({ title, singular }) => {
+      const cfg = window.KOMPANIE_CONFIG!;
+      const headers = { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token };
+      const all = await (await fetch(cfg.apiBase + 'offices', { credentials: 'same-origin' })).json();
+      const o = (all.offices as { id: number; title: string }[]).find((x) => x.title === title)!;
+      const r = await fetch(cfg.apiBase + `offices/${o.id}`, {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers,
+        body: JSON.stringify({ singular }),
+      });
+      return r.status;
+    },
+    { title: offices[0], singular: officeSingular },
+  );
+  expect(patched).toBeLessThan(300);
+
   // Öffentlich: eine Karte je gemeinsame Amtszeit mit Bild und den Personen je Amt
   await page.goto('/app/#/mitglieder/aemter');
   await expect(page.locator('.office-group h2', { hasText: group })).toBeVisible();
@@ -1646,7 +1666,8 @@ test('Ämter: gemeinsame Amtszeiten einer Gruppe mit Gruppenbild, öffentlich al
   await expect(card.locator('.joint-term-title')).toContainText('aktuell');
   await expect(card.locator('img.joint-term-image')).toBeVisible();
   expect(await card.locator('img.joint-term-image').evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
-  await expect(card.locator('.joint-term-offices > div', { hasText: offices[0] }).locator('dd')).toContainText(holders[0]);
+  await expect(card.locator('.joint-term-offices > div', { hasText: officeSingular }).locator('dd')).toContainText(holders[0]);
+  await expect(card.locator('.joint-term-offices dt', { hasText: offices[0] })).toHaveCount(0);
   await expect(card.locator('.joint-term-offices > div', { hasText: offices[1] }).locator('dd')).toContainText(holders[1]);
 
   // Aufräumen: gemeinsame Amtszeit, Ämter und Gruppe löschen
