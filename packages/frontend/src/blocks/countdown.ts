@@ -65,10 +65,63 @@ export function nextTick(ms: number): number {
   return Math.min(((ms - 1) % 60_000) + 1, ms - HOUR);
 }
 
+const formatters = new Map<string, Intl.DateTimeFormat | null>();
+
+/** Formatierer für die Zeitzone $timeZone; null, wenn das Gerät sie nicht kennt. */
+function formatter(timeZone: string): Intl.DateTimeFormat | null {
+  if (!formatters.has(timeZone)) {
+    let f: Intl.DateTimeFormat | null = null;
+    try {
+      f = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        hourCycle: 'h23',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+      });
+    } catch {
+      f = null;
+    }
+    formatters.set(timeZone, f);
+  }
+  return formatters.get(timeZone) ?? null;
+}
+
+/**
+ * Abstand der Ortszeit (Wanduhr) zu UTC in Millisekunden zum Zeitpunkt $t, in der Zeitzone $timeZone (ohne oder
+ * unbekannt: Zeitzone des Geräts).
+ */
+export function utcOffset(t: number, timeZone?: string): number {
+  const f = timeZone ? formatter(timeZone) : null;
+  if (!f) return -new Date(t).getTimezoneOffset() * 60_000;
+  const p: Record<string, number> = {};
+  for (const part of f.formatToParts(new Date(t))) {
+    if (part.type !== 'literal') p[part.type] = Number(part.value);
+  }
+  const wall = Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute, p.second);
+  return wall - Math.floor(t / 1000) * 1000;
+}
+
+/**
+ * Restzeit bis $startsAt nach Kalender (Wanduhr) in der Zeitzone $timeZone: Liegt eine Zeitumstellung dazwischen,
+ * zählt die verschobene Stunde nicht (z. B. von 21:47 Uhr Winterzeit bis 0:00 Uhr Sommerzeit: 2 Std 13 Min, nicht die
+ * tatsächlich vergehenden 1 Std 13 Min). Zum Beginn ist sie genau 0. Nur für den Sonderfall, dass der Beginn in der
+ * doppelten Stunde bei der Umstellung auf Winterzeit liegt und die Wanduhr ihn schon überholt hat: tatsächliche Restzeit.
+ */
+export function remaining(now: number, startsAt: string, timeZone?: string): number {
+  const start = Date.parse(startsAt);
+  const real = start - now;
+  const wall = real + utcOffset(start, timeZone) - utcOffset(now, timeZone);
+  return wall > 0 || real <= 0 ? wall : real;
+}
+
 /** Wartezeit bis zum nächsten Phasenwechsel (laufend: bis zum Ende), gedeckelt, damit Timer nicht überlaufen. */
-export function nextChange(now: number, startsAt: string | null, endsAt: string | null): number | null {
+export function nextChange(now: number, startsAt: string | null, endsAt: string | null, timeZone?: string): number | null {
   const phase = countdownPhase(now, startsAt, endsAt);
-  if (phase === 'before') return nextTick(Date.parse(startsAt as string) - now);
+  if (phase === 'before') return nextTick(remaining(now, startsAt as string, timeZone));
   if (phase === 'running') return Math.min(Date.parse(endsAt as string) - now, DAY);
   return null;
 }

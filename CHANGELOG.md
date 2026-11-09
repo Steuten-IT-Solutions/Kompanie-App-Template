@@ -26,6 +26,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- Der Countdown-Block zählt jetzt nach dem Kalender in der Zeitzone der App. Bisher fehlte bei einem Countdown über
+  die Umstellung auf Sommerzeit eine Stunde (z. B. 227 Tage 1 Stunde statt 2 Stunden bis zu einem Termin im Juni),
+  weil er die tatsächlich vergehende Zeit gezählt hat.
 - Kompanieliste: Die Logos der Kompanien werden nicht mehr mit abgerundeten Ecken angezeigt, sondern so, wie sie
   hochgeladen sind. Logos mit eigenem Hintergrund (z. B. weiß) haben jetzt eckige Ecken.
 

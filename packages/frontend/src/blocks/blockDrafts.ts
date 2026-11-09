@@ -20,7 +20,7 @@ import type {
 } from '../api';
 
 export type TextDraft = Omit<TextBlock, never>;
-export type CountdownDraft = Omit<CountdownBlock, 'starts_at' | 'ends_at' | 'event_title'> & { event_title?: string | null };
+export type CountdownDraft = Omit<CountdownBlock, 'starts_at' | 'ends_at' | 'timezone' | 'event_title'> & { event_title?: string | null };
 export type ButtonDraft = ButtonBlock;
 export type EventsDraft = Omit<EventsBlock, 'events'>;
 export type ContactsDraft = Omit<ContactsBlock, 'offices'>;
@@ -137,7 +137,7 @@ export function draftsFrom(blocks: Block[] | undefined, body: string): BlockDraf
       return rest;
     }
     if (b.type !== 'countdown') return b;
-    const { starts_at: _s, ends_at: _e, ...rest } = b;
+    const { starts_at: _s, ends_at: _e, timezone: _z, ...rest } = b;
     return { ...rest, time: rest.time ?? '', end_date: rest.end_date ?? '', end_time: rest.end_time ?? '', date: rest.date ?? '' };
   });
 }

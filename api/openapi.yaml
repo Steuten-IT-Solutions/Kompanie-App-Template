@@ -9447,6 +9447,7 @@ components:
             after_text: { type: string, maxLength: 200 }
             starts_at: { type: [string, 'null'], format: date-time, readOnly: true, description: 'Nur in Antworten: Beginn in UTC; null, wenn der Termin fehlt oder für die Person nicht sichtbar ist (Bereich events, view_events): dann wie nach dem Ende' }
             ends_at: { type: [string, 'null'], format: date-time, readOnly: true, description: 'Nur in Antworten: Ende in UTC; null ohne Ende' }
+            timezone: { type: string, readOnly: true, description: 'Nur in Antworten: Zeitzone der Installation (z. B. Europe/Berlin). Die App zählt die Restzeit nach Kalender in dieser Zeitzone (Wanduhr): Eine Zeitumstellung vor dem Beginn ändert sie nicht.' }
             event_title: { type: [string, 'null'], readOnly: true, description: 'Nur in Antworten bei source event: Titel des Termins, null wenn nicht sichtbar' }
     BlockButton:
       allOf:

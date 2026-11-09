@@ -2,7 +2,7 @@
 // Neuzeichnen; Blöcke beim Bearbeiten (src/blocks/blockDrafts.ts).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { countdownParts, countdownPhase, nextChange, nextDay, nextTick, unitLabel } from '../src/blocks/countdown.ts';
+import { countdownParts, countdownPhase, nextChange, nextDay, nextTick, remaining, unitLabel, utcOffset } from '../src/blocks/countdown.ts';
 import { blocksInput, draftsFrom, hasContent, moveBlock, newBlock } from '../src/blocks/blockDrafts.ts';
 
 const S = 1000;
@@ -79,6 +79,32 @@ test('neu zeichnen: je Sekunde unter einer Stunde, sonst je Minute, nie über di
   assert.equal(nextChange(now, '2027-06-12T12:00:00Z', null), 1000);
   assert.equal(nextChange(now, '2027-06-12T10:00:00Z', '2027-06-12T13:00:00Z'), 2 * H, 'läuft: bis zum Ende');
   assert.equal(nextChange(now, '2027-06-12T10:00:00Z', null), null, 'danach: nichts mehr');
+});
+
+test('Restzeit nach Kalender in der Zeitzone der Installation: Zeitumstellung zählt nicht', () => {
+  const berlin = 'Europe/Berlin';
+  assert.equal(utcOffset(Date.parse('2026-11-09T20:47:00Z'), berlin), H, 'Winterzeit');
+  assert.equal(utcOffset(Date.parse('2027-06-24T22:00:00Z'), berlin), 2 * H, 'Sommerzeit');
+  // 09.11.2026, 21:47 Uhr (Winterzeit) bis 25.06.2027, 0:00 Uhr (Sommerzeit): Wanduhr 227 Tage 2 Std 13 Min
+  const now = Date.parse('2026-11-09T20:47:00Z');
+  const start = '2027-06-24T22:00:00Z';
+  assert.equal(Date.parse(start) - now, 227 * D + H + 13 * M, 'tatsächlich vergehen eine Stunde weniger');
+  assert.equal(remaining(now, start, berlin), 227 * D + 2 * H + 13 * M);
+  assert.deepEqual(countdownParts(remaining(now, start, berlin)), [
+    { value: 227, unit: 'day' },
+    { value: 2, unit: 'hour' },
+  ]);
+  // Ohne Zeitumstellung dazwischen: wie die tatsächliche Restzeit, zum Beginn genau 0
+  const summer = Date.parse('2027-06-20T10:00:00Z');
+  assert.equal(remaining(summer, start, berlin), Date.parse(start) - summer);
+  assert.equal(remaining(Date.parse(start), start, berlin), 0);
+  // Umstellung auf Winterzeit (31.10.2027, 3:00 → 2:00 Uhr): bis 4:00 Uhr Winterzeit sind es auf der Wanduhr 2 Stunden
+  assert.equal(remaining(Date.parse('2027-10-30T23:59:00Z'), '2027-10-31T03:00:00Z', berlin), 2 * H + M);
+  // Beginn in der doppelten Stunde, von der Wanduhr schon überholt: tatsächliche Restzeit statt 0
+  assert.equal(remaining(Date.parse('2027-10-31T00:45:00Z'), '2027-10-31T01:15:00Z', berlin), 30 * M);
+  // Unbekannte Zeitzone: Zeitzone des Geräts, kein Absturz
+  assert.equal(typeof remaining(now, start, 'Nirgendwo/Unbekannt'), 'number');
+  assert.equal(nextChange(now, start, null, berlin), M, 'neu zeichnen je Minute');
 });
 
 test('Folgetag auch über Monats- und Jahresgrenzen', () => {
