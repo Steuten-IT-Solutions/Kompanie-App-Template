@@ -26,6 +26,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Update als Datei hochladen**: Unter [Einstellungen → Zustand und Updates](app:einstellungen/zustand) lässt sich bei
+  *Update-Paket hochladen* ein Update-Paket (ZIP-Datei) direkt in der App hochladen und einspielen, ohne Zugang zum
+  Server. Die App zeigt vorher, welche Version es ist, und spielt nur unveränderte Pakete aus der geprüften Update-Liste
+  ein, auch eine Vorabversion oder eine ältere Version. Wie immer wird vorher gesichert.
 - **Navigation: Bereiche umbenennen, Symbole wählen, Startseite festlegen**: Unter [Einstellungen → Navigation](app:einstellungen/navigation) gebt
   ihr jedem Bereich, jeder eigenen Seite und dem Untermenü *Intern* der Standardnavigation einen eigenen Namen und ein
   eigenes Symbol (dazu gibt es zehn neue, allgemeine Symbole). Der Name gilt überall in der App: in der Leiste, in den

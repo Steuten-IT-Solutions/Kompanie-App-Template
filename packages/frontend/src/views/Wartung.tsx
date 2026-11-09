@@ -17,6 +17,7 @@ import brand from '../generated/brand';
 import { ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { confirmAsk } from '../ask';
+import { UPDATE_ACCEPT, uploadUpdatePackage } from '../updateUpload';
 
 /**
  * Wartung für Admins: Ampel (Status), Updates mit Zurückrollen, Statusmeldungen (nur mit
@@ -145,6 +146,9 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
   const [error, setError] = useState<string | null>(null);
   const [older, setOlder] = useState('');
   const [showPayload, setShowPayload] = useState(false);
+  /** Anteil des hochgeladenen Update-Pakets (0 bis 1); null: es wird keins hochgeladen */
+  const [uploadShare, setUploadShare] = useState<number | null>(null);
+  const packageInput = useRef<HTMLInputElement>(null);
   /** Fortschritt des laufenden Updates; undefined: keins läuft */
   const [progress, setProgress] = useState<UpdateProgress | null | undefined>(status.updates.running ? status.updates.progress : undefined);
   const alive = useRef(true);
@@ -252,6 +256,37 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
       }
       await follow(version, fn(true));
     }
+  }
+
+  /** Update-Paket hochladen, erkennen (Version aus der signierten Liste), nach Rückfrage einspielen. */
+  async function installPackage(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    await run('package', async () => {
+      let id: string;
+      try {
+        id = await uploadUpdatePackage(file, setUploadShare);
+      } finally {
+        setUploadShare(null);
+      }
+      try {
+        const info = await api.checkUpdateUpload(id);
+        const notes = [
+          info.older && `Das ist eine ältere Version als die installierte (${info.current}).`,
+          !info.released && 'Diese Version ist noch nicht für alle freigegeben (Vorabversion).',
+          info.major && 'Das ist eine neue Hauptversion: Zurück geht es danach nur mit unserer Hilfe.',
+        ].filter(Boolean);
+        if (!(await confirmAsk([`Version ${info.version} aus „${file.name}“ einspielen?`, ...notes].join('\n\n')))) {
+          void api.cancelUpdateUpload(id).catch(() => undefined);
+          return;
+        }
+        await askWithoutDrive(info.version, (withoutDrive) => api.installUpdateUpload(id, info.major, withoutDrive));
+      } catch (err) {
+        void api.cancelUpdateUpload(id).catch(() => undefined);
+        throw err;
+      }
+    });
   }
 
   const install = (version: string, major = false) =>
@@ -450,6 +485,23 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
               </button>
             </details>
           )}
+          <details className="small">
+            <summary>Update-Paket hochladen</summary>
+            <p>
+              Statt das Update vom Server laden zu lassen, kannst du das Paket hier hochladen, z. B.{' '}
+              <code>{`kompanie-app-${config?.variant ?? 'standalone'}.zip`}</code> aus den Releases deiner App. Eingespielt wird nur ein
+              unverändertes Paket, das in der geprüften Update-Liste steht, auch eine Vorabversion oder eine ältere Version. Vorher wird wie
+              immer gesichert.
+            </p>
+            <button type="button" className="btn btn-secondary" disabled={!!busy} onClick={() => packageInput.current?.click()}>
+              {busy === 'package'
+                ? uploadShare !== null
+                  ? `Wird hochgeladen … ${Math.round(uploadShare * 100)} %`
+                  : 'Wird eingespielt …'
+                : 'Paket wählen …'}
+            </button>
+            <input ref={packageInput} type="file" accept={UPDATE_ACCEPT} hidden onChange={(e) => void installPackage(e)} />
+          </details>
         </>
       )}
       {status.statusReports.available && (

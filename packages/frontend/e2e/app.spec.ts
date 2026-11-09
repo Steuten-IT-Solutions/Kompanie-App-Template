@@ -6512,6 +6512,64 @@ test('Vorabversionen erhalten: nach dem Bestätigen der Rückfrage wird der Vora
   expect(sent).toEqual([{ channel: 'early' }, { channel: 'stable' }]);
 });
 
+test('Update-Paket hochladen: in Stücken, Version aus der Datei zeigen, nach Bestätigung einspielen', async ({ page }) => {
+  // Die Testinstallation bekommt keine Updates über die App: Zustand und Hochladen so beantworten, als wäre sie eingerichtet.
+  await page.route('**/admin/status', async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    body.updates = { ...body.updates, configured: true };
+    await route.fulfill({ response: res, json: body });
+  });
+  const chunks: number[] = [];
+  const calls: string[] = [];
+  let received = 0;
+  await page.route('**/admin/update/upload**', async (route) => {
+    const url = route.request().url();
+    const data = route.request().postDataJSON() as Record<string, unknown>;
+    if (url.endsWith('/upload')) {
+      calls.push(`start ${data.size}`);
+      return route.fulfill({ status: 201, json: { id: 'a'.repeat(32), chunk_size: 4, max_bytes: 100 } });
+    }
+    if (url.endsWith('/chunk')) {
+      chunks.push(data.offset as number);
+      received = (data.offset as number) + atob(data.data as string).length;
+      return route.fulfill({ json: { received } });
+    }
+    calls.push(`${url.split('/').pop()} ${JSON.stringify(data)}`);
+    if (url.endsWith('/check')) {
+      return route.fulfill({ json: { version: '9.9.9.1', current: '0.1.0.1', major: false, older: false, released: false } });
+    }
+    if (url.endsWith('/install')) return route.fulfill({ json: { installed: '9.9.9.1' } });
+    return route.fulfill({ json: { cancelled: true } });
+  });
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Einstellungen');
+  await page
+    .locator('.settings-link')
+    .filter({ has: page.getByText('Zustand und Updates', { exact: true }) })
+    .click();
+  await page.getByText('Update-Paket hochladen').click();
+  const input = page.locator('input[type=file][accept*=".zip"]');
+  const pkg = { name: 'kompanie-app-standalone.zip', mimeType: 'application/zip', buffer: Buffer.from('PK\x03\x04abcdef') };
+
+  // Abbrechen: Sitzung gelöscht, nichts eingespielt
+  await input.setInputFiles(pkg);
+  await expect(page.locator('.ask-dialog')).toContainText('Version 9.9.9.1 aus „kompanie-app-standalone.zip“ einspielen?');
+  await expect(page.locator('.ask-dialog')).toContainText('noch nicht für alle freigegeben (Vorabversion)');
+  await askCancel(page);
+  await expect.poll(() => calls.at(-1)).toBe(`cancel {"upload":"${'a'.repeat(32)}"}`);
+  expect(chunks).toEqual([0, 4, 8]);
+  expect(calls.filter((c) => c.startsWith('install'))).toEqual([]);
+
+  // Bestätigen: eingespielt, die App lädt neu
+  chunks.length = 0;
+  await input.setInputFiles(pkg);
+  await askOk(page);
+  await expect(page.getByText('Version 9.9.9.1 ist eingespielt.')).toBeVisible();
+  expect(calls).toContain(`install {"upload":"${'a'.repeat(32)}","major":false,"without_drive":false}`);
+  expect(chunks).toEqual([0, 4, 8]);
+});
+
 test('Nutzung: Admin sieht aktive Konten, Nutzung je Bereich und den Verlauf einer Person, schaltet die Erfassung je Person aus und an', async ({
   page,
   browser,

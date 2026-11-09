@@ -251,6 +251,75 @@ final class UpdateService
      */
     public function install(string $version, string $kind = 'manual', bool $allowMajor = false, bool $withoutDrive = false): void
     {
+        $this->installVersion($version, $kind, $allowMajor, $withoutDrive, null);
+    }
+
+    /**
+     * Hochgeladenes Paket (UpdateUpload) erkennen: Es muss genau so (SHA-256 und Größe) für diese Installation in der
+     * signierten Update-Liste stehen. Vorher wird die Liste neu geladen, damit auch eine gerade erschienene Version
+     * erkannt wird; ist sie nicht erreichbar, gilt die zuletzt geprüfte.
+     *
+     * @return array{version: string, current: string, major: bool, older: bool, released: bool}
+     */
+    public function identifyUpload(string $path): array
+    {
+        $this->requireConfigured();
+        try {
+            $list = $this->check();
+        } catch (ApiError $e) {
+            $state = (array) $this->settings->get(self::STATE, []);
+            if (!is_array($state['list'] ?? null)) {
+                throw $e;
+            }
+            $list = UpdateList::fromPayload($state['list']);
+        }
+        clearstatcache(true, $path);
+        $hash = (string) hash_file('sha256', $path);
+        $size = (int) filesize($path);
+        $variant = $this->target->variant();
+        $version = null;
+        foreach ($list->toArray()['versions'] as $e) {
+            $file = is_array($e) ? ($e['files'][$variant] ?? null) : null;
+            if (is_array($file) && hash_equals((string) ($file['sha256'] ?? ''), $hash) && (!isset($file['size']) || (int) $file['size'] === $size)) {
+                $version = (string) $e['version'];
+                break;
+            }
+        }
+        if ($version === null) {
+            throw ApiError::invalid('Diese Datei ist kein Update-Paket für diese Installation: Sie steht nicht in der signierten Update-Liste. '
+                . "Bitte das Paket „kompanie-app-$variant.zip“ aus den Releases dieser Kompanie nehmen, unverändert.");
+        }
+        if ($list->isWithdrawn($version)) {
+            throw ApiError::invalid("Version $version wurde zurückgezogen und wird nicht eingespielt.");
+        }
+        if ($version === $this->currentVersion) {
+            throw ApiError::invalid("Version $version ist schon installiert.");
+        }
+        return [
+            'version' => $version,
+            'current' => $this->currentVersion,
+            'major' => Version::major($version) > Version::major($this->currentVersion),
+            'older' => Version::compare($version, $this->currentVersion) < 0,
+            'released' => $list->wasStable($version),
+        ];
+    }
+
+    /**
+     * Hochgeladenes Paket einspielen (wie install(), auch eine noch nicht freigegebene oder ältere Version). Die Datei
+     * bleibt liegen; der Aufrufer löscht sie (bei 409 drive_backup_failed erst nach der Rückfrage).
+     *
+     * @return string eingespielte Version
+     */
+    public function installUpload(string $path, bool $allowMajor = false, bool $withoutDrive = false): string
+    {
+        $info = $this->identifyUpload($path);
+        $this->installVersion($info['version'], $info['older'] ? 'rollback' : 'manual', $allowMajor, $withoutDrive, $path);
+        return $info['version'];
+    }
+
+    /** @param string|null $localZip hochgeladenes, schon erkanntes Paket statt Download (dann jeder Kanal) */
+    private function installVersion(string $version, string $kind, bool $allowMajor, bool $withoutDrive, ?string $localZip): void
+    {
         $this->requireConfigured();
         $state = (array) $this->settings->get(self::STATE, []);
         if (!is_array($state['list'] ?? null)) {
@@ -262,7 +331,7 @@ final class UpdateService
         if ($entry === null || $list->isWithdrawn($version)) {
             throw ApiError::invalid("Version $version ist nicht verfügbar.");
         }
-        if ($this->channel() === 'stable' && !$list->wasStable($version)) {
+        if ($localZip === null && $this->channel() === 'stable' && !$list->wasStable($version)) {
             throw ApiError::invalid("Version $version ist noch nicht für alle freigegeben.");
         }
         if (Version::major($version) > Version::major($this->currentVersion) && !$allowMajor) {
@@ -313,7 +382,7 @@ final class UpdateService
         $step = 'download';
         try {
             $progress($step);
-            $zip = $this->download($file);
+            $zip = $localZip ?? $this->download($file);
             try {
                 $step = 'backup';
                 // Größe der letzten Sicherung als Schätzung; geschrieben ist, was schon in der Datei steht (status()).
@@ -330,7 +399,7 @@ final class UpdateService
                 $this->settings->delete(App::PLAN_SETTING);
                 $this->target->install($zip, $version);
             } finally {
-                @unlink($zip);
+                $localZip === null && @unlink($zip);
             }
         } catch (\RuntimeException $e) {
             $this->settings->delete(self::PROGRESS);
