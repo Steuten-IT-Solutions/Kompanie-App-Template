@@ -87,11 +87,23 @@ final class CompanyTest extends TestCase
             'Jahr in der Zukunft' => ['name' => 'A', 'founded_year' => 9999],
             'nur http' => ['name' => 'A', 'website_url' => 'http://example.org/'],
             'App nur https' => ['name' => 'A', 'app_url' => 'javascript:alert(1)'],
+            'ohne Endung' => ['name' => 'A', 'website_url' => 'example'],
+            'mit Zugangsdaten' => ['name' => 'A', 'app_url' => 'https://nutzer:geheim@example.org/'],
             'aktiv kein Wahrheitswert' => ['name' => 'A', 'active' => 'ja'],
         ] as $case => $body) {
             $this->assertSame(400, $this->call('POST', '/companies', $body)->status, $case);
         }
         $this->assertSame([], $this->call('GET', '/companies')->data);
+    }
+
+    public function testLinksWithoutScheme(): void
+    {
+        $res = $this->call('POST', '/companies', ['name' => 'A', 'website_url' => ' example.org ', 'app_url' => 'Example.org/app']);
+        $this->assertSame(['https://example.org', 'https://Example.org/app'], [$res->data['website_url'], $res->data['app_url']]);
+        $res = $this->call('PATCH', '/companies/' . $res->data['id'], ['app_url' => 'http://example.org/app']);
+        $this->assertSame([400, '„App der Kompanie“ muss mit https:// beginnen (sichere Verbindung), nicht mit http://.'], [$res->status, $res->data['message'] ?? null]);
+        $res = $this->call('POST', '/companies', ['name' => 'B', 'website_url' => 'example']);
+        $this->assertSame('„Webseite“ ist keine gültige Webadresse. Beispiel: beispiel.de oder https://beispiel.de/seite', $res->data['message'] ?? null, 'Meldung nennt das Feld');
     }
 
     public function testRightsAndFeature(): void

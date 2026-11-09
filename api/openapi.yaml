@@ -3604,7 +3604,7 @@ paths:
               required: [name]
               properties:
                 name: { type: string, maxLength: 100, description: 'Mehrfache Leerzeichen werden zu einem' }
-                url: { type: string, maxLength: 255, description: 'Nur https://…, leer ohne Link' }
+                url: { type: string, maxLength: 255, description: 'https://… oder ohne Schema (beispiel.de, https:// wird ergänzt); http und Rechner ohne Endung werden abgelehnt; leer ohne Link' }
       responses:
         '201':
           description: Angelegt
@@ -9345,8 +9345,8 @@ components:
         short_name: { type: string, maxLength: 30 }
         founded_year: { type: [integer, 'null'], description: 'Von 1800 bis zum laufenden Jahr' }
         description: { type: string, maxLength: 20000, description: 'HTML wie bei News, wird bereinigt; Bilder werden entfernt' }
-        website_url: { type: string, maxLength: 255, description: 'Nur https://…, leer ohne' }
-        app_url: { type: string, maxLength: 255, description: 'Nur https://…, leer ohne' }
+        website_url: { type: string, maxLength: 255, description: 'https://… oder ohne Schema (beispiel.de, https:// wird ergänzt); http und Rechner ohne Endung werden abgelehnt; leer ohne' }
+        app_url: { type: string, maxLength: 255, description: 'Wie website_url' }
         active: { type: boolean, description: 'false: aufgelöst' }
 
     Sponsor:

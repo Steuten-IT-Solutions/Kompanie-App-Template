@@ -24,6 +24,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Geändert
+
+- **Webadressen ohne https:// eingeben**: Bei [Verwaltung → Einrichtungen → Kompanien](app:verwaltung/kompanien) (Webseite,
+  App der Kompanie) und [Verwaltung → Einrichtungen → Sponsoren](app:verwaltung/sponsoren) (Link) reicht jetzt z. B.
+  `beispiel.de/app`; die App ergänzt `https://` beim Verlassen des Felds. Eine ungültige Adresse (ohne Endung wie `.de`,
+  mit `http://` statt `https://`, kein Weblink) zeigt die App mit einer verständlichen Meldung direkt am Feld, statt
+  der knappen Meldung des Browsers „Gib eine URL ein.“.
+
 ## [0.8.0] – 2026-11-09
 
 ### Neu

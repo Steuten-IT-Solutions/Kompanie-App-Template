@@ -93,11 +93,12 @@ final class SponsorTest extends TestCase
             'Name zu lang' => ['name' => str_repeat('x', SponsorService::NAME_MAX + 1)],
             'nur http' => ['name' => 'A', 'url' => 'http://example.org/'],
             'kein Link' => ['name' => 'A', 'url' => 'javascript:alert(1)'],
-            'Adresse ohne Schema' => ['name' => 'A', 'url' => 'example.org'],
+            'Rechner ohne Endung' => ['name' => 'A', 'url' => 'example'],
         ] as $case => $body) {
             $this->assertSame(400, $this->call('POST', '/sponsors', $body)->status, $case);
         }
         $this->assertSame([], $this->call('GET', '/sponsors')->data);
+        $this->assertSame('https://example.org/sponsor', $this->call('POST', '/sponsors', ['name' => 'A', 'url' => 'example.org/sponsor'])->data['url'], 'https:// ergänzt');
     }
 
     public function testRightsAndFeature(): void

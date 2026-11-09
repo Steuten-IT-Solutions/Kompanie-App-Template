@@ -61,6 +61,19 @@ final class CoreTest extends TestCase
         $this->assertNull(Input::integer('1e3'));
         $this->assertSame('https://a.de/x', Input::url('https://a.de/x', 'f'));
         $this->assertSame('https://bürger-verein.de/schützenfest', Input::url('https://bürger-verein.de/schützenfest', 'f'));
+        $this->assertSame('https://a.de/x', Input::httpsUrl('a.de/x', 'f'), 'https:// ergänzt');
+        $this->assertSame('https://a.de:8443/x', Input::httpsUrl('//a.de:8443/x', 'f'), 'Port ist kein Schema');
+        $this->assertSame('https://A.de/x?b=1#c', Input::httpsUrl('HTTPS://A.de/x?b=1#c', 'f'));
+        $this->assertSame('https://bürger-verein.de/fest', Input::httpsUrl('bürger-verein.de/fest', 'f'));
+        $this->assertSame('', Input::httpsUrl('  ', 'f'));
+        foreach (['http://a.de', 'a', 'https://1.2.3.4', 'https://-a.de', 'https://a..de', 'https://u@a.de', 'mailto:x@a.de', 'javascript:alert(1)', 'a.de/<x>', 'https://a.de:abc', 'a.de/' . str_repeat('x', 250)] as $bad) {
+            try {
+                Input::httpsUrl($bad, 'f');
+                $this->fail("angenommen: $bad");
+            } catch (\KompanieApp\Core\Http\ApiError) {
+                $this->addToAssertionCount(1);
+            }
+        }
         $this->assertTrue(Input::bool('true'));
         $this->assertFalse(Input::bool('false'));
         $this->expectException(\KompanieApp\Core\Http\ApiError::class);

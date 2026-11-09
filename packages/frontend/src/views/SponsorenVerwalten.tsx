@@ -2,7 +2,8 @@ import { useRef, useState, type FormEvent } from 'react';
 import { api, type Sponsor } from '../api';
 import { useDragSort, useSaveQueue } from '../dragSort';
 import brand from '../generated/brand';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { Empty, ErrorBox, LinkField, Loading, useAsync } from '../ui';
+import { normalizeLink } from '../link';
 import { sources } from '../viewData';
 import { SponsorLogo } from './Sponsoren';
 import { confirmAsk } from '../ask';
@@ -34,10 +35,7 @@ function SponsorFields({
         <span>Name</span>
         <input type="text" maxLength={NAME_MAX} value={name} onChange={(e) => onName(e.target.value)} required autoFocus={autoFocus} />
       </label>
-      <label className="field">
-        <span>Link (optional)</span>
-        <input type="url" inputMode="url" placeholder="https://" value={url} onChange={(e) => onUrl(e.target.value)} />
-      </label>
+      <LinkField label="Link (optional)" value={url} onChange={onUrl} />
     </>
   );
 }
@@ -76,7 +74,7 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
 
   async function add(e: FormEvent) {
     e.preventDefault();
-    if (await run(() => api.createSponsor({ name: name.trim(), url: url.trim() }), 'Sponsor angelegt')) {
+    if (await run(() => api.createSponsor({ name: name.trim(), url: normalizeLink(url) }), 'Sponsor angelegt')) {
       setName('');
       setUrl('');
     }
@@ -143,7 +141,7 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
                   className="form"
                   onSubmit={async (e) => {
                     e.preventDefault();
-                    if (await run(() => api.updateSponsor(s.id, { name: editName.trim(), url: editUrl.trim() }), 'Gespeichert'))
+                    if (await run(() => api.updateSponsor(s.id, { name: editName.trim(), url: normalizeLink(editUrl) }), 'Gespeichert'))
                       setEditing(null);
                   }}
                 >
