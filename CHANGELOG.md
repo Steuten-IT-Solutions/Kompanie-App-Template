@@ -115,6 +115,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Ämter in der Einzahl**: Auf den Karten gemeinsamer Amtszeiten (z. B. „Königshaus 2026–2028“) und beim Antippen
+  eines Balkens in der Jahresansicht steht jetzt die Einzahl des Amts („Prinz“ statt „Prinzen“), wie schon auf der
+  Seite einer Person. Ebenso im Block *Ansprechpartner* über jeder Person und in der Mail vom Brett, wenn das Amt nur
+  eine Person hat. Ohne Einzahl bleibt die Bezeichnung.
 - **Rollen Mitglied und Gast: auch Rechte zum Verwalten**: Unter *Einstellungen → Rollen* lässt sich den Rollen
   Mitglied und Gast jetzt jedes Recht geben, nicht mehr nur Rechte zum Sehen, z. B. *Bilder und Videos einreichen*.
   Jede Person mit der Rolle bekommt es dann, bei Mitglied auch jedes neue Konto. Gast gehört weiter nie zur Kompanie;
