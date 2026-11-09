@@ -487,6 +487,10 @@ p.small + p.small:not(.muted) {
 .row-title:has(.badge) + .row-sub {
   margin-top: var(--space-1);
 }
+/* Art eines Punkts (z. B. „Eigene Seite“) hinter dem Namen in derselben Zeile: nicht direkt an den Namen kleben. */
+.row-title + .row-kind {
+  margin-left: var(--space-2);
+}
 .chevron {
   color: var(--accent-dark);
   font-size: 1.6rem;

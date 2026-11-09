@@ -301,8 +301,8 @@ function Editor({
   const targetRow = (t: NavTarget) => (
     <div className="row-main">
       <span className="row-title">{labels[t]}</span>
-      {isPageTarget(t) && <span className="row-sub">Eigene Seite</span>}
-      {!isOn(t) && <span className="row-sub">Der Bereich ist ausgeschaltet und erscheint erst, wenn er an ist.</span>}
+      {isPageTarget(t) && <span className="row-sub row-kind">Eigene Seite</span>}
+      {!isOn(t) && <div className="row-sub">Der Bereich ist ausgeschaltet und erscheint erst, wenn er an ist.</div>}
       {placeSelect(t)}
       {renameFields(t, targetIcon(t))}
     </div>
@@ -392,7 +392,7 @@ function Editor({
               <li key={t} className="card row">
                 <div className="row-main">
                   <span className="row-title">{labels[t]}</span>
-                  <span className="row-sub">Neu: erscheint hinten in der Leiste, bis du ihm einen Platz gibst.</span>
+                  <div className="row-sub">Neu: erscheint hinten in der Leiste, bis du ihm einen Platz gibst.</div>
                   {placeSelect(t)}
                 </div>
               </li>
@@ -408,7 +408,7 @@ function Editor({
             <li className="card row">
               <div className="row-main">
                 <span className="row-title">{labels.intern ?? defaultLabel('intern', pages)}</span>
-                <span className="row-sub">Sammelt in der Standardnavigation die internen Bereiche.</span>
+                <div className="row-sub">Sammelt in der Standardnavigation die internen Bereiche.</div>
                 {renameFields('intern', 'intern')}
               </div>
             </li>
