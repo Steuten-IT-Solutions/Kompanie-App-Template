@@ -15,6 +15,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Was ist neu
 - **Vorabversion** mit dem Zeichen **noch nicht für alle freigegeben**: steht ganz oben, wenn bei euch eine Vorabversion läuft (siehe [Zustand und Updates](seite:admin-zustand)). Hier steht, was dort schon dabei ist, aber noch nicht für alle freigegeben wurde.
 
 ## Gut zu wissen
+- Steht bei einer Änderung ein Weg wie **Einstellungen → Rollen**, ist er ein Verweis: Antippen öffnet gleich die Seite, auf der du das Neue einstellst.
 - Die Liste gehört zur installierten Version und ist auch ohne Internetverbindung da. Nach einem Update kommen die neuen Einträge dazu.
 
 ## Siehe auch

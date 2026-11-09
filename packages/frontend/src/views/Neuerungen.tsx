@@ -27,7 +27,8 @@ function eintraege(html: string): number {
  * „Was ist neu“ für Admins (Einstellungen): das Changelog aus CHANGELOG.md (scripts/changelog.php), mit der App gebaut,
  * also passend zur installierten Version und offline verfügbar. Das HTML ist beim Bauen maskiert. Aufgeklappt ist nur
  * die Vorabversion bzw. die installierte (sonst die neueste) Version, ältere stehen eingeklappt mit Datum und Anzahl
- * der Änderungen darunter (Issue #352).
+ * der Änderungen darunter (Issue #352). Wege wie „Einstellungen → Rollen“ sind Verweise auf die Seite der App
+ * (app:einstellungen/rollen im Changelog, hier #/einstellungen/rollen).
  */
 export default function Neuerungen() {
   const versionen = changelog.versionen as Version[];
