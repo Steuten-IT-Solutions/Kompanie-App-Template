@@ -399,13 +399,19 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
               type="checkbox"
               checked={u.channel === 'early'}
               disabled={!!busy}
-              onChange={async (e) =>
-                (!e.target.checked ||
-                  (await confirmAsk(
+              onChange={async (e) => {
+                // Vor der Rückfrage lesen: Während sie offen ist, setzt React den Haken auf den alten Stand zurück.
+                const early = e.target.checked;
+                if (
+                  early &&
+                  !(await confirmAsk(
                     'Vorabversionen erhalten? Diese Installation bekommt dann jede neue Version, bevor sie für alle freigegeben ist – zum Testen, kann noch Fehler enthalten.',
-                  ))) &&
-                run('channel', async () => setU(await api.updateOptions({ channel: e.target.checked ? 'early' : 'stable' })))
-              }
+                  ))
+                ) {
+                  return;
+                }
+                await run('channel', async () => setU(await api.updateOptions({ channel: early ? 'early' : 'stable' })));
+              }}
             />
             <span>Vorabversionen erhalten (zum Testen)</span>
           </label>

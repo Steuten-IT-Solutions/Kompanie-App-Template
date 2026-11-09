@@ -186,6 +186,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Vorabversionen erhalten**: Der Haken unter [Einstellungen → Zustand und Updates](app:einstellungen/zustand) bleibt nach
+  dem Bestätigen der Rückfrage gesetzt, und die Installation bekommt wieder Vorabversionen. Bisher war er danach wieder
+  aus, und der Kanal blieb bei den freigegebenen Versionen.
 - **Hilfe zu Impressum und Datenschutz**: Der Knopf *?* auf der Seite *Impressum und Datenschutz* der Einstellungen
   öffnet jetzt deren Anleitung statt der Übersicht der Einstellungen.
 - **Benachrichtigungen, Zuletzt verschickt**: Die Liste unter [Einstellungen → Benachrichtigungen](app:einstellungen/benachrichtigungen) ist jetzt nach
