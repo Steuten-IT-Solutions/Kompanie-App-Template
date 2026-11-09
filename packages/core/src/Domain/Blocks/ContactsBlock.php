@@ -60,7 +60,7 @@ final class ContactsBlock implements BlockType
         return ['title' => (string) ($data['title'] ?? ''), 'office_ids' => self::ids($data), 'offices' => $this->contacts($data, $viewer)];
     }
 
-    /** Je Amt eine Zeile „Amt: Name (E-Mail, Telefon), Name“, mit der Überschrift davor. */
+    /** Je Amt eine Zeile „Amt: Name (E-Mail, Telefon), Name“, mit der Überschrift davor; bei einer Person das Amt in der Einzahl. */
     public function plain(array $data, ?User $viewer = null): string
     {
         $lines = [];
@@ -69,7 +69,9 @@ final class ContactsBlock implements BlockType
                 $contact = array_values(array_filter([$p['email'] ?? '', $p['phone'] ?? ''], static fn (string $v): bool => $v !== ''));
                 return $p['name'] . ($contact !== [] ? ' (' . implode(', ', $contact) . ')' : '');
             }, $o['holders']);
-            $lines[] = $o['title'] . ': ' . ($names === [] ? 'zurzeit nicht besetzt' : implode(', ', $names));
+            // Eine Person (oder niemand): das Amt in der Einzahl; mehrere: die Bezeichnung
+            $label = count($names) <= 1 && $o['holder_title'] !== null ? $o['holder_title'] : $o['title'];
+            $lines[] = $label . ': ' . ($names === [] ? 'zurzeit nicht besetzt' : implode(', ', $names));
         }
         if ($lines === [] || !$this->app->features()->enabled('offices')) {
             return '';
@@ -91,7 +93,7 @@ final class ContactsBlock implements BlockType
      * Ämter in der Reihenfolge des Blocks mit den Inhabern ihrer laufenden Amtszeiten.
      *
      * @param array<string, mixed> $data
-     * @return list<array{id: int, title: string, holders: list<array<string, mixed>>}>
+     * @return list<array{id: int, title: string, holder_title: ?string, holders: list<array<string, mixed>>}>
      */
     private function contacts(array $data, ?User $viewer): array
     {
@@ -126,7 +128,8 @@ final class ContactsBlock implements BlockType
                     $holders[] = $p;
                 }
             }
-            $out[] = ['id' => $id, 'title' => (string) $office['title'], 'holders' => $holders];
+            // Einzahl wie im Zeitstrahl einer Person („Prinz“ statt „Prinzen“), null ohne
+            $out[] = ['id' => $id, 'title' => (string) $office['title'], 'holder_title' => $office['holder_title'], 'holders' => $holders];
         }
         return $out;
     }

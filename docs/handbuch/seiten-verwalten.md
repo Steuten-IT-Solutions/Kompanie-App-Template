@@ -63,7 +63,7 @@ Der Block zeigt immer die nächsten Termine ab heute aus den {bereich.events}, m
 1. Füge einen Block **Ansprechpartner** ein.
 2. Trage bei Bedarf eine **Überschrift** ein und setze bei **Ämter** die Haken bei den Ämtern, deren Inhaber erscheinen sollen (höchstens 20). Sie erscheinen in der Reihenfolge, in der du sie anhakst.
 
-Der Block zeigt, wer das Amt gerade innehat, mit Foto wie in den Ämtern. E-Mail-Adresse und Handynummer sehen nur Personen, die persönliche Angaben sehen dürfen, und nur bei Inhabern, deren Konto die Ämter zeigen. Ist ein Amt nicht besetzt, steht „zurzeit nicht besetzt“ dabei. Sind die Ämter ausgeschaltet, fehlt der Block.
+Der Block zeigt, wer das Amt gerade innehat, mit Foto wie in den Ämtern. Über jeder Person steht das Amt in der Einzahl („Prinz“ statt „Prinzen“), wenn eine eingetragen ist. E-Mail-Adresse und Handynummer sehen nur Personen, die persönliche Angaben sehen dürfen, und nur bei Inhabern, deren Konto die Ämter zeigen. Ist ein Amt nicht besetzt, steht „zurzeit nicht besetzt“ dabei. Sind die Ämter ausgeschaltet, fehlt der Block.
 
 ### Einen Hinweis-Kasten oder eine Trennlinie einfügen
 - **Hinweis-Kasten**: Trage optional eine **Überschrift** und den **Hinweis** ein (höchstens 1000 Zeichen) und wähle bei **Art** **Info**, **Warnung** oder **Erfolg**. Der Kasten erscheint farbig hervorgehoben.

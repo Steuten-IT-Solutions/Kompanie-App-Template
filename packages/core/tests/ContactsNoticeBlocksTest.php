@@ -53,18 +53,21 @@ final class ContactsNoticeBlocksTest extends TestCase
     public function testContacts(): void
     {
         $chair = (int) $this->ok('POST', '/offices', ['title' => 'Vorsitz'])['id'];
-        $treasurer = (int) $this->ok('POST', '/offices', ['title' => 'Kasse'])['id'];
+        $treasurer = (int) $this->ok('POST', '/offices', ['title' => 'Kassenwarte', 'singular' => 'Kassenwart'])['id'];
+        $board = (int) $this->ok('POST', '/offices', ['title' => 'Beisitzer', 'singular' => 'Beisitzerin'])['id'];
         $empty = (int) $this->ok('POST', '/offices', ['title' => 'Fahnenträger'])['id'];
         $this->ok('POST', "/offices/$chair/terms", ['start_year' => 2020, 'end_year' => 2023, 'holders' => [['name' => 'Früher']]]);
         $this->ok('POST', "/offices/$chair/terms", ['start_year' => 2024, 'holders' => [['user_id' => $this->member]]]);
         $this->ok('POST', "/offices/$treasurer/terms", ['start_year' => 2025, 'holders' => [['name' => 'Karl Kasse']]]);
+        $this->ok('POST', "/offices/$board/terms", ['start_year' => 2025, 'holders' => [['name' => 'Bea'], ['name' => 'Bob']]]);
         $page = $this->ok('POST', '/pages', ['title' => 'Kontakt', 'audience' => 'public', 'blocks' => [
             ['type' => 'contacts', 'title' => 'Sprich uns an', 'office_ids' => [$treasurer, $chair, $empty, $chair]],
         ]]);
         $this->assertSame([$treasurer, $chair, $empty], $page['blocks'][0]['office_ids'], 'doppelte einmal, Reihenfolge des Blocks');
 
         $offices = $this->ok('GET', "/pages/{$page['id']}")['blocks'][0]['offices'];
-        $this->assertSame(['Kasse', 'Vorsitz', 'Fahnenträger'], array_column($offices, 'title'));
+        $this->assertSame(['Kassenwarte', 'Vorsitz', 'Fahnenträger'], array_column($offices, 'title'));
+        $this->assertSame(['Kassenwart', null, null], array_column($offices, 'holder_title'), 'Einzahl, null ohne');
         $this->assertSame(['Anna'], array_column($offices[1]['holders'], 'name'), 'nur die laufende Amtszeit');
         $this->assertSame('anna@example.org', $offices[1]['holders'][0]['email'], 'mit view_personal: Kontaktdaten');
         $this->assertSame([], $offices[2]['holders']);
@@ -74,7 +77,9 @@ final class ContactsNoticeBlocksTest extends TestCase
             $this->assertArrayNotHasKey('email', $shown[1]['holders'][0], 'ohne view_personal keine Kontaktdaten');
             $this->assertStringNotContainsString('anna@example.org', (string) json_encode($shown));
         }
-        $this->assertSame("Sprich uns an\nKasse: Karl Kasse\nVorsitz: Anna\nFahnenträger: zurzeit nicht besetzt", $this->app->blocks()->plain([['type' => 'contacts', 'title' => 'Sprich uns an', 'office_ids' => [$treasurer, $chair, $empty]]], true));
+        $this->assertSame("Sprich uns an\nKassenwart: Karl Kasse\nVorsitz: Anna\nFahnenträger: zurzeit nicht besetzt", $this->app->blocks()->plain([['type' => 'contacts', 'title' => 'Sprich uns an', 'office_ids' => [$treasurer, $chair, $empty]]], true));
+        // Mehrere Personen: die Bezeichnung, nicht die Einzahl
+        $this->assertSame('Beisitzer: Bea, Bob', $this->app->blocks()->plain([['type' => 'contacts', 'office_ids' => [$board]]], true));
 
         foreach ([[], [999999], ['x'], array_fill(0, 21, $chair)] as $ids) {
             $this->assertSame(400, $this->call('POST', '/pages', ['title' => 'X', 'blocks' => [['type' => 'contacts', 'office_ids' => $ids]]])->status, (string) json_encode($ids));

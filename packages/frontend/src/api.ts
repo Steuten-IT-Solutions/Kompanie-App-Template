@@ -242,7 +242,8 @@ export interface ContactsBlock extends BlockBase {
   type: 'contacts';
   title: string;
   office_ids: number[];
-  offices: { id: number; title: string; holders: BlockContact[] }[];
+  /** holder_title: Einzahl des Amts wie in GET /offices, fehlt bei älteren Servern */
+  offices: { id: number; title: string; holder_title?: string | null; holders: BlockContact[] }[];
 }
 /** Hinweis-Kasten: kurzer reiner Text, farbig */
 export interface NoticeBlock extends BlockBase {
