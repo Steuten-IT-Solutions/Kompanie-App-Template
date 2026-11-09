@@ -16,6 +16,7 @@ import {
   startOf,
   tabbarClass,
   unplaced,
+  viewPath,
   type NavContext,
   type NavTarget,
 } from '../src/navigation.ts';
@@ -153,6 +154,16 @@ test('Startseite: eingestellt, wenn sie in der Leiste steht, sonst der erste Pun
   assert.equal(startOf(tabs, 'news'), 'termine', 'darf die Person nicht sehen: erster Punkt');
   assert.equal(startOf(tabs, undefined), 'termine');
   assert.equal(startOf([], 'galerie'), undefined);
+});
+
+test('Startseite: eine eigene Seite öffnet die Seite, nicht die Übersicht der Seiten', () => {
+  const tabs = buildNav({ items: [pageTarget(5), 'termine'], hidden: [] }, { ...ctx(['termine']), visible: () => true });
+  const start = startOf(tabs, undefined) ?? '';
+  assert.equal(start, 'seiten/5', 'erster Punkt der Navigation');
+  assert.deepEqual(viewPath([], false, start), ['seiten', '5']);
+  assert.deepEqual(viewPath([], false, startOf(tabs, 'seiten/5') ?? ''), ['seiten', '5'], 'als Startseite gewählt');
+  assert.deepEqual(viewPath(['seiten'], true, start), ['seiten'], 'Aufruf von #/seiten bleibt die Übersicht');
+  assert.deepEqual(viewPath(['termine'], true, start), ['termine']);
 });
 
 test('Startseite: Auswahl aus der Navigation, „Meins“ nur für Angemeldete', () => {
