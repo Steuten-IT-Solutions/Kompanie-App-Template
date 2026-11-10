@@ -644,7 +644,7 @@ function AdminOrderList({
   if (shown.length === 0) return null;
   return (
     <>
-      <p className="small">
+      <p className="small nav-order-title">
         <strong>{title}</strong>
       </p>
       <ul className="card-list">

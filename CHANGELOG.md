@@ -38,6 +38,15 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   für alle gleich. Jede Person sieht weiter nur die Knöpfe, für die sie das Recht hat. Auch die Bereiche in „Intern“ der
   Standardnavigation lassen sich jetzt umordnen, ohne dass daraus eine eigene Navigation wird.
 
+### Behoben
+
+- **Fehlende Abstände**: In [Einstellungen → Navigation](app:einstellungen/navigation) klebten die Zwischenüberschrift
+  „Einrichtungen“, die Felder der Startseite und die Knöpfe unten („Navigation speichern“, „Standardnavigation
+  wiederherstellen“, „Standardreihenfolge der Verwaltung“) an der Karte darüber. Das ist behoben, ebenso unter
+  [Einstellungen → Rollen](app:einstellungen/rollen) („+ Neue Rolle“), [Einstellungen → Kalender](app:einstellungen/kalender),
+  bei den laufenden Umfragen am Schwarzen Brett, bei den Gruppen der Ämter, bei den Dienstgraden und beim Import aus
+  Excel. Alle Einstellungen halten jetzt einheitlich Abstand zwischen ihren Teilen.
+
 ## [0.8.2] – 2026-11-09
 
 ### Geändert
