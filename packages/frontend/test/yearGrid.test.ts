@@ -1,7 +1,7 @@
 // Jahresübersicht der Ämter (src/yearGrid.ts): belegte Jahre, Spuren für gleichzeitige Amtszeiten, Jahre des Rasters.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { lanes, occupied, yearRange, type GridTerm } from '../src/yearGrid.ts';
+import { breakAfterSlash, columnChars, lanes, occupied, yearRange, type GridTerm } from '../src/yearGrid.ts';
 
 let next = 1;
 const term = (start: number, end: number | null, kind: 'period' | 'point' = 'period'): GridTerm => ({
@@ -46,4 +46,19 @@ test('aufeinanderfolgende Amtszeiten bleiben in einer Spur, gleichzeitige bekomm
 test('Jahre des Rasters: neueste oben, vom frühesten Beginn bis heute', () => {
   assert.deepEqual(yearRange([term(2020, null), term(2018, 2019)], 2022), [2022, 2021, 2020, 2019, 2018]);
   assert.deepEqual(yearRange([], 2022), []);
+});
+
+test('Bezeichnung bricht nach „/“ um', () => {
+  assert.equal(breakAfterSlash('Könige/Königinnen'), 'Könige/​Königinnen');
+  assert.equal(breakAfterSlash('Kassierer'), 'Kassierer');
+  assert.equal(breakAfterSlash('A / B'), 'A / B', 'vor einem Leerzeichen ist schon eine Umbruchstelle');
+});
+
+test('Spaltenbreite: längstes Wort passt, Bezeichnung in höchstens drei Zeilen', () => {
+  assert.equal(columnChars('Könige/Königinnen', ['Erika Beispiel']), 10, 'Königinnen');
+  assert.equal(columnChars('Kriegsminister*', ['Max Mustermann']), 15, 'Kriegsminister*');
+  assert.equal(columnChars('Offiziere des Königshauses und Adjutanten', []), 14, 'drei Zeilen');
+  assert.equal(columnChars('Hut', ['Dirk Mustermann-Schulze']), 11, 'Bindestrich ist Umbruchstelle');
+  assert.equal(columnChars('Donaudampfschifffahrtsgesellschaftskapitän', []), 18, 'gedeckelt');
+  assert.equal(columnChars('', []), 0);
 });

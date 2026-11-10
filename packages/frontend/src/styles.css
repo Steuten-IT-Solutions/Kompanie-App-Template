@@ -4696,7 +4696,7 @@ fieldset.board-targets legend {
 .year-grid-wrap {
   --yg-years: 3.5rem;
   --yg-col: 6.5rem;
-  --yg-row: 1.6rem;
+  --yg-row: 1.6rem; /* Mindesthöhe: ein Jahr mit zweizeiligem Namen wird höher */
   margin-top: 12px;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -4759,6 +4759,10 @@ fieldset.board-targets legend {
   display: flex;
   align-items: flex-end;
   border-bottom: 1px solid var(--line);
+}
+.yg-office span {
+  /* sonst bricht die Bezeichnung im Flex-Kasten nicht um und läuft über die Nachbarspalte */
+  min-width: 0;
 }
 .yg-group.empty {
   border-bottom-color: transparent;
