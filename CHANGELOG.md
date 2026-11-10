@@ -38,6 +38,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   für alle gleich. Jede Person sieht weiter nur die Knöpfe, für die sie das Recht hat. Auch die Bereiche in „Intern“ der
   Standardnavigation lassen sich jetzt umordnen, ohne dass daraus eine eigene Navigation wird.
 
+### Behoben
+
+- Knöpfe trennen Wörter nicht mehr mit Bindestrich, sondern schieben ein Wort, das nicht mehr in die Zeile passt, ganz
+  in die nächste (z. B. „Bilder und Videos einreichen“ in der [Galerie](app:galerie) statt „VI-DEOS“). Nur wenn ein
+  Wort allein nicht in den Knopf passt (lange Wörter auf schmalen Handys), trennt der Knopf wie bisher.
+
 ## [0.8.2] – 2026-11-09
 
 ### Geändert

@@ -46,11 +46,11 @@ select {
 }
 
 /* Lange Wörter in Überschriften, Kacheln und Titeln nach deutschen Regeln trennen (lang="de"), statt sie an
-   beliebiger Stelle umzubrechen (overflow-wrap: anywhere greift erst, wenn keine Trennstelle passt). */
+   beliebiger Stelle umzubrechen (overflow-wrap: anywhere greift erst, wenn keine Trennstelle passt). Knöpfe nicht:
+   siehe .btn. */
 h1,
 h2,
 h3,
-.btn,
 .row-title,
 .event-title,
 .page-tile,
@@ -646,12 +646,24 @@ p.small + p.small:not(.muted) {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   font-size: 0.95rem;
+  /* Wörter in Knöpfen nicht trennen, sondern ganz in die nächste Zeile schieben („Bilder und Videos einreichen“),
+     auch nicht von einer Kachel oder Überschrift geerbt. Höchstens so breit wie der Platz, damit ein zu langes Wort
+     im Knopf überläuft; das erkennt buttonWords.ts und erlaubt dann die Trennung (data-hyphenate). */
+  max-width: 100%;
+  hyphens: manual;
+  -webkit-hyphens: manual;
   box-shadow:
     inset 0 -2px 0 rgb(0 0 0 / 18%),
     0 1px 2px color-mix(in srgb, var(--primary-ink) 20%, transparent);
   transition:
     transform 0.08s ease,
     filter 0.15s ease;
+}
+/* Ein Wort passt allein nicht in den Knopf: nach deutschen Regeln trennen, notfalls an beliebiger Stelle */
+.btn[data-hyphenate] {
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  overflow-wrap: anywhere;
 }
 .btn:active {
   transform: translateY(1px);
