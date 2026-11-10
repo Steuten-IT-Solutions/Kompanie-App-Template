@@ -48,13 +48,18 @@ test('Jahre des Rasters: neueste oben, vom frühesten Beginn bis heute', () => {
   assert.deepEqual(yearRange([], 2022), []);
 });
 
-test('Bezeichnung bricht nach „/“ und vor der Gender-Endung um', () => {
+test('Bezeichnung bricht nach „/“, vor Wortteilen und vor der Gender-Endung um', () => {
   assert.equal(titleBreaks('Könige/Königinnen'), 'Könige/​Königinnen');
   assert.equal(titleBreaks('Kassierer'), 'Kassierer');
   assert.equal(titleBreaks('A / B'), 'A / B', 'vor einem Leerzeichen ist schon eine Umbruchstelle');
-  assert.equal(titleBreaks('Ordonnanzoffizier*in'), 'Ordonnanzoffizier\u200B*in', 'vor der Gender-Endung');
-  assert.equal(titleBreaks('Kassierer:innen'), 'Kassierer\u200B:innen');
-  assert.equal(titleBreaks('Kriegsminister*'), 'Kriegsminister*', 'Stern am Ende bleibt');
+  assert.equal(titleBreaks('Ordonnanzoffizier*in'), 'Ordonnanz\u00ADoffizier*in', 'vor dem Wortteil, nicht vor „*in“');
+  assert.equal(titleBreaks('Kriegsminister*in'), 'Kriegs\u00ADminister*in');
+  assert.equal(titleBreaks('1. Brudermeister'), '1. Bruder\u00ADmeister');
+  assert.equal(titleBreaks('Offizier'), 'Offizier', 'am Wortanfang keine Trennung');
+  assert.equal(titleBreaks('Kassierer:innen'), 'Kassierer\u200B:innen', 'ohne Wortteil: vor der Gender-Endung');
+  assert.equal(titleBreaks('Schriftführer*in'), 'Schrift\u00ADführer*in');
+  assert.equal(titleBreaks('Kriegsminister*'), 'Kriegs\u00ADminister*', 'Stern am Ende bleibt');
+  assert.equal(titleBreaks('Prinz/Prinzessin'), 'Prinz/\u200BPrinzessin', 'Prinz am Wortanfang');
 });
 
 test('Spaltenbreite: längstes Wort passt, Bezeichnung in höchstens drei Zeilen', () => {
