@@ -6449,12 +6449,21 @@ button.spotlight-person:focus-visible {
 .joint-term-offices {
   margin: 0;
   display: grid;
-  gap: 6px;
+  /* Bezeichnungen so breit wie die längste (höchstens 45 %), damit „Ordonnanzoffizier*in“ in eine Zeile passt; alle
+     Zeilen teilen sich die Spalten (subgrid), die Namen stehen also bündig */
+  grid-template-columns: fit-content(45%) 1fr;
+  gap: 6px 8px;
 }
 .joint-term-offices > div {
   display: grid;
-  grid-template-columns: minmax(110px, 40%) 1fr;
-  gap: 8px;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+@supports not (grid-template-columns: subgrid) {
+  .joint-term-offices > div {
+    grid-template-columns: minmax(110px, 40%) 1fr;
+    gap: 8px;
+  }
 }
 .joint-term-offices dt {
   min-width: 0;
