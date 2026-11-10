@@ -70,6 +70,8 @@ enum Capability: string
     case ManageAttendance = 'manage_attendance';
     /** Öffentliche Termine pflegen (Bereich Termine). */
     case ManageEvents = 'manage_events';
+    /** Termine des internen Kalenders in der App pflegen (Bereich Kalender mit der Quelle „In der App“). */
+    case ManageCalendar = 'manage_calendar';
     /**
      * Dokumente pflegen und alle Dokumente sehen, auch die mit eingeschränkter Sichtbarkeit.
      * Die Dokumente selbst kommen mit Issue #2.

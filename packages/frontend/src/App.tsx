@@ -22,7 +22,7 @@ import { setReportOrigin } from './lastError';
 import { shareLink, shareUrl } from './share';
 import { toggleTheme, useTheme } from './theme';
 import News from './views/News';
-import Termine from './views/Termine';
+import Termine, { canManageCalendar } from './views/Termine';
 import { hasEvents, prefetcher, tabSources, type TabId } from './viewData';
 import { whenIdle } from './prefetch';
 
@@ -678,6 +678,8 @@ export default function App({ notice = null }: { notice?: string | null }) {
             {tab === 'termine' &&
               (path[1] === 'verwalten' && features?.events && can('manage_events') ? (
                 <TermineVerwalten onToast={showToast} />
+              ) : path[1] === 'kalender' && canManageCalendar() ? (
+                <TermineVerwalten internal onToast={showToast} />
               ) : (
                 <Termine focus={path[1] === 'termin' ? focusId(path[2]) : undefined} />
               ))}

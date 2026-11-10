@@ -127,6 +127,9 @@ final class StatusService
             return $this->item('calendar', 'Kalender', 'off', 'Der Kalender ist ausgeschaltet.');
         }
         $cal = $this->app->calendar();
+        if ($cal->source() === CalendarService::SOURCE_APP) {
+            return $this->item('calendar', 'Kalender', 'ok', 'Die Termine werden in der App gepflegt.');
+        }
         $via = [
             'google' => 'über die Google-API mit eigenem API-Schlüssel',
             'google_connection' => 'über die Kalender-IDs und den Google-Zugang',

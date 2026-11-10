@@ -583,6 +583,8 @@ final class Api
             'section_labels' => self::jsonObject($a->navigation()->sectionOverrides($a->features()->enabled('directory'), $a->features()->enabled('offices'))),
             // News in der App geschrieben (Quelle „app“): Wer manage_news hat, sieht dort Knöpfe zum Schreiben und Ändern
             'newsInApp' => ($features['news'] ?? false) && $a->newsService()->inApp(),
+            // Interner Kalender in der App gepflegt (Quelle „app“): Wer manage_calendar hat, sieht bei den Terminen den Knopf dafür
+            'calendarInApp' => ($features['calendar'] ?? false) && $a->calendar()->inApp(),
             // Eigene Seiten (Issue #287), die die Person lesen darf: für die Kacheln unter „Seiten“ (ohne Text)
             'pages' => array_map(static fn (array $p): array => ['id' => $p['id'], 'title' => $p['title']], $a->pages()->list($user)),
             'setupPending' => $this->can(Cap::ManageSettings) && !(bool) $a->settings->get(self::SETUP_SETTING, false),
@@ -751,6 +753,24 @@ final class Api
                 return ['sent' => true];
             }),
             new Route('GET', '/calendar', Cap::Calendar, fn () => $a->calendar()->upcoming(), 'calendar', $denyCalendar),
+            // Interner Kalender in der App (Quelle „app“): Termine pflegen mit manage_calendar, getrennt von den öffentlichen.
+            // Benachrichtigungen wie bei jeder Quelle über PushTriggers::checkCalendar, nach dem Speichern sofort angestoßen.
+            new Route('GET', '/calendar/entries', Cap::ManageCalendar, fn () => $a->calendar()->requireInApp()->upcoming(), 'calendar', $denyRights),
+            new Route('POST', '/calendar/entries', Cap::ManageCalendar, function (Request $r) use ($a) {
+                $event = $a->calendar()->requireInApp()->create(EventService::input($r->body), $this->user()->id);
+                $this->notify(static fn () => $a->pushTriggers()->checkCalendar());
+                return Response::created($event);
+            }, 'calendar', $denyRights),
+            new Route('PATCH', '/calendar/entries/{id}', Cap::ManageCalendar, function (Request $r) use ($a) {
+                $event = $a->calendar()->requireInApp()->update($r->id(), EventService::input($r->body));
+                $this->notify(static fn () => $a->pushTriggers()->checkCalendar());
+                return $event;
+            }, 'calendar', $denyRights),
+            new Route('DELETE', '/calendar/entries/{id}', Cap::ManageCalendar, function (Request $r) use ($a) {
+                $a->calendar()->requireInApp()->delete($r->id());
+                $this->notify(static fn () => $a->pushTriggers()->checkCalendar());
+                return ['deleted' => true];
+            }, 'calendar', $denyRights),
 
             // Öffentliche Termine
             new Route('GET', '/events', Cap::ViewEvents, fn () => $a->events()->upcoming(), 'events', $denyView),

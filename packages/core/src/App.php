@@ -275,7 +275,8 @@ final class App
         $wanted = [
             GalleryService::TASK => $gallery,
             GalleryService::PROCESS_TASK => $gallery,
-            CalendarService::TASK => $this->features()->enabled('calendar') && $this->calendar()->isConfigured(),
+            // Termine der App liest der Kalender direkt aus der Datenbank: nichts zu erneuern.
+            CalendarService::TASK => $this->features()->enabled('calendar') && $this->calendar()->isConfigured() && !$this->calendar()->inApp(),
             UpdateService::TASK => $this->updates()->configured(),
             StatusReporter::TASK => $this->statusReporter()->enabled(),
             // Versand: stündlich als Rückfall, sonst nach dem Einreihen vorgezogen (Scheduler::runSoon).
@@ -543,6 +544,12 @@ final class App
         return $this->service(EventService::class, fn () => new EventService(new EventRepository($this->db), $this->time()));
     }
 
+    /** Termine des internen Kalenders in der App (Quelle „app“), getrennt von den öffentlichen. */
+    public function internalEvents(): EventService
+    {
+        return $this->service('internal_events', fn () => new EventService(new EventRepository($this->db, EventRepository::INTERNAL), $this->time()));
+    }
+
     public function scores(): ScoreService
     {
         return $this->service(ScoreService::class, fn () => new ScoreService(
@@ -737,7 +744,7 @@ final class App
 
     public function calendar(): CalendarService
     {
-        return $this->service(CalendarService::class, fn () => new CalendarService($this->settings, $this->http, $this->cache, $this->time(), $this->drive()));
+        return $this->service(CalendarService::class, fn () => new CalendarService($this->settings, $this->http, $this->cache, $this->time(), $this->drive(), $this->internalEvents()));
     }
 
     public function drive(): DriveClient

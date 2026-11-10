@@ -26,6 +26,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Internen Kalender direkt in der App pflegen, ohne Google**: Unter [Einstellungen → Kalender](app:einstellungen/kalender)
+  wählst du jetzt die Quelle des internen Kalenders: **In der App pflegen**, **Google Kalender** oder **iCal-Adresse**.
+  Es gilt immer genau eine Quelle. Mit „In der App pflegen“ legt, wer das neue Recht „Kalender pflegen“ hat (z. B. über
+  die neue Rolle „Kalender verwalten“), unter [Termine](app:termine) → „Internen Kalender verwalten“ interne Termine an.
+  Die sehen nur Angemeldete mit dem internen Kalender, getrennt von den öffentlichen Terminen; Benachrichtigungen und
+  Anwesenheitslisten nutzen sie wie bisher die Termine aus Google. Serientermine gibt es dafür noch nicht.
+
 - **Reihenfolge der Knöpfe in der Verwaltung und in „Intern“**: Unter [Einstellungen → Navigation](app:einstellungen/navigation)
   ordnest du im neuen Abschnitt „Verwaltung“ die Knöpfe der Startseite der Verwaltung und unter „Einrichtungen“ per Ziehen,
   für alle gleich. Jede Person sieht weiter nur die Knöpfe, für die sie das Recht hat. Auch die Bereiche in „Intern“ der

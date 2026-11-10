@@ -30,9 +30,39 @@ function toInput(ev: PublicEvent): EventInput {
   };
 }
 
-/** Admins pflegen hier die öffentliche Terminliste (App für Gäste und ggf. die Webseite). */
-export default function TermineVerwalten({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload } = useAsync(sources.events.load, sources.events.deps, sources.events.key);
+/** Was je Liste anders ist: öffentliche Termine (manage_events) oder der interne Kalender in der App (manage_calendar). */
+const KINDS = {
+  public: {
+    source: sources.events,
+    create: api.createEvent,
+    update: api.updateEvent,
+    remove: api.deleteEvent,
+    newTitle: 'Neuer öffentlicher Termin',
+    add: '+ Öffentlichen Termin anlegen',
+    listTitle: 'Kommend und öffentlich',
+    empty: 'Noch keine öffentlichen Einträge.',
+    hint: null,
+  },
+  internal: {
+    source: sources.calendarEntries,
+    create: api.createCalendarEntry,
+    update: api.updateCalendarEntry,
+    remove: api.deleteCalendarEntry,
+    newTitle: 'Neuer interner Termin',
+    add: '+ Internen Termin anlegen',
+    listTitle: 'Kommend im internen Kalender',
+    empty: 'Noch keine internen Termine.',
+    hint: 'Diese Termine sehen nur Angemeldete mit dem internen Kalender. Die öffentlichen Termine bleiben davon getrennt.',
+  },
+};
+
+/**
+ * Hier pflegt, wer darf, die öffentliche Terminliste (App für Gäste und ggf. die Webseite) oder mit `internal` die
+ * Termine des internen Kalenders in der App.
+ */
+export default function TermineVerwalten({ onToast, internal = false }: { onToast: (msg: string) => void; internal?: boolean }) {
+  const kind = KINDS[internal ? 'internal' : 'public'];
+  const { data, error, loading, reload } = useAsync(kind.source.load, kind.source.deps, kind.source.key);
   const [editing, setEditing] = useState<number | 'new' | null>(null);
   const [form, setForm] = useState<EventInput>(EMPTY);
   const [busy, setBusy] = useState(false);
@@ -55,10 +85,10 @@ export default function TermineVerwalten({ onToast }: { onToast: (msg: string) =
     setBusy(true);
     try {
       if (editing === 'new') {
-        await api.createEvent(form);
+        await kind.create(form);
         onToast('Termin angelegt');
       } else if (typeof editing === 'number') {
-        await api.updateEvent(editing, form);
+        await kind.update(editing, form);
         onToast('Termin gespeichert');
       }
       setEditing(null);
@@ -73,7 +103,7 @@ export default function TermineVerwalten({ onToast }: { onToast: (msg: string) =
   async function remove(ev: PublicEvent) {
     if (!(await confirmAsk(`Termin „${ev.title}“ wirklich löschen?`))) return;
     try {
-      await api.deleteEvent(ev.id);
+      await kind.remove(ev.id);
       onToast('Termin gelöscht');
       reload();
     } catch (err) {
@@ -89,7 +119,7 @@ export default function TermineVerwalten({ onToast }: { onToast: (msg: string) =
 
       {editing !== null ? (
         <form className="form card event-form" onSubmit={submit}>
-          <h3>{editing === 'new' ? 'Neuer öffentlicher Termin' : 'Termin bearbeiten'}</h3>
+          <h3>{editing === 'new' ? kind.newTitle : 'Termin bearbeiten'}</h3>
           <label className="field">
             <span>Titel</span>
             <input type="text" maxLength={191} value={form.title} onChange={set('title')} required />
@@ -143,17 +173,18 @@ export default function TermineVerwalten({ onToast }: { onToast: (msg: string) =
         </form>
       ) : (
         <button className="btn btn-block add-event" onClick={() => startEdit(null)}>
-          + Öffentlichen Termin anlegen
+          {kind.add}
         </button>
       )}
+      {kind.hint && <p className="muted small">{kind.hint}</p>}
 
-      <h2 className="section-title">Kommend und öffentlich</h2>
+      <h2 className="section-title">{kind.listTitle}</h2>
       {loading && !data ? (
         <Loading shape="text" />
       ) : error ? (
         <ErrorBox message={error} onRetry={reload} />
       ) : (data ?? []).length === 0 ? (
-        <Empty>Noch keine öffentlichen Einträge.</Empty>
+        <Empty>{kind.empty}</Empty>
       ) : (
         <ul className="card-list">
           {(data ?? []).map((ev) => (

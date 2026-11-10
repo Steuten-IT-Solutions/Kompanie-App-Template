@@ -91,6 +91,12 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
     items: [
       { key: 'manage_events', label: `Öffentliche ${sec.events} pflegen`, short: `${sec.events} pflegen`, features: ['events'] },
       {
+        key: 'manage_calendar',
+        label: 'Internen Kalender pflegen: Termine in der App anlegen, ändern und löschen (nur mit der Quelle „In der App“)',
+        short: 'Kalender pflegen',
+        features: ['calendar'],
+      },
+      {
         key: 'manage_news',
         label: `${sec.news}: Beiträge in der App schreiben, bearbeiten und löschen (nur mit der Quelle „In der App“)`,
         short: `${sec.news} schreiben`,

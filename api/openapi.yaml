@@ -987,9 +987,10 @@ paths:
   /calendar:
     get:
       tags: [Termine]
-      summary: Alle Termine aus Google Kalender / iCal (Mitglieder und Anwärter)
+      summary: Alle Termine des internen Kalenders (Mitglieder und Anwärter)
       description: |
-        Der Server hält die letzte gute Fassung bereit (bis `calendar_cache_minutes` frisch) und erneuert sie
+        Aus der gewählten Quelle: in der App gepflegt (`app`, Kennungen mit `i` davor, direkt aus der Datenbank),
+        Google Kalender oder eine iCal-Adresse. Bei Google und iCal hält der Server die letzte gute Fassung bereit (bis `calendar_cache_minutes` frisch) und erneuert sie
         im Hintergrund. Ist sie veraltet und der Kalender gerade nicht erreichbar, kommt die alte Fassung
         mit 200. 502 nur, wenn es noch keine Fassung gibt; ein solcher Fehler wird etwa 60 Sekunden gemerkt.
       x-capability: calendar
@@ -1008,6 +1009,74 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+
+  /calendar/entries:
+    get:
+      tags: [Termine]
+      summary: Kommende Termine des internen Kalenders in der App (zum Pflegen)
+      description: Nur mit der Quelle `app` (sonst 409 `not_in_app`). Getrennt von den öffentlichen Terminen, gleiche Felder.
+      x-capability: manage_calendar
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PublicEvent' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Termine]
+      summary: Internen Termin anlegen
+      description: Nur mit der Quelle `app` (sonst 409 `not_in_app`). Benachrichtigt wie bei jeder Quelle über neue Termine.
+      x-capability: manage_calendar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EventInput' }
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicEvent' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /calendar/entries/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Termine]
+      summary: Internen Termin ändern
+      x-capability: manage_calendar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EventInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicEvent' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Termine]
+      summary: Internen Termin löschen
+      x-capability: manage_calendar
+      responses:
+        '200': { $ref: '#/components/responses/Deleted' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
 
   /events:
     get:
@@ -6040,7 +6109,8 @@ paths:
             schema:
               type: object
               properties:
-                calendar_ics_url: { type: string, description: 'Geheime iCal-Adresse; webcal:// wird als https:// gespeichert' }
+                calendar_source: { type: string, enum: [app, google, ics], description: 'Quelle des internen Kalenders: in der App gepflegt, Google-Kalender-IDs oder iCal-Adresse. Die Angaben der anderen Quellen bleiben gespeichert. Der Wechsel zu bzw. weg von app legt die Standardrolle „Kalender verwalten“ an bzw. entfernt sie, wenn niemand sie hat.' }
+                calendar_ics_url: { type: string, description: 'iCal-Adresse; webcal:// wird als https:// gespeichert. Ohne calendar_source und calendar_ids leert eine neue Adresse die Kalender-IDs (wie bisher).' }
                 google_api_key: { type: string }
                 calendar_ids: { type: string, description: 'Kommagetrennte Kalender-IDs; gelesen mit API-Schlüssel (öffentliche Kalender) oder über den Google-Zugang' }
                 calendar_cache_minutes: { type: integer, minimum: 1, maximum: 1440 }
@@ -8051,11 +8121,16 @@ components:
           properties:
             source:
               type: string
-              enum: [ics, google, google_connection, none]
+              enum: [app, ics, google, google_connection, none]
               description: >-
-                Genutzte Quelle, in dieser Reihenfolge: `google` (Kalender-IDs mit eigenem API-Schlüssel),
-                `google_connection` (Kalender-IDs über den Google-Zugang: OAuth-Verbindung mit
-                `calendar.readonly` oder Dienstkonto), `ics` (geheime iCal-Adresse), sonst `none`.
+                Genutzte Quelle: `app` (Termine in der App gepflegt), `google` (Kalender-IDs mit eigenem
+                API-Schlüssel), `google_connection` (Kalender-IDs über den Google-Zugang: OAuth-Verbindung mit
+                `calendar.readonly` oder Dienstkonto), `ics` (iCal-Adresse), sonst `none`. Ohne gewählte Quelle
+                (`choice` leer) gilt das Eingetragene in dieser Reihenfolge: `google`, `google_connection`, `ics`.
+            choice:
+              type: string
+              enum: [app, google, ics, '']
+              description: Vom Admin gewählte Quelle (calendar_source); leer, solange keine gewählt ist
             connection_needs_calendar_access:
               type: boolean
               description: Kalender-IDs ohne API-Schlüssel eingetragen, aber die OAuth-Verbindung darf den Kalender nicht lesen (neu verbinden nötig)
@@ -8136,7 +8211,7 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports, view_activity, manage_settings] }
+              items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_calendar, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports, view_activity, manage_settings] }
               description: 'Rechte der Rolle, jedes für sich (member schließt nichts ein); bei admin alle; vergebbar sind alle außer view_activity und manage_settings. Rechte zum Verwalten und view_own_* nur zusammen mit member. guest gilt auch ohne Anmeldung.'
             users: { type: integer, description: 'Anzahl der Personen mit dieser Rolle, als Grundrolle oder als Zusatzrolle' }
             extra_users: { type: integer, description: Davon als Zusatzrolle }
@@ -8149,7 +8224,7 @@ components:
         label: { type: string, maxLength: 30 }
         capabilities:
           type: array
-          items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports] }
+          items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_calendar, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports] }
           description: 'Jedes Recht für sich. Rechte zum Verwalten und view_own_* nur zusammen mit member; die übrigen Rechte zum Sehen gehen auch allein (wie bei Anwärtern). guest: nur Rechte zum Sehen ohne member; member: immer member, sonst nur Rechte zum Sehen; admin: nicht änderbar.'
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
         new_accounts: { type: boolean, description: 'Nur eigene Rollen: beim Anlegen von Konten wählbar' }
@@ -8177,7 +8252,7 @@ components:
           type: array
           items:
             type: string
-            enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports, view_activity, manage_settings]
+            enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_calendar, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports, view_activity, manage_settings]
           description: 'Wirksame Rechte aller Rollen zusammen (Grundrolle und Zusatzrollen); member bringt calendar mit.'
 
     ErrorLog:
@@ -8295,6 +8370,9 @@ components:
         newsInApp:
           type: boolean
           description: 'News werden in der App geschrieben (Quelle app, Bereich news an); wer manage_news hat, sieht die Knöpfe dazu'
+        calendarInApp:
+          type: boolean
+          description: 'Der interne Kalender wird in der App gepflegt (Quelle app, Bereich calendar an); wer manage_calendar hat, sieht den Knopf dazu'
         pages:
           type: array
           description: 'Eigene Seiten (Issue #287), die die Person lesen darf, in ihrer Reihenfolge (Kacheln unter Seiten); leer mit Bereich pages aus'
@@ -8440,6 +8518,7 @@ components:
         all_day: { type: boolean }
         location: { type: string }
         description: { type: string }
+        url: { type: string, description: 'Nur bei Terminen, die in der App gepflegt werden (Quelle app)' }
 
     PublicEvent:
       type: object
@@ -8880,7 +8959,7 @@ components:
     GrantableCapability:
       type: string
       description: Recht, das sich einer Rolle oder einer Person geben lässt (alle außer `manage_settings`).
-      enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports]
+      enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_calendar, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports]
 
     MemberRights:
       type: object

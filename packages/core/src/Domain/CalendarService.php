@@ -11,14 +11,17 @@ use KompanieApp\Core\Port\HttpClient;
 use KompanieApp\Core\Port\Settings;
 
 /**
- * Alle Termine für Mitglieder aus dem Google Kalender.
+ * Der interne Kalender: alle Termine für Mitglieder, getrennt von den öffentlichen Terminen.
  *
- * Quellen, in dieser Reihenfolge:
- *  1. Google-Kalender-IDs mit eigenem API-Schlüssel (nur öffentliche Kalender), 'google'.
- *  2. Google-Kalender-IDs über den Google-Zugang, gemeinsam mit der Galerie (DriveClient: OAuth-Verbindung mit
- *     calendar.readonly oder Dienstkonto), auch für private Kalender, 'google_connection'.
- *  3. Geheime iCal-Adresse (Standard in der App, ohne Google Cloud), 'ics'.
- * Bei 1. und 2. löst Google Serientermine selbst auf (singleEvents=true).
+ * Welche Quelle gilt, wählt der Admin (Einstellung calendar_source, choice()):
+ *  - 'app': Termine werden in der App gepflegt (Tabelle internal_events, Recht manage_calendar), ohne fremden Dienst.
+ *  - 'google': Google-Kalender-IDs, mit eigenem API-Schlüssel (nur öffentliche Kalender) als 'google' oder über den
+ *    Google-Zugang, gemeinsam mit der Galerie (DriveClient: OAuth-Verbindung mit calendar.readonly oder Dienstkonto),
+ *    auch für private Kalender, als 'google_connection'.
+ *  - 'ics': eine iCal-Adresse (z. B. die geheime Adresse aus Google Kalender), 'ics'.
+ * Ohne Auswahl (Installationen von vorher) gilt das Eingetragene in der Reihenfolge Kalender-IDs mit API-Schlüssel,
+ * Kalender-IDs über den Google-Zugang, iCal-Adresse. Bei Google löst Google Serientermine selbst auf (singleEvents=true).
+ * Termine der App liest der Kalender ohne Zwischenspeicher direkt aus der Datenbank.
  *
  * Schlüssel verlassen nie den Server.
  *
@@ -34,6 +37,14 @@ final class CalendarService
     public const CACHE_KEY = 'calendar_events';
     public const ERROR_KEY = 'calendar_error';
     public const TASK = 'calendar_refresh';
+    /** Vom Admin gewählte Quelle (SOURCES); leer: wie vor der Auswahl (das Eingetragene gilt). */
+    public const SOURCE_SETTING = 'calendar_source';
+    public const SOURCE_APP = 'app';
+    public const SOURCES = [self::SOURCE_APP, 'google', 'ics'];
+    /** Rechte der Standardrolle „Kalender verwalten“ (nur mit der Quelle app, Features::roleOf). */
+    public const ROLE = ['member', 'manage_calendar'];
+    /** Vor der Kennung eines Termins der App (die öffentlichen Termine haben „p“ in der Terminliste). */
+    public const APP_ID_PREFIX = 'i';
     /** So lange bleibt die letzte gute Fassung als Rückfall erhalten. */
     public const KEEP_SECONDS = 30 * 86400;
     /** Wie weit zurück der Kalender Termine lädt (Anwesenheit nachtragen). */
@@ -50,6 +61,7 @@ final class CalendarService
         private readonly Cache $cache,
         private readonly Time $time,
         private readonly ?DriveClient $drive = null,
+        private readonly ?EventService $internal = null,
     ) {
     }
 
@@ -58,16 +70,45 @@ final class CalendarService
         return $this->source() !== 'none';
     }
 
-    /** 'google' (eigener API-Schlüssel), 'google_connection' (Google-Zugang), 'ics' oder 'none' */
+    /** Gewählte Quelle: 'app', 'google', 'ics' oder '' (keine Auswahl gespeichert, Installationen von vorher). */
+    public function choice(): string
+    {
+        $v = $this->settings->get(self::SOURCE_SETTING, '');
+        return is_string($v) && in_array($v, self::SOURCES, true) ? $v : '';
+    }
+
+    /** Werden die Termine in der App gepflegt? */
+    public function inApp(): bool
+    {
+        return $this->choice() === self::SOURCE_APP && $this->internal !== null;
+    }
+
+    /** Termine pflegen nur mit der Quelle „app“ (409 sonst). */
+    public function requireInApp(): EventService
+    {
+        if (!$this->inApp() || $this->internal === null) {
+            throw new ApiError(409, 'not_in_app', 'Der interne Kalender wird nicht in der App gepflegt. Ein Admin kann das unter Einstellungen → Kalender ändern.');
+        }
+        return $this->internal;
+    }
+
+    /** 'app' (in der App), 'google' (eigener API-Schlüssel), 'google_connection' (Google-Zugang), 'ics' oder 'none' */
     public function source(): string
     {
-        if ($this->calendarIds() !== []) {
+        $choice = $this->choice();
+        if ($choice === self::SOURCE_APP) {
+            return $this->inApp() ? self::SOURCE_APP : 'none';
+        }
+        if ($choice !== 'ics' && $this->calendarIds() !== []) {
             if (trim((string) $this->settings->get('google_api_key', '')) !== '') {
                 return 'google';
             }
             if ($this->drive?->calendarAccess()) {
                 return 'google_connection';
             }
+        }
+        if ($choice === 'google') {
+            return 'none';
         }
         return trim((string) $this->settings->get('calendar_ics_url', '')) !== '' ? 'ics' : 'none';
     }
@@ -80,6 +121,7 @@ final class CalendarService
     {
         $drive = $this->drive;
         return $drive !== null
+            && !in_array($this->choice(), [self::SOURCE_APP, 'ics'], true)
             && $drive->oauth() !== null
             && !$drive->calendarAccess()
             && $this->calendarIds() !== []
@@ -96,6 +138,9 @@ final class CalendarService
     /** @return array<int, array<string, mixed>> nach Beginn sortiert */
     public function events(): array
     {
+        if ($this->source() === self::SOURCE_APP) {
+            return $this->appEvents();
+        }
         $copy = $this->copy();
         if ($copy !== null && $copy['fresh_until'] > $this->time->timestamp()) {
             return $copy['events'];
@@ -127,6 +172,9 @@ final class CalendarService
      */
     public function latest(int $maxAgeSeconds = 60): array
     {
+        if ($this->source() === self::SOURCE_APP) {
+            return $this->appEvents();
+        }
         $copy = $this->copy();
         if ($copy === null) {
             return $this->events();
@@ -149,7 +197,7 @@ final class CalendarService
     /** @return string|null Fehlermeldung, wenn der Abruf gescheitert ist (für das Fehlerprotokoll und die Statusmeldungen) */
     public function refreshIfStale(): ?string
     {
-        if (!$this->isConfigured()) {
+        if (!$this->isConfigured() || $this->source() === self::SOURCE_APP) {
             return null;
         }
         $copy = $this->copy();
@@ -227,6 +275,35 @@ final class CalendarService
     {
         $from = $this->time->timestamp() - 86400;
         return array_values(array_filter($this->events(), static fn (array $e): bool => (int) strtotime((string) $e['end']) >= $from));
+    }
+
+    /**
+     * Termine der App im selben Zeitraum und Format wie die anderen Quellen; Kennung mit APP_ID_PREFIX. url wie bei den
+     * öffentlichen Terminen (Knopf „Mehr Infos“).
+     *
+     * @return array<int, array<string, mixed>> nach Beginn sortiert
+     */
+    private function appEvents(): array
+    {
+        if ($this->internal === null) {
+            return [];
+        }
+        [$min, $max] = $this->range();
+        $tz = $this->time->timezone();
+        $from = (new \DateTimeImmutable('@' . $min))->setTimezone($tz)->format('Y-m-d');
+        $to = (new \DateTimeImmutable('@' . $max))->setTimezone($tz)->format('Y-m-d');
+        $events = array_map(static fn (array $e): array => [
+            'id' => self::APP_ID_PREFIX . $e['id'],
+            'title' => $e['title'],
+            'start' => $e['start'],
+            'end' => $e['end'],
+            'all_day' => $e['all_day'],
+            'location' => $e['location'],
+            'description' => $e['description'],
+            'url' => $e['url'],
+        ], $this->internal->between($from, $to));
+        usort($events, static fn (array $a, array $b): int => strcmp((string) $a['start'], (string) $b['start']));
+        return $events;
     }
 
     /**
