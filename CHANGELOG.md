@@ -38,6 +38,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   für alle gleich. Jede Person sieht weiter nur die Knöpfe, für die sie das Recht hat. Auch die Bereiche in „Intern“ der
   Standardnavigation lassen sich jetzt umordnen, ohne dass daraus eine eigene Navigation wird.
 
+### Behoben
+
+- **Ämter, Ansicht „Jahre“: Namen nicht mehr abgeschnitten**: Unter [Mitglieder → Ämter](app:mitglieder/aemter) sind
+  die Spalten jetzt so breit, dass Bezeichnungen wie „Könige/Königinnen“ und lange Namen ganz zu lesen sind. Bezeichnungen
+  brechen nach „/“ um, ein Jahr mit zweizeiligem Namen wird höher statt die zweite Zeile zu verdecken. Auch in den Karten
+  gemeinsamer Amtszeiten (z. B. ein Königshaus) laufen lange Bezeichnungen wie „Ordonnanzoffizier*in“ nicht mehr in die
+  Namen daneben: Die Spalte richtet sich nach der längsten Bezeichnung, nur sehr lange werden umbrochen.
+
 ## [0.8.2] – 2026-11-09
 
 ### Geändert
