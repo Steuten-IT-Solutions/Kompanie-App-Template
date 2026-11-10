@@ -38,6 +38,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   für alle gleich. Jede Person sieht weiter nur die Knöpfe, für die sie das Recht hat. Auch die Bereiche in „Intern“ der
   Standardnavigation lassen sich jetzt umordnen, ohne dass daraus eine eigene Navigation wird.
 
+### Behoben
+
+- **Ämter-Liste**: Unter [Verwaltung → Ämter](app:verwaltung/aemter) steht ein langer, zweizeiliger Name eines Amts jetzt
+  linksbündig wie die übrigen statt mittig. Unter „Gemeinsame Amtszeiten“ hat der Knopf „Neue gemeinsame Amtszeit“ wieder
+  Abstand zur Karte darüber.
+
 ## [0.8.2] – 2026-11-09
 
 ### Geändert

@@ -706,6 +706,15 @@ p.small + p.small:not(.muted) {
   font-weight: 600;
   font-size: 0.95rem;
 }
+/*
+ * Titel als Link in einer Kartenzeile (z. B. Ämter): .btn zentriert den Inhalt. Solange der Titel in eine Zeile passt,
+ * ist der Knopf nur so breit wie der Text und steht links; bricht ein langer Titel um, füllt der Knopf die Zeile und
+ * der Text stünde mittig. Daher linksbündig wie die übrigen Titel.
+ */
+.btn-link.row-title {
+  justify-content: flex-start;
+  text-align: left;
+}
 .btn-small {
   padding: 6px 11px;
   font-size: 0.78rem;
@@ -6460,6 +6469,10 @@ button.spotlight-person:focus-visible {
 }
 .joint-admin {
   margin: 8px 0 16px;
+}
+/* Abstand zwischen der letzten Karte und „Neue gemeinsame Amtszeit“ (die Liste ist leer, wenn es noch keine gibt) */
+.joint-admin > .card-list:not(:empty) + .btn {
+  margin-top: 16px;
 }
 .joint-admin-image {
   flex: 0 0 64px;
