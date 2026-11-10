@@ -15,6 +15,7 @@ import { checkPushOnStart } from './push';
 import { takeRememberedRoute } from './share';
 import { watchRuntimeErrors } from './lastError';
 import { watchSharpS } from './sharpS';
+import { watchButtonWords } from './buttonWords';
 // Gewählte Schrift aus kompanie.json, lokal gebündelt (kein Abruf bei Google).
 import './generated/fonts';
 import './generated/theme.css';
@@ -49,6 +50,8 @@ if (isStandalone() && window.location.hash.startsWith('#/installieren')) {
 watchRuntimeErrors();
 // Großes ẞ statt „SS“ in Plaketten, Überschriften und Schaltflächen in Großbuchstaben.
 watchSharpS();
+// Wörter in Knöpfen nur trennen, wenn sie allein nicht hineinpassen.
+watchButtonWords();
 
 /**
  * Gerüste der Seiten vom Gerät (skeleton.tsx), getrennt nach Version und Benutzer. Höchstens kurz darauf warten: Ein

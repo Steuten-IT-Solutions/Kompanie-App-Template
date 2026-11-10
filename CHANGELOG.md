@@ -51,6 +51,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   [Einstellungen → Rollen](app:einstellungen/rollen) („+ Neue Rolle“), [Einstellungen → Kalender](app:einstellungen/kalender),
   bei den laufenden Umfragen am Schwarzen Brett, bei den Gruppen der Ämter, bei den Dienstgraden und beim Import aus
   Excel. Alle Einstellungen halten jetzt einheitlich Abstand zwischen ihren Teilen.
+- Knöpfe trennen Wörter nicht mehr mit Bindestrich, sondern schieben ein Wort, das nicht mehr in die Zeile passt, ganz
+  in die nächste (z. B. „Bilder und Videos einreichen“ in der [Galerie](app:galerie) statt „VI-DEOS“). Nur wenn ein
+  Wort allein nicht in den Knopf passt (lange Wörter auf schmalen Handys), trennt der Knopf wie bisher.
 
 ## [0.8.2] – 2026-11-09
 
