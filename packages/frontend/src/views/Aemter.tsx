@@ -343,7 +343,7 @@ export function JointTerms({
               <dl className="joint-term-offices">
                 {rows.map((r) => (
                   <div key={r.office.id}>
-                    <dt>{officeSingular(r.office)}</dt>
+                    <dt>{breakAfterSlash(officeSingular(r.office))}</dt>
                     <dd>
                       <Holders holders={r.holders} to={memberPath} />
                     </dd>

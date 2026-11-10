@@ -6457,7 +6457,11 @@ button.spotlight-person:focus-visible {
   gap: 8px;
 }
 .joint-term-offices dt {
+  min-width: 0;
   color: var(--muted);
+  /* lange Bezeichnungen („Ordonnanzoffizier*in“) trennen statt in die Namen daneben zu laufen */
+  hyphens: auto;
+  overflow-wrap: anywhere;
 }
 .joint-term-offices dd {
   margin: 0;

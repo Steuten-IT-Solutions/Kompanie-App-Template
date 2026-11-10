@@ -42,7 +42,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 - **Ämter, Ansicht „Jahre“: Namen nicht mehr abgeschnitten**: Unter [Mitglieder → Ämter](app:mitglieder/aemter) sind
   die Spalten jetzt so breit, dass Bezeichnungen wie „Könige/Königinnen“ und lange Namen ganz zu lesen sind. Bezeichnungen
-  brechen nach „/“ um, ein Jahr mit zweizeiligem Namen wird höher statt die zweite Zeile zu verdecken.
+  brechen nach „/“ um, ein Jahr mit zweizeiligem Namen wird höher statt die zweite Zeile zu verdecken. Auch in den Karten
+  gemeinsamer Amtszeiten (z. B. ein Königshaus) laufen lange Bezeichnungen wie „Ordonnanzoffizier*in“ nicht mehr in die
+  Namen daneben, sondern werden getrennt.
 
 ## [0.8.2] – 2026-11-09
 
