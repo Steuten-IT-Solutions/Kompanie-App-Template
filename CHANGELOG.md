@@ -40,6 +40,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Ämter, Ansicht „Jahre“: Namen nicht mehr abgeschnitten**: Unter [Mitglieder → Ämter](app:mitglieder/aemter) sind
+  die Spalten jetzt so breit, dass Bezeichnungen wie „Könige/Königinnen“ und lange Namen ganz zu lesen sind. Bezeichnungen
+  brechen nach „/“ um, ein Jahr mit zweizeiligem Namen wird höher statt die zweite Zeile zu verdecken. Auch in den Karten
+  gemeinsamer Amtszeiten (z. B. ein Königshaus) laufen lange Bezeichnungen wie „Ordonnanzoffizier*in“ nicht mehr in die
+  Namen daneben: Die Spalte richtet sich nach der längsten Bezeichnung, nur sehr lange werden umbrochen.
 - **Fehlende Abstände**: In [Einstellungen → Navigation](app:einstellungen/navigation) klebten die Zwischenüberschrift
   „Einrichtungen“, die Felder der Startseite und die Knöpfe unten („Navigation speichern“, „Standardnavigation
   wiederherstellen“, „Standardreihenfolge der Verwaltung“) an der Karte darüber. Das ist behoben, ebenso unter
