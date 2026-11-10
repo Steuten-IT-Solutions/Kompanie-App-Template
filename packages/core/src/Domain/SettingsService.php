@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Domain;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Infra\RemoteNewsSource;
+use KompanieApp\Core\Push\PushService;
 
 /**
  * Einstellungen, die Admins in der App pflegen (bei WordPress zusätzlich im WP-Admin):
@@ -47,6 +48,8 @@ final class SettingsService
             ],
             'calendar' => [
                 'source' => $a->calendar()->source(),
+                // Gewählte Quelle (app, google, ics); leer, solange nichts gewählt ist (dann gilt das Eingetragene)
+                'choice' => $a->calendar()->choice(),
                 // Kalender-IDs ohne API-Schlüssel, aber die OAuth-Verbindung darf den Kalender nicht lesen: neu verbinden.
                 'connection_needs_calendar_access' => $a->calendar()->connectionNeedsCalendarAccess(),
                 'ics_url_set' => trim((string) $s->get('calendar_ics_url', '')) !== '',
@@ -107,6 +110,7 @@ final class SettingsService
         $a = $this->app;
         $news = $a->news instanceof RemoteNewsSource;
         $newsBefore = $a->newsService()->sourceType();
+        $calendarBefore = $a->calendar()->source();
         foreach ($in as $key => $value) {
             if (!is_string($value) && !($key === 'calendar_cache_minutes' && is_int($value))) {
                 throw ApiError::invalid('Ungültiger Wert für ' . $key . '.');
@@ -114,10 +118,18 @@ final class SettingsService
         }
 
         $set = [];
+        if (array_key_exists('calendar_source', $in)) {
+            if (!in_array($in['calendar_source'], CalendarService::SOURCES, true)) {
+                throw ApiError::invalid('Unbekannte Quelle für den Kalender.');
+            }
+            $set[CalendarService::SOURCE_SETTING] = $in['calendar_source'];
+        }
         if (array_key_exists('calendar_ics_url', $in)) {
             $url = (string) preg_replace('#^webcal://#i', 'https://', trim($in['calendar_ics_url']));
-            $set['calendar_ics_url'] = Input::url($url, 'Bitte die geheime iCal-Adresse aus Google Kalender einfügen (beginnt mit https://).');
-            if ($set['calendar_ics_url'] !== '' && !array_key_exists('calendar_ids', $in)) {
+            $set['calendar_ics_url'] = Input::url($url, 'Bitte die iCal-Adresse des Kalenders einfügen (beginnt mit https://).');
+            // Ohne gewählte Quelle (ältere Fassungen der App): Die iCal-Adresse soll gelten. Mit Auswahl bleiben die
+            // Kalender-IDs für ein Zurückwechseln erhalten.
+            if ($set['calendar_ics_url'] !== '' && !array_key_exists('calendar_ids', $in) && !array_key_exists('calendar_source', $in)) {
                 // Die iCal-Adresse soll gelten; eine eingerichtete Google-API hätte sonst Vorrang.
                 $set['calendar_ids'] = '';
             }
@@ -205,7 +217,7 @@ final class SettingsService
         }
         // Auch der Google-Zugang kann die Quelle des Kalenders sein (Kalender-IDs ohne API-Schlüssel).
         $driveChanged = array_key_exists('drive_service_account', $in) || array_key_exists('drive_oauth', $in);
-        if (array_intersect(array_keys($set), ['calendar_ics_url', 'google_api_key', 'calendar_ids', 'calendar_cache_minutes'])
+        if (array_intersect(array_keys($set), [CalendarService::SOURCE_SETTING, 'calendar_ics_url', 'google_api_key', 'calendar_ids', 'calendar_cache_minutes'])
             || ($driveChanged && $a->calendar()->calendarIds() !== [])) {
             $a->calendar()->clearCache();
         }
@@ -238,8 +250,33 @@ final class SettingsService
         if (isset($set['news_source'])) {
             $a->newsService()->sourceChanged($newsBefore);
         }
+        if (isset($set[CalendarService::SOURCE_SETTING])) {
+            $this->calendarSourceChanged($calendarBefore);
+        }
         $a->scheduleTasks();
         return $this->get();
+    }
+
+    /**
+     * Andere Quelle des internen Kalenders: Standardrolle „Kalender verwalten“ anlegen bzw. entfernen (wie bei den News) und
+     * die gemerkten Termine der Benachrichtigungen neu aufsetzen, damit nach dem Wechsel nicht jeder Termin als neu gilt.
+     */
+    private function calendarSourceChanged(string $before): void
+    {
+        $a = $this->app;
+        $now = $a->calendar()->source();
+        if ($now === $before) {
+            return;
+        }
+        $features = $a->features();
+        if ($features->enabled('calendar') && ($now === CalendarService::SOURCE_APP || $before === CalendarService::SOURCE_APP)) {
+            $a->roles()->featureChanged('calendar', $now === CalendarService::SOURCE_APP, $features->roleLabel('calendar'), CalendarService::ROLE);
+        }
+        $a->settings->delete(PushService::CALENDAR_SETTING);
+        if ($now === CalendarService::SOURCE_APP) {
+            // Ohne Abruf von außen: gleich merken, was schon da ist; der nächste neue Termin wird dann gemeldet.
+            $a->pushTriggers()->checkCalendar();
+        }
     }
 
     /** @return array{count: int, sample: array<int, array{start: string, title: string}>} */

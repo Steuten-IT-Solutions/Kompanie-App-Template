@@ -457,6 +457,7 @@ Unabhängig vom Adapter kann der Admin als Quelle „In der App schreiben“ wä
 | `manage_titles` | Titelliste pflegen und Titel vergeben |
 | `manage_attendance` | Anwesenheitslisten je Termin führen |
 | `manage_events` | öffentliche Termine pflegen |
+| `manage_calendar` | Termine des internen Kalenders in der App pflegen (nur mit der Quelle `app`) |
 | `manage_documents` | Dokumente pflegen und **alle** Dokumente sehen, auch die mit eingeschränkter Sichtbarkeit |
 | `post_board` | Nachrichten ans Schwarze Brett schreiben, ändern und vorzeitig löschen |
 | `manage_polls` | Umfragen anlegen, ändern, beenden und löschen; alle Ergebnisse sehen |
@@ -497,6 +498,7 @@ Unabhängig vom Adapter kann der Admin als Quelle „In der App schreiben“ wä
   | Bereich | Standardrolle | Rechte |
   |---|---|---|
   | Termine | Termine verwalten | `member`, `manage_events` |
+  | Kalender (nur mit der Quelle „In der App“) | Kalender verwalten | `member`, `manage_calendar` |
   | Punkte | Punkte verwalten | `member`, `manage_points` |
   | Strafen | Strafen verwalten | `member`, `manage_penalties` |
   | Dienstgrade | Dienstgrade verwalten | `member`, `manage_ranks` |
@@ -613,7 +615,11 @@ Die App setzt **HTTPS** voraus (sonst funktioniert die Installation aufs Handy n
 
 ### Kalender
 
-Standard ist die **geheime iCal-Adresse** des Google Kalenders. Das ist ein Link zum Einfügen, ohne Google Cloud. Daneben gehen Google-Kalender-IDs (`calendar_ids`) über die Google Calendar API. `CalendarService::source()` wählt in dieser Reihenfolge:
+**Quelle wählen:** Der Admin wählt die Quelle des internen Kalenders (Einstellung `calendar_source`: `app`, `google` oder `ics`, `CalendarService::choice()`). Es gilt genau eine Quelle; die Angaben der anderen bleiben beim Wechsel gespeichert. Ohne Auswahl (Installationen von vorher, ältere Fassungen) gilt das Eingetragene in der Reihenfolge unten. Mit der Auswahl `google` gelten nur 1. und 2., mit `ics` nur 3.
+
+**In der App (`app`):** Termine in der Tabelle `internal_events` (Migration 58, Aufbau wie `events`, getrennt von den öffentlichen Terminen, in der Sicherung), gepflegt über `/calendar/entries` mit `manage_calendar` (`EventService` mit eigener `EventRepository`-Tabelle, `App::internalEvents`; ohne die Quelle 409 `not_in_app`). `/calendar` liest sie ohne Zwischenspeicher direkt (Kennungen `i<id>`, sonst wie die anderen Quellen, dazu `url`), `calendar_refresh` entfällt. Nach dem Speichern stößt die API `PushTriggers::checkCalendar` an, so kommen Benachrichtigungen sofort. Der Wechsel zu oder weg von `app` legt die Standardrolle „Kalender verwalten“ an bzw. entfernt sie, wenn niemand sie hat (wie bei den News), und setzt den gemerkten Stand der Benachrichtigungen (`push_calendar_seen`) neu auf. `config.calendarInApp` zeigt der App den Knopf „Internen Kalender verwalten“ (Route `termine/kalender`). Keine Serientermine in der ersten Fassung.
+
+**Google und iCal:** Die **geheime iCal-Adresse** des Google Kalenders ist ein Link zum Einfügen, ohne Google Cloud; jede andere iCal-Adresse über http(s) geht ebenso. Daneben gehen Google-Kalender-IDs (`calendar_ids`) über die Google Calendar API. `CalendarService::source()` wählt in dieser Reihenfolge:
 
 1. `google`: Kalender-IDs mit eigenem API-Key (`google_api_key`, nur öffentliche Kalender).
 2. `google_connection`: Kalender-IDs über den gemeinsamen Google-Zugang (`DriveClient`, siehe Galerie), auch für private Kalender. Abgerufen wird mit `Authorization: Bearer <Zugriffstoken>` und ohne `key`, sonst wie bei 1. (dieselben Parameter mit `singleEvents=true`, Weiterblättern, mehrere Kalender gleichzeitig über `requestAll`). Voraussetzung ist `DriveClient::calendarAccess()`: Bei einer OAuth-Verbindung (`drive_oauth`) muss deren `scope` (durch Leerzeichen getrennt, wie Google ihn beim Token-Austausch liefert; „Mit Google verbinden“ speichert ihn so, die Übernahme kopiert ihn unverändert) `https://www.googleapis.com/auth/calendar.readonly` enthalten. Ein Dienstkonto fragt im JWT immer `drive.readonly` und `calendar.readonly` an (`DriveClient::scopes()`); der Zwischenspeicher des Tokens hängt dort an den Berechtigungen, damit ein Token von vorher nicht weiterverwendet wird. Lehnt Google mit 401/403/404 ab, nennt die Meldung die wahrscheinliche Ursache (Kalender für das verbundene Konto sichtbar bzw. für die Adresse des Dienstkontos freigegeben, Calendar API im Projekt aktiviert).

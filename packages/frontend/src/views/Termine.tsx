@@ -10,6 +10,9 @@ import { useFocusEntry } from '../focus';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { hasEvents, prefetcher, prefetchOnTap, sources, type EventLike } from '../viewData';
 
+/** Interne Termine in der App pflegen: Quelle „In der App“ und das Recht dazu. */
+export const canManageCalendar = (): boolean => !!config?.calendarInApp && !!config.features.calendar && can('manage_calendar');
+
 /** `focus`: Kennung eines Termins aus der Adresse termine/termin/<id> (Ziel einer Benachrichtigung, Issue #190). */
 export default function Termine({ focus }: { focus?: string }) {
   // Geburtstage (Issue #1): „Anstehende Geburtstage“ oben; ohne Termine die einzige Karte.
@@ -48,19 +51,35 @@ function EventList({ focus }: { focus?: string }) {
   }, [flash]);
 
   const canManage = can('manage_events') && !!config?.features.events;
+  const canCalendar = canManageCalendar();
   // Wer Termine pflegt, öffnet die Seite dahinter oft: im Leerlauf vorab laden, beim Antippen sofort.
   useEffect(() => {
     if (canManage) void prefetcher.idle([sources.events]);
-  }, [canManage]);
-  const manage = canManage ? (
-    <button
-      className="btn btn-secondary btn-block manage-events"
-      onClick={() => navigate('termine/verwalten')}
-      {...prefetchOnTap(sources.events)}
-    >
-      Öffentliche Termine verwalten
-    </button>
-  ) : null;
+    if (canCalendar) void prefetcher.idle([sources.calendarEntries]);
+  }, [canManage, canCalendar]);
+  const manage =
+    canManage || canCalendar ? (
+      <>
+        {canCalendar && (
+          <button
+            className="btn btn-secondary btn-block manage-events"
+            onClick={() => navigate('termine/kalender')}
+            {...prefetchOnTap(sources.calendarEntries)}
+          >
+            Internen Kalender verwalten
+          </button>
+        )}
+        {canManage && (
+          <button
+            className="btn btn-secondary btn-block manage-events"
+            onClick={() => navigate('termine/verwalten')}
+            {...prefetchOnTap(sources.events)}
+          >
+            Öffentliche Termine verwalten
+          </button>
+        )}
+      </>
+    ) : null;
 
   const notify = <GuestPushButton label="Bei neuen Terminen benachrichtigen" />;
 

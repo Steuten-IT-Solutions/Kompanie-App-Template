@@ -4250,7 +4250,7 @@ test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ 
     return;
   }
   await open('Kalender');
-  await expect(page.getByText('✓ Eingerichtet über die geheime iCal-Adresse.')).toBeVisible();
+  await expect(page.getByText('✓ Eingerichtet über die iCal-Adresse.')).toBeVisible();
   await expect(page.getByText('https://kalender.test')).toHaveCount(0); // geheime Adresse wird nicht angezeigt
 
   await page.getByRole('button', { name: 'Kalender testen' }).click();
@@ -4278,6 +4278,55 @@ test('Admin richtet Kalender, Galerie und Neuigkeiten in der App ein', async ({ 
   await page.goto('/app/#/einstellungen');
   await expect(page.locator('.settings-link').first()).toBeVisible();
   await shot(page, '18-einstellungen');
+});
+
+test('Admin stellt den internen Kalender auf „In der App pflegen“ um, legt einen Termin an, Mitglieder sehen ihn', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const section = () => page.locator('.settings-section', { hasText: 'Kalender für Mitglieder' });
+  const source = async (label: string) => {
+    await page.goto('/app/#/einstellungen/kalender');
+    await section().getByLabel('Quelle').selectOption({ label });
+    await section().getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
+    await page.locator('.toast').waitFor({ state: 'detached' });
+  };
+  await source('In der App pflegen');
+  await expect(section().getByText('✓ Die Termine werden in der App gepflegt.')).toBeVisible();
+  await expect(section().getByLabel('Aktualisieren alle … Minuten')).toHaveCount(0);
+  await shot(page, 'kalender-quelle');
+
+  await page.goto('/app/#/termine');
+  await page.getByRole('button', { name: 'Internen Kalender verwalten' }).click();
+  await expect(page.getByRole('heading', { name: 'Kommend im internen Kalender' })).toBeVisible();
+  await page.getByRole('button', { name: '+ Internen Termin anlegen' }).click();
+  const form = page.locator('.event-form');
+  await expect(form.getByRole('heading', { name: 'Neuer interner Termin' })).toBeVisible();
+  await form.getByLabel('Titel').fill('E2E Vorstandssitzung');
+  await form.getByLabel('Datum').fill(new Date(Date.now() + 5 * 86400_000).toISOString().slice(0, 10));
+  await form.getByLabel('Beginn (optional)').fill('19:30');
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Termin angelegt');
+  await expect(page.locator('.card-list .row-title', { hasText: 'E2E Vorstandssitzung' })).toBeVisible();
+  await shot(page, 'kalender-pflegen');
+
+  // Mitglieder sehen ihn im internen Kalender, Gäste nicht.
+  await login(page, 'mitglied1');
+  await page.goto('/app/#/termine');
+  await expect(page.locator('.event-title', { hasText: 'E2E Vorstandssitzung' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Internen Kalender verwalten' })).toHaveCount(0);
+  await page.context().clearCookies();
+  await page.goto('/app/');
+  await page.reload();
+  await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toHaveCount(0);
+  await page.goto('/app/#/termine');
+  await expect(page.locator('.events, .empty').first()).toBeVisible();
+  await expect(page.locator('.event-title', { hasText: 'E2E Vorstandssitzung' })).toHaveCount(0);
+
+  // Zurück zur bisherigen Quelle (die anderen Tests erwarten den Kalender aus der iCal-Adresse bzw. ohne Kalender).
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await source('iCal-Adresse');
+  await page.goto('/app/#/termine');
+  await expect(page.getByRole('button', { name: 'Internen Kalender verwalten' })).toHaveCount(0);
 });
 
 test('Admin verbindet die App mit Google (Google simuliert) und trennt wieder', async ({ page }) => {

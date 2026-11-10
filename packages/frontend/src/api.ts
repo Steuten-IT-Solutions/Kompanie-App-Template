@@ -41,6 +41,7 @@ export type Capability =
   | 'manage_titles'
   | 'manage_attendance'
   | 'manage_events'
+  | 'manage_calendar'
   | 'manage_documents'
   | 'post_board'
   | 'manage_polls'
@@ -154,6 +155,8 @@ export interface AppConfig {
   pages?: { id: number; title: string }[];
   /** News werden in der App geschrieben (Quelle „In der App“); fehlt bei älteren Servern */
   newsInApp?: boolean;
+  /** Interner Kalender wird in der App gepflegt (Quelle „In der App“); fehlt bei älteren Servern */
+  calendarInApp?: boolean;
   /** Vorschau „App als Rolle ansehen“ (Issue #63): vom Server bestätigt; role ist der Schlüssel oder @public */
   preview?: { role: string; label: string } | null;
   /** Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen; null ohne den Bereich, fehlt bei älteren Servern */
@@ -2167,6 +2170,11 @@ export const api = {
   createEvent: (data: EventInput) => request<PublicEvent>('POST', '/events', data),
   updateEvent: (id: number, data: EventInput) => request<PublicEvent>('PATCH', `/events/${id}`, data),
   deleteEvent: (id: number) => request<{ deleted: boolean }>('DELETE', `/events/${id}`),
+  // Interner Kalender in der App (Quelle „In der App“, manage_calendar): gleiche Felder wie die öffentlichen Termine
+  calendarEntries: () => request<PublicEvent[]>('GET', '/calendar/entries'),
+  createCalendarEntry: (data: EventInput) => request<PublicEvent>('POST', '/calendar/entries', data),
+  updateCalendarEntry: (id: number, data: EventInput) => request<PublicEvent>('PATCH', `/calendar/entries/${id}`, data),
+  deleteCalendarEntry: (id: number) => request<{ deleted: boolean }>('DELETE', `/calendar/entries/${id}`),
 
   news: async (page = 1) => {
     const { data, headers } = await requestFull<NewsItem[]>('GET', '/news', undefined, { page: String(page) });
@@ -2994,6 +3002,8 @@ export interface ErrorLogEntry {
 
 /** site: Beiträge dieser WordPress-Seite (nur im Plugin); app: in der App geschrieben */
 export type NewsSourceType = 'none' | 'wordpress' | 'rss' | 'site' | 'app';
+/** Quelle des internen Kalenders, die der Admin wählt */
+export type CalendarSourceChoice = 'app' | 'google' | 'ics';
 
 export interface AdminSettings {
   /** Gemeinsamer Google-Zugang für Galerie und Kalender: „Mit Google verbinden“ oder Dienstkonto */
@@ -3010,8 +3020,13 @@ export interface AdminSettings {
     last_result: { ok: boolean; message: string; at: number } | null;
   };
   calendar: {
-    /** google: eigener API-Schlüssel; google_connection: Google-Zugang (OAuth mit Kalender-Berechtigung oder Dienstkonto) */
-    source: 'ics' | 'google' | 'google_connection' | 'none';
+    /**
+     * app: Termine in der App gepflegt; google: eigener API-Schlüssel; google_connection: Google-Zugang (OAuth mit
+     * Kalender-Berechtigung oder Dienstkonto)
+     */
+    source: 'app' | 'ics' | 'google' | 'google_connection' | 'none';
+    /** Gewählte Quelle; leer, solange keine gewählt ist (dann gilt das Eingetragene); fehlt bei älteren Servern */
+    choice?: CalendarSourceChoice | '';
     /** Kalender-IDs ohne API-Schlüssel, aber die OAuth-Verbindung darf den Kalender nicht lesen (neu verbinden) */
     connection_needs_calendar_access: boolean;
     ics_url_set: boolean;
@@ -3110,6 +3125,7 @@ export interface FailedPhoto {
 }
 
 export interface AdminSettingsInput {
+  calendar_source?: CalendarSourceChoice;
   calendar_ics_url?: string;
   google_api_key?: string;
   calendar_ids?: string;
