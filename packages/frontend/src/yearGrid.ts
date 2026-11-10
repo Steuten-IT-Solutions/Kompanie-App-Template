@@ -67,9 +67,13 @@ export function yearRange(terms: GridTerm[], thisYear: number): number[] {
   return years;
 }
 
-/** Bezeichnung mit Umbruchstellen nach „/“ (z. B. „Könige/Königinnen“), sonst gäbe es dort keine Stelle zum Umbrechen. */
-export function breakAfterSlash(title: string): string {
-  return title.replace(/\/(?=\S)/g, '/​');
+/**
+ * Bezeichnung mit Umbruchstellen, wo ein Umbruch gut lesbar ist: nach „/“ („Könige/Königinnen“) und vor der
+ * Gender-Endung („Ordonnanzoffizier*in“ → „Ordonnanzoffizier“ / „*in“). Sonst gibt es dort keine Stelle, und der
+ * Browser bricht notfalls mitten im Wort um („…offizier*i“ / „n“).
+ */
+export function titleBreaks(title: string): string {
+  return title.replace(/\/(?=\S)/g, '/\u200B').replace(/(?<=\p{L})([*:_])(?=\p{Ll})/gu, '\u200B$1');
 }
 
 /** Längstes Wort eines Texts; getrennt wird an Leerzeichen und nach „/“ und „-“, wo auch der Browser umbricht. */
