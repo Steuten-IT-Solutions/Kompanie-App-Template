@@ -1,7 +1,7 @@
 // Jahresübersicht der Ämter (src/yearGrid.ts): belegte Jahre, Spuren für gleichzeitige Amtszeiten, Jahre des Rasters.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { breakAfterSlash, columnChars, lanes, occupied, yearRange, type GridTerm } from '../src/yearGrid.ts';
+import { titleBreaks, columnChars, lanes, occupied, yearRange, type GridTerm } from '../src/yearGrid.ts';
 
 let next = 1;
 const term = (start: number, end: number | null, kind: 'period' | 'point' = 'period'): GridTerm => ({
@@ -48,10 +48,18 @@ test('Jahre des Rasters: neueste oben, vom frühesten Beginn bis heute', () => {
   assert.deepEqual(yearRange([], 2022), []);
 });
 
-test('Bezeichnung bricht nach „/“ um', () => {
-  assert.equal(breakAfterSlash('Könige/Königinnen'), 'Könige/​Königinnen');
-  assert.equal(breakAfterSlash('Kassierer'), 'Kassierer');
-  assert.equal(breakAfterSlash('A / B'), 'A / B', 'vor einem Leerzeichen ist schon eine Umbruchstelle');
+test('Bezeichnung bricht nach „/“, vor Wortteilen und vor der Gender-Endung um', () => {
+  assert.equal(titleBreaks('Könige/Königinnen'), 'Könige/​Königinnen');
+  assert.equal(titleBreaks('Kassierer'), 'Kassierer');
+  assert.equal(titleBreaks('A / B'), 'A / B', 'vor einem Leerzeichen ist schon eine Umbruchstelle');
+  assert.equal(titleBreaks('Ordonnanzoffizier*in'), 'Ordonnanz\u00ADoffizier*in', 'vor dem Wortteil, nicht vor „*in“');
+  assert.equal(titleBreaks('Kriegsminister*in'), 'Kriegs\u00ADminister*in');
+  assert.equal(titleBreaks('1. Brudermeister'), '1. Bruder\u00ADmeister');
+  assert.equal(titleBreaks('Offizier'), 'Offizier', 'am Wortanfang keine Trennung');
+  assert.equal(titleBreaks('Kassierer:innen'), 'Kassierer\u200B:innen', 'ohne Wortteil: vor der Gender-Endung');
+  assert.equal(titleBreaks('Schriftführer*in'), 'Schrift\u00ADführer*in');
+  assert.equal(titleBreaks('Kriegsminister*'), 'Kriegs\u00ADminister*', 'Stern am Ende bleibt');
+  assert.equal(titleBreaks('Prinz/Prinzessin'), 'Prinz/\u200BPrinzessin', 'Prinz am Wortanfang');
 });
 
 test('Spaltenbreite: längstes Wort passt, Bezeichnung in höchstens drei Zeilen', () => {

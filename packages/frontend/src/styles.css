@@ -6461,8 +6461,8 @@ button.spotlight-person:focus-visible {
 .joint-term-offices {
   margin: 0;
   display: grid;
-  /* Bezeichnungen so breit wie die längste (höchstens 45 %), damit „Ordonnanzoffizier*in“ in eine Zeile passt; alle
-     Zeilen teilen sich die Spalten (subgrid), die Namen stehen also bündig */
+  /* Bezeichnungen so breit wie die längste (höchstens 45 %, die Namen brauchen auch Platz), damit „Ordonnanzoffizier*in“ möglichst in eine Zeile
+     passt; alle Zeilen teilen sich die Spalten (subgrid), die Namen stehen also bündig */
   grid-template-columns: fit-content(45%) 1fr;
   gap: 6px 8px;
 }
@@ -6478,11 +6478,10 @@ button.spotlight-person:focus-visible {
   }
 }
 .joint-term-offices dt {
-  min-width: 0;
   color: var(--muted);
-  /* lange Bezeichnungen („Ordonnanzoffizier*in“) trennen statt in die Namen daneben zu laufen */
-  hyphens: auto;
-  overflow-wrap: anywhere;
+  /* Lange Bezeichnungen brechen an den Stellen aus titleBreaks um (nach „/“, vor „*in“), nicht mitten im Wort; die
+     Spalte ist nie schmaler als das längste Stück (break-word zählt nicht zur Mindestbreite, anders als anywhere) */
+  overflow-wrap: break-word;
 }
 .joint-term-offices dd {
   margin: 0;

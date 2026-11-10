@@ -67,9 +67,43 @@ export function yearRange(terms: GridTerm[], thisYear: number): number[] {
   return years;
 }
 
-/** Bezeichnung mit Umbruchstellen nach „/“ (z. B. „Könige/Königinnen“), sonst gäbe es dort keine Stelle zum Umbrechen. */
-export function breakAfterSlash(title: string): string {
-  return title.replace(/\/(?=\S)/g, '/​');
+/** Wortteile von Amtsbezeichnungen, vor denen ein zusammengesetztes Wort gut lesbar getrennt wird („Ordonnanz-offizier“). */
+const PARTS = [
+  'offizier',
+  'minister',
+  'meister',
+  'könig',
+  'prinz',
+  'kommandant',
+  'adjutant',
+  'hauptmann',
+  'leutnant',
+  'general',
+  'oberst',
+  'führer',
+  'träger',
+  'leiter',
+  'schreiber',
+  'kassierer',
+  'wart',
+];
+const PART = new RegExp(`(?<=\\p{L}{3})(?=(?:${PARTS.join('|')}))`, 'giu');
+
+/**
+ * Bezeichnung mit Umbruchstellen, wo ein Umbruch gut lesbar ist: nach „/“ („Könige/Königinnen“), in zusammengesetzten
+ * Wörtern vor einem bekannten Wortteil als weiches Trennzeichen („Ordonnanz-“ / „offizier*in“, der Strich erscheint nur
+ * beim Umbruch) und, wenn es das nicht gibt, vor der Gender-Endung („Kassierer“ / „*in“). Sonst bricht der Browser
+ * notfalls mitten im Wort um („…offizier*i“ / „n“).
+ */
+export function titleBreaks(title: string): string {
+  return title
+    .split(/(\s+)/)
+    .map((word) => {
+      const parts = word.replace(PART, '\u00AD');
+      const split = parts === word ? word.replace(/(?<=\p{L})([*:_])(?=\p{Ll})/gu, '\u200B$1') : parts;
+      return split.replace(/\/(?=\S)/g, '/\u200B');
+    })
+    .join('');
 }
 
 /** Längstes Wort eines Texts; getrennt wird an Leerzeichen und nach „/“ und „-“, wo auch der Browser umbricht. */

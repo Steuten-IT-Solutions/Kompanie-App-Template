@@ -44,7 +44,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   die Spalten jetzt so breit, dass Bezeichnungen wie „Könige/Königinnen“ und lange Namen ganz zu lesen sind. Bezeichnungen
   brechen nach „/“ um, ein Jahr mit zweizeiligem Namen wird höher statt die zweite Zeile zu verdecken. Auch in den Karten
   gemeinsamer Amtszeiten (z. B. ein Königshaus) laufen lange Bezeichnungen wie „Ordonnanzoffizier*in“ nicht mehr in die
-  Namen daneben: Die Spalte richtet sich nach der längsten Bezeichnung, nur sehr lange werden umbrochen.
+  Namen daneben: Die Spalte richtet sich nach der längsten Bezeichnung; wird es zu eng, wird vor bekannten Wortteilen
+  getrennt („Ordonnanz-offizier*in“, „Kriegs-minister*in“), sonst vor „*in“ oder nach „/“, nicht mitten im Wort.
 - **Fehlende Abstände**: In [Einstellungen → Navigation](app:einstellungen/navigation) klebten die Zwischenüberschrift
   „Einrichtungen“, die Felder der Startseite und die Knöpfe unten („Navigation speichern“, „Standardnavigation
   wiederherstellen“, „Standardreihenfolge der Verwaltung“) an der Karte darüber. Das ist behoben, ebenso unter

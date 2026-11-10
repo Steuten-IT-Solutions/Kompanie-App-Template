@@ -5,7 +5,7 @@ import { MemberAvatar } from '../memberPhoto';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
-import { breakAfterSlash, columnChars, lanes, yearRange } from '../yearGrid';
+import { titleBreaks, columnChars, lanes, yearRange } from '../yearGrid';
 import { officeSingular } from '../officeName';
 
 const sec = brand.labels.sections;
@@ -343,7 +343,7 @@ export function JointTerms({
               <dl className="joint-term-offices">
                 {rows.map((r) => (
                   <div key={r.office.id}>
-                    <dt>{breakAfterSlash(officeSingular(r.office))}</dt>
+                    <dt>{titleBreaks(officeSingular(r.office))}</dt>
                     <dd>
                       <Holders holders={r.holders} to={memberPath} />
                     </dd>
@@ -458,7 +458,7 @@ export function YearGrid({
       for (let i = 0; i < count; i++) tracks.push(`minmax(${min}, 1fr)`);
       heads.push(
         <div key={`o${o.id}`} className="yg-office" style={{ gridColumn: `${column} / span ${count}`, gridRow: 2 }}>
-          <span>{breakAfterSlash(o.title)}</span>
+          <span>{titleBreaks(o.title)}</span>
         </div>,
       );
       for (const { term, lane, first, last } of bars) {
