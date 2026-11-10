@@ -142,6 +142,28 @@ async function gapBetween(a: Locator, b: Locator): Promise<number> {
   return Math.round(rb!.y - (ra!.y + ra!.height));
 }
 
+/**
+ * Kleinster senkrechter Abstand zwischen zwei untereinander stehenden, sichtbaren Kindern von `scope` (Pixel). Bausteine
+ * im normalen Fluss (Liste, Knopf, Feld, Zwischenzeile) dürfen nicht aneinanderkleben; erwartet sind mindestens 12 px.
+ */
+async function smallestStackGap(scope: Locator): Promise<{ gap: number; between: string }> {
+  return scope.evaluate((el) => {
+    const name = (e: Element) => `${e.tagName.toLowerCase()}.${[...e.classList].join('.')} „${(e.textContent ?? '').trim().slice(0, 30)}“`;
+    const kids = [...el.children].filter((k) => {
+      const r = k.getBoundingClientRect();
+      return r.height > 0 && getComputedStyle(k).position !== 'absolute';
+    });
+    let best = { gap: Infinity, between: '' };
+    for (let i = 1; i < kids.length; i++) {
+      const [a, b] = [kids[i - 1].getBoundingClientRect(), kids[i].getBoundingClientRect()];
+      if (b.top < a.bottom - 1) continue; // nebeneinander
+      const gap = Math.round(b.top - a.bottom);
+      if (gap < best.gap) best = { gap, between: `${name(kids[i - 1])} / ${name(kids[i])}` };
+    }
+    return best;
+  });
+}
+
 /** Bildschirmfotos schmal (360 px) und breit, hell und dunkel; danach wieder wie vorher. */
 async function shotsNarrowAndWide(page: Page, name: string) {
   if (!SHOTS) return;
@@ -1147,6 +1169,10 @@ test('Navigation einrichten (Issue #277): Untermenü umbenennen, Termine hineins
     await card.getByRole('button', { name: 'Navigation speichern' }).click();
     await expect(page.getByText('Navigation gespeichert')).toBeVisible();
     await expect(card.getByText('Zurzeit gilt eure eigene Navigation.')).toBeVisible();
+    // Kein Baustein klebt am vorigen: Listen, Zwischenüberschriften, Felder der Startseite, beide Knöpfe unten und das
+    // Untermenü (Felder, Liste, „Untermenü entfernen“).
+    expect((await smallestStackGap(card)).gap).toBeGreaterThanOrEqual(12);
+    expect((await smallestStackGap(card.locator('.nav-menu').first())).gap).toBeGreaterThanOrEqual(12);
 
     const tabbar = page.locator('.tabbar');
     await expect(tabbar.getByRole('button', { name: 'Verein' })).toBeVisible();
@@ -3129,6 +3155,8 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
   const rollen = page.locator('#einstellungen-rollen');
   await expect(rollen.locator('.row-title', { hasText: SPIESS })).toBeVisible();
   await expect(rollen.locator('.row-title', { hasText: 'Kasse verwalten' })).toBeVisible(); // Standardrolle des Bereichs
+  // „+ Neue Rolle“ klebt nicht an der letzten Rolle.
+  expect(await gapBetween(rollen.locator('.role-list'), rollen.getByRole('button', { name: '+ Neue Rolle' }))).toBeGreaterThanOrEqual(12);
   await rollen.getByRole('button', { name: '+ Neue Rolle' }).click();
   await rollen.getByLabel('Name der Rolle').fill('Kassenwart');
   await rollen.getByRole('button', { name: /^Kompanie verwalten/ }).click();

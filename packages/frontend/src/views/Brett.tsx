@@ -792,7 +792,7 @@ export default function Brett({ focus, onToast }: { focus?: string; onToast: (ms
       )}
       {canPostBoard() && <Ended />}
       {(pollsVisible() || canManagePolls()) && boardLoaded() && (
-        <section className="board-polls">
+        <section className="board-polls stack">
           <h2 className="board-page-title">Laufende {brand.labels.sections.polls}</h2>
           {polls.length === 0 ? (
             <p className="muted small">Zurzeit läuft keine Umfrage.</p>

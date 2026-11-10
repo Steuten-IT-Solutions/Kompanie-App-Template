@@ -45,6 +45,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   brechen nach „/“ um, ein Jahr mit zweizeiligem Namen wird höher statt die zweite Zeile zu verdecken. Auch in den Karten
   gemeinsamer Amtszeiten (z. B. ein Königshaus) laufen lange Bezeichnungen wie „Ordonnanzoffizier*in“ nicht mehr in die
   Namen daneben: Die Spalte richtet sich nach der längsten Bezeichnung, nur sehr lange werden umbrochen.
+- **Fehlende Abstände**: In [Einstellungen → Navigation](app:einstellungen/navigation) klebten die Zwischenüberschrift
+  „Einrichtungen“, die Felder der Startseite und die Knöpfe unten („Navigation speichern“, „Standardnavigation
+  wiederherstellen“, „Standardreihenfolge der Verwaltung“) an der Karte darüber. Das ist behoben, ebenso unter
+  [Einstellungen → Rollen](app:einstellungen/rollen) („+ Neue Rolle“), [Einstellungen → Kalender](app:einstellungen/kalender),
+  bei den laufenden Umfragen am Schwarzen Brett, bei den Gruppen der Ämter, bei den Dienstgraden und beim Import aus
+  Excel. Alle Einstellungen halten jetzt einheitlich Abstand zwischen ihren Teilen.
 - Knöpfe trennen Wörter nicht mehr mit Bindestrich, sondern schieben ein Wort, das nicht mehr in die Zeile passt, ganz
   in die nächste (z. B. „Bilder und Videos einreichen“ in der [Galerie](app:galerie) statt „VI-DEOS“). Nur wenn ein
   Wort allein nicht in den Knopf passt (lange Wörter auf schmalen Handys), trennt der Knopf wie bisher.

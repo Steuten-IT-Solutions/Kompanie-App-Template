@@ -278,7 +278,7 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
   );
 
   return (
-    <section>
+    <section className="stack">
       <h3 className="section-title">Gruppen</h3>
       <FormError error={error} />
       {list.length > 0 && (
