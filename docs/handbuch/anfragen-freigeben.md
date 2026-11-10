@@ -6,7 +6,7 @@ rechte: [create_users]
 Hier gibst du Anfragen von Personen frei, die selbst einen Zugang zur App beantragt haben, oder lehnst sie ab. Beim Freigeben entsteht das Konto mit dem Passwort, das die Person in der Anfrage gewählt hat. Du musst also kein Startpasswort weitergeben.
 
 ## So öffnest du die Seite
-Tippe unten auf **Verwaltung** und dann auf **Anfragen**. Warten Anfragen, steht ihre Zahl dahinter, z. B. **Anfragen (2)**. Den Knopf gibt es, solange **Zugang beantragen** eingeschaltet ist oder noch Anfragen warten.
+Tippe unten auf **Verwaltung** und dann auf **Anfragen**. Warten Anfragen, zeigt die kleine Zahl im roten Kreis an der Ecke des Knopfs, wie viele es sind; warten keine, fehlt sie. Den Knopf gibt es, solange **Zugang beantragen** eingeschaltet ist oder noch Anfragen warten.
 
 ## Was du hier siehst
 Je Anfrage eine Karte mit:

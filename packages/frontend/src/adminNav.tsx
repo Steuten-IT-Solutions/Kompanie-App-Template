@@ -4,7 +4,9 @@ import { can, config, type Feature } from './api';
 import { canManagePolls, canPostBoard } from './board';
 import brand from './generated/brand';
 import { navigate } from './router';
+import { useAdminCounts } from './adminCounts';
 import { usePromotionsDue } from './promotionsDue';
+import { tileCount } from './tileCount';
 import { menuSources, prefetchOnTap, usePrefetchMenu } from './viewData';
 
 const sec = brand.labels.sections;
@@ -45,18 +47,14 @@ export function adminTabs(): AdminTab[] {
     [
       { id: 'mitglieder', label: 'Mitglieder', on: memberListAllowed() },
       { id: 'ehemalige', label: 'Ehemalige', on: can('create_users') },
-      // Anfragen auf einen Zugang (Issue #314): mit Zahl der offenen; auch nach dem Ausschalten, solange welche warten
+      // Anfragen auf einen Zugang (Issue #314): auch nach dem Ausschalten, solange welche warten; Zahl der offenen im Kreis
       {
         id: 'anfragen',
-        label: config?.pendingRegistrations ? `Anfragen (${config.pendingRegistrations})` : 'Anfragen',
+        label: 'Anfragen',
         on: can('create_users') && (!!config?.registration || (config?.pendingRegistrations ?? 0) > 0),
       },
-      // Fehlermeldungen aus der App: mit Zahl der offenen
-      {
-        id: 'meldungen',
-        label: config?.openReports ? `Fehlermeldungen (${config.openReports})` : 'Fehlermeldungen',
-        on: can('review_reports'),
-      },
+      // Fehlermeldungen aus der App: Zahl der offenen im Kreis
+      { id: 'meldungen', label: 'Fehlermeldungen', on: can('review_reports') },
       { id: 'punkte', label: `${sec.points} +`, on: points },
       { id: 'strafe', label: `${sec.penalties} +`, on: canPenalties() },
       { id: 'katalog', label: sec.catalog, on: points, group: SETUP },
@@ -362,6 +360,8 @@ export function AdminIcon({ id }: { id: string }) {
 /** Startseite der Verwaltung: je Bereich ein Knopf mit Symbol; mit group die Bereiche unter „Einrichtungen“. */
 export function AdminMenu({ group }: { group?: string }) {
   const due = usePromotionsDue();
+  useAdminCounts(!group);
+  const counts = { promotions: due, registrations: config?.pendingRegistrations, reports: config?.openReports };
   // Daten der Bereiche hinter den Knöpfen im Leerlauf vorab laden (auch die unter „Einrichtungen“), beim Antippen sofort.
   usePrefetchMenu(
     'verwaltung',
@@ -370,28 +370,29 @@ export function AdminMenu({ group }: { group?: string }) {
   return (
     <nav aria-label={group ? 'Einrichtungen' : 'Verwaltung'}>
       <ul className="admin-tiles">
-        {(group ? setupTabs() : startTabs()).map((t) => (
-          <li key={t.id}>
-            <button
-              type="button"
-              className="card admin-tile"
-              title={
-                t.id === 'befoerderungen' && due ? `${due} ${due === 1 ? 'Mitglied' : 'Mitglieder'} zur Beförderung bereit` : undefined
-              }
-              onClick={() => navigate(t.route ?? `verwaltung/${t.id}`)}
-              {...prefetchOnTap(...menuSources('verwaltung', t.id))}
-            >
-              <AdminIcon id={t.id} />
-              <span>{t.label}</span>
-              {t.id === 'befoerderungen' && !!due && (
-                // Zahl im Kreis an der Ecke: wie viele Mitglieder gerade zur Beförderung bereit sind (erklärt im title).
-                <span className="count-badge" aria-hidden="true">
-                  {due > 99 ? '99+' : due}
-                </span>
-              )}
-            </button>
-          </li>
-        ))}
+        {(group ? setupTabs() : startTabs()).map((t) => {
+          const badge = tileCount(t.id, counts);
+          return (
+            <li key={t.id}>
+              <button
+                type="button"
+                className="card admin-tile"
+                title={badge?.title}
+                onClick={() => navigate(t.route ?? `verwaltung/${t.id}`)}
+                {...prefetchOnTap(...menuSources('verwaltung', t.id))}
+              >
+                <AdminIcon id={t.id} />
+                <span>{t.label}</span>
+                {badge && (
+                  // Zahl im Kreis an der Ecke: was dort gerade ansteht (erklärt im title).
+                  <span className="count-badge" aria-hidden="true">
+                    {badge.text}
+                  </span>
+                )}
+              </button>
+            </li>
+          );
+        })}
       </ul>
     </nav>
   );
