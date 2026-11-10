@@ -6464,12 +6464,17 @@ button.spotlight-person:focus-visible {
   /* Bezeichnungen so breit wie die längste (höchstens 45 %, die Namen brauchen auch Platz), damit „Ordonnanzoffizier*in“ möglichst in eine Zeile
      passt; alle Zeilen teilen sich die Spalten (subgrid), die Namen stehen also bündig */
   grid-template-columns: fit-content(45%) 1fr;
-  gap: 6px 8px;
+  /* Abstand und feine Linie zwischen den Ämtern, damit eine zweizeilige Bezeichnung nicht an der nächsten klebt */
+  gap: 10px 8px;
 }
 .joint-term-offices > div {
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: subgrid;
+}
+.joint-term-offices > div + div {
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
 }
 @supports not (grid-template-columns: subgrid) {
   .joint-term-offices > div {
