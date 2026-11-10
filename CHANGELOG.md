@@ -40,6 +40,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **„Im Amt“ im hellen Modus leichter**: Unter [Mitglieder → Ämter](app:mitglieder/aemter) steht der Bereich „Im Amt“
+  eines aufgeklappten Amts im hellen Modus jetzt auf einer zarten Tönung der Kompaniefarbe statt auf der vollen Farbe. Im
+  dunklen Modus bleibt er wie bisher.
+
 - **Zahl im Kreis auch bei Anfragen und Fehlermeldungen**: Wie bei **Beförderungen** zeigen die Knöpfe
   [Anfragen](app:verwaltung/anfragen) und [Fehlermeldungen](app:verwaltung/meldungen) in der Verwaltung die Zahl der
   offenen Einträge jetzt als Zahl im roten Kreis an der Ecke statt in Klammern hinter dem Namen. Die Zahl wird beim
