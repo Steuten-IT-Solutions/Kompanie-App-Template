@@ -40,6 +40,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **„Im Amt“ im hellen Modus leichter**: Unter [Mitglieder → Ämter](app:mitglieder/aemter) steht der Bereich „Im Amt“
+  eines aufgeklappten Amts im hellen Modus jetzt auf einer zarten Tönung der Kompaniefarbe statt auf der vollen Farbe. Im
+  dunklen Modus bleibt er wie bisher.
+
 - **Zahl im Kreis auch bei Anfragen und Fehlermeldungen**: Wie bei **Beförderungen** zeigen die Knöpfe
   [Anfragen](app:verwaltung/anfragen) und [Fehlermeldungen](app:verwaltung/meldungen) in der Verwaltung die Zahl der
   offenen Einträge jetzt als Zahl im roten Kreis an der Ecke statt in Klammern hinter dem Namen. Die Zahl wird beim
@@ -53,7 +57,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   brechen nach „/“ um, ein Jahr mit zweizeiligem Namen wird höher statt die zweite Zeile zu verdecken. Auch in den Karten
   gemeinsamer Amtszeiten (z. B. ein Königshaus) laufen lange Bezeichnungen wie „Ordonnanzoffizier*in“ nicht mehr in die
   Namen daneben: Die Spalte richtet sich nach der längsten Bezeichnung; wird es zu eng, wird vor bekannten Wortteilen
-  getrennt („Ordonnanz-offizier*in“, „Kriegs-minister*in“), sonst vor „*in“ oder nach „/“, nicht mitten im Wort.
+  getrennt („Ordonnanz-offizier*in“, „Kriegs-minister*in“), sonst vor „*in“ oder nach „/“, nicht mitten im Wort. Zwischen
+  den Ämtern einer solchen Karte stehen jetzt etwas Abstand und eine feine Linie.
 - **Fehlende Abstände**: In [Einstellungen → Navigation](app:einstellungen/navigation) klebten die Zwischenüberschrift
   „Einrichtungen“, die Felder der Startseite und die Knöpfe unten („Navigation speichern“, „Standardnavigation
   wiederherstellen“, „Standardreihenfolge der Verwaltung“) an der Karte darüber. Das ist behoben, ebenso unter

@@ -5028,13 +5028,15 @@ fieldset.board-targets legend {
   background: color-mix(in srgb, var(--primary-text) 3%, var(--card));
 }
 
-/* „Im Amt“: die aktuellen Inhaber auf der Kompaniefarbe, wie die Kopfleiste */
+/* „Im Amt“: die aktuellen Inhaber hervorgehoben. Hell auf einer zarten Tönung der Kompaniefarbe (die volle Farbe wirkte
+   in der hellen Karte zu schwer), dunkel auf der Kompaniefarbe wie die Kopfleiste; unten immer der Strich in der
+   Akzentfarbe. */
 .spotlight {
   position: relative;
   padding: 14px 14px 16px;
-  background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 55%),
-    linear-gradient(160deg, var(--primary) 0%, var(--primary-deep) 100%);
-  color: var(--on-primary);
+  background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--accent) 14%, transparent) 0%, transparent 55%),
+    color-mix(in srgb, var(--primary-text) 8%, var(--card));
+  color: var(--ink);
   border-bottom: 3px solid var(--accent);
 }
 .spotlight-label {
@@ -5043,7 +5045,7 @@ fieldset.board-targets legend {
   font-size: 0.75rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--accent-on-primary);
+  color: var(--accent-text);
   margin-bottom: 10px;
 }
 .spotlight-list {
@@ -5060,9 +5062,9 @@ fieldset.board-targets legend {
   gap: 12px;
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid color-mix(in srgb, var(--on-primary) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary-text) 18%, transparent);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--on-primary) 8%, transparent);
+  background: var(--card);
   color: inherit;
   font: inherit;
   text-align: left;
@@ -5072,7 +5074,25 @@ button.spotlight-person {
 }
 button.spotlight-person:hover,
 button.spotlight-person:focus-visible {
-  background: color-mix(in srgb, var(--on-primary) 16%, transparent);
+  background: color-mix(in srgb, var(--primary-text) 8%, var(--card));
+}
+@media (prefers-color-scheme: dark) {
+  .spotlight {
+    background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 55%),
+      linear-gradient(160deg, var(--primary) 0%, var(--primary-deep) 100%);
+    color: var(--on-primary);
+  }
+  .spotlight-label {
+    color: var(--accent-on-primary);
+  }
+  .spotlight-person {
+    border-color: color-mix(in srgb, var(--on-primary) 18%, transparent);
+    background: color-mix(in srgb, var(--on-primary) 8%, transparent);
+  }
+  button.spotlight-person:hover,
+  button.spotlight-person:focus-visible {
+    background: color-mix(in srgb, var(--on-primary) 16%, transparent);
+  }
 }
 .spotlight-avatar {
   flex: none;
@@ -6464,12 +6484,17 @@ button.spotlight-person:focus-visible {
   /* Bezeichnungen so breit wie die längste (höchstens 45 %, die Namen brauchen auch Platz), damit „Ordonnanzoffizier*in“ möglichst in eine Zeile
      passt; alle Zeilen teilen sich die Spalten (subgrid), die Namen stehen also bündig */
   grid-template-columns: fit-content(45%) 1fr;
-  gap: 6px 8px;
+  /* Abstand und feine Linie zwischen den Ämtern, damit eine zweizeilige Bezeichnung nicht an der nächsten klebt */
+  gap: 10px 8px;
 }
 .joint-term-offices > div {
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: subgrid;
+}
+.joint-term-offices > div + div {
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
 }
 @supports not (grid-template-columns: subgrid) {
   .joint-term-offices > div {

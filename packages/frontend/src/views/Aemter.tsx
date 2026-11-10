@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactElement } from 'react';
+import { Fragment, useLayoutEffect, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 import { type Office, type OfficeGroup, type OfficeGroupTerm, type OfficeHolder, type OfficesOverview, type OfficeTerm } from '../api';
 import brand from '../generated/brand';
 import { MemberAvatar } from '../memberPhoto';
@@ -9,6 +9,24 @@ import { titleBreaks, columnChars, lanes, yearRange } from '../yearGrid';
 import { officeSingular } from '../officeName';
 
 const sec = brand.labels.sections;
+
+/**
+ * Bezeichnung mit den Umbruchstellen aus titleBreaks. Die Stellen ohne Strich werden zu <wbr>: Das Zeichen U+200B
+ * zeigen manche Handy-Schriften als Leerzeichen an („Prinz/ Prinzessin“).
+ */
+function Title({ text }: { text: string }) {
+  const pieces = titleBreaks(text).split('\u200B');
+  return (
+    <>
+      {pieces.map((piece, i) => (
+        <Fragment key={i}>
+          {i > 0 && <wbr />}
+          {piece}
+        </Fragment>
+      ))}
+    </>
+  );
+}
 
 /** „2007–2020“, „seit 2020“ (läuft), „2025“ (einzelnes Jahr oder Anfang und Ende im selben Jahr). */
 export function termYears(t: Pick<OfficeTerm, 'kind' | 'start_year' | 'end_year'>): string {
@@ -343,7 +361,9 @@ export function JointTerms({
               <dl className="joint-term-offices">
                 {rows.map((r) => (
                   <div key={r.office.id}>
-                    <dt>{titleBreaks(officeSingular(r.office))}</dt>
+                    <dt>
+                      <Title text={officeSingular(r.office)} />
+                    </dt>
                     <dd>
                       <Holders holders={r.holders} to={memberPath} />
                     </dd>
@@ -458,7 +478,9 @@ export function YearGrid({
       for (let i = 0; i < count; i++) tracks.push(`minmax(${min}, 1fr)`);
       heads.push(
         <div key={`o${o.id}`} className="yg-office" style={{ gridColumn: `${column} / span ${count}`, gridRow: 2 }}>
-          <span>{titleBreaks(o.title)}</span>
+          <span>
+            <Title text={o.title} />
+          </span>
         </div>,
       );
       for (const { term, lane, first, last } of bars) {
