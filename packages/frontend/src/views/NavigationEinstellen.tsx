@@ -1,11 +1,18 @@
 import { useState, type ReactNode } from 'react';
 import { defaultSections } from '../generated/brand';
+import { adminTabs, adminTileCatalog } from '../adminNav';
 import { api, applyNavigation, config, type Feature, type NavigationAdmin, type PageSummary } from '../api';
 import { useDragSort } from '../dragSort';
 import {
   draftError,
   draftOf,
+  internOrderOf,
   isPageTarget,
+  mergeOrder,
+  orderToSave,
+  SETUP,
+  setupOrder,
+  startOrder,
   moveTo,
   NAV_ICONS,
   NAV_TARGETS,
@@ -110,7 +117,7 @@ export default function NavigationEinstellen({ onToast }: { onToast: (msg: strin
     return <ErrorBox message={pages.error ?? 'Die Seiten konnten nicht geladen werden.'} onRetry={pages.reload} />;
   return (
     <Editor
-      key={JSON.stringify([data.navigation, data.names, data.start, data.show_labels])}
+      key={JSON.stringify([data.navigation, data.names, data.start, data.show_labels, data.intern_order, data.admin_order])}
       data={data}
       pages={pages.data}
       onSaved={setData}
@@ -138,15 +145,20 @@ function Editor({
   const [names, setNames] = useState<NavNames>(savedNames);
   const [start, setStart] = useState<NavStart>(savedStart);
   const [showLabels, setShowLabels] = useState(data.show_labels);
-  const [initial] = useState<NavigationSetting>(() =>
-    draftOf(data.navigation, isOn, pageTargets, savedNames.intern?.label || defaultLabel('intern', pages)),
-  );
+  const internLabel = savedNames.intern?.label || defaultLabel('intern', pages);
+  const savedInternOrder = data.intern_order ?? [];
+  const [initial] = useState<NavigationSetting>(() => draftOf(data.navigation, isOn, pageTargets, internLabel, savedInternOrder));
+  // Reihenfolge der Verwaltung (für alle gleich), je Gruppe; die Kacheln bleiben in ihrer Gruppe.
+  const [adminStart, setAdminStart] = useState<string[]>(() => startOrder(data.admin_order));
+  const [adminSetup, setAdminSetup] = useState<string[]>(() => setupOrder(data.admin_order));
   const [draft, setDraft] = useState<NavigationSetting>(initial);
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const custom = data.navigation !== null;
-  // Unverändert aus der Standardnavigation: Sie bleibt (auch mit eigenen Namen), statt zur eigenen Navigation zu werden.
-  const keepDefault = !custom && JSON.stringify(draft) === JSON.stringify(initial);
+  // Unverändert aus der Standardnavigation, höchstens „Intern“ anders geordnet: Sie bleibt (auch mit eigenen Namen), statt
+  // zur eigenen Navigation zu werden; die Reihenfolge in „Intern“ wird dann eigens gespeichert.
+  const internOrder = custom ? null : internOrderOf(initial, draft);
+  const keepDefault = internOrder !== null;
   const labels: Labels = Object.fromEntries(
     [...NAV_TARGETS, ...pageTargets, 'intern'].map((t) => [t, names[t]?.label?.trim() || defaultLabel(t, pages)]),
   );
@@ -177,14 +189,25 @@ function Editor({
         return Object.keys(one).length > 0 ? [[k, one]] : [];
       }),
     );
+    // Reihenfolge in „Intern“: nur speichern, wenn sie von der Standardreihenfolge abweicht.
+    const std = draftOf(null, isOn, pageTargets, internLabel).items.at(-1);
+    const standardIntern = typeof std === 'object' ? std.items : [];
+    const ownIntern = keepDefault && internOrder.join() !== standardIntern.join() ? internOrder : null;
     const body = reset
-      ? { navigation: null, names: {}, start: {}, show_labels: true }
-      : { navigation: keepDefault ? null : draft, names: clean, start, show_labels: showLabels };
+      ? { navigation: null, names: {}, start: {}, show_labels: true, intern_order: null }
+      : {
+          navigation: keepDefault ? null : draft,
+          names: clean,
+          start,
+          show_labels: showLabels,
+          ...(keepDefault ? { intern_order: ownIntern } : {}),
+          admin_order: orderToSave(adminStart, adminSetup),
+        };
     // Neue Namen stehen überall in der App (auch in Überschriften): dann einmal neu laden.
     const reload = JSON.stringify(body.names) !== JSON.stringify(savedNames) || body.show_labels !== data.show_labels;
     try {
       const next = await api.saveNavigation(body);
-      applyNavigation(next.navigation);
+      applyNavigation(next);
       onSaved(next);
       onToast(reset ? 'Standardnavigation wiederhergestellt' : 'Navigation gespeichert');
       if (reload) setTimeout(() => window.location.reload(), 800);
@@ -408,7 +431,10 @@ function Editor({
             <li className="card row">
               <div className="row-main">
                 <span className="row-title">{labels.intern ?? defaultLabel('intern', pages)}</span>
-                <div className="row-sub">Sammelt in der Standardnavigation die internen Bereiche.</div>
+                <div className="row-sub">
+                  Sammelt in der Standardnavigation die internen Bereiche. Ihre Reihenfolge änderst du oben im Untermenü am Griff; die
+                  Standardnavigation bleibt dabei erhalten.
+                </div>
                 {renameFields('intern', 'intern')}
               </div>
             </li>
@@ -439,6 +465,44 @@ function Editor({
       </label>
       {!showLabels && <p className="small muted">Unten stehen nur die Symbole; die Namen stehen weiter oben auf jeder Seite.</p>}
 
+      <h4>Verwaltung</h4>
+      <p className="small muted">
+        Reihenfolge der Knöpfe in der Verwaltung, für alle gleich. Zum Ändern am Griff ziehen. Jede Person sieht weiter nur die Knöpfe, die
+        sie nutzen darf.
+      </p>
+      <AdminOrderList
+        title="Startseite der Verwaltung"
+        ids={adminStart}
+        disabled={busy}
+        onChange={(next) => {
+          setAdminStart(next);
+          setSaveError(null);
+        }}
+      />
+      <AdminOrderList
+        title="Einrichtungen"
+        ids={adminSetup}
+        disabled={busy}
+        onChange={(next) => {
+          setAdminSetup(next);
+          setSaveError(null);
+        }}
+      />
+      {Object.keys(orderToSave(adminStart, adminSetup)).length > 0 && (
+        <button
+          type="button"
+          className="btn btn-small btn-secondary"
+          disabled={busy}
+          onClick={() => {
+            setAdminStart(startOrder(null));
+            setAdminSetup(setupOrder(null));
+            setSaveError(null);
+          }}
+        >
+          Standardreihenfolge der Verwaltung
+        </button>
+      )}
+
       {duplicates.length > 0 && (
         <p className="small muted" role="note">
           Mehrere Punkte heißen gleich: {duplicates.map((d) => `„${d}“`).join(', ')}.
@@ -452,7 +516,11 @@ function Editor({
       <button type="button" className="btn btn-block" disabled={busy || !!problem} onClick={() => void save(false)}>
         {busy ? 'Speichert …' : 'Navigation speichern'}
       </button>
-      {(custom || Object.keys(savedNames).length > 0 || Object.keys(savedStart).length > 0 || !data.show_labels) && (
+      {(custom ||
+        Object.keys(savedNames).length > 0 ||
+        Object.keys(savedStart).length > 0 ||
+        !data.show_labels ||
+        savedInternOrder.length > 0) && (
         <button
           type="button"
           className="btn btn-block btn-secondary"
@@ -551,5 +619,45 @@ function SubList({
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * Kacheln einer Gruppe der Verwaltung per Ziehen ordnen. Gezeigt werden die, deren Bereich an ist; die übrigen behalten
+ * ihren Platz in der gespeicherten Folge (mergeOrder).
+ */
+function AdminOrderList({
+  title,
+  ids,
+  disabled,
+  onChange,
+}: {
+  title: string;
+  ids: string[];
+  disabled: boolean;
+  onChange: (next: string[]) => void;
+}) {
+  const catalog = adminTileCatalog();
+  const shown = ids.filter((id) => catalog[id]?.on);
+  const sort = useDragSort(shown, (next) => onChange(mergeOrder(ids, next)), disabled);
+  const own = new Set(adminTabs().map((t) => t.id));
+  if (shown.length === 0) return null;
+  return (
+    <>
+      <p className="small">
+        <strong>{title}</strong>
+      </p>
+      <ul className="card-list">
+        {shown.map((id, i) => (
+          <li key={id} {...sort.itemProps(i, 'card row')}>
+            {shown.length > 1 && sort.handle(i, catalog[id]?.label ?? id)}
+            <div className="row-main">
+              <span className="row-title">{catalog[id]?.label ?? id}</span>
+              {id !== SETUP && !own.has(id) && <div className="row-sub">Siehst du selbst nicht (fehlendes Recht).</div>}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }

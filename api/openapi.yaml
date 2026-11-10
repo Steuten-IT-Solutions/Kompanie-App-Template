@@ -5814,7 +5814,9 @@ paths:
         „Verwaltung“ und „Meins“ stehen immer am Ende und sind nicht einstellbar. Jeder Bereich darf höchstens einmal
         vorkommen (Hauptpunkt, in einem Untermenü oder unter hidden). Bereiche, die nirgends stehen, hängt die App hinten an.
         Die Zahl der Hauptpunkte ist frei (Issue #362). names, start und show_labels sind optional; fehlen sie, bleiben sie,
-        wie sie sind. Die App setzt mit „Standardnavigation wiederherstellen“ alles zurück (navigation null, names {}, start {}, show_labels true).
+        wie sie sind. Die App setzt mit „Standardnavigation wiederherstellen“ alles zurück (navigation null, names {}, start {}, show_labels true,
+        intern_order null). Ebenso optional: intern_order (Reihenfolge in „Intern“ der Standardnavigation) und admin_order
+        (Reihenfolge der Kacheln der Verwaltung); null bzw. leer = Standardreihenfolge.
       x-capability: manage_settings
       requestBody:
         required: true
@@ -5832,6 +5834,16 @@ paths:
                 names: { $ref: '#/components/schemas/NavigationNames' }
                 start: { $ref: '#/components/schemas/NavigationStart' }
                 show_labels: { type: boolean }
+                intern_order:
+                  description: Reihenfolge der Bereiche in „Intern“ der Standardnavigation; null = Standard
+                  oneOf:
+                    - $ref: '#/components/schemas/NavigationInternOrder'
+                    - type: 'null'
+                admin_order:
+                  description: Reihenfolge der Kacheln der Verwaltung; null oder {} = Standard
+                  oneOf:
+                    - $ref: '#/components/schemas/AdminOrder'
+                    - type: 'null'
       responses:
         '200':
           description: Neuer Stand
@@ -7859,9 +7871,27 @@ components:
       properties:
         guest: { type: string }
         member: { type: string }
+    NavigationInternOrder:
+      type: array
+      description: 'Reihenfolge der Kacheln in „Intern“ der Standardnavigation, ohne eigene Navigation. Bereiche, die fehlen, stehen hinter ihrem Vorgänger aus der Standardreihenfolge. Leer = Standard.'
+      items: { $ref: '#/components/schemas/NavigationTarget' }
+      uniqueItems: true
+    AdminOrder:
+      type: object
+      description: 'Reihenfolge der Kacheln der Verwaltung, für alle gleich, je Gruppe: start (Startseite, mit dem Sammelknopf einrichtungen) und setup (unter „Einrichtungen“). Eine Kachel wechselt die Gruppe nicht. Kacheln, die fehlen, stehen hinter ihrem Vorgänger aus der Standardreihenfolge. Leer kommt als [] an.'
+      additionalProperties: false
+      properties:
+        start:
+          type: array
+          uniqueItems: true
+          items: { type: string, enum: [mitglieder, ehemalige, anfragen, meldungen, punkte, strafe, befoerderungen, anwesenheit, brett, umfragen, inventar, listen, mail, einrichtungen, einstellungen] }
+        setup:
+          type: array
+          uniqueItems: true
+          items: { type: string, enum: [katalog, dienstgrade, titel, aemter, kompanien, sponsoren, seiten] }
     NavigationAdmin:
       type: object
-      required: [navigation, names, start, show_labels, targets, icons, max_menu_items, label_max]
+      required: [navigation, names, start, show_labels, intern_order, admin_order, targets, icons, max_menu_items, label_max]
       properties:
         navigation:
           description: Gespeicherte Navigation; null = Standardnavigation
@@ -7871,6 +7901,8 @@ components:
         names: { $ref: '#/components/schemas/NavigationNames' }
         start: { $ref: '#/components/schemas/NavigationStart' }
         show_labels: { type: boolean, description: 'Namen unter den Symbolen der Leiste' }
+        intern_order: { $ref: '#/components/schemas/NavigationInternOrder' }
+        admin_order: { $ref: '#/components/schemas/AdminOrder' }
         targets: { type: array, items: { $ref: '#/components/schemas/NavigationTarget' } }
         icons: { type: array, items: { $ref: '#/components/schemas/NavigationIcon' } }
         max_menu_items: { type: integer }
@@ -8254,6 +8286,8 @@ components:
         navigation_names: { $ref: '#/components/schemas/NavigationNames' }
         navigation_start: { $ref: '#/components/schemas/NavigationStart' }
         navigation_labels: { type: boolean, description: 'Namen unter den Symbolen der Leiste (Issue #362)' }
+        navigation_intern_order: { $ref: '#/components/schemas/NavigationInternOrder' }
+        admin_order: { $ref: '#/components/schemas/AdminOrder' }
         section_labels:
           type: object
           description: 'Eigene Namen als Abschnitte der Bezeichnungen (z. B. gallery, catalog, intern), gehen vor kompanie.json (Issue #362). Leer kommt als [] an.'

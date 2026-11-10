@@ -577,6 +577,9 @@ final class Api
             'navigation_names' => self::jsonObject($a->navigation()->names()),
             'navigation_start' => self::jsonObject($a->navigation()->start()),
             'navigation_labels' => $a->navigation()->showLabels(),
+            // Reihenfolge der Kacheln in „Intern“ der Standardnavigation und in der Verwaltung; leer = Standard
+            'navigation_intern_order' => $a->navigation()->internOrder(),
+            'admin_order' => self::jsonObject($a->navigation()->adminOrder()),
             'section_labels' => self::jsonObject($a->navigation()->sectionOverrides($a->features()->enabled('directory'), $a->features()->enabled('offices'))),
             // News in der App geschrieben (Quelle „app“): Wer manage_news hat, sieht dort Knöpfe zum Schreiben und Ändern
             'newsInApp' => ($features['news'] ?? false) && $a->newsService()->inApp(),

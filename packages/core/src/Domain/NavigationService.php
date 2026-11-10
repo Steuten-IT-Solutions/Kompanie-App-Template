@@ -24,6 +24,11 @@ use KompanieApp\Core\Port\Settings;
  *   nennt (sectionOverrides → KompanieConfig::sectionLabel), bei eigenen Seiten nur im Tab (ihr Titel bleibt);
  * - die Startseite beim Öffnen der App, getrennt für Gäste und Angemeldete (START): ein Punkt der Navigation;
  * - ob die Tab-Leiste unter den Symbolen Namen zeigt (LABELS).
+ *
+ * Und die Reihenfolge der Kacheln (ebenfalls nur Darstellung):
+ * - in „Intern“ der Standardnavigation (INTERN_ORDER), ohne dafür eine eigene Navigation anzulegen;
+ * - auf der Startseite der Verwaltung und unter „Einrichtungen“ (ADMIN_ORDER), je Gruppe; eine Kachel wechselt die Gruppe
+ *   dabei nicht. Kacheln, die in der Liste fehlen (z. B. neu mit einem Update), stellt die App an ihren Standardplatz.
  */
 final class NavigationService
 {
@@ -33,6 +38,16 @@ final class NavigationService
     public const LABELS = 'navigation_labels';
     /** Ein String, kein false: WordPress speichert false als leeren String (get_option liefert dann ''). */
     private const LABELS_OFF = 'off';
+    public const INTERN_ORDER = 'navigation_intern_order';
+    public const ADMIN_ORDER = 'admin_order';
+
+    /** Kacheln der Startseite der Verwaltung (wie adminTabs() in der App), „einrichtungen“ ist der Sammelknopf. */
+    public const ADMIN_START = [
+        'mitglieder', 'ehemalige', 'anfragen', 'meldungen', 'punkte', 'strafe', 'befoerderungen', 'anwesenheit', 'brett', 'umfragen',
+        'inventar', 'listen', 'mail', 'einrichtungen', 'einstellungen',
+    ];
+    /** Kacheln unter „Einrichtungen“ in der Verwaltung. */
+    public const ADMIN_SETUP = ['katalog', 'dienstgrade', 'titel', 'aemter', 'kompanien', 'sponsoren', 'seiten'];
 
     /** Abschnitt (KompanieConfig::sectionLabel) je Bereich der Navigation; „mitglieder“ wählt sectionOverrides. */
     private const SECTIONS = [
@@ -79,6 +94,10 @@ final class NavigationService
         if (isset($names[$id])) {
             unset($names[$id]);
             $this->saveNames($names);
+        }
+        $order = $this->internOrder();
+        if (in_array($id, $order, true)) {
+            $this->saveInternOrder(array_values(array_filter($order, static fn (string $t): bool => $t !== $id)));
         }
         $start = $this->start();
         if (in_array($id, $start, true)) {
@@ -138,7 +157,7 @@ final class NavigationService
     }
 
     /**
-     * @return array{navigation: array<string, mixed>|null, names: array<string, array{label?: string, icon?: string}>|\stdClass, start: array{guest?: string, member?: string}|\stdClass, show_labels: bool, targets: list<string>, icons: list<string>, max_menu_items: int, label_max: int}
+     * @return array{navigation: array<string, mixed>|null, names: array<string, array{label?: string, icon?: string}>|\stdClass, start: array{guest?: string, member?: string}|\stdClass, show_labels: bool, intern_order: list<string>, admin_order: array{start?: list<string>, setup?: list<string>}|\stdClass, targets: list<string>, icons: list<string>, max_menu_items: int, label_max: int}
      */
     public function describe(): array
     {
@@ -148,6 +167,8 @@ final class NavigationService
             'names' => $this->names() === [] ? new \stdClass() : $this->names(),
             'start' => $this->start() === [] ? new \stdClass() : $this->start(),
             'show_labels' => $this->showLabels(),
+            'intern_order' => $this->internOrder(),
+            'admin_order' => $this->adminOrder() === [] ? new \stdClass() : $this->adminOrder(),
             'targets' => self::TARGETS,
             'icons' => self::ICONS,
             'max_menu_items' => self::MAX_MENU_ITEMS,
@@ -224,6 +245,36 @@ final class NavigationService
         return $this->settings->get(self::LABELS) !== self::LABELS_OFF;
     }
 
+    /**
+     * Reihenfolge der Kacheln in „Intern“ der Standardnavigation; leer = Standard. Unbekanntes fällt weg.
+     *
+     * @return list<string>
+     */
+    public function internOrder(): array
+    {
+        $raw = $this->settings->get(self::INTERN_ORDER);
+        return is_array($raw) ? array_values(array_unique(array_filter($raw, static fn (mixed $t): bool => self::isTarget($t)))) : [];
+    }
+
+    /**
+     * Reihenfolge der Kacheln der Verwaltung je Gruppe (start: Startseite, setup: „Einrichtungen“); leer = Standard.
+     *
+     * @return array{start?: list<string>, setup?: list<string>}
+     */
+    public function adminOrder(): array
+    {
+        $raw = $this->settings->get(self::ADMIN_ORDER);
+        $out = [];
+        foreach (['start' => self::ADMIN_START, 'setup' => self::ADMIN_SETUP] as $group => $known) {
+            $list = is_array($raw) && is_array($raw[$group] ?? null) ? $raw[$group] : [];
+            $list = array_values(array_unique(array_filter($list, static fn (mixed $t): bool => is_string($t) && in_array($t, $known, true))));
+            if ($list !== []) {
+                $out[$group] = $list;
+            }
+        }
+        return $out;
+    }
+
     /** Kann einen eigenen Namen bekommen: ein Bereich, eine eigene Seite oder „Intern“ der Standardnavigation. */
     private static function isNamed(string $key): bool
     {
@@ -240,7 +291,7 @@ final class NavigationService
      * Speichert Einstellungen → Navigation (Issue #362): die Navigation (null = Standard) und, falls angegeben, eigene
      * Namen und Symbole, Startseiten und die Namen in der Leiste. Startseiten prüft das gegen die neue Navigation.
      *
-     * @param array<mixed> $body navigation (Pflicht), names?, start?, show_labels?
+     * @param array<mixed> $body navigation (Pflicht), names?, start?, show_labels?, intern_order?, admin_order?
      * @return array<string, mixed> wie describe()
      */
     public function save(array $body): array
@@ -249,7 +300,15 @@ final class NavigationService
             throw ApiError::invalid('Bitte die Navigation angeben (null für die Standardnavigation).');
         }
         $names = array_key_exists('names', $body) ? $this->validNames($body['names']) : null;
+        $internOrder = array_key_exists('intern_order', $body) ? self::validInternOrder($body['intern_order']) : null;
+        $adminOrder = array_key_exists('admin_order', $body) ? self::validAdminOrder($body['admin_order']) : null;
         $this->set($body['navigation']);
+        if ($internOrder !== null) {
+            $this->saveInternOrder($internOrder);
+        }
+        if ($adminOrder !== null) {
+            $adminOrder === [] ? $this->settings->delete(self::ADMIN_ORDER) : $this->settings->set(self::ADMIN_ORDER, $adminOrder);
+        }
         if ($names !== null) {
             $this->saveNames($names);
         }
@@ -263,6 +322,67 @@ final class NavigationService
             $body['show_labels'] ? $this->settings->delete(self::LABELS) : $this->settings->set(self::LABELS, self::LABELS_OFF);
         }
         return $this->describe();
+    }
+
+    /** @return list<string> */
+    private static function validInternOrder(mixed $order): array
+    {
+        if ($order === null) {
+            return [];
+        }
+        if (!is_array($order) || !array_is_list($order)) {
+            throw ApiError::invalid('Die Reihenfolge von „Intern“ muss eine Liste sein.');
+        }
+        foreach ($order as $t) {
+            if (!self::isTarget($t)) {
+                throw ApiError::invalid('Unbekannter Bereich in der Reihenfolge von „Intern“.');
+            }
+        }
+        if (count(array_unique($order)) !== count($order)) {
+            throw ApiError::invalid('Jeder Bereich darf in der Reihenfolge von „Intern“ nur einmal stehen.');
+        }
+        return $order;
+    }
+
+    /** @return array{start?: list<string>, setup?: list<string>} */
+    private static function validAdminOrder(mixed $order): array
+    {
+        if ($order === null) {
+            return [];
+        }
+        if (!is_array($order) || ($order !== [] && array_is_list($order))) {
+            throw ApiError::invalid('Die Reihenfolge der Verwaltung muss ein Objekt sein (start, setup).');
+        }
+        $out = [];
+        foreach ($order as $group => $list) {
+            $known = match ($group) {
+                'start' => self::ADMIN_START,
+                'setup' => self::ADMIN_SETUP,
+                default => throw ApiError::invalid('Die Reihenfolge der Verwaltung kennt nur start und setup.'),
+            };
+            if ($list === null || $list === []) {
+                continue;
+            }
+            if (!is_array($list) || !array_is_list($list)) {
+                throw ApiError::invalid('Die Reihenfolge einer Gruppe der Verwaltung muss eine Liste sein.');
+            }
+            foreach ($list as $id) {
+                if (!is_string($id) || !in_array($id, $known, true)) {
+                    throw ApiError::invalid('Unbekannte Kachel in der Reihenfolge der Verwaltung.');
+                }
+            }
+            if (count(array_unique($list)) !== count($list)) {
+                throw ApiError::invalid('Jede Kachel darf in der Reihenfolge der Verwaltung nur einmal stehen.');
+            }
+            $out[$group] = $list;
+        }
+        return $out;
+    }
+
+    /** @param list<string> $order */
+    private function saveInternOrder(array $order): void
+    {
+        $order === [] ? $this->settings->delete(self::INTERN_ORDER) : $this->settings->set(self::INTERN_ORDER, $order);
     }
 
     /** @return array<string, array{label?: string, icon?: string}> */

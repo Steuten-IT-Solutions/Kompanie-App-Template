@@ -424,6 +424,8 @@ export default function App({ notice = null }: { notice?: string | null }) {
     // Eigene Namen und Symbole (Einstellungen → Navigation, Issue #362)
     icons: targetIcons(),
     internLabel: sec.intern,
+    // Reihenfolge in „Intern“ (Einstellungen → Navigation), ohne eigene Navigation
+    internOrder: config?.navigation_intern_order,
   });
   allowed.intern = navEntries.some((e) => e.key === 'intern');
   // „Meins“ ganz rechts, die Verwaltung davor.

@@ -215,4 +215,67 @@ final class NavigationTest extends TestCase
         $this->assertSame(['galerie' => ['label' => 'Fotos']], $this->app->navigation()->names());
         $this->assertSame(['member' => 'galerie'], $this->app->navigation()->start());
     }
+    public function testInternAndAdminOrder(): void
+    {
+        $res = $this->call('GET', '/admin/navigation');
+        $this->assertSame([], $res->data['intern_order'], 'ohne Einstellung die Standardreihenfolge');
+        $this->assertEquals(new \stdClass(), $res->data['admin_order']);
+        $this->assertEquals(new \stdClass(), $this->call('GET', '/config')->data['admin_order']);
+
+        $res = $this->call('PUT', '/admin/navigation', [
+            'navigation' => null,
+            'intern_order' => ['brett', 'mitglieder', 'seiten/3'],
+            'admin_order' => ['start' => ['einstellungen', 'mitglieder', 'einrichtungen'], 'setup' => ['seiten', 'katalog']],
+        ]);
+        $this->assertSame(200, $res->status);
+        $this->assertNull($res->data['navigation'], 'die Standardnavigation bleibt');
+        $this->assertSame(['brett', 'mitglieder', 'seiten/3'], $res->data['intern_order']);
+        $this->users->current = $this->member;
+        $config = $this->call('GET', '/config')->data;
+        $this->assertSame(['brett', 'mitglieder', 'seiten/3'], $config['navigation_intern_order'], 'für alle in /config');
+        $this->assertSame(['start' => ['einstellungen', 'mitglieder', 'einrichtungen'], 'setup' => ['seiten', 'katalog']], $config['admin_order']);
+        $this->users->current = $this->admin;
+
+        // Ohne die Schlüssel bleibt alles, wie es ist.
+        $this->assertSame(200, $this->save(null)->status);
+        $this->assertSame(['brett', 'mitglieder', 'seiten/3'], $this->app->navigation()->internOrder());
+
+        // Gelöschte Seite fällt auch aus der Reihenfolge von „Intern“.
+        $this->app->navigation()->removeTarget('seiten/3');
+        $this->assertSame(['brett', 'mitglieder'], $this->app->navigation()->internOrder());
+
+        // Zurücksetzen
+        $res = $this->call('PUT', '/admin/navigation', ['navigation' => null, 'intern_order' => null, 'admin_order' => ['setup' => []]]);
+        $this->assertSame(200, $res->status);
+        $this->assertSame([], $this->app->navigation()->internOrder());
+        $this->assertSame([], $this->app->navigation()->adminOrder());
+        $this->assertNull($this->app->settings->get('admin_order'), 'nichts mehr gespeichert');
+    }
+
+    public function testRejectsInvalidOrder(): void
+    {
+        $cases = [
+            'Intern unbekannt' => ['intern_order' => ['verwaltung']],
+            'Intern doppelt' => ['intern_order' => ['brett', 'brett']],
+            'Intern als Objekt' => ['intern_order' => ['a' => 'brett']],
+            'Verwaltung als Liste' => ['admin_order' => ['mitglieder']],
+            'Verwaltung Gruppe unbekannt' => ['admin_order' => ['mehr' => ['mitglieder']]],
+            'Kachel der anderen Gruppe' => ['admin_order' => ['start' => ['katalog']]],
+            'Kachel doppelt' => ['admin_order' => ['setup' => ['seiten', 'seiten']]],
+            'Kachel kein Text' => ['admin_order' => ['start' => [1]]],
+        ];
+        foreach ($cases as $name => $body) {
+            $this->assertSame(400, $this->call('PUT', '/admin/navigation', $body + ['navigation' => null])->status, $name);
+        }
+        $this->assertSame([], $this->app->navigation()->internOrder(), 'nichts gespeichert');
+        $this->assertSame([], $this->app->navigation()->adminOrder());
+    }
+
+    public function testStoredOrderDropsUnknownTiles(): void
+    {
+        $this->app->settings->set('admin_order', ['start' => ['alt', 'mail', 'mail'], 'setup' => 'kaputt']);
+        $this->app->settings->set('navigation_intern_order', ['brett', 'weg', 'brett']);
+        $this->assertSame(['start' => ['mail']], $this->app->navigation()->adminOrder());
+        $this->assertSame(['brett'], $this->app->navigation()->internOrder());
+    }
 }

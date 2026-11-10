@@ -24,6 +24,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Neu
+
+- **Reihenfolge der Knöpfe in der Verwaltung und in „Intern“**: Unter [Einstellungen → Navigation](app:einstellungen/navigation)
+  ordnest du im neuen Abschnitt „Verwaltung“ die Knöpfe der Startseite der Verwaltung und unter „Einrichtungen“ per Ziehen,
+  für alle gleich. Jede Person sieht weiter nur die Knöpfe, für die sie das Recht hat. Auch die Bereiche in „Intern“ der
+  Standardnavigation lassen sich jetzt umordnen, ohne dass daraus eine eigene Navigation wird.
+
 ## [0.8.2] – 2026-11-09
 
 ### Geändert

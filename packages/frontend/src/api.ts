@@ -8,7 +8,7 @@ import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
 import { noteError } from './lastError';
 import { rememberRoute } from './share';
-import type { NavigationSetting, NavNames, NavStart } from './navigation';
+import type { AdminOrder, NavigationSetting, NavNames, NavStart } from './navigation';
 
 /** Schlüssel einer Rolle: guest, member, admin, früher fest (organizer, manager, candidate) oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
@@ -144,6 +144,10 @@ export interface AppConfig {
   navigation_start?: NavStart;
   /** Namen unter den Symbolen der Tab-Leiste (Issue #362); fehlt = ja */
   navigation_labels?: boolean;
+  /** Reihenfolge der Kacheln in „Intern“ der Standardnavigation; leer = Standard, fehlt bei älteren Servern */
+  navigation_intern_order?: string[];
+  /** Reihenfolge der Kacheln der Verwaltung je Gruppe (leer kann als [] kommen); fehlt bei älteren Servern */
+  admin_order?: AdminOrder | [];
   /** Eigene Namen als Abschnitte (brand.labels.sections), übernimmt generated/brand.ts beim Laden */
   section_labels?: Record<string, string>;
   /** Eigene Seiten (Issue #287), die die Person lesen darf, in ihrer Reihenfolge; fehlt bei älteren Servern */
@@ -347,6 +351,9 @@ export interface NavigationAdmin {
   names: NavNames;
   start: NavStart;
   show_labels: boolean;
+  /** Reihenfolge in „Intern“ der Standardnavigation und der Verwaltung; fehlen bei älteren Servern */
+  intern_order?: string[];
+  admin_order?: AdminOrder | [];
   targets: string[];
   icons: string[];
   max_menu_items: number;
@@ -434,9 +441,11 @@ export function applyBirthdayUpcomingDays(days: number): void {
 }
 
 /** Übernimmt die gespeicherte Navigation in die geladene Konfiguration und baut die Tab-Leiste neu. */
-export function applyNavigation(navigation: NavigationSetting | null): void {
+export function applyNavigation(next: Pick<NavigationAdmin, 'navigation' | 'intern_order' | 'admin_order'>): void {
   if (!config) return;
-  config.navigation = navigation;
+  config.navigation = next.navigation;
+  config.navigation_intern_order = next.intern_order;
+  config.admin_order = next.admin_order;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -2491,8 +2500,14 @@ export const api = {
   setActivityPersonal: (personal: boolean) => request<{ personal: boolean }>('PUT', '/admin/activity/settings', { personal }),
   maintenance: () => request<MaintenanceState>('GET', '/admin/maintenance'),
   navigation: () => request<NavigationAdmin>('GET', '/admin/navigation'),
-  saveNavigation: (body: { navigation: NavigationSetting | null; names?: NavNames; start?: NavStart; show_labels?: boolean }) =>
-    request<NavigationAdmin>('PUT', '/admin/navigation', body),
+  saveNavigation: (body: {
+    navigation: NavigationSetting | null;
+    names?: NavNames;
+    start?: NavStart;
+    show_labels?: boolean;
+    intern_order?: string[] | null;
+    admin_order?: AdminOrder | null;
+  }) => request<NavigationAdmin>('PUT', '/admin/navigation', body),
   setMaintenance: (on: boolean, reason?: string) =>
     request<MaintenanceState>('POST', '/admin/maintenance', reason === undefined ? { on } : { on, reason }),
   /** Laufzeit-Konfiguration neu laden (z. B. „Erneut versuchen“ auf der Wartungsseite). */
