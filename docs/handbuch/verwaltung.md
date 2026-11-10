@@ -44,3 +44,4 @@ Du siehst nur die Knöpfe, für die du das Recht hast und deren Bereich die Komp
 - Hast du nur eine einzige Aufgabe, gibt es keine Startseite: **Verwaltung** öffnet diese Aufgabe gleich.
 - Unterseiten, z. B. die Seite eines Mitglieds oder ein einzelnes Amt, haben ihren eigenen Rückweg (z. B. **‹ Alle Mitglieder**).
 - Welche Knöpfe jemand sieht, hängt von seiner Rolle ab. Die Rollen legen die {rolle.admin}s fest.
+- Die Reihenfolge der Knöpfe auf der Startseite und unter **Einrichtungen** legen die {rolle.admin}s unter **Einstellungen** → **Navigation** fest, für alle gleich. Die Liste oben zeigt die Standardreihenfolge.

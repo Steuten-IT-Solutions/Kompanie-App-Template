@@ -5,10 +5,13 @@ import {
   buildNav,
   draftError,
   draftOf,
+  internOrderOf,
   isPageTarget,
+  mergeOrder,
   menuOf,
   moveTo,
   NAV_TARGETS,
+  orderBy,
   pageTarget,
   placeOf,
   removeMenu,
@@ -181,4 +184,32 @@ test('Tab-Leiste: Stufen nach Zahl der Tabs, auf Wunsch nur Symbole', () => {
   assert.equal(tabbarClass(8, true), 'tabbar tabs-8');
   assert.equal(tabbarClass(11, true), 'tabbar tabs-8 tabs-10');
   assert.equal(tabbarClass(14, false), 'tabbar tabs-8 tabs-10 tabs-12 tabbar-icons');
+});
+
+test('Reihenfolge: eingestellte Folge, Unbekanntes hinter seinem Vorgänger', () => {
+  assert.deepEqual(orderBy(['a', 'b', 'c', 'd'], ['c', 'a']), ['c', 'd', 'a', 'b'], 'b hinter a, d hinter c');
+  assert.deepEqual(orderBy(['a', 'b', 'c'], ['x', 'c']), ['a', 'b', 'c'], 'ohne Vorgänger vorn, a und b vor c');
+  assert.deepEqual(orderBy(['a', 'b'], undefined), ['a', 'b']);
+  assert.deepEqual(mergeOrder(['a', 'x', 'b', 'c'], ['c', 'a', 'b']), ['c', 'x', 'a', 'b'], 'x behält seinen Platz');
+});
+
+test('„Intern“ der Standardnavigation in eigener Reihenfolge', () => {
+  const visible: NavTarget[] = ['termine', 'news', 'galerie', 'mitglieder', 'dokumente', 'brett'];
+  const nav = buildNav(null, { ...ctx(visible, true), internOrder: ['brett', 'mitglieder'] });
+  assert.deepEqual(nav.at(-1)?.children, ['brett', 'mitglieder', 'dokumente']);
+  const draft = draftOf(null, () => true, [], 'Intern', ['punktekatalog', 'sponsoren']);
+  const menu = draft.items.at(-1);
+  assert.equal(typeof menu === 'object' && menu.items[0], 'punktekatalog', 'Entwurf übernimmt die Reihenfolge');
+});
+
+test('Nur „Intern“ umgeordnet: es bleibt bei der Standardnavigation', () => {
+  const initial = draftOf(null);
+  assert.deepEqual(internOrderOf(initial, initial), [...(initial.items.at(-1) as { items: string[] }).items]);
+  const menu = initial.items.at(-1) as { label: string; icon: string; items: string[] };
+  const sorted = { ...initial, items: [...initial.items.slice(0, -1), { ...menu, items: [...menu.items].reverse() }] };
+  assert.deepEqual(internOrderOf(initial, sorted), [...menu.items].reverse());
+  const moved = moveTo(initial, 'termine', 0);
+  assert.equal(internOrderOf(initial, moved), null, 'anderer Platz: eigene Navigation');
+  const renamed = { ...initial, items: [...initial.items.slice(0, -1), { ...menu, label: 'Mehr' }] };
+  assert.equal(internOrderOf(initial, renamed), null, 'anderer Name: eigene Navigation');
 });

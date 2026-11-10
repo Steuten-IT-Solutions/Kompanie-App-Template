@@ -3,7 +3,7 @@ titel: Navigation
 reihenfolge: 113
 rechte: [manage_settings]
 ---
-Hier legst du fest, welche Bereiche unten in der Leiste stehen, in welcher Reihenfolge, und welche Bereiche ihr in einem **Untermenü** zusammenfasst. Außerdem gibst du Bereichen eigene Namen und Symbole und wählst die Startseite der App. Ein Untermenü ist ein Punkt in der Leiste, hinter dem Knöpfe für mehrere Bereiche liegen, wie bei **Intern**.
+Hier legst du fest, welche Bereiche unten in der Leiste stehen, in welcher Reihenfolge, und welche Bereiche ihr in einem **Untermenü** zusammenfasst. Außerdem gibst du Bereichen eigene Namen und Symbole, wählst die Startseite der App und ordnest die Knöpfe der [Verwaltung](seite:verwaltung). Ein Untermenü ist ein Punkt in der Leiste, hinter dem Knöpfe für mehrere Bereiche liegen, wie bei **Intern**.
 
 ## So öffnest du die Seite
 Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Navigation**.
@@ -16,6 +16,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Navigation*
 - In der Standardnavigation: **Untermenü der Standardnavigation** mit **Umbenennen** für **Intern**.
 - **Startseite**: was beim Öffnen der App erscheint, getrennt **Ohne Anmeldung** und **Angemeldet**.
 - **Darstellung**: **Namen unter den Symbolen zeigen**.
+- **Verwaltung**: die Knöpfe der **Startseite der Verwaltung** und unter **Einrichtungen** in ihrer Reihenfolge, für alle gleich. Es stehen nur Knöpfe von Bereichen darin, die ihr nutzt. **Siehst du selbst nicht** heißt: Dir fehlt das Recht dafür, andere sehen den Knopf aber.
 - **Nicht in der Navigation**: Bereiche, die in der Leiste nicht erscheinen. Ein Bereich, der mit einem Update neu dazukommt, steht hier mit dem Hinweis **Neu** und erscheint hinten in der Leiste, bis du ihm einen Platz gibst.
 - Bei jedem Bereich wählst du seinen **Platz**: unten in der Leiste, in einem Untermenü oder nicht in der Navigation.
 - Mit dem Bereich {bereich.pages} steht jede eigene Seite als eigener Punkt in der Liste (mit dem Hinweis **Eigene Seite**). Eine neue Seite erscheint wie ein neuer Bereich hinten in der Leiste, bis du ihr einen Platz gibst; eine gelöschte verschwindet von selbst.
@@ -24,8 +25,16 @@ Die Navigation ändert nur, wo etwas steht, nicht wer es sehen darf. Jede Person
 
 ## So gehst du vor
 ### Die Reihenfolge ändern
-1. Ziehe einen Punkt am Griff (sechs Punkte links) an seine neue Stelle. Mit der Tastatur geht es mit den Pfeiltasten am Griff.
+1. Ziehe einen Punkt am Griff (sechs Punkte links) an seine neue Stelle. Mit der Tastatur geht es mit den Pfeiltasten am Griff. So ordnest du auch die Bereiche in einem Untermenü: Sie erscheinen dort als Knöpfe in dieser Reihenfolge.
 2. Tippe auf **Navigation speichern**.
+
+Ordnest du in der Standardnavigation nur die Bereiche im Untermenü **Intern** um, bleibt es bei der Standardnavigation. Erst wenn du etwas anderes änderst (z. B. einen Punkt verschiebst oder das Untermenü umbenennst), wird daraus eure eigene Navigation.
+
+### Die Knöpfe der Verwaltung ordnen
+1. Ziehe unter **Verwaltung** einen Knopf am Griff an seine neue Stelle, in der Liste **Startseite der Verwaltung** oder **Einrichtungen**. Ein Knopf bleibt dabei in seiner Liste.
+2. Tippe auf **Navigation speichern**.
+
+Die Reihenfolge gilt für alle; jede Person sieht weiter nur die Knöpfe, für die sie das Recht hat. **Standardreihenfolge der Verwaltung** stellt die ursprüngliche Reihenfolge wieder her; tippe danach auf **Navigation speichern**. Ein Knopf, der mit einem Update neu dazukommt, steht hinter dem Knopf, hinter dem er auch ohne eure Reihenfolge stünde.
 
 ### Ein Untermenü anlegen
 1. Tippe auf **Untermenü hinzufügen**.
@@ -42,7 +51,7 @@ Ein Untermenü braucht mindestens einen Bereich. **Untermenü entfernen** schieb
 
 Der eigene Name gilt überall in der App: unten in der Leiste, in den Überschriften, in der Verwaltung, in Benachrichtigungen und Mails und in dieser Hilfe. Die Adressen bleiben gleich, geteilte Links funktionieren also weiter. Bei einer eigenen Seite ist es nur der Name in der Leiste; ihr Titel bleibt. Neben einem eigenen Namen steht der Standardname, damit du den Bereich in dieser Hilfe wiederfindest. Heißen zwei Punkte gleich, weist die Seite darauf hin.
 
-So lässt sich auch **Intern** der Standardnavigation umbenennen, ohne dass ihr eine eigene Navigation anlegt: Solange du die Reihenfolge nicht änderst, bleibt die Standardnavigation.
+So lässt sich auch **Intern** der Standardnavigation umbenennen, ohne dass ihr eine eigene Navigation anlegt: Solange du die Reihenfolge unten in der Leiste nicht änderst, bleibt die Standardnavigation.
 
 ### Die Startseite wählen
 1. Wähle unter **Startseite** bei **Ohne Anmeldung** und bei **Angemeldet** jeweils einen Punkt. Zur Wahl steht, was in der Leiste steht, auch Untermenüs; für Angemeldete auch **Meins**.
@@ -54,4 +63,4 @@ Wer die gewählte Startseite nicht sehen darf, landet auf dem ersten Punkt der L
 Schalte unter **Darstellung** **Namen unter den Symbolen zeigen** aus und tippe auf **Navigation speichern**. Unten stehen dann nur noch die Symbole, das hilft bei vielen Punkten. Die Namen stehen weiter oben auf jeder Seite.
 
 ### Zur Standardnavigation zurück
-Tippe auf **Standardnavigation wiederherstellen** und bestätige die Rückfrage. Das setzt alles auf dieser Seite zurück: Reihenfolge und Untermenüs, eigene Namen und Symbole, die Startseiten und die Namen unter den Symbolen. In der Standardnavigation stehen {bereich.events}, {bereich.news} und {bereich.gallery} unten, dahinter {bereich.companies}, {bereich.sponsors} und jede eigene Seite, soweit sie an sind. Wer das Recht **Intern** hat, sieht unten höchstens fünf Punkte; was nicht passt, steht vorne unter **Intern**. Wer das Recht **Intern** hat, findet {bereich.directory}, {bereich.documents}, {bereich.board}, {bereich.ranks} und {bereich.catalog} unter **Intern**; alle anderen sehen {bereich.directory} und {bereich.documents} als eigene Punkte. Mit eurer eigenen Navigation spielt das Recht **Intern** für die Leiste keine Rolle mehr.
+Tippe auf **Standardnavigation wiederherstellen** und bestätige die Rückfrage. Das setzt die Navigation zurück: Reihenfolge und Untermenüs (auch die in **Intern**), eigene Namen und Symbole, die Startseiten und die Namen unter den Symbolen. Die Reihenfolge der Verwaltung bleibt; dafür gibt es **Standardreihenfolge der Verwaltung**. In der Standardnavigation stehen {bereich.events}, {bereich.news} und {bereich.gallery} unten, dahinter {bereich.companies}, {bereich.sponsors} und jede eigene Seite, soweit sie an sind. Wer das Recht **Intern** hat, sieht unten höchstens fünf Punkte; was nicht passt, steht vorne unter **Intern**. Wer das Recht **Intern** hat, findet {bereich.directory}, {bereich.documents}, {bereich.board}, {bereich.ranks} und {bereich.catalog} unter **Intern**; alle anderen sehen {bereich.directory} und {bereich.documents} als eigene Punkte. Mit eurer eigenen Navigation spielt das Recht **Intern** für die Leiste keine Rolle mehr.
