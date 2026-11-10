@@ -66,3 +66,23 @@ export function yearRange(terms: GridTerm[], thisYear: number): number[] {
   for (let y = to; y >= from; y--) years.push(y);
   return years;
 }
+
+/** Bezeichnung mit Umbruchstellen nach „/“ (z. B. „Könige/Königinnen“), sonst gäbe es dort keine Stelle zum Umbrechen. */
+export function breakAfterSlash(title: string): string {
+  return title.replace(/\/(?=\S)/g, '/​');
+}
+
+/** Längstes Wort eines Texts; getrennt wird an Leerzeichen und nach „/“ und „-“, wo auch der Browser umbricht. */
+function longestWord(text: string): number {
+  return Math.max(0, ...text.split(/\s+|(?<=[/-])/).map((w) => [...w].length));
+}
+
+/**
+ * Mindestbreite eines Amts in Zeichen (Einheit ch), damit nichts abgeschnitten wird: das längste Wort der Bezeichnung und
+ * der Namen passt in eine Zeile, die Bezeichnung in höchstens drei. Höchstens $cap, damit ein sehr langes Wort die
+ * Spalte nicht übers Bild zieht (das bricht dann notfalls im Wort um).
+ */
+export function columnChars(title: string, names: string[], cap = 18): number {
+  const words = Math.max(longestWord(title), ...names.map(longestWord));
+  return Math.min(cap, Math.max(words, Math.ceil([...title].length / 3)));
+}

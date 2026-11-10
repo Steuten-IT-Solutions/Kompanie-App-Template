@@ -40,6 +40,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Ämter, Ansicht „Jahre“: Namen nicht mehr abgeschnitten**: Unter [Mitglieder → Ämter](app:mitglieder/aemter) sind
+  die Spalten jetzt so breit, dass Bezeichnungen wie „Könige/Königinnen“ und lange Namen ganz zu lesen sind. Bezeichnungen
+  brechen nach „/“ um, ein Jahr mit zweizeiligem Namen wird höher statt die zweite Zeile zu verdecken. Auch in den Karten
+  gemeinsamer Amtszeiten (z. B. ein Königshaus) laufen lange Bezeichnungen wie „Ordonnanzoffizier*in“ nicht mehr in die
+  Namen daneben: Die Spalte richtet sich nach der längsten Bezeichnung, nur sehr lange werden umbrochen.
 - Knöpfe trennen Wörter nicht mehr mit Bindestrich, sondern schieben ein Wort, das nicht mehr in die Zeile passt, ganz
   in die nächste (z. B. „Bilder und Videos einreichen“ in der [Galerie](app:galerie) statt „VI-DEOS“). Nur wenn ein
   Wort allein nicht in den Knopf passt (lange Wörter auf schmalen Handys), trennt der Knopf wie bisher.

@@ -5,7 +5,7 @@ import { MemberAvatar } from '../memberPhoto';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
-import { lanes, yearRange } from '../yearGrid';
+import { breakAfterSlash, columnChars, lanes, yearRange } from '../yearGrid';
 import { officeSingular } from '../officeName';
 
 const sec = brand.labels.sections;
@@ -343,7 +343,7 @@ export function JointTerms({
               <dl className="joint-term-offices">
                 {rows.map((r) => (
                   <div key={r.office.id}>
-                    <dt>{officeSingular(r.office)}</dt>
+                    <dt>{breakAfterSlash(officeSingular(r.office))}</dt>
                     <dd>
                       <Holders holders={r.holders} to={memberPath} />
                     </dd>
@@ -443,14 +443,22 @@ export function YearGrid({
   const grouped = ordered.some((s) => s.title);
   const heads: ReactElement[] = []; // Kopf: Zeile 1 Gruppen, Zeile 2 Ämter
   const cells: ReactElement[] = [];
-  let column = 2; // Spalte 1: Jahre
+  const tracks: string[] = []; // Spalten der Ämter, Spalte 1 sind die Jahre
+  let column = 2;
   for (const section of ordered) {
     const sectionStart = column;
     for (const o of section.offices) {
       const { bars, count } = lanes(o.terms, thisYear);
+      // Breit genug, dass Bezeichnung und Namen nicht abgeschnitten werden (verteilt auf die Spuren des Amts)
+      const chars = columnChars(
+        o.title,
+        o.terms.flatMap((t) => t.holders.map((h) => h.name)),
+      );
+      const min = `max(var(--yg-col), calc(${(chars * 1.1) / count}ch + ${Math.ceil(16 / count)}px))`;
+      for (let i = 0; i < count; i++) tracks.push(`minmax(${min}, 1fr)`);
       heads.push(
         <div key={`o${o.id}`} className="yg-office" style={{ gridColumn: `${column} / span ${count}`, gridRow: 2 }}>
-          {o.title}
+          <span>{breakAfterSlash(o.title)}</span>
         </div>,
       );
       for (const { term, lane, first, last } of bars) {
@@ -489,8 +497,8 @@ export function YearGrid({
       );
     }
   }
-  // Kopf und Raster mit denselben Spalten, damit sie genau übereinanderstehen; Breiten aus styles.css (Handy schmaler)
-  const columns = `var(--yg-years) repeat(${column - 2}, minmax(var(--yg-col), 1fr))`;
+  // Kopf und Raster mit denselben Spalten, damit sie genau übereinanderstehen; Grundbreiten aus styles.css (Handy schmaler)
+  const columns = `var(--yg-years) ${tracks.join(' ')}`;
   return (
     <>
       <p className="yg-rotate-hint muted small">Tipp: Dreh das Handy quer, dann passen mehr {sec.offices} nebeneinander.</p>
@@ -510,7 +518,7 @@ export function YearGrid({
             className="year-grid"
             role="list"
             aria-label={`${sec.offices} nach Jahren`}
-            style={{ gridTemplateColumns: columns, gridTemplateRows: `repeat(${years.length}, var(--yg-row))` }}
+            style={{ gridTemplateColumns: columns, gridTemplateRows: `repeat(${years.length}, minmax(var(--yg-row), auto))` }}
           >
             {years.map((y) => (
               <div
