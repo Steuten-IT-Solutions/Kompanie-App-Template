@@ -38,6 +38,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   für alle gleich. Jede Person sieht weiter nur die Knöpfe, für die sie das Recht hat. Auch die Bereiche in „Intern“ der
   Standardnavigation lassen sich jetzt umordnen, ohne dass daraus eine eigene Navigation wird.
 
+### Geändert
+
+- **Zahl im Kreis auch bei Anfragen und Fehlermeldungen**: Wie bei **Beförderungen** zeigen die Knöpfe
+  [Anfragen](app:verwaltung/anfragen) und [Fehlermeldungen](app:verwaltung/meldungen) in der Verwaltung die Zahl der
+  offenen Einträge jetzt als Zahl im roten Kreis an der Ecke statt in Klammern hinter dem Namen. Die Zahl wird beim
+  Öffnen der Verwaltung aufgefrischt und ist nur für die zu sehen, die Anfragen freigeben bzw. Fehlermeldungen
+  bearbeiten dürfen.
+
 ### Behoben
 
 - **Ämter, Ansicht „Jahre“: Namen nicht mehr abgeschnitten**: Unter [Mitglieder → Ämter](app:mitglieder/aemter) sind

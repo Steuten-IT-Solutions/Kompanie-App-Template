@@ -4181,12 +4181,13 @@ test('Fehler melden: Gast und Mitglied, Eingang der Admins (schließen, weiterle
 
   // Admin: Gastmeldung mit Begründung schließen, Meldung des Mitglieds weiterleiten
   await login(page, 'admin', ADMIN_PASSWORD);
-  // Der Knopf trägt die Zahl der offenen Meldungen, z. B. „Fehlermeldungen (2)“.
+  // Der Knopf trägt die Zahl der offenen Meldungen als Zahl im Kreis an der Ecke (mindestens die beiden von oben).
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
-  await page
-    .locator('.admin-tiles')
-    .getByRole('button', { name: /^Fehlermeldungen \(\d+\)$/ })
-    .click();
+  const reportsTile = page.locator('.admin-tiles').getByRole('button', { name: 'Fehlermeldungen', exact: true });
+  await expect(reportsTile.locator('.count-badge')).toHaveText(/^(\d+|99\+)$/);
+  expect(Number((await reportsTile.locator('.count-badge').textContent())?.replace('+', ''))).toBeGreaterThanOrEqual(2);
+  await expect(reportsTile).toHaveAttribute('title', /offene Fehlermeldungen$/);
+  await reportsTile.click();
   const guestCard = page.locator('.report-review', { hasText: guestText });
   await expect(guestCard).toContainText('Ohne Anmeldung');
   await guestCard.getByRole('button', { name: 'Bildschirmfoto anzeigen' }).click();

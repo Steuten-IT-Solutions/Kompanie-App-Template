@@ -454,14 +454,14 @@ export function applyNavigation(next: Pick<NavigationAdmin, 'navigation' | 'inte
 
 /** Zahl der offenen Anfragen auf einen Zugang (Issue #314) nach dem Freigeben oder Ablehnen: Zähler in der Verwaltung. */
 export function applyPendingRegistrations(count: number): void {
-  if (!config || config.pendingRegistrations == null) return;
+  if (!config || config.pendingRegistrations == null || config.pendingRegistrations === count) return;
   config.pendingRegistrations = count;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
 /** Zahl der offenen Fehlermeldungen nach dem Schließen oder Weiterleiten: Zähler in der Verwaltung. */
 export function applyOpenReports(count: number): void {
-  if (!config || config.openReports == null) return;
+  if (!config || config.openReports == null || config.openReports === count) return;
   config.openReports = count;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
