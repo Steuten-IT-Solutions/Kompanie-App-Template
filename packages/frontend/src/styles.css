@@ -7016,3 +7016,21 @@ fieldset.block-source legend {
 .block-row-short {
   flex: 0 0 7em;
 }
+
+/*
+ * Bausteine untereinander: Bereiche, die ihre Teile im normalen Fluss stapeln (kein Flex oder Grid mit gap), halten
+ * zwischen zwei Bausteinen den Abstand zwischen Elementen (--space-3). Sonst klebt z. B. ein Knopf, eine Zwischenzeile
+ * oder ein Feld an der Karte darüber, weil .card-list, .small, .btn und .toggle keinen eigenen Rand oben haben.
+ * Steht am Ende der Datei und wiegt so viel wie eine Klasse (:where): Es gewinnt gegen die allgemeinen „margin: 0“ der
+ * Bausteine, Regeln für ein bestimmtes Paar (z. B. .card-list + .form.card) gehen weiter vor. Ränder fallen im Fluss
+ * zusammen, ein größerer Rand unten am Baustein darüber bleibt. Überschriften behalten ihren eigenen Abstand.
+ * Gilt für alle Einstellungen ohne Formular-Raster, für Untermenüs der Navigation und für Bereiche mit .stack.
+ */
+:where(section.settings-section:not(.form), .nav-menu, .stack) > :not(:first-child, h1, h2, h3, h4, h5, h6) {
+  margin-top: var(--space-3);
+}
+/* Zwischenüberschrift einer Liste (z. B. „Einrichtungen“ in der Navigation): etwas weiter weg von der Liste darüber als
+   von der eigenen, damit sie sichtbar zur Liste darunter gehört. */
+.settings-section > p.nav-order-title {
+  margin-top: var(--space-4);
+}

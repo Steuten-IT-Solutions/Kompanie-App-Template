@@ -169,7 +169,7 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
   const missing = points && list.some((r) => r.active && r.min_points === null);
 
   return (
-    <div>
+    <div className="stack">
       {missing && (
         <p className="small">
           Noch nicht alle {sec.ranks} haben eine {sec.points}schwelle; für diese gelten keine Regeln zu {sec.points}.

@@ -140,7 +140,7 @@ export function MemberImport({ onDone, doneLabel }: { onDone: () => void; doneLa
     const former = result.new.former;
     const noAccess = result.new.no_access ?? 0;
     return (
-      <div className="member-import">
+      <div className="member-import stack">
         <h2 className="member-name no-print">Import übernommen</h2>
         <p role="status" className="no-print">
           {count(result.created.length, 'Konto', 'Konten')} mit Startpasswort angelegt
@@ -167,7 +167,7 @@ export function MemberImport({ onDone, doneLabel }: { onDone: () => void; doneLa
   const errors = result?.rows.filter((r) => r.error).length ?? 0;
   const total = result ? result.new.active + result.new.former : 0;
   return (
-    <div className="member-import office-import">
+    <div className="member-import office-import stack">
       <button type="button" className="btn btn-link" onClick={downloadTemplate}>
         Vorlage herunterladen (CSV für Excel)
       </button>
