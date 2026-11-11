@@ -467,6 +467,7 @@ Unabhängig vom Adapter kann der Admin als Quelle „In der App schreiben“ wä
 | `send_mail` | E-Mails aus der Verwaltung an Rollen, Mitglieder und freie Adressen versenden; Verlauf mit Protokoll |
 | `manage_sponsors` | Sponsoren anlegen, ändern, ordnen und löschen, Logos hochladen (Issue #279) |
 | `manage_companies` | Kompanien anlegen, ändern, ordnen und löschen, Logos hochladen, Mitglieder zuordnen (Issue #280) |
+| `manage_gallery` | Galerie direkt in der Galerie verwalten: Alben der App anlegen, ändern und löschen, hochladen, hochgeladene Bilder und Videos verschieben (`POST /gallery/photos/move`), löschen (`POST /gallery/photos/delete`, auch mehrere) und intern stellen; Quelle und Drive-Abgleich bleiben bei `manage_settings`. Die Standardrolle „Galerie verwalten“ bekommt es einmalig (`gallery_manage_added`, `RoleService::grantOnce`) |
 | `manage_pages` | Eigene Seiten anlegen, ändern, ordnen und löschen; sieht alle Seiten (Issue #287) |
 | `manage_news` | News in der App schreiben, ändern und löschen (nur mit der Quelle „In der App schreiben“) |
 | `view_personal` | Persönliche Angaben anderer sehen: E-Mail-Adresse, Handynummer, Adresse, ganzes Geburtsdatum (Verwaltung → Mitglied) |

@@ -1386,7 +1386,7 @@ paths:
         richtet sich nach post_max_size des Servers), zum Schluss /gallery/video-uploads/finish. Die Datei bleibt
         unverändert. Zweck album braucht manage_settings (direkt ins Album), Zweck submission submit_gallery (als
         Einreichung). Prüft vorher, ob auf dem Server genug Platz frei ist (400).
-      x-capability: 'manage_settings oder submit_gallery (je nach purpose)'
+      x-capability: 'manage_settings oder manage_gallery (purpose album) bzw. submit_gallery (purpose submission)'
       requestBody:
         required: true
         content:
@@ -1420,7 +1420,7 @@ paths:
       tags: [Galerie]
       summary: Video hochladen, Schritt 2 von 3, ein Stück
       description: 'Stücke in Reihenfolge (offset = bisher angekommene Bytes). Das letzte Stück darf noch einmal kommen (Antwort verloren); es zählt nur einmal. Nur die Person, die die Sitzung angelegt hat.'
-      x-capability: 'manage_settings oder submit_gallery'
+      x-capability: 'manage_settings, manage_gallery oder submit_gallery'
       requestBody:
         required: true
         content:
@@ -1454,7 +1454,7 @@ paths:
         Übernimmt die vollständige Datei in die Ablage. Zweck album: Video im Album (Antwort wie beim Hochladen von
         Bildern), Zweck submission: offene Einreichung (consent muss true sein, Benachrichtigung wie bei Bildern).
         Das Standbild (JPEG aus dem Browser) wird neu kodiert und ist die Vorschau; ohne erscheint das Video mit ▶.
-      x-capability: 'manage_settings oder submit_gallery'
+      x-capability: 'manage_settings, manage_gallery oder submit_gallery'
       requestBody:
         required: true
         content:
@@ -1488,7 +1488,7 @@ paths:
       tags: [Galerie]
       summary: Video hochladen abbrechen
       description: 'Löscht die Sitzung und das Angekommene. Liegengebliebene Sitzungen löscht der Server nach einem Tag.'
-      x-capability: 'manage_settings oder submit_gallery'
+      x-capability: 'manage_settings, manage_gallery oder submit_gallery'
       requestBody:
         required: true
         content:
@@ -1522,7 +1522,7 @@ paths:
         Bilder aus Google Drive stellt der Ordner „intern“ in Drive um (400). Bei einem Wechsel löscht der Server die
         aufbereiteten Größen (öffentliche lagen als statische Dateien vor), vergibt neue Adressen und bereitet im
         Hintergrund neu auf; die alten öffentlichen Adressen liefern danach nichts mehr. Das Original bleibt.
-      x-capability: 'manage_settings oder review_gallery'
+      x-capability: 'manage_settings, manage_gallery oder review_gallery'
       requestBody:
         required: true
         content:
@@ -1543,6 +1543,104 @@ paths:
                 properties:
                   id: { type: integer }
                   intern: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /gallery/albums:
+    get:
+      tags: [Galerie]
+      summary: Alle Alben als Ziel zum Verschieben
+      description: Auch leere Alben und Alben aus Google Drive (source drive); hochgeladene Bilder dürfen in jedes Album.
+      x-capability: 'manage_settings oder manage_gallery'
+      responses:
+        '200':
+          description: Alben
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [albums]
+                properties:
+                  albums:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, title, year, source]
+                      properties:
+                        id: { type: integer }
+                        title: { type: string }
+                        year: { type: string }
+                        source: { type: string, enum: [app, drive] }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /gallery/photos/move:
+    post:
+      tags: [Galerie]
+      summary: Hochgeladene Bilder und Videos in ein anderes Album verschieben
+      description: |
+        Höchstens 500 auf einmal. Erst prüft der Server alle (404, wenn eines fehlt; 400 bei Bildern aus Google Drive),
+        dann verschiebt er; bei einem Fehler bleibt alles, wie es war. Das Original zieht in der Ablage mit, die
+        aufbereiteten Größen öffentlicher Bilder ins Verzeichnis des neuen Albums: Ihre alten öffentlichen Adressen
+        liefern danach nichts mehr. Eine freigegebene Einreichung zum Bild zählt danach zum neuen Album. Bilder, die
+        schon im Ziel liegen, zählen nicht mit.
+      x-capability: 'manage_settings oder manage_gallery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids, album_id]
+              properties:
+                ids: { type: array, minItems: 1, maxItems: 500, items: { type: integer } }
+                album_id: { type: integer, description: Ziel, auch ein Album aus Google Drive }
+      responses:
+        '200':
+          description: Verschoben
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [moved, album_id]
+                properties:
+                  moved: { type: integer }
+                  album_id: { type: integer }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /gallery/photos/delete:
+    post:
+      tags: [Galerie]
+      summary: Hochgeladene Bilder und Videos löschen, mehrere auf einmal
+      description: |
+        Höchstens 500 auf einmal; erst geprüft, dann gelöscht (alles oder nichts, 404 bzw. 400 wie beim Verschieben).
+        Löscht die Originale und alle aufbereiteten Größen. Kam ein Bild aus einer Einreichung, gilt diese als wieder
+        entfernt.
+      x-capability: 'manage_settings oder manage_gallery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, minItems: 1, maxItems: 500, items: { type: integer } }
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted: { type: integer }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
@@ -6329,7 +6427,7 @@ paths:
     get:
       tags: [Einstellungen]
       summary: Alle Alben mit Herkunft und Anzahl der Bilder
-      x-capability: manage_settings
+      x-capability: 'manage_settings oder manage_gallery'
       responses:
         '200':
           description: OK
@@ -6348,7 +6446,7 @@ paths:
       tags: [Einstellungen]
       summary: Album nur in der App anlegen
       description: Der Abgleich mit Google Drive lässt Alben der App in Ruhe.
-      x-capability: manage_settings
+      x-capability: 'manage_settings oder manage_gallery'
       requestBody:
         required: true
         content:
@@ -6370,7 +6468,7 @@ paths:
     get:
       tags: [Einstellungen]
       summary: Album mit seinen hochgeladenen Bildern
-      x-capability: manage_settings
+      x-capability: 'manage_settings oder manage_gallery'
       responses:
         '200':
           description: OK
@@ -6384,7 +6482,7 @@ paths:
       tags: [Einstellungen]
       summary: Titel oder Jahr eines Albums der App ändern
       description: Alben aus Google Drive ändert man in Drive (400).
-      x-capability: manage_settings
+      x-capability: 'manage_settings oder manage_gallery'
       requestBody:
         required: true
         content:
@@ -6404,7 +6502,7 @@ paths:
       tags: [Einstellungen]
       summary: Album der App mit allen Bildern darin löschen
       description: Alben aus Google Drive lassen sich hier nicht löschen (400).
-      x-capability: manage_settings
+      x-capability: 'manage_settings oder manage_gallery'
       responses:
         '200': { $ref: '#/components/responses/Deleted' }
         '400': { $ref: '#/components/responses/Error' }
@@ -6419,7 +6517,7 @@ paths:
       tags: [Einstellungen]
       summary: Ein Bild in ein Album hochladen (auch in eines aus Google Drive)
       description: 'JPG, PNG oder WebP. Der Server prüft Format, Größe und Arbeitsspeicher, kodiert das Bild neu als JPEG ohne Metadaten (auch ohne Aufnahmeort) und bereitet es danach wie Bilder aus Drive auf.'
-      x-capability: manage_settings
+      x-capability: 'manage_settings oder manage_gallery'
       requestBody:
         required: true
         content:
@@ -6453,7 +6551,7 @@ paths:
       tags: [Einstellungen]
       summary: Ein hochgeladenes Bild löschen
       description: Nur hochgeladene Bilder (Bilder aus Drive kämen beim nächsten Abgleich wieder; sonst 404).
-      x-capability: manage_settings
+      x-capability: 'manage_settings oder manage_gallery'
       responses:
         '200': { $ref: '#/components/responses/Deleted' }
         '401': { $ref: '#/components/responses/Error' }
@@ -8211,7 +8309,7 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_calendar, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports, view_activity, manage_settings] }
+              items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_calendar, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports, view_activity, manage_settings] }
               description: 'Rechte der Rolle, jedes für sich (member schließt nichts ein); bei admin alle; vergebbar sind alle außer view_activity und manage_settings. Rechte zum Verwalten und view_own_* nur zusammen mit member. guest gilt auch ohne Anmeldung.'
             users: { type: integer, description: 'Anzahl der Personen mit dieser Rolle, als Grundrolle oder als Zusatzrolle' }
             extra_users: { type: integer, description: Davon als Zusatzrolle }
@@ -8224,7 +8322,7 @@ components:
         label: { type: string, maxLength: 30 }
         capabilities:
           type: array
-          items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_calendar, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports] }
+          items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_calendar, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports] }
           description: 'Jedes Recht für sich. Rechte zum Verwalten und view_own_* nur zusammen mit member; die übrigen Rechte zum Sehen gehen auch allein (wie bei Anwärtern). guest: nur Rechte zum Sehen ohne member; member: immer member, sonst nur Rechte zum Sehen; admin: nicht änderbar.'
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
         new_accounts: { type: boolean, description: 'Nur eigene Rollen: beim Anlegen von Konten wählbar' }
@@ -8252,7 +8350,7 @@ components:
           type: array
           items:
             type: string
-            enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_calendar, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports, view_activity, manage_settings]
+            enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_calendar, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports, view_activity, manage_settings]
           description: 'Wirksame Rechte aller Rollen zusammen (Grundrolle und Zusatzrollen); member bringt calendar mit.'
 
     ErrorLog:
@@ -8570,6 +8668,7 @@ components:
       properties:
         id: { type: integer }
         title: { type: string }
+        source: { type: string, enum: [app, drive], description: 'Album der App (in der App änderbar) oder aus Google Drive' }
         count: { type: integer, description: Bilder und Videos zusammen }
         video_count: { type: integer, description: davon Videos }
         intern_count: { type: integer }
@@ -8632,6 +8731,7 @@ components:
         id: { type: integer }
         title: { type: string }
         year: { type: string }
+        source: { type: string, enum: [app, drive], description: 'Album der App (in der App änderbar) oder aus Google Drive' }
         downloads:
           type: boolean
           description: |
@@ -8959,7 +9059,7 @@ components:
     GrantableCapability:
       type: string
       description: Recht, das sich einer Rolle oder einer Person geben lässt (alle außer `manage_settings`).
-      enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_calendar, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports]
+      enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_calendar, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports]
 
     MemberRights:
       type: object

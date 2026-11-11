@@ -147,6 +147,12 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         features: ['gallery'],
       },
       {
+        key: 'manage_gallery',
+        label: `${sec.gallery}: Alben anlegen, ändern und löschen, Bilder und Videos hochladen, verschieben, löschen und intern stellen`,
+        short: `${sec.gallery} verwalten`,
+        features: ['gallery'],
+      },
+      {
         key: 'manage_pages',
         label: `${sec.pages}: eigene Seiten anlegen, bearbeiten, sortieren und löschen (sieht alle Seiten)`,
         short: `${sec.pages} pflegen`,

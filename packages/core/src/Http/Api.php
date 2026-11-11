@@ -802,18 +802,25 @@ final class Api
                 $a->gallerySubmissions()->withdraw($this->user(), $r->id());
                 return ['deleted' => true];
             }, 'gallery'),
-            // Videos in Stücken hochladen (Issue #350): ins Album (manage_settings) oder als Einreichung (submit_gallery)
-            new Route('POST', '/gallery/video-uploads', [Cap::ManageSettings, Cap::SubmitGallery], fn (Request $r) => Response::created(
-                $a->videoUploads()->start($this->user(), $r->body, $this->can(Cap::ManageSettings), $this->can(Cap::SubmitGallery)),
+            // Videos in Stücken hochladen (Issue #350): ins Album (manage_gallery) oder als Einreichung (submit_gallery)
+            new Route('POST', '/gallery/video-uploads', [Cap::ManageSettings, Cap::ManageGallery, Cap::SubmitGallery], fn (Request $r) => Response::created(
+                $a->videoUploads()->start($this->user(), $r->body, $this->can(Cap::ManageSettings) || $this->can(Cap::ManageGallery), $this->can(Cap::SubmitGallery)),
             ), 'gallery'),
-            new Route('POST', '/gallery/video-uploads/chunk', [Cap::ManageSettings, Cap::SubmitGallery], fn (Request $r) => $a->videoUploads()->chunk($this->user(), $r->input('upload'), $r->input('offset'), $r->input('data')), 'gallery'),
-            new Route('POST', '/gallery/video-uploads/finish', [Cap::ManageSettings, Cap::SubmitGallery], fn (Request $r) => Response::created($a->videoUploads()->finish($this->user(), $r->body)), 'gallery'),
-            new Route('POST', '/gallery/video-uploads/cancel', [Cap::ManageSettings, Cap::SubmitGallery], function (Request $r) use ($a) {
+            new Route('POST', '/gallery/video-uploads/chunk', [Cap::ManageSettings, Cap::ManageGallery, Cap::SubmitGallery], fn (Request $r) => $a->videoUploads()->chunk($this->user(), $r->input('upload'), $r->input('offset'), $r->input('data')), 'gallery'),
+            new Route('POST', '/gallery/video-uploads/finish', [Cap::ManageSettings, Cap::ManageGallery, Cap::SubmitGallery], fn (Request $r) => Response::created($a->videoUploads()->finish($this->user(), $r->body)), 'gallery'),
+            new Route('POST', '/gallery/video-uploads/cancel', [Cap::ManageSettings, Cap::ManageGallery, Cap::SubmitGallery], function (Request $r) use ($a) {
                 $a->videoUploads()->cancel($this->user(), $r->input('upload'));
                 return ['cancelled' => true];
             }, 'gallery'),
             // Hochgeladene Bilder und Videos nachträglich intern oder öffentlich stellen (Alben, Prüfen, Großansicht)
-            new Route('PATCH', '/gallery/photos/{id}', [Cap::ManageSettings, Cap::ReviewGallery], fn (Request $r) => $a->galleryUploads()->setIntern($r->id(), $r->input('intern')), 'gallery'),
+            new Route('PATCH', '/gallery/photos/{id}', [Cap::ManageSettings, Cap::ManageGallery, Cap::ReviewGallery], fn (Request $r) => $a->galleryUploads()->setIntern($r->id(), $r->input('intern')), 'gallery'),
+            // Hochgeladene Bilder und Videos verschieben oder löschen, mehrere auf einmal (manage_gallery)
+            new Route('GET', '/gallery/albums', [Cap::ManageSettings, Cap::ManageGallery], fn () => ['albums' => array_map(
+                static fn (array $al): array => ['id' => $al['id'], 'title' => $al['title'], 'year' => $al['year'], 'source' => $al['source']],
+                $a->galleryUploads()->albums(),
+            )], 'gallery'),
+            new Route('POST', '/gallery/photos/move', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => $a->galleryUploads()->movePhotos($r->input('ids'), $r->input('album_id')), 'gallery'),
+            new Route('POST', '/gallery/photos/delete', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => $a->galleryUploads()->deletePhotos($r->input('ids'), $this->user()), 'gallery'),
             new Route('GET', '/gallery/review', Cap::ReviewGallery, fn () => $a->gallerySubmissions()->review(), 'gallery'),
             new Route('POST', '/gallery/review/{id}/approve', Cap::ReviewGallery, fn (Request $r) => $a->gallerySubmissions()->approve($this->user(), $r->id(), Input::bool($r->input('intern'))), 'gallery'),
             new Route('POST', '/gallery/review/{id}/reject', Cap::ReviewGallery, fn (Request $r) => $a->gallerySubmissions()->reject($this->user(), $r->id(), $r->input('reason')), 'gallery'),
@@ -1364,19 +1371,19 @@ final class Api
             new Route('POST', '/admin/gallery/retry', Cap::ManageSettings, fn () => ['retried' => $a->gallery()->retryFailedNow(), 'pending' => $a->gallery()->countPending()], null, $denySettings),
             new Route('POST', '/admin/gallery/sync', Cap::ManageSettings, fn (Request $r) => $a->settingsService()->syncGallery(Input::bool($r->input('only_process'))), null, $denySettings),
             // Alben der App und hochgeladene Bilder (Issue #285)
-            new Route('GET', '/admin/gallery/albums', Cap::ManageSettings, fn () => ['albums' => $a->galleryUploads()->albums()], null, $denySettings),
-            new Route('POST', '/admin/gallery/albums', Cap::ManageSettings, fn (Request $r) => Response::created($a->galleryUploads()->createAlbum($r->body)), null, $denySettings),
-            new Route('GET', '/admin/gallery/albums/{id}', Cap::ManageSettings, fn (Request $r) => $a->galleryUploads()->album($r->id()), null, $denySettings),
-            new Route('PATCH', '/admin/gallery/albums/{id}', Cap::ManageSettings, fn (Request $r) => $a->galleryUploads()->updateAlbum($r->id(), $r->body), null, $denySettings),
-            new Route('DELETE', '/admin/gallery/albums/{id}', Cap::ManageSettings, function (Request $r) use ($a) {
+            new Route('GET', '/admin/gallery/albums', [Cap::ManageSettings, Cap::ManageGallery], fn () => ['albums' => $a->galleryUploads()->albums()], null, $denyRights),
+            new Route('POST', '/admin/gallery/albums', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => Response::created($a->galleryUploads()->createAlbum($r->body)), null, $denyRights),
+            new Route('GET', '/admin/gallery/albums/{id}', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => $a->galleryUploads()->album($r->id()), null, $denyRights),
+            new Route('PATCH', '/admin/gallery/albums/{id}', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => $a->galleryUploads()->updateAlbum($r->id(), $r->body), null, $denyRights),
+            new Route('DELETE', '/admin/gallery/albums/{id}', [Cap::ManageSettings, Cap::ManageGallery], function (Request $r) use ($a) {
                 $a->galleryUploads()->deleteAlbum($r->id());
                 return ['deleted' => true];
-            }, null, $denySettings),
-            new Route('POST', '/admin/gallery/albums/{id}/photos', Cap::ManageSettings, fn (Request $r) => Response::created($a->galleryUploads()->upload($r->id(), $r->input('file'), Input::bool($r->input('intern')))), null, $denySettings),
-            new Route('DELETE', '/admin/gallery/photos/{id}', Cap::ManageSettings, function (Request $r) use ($a) {
+            }, null, $denyRights),
+            new Route('POST', '/admin/gallery/albums/{id}/photos', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => Response::created($a->galleryUploads()->upload($r->id(), $r->input('file'), Input::bool($r->input('intern')))), null, $denyRights),
+            new Route('DELETE', '/admin/gallery/photos/{id}', [Cap::ManageSettings, Cap::ManageGallery], function (Request $r) use ($a) {
                 $a->galleryUploads()->deletePhoto($r->id(), $this->user());
                 return ['deleted' => true];
-            }, null, $denySettings),
+            }, null, $denyRights),
 
             // Status, Updates, Datensicherung, Einrichtung (Admins)
             new Route('GET', '/admin/status', Cap::ManageSettings, fn () => $a->status()->report() + [

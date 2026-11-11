@@ -23,6 +23,7 @@ import { shareLink, shareUrl } from './share';
 import { toggleTheme, useTheme } from './theme';
 import News from './views/News';
 import Termine, { canManageCalendar } from './views/Termine';
+import { canManageGallery } from './galleryManage';
 import { hasEvents, prefetcher, tabSources, type TabId } from './viewData';
 import { whenIdle } from './prefetch';
 
@@ -32,6 +33,7 @@ const Anmelden = lazyView(() => import('./views/Anmelden'));
 const Registrieren = lazyView(() => import('./views/Registrieren'));
 const Galerie = lazyView(() => import('./views/Galerie'));
 const GalerieEinreichungen = lazyView(() => import('./views/GalerieEinreichungen'));
+const GalleryAlbums = lazyView(() => import('./views/GalerieAlben'));
 const Kompanien = lazyView(() => import('./views/Kompanien'));
 const Sponsoren = lazyView(() => import('./views/Sponsoren'));
 const Seiten = lazyView(() => import('./views/Seiten'));
@@ -689,8 +691,15 @@ export default function App({ notice = null }: { notice?: string | null }) {
                 <GalerieEinreichungen mode="einreichen" onToast={showToast} />
               ) : path[1] === 'pruefen' && can('review_gallery') ? (
                 <GalerieEinreichungen mode="pruefen" onToast={showToast} />
+              ) : path[1] === 'verwalten' && canManageGallery() ? (
+                <div>
+                  <button className="btn btn-link back" onClick={() => navigate('galerie')}>
+                    ‹ Alle Alben
+                  </button>
+                  <GalleryAlbums onToast={showToast} />
+                </div>
               ) : (
-                <Galerie albumId={albumId} />
+                <Galerie albumId={albumId} onToast={showToast} />
               ))}
             {tab === 'kompanien' && <Kompanien id={companyId} />}
             {tab === 'sponsoren' && <Sponsoren />}

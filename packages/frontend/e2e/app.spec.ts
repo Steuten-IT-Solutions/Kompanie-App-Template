@@ -1894,6 +1894,86 @@ test('Galerie: Knöpfe zum Herunterladen für ein Bild und das Album als ZIP, nu
   }
 });
 
+test('Galerie verwalten: Bilder auswählen, verschieben und löschen, Alben ins andere Jahr setzen und löschen', async ({ page }) => {
+  const n = Date.now() % 1000000;
+  const from = `Alt ${n}`;
+  const to = `Neu ${n}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json()) as { id?: number } };
+      },
+      [path, method, body] as const,
+    );
+  const fromId = (await api('admin/gallery/albums', 'POST', { title: from, year: 2026 })).data.id!;
+  const toId = (await api('admin/gallery/albums', 'POST', { title: to, year: 2026 })).data.id!;
+  for (const name of ['eins.png', 'zwei.png', 'drei.png']) {
+    expect(
+      (await api(`admin/gallery/albums/${fromId}/photos`, 'POST', { file: { name, data: PNG.buffer.toString('base64') } })).status,
+    ).toBe(201);
+  }
+  try {
+    // Zwei auswählen und ins andere Album verschieben
+    await page.goto(`/app/#/galerie/${fromId}`);
+    await expect(page.locator('.photo-grid .photo')).toHaveCount(3);
+    // Langes Drücken auf ein Bild beginnt das Auswählen, mit diesem Bild; danach genügt Tippen
+    await page.getByRole('button', { name: 'Bild 1 öffnen' }).hover();
+    await page.mouse.down();
+    await page.waitForTimeout(700);
+    await page.mouse.up();
+    await expect(page.locator('.lightbox')).toHaveCount(0);
+    await expect(page.locator('.gallery-select-bar')).toContainText('1 Bild oder Video gewählt');
+    await page.getByRole('button', { name: 'Bild 2 wählen' }).click();
+    await expect(page.locator('.gallery-select-bar')).toContainText('2 Bilder und Videos gewählt');
+    await page.locator('.gallery-select-bar').getByRole('button', { name: 'Verschieben' }).click();
+    const sheet = page.locator('.sheet', { hasText: '2 Bilder und Videos verschieben' });
+    await sheet.getByLabel('In das Album').selectOption({ label: to });
+    await sheet.getByRole('button', { name: 'Verschieben' }).click();
+    await expect(page.locator('.toast')).toHaveText(`2 Bilder und Videos nach „${to}“ verschoben`);
+    await expect(page.locator('.photo-grid .photo')).toHaveCount(1);
+
+    // Das letzte in der Großansicht löschen: Das Album ist leer, zurück zur Übersicht
+    await page.locator('.photo-grid .photo').first().click();
+    await page.locator('.lb-count').getByRole('button', { name: 'Löschen' }).click();
+    await expect(page.locator('.ask-dialog')).toContainText('1 Bild oder Video löschen?');
+    await askOk(page);
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+    await expect(page).toHaveURL(/#\/galerie$/);
+
+    // Übersicht: Album wählen, ins Jahr 2025 setzen, dann löschen
+    await page.locator('.album-card', { hasText: to }).hover();
+    await page.mouse.down();
+    await page.waitForTimeout(700);
+    await page.mouse.up();
+    await expect(page).toHaveURL(/#\/galerie$/);
+    await expect(page.locator('.gallery-select-bar')).toContainText('1 Album gewählt');
+    await page.locator('.gallery-select-bar').getByRole('button', { name: 'Jahr ändern' }).click();
+    await askOk(page, '2025');
+    await expect(page.locator('.toast')).toHaveText('Album ins Jahr 2025 gesetzt');
+    await expect(
+      page.locator('section', { has: page.locator('h2', { hasText: '2025' }) }).locator('.album-card', { hasText: to }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Alben auswählen' }).click();
+    await page.locator('.album-card', { hasText: to }).click();
+    await page.locator('.gallery-select-bar').getByRole('button', { name: 'Löschen' }).click();
+    await expect(page.locator('.ask-dialog')).toContainText(`Album „${to}“ löschen? Dabei werden 2 Bilder und Videos mitgelöscht.`);
+    await askOk(page);
+    await expect(page.locator('.toast')).toHaveText('Album gelöscht');
+    await expect(page.locator('.album-card', { hasText: to })).toHaveCount(0);
+  } finally {
+    await api(`admin/gallery/albums/${fromId}`, 'DELETE');
+    await api(`admin/gallery/albums/${toId}`, 'DELETE');
+  }
+});
+
 test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)', async ({ page }) => {
   const n = Date.now() % 1000000;
   const title = `Einreichung ${n}`;

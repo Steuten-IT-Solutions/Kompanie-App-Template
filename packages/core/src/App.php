@@ -237,6 +237,12 @@ final class App
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Einreichungen der Galerie nicht eingerichtet: ' . $e->getMessage());
         }
+        // Galerie verwalten: die Standardrolle bekommt einmalig manage_gallery
+        try {
+            $this->galleryUploads()->initialize();
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Recht „Galerie verwalten“ nicht ergänzt: ' . $e->getMessage());
+        }
         // Fehlermeldungen zuerst an die Admins: Benachrichtigungen dazu einmalig auf bestehenden Geräten einschalten
         try {
             $this->bugReports()->initialize();

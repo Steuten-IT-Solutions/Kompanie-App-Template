@@ -52,7 +52,7 @@ final class VideoUploadService
         $in = is_array($in) ? $in : [];
         $purpose = in_array($in['purpose'] ?? null, self::PURPOSES, true) ? (string) $in['purpose'] : 'album';
         if (!($purpose === 'album' ? $mayManage : $maySubmit)) {
-            throw ApiError::forbidden($purpose === 'album' ? 'Videos in Alben laden nur Admins hoch.' : 'Du darfst keine Videos einreichen.');
+            throw ApiError::forbidden($purpose === 'album' ? 'Videos in Alben lädt nur hoch, wer die Galerie verwaltet.' : 'Du darfst keine Videos einreichen.');
         }
         $albumId = Input::integer($in['album_id'] ?? null) ?? 0;
         $this->app->gallerySubmissions()->album($albumId);

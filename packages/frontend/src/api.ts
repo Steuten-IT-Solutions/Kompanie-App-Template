@@ -53,6 +53,7 @@ export type Capability =
   | 'manage_companies'
   | 'submit_gallery'
   | 'review_gallery'
+  | 'manage_gallery'
   | 'manage_pages'
   | 'manage_news'
   | 'view_personal'
@@ -716,6 +717,8 @@ export interface NewsInput {
 export interface GalleryAlbumSummary {
   id: number;
   title: string;
+  /** Album der App (in der App änderbar) oder aus Google Drive; fehlt bei älteren Servern */
+  source?: 'app' | 'drive';
   /** Bilder und Videos zusammen */
   count: number;
   /** davon Videos; fehlt bei älteren Servern */
@@ -756,6 +759,8 @@ export interface GalleryAlbum {
   id: number;
   title: string;
   year: string;
+  /** Album der App (in der App änderbar) oder aus Google Drive; fehlt bei älteren Servern */
+  source?: 'app' | 'drive';
   /** Knöpfe zum Herunterladen zeigen (je Bild in der Großansicht, das Album als ZIP); fehlt bei älteren Servern */
   downloads?: boolean;
   photos: GalleryPhoto[];
@@ -2553,9 +2558,17 @@ export const api = {
   uploadGalleryPhoto: async (albumId: number, file: File, intern: boolean) =>
     request<GalleryAdminAlbumDetail>('POST', `/admin/gallery/albums/${albumId}/photos`, { file: await encodeFile(file), intern }),
   deleteGalleryPhoto: (id: number) => request<{ deleted: boolean }>('DELETE', `/admin/gallery/photos/${id}`),
-  /** Hochgeladenes Bild oder Video nachträglich intern oder öffentlich stellen (manage_settings oder review_gallery) */
+  /** Hochgeladenes Bild oder Video nachträglich intern oder öffentlich stellen (manage_gallery oder review_gallery) */
   setGalleryPhotoIntern: (id: number, intern: boolean) =>
     request<{ id: number; intern: boolean }>('PATCH', `/gallery/photos/${id}`, { intern }),
+  /** Alben als Ziel zum Verschieben (manage_gallery) */
+  galleryMoveTargets: () =>
+    request<{ albums: { id: number; title: string; year: string; source: 'app' | 'drive' }[] }>('GET', '/gallery/albums'),
+  /** Hochgeladene Bilder und Videos in ein anderes Album verschieben (manage_gallery) */
+  moveGalleryPhotos: (ids: number[], albumId: number) =>
+    request<{ moved: number; album_id: number }>('POST', '/gallery/photos/move', { ids, album_id: albumId }),
+  /** Hochgeladene Bilder und Videos löschen, mehrere auf einmal (manage_gallery) */
+  deleteGalleryPhotos: (ids: number[]) => request<{ deleted: number }>('POST', '/gallery/photos/delete', { ids }),
   // Einreichungen (Issue #286)
   // Videos in Stücken hochladen (Issue #350), siehe videoUpload.ts
   startVideoUpload: (input: { album_id: number; name: string; size: number; purpose: 'album' | 'submission' }) =>

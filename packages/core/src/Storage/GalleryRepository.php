@@ -274,13 +274,13 @@ final class GalleryRepository
         return $this->db->select(
             "SELECT s.*, ph.file_key AS cover_file_key, ph.is_intern AS cover_is_intern, ph.album_id AS cover_album_id, ph.status AS cover_status, ph.media AS cover_media, ph.md5 AS cover_md5
              FROM (
-                SELECT a.id, a.year, a.title, a.sort_date, COUNT(p.id) AS cnt, SUM(p.is_intern) AS intern_cnt,
+                SELECT a.id, a.year, a.title, a.sort_date, a.source, COUNT(p.id) AS cnt, SUM(p.is_intern) AS intern_cnt,
                     SUM(CASE WHEN p.media = 'video' THEN 1 ELSE 0 END) AS video_cnt,
                     (SELECT c.id FROM {photos} c WHERE c.album_id = a.id AND c.status <> ?$coverVis
                      ORDER BY c.is_intern ASC, (c.media = 'image') DESC, (c.status = 'ready') DESC, c.taken_at ASC, c.name ASC LIMIT 1) AS cover_id
                 FROM {albums} a JOIN {photos} p ON p.album_id = a.id
                 WHERE p.status <> ?$vis
-                GROUP BY a.id, a.year, a.title, a.sort_date
+                GROUP BY a.id, a.year, a.title, a.sort_date, a.source
              ) s
              LEFT JOIN {photos} ph ON ph.id = s.cover_id
              ORDER BY s.year DESC, s.sort_date DESC",
