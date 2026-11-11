@@ -1931,6 +1931,21 @@ test('Galerie verwalten: Bilder auswählen, verschieben und löschen, Alben ins 
     await page.mouse.up();
     await expect(page.locator('.lightbox')).toHaveCount(0);
     await expect(page.locator('.gallery-select-bar')).toContainText('1 Bild oder Video gewählt');
+    // Kein Knopf zum Beenden: Ist nichts mehr gewählt, endet das Auswählen von selbst; Escape (bzw. Zurück) ebenso
+    await expect(page.getByRole('button', { name: /^(Auswählen|Fertig)$/ })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Bild 1 wählen' }).click();
+    await expect(page.locator('.gallery-select-bar')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Bild 1 öffnen' })).toBeVisible();
+    await page.getByRole('button', { name: 'Bild 2 öffnen' }).hover();
+    await page.mouse.down();
+    await page.waitForTimeout(700);
+    await page.mouse.up();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.gallery-select-bar')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Bild 1 öffnen' }).hover();
+    await page.mouse.down();
+    await page.waitForTimeout(700);
+    await page.mouse.up();
     await page.getByRole('button', { name: 'Bild 2 wählen' }).click();
     await expect(page.locator('.gallery-select-bar')).toContainText('2 Bilder und Videos gewählt');
     await page.locator('.gallery-select-bar').getByRole('button', { name: 'Verschieben' }).click();
@@ -1961,8 +1976,11 @@ test('Galerie verwalten: Bilder auswählen, verschieben und löschen, Alben ins 
     await expect(
       page.locator('section', { has: page.locator('h2', { hasText: '2025' }) }).locator('.album-card', { hasText: to }),
     ).toBeVisible();
-    await page.getByRole('button', { name: 'Alben auswählen' }).click();
-    await page.locator('.album-card', { hasText: to }).click();
+    await expect(page.getByRole('button', { name: 'Alben auswählen' })).toHaveCount(0);
+    await page.locator('.album-card', { hasText: to }).hover();
+    await page.mouse.down();
+    await page.waitForTimeout(700);
+    await page.mouse.up();
     await page.locator('.gallery-select-bar').getByRole('button', { name: 'Löschen' }).click();
     await expect(page.locator('.ask-dialog')).toContainText(`Album „${to}“ löschen? Dabei werden 2 Bilder und Videos mitgelöscht.`);
     await askOk(page);

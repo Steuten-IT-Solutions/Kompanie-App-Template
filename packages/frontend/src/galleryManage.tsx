@@ -1,4 +1,4 @@
-import { useRef, useState, type MouseEvent, type PointerEvent } from 'react';
+import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from 'react';
 import { api, can } from './api';
 import { confirmAsk } from './ask';
 import { dataUpdated } from './dataCache';
@@ -274,4 +274,40 @@ export function deleteAlbumsQuestion(albums: { title: string; count: number }[])
   const total = albums.reduce((n, a) => n + a.count, 0);
   const what = albums.length === 1 ? `Album „${albums[0].title}“` : `${albums.length} Alben`;
   return total === 0 ? `${what} löschen?` : `${what} löschen? Dabei werden ${itemsLabel(total)} mitgelöscht.`;
+}
+
+function isSelectEntry(): boolean {
+  return !!(window.history.state as { gallerySelect?: boolean } | null)?.gallerySelect;
+}
+
+/**
+ * Auswählen beenden ohne eigenen Knopf: Beim Beginnen kommt ein Eintrag mit derselben Adresse in den Verlauf (wie bei
+ * der Großansicht), so beendet „Zurück“ (Taste, Geste des Geräts) das Auswählen statt die Seite zu verlassen; Escape
+ * ebenso. Endet es anders (nichts mehr gewählt, Aktion fertig), nimmt leaveSelection den Eintrag wieder weg.
+ */
+export function useSelectionBack(selecting: boolean, onExit: () => void): void {
+  const exit = useRef(onExit);
+  exit.current = onExit;
+  useEffect(() => {
+    if (!selecting) return;
+    if (!isSelectEntry()) window.history.pushState({ ...window.history.state, gallerySelect: true }, '');
+    const onPop = () => {
+      if (!isSelectEntry()) exit.current();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      // Ein offenes Fenster (Verschieben, Rückfrage) schließt Escape selbst.
+      if (e.key === 'Escape' && !document.querySelector('.sheet-backdrop')) leaveSelection();
+    };
+    window.addEventListener('popstate', onPop);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [selecting]);
+}
+
+/** Den Eintrag des Auswählens aus dem Verlauf nehmen; „Zurück“ ruft dann onExit von useSelectionBack auf. */
+export function leaveSelection(): void {
+  if (isSelectEntry()) window.history.back();
 }
