@@ -52,6 +52,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Benachrichtigungen einer Test-App erscheinen nicht mehr unter der Produktiv-App**: Wer eine Sicherung unter
+  [Einstellungen → Datensicherung](app:einstellungen/datensicherung) in eine Installation unter einer anderen Adresse
+  einspielt (z. B. die Produktiv-App in eine Test-App), übernimmt die Anmeldungen der Geräte für Benachrichtigungen nicht
+  mehr. Bisher schickte die Test-App dann ihre Nachrichten auch an die Geräte der Produktiv-App, und dort erschienen sie
+  unter deren Namen. Jetzt entfernt das Wiederherstellen in diesem Fall die bisherigen Anmeldungen; schalte die
+  Benachrichtigungen auf den Geräten der Test-App danach neu ein. Gilt für Sicherungen, die ab dieser Version erstellt
+  wurden (nur ohne WordPress; mit WordPress geht Wiederherstellen ohnehin nur auf derselben Webseite).
+
 - **Ämter, Ansicht „Jahre“: Namen nicht mehr abgeschnitten**: Unter [Mitglieder → Ämter](app:mitglieder/aemter) sind
   die Spalten jetzt so breit, dass Bezeichnungen wie „Könige/Königinnen“ und lange Namen ganz zu lesen sind. Bezeichnungen
   brechen nach „/“ um, ein Jahr mit zweizeiligem Namen wird höher statt die zweite Zeile zu verdecken. Auch in den Karten

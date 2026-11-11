@@ -24,7 +24,11 @@ use KompanieApp\Core\Storage\Sql\Schema;
  * Inhalt als Base64; nur Dateien, auf die eine Zeile verweist). Die Fotos der Mitglieder liegen in der Datenbank
  * (member_photos) und sind deshalb enthalten.
  * Die Push-Abos (push_subscriptions) und der Schlüssel dazu (Einstellung push_vapid) sind enthalten, damit Benachrichtigungen
- * nach einem Umzug weiter ankommen; die Warteschlange (push_queue) nicht.
+ * nach einem Umzug auf einen anderen Server weiter ankommen; die Warteschlange (push_queue) nicht. Ein Abo gehört zur
+ * App unter einer Adresse (der Browser stellt die Nachricht dem Service Worker dieser Adresse zu). Stammt die Sicherung
+ * von einer anderen Adresse (z. B. die Produktiv-App, eingespielt in eine Test-Installation), übernimmt das
+ * Wiederherstellen weder Abos noch Schlüssel und entfernt die bisherigen Abos (pushBelongsHere()): Sonst schickte die
+ * Test-Installation ihre Nachrichten an die Geräte der anderen App, und dort erschienen sie unter deren Namen.
  * Nicht enthalten sind wartende Fehlermeldungen (bug_reports, Issue #64): Sie gehören zur Installation, und Meldungen mit
  * Bildschirmfoto und ggf. Namen sollen nicht in Sicherungsdateien landen.
  * Schwarzes Brett (Issue #172): Nachrichten mit Verlauf, Bilder in formatierten Inhalten (rich_images, in der Datenbank),
@@ -74,6 +78,9 @@ final class Backup
      * in Sicherungen; eine ältere Sicherung soll die Geräte nicht abmelden (der Schlüssel bleibt dann ebenfalls).
      */
     public const KEEP_IF_MISSING = ['push_subscriptions'];
+    /** Tabelle und Einstellung, die nur zu einer Sicherung derselben Adresse passen (pushBelongsHere()). */
+    public const PUSH_TABLE = 'push_subscriptions';
+    public const PUSH_SETTING = 'push_vapid';
     /** Ordner der geschützten Dateiablage mit Dateien, die zur Sicherung gehören: Dokumente, Abzeichen der Dienstgrade, Anhänge. */
     /** einreichungen: hochgeladene Bilder der Galerie (Issue #285), lassen sich nicht aus Drive neu erzeugen */
     public const FILE_DIRS = ['dokumente', 'abzeichen', 'anhaenge', 'einreichungen'];
@@ -100,6 +107,42 @@ final class Backup
             $out[$t] = $this->db->select('SELECT * FROM {' . $t . '} ORDER BY 1');
         }
         return $out;
+    }
+
+    /**
+     * Gehören Push-Abos und Schlüssel einer Sicherung, die unter $from angelegt wurde, zur App unter $here? Verglichen
+     * werden Host (ohne „www.“) und Pfad. Ohne bekannte Adresse (ältere Sicherung, Kommandozeile ohne --url und ohne
+     * base_url, dann „localhost“) bleibt es beim bisherigen Verhalten: übernehmen.
+     */
+    public static function pushBelongsHere(mixed $from, string $here): bool
+    {
+        $key = static function (mixed $url): ?string {
+            $parts = is_string($url) && $url !== '' ? parse_url($url) : false;
+            $host = is_array($parts) ? strtolower((string) ($parts['host'] ?? '')) : '';
+            if ($host === '' || $host === 'localhost') {
+                return null;
+            }
+            $host = str_starts_with($host, 'www.') ? substr($host, 4) : $host;
+            return $host . '/' . trim((string) ($parts['path'] ?? ''), '/');
+        };
+        $a = $key($from);
+        $b = $key($here);
+        return $a === null || $b === null || $a === $b;
+    }
+
+    /**
+     * Sicherung einer anderen Adresse (pushBelongsHere()): Abos und Warteschlange leeren, nichts aus der Sicherung
+     * übernehmen. Die Geräte dieser App melden sich danach neu an (in der App „Benachrichtigungen“ wieder einschalten).
+     *
+     * @param array<string, mixed> $tables aus der Sicherung
+     * @return array<string, mixed> $tables ohne Abos
+     */
+    public function dropForeignPush(array $tables): array
+    {
+        unset($tables[self::PUSH_TABLE]);
+        $this->db->execute('DELETE FROM {push_queue}');
+        $this->db->execute('DELETE FROM {' . self::PUSH_TABLE . '}');
+        return $tables;
     }
 
     /**

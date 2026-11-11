@@ -49,6 +49,8 @@ final class StandaloneBackup implements BackupProvider
             'variant' => 'standalone',
             'version' => $this->kernel->version(),
             'kompanie' => $app->config->name(),
+            // Adresse der App: Push-Abos gehören zu ihr (Backup::pushBelongsHere()).
+            'appUrl' => $app->env->appUrl(),
             'schema' => [
                 'core' => (int) $app->settings->get(Migrator::SETTING, 0),
                 'standalone' => (int) $app->settings->get(Migrations::SETTING, 0),
@@ -85,10 +87,16 @@ final class StandaloneBackup implements BackupProvider
         }
         $files = Backup::parseFiles($data['files'] ?? null);
         $db = $this->kernel->db();
-        $db->transaction(function () use ($db, $data): void {
-            (new Backup($db))->restore($data['tables'], self::TABLES);
+        $pushHere = Backup::pushBelongsHere($data['appUrl'] ?? null, $this->kernel->app()->env->appUrl());
+        $db->transaction(function () use ($db, $data, $pushHere): void {
+            $backup = new Backup($db);
+            $tables = (array) $data['tables'];
+            if (!$pushHere) {
+                $tables = $backup->dropForeignPush($tables);
+            }
+            $backup->restore($tables, self::TABLES);
             foreach ((array) ($data['settings'] ?? []) as $name => $value) {
-                if (is_string($name) && !in_array($name, self::SKIP_SETTINGS, true)) {
+                if (is_string($name) && !in_array($name, self::SKIP_SETTINGS, true) && ($pushHere || $name !== Backup::PUSH_SETTING)) {
                     $db->execute('DELETE FROM {settings} WHERE name = ?', [$name]);
                     $db->insert('settings', ['name' => $name, 'value' => (string) json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)]);
                 }

@@ -34,6 +34,7 @@ use KompanieApp\Standalone\Kernel;
 use KompanieApp\Standalone\SessionAuth;
 use KompanieApp\Standalone\Sessions;
 use KompanieApp\Standalone\Setup;
+use KompanieApp\Core\Storage\Backup;
 use KompanieApp\Standalone\StandaloneBackup;
 
 $opts = getopt('', ['mysql::']);
@@ -800,6 +801,32 @@ try {
     @unlink($badge);
     $c->ok((int) $kernel->db()->scalar('SELECT COUNT(*) FROM {sessions}') === 0, 'Nach dem Import müssen sich alle neu anmelden');
     $c->ok($kernel->users()->verifyPassword($anna, 'anna-passwort'), 'Passwörter bleiben erhalten');
+    // Push-Abos gehören zur App unter einer Adresse: Eine Sicherung einer anderen Adresse (Produktiv-App in eine
+    // Test-Installation) bringt weder Abos noch Schlüssel mit und entfernt die bisherigen Abos.
+    $c->ok(($export['appUrl'] ?? '') === $kernel->app()->env->appUrl(), 'Sicherung nennt die Adresse der App');
+    $pushRepo = new \KompanieApp\Core\Storage\PushRepository($kernel->db());
+    $vapidHere = ['public' => 'hier-oeffentlich', 'private' => 'hier-privat'];
+    $kernel->app()->settings->set(Backup::PUSH_SETTING, $vapidHere);
+    $pushRepo->insert(0, 'https://fcm.googleapis.com/fcm/send/hier', 'p', 'a', ['news'], false, '2031-01-01 00:00:00');
+    $foreign = (array) json_decode($streamed, true);
+    $foreign['appUrl'] = 'https://andere.example/';
+    $foreign['settings'][Backup::PUSH_SETTING] = ['public' => 'dort-oeffentlich', 'private' => 'dort-privat'];
+    $foreign['tables']['push_subscriptions'] = [['id' => 77, 'user_id' => 0, 'endpoint' => 'https://fcm.googleapis.com/fcm/send/dort', 'endpoint_hash' => hash('sha256', 'https://fcm.googleapis.com/fcm/send/dort'), 'p256dh' => 'p', 'auth' => 'a', 'types' => 'news', 'details' => 0, 'created_at' => '2031-01-01 00:00:00', 'updated_at' => '2031-01-01 00:00:00']];
+    $backup->import((string) json_encode($foreign));
+    $c->ok((int) $kernel->db()->scalar('SELECT COUNT(*) FROM {push_subscriptions}') === 0, 'Sicherung einer anderen Adresse: keine Push-Abos übernommen, bisherige entfernt');
+    $c->ok($kernel->app()->settings->fresh(Backup::PUSH_SETTING) == $vapidHere, 'Sicherung einer anderen Adresse: eigener Push-Schlüssel bleibt');
+    $c->ok((int) $kernel->db()->scalar("SELECT COUNT(*) FROM {events} WHERE title = 'Sicherungstest'") === 1, 'Sicherung einer anderen Adresse: übrige Daten wiederhergestellt');
+    $sameUrl = $foreign;
+    $sameUrl['appUrl'] = str_replace('://', '://www.', $kernel->app()->env->appUrl());
+    $backup->import((string) json_encode($sameUrl));
+    $c->ok($pushRepo->byEndpoint('https://fcm.googleapis.com/fcm/send/dort') !== null && $kernel->app()->settings->fresh(Backup::PUSH_SETTING)['public'] === 'dort-oeffentlich', 'Sicherung derselben Adresse (auch mit www.): Push-Abos und Schlüssel übernommen');
+    unset($sameUrl['appUrl']);
+    $kernel->app()->settings->set(Backup::PUSH_SETTING, $vapidHere);
+    $backup->import((string) json_encode($sameUrl));
+    $c->ok($pushRepo->byEndpoint('https://fcm.googleapis.com/fcm/send/dort') !== null && $kernel->app()->settings->fresh(Backup::PUSH_SETTING)['public'] === 'dort-oeffentlich', 'Ältere Sicherung ohne Adresse: Push-Abos und Schlüssel wie bisher übernommen');
+    $kernel->db()->execute('DELETE FROM {push_subscriptions}');
+    $kernel->db()->execute('DELETE FROM {settings} WHERE name = ?', [Backup::PUSH_SETTING]);
+    $kernel->db()->execute('DELETE FROM {sessions}');
     $noAdmin = $export;
     $noAdmin['tables']['users'] = array_values(array_filter($export['tables']['users'], static fn ($u) => $u['level'] !== 'admin'));
     try {
