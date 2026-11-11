@@ -66,3 +66,57 @@ export function yearRange(terms: GridTerm[], thisYear: number): number[] {
   for (let y = to; y >= from; y--) years.push(y);
   return years;
 }
+
+/** Wortteile von Amtsbezeichnungen, vor denen ein zusammengesetztes Wort gut lesbar getrennt wird („Ordonnanz-offizier“). */
+const PARTS = [
+  'offizier',
+  'minister',
+  'meister',
+  'könig',
+  'prinz',
+  'kommandant',
+  'adjutant',
+  'hauptmann',
+  'leutnant',
+  'general',
+  'oberst',
+  'führer',
+  'träger',
+  'leiter',
+  'schreiber',
+  'kassierer',
+  'wart',
+];
+const PART = new RegExp(`(?<=\\p{L}{3})(?=(?:${PARTS.join('|')}))`, 'giu');
+
+/**
+ * Bezeichnung mit Umbruchstellen, wo ein Umbruch gut lesbar ist: nach „/“ („Könige/Königinnen“), in zusammengesetzten
+ * Wörtern vor einem bekannten Wortteil als weiches Trennzeichen („Ordonnanz-“ / „offizier*in“, der Strich erscheint nur
+ * beim Umbruch) und, wenn es das nicht gibt, vor der Gender-Endung („Kassierer“ / „*in“). Sonst bricht der Browser
+ * notfalls mitten im Wort um („…offizier*i“ / „n“).
+ */
+export function titleBreaks(title: string): string {
+  return title
+    .split(/(\s+)/)
+    .map((word) => {
+      const parts = word.replace(PART, '\u00AD');
+      const split = parts === word ? word.replace(/(?<=\p{L})([*:_])(?=\p{Ll})/gu, '\u200B$1') : parts;
+      return split.replace(/\/(?=\S)/g, '/\u200B');
+    })
+    .join('');
+}
+
+/** Längstes Wort eines Texts; getrennt wird an Leerzeichen und nach „/“ und „-“, wo auch der Browser umbricht. */
+function longestWord(text: string): number {
+  return Math.max(0, ...text.split(/\s+|(?<=[/-])/).map((w) => [...w].length));
+}
+
+/**
+ * Mindestbreite eines Amts in Zeichen (Einheit ch), damit nichts abgeschnitten wird: das längste Wort der Bezeichnung und
+ * der Namen passt in eine Zeile, die Bezeichnung in höchstens drei. Höchstens $cap, damit ein sehr langes Wort die
+ * Spalte nicht übers Bild zieht (das bricht dann notfalls im Wort um).
+ */
+export function columnChars(title: string, names: string[], cap = 18): number {
+  const words = Math.max(longestWord(title), ...names.map(longestWord));
+  return Math.min(cap, Math.max(words, Math.ceil([...title].length / 3)));
+}

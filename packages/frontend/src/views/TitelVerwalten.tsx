@@ -6,6 +6,7 @@ import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { confirmAsk } from '../ask';
+import { IconButton } from '../icons';
 
 const sec = brand.labels.sections;
 
@@ -157,13 +158,13 @@ export function TitleList({ onToast }: { onToast: (msg: string) => void }) {
                       </button>
                     )}
                     {t.assigned === 0 && (
-                      <button
-                        className="btn btn-small btn-danger"
+                      <IconButton
+                        icon="delete"
+                        label="Löschen"
+                        variant="danger"
                         disabled={busy}
                         onClick={async () => (await confirmAsk(`„${t.title}“ löschen?`)) && run(() => api.deleteTitle(t.id), 'Gelöscht')}
-                      >
-                        Löschen
-                      </button>
+                      />
                     )}
                   </div>
                 </div>

@@ -11,6 +11,7 @@ import {
   newsTitle,
   refreshRoles,
   type AdminSettings,
+  type CalendarSourceChoice,
   type FailedPhoto,
   type GallerySourceType,
   type Feature,
@@ -32,6 +33,7 @@ import { navigate } from '../router';
 import { formatBytes, formatUntil } from '../format';
 import { menuSources, prefetchOnTap, sources, usePrefetchMenu } from '../viewData';
 import { confirmAsk } from '../ask';
+import { IconButton } from '../icons';
 
 const sec = brand.labels.sections;
 
@@ -912,14 +914,19 @@ export function GoogleAccess({ settings, onSaved, onToast }: SectionProps) {
           {result.message}
         </p>
       )}
-      <label className="field">
-        <span>Weiterleitungs-URI (im OAuth-Client bei Google eintragen)</span>
-        <input type="text" readOnly value={g.redirect_uri} onFocus={(e) => e.currentTarget.select()} />
-      </label>
-      <div className="button-row">
-        <button type="button" className="btn btn-secondary" onClick={copy}>
-          Adresse kopieren
-        </button>
+      <div className="field">
+        <span id="google-redirect-label">Weiterleitungs-URI (im OAuth-Client bei Google eintragen)</span>
+        {/* Kopieren als Symbol direkt neben dem Feld */}
+        <div className="copy-field">
+          <input
+            type="text"
+            readOnly
+            aria-labelledby="google-redirect-label"
+            value={g.redirect_uri}
+            onFocus={(e) => e.currentTarget.select()}
+          />
+          <IconButton icon="copy" label="Adresse kopieren" onClick={() => void copy()} />
+        </div>
       </div>
       {g.connected ? (
         <div className="small">
@@ -1055,21 +1062,46 @@ function GoogleLink() {
 /** Zwischenspeicher des Kalenders in Minuten (Grenzen wie SettingsService::update auf dem Server). */
 const CACHE_MINUTES = { min: 1, max: 1440 };
 
+/** Bezeichnung je Quelle des internen Kalenders (Auswahl in den Einstellungen). */
+const CALENDAR_SOURCE_LABELS: Record<CalendarSourceChoice, string> = {
+  app: 'In der App pflegen',
+  google: 'Google Kalender (Kalender-IDs)',
+  ics: 'iCal-Adresse',
+};
+
+/** Vorauswahl: die gewählte Quelle; ohne Auswahl (Einrichtung von vorher) die, die gerade gilt, sonst die iCal-Adresse. */
+function calendarChoice(c: AdminSettings['calendar']): CalendarSourceChoice {
+  if (c.choice) return c.choice;
+  if (c.source === 'google' || c.source === 'google_connection') return 'google';
+  return 'ics';
+}
+
 export function Calendar({ settings, onSaved, onToast }: SectionProps) {
   const c = settings.calendar;
+  // Ältere Server kennen keine Auswahl: dann wie bisher Kalender-IDs und iCal-Adresse zusammen.
+  const selectable = c.choice !== undefined;
+  const [choice, setChoice] = useState<CalendarSourceChoice>(calendarChoice(c));
   const [url, setUrl] = useState('');
   const [ids, setIds] = useState(c.calendar_ids);
   const [minutes, setMinutes] = useState(String(c.cache_minutes));
   const [result, setResult] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
-  const { busy, error, setError, save } = useSave(onSaved, onToast);
+  const { busy, error, setError, save } = useSave((s) => {
+    // Knopf „Internen Kalender verwalten“ gleich zeigen bzw. ausblenden, ohne die App neu zu laden.
+    if (config) config.calendarInApp = s.calendar.source === 'app' && !!config.features.calendar;
+    onSaved(s);
+  }, onToast);
   const access = googleAccessLabel(settings.google);
   const status = {
-    ics: '✓ Eingerichtet über die geheime iCal-Adresse.',
+    app: '✓ Die Termine werden in der App gepflegt.',
+    ics: '✓ Eingerichtet über die iCal-Adresse.',
     google: '✓ Eingerichtet über die Google-API (Kalender-IDs und API-Schlüssel).',
     google_connection: `✓ Eingerichtet über die Kalender-IDs und ${access || 'den Google-Zugang'}.`,
     none: 'Noch kein Kalender eingerichtet.',
   }[c.source];
+  const showIds = !selectable || choice === 'google';
+  const showUrl = !selectable || choice === 'ics';
+  const external = !selectable || choice !== 'app';
 
   async function test() {
     setTesting(true);
@@ -1089,86 +1121,136 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
     }
   }
 
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    // Die Grenzen prüfen der Browser (min/max am Feld) und genau noch einmal der Server.
+    const cacheMinutes = Number(minutes);
+    // Nur die Dauer geändert: auch ohne neue Adresse oder IDs speichern (Issue #177).
+    const cache = external && cacheMinutes !== c.cache_minutes ? { calendar_cache_minutes: cacheMinutes } : {};
+    if (!selectable) {
+      const idsChanged = ids.trim() !== c.calendar_ids;
+      if (!url.trim() && !idsChanged) {
+        if ('calendar_cache_minutes' in cache) return save(cache);
+        if (c.source !== 'none') return onToast('Nichts geändert – der Kalender ist schon eingerichtet.');
+        return setError('Bitte die iCal-Adresse oder Kalender-IDs eintragen.');
+      }
+      return save({ ...(url.trim() ? { calendar_ics_url: url.trim() } : {}), calendar_ids: ids.trim(), ...cache }, () => setUrl(''));
+    }
+    const changed = choice !== calendarChoice(c);
+    if (choice === 'app') {
+      if (!changed) return onToast('Nichts geändert – die Termine werden schon in der App gepflegt.');
+      return save({ calendar_source: 'app' });
+    }
+    // Nur die Dauer geändert, die Quelle noch ohne Angaben: nur die Dauer speichern.
+    const onlyCache = 'calendar_cache_minutes' in cache && !changed && c.source === 'none';
+    if (choice === 'google') {
+      if (!ids.trim()) return onlyCache ? save(cache) : setError('Bitte die Kalender-IDs eintragen.');
+      if (!changed && ids.trim() === c.calendar_ids && !('calendar_cache_minutes' in cache))
+        return onToast('Nichts geändert – der Kalender ist schon eingerichtet.');
+      return save({ calendar_source: 'google', calendar_ids: ids.trim(), ...cache });
+    }
+    if (!url.trim() && !c.ics_url_set) return onlyCache ? save(cache) : setError('Bitte die iCal-Adresse eintragen.');
+    if (!changed && !url.trim() && !('calendar_cache_minutes' in cache))
+      return onToast('Nichts geändert – der Kalender ist schon eingerichtet.');
+    save({ calendar_source: 'ics', ...(url.trim() ? { calendar_ics_url: url.trim() } : {}), ...cache }, () => setUrl(''));
+  }
+
   return (
-    <Section
-      id="kalender"
-      title="Kalender für Mitglieder"
-      busy={busy}
-      error={error}
-      onSubmit={(e) => {
-        e.preventDefault();
-        const idsChanged = ids.trim() !== c.calendar_ids;
-        // Die Grenzen prüfen der Browser (min/max am Feld) und genau noch einmal der Server.
-        const cacheMinutes = Number(minutes);
-        // Nur die Dauer geändert: auch ohne neue Adresse oder IDs speichern (Issue #177).
-        const cache = cacheMinutes !== c.cache_minutes ? { calendar_cache_minutes: cacheMinutes } : {};
-        if (!url.trim() && !idsChanged) {
-          if ('calendar_cache_minutes' in cache) return save(cache);
-          if (c.source !== 'none') return onToast('Nichts geändert – der Kalender ist schon eingerichtet.');
-          return setError('Bitte die iCal-Adresse oder Kalender-IDs eintragen.');
-        }
-        save({ ...(url.trim() ? { calendar_ics_url: url.trim() } : {}), calendar_ids: ids.trim(), ...cache }, () => setUrl(''));
-      }}
-    >
+    <Section id="kalender" title="Kalender für Mitglieder" busy={busy} error={error} onSubmit={submit}>
       <p className="small">{status}</p>
-      {c.connection_needs_calendar_access && (
+      {selectable && (
+        <label className="field">
+          <span>Quelle</span>
+          <select value={choice} onChange={(e) => setChoice(e.target.value as CalendarSourceChoice)}>
+            {(Object.keys(CALENDAR_SOURCE_LABELS) as CalendarSourceChoice[]).map((k) => (
+              <option key={k} value={k}>
+                {CALENDAR_SOURCE_LABELS[k]}
+              </option>
+            ))}
+          </select>
+          <span className="small muted">
+            Der interne Kalender ist von den öffentlichen Terminen getrennt. Die Termine kommen aus genau einer Quelle; beim Wechsel bleiben
+            die Angaben der anderen gespeichert.
+          </span>
+        </label>
+      )}
+      {selectable && choice === 'app' && (
+        <p className="small">
+          Termine legst du bei den Terminen über <strong>Internen Kalender verwalten</strong> an. Das darf, wer das Recht „Kalender pflegen“
+          hat, z. B. über die Rolle „Kalender verwalten“.
+          {c.source === 'app' && config?.features.calendar && (
+            <>
+              {' '}
+              <button type="button" className="btn btn-link btn-inline" onClick={() => navigate('termine/kalender')}>
+                Zu den internen Terminen
+              </button>
+            </>
+          )}
+        </p>
+      )}
+      {c.connection_needs_calendar_access && showIds && (
         <p className="small">
           Die Kalender-IDs <code>{c.calendar_ids}</code> sind eingetragen, aber die Verbindung mit Google darf den Kalender nicht lesen
           (beim Verbinden nicht erlaubt). Unter <GoogleLink /> die Verbindung trennen und neu verbinden, dabei auch das Häkchen für den
           Kalender setzen{c.source === 'ics' ? '; bis dahin gilt die iCal-Adresse' : ''}.
         </p>
       )}
-      <label className="field">
-        <span>Google-Kalender-IDs</span>
-        <input
-          type="text"
-          autoComplete="off"
-          spellCheck={false}
-          placeholder="abc123@group.calendar.google.com"
-          value={ids}
-          onChange={(e) => setIds(e.target.value)}
-        />
-        <span className="small muted">
-          In Google Kalender: Einstellungen des Kalenders → Kalender integrieren → Kalender-ID. Mehrere durch Komma trennen.
-          {!access && ' Dafür zuerst den Google-Zugang einrichten.'}
-        </span>
-      </label>
-      <label className="field">
-        <span>{c.ics_url_set ? 'Neue iCal-Adresse (ersetzt die bisherige)' : 'Geheime iCal-Adresse'}</span>
-        <input
-          type="url"
-          inputMode="url"
-          autoComplete="off"
-          placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-        />
-        <span className="small muted">
-          In Google Kalender: Einstellungen des Kalenders → Kalender integrieren → Geheime Adresse im iCal-Format. Sie wird nicht wieder
-          angezeigt.
-        </span>
-      </label>
-      <label className="field">
-        <span>Aktualisieren alle … Minuten</span>
-        <input
-          type="number"
-          inputMode="numeric"
-          min={CACHE_MINUTES.min}
-          max={CACHE_MINUTES.max}
-          step={1}
-          required
-          value={minutes}
-          onChange={(e) => setMinutes(e.target.value)}
-        />
-        <span className="small muted">
-          So lange zeigt die App die zuletzt geladenen Termine, bevor sie bei Google neu nachfragt ({CACHE_MINUTES.min} bis{' '}
-          {CACHE_MINUTES.max} Minuten). Kürzere Zeiten zeigen Änderungen schneller, bedeuten aber mehr Abrufe bei Google, und das Öffnen der
-          Termine dauert dann öfter länger. Zusätzlich erneuert die App den Kalender stündlich im Hintergrund. „Kalender testen“ und
-          Speichern laden sofort neu.
-        </span>
-      </label>
-      {c.source !== 'none' && (
-        <div className="button-row">
+      {showIds && (
+        <label className="field">
+          <span>Google-Kalender-IDs</span>
+          <input
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="abc123@group.calendar.google.com"
+            value={ids}
+            onChange={(e) => setIds(e.target.value)}
+          />
+          <span className="small muted">
+            In Google Kalender: Einstellungen des Kalenders → Kalender integrieren → Kalender-ID. Mehrere durch Komma trennen.
+            {!access && ' Dafür zuerst den Google-Zugang einrichten.'}
+          </span>
+        </label>
+      )}
+      {showUrl && (
+        <label className="field">
+          <span>{c.ics_url_set ? 'Neue iCal-Adresse (ersetzt die bisherige)' : selectable ? 'iCal-Adresse' : 'Geheime iCal-Adresse'}</span>
+          <input
+            type="url"
+            inputMode="url"
+            autoComplete="off"
+            placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+          />
+          <span className="small muted">
+            Die Adresse eines Kalenders im iCal-Format, z. B. in Google Kalender: Einstellungen des Kalenders → Kalender integrieren →
+            Geheime Adresse im iCal-Format. Sie wird nicht wieder angezeigt.
+          </span>
+        </label>
+      )}
+      {external && (
+        <label className="field">
+          <span>Aktualisieren alle … Minuten</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={CACHE_MINUTES.min}
+            max={CACHE_MINUTES.max}
+            step={1}
+            required
+            value={minutes}
+            onChange={(e) => setMinutes(e.target.value)}
+          />
+          <span className="small muted">
+            So lange zeigt die App die zuletzt geladenen Termine, bevor sie neu nachfragt ({CACHE_MINUTES.min} bis {CACHE_MINUTES.max}{' '}
+            Minuten). Kürzere Zeiten zeigen Änderungen schneller, bedeuten aber mehr Abrufe, und das Öffnen der Termine dauert dann öfter
+            länger. Zusätzlich erneuert die App den Kalender stündlich im Hintergrund. „Kalender testen“ und Speichern laden sofort neu.
+          </span>
+        </label>
+      )}
+      {c.source !== 'none' && c.source !== 'app' && external && (
+        <div className="button-row single">
           <button type="button" className="btn btn-secondary" onClick={test} disabled={testing}>
             {testing ? 'Prüft …' : 'Kalender testen'}
           </button>

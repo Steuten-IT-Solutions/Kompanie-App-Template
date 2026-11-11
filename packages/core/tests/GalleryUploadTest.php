@@ -194,6 +194,87 @@ final class GalleryUploadTest extends TestCase
         $this->assertNotSame($photo['thumb'], $again['photos'][0]['thumb'], 'neue Adresse (neuer file_key)');
     }
 
+    /**
+     * Verschieben und Löschen mehrerer hochgeladener Bilder: POST /gallery/photos/move und /gallery/photos/delete mit
+     * manage_gallery (oder als Admin). Öffentliche Größen ziehen ins Verzeichnis des neuen Albums, das Original in
+     * der Ablage mit; eine freigegebene Einreichung zählt zum neuen Album. Bilder aus Drive bleiben, wie sie sind.
+     */
+    public function testMoveAndDeleteSeveral(): void
+    {
+        $this->ok('PATCH', '/admin/settings', ['gallery_source' => 'server']);
+        $from = (int) $this->ok('POST', '/admin/gallery/albums', ['title' => 'Alt', 'year' => 2025])['id'];
+        $to = (int) $this->ok('POST', '/admin/gallery/albums', ['title' => 'Neu', 'year' => 2026])['id'];
+        $this->ok('POST', "/admin/gallery/albums/{$from}/photos", ['file' => $this->file('Offen.jpg')]);
+        $this->ok('POST', "/admin/gallery/albums/{$from}/photos", ['file' => $this->file('Intern.jpg'), 'intern' => true]);
+        $uploads = $this->ok('POST', "/admin/gallery/albums/{$from}/photos", ['file' => $this->file('Drei.jpg')])['uploads'];
+        $ids = array_column($uploads, 'id', 'name');
+        $gallery = $this->app->gallery();
+        $gallery->processPending(30);
+        $open = $gallery->album($from, false)['photos'];
+        $thumb = (string) array_column($open, 'thumb', 'name')['Offen.jpg'];
+        $publicFile = str_replace('https://example.org/media/', $this->dir . '/public/', $thumb);
+        $this->assertFileExists($publicFile);
+        $this->assertSame(['albums' => [
+            ['id' => $from, 'title' => 'Alt', 'year' => '2025', 'source' => 'app'],
+            ['id' => $to, 'title' => 'Neu', 'year' => '2026', 'source' => 'app'],
+        ]], $this->sortAlbums($this->ok('GET', '/gallery/albums')));
+
+        // Ungültige Angaben ändern nichts
+        $this->assertSame(400, $this->call('POST', '/gallery/photos/move', ['ids' => [$ids['Offen.jpg']]])->status, 'Album fehlt');
+        $this->assertSame(404, $this->call('POST', '/gallery/photos/move', ['ids' => [$ids['Offen.jpg']], 'album_id' => 999])->status);
+        $this->assertSame(400, $this->call('POST', '/gallery/photos/move', ['ids' => [], 'album_id' => $to])->status, 'leer');
+        $this->assertSame(400, $this->call('POST', '/gallery/photos/move', ['ids' => ['1'], 'album_id' => $to])->status, 'keine Zahl');
+        $this->assertSame(404, $this->call('POST', '/gallery/photos/move', ['ids' => [$ids['Offen.jpg'], 999], 'album_id' => $to])->status);
+        $this->assertCount(3, $gallery->album($from, true)['photos'], 'nichts verschoben');
+
+        // Rechte: ohne Recht nicht, mit review_gallery schon
+        $this->users->current = $this->m;
+        $this->assertSame(403, $this->call('GET', '/gallery/albums')->status);
+        $this->assertSame(403, $this->call('POST', '/gallery/photos/move', ['ids' => [$ids['Offen.jpg']], 'album_id' => $to])->status);
+        $this->assertSame(403, $this->call('POST', '/gallery/photos/delete', ['ids' => [$ids['Drei.jpg']]])->status);
+        $reviewer = $this->users->add('pruefer', Roles::MEMBER);
+        $this->app->roles()->setOverrides($this->users->find($this->admin), $reviewer, ['review_gallery'], []);
+        $this->users->current = $reviewer;
+        $this->assertSame(403, $this->call('POST', '/gallery/photos/move', ['ids' => [$ids['Offen.jpg']], 'album_id' => $to])->status, 'Prüfen reicht nicht');
+        $this->assertSame(403, $this->call('POST', '/gallery/photos/delete', ['ids' => [$ids['Drei.jpg']]])->status, 'Prüfen reicht nicht');
+        $manager = $this->users->add('galerie', Roles::MEMBER);
+        $this->app->roles()->setOverrides($this->users->find($this->admin), $manager, ['manage_gallery'], []);
+        $this->users->current = $manager;
+        // Wer die Galerie verwaltet, darf auch Alben anlegen und hochladen (ohne Einstellungen)
+        $this->assertSame(403, $this->call('GET', '/admin/settings')->status);
+        $this->ok('GET', '/admin/gallery/albums');
+
+        $this->assertSame(['moved' => 2, 'album_id' => $to], $this->ok('POST', '/gallery/photos/move', ['ids' => [$ids['Offen.jpg'], $ids['Intern.jpg']], 'album_id' => $to]));
+        $this->assertFileDoesNotExist($publicFile, 'alte öffentliche Adresse liefert nichts mehr');
+        $moved = $gallery->album($to, true);
+        $this->assertNotNull($moved);
+        $this->assertEqualsCanonicalizing(['Offen.jpg', 'Intern.jpg'], array_column($moved['photos'], 'name'));
+        foreach ($moved['photos'] as $p) {
+            $this->assertTrue($p['ready'], 'ohne neues Aufbereiten sofort fertig');
+        }
+        $newThumb = (string) array_column($gallery->album($to, false)['photos'], 'thumb', 'name')['Offen.jpg'];
+        $this->assertFileExists(str_replace('https://example.org/media/', $this->dir . '/public/', $newThumb));
+        $this->assertStringContainsString("/{$to}/", $newThumb);
+        $this->assertSame(200, $gallery->photoForDelivery($ids['Offen.jpg'], GalleryService::ORIGINAL, false, false)['status'], 'Original noch da');
+        $originals = $this->stored();
+        $this->assertCount(3, $originals);
+        $this->assertCount(2, array_filter($originals, static fn (string $f): bool => str_starts_with($f, $to . '-')), 'Originale zum neuen Album');
+        $this->assertSame(['moved' => 0, 'album_id' => $to], $this->ok('POST', '/gallery/photos/move', ['ids' => [$ids['Offen.jpg']], 'album_id' => $to]), 'schon dort');
+
+        // Löschen mehrerer
+        $this->assertSame(['deleted' => 2], $this->ok('POST', '/gallery/photos/delete', ['ids' => [$ids['Drei.jpg'], $ids['Intern.jpg']]]));
+        $this->assertCount(1, $this->stored());
+        $this->assertSame(404, $this->call('POST', '/gallery/photos/delete', ['ids' => [$ids['Drei.jpg']]])->status, 'schon weg');
+        $this->assertSame(['Offen.jpg'], array_column($gallery->album($to, true)['photos'], 'name'));
+    }
+
+    /** @param array<string, mixed> $res */
+    private function sortAlbums(array $res): array
+    {
+        usort($res['albums'], static fn (array $a, array $b): int => $a['id'] <=> $b['id']);
+        return $res;
+    }
+
     /** Knöpfe zum Herunterladen: Einstellung gallery_downloads, Vorgabe aus; das Album meldet sie der App. */
     public function testDownloadButtonsSetting(): void
     {

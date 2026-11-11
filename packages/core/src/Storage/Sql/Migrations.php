@@ -1839,6 +1839,45 @@ WHERE title IS NULL",
                 'mysql' => ['ALTER TABLE {gallery_submissions} ADD COLUMN duration_ms int(11) NOT NULL DEFAULT 0'],
                 'sqlite' => ['ALTER TABLE {gallery_submissions} ADD COLUMN duration_ms INTEGER NOT NULL DEFAULT 0'],
             ],
+            // Interner Kalender in der App (Quelle „app“ des internen Kalenders, CalendarService): Termine nur für
+            // Angemeldete mit dem internen Kalender, getrennt von den öffentlichen Terminen (events), gleicher Aufbau.
+            58 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {internal_events} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  title varchar(191) NOT NULL,
+  start_date date NOT NULL,
+  start_time time DEFAULT NULL,
+  end_date date DEFAULT NULL,
+  end_time time DEFAULT NULL,
+  location varchar(191) NOT NULL DEFAULT \'\',
+  description text NOT NULL,
+  url varchar(255) NOT NULL DEFAULT \'\',
+  created_by bigint(20) unsigned NOT NULL,
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  KEY start_date (start_date)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {internal_events} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  start_date TEXT NOT NULL,
+  start_time TEXT DEFAULT NULL,
+  end_date TEXT DEFAULT NULL,
+  end_time TEXT DEFAULT NULL,
+  location TEXT NOT NULL DEFAULT \'\',
+  description TEXT NOT NULL DEFAULT \'\',
+  url TEXT NOT NULL DEFAULT \'\',
+  created_by INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {internal_events}_start_date ON {internal_events} (start_date)',
+                ],
+            ],
         ];
     }
 

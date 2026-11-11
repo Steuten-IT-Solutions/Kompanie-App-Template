@@ -6,6 +6,7 @@ import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { promptAsk } from '../ask';
+import { IconButton } from '../icons';
 
 // Inventar (Issue #6): Liste nach Material gruppiert (Summe über alle Orte, je Einheit), aufklappbar zu den Einträgen je
 // Ort; anlegen, ändern, −/+, umlagern, löschen; Verlauf je Eintrag und gesamt. Nur mit manage_inventory.
@@ -256,15 +257,9 @@ function Entry({ item, onToast, onChanged }: { item: InventoryItem; onToast: (ms
           <button className="btn btn-secondary btn-small" disabled={busy} onClick={() => setMode('move')}>
             Umlagern
           </button>
-          <button className="btn btn-secondary btn-small" disabled={busy} onClick={() => setMode('edit')}>
-            Bearbeiten
-          </button>
-          <button className="btn btn-secondary btn-small" onClick={() => navigate(`inventar/verlauf/${item.id}`)}>
-            Verlauf
-          </button>
-          <button className="btn btn-danger btn-small" disabled={busy} onClick={remove}>
-            Löschen
-          </button>
+          <IconButton icon="edit" label="Bearbeiten" disabled={busy} onClick={() => setMode('edit')} />
+          <IconButton icon="history" label="Verlauf" onClick={() => navigate(`inventar/verlauf/${item.id}`)} />
+          <IconButton icon="delete" label="Löschen" variant="danger" disabled={busy} onClick={remove} />
         </div>
       )}
       {mode === 'edit' && (

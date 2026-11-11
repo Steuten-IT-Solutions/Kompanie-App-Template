@@ -17,7 +17,7 @@ Tippe unten auf **Verwaltung**, dann auf **{bereich.lists}**. Tippe bei einer Li
 - **Spalten**: die Spalten der Liste, in ihrer Reihenfolge.
 - **Zeilen**: wer in die Liste kommt, die Zeilen der Liste mit Nummer und Name und **Sortieren nach**.
 - **Speichern**: erscheint unten, sobald du etwas geändert hast.
-- **Ausgabe**: **PDF herunterladen**, **Drucken**, **CSV herunterladen** und darunter die Vorschau.
+- **Ausgabe**: **PDF herunterladen** (Pfeil nach unten mit „PDF“), **CSV herunterladen** (Pfeil nach unten mit „CSV“), **Drucken** (Drucker) und darunter die Vorschau.
 
 ## So gehst du vor
 ### Spalten einrichten
@@ -43,7 +43,7 @@ Es gibt zwei Arten von Spalten:
 ![Mitglieder aktualisieren: Die App zeigt, was sich ändert](bild:liste-bearbeiten-zeilen)
 
 ### Eigene Zeilen hinzufügen
-1. Tippe auf **+ Leere Zeile** oder **+ 5 leere Zeilen**, z. B. für Gäste, die sich vor Ort eintragen.
+1. Tippe auf **+ Zeile** oder **+ 5 Zeilen**, z. B. für Gäste, die sich vor Ort eintragen.
 2. Schreibe einen Namen in die Zeile oder lass sie leer.
 3. Tippe auf **Speichern**.
 
@@ -58,8 +58,8 @@ Zahlen sortiert die App nach ihrem Wert, Geburtstage nach dem Tag im Jahr (Janua
 
 ### Drucken oder herunterladen
 1. Sieh dir unter **Ausgabe** die Vorschau an.
-2. Tippe auf **PDF herunterladen**. Die App speichert die Liste als PDF-Datei, ohne Druckdialog.
-3. Zum Drucken tippe auf **Drucken**.
+2. Tippe auf **PDF herunterladen** (Pfeil nach unten mit „PDF“). Die App speichert die Liste als PDF-Datei, ohne Druckdialog.
+3. Zum Drucken tippe auf **Drucken** (Drucker).
 4. Oder tippe auf **CSV herunterladen**. Die Datei öffnest du mit Excel oder einer anderen Tabellenkalkulation.
 
 ![Die Ausgabe mit Druckknöpfen und Vorschau](bild:liste-bearbeiten-ausgabe)

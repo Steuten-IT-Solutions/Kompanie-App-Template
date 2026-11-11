@@ -11,6 +11,7 @@ import { isDue } from '../promotionCheck';
 import { notePromotions } from '../promotionsDue';
 import { sources } from '../viewData';
 import { confirmAsk } from '../ask';
+import { IconButton } from '../icons';
 
 const rank = brand.labels.rank;
 const sec = brand.labels.sections;
@@ -169,7 +170,7 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
   const missing = points && list.some((r) => r.active && r.min_points === null);
 
   return (
-    <div>
+    <div className="stack">
       {missing && (
         <p className="small">
           Noch nicht alle {sec.ranks} haben eine {sec.points}schwelle; für diese gelten keine Regeln zu {sec.points}.
@@ -224,13 +225,13 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
                       </button>
                     )}
                     {!r.assigned && (
-                      <button
-                        className="btn btn-small btn-danger"
+                      <IconButton
+                        icon="delete"
+                        label="Löschen"
+                        variant="danger"
                         disabled={busy}
                         onClick={async () => (await confirmAsk(`„${r.title}“ löschen?`)) && run(() => api.deleteRank(r.id), 'Gelöscht')}
-                      >
-                        Löschen
-                      </button>
+                      />
                     )}
                   </div>
                   <div className="rank-badge-tools" role="group" aria-label={`Abzeichen von ${r.title}`}>

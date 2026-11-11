@@ -24,6 +24,92 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.9.0] – 2026-11-11
+
+### Neu
+
+- **Internen Kalender direkt in der App pflegen, ohne Google**: Unter [Einstellungen → Kalender](app:einstellungen/kalender)
+  wählst du jetzt die Quelle des internen Kalenders: **In der App pflegen**, **Google Kalender** oder **iCal-Adresse**.
+  Es gilt immer genau eine Quelle. Mit „In der App pflegen“ legt, wer das neue Recht „Kalender pflegen“ hat (z. B. über
+  die neue Rolle „Kalender verwalten“), unter [Termine](app:termine) → „Internen Kalender verwalten“ interne Termine an.
+  Die sehen nur Angemeldete mit dem internen Kalender, getrennt von den öffentlichen Terminen; Benachrichtigungen und
+  Anwesenheitslisten nutzen sie wie bisher die Termine aus Google. Serientermine gibt es dafür noch nicht.
+
+- **Reihenfolge der Knöpfe in der Verwaltung und in „Intern“**: Unter [Einstellungen → Navigation](app:einstellungen/navigation)
+  ordnest du im neuen Abschnitt „Verwaltung“ die Knöpfe der Startseite der Verwaltung und unter „Einrichtungen“ per Ziehen,
+  für alle gleich. Jede Person sieht weiter nur die Knöpfe, für die sie das Recht hat. Auch die Bereiche in „Intern“ der
+  Standardnavigation lassen sich jetzt umordnen, ohne dass daraus eine eigene Navigation wird.
+
+- **Galerie direkt in der Galerie verwalten: verschieben, löschen, intern stellen**: Wer das neue Recht „Galerie
+  verwalten“ hat, wählt in der [Galerie](app:galerie) in einem Album mit langem Drücken auf ein Bild ein oder mehrere hochgeladene
+  Bilder und Videos und verschiebt sie in ein anderes Album, löscht sie oder stellt sie intern bzw. öffentlich; ein
+  einzelnes geht auch in der Großansicht. Alben der App benennt man mit **Album bearbeiten** um, setzt sie in ein anderes
+  Jahr oder löscht sie, in der Übersicht mit langem Drücken auf ein Album auch mehrere auf einmal; die Rückfrage nennt, wie viele
+  Bilder und Videos mitgelöscht werden. Über **Alben anlegen und hochladen** legt man Alben an und lädt hoch, ohne an die
+  Einstellungen zu müssen. Die bestehende Rolle „Galerie verwalten“ bekommt das Recht einmalig dazu; unter
+  [Einstellungen → Rollen](app:einstellungen/rollen) kannst du es anderen Rollen geben oder wegnehmen. Bilder und Alben
+  aus Google Drive änderst du weiter in Drive. Alle Knöpfe der Galerie (auch Einreichen und Prüfen) sind jetzt runde
+  Symbole; am Rechner zeigt der Mauszeiger ihren Namen.
+
+### Geändert
+
+- **Kleinere Knöpfe auf dem Handy: Symbole statt Text, ganze Breite statt halber**: Wie in der Galerie sind
+  **Bearbeiten** (Stift), **Löschen** (Mülleimer), **Verlauf** (Uhr) und **Ansehen** (Auge) jetzt runde Symbole, u. a.
+  am [Schwarzen Brett](app:brett), bei [Terminen](app:termine/verwalten), [Umfragen](app:umfragen/verwalten),
+  [Ämtern](app:verwaltung/aemter), Kompanien, Sponsoren, Seiten, Dokumenten, im Inventar, bei Neuigkeiten und unter
+  [Einstellungen → Rollen](app:einstellungen/rollen); am Rechner zeigt der Mauszeiger ihren Namen. In einer
+  [Liste](app:verwaltung/listen) heißen die Ausgabe-Knöpfe kurz **PDF** und **CSV** (mit Pfeil nach unten), **Drucken**
+  ist ein Drucker, **+ Leere Zeile** heißt **+ Zeile**. **Adresse kopieren** unter
+  [Einstellungen → Google-Zugang](app:einstellungen/google) steht als Symbol direkt neben dem Feld. Steht ein Knopf
+  allein in seiner Reihe (z. B. **+ Mitglied anlegen**, **Wartungsmodus einschalten**), nimmt er die ganze Breite ein,
+  statt halb breit links zu stehen und auf mehrere Zeilen umzubrechen; Symbolreihen stehen mittig. In einer Umfrage
+  führen „‹ Schwarzes Brett“ und „Alle Umfragen ›“ zurück (bisher stand dort „Zum Schwarzes Brett“).
+
+- **„Im Amt“ im hellen Modus leichter**: Unter [Mitglieder → Ämter](app:mitglieder/aemter) steht der Bereich „Im Amt“
+  eines aufgeklappten Amts im hellen Modus jetzt auf einer zarten Tönung der Kompaniefarbe statt auf der vollen Farbe. Im
+  dunklen Modus bleibt er wie bisher.
+
+- **Zahl im Kreis auch bei Anfragen und Fehlermeldungen**: Wie bei **Beförderungen** zeigen die Knöpfe
+  [Anfragen](app:verwaltung/anfragen) und [Fehlermeldungen](app:verwaltung/meldungen) in der Verwaltung die Zahl der
+  offenen Einträge jetzt als Zahl im roten Kreis an der Ecke statt in Klammern hinter dem Namen. Die Zahl wird beim
+  Öffnen der Verwaltung aufgefrischt und ist nur für die zu sehen, die Anfragen freigeben bzw. Fehlermeldungen
+  bearbeiten dürfen.
+
+### Behoben
+
+- **„Zurück“ schließt offene Fenster**: Ist ein Fenster der App offen (z. B. zum Verschieben eines Fotos, eine
+  Rückfrage, die vergrößerte Ansicht eines Mitgliedsfotos), schließt die Zurück-Taste bzw. -Geste des Handys oder der
+  Zurück-Knopf des Browsers jetzt zuerst dieses Fenster, ohne etwas zu ändern. Bisher ging die App dabei eine Seite
+  zurück. Liegen mehrere übereinander (Auswählen in der [Galerie](app:galerie), Großansicht, Fenster, Rückfrage), schließt
+  jedes „Zurück“ nur das oberste.
+- **Einreichungen prüfen auf dem Handy**: Unter *Zuletzt freigegeben* hat der Name eines Bilds jetzt die volle Breite
+  neben der Vorschau, Haken *intern* und *Wieder entfernen* (jetzt ein Mülleimer) stehen darunter. Bisher stand alles in
+  einer Zeile und der Name brach Buchstabe für Buchstabe um. Die Karten der Seite haben wieder einen Innenrand.
+- **Benachrichtigungen einer Test-App erscheinen nicht mehr unter der Produktiv-App**: Wer eine Sicherung unter
+  [Einstellungen → Datensicherung](app:einstellungen/datensicherung) in eine Installation unter einer anderen Adresse
+  einspielt (z. B. die Produktiv-App in eine Test-App), übernimmt die Anmeldungen der Geräte für Benachrichtigungen nicht
+  mehr. Bisher schickte die Test-App dann ihre Nachrichten auch an die Geräte der Produktiv-App, und dort erschienen sie
+  unter deren Namen. Jetzt entfernt das Wiederherstellen in diesem Fall die bisherigen Anmeldungen; schalte die
+  Benachrichtigungen auf den Geräten der Test-App danach neu ein. Gilt für Sicherungen, die ab dieser Version erstellt
+  wurden (nur ohne WordPress; mit WordPress geht Wiederherstellen ohnehin nur auf derselben Webseite).
+
+- **Ämter, Ansicht „Jahre“: Namen nicht mehr abgeschnitten**: Unter [Mitglieder → Ämter](app:mitglieder/aemter) sind
+  die Spalten jetzt so breit, dass Bezeichnungen wie „Könige/Königinnen“ und lange Namen ganz zu lesen sind. Bezeichnungen
+  brechen nach „/“ um, ein Jahr mit zweizeiligem Namen wird höher statt die zweite Zeile zu verdecken. Auch in den Karten
+  gemeinsamer Amtszeiten (z. B. ein Königshaus) laufen lange Bezeichnungen wie „Ordonnanzoffizier*in“ nicht mehr in die
+  Namen daneben: Die Spalte richtet sich nach der längsten Bezeichnung; wird es zu eng, wird vor bekannten Wortteilen
+  getrennt („Ordonnanz-offizier*in“, „Kriegs-minister*in“), sonst vor „*in“ oder nach „/“, nicht mitten im Wort. Zwischen
+  den Ämtern einer solchen Karte stehen jetzt etwas Abstand und eine feine Linie.
+- **Fehlende Abstände**: In [Einstellungen → Navigation](app:einstellungen/navigation) klebten die Zwischenüberschrift
+  „Einrichtungen“, die Felder der Startseite und die Knöpfe unten („Navigation speichern“, „Standardnavigation
+  wiederherstellen“, „Standardreihenfolge der Verwaltung“) an der Karte darüber. Das ist behoben, ebenso unter
+  [Einstellungen → Rollen](app:einstellungen/rollen) („+ Neue Rolle“), [Einstellungen → Kalender](app:einstellungen/kalender),
+  bei den laufenden Umfragen am Schwarzen Brett, bei den Gruppen der Ämter, bei den Dienstgraden und beim Import aus
+  Excel. Alle Einstellungen halten jetzt einheitlich Abstand zwischen ihren Teilen.
+- Knöpfe trennen Wörter nicht mehr mit Bindestrich, sondern schieben ein Wort, das nicht mehr in die Zeile passt, ganz
+  in die nächste (z. B. „Bilder und Videos einreichen“ in der [Galerie](app:galerie) statt „VI-DEOS“). Nur wenn ein
+  Wort allein nicht in den Knopf passt (lange Wörter auf schmalen Handys), trennt der Knopf wie bisher.
+
 ## [0.8.2] – 2026-11-09
 
 ### Geändert

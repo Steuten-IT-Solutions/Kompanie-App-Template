@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { can, config } from './api';
+import { flatOrder, setupOrder, SETUP, sortByIds, startOrder } from './navigation';
+import { can, config, type Feature } from './api';
 import { canManagePolls, canPostBoard } from './board';
 import brand from './generated/brand';
 import { navigate } from './router';
+import { useAdminCounts } from './adminCounts';
 import { usePromotionsDue } from './promotionsDue';
+import { tileCount } from './tileCount';
 import { menuSources, prefetchOnTap, usePrefetchMenu } from './viewData';
 
 const sec = brand.labels.sections;
@@ -37,28 +40,21 @@ export function memberListAllowed(): boolean {
 
 type AdminTab = { id: string; label: string; on: boolean; route?: string; group?: string };
 
-/** Sammelknopf „Einrichtungen“ auf der Startseite der Verwaltung: was eine Kompanie einmal anlegt und selten ändert. */
-const SETUP = 'einrichtungen';
-
 /** Bereiche der Verwaltung (Knöpfe auf ihrer Startseite, die mit group unter „Einrichtungen“); Schwarzes Brett, Umfragen, Inventar und Einstellungen sind eigene Seiten (route), stehen aber hier mit. */
 export function adminTabs(): AdminTab[] {
   const points = canPoints();
-  return (
+  const tabs = (
     [
       { id: 'mitglieder', label: 'Mitglieder', on: memberListAllowed() },
       { id: 'ehemalige', label: 'Ehemalige', on: can('create_users') },
-      // Anfragen auf einen Zugang (Issue #314): mit Zahl der offenen; auch nach dem Ausschalten, solange welche warten
+      // Anfragen auf einen Zugang (Issue #314): auch nach dem Ausschalten, solange welche warten; Zahl der offenen im Kreis
       {
         id: 'anfragen',
-        label: config?.pendingRegistrations ? `Anfragen (${config.pendingRegistrations})` : 'Anfragen',
+        label: 'Anfragen',
         on: can('create_users') && (!!config?.registration || (config?.pendingRegistrations ?? 0) > 0),
       },
-      // Fehlermeldungen aus der App: mit Zahl der offenen
-      {
-        id: 'meldungen',
-        label: config?.openReports ? `Fehlermeldungen (${config.openReports})` : 'Fehlermeldungen',
-        on: can('review_reports'),
-      },
+      // Fehlermeldungen aus der App: Zahl der offenen im Kreis
+      { id: 'meldungen', label: 'Fehlermeldungen', on: can('review_reports') },
       { id: 'punkte', label: `${sec.points} +`, on: points },
       { id: 'strafe', label: `${sec.penalties} +`, on: canPenalties() },
       { id: 'katalog', label: sec.catalog, on: points, group: SETUP },
@@ -78,11 +74,49 @@ export function adminTabs(): AdminTab[] {
       { id: 'einstellungen', label: 'Einstellungen', on: can('manage_settings'), route: 'einstellungen' },
     ] as AdminTab[]
   ).filter((t) => t.on);
+  // Reihenfolge aus Einstellungen → Navigation (Abschnitt „Verwaltung“); ohne sie die Folge oben.
+  return sortByIds(tabs, flatOrder(config?.admin_order));
+}
+
+/**
+ * Für Einstellungen → Navigation (Abschnitt „Verwaltung“): Name jeder Kachel und ob ihr Bereich an ist, unabhängig von
+ * den Rechten der Person, die gerade einstellt (die Reihenfolge gilt für alle).
+ */
+export function adminTileCatalog(): Record<string, { label: string; on: boolean }> {
+  const f = config?.features;
+  const on = (...keys: Feature[]) => keys.every((k) => !!f?.[k]);
+  return {
+    mitglieder: { label: 'Mitglieder', on: true },
+    ehemalige: { label: 'Ehemalige', on: true },
+    anfragen: { label: 'Anfragen', on: !!config?.registration || (config?.pendingRegistrations ?? 0) > 0 },
+    meldungen: { label: 'Fehlermeldungen', on: true },
+    punkte: { label: `${sec.points} +`, on: on('points') },
+    strafe: { label: `${sec.penalties} +`, on: on('penalties') },
+    befoerderungen: { label: 'Beförderungen', on: on('ranks', 'points') },
+    anwesenheit: { label: sec.attendance, on: on('attendance') },
+    brett: { label: sec.board, on: on('board') },
+    umfragen: { label: sec.polls, on: on('polls') },
+    inventar: { label: sec.inventory, on: on('inventory') },
+    listen: { label: sec.lists, on: on('lists') },
+    mail: { label: sec.mail, on: on('mail') },
+    [SETUP]: { label: 'Einrichtungen', on: true },
+    einstellungen: { label: 'Einstellungen', on: true },
+    katalog: { label: sec.catalog, on: on('points') },
+    dienstgrade: { label: sec.ranks, on: on('ranks') },
+    titel: { label: sec.titles, on: on('titles') },
+    aemter: { label: sec.offices, on: on('offices') },
+    kompanien: { label: sec.companies, on: on('companies') },
+    sponsoren: { label: sec.sponsors, on: on('sponsors') },
+    seiten: { label: sec.pages, on: on('pages') },
+  };
 }
 
 /** Bereiche unter „Einrichtungen“; der Sammelknopf erscheint erst ab zweien, ein einzelner steht direkt auf der Startseite. */
 export function setupTabs(): AdminTab[] {
-  const tabs = adminTabs().filter((t) => t.group === SETUP);
+  const tabs = sortByIds(
+    adminTabs().filter((t) => t.group === SETUP),
+    setupOrder(config?.admin_order),
+  );
   return tabs.length > 1 ? tabs : [];
 }
 
@@ -92,9 +126,9 @@ function startTabs(): AdminTab[] {
   const tabs = adminTabs().filter((t) => !setup.some((s) => s.id === t.id));
   // Nur Bereiche der Einrichtungen: keine Seite mit einem einzigen Knopf, sie stehen gleich auf der Startseite.
   if (setup.length === 0 || tabs.length === 0) return adminTabs();
-  const at = tabs.findIndex((t) => t.id === 'einstellungen');
+  // „Einrichtungen“ steht, wo die Reihenfolge es sagt (Standard: vor den Einstellungen).
   const entry: AdminTab = { id: SETUP, label: 'Einrichtungen', on: true, route: `verwaltung/${SETUP}` };
-  return at < 0 ? [...tabs, entry] : [...tabs.slice(0, at), entry, ...tabs.slice(at)];
+  return sortByIds([...tabs, entry], startOrder(config?.admin_order));
 }
 
 export type MenuItem = { id: string; label: string; onSelect: () => void };
@@ -326,6 +360,8 @@ export function AdminIcon({ id }: { id: string }) {
 /** Startseite der Verwaltung: je Bereich ein Knopf mit Symbol; mit group die Bereiche unter „Einrichtungen“. */
 export function AdminMenu({ group }: { group?: string }) {
   const due = usePromotionsDue();
+  useAdminCounts(!group);
+  const counts = { promotions: due, registrations: config?.pendingRegistrations, reports: config?.openReports };
   // Daten der Bereiche hinter den Knöpfen im Leerlauf vorab laden (auch die unter „Einrichtungen“), beim Antippen sofort.
   usePrefetchMenu(
     'verwaltung',
@@ -334,28 +370,29 @@ export function AdminMenu({ group }: { group?: string }) {
   return (
     <nav aria-label={group ? 'Einrichtungen' : 'Verwaltung'}>
       <ul className="admin-tiles">
-        {(group ? setupTabs() : startTabs()).map((t) => (
-          <li key={t.id}>
-            <button
-              type="button"
-              className="card admin-tile"
-              title={
-                t.id === 'befoerderungen' && due ? `${due} ${due === 1 ? 'Mitglied' : 'Mitglieder'} zur Beförderung bereit` : undefined
-              }
-              onClick={() => navigate(t.route ?? `verwaltung/${t.id}`)}
-              {...prefetchOnTap(...menuSources('verwaltung', t.id))}
-            >
-              <AdminIcon id={t.id} />
-              <span>{t.label}</span>
-              {t.id === 'befoerderungen' && !!due && (
-                // Zahl im Kreis an der Ecke: wie viele Mitglieder gerade zur Beförderung bereit sind (erklärt im title).
-                <span className="count-badge" aria-hidden="true">
-                  {due > 99 ? '99+' : due}
-                </span>
-              )}
-            </button>
-          </li>
-        ))}
+        {(group ? setupTabs() : startTabs()).map((t) => {
+          const badge = tileCount(t.id, counts);
+          return (
+            <li key={t.id}>
+              <button
+                type="button"
+                className="card admin-tile"
+                title={badge?.title}
+                onClick={() => navigate(t.route ?? `verwaltung/${t.id}`)}
+                {...prefetchOnTap(...menuSources('verwaltung', t.id))}
+              >
+                <AdminIcon id={t.id} />
+                <span>{t.label}</span>
+                {badge && (
+                  // Zahl im Kreis an der Ecke: was dort gerade ansteht (erklärt im title).
+                  <span className="count-badge" aria-hidden="true">
+                    {badge.text}
+                  </span>
+                )}
+              </button>
+            </li>
+          );
+        })}
       </ul>
     </nav>
   );

@@ -13,6 +13,7 @@ import {
   type Ref,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { useBackClose } from './backClose';
 import type { MemberSummary, PersonName } from './api';
 import { cacheKey as keyOf, DATA_UPDATED, dataCache, pendingPrefetch, takeFresh } from './dataCache';
 import { noteError } from './lastError';
@@ -236,18 +237,23 @@ export function Sheet({
   onClose,
   children,
   top = false,
+  routed = false,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   /** Über allem anderen, auch über der vergrößerten Bildansicht (Rückfragen, ask.tsx). */
   top?: boolean;
+  /** Das Fenster hat eine eigene Adresse (z. B. …/mitglied/12/punkte): „Zurück“ schließt es schon über den Router. */
+  routed?: boolean;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   // Aktuelles onClose ohne neuen Effekt: Sonst sprang der Fokus bei jedem Neuzeichnen (z. B. Tippen) auf „Schließen“.
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  // „Zurück“ (Taste, Geste des Geräts) schließt das Fenster statt die Seite zu verlassen (backClose.ts).
+  useBackClose(!routed, () => onCloseRef.current());
   useEffect(() => {
     closeRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {

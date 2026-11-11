@@ -50,6 +50,8 @@ Setze oder entferne neben dem Bild den Haken **intern**. Mit Haken sehen es nur 
 
 Bei einem Album der App änderst du darunter **Titel des Albums** und **Jahr des Albums** (**Album speichern**) oder löschst es mit **Album löschen** samt allen Bildern darin.
 
+Verschieben, mehrere auf einmal löschen und Alben bearbeiten geht auch direkt in der {bereich.gallery}, auch für alle mit dem Recht „{bereich.gallery} verwalten“. Wie das geht, steht im Handbuch unter „Die Galerie verwalten“.
+
 ### Herunterladen erlauben
 1. Setze den Haken **Knöpfe zum Herunterladen zeigen** und tippe auf **Speichern**.
 2. In jedem Album steht dann rechts neben dem Titel ein runder Knopf mit Pfeil nach unten (ganzes Album als ZIP), in der Großansicht oben rechts neben **✕** derselbe Knopf für das einzelne Bild oder Video.

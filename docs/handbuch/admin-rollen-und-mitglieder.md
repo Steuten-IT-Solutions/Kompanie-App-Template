@@ -15,8 +15,8 @@ Oben schaltest du zwischen **Rollen** (die Liste) und **Wer sieht was** (die Üb
 
 - **Liste der Rollen**: je Rolle der Name, wie viele Personen sie haben (davon als Zusatzrolle) und ihre Rechte. Bei eigenen Rollen steht außerdem **für neue Konten** oder **aufnehmen als {rolle.member}**, wenn das eingestellt ist. Weicht der {bereich.points}faktor von 1 ab, steht er als Abzeichen neben dem Namen, z. B. „×0,5“.
 - **Griff** links neben jeder Rolle: zum Ändern der Reihenfolge.
-- **Ansehen**: zeigt die App so, wie diese Rolle sie sieht (siehe [App als Rolle ansehen](seite:admin-vorschau)). Bei {rolle.admin} fehlt der Knopf.
-- **Bearbeiten**: öffnet die Rolle zum Ändern.
+- **Ansehen** (Auge): zeigt die App so, wie diese Rolle sie sieht (siehe [App als Rolle ansehen](seite:admin-vorschau)). Bei {rolle.admin} fehlt der Knopf.
+- **Bearbeiten** (Stift): öffnet die Rolle zum Ändern.
 - **+ Neue Rolle**: legt eine weitere Rolle an.
 - **App ohne Anmeldung ansehen**: zeigt die App, wie Besucher ohne Konto sie sehen.
 - **{bereich.attendance}: Gruppen im Zähler** (nur wenn {bereich.attendance} an ist): als was jede Rolle in den Anwesenheitslisten zählt.

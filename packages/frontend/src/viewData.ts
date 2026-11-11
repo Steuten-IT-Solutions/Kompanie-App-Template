@@ -80,6 +80,7 @@ export const sources = {
   lists: source('lists', api.lists),
   list: (id: number) => source('list', () => api.list(id), [id]),
   events: source('events', api.events),
+  calendarEntries: source('calendar-entries', api.calendarEntries),
   // Einstellungen (/admin/…: nur im Speicher der App, nie im Service Worker)
   settings: source('settings', () => api.settings()),
   features: source('features', () => api.features()),

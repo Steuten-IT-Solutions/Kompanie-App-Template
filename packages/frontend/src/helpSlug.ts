@@ -19,6 +19,7 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
   switch (view) {
     case 'termine':
       if (sub === 'verwalten') return 'termine-pflegen';
+      if (sub === 'kalender') return 'kalender-pflegen';
       // Mit internem Kalender zeigt die Seite alle Termine (kalender), sonst nur die öffentlichen.
       return on('calendar') && ctx.can('calendar')
         ? 'kalender'
@@ -30,7 +31,15 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
     case 'news':
       return sub ? 'neuigkeiten-beitrag' : 'neuigkeiten';
     case 'galerie':
-      return id ? 'galerie-album' : sub === 'einreichen' ? 'galerie-einreichen' : sub === 'pruefen' ? 'galerie-pruefen' : 'galerie';
+      return id
+        ? 'galerie-album'
+        : sub === 'einreichen'
+          ? 'galerie-einreichen'
+          : sub === 'pruefen'
+            ? 'galerie-pruefen'
+            : sub === 'verwalten'
+              ? 'galerie-verwalten'
+              : 'galerie';
     case 'kompanien':
       return 'kompanien';
     case 'sponsoren':

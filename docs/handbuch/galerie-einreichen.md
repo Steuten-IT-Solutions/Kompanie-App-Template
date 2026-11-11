@@ -7,7 +7,7 @@ bereiche: [gallery]
 Hast du schöne Bilder oder Videos von einem Fest, reichst du sie hier für ein Album der {bereich.gallery} ein. Sie erscheinen erst, wenn jemand mit dem Recht zum Prüfen sie freigibt.
 
 ## So öffnest du die Seite
-Tippe unten auf **{bereich.gallery}** und oben auf **Bilder und Videos einreichen**. Mit **‹ Alle Alben** kommst du zurück.
+Tippe unten auf **{bereich.gallery}** und oben auf **Bilder und Videos einreichen** (Pfeil nach oben). Mit **‹ Alle Alben** kommst du zurück.
 
 ## Was du hier siehst
 - **Album**: in welches Album die Bilder und Videos sollen.

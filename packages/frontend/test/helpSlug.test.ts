@@ -59,6 +59,7 @@ function sees(slug: string, ctx: HelpContext): boolean {
 const PATHS = [
   ['termine'],
   ['termine', 'verwalten'],
+  ['termine', 'kalender'],
   ['news'],
   ['news', 'abc'],
   ['galerie'],
@@ -186,6 +187,7 @@ test('Eine eigene Seite je Bildschirm', () => {
   const cases: [string[], string][] = [
     [['news', 'abc'], 'neuigkeiten-beitrag'],
     [['galerie', '3'], 'galerie-album'],
+    [['galerie', 'verwalten'], 'galerie-verwalten'],
     [['sponsoren'], 'sponsoren'],
     [['verwaltung', 'sponsoren'], 'sponsoren-verwalten'],
     [['kompanien'], 'kompanien'],

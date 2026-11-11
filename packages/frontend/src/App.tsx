@@ -22,7 +22,8 @@ import { setReportOrigin } from './lastError';
 import { shareLink, shareUrl } from './share';
 import { toggleTheme, useTheme } from './theme';
 import News from './views/News';
-import Termine from './views/Termine';
+import Termine, { canManageCalendar } from './views/Termine';
+import { canManageGallery } from './galleryManage';
 import { hasEvents, prefetcher, tabSources, type TabId } from './viewData';
 import { whenIdle } from './prefetch';
 
@@ -32,6 +33,7 @@ const Anmelden = lazyView(() => import('./views/Anmelden'));
 const Registrieren = lazyView(() => import('./views/Registrieren'));
 const Galerie = lazyView(() => import('./views/Galerie'));
 const GalerieEinreichungen = lazyView(() => import('./views/GalerieEinreichungen'));
+const GalleryAlbums = lazyView(() => import('./views/GalerieAlben'));
 const Kompanien = lazyView(() => import('./views/Kompanien'));
 const Sponsoren = lazyView(() => import('./views/Sponsoren'));
 const Seiten = lazyView(() => import('./views/Seiten'));
@@ -424,6 +426,8 @@ export default function App({ notice = null }: { notice?: string | null }) {
     // Eigene Namen und Symbole (Einstellungen → Navigation, Issue #362)
     icons: targetIcons(),
     internLabel: sec.intern,
+    // Reihenfolge in „Intern“ (Einstellungen → Navigation), ohne eigene Navigation
+    internOrder: config?.navigation_intern_order,
   });
   allowed.intern = navEntries.some((e) => e.key === 'intern');
   // „Meins“ ganz rechts, die Verwaltung davor.
@@ -676,6 +680,8 @@ export default function App({ notice = null }: { notice?: string | null }) {
             {tab === 'termine' &&
               (path[1] === 'verwalten' && features?.events && can('manage_events') ? (
                 <TermineVerwalten onToast={showToast} />
+              ) : path[1] === 'kalender' && canManageCalendar() ? (
+                <TermineVerwalten internal onToast={showToast} />
               ) : (
                 <Termine focus={path[1] === 'termin' ? focusId(path[2]) : undefined} />
               ))}
@@ -685,8 +691,15 @@ export default function App({ notice = null }: { notice?: string | null }) {
                 <GalerieEinreichungen mode="einreichen" onToast={showToast} />
               ) : path[1] === 'pruefen' && can('review_gallery') ? (
                 <GalerieEinreichungen mode="pruefen" onToast={showToast} />
+              ) : path[1] === 'verwalten' && canManageGallery() ? (
+                <div>
+                  <button className="btn btn-link back" onClick={() => navigate('galerie')}>
+                    ‹ Alle Alben
+                  </button>
+                  <GalleryAlbums onToast={showToast} />
+                </div>
               ) : (
-                <Galerie albumId={albumId} />
+                <Galerie albumId={albumId} onToast={showToast} />
               ))}
             {tab === 'kompanien' && <Kompanien id={companyId} />}
             {tab === 'sponsoren' && <Sponsoren />}

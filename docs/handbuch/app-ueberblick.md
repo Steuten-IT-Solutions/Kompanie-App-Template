@@ -70,6 +70,7 @@ Unter der Kopfleiste erscheinen manchmal Hinweise:
 
 ## Gut zu wissen
 - Fragt die App nach, bevor sie etwas tut (z. B. „Wirklich löschen?“), öffnet sich ein eigenes Fenster der App mit **Abbrechen** und **OK**. Der Rest der Seite ist dabei abgedunkelt. Löschen und Entfernen steht auf einem roten Knopf. **Abbrechen**, **✕** oder die Taste Esc ändern nichts.
+- Ist ein Fenster der App offen (z. B. zum Verschieben eines Fotos oder eine Rückfrage), schließt **Zurück** (Taste oder Geste des Handys, Zurück-Knopf des Browsers) zuerst das Fenster, ohne etwas zu ändern. Du bleibst auf der Seite. Erst wenn nichts mehr offen ist, führt **Zurück** auf die Seite davor.
 - Wird die App gerade gewartet, siehst du statt der Inhalte nur einen Hinweis darauf. Mit **Erneut versuchen** prüfst du, ob sie wieder da ist.
 - Die Bezeichnungen der Bereiche (z. B. **{bereich.events}**) legt jede Kompanie selbst fest. Deshalb können sie bei dir anders heißen als in anderen Apps.
 

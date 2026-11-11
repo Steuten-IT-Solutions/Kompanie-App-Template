@@ -8,7 +8,7 @@ Meldet jemand über **Fehler melden** ein Problem, landet die Meldung zuerst hie
 
 ## So öffnest du die Seite
 
-Tippe unten auf **Verwaltung** und dann auf **Fehlermeldungen**. Sind Meldungen offen, steht ihre Zahl dahinter, z. B. **Fehlermeldungen (2)**. Kommt eine neue Meldung, bekommst du eine Benachrichtigung, wenn du sie eingeschaltet hast.
+Tippe unten auf **Verwaltung** und dann auf **Fehlermeldungen**. Sind Meldungen offen, zeigt die kleine Zahl im roten Kreis an der Ecke des Knopfs, wie viele es sind; sind keine offen, fehlt sie. Kommt eine neue Meldung, bekommst du eine Benachrichtigung, wenn du sie eingeschaltet hast.
 
 ## Was du hier siehst
 

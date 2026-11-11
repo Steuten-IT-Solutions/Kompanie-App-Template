@@ -8,6 +8,7 @@ import { navigate } from '../router';
 import { ErrorBox, lazyView, Loading, useAsync } from '../ui';
 import { canWriteNews } from './News';
 import { confirmAsk } from '../ask';
+import { IconButton } from '../icons';
 
 const NewsSchreiben = lazyView(() => import('./NewsSchreiben'));
 
@@ -122,13 +123,9 @@ export default function NewsArtikel({ id, onToast }: { id: string; onToast: (msg
               {actionError}
             </p>
           )}
-          <div className="button-row">
-            <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setEditing(true)}>
-              Bearbeiten
-            </button>
-            <button type="button" className="btn btn-danger" disabled={busy} onClick={remove}>
-              Löschen
-            </button>
+          <div className="icon-row news-article-actions">
+            <IconButton icon="edit" label="Bearbeiten" disabled={busy} onClick={() => setEditing(true)} />
+            <IconButton icon="delete" label="Löschen" variant="danger" disabled={busy} onClick={remove} />
           </div>
         </>
       )}

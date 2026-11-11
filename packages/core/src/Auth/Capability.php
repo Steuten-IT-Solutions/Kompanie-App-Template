@@ -70,6 +70,8 @@ enum Capability: string
     case ManageAttendance = 'manage_attendance';
     /** Öffentliche Termine pflegen (Bereich Termine). */
     case ManageEvents = 'manage_events';
+    /** Termine des internen Kalenders in der App pflegen (Bereich Kalender mit der Quelle „In der App“). */
+    case ManageCalendar = 'manage_calendar';
     /**
      * Dokumente pflegen und alle Dokumente sehen, auch die mit eingeschränkter Sichtbarkeit.
      * Die Dokumente selbst kommen mit Issue #2.
@@ -95,6 +97,12 @@ enum Capability: string
     case SubmitGallery = 'submit_gallery';
     /** Einreichungen sehen, freigeben (öffentlich oder intern), ablehnen und freigegebene wieder entfernen (Issue #286). */
     case ReviewGallery = 'review_gallery';
+    /**
+     * Galerie verwalten: Alben der App anlegen, umbenennen, ins andere Jahr setzen und löschen, Bilder und Videos
+     * hochladen, verschieben, löschen und intern oder öffentlich stellen, direkt in der Galerie. Quelle und Abgleich mit
+     * Drive bleiben bei manage_settings.
+     */
+    case ManageGallery = 'manage_gallery';
     /** News in der App schreiben, bearbeiten und löschen (nur mit der Quelle „In der App“, NewsService). */
     case ManageNews = 'manage_news';
     /** Eigene Seiten anlegen, bearbeiten, sortieren und löschen (Bereich Seiten, Issue #287). */

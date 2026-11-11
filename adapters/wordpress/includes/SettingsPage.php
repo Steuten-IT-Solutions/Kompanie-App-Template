@@ -162,9 +162,12 @@ final class SettingsPage
                <strong>„Privatadresse im iCal-Format“</strong> kopieren und hier einfügen.
                Ein privater Kalender geht auch über seine Kalender-ID und den <a href="#google">Google-Zugang</a>
                (Verbindung mit Erlaubnis für den Kalender oder Dienstkonto, für das der Kalender freigegeben ist).
-               Reihenfolge: API-Schlüssel, dann Google-Zugang, dann iCal-Link.</p>
+               Reihenfolge: API-Schlüssel, dann Google-Zugang, dann iCal-Link.
+               Welche Quelle gilt (auch Termine direkt in der App pflegen), wählst du in der App unter
+               <em>Verwaltung → Einstellungen → Kalender</em>.</p>
             <?php
             $calendarSource = [
+                'app' => 'Termine in der App gepflegt (die Felder hier gelten dann nicht)',
                 'google' => 'Google-API mit eigenem API-Schlüssel',
                 'google_connection' => 'Kalender-IDs über den Google-Zugang',
                 'ics' => 'iCal-Link',

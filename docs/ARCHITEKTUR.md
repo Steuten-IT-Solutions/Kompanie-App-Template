@@ -271,7 +271,7 @@ Unabhängig vom Adapter kann der Admin als Quelle „In der App schreiben“ wä
 - **Kern:** `Domain\BugReportService` (Formular mit Zeitmarke, Prüfung, Eingang `report_inbox`, Schließen und Weiterleiten, Warteschlange `bug_reports`, Aufgabe `bug_reports` – läuft immer, löscht erledigte Meldungen im Eingang nach 30 Tagen). Push-Arten `reports_review` (neue Meldungen an alle mit `review_reports`) und `reports` (Antwort an die meldende Person, Empfängerkreis `account`), einmalig für bestehende Abos über `BugReportService::initialize` (`report_inbox_setup`). Installations-ID und Geheimnis kommen aus `StatusReporter`, der Stand „vom Cockpit bestätigt“ ist eigen (`bug_reports_registered`), damit Fehlermeldungen ohne Zustimmung zu den Statusmeldungen funktionieren.
 - **Bildschirmfoto in der Datenbank** (Base64, ≤ 2 MB, eine Zeile je Meldung) statt im Datenverzeichnis: Löschen beim Schließen bzw. Weiterleiten (Eingang), nach der Zustellung, 7 Tage nach dem Weiterleiten oder mit dem Konto entfernt alles auf einmal; es liegt nie in einem vom Webserver ausgelieferten Ordner und nicht in Sicherungen. Die Tabelle ist keine Kerntabelle der Sicherung.
 - **Gäste dürfen melden:** Honeypot, Zeitfalle (signierte Zeitmarke, frühestens 3 s), Begrenzung je IP-Hash und je Installation, höchstens 100 offene Meldungen im Eingang; kein Captcha.
-- **Frontend:** `#/hilfe/melden` (`views/FehlerMelden.tsx`, darunter „Deine Meldungen“), Knopf auf jeder Hilfeseite und im Verzeichnis; Eingang `views/Meldungen.tsx` mit Zähler `openReports` aus `/config`. `lastError.ts` merkt die letzte Fehlermeldung (API-Fehler, Programmfehler) und die Seite, auf der „?“ gedrückt wurde, nur im Speicher.
+- **Frontend:** `#/hilfe/melden` (`views/FehlerMelden.tsx`, darunter „Deine Meldungen“), Knopf auf jeder Hilfeseite und im Verzeichnis; Eingang `views/Meldungen.tsx`; Zähler `openReports` (wie `pendingRegistrations`) aus `/config` als Zahl im Kreis an der Kachel (`tileCount.ts`), beim Öffnen der Verwaltung still neu geholt (`adminCounts.ts`). `lastError.ts` merkt die letzte Fehlermeldung (API-Fehler, Programmfehler) und die Seite, auf der „?“ gedrückt wurde, nur im Speicher.
 
 ### Dokumente (Issue #2)
 
@@ -457,6 +457,7 @@ Unabhängig vom Adapter kann der Admin als Quelle „In der App schreiben“ wä
 | `manage_titles` | Titelliste pflegen und Titel vergeben |
 | `manage_attendance` | Anwesenheitslisten je Termin führen |
 | `manage_events` | öffentliche Termine pflegen |
+| `manage_calendar` | Termine des internen Kalenders in der App pflegen (nur mit der Quelle `app`) |
 | `manage_documents` | Dokumente pflegen und **alle** Dokumente sehen, auch die mit eingeschränkter Sichtbarkeit |
 | `post_board` | Nachrichten ans Schwarze Brett schreiben, ändern und vorzeitig löschen |
 | `manage_polls` | Umfragen anlegen, ändern, beenden und löschen; alle Ergebnisse sehen |
@@ -466,6 +467,7 @@ Unabhängig vom Adapter kann der Admin als Quelle „In der App schreiben“ wä
 | `send_mail` | E-Mails aus der Verwaltung an Rollen, Mitglieder und freie Adressen versenden; Verlauf mit Protokoll |
 | `manage_sponsors` | Sponsoren anlegen, ändern, ordnen und löschen, Logos hochladen (Issue #279) |
 | `manage_companies` | Kompanien anlegen, ändern, ordnen und löschen, Logos hochladen, Mitglieder zuordnen (Issue #280) |
+| `manage_gallery` | Galerie direkt in der Galerie verwalten: Alben der App anlegen, ändern und löschen, hochladen, hochgeladene Bilder und Videos verschieben (`POST /gallery/photos/move`), löschen (`POST /gallery/photos/delete`, auch mehrere) und intern stellen; Quelle und Drive-Abgleich bleiben bei `manage_settings`. Die Standardrolle „Galerie verwalten“ bekommt es einmalig (`gallery_manage_added`, `RoleService::grantOnce`) |
 | `manage_pages` | Eigene Seiten anlegen, ändern, ordnen und löschen; sieht alle Seiten (Issue #287) |
 | `manage_news` | News in der App schreiben, ändern und löschen (nur mit der Quelle „In der App schreiben“) |
 | `view_personal` | Persönliche Angaben anderer sehen: E-Mail-Adresse, Handynummer, Adresse, ganzes Geburtsdatum (Verwaltung → Mitglied) |
@@ -497,6 +499,7 @@ Unabhängig vom Adapter kann der Admin als Quelle „In der App schreiben“ wä
   | Bereich | Standardrolle | Rechte |
   |---|---|---|
   | Termine | Termine verwalten | `member`, `manage_events` |
+  | Kalender (nur mit der Quelle „In der App“) | Kalender verwalten | `member`, `manage_calendar` |
   | Punkte | Punkte verwalten | `member`, `manage_points` |
   | Strafen | Strafen verwalten | `member`, `manage_penalties` |
   | Dienstgrade | Dienstgrade verwalten | `member`, `manage_ranks` |
@@ -613,7 +616,11 @@ Die App setzt **HTTPS** voraus (sonst funktioniert die Installation aufs Handy n
 
 ### Kalender
 
-Standard ist die **geheime iCal-Adresse** des Google Kalenders. Das ist ein Link zum Einfügen, ohne Google Cloud. Daneben gehen Google-Kalender-IDs (`calendar_ids`) über die Google Calendar API. `CalendarService::source()` wählt in dieser Reihenfolge:
+**Quelle wählen:** Der Admin wählt die Quelle des internen Kalenders (Einstellung `calendar_source`: `app`, `google` oder `ics`, `CalendarService::choice()`). Es gilt genau eine Quelle; die Angaben der anderen bleiben beim Wechsel gespeichert. Ohne Auswahl (Installationen von vorher, ältere Fassungen) gilt das Eingetragene in der Reihenfolge unten. Mit der Auswahl `google` gelten nur 1. und 2., mit `ics` nur 3.
+
+**In der App (`app`):** Termine in der Tabelle `internal_events` (Migration 58, Aufbau wie `events`, getrennt von den öffentlichen Terminen, in der Sicherung), gepflegt über `/calendar/entries` mit `manage_calendar` (`EventService` mit eigener `EventRepository`-Tabelle, `App::internalEvents`; ohne die Quelle 409 `not_in_app`). `/calendar` liest sie ohne Zwischenspeicher direkt (Kennungen `i<id>`, sonst wie die anderen Quellen, dazu `url`), `calendar_refresh` entfällt. Nach dem Speichern stößt die API `PushTriggers::checkCalendar` an, so kommen Benachrichtigungen sofort. Der Wechsel zu oder weg von `app` legt die Standardrolle „Kalender verwalten“ an bzw. entfernt sie, wenn niemand sie hat (wie bei den News), und setzt den gemerkten Stand der Benachrichtigungen (`push_calendar_seen`) neu auf. `config.calendarInApp` zeigt der App den Knopf „Internen Kalender verwalten“ (Route `termine/kalender`). Keine Serientermine in der ersten Fassung.
+
+**Google und iCal:** Die **geheime iCal-Adresse** des Google Kalenders ist ein Link zum Einfügen, ohne Google Cloud; jede andere iCal-Adresse über http(s) geht ebenso. Daneben gehen Google-Kalender-IDs (`calendar_ids`) über die Google Calendar API. `CalendarService::source()` wählt in dieser Reihenfolge:
 
 1. `google`: Kalender-IDs mit eigenem API-Key (`google_api_key`, nur öffentliche Kalender).
 2. `google_connection`: Kalender-IDs über den gemeinsamen Google-Zugang (`DriveClient`, siehe Galerie), auch für private Kalender. Abgerufen wird mit `Authorization: Bearer <Zugriffstoken>` und ohne `key`, sonst wie bei 1. (dieselben Parameter mit `singleEvents=true`, Weiterblättern, mehrere Kalender gleichzeitig über `requestAll`). Voraussetzung ist `DriveClient::calendarAccess()`: Bei einer OAuth-Verbindung (`drive_oauth`) muss deren `scope` (durch Leerzeichen getrennt, wie Google ihn beim Token-Austausch liefert; „Mit Google verbinden“ speichert ihn so, die Übernahme kopiert ihn unverändert) `https://www.googleapis.com/auth/calendar.readonly` enthalten. Ein Dienstkonto fragt im JWT immer `drive.readonly` und `calendar.readonly` an (`DriveClient::scopes()`); der Zwischenspeicher des Tokens hängt dort an den Berechtigungen, damit ein Token von vorher nicht weiterverwendet wird. Lehnt Google mit 401/403/404 ab, nennt die Meldung die wahrscheinliche Ursache (Kalender für das verbundene Konto sichtbar bzw. für die Adresse des Dienstkontos freigegeben, Calendar API im Projekt aktiviert).

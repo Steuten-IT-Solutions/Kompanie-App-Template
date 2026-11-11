@@ -34,11 +34,13 @@ final class Features
      */
     public const DEFINITIONS = [
         'events' => ['label' => 'Termine', 'description' => 'Öffentliche Termine, die auch Gäste ohne Anmeldung sehen.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_events']],
-        'calendar' => ['label' => 'Kalender', 'description' => 'Alle Termine aus Google Kalender für angemeldete Mitglieder.', 'requires' => [], 'setup' => 'kalender', 'role' => null],
+        // Interner Kalender: Termine in der App gepflegt, aus Google Kalender oder einer iCal-Adresse (CalendarService). Die
+        // Standardrolle „Kalender verwalten“ gibt es nur mit der Quelle „In der App“ (roleOf).
+        'calendar' => ['label' => 'Kalender', 'description' => 'Interne Termine für angemeldete Mitglieder, getrennt von den öffentlichen: direkt in der App gepflegt, aus Google Kalender oder einer iCal-Adresse.', 'requires' => [], 'setup' => 'kalender', 'role' => null],
         // News: aus den Beiträgen einer Webseite, einem Feed oder in der App geschrieben (NewsService). Die Standardrolle
         // „News verwalten“ gibt es nur mit der Quelle „In der App“ (roleOf); sonst gibt es in der App nichts zu pflegen.
         'news' => ['label' => 'News', 'description' => 'Neuigkeiten der Kompanie: aus den Beiträgen der Webseite, einem Feed oder direkt in der App geschrieben.', 'requires' => [], 'setup' => 'news', 'role' => null],
-        'gallery' => ['label' => 'Galerie', 'description' => 'Fotoalben aus Google Drive oder nur in der App, mit internen Bildern nur für Mitglieder; auf Wunsch reichen Mitglieder Bilder zur Freigabe ein.', 'requires' => [], 'setup' => 'galerie', 'role' => ['member', 'review_gallery']],
+        'gallery' => ['label' => 'Galerie', 'description' => 'Fotoalben aus Google Drive oder nur in der App, mit internen Bildern nur für Mitglieder; auf Wunsch reichen Mitglieder Bilder zur Freigabe ein.', 'requires' => [], 'setup' => 'galerie', 'role' => ['member', 'review_gallery', 'manage_gallery']],
         'points' => ['label' => 'Punkte', 'description' => 'Punkte für Mitglieder, mit Katalog und Verlauf.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_points']],
         'penalties' => ['label' => 'Strafen', 'description' => 'Strafen der Mitglieder, offen oder bezahlt.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_penalties']],
         'ranks' => ['label' => 'Dienstgrade', 'description' => 'Dienstgrade der Mitglieder mit Verlauf; zusammen mit Punkten mit Punkteschwellen und Beförderungsübersicht.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_ranks']],
@@ -210,7 +212,8 @@ final class Features
 
     /** Name der Standardrolle eines Bereichs, z. B. „Punkte verwalten“ (mit der Bezeichnung aus kompanie.json). */
     /**
-     * Rechte der Standardrolle eines Bereichs (DEFINITIONS role); bei den News nur mit der Quelle „In der App“.
+     * Rechte der Standardrolle eines Bereichs (DEFINITIONS role); bei den News und beim Kalender nur mit der Quelle
+     * „In der App“.
      *
      * @return string[]|null
      */
@@ -218,6 +221,9 @@ final class Features
     {
         if ($feature === 'news') {
             return $this->app->newsService()->inApp() ? NewsService::ROLE : null;
+        }
+        if ($feature === 'calendar') {
+            return $this->app->calendar()->inApp() ? CalendarService::ROLE : null;
         }
         return self::DEFINITIONS[$feature]['role'];
     }

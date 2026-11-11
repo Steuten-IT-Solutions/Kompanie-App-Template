@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Tests;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Domain\GallerySubmissionService;
+use KompanieApp\Core\Domain\GalleryUploadService;
 use KompanieApp\Core\Domain\PersonalDataExport;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Http\Response;
@@ -238,8 +240,28 @@ final class GallerySubmissionTest extends TestCase
     {
         $this->app->settings->set(GallerySubmissionService::SETUP_SETTING, false);
         $this->app->gallerySubmissions()->initialize(true);
-        $this->assertSame(TestApp::caps(['member', 'review_gallery']), $this->app->roles()->find('gallery')['capabilities'] ?? null);
+        $this->assertSame(TestApp::caps(['member', 'review_gallery', 'manage_gallery']), $this->app->roles()->find('gallery')['capabilities'] ?? null);
         $this->assertSame('Galerie verwalten', $this->app->roles()->find('gallery')['label'] ?? null);
         $this->assertTrue($this->app->settings->get(GallerySubmissionService::SETUP_SETTING));
+    }
+
+    /** Die schon bestehende Standardrolle „Galerie verwalten“ bekommt manage_gallery einmal; nimmt der Admin es weg, bleibt es weg. */
+    public function testManageGalleryAddedOnceToExistingRole(): void
+    {
+        $this->app->settings->set(GallerySubmissionService::SETUP_SETTING, false);
+        $this->app->gallerySubmissions()->initialize(true);
+        $roles = $this->app->roles();
+        $without = array_values(array_diff($roles->find('gallery')['capabilities'] ?? [], ['manage_gallery']));
+        // Stand vor dem Update: Rolle ohne das neue Recht, noch nicht ergänzt
+        $roles->update('gallery', ['capabilities' => $without]);
+        $this->app->settings->set(GalleryUploadService::MANAGE_SETTING, false);
+        $this->assertNotContains('manage_gallery', $roles->find('gallery')['capabilities'] ?? []);
+        $this->app->galleryUploads()->initialize();
+        $this->assertContains('manage_gallery', $roles->find('gallery')['capabilities'] ?? []);
+        $roles->update('gallery', ['capabilities' => $without]);
+        $this->app->galleryUploads()->initialize();
+        $this->assertNotContains('manage_gallery', $roles->find('gallery')['capabilities'] ?? [], 'nur einmal');
+        $this->assertContains(Capability::ManageGallery, Roles::GRANTABLE);
+        $this->assertSame(Capability::Member, Capability::ManageGallery->requires());
     }
 }

@@ -8,7 +8,8 @@ use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Storage\EventRepository;
 
 /**
- * Öffentliche Termine, die Admins in der App pflegen.
+ * Termine, die in der App gepflegt werden: die öffentlichen (App::events, Recht manage_events) und, getrennt davon in
+ * einer eigenen Tabelle, die des internen Kalenders mit der Quelle „app“ (App::internalEvents, Recht manage_calendar).
  * Datum und Uhrzeit sind getrennt gespeichert, weil viele Termine ganztägig oder mehrtägig sind.
  */
 final class EventService
@@ -27,6 +28,16 @@ final class EventService
     {
         $rows = $this->events->upcoming($this->time->today()->format('Y-m-d'), $limit);
         return array_map([$this, 'format'], $rows);
+    }
+
+    /**
+     * Termine, die zwischen zwei Tagen (je einschließlich) liegen oder laufen.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function between(string $from, string $to): array
+    {
+        return array_map([$this, 'format'], $this->events->between($from, $to));
     }
 
     /** @return array<string, mixed>|null */

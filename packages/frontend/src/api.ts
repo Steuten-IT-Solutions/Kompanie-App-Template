@@ -8,7 +8,7 @@ import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
 import { noteError } from './lastError';
 import { rememberRoute } from './share';
-import type { NavigationSetting, NavNames, NavStart } from './navigation';
+import type { AdminOrder, NavigationSetting, NavNames, NavStart } from './navigation';
 
 /** Schlüssel einer Rolle: guest, member, admin, früher fest (organizer, manager, candidate) oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
@@ -41,6 +41,7 @@ export type Capability =
   | 'manage_titles'
   | 'manage_attendance'
   | 'manage_events'
+  | 'manage_calendar'
   | 'manage_documents'
   | 'post_board'
   | 'manage_polls'
@@ -52,6 +53,7 @@ export type Capability =
   | 'manage_companies'
   | 'submit_gallery'
   | 'review_gallery'
+  | 'manage_gallery'
   | 'manage_pages'
   | 'manage_news'
   | 'view_personal'
@@ -144,12 +146,18 @@ export interface AppConfig {
   navigation_start?: NavStart;
   /** Namen unter den Symbolen der Tab-Leiste (Issue #362); fehlt = ja */
   navigation_labels?: boolean;
+  /** Reihenfolge der Kacheln in „Intern“ der Standardnavigation; leer = Standard, fehlt bei älteren Servern */
+  navigation_intern_order?: string[];
+  /** Reihenfolge der Kacheln der Verwaltung je Gruppe (leer kann als [] kommen); fehlt bei älteren Servern */
+  admin_order?: AdminOrder | [];
   /** Eigene Namen als Abschnitte (brand.labels.sections), übernimmt generated/brand.ts beim Laden */
   section_labels?: Record<string, string>;
   /** Eigene Seiten (Issue #287), die die Person lesen darf, in ihrer Reihenfolge; fehlt bei älteren Servern */
   pages?: { id: number; title: string }[];
   /** News werden in der App geschrieben (Quelle „In der App“); fehlt bei älteren Servern */
   newsInApp?: boolean;
+  /** Interner Kalender wird in der App gepflegt (Quelle „In der App“); fehlt bei älteren Servern */
+  calendarInApp?: boolean;
   /** Vorschau „App als Rolle ansehen“ (Issue #63): vom Server bestätigt; role ist der Schlüssel oder @public */
   preview?: { role: string; label: string } | null;
   /** Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen; null ohne den Bereich, fehlt bei älteren Servern */
@@ -347,6 +355,9 @@ export interface NavigationAdmin {
   names: NavNames;
   start: NavStart;
   show_labels: boolean;
+  /** Reihenfolge in „Intern“ der Standardnavigation und der Verwaltung; fehlen bei älteren Servern */
+  intern_order?: string[];
+  admin_order?: AdminOrder | [];
   targets: string[];
   icons: string[];
   max_menu_items: number;
@@ -434,22 +445,24 @@ export function applyBirthdayUpcomingDays(days: number): void {
 }
 
 /** Übernimmt die gespeicherte Navigation in die geladene Konfiguration und baut die Tab-Leiste neu. */
-export function applyNavigation(navigation: NavigationSetting | null): void {
+export function applyNavigation(next: Pick<NavigationAdmin, 'navigation' | 'intern_order' | 'admin_order'>): void {
   if (!config) return;
-  config.navigation = navigation;
+  config.navigation = next.navigation;
+  config.navigation_intern_order = next.intern_order;
+  config.admin_order = next.admin_order;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
 /** Zahl der offenen Anfragen auf einen Zugang (Issue #314) nach dem Freigeben oder Ablehnen: Zähler in der Verwaltung. */
 export function applyPendingRegistrations(count: number): void {
-  if (!config || config.pendingRegistrations == null) return;
+  if (!config || config.pendingRegistrations == null || config.pendingRegistrations === count) return;
   config.pendingRegistrations = count;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
 /** Zahl der offenen Fehlermeldungen nach dem Schließen oder Weiterleiten: Zähler in der Verwaltung. */
 export function applyOpenReports(count: number): void {
-  if (!config || config.openReports == null) return;
+  if (!config || config.openReports == null || config.openReports === count) return;
   config.openReports = count;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
@@ -704,6 +717,8 @@ export interface NewsInput {
 export interface GalleryAlbumSummary {
   id: number;
   title: string;
+  /** Album der App (in der App änderbar) oder aus Google Drive; fehlt bei älteren Servern */
+  source?: 'app' | 'drive';
   /** Bilder und Videos zusammen */
   count: number;
   /** davon Videos; fehlt bei älteren Servern */
@@ -744,6 +759,8 @@ export interface GalleryAlbum {
   id: number;
   title: string;
   year: string;
+  /** Album der App (in der App änderbar) oder aus Google Drive; fehlt bei älteren Servern */
+  source?: 'app' | 'drive';
   /** Knöpfe zum Herunterladen zeigen (je Bild in der Großansicht, das Album als ZIP); fehlt bei älteren Servern */
   downloads?: boolean;
   photos: GalleryPhoto[];
@@ -2158,6 +2175,11 @@ export const api = {
   createEvent: (data: EventInput) => request<PublicEvent>('POST', '/events', data),
   updateEvent: (id: number, data: EventInput) => request<PublicEvent>('PATCH', `/events/${id}`, data),
   deleteEvent: (id: number) => request<{ deleted: boolean }>('DELETE', `/events/${id}`),
+  // Interner Kalender in der App (Quelle „In der App“, manage_calendar): gleiche Felder wie die öffentlichen Termine
+  calendarEntries: () => request<PublicEvent[]>('GET', '/calendar/entries'),
+  createCalendarEntry: (data: EventInput) => request<PublicEvent>('POST', '/calendar/entries', data),
+  updateCalendarEntry: (id: number, data: EventInput) => request<PublicEvent>('PATCH', `/calendar/entries/${id}`, data),
+  deleteCalendarEntry: (id: number) => request<{ deleted: boolean }>('DELETE', `/calendar/entries/${id}`),
 
   news: async (page = 1) => {
     const { data, headers } = await requestFull<NewsItem[]>('GET', '/news', undefined, { page: String(page) });
@@ -2491,8 +2513,14 @@ export const api = {
   setActivityPersonal: (personal: boolean) => request<{ personal: boolean }>('PUT', '/admin/activity/settings', { personal }),
   maintenance: () => request<MaintenanceState>('GET', '/admin/maintenance'),
   navigation: () => request<NavigationAdmin>('GET', '/admin/navigation'),
-  saveNavigation: (body: { navigation: NavigationSetting | null; names?: NavNames; start?: NavStart; show_labels?: boolean }) =>
-    request<NavigationAdmin>('PUT', '/admin/navigation', body),
+  saveNavigation: (body: {
+    navigation: NavigationSetting | null;
+    names?: NavNames;
+    start?: NavStart;
+    show_labels?: boolean;
+    intern_order?: string[] | null;
+    admin_order?: AdminOrder | null;
+  }) => request<NavigationAdmin>('PUT', '/admin/navigation', body),
   setMaintenance: (on: boolean, reason?: string) =>
     request<MaintenanceState>('POST', '/admin/maintenance', reason === undefined ? { on } : { on, reason }),
   /** Laufzeit-Konfiguration neu laden (z. B. „Erneut versuchen“ auf der Wartungsseite). */
@@ -2530,9 +2558,17 @@ export const api = {
   uploadGalleryPhoto: async (albumId: number, file: File, intern: boolean) =>
     request<GalleryAdminAlbumDetail>('POST', `/admin/gallery/albums/${albumId}/photos`, { file: await encodeFile(file), intern }),
   deleteGalleryPhoto: (id: number) => request<{ deleted: boolean }>('DELETE', `/admin/gallery/photos/${id}`),
-  /** Hochgeladenes Bild oder Video nachträglich intern oder öffentlich stellen (manage_settings oder review_gallery) */
+  /** Hochgeladenes Bild oder Video nachträglich intern oder öffentlich stellen (manage_gallery oder review_gallery) */
   setGalleryPhotoIntern: (id: number, intern: boolean) =>
     request<{ id: number; intern: boolean }>('PATCH', `/gallery/photos/${id}`, { intern }),
+  /** Alben als Ziel zum Verschieben (manage_gallery) */
+  galleryMoveTargets: () =>
+    request<{ albums: { id: number; title: string; year: string; source: 'app' | 'drive' }[] }>('GET', '/gallery/albums'),
+  /** Hochgeladene Bilder und Videos in ein anderes Album verschieben (manage_gallery) */
+  moveGalleryPhotos: (ids: number[], albumId: number) =>
+    request<{ moved: number; album_id: number }>('POST', '/gallery/photos/move', { ids, album_id: albumId }),
+  /** Hochgeladene Bilder und Videos löschen, mehrere auf einmal (manage_gallery) */
+  deleteGalleryPhotos: (ids: number[]) => request<{ deleted: number }>('POST', '/gallery/photos/delete', { ids }),
   // Einreichungen (Issue #286)
   // Videos in Stücken hochladen (Issue #350), siehe videoUpload.ts
   startVideoUpload: (input: { album_id: number; name: string; size: number; purpose: 'album' | 'submission' }) =>
@@ -2979,6 +3015,8 @@ export interface ErrorLogEntry {
 
 /** site: Beiträge dieser WordPress-Seite (nur im Plugin); app: in der App geschrieben */
 export type NewsSourceType = 'none' | 'wordpress' | 'rss' | 'site' | 'app';
+/** Quelle des internen Kalenders, die der Admin wählt */
+export type CalendarSourceChoice = 'app' | 'google' | 'ics';
 
 export interface AdminSettings {
   /** Gemeinsamer Google-Zugang für Galerie und Kalender: „Mit Google verbinden“ oder Dienstkonto */
@@ -2995,8 +3033,13 @@ export interface AdminSettings {
     last_result: { ok: boolean; message: string; at: number } | null;
   };
   calendar: {
-    /** google: eigener API-Schlüssel; google_connection: Google-Zugang (OAuth mit Kalender-Berechtigung oder Dienstkonto) */
-    source: 'ics' | 'google' | 'google_connection' | 'none';
+    /**
+     * app: Termine in der App gepflegt; google: eigener API-Schlüssel; google_connection: Google-Zugang (OAuth mit
+     * Kalender-Berechtigung oder Dienstkonto)
+     */
+    source: 'app' | 'ics' | 'google' | 'google_connection' | 'none';
+    /** Gewählte Quelle; leer, solange keine gewählt ist (dann gilt das Eingetragene); fehlt bei älteren Servern */
+    choice?: CalendarSourceChoice | '';
     /** Kalender-IDs ohne API-Schlüssel, aber die OAuth-Verbindung darf den Kalender nicht lesen (neu verbinden) */
     connection_needs_calendar_access: boolean;
     ics_url_set: boolean;
@@ -3095,6 +3138,7 @@ export interface FailedPhoto {
 }
 
 export interface AdminSettingsInput {
+  calendar_source?: CalendarSourceChoice;
   calendar_ics_url?: string;
   google_api_key?: string;
   calendar_ids?: string;
