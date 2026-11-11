@@ -12,7 +12,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{
 ## Was du hier siehst
 - Alle Seiten in ihrer Reihenfolge mit dem Titel, bei Seiten nur für Mitglieder mit dem Hinweis **nur Mitglieder**, und darunter, wann und von wem sie zuletzt geändert wurden.
 - Links der **Griff** (sechs Punkte) zum Verschieben.
-- Bei jeder Seite **Bearbeiten** und **Löschen**.
+- Bei jeder Seite die runden Symbole **Bearbeiten** (Stift) und **Löschen** (Mülleimer).
 - Unten das Formular **Neue Seite** mit **Titel**, **Für wen?**, dem **Inhalt** aus Blöcken und **Anlegen**.
 
 ## So gehst du vor

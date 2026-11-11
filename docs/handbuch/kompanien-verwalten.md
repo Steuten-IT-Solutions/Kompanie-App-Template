@@ -12,7 +12,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{
 ## Was du hier siehst
 - Alle {bereich.companies} in der Reihenfolge der Liste, mit einer kleinen Vorschau des Logos, dem Namen, Kurzname, Gründungsjahr und der Zahl der Mitglieder. Aufgelöste sind mit **ehemalig** markiert.
 - Links der **Griff** (sechs Punkte) zum Verschieben.
-- Bei jedem Eintrag **Bearbeiten**, **Mitglieder**, **Logo hochladen** (bzw. **Logo ersetzen**), **Logo entfernen** und **Löschen**.
+- Bei jedem Eintrag **Bearbeiten** (Stift), **Mitglieder**, **Logo hochladen** (bzw. **Logo ersetzen**), **Logo entfernen** und **Löschen** (Mülleimer).
 - Unten das Formular **Neue Kompanie**.
 
 ## So gehst du vor

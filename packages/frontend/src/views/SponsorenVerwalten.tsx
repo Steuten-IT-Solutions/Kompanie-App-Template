@@ -7,6 +7,7 @@ import { normalizeLink } from '../link';
 import { sources } from '../viewData';
 import { SponsorLogo } from './Sponsoren';
 import { confirmAsk } from '../ask';
+import { IconButton } from '../icons';
 
 const sec = brand.labels.sections;
 
@@ -166,17 +167,16 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
                   <div className="row-title">{s.name}</div>
                   <div className="row-sub">{s.url || 'ohne Link'}</div>
                   <div className="row-actions">
-                    <button
-                      className="btn btn-small btn-secondary"
+                    <IconButton
+                      icon="edit"
+                      label="Bearbeiten"
                       disabled={busy}
                       onClick={() => {
                         setEditName(s.name);
                         setEditUrl(s.url);
                         setEditing(s.id);
                       }}
-                    >
-                      Bearbeiten
-                    </button>
+                    />
                     <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => chooseLogo(s.id)}>
                       {s.logo_url ? 'Logo ersetzen' : 'Logo hochladen'}
                     </button>
@@ -191,13 +191,13 @@ export function SponsorAdmin({ onToast }: { onToast: (msg: string) => void }) {
                         Logo entfernen
                       </button>
                     )}
-                    <button
-                      className="btn btn-small btn-danger"
+                    <IconButton
+                      icon="delete"
+                      label="Löschen"
+                      variant="danger"
                       disabled={busy}
                       onClick={async () => (await confirmAsk(`„${s.name}“ löschen?`)) && run(() => api.deleteSponsor(s.id), 'Gelöscht')}
-                    >
-                      Löschen
-                    </button>
+                    />
                   </div>
                 </div>
               </li>

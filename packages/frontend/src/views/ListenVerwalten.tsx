@@ -12,6 +12,7 @@ import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { confirmAsk } from '../ask';
+import { Icon, IconButton } from '../icons';
 
 const sec = brand.labels.sections;
 
@@ -177,13 +178,13 @@ function ListOverview({ onToast }: { onToast: Toast }) {
                   >
                     Kopieren
                   </button>
-                  <button
-                    className="btn btn-small btn-danger"
+                  <IconButton
+                    icon="delete"
+                    label="Löschen"
+                    variant="danger"
                     disabled={busy}
                     onClick={async () => (await confirmAsk(`Liste „${l.title}“ löschen?`)) && run(() => api.deleteList(l.id), 'Gelöscht')}
-                  >
-                    Löschen
-                  </button>
+                  />
                 </div>
               </div>
             </li>
@@ -401,16 +402,28 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
         {hidden.length > 0 && (
           <p className="muted small">Ohne die Rechte dazu bleiben diese Spalten leer: {hidden.map((c) => columnLabel(c)).join(', ')}.</p>
         )}
-        <div className="button-row">
-          <button className="btn" disabled={pdfBusy} onClick={downloadPdf}>
-            {pdfBusy ? 'PDF wird erstellt …' : 'PDF herunterladen'}
+        {/* Symbol und kurzer Text: Herunterladen als PDF bzw. CSV, Drucken nur als Symbol (passt auf schmale Handys) */}
+        <div className="list-output-buttons">
+          <button
+            className="btn btn-icon-text"
+            disabled={pdfBusy}
+            onClick={downloadPdf}
+            aria-label={pdfBusy ? 'PDF wird erstellt' : 'PDF herunterladen'}
+            title="PDF herunterladen"
+          >
+            <Icon name="download" />
+            {pdfBusy ? 'PDF …' : 'PDF'}
           </button>
-          <button className="btn btn-secondary" onClick={() => window.print()}>
-            Drucken
+          <button
+            className="btn btn-secondary btn-icon-text"
+            onClick={() => downloadCsv(draft)}
+            aria-label="CSV herunterladen"
+            title="CSV herunterladen"
+          >
+            <Icon name="download" />
+            CSV
           </button>
-          <button className="btn btn-secondary" onClick={() => downloadCsv(draft)}>
-            CSV herunterladen
-          </button>
+          <IconButton icon="print" label="Drucken" onClick={() => window.print()} />
         </div>
         <p className="muted small">Die Liste enthält personenbezogene Daten. Bitte nach Gebrauch vernichten bzw. löschen.</p>
         <div className="list-preview" aria-label="Vorschau">
@@ -671,15 +684,15 @@ function RowEditor({
           sie.
         </p>
       )}
-      <div className="button-row">
+      <div className="button-row list-row-buttons">
         <button type="button" className="btn" disabled={busy} onClick={onSync}>
           Mitglieder aktualisieren
         </button>
         <button type="button" className="btn btn-secondary" disabled={rows.length >= ROWS_MAX} onClick={() => addFree(1)}>
-          + Leere Zeile
+          + Zeile
         </button>
         <button type="button" className="btn btn-secondary" disabled={rows.length >= ROWS_MAX} onClick={() => addFree(5)}>
-          + 5 leere Zeilen
+          + 5 Zeilen
         </button>
       </div>
       <div className="field-row list-sort">

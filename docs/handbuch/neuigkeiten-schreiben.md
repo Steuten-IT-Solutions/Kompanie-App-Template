@@ -7,7 +7,7 @@ bereiche: [news]
 Hier schreibst du Beiträge für die {bereich.news} direkt in der App, aus Blöcken mit formatiertem Text, Bildern und vorgefertigten Blöcken wie einem **Countdown**, und änderst oder löschst sie später. Das geht nur, wenn ein {rolle.admin} als Quelle der {bereich.news} **In der App schreiben** gewählt hat (Einstellungen → Neuigkeiten).
 
 ## So öffnest du die Seite
-Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum Ändern öffnest du einen Beitrag; unter dem Text stehen **Bearbeiten** und **Löschen**.
+Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum Ändern öffnest du einen Beitrag; unter dem Text stehen **Bearbeiten** (Stift) und **Löschen** (Mülleimer).
 
 ## Was du hier siehst
 - **Neuer Beitrag** (über der Liste): öffnet das Formular für einen neuen Beitrag.
@@ -15,7 +15,7 @@ Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum 
 - **Titelbild (optional)**: ein Bild, das in der Liste der {bereich.news} über dem Beitrag und groß oben im Beitrag steht. Mit **Bild wählen** lädst du es hoch, mit **Bild ersetzen** tauschst du es aus, mit **Bild entfernen** nimmst du es heraus. Die Vorschau zeigt den Ausschnitt wie in der Liste (Querformat 16:9). Ohne Titelbild erscheint in der Liste das erste Bild in einem Text für alle.
 - **Inhalt**: der Beitrag aus Blöcken, zuerst ein Textblock mit Formatierung, Links und Bildern. Mit **+ Block einfügen** kommen weitere Blöcke dazu, zum Beispiel ein **Countdown**.
 - **Veröffentlichen** bzw. **Speichern** und **Abbrechen**.
-- Im geöffneten Beitrag: **Zuletzt geändert** mit Datum und Name, darunter **Bearbeiten** und **Löschen**.
+- Im geöffneten Beitrag: **Zuletzt geändert** mit Datum und Name, darunter **Bearbeiten** (Stift) und **Löschen** (Mülleimer).
 
 ## So gehst du vor
 ### Einen Beitrag schreiben

@@ -14,7 +14,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{
 ## Was du hier siehst
 - Die {bereich.ranks} vom niedrigsten (oben) zum höchsten (unten), jeweils mit Abzeichen, Bezeichnung, Schwelle („ab … {bereich.points}“ oder „ohne Schwelle“) und wie oft er vergeben ist. Deaktivierte tragen das Schild „inaktiv“.
 - Ab zwei {bereich.ranks} links bei jedem ein Griff (sechs Punkte) zum Verschieben.
-- Bei jedem {begriff.rank} die Knöpfe **Ändern**, **Deaktivieren** (bzw. **Aktivieren**) oder **Löschen**.
+- Bei jedem {begriff.rank} die Knöpfe **Ändern**, **Deaktivieren** (bzw. **Aktivieren**) oder **Löschen** (Mülleimer).
 - Darunter das Abzeichen: eine Vorschau auf heller und dunkler Fläche („hell“, „dunkel“) mit **Ersetzen** und **Entfernen**, ohne Abzeichen der Knopf **Abzeichen hochladen**.
 - Unten das Formular **Neuer {begriff.rank}** mit **Bezeichnung**, **{bereich.points}schwelle (optional)** und **Anlegen**.
 

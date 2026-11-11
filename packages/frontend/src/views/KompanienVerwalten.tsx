@@ -7,6 +7,7 @@ import { normalizeLink } from '../link';
 import { sources } from '../viewData';
 import { CompanyLogo } from './Kompanien';
 import { confirmAsk } from '../ask';
+import { IconButton } from '../icons';
 
 const RichTextEditor = lazyView(() => import('../richtext/RichTextEditor'));
 
@@ -334,16 +335,15 @@ export function CompanyAdmin({ onToast }: { onToast: (msg: string) => void }) {
                       .join(' · ')}
                   </div>
                   <div className="row-actions">
-                    <button
-                      className="btn btn-small btn-secondary"
+                    <IconButton
+                      icon="edit"
+                      label="Bearbeiten"
                       disabled={busy}
                       onClick={() => {
                         setEditDraft(draftOf(c));
                         setEditing(c.id);
                       }}
-                    >
-                      Bearbeiten
-                    </button>
+                    />
                     <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => setAssigning(c.id)}>
                       Mitglieder
                     </button>
@@ -361,17 +361,17 @@ export function CompanyAdmin({ onToast }: { onToast: (msg: string) => void }) {
                         Logo entfernen
                       </button>
                     )}
-                    <button
-                      className="btn btn-small btn-danger"
+                    <IconButton
+                      icon="delete"
+                      label="Löschen"
+                      variant="danger"
                       disabled={busy}
                       onClick={async () =>
                         (await confirmAsk(
                           `„${c.name}“ löschen? Die Zuordnungen der Mitglieder gehen verloren. Aufgelöste besser als „aufgelöst“ markieren.`,
                         )) && run(() => api.deleteCompany(c.id), 'Gelöscht')
                       }
-                    >
-                      Löschen
-                    </button>
+                    />
                   </div>
                 </div>
               </li>
