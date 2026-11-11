@@ -18,6 +18,9 @@ use KompanieApp\Core\Telemetry\Code;
  *
  * Mit $encrypted (Adresse mit ?verschluesselt=1) verschlüsselt mit dem Passwort für Sicherungen (BackupCrypto), beim
  * Schreiben Stück für Stück.
+ *
+ * Mit $file (Adresse mit ?datei=<Name>) eine Sicherung, die schon auf dem Server liegt (ServerBackupService::files: die
+ * wöchentlichen und die vor Updates), so wie sie dort liegt (unverschlüsselt).
  */
 final class BackupDownload
 {
@@ -31,7 +34,7 @@ final class BackupDownload
      *
      * @return array{status: int, headers: array<string, string>, write?: \Closure(resource): void}
      */
-    public function forDelivery(?User $viewer, bool $encrypted = false): array
+    public function forDelivery(?User $viewer, bool $encrypted = false, ?string $file = null): array
     {
         $deny = static fn (int $status): array => ['status' => $status, 'headers' => ['Cache-Control' => 'no-store', 'X-Content-Type-Options' => 'nosniff']];
         $backup = $this->app->backup;
@@ -43,6 +46,9 @@ final class BackupDownload
         }
         if (!$viewer->can(Capability::ManageSettings) || $viewer->preview) {
             return $deny(403);
+        }
+        if ($file !== null) {
+            return $this->stored($file) ?? $deny(404);
         }
         // Verschlüsselt nur mit geprüftem Passwort: Ein vertipptes machte die Sicherung unbrauchbar (die Seite bietet es
         // vorher nicht an).
@@ -74,6 +80,39 @@ final class BackupDownload
             }
             // Erst nach dem Schreiben: Die Ampel zählt nur eine vollständig erzeugte Sicherung.
             $this->app->settings->set(StatusService::BACKUP_SETTING, $now);
+        }];
+    }
+
+    /**
+     * Eine Sicherung vom Server (nur Namen aus der Liste), null wenn es sie nicht gibt.
+     *
+     * @return array{status: int, headers: array<string, string>, write: \Closure(resource): void}|null
+     */
+    private function stored(string $file): ?array
+    {
+        $path = $this->app->serverBackup()->path($file);
+        if ($path === null) {
+            return null;
+        }
+        // Stück für Stück wie die übrigen Sicherungen (die Adapter leeren dafür die Ausgabepuffer): Eine große Sicherung
+        // soll nicht erst ganz im Arbeitsspeicher landen.
+        return ['status' => 200, 'headers' => [
+            'Content-Type' => 'application/json; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="' . $file . '"',
+            'Content-Length' => (string) (int) @filesize($path),
+            'Cache-Control' => 'no-store',
+            'X-Content-Type-Options' => 'nosniff',
+            'X-Robots-Tag' => 'noindex',
+        ], 'write' => static function ($out) use ($path): void {
+            $in = @fopen($path, 'rb');
+            if ($in === false) {
+                throw new \RuntimeException('Die Sicherung ließ sich auf dem Server nicht lesen.');
+            }
+            try {
+                stream_copy_to_stream($in, $out);
+            } finally {
+                fclose($in);
+            }
         }];
     }
 }
