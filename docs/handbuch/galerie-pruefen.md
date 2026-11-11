@@ -24,7 +24,7 @@ Tippe auf **Ablehnen** und schreibe kurz, warum. Der Server löscht die Datei so
 Setze oder entferne unter **Zuletzt freigegeben** den Haken **intern**. Mit Haken sehen es nur {rolle.member}, ohne alle. Wer es vorher schon angesehen oder gespeichert hat, behält diese Kopie. Dasselbe geht in der Großansicht der {bereich.gallery}. Verschieben und löschen darf nur, wer die {bereich.gallery} verwaltet.
 
 ### Ein freigegebenes Bild wieder entfernen
-Tippe unter **Zuletzt freigegeben** auf **Wieder entfernen** und bestätige. Das Bild verschwindet aus der {bereich.gallery}.
+Tippe unter **Zuletzt freigegeben** auf **Wieder entfernen** (Mülleimer) und bestätige. Das Bild verschwindet aus der {bereich.gallery}.
 
 ## Gut zu wissen
 - Bei neuen Einreichungen bekommst du eine Benachrichtigung, je Person und Schub Bilder nur eine (unter **Meins → Benachrichtigungen** einstellbar).

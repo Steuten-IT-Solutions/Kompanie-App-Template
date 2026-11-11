@@ -3,6 +3,7 @@ import { api, type GallerySubmission } from '../api';
 import { navigate } from '../router';
 import { Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
 import { confirmAsk, promptAsk } from '../ask';
+import { IconButton } from '../galleryIcons';
 import { InternToggle } from '../galleryIntern';
 import { VIDEO_ACCEPT, countFiles, isVideoFile, submitVideo } from '../videoUpload';
 
@@ -119,7 +120,7 @@ function Submit({ onToast }: { onToast: (msg: string) => void }) {
           </>
         )}
       </form>
-      <section className="card">
+      <section className="card settings-section">
         <h3>Deine Einreichungen</h3>
         {(data?.submissions ?? []).length === 0 ? (
           <p className="muted small">Noch keine.</p>
@@ -243,37 +244,38 @@ function Review({ onToast }: { onToast: (msg: string) => void }) {
         </ul>
       )}
       {approved.length > 0 && (
-        <section className="card">
+        <section className="card settings-section">
           <h3>Zuletzt freigegeben</h3>
           <ul className="gallery-upload-list">
             {approved.map((s) => (
-              <li key={s.id} className="gallery-upload">
+              <li key={s.id} className="gallery-upload gallery-approved">
                 <Preview s={s} />
                 <span className="small">
                   {s.name} · {s.album} · von {s.user_name}
                 </span>
-                {s.photo_id !== null && typeof s.intern === 'boolean' && (
-                  <InternToggle
-                    checked={s.intern}
-                    name={s.name}
+                <div className="gallery-approved-actions">
+                  {s.photo_id !== null && typeof s.intern === 'boolean' && (
+                    <InternToggle
+                      checked={s.intern}
+                      name={s.name}
+                      disabled={busy}
+                      onChange={(next) =>
+                        run(() => api.setGalleryPhotoIntern(s.photo_id!, next), next ? 'Jetzt nur für Mitglieder' : 'Jetzt öffentlich')
+                      }
+                    />
+                  )}
+                  <IconButton
+                    icon="delete"
+                    label="Wieder entfernen"
+                    variant="danger"
                     disabled={busy}
-                    onChange={(next) =>
-                      run(() => api.setGalleryPhotoIntern(s.photo_id!, next), next ? 'Jetzt nur für Mitglieder' : 'Jetzt öffentlich')
-                    }
+                    onClick={async () => {
+                      if (!(await confirmAsk(`${s.type === 'video' ? 'Video' : 'Bild'} „${s.name}“ wieder aus der Galerie entfernen?`)))
+                        return;
+                      void run(() => api.removeGallerySubmission(s.id), 'Entfernt');
+                    }}
                   />
-                )}
-                <button
-                  type="button"
-                  className="btn btn-small btn-danger"
-                  disabled={busy}
-                  onClick={async () => {
-                    if (!(await confirmAsk(`${s.type === 'video' ? 'Video' : 'Bild'} „${s.name}“ wieder aus der Galerie entfernen?`)))
-                      return;
-                    void run(() => api.removeGallerySubmission(s.id), 'Entfernt');
-                  }}
-                >
-                  Wieder entfernen
-                </button>
+                </div>
               </li>
             ))}
           </ul>
