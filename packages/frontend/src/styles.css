@@ -7303,9 +7303,11 @@ fieldset.block-source legend {
   flex: 1;
   min-width: 0;
 }
-/* Ämter verwalten: Symbole für Bearbeiten und Löschen nebeneinander, der Schalter „Amtszeiten gemeinsam“ dahinter */
+/* Ämter verwalten: zuerst der Schalter „Amtszeiten gemeinsam“ in eigener Zeile, darunter die Symbole für Bearbeiten
+ * und Löschen nebeneinander */
 .row-actions .joint-toggle {
-  order: 1;
+  order: -1;
+  flex-basis: 100%;
 }
 /* Bei „Mitglieder aktualisieren“ über die ganze Breite stehen „+ Zeile“ und „+ 5 Zeilen“ darunter nebeneinander */
 .list-row-buttons > :last-child:nth-child(odd) {

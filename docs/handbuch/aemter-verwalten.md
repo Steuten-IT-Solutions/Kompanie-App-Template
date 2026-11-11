@@ -15,7 +15,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf **{bereich.of
 - **Tabelle importieren**: viele Amtszeiten auf einmal übernehmen.
 - **Zeitstrahl ansehen**: öffnet die Ansicht, die alle sehen.
 - **Namen mit Mitgliedern verknüpfen**: Vorschläge, welche Personen ohne Profil schon als Mitglied oder Ehemaliger in der App stehen.
-- **Gruppen**: je Gruppe die Symbole **Bearbeiten** (Stift) und **Löschen** (Mülleimer) und der Schalter **Amtszeiten gemeinsam**, darunter **Neue Gruppe** mit **Gruppe anlegen**.
+- **Gruppen**: je Gruppe der Schalter **Amtszeiten gemeinsam** und darunter die Symbole **Bearbeiten** (Stift) und **Löschen** (Mülleimer), darunter **Neue Gruppe** mit **Gruppe anlegen**.
 - **Die Ämter** je Gruppe (und unter **Ohne Gruppe**), mit der Zahl der Amtszeiten und, falls verknüpft, dem {bereich.titles}, den das Amt vergibt.
 - **Neues Amt** mit **Bezeichnung**, **Gruppe** und **Anlegen**.
 - Links an Gruppen und Ämtern ein Griff (sechs Punkte) zum Verschieben.
