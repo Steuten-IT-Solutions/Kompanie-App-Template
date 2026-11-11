@@ -14,7 +14,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{
 ## Was du hier siehst
 - Alle {bereich.titles} in der Reihenfolge, in der sie überall angezeigt werden, jeweils mit „… × vergeben“ oder „nicht vergeben“. Deaktivierte tragen das Schild „inaktiv“.
 - Links der **Griff** (sechs Punkte) zum Verschieben.
-- Bei jedem Titel **Umbenennen**, **Deaktivieren** (bzw. **Aktivieren**) oder **Löschen**.
+- Bei jedem Titel **Umbenennen**, **Deaktivieren** (bzw. **Aktivieren**) oder **Löschen** (Mülleimer).
 - Unten das Formular **Neuer Titel** mit **Bezeichnung** und **Anlegen**.
 
 ## So gehst du vor

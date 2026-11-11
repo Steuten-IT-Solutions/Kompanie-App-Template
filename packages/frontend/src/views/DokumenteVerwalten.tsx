@@ -8,6 +8,7 @@ import { Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
 import { docGroupKey, groupDocuments, groupKey } from '../documents';
 import { ACCEPT, DocGroupSection, DocSortSelect, typeLabel, useDocSort, useOpenGroups, VISIBILITY_LABELS } from './Dokumente';
 import { confirmAsk, promptAsk } from '../ask';
+import { IconButton } from '../icons';
 
 const sec = brand.labels.sections;
 
@@ -255,8 +256,9 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
                       </div>
                       <div className="row-sub">{VISIBILITY_LABELS[doc.visibility]}</div>
                       <div className="row-actions">
-                        <button
-                          className="btn btn-small btn-secondary"
+                        <IconButton
+                          icon="edit"
+                          label="Bearbeiten"
                           disabled={busy}
                           onClick={() =>
                             setEditing({
@@ -264,9 +266,7 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
                               meta: { title: doc.title, category_id: doc.category_id, date: doc.date, visibility: doc.visibility },
                             })
                           }
-                        >
-                          Bearbeiten
-                        </button>
+                        />
                         <button
                           className="btn btn-small btn-secondary"
                           disabled={busy}
@@ -277,16 +277,16 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
                         >
                           Neue Fassung
                         </button>
-                        <button
-                          className="btn btn-small btn-danger"
+                        <IconButton
+                          icon="delete"
+                          label="Löschen"
+                          variant="danger"
                           disabled={busy}
                           onClick={async () =>
                             (await confirmAsk(`„${doc.title}“ wirklich löschen?`)) &&
                             run(() => api.deleteDocument(doc.id), 'Dokument gelöscht')
                           }
-                        >
-                          Löschen
-                        </button>
+                        />
                       </div>
                     </div>
                   </li>
@@ -335,8 +335,10 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
                   >
                     Umbenennen
                   </button>
-                  <button
-                    className="btn btn-small btn-danger"
+                  <IconButton
+                    icon="delete"
+                    label="Löschen"
+                    variant="danger"
                     disabled={busy}
                     onClick={async () =>
                       (await confirmAsk(
@@ -345,9 +347,7 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
                           : `Kategorie „${c.title}“ löschen? ${count === 1 ? 'Das Dokument steht' : `Die ${count} Dokumente stehen`} danach ohne Kategorie da.`,
                       )) && run(() => api.deleteDocCategory(c.id), 'Kategorie gelöscht')
                     }
-                  >
-                    Löschen
-                  </button>
+                  />
                 </div>
               </div>
             </li>

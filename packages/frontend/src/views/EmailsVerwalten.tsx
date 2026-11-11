@@ -17,6 +17,7 @@ import RichTextView from '../richtext/RichTextView';
 import { navigate } from '../router';
 import { ErrorBox, Loading } from '../ui';
 import { confirmAsk } from '../ask';
+import { IconButton } from '../icons';
 
 /** Entwurf der E-Mail (auf diesem Gerät): geht beim Sprung zur Signatur-Einrichtung und beim Verlassen nicht verloren. */
 const DRAFT_KEY = 'kompanie-mail-draft';
@@ -640,15 +641,15 @@ function Groups({ onToast }: { onToast: (msg: string) => void }) {
                   {g.standard ? 'Umbenennen' : 'Bearbeiten'}
                 </button>
                 {!g.standard && (
-                  <button
-                    className="btn btn-small btn-danger"
+                  <IconButton
+                    icon="delete"
+                    label="Löschen"
+                    variant="danger"
                     disabled={busy}
                     onClick={async () =>
                       (await confirmAsk(`Mailgruppe „${g.label}“ löschen?`)) && void run(() => api.deleteMailGroup(g.key), 'Gelöscht')
                     }
-                  >
-                    Löschen
-                  </button>
+                  />
                 )}
               </div>
             </div>

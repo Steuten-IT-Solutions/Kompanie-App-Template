@@ -398,7 +398,7 @@ function Editor({
           );
         }}
       />
-      <button type="button" className="btn btn-secondary" disabled={busy} onClick={addMenu}>
+      <button type="button" className="btn btn-secondary btn-block" disabled={busy} onClick={addMenu}>
         Untermenü hinzufügen
       </button>
 

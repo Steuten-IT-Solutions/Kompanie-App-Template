@@ -39,7 +39,7 @@ Wer dazugehört, ermittelt die App beim Senden; du musst diese beiden Gruppen ni
 3. Wähle unter **Mitglieder der Gruppe** Rollen, einzelne Mitglieder und beliebige Mailadressen aus, genauso wie beim Schreiben.
 4. Tippe auf **Speichern**.
 
-Mit **Bearbeiten** änderst du eine Gruppe, mit **Löschen** entfernst du sie. Versendete E-Mails zeigen eine gelöschte Gruppe als „Gelöschte Gruppe“.
+Mit **Bearbeiten** änderst du eine Gruppe, mit **Löschen** (Mülleimer) entfernst du sie. Versendete E-Mails zeigen eine gelöschte Gruppe als „Gelöschte Gruppe“.
 
 ### Nachsehen, ob die E-Mail angekommen ist
 1. Tippe unter **Versendete E-Mails** auf die E-Mail.

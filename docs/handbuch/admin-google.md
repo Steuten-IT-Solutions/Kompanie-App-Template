@@ -11,7 +11,7 @@ rechte: [manage_settings]
 Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Google-Zugang**. Im [Einrichtungsassistenten](seite:admin-einrichtung) steht derselbe Abschnitt im Schritt für die {bereich.gallery} bzw. den Kalender.
 
 ## Was du hier siehst
-- **Weiterleitungs-URI (im OAuth-Client bei Google eintragen)**: die Adresse, die du bei Google einträgst, mit dem Knopf **Adresse kopieren**.
+- **Weiterleitungs-URI (im OAuth-Client bei Google eintragen)**: die Adresse, die du bei Google einträgst, mit dem Knopf **Adresse kopieren** (zwei Blätter) rechts daneben.
 - **Client-ID** und **Clientschlüssel (Client-Secret)**: die beiden Werte von Google, mit dem Knopf **Speichern und mit Google verbinden**.
 - **✓ Verbunden mit Google als …**: steht statt der Felder, sobald die Verbindung besteht, mit **Verbindung trennen**. Dahinter steht, ob die App auch den Kalender lesen darf.
 - **Alternative: Dienstkonto mit JSON-Schlüssel**: zum Aufklappen, für den zweiten Weg (siehe unten).
@@ -43,7 +43,7 @@ Empfohlen ist **Mit Google verbinden**. Dafür legst du einmal ein kleines Proje
 > Unter **Datenzugriff** trägst du **nichts** ein. Dort eingetragene Berechtigungen verlangen eine Prüfung durch Google. Die App fragt ihre Berechtigungen beim Verbinden selbst an; das reicht.
 
 ### 4. Zugang bei Google anlegen
-1. Tippe in der App auf **Adresse kopieren**. Die Weiterleitungs-URI ist für jede Installation anders.
+1. Tippe in der App auf **Adresse kopieren** (zwei Blätter neben dem Feld). Die Weiterleitungs-URI ist für jede Installation anders.
 2. Öffne in der Google Auth Platform links **Clients** und klicke auf **Client erstellen**.
 3. Wähle als **Anwendungstyp** **Webanwendung** und gib einen Namen ein, z. B. „Kompanie-App“.
 4. Klicke unter **Autorisierte Weiterleitungs-URIs** auf **URI hinzufügen** und füge die kopierte Adresse genau so ein (ohne Leerzeichen, mit `https://`). Klicke auf **Erstellen**.

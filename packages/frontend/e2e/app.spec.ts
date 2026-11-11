@@ -2391,8 +2391,8 @@ test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, C
   const count = page.locator('.list-column').last();
   await count.getByLabel('Überschrift').fill('Anzahl Kinder');
   await count.getByLabel('Breite').selectOption('narrow');
-  await page.getByRole('button', { name: '+ Leere Zeile' }).click();
-  await page.getByRole('button', { name: '+ Leere Zeile' }).click();
+  await page.getByRole('button', { name: '+ Zeile' }).click();
+  await page.getByRole('button', { name: '+ Zeile' }).click();
   await page.getByLabel(`Zeile ${members + 1}: Name`).fill('Gast vom Nachbarverein');
   await page.getByRole('button', { name: 'Speichern' }).click();
   await expect(page.locator('.toast')).toHaveText('Gespeichert');
@@ -2462,7 +2462,7 @@ test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, C
 
   // Auch im dunklen Modus schwarz auf weiß; Zeilen werden nicht geteilt, der Kopf steht auf jeder Seite (Issue #121).
   // Mit vielen Zeilen über mehrere Seiten (nicht gespeichert, die Druckansicht zeigt den Entwurf).
-  for (let i = 0; i < 8; i++) await page.getByRole('button', { name: '+ 5 leere Zeilen' }).click();
+  for (let i = 0; i < 8; i++) await page.getByRole('button', { name: '+ 5 Zeilen' }).click();
   await page.emulateMedia({ media: 'print', colorScheme: 'dark' });
   const printed = await page.evaluate(() => {
     const css = (sel: string) => getComputedStyle(document.querySelector(sel)!);

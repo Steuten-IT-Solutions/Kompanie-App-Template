@@ -8,6 +8,7 @@ import brand from '../generated/brand';
 import { PUBLIC_PREVIEW, startPreview } from '../preview';
 import { ErrorBox, Loading, useAsync } from '../ui';
 import { confirmAsk } from '../ask';
+import { IconButton } from '../icons';
 
 const sec = brand.labels.sections;
 
@@ -121,24 +122,9 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
                   </div>
                   <div className="role-actions">
                     {r.key !== 'admin' && (
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => startPreview(r.key)}
-                        aria-label={`App als ${r.label} ansehen`}
-                        title="App als diese Rolle ansehen"
-                      >
-                        Ansehen
-                      </button>
+                      <IconButton icon="view" label={`App als ${r.label} ansehen`} onClick={() => startPreview(r.key)} />
                     )}
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => setEditing(r.key)}
-                      aria-label={`${r.label} bearbeiten`}
-                    >
-                      Bearbeiten
-                    </button>
+                    <IconButton icon="edit" label={`${r.label} bearbeiten`} onClick={() => setEditing(r.key)} />
                   </div>
                 </li>
               ),

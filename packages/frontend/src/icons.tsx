@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-/** Linien der Symbole auf den Knöpfen der Galerie (24×24, Strich wie beim Herunterladen). */
+/** Linien der Symbole auf Knöpfen nur mit Symbol (24×24, Strich wie beim Herunterladen). */
 const ICONS = {
   submit: <path d="M12 15V4M7 8.5l5-5 5 5M5 20h14" />,
   review: (
@@ -43,11 +43,36 @@ const ICONS = {
       <path d="M3 12h18M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9s1-6.5 3.5-9z" />
     </>
   ),
+  history: (
+    <>
+      <path d="M3.5 12a8.5 8.5 0 1 0 2.5-6L3.5 8.5" />
+      <path d="M3.5 4v4.5H8M12 7.5V12l3 2" />
+    </>
+  ),
+  view: (
+    <>
+      <path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  copy: (
+    <>
+      <rect x="9" y="9" width="11" height="11" rx="1.5" />
+      <path d="M15 9V5.5A1.5 1.5 0 0 0 13.5 4h-8A1.5 1.5 0 0 0 4 5.5v8A1.5 1.5 0 0 0 5.5 15H9" />
+    </>
+  ),
+  print: (
+    <>
+      <path d="M7 9V3.5h10V9M7 17H4.5A1.5 1.5 0 0 1 3 15.5v-5A1.5 1.5 0 0 1 4.5 9h15a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 1-1.5 1.5H17" />
+      <path d="M7 14h10v6.5H7z" />
+    </>
+  ),
+  download: <path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" />,
 } satisfies Record<string, ReactNode>;
 
-export type GalleryIconName = keyof typeof ICONS;
+export type IconName = keyof typeof ICONS;
 
-export function GalleryIcon({ name }: { name: GalleryIconName }) {
+export function Icon({ name }: { name: IconName }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -67,7 +92,8 @@ export function GalleryIcon({ name }: { name: GalleryIconName }) {
 
 /**
  * Runder Knopf nur mit Symbol: label ist der Name für Screenreader und der Tooltip (title) am Rechner. variant wie bei
- * .btn (secondary, danger), lb für die dunkle Leiste der Großansicht.
+ * .btn (secondary, danger), lb für die dunkle Leiste der Großansicht der Galerie. Nur für Aktionen mit eindeutigem
+ * Symbol (Bearbeiten, Löschen, Verlauf, Ansehen, Kopieren, Drucken); sonst bleibt der Knopf mit Text.
  */
 export function IconButton({
   icon,
@@ -75,13 +101,16 @@ export function IconButton({
   variant = 'secondary',
   className,
   disabled,
+  expanded,
   onClick,
 }: {
-  icon: GalleryIconName;
+  icon: IconName;
   label: string;
   variant?: 'secondary' | 'danger' | 'lb' | 'lb-danger';
   className?: string;
   disabled?: boolean;
+  /** Für Knöpfe, die etwas auf- und zuklappen (z. B. Verlauf) */
+  expanded?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -90,10 +119,11 @@ export function IconButton({
       className={`icon-btn icon-btn-${variant}${className ? ` ${className}` : ''}`}
       aria-label={label}
       title={label}
+      aria-expanded={expanded}
       disabled={disabled}
       onClick={onClick}
     >
-      <GalleryIcon name={icon} />
+      <Icon name={icon} />
     </button>
   );
 }

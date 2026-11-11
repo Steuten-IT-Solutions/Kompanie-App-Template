@@ -736,6 +736,11 @@ p.small + p.small:not(.muted) {
 .button-row > * {
   min-width: 0;
 }
+/* Ein einzelner Knopf in der Reihe (bzw. der letzte bei ungerader Zahl) nimmt die ganze Breite, statt in der halben
+ * Spalte links zu stehen und umzubrechen */
+.button-row > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
 
 /* Gerüst der Seite beim Laden (skeleton.tsx): ohne eigene Box, damit es im Raster bzw. Flex des Bereichs genauso
  * steht wie der echte Inhalt; Text als graue Balken, alles entfärbt und nicht bedienbar. */
@@ -7156,6 +7161,31 @@ fieldset.block-source legend {
 .icon-btn-danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
+/* Aufgeklappt (z. B. Verlauf einer Nachricht): Knopf bleibt hinterlegt */
+.icon-btn[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--accent-text) 14%, transparent);
+}
+/* Reihe von Symbol-Knöpfen (Bearbeiten, Löschen, …) außerhalb der Galerie */
+.icon-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+/* Steht die Reihe für sich (nicht in einer Listenzeile unter deren Text), mittig */
+.icon-row:not(.row-actions) {
+  justify-content: center;
+}
+/* Knopf mit Symbol vor kurzem Text (z. B. Herunterladen als PDF) */
+.btn-icon-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn-icon-text svg {
+  flex: none;
+}
 .lb-count .icon-btn-lb,
 .lb-count .icon-btn-lb-danger {
   width: 40px;
@@ -7182,4 +7212,73 @@ fieldset.block-source legend {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+}
+
+/* Umfrage verwalten: Bearbeiten und Löschen als Symbole, „Beenden“ als Text dahinter */
+.poll-manage-actions {
+  margin: 14px 0 0;
+}
+.poll-manage-actions .poll-close {
+  order: 1;
+}
+/* Umfrage ansehen: zurück zum Brett und zur Liste als Verweise */
+.poll-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin: 10px 0;
+}
+.board-item-actions {
+  margin: 14px 0;
+}
+.news-article-actions {
+  margin: 14px 0;
+}
+/* In Zeilen mit kleinen Text-Knöpfen (.btn-small) etwas kleiner, damit die Reihe nicht höher wird als nötig */
+.row-actions .icon-btn {
+  width: 38px;
+  height: 38px;
+}
+.row-actions {
+  align-items: center;
+}
+/* Liste bearbeiten: „Mitglieder aktualisieren“ über die ganze Breite, darunter „+ Zeile“ und „+ 5 Zeilen“ */
+.list-row-buttons > :first-child {
+  grid-column: 1 / -1;
+}
+/* Liste ausgeben: PDF und CSV mit Symbol und kurzem Text, Drucken nur als Symbol */
+.list-output-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+}
+.list-output-buttons .btn {
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* Feld mit Knopf „Kopieren“ (Symbol) rechts daneben */
+.copy-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.copy-field input {
+  flex: 1;
+  min-width: 0;
+}
+/* Ämter verwalten: Symbole für Bearbeiten und Löschen nebeneinander, der Schalter „Amtszeiten gemeinsam“ dahinter */
+.row-actions .joint-toggle {
+  order: 1;
+}
+/* Bei „Mitglieder aktualisieren“ über die ganze Breite stehen „+ Zeile“ und „+ 5 Zeilen“ darunter nebeneinander */
+.list-row-buttons > :last-child:nth-child(odd) {
+  grid-column: auto;
+}
+/* „Erneut versuchen“ in Fehlermeldungen mittig */
+.error > .btn {
+  display: block;
+  margin: 0 auto;
 }
