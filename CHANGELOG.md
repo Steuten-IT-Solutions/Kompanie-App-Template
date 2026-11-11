@@ -38,6 +38,16 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   für alle gleich. Jede Person sieht weiter nur die Knöpfe, für die sie das Recht hat. Auch die Bereiche in „Intern“ der
   Standardnavigation lassen sich jetzt umordnen, ohne dass daraus eine eigene Navigation wird.
 
+- **Galerie direkt in der Galerie verwalten: verschieben, löschen, intern stellen**: Wer das neue Recht „Galerie
+  verwalten“ hat, wählt in der [Galerie](app:galerie) in einem Album mit **Auswählen** ein oder mehrere hochgeladene
+  Bilder und Videos und verschiebt sie in ein anderes Album, löscht sie oder stellt sie intern bzw. öffentlich; ein
+  einzelnes geht auch in der Großansicht. Alben der App benennt man mit **Album bearbeiten** um, setzt sie in ein anderes
+  Jahr oder löscht sie, in der Übersicht mit **Alben auswählen** auch mehrere auf einmal; die Rückfrage nennt, wie viele
+  Bilder und Videos mitgelöscht werden. Über **Alben anlegen und hochladen** legt man Alben an und lädt hoch, ohne an die
+  Einstellungen zu müssen. Die bestehende Rolle „Galerie verwalten“ bekommt das Recht einmalig dazu; unter
+  [Einstellungen → Rollen](app:einstellungen/rollen) kannst du es anderen Rollen geben oder wegnehmen. Bilder und Alben
+  aus Google Drive änderst du weiter in Drive.
+
 ### Geändert
 
 - **„Im Amt“ im hellen Modus leichter**: Unter [Mitglieder → Ämter](app:mitglieder/aemter) steht der Bereich „Im Amt“

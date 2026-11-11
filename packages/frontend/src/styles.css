@@ -7070,3 +7070,60 @@ fieldset.block-source legend {
 .settings-section > p.nav-order-title {
   margin-top: var(--space-4);
 }
+
+/* Galerie verwalten (manage_gallery): Alben, Bilder und Videos auswählen */
+.gallery-select-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.gallery-select-bar .button-row {
+  flex-wrap: wrap;
+}
+.album-card.selected,
+.photo.selected {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+}
+.album-card:disabled,
+.photo-grid.selecting .photo:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.photo-grid.selecting .photo {
+  cursor: pointer;
+}
+.photo-check {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.photo.selected .photo-check {
+  background: var(--accent);
+}
+/* Zahl und Knöpfe der Großansicht: auf schmalen Handys umbrechen mit Abstand statt aneinander zu kleben */
+.lb-count {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 0;
+}
+.lb-count .lb-intern.btn-danger {
+  background: rgb(190 40 40 / 75%);
+}

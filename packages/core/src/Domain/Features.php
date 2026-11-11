@@ -40,7 +40,7 @@ final class Features
         // News: aus den Beiträgen einer Webseite, einem Feed oder in der App geschrieben (NewsService). Die Standardrolle
         // „News verwalten“ gibt es nur mit der Quelle „In der App“ (roleOf); sonst gibt es in der App nichts zu pflegen.
         'news' => ['label' => 'News', 'description' => 'Neuigkeiten der Kompanie: aus den Beiträgen der Webseite, einem Feed oder direkt in der App geschrieben.', 'requires' => [], 'setup' => 'news', 'role' => null],
-        'gallery' => ['label' => 'Galerie', 'description' => 'Fotoalben aus Google Drive oder nur in der App, mit internen Bildern nur für Mitglieder; auf Wunsch reichen Mitglieder Bilder zur Freigabe ein.', 'requires' => [], 'setup' => 'galerie', 'role' => ['member', 'review_gallery']],
+        'gallery' => ['label' => 'Galerie', 'description' => 'Fotoalben aus Google Drive oder nur in der App, mit internen Bildern nur für Mitglieder; auf Wunsch reichen Mitglieder Bilder zur Freigabe ein.', 'requires' => [], 'setup' => 'galerie', 'role' => ['member', 'review_gallery', 'manage_gallery']],
         'points' => ['label' => 'Punkte', 'description' => 'Punkte für Mitglieder, mit Katalog und Verlauf.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_points']],
         'penalties' => ['label' => 'Strafen', 'description' => 'Strafen der Mitglieder, offen oder bezahlt.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_penalties']],
         'ranks' => ['label' => 'Dienstgrade', 'description' => 'Dienstgrade der Mitglieder mit Verlauf; zusammen mit Punkten mit Punkteschwellen und Beförderungsübersicht.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_ranks']],

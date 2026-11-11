@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Storage\GalleryRepository;
+use KompanieApp\Core\Storage\GallerySubmissionRepository;
 
 /**
  * Alben der App und hochgeladene Bilder (Issue #285, Quelle „eigener Server“), gepflegt unter Einstellungen → Galerie
@@ -26,11 +28,22 @@ final class GalleryUploadService
 {
     public const ALBUM_PREFIX = 'app:';
     public const TITLE_MAX = 120;
+    /** Höchstens so viele Bilder auf einmal verschieben oder löschen. */
+    public const BATCH_MAX = 500;
     /** Erlaubte Endungen und der Anfang der Datei. */
     private const TYPES = ['jpg' => "\xFF\xD8\xFF", 'jpeg' => "\xFF\xD8\xFF", 'png' => "\x89PNG\r\n\x1A\n", 'webp' => 'RIFF'];
 
+    /** Einmalig: Die Standardrolle „Galerie verwalten“ (Schlüssel gallery) bekommt das Recht manage_gallery. */
+    public const MANAGE_SETTING = 'gallery_manage_added';
+
     public function __construct(private readonly App $app)
     {
+    }
+
+    /** Nach dem Update: bestehende Standardrolle „Galerie verwalten“ einmalig um manage_gallery ergänzen. */
+    public function initialize(): void
+    {
+        $this->app->roles()->grantOnce('gallery', Capability::ManageGallery, self::MANAGE_SETTING);
     }
 
     private function repo(): GalleryRepository
@@ -285,6 +298,103 @@ final class GalleryUploadService
         $this->removePhoto($photo);
         // Kam es aus einer Einreichung (Issue #286), gilt diese als wieder entfernt.
         $this->app->gallerySubmissions()->photoRemoved($id, $actor);
+    }
+
+    /**
+     * Hochgeladene Bilder und Videos in ein anderes Album verschieben, auch in eines aus Drive. Erst wird alles geprüft,
+     * dann verschoben: Ist ein Bild nicht (mehr) da oder aus Drive, bleibt alles, wie es war. Das Original zieht in der
+     * Ablage mit um, die aufbereiteten Größen öffentlicher Bilder ins Verzeichnis des neuen Albums (alte Adressen
+     * liefern danach nichts mehr). Eine freigegebene Einreichung zum Bild zählt danach zum neuen Album.
+     *
+     * @param mixed $ids Liste der IDs
+     * @return array{moved: int, album_id: int}
+     */
+    public function movePhotos(mixed $ids, mixed $albumId): array
+    {
+        $target = Input::integer($albumId);
+        if ($target === null || $target < 1) {
+            throw ApiError::invalid('Bitte das Album angeben, in das verschoben werden soll.');
+        }
+        $repo = $this->repo();
+        $repo->album($target) ?? throw ApiError::notFound('Album nicht gefunden.');
+        $photos = $this->uploadedPhotos($ids);
+        $gallery = $this->app->gallery();
+        $submissions = new GallerySubmissionRepository($this->app->db);
+        $moved = 0;
+        $renew = false;
+        foreach ($photos as $photo) {
+            if ((int) $photo['album_id'] === $target) {
+                continue;
+            }
+            $data = ['album_id' => $target];
+            try {
+                $data['drive_file_id'] = GalleryService::UPLOAD_PREFIX . $gallery->media()->move(GalleryService::uploadKey($photo), $target);
+            } catch (\RuntimeException | \InvalidArgumentException) {
+                // Original fehlt oder lässt sich nicht umbenennen: Es bleibt unter seinem Schlüssel, das Bild zieht trotzdem um.
+            }
+            if (!$gallery->moveFiles($photo, $target)) {
+                $gallery->deleteFiles($photo);
+                $data += ['file_key' => bin2hex(random_bytes(16)), 'status' => GalleryRepository::PENDING, 'error' => '', 'attempts' => 0];
+                $renew = true;
+            }
+            $repo->updatePhoto((int) $photo['id'], $data);
+            $s = $submissions->byPhoto((int) $photo['id']);
+            if ($s !== null) {
+                $submissions->update((int) $s['id'], ['album_id' => $target]);
+            }
+            $moved++;
+        }
+        if ($renew) {
+            $this->app->scheduler->runSoon(GalleryService::PROCESS_TASK);
+        }
+        return ['moved' => $moved, 'album_id' => $target];
+    }
+
+    /**
+     * Mehrere hochgeladene Bilder und Videos löschen; erst geprüft, dann gelöscht (alles oder nichts).
+     *
+     * @param mixed $ids Liste der IDs
+     * @return array{deleted: int}
+     */
+    public function deletePhotos(mixed $ids, ?User $actor): array
+    {
+        $photos = $this->uploadedPhotos($ids);
+        foreach ($photos as $photo) {
+            $this->removePhoto($photo);
+            $this->app->gallerySubmissions()->photoRemoved((int) $photo['id'], $actor);
+        }
+        return ['deleted' => count($photos)];
+    }
+
+    /**
+     * @param mixed $ids Liste der IDs, höchstens BATCH_MAX
+     * @return list<array<string, mixed>> die hochgeladenen Bilder dazu
+     */
+    private function uploadedPhotos(mixed $ids): array
+    {
+        if (!is_array($ids) || !array_is_list($ids) || $ids === []) {
+            throw ApiError::invalid('Bitte mindestens ein Bild oder Video angeben (ids).');
+        }
+        if (count($ids) > self::BATCH_MAX) {
+            throw ApiError::invalid(sprintf('Höchstens %d Bilder oder Videos auf einmal.', self::BATCH_MAX));
+        }
+        $repo = $this->repo();
+        $photos = [];
+        foreach ($ids as $raw) {
+            $id = is_int($raw) ? $raw : null;
+            if ($id === null || $id < 1) {
+                throw ApiError::invalid('Die Angabe ids muss eine Liste von IDs sein.');
+            }
+            $photo = $repo->photo($id);
+            if ($photo === null) {
+                throw ApiError::notFound('Bild oder Video nicht gefunden.');
+            }
+            if (!GalleryService::isUpload($photo)) {
+                throw ApiError::invalid(sprintf('„%s“ kommt aus Google Drive. Das verschiebst oder löschst du in Drive.', (string) $photo['name']));
+            }
+            $photos[$id] = $photo;
+        }
+        return array_values($photos);
     }
 
     /** @param array<string, mixed> $photo */

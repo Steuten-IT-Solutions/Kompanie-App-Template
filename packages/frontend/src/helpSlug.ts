@@ -31,7 +31,15 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
     case 'news':
       return sub ? 'neuigkeiten-beitrag' : 'neuigkeiten';
     case 'galerie':
-      return id ? 'galerie-album' : sub === 'einreichen' ? 'galerie-einreichen' : sub === 'pruefen' ? 'galerie-pruefen' : 'galerie';
+      return id
+        ? 'galerie-album'
+        : sub === 'einreichen'
+          ? 'galerie-einreichen'
+          : sub === 'pruefen'
+            ? 'galerie-pruefen'
+            : sub === 'verwalten'
+              ? 'galerie-verwalten'
+              : 'galerie';
     case 'kompanien':
       return 'kompanien';
     case 'sponsoren':

@@ -17,9 +17,14 @@ import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { useSwipeDrag } from '../swipe';
 import { prefetchAlbumOnTap, sources } from '../viewData';
+import { confirmAsk, promptAsk } from '../ask';
+import { dataUpdated } from '../dataCache';
+import { AlbumEditSheet, MoveSheet, canManageGallery, deleteAlbumsQuestion, itemsLabel } from '../galleryManage';
 
-export default function Galerie({ albumId }: { albumId?: number }) {
-  return albumId ? <Album id={albumId} /> : <Overview />;
+type Toast = (msg: string) => void;
+
+export default function Galerie({ albumId, onToast = () => {} }: { albumId?: number; onToast?: Toast }) {
+  return albumId ? <Album id={albumId} onToast={onToast} /> : <Overview onToast={onToast} />;
 }
 
 /**
@@ -74,9 +79,15 @@ function LoadingImage({
  */
 let overviewScroll: number | null = null;
 
-function Overview() {
+function Overview({ onToast }: { onToast: Toast }) {
   const { data, error, loading, reload } = useAsync(sources.gallery.load, sources.gallery.deps, sources.gallery.key);
   const ready = !!data;
+  // Galerie verwalten (manage_gallery): Alben der App auswählen, dann ins andere Jahr setzen oder löschen
+  const manage = canManageGallery();
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<ReadonlySet<number>>(() => new Set());
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   useLayoutEffect(() => {
     if (!ready || overviewScroll === null) return;
     window.scrollTo(0, overviewScroll);
@@ -85,9 +96,69 @@ function Overview() {
   if (loading && !data) return <Loading shape="grid" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const years = data?.years ?? [];
-  // Einreichungen (Issue #286)
+  const chosen = years.flatMap((y) => y.albums.map((a) => ({ ...a, year: y.year }))).filter((a) => selected.has(a.id));
+
+  function stopSelecting() {
+    setSelecting(false);
+    setSelected(new Set());
+    setActionError(null);
+  }
+
+  /** Für alle gewählten Alben nacheinander; bricht beim ersten Fehler ab und meldet, wie weit es kam. */
+  async function each(fn: (id: number) => Promise<unknown>, doneMsg: (n: number) => string) {
+    setBusy(true);
+    setActionError(null);
+    let done = 0;
+    try {
+      for (const a of chosen) {
+        await fn(a.id);
+        done++;
+      }
+      onToast(doneMsg(done));
+      stopSelecting();
+    } catch (e) {
+      setActionError(`${done > 0 ? `${done} erledigt, dann: ` : ''}${(e as Error).message}`);
+    } finally {
+      setBusy(false);
+      if (done > 0) {
+        dataUpdated();
+        reload();
+      }
+    }
+  }
+
+  async function changeYear() {
+    const raw = await promptAsk(
+      `In welches Jahr sollen ${chosen.length === 1 ? 'das Album' : `die ${chosen.length} Alben`}?`,
+      chosen[0]?.year ?? '',
+      {
+        title: 'Jahr ändern',
+        okLabel: 'Ändern',
+      },
+    );
+    if (raw === null) return;
+    const year = Number(raw.trim());
+    if (!Number.isInteger(year)) {
+      setActionError('Bitte ein Jahr als Zahl angeben, z. B. 2026.');
+      return;
+    }
+    await each(
+      (id) => api.updateGalleryAlbum(id, { year }),
+      (n) => (n === 1 ? `Album ins Jahr ${year} gesetzt` : `${n} Alben ins Jahr ${year} gesetzt`),
+    );
+  }
+
+  async function removeAlbums() {
+    if (!(await confirmAsk(deleteAlbumsQuestion(chosen)))) return;
+    await each(
+      (id) => api.deleteGalleryAlbum(id),
+      (n) => (n === 1 ? 'Album gelöscht' : `${n} Alben gelöscht`),
+    );
+  }
+
+  // Einreichungen (Issue #286), Verwalten (manage_gallery)
   const actions =
-    can('submit_gallery') || can('review_gallery') ? (
+    can('submit_gallery') || can('review_gallery') || manage ? (
       <div className="button-row gallery-actions">
         {can('submit_gallery') && (
           <button className="btn btn-secondary" onClick={() => navigate('galerie/einreichen')}>
@@ -99,8 +170,42 @@ function Overview() {
             Einreichungen prüfen
           </button>
         )}
+        {manage && (
+          <button className="btn btn-secondary" onClick={() => navigate('galerie/verwalten')}>
+            Alben anlegen und hochladen
+          </button>
+        )}
+        {manage && years.length > 0 && (
+          <button className="btn btn-secondary" aria-pressed={selecting} onClick={() => (selecting ? stopSelecting() : setSelecting(true))}>
+            {selecting ? 'Fertig' : 'Alben auswählen'}
+          </button>
+        )}
       </div>
     ) : null;
+  const selectBar = selecting && (
+    <div className="gallery-select-bar" role="toolbar" aria-label="Gewählte Alben">
+      <span className="small">
+        {chosen.length === 0
+          ? 'Tippe auf Alben aus der App, um sie zu wählen.'
+          : chosen.length === 1
+            ? '1 Album gewählt'
+            : `${chosen.length} Alben gewählt`}
+      </span>
+      <div className="button-row">
+        <button className="btn btn-small btn-secondary" disabled={busy || chosen.length === 0} onClick={() => void changeYear()}>
+          Jahr ändern
+        </button>
+        <button className="btn btn-small btn-danger" disabled={busy || chosen.length === 0} onClick={() => void removeAlbums()}>
+          Löschen
+        </button>
+      </div>
+      {actionError && (
+        <p className="form-error small" role="alert">
+          {actionError}
+        </p>
+      )}
+    </div>
+  );
   if (years.length === 0)
     return (
       <>
@@ -112,6 +217,7 @@ function Overview() {
   return (
     <div>
       {actions}
+      {selectBar}
       {years.map((y) => (
         <section key={y.year}>
           <h2 className="section-title">{y.year}</h2>
@@ -119,12 +225,19 @@ function Overview() {
             {y.albums.map((a) => (
               <li key={a.id}>
                 <button
-                  className="album-card"
+                  className={selected.has(a.id) ? 'album-card selected' : 'album-card'}
+                  aria-pressed={selecting ? selected.has(a.id) : undefined}
+                  disabled={selecting && a.source !== 'app'}
+                  title={selecting && a.source !== 'app' ? 'Aus Google Drive: in Drive ändern' : undefined}
                   onClick={() => {
+                    if (selecting) {
+                      setSelected((old) => toggle(old, a.id));
+                      return;
+                    }
                     overviewScroll = window.scrollY;
                     navigate(`galerie/${a.id}`);
                   }}
-                  {...prefetchAlbumOnTap(a.id)}
+                  {...(selecting ? {} : prefetchAlbumOnTap(a.id))}
                 >
                   {a.cover ? (
                     <span className="album-cover">
@@ -146,6 +259,14 @@ function Overview() {
       ))}
     </div>
   );
+}
+
+/** Menge mit oder ohne id. */
+function toggle(set: ReadonlySet<number>, id: number): ReadonlySet<number> {
+  const next = new Set(set);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
 }
 
 /** „3 Bilder · 1 Video“ (wie der Shortcode auf der Webseite, Shortcodes::mediaCount). */
@@ -175,14 +296,36 @@ function retryUrl(url: string, n: number): string {
   return n === 0 ? url : `${url}${url.includes('?') ? '&' : '?'}v=${n}`;
 }
 
-function Album({ id }: { id: number }) {
+type AlbumSheet = { kind: 'move'; ids: number[]; top: boolean; done?: (ok: boolean) => void } | { kind: 'edit' } | null;
+
+function Album({ id, onToast }: { id: number; onToast: Toast }) {
   const s = sources.album(id);
   const { data, error, loading, reload } = useAsync(s.load, s.deps, s.key);
   const [open, setOpen] = useState<number | null>(null);
   const tiles = useRef<(HTMLButtonElement | null)[]>([]);
   const [retry, setRetry] = useState(0);
-  // Hochgeladene Bilder und Videos intern oder öffentlich stellen (in der Großansicht)
-  const canIntern = can('manage_settings') || can('review_gallery');
+  // Hochgeladene Bilder und Videos intern oder öffentlich stellen (Großansicht, Auswahl)
+  const manage = canManageGallery();
+  const canIntern = manage || can('review_gallery');
+  // Auswählen, verschieben, löschen (manage_gallery)
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<ReadonlySet<number>>(() => new Set());
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [sheet, setSheet] = useState<AlbumSheet>(null);
+  // Alles herausgenommen: zurück zur Übersicht (das leere Album gibt es für die Galerie nicht mehr)
+  const [emptied, setEmptied] = useState(false);
+  // Geändert, während die Großansicht offen war: erst nach dem Schließen neu laden (sonst fehlte ihr das Bild)
+  const [stale, setStale] = useState(false);
+  useEffect(() => {
+    if (open !== null) return;
+    if (emptied) navigate('galerie');
+    else if (stale) {
+      setStale(false);
+      setRetry(0);
+      reload();
+    }
+  }, [emptied, stale, open, reload]);
   const pending = !!data?.photos.some((p) => !p.ready);
   // Solange die App noch nachsieht, drehen sich in den Platzhaltern die Ladeschnecken.
   const preparing = retry < PENDING_RETRIES;
@@ -218,6 +361,124 @@ function Album({ id }: { id: number }) {
   const photos = album.photos.map((p) =>
     p.ready || !p.thumb ? p : { ...p, thumb: retryUrl(p.thumb, retry), large: p.large && retryUrl(p.large, retry) },
   );
+  const uploads = photos.filter((p) => p.upload);
+  const chosen = uploads.filter((p) => selected.has(p.id));
+
+  function stopSelecting() {
+    setSelecting(false);
+    setSelected(new Set());
+    setActionError(null);
+  }
+
+  /** Nach Verschieben oder Löschen: neu laden oder, wenn nichts mehr drin ist, zur Übersicht. */
+  function removed(n: number) {
+    dataUpdated();
+    stopSelecting();
+    if (n >= photos.length) setEmptied(true);
+    else setStale(true);
+  }
+
+  async function run(fn: () => Promise<unknown>): Promise<boolean> {
+    setBusy(true);
+    setActionError(null);
+    try {
+      await fn();
+      return true;
+    } catch (e) {
+      setActionError((e as Error).message);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteItems(ids: number[]): Promise<boolean> {
+    if (!(await confirmAsk(`${itemsLabel(ids.length)} löschen? Das lässt sich nicht rückgängig machen.`))) return false;
+    if (!(await run(() => api.deleteGalleryPhotos(ids)))) return false;
+    onToast(ids.length === 1 ? 'Gelöscht' : `${ids.length} gelöscht`);
+    removed(ids.length);
+    return true;
+  }
+
+  async function setIntern(intern: boolean) {
+    let done = 0;
+    const ok = await run(async () => {
+      for (const p of chosen) {
+        if (p.intern !== intern) await api.setGalleryPhotoIntern(p.id, intern);
+        done++;
+      }
+    });
+    if (done > 0) {
+      dataUpdated();
+      setRetry(0);
+      reload();
+    }
+    if (ok) {
+      onToast(intern ? `${itemsLabel(done)} nur für Mitglieder` : `${itemsLabel(done)} öffentlich`);
+      stopSelecting();
+    }
+  }
+
+  const tools = manage && (
+    <div className="button-row gallery-actions">
+      {uploads.length > 0 && (
+        <button
+          className="btn btn-small btn-secondary"
+          aria-pressed={selecting}
+          onClick={() => (selecting ? stopSelecting() : setSelecting(true))}
+        >
+          {selecting ? 'Fertig' : 'Auswählen'}
+        </button>
+      )}
+      {album.source === 'app' && !selecting && (
+        <button className="btn btn-small btn-secondary" onClick={() => setSheet({ kind: 'edit' })}>
+          Album bearbeiten
+        </button>
+      )}
+    </div>
+  );
+  const selectBar = selecting && (
+    <div className="gallery-select-bar" role="toolbar" aria-label="Gewählte Bilder und Videos">
+      <span className="small">
+        {chosen.length === 0 ? 'Tippe auf Bilder und Videos, um sie zu wählen.' : `${itemsLabel(chosen.length)} gewählt`}
+      </span>
+      <div className="button-row">
+        <button
+          className="btn btn-small btn-secondary"
+          disabled={busy}
+          onClick={() => setSelected(chosen.length === uploads.length ? new Set() : new Set(uploads.map((p) => p.id)))}
+        >
+          {chosen.length === uploads.length ? 'Keine' : 'Alle'}
+        </button>
+        <button
+          className="btn btn-small btn-secondary"
+          disabled={busy || chosen.length === 0}
+          onClick={() => setSheet({ kind: 'move', ids: chosen.map((p) => p.id), top: false })}
+        >
+          Verschieben
+        </button>
+        <button className="btn btn-small btn-secondary" disabled={busy || chosen.length === 0} onClick={() => void setIntern(true)}>
+          Nur für Mitglieder
+        </button>
+        <button className="btn btn-small btn-secondary" disabled={busy || chosen.length === 0} onClick={() => void setIntern(false)}>
+          Öffentlich
+        </button>
+        <button
+          className="btn btn-small btn-danger"
+          disabled={busy || chosen.length === 0}
+          onClick={() => void deleteItems(chosen.map((p) => p.id))}
+        >
+          Löschen
+        </button>
+      </div>
+      {uploads.length < photos.length && <p className="small muted">Bilder aus Google Drive verschiebst und löschst du in Drive.</p>}
+      {actionError && (
+        <p className="form-error small" role="alert">
+          {actionError}
+        </p>
+      )}
+    </div>
+  );
 
   return (
     <div>
@@ -225,17 +486,25 @@ function Album({ id }: { id: number }) {
         ‹ Alle Alben
       </button>
       <AlbumHeading album={album} />
-      <ul className="photo-grid">
+      {tools}
+      {selectBar}
+      <ul className={selecting ? 'photo-grid selecting' : 'photo-grid'}>
         {photos.map((p, i) => (
           <li key={p.id}>
             <button
               ref={(el) => {
                 tiles.current[i] = el;
               }}
-              className={isVideo(p) ? 'photo photo-video' : 'photo'}
-              onClick={() => setOpen(i)}
+              className={`${isVideo(p) ? 'photo photo-video' : 'photo'}${selected.has(p.id) ? ' selected' : ''}`}
+              onClick={() => (selecting ? setSelected((old) => toggle(old, p.id)) : setOpen(i))}
+              disabled={selecting && !p.upload}
+              aria-pressed={selecting ? selected.has(p.id) : undefined}
               data-intern={p.intern ? '' : undefined}
-              aria-label={`${isVideo(p) ? 'Video' : 'Bild'} ${i + 1} öffnen${p.intern ? ' (nur für Mitglieder)' : ''}`}
+              aria-label={
+                selecting
+                  ? `${isVideo(p) ? 'Video' : 'Bild'} ${i + 1} wählen${p.intern ? ' (nur für Mitglieder)' : ''}`
+                  : `${isVideo(p) ? 'Video' : 'Bild'} ${i + 1} öffnen${p.intern ? ' (nur für Mitglieder)' : ''}`
+              }
             >
               {p.thumb && <LoadingImage src={p.thumb} busy={!p.ready && preparing} lazy />}
               {isVideo(p) && (
@@ -249,6 +518,11 @@ function Album({ id }: { id: number }) {
               {p.intern && (
                 <span className="photo-lock" aria-hidden="true">
                   🔒
+                </span>
+              )}
+              {selecting && p.upload && (
+                <span className="photo-check" aria-hidden="true">
+                  {selected.has(p.id) ? '✓' : ''}
                 </span>
               )}
             </button>
@@ -265,11 +539,48 @@ function Album({ id }: { id: number }) {
             canIntern
               ? async (p, intern) => {
                   await api.setGalleryPhotoIntern(p.id, intern);
+                  dataUpdated();
                   setRetry(0);
                   reload();
                 }
               : undefined
           }
+          onMove={manage ? (p) => new Promise<boolean>((done) => setSheet({ kind: 'move', ids: [p.id], top: true, done })) : undefined}
+          onDelete={manage ? (p) => deleteItems([p.id]) : undefined}
+        />
+      )}
+      {sheet?.kind === 'move' && (
+        <MoveSheet
+          ids={sheet.ids}
+          currentAlbum={album.id}
+          top={sheet.top}
+          onClose={() => {
+            sheet.done?.(false);
+            setSheet(null);
+          }}
+          onMoved={(_, title) => {
+            sheet.done?.(true);
+            setSheet(null);
+            onToast(`${itemsLabel(sheet.ids.length)} nach „${title}“ verschoben`);
+            removed(sheet.ids.length);
+          }}
+        />
+      )}
+      {sheet?.kind === 'edit' && (
+        <AlbumEditSheet
+          album={album}
+          count={photos.length}
+          onClose={() => setSheet(null)}
+          onSaved={() => {
+            setSheet(null);
+            onToast('Album gespeichert');
+            reload();
+          }}
+          onDeleted={() => {
+            setSheet(null);
+            onToast('Album gelöscht');
+            navigate('galerie');
+          }}
         />
       )}
     </div>
@@ -409,13 +720,18 @@ function Lightbox({
   onClose,
   downloads = false,
   onIntern,
+  onMove,
+  onDelete,
 }: {
   photos: GalleryPhoto[];
   start: number;
   onClose: (last: number) => void;
   downloads?: boolean;
-  /** Umstellen intern/öffentlich für hochgeladene Bilder und Videos (manage_settings oder review_gallery) */
+  /** Umstellen intern/öffentlich für hochgeladene Bilder und Videos (manage_gallery oder review_gallery) */
   onIntern?: (p: GalleryPhoto, intern: boolean) => Promise<void>;
+  /** Hochgeladenes Bild oder Video verschieben bzw. löschen (manage_gallery); true, wenn es geschehen ist (dann schließt die Großansicht) */
+  onMove?: (p: GalleryPhoto) => Promise<boolean>;
+  onDelete?: (p: GalleryPhoto) => Promise<boolean>;
 }) {
   const [i, setI] = useState(start);
   const current = useRef(i);
@@ -698,6 +1014,30 @@ function Lightbox({
             }}
           >
             {p.intern ? 'Öffentlich zeigen' : 'Nur für Mitglieder'}
+          </button>
+        )}
+        {onMove && p.upload && (
+          <button
+            type="button"
+            className="btn btn-small btn-secondary lb-intern"
+            disabled={switching}
+            onClick={async () => {
+              if (await onMove(p)) close();
+            }}
+          >
+            Verschieben
+          </button>
+        )}
+        {onDelete && p.upload && (
+          <button
+            type="button"
+            className="btn btn-small btn-danger lb-intern"
+            disabled={switching}
+            onClick={async () => {
+              if (await onDelete(p)) close();
+            }}
+          >
+            Löschen
           </button>
         )}
       </div>

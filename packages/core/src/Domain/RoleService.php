@@ -853,6 +853,25 @@ final class RoleService
      *
      * @param string[] $capabilities
      */
+    /**
+     * Einmalig ein später dazugekommenes Recht an eine bestehende Rolle geben (z. B. manage_gallery an die Standardrolle
+     * „Galerie verwalten“); $setting merkt, dass es geschehen ist, auch wenn es die Rolle nicht gibt. Danach kann der
+     * Admin es wieder wegnehmen.
+     */
+    public function grantOnce(string $roleKey, Capability $cap, string $setting): void
+    {
+        if ($this->settings->get($setting, false)) {
+            return;
+        }
+        $this->settings->set($setting, true);
+        $roles = $this->all();
+        if (!isset($roles[$roleKey]) || $roleKey === Roles::ADMIN || in_array($cap->value, $roles[$roleKey]['capabilities'], true)) {
+            return;
+        }
+        $roles[$roleKey]['capabilities'] = self::ordered([...$roles[$roleKey]['capabilities'], $cap->value]);
+        $this->save($roles);
+    }
+
     public function featureChanged(string $key, bool $on, string $label, array $capabilities): void
     {
         $label = mb_substr($label, 0, self::LABEL_MAX);

@@ -771,6 +771,36 @@ final class GalleryService
         $this->files->delete(self::markerPath($photo), false);
     }
 
+    /**
+     * Aufbereitete Größen eines öffentlichen Bilds in das Verzeichnis eines anderen Albums umziehen (interne liegen
+     * ohne Album, da ändert sich nichts). Klappt es für eine Größe nicht, sind die schon umgezogenen wieder gelöscht:
+     * Der Aufrufer bereitet das Bild dann neu auf.
+     *
+     * @param array<string, mixed> $photo
+     */
+    public function moveFiles(array $photo, int $albumId): bool
+    {
+        if ((int) $photo['is_intern']) {
+            return true;
+        }
+        $target = ['album_id' => $albumId] + $photo;
+        $moved = [];
+        foreach ([...array_keys(self::SIZES), self::ORIGINAL] as $size) {
+            $from = $this->path($photo, $size);
+            if (!is_file($from)) {
+                continue;
+            }
+            if (!@rename($from, $this->path($target, $size))) {
+                foreach ($moved as $done) {
+                    $this->files->delete(self::relativePath($target, $done), true);
+                }
+                return false;
+            }
+            $moved[] = $size;
+        }
+        return true;
+    }
+
     /** Merker für die Originalauflösung, immer im geschützten Verzeichnis (nie öffentlich abrufbar). */
     private static function markerPath(array $photo): string
     {
@@ -1252,6 +1282,8 @@ final class GalleryService
             $years[(string) $r['year']][] = [
                 'id' => (int) $r['id'],
                 'title' => (string) $r['title'],
+                // Album der App (in der App änderbar) oder aus Drive
+                'source' => (string) ($r['source'] ?? '') === 'app' ? 'app' : 'drive',
                 // Bilder und Videos zusammen; davon Videos
                 'count' => (int) $r['cnt'],
                 'video_count' => (int) $r['video_cnt'],
@@ -1291,6 +1323,7 @@ final class GalleryService
             'id' => (int) $album['id'],
             'title' => (string) $album['title'],
             'year' => (string) $album['year'],
+            'source' => (string) $album['source'] === 'app' ? 'app' : 'drive',
             // Knöpfe zum Herunterladen zeigen (Einstellungen → Galerie)
             'downloads' => $this->downloadsEnabled(),
             'photos' => array_map(fn (array $ph): array => self::isVideoRow($ph) ? [
