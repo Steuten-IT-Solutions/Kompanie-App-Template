@@ -2635,6 +2635,11 @@ export const api = {
   backupDrive: () => request<BackupDriveStatus>('GET', '/admin/backup/drive'),
   setBackupDrive: (enabled: boolean) => request<BackupDriveStatus>('PUT', '/admin/backup/drive', { enabled }),
   uploadBackupDrive: () => request<BackupDriveStatus>('POST', '/admin/backup/drive/upload', {}),
+  backupServer: () => request<BackupServerStatus>('GET', '/admin/backup/server'),
+  setBackupServer: (enabled: boolean) => request<BackupServerStatus>('PUT', '/admin/backup/server', { enabled }),
+  createBackupServer: () => request<BackupServerStatus>('POST', '/admin/backup/server/create', {}),
+  restoreBackupServer: (id: string) => request<{ restored: boolean }>('POST', '/admin/backup/server/restore', { id, confirm: true }),
+  deleteBackupServer: (id: string) => request<BackupServerStatus>('POST', '/admin/backup/server/delete', { id }),
   clearErrorLog: () => request<{ errorLog: ErrorLogEntry[] }>('DELETE', '/admin/error-log'),
   setupDone: () => request<{ done: boolean }>('POST', '/admin/setup/done', {}),
 
@@ -2905,6 +2910,31 @@ export interface BackupDriveStatus {
   error: string | null;
   every_days: number;
   keep: number;
+}
+
+/** Eine Sicherung im geschützten Ordner auf dem Server: wöchentlich oder vor einem Update */
+export interface ServerBackupFile {
+  id: string;
+  kind: 'weekly' | 'update';
+  created: number;
+  size: number;
+  /** Version vor dem Update (nur kind update, ältere Namen ohne) */
+  version: string | null;
+}
+
+/** Sicherungen auf dem eigenen Server */
+export interface BackupServerStatus {
+  /** Datensicherung hier vorhanden */
+  available: boolean;
+  enabled: boolean;
+  /** Wiederherstellen ist hier möglich */
+  can_restore: boolean;
+  last_ok: number | null;
+  last_try: number | null;
+  error: string | null;
+  every_days: number;
+  keep: number;
+  files: ServerBackupFile[];
 }
 
 /** Aufbewahrungsfrist für Ehemalige: 0 = aus; due wird beim nächsten Lauf gelöscht, soon in den nächsten 30 Tagen fällig */

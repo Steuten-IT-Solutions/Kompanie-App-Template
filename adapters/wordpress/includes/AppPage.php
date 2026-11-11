@@ -25,7 +25,8 @@ use KompanieApp\Core\Http\ManifestIcons;
  * /app/kompanielogo/<id>?v=… → Logo einer Kompanie (wer die Kompanien sehen darf, anfangs auch ohne Anmeldung)
  * /app/bild/<kennung>        → Bild in formatiertem Inhalt (Signatur, Schwarzes Brett; wer den Inhalt sehen darf)
  * /app/anhang/<kennung>      → Dateianhang (Schwarzes Brett, E-Mails; wer den Inhalt sehen darf), immer als Download
- * /app/sicherung             → Datensicherung herunterladen (nur Admins), Stück für Stück geschrieben
+ * /app/sicherung             → Datensicherung herunterladen (nur Admins), Stück für Stück geschrieben;
+ *                              ?datei=<Name>: eine Sicherung, die auf dem Server liegt
  * /app/csrf                  → neues CSRF-Token (REST-Nonce) für angemeldete Benutzer
  * /app/<anderes>             → App (z. B. /app/installieren/ zum Weitergeben)
  *
@@ -161,7 +162,7 @@ final class AppPage
         } elseif (preg_match('#^bild/([a-f0-9]{32})/?$#', $path, $m)) {
             self::sendBody($app->richImages()->forDelivery($app->authContext->currentUser(), $m[1]));
         } elseif ($path === 'sicherung') {
-            self::sendBody($app->backupDownload()->forDelivery($app->authContext->currentUser(), ($_GET['verschluesselt'] ?? '') === '1'));
+            self::sendBody($app->backupDownload()->forDelivery($app->authContext->currentUser(), ($_GET['verschluesselt'] ?? '') === '1', is_string($_GET['datei'] ?? null) ? $_GET['datei'] : null));
         } elseif (preg_match('#^anhang/([a-f0-9]{32})/?$#', $path, $m)) {
             self::sendBody($app->attachments()->forDelivery($app->authContext->currentUser(), $m[1]));
         } else {
