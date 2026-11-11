@@ -1948,6 +1948,10 @@ test('Galerie verwalten: Bilder auswählen, verschieben und löschen, Alben ins 
     await page.mouse.up();
     await page.getByRole('button', { name: 'Bild 2 wählen' }).click();
     await expect(page.locator('.gallery-select-bar')).toContainText('2 Bilder und Videos gewählt');
+    // Knöpfe der Leiste nur mit Symbol: Name als aria-label und Tooltip, kein sichtbarer Text
+    const moveButton = page.locator('.gallery-select-bar').getByRole('button', { name: 'Verschieben' });
+    await expect(moveButton).toHaveText('');
+    await expect(moveButton).toHaveAttribute('title', 'Verschieben');
     await page.locator('.gallery-select-bar').getByRole('button', { name: 'Verschieben' }).click();
     const sheet = page.locator('.sheet', { hasText: '2 Bilder und Videos verschieben' });
     await sheet.getByLabel('In das Album').selectOption({ label: to });

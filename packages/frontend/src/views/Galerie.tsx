@@ -19,6 +19,7 @@ import { useSwipeDrag } from '../swipe';
 import { prefetchAlbumOnTap, sources } from '../viewData';
 import { confirmAsk, promptAsk } from '../ask';
 import { dataUpdated } from '../dataCache';
+import { IconButton } from '../galleryIcons';
 import {
   AlbumEditSheet,
   MoveSheet,
@@ -191,20 +192,10 @@ function Overview({ onToast }: { onToast: Toast }) {
     can('submit_gallery') || can('review_gallery') || manage ? (
       <div className="button-row gallery-actions">
         {can('submit_gallery') && (
-          <button className="btn btn-secondary" onClick={() => navigate('galerie/einreichen')}>
-            Bilder und Videos einreichen
-          </button>
+          <IconButton icon="submit" label="Bilder und Videos einreichen" onClick={() => navigate('galerie/einreichen')} />
         )}
-        {can('review_gallery') && (
-          <button className="btn btn-secondary" onClick={() => navigate('galerie/pruefen')}>
-            Einreichungen prüfen
-          </button>
-        )}
-        {manage && (
-          <button className="btn btn-secondary" onClick={() => navigate('galerie/verwalten')}>
-            Alben anlegen und hochladen
-          </button>
-        )}
+        {can('review_gallery') && <IconButton icon="review" label="Einreichungen prüfen" onClick={() => navigate('galerie/pruefen')} />}
+        {manage && <IconButton icon="albumAdd" label="Alben anlegen und hochladen" onClick={() => navigate('galerie/verwalten')} />}
       </div>
     ) : null;
   const selectBar = selecting && (
@@ -217,12 +208,14 @@ function Overview({ onToast }: { onToast: Toast }) {
             : `${chosen.length} Alben gewählt`}
       </span>
       <div className="button-row">
-        <button className="btn btn-small btn-secondary" disabled={busy || chosen.length === 0} onClick={() => void changeYear()}>
-          Jahr ändern
-        </button>
-        <button className="btn btn-small btn-danger" disabled={busy || chosen.length === 0} onClick={() => void removeAlbums()}>
-          Löschen
-        </button>
+        <IconButton icon="year" label="Jahr ändern" disabled={busy || chosen.length === 0} onClick={() => void changeYear()} />
+        <IconButton
+          icon="delete"
+          label="Löschen"
+          variant="danger"
+          disabled={busy || chosen.length === 0}
+          onClick={() => void removeAlbums()}
+        />
       </div>
       {actionError && (
         <p className="form-error small" role="alert">
@@ -483,9 +476,7 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
   // Auswählen beginnt mit langem Drücken auf ein Bild (useLongPress), ohne eigenen Knopf
   const tools = manage && album.source === 'app' && !selecting && (
     <div className="button-row gallery-actions">
-      <button className="btn btn-small btn-secondary" onClick={() => setSheet({ kind: 'edit' })}>
-        Album bearbeiten
-      </button>
+      <IconButton icon="edit" label="Album bearbeiten" onClick={() => setSheet({ kind: 'edit' })} />
     </div>
   );
   const selectBar = selecting && (
@@ -494,33 +485,27 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
         {chosen.length === 0 ? 'Tippe auf Bilder und Videos, um sie zu wählen.' : `${itemsLabel(chosen.length)} gewählt`}
       </span>
       <div className="button-row">
-        <button
-          className="btn btn-small btn-secondary"
+        <IconButton
+          icon="selectAll"
+          label="Alle wählen"
           disabled={busy || chosen.length === uploads.length}
           onClick={() => setSelected(new Set(uploads.map((p) => p.id)))}
-        >
-          Alle
-        </button>
-        <button
-          className="btn btn-small btn-secondary"
+        />
+        <IconButton
+          icon="move"
+          label="Verschieben"
           disabled={busy || chosen.length === 0}
           onClick={() => setSheet({ kind: 'move', ids: chosen.map((p) => p.id), top: false })}
-        >
-          Verschieben
-        </button>
-        <button className="btn btn-small btn-secondary" disabled={busy || chosen.length === 0} onClick={() => void setIntern(true)}>
-          Nur für Mitglieder
-        </button>
-        <button className="btn btn-small btn-secondary" disabled={busy || chosen.length === 0} onClick={() => void setIntern(false)}>
-          Öffentlich
-        </button>
-        <button
-          className="btn btn-small btn-danger"
+        />
+        <IconButton icon="intern" label="Nur für Mitglieder" disabled={busy || chosen.length === 0} onClick={() => void setIntern(true)} />
+        <IconButton icon="public" label="Öffentlich" disabled={busy || chosen.length === 0} onClick={() => void setIntern(false)} />
+        <IconButton
+          icon="delete"
+          label="Löschen"
+          variant="danger"
           disabled={busy || chosen.length === 0}
           onClick={() => void deleteItems(chosen.map((p) => p.id))}
-        >
-          Löschen
-        </button>
+        />
       </div>
       {uploads.length < photos.length && <p className="small muted">Bilder aus Google Drive verschiebst und löschst du in Drive.</p>}
       {actionError && (
@@ -1049,9 +1034,11 @@ function Lightbox({
         {i + 1} / {photos.length}
         {p.intern && ' · intern'}
         {onIntern && p.upload && (
-          <button
-            type="button"
-            className="btn btn-small btn-secondary lb-intern"
+          <IconButton
+            icon={p.intern ? 'public' : 'intern'}
+            label={p.intern ? 'Öffentlich zeigen' : 'Nur für Mitglieder'}
+            variant="lb"
+            className="lb-intern"
             disabled={switching}
             onClick={async () => {
               setSwitching(true);
@@ -1064,33 +1051,31 @@ function Lightbox({
                 setSwitching(false);
               }
             }}
-          >
-            {p.intern ? 'Öffentlich zeigen' : 'Nur für Mitglieder'}
-          </button>
+          />
         )}
         {onMove && p.upload && (
-          <button
-            type="button"
-            className="btn btn-small btn-secondary lb-intern"
+          <IconButton
+            icon="move"
+            label="Verschieben"
+            variant="lb"
+            className="lb-intern"
             disabled={switching}
             onClick={async () => {
               if (await onMove(p)) close();
             }}
-          >
-            Verschieben
-          </button>
+          />
         )}
         {onDelete && p.upload && (
-          <button
-            type="button"
-            className="btn btn-small btn-danger lb-intern"
+          <IconButton
+            icon="delete"
+            label="Löschen"
+            variant="lb-danger"
+            className="lb-intern"
             disabled={switching}
             onClick={async () => {
               if (await onDelete(p)) close();
             }}
-          >
-            Löschen
-          </button>
+          />
         )}
       </div>
     </div>

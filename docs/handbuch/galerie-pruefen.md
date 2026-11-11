@@ -7,7 +7,7 @@ bereiche: [gallery]
 Hier siehst du die Bilder und Videos, die Mitglieder für die {bereich.gallery} eingereicht haben, und entscheidest, ob sie hineinkommen.
 
 ## So öffnest du die Seite
-Tippe unten auf **{bereich.gallery}** und oben auf **Einreichungen prüfen**. Mit **‹ Alle Alben** kommst du zurück.
+Tippe unten auf **{bereich.gallery}** und oben auf **Einreichungen prüfen** (Klemmbrett mit Haken). Mit **‹ Alle Alben** kommst du zurück.
 
 ## Was du hier siehst
 - **Offene Einreichungen**, die ältesten zuerst: das Bild oder Video, sein Name, das Album und wer es eingereicht hat. Ein Video spielst du hier mit ▶ ab, bevor du entscheidest.

@@ -46,7 +46,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Bilder und Videos mitgelöscht werden. Über **Alben anlegen und hochladen** legt man Alben an und lädt hoch, ohne an die
   Einstellungen zu müssen. Die bestehende Rolle „Galerie verwalten“ bekommt das Recht einmalig dazu; unter
   [Einstellungen → Rollen](app:einstellungen/rollen) kannst du es anderen Rollen geben oder wegnehmen. Bilder und Alben
-  aus Google Drive änderst du weiter in Drive.
+  aus Google Drive änderst du weiter in Drive. Alle Knöpfe der Galerie (auch Einreichen und Prüfen) sind jetzt runde
+  Symbole; am Rechner zeigt der Mauszeiger ihren Namen.
 
 ### Geändert
 
