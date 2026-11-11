@@ -3,6 +3,7 @@ import { api, can } from './api';
 import { confirmAsk } from './ask';
 import { dataUpdated } from './dataCache';
 import { ErrorBox, Loading, Sheet, useAsync } from './ui';
+import { useBackClose } from './backClose';
 
 /**
  * Galerie direkt in der Galerie verwalten (Recht manage_gallery, Admins sowieso): hochgeladene Bilder und Videos
@@ -276,38 +277,22 @@ export function deleteAlbumsQuestion(albums: { title: string; count: number }[])
   return total === 0 ? `${what} löschen?` : `${what} löschen? Dabei werden ${itemsLabel(total)} mitgelöscht.`;
 }
 
-function isSelectEntry(): boolean {
-  return !!(window.history.state as { gallerySelect?: boolean } | null)?.gallerySelect;
-}
-
 /**
- * Auswählen beenden ohne eigenen Knopf: Beim Beginnen kommt ein Eintrag mit derselben Adresse in den Verlauf (wie bei
- * der Großansicht), so beendet „Zurück“ (Taste, Geste des Geräts) das Auswählen statt die Seite zu verlassen; Escape
- * ebenso. Endet es anders (nichts mehr gewählt, Aktion fertig), nimmt leaveSelection den Eintrag wieder weg.
+ * Auswählen beenden ohne eigenen Knopf: „Zurück“ (Taste, Geste des Geräts) beendet das Auswählen statt die Seite zu
+ * verlassen (wie bei der Großansicht und offenen Fenstern, backClose.ts); Escape ebenso. Endet es anders (nichts mehr
+ * gewählt, Aktion fertig), verschwindet sein Eintrag im Verlauf von selbst.
  */
 export function useSelectionBack(selecting: boolean, onExit: () => void): void {
   const exit = useRef(onExit);
   exit.current = onExit;
+  useBackClose(selecting, () => exit.current());
   useEffect(() => {
     if (!selecting) return;
-    if (!isSelectEntry()) window.history.pushState({ ...window.history.state, gallerySelect: true }, '');
-    const onPop = () => {
-      if (!isSelectEntry()) exit.current();
-    };
     const onKey = (e: KeyboardEvent) => {
-      // Ein offenes Fenster (Verschieben, Rückfrage) schließt Escape selbst.
-      if (e.key === 'Escape' && !document.querySelector('.sheet-backdrop')) leaveSelection();
+      // Ein offenes Fenster (Verschieben, Rückfrage) oder die Großansicht schließt Escape selbst.
+      if (e.key === 'Escape' && !document.querySelector('.sheet-backdrop, .lightbox')) exit.current();
     };
-    window.addEventListener('popstate', onPop);
     document.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('popstate', onPop);
-      document.removeEventListener('keydown', onKey);
-    };
+    return () => document.removeEventListener('keydown', onKey);
   }, [selecting]);
-}
-
-/** Den Eintrag des Auswählens aus dem Verlauf nehmen; „Zurück“ ruft dann onExit von useSelectionBack auf. */
-export function leaveSelection(): void {
-  if (isSelectEntry()) window.history.back();
 }

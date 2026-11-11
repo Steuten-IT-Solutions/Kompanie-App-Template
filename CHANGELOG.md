@@ -75,6 +75,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **„Zurück“ schließt offene Fenster**: Ist ein Fenster der App offen (z. B. zum Verschieben eines Fotos, eine
+  Rückfrage, die vergrößerte Ansicht eines Mitgliedsfotos), schließt die Zurück-Taste bzw. -Geste des Handys oder der
+  Zurück-Knopf des Browsers jetzt zuerst dieses Fenster, ohne etwas zu ändern. Bisher ging die App dabei eine Seite
+  zurück. Liegen mehrere übereinander (Auswählen in der [Galerie](app:galerie), Großansicht, Fenster, Rückfrage), schließt
+  jedes „Zurück“ nur das oberste.
 - **Einreichungen prüfen auf dem Handy**: Unter *Zuletzt freigegeben* hat der Name eines Bilds jetzt die volle Breite
   neben der Vorschau, Haken *intern* und *Wieder entfernen* (jetzt ein Mülleimer) stehen darunter. Bisher stand alles in
   einer Zeile und der Name brach Buchstabe für Buchstabe um. Die Karten der Seite haben wieder einen Innenrand.

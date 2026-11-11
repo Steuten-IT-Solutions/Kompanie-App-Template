@@ -1954,18 +1954,57 @@ test('Galerie verwalten: Bilder auswählen, verschieben und löschen, Alben ins 
     await expect(moveButton).toHaveAttribute('title', 'Verschieben');
     await page.locator('.gallery-select-bar').getByRole('button', { name: 'Verschieben' }).click();
     const sheet = page.locator('.sheet', { hasText: '2 Bilder und Videos verschieben' });
+    // „Zurück“ des Geräts schließt zuerst das Fenster (das Auswählen bleibt), dann das Auswählen, erst dann die Seite.
+    const albumUrl = page.url();
+    await expect(sheet).toBeVisible();
+    await page.goBack();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.locator('.gallery-select-bar')).toContainText('2 Bilder und Videos gewählt');
+    expect(page.url()).toBe(albumUrl);
+    await page.locator('.gallery-select-bar').getByRole('button', { name: 'Verschieben' }).click();
+    // Mit ✕ geschlossen bleibt kein Eintrag übrig: Das nächste „Zurück“ beendet das Auswählen.
+    await sheet.getByRole('button', { name: 'Schließen' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    // Die App nimmt den Eintrag des Fensters gleich danach weg (ein Mensch drückt nicht innerhalb von Millisekunden).
+    await page.waitForFunction(() => (history.state as { backLayers?: number } | null)?.backLayers === 1);
+    await page.goBack();
+    await expect(page.locator('.gallery-select-bar')).toHaveCount(0);
+    expect(page.url()).toBe(albumUrl);
+    await page.getByRole('button', { name: 'Bild 1 öffnen' }).hover();
+    await page.mouse.down();
+    await page.waitForTimeout(700);
+    await page.mouse.up();
+    await page.getByRole('button', { name: 'Bild 2 wählen' }).click();
+    await page.locator('.gallery-select-bar').getByRole('button', { name: 'Verschieben' }).click();
     await sheet.getByLabel('In das Album').selectOption({ label: to });
     await sheet.getByRole('button', { name: 'Verschieben' }).click();
     await expect(page.locator('.toast')).toHaveText(`2 Bilder und Videos nach „${to}“ verschoben`);
     await expect(page.locator('.photo-grid .photo')).toHaveCount(1);
 
-    // Das letzte in der Großansicht löschen: Das Album ist leer, zurück zur Übersicht
+    // Großansicht: „Zurück“ schließt erst die Rückfrage bzw. das Fenster zum Verschieben, die Großansicht bleibt offen.
     await page.locator('.photo-grid .photo').first().click();
+    await page.locator('.lb-count').getByRole('button', { name: 'Verschieben' }).click();
+    await expect(page.locator('.sheet', { hasText: '1 Bild oder Video verschieben' })).toBeVisible();
+    await page.goBack();
+    await expect(page.locator('.sheet')).toHaveCount(0);
+    await expect(page.locator('.lightbox')).toHaveCount(1);
+    await page.locator('.lb-count').getByRole('button', { name: 'Löschen' }).click();
+    await expect(page.locator('.ask-dialog')).toBeVisible();
+    await page.goBack();
+    await expect(page.locator('.ask-dialog')).toHaveCount(0);
+    await expect(page.locator('.lightbox')).toHaveCount(1);
+    await expect(page.locator('.photo-grid .photo')).toHaveCount(1);
+
+    // Das letzte in der Großansicht löschen: Das Album ist leer, zurück zur Übersicht
     await page.locator('.lb-count').getByRole('button', { name: 'Löschen' }).click();
     await expect(page.locator('.ask-dialog')).toContainText('1 Bild oder Video löschen?');
     await askOk(page);
     await expect(page.locator('.toast')).toHaveText('Gelöscht');
     await expect(page).toHaveURL(/#\/galerie$/);
+    // Das leere Album ist durch die Übersicht ersetzt: „Zurück“ führt nicht dorthin.
+    await page.goBack();
+    await expect(page).not.toHaveURL(new RegExp(`#/galerie/${fromId}$`));
+    await page.goto('/app/#/galerie');
 
     // Übersicht: Album wählen, ins Jahr 2025 setzen, dann löschen
     await page.locator('.album-card', { hasText: to }).hover();
@@ -6706,6 +6745,8 @@ test('Vorabversionen erhalten: nach dem Bestätigen der Rückfrage wird der Vora
   await box.click();
   await expect(box).not.toBeChecked();
   expect(sent).toEqual([{ channel: 'early' }, { channel: 'stable' }]);
+  // Eine Abfrage des Zustands, die beim Ende des Tests noch läuft, soll ihn nicht rot machen („Response has been disposed“).
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
 test('Update-Paket hochladen: in Stücken, Version aus der Datei zeigen, nach Bestätigung einspielen', async ({ page }) => {

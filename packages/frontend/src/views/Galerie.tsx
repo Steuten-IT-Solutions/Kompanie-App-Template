@@ -13,6 +13,7 @@ import {
 import { api, can, type GalleryAlbum, type GalleryPhoto } from '../api';
 import { downloadablePhotos } from '../downloadFiles';
 import { downloadAlbum, downloadMedia } from '../galleryDownload';
+import { afterBackSync, useBackClose } from '../backClose';
 import { navigate, redirect } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { useSwipeDrag } from '../swipe';
@@ -26,7 +27,6 @@ import {
   canManageGallery,
   deleteAlbumsQuestion,
   itemsLabel,
-  leaveSelection,
   useLongPress,
   useSelectionBack,
   type LongPressHandlers,
@@ -114,7 +114,6 @@ function Overview({ onToast }: { onToast: Toast }) {
     if (selecting && selected.size === 0) {
       setSelecting(false);
       setActionError(null);
-      leaveSelection();
     }
   }, [selecting, selected]);
   useLayoutEffect(() => {
@@ -127,12 +126,11 @@ function Overview({ onToast }: { onToast: Toast }) {
   const years = data?.years ?? [];
   const chosen = years.flatMap((y) => y.albums.map((a) => ({ ...a, year: y.year }))).filter((a) => selected.has(a.id));
 
-  /** Auswählen beenden; leave: auch den Eintrag im Verlauf wegnehmen (nicht, wenn „Zurück“ es beendet hat). */
-  function stopSelecting(leave = true) {
+  /** Auswählen beenden (sein Eintrag im Verlauf verschwindet von selbst, backClose.ts). */
+  function stopSelecting() {
     setSelecting(false);
     setSelected(new Set());
     setActionError(null);
-    if (leave) leaveSelection();
   }
 
   /** Für alle gewählten Alben nacheinander; bricht beim ersten Fehler ab und meldet, wie weit es kam. */
@@ -359,7 +357,6 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
     if (selecting && selected.size === 0) {
       setSelecting(false);
       setActionError(null);
-      leaveSelection();
     }
   }, [selecting, selected]);
   // Alles herausgenommen: zurück zur Übersicht (das leere Album gibt es für die Galerie nicht mehr)
@@ -368,8 +365,9 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
   const [stale, setStale] = useState(false);
   useEffect(() => {
     if (open !== null) return;
-    // Ersetzt den Eintrag (auch den des Auswählens): „Zurück“ führt nicht ins leere Album
-    if (emptied) redirect('galerie');
+    // Erst wenn die Einträge von Großansicht, Fenster und Auswählen aus dem Verlauf sind, ersetzt die Übersicht den des
+    // Albums: „Zurück“ führt nicht ins leere Album.
+    if (emptied) afterBackSync(() => redirect('galerie'));
     else if (stale) {
       setStale(false);
       setRetry(0);
@@ -414,20 +412,18 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
   const uploads = photos.filter((p) => p.upload);
   const chosen = uploads.filter((p) => selected.has(p.id));
 
-  /** Auswählen beenden; leave: auch den Eintrag im Verlauf wegnehmen (nicht, wenn „Zurück“ es beendet hat). */
-  function stopSelecting(leave = true) {
+  /** Auswählen beenden (sein Eintrag im Verlauf verschwindet von selbst, backClose.ts). */
+  function stopSelecting() {
     setSelecting(false);
     setSelected(new Set());
     setActionError(null);
-    if (leave) leaveSelection();
   }
 
   /** Nach Verschieben oder Löschen: neu laden oder, wenn nichts mehr drin ist, zur Übersicht. */
   function removed(n: number) {
     dataUpdated();
     const empty = n >= photos.length;
-    // Leer: Der Eintrag des Auswählens wird gleich durch die Übersicht ersetzt (ein history.back() käme dem in die Quere).
-    stopSelecting(!empty);
+    stopSelecting();
     if (empty) setEmptied(true);
     else setStale(true);
   }
@@ -723,10 +719,6 @@ function DownloadIcon() {
   );
 }
 
-function isLightboxEntry(): boolean {
-  return !!(window.history.state as { lightbox?: boolean } | null)?.lightbox;
-}
-
 type Zoom = { scale: number; x: number; y: number };
 const NO_ZOOM: Zoom = { scale: 1, x: 0, y: 0 };
 const MAX_ZOOM = 4;
@@ -773,23 +765,15 @@ function Lightbox({
   const [i, setI] = useState(start);
   const current = useRef(i);
   current.current = i;
-  // Zurück (Taste, Geste des Geräts) schließt die Großansicht statt das Album: Beim Öffnen kommt ein Eintrag mit derselben
-  // Adresse in den Verlauf (kein hashchange, der Router merkt nichts). Schließen mit ✕ oder Escape nimmt ihn wieder weg.
+  // Zurück (Taste, Geste des Geräts) schließt die Großansicht statt das Album (backClose.ts). Schließen mit ✕ oder Escape
+  // nimmt ihren Eintrag im Verlauf wieder weg.
   const closing = useRef(false);
   const close = useCallback(() => {
     if (closing.current) return;
     closing.current = true;
-    if (isLightboxEntry()) window.history.back();
-    else onClose(current.current);
+    onClose(current.current);
   }, [onClose]);
-  useEffect(() => {
-    if (!isLightboxEntry()) window.history.pushState({ ...window.history.state, lightbox: true }, '');
-    const onPop = () => {
-      if (!isLightboxEntry()) onClose(current.current);
-    };
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, [onClose]);
+  useBackClose(true, close);
   const [zoom, setZoom] = useState<Zoom>(NO_ZOOM);
   const gesture = useRef<{ kind: 'tap' | 'pan' | 'pinch'; x: number; y: number; start: Zoom; dist?: number } | null>(null);
   const lastTap = useRef(0);
