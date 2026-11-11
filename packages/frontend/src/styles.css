@@ -6616,6 +6616,40 @@ button.spotlight-person:focus-visible {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+/* Zuletzt freigegeben: Vorschau links, rechts Name und darunter Haken und Knopf, damit der Name die volle Breite hat */
+.gallery-approved {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  column-gap: 10px;
+  row-gap: 6px;
+  padding: 8px 0;
+}
+.gallery-approved + .gallery-approved {
+  border-top: 1px solid var(--line);
+}
+.gallery-approved > img,
+.gallery-approved > .gallery-upload-video {
+  grid-row: span 2;
+  align-self: start;
+}
+/* auch ohne Vorschau (kein Standbild) rechts */
+.gallery-approved > .small,
+.gallery-approved-actions {
+  grid-column: 2;
+}
+.gallery-approved-actions .toggle {
+  margin: 0;
+}
+section.settings-section > .gallery-upload-list:last-child {
+  margin-bottom: 0;
+}
+.gallery-approved-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
 
 /* Einreichungen der Galerie (Issue #286) */
 .gallery-actions {
