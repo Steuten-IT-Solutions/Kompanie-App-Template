@@ -24,6 +24,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.10.0] – 2026-11-11
+
 ### Neu
 
 - **Automatische Sicherungen auf dem eigenen Server**: Unter [Einstellungen → Datensicherung](app:einstellungen/datensicherung)
