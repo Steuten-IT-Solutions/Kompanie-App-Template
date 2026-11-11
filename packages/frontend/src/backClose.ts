@@ -7,8 +7,9 @@ import { useEffect, useRef } from 'react';
  * Jede offene Ebene hat einen Eintrag mit derselben Adresse im Verlauf (kein hashchange, der Router merkt nichts). Im
  * Zustand des Eintrags steht, wie viele Ebenen bei ihm offen waren. Geht der Verlauf zurück, schließen die Ebenen darüber
  * (die oberste zuerst). Schließt eine Ebene anders (✕, Escape, nach dem Speichern), nimmt die App ihren Eintrag wieder
- * weg. Alles Abgleichen geschieht gesammelt nach dem aktuellen Ablauf: Mehrere Ebenen, die zugleich schließen (z. B.
- * Fenster, Großansicht und Auswählen nach dem Verschieben), gehen in einem Schritt zurück statt sich in die Quere zu kommen.
+ * weg. Es geht immer nur ein Schritt (history.go) zugleich: Schließen mehrere Ebenen zugleich (z. B. Fenster, Großansicht
+ * und Auswählen nach dem Verschieben), folgt der Rest nach dessen popstate, statt dass sich mehrere history.back() in die
+ * Quere kommen.
  */
 
 const KEY = 'backLayers';
@@ -105,7 +106,9 @@ export function openBackLayer(close: () => void): () => void {
     const i = layers.indexOf(layer);
     if (i < 0) return; // schon durch „Zurück“ geschlossen
     layers.splice(i, 1);
-    schedule();
+    // Gleich zurückgehen: Folgt sofort eine andere Navigation (Link, neue Adresse), käme ein späteres go() ihr in die
+    // Quere. Schließen weitere Ebenen, während das unterwegs ist, folgt der Rest nach dem popstate in einem Schritt.
+    sync();
   };
 }
 
