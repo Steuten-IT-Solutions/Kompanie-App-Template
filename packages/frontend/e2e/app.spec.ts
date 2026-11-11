@@ -3103,11 +3103,15 @@ test.describe('Vorabladen (Issue #104)', () => {
     page.addInitScript(() => Object.defineProperty(navigator, 'connection', { value: { saveData: true, effectiveType: '4g' } }));
 
   /** API ab jetzt sehr langsam: Was nicht schon vorab da ist, zeigt „Lädt …“ bzw. das Gerüst. */
+  // Nur Anfragen an die API bremsen, nicht Programmteile, deren Name zufällig passt (z. B. galleryIcons-….js)
   const slowApi = (page: Page, re: RegExp) =>
-    page.route(re, async (route) => {
-      await new Promise((r) => setTimeout(r, 8000));
-      await route.continue().catch(() => undefined);
-    });
+    page.route(
+      (url) => re.test(decodeURIComponent(url.toString()).match(API_PATH)?.[1] ?? ''),
+      async (route) => {
+        await new Promise((r) => setTimeout(r, 8000));
+        await route.continue().catch(() => undefined);
+      },
+    );
 
   test('Leerlauf: Die übrigen Tabs sind beim ersten Öffnen sofort da, ohne 403', async ({ page }) => {
     const api = watchApi(page);

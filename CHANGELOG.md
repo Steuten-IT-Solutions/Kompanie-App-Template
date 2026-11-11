@@ -68,6 +68,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Zurück-Knopf des Browsers jetzt zuerst dieses Fenster, ohne etwas zu ändern. Bisher ging die App dabei eine Seite
   zurück. Liegen mehrere übereinander (Auswählen in der [Galerie](app:galerie), Großansicht, Fenster, Rückfrage), schließt
   jedes „Zurück“ nur das oberste.
+- **Einreichungen prüfen auf dem Handy**: Unter *Zuletzt freigegeben* hat der Name eines Bilds jetzt die volle Breite
+  neben der Vorschau, Haken *intern* und *Wieder entfernen* (jetzt ein Mülleimer) stehen darunter. Bisher stand alles in
+  einer Zeile und der Name brach Buchstabe für Buchstabe um. Die Karten der Seite haben wieder einen Innenrand.
 - **Benachrichtigungen einer Test-App erscheinen nicht mehr unter der Produktiv-App**: Wer eine Sicherung unter
   [Einstellungen → Datensicherung](app:einstellungen/datensicherung) in eine Installation unter einer anderen Adresse
   einspielt (z. B. die Produktiv-App in eine Test-App), übernimmt die Anmeldungen der Geräte für Benachrichtigungen nicht
