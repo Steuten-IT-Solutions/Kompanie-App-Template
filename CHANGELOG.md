@@ -51,6 +51,18 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Kleinere Knöpfe auf dem Handy: Symbole statt Text, ganze Breite statt halber**: Wie in der Galerie sind
+  **Bearbeiten** (Stift), **Löschen** (Mülleimer), **Verlauf** (Uhr) und **Ansehen** (Auge) jetzt runde Symbole, u. a.
+  am [Schwarzen Brett](app:brett), bei [Terminen](app:termine/verwalten), [Umfragen](app:umfragen/verwalten),
+  [Ämtern](app:verwaltung/aemter), Kompanien, Sponsoren, Seiten, Dokumenten, im Inventar, bei Neuigkeiten und unter
+  [Einstellungen → Rollen](app:einstellungen/rollen); am Rechner zeigt der Mauszeiger ihren Namen. In einer
+  [Liste](app:verwaltung/listen) heißen die Ausgabe-Knöpfe kurz **PDF** und **CSV** (mit Pfeil nach unten), **Drucken**
+  ist ein Drucker, **+ Leere Zeile** heißt **+ Zeile**. **Adresse kopieren** unter
+  [Einstellungen → Google-Zugang](app:einstellungen/google) steht als Symbol direkt neben dem Feld. Steht ein Knopf
+  allein in seiner Reihe (z. B. **+ Mitglied anlegen**, **Wartungsmodus einschalten**), nimmt er die ganze Breite ein,
+  statt halb breit links zu stehen und auf mehrere Zeilen umzubrechen; Symbolreihen stehen mittig. In einer Umfrage
+  führen „‹ Schwarzes Brett“ und „Alle Umfragen ›“ zurück (bisher stand dort „Zum Schwarzes Brett“).
+
 - **„Im Amt“ im hellen Modus leichter**: Unter [Mitglieder → Ämter](app:mitglieder/aemter) steht der Bereich „Im Amt“
   eines aufgeklappten Amts im hellen Modus jetzt auf einer zarten Tönung der Kompaniefarbe statt auf der vollen Farbe. Im
   dunklen Modus bleibt er wie bisher.

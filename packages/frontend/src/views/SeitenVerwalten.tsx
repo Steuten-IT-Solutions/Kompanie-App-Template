@@ -8,6 +8,7 @@ import { sources } from '../viewData';
 import { AudienceBadge } from './Seiten';
 import { blocksInput, draftsFrom, newBlock, type BlockDraft } from '../blocks/blockDrafts';
 import { confirmAsk } from '../ask';
+import { IconButton } from '../icons';
 
 const BlocksEditor = lazyView(() => import('../blocks/BlocksEditor'));
 
@@ -238,18 +239,16 @@ export function PageAdmin({ onToast }: { onToast: (msg: string) => void }) {
                     </div>
                   )}
                   <div className="row-actions">
-                    <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => setEditing(p.id)}>
-                      Bearbeiten
-                    </button>
-                    <button
-                      className="btn btn-small btn-danger"
+                    <IconButton icon="edit" label="Bearbeiten" disabled={busy} onClick={() => setEditing(p.id)} />
+                    <IconButton
+                      icon="delete"
+                      label="Löschen"
+                      variant="danger"
                       disabled={busy}
                       onClick={async () =>
                         (await confirmAsk(`Seite „${p.title}“ samt ihren Bildern löschen?`)) && run(() => api.deletePage(p.id), 'Gelöscht')
                       }
-                    >
-                      Löschen
-                    </button>
+                    />
                   </div>
                 </div>
               </li>

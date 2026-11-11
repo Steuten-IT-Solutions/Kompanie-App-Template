@@ -33,6 +33,7 @@ import { navigate } from '../router';
 import { formatBytes, formatUntil } from '../format';
 import { menuSources, prefetchOnTap, sources, usePrefetchMenu } from '../viewData';
 import { confirmAsk } from '../ask';
+import { IconButton } from '../icons';
 
 const sec = brand.labels.sections;
 
@@ -913,14 +914,19 @@ export function GoogleAccess({ settings, onSaved, onToast }: SectionProps) {
           {result.message}
         </p>
       )}
-      <label className="field">
-        <span>Weiterleitungs-URI (im OAuth-Client bei Google eintragen)</span>
-        <input type="text" readOnly value={g.redirect_uri} onFocus={(e) => e.currentTarget.select()} />
-      </label>
-      <div className="button-row">
-        <button type="button" className="btn btn-secondary" onClick={copy}>
-          Adresse kopieren
-        </button>
+      <div className="field">
+        <span id="google-redirect-label">Weiterleitungs-URI (im OAuth-Client bei Google eintragen)</span>
+        {/* Kopieren als Symbol direkt neben dem Feld */}
+        <div className="copy-field">
+          <input
+            type="text"
+            readOnly
+            aria-labelledby="google-redirect-label"
+            value={g.redirect_uri}
+            onFocus={(e) => e.currentTarget.select()}
+          />
+          <IconButton icon="copy" label="Adresse kopieren" onClick={() => void copy()} />
+        </div>
       </div>
       {g.connected ? (
         <div className="small">
@@ -1244,7 +1250,7 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
         </label>
       )}
       {c.source !== 'none' && c.source !== 'app' && external && (
-        <div className="button-row">
+        <div className="button-row single">
           <button type="button" className="btn btn-secondary" onClick={test} disabled={testing}>
             {testing ? 'Prüft …' : 'Kalender testen'}
           </button>

@@ -16,7 +16,7 @@ Tippe im Banner oben oder am {bereich.board} bei der Umfrage auf **Teilnehmen** 
 - **Namentlich** oder **Anonym**: ein Kasten, der erklärt, wer deine Antwort sieht und wann die Ergebnisse sichtbar werden.
 - **Deine Antwort**: die Antwortmöglichkeiten zum Antippen oder ein Textfeld, dazu **Antwort senden** bzw. **Antwort ändern** und **Zurückziehen**.
 - **Ergebnisse**: die Zahl der Teilnahmen und je Antwortmöglichkeit ein Balken mit Anzahl und Prozent, bei Freitext alle Antworten als Liste. Bei namentlichen {bereich.polls} stehen die Namen dabei. Darfst du die Ergebnisse noch nicht sehen, steht dort, wer sie wann sieht.
-- **Zum {bereich.board}** und **Alle {bereich.polls}**: führen zum Brett bzw. zur Liste aller {bereich.polls}.
+- **‹ {bereich.board}** und **Alle {bereich.polls} ›**: führen zum Brett bzw. zur Liste aller {bereich.polls}.
 
 ## So gehst du vor
 ### Antworten

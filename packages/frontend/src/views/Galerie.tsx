@@ -20,7 +20,7 @@ import { useSwipeDrag } from '../swipe';
 import { prefetchAlbumOnTap, sources } from '../viewData';
 import { confirmAsk, promptAsk } from '../ask';
 import { dataUpdated } from '../dataCache';
-import { IconButton } from '../galleryIcons';
+import { IconButton } from '../icons';
 import {
   AlbumEditSheet,
   MoveSheet,

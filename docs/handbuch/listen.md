@@ -15,7 +15,7 @@ Tippe unten auf **Verwaltung** und dann auf den Knopf **{bereich.lists}**.
 - **Die Listen**: je Liste der Titel, das Datum (falls eingetragen), die Zahl der Zeilen und wer sie zuletzt geändert hat.
 - **Öffnen**: öffnet die Liste zum Bearbeiten, Drucken und Herunterladen. Ein Tipp auf die Liste selbst tut dasselbe.
 - **Kopieren**: legt eine Kopie mit allen Spalten und Zeilen an. Ihr Titel endet auf „(Kopie)“.
-- **Löschen**: löscht die Liste nach einer Rückfrage.
+- **Löschen** (Mülleimer): löscht die Liste nach einer Rückfrage.
 - **Neue Liste**: unten, zum Anlegen einer neuen Liste.
 
 ## So gehst du vor

@@ -3,7 +3,7 @@ import { api, type GallerySubmission } from '../api';
 import { navigate } from '../router';
 import { Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
 import { confirmAsk, promptAsk } from '../ask';
-import { IconButton } from '../galleryIcons';
+import { IconButton } from '../icons';
 import { InternToggle } from '../galleryIntern';
 import { VIDEO_ACCEPT, countFiles, isVideoFile, submitVideo } from '../videoUpload';
 

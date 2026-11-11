@@ -17,7 +17,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Rollen**. D
 
 ## So gehst du vor
 ### Die App als eine Rolle ansehen
-1. Tippe auf der Seite **Rollen** neben der Rolle auf **Ansehen**.
+1. Tippe auf der Seite **Rollen** neben der Rolle auf **Ansehen** (Auge).
 2. Die App lädt neu und beginnt auf der Startseite dieser Rolle. Sieh dich in Ruhe um.
 3. Tippe im Banner oben auf **Beenden**. Du kommst zurück zur Seite **Rollen**, wieder mit allen Rechten.
 
