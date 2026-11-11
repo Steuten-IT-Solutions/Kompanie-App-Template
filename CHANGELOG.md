@@ -24,6 +24,17 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.10.0] – 2026-11-11
+
+### Neu
+
+- **Automatische Sicherungen auf dem eigenen Server**: Unter [Einstellungen → Datensicherung](app:einstellungen/datensicherung)
+  gibt es neben Google Drive jetzt das Ziel „Server“: Mit **Wöchentlich auf dem Server sichern** legt die App einmal pro
+  Woche eine Sicherung in einem geschützten Ordner auf dem eigenen Webspace ab und behält die letzten vier. Darunter
+  stehen alle Sicherungen auf dem Server, auch die vor Updates: Du kannst sie herunterladen, direkt wiederherstellen
+  oder löschen. Sie helfen, wenn Daten versehentlich gelöscht wurden; geht der Server verloren, sind sie mit weg.
+  Lade deshalb weiterhin Sicherungen herunter oder nutze Google Drive.
+
 ## [0.9.0] – 2026-11-11
 
 ### Neu

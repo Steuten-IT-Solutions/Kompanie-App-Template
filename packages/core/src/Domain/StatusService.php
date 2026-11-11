@@ -172,6 +172,15 @@ final class StatusService
                 $hint = ' Das Passwort für Sicherungen ist noch nicht geprüft: Ist es vertippt, lassen sich die verschlüsselten Sicherungen nicht wiederherstellen. Bitte unter Einstellungen → Datensicherung „Passwort prüfen“ wählen; bis dahin löscht die App in Google Drive keine älteren unverschlüsselten Sicherungen.';
             }
         }
+        // Sicherungen auf dem eigenen Server: nur Hinweis und Fehler. Sie zählen nicht als aufbewahrte Sicherung, weil sie
+        // mit dem Server verloren gehen (die Erinnerung unten bleibt).
+        $server = $this->app->serverBackup()->status();
+        if ($server['enabled']) {
+            $text .= ' Letzte Sicherung auf dem Server: ' . $this->date($server['last_ok']) . '.';
+            if ($server['error'] !== null) {
+                return $this->item('backup', 'Datensicherung', 'warn', $text . ' Die letzte Sicherung auf dem Server ist fehlgeschlagen: ' . $server['error']);
+            }
+        }
         $newest = max($last ?? 0, $drive['enabled'] ? (int) $drive['last_ok'] : 0);
         if ($newest < $this->app->time()->timestamp() - self::BACKUP_REMIND_DAYS * 86400) {
             return $this->item('backup', 'Datensicherung', 'warn', $text . ' Bitte unter Einstellungen → Datensicherung eine Sicherung herunterladen und aufbewahren oder Sicherungen in Google Drive einschalten.' . $hint);

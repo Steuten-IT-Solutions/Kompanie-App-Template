@@ -41,6 +41,7 @@ use KompanieApp\Core\Domain\RegistrationService;
 use KompanieApp\Core\Domain\RoleService;
 use KompanieApp\Core\Domain\ScoreService;
 use KompanieApp\Core\Domain\SettingsService;
+use KompanieApp\Core\Domain\ServerBackupService;
 use KompanieApp\Core\Domain\TitleService;
 use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Time;
@@ -122,6 +123,7 @@ final class App
         BirthdayService::TASK => 3600,
         BugReportService::TASK => BugReportService::INTERVAL,
         BackupUploadService::TASK => BackupUploadService::INTERVAL,
+        ServerBackupService::TASK => ServerBackupService::INTERVAL,
         ActivityService::TASK => ActivityService::INTERVAL,
         FormerMemberService::RETENTION_TASK => FormerMemberService::RETENTION_INTERVAL,
         RegistrationService::TASK => RegistrationService::INTERVAL,
@@ -305,6 +307,8 @@ final class App
             BugReportService::TASK => true,
             // Sicherung in Google Drive: täglich prüfen, wöchentlich hochladen.
             BackupUploadService::TASK => $this->backupUpload()->active(),
+            // Sicherung auf dem eigenen Server: täglich prüfen, wöchentlich sichern.
+            ServerBackupService::TASK => $this->serverBackup()->active(),
             // Nutzungsauswertung (Issue #175): täglich Einträge je Person nach 90 Tagen und Pseudonyme nach 31 Tagen löschen.
             ActivityService::TASK => true,
             // Ehemalige nach Ablauf der Aufbewahrungsfrist löschen: täglich, nur mit eingestellter Frist.
@@ -383,6 +387,8 @@ final class App
                 $this->bugReports()->runTask();
             } elseif ($task === BackupUploadService::TASK) {
                 $this->backupUpload()->runTask();
+            } elseif ($task === ServerBackupService::TASK) {
+                $this->serverBackup()->runTask();
             } elseif ($task === ActivityService::TASK) {
                 $this->activity()->prune();
             } elseif ($task === FormerMemberService::RETENTION_TASK) {
@@ -811,6 +817,12 @@ final class App
     public function backupUpload(): BackupUploadService
     {
         return $this->service(BackupUploadService::class, fn () => new BackupUploadService($this));
+    }
+
+    /** Sicherungen automatisch auf dem eigenen Server, Liste der Sicherungen dort */
+    public function serverBackup(): ServerBackupService
+    {
+        return $this->service(ServerBackupService::class, fn () => new ServerBackupService($this));
     }
 
     public function status(): StatusService

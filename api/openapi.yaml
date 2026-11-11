@@ -7205,6 +7205,104 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }
 
+  /admin/backup/server:
+    get:
+      tags: [Wartung]
+      summary: Sicherungen auf dem eigenen Server – Stand und Liste
+      description: |
+        Liste aller Sicherungen im geschützten Ordner auf dem Server, neueste zuerst: die wöchentlichen (`weekly`) und
+        die vor Updates (`update`). Herunterladen als Datei über `<App>/sicherung?datei=<id>` (nur Admins, nicht in der
+        Vorschau).
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/BackupServerStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Wartung]
+      summary: Wöchentliche Sicherungen auf dem eigenen Server ein- oder ausschalten
+      description: |
+        Eingeschaltet legt die App einmal pro Woche eine unverschlüsselte Sicherung im geschützten Ordner auf dem Server
+        ab und behält die letzten vier (die vor Updates zählen nicht mit). Schalter und Zustand gehören zur Installation
+        und kommen nicht aus einer Sicherung.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/BackupServerStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/backup/server/create:
+    post:
+      tags: [Wartung]
+      summary: Sicherung jetzt auf dem Server ablegen
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/BackupServerStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '500': { $ref: '#/components/responses/Error' }
+
+  /admin/backup/server/restore:
+    post:
+      tags: [Wartung]
+      summary: Alle Daten durch eine Sicherung auf dem Server ersetzen
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, confirm]
+              properties:
+                id: { type: string, description: id aus der Liste }
+                confirm: { type: boolean, description: Muss true sein }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  restored: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/backup/server/delete:
+    post:
+      tags: [Wartung]
+      summary: Eine Sicherung auf dem Server löschen
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id: { type: string, description: id aus der Liste }
+      responses:
+        '200': { $ref: '#/components/responses/BackupServerStatus' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /admin/setup/done:
     post:
       tags: [Wartung]
@@ -7285,6 +7383,33 @@ components:
               error: { type: [string, 'null'], description: Fehler beim letzten Versuch }
               every_days: { type: integer }
               keep: { type: integer }
+    BackupServerStatus:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [available, enabled, can_restore, last_ok, last_try, error, every_days, keep, files]
+            properties:
+              available: { type: boolean, description: Datensicherung in dieser Installation vorhanden }
+              enabled: { type: boolean, description: Wöchentlich auf dem Server sichern }
+              can_restore: { type: boolean, description: Wiederherstellen ist hier möglich }
+              last_ok: { type: [integer, 'null'], description: Letzte erfolgreiche Sicherung auf dem Server (Unix-Zeit) }
+              last_try: { type: [integer, 'null'] }
+              error: { type: [string, 'null'], description: Fehler beim letzten Versuch }
+              every_days: { type: integer }
+              keep: { type: integer, description: So viele wöchentliche Sicherungen bleiben }
+              files:
+                type: array
+                items:
+                  type: object
+                  required: [id, kind, created, size, version]
+                  properties:
+                    id: { type: string, description: Dateiname im Ordner der Sicherungen }
+                    kind: { type: string, enum: [weekly, update] }
+                    created: { type: integer, description: Unix-Zeit }
+                    size: { type: integer, description: Bytes }
+                    version: { type: [string, 'null'], description: Version vor dem Update (nur update) }
     FormerRetention:
       description: OK
       content:
@@ -8449,7 +8574,7 @@ components:
         registration: { type: boolean, description: 'Zugang beantragen eingeschaltet (Issue #314): Link „Zugang beantragen“ für Gäste' }
         pendingRegistrations: { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null' }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
-        backupUrl: { type: [string, 'null'], description: 'Nur für Admins (nicht in der Vorschau): Adresse zum Herunterladen der Datensicherung als Datei (<App>/sicherung), Stück für Stück erzeugt; sonst null' }
+        backupUrl: { type: [string, 'null'], description: 'Nur für Admins (nicht in der Vorschau): Adresse zum Herunterladen der Datensicherung als Datei (<App>/sicherung), Stück für Stück erzeugt; mit ?datei=<id> eine Sicherung, die auf dem Server liegt (GET /admin/backup/server); sonst null' }
         maintenance: { $ref: '#/components/schemas/MaintenanceInfo' }
         navigation:
           description: 'Einrichtbare Navigation (Issue #277, Einstellungen → Navigation), für alle; null = Standardnavigation'

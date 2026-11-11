@@ -56,6 +56,9 @@ final class Backup
         'bug_reports_registered',
         // Zustand der Sicherungen in Google Drive (BackupUploadService::STATE_SETTING): letzter Lauf, Fehler.
         'backup_drive_state',
+        // Sicherungen auf dem eigenen Server (ServerBackupService): Schalter und Zustand gehören zu diesem Server. Eine
+        // Sicherung, die von dort wiederhergestellt wird, soll sie nicht ausschalten.
+        'backup_server', 'backup_server_state',
         // Öffentlicher Schlüssel für verschlüsselte Sicherungen (BackupCrypto::SETTING): gehört zur Installation. Eine ältere
         // Sicherung soll kein früheres Passwort zurückbringen; nach einem Umzug richtet der Admin es neu ein.
         'backup_encryption',

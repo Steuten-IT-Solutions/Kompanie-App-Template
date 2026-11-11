@@ -1531,6 +1531,28 @@ final class Api
                     throw $e instanceof ApiError ? $e : new ApiError(502, 'upload_failed', $e->getMessage());
                 }
             }, null, $denySettings),
+            // Sicherungen auf dem eigenen Server: wöchentlich (Schalter), Liste mit Herunterladen (<App>/sicherung?datei=…),
+            // Wiederherstellen und Löschen
+            new Route('GET', '/admin/backup/server', Cap::ManageSettings, fn () => $a->serverBackup()->status(), null, $denySettings),
+            new Route('PUT', '/admin/backup/server', Cap::ManageSettings, function (Request $r) use ($a) {
+                $status = $a->serverBackup()->setEnabled(Input::bool($r->input('enabled')));
+                $a->scheduleTasks();
+                return $status;
+            }, null, $denySettings),
+            new Route('POST', '/admin/backup/server/create', Cap::ManageSettings, function () use ($a) {
+                try {
+                    return $a->serverBackup()->create();
+                } catch (\RuntimeException $e) {
+                    throw $e instanceof ApiError ? $e : new ApiError(500, 'backup_failed', $e->getMessage());
+                }
+            }, null, $denySettings),
+            new Route('POST', '/admin/backup/server/restore', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->serverBackup()->restore($r->input('id'), Input::bool($r->input('confirm')));
+                // wie POST /admin/backup: Bereiche und Verbindungen kommen aus der Sicherung
+                $a->settings->set(self::SETUP_SETTING, true);
+                return ['restored' => true];
+            }, null, $denySettings),
+            new Route('POST', '/admin/backup/server/delete', Cap::ManageSettings, fn (Request $r) => $a->serverBackup()->delete($r->input('id')), null, $denySettings),
             new Route('POST', '/admin/setup/done', Cap::ManageSettings, function () use ($a) {
                 $a->settings->set(self::SETUP_SETTING, true);
                 return ['done' => true];
