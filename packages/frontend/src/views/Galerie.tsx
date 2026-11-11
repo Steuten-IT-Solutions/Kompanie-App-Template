@@ -13,7 +13,7 @@ import {
 import { api, can, type GalleryAlbum, type GalleryPhoto } from '../api';
 import { downloadablePhotos } from '../downloadFiles';
 import { downloadAlbum, downloadMedia } from '../galleryDownload';
-import { navigate } from '../router';
+import { navigate, redirect } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { useSwipeDrag } from '../swipe';
 import { prefetchAlbumOnTap, sources } from '../viewData';
@@ -25,7 +25,9 @@ import {
   canManageGallery,
   deleteAlbumsQuestion,
   itemsLabel,
+  leaveSelection,
   useLongPress,
+  useSelectionBack,
   type LongPressHandlers,
 } from '../galleryManage';
 
@@ -101,6 +103,19 @@ function Overview({ onToast }: { onToast: Toast }) {
     setSelecting(true);
     setSelected((old) => toggle(old, id));
   });
+  // Beenden ohne Knopf: „Zurück“, Escape oder wenn nichts mehr gewählt ist
+  useSelectionBack(selecting, () => {
+    setSelecting(false);
+    setSelected(new Set());
+    setActionError(null);
+  });
+  useEffect(() => {
+    if (selecting && selected.size === 0) {
+      setSelecting(false);
+      setActionError(null);
+      leaveSelection();
+    }
+  }, [selecting, selected]);
   useLayoutEffect(() => {
     if (!ready || overviewScroll === null) return;
     window.scrollTo(0, overviewScroll);
@@ -111,10 +126,12 @@ function Overview({ onToast }: { onToast: Toast }) {
   const years = data?.years ?? [];
   const chosen = years.flatMap((y) => y.albums.map((a) => ({ ...a, year: y.year }))).filter((a) => selected.has(a.id));
 
-  function stopSelecting() {
+  /** Auswählen beenden; leave: auch den Eintrag im Verlauf wegnehmen (nicht, wenn „Zurück“ es beendet hat). */
+  function stopSelecting(leave = true) {
     setSelecting(false);
     setSelected(new Set());
     setActionError(null);
+    if (leave) leaveSelection();
   }
 
   /** Für alle gewählten Alben nacheinander; bricht beim ersten Fehler ab und meldet, wie weit es kam. */
@@ -186,11 +203,6 @@ function Overview({ onToast }: { onToast: Toast }) {
         {manage && (
           <button className="btn btn-secondary" onClick={() => navigate('galerie/verwalten')}>
             Alben anlegen und hochladen
-          </button>
-        )}
-        {manage && years.length > 0 && (
-          <button className="btn btn-secondary" aria-pressed={selecting} onClick={() => (selecting ? stopSelecting() : setSelecting(true))}>
-            {selecting ? 'Fertig' : 'Alben auswählen'}
           </button>
         )}
       </div>
@@ -344,13 +356,27 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
     setSelecting(true);
     setSelected((old) => toggle(old, photoId));
   });
+  // Beenden ohne Knopf: „Zurück“, Escape oder wenn nichts mehr gewählt ist
+  useSelectionBack(selecting, () => {
+    setSelecting(false);
+    setSelected(new Set());
+    setActionError(null);
+  });
+  useEffect(() => {
+    if (selecting && selected.size === 0) {
+      setSelecting(false);
+      setActionError(null);
+      leaveSelection();
+    }
+  }, [selecting, selected]);
   // Alles herausgenommen: zurück zur Übersicht (das leere Album gibt es für die Galerie nicht mehr)
   const [emptied, setEmptied] = useState(false);
   // Geändert, während die Großansicht offen war: erst nach dem Schließen neu laden (sonst fehlte ihr das Bild)
   const [stale, setStale] = useState(false);
   useEffect(() => {
     if (open !== null) return;
-    if (emptied) navigate('galerie');
+    // Ersetzt den Eintrag (auch den des Auswählens): „Zurück“ führt nicht ins leere Album
+    if (emptied) redirect('galerie');
     else if (stale) {
       setStale(false);
       setRetry(0);
@@ -395,17 +421,21 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
   const uploads = photos.filter((p) => p.upload);
   const chosen = uploads.filter((p) => selected.has(p.id));
 
-  function stopSelecting() {
+  /** Auswählen beenden; leave: auch den Eintrag im Verlauf wegnehmen (nicht, wenn „Zurück“ es beendet hat). */
+  function stopSelecting(leave = true) {
     setSelecting(false);
     setSelected(new Set());
     setActionError(null);
+    if (leave) leaveSelection();
   }
 
   /** Nach Verschieben oder Löschen: neu laden oder, wenn nichts mehr drin ist, zur Übersicht. */
   function removed(n: number) {
     dataUpdated();
-    stopSelecting();
-    if (n >= photos.length) setEmptied(true);
+    const empty = n >= photos.length;
+    // Leer: Der Eintrag des Auswählens wird gleich durch die Übersicht ersetzt (ein history.back() käme dem in die Quere).
+    stopSelecting(!empty);
+    if (empty) setEmptied(true);
     else setStale(true);
   }
 
@@ -450,22 +480,12 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
     }
   }
 
-  const tools = manage && (
+  // Auswählen beginnt mit langem Drücken auf ein Bild (useLongPress), ohne eigenen Knopf
+  const tools = manage && album.source === 'app' && !selecting && (
     <div className="button-row gallery-actions">
-      {uploads.length > 0 && (
-        <button
-          className="btn btn-small btn-secondary"
-          aria-pressed={selecting}
-          onClick={() => (selecting ? stopSelecting() : setSelecting(true))}
-        >
-          {selecting ? 'Fertig' : 'Auswählen'}
-        </button>
-      )}
-      {album.source === 'app' && !selecting && (
-        <button className="btn btn-small btn-secondary" onClick={() => setSheet({ kind: 'edit' })}>
-          Album bearbeiten
-        </button>
-      )}
+      <button className="btn btn-small btn-secondary" onClick={() => setSheet({ kind: 'edit' })}>
+        Album bearbeiten
+      </button>
     </div>
   );
   const selectBar = selecting && (
@@ -476,10 +496,10 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
       <div className="button-row">
         <button
           className="btn btn-small btn-secondary"
-          disabled={busy}
-          onClick={() => setSelected(chosen.length === uploads.length ? new Set() : new Set(uploads.map((p) => p.id)))}
+          disabled={busy || chosen.length === uploads.length}
+          onClick={() => setSelected(new Set(uploads.map((p) => p.id)))}
         >
-          {chosen.length === uploads.length ? 'Keine' : 'Alle'}
+          Alle
         </button>
         <button
           className="btn btn-small btn-secondary"
