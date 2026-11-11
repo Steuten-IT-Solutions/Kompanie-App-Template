@@ -24,6 +24,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.9.0] – 2026-11-11
+
 ### Neu
 
 - **Internen Kalender direkt in der App pflegen, ohne Google**: Unter [Einstellungen → Kalender](app:einstellungen/kalender)
