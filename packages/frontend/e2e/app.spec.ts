@@ -1924,8 +1924,13 @@ test('Galerie verwalten: Bilder auswählen, verschieben und löschen, Alben ins 
     // Zwei auswählen und ins andere Album verschieben
     await page.goto(`/app/#/galerie/${fromId}`);
     await expect(page.locator('.photo-grid .photo')).toHaveCount(3);
-    await page.getByRole('button', { name: 'Auswählen' }).click();
-    await page.getByRole('button', { name: 'Bild 1 wählen' }).click();
+    // Langes Drücken auf ein Bild beginnt das Auswählen, mit diesem Bild; danach genügt Tippen
+    await page.getByRole('button', { name: 'Bild 1 öffnen' }).hover();
+    await page.mouse.down();
+    await page.waitForTimeout(700);
+    await page.mouse.up();
+    await expect(page.locator('.lightbox')).toHaveCount(0);
+    await expect(page.locator('.gallery-select-bar')).toContainText('1 Bild oder Video gewählt');
     await page.getByRole('button', { name: 'Bild 2 wählen' }).click();
     await expect(page.locator('.gallery-select-bar')).toContainText('2 Bilder und Videos gewählt');
     await page.locator('.gallery-select-bar').getByRole('button', { name: 'Verschieben' }).click();
@@ -1944,8 +1949,11 @@ test('Galerie verwalten: Bilder auswählen, verschieben und löschen, Alben ins 
     await expect(page).toHaveURL(/#\/galerie$/);
 
     // Übersicht: Album wählen, ins Jahr 2025 setzen, dann löschen
-    await page.getByRole('button', { name: 'Alben auswählen' }).click();
-    await page.locator('.album-card', { hasText: to }).click();
+    await page.locator('.album-card', { hasText: to }).hover();
+    await page.mouse.down();
+    await page.waitForTimeout(700);
+    await page.mouse.up();
+    await expect(page).toHaveURL(/#\/galerie$/);
     await expect(page.locator('.gallery-select-bar')).toContainText('1 Album gewählt');
     await page.locator('.gallery-select-bar').getByRole('button', { name: 'Jahr ändern' }).click();
     await askOk(page, '2025');

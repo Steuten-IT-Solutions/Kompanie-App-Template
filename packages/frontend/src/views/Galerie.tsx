@@ -19,7 +19,15 @@ import { useSwipeDrag } from '../swipe';
 import { prefetchAlbumOnTap, sources } from '../viewData';
 import { confirmAsk, promptAsk } from '../ask';
 import { dataUpdated } from '../dataCache';
-import { AlbumEditSheet, MoveSheet, canManageGallery, deleteAlbumsQuestion, itemsLabel } from '../galleryManage';
+import {
+  AlbumEditSheet,
+  MoveSheet,
+  canManageGallery,
+  deleteAlbumsQuestion,
+  itemsLabel,
+  useLongPress,
+  type LongPressHandlers,
+} from '../galleryManage';
 
 type Toast = (msg: string) => void;
 
@@ -88,6 +96,11 @@ function Overview({ onToast }: { onToast: Toast }) {
   const [selected, setSelected] = useState<ReadonlySet<number>>(() => new Set());
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  // Langes Drücken auf ein Album der App beginnt das Auswählen (mit diesem Album)
+  const press = useLongPress(manage, (id) => {
+    setSelecting(true);
+    setSelected((old) => toggle(old, id));
+  });
   useLayoutEffect(() => {
     if (!ready || overviewScroll === null) return;
     window.scrollTo(0, overviewScroll);
@@ -215,7 +228,7 @@ function Overview({ onToast }: { onToast: Toast }) {
     );
 
   return (
-    <div>
+    <div className={manage ? 'gallery-manage' : undefined}>
       {actions}
       {selectBar}
       {years.map((y) => (
@@ -238,6 +251,7 @@ function Overview({ onToast }: { onToast: Toast }) {
                     navigate(`galerie/${a.id}`);
                   }}
                   {...(selecting ? {} : prefetchAlbumOnTap(a.id))}
+                  {...withPrefetch(press(a.id, a.source === 'app'), selecting ? undefined : prefetchAlbumOnTap(a.id).onPointerDown)}
                 >
                   {a.cover ? (
                     <span className="album-cover">
@@ -259,6 +273,18 @@ function Overview({ onToast }: { onToast: Toast }) {
       ))}
     </div>
   );
+}
+
+/** Langes Drücken und Vorladen beim Antippen zusammen (beide brauchen onPointerDown). */
+function withPrefetch(press: LongPressHandlers, prefetch?: () => void): LongPressHandlers {
+  if (!prefetch) return press;
+  return {
+    ...press,
+    onPointerDown: (e) => {
+      prefetch();
+      press.onPointerDown?.(e);
+    },
+  };
 }
 
 /** Menge mit oder ohne id. */
@@ -313,6 +339,11 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [sheet, setSheet] = useState<AlbumSheet>(null);
+  // Langes Drücken auf ein hochgeladenes Bild oder Video beginnt das Auswählen (mit diesem)
+  const press = useLongPress(manage, (photoId) => {
+    setSelecting(true);
+    setSelected((old) => toggle(old, photoId));
+  });
   // Alles herausgenommen: zurück zur Übersicht (das leere Album gibt es für die Galerie nicht mehr)
   const [emptied, setEmptied] = useState(false);
   // Geändert, während die Großansicht offen war: erst nach dem Schließen neu laden (sonst fehlte ihr das Bild)
@@ -481,7 +512,7 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
   );
 
   return (
-    <div>
+    <div className={manage ? 'gallery-manage' : undefined}>
       <button className="btn btn-link back" onClick={() => navigate('galerie')}>
         ‹ Alle Alben
       </button>
@@ -497,6 +528,7 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
               }}
               className={`${isVideo(p) ? 'photo photo-video' : 'photo'}${selected.has(p.id) ? ' selected' : ''}`}
               onClick={() => (selecting ? setSelected((old) => toggle(old, p.id)) : setOpen(i))}
+              {...press(p.id, !!p.upload)}
               disabled={selecting && !p.upload}
               aria-pressed={selecting ? selected.has(p.id) : undefined}
               data-intern={p.intern ? '' : undefined}

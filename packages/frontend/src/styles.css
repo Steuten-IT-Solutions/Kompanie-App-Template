@@ -7127,3 +7127,10 @@ fieldset.block-source legend {
 .lb-count .lb-intern.btn-danger {
   background: rgb(190 40 40 / 75%);
 }
+/* Langes Drücken beginnt das Auswählen: dabei kein Markieren von Text und kein Menü „Bild sichern“ (iOS) */
+.gallery-manage .photo,
+.gallery-manage .album-card {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}

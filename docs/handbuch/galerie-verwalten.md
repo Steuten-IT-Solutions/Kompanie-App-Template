@@ -11,8 +11,8 @@ Tippe unten auf **{bereich.gallery}**. Oben stehen für dich die Knöpfe **Alben
 
 ## Was du hier siehst
 - **Alben anlegen und hochladen**: alle Alben mit der Zahl der Bilder aus Drive und der hochgeladenen, darunter **Neues Album in der App**. Tippst du ein Album an, klappt es auf: Dort lädst du Bilder und Videos hoch und siehst die hochgeladenen.
-- **Alben auswählen**: Tippe Alben aus der App an, um sie zu wählen; gewählte tragen einen farbigen Rahmen. Alben aus Google Drive lassen sich nicht wählen. Oben stehen dann **Jahr ändern** und **Löschen**.
-- **Auswählen** in einem Album: Tippe Bilder und Videos an, um sie zu wählen; gewählte tragen einen Haken ✓. Oben stehen **Alle** (bzw. **Keine**), **Verschieben**, **Nur für Mitglieder**, **Öffentlich** und **Löschen**. Mit **Fertig** hörst du auf.
+- **Alben auswählen** (oder lange auf ein Album drücken): Tippe Alben aus der App an, um sie zu wählen; gewählte tragen einen farbigen Rahmen. Alben aus Google Drive lassen sich nicht wählen. Oben stehen dann **Jahr ändern** und **Löschen**.
+- **Auswählen** in einem Album (oder lange auf ein hochgeladenes Bild drücken): Tippe Bilder und Videos an, um sie zu wählen; gewählte tragen einen Haken ✓. Oben stehen **Alle** (bzw. **Keine**), **Verschieben**, **Nur für Mitglieder**, **Öffentlich** und **Löschen**. Mit **Fertig** hörst du auf.
 - In der **Großansicht** eines hochgeladenen Bilds stehen unten **Nur für Mitglieder** bzw. **Öffentlich zeigen**, **Verschieben** und **Löschen**.
 
 ## So gehst du vor
@@ -23,7 +23,7 @@ Tippe unten auf **{bereich.gallery}**. Oben stehen für dich die Knöpfe **Alben
 4. Das neue Album erscheint in der {bereich.gallery}, sobald ein Bild oder Video darin ist.
 
 ### Bilder oder Videos in ein anderes Album verschieben
-1. Öffne das Album und tippe auf **Auswählen**.
+1. Öffne das Album und drücke lange auf ein Bild oder Video, oder tippe auf **Auswählen**.
 2. Tippe die Bilder und Videos an, die umziehen sollen, oder auf **Alle**.
 3. Tippe auf **Verschieben**, wähle bei **In das Album** das Ziel und tippe auf **Verschieben**.
 Ein einzelnes Bild verschiebst du auch in der Großansicht mit **Verschieben**. Ist das Album danach leer, kommst du zurück zur Übersicht.

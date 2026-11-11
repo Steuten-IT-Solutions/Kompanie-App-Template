@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState, type MouseEvent, type PointerEvent } from 'react';
 import { api, can } from './api';
 import { confirmAsk } from './ask';
 import { dataUpdated } from './dataCache';
@@ -11,6 +11,95 @@ import { ErrorBox, Loading, Sheet, useAsync } from './ui';
  */
 export function canManageGallery(): boolean {
   return can('manage_gallery') || can('manage_settings');
+}
+
+/** So lange (ms) drücken, bis das Auswählen beginnt; so weit (px) darf sich der Finger dabei bewegen (sonst Scrollen). */
+export const LONG_PRESS_MS = 500;
+const LONG_PRESS_SLOP = 10;
+
+/**
+ * Das Tippen (click), das nach dem Loslassen kommt, abfangen, wo es auch landet: Die Leiste zum Auswählen erscheint
+ * über den Kacheln und schiebt sie nach unten, der Klick träfe sonst, was jetzt unter dem Finger liegt.
+ */
+function swallowNextClick(): void {
+  const stop = (e: Event) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  window.addEventListener('click', stop, { capture: true, once: true });
+  // Kommt kein Klick (z. B. Finger weggezogen), gilt der nächste echte wieder.
+  window.addEventListener('pointerdown', () => setTimeout(() => window.removeEventListener('click', stop, { capture: true }), 0), {
+    capture: true,
+    once: true,
+  });
+}
+
+export interface LongPressHandlers {
+  onPointerDown?: (e: PointerEvent) => void;
+  onPointerMove?: (e: PointerEvent) => void;
+  onPointerUp?: () => void;
+  onPointerCancel?: () => void;
+  onPointerLeave?: () => void;
+  onContextMenu?: (e: MouseEvent) => void;
+}
+
+/**
+ * Langes Drücken auf eine Kachel (Finger oder Maus): ruft onLongPress(key) auf. Das Tippen danach (click) und das
+ * Kontextmenü des Browsers (Bild sichern …) fallen dann weg. Bewegt sich der Finger (Scrollen), zählt es nicht.
+ * Ohne enabled bleiben die Kacheln, wie sie sind.
+ */
+export function useLongPress(enabled: boolean, onLongPress: (key: number) => void): (key: number, on?: boolean) => LongPressHandlers {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const start = useRef<{ x: number; y: number } | null>(null);
+  const fired = useRef(false);
+  // Finger bzw. Maustaste ist unten (bis pointerup), auch wenn der Browser den Zeiger abgebrochen hat
+  const down = useRef(false);
+  const cancel = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    start.current = null;
+  };
+  return (key: number, on = true) =>
+    enabled && on
+      ? {
+          onPointerDown: (e: PointerEvent) => {
+            if (e.button !== 0) return;
+            fired.current = false;
+            down.current = true;
+            cancel();
+            start.current = { x: e.clientX, y: e.clientY };
+            timer.current = setTimeout(() => {
+              timer.current = null;
+              fired.current = true;
+              navigator.vibrate?.(15);
+              swallowNextClick();
+              onLongPress(key);
+            }, LONG_PRESS_MS);
+          },
+          onPointerMove: (e: PointerEvent) => {
+            const s = start.current;
+            if (s && Math.hypot(e.clientX - s.x, e.clientY - s.y) > LONG_PRESS_SLOP) {
+              down.current = false;
+              cancel();
+            }
+          },
+          onPointerUp: () => {
+            down.current = false;
+            cancel();
+          },
+          onPointerCancel: cancel,
+          onPointerLeave: cancel,
+          // Android meldet langes Drücken als Kontextmenü (und bricht den Zeiger dabei manchmal ab): dann gleich auswählen
+          onContextMenu: (e: MouseEvent) => {
+            e.preventDefault();
+            if (fired.current || !down.current) return;
+            cancel();
+            fired.current = true;
+            swallowNextClick();
+            onLongPress(key);
+          },
+        }
+      : {};
 }
 
 /** „3 Bilder und Videos“ für Rückfragen und Meldungen. */
