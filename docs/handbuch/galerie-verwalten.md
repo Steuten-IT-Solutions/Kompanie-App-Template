@@ -7,14 +7,14 @@ bereiche: [gallery]
 Wer die {bereich.gallery} verwaltet, legt Alben an, lädt Bilder und Videos hoch, verschiebt und löscht sie und stellt sie intern oder öffentlich, direkt in der {bereich.gallery}. Das geht mit allem, was in der App angelegt bzw. hochgeladen wurde. Alben und Bilder aus Google Drive änderst du in Drive.
 
 ## So öffnest du die Seite
-Tippe unten auf **{bereich.gallery}**. Oben steht für dich der Knopf **Alben anlegen und hochladen**, in einem Album der App **Album bearbeiten**. Zum Auswählen drückst du lange auf ein Album oder Bild.
+Tippe unten auf **{bereich.gallery}**. Die Knöpfe der {bereich.gallery} sind runde Symbole; am Rechner zeigt der Mauszeiger ihren Namen. Oben steht für dich **Alben anlegen und hochladen** (Ordner mit Plus), in einem Album der App **Album bearbeiten** (Stift). Zum Auswählen drückst du lange auf ein Album oder Bild.
 
 ## Was du hier siehst
 - **Alben anlegen und hochladen**: alle Alben mit der Zahl der Bilder aus Drive und der hochgeladenen, darunter **Neues Album in der App**. Tippst du ein Album an, klappt es auf: Dort lädst du Bilder und Videos hoch und siehst die hochgeladenen.
-- **Alben auswählen**: Drücke lange auf ein Album aus der App. Es ist dann gewählt; tippe weitere an. Gewählte tragen einen farbigen Rahmen. Alben aus Google Drive lassen sich nicht wählen. Oben stehen dann **Jahr ändern** und **Löschen**.
-- **Bilder und Videos auswählen**: Drücke in einem Album lange auf ein hochgeladenes Bild oder Video. Es ist dann gewählt; tippe weitere an. Gewählte tragen einen Haken ✓. Oben stehen **Alle**, **Verschieben**, **Nur für Mitglieder**, **Öffentlich** und **Löschen**.
+- **Alben auswählen**: Drücke lange auf ein Album aus der App. Es ist dann gewählt; tippe weitere an. Gewählte tragen einen farbigen Rahmen. Alben aus Google Drive lassen sich nicht wählen. Oben stehen dann **Jahr ändern** (Kalender) und **Löschen** (Mülleimer).
+- **Bilder und Videos auswählen**: Drücke in einem Album lange auf ein hochgeladenes Bild oder Video. Es ist dann gewählt; tippe weitere an. Gewählte tragen einen Haken ✓. Oben stehen **Alle wählen** (Doppelhaken), **Verschieben** (Ordner mit Pfeil), **Nur für Mitglieder** (Schloss), **Öffentlich** (Weltkugel) und **Löschen** (Mülleimer).
 - **Auswählen beenden**: Tippe die gewählten wieder an. Ist nichts mehr gewählt, endet das Auswählen von selbst. Auch **Zurück** (Taste oder Geste des Handys) und am Computer die Escape-Taste beenden es, ebenso jede erledigte Aktion.
-- In der **Großansicht** eines hochgeladenen Bilds stehen unten **Nur für Mitglieder** bzw. **Öffentlich zeigen**, **Verschieben** und **Löschen**.
+- In der **Großansicht** eines hochgeladenen Bilds stehen unten **Nur für Mitglieder** (Schloss) bzw. **Öffentlich zeigen** (Weltkugel), **Verschieben** und **Löschen**.
 
 ## So gehst du vor
 ### Ein Album anlegen und Bilder hochladen
@@ -25,7 +25,7 @@ Tippe unten auf **{bereich.gallery}**. Oben steht für dich der Knopf **Alben an
 
 ### Bilder oder Videos in ein anderes Album verschieben
 1. Öffne das Album und drücke lange auf ein Bild oder Video, das umziehen soll.
-2. Tippe die Bilder und Videos an, die umziehen sollen, oder auf **Alle**.
+2. Tippe die Bilder und Videos an, die umziehen sollen, oder auf **Alle wählen**.
 3. Tippe auf **Verschieben**, wähle bei **In das Album** das Ziel und tippe auf **Verschieben**.
 Ein einzelnes Bild verschiebst du auch in der Großansicht mit **Verschieben**. Ist das Album danach leer, kommst du zurück zur Übersicht.
 
