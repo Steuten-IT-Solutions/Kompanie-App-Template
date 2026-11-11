@@ -63,6 +63,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **„Zurück“ schließt offene Fenster**: Ist ein Fenster der App offen (z. B. zum Verschieben eines Fotos, eine
+  Rückfrage, die vergrößerte Ansicht eines Mitgliedsfotos), schließt die Zurück-Taste bzw. -Geste des Handys oder der
+  Zurück-Knopf des Browsers jetzt zuerst dieses Fenster, ohne etwas zu ändern. Bisher ging die App dabei eine Seite
+  zurück. Liegen mehrere übereinander (Auswählen in der [Galerie](app:galerie), Großansicht, Fenster, Rückfrage), schließt
+  jedes „Zurück“ nur das oberste.
 - **Benachrichtigungen einer Test-App erscheinen nicht mehr unter der Produktiv-App**: Wer eine Sicherung unter
   [Einstellungen → Datensicherung](app:einstellungen/datensicherung) in eine Installation unter einer anderen Adresse
   einspielt (z. B. die Produktiv-App in eine Test-App), übernimmt die Anmeldungen der Geräte für Benachrichtigungen nicht

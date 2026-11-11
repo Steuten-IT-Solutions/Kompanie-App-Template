@@ -1164,7 +1164,7 @@ function MemberDetailView({
       </FoldSection>
 
       {sheet === 'punkte' && canPoints() && (
-        <Sheet title={sec.points} onClose={closeSheet}>
+        <Sheet title={sec.points} onClose={closeSheet} routed>
           {m.member && <GivePoints preselect={[m.id]} fixed onToast={onToast} onDone={reload} />}
           <h3 className="section-title">Einträge</h3>
           <PointEntries entries={m.point_list} busy={busy} run={run} />
@@ -1172,7 +1172,7 @@ function MemberDetailView({
       )}
 
       {sheet === 'strafen' && canPenalties() && (
-        <Sheet title={sec.penalties} onClose={closeSheet}>
+        <Sheet title={sec.penalties} onClose={closeSheet} routed>
           {m.member && <GivePenalty preselect={[m.id]} fixed onToast={onToast} onDone={reload} />}
           <h3 className="section-title">Einträge</h3>
           <PenaltyEntries entries={m.penalties} busy={busy} run={run} />
@@ -1180,7 +1180,7 @@ function MemberDetailView({
       )}
 
       {sheet === 'dienstgrad' && rankOn && m.rank && (
-        <Sheet title={brand.labels.rank} onClose={closeSheet}>
+        <Sheet title={brand.labels.rank} onClose={closeSheet} routed>
           <MemberRank
             id={m.id}
             member={m.member}
@@ -1194,7 +1194,7 @@ function MemberDetailView({
       )}
 
       {sheet === 'titel' && titlesOn && m.titles && (
-        <Sheet title={sec.titles} onClose={closeSheet}>
+        <Sheet title={sec.titles} onClose={closeSheet} routed>
           <MemberTitles
             key={`${m.id}:${m.titles.map((t) => t.id).join(',')}`}
             id={m.id}
@@ -1207,7 +1207,7 @@ function MemberDetailView({
       )}
 
       {sheet === 'kompanien' && companiesOn && m.companies && (
-        <Sheet title={sec.companies} onClose={closeSheet}>
+        <Sheet title={sec.companies} onClose={closeSheet} routed>
           <MemberCompanies
             key={`${m.id}:${m.companies.map((c) => c.id).join(',')}`}
             id={m.id}
@@ -1219,19 +1219,19 @@ function MemberDetailView({
         </Sheet>
       )}
       {sheet === 'geburtstag' && birthdayOn && m.birthday !== undefined && (
-        <Sheet title="Geburtstag" onClose={closeSheet}>
+        <Sheet title="Geburtstag" onClose={closeSheet} routed>
           <MemberBirthday key={JSON.stringify(m.birthday)} id={m.id} birthday={m.birthday} onChanged={reload} onToast={onToast} />
         </Sheet>
       )}
 
       {sheet === 'eintritt' && joinOn && m.join_year !== undefined && (
-        <Sheet title="Eintritt" onClose={closeSheet}>
+        <Sheet title="Eintritt" onClose={closeSheet} routed>
           <MemberJoinYear key={JSON.stringify(m.join_year)} id={m.id} joinYear={m.join_year} onChanged={reload} onToast={onToast} />
         </Sheet>
       )}
 
       {sheet === 'austritt' && formerEditable && (
-        <Sheet title="Austritt" onClose={closeSheet}>
+        <Sheet title="Austritt" onClose={closeSheet} routed>
           {formerPanel(true)}
         </Sheet>
       )}

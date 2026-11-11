@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { api, type EncodedFile } from './api';
 import { badgeSrc, preloadImage } from './RankBadge';
 import { Sheet } from './ui';
+import { useBackClose } from './backClose';
 import { confirmAsk } from './ask';
 
 /**
@@ -144,6 +145,8 @@ function PhotoZoom({ url, name, actions, onClose }: { url: string; name: string;
       big.src = '';
     };
   }, [url]);
+  // „Zurück“ (Taste, Geste des Geräts) schließt die Ansicht statt die Seite zu verlassen (backClose.ts).
+  useBackClose(true, onClose);
   useEffect(() => {
     closeRef.current?.focus();
     // Esc schließt erst eine offene Rückfrage darüber (ask.tsx), nicht gleich die Ansicht.
