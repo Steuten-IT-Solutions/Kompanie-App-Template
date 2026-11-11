@@ -6745,6 +6745,8 @@ test('Vorabversionen erhalten: nach dem Bestätigen der Rückfrage wird der Vora
   await box.click();
   await expect(box).not.toBeChecked();
   expect(sent).toEqual([{ channel: 'early' }, { channel: 'stable' }]);
+  // Eine Abfrage des Zustands, die beim Ende des Tests noch läuft, soll ihn nicht rot machen („Response has been disposed“).
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
 test('Update-Paket hochladen: in Stücken, Version aus der Datei zeigen, nach Bestätigung einspielen', async ({ page }) => {
