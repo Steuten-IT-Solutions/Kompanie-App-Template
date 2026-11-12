@@ -160,10 +160,8 @@ final class Api
             if ($subject === null || $user === null || $user->preview || (!$this->app->changeLog()->enabled() && $route->path !== '/admin/changes/settings')) {
                 return null;
             }
-            $before = [];
-            foreach (($subject->ids)($request, null) as $id) {
-                $before[$id] = ($subject->load)($id);
-            }
+            $this->changeSubjects()->reset();
+            $before = $subject->loadAll(array_values(array_unique(array_map('strval', ($subject->ids)($request, null)))));
             return ['subject' => $subject, 'user' => $user, 'before' => $before, 'all' => $subject->all !== null ? ($subject->all)() : null];
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Stand für das Änderungsprotokoll nicht gelesen: ' . $e->getMessage());
@@ -187,9 +185,13 @@ final class Api
             // Ein Platzhalter am Ende der Adresse ({id}, {key}): DELETE löscht den Eintrag (auch wenn er nur als gelöscht
             // markiert bleibt); DELETE auf einen Teil (…/{id}/photo) ändert ihn.
             $whole = preg_match('#/\{[a-z]+\}$#', $route->path) === 1;
-            foreach (array_values(array_unique(array_map('strval', $ids))) as $id) {
+            $ids = array_values(array_unique(array_map('strval', $ids)));
+            $this->changeSubjects()->reset();
+            $afters = $subject->event === 'delete' ? [] : $subject->loadAll($ids);
+            $changes = [];
+            foreach ($ids as $id) {
                 $before = $state['before'][$id] ?? null;
-                $after = $subject->event === 'delete' ? null : ($subject->load)($id);
+                $after = $afters[$id] ?? null;
                 if ($subject->secretField !== null && $before !== null && $after !== null) {
                     $before = new Item($before->type, $before->id, $before->label, $before->fields + [$subject->secretField => '0'], $before->personal, [...$before->secret, $subject->secretField], $before->subject);
                     $after = new Item($after->type, $after->id, $after->label, $after->fields + [$subject->secretField => '1'], $after->personal, [...$after->secret, $subject->secretField], $after->subject);
@@ -199,8 +201,9 @@ final class Api
                     $after === null, $route->method === 'DELETE' && $whole => 'delete',
                     default => 'update',
                 };
-                $this->app->changeLog()->record($state['user'], $route->feature ?? 'app', $action, $before, $after, $subject->event !== null);
+                $changes[] = [$action, $before, $after, $subject->event !== null];
             }
+            $this->app->changeLog()->recordMany($state['user'], $route->feature ?? 'app', $changes);
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Änderung nicht protokolliert: ' . $e->getMessage());
         }

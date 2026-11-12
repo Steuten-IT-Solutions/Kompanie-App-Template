@@ -36,7 +36,7 @@ final class ChangeLogService
     public const KEEP_DEFAULT = 365;
     public const KEEP_MIN = 30;
     public const KEEP_MAX = 730;
-    public const ACTIONS = ['create', 'update', 'delete'];
+    public const ACTIONS = ['create', 'update', 'delete', 'event'];
     /** Längere Werte werden gekürzt gespeichert (Zeichen). */
     public const VALUE_MAX = 300;
     /** Höchstens so viele Felder je Eintrag */
@@ -111,40 +111,71 @@ final class ChangeLogService
      * Eine Änderung festhalten. Ohne Unterschied (Aktion update) entsteht kein Eintrag. Scheitert das Schreiben (z. B.
      * Tabelle fehlt nach einem abgebrochenen Update), bleibt die Änderung selbst davon unberührt.
      *
-     * @param 'create'|'update'|'delete' $action
+     * @param 'create'|'update'|'delete'|'event' $action event: etwas ohne vergleichbaren Stand (Update eingespielt), die Bezeichnung ist der Satz
      */
     public function record(User $actor, string $area, string $action, ?Item $before, ?Item $after, bool $event = false): void
     {
-        if ($actor->preview || !in_array($action, self::ACTIONS, true) || ($before === null && $after === null)) {
+        $this->recordMany($actor, $area, [[$action, $before, $after, $event]]);
+    }
+
+    /**
+     * Mehrere Änderungen einer Anfrage festhalten, mit festen Kosten (ein Abruf der Konten, wenige INSERTs), auch bei
+     * vielen Einträgen (Punkte für alle).
+     *
+     * @param list<array{0: string, 1: ?Item, 2: ?Item, 3: bool}> $changes je Aktion, Stand davor, danach, ohne vergleichbaren Stand
+     */
+    public function recordMany(User $actor, string $area, array $changes): void
+    {
+        if ($actor->preview || $changes === []) {
             return;
         }
         try {
             if (!$this->enabled()) {
                 return;
             }
-            $item = $after ?? $before;
-            $changes = self::diff($action === 'create' ? null : $before, $action === 'delete' ? null : $after);
-            if ($changes === [] && $action === 'update' && !$event) {
+            $now = $this->app->time()->timestamp();
+            $area = preg_match('/^[a-z_]{1,20}$/', $area) === 1 ? $area : 'app';
+            $rows = [];
+            foreach ($changes as [$action, $before, $after, $event]) {
+                if (!in_array($action, self::ACTIONS, true) || ($before === null && $after === null)) {
+                    continue;
+                }
+                $item = $after ?? $before;
+                $diff = self::diff($action === 'create' ? null : $before, $action === 'delete' ? null : $after);
+                if ($diff === [] && $action === 'update' && !$event) {
+                    continue;
+                }
+                $rows[] = [
+                    'at' => $now,
+                    'actor_id' => $actor->id,
+                    'actor_name' => $actor->name,
+                    'area' => $area,
+                    'type' => $item->type,
+                    'item' => $item->id,
+                    'label' => $item->label,
+                    'action' => $action,
+                    'subject_user_id' => $item->subject,
+                    'personal' => false,
+                    'changes' => $diff,
+                ];
+            }
+            if ($rows === []) {
                 return;
             }
-            $subject = $item->subject;
             // Konto gibt es nicht mehr (gerade gelöscht): keine Werte über die Person behalten.
-            if ($subject !== null && $this->app->users->find($subject) === null) {
-                $changes = self::strip($changes, false);
+            $subjects = array_values(array_unique(array_filter(array_column($rows, 'subject_user_id'), static fn (?int $id): bool => $id !== null)));
+            $existing = $subjects === [] ? [] : $this->app->users->findMany($subjects);
+            foreach ($rows as $i => $row) {
+                if ($row['subject_user_id'] !== null && !isset($existing[$row['subject_user_id']])) {
+                    $rows[$i]['changes'] = self::strip($row['changes'], false);
+                }
+                $rows[$i]['personal'] = self::hasPersonalValues($rows[$i]['changes']);
             }
-            $this->repo->insert([
-                'at' => $this->app->time()->timestamp(),
-                'actor_id' => $actor->id,
-                'actor_name' => $actor->name,
-                'area' => preg_match('/^[a-z_]{1,20}$/', $area) === 1 ? $area : 'app',
-                'type' => $item->type,
-                'item' => $item->id,
-                'label' => $item->label,
-                'action' => $action,
-                'subject_user_id' => $subject,
-                'personal' => self::hasPersonalValues($changes),
-                'changes' => $changes,
-            ]);
+            if (count($rows) === 1) {
+                $this->repo->insert($rows[0]);
+            } else {
+                $this->repo->insertMany($rows);
+            }
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Änderung nicht protokolliert: ' . $e->getMessage());
         }

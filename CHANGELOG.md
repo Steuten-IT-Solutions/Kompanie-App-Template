@@ -28,9 +28,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 - **Änderungsprotokoll**: Unter [Verwaltung → Änderungen](app:verwaltung/aenderungen) siehst du, wer wann was in der
   App angelegt, geändert oder gelöscht hat, mit den alten und neuen Werten, z. B. wer einen Termin gelöscht oder die
-  Rolle einer Person geändert hat. Aufgezeichnet werden Mitglieder und Konten, Rollen und Rechte, Einstellungen und
-  jedes Löschen in allen Bereichen; was in den Bereichen angelegt oder geändert wird, folgt mit einem der nächsten
-  Updates. Du kannst nach Zeitraum, Person und Bereich auswählen und alles als CSV-Datei herunterladen. Sehen dürfen
+  Rolle einer Person geändert hat. Aufgezeichnet werden Mitglieder und Konten (auch Dienstgrad, Titel und Kompanien),
+  Rollen und Rechte, Einstellungen, Updates und Sicherungen sowie alles, was in den Bereichen angelegt, geändert oder
+  gelöscht wird, z. B. Termine, News, Punkte, Strafen, Listen, Anwesenheit, Ämter und die Galerie. Du kannst nach Zeitraum, Person und Bereich auswählen und alles als CSV-Datei herunterladen. Sehen dürfen
   es Admins und alle mit dem neuen Recht „Änderungen ansehen“. Werte persönlicher Angaben sieht nur, wer „Persönliches
   sehen“ hat; Passwörter und Zugangsdaten kommen nie ins Protokoll. Das Protokoll ist eingeschaltet, Einträge werden
   nach 365 Tagen gelöscht; beides stellst du unten auf der Seite ein (30 bis 730 Tage). Es enthält persönliche Angaben:

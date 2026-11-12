@@ -22,9 +22,10 @@ final class Subject
      * @param \Closure(string): ?Item $load
      * @param \Closure(Request, mixed): list<string> $ids $result ist vor dem Ausführen null
      * @param (\Closure(): list<string>)|null $all
-     * @param 'create'|'update'|'delete'|null $event
+     * @param 'create'|'update'|'delete'|'event'|null $event
      * @param string|null $secretField geheimes Feld, das sich mit jeder Anfrage ändert (Passwort): steht als „geändert“ im
      *        Eintrag, ohne Werte
+     * @param (\Closure(list<string>): array<string, Item>)|null $loadMany mehrere auf einmal (feste Zahl von Abfragen), sonst load je ID
      */
     public function __construct(
         public readonly \Closure $load,
@@ -32,7 +33,30 @@ final class Subject
         public readonly ?\Closure $all = null,
         public readonly ?string $event = null,
         public readonly ?string $secretField = null,
+        public readonly ?\Closure $loadMany = null,
     ) {
+    }
+
+    /**
+     * Stand mehrerer Einträge; fehlende (gelöscht, nie da) als null.
+     *
+     * @param list<string> $ids
+     * @return array<string, Item|null>
+     */
+    public function loadAll(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+        if ($this->loadMany !== null) {
+            $found = ($this->loadMany)($ids);
+            return array_combine($ids, array_map(static fn (string $id): ?Item => $found[$id] ?? null, $ids));
+        }
+        $out = [];
+        foreach ($ids as $id) {
+            $out[$id] = ($this->load)($id);
+        }
+        return $out;
     }
 
     /** IDs aus dem Platzhalter der Adresse ({id} bzw. {key}) und, nach dem Ausführen, eine id in der Antwort. */

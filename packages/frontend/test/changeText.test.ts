@@ -10,6 +10,10 @@ test('Titel mit Art, Bezeichnung und Aktion; Einstellungen ohne Anführungszeich
   assert.equal(entryTitle({ type: 'Mitglied', label: 'Max Muster', action: 'update' }), 'Mitglied „Max Muster“ geändert');
   assert.equal(entryTitle({ type: 'Termin', label: 'Schützenfest', action: 'delete' }), 'Termin „Schützenfest“ gelöscht');
   assert.equal(entryTitle({ type: 'Einstellungen', label: 'E-Mail', action: 'update' }), 'E-Mail geändert');
+  assert.equal(
+    entryTitle({ type: 'Einstellungen', label: 'Update auf Version 1.2.0 eingespielt', action: 'event' }),
+    'Update auf Version 1.2.0 eingespielt',
+  );
 });
 
 test('Felder: alt → neu, nur neu, nur alt, geheim, ausgeblendet, entfernt', () => {
