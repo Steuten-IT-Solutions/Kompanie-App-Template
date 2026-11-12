@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Tests;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Roles;
+use KompanieApp\Core\ChangeLog\Subjects;
 use KompanieApp\Core\Domain\ChangeLogService;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Http\Response;
@@ -17,7 +18,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Änderungsprotokoll: Mitglieder, Rollen, Einstellungen und jedes Löschen mit alten und neuen Werten; persönliche Angaben
+ * Änderungsprotokoll: Mitglieder, Rollen, Einstellungen, Anlegen, Ändern und Löschen in den Bereichen mit alten und neuen Werten; persönliche Angaben
  * nur mit view_personal, Geheimes nie; aus, Frist, Löschen mit dem Konto, Auskunft, nicht in Sicherungen.
  */
 final class ChangeLogTest extends TestCase
@@ -124,35 +125,106 @@ final class ChangeLogTest extends TestCase
     {
         $event = $this->call('POST', '/events', ['title' => 'Schützenfest', 'start_date' => '2027-06-01', 'location' => 'Festplatz']);
         $this->assertSame(201, $event->status);
-        $this->assertSame([], $this->entries(), 'Anlegen in den Bereichen kommt mit Stufe 2');
         $this->assertSame(200, $this->call('DELETE', '/events/' . $event->data['id'])->status);
-        [$e] = $this->entries();
+        [$e, $created] = $this->entries();
+        $this->assertSame(['create', 'Festplatz'], [$created['action'], self::fields($created)['Ort']['new']]);
         $this->assertSame(['Termin', 'delete', 'events', 'Schützenfest'], [$e['type'], $e['action'], $e['area'], $e['label']]);
         $f = self::fields($e);
         $this->assertSame(['field' => 'Ort', 'old' => 'Festplatz'], $f['Ort']);
         $this->assertSame('2027-06-01', $f['Beginn']['old']);
         // Fehlgeschlagen: kein Eintrag
         $this->assertSame(404, $this->call('DELETE', '/events/' . $event->data['id'])->status);
-        $this->assertCount(1, $this->entries());
+        $this->assertCount(2, $this->entries());
     }
 
-    public function testEveryDeleteRouteIsCovered(): void
+    /** Jede ändernde Route ist erfasst oder steht mit Grund in Subjects::NOT_RECORDED, nie in beiden. */
+    public function testEveryChangingRouteIsCoveredOrExcluded(): void
     {
-        // Abstimmungen (Anonymität) und Push-Abos (Technik des Geräts) absichtlich nicht.
-        $excluded = ['DELETE /polls/{id}/vote', 'DELETE /me/push', 'DELETE /push'];
         $subjects = $this->app->api()->changeSubjects();
-        $missing = [];
+        $routes = [];
         foreach ($this->app->api()->routes() as $route) {
-            $key = $route->method . ' ' . $route->path;
-            if ($route->method === 'DELETE' && !in_array($key, $excluded, true) && $subjects->for($route->method, $route->path) === null) {
-                $missing[] = $key;
+            if ($route->method !== 'GET' && $route->method !== 'HEAD') {
+                $routes[] = $route->method . ' ' . $route->path;
             }
         }
-        $this->assertSame([], $missing);
-        foreach ($subjects->keys() as $key) {
-            [$method, $path] = explode(' ', $key, 2);
-            $this->assertNotEmpty(array_filter($this->app->api()->routes(), static fn ($r): bool => $r->method === $method && $r->path === $path), "Route $key gibt es nicht");
+        $missing = array_values(array_filter($routes, static fn (string $k): bool => !in_array($k, Subjects::NOT_RECORDED, true) && !in_array($k, $subjects->keys(), true)));
+        $this->assertSame([], $missing, 'erfassen oder in Subjects::NOT_RECORDED begründen');
+        $this->assertSame([], array_values(array_intersect(Subjects::NOT_RECORDED, $subjects->keys())), 'nicht in beiden Listen');
+        foreach ([...$subjects->keys(), ...Subjects::NOT_RECORDED] as $key) {
+            $this->assertContains($key, $routes, "Route $key gibt es nicht");
         }
+    }
+
+    /** Anlegen und Ändern in den Bereichen, auch mit Feldern aus anderen Tabellen und mehreren Einträgen auf einmal. */
+    public function testCreateAndUpdateInAreas(): void
+    {
+        $event = $this->call('POST', '/events', ['title' => 'Schützenfest', 'start_date' => '2027-06-01', 'location' => 'Festplatz'])->data['id'];
+        $this->assertSame(200, $this->call('PATCH', "/events/{$event}", ['location' => 'Halle'])->status);
+        [$update, $create] = $this->entries();
+        $this->assertSame(['Termin', 'create', 'events'], [$create['type'], $create['action'], $create['area']]);
+        $this->assertSame(['update', ['field' => 'Ort', 'old' => 'Festplatz', 'new' => 'Halle']], [$update['action'], self::fields($update)['Ort']]);
+        $this->assertCount(1, $update['changes'], 'nur was sich geändert hat');
+
+        // Seite mit Blöcken: der Inhalt als Text
+        $page = $this->call('POST', '/pages', ['title' => 'Über uns', 'blocks' => [['type' => 'text', 'audience' => 'all', 'html' => '<p>Hallo <b>Welt</b></p>']]]);
+        $this->assertSame(201, $page->status, (string) json_encode($page->data));
+        [$e] = $this->entries();
+        $this->assertSame(['Seite', 'create', 'Hallo Welt'], [$e['type'], $e['action'], self::fields($e)['Inhalt']['new']]);
+
+        // Umfrage mit Antworten (andere Tabelle)
+        $poll = $this->call('POST', '/polls', ['title' => 'Grillfest?', 'type' => 'single', 'options' => ['Ja', 'Nein']]);
+        $this->assertSame(201, $poll->status, (string) json_encode($poll->data));
+        [$e] = $this->entries();
+        $this->assertSame(['Umfrage', 'Ja, Nein'], [$e['type'], self::fields($e)['Antworten']['new']]);
+
+        // Punkte für zwei Mitglieder: zwei Einträge, je mit dem Mitglied
+        $other = $this->users->add('zweites', Roles::MEMBER);
+        $this->assertSame(201, $this->call('POST', '/points', ['user_ids' => [$this->member, $other], 'points' => 5, 'reason' => 'Fest'])->status);
+        [$a, $b] = $this->entries();
+        $this->assertSame(['Punkte', 'Punkte', 'create', 'create'], [$a['type'], $b['type'], $a['action'], $b['action']]);
+        $this->assertEqualsCanonicalizing([$this->member, $other], [$a['subject_user_id'], $b['subject_user_id']]);
+
+        // Amtszeit unter einem Amt: die Adresse trägt die ID des Amts, angelegt wird die Amtszeit
+        $office = $this->call('POST', '/offices', ['title' => 'Vorsitz'])->data['id'];
+        $term = $this->call('POST', "/offices/{$office}/terms", ['kind' => 'period', 'start_year' => 1975, 'end_year' => 1980, 'holders' => [['name' => 'Max Beispiel']]]);
+        $this->assertSame(201, $term->status, (string) json_encode($term->data));
+        [$e, $o] = $this->entries();
+        $this->assertSame(['Amt', 'create'], [$o['type'], $o['action']]);
+        $this->assertSame(['Amtszeit', 'create', 'Vorsitz 1975–1980', 'Max Beispiel'], [$e['type'], $e['action'], $e['label'], self::fields($e)['Inhaber']['new']]);
+    }
+
+    public function testAssignmentsOrderAttendanceAndEvents(): void
+    {
+        $rank = $this->call('POST', '/ranks', ['title' => 'Gefreiter'])->data['id'];
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->member}/rank", ['rank_id' => $rank])->status);
+        [$e] = $this->entries();
+        $this->assertSame(['Mitglied', 'update', 'ranks'], [$e['type'], $e['action'], $e['area']]);
+        $this->assertSame(['old' => null, 'new' => 'Gefreiter'], array_intersect_key(self::fields($e)['Dienstgrad'], ['old' => 1, 'new' => 1]));
+
+        $first = $this->call('POST', '/titles', ['title' => 'Ehrenmitglied'])->data['id'];
+        $second = $this->call('POST', '/titles', ['title' => 'Vorsitz'])->data['id'];
+        $this->assertSame(200, $this->call('PUT', '/titles/order', ['ids' => [$second, $first]])->status);
+        [$e] = $this->entries();
+        $this->assertSame(['Einstellungen', 'Reihenfolge der Titel'], [$e['type'], $e['label']]);
+        $this->assertSame(['old' => 'Ehrenmitglied, Vorsitz', 'new' => 'Vorsitz, Ehrenmitglied'], array_intersect_key(self::fields($e)['Reihenfolge'], ['old' => 1, 'new' => 1]));
+
+        // Freie Anwesenheitsliste anlegen, dann ändern (ohne ID in der Adresse)
+        $list = $this->call('PUT', '/attendance', ['source' => 'free', 'title' => 'Übung', 'date' => '2026-11-10', 'entries' => [$this->member => 'present']]);
+        $this->assertSame(201, $list->status, (string) json_encode($list->data));
+        $this->assertSame(200, $this->call('PUT', '/attendance', ['id' => $list->data['id'], 'entries' => [$this->member => 'absent']])->status);
+        [$update, $create] = $this->entries();
+        $this->assertSame(['Anwesenheitsliste', 'create', 'Mitglied: anwesend'], [$create['type'], $create['action'], self::fields($create)['Einträge']['new']]);
+        $this->assertSame(['update', 'Mitglied: anwesend', 'Mitglied: fehlt'], [$update['action'], self::fields($update)['Einträge']['old'], self::fields($update)['Einträge']['new']]);
+
+        // Mailgruppe anlegen
+        $this->assertSame(201, $this->call('POST', '/mails/groups', ['label' => 'Vorstand', 'users' => [$this->member]])->status);
+        [$e] = $this->entries();
+        $this->assertSame(['Mailgruppe', 'create', 'Vorstand'], [$e['type'], $e['action'], $e['label']]);
+
+        // Ohne vergleichbaren Stand: nur der Satz
+        $this->assertSame(200, $this->call('POST', '/admin/setup/done')->status);
+        [$e] = $this->entries();
+        $this->assertSame(['event', 'Ersteinrichtung abgeschlossen', []], [$e['action'], $e['label'], $e['changes']]);
     }
 
     /** Jede erfasste Route lädt ihren Stand ohne Fehler (GET-Routen der Einstellungen, Tabellen, Spalten). */
@@ -168,7 +240,7 @@ final class ChangeLogTest extends TestCase
                 ($subject->load)($id);
             }
             if ($subject->all !== null) {
-                $this->assertNotEmpty(($subject->all)(), $key);
+                $this->assertIsArray(($subject->all)(), $key);
             }
         }
         $this->addToAssertionCount(1);

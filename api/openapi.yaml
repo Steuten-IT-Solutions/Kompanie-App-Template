@@ -5966,8 +5966,9 @@ paths:
       summary: Änderungsprotokoll (wer hat wann was angelegt, geändert oder gelöscht)
       description: |
         Mit `view_changes` (Admins immer, an Rollen und Personen vergebbar). Aufgezeichnet werden Änderungen über die App
-        (nicht in der Vorschau): Mitglieder und Konten, Rollen, Einstellungen und jedes Löschen in allen Bereichen, mit den
-        Werten vorher und nachher. Werte persönlicher Angaben nur mit `view_personal` (sonst `hidden`), Geheimes nie
+        (nicht in der Vorschau): Mitglieder und Konten, Rollen, Einstellungen, Updates und Sicherungen sowie Anlegen, Ändern
+        und Löschen in allen Bereichen, mit den Werten vorher und nachher. Nicht erfasst werden Anmelden, Abstimmungen,
+        Push-Abos, Prüfungen und Tests sowie Teile von Uploads (Liste `ChangeLog\Subjects::NOT_RECORDED`). Werte persönlicher Angaben nur mit `view_personal` (sonst `hidden`), Geheimes nie
         (`secret`). Neueste zuerst, höchstens 2000 (`truncated` = es gab mehr). Nicht in Sicherungen. Einträge werden nach
         `keep_days` Tagen gelöscht; wird ein Konto gelöscht, verlieren die Einträge über diese Person ihre Werte.
       x-capability: view_changes
@@ -8201,7 +8202,7 @@ components:
         type: { type: string, description: 'Art des Eintrags, z. B. Mitglied, Rolle, Termin, Einstellungen' }
         item: { type: string, description: ID des Eintrags }
         label: { type: string, description: 'Name des Eintrags zum Zeitpunkt der Änderung' }
-        action: { type: string, enum: [create, update, delete] }
+        action: { type: string, enum: [create, update, delete, event], description: 'event: etwas ohne vergleichbaren Stand (z. B. Update eingespielt); label ist dann der ganze Satz' }
         subject_user_id: { type: [integer, 'null'], description: 'Konto, um das es geht (Mitglieder, Punkte, Strafen)' }
         changes:
           type: array

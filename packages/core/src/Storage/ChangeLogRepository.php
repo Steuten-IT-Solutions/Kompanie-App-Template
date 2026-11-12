@@ -23,7 +23,37 @@ final class ChangeLogRepository
      */
     public function insert(array $row): int
     {
-        return $this->db->insert('change_log', [
+        return $this->db->insert('change_log', self::columns($row));
+    }
+
+    /**
+     * Mehrere Einträge mit wenigen INSERTs (je 100 Zeilen), z. B. Punkte für viele Mitglieder auf einmal.
+     *
+     * @param list<array{at: int, actor_id: int, actor_name: string, area: string, type: string, item: string, label: string, action: string, subject_user_id: int|null, personal: bool, changes: list<array<string, mixed>>}> $rows
+     */
+    public function insertMany(array $rows): void
+    {
+        foreach (array_chunk($rows, 100) as $chunk) {
+            $values = [];
+            $params = [];
+            $names = [];
+            foreach ($chunk as $row) {
+                $cols = self::columns($row);
+                $names = array_keys($cols);
+                $values[] = '(' . implode(', ', array_fill(0, count($cols), '?')) . ')';
+                array_push($params, ...array_values($cols));
+            }
+            $this->db->execute('INSERT INTO {change_log} (' . implode(', ', $names) . ') VALUES ' . implode(', ', $values), $params);
+        }
+    }
+
+    /**
+     * @param array{at: int, actor_id: int, actor_name: string, area: string, type: string, item: string, label: string, action: string, subject_user_id: int|null, personal: bool, changes: list<array<string, mixed>>} $row
+     * @return array<string, int|string|null>
+     */
+    private static function columns(array $row): array
+    {
+        return [
             'at' => $row['at'],
             'actor_id' => $row['actor_id'],
             'actor_name' => mb_substr($row['actor_name'], 0, 191),
@@ -35,7 +65,7 @@ final class ChangeLogRepository
             'subject_user_id' => $row['subject_user_id'],
             'personal' => $row['personal'] ? 1 : 0,
             'changes' => self::encode($row['changes']),
-        ]);
+        ];
     }
 
     /**

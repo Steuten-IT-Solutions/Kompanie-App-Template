@@ -168,6 +168,12 @@ final class NoAccessMemberTest extends TestCase
         $this->assertFalse($this->app->members()->hasNoAccess($id));
         $this->assertSame(0, (int) $this->app->db->scalar('SELECT COUNT(*) FROM {registration_requests}'));
         $this->assertSame(200, $this->api('POST', '/auth/login', ['username' => 'juergen', 'password' => 'sicheres-passwort'])[0]);
+        // Änderungsprotokoll: das vorhandene Mitglied hat jetzt einen Zugang
+        [, $log] = $this->asAdmin('GET', '/admin/changes');
+        $entry = $log['entries'][0];
+        $this->assertSame(['Mitglied', 'update', $id], [$entry['type'], $entry['action'], $entry['subject_user_id']]);
+        $login = array_values(array_filter($entry['changes'], static fn (array $c): bool => $c['field'] === 'Benutzername'))[0];
+        $this->assertSame(['ohne Zugang', 'juergen'], [$login['old'], $login['new']]);
     }
 
     public function testOnlyMembersWithoutAccessCanBeLinked(): void

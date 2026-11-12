@@ -16,12 +16,13 @@ Tippe unten auf **Verwaltung** und dann auf **Änderungen**.
 - **Einstellungen** (nur für {rolle.admin}s): der Schalter für das Protokoll und die Frist, nach der Einträge gelöscht werden.
 
 ## Was aufgezeichnet wird
-- **Mitglieder und Konten**: anlegen (auch mehrere oder per Import), Angaben und persönliche Angaben ändern, Rolle, Zusatzrollen und Rechte, Foto, Eintritt, Geburtsdatum, als ehemalig eintragen und wieder aufnehmen, Passwort neu erzeugen, löschen. Auch was jemand am eigenen Konto ändert.
-- **Rollen** anlegen, ändern und löschen.
-- **Einstellungen** wie E-Mail, Bereiche, Navigation, Benachrichtigungen, Wartungsmodus, Updates und Datensicherung.
-- **Jedes Löschen** in allen Bereichen, z. B. Termine, News, Punkte, Strafen, Dokumente, Nachrichten am Brett, Umfragen, Bilder und Alben der Galerie.
+- **Mitglieder und Konten**: anlegen (auch mehrere, per Import oder durch Freigabe einer Anfrage), Angaben und persönliche Angaben ändern, Rolle, Zusatzrollen und Rechte, Dienstgrad, Titel, Kompanien, Foto, Eintritt, Geburtsdatum, als ehemalig eintragen und wieder aufnehmen, Passwort neu erzeugen, löschen. Auch was jemand am eigenen Konto ändert.
+- **Rollen** anlegen, ändern, löschen und ihre Reihenfolge.
+- **Einstellungen** wie E-Mail, Bereiche, Navigation, Benachrichtigungen, Wartungsmodus, Updates und Datensicherung. Auch wer ein Update eingespielt, eine Sicherung erstellt oder wiederhergestellt hat.
+- **Alles in den Bereichen**, was angelegt, geändert oder gelöscht wird, z. B. Termine, News, Seiten, Punkte, Strafen, Dienstgrade, Titel, Ämter und Amtszeiten, Listen, Anwesenheit, Dokumente, Nachrichten am Brett, Umfragen, Inventar, E-Mails und Mailgruppen, Bilder, Alben und Einreichungen der Galerie. Auch die Reihenfolge, z. B. der Dienstgrade.
+- **Fehlermeldungen**: wer eine Meldung geschlossen oder an die Betreuer weitergeleitet hat.
 
-Was in den Bereichen angelegt oder geändert wird, kommt mit einem der nächsten Updates dazu.
+Nicht aufgezeichnet werden das Anmelden, Abstimmungen in Umfragen, das An- und Abmelden der Benachrichtigungen auf einem Gerät, Tests (z. B. Test-Mail) und der Abgleich der Galerie mit Google Drive.
 
 ## So gehst du vor
 ### Herausfinden, was jemand gelöscht hat
@@ -35,7 +36,8 @@ Was in den Bereichen angelegt oder geändert wird, kommt mit einem der nächsten
 ## Gut zu wissen
 - Das Protokoll ist zu Beginn eingeschaltet, die Frist beträgt 365 Tage. Es enthält persönliche Angaben. Informiert eure Mitglieder darüber, z. B. in der Datenschutzerklärung.
 - Werte persönlicher Angaben (E-Mail-Adresse, Handynummer, Adresse, Geburtsdatum) siehst du nur mit dem Recht **Persönliches sehen**. Sonst steht dort nur, dass sie geändert wurden.
-- Passwörter, Zugangsdaten und Schlüssel kommen nie ins Protokoll, bei Fotos und Logos nur, dass sie geändert wurden. Abstimmungen in Umfragen werden nicht aufgezeichnet.
+- Passwörter, Zugangsdaten und Schlüssel kommen nie ins Protokoll, bei Fotos, Logos, Abzeichen und Dateien nur, dass sie geändert wurden.
+- Bei Seiten, News und Nachrichten am Brett steht der Inhalt als reiner Text da. Lange Werte werden gekürzt.
 - Wird ein Konto gelöscht, verlieren die Einträge über diese Person ihre Werte. Es bleibt z. B. **Mitglied „Max Muster“ gelöscht** mit dem Namen dessen, der gelöscht hat. Was die Person selbst geändert hat, bleibt mit ihrem Namen bis zum Ende der Frist.
 - Die Einträge bleiben auf eurem Server und kommen nicht in die Datensicherung. In der Auskunft über eine Person (**Meine Daten**) stehen die Einträge über sie mit Werten und die Einträge, die sie gemacht hat, ohne Werte.
 - Was ihr direkt bei WordPress im Backend ändert, geht an der App vorbei und steht nicht im Protokoll.

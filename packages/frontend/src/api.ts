@@ -420,7 +420,8 @@ export interface ChangeField {
   secret?: boolean;
 }
 
-export type ChangeAction = 'create' | 'update' | 'delete';
+/** event: etwas ohne vergleichbaren Stand (z. B. Update eingespielt); label ist dann der ganze Satz */
+export type ChangeAction = 'create' | 'update' | 'delete' | 'event';
 
 export interface ChangeEntry {
   id: number;

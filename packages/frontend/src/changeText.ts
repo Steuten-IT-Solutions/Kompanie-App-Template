@@ -5,13 +5,15 @@ export const ACTION_TEXT: Record<ChangeAction, string> = {
   create: 'angelegt',
   update: 'geändert',
   delete: 'gelöscht',
+  event: 'ausgeführt',
 };
 
 /** Felder, deren Werte Schlüssel von Rechten sind (Rollen, Ausnahmen einer Person): in der Anzeige ihre Namen. */
 const CAPABILITY_FIELDS = ['Rechte', 'Rechte zusätzlich', 'Rechte entzogen'];
 
-/** „Mitglied „Max Muster“ geändert“; Einstellungen ohne Anführungszeichen („E-Mail geändert“). */
+/** „Mitglied „Max Muster“ geändert“; Einstellungen ohne Anführungszeichen („E-Mail geändert“); event: nur der Satz. */
 export function entryTitle(e: Pick<ChangeEntry, 'type' | 'label' | 'action'>): string {
+  if (e.action === 'event') return e.label || e.type;
   const action = ACTION_TEXT[e.action] ?? e.action;
   if (e.type === 'Einstellungen' || e.label === '') return `${e.label || e.type} ${action}`;
   return `${e.type} „${e.label}“ ${action}`;

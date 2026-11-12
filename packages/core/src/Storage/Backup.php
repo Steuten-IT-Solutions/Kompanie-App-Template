@@ -67,6 +67,9 @@ final class Backup
         'former_retention',
         // Nutzungsauswertung (Issue #175): Geheimnis des Pseudonyms. Die Tabellen activity* sind keine Kerntabellen der Sicherung.
         'activity_secret',
+        // Änderungsprotokoll (ChangeLogService): Schalter und Frist gehören wie die Einträge zu diesem Server. Eine Sicherung
+        // soll das Protokoll nicht aus- oder die Frist kürzer stellen (beides löscht Einträge).
+        'change_log', 'change_log_days',
         // Web Push: Stand der Abgleiche gehört zu dieser Installation (Schlüssel und Abos sind in der Sicherung).
         // Mailversand (Issue #172): gemerktes Limit des Mailservers und Pause zwischen den Portionen.
         'mail_server_size', 'board_mail_next',
