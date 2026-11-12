@@ -24,6 +24,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.11.0] – 2026-11-12
+
 ### Neu
 
 - **Änderungsprotokoll**: Unter [Verwaltung → Änderungen](app:verwaltung/aenderungen) siehst du, wer wann was in der
