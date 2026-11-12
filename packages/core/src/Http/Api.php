@@ -9,6 +9,9 @@ use KompanieApp\Core\Auth\Capability as Cap;
 use KompanieApp\Core\Auth\Preview;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
+use KompanieApp\Core\ChangeLog\Item;
+use KompanieApp\Core\ChangeLog\Subject;
+use KompanieApp\Core\ChangeLog\Subjects;
 use KompanieApp\Core\Domain\AttachmentService;
 use KompanieApp\Core\Domain\BoardService;
 use KompanieApp\Core\Domain\EventService;
@@ -44,12 +47,14 @@ final class Api
     public const PREVIEW_OPEN = ['/auth/logout'];
     /**
      * Zählen nicht als Nutzung (Issue #175): ruft die App von selbst auf (Konfiguration, Abgleich der Benachrichtigungen,
-     * Formular zum Fehlermelden). Die Anmeldung erfasst ihre Route selbst (Aktion login), die Abmeldung gar nicht.
+     * Formular zum Fehlermelden) oder ist Technik des Geräts (Push-Abo an- und abmelden, auch beim Abmelden vom Konto). Die
+     * Anmeldung erfasst ihre Route selbst (Aktion login), die Abmeldung gar nicht.
      */
-    private const NOT_TRACKED = ['/config', '/auth/csrf', '/auth/login', '/auth/logout', '/push/status', '/me/push/status', '/reports/form', '/registration/form'];
+    private const NOT_TRACKED = ['/config', '/auth/csrf', '/auth/login', '/auth/logout', '/push/status', '/me/push/status', '/push', '/me/push', '/reports/form', '/registration/form'];
 
     /** @var Route[]|null */
     private ?array $routes = null;
+    private ?Subjects $changeSubjects = null;
 
     public function __construct(private readonly App $app)
     {
@@ -109,10 +114,14 @@ final class Api
                 throw $this->app->maintenance()->error();
             }
             $this->authorize($route);
+            $changes = $this->changesBefore($route, $request);
             $result = ($route->handler)($request);
             $response = $result instanceof Response ? $result : new Response($result);
             if ($response->status < 400 && !in_array($route->path, self::NOT_TRACKED, true)) {
                 $this->app->activity()->record($this->app->authContext->currentUser(), $route->feature ?? 'app', self::action($route));
+            }
+            if ($response->status < 400 && $changes !== null) {
+                $this->changesAfter($route, $request, $response->data, $changes);
             }
             return $response;
         } catch (ApiError $e) {
@@ -125,6 +134,88 @@ final class Api
             $this->app->telemetry()->record($db ? Code::DbError : Code::ServerError, Detail::of($kind, $route->method, $route->path), Detail::describe($e));
             return Response::error(new ApiError(500, 'internal_error', 'Es ist ein Fehler aufgetreten. Bitte versuche es später erneut.'));
         }
+    }
+
+    /** Erfasste Routen des Änderungsprotokolls (ChangeLog\Subjects) */
+    public function changeSubjects(): Subjects
+    {
+        return $this->changeSubjects ??= new Subjects($this->app, fn (string $path): mixed => $this->getResult($path));
+    }
+
+    /**
+     * Änderungsprotokoll: Stand der betroffenen Einträge vor dem Ausführen. null, wenn die Route nicht erfasst wird, das
+     * Protokoll aus ist oder niemand angemeldet ist (auch in der Vorschau). Fehler hier halten die Anfrage nicht auf.
+     *
+     * @return array{subject: Subject, user: User, before: array<string, Item|null>, all: list<string>|null}|null
+     */
+    private function changesBefore(Route $route, Request $request): ?array
+    {
+        if ($request->method === 'GET' || $request->method === 'HEAD') {
+            return null;
+        }
+        try {
+            $subject = $this->changeSubjects()->for($route->method, $route->path);
+            $user = $this->app->authContext->currentUser();
+            // Auch das Einschalten des Protokolls selbst kommt hinein.
+            if ($subject === null || $user === null || $user->preview || (!$this->app->changeLog()->enabled() && $route->path !== '/admin/changes/settings')) {
+                return null;
+            }
+            $before = [];
+            foreach (($subject->ids)($request, null) as $id) {
+                $before[$id] = ($subject->load)($id);
+            }
+            return ['subject' => $subject, 'user' => $user, 'before' => $before, 'all' => $subject->all !== null ? ($subject->all)() : null];
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Stand für das Änderungsprotokoll nicht gelesen: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Änderungsprotokoll nach dem Ausführen: Stand danach laden und je Eintrag festhalten (angelegt, geändert, gelöscht).
+     *
+     * @param array{subject: Subject, user: User, before: array<string, Item|null>, all: list<string>|null} $state
+     */
+    private function changesAfter(Route $route, Request $request, mixed $result, array $state): void
+    {
+        try {
+            $subject = $state['subject'];
+            $ids = [...array_keys($state['before']), ...($subject->ids)($request, $result)];
+            if ($state['all'] !== null) {
+                $ids = [...$ids, ...array_diff(($subject->all)(), $state['all'])];
+            }
+            // Ein Platzhalter am Ende der Adresse ({id}, {key}): DELETE löscht den Eintrag (auch wenn er nur als gelöscht
+            // markiert bleibt); DELETE auf einen Teil (…/{id}/photo) ändert ihn.
+            $whole = preg_match('#/\{[a-z]+\}$#', $route->path) === 1;
+            foreach (array_values(array_unique(array_map('strval', $ids))) as $id) {
+                $before = $state['before'][$id] ?? null;
+                $after = $subject->event === 'delete' ? null : ($subject->load)($id);
+                if ($subject->secretField !== null && $before !== null && $after !== null) {
+                    $before = new Item($before->type, $before->id, $before->label, $before->fields + [$subject->secretField => '0'], $before->personal, [...$before->secret, $subject->secretField], $before->subject);
+                    $after = new Item($after->type, $after->id, $after->label, $after->fields + [$subject->secretField => '1'], $after->personal, [...$after->secret, $subject->secretField], $after->subject);
+                }
+                $action = $subject->event ?? match (true) {
+                    $before === null => 'create',
+                    $after === null, $route->method === 'DELETE' && $whole => 'delete',
+                    default => 'update',
+                };
+                $this->app->changeLog()->record($state['user'], $route->feature ?? 'app', $action, $before, $after, $subject->event !== null);
+            }
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Änderung nicht protokolliert: ' . $e->getMessage());
+        }
+    }
+
+    /** Antwort einer GET-Route ohne Prüfung und Erfassung (Stand von Einstellungen für das Änderungsprotokoll). */
+    private function getResult(string $path): mixed
+    {
+        foreach ($this->routes() as $route) {
+            if ($route->method === 'GET' && $route->path === $path) {
+                $result = ($route->handler)(new Request('GET', $path));
+                return $result instanceof Response ? $result->data : $result;
+            }
+        }
+        return null;
     }
 
     /** Art der Nutzung einer Route für die Nutzungsauswertung (Domain\ActivityService::ACTIONS). */
@@ -1302,6 +1393,9 @@ final class Api
             new Route('GET', '/admin/activity', Cap::ViewActivity, fn (Request $r) => $a->activity()->overview($r->query['from'] ?? null, $r->query['to'] ?? null), null, $denySettings),
             new Route('GET', '/admin/activity/entries', Cap::ViewActivity, fn (Request $r) => $a->activity()->entries($r->query['from'] ?? null, $r->query['to'] ?? null, $r->query['user_id'] ?? null), null, $denySettings),
             new Route('PUT', '/admin/activity/settings', Cap::ManageSettings, fn (Request $r) => ['personal' => $a->activity()->setPersonal($r->input('personal'))], null, $denySettings),
+            // Änderungsprotokoll (Domain\ChangeLogService): ansehen mit view_changes, ein/aus und Frist mit den Einstellungen
+            new Route('GET', '/admin/changes', Cap::ViewChanges, fn (Request $r) => $a->changeLog()->entries($this->user(), $r->query['from'] ?? null, $r->query['to'] ?? null, $r->query['user_id'] ?? null, $r->query['subject_id'] ?? null, $r->query['area'] ?? null), null, $denyRights),
+            new Route('PUT', '/admin/changes/settings', Cap::ManageSettings, fn (Request $r) => $a->changeLog()->updateSettings($r->body), null, $denySettings),
             new Route('GET', '/admin/maintenance', Cap::ManageSettings, fn () => $a->maintenance()->state() + ['log' => $a->maintenance()->log()], null, $denySettings),
             new Route('POST', '/admin/maintenance', Cap::ManageSettings, fn (Request $r) => $a->maintenance()->set($r->input('on'), $r->body['reason'] ?? null, $this->user()) + ['log' => $a->maintenance()->log()], null, $denySettings),
             new Route('GET', '/admin/navigation', Cap::ManageSettings, fn () => $a->navigation()->describe(), null, $denySettings),

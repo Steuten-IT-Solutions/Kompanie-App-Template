@@ -142,6 +142,7 @@ function adminSlug([sub, arg, page]: string[], ctx: HelpContext): string | null 
     import: 'mitglieder-import',
     anfragen: 'anfragen-freigeben',
     meldungen: 'fehlermeldungen-bearbeiten',
+    aenderungen: 'admin-aenderungen',
   };
   // „Einrichtungen“ sammelt nur Knöpfe der Startseite; ihre Anleitung steht dort.
   if (!sub || sub === 'einrichtungen') return 'verwaltung';

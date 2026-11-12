@@ -1878,6 +1878,51 @@ WHERE title IS NULL",
                     'CREATE INDEX IF NOT EXISTS {internal_events}_start_date ON {internal_events} (start_date)',
                 ],
             ],
+            // Änderungsprotokoll (Domain\ChangeLogService): wer wann welchen Eintrag angelegt, geändert oder gelöscht hat, mit
+            // alten und neuen Werten (changes, JSON). Namen von Person und Eintrag zum Zeitpunkt (actor_name, label);
+            // subject_user_id = die Person, um die es geht (Mitglied), personal = Werte persönlicher Angaben enthalten. Zeit
+            // als Unix-Zeit. Nicht in Sicherungen; Einträge nach der eingestellten Frist gelöscht.
+            59 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {change_log} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  at int(11) NOT NULL,
+  actor_id bigint(20) unsigned NOT NULL,
+  actor_name varchar(191) NOT NULL DEFAULT \'\',
+  area varchar(20) NOT NULL,
+  type varchar(40) NOT NULL,
+  item varchar(64) NOT NULL DEFAULT \'\',
+  label varchar(191) NOT NULL DEFAULT \'\',
+  action varchar(10) NOT NULL,
+  subject_user_id bigint(20) unsigned DEFAULT NULL,
+  personal tinyint(1) NOT NULL DEFAULT 0,
+  changes longtext NOT NULL,
+  PRIMARY KEY (id),
+  KEY at (at),
+  KEY actor_at (actor_id, at),
+  KEY subject (subject_user_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {change_log} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  at INTEGER NOT NULL,
+  actor_id INTEGER NOT NULL,
+  actor_name TEXT NOT NULL DEFAULT \'\',
+  area TEXT NOT NULL,
+  type TEXT NOT NULL,
+  item TEXT NOT NULL DEFAULT \'\',
+  label TEXT NOT NULL DEFAULT \'\',
+  action TEXT NOT NULL,
+  subject_user_id INTEGER DEFAULT NULL,
+  personal INTEGER NOT NULL DEFAULT 0,
+  changes TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {change_log}_at ON {change_log} (at)',
+                    'CREATE INDEX IF NOT EXISTS {change_log}_actor_at ON {change_log} (actor_id, at)',
+                    'CREATE INDEX IF NOT EXISTS {change_log}_subject ON {change_log} (subject_user_id)',
+                ],
+            ],
         ];
     }
 

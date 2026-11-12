@@ -28,6 +28,8 @@ use KompanieApp\Core\Storage\UserData;
  * - Antworten in anonymen Umfragen und Entwürfe (Bilder, Anhänge) nur beim eigenen Export: Sonst sähe die Verwaltung,
  *   wer was geantwortet hat, und was in der App nur die Person selbst sieht.
  * - Nutzungsauswertung (activity*) nur beim eigenen Export und für Admins mit view_activity, die sie ohnehin sehen.
+ * - Änderungsprotokoll (change_log) nur beim eigenen Export und mit view_changes: Einträge über die Person mit Werten,
+ *   Einträge von ihr ohne Werte.
  * Was die Person für andere eingetragen hat (created_by, updated_by), gehört nicht dazu.
  */
 final class PersonalDataExport
@@ -129,6 +131,19 @@ final class PersonalDataExport
             $seen = $this->app->db->select('SELECT area, at FROM {activity_seen} WHERE token = ? ORDER BY area', [ActivityService::token($activitySecret, $userId)]);
             if ($seen !== []) {
                 $data['activity_seen'] = $seen;
+            }
+        }
+
+        // Änderungsprotokoll: Einträge über die Person mit Werten, Einträge von ihr ohne Werte (darin stehen Angaben anderer);
+        // für sie selbst und wer das Protokoll ohnehin sieht.
+        if ($self || $actor->can(Capability::ViewChanges)) {
+            try {
+                $changes = $this->app->changeLog()->export($userId);
+                if ($changes['about'] !== [] || $changes['by'] !== []) {
+                    $data['change_log'] = $changes;
+                }
+            } catch (\RuntimeException $e) {
+                error_log('Kompanie-App: Änderungsprotokoll nicht in der Auskunft: ' . $e->getMessage());
             }
         }
 

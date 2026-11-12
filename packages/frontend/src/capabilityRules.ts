@@ -150,6 +150,7 @@ const ORDER: Capability[] = [
   'create_users',
   'promote_users',
   'review_reports',
+  'view_changes',
 ];
 
 /** Rechte in der Reihenfolge der Gruppen (wie der Kern sie speichert). */
