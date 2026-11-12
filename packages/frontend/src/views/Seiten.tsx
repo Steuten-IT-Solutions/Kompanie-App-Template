@@ -3,7 +3,7 @@ import brand from '../generated/brand';
 import BlocksView from '../blocks/BlocksView';
 import RichTextView from '../richtext/RichTextView';
 import { navigate } from '../router';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { Caps, Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 
 const sec = brand.labels.sections;
@@ -31,7 +31,7 @@ function PageTiles() {
     <div>
       {manager && (
         <button type="button" className="btn btn-secondary btn-block manage-events" onClick={() => navigate('verwaltung/seiten')}>
-          {sec.pages} verwalten
+          <Caps text={sec.pages} /> verwalten
         </button>
       )}
       {data.length === 0 ? (
@@ -66,7 +66,7 @@ function PageView({ id }: { id: number }) {
             <p className="page-meta">
               <AudienceBadge page={data} />
               <button type="button" className="btn btn-small btn-secondary" onClick={() => navigate('verwaltung/seiten')}>
-                {sec.pages} verwalten
+                <Caps text={sec.pages} /> verwalten
               </button>
             </p>
           )}

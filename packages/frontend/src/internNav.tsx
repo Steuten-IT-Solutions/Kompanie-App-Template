@@ -1,6 +1,7 @@
 import { AdminIcon } from './adminNav';
 import { targetIcon } from './navigation';
 import { navigate } from './router';
+import { Caps } from './ui';
 
 /** Bereich eines Untermenüs: eigene Ansicht (#/<id>). */
 export type InternTab = { id: string; label: string };
@@ -15,7 +16,9 @@ export function InternMenu({ tabs, label = 'Intern' }: { tabs: InternTab[]; labe
           <li key={t.id}>
             <button type="button" className="card admin-tile" onClick={() => navigate(t.id)}>
               <AdminIcon id={targetIcon(t.id)} />
-              <span>{t.label}</span>
+              <span>
+                <Caps text={t.label} />
+              </span>
             </button>
           </li>
         ))}

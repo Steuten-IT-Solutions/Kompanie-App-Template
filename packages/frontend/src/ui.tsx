@@ -17,6 +17,7 @@ import { useBackClose } from './backClose';
 import type { MemberSummary, PersonName } from './api';
 import { cacheKey as keyOf, DATA_UPDATED, dataCache, pendingPrefetch, takeFresh } from './dataCache';
 import { noteError } from './lastError';
+import { caps } from './sharpS';
 import { emailProblem, emailSuggestion, normalizeEmail, tidyEmail } from './email';
 import { linkProblem, normalizeLink, tidyLink } from './link';
 import { composePhone, COUNTRIES, normalizePhone, OTHER, phoneHint, phoneProblem, splitPhone, tidyPhone } from './phone';
@@ -192,6 +193,22 @@ export function StatCard({
 }
 
 /**
+ * Name oder Inhalt (Rolle, Bereich, Seite, Kategorie) auf einer Schaltfläche oder in einer Feldbeschriftung, die in
+ * Großbuchstaben erscheint: „ß“ als „ẞ“ (sonst „SPIESS“). Feste Wörter der Oberfläche korrigiert der Beobachter in
+ * sharpS.ts dort absichtlich nicht; Namen müssen deshalb hier durch. Screenreader und Tests lesen weiter den Text mit
+ * „ß“ (versteckt daneben), der Name des Feldes oder der Schaltfläche bleibt also gleich.
+ */
+export function Caps({ text }: { text: string }) {
+  if (!text.includes('ß')) return <>{text}</>;
+  return (
+    <>
+      <span aria-hidden="true">{caps(text)}</span>
+      <span className="visually-hidden">{text}</span>
+    </>
+  );
+}
+
+/**
  * Einklappbarer Abschnitt: Kopf in der Optik von .section-title mit Pfeil „›“, der beim Aufklappen nach unten zeigt.
  * Für Dokument-Kategorien und „Konto und Rolle“ in den Mitgliedsdetails, damit alle gleich aussehen.
  */
@@ -215,7 +232,7 @@ export function FoldSection({
     <section id={id} className={className ? `fold ${className}` : 'fold'}>
       <h3 className="section-title fold-title">
         <button type="button" className="fold-toggle" aria-expanded={open} aria-controls={bodyId} onClick={onToggle}>
-          {title}
+          {typeof title === 'string' ? <Caps text={title} /> : title}
           <span className="fold-arrow" aria-hidden="true">
             ›
           </span>

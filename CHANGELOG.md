@@ -47,6 +47,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   neue Bild geladen ist, dreht sich ein Ladekreis; das vorherige und das nächste Bild werden vorab geladen.
 - **Termine auf der Webseite (WordPress)**: Im Shortcode `[kompanie_termine]` steht beim Wochentag kein doppelter
   Punkt mehr („So., 6. Dezember 2026“ statt „So.., 6. Dezember 2026“).
+- **„ß“ in Großbuchstaben**: Namen von Rollen, Bereichen, eigenen Seiten und Dokument-Kategorien stehen auch auf
+  Kacheln, Knöpfen und in Feldbeschriftungen in Großbuchstaben mit „ẞ“, z. B. „SPIEẞ“ statt „SPIESS“ unter
+  [Einstellungen → Rollen](app:einstellungen/rollen) bei „Gruppen im Zähler“.
 
 ## [0.11.0] – 2026-11-12
 
