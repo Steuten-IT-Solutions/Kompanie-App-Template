@@ -315,6 +315,14 @@ $tomorrow = wp_date('Y-m-d', time() + DAY_IN_SECONDS);
 [, $ev] = $d->request('POST', '/events', ['title' => 'Kpwp Fest', 'start_date' => $tomorrow, 'start_time' => '19:00', 'end_time' => '23:00', 'url' => 'https://example.org/fest']);
 $html = do_shortcode('[kompanie_termine anzahl="50"]');
 $c->ok(str_contains($html, 'Kpwp Fest') && str_contains($html, 'href="https://example.org/fest"') && str_contains($html, '19:00–23:00 Uhr'), '[kompanie_termine] mit Link und Uhrzeit');
+// Wie de_DE: Abkürzung des Wochentags schon mit Punkt (2026-12-06 ist ein Sonntag).
+global $wp_locale;
+$sunday = $wp_locale->get_weekday(0);
+$abbrev = $wp_locale->weekday_abbrev[$sunday];
+$wp_locale->weekday_abbrev[$sunday] = 'So.';
+$when = KompanieApp\WordPress\Shortcodes::when(['start_date' => '2026-12-06', 'end_date' => null, 'start_time' => '', 'end_time' => '']);
+$wp_locale->weekday_abbrev[$sunday] = $abbrev;
+$c->ok(str_starts_with($when, 'So., 6. '), 'Wochentag mit Punkt in der Übersetzung bekommt keinen zweiten (' . $when . ')');
 $c->ok(!str_contains($html, '⚓'), 'Keine Motive einer bestimmten Kompanie');
 $d->request('DELETE', '/events/' . $ev['id']);
 
@@ -536,6 +544,42 @@ $app->calendar()->clearCache();
 [$s, $cal] = $d->request('GET', '/calendar');
 remove_filter('pre_http_request', $icsFilter, 10);
 $c->ok($s === 200 && in_array('Vereinsabend', array_column($cal, 'title'), true), 'Kalender aus iCal-Link der Test-Instanz');
+
+// [kompanie_kalender]: interner Kalender für Angemeldete mit dem Recht calendar (Quelle app).
+$sourceBefore = $app->settings->get(KompanieApp\Core\Domain\CalendarService::SOURCE_SETTING);
+$app->settings->set(KompanieApp\Core\Domain\CalendarService::SOURCE_SETTING, 'app');
+$d->actAs($admin);
+$day = (new DateTimeImmutable('today', wp_timezone()))->modify('+40 days');
+[$s1, $timed] = $d->request('POST', '/calendar/entries', ['title' => 'Kpwp Vorstandssitzung', 'start_date' => $day->format('Y-m-d'), 'start_time' => '19:00', 'end_time' => '21:00', 'location' => 'Vereinsheim']);
+[$s2, $multi] = $d->request('POST', '/calendar/entries', ['title' => 'Kpwp Fahrt', 'start_date' => $day->modify('+1 day')->format('Y-m-d'), 'end_date' => $day->modify('+3 days')->format('Y-m-d')]);
+$past = $d->request('POST', '/calendar/entries', ['title' => 'Kpwp Vorbei', 'start_date' => (new DateTimeImmutable('today', wp_timezone()))->modify('-3 days')->format('Y-m-d')])[1];
+$c->ok($s1 === 201 && $s2 === 201, 'Interne Termine für den Shortcode angelegt');
+$d->actAs($member);
+wp_set_current_user($member);
+$html = do_shortcode('[kompanie_kalender]');
+$c->ok(str_contains($html, 'Kpwp Vorstandssitzung') && str_contains($html, '19:00–21:00 Uhr') && str_contains($html, 'Ort: Vereinsheim') && !str_contains($html, 'Kpwp Vorbei'), '[kompanie_kalender] zeigt kommende interne Termine mit Uhrzeit und Ort, keine vergangenen');
+$from = $day->modify('+1 day')->getTimestamp();
+$to = $day->modify('+3 days')->getTimestamp();
+$range = (wp_date('Y-m', $from) === wp_date('Y-m', $to) ? wp_date('j.', $from) : wp_date('j. F', $from)) . '–' . wp_date('j. F Y', $to);
+$c->ok(str_contains($html, $range), '[kompanie_kalender]: mehrtägiger ganztägiger Termin bis zum letzten Tag (' . $range . ')');
+$c->ok(substr_count(do_shortcode('[kompanie_kalender anzahl="1"]'), 'class="ka-termin"') === 1, '[kompanie_kalender anzahl="1"] begrenzt');
+$c->ok(substr_count(do_shortcode('[kompanie_kalender anzahl="0"]'), 'class="ka-termin"') >= 2, '[kompanie_kalender anzahl="0"] zeigt alle kommenden Termine');
+wp_set_current_user(0);
+$d->actAs(null);
+$html = do_shortcode('[kompanie_kalender]');
+$c->ok(!str_contains($html, 'Kpwp Vorstandssitzung') && str_contains($html, 'wenn du angemeldet bist'), '[kompanie_kalender] ohne Anmeldung: nur ein Hinweis, keine Termine');
+$d->actAs($admin);
+foreach ([$timed, $multi, $past] as $ev) {
+    $d->request('DELETE', '/calendar/entries/' . (int) ($ev['id'] ?? 0));
+}
+if ($sourceBefore === null) {
+    $app->settings->delete(KompanieApp\Core\Domain\CalendarService::SOURCE_SETTING);
+} else {
+    $app->settings->set(KompanieApp\Core\Domain\CalendarService::SOURCE_SETTING, $sourceBefore);
+}
+$app->calendar()->clearCache();
+wp_set_current_user($member);
+$d->actAs($member);
 
 // Kalender-IDs über den Google-Zugang der Galerie (Dienstkonto der Test-Instanz): Bearer-Token, kein API-Schlüssel.
 $calendarRequests = [];

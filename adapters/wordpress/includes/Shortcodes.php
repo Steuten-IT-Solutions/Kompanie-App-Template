@@ -12,6 +12,7 @@ use KompanieApp\Core\Domain\MemberPhotoService;
  * Shortcodes für die Webseite, in den Farben der Kompanie.
  *
  * [kompanie_termine anzahl="10"]  Kommende öffentliche Termine aus der App.
+ * [kompanie_kalender anzahl="20"] Kommende Termine des internen Kalenders, nur für Angemeldete mit dem Recht calendar (0: alle).
  * [kompanie_galerie]              Galerie (Jahre → Alben → Bilder).
  * [kompanie_aemter gruppe="…" amt="…"]  Ämter mit Inhabern und Chronik (optional nur eine Gruppe und/oder ein Amt).
  * [kompanie_mitglieder]           Mitglieder (ohne Anwärter) als Bildergalerie (Foto mit Namen, Großansicht beim Antippen).
@@ -24,6 +25,7 @@ final class Shortcodes
     public static function init(App $app): void
     {
         add_shortcode('kompanie_termine', static fn ($atts) => self::events($app, is_array($atts) ? $atts : []));
+        add_shortcode('kompanie_kalender', static fn ($atts) => self::calendar($app, is_array($atts) ? $atts : []));
         add_shortcode('kompanie_galerie', static fn () => self::gallery($app));
         add_shortcode('kompanie_aemter', static fn ($atts) => self::offices($app, is_array($atts) ? $atts : []));
         add_shortcode('kompanie_mitglieder', static fn () => self::members($app));
@@ -170,12 +172,122 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         return $html . '</ol>';
     }
 
+    /**
+     * Interner Kalender (Bereich calendar) für eine Seite im geschützten Bereich der Webseite. Anders als die übrigen
+     * Shortcodes zählt hier die angemeldete Person (Recht calendar, wie in der App), nicht Gast. Ohne Anmeldung ein
+     * Hinweis, angemeldet ohne das Recht nichts. DONOTCACHEPAGE bittet Seiten-Cache-Plugins, die Seite nicht für alle zu
+     * speichern; ohne Anmeldung enthält sie ohnehin nur den Hinweis.
+     */
+    private static function calendar(App $app, array $atts): string
+    {
+        if (!defined('DONOTCACHEPAGE')) {
+            define('DONOTCACHEPAGE', true);
+        }
+        if (!$app->features()->enabled('calendar')) {
+            return '';
+        }
+        if (!$app->can(Capability::Calendar)) {
+            return is_user_logged_in() ? '' : self::styles($app) . '<p class="ka">Die internen Termine siehst du, wenn du angemeldet bist.</p>';
+        }
+        // 0: alle kommenden Termine (der Kalender reicht etwa ein Jahr voraus).
+        $limit = max(0, (int) ($atts['anzahl'] ?? 20));
+        $html = self::styles($app);
+        try {
+            $events = $app->calendar()->upcoming();
+        } catch (\KompanieApp\Core\Http\ApiError $e) {
+            return $html . '<p class="ka">Der Kalender ist gerade nicht erreichbar.</p>';
+        }
+        $tz = wp_timezone();
+        $today = (new \DateTimeImmutable('today', $tz))->getTimestamp();
+        $events = array_values(array_filter($events, static fn (array $ev): bool => self::calendarRange($ev, $tz)[1] >= $today));
+        if ($limit > 0) {
+            $events = array_slice($events, 0, $limit);
+        }
+        if ($events === []) {
+            return $html . '<p class="ka">Derzeit sind keine Termine eingetragen.</p>';
+        }
+        $html .= '<ol class="ka ka-termine">';
+        foreach ($events as $ev) {
+            [$start] = self::calendarRange($ev, $tz);
+            $title = esc_html((string) $ev['title']);
+            $url = (string) ($ev['url'] ?? '');
+            if ($url !== '') {
+                $external = !str_starts_with($url, home_url());
+                $title = sprintf('<a href="%s"%s>%s</a>', esc_url($url), $external ? ' target="_blank" rel="noopener"' : '', $title);
+            }
+            $html .= '<li class="ka-termin">';
+            $html .= sprintf(
+                '<div class="ka-datum" aria-hidden="true"><span class="ka-monat">%s</span><span class="ka-tag">%s</span></div>',
+                esc_html(wp_date('M', $start)),
+                esc_html(wp_date('j', $start)),
+            );
+            $html .= '<div class="ka-text"><h4 class="ka-titel">' . $title . '</h4>';
+            $html .= '<div class="ka-wann">' . esc_html(self::calendarWhen($ev)) . '</div>';
+            $location = (string) ($ev['location'] ?? '');
+            if ($location !== '') {
+                $html .= '<div class="ka-ort">Ort: ' . esc_html($location) . '</div>';
+            }
+            // Beschreibungen aus Google Kalender können HTML enthalten: als Text zeigen.
+            $description = trim(wp_strip_all_tags(str_ireplace(['<br>', '<br/>', '<br />'], "\n", (string) ($ev['description'] ?? ''))));
+            if ($description !== '') {
+                $html .= '<p class="ka-beschreibung">' . nl2br(esc_html($description)) . '</p>';
+            }
+            $html .= '</div></li>';
+        }
+        return $html . '</ol>';
+    }
+
+    /**
+     * Beginn und (inklusives) Ende eines Termins des internen Kalenders als Zeitstempel. Ganztägige Termine haben ein
+     * Datum; Google und iCal liefern das Ende exklusiv (Tag danach), daher einen Tag abziehen (wie eventEnd im Frontend).
+     *
+     * @return array{0: int, 1: int}
+     */
+    private static function calendarRange(array $ev, \DateTimeZone $tz): array
+    {
+        $startText = (string) $ev['start'];
+        $endText = (string) ($ev['end'] ?? '') !== '' ? (string) $ev['end'] : $startText;
+        if (!empty($ev['all_day'])) {
+            $start = new \DateTimeImmutable(substr($startText, 0, 10), $tz);
+            $end = new \DateTimeImmutable(substr($endText, 0, 10), $tz);
+            if ($end > $start) {
+                $end = $end->modify('-1 day');
+            }
+            return [$start->getTimestamp(), $end->setTime(23, 59, 59)->getTimestamp()];
+        }
+        $start = (new \DateTimeImmutable($startText, $tz))->getTimestamp();
+        return [$start, max($start, (new \DateTimeImmutable($endText, $tz))->getTimestamp())];
+    }
+
+    /** Zeit eines Termins des internen Kalenders: „Sa., 27. Juni 2027 · 19:00–23:00 Uhr“, „25.–28. Juni 2027“. */
+    public static function calendarWhen(array $ev): string
+    {
+        $tz = wp_timezone();
+        [$start, $end] = self::calendarRange($ev, $tz);
+        $day = static fn (int $t): string => rtrim(wp_date('D', $t), '.') . '., ' . wp_date('j. F Y', $t);
+        $sameDay = wp_date('Y-m-d', $start) === wp_date('Y-m-d', $end);
+        if (!empty($ev['all_day'])) {
+            if ($sameDay) {
+                return $day($start);
+            }
+            $sameMonth = wp_date('Y-m', $start) === wp_date('Y-m', $end);
+            return ($sameMonth ? wp_date('j.', $start) : wp_date('j. F', $start)) . '–' . wp_date('j. F Y', $end);
+        }
+        if ($end <= $start) {
+            return $day($start) . ' · ' . wp_date('H:i', $start) . ' Uhr';
+        }
+        return $sameDay
+            ? $day($start) . ' · ' . wp_date('H:i', $start) . '–' . wp_date('H:i', $end) . ' Uhr'
+            : $day($start) . ', ' . wp_date('H:i', $start) . ' Uhr – ' . $day($end) . ', ' . wp_date('H:i', $end) . ' Uhr';
+    }
+
     /** „Sa., 27. Juni 2027 · 19:00–23:00 Uhr“ bzw. „25.–28. Juni 2027“. */
     public static function when(array $ev): string
     {
         $tz = wp_timezone();
         $start = (new \DateTimeImmutable($ev['start_date'], $tz))->getTimestamp();
-        $text = wp_date('D., j. F Y', $start);
+        // Manche Sprachen kürzen den Wochentag schon mit Punkt ab (de_DE: „So.“); dann keinen zweiten anhängen.
+        $text = rtrim(wp_date('D', $start), '.') . '., ' . wp_date('j. F Y', $start);
         if ($ev['end_date']) {
             $end = (new \DateTimeImmutable($ev['end_date'], $tz))->getTimestamp();
             $same = wp_date('Y-m', $start) === wp_date('Y-m', $end);

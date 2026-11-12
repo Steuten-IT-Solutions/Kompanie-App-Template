@@ -24,6 +24,18 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Neu
+
+- **Interner Kalender auf der Webseite (WordPress)**: Der Shortcode `[kompanie_kalender]` zeigt die Termine des
+  internen Kalenders auf einer Seite der Webseite, z. B. im Mitgliederbereich. Die Termine sehen nur angemeldete
+  Personen, die den Kalender auch in der App sehen; ohne Anmeldung steht dort ein Hinweis. Mit `anzahl="10"` begrenzt
+  du die Zahl der Termine, `anzahl="0"` zeigt alle.
+
+### Behoben
+
+- **Termine auf der Webseite (WordPress)**: Im Shortcode `[kompanie_termine]` steht beim Wochentag kein doppelter
+  Punkt mehr („So., 6. Dezember 2026“ statt „So.., 6. Dezember 2026“).
+
 ## [0.11.0] – 2026-11-12
 
 ### Neu
