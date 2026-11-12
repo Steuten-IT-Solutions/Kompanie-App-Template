@@ -67,5 +67,5 @@ tests/handbuch/run-tests.sh                # Handbuch: Aufbau, Platzhalter, Ausg
 tests/changelog/run-tests.sh               # Changelog: Aufbau, Prüfung zum Release, Ausgabe für die App
 ```
 
-GitHub Actions führt bei jedem Push alle Prüfungen aus, auch die WordPress-Tests, beide Datenbanken und die
+GitHub Actions führt alle Prüfungen bei jedem Pull Request und jedem Push auf `develop` und `main` aus, auch die WordPress-Tests, beide Datenbanken und die
 OpenAPI-Spezifikation ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
