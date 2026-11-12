@@ -320,8 +320,8 @@ final class SettingsPage
         ?>
         <h2 id="schnell">App schneller laden</h2>
         <p>Bei jedem Aufruf der App startet WordPress samt allen aktiven Plugins, auch solchen, die die App nie braucht
-           (Seitenbaukästen, Statistik, Formulare …). Eingeschaltet lädt WordPress bei Aufrufen der App nur die Kompanie-App und
-           die Plugins mit Häkchen. Die Webseite, wp-admin, die Anmeldung und geplante Aufgaben laufen weiter mit allen Plugins,
+           (Seitenbaukästen, Statistik, Formulare …). Eingeschaltet lädt WordPress bei Aufrufen der App nur die Kompanie-App,
+           die Plugins mit Häkchen und, wenn gewählt, das Theme. Die Webseite, wp-admin, die Anmeldung und geplante Aufgaben laufen weiter mit allen Plugins,
            ebenso die Neuigkeiten aus den Beiträgen der Webseite. In der Datenbank ändert sich nichts.</p>
         <?php if ($disabled) : ?>
             <div class="notice notice-warning inline"><p>In <code>wp-config.php</code> ist <code>define('<?php echo esc_html(FastLoad::CONSTANT); ?>', false);</code> gesetzt: Die App lädt immer alle Plugins, egal was hier eingestellt ist.</p></div>
@@ -360,6 +360,10 @@ final class SettingsPage
                     <?php endforeach; ?>
                 </fieldset>
             <?php endif; ?>
+            <p><label><input type="checkbox" name="fast_theme" value="1" <?php checked($o['theme']); ?> />
+                Theme auch in der App laden (<?php echo esc_html(wp_get_theme()->get('Name')); ?>)</label><br />
+               <span class="description">Die App zeigt nichts vom Theme. Manche Themes ändern aber in ihrer functions.php Dinge, die auch
+               die App betreffen (z. B. den Ordner für Uploads oder eigene Filter der App). Ohne Haken vorher messen und die App danach prüfen.</span></p>
             <?php submit_button('Speichern', 'secondary'); ?>
         </form>
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
@@ -395,7 +399,7 @@ final class SettingsPage
             $names = FastLoad::otherPlugins();
             $keep = array_map(static fn (string $p): string => $names[$p] ?? $p, $o['keep']);
             sort($keep);
-            return ['Eingeschaltet' => $o['on'], 'Auch in der App' => $keep === [] ? null : implode(', ', $keep)];
+            return ['Eingeschaltet' => $o['on'], 'Auch in der App' => $keep === [] ? null : implode(', ', $keep), 'Theme in der App' => $o['theme']];
         });
         [$message, $error] = self::logged($app, $subject, static fn (): array => self::applyFastLoad(wp_unslash($_POST)));
         self::back($message, $error, 'schnell');
@@ -412,7 +416,7 @@ final class SettingsPage
         $active = array_keys(FastLoad::otherPlugins());
         $keep = isset($post['fast_keep']) && is_array($post['fast_keep']) ? array_values(array_intersect(array_map('strval', array_filter($post['fast_keep'], 'is_scalar')), $active)) : [];
         $on = !empty($post['fast_on']);
-        FastLoad::save($on, $keep);
+        FastLoad::save($on, $keep, !empty($post['fast_theme']));
         $installed = FastLoad::install();
         if ($on && !$installed) {
             return ['Gespeichert. Damit es wirkt, fehlt noch die Datei in mu-plugins (siehe Hinweis).', true];

@@ -1192,11 +1192,25 @@ $loaded = static function (string $path): ?bool {
     $out = trim((string) $out);
     return str_ends_with($out, '+app') ? str_starts_with($out, 'mit') : null;
 };
+// Ob die functions.php des Themes geladen wurde (und die Pfade des Themes danach wieder stimmen).
+$themeFunctions = get_stylesheet_directory() . '/functions.php';
+$themeLoaded = static function (string $path) use ($themeFunctions): ?string {
+    $out = WP_CLI::runcommand('eval "echo in_array(realpath(get_stylesheet_directory() . \'/functions.php\'), get_included_files(), true) ? \'mit\' : \'ohne\'; echo \$GLOBALS[\'wp_stylesheet_path\'] === get_stylesheet_directory() && is_dir(get_stylesheet_directory()) ? \'+pfad\' : \'\';" --url=' . escapeshellarg(home_url($path)), ['launch' => true, 'return' => true, 'exit_error' => false]);
+    return trim((string) $out);
+};
 FastLoad::save(true, []);
 $c->ok($loaded('/wp-json/kompanie-app/v1/config') === false && $loaded('/app/') === false, 'Eingeschaltet: App-Aufrufe ohne das andere Plugin, mit der Kompanie-App');
 $c->ok($loaded('/') === true && $loaded('/wp-json/wp/v2/posts') === true && $loaded('/wp-json/kompanie-app/v1/news') === true, 'Webseite, andere Schnittstellen und Neuigkeiten mit dem anderen Plugin');
 [$saveMsg, $saveErr] = KompanieApp\WordPress\SettingsPage::applyFastLoad(['fast_on' => '1', 'fast_keep' => ['kpwp-schnell/kpwp-schnell.php', 'nicht/aktiv.php']]);
 $c->ok(!$saveErr && FastLoad::option()['keep'] === ['kpwp-schnell/kpwp-schnell.php'] && $loaded('/wp-json/kompanie-app/v1/config') === true, 'Mit Häkchen lädt es auch in der App; nur aktive Plugins lassen sich behalten');
+if (is_file($themeFunctions)) {
+    $c->ok($themeLoaded('/wp-json/kompanie-app/v1/config') === 'ohne+pfad' && $themeLoaded('/') === 'mit+pfad', 'Ohne Haken beim Theme: App-Aufrufe ohne functions.php des Themes, Webseite mit; Pfade des Themes stimmen danach');
+    KompanieApp\WordPress\SettingsPage::applyFastLoad(['fast_on' => '1', 'fast_theme' => '1']);
+    $c->ok(FastLoad::option()['theme'] && $themeLoaded('/wp-json/kompanie-app/v1/config') === 'mit+pfad', 'Mit Haken lädt das Theme auch in der App');
+} else {
+    $c->ok(true, 'Theme ohne functions.php: Prüfung des Themes übersprungen');
+}
+$c->ok(FastLoad::keepTheme(['on' => true]) && !FastLoad::keepTheme(['theme' => false]), 'Vorgabe ohne Angabe: Theme laden');
 KompanieApp\WordPress\SettingsPage::applyFastLoad([]);
 $c->ok(!FastLoad::option()['on'] && $loaded('/wp-json/kompanie-app/v1/config') === true, 'Ausgeschaltet: alle Plugins');
 deactivate_plugins('kpwp-schnell/kpwp-schnell.php', true);

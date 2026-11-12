@@ -20,7 +20,10 @@ namespace KompanieApp\WordPress;
  */
 final class FastLoad
 {
-    /** Einstellung (mit Autoload): on, plugin (eigener Pfad, z. B. kompanie-app/kompanie-app.php), keep (Liste), key. */
+    /**
+     * Einstellung (mit Autoload): on, plugin (eigener Pfad, z. B. kompanie-app/kompanie-app.php), keep (Liste), theme (ob das
+     * Theme geladen wird), key.
+     */
     public const OPTION = 'kompanie_app_fast_load';
 
     /** Wie WpEnvironment::NAMESPACE und AppPage::QUERY_VAR; hier ausgeschrieben, weil der Autoloader noch nicht läuft. */
@@ -87,9 +90,41 @@ final class FastLoad
                 return is_array($plugins) ? self::filterNetworkPlugins($plugins, $self, $keep) : $plugins;
             }, 1);
         }
+        if (!self::keepTheme($option)) {
+            self::skipTheme();
+        }
         if (!headers_sent()) {
             header(self::HEADER . ': 1');
         }
+    }
+
+    /** @param array<mixed> $option */
+    public static function keepTheme(array $option): bool
+    {
+        // Ohne Angabe (ältere Einstellung): Theme laden.
+        return !array_key_exists('theme', $option) || !empty($option['theme']);
+    }
+
+    /**
+     * Das Theme (seine functions.php) nicht laden: WordPress lädt die functions.php aus den Pfaden, die es kurz nach
+     * setup_theme festlegt (wp_templating_constants, wp_set_template_globals). Für diesen Moment zeigen die Pfade auf
+     * einen Ordner, den es nicht gibt; danach gelten wieder die echten. Die App gibt keine Seiten des Themes aus.
+     */
+    private static function skipTheme(): void
+    {
+        $nowhere = static fn (): string => WP_CONTENT_DIR . '/kompanie-app-ohne-theme';
+        add_action('setup_theme', static function () use ($nowhere): void {
+            add_filter('template_directory', $nowhere, PHP_INT_MAX);
+            add_filter('stylesheet_directory', $nowhere, PHP_INT_MAX);
+        }, PHP_INT_MAX);
+        add_action('after_setup_theme', static function () use ($nowhere): void {
+            remove_filter('template_directory', $nowhere, PHP_INT_MAX);
+            remove_filter('stylesheet_directory', $nowhere, PHP_INT_MAX);
+            // Die Pfade für den Rest des Aufrufs wieder auf das echte Theme (nur die veralteten Konstanten TEMPLATEPATH und
+            // STYLESHEETPATH bleiben auf dem Ordner, den es nicht gibt).
+            $GLOBALS['wp_stylesheet_path'] = get_stylesheet_directory();
+            $GLOBALS['wp_template_path'] = get_template_directory();
+        }, PHP_INT_MIN);
     }
 
     /**
@@ -223,9 +258,10 @@ final class FastLoad
     // --- Verwaltung (aus dem geladenen Plugin) ---
 
     /**
-     * Gespeicherte Einstellung mit Vorgaben: aus, keine behaltenen Plugins, eigener Pfad, Schlüssel für die Messung.
+     * Gespeicherte Einstellung mit Vorgaben: aus, keine behaltenen Plugins, Theme laden, eigener Pfad, Schlüssel für die
+     * Messung.
      *
-     * @return array{on: bool, plugin: string, keep: list<string>, key: string}
+     * @return array{on: bool, plugin: string, keep: list<string>, theme: bool, key: string}
      */
     public static function option(): array
     {
@@ -235,19 +271,21 @@ final class FastLoad
             'on' => !empty($o['on']),
             'plugin' => plugin_basename(KOMPANIE_APP_FILE),
             'keep' => self::keepList($o),
+            'theme' => self::keepTheme($o),
             'key' => isset($o['key']) && is_string($o['key']) && strlen($o['key']) >= 32 ? $o['key'] : bin2hex(random_bytes(16)),
         ];
     }
 
     /**
-     * Schalter und behaltene Plugins speichern (der eigene Pfad und der Schlüssel werden ergänzt).
+     * Schalter, behaltene Plugins und Theme speichern (der eigene Pfad und der Schlüssel werden ergänzt).
      *
      * @param list<string> $keep
      */
-    public static function save(bool $on, array $keep): void
+    public static function save(bool $on, array $keep, bool $theme = true): void
     {
         $o = self::option();
         $o['on'] = $on;
+        $o['theme'] = $theme;
         $o['keep'] = array_values(array_unique(array_filter($keep, static fn ($p): bool => is_string($p) && $p !== '' && $p !== $o['plugin'])));
         update_option(self::OPTION, $o, true);
     }

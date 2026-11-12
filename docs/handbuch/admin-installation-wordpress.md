@@ -34,12 +34,13 @@ In `[kompanie_mitglieder]` stehen bei Personen ohne Foto ihre Anfangsbuchstaben.
 **Platzhalterbild entfernen** bringt die Anfangsbuchstaben zurück, ebenso das Löschen des Bilds aus der Mediathek. In der App selbst bleiben die Anfangsbuchstaben.
 
 ### Die App schneller laden
-Bei jedem Aufruf der App startet WordPress samt allen aktiven Plugins, auch solchen, die die App nie braucht, etwa Seitenbaukästen, Statistik oder Formulare. Auf manchen Webspaces dauert so jeder Aufruf eine Sekunde oder länger. Eingeschaltet lädt WordPress bei Aufrufen der App nur die App selbst und die Plugins, die du auswählst. Die Webseite, das WordPress-Backend, die Anmeldung und geplante Aufgaben laufen weiter mit allen Plugins, ebenso die {bereich.news} aus den Beiträgen der Webseite. In der Datenbank ändert sich nichts.
+Bei jedem Aufruf der App startet WordPress samt allen aktiven Plugins, auch solchen, die die App nie braucht, etwa Seitenbaukästen, Statistik oder Formulare. Auf manchen Webspaces dauert so jeder Aufruf eine Sekunde oder länger. Eingeschaltet lädt WordPress bei Aufrufen der App nur die App selbst und die Plugins, die du auswählst, auf Wunsch auch ohne das Theme. Die Webseite, das WordPress-Backend, die Anmeldung und geplante Aufgaben laufen weiter mit allen Plugins, ebenso die {bereich.news} aus den Beiträgen der Webseite. In der Datenbank ändert sich nichts.
 1. Öffne im WordPress-Backend unter *Einstellungen* die Seite der App und dort den Abschnitt **App schneller laden**.
 2. Klicke auf **Jetzt messen**. Nach einigen Sekunden siehst du, wie lange ein Aufruf der App mit allen Plugins dauert und wie lange schnell.
 3. Setze ein Häkchen bei Plugins, die die App brauchen könnte: Sicherheits-Plugins (Firewall, Schutz vor zu vielen Anfragen), Plugins, die Benutzerrollen ändern, und Plugins, die Bilder der Mediathek an einem anderen Ort speichern. Im Zweifel setzt du das Häkchen.
-4. Schalte **Bei Aufrufen der App nur die nötigen Plugins laden** ein und klicke auf **Speichern**.
-5. Öffne die App und prüfe, ob alles wie gewohnt läuft.
+4. Der Haken **Theme auch in der App laden** ist gesetzt. Die App zeigt nichts vom Theme; manche Themes ändern aber Dinge, die auch die App betreffen, etwa den Ordner für Uploads. Nimmst du den Haken heraus, wird die App meist noch etwas schneller. Miss vorher und prüfe die App danach.
+5. Schalte **Bei Aufrufen der App nur die nötigen Plugins laden** ein und klicke auf **Speichern**.
+6. Öffne die App und prüfe, ob alles wie gewohnt läuft.
 
 Das Plugin legt dafür die Datei `kompanie-app-schnell.php` im Ordner `wp-content/mu-plugins/` an und entfernt sie beim Deaktivieren. Darf es dort nicht schreiben, zeigt der Abschnitt einen Hinweis mit der Datei zum Herunterladen; lade sie dann per FTP in diesen Ordner.
 
