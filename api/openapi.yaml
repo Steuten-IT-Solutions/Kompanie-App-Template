@@ -1324,6 +1324,11 @@ paths:
                 type: object
                 required: [albums, submissions]
                 properties:
+                  enabled:
+                    {
+                      type: boolean,
+                      description: 'Einreichen erlaubt (Einstellung gallery_submissions); ohne lassen sich die eigenen Einreichungen nur ansehen und zurückziehen',
+                    }
                   albums:
                     type: array
                     items:
@@ -1340,7 +1345,7 @@ paths:
     post:
       tags: [Galerie]
       summary: Ein Bild einreichen
-      description: 'JPG, PNG oder WebP; neu kodiert als JPEG ohne Metadaten (auch ohne Aufnahmeort). Alle mit review_gallery bekommen eine Benachrichtigung (je Person und Schub höchstens eine in zehn Minuten).'
+      description: 'JPG, PNG oder WebP; neu kodiert als JPEG ohne Metadaten (auch ohne Aufnahmeort). Alle mit review_gallery bekommen eine Benachrichtigung (je Person und Schub höchstens eine in zehn Minuten). 403, solange das Einreichen ausgeschaltet ist (Einstellung gallery_submissions).'
       x-capability: submit_gallery
       requestBody:
         required: true
@@ -1412,7 +1417,8 @@ paths:
         Danach die Datei in Stücken von höchstens chunk_size Bytes an /gallery/video-uploads/chunk schicken (chunk_size
         richtet sich nach post_max_size des Servers), zum Schluss /gallery/video-uploads/finish. Die Datei bleibt
         unverändert. Zweck album braucht manage_settings (direkt ins Album), Zweck submission submit_gallery (als
-        Einreichung). Prüft vorher, ob auf dem Server genug Platz frei ist (400).
+        Einreichung; 403, solange das Einreichen ausgeschaltet ist, Einstellung gallery_submissions, auch noch beim
+        Abschließen). Prüft vorher, ob auf dem Server genug Platz frei ist (400).
       x-capability: 'manage_settings oder manage_gallery (purpose album) bzw. submit_gallery (purpose submission)'
       requestBody:
         required: true
@@ -6420,6 +6426,12 @@ paths:
                     enum: ['0', '1'],
                     description: 'Knöpfe zum Herunterladen in der Galerie zeigen (1) oder nicht (0, Vorgabe): je Bild in der Großansicht und je Album als ZIP',
                   }
+                gallery_submissions:
+                  {
+                    type: string,
+                    enum: ['0', '1'],
+                    description: 'Einreichen von Bildern und Videos durch Mitglieder mit submit_gallery erlauben (1) oder nicht (0). Neue Installationen: 0; bestehende bekamen beim Update einmalig 1',
+                  }
                 news_source:
                   {
                     type: string,
@@ -8866,6 +8878,7 @@ components:
             store: { type: string, enum: [server] }
             media_bytes: { type: integer, description: Belegter Platz der hochgeladenen Bilder in Bytes }
             downloads: { type: boolean, description: 'Knöpfe zum Herunterladen in der Galerie (Einstellung gallery_downloads)' }
+            submissions: { type: boolean, description: 'Einreichen durch Mitglieder erlaubt (Einstellung gallery_submissions)' }
             service_account_email: { type: string, description: wie google.service_account_email (für ältere Fassungen der App) }
             oauth_connected: { type: boolean, description: 'wie google.connected: OAuth-Verbindung zu Google (geht dem Dienstkonto vor)' }
             oauth_email: { type: string, description: Google-Konto der OAuth-Verbindung, leer wenn unbekannt }
@@ -9241,6 +9254,8 @@ components:
         registration: { type: boolean, description: 'Zugang beantragen eingeschaltet (Issue #314): Link „Zugang beantragen“ für Gäste' }
         pendingRegistrations:
           { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null' }
+        gallerySubmissions:
+          { type: boolean, description: 'Galerie an und Einreichen erlaubt (Einstellung gallery_submissions): sonst kein Knopf zum Einreichen' }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
         backupUrl:
           {

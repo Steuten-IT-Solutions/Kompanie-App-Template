@@ -41,7 +41,7 @@ final class VideoUploadTest extends TestCase
         $this->app->roles()->setOverrides($this->users->find($this->admin), $this->sub, ['submit_gallery'], []);
         $this->app->roles()->setOverrides($this->users->find($this->admin), $this->rev, ['review_gallery'], []);
         $this->users->current = $this->admin;
-        $this->ok('PATCH', '/admin/settings', ['gallery_source' => 'server']);
+        $this->ok('PATCH', '/admin/settings', ['gallery_source' => 'server', 'gallery_submissions' => '1']);
         $this->album = (int) $this->ok('POST', '/admin/gallery/albums', ['title' => 'Sommerfest', 'year' => 2026])['id'];
         $this->app->gallery()->waitSeconds = 0;
     }
@@ -237,6 +237,17 @@ final class VideoUploadTest extends TestCase
         $this->assertSame(['video', 3, 1280, 720, true], [$photo['type'], $photo['duration'], $photo['width'], $photo['height'], $photo['ready']]);
         $res = $this->app->gallery()->deliverVideo($photo['id'], null, static fn (): array => [false, false]);
         $this->assertSame($video, $res['body']);
+    }
+
+    /** Schaltet der Admin das Einreichen während des Hochladens aus, wird das Video keine Einreichung. */
+    public function testSubmissionSwitchedOffDuringUpload(): void
+    {
+        $this->users->current = $this->sub;
+        $id = $this->send($this->mp4(3000), 'submission');
+        $this->app->gallerySubmissions()->setEnabled(false);
+        $this->assertSame(403, $this->call('POST', '/gallery/video-uploads/finish', ['upload' => $id, 'poster' => $this->poster(), 'consent' => true])->status);
+        $this->assertSame(0, $this->app->gallerySubmissions()->countPending());
+        $this->assertSame(['cancelled' => true], $this->ok('POST', '/gallery/video-uploads/cancel', ['upload' => $id]));
     }
 
     public function testStaleSessionsArePruned(): void

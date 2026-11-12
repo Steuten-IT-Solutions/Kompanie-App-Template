@@ -40,6 +40,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Aufruf der App dadurch deutlich schneller. Ein Knopf misst vorher, was es bei euch bringt. Der Schalter ist zunächst
   aus.
 
+### Geändert
+
+- **Einreichen von Bildern und Videos erst erlauben**: Unter [Einstellungen → Galerie](app:einstellungen/galerie) gibt
+  es den Haken *Einreichen von Bildern und Videos durch Mitglieder erlauben*. Ohne Haken fehlt in der Galerie der Knopf
+  zum Einreichen, und der Server nimmt keine Einreichungen an; schon eingereichte bleiben und lassen sich weiter
+  prüfen. Neue Installationen starten ohne Haken. Bestehende Installationen
+  bekommen ihn beim Update gesetzt, dort ändert sich also nichts.
+
 ### Behoben
 
 - **Großansicht auf der Webseite (WordPress)**: Beim Blättern in der Großansicht von `[kompanie_mitglieder]` und
