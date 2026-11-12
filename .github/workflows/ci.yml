@@ -1,12 +1,21 @@
 name: CI
 
 on:
+  # Pull Requests prüft der Lauf zu pull_request. Ein Push auf ihren Zweig startete sonst für denselben Commit einen
+  # zweiten, gleichen Lauf; deshalb bei push nur die Zweige ohne Pull Request.
   push:
+    branches: [develop, main]
   pull_request:
   workflow_call:
 
 permissions:
   contents: read
+
+# Ein neuer Commit im selben Pull Request bricht den älteren, noch laufenden Lauf ab. develop und main laufen jeder für
+# sich zu Ende.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   checks:
