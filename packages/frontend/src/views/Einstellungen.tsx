@@ -21,7 +21,7 @@ import {
   type NewsSourceType,
   type PushAdmin,
 } from '../api';
-import { EmailField, ErrorBox, Loading, useAsync } from '../ui';
+import { Caps, EmailField, ErrorBox, Loading, useAsync } from '../ui';
 import { normalizeEmail } from '../email';
 import Neuerungen from './Neuerungen';
 import NavigationEinstellen from './NavigationEinstellen';
@@ -437,7 +437,9 @@ function BirthdaySettingsSection({ onToast }: { onToast: (msg: string) => void }
     <section className="card settings-section" id="einstellungen-geburtstage">
       <h3>{sec.birthdays}</h3>
       <label className="field">
-        <span>Anstehende {sec.birthdays} anzeigen</span>
+        <span>
+          Anstehende <Caps text={sec.birthdays} /> anzeigen
+        </span>
         <select value={data!.upcoming_days} disabled={busy} onChange={(e) => save(Number(e.target.value))}>
           {Array.from({ length: UPCOMING_DAYS_MAX + 1 }, (_, d) => (
             <option key={d} value={d}>

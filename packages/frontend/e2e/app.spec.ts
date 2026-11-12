@@ -3317,6 +3317,10 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
     .click();
   const rollen = page.locator('#einstellungen-rollen');
   await expect(rollen.locator('.row-title', { hasText: SPIESS })).toBeVisible();
+  // Rollenname in einer Feldbeschriftung in Großbuchstaben: „SPIEẞ“ statt „SPIESS“; das Feld heißt weiter „Spieß“.
+  const gruppen = rollen.locator('.attendance-group-form');
+  await expect(gruppen.getByText('Spieẞ', { exact: true })).toBeVisible();
+  await expect(gruppen.getByLabel(SPIESS)).toBeVisible();
   await expect(rollen.locator('.row-title', { hasText: 'Kasse verwalten' })).toBeVisible(); // Standardrolle des Bereichs
   // „+ Neue Rolle“ klebt nicht an der letzten Rolle.
   expect(await gapBetween(rollen.locator('.role-list'), rollen.getByRole('button', { name: '+ Neue Rolle' }))).toBeGreaterThanOrEqual(12);

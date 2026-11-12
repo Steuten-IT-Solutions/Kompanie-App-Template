@@ -4,6 +4,7 @@ import { can, config, type Feature } from './api';
 import { canManagePolls, canPostBoard } from './board';
 import brand from './generated/brand';
 import { navigate } from './router';
+import { Caps } from './ui';
 import { useAdminCounts } from './adminCounts';
 import { usePromotionsDue } from './promotionsDue';
 import { tileCount } from './tileCount';
@@ -173,7 +174,9 @@ export function MenuNav({
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
           <path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z" fill="currentColor" />
         </svg>
-        <span className="admin-menu-current">{current.label}</span>
+        <span className="admin-menu-current">
+          <Caps text={current.label} />
+        </span>
         <span className="admin-menu-chevron" aria-hidden="true">
           {open ? '▴' : '▾'}
         </span>
@@ -191,7 +194,7 @@ export function MenuNav({
                   t.onSelect();
                 }}
               >
-                {t.label}
+                <Caps text={t.label} />
               </button>
             </li>
           ))}
@@ -393,7 +396,9 @@ export function AdminMenu({ group }: { group?: string }) {
                 {...prefetchOnTap(...menuSources('verwaltung', t.id))}
               >
                 <AdminIcon id={t.id} />
-                <span>{t.label}</span>
+                <span>
+                  <Caps text={t.label} />
+                </span>
                 {badge && (
                   // Zahl im Kreis an der Ecke: was dort gerade ansteht (erklärt im title).
                   <span className="count-badge" aria-hidden="true">
