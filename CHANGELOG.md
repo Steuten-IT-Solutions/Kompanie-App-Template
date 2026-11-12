@@ -26,15 +26,19 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
-- **Dauer des Hochladens nach Google Drive**: Unter [Einstellungen → Datensicherung](app:einstellungen/datensicherung)
-  steht bei den Sicherungen in Google Drive, wie lange das letzte Hochladen gedauert hat: Größe, Zahl der Stücke, Dauer
-  und Rate, dazu Verbindung zu Google, Lesen von der Platte und das langsamste Stück. Daran lässt sich ablesen, woran
-  ein langsames Hochladen liegt.
+- **Sicherungen in Google Drive gepackt, Dauer des Hochladens**: Die App packt Sicherungen vor dem Hochladen nach
+  Google Drive (gzip). Sie werden etwa ein Viertel kleiner, mit wenigen Fotos und Dokumenten deutlich mehr, und sind
+  entsprechend schneller oben. Ohne Passwort für Sicherungen heißen sie jetzt `….json.gz`, mit Passwort bleibt es bei
+  `….json.enc`. Zum Wiederherstellen unter [Einstellungen → Datensicherung](app:einstellungen/datensicherung) wählst du
+  die Datei aus Google Drive wie bisher; die App entpackt sie selbst. Ältere App-Versionen (bis 0.11.0) können gepackte
+  Sicherungen nicht einspielen. Außerdem steht dort bei den Sicherungen in Google Drive, wie lange das letzte Hochladen
+  gedauert hat: Größe, Zahl der Stücke, Dauer und Rate, dazu Verbindung zu Google, Lesen von der Platte und das
+  langsamste Stück.
 - **Interner Kalender auf der Webseite (WordPress)**: Der Shortcode `[kompanie_kalender]` zeigt die Termine des
   internen Kalenders auf einer Seite der Webseite, z. B. im Mitgliederbereich. Die Termine sehen nur angemeldete
   Personen, die den Kalender auch in der App sehen; ohne Anmeldung steht dort ein Hinweis. Mit `anzahl="10"` begrenzt
   du die Zahl der Termine, `anzahl="0"` zeigt alle.
-- **App schneller laden (WordPress)**: Im WordPress-Backend unter *Einstellungen* gibt es auf der Seite der App den
+- **App schneller laden (WordPress)**: Im WordPress-Backend unter _Einstellungen_ gibt es auf der Seite der App den
   neuen Abschnitt „App schneller laden“. Eingeschaltet lädt WordPress bei Aufrufen der App nur die App selbst und die
   Plugins, die du auswählst, auf Wunsch auch ohne das Theme; die Webseite läuft weiter mit allen Plugins. Je nach Webspace und Plugins wird jeder
   Aufruf der App dadurch deutlich schneller. Ein Knopf misst vorher, was es bei euch bringt. Der Schalter ist zunächst
@@ -43,7 +47,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 ### Geändert
 
 - **Einreichen von Bildern und Videos erst erlauben**: Unter [Einstellungen → Galerie](app:einstellungen/galerie) gibt
-  es den Haken *Einreichen von Bildern und Videos durch Mitglieder erlauben*. Ohne Haken fehlt in der Galerie der Knopf
+  es den Haken _Einreichen von Bildern und Videos durch Mitglieder erlauben_. Ohne Haken fehlt in der Galerie der Knopf
   zum Einreichen, und der Server nimmt keine Einreichungen an; schon eingereichte bleiben und lassen sich weiter
   prüfen. Neue Installationen starten ohne Haken. Bestehende Installationen
   bekommen ihn beim Update gesetzt, dort ändert sich also nichts.
