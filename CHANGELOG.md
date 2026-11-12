@@ -24,6 +24,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Behoben
+
+- **Termine auf der Webseite (WordPress)**: Im Shortcode `[kompanie_termine]` steht beim Wochentag kein doppelter
+  Punkt mehr („So., 6. Dezember 2026“ statt „So.., 6. Dezember 2026“).
+
 ## [0.11.0] – 2026-11-12
 
 ### Neu

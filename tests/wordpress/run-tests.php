@@ -315,6 +315,14 @@ $tomorrow = wp_date('Y-m-d', time() + DAY_IN_SECONDS);
 [, $ev] = $d->request('POST', '/events', ['title' => 'Kpwp Fest', 'start_date' => $tomorrow, 'start_time' => '19:00', 'end_time' => '23:00', 'url' => 'https://example.org/fest']);
 $html = do_shortcode('[kompanie_termine anzahl="50"]');
 $c->ok(str_contains($html, 'Kpwp Fest') && str_contains($html, 'href="https://example.org/fest"') && str_contains($html, '19:00–23:00 Uhr'), '[kompanie_termine] mit Link und Uhrzeit');
+// Wie de_DE: Abkürzung des Wochentags schon mit Punkt (2026-12-06 ist ein Sonntag).
+global $wp_locale;
+$sunday = $wp_locale->get_weekday(0);
+$abbrev = $wp_locale->weekday_abbrev[$sunday];
+$wp_locale->weekday_abbrev[$sunday] = 'So.';
+$when = KompanieApp\WordPress\Shortcodes::when(['start_date' => '2026-12-06', 'end_date' => null, 'start_time' => '', 'end_time' => '']);
+$wp_locale->weekday_abbrev[$sunday] = $abbrev;
+$c->ok(str_starts_with($when, 'So., 6. '), 'Wochentag mit Punkt in der Übersetzung bekommt keinen zweiten (' . $when . ')');
 $c->ok(!str_contains($html, '⚓'), 'Keine Motive einer bestimmten Kompanie');
 $d->request('DELETE', '/events/' . $ev['id']);
 

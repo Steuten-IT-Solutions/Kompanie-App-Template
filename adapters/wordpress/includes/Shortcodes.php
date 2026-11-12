@@ -175,7 +175,8 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
     {
         $tz = wp_timezone();
         $start = (new \DateTimeImmutable($ev['start_date'], $tz))->getTimestamp();
-        $text = wp_date('D., j. F Y', $start);
+        // Manche Sprachen kürzen den Wochentag schon mit Punkt ab (de_DE: „So.“); dann keinen zweiten anhängen.
+        $text = rtrim(wp_date('D', $start), '.') . '., ' . wp_date('j. F Y', $start);
         if ($ev['end_date']) {
             $end = (new \DateTimeImmutable($ev['end_date'], $tz))->getTimestamp();
             $same = wp_date('Y-m', $start) === wp_date('Y-m', $end);
