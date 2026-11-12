@@ -12,7 +12,7 @@ use KompanieApp\Core\Domain\MemberPhotoService;
  * Shortcodes für die Webseite, in den Farben der Kompanie.
  *
  * [kompanie_termine anzahl="10"]  Kommende öffentliche Termine aus der App.
- * [kompanie_kalender anzahl="20"] Kommende Termine des internen Kalenders, nur für Angemeldete mit dem Recht calendar.
+ * [kompanie_kalender anzahl="20"] Kommende Termine des internen Kalenders, nur für Angemeldete mit dem Recht calendar (0: alle).
  * [kompanie_galerie]              Galerie (Jahre → Alben → Bilder).
  * [kompanie_aemter gruppe="…" amt="…"]  Ämter mit Inhabern und Chronik (optional nur eine Gruppe und/oder ein Amt).
  * [kompanie_mitglieder]           Mitglieder (ohne Anwärter) als Bildergalerie (Foto mit Namen, Großansicht beim Antippen).
@@ -189,7 +189,8 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         if (!$app->can(Capability::Calendar)) {
             return is_user_logged_in() ? '' : self::styles($app) . '<p class="ka">Die internen Termine siehst du, wenn du angemeldet bist.</p>';
         }
-        $limit = max(1, min(100, (int) ($atts['anzahl'] ?? 20)));
+        // 0: alle kommenden Termine (der Kalender reicht etwa ein Jahr voraus).
+        $limit = max(0, (int) ($atts['anzahl'] ?? 20));
         $html = self::styles($app);
         try {
             $events = $app->calendar()->upcoming();
@@ -198,10 +199,10 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         }
         $tz = wp_timezone();
         $today = (new \DateTimeImmutable('today', $tz))->getTimestamp();
-        $events = array_slice(array_values(array_filter(
-            $events,
-            static fn (array $ev): bool => self::calendarRange($ev, $tz)[1] >= $today,
-        )), 0, $limit);
+        $events = array_values(array_filter($events, static fn (array $ev): bool => self::calendarRange($ev, $tz)[1] >= $today));
+        if ($limit > 0) {
+            $events = array_slice($events, 0, $limit);
+        }
         if ($events === []) {
             return $html . '<p class="ka">Derzeit sind keine Termine eingetragen.</p>';
         }

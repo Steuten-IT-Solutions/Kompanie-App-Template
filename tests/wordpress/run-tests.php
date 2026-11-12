@@ -563,6 +563,7 @@ $to = $day->modify('+3 days')->getTimestamp();
 $range = (wp_date('Y-m', $from) === wp_date('Y-m', $to) ? wp_date('j.', $from) : wp_date('j. F', $from)) . '–' . wp_date('j. F Y', $to);
 $c->ok(str_contains($html, $range), '[kompanie_kalender]: mehrtägiger ganztägiger Termin bis zum letzten Tag (' . $range . ')');
 $c->ok(substr_count(do_shortcode('[kompanie_kalender anzahl="1"]'), 'class="ka-termin"') === 1, '[kompanie_kalender anzahl="1"] begrenzt');
+$c->ok(substr_count(do_shortcode('[kompanie_kalender anzahl="0"]'), 'class="ka-termin"') >= 2, '[kompanie_kalender anzahl="0"] zeigt alle kommenden Termine');
 wp_set_current_user(0);
 $d->actAs(null);
 $html = do_shortcode('[kompanie_kalender]');
