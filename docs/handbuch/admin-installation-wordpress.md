@@ -20,6 +20,7 @@ Läuft eure Webseite mit WordPress, installierst du die App als Plugin, also als
 ### Inhalte der App auf der Webseite zeigen
 Auf Seiten und in Beiträgen von WordPress zeigen diese Kurzbefehle (Shortcodes) Inhalte der App. Du schreibst sie einfach in den Text der Seite:
 - `[kompanie_termine]`: die öffentlichen {bereich.events}
+- `[kompanie_kalender]`: die Termine aus dem internen {bereich.calendar}, für eine Seite im geschützten Bereich der Webseite. Anders als die anderen Kurzbefehle zeigt er nur angemeldeten Personen, die den {bereich.calendar} auch in der App sehen, die Termine. Ohne Anmeldung steht dort nur ein Hinweis. Mit `[kompanie_kalender anzahl="10"]` begrenzt du die Zahl der Termine (ohne Angabe 20).
 - `[kompanie_galerie]`: die {bereich.gallery}
 - `[kompanie_aemter]`: die {bereich.offices}
 - `[kompanie_mitglieder]`: die {bereich.directory} als Bildergalerie
