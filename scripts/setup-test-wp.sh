@@ -47,6 +47,8 @@ fi
 
 ln -sfn "$ROOT/adapters/wordpress" "$DIR/wp/wp-content/plugins/kompanie-app"
 $WP plugin activate kompanie-app
+# „App schneller laden“ an: Die E2E-Tests laufen so, wie es eingeschaltet bei Kompanien läuft.
+$WP eval 'KompanieApp\WordPress\FastLoad::save( true, array() ); KompanieApp\WordPress\FastLoad::install() || exit( 1 );'
 
 for u in Verwalter Mitglied1 Mitglied2; do
   login=$(echo "$u" | tr '[:upper:]' '[:lower:]')

@@ -34,6 +34,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   internen Kalenders auf einer Seite der Webseite, z. B. im Mitgliederbereich. Die Termine sehen nur angemeldete
   Personen, die den Kalender auch in der App sehen; ohne Anmeldung steht dort ein Hinweis. Mit `anzahl="10"` begrenzt
   du die Zahl der Termine, `anzahl="0"` zeigt alle.
+- **App schneller laden (WordPress)**: Im WordPress-Backend unter *Einstellungen* gibt es auf der Seite der App den
+  neuen Abschnitt „App schneller laden“. Eingeschaltet lädt WordPress bei Aufrufen der App nur die App selbst und die
+  Plugins, die du auswählst, auf Wunsch auch ohne das Theme; die Webseite läuft weiter mit allen Plugins. Je nach Webspace und Plugins wird jeder
+  Aufruf der App dadurch deutlich schneller. Ein Knopf misst vorher, was es bei euch bringt. Der Schalter ist zunächst
+  aus.
 
 ### Behoben
 

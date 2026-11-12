@@ -33,8 +33,21 @@ In `[kompanie_mitglieder]` stehen bei Personen ohne Foto ihre Anfangsbuchstaben.
 
 **Platzhalterbild entfernen** bringt die Anfangsbuchstaben zurück, ebenso das Löschen des Bilds aus der Mediathek. In der App selbst bleiben die Anfangsbuchstaben.
 
+### Die App schneller laden
+Bei jedem Aufruf der App startet WordPress samt allen aktiven Plugins, auch solchen, die die App nie braucht, etwa Seitenbaukästen, Statistik oder Formulare. Auf manchen Webspaces dauert so jeder Aufruf eine Sekunde oder länger. Eingeschaltet lädt WordPress bei Aufrufen der App nur die App selbst und die Plugins, die du auswählst, auf Wunsch auch ohne das Theme. Die Webseite, das WordPress-Backend, die Anmeldung und geplante Aufgaben laufen weiter mit allen Plugins, ebenso die {bereich.news} aus den Beiträgen der Webseite. In der Datenbank ändert sich nichts.
+1. Öffne im WordPress-Backend unter *Einstellungen* die Seite der App und dort den Abschnitt **App schneller laden**.
+2. Klicke auf **Jetzt messen**. Nach einigen Sekunden siehst du, wie lange ein Aufruf der App mit allen Plugins dauert und wie lange schnell.
+3. Setze ein Häkchen bei Plugins, die die App brauchen könnte: Sicherheits-Plugins (Firewall, Schutz vor zu vielen Anfragen), Plugins, die Benutzerrollen ändern, und Plugins, die Bilder der Mediathek an einem anderen Ort speichern. Im Zweifel setzt du das Häkchen.
+4. Der Haken **Theme auch in der App laden** ist gesetzt. Die App zeigt nichts vom Theme; manche Themes ändern aber Dinge, die auch die App betreffen, etwa den Ordner für Uploads. Nimmst du den Haken heraus, wird die App meist noch etwas schneller. Miss vorher und prüfe die App danach.
+5. Schalte **Bei Aufrufen der App nur die nötigen Plugins laden** ein und klicke auf **Speichern**.
+6. Öffne die App und prüfe, ob alles wie gewohnt läuft.
+
+Das Plugin legt dafür die Datei `kompanie-app-schnell.php` im Ordner `wp-content/mu-plugins/` an und entfernt sie beim Deaktivieren. Darf es dort nicht schreiben, zeigt der Abschnitt einen Hinweis mit der Datei zum Herunterladen; lade sie dann per FTP in diesen Ordner.
+
+**Notschalter:** Läuft die App nach dem Einschalten nicht richtig und kommst du nicht mehr ins Backend, trage in der `wp-config.php` die Zeile `define('KOMPANIE_APP_SCHNELL', false);` ein. Dann lädt die App wieder alle Plugins, bis du die Zeile entfernst.
+
 ## Gut zu wissen
-- **Einstellungen:** Die Einstellungen der App findest du in der App unter **Verwaltung → Einstellungen**. Zusätzlich gibt es im WordPress-Backend unter *Einstellungen* eine Seite der App mit Wartungsmodus, Bereichen, Google-Zugang, {bereich.calendar}, {bereich.gallery} und dem Platzhalterbild. Sie hilft, wenn die App selbst nicht erreichbar ist.
+- **Einstellungen:** Die Einstellungen der App findest du in der App unter **Verwaltung → Einstellungen**. Zusätzlich gibt es im WordPress-Backend unter *Einstellungen* eine Seite der App mit Wartungsmodus, Bereichen, Google-Zugang, {bereich.calendar}, {bereich.gallery}, dem Platzhalterbild und „App schneller laden“. Sie hilft, wenn die App selbst nicht erreichbar ist.
 - **{rolle.admin}s:** {rolle.admin} in der App ist, wer in WordPress Administrator ist. Diese Rolle vergibst du nur in WordPress. Die Rolle anderer Personen wählst du in der App oder im WordPress-Benutzerprofil unter **Rolle in der App** (siehe [Rollen](seite:admin-rollen-und-mitglieder)). Wer in WordPress Benutzer anlegen darf (z. B. weil ein Plugin das einer Redakteursrolle gibt), darf das auch in der App und sieht damit E-Mail und Telefon der Mitglieder.
 - **Adresse:** Ohne „schöne“ Permalinks (die lesbaren Adressen von WordPress) läuft die App unter einer längeren Adresse; WordPress zeigt sie dann oben im Backend an. Für die kurze Adresse `/app/` wählst du unter **Einstellungen → Permalinks** z. B. „Beitragsname“.
 - **{bereich.news}:** Sie kommen aus den Beiträgen der Webseite; dafür gibt es nichts einzustellen. Wollt ihr sie lieber in der App schreiben, wählt das unter [{bereich.news} einrichten](seite:admin-neuigkeiten).
