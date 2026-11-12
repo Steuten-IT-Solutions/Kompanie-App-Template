@@ -340,6 +340,7 @@ export const ADMIN_START = [
   'ehemalige',
   'anfragen',
   'meldungen',
+  'aenderungen',
   'punkte',
   'strafe',
   'befoerderungen',

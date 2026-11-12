@@ -62,6 +62,7 @@ export type Capability =
   | 'promote_users'
   | 'review_reports'
   | 'view_activity'
+  | 'view_changes'
   | 'manage_settings';
 export type Feature =
   | 'events'
@@ -402,6 +403,54 @@ export interface ActivityEntry {
   label: string;
   action: ActivityAction;
   at: number;
+}
+
+/** Änderungsprotokoll: ein Feld mit altem und neuem Wert */
+export interface ChangeField {
+  field: string;
+  /** fehlt beim Anlegen */
+  old?: string | null;
+  /** fehlt beim Löschen */
+  new?: string | null;
+  /** persönliche Angabe (E-Mail, Telefon, Adresse, Geburtsdatum) */
+  personal?: boolean;
+  /** Werte ohne view_personal ausgeblendet */
+  hidden?: boolean;
+  /** geheim (Passwort, Foto, Logo): nur „geändert“ */
+  secret?: boolean;
+}
+
+export type ChangeAction = 'create' | 'update' | 'delete';
+
+export interface ChangeEntry {
+  id: number;
+  at: number;
+  actor_id: number;
+  actor_name: string;
+  area: string;
+  area_label: string;
+  /** Art des Eintrags, z. B. „Mitglied“ */
+  type: string;
+  item: string;
+  label: string;
+  action: ChangeAction;
+  subject_user_id: number | null;
+  changes: ChangeField[];
+}
+
+export interface ChangeLogSettings {
+  enabled: boolean;
+  keep_days: number;
+  keep_min: number;
+  keep_max: number;
+}
+
+export interface ChangeLog extends ChangeLogSettings {
+  from: string;
+  to: string;
+  entries: ChangeEntry[];
+  truncated: boolean;
+  areas: { area: string; label: string }[];
 }
 
 declare global {
@@ -2511,6 +2560,15 @@ export const api = {
       ...(userId ? { user_id: String(userId) } : {}),
     }),
   setActivityPersonal: (personal: boolean) => request<{ personal: boolean }>('PUT', '/admin/activity/settings', { personal }),
+  changes: (q: { from: string; to: string; userId?: number; area?: string }) =>
+    request<ChangeLog>('GET', '/admin/changes', undefined, {
+      from: q.from,
+      to: q.to,
+      ...(q.userId ? { user_id: String(q.userId) } : {}),
+      ...(q.area ? { area: q.area } : {}),
+    }),
+  setChangeLogSettings: (data: Partial<Pick<ChangeLogSettings, 'enabled' | 'keep_days'>>) =>
+    request<ChangeLogSettings>('PUT', '/admin/changes/settings', data),
   maintenance: () => request<MaintenanceState>('GET', '/admin/maintenance'),
   navigation: () => request<NavigationAdmin>('GET', '/admin/navigation'),
   saveNavigation: (body: {

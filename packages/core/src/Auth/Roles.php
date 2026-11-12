@@ -139,6 +139,7 @@ final class Roles
         Capability::CreateUsers,
         Capability::PromoteUsers,
         Capability::ReviewReports,
+        Capability::ViewChanges,
     ];
 
     /**

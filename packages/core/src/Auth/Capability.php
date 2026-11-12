@@ -128,6 +128,11 @@ enum Capability: string
      * (Roles::GRANTABLE), solange offen ist, wer außer dem Admin die Auswertung je Person sehen darf.
      */
     case ViewActivity = 'view_activity';
+    /**
+     * Änderungsprotokoll ansehen: wer wann welchen Eintrag angelegt, geändert oder gelöscht hat, mit alten und neuen Werten
+     * (Domain\ChangeLogService). Werte persönlicher Angaben darin nur zusammen mit view_personal. An Rollen vergebbar.
+     */
+    case ViewChanges = 'view_changes';
     /** Einstellungen und Updates (WordPress: Recht manage_options; zusätzlich gibt es dort das Formular im WP-Admin). */
     case ManageSettings = 'manage_settings';
 

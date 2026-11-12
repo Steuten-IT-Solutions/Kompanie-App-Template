@@ -96,6 +96,8 @@ final class UserData
         $queries[] = 'SELECT DISTINCT user_id AS id FROM {push_subscriptions} WHERE user_id IN (%s)';
         $queries[] = "SELECT DISTINCT owner_id AS id FROM {rich_images} WHERE owner_type IN ('signature', 'draft') AND owner_id IN (%s)";
         $queries[] = "SELECT DISTINCT owner_id AS id FROM {attachments} WHERE owner_type = 'draft' AND owner_id IN (%s)";
+        // Änderungsprotokoll: Werte persönlicher Angaben über die Person (ChangeLogService::forgetSubject entfernt sie)
+        $queries[] = 'SELECT DISTINCT subject_user_id AS id FROM {change_log} WHERE personal = 1 AND subject_user_id IN (%s)';
         $found = [];
         foreach (array_chunk(array_values(array_unique($userIds)), 500) as $chunk) {
             $in = implode(', ', array_fill(0, count($chunk), '?'));

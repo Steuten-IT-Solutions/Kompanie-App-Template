@@ -5960,6 +5960,56 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+  /admin/changes:
+    get:
+      tags: [Einstellungen]
+      summary: Änderungsprotokoll (wer hat wann was angelegt, geändert oder gelöscht)
+      description: |
+        Mit `view_changes` (Admins immer, an Rollen und Personen vergebbar). Aufgezeichnet werden Änderungen über die App
+        (nicht in der Vorschau): Mitglieder und Konten, Rollen, Einstellungen und jedes Löschen in allen Bereichen, mit den
+        Werten vorher und nachher. Werte persönlicher Angaben nur mit `view_personal` (sonst `hidden`), Geheimes nie
+        (`secret`). Neueste zuerst, höchstens 2000 (`truncated` = es gab mehr). Nicht in Sicherungen. Einträge werden nach
+        `keep_days` Tagen gelöscht; wird ein Konto gelöscht, verlieren die Einträge über diese Person ihre Werte.
+      x-capability: view_changes
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date }, description: 'Beginn (JJJJ-MM-TT); Standard 29 Tage vor dem Ende' }
+        - { name: to, in: query, schema: { type: string, format: date }, description: 'Ende einschließlich; Standard heute. Höchstens 731 Tage.' }
+        - { name: user_id, in: query, schema: { type: integer }, description: Nur Änderungen dieses Kontos }
+        - { name: subject_id, in: query, schema: { type: integer }, description: Nur Änderungen über dieses Konto }
+        - { name: area, in: query, schema: { type: string, pattern: '^[a-z_]{1,20}$' }, description: Nur dieser Bereich }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChangeLog' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /admin/changes/settings:
+    put:
+      tags: [Einstellungen]
+      summary: Änderungsprotokoll ein- oder ausschalten, Frist ändern
+      description: Standard an, 365 Tage. Ausschalten löscht sofort alle Einträge; eine kürzere Frist löscht ältere Einträge sofort.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled: { type: boolean }
+                keep_days: { type: integer, minimum: 30, maximum: 730 }
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChangeLogSettings' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /admin/navigation:
     get:
       tags: [Einstellungen]
@@ -8109,6 +8159,63 @@ components:
                   name: { type: string }
                   last_active: { type: [integer, 'null'], description: 'Unix-Zeit; null = nicht aktiv, seit die Erfassung je Person läuft' }
                   actions: { type: integer, description: 'Einträge je Person im Zeitraum (0 = im Zeitraum nicht aktiv)' }
+    ChangeLogSettings:
+      type: object
+      required: [enabled, keep_days, keep_min, keep_max]
+      properties:
+        enabled: { type: boolean }
+        keep_days: { type: integer, description: 'Tage, nach denen Einträge gelöscht werden' }
+        keep_min: { type: integer }
+        keep_max: { type: integer }
+    ChangeLog:
+      allOf:
+        - $ref: '#/components/schemas/ChangeLogSettings'
+        - type: object
+          required: [from, to, entries, truncated, areas]
+          properties:
+            from: { type: string, format: date }
+            to: { type: string, format: date }
+            truncated: { type: boolean }
+            areas:
+              type: array
+              description: Bereiche, zu denen es Einträge gibt
+              items:
+                type: object
+                required: [area, label]
+                properties:
+                  area: { type: string }
+                  label: { type: string }
+            entries:
+              type: array
+              items: { $ref: '#/components/schemas/ChangeEntry' }
+    ChangeEntry:
+      type: object
+      required: [id, at, actor_id, actor_name, area, area_label, type, item, label, action, subject_user_id, changes]
+      properties:
+        id: { type: integer }
+        at: { type: integer, description: Unix-Zeit }
+        actor_id: { type: integer }
+        actor_name: { type: string }
+        area: { type: string }
+        area_label: { type: string }
+        type: { type: string, description: 'Art des Eintrags, z. B. Mitglied, Rolle, Termin, Einstellungen' }
+        item: { type: string, description: ID des Eintrags }
+        label: { type: string, description: 'Name des Eintrags zum Zeitpunkt der Änderung' }
+        action: { type: string, enum: [create, update, delete] }
+        subject_user_id: { type: [integer, 'null'], description: 'Konto, um das es geht (Mitglieder, Punkte, Strafen)' }
+        changes:
+          type: array
+          items:
+            type: object
+            required: [field]
+            description: 'old fehlt beim Anlegen, new beim Löschen; beide fehlen bei secret, hidden und entfernten Werten'
+            properties:
+              field: { type: string }
+              old: { type: [string, 'null'] }
+              new: { type: [string, 'null'] }
+              secret: { type: boolean, description: 'Geheim (z. B. Passwort, Foto): nur „geändert“' }
+              hidden: { type: boolean, description: 'Persönliche Angabe ohne view_personal' }
+              personal: { type: boolean }
     ActivityEntry:
       type: object
       required: [user_id, name, area, label, action, at]
@@ -8434,8 +8541,8 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_calendar, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports, view_activity, manage_settings] }
-              description: 'Rechte der Rolle, jedes für sich (member schließt nichts ein); bei admin alle; vergebbar sind alle außer view_activity und manage_settings. Rechte zum Verwalten und view_own_* nur zusammen mit member. guest gilt auch ohne Anmeldung.'
+              items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_calendar, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports, view_activity, view_changes, manage_settings] }
+              description: 'Rechte der Rolle, jedes für sich (member schließt nichts ein); bei admin alle; vergebbar sind alle außer view_activity und manage_settings (view_changes ist vergebbar). Rechte zum Verwalten und view_own_* nur zusammen mit member. guest gilt auch ohne Anmeldung.'
             users: { type: integer, description: 'Anzahl der Personen mit dieser Rolle, als Grundrolle oder als Zusatzrolle' }
             extra_users: { type: integer, description: Davon als Zusatzrolle }
             system: { type: boolean, description: 'guest, member und admin: nicht löschbar; bei guest und member nur die Rechte zum Sehen änderbar, bei admin keine' }
@@ -8475,7 +8582,7 @@ components:
           type: array
           items:
             type: string
-            enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_calendar, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports, view_activity, manage_settings]
+            enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_calendar, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports, view_activity, view_changes, manage_settings]
           description: 'Wirksame Rechte aller Rollen zusammen (Grundrolle und Zusatzrollen); member bringt calendar mit.'
 
     ErrorLog:

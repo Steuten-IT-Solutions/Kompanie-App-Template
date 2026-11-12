@@ -55,6 +55,8 @@ export function adminTabs(): AdminTab[] {
       },
       // Fehlermeldungen aus der App: Zahl der offenen im Kreis
       { id: 'meldungen', label: 'Fehlermeldungen', on: can('review_reports') },
+      // Änderungsprotokoll: wer wann was angelegt, geändert oder gelöscht hat
+      { id: 'aenderungen', label: 'Änderungen', on: can('view_changes') },
       { id: 'punkte', label: `${sec.points} +`, on: points },
       { id: 'strafe', label: `${sec.penalties} +`, on: canPenalties() },
       { id: 'katalog', label: sec.catalog, on: points, group: SETUP },
@@ -90,6 +92,7 @@ export function adminTileCatalog(): Record<string, { label: string; on: boolean 
     ehemalige: { label: 'Ehemalige', on: true },
     anfragen: { label: 'Anfragen', on: !!config?.registration || (config?.pendingRegistrations ?? 0) > 0 },
     meldungen: { label: 'Fehlermeldungen', on: true },
+    aenderungen: { label: 'Änderungen', on: true },
     punkte: { label: `${sec.points} +`, on: on('points') },
     strafe: { label: `${sec.penalties} +`, on: on('penalties') },
     befoerderungen: { label: 'Beförderungen', on: on('ranks', 'points') },
