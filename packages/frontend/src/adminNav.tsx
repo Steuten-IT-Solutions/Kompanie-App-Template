@@ -271,6 +271,14 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
       <path d="M12 8v4M12 14.5h.01" />
     </>
   ),
+  // Änderungen: Uhr mit Pfeil zurück (Verlauf)
+  aenderungen: (
+    <>
+      <path d="M3.5 12a8.5 8.5 0 1 0 2.5-6" />
+      <path d="M3 3.5V8h4.5" />
+      <path d="M12 7.5V12l3 2" />
+    </>
+  ),
   punkte: <path d="M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6L12 16.3l-5.4 3 1.3-6-4.6-4.1 6.1-.6z" />,
   strafe: (
     <>
