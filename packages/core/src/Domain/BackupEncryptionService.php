@@ -28,6 +28,11 @@ final class BackupEncryptionService
     private const VERIFY = 'verify';
     private const RESTORE = 'restore';
 
+    /** Erste Bytes einer gzip-Datei */
+    public const GZIP_MAGIC = "\x1f\x8b";
+    /** Stufe beim Packen: 6 ist der übliche Mittelweg aus Größe und Rechenzeit. */
+    private const GZIP_LEVEL = 6;
+
     public function __construct(private readonly App $app)
     {
     }
@@ -174,7 +179,7 @@ final class BackupEncryptionService
             if ($plain === false) {
                 throw ApiError::invalid('Die Datei ließ sich nicht lesen.');
             }
-            return $plain; // unverschlüsselte Sicherung
+            return self::unpack($plain); // unverschlüsselte Sicherung (auch gepackt, .json.gz)
         }
         if (!is_string($passphrase) || $passphrase === '') {
             throw new ApiError(400, 'passphrase_required', 'Die Sicherung ist verschlüsselt. Bitte das Passwort für Sicherungen eingeben.');
@@ -200,7 +205,7 @@ final class BackupEncryptionService
             rewind($in);
             $plain = BackupCrypto::decrypt($in, $passphrase);
             $this->restoredWith($passphrase);
-            return $plain;
+            return self::unpack($plain); // in Google Drive gepackt, dann verschlüsselt
         } catch (\RuntimeException $e) {
             // Nur ein falsches Passwort zählt; eine beschädigte Datei oder zu wenig Speicher sperrt niemanden aus.
             if ($e->getCode() === BackupCrypto::WRONG_PASSPHRASE) {
@@ -218,9 +223,9 @@ final class BackupEncryptionService
      *
      * @return string Pfad der verschlüsselten Datei
      */
-    public function exportToTempFile(BackupProvider $backup): string
+    public function exportToTempFile(BackupProvider $backup, bool $gzip = false): string
     {
-        return $this->writeBackupFile(static fn ($out) => $backup->exportTo($out));
+        return $this->writeBackupFile(self::packed(static fn ($out) => $backup->exportTo($out), $gzip));
     }
 
     /**
@@ -228,9 +233,9 @@ final class BackupEncryptionService
      * Vorkehrungen wie verschlüsselt: nur für den Besitzer lesbar, gelöscht am Ende der Anfrage, falls PHP abbricht. Der
      * Aufrufer löscht sie (discard).
      */
-    public function exportPlainToTempFile(BackupProvider $backup): string
+    public function exportPlainToTempFile(BackupProvider $backup, bool $gzip = false): string
     {
-        return $this->writeBackupFile(static fn ($out) => $backup->exportTo($out), null, false);
+        return $this->writeBackupFile(self::packed(static fn ($out) => $backup->exportTo($out), $gzip), null, false);
     }
 
     /**
@@ -270,17 +275,87 @@ final class BackupEncryptionService
      *
      * @return string Pfad der verschlüsselten Datei
      */
-    public function encryptFile(string $plainPath): string
+    public function encryptFile(string $plainPath, bool $gzip = false): string
+    {
+        return $this->copyFile($plainPath, true, $gzip);
+    }
+
+    /**
+     * Datei (z. B. die Sicherung vor einem Update) gepackt (gzip) in eine temporäre Datei schreiben, unverschlüsselt; der
+     * Aufrufer löscht sie.
+     */
+    public function gzipFile(string $plainPath): string
+    {
+        return $this->copyFile($plainPath, false, true);
+    }
+
+    /** Lässt sich hier packen? Braucht die PHP-Erweiterung zlib (Filter zlib.deflate und gzdecode zum Entpacken). */
+    public static function gzipAvailable(): bool
+    {
+        return function_exists('gzdecode') && in_array('zlib.*', stream_get_filters(), true);
+    }
+
+    /**
+     * Gepackte Sicherung (gzip, erkennbar an den ersten beiden Bytes) entpacken, sonst unverändert. JSON beginnt nie mit
+     * diesen Bytes.
+     *
+     * @throws ApiError wenn sie sich nicht entpacken lässt
+     */
+    public static function unpack(string $data): string
+    {
+        if (!str_starts_with($data, self::GZIP_MAGIC)) {
+            return $data;
+        }
+        if (!function_exists('gzdecode')) {
+            throw ApiError::invalid('Die Sicherung ist gepackt (gzip), aber PHP fehlt die Erweiterung zlib. Bitte die Datei vorher entpacken (z. B. mit 7-Zip) und die .json einspielen.');
+        }
+        $plain = @gzdecode($data);
+        if ($plain === false) {
+            throw ApiError::invalid('Die gepackte Sicherung ist beschädigt (gzip lässt sich nicht entpacken).');
+        }
+        return $plain;
+    }
+
+    private function copyFile(string $plainPath, bool $encrypt, bool $gzip): string
     {
         $in = @fopen($plainPath, 'rb');
         if ($in === false) {
             throw new \RuntimeException('Die Sicherung ließ sich nicht verschlüsseln (Datei nicht lesbar).');
         }
         try {
-            return $this->writeBackupFile(static fn ($out) => BackupCrypto::copy($in, $out));
+            return $this->writeBackupFile(self::packed(static fn ($out) => BackupCrypto::copy($in, $out), $gzip), null, $encrypt);
         } finally {
             fclose($in);
         }
+    }
+
+    /**
+     * Mit $gzip: was $write schreibt, vorher packen (gzip). Der Filter kommt vor alle anderen (prepend), also vor das
+     * Verschlüsseln (BackupEncryptor): gepackt wird der Klartext, verschlüsselte Daten ließen sich nicht packen. Das
+     * Entfernen des Filters schreibt den Rest samt Prüfsumme, bevor das Verschlüsseln abschließt.
+     *
+     * @param \Closure(resource): void $write
+     * @return \Closure(resource): void
+     */
+    private static function packed(\Closure $write, bool $gzip): \Closure
+    {
+        if (!$gzip) {
+            return $write;
+        }
+        return static function ($out) use ($write): void {
+            $filter = @stream_filter_prepend($out, 'zlib.deflate', STREAM_FILTER_WRITE, ['level' => self::GZIP_LEVEL, 'window' => 31]);
+            if ($filter === false) {
+                throw new \RuntimeException('Die Sicherung ließ sich nicht packen (PHP-Erweiterung zlib).');
+            }
+            try {
+                $write($out);
+            } finally {
+                $removed = stream_filter_remove($filter);
+            }
+            if (!$removed) {
+                throw new \RuntimeException('Die gepackte Sicherung ließ sich nicht vollständig schreiben.');
+            }
+        };
     }
 
     /**

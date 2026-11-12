@@ -839,7 +839,7 @@ function Datensicherung({
       <input
         ref={fileInput}
         type="file"
-        accept="application/json,application/octet-stream,.json,.enc"
+        accept="application/json,application/octet-stream,application/gzip,.json,.enc,.gz"
         hidden
         onChange={(e) => void restore(e)}
       />

@@ -21,7 +21,9 @@ use KompanieApp\Core\Update\OffsiteBackup;
  * KEEP_BEFORE_UPDATE); scheitert das, fragt UpdateService nach, ob trotzdem aktualisiert werden soll.
  *
  * Ist ein Passwort für Sicherungen eingerichtet (BackupEncryptionService), gehen sie verschlüsselt nach Drive (Endung
- * .json.enc), sonst wie bisher als .json.
+ * .json.enc), sonst unverschlüsselt. Vorher packt die App sie mit gzip (etwa ein Viertel kleiner, Text deutlich mehr;
+ * Fotos und Dateien stehen als Base64 darin): ohne Passwort als .json.gz, mit Passwort gepackt und dann verschlüsselt.
+ * Fehlt PHP die Erweiterung zlib, gehen sie ungepackt (.json) wie früher. Wiederherstellen erkennt beides.
  */
 final class BackupUploadService implements OffsiteBackup
 {
@@ -41,6 +43,8 @@ final class BackupUploadService implements OffsiteBackup
      */
     public const STATE_SETTING = 'backup_drive_state';
     private const PREFIX = 'sicherung-';
+    /** Endung unverschlüsselter, gepackter Sicherungen (mit Passwort: gepackt und verschlüsselt, Endung wie bisher .json.enc) */
+    public const GZIP_EXTENSION = '.json.gz';
     private const PREFIX_UPDATE = 'vor-update-';
 
     public function __construct(private readonly App $app)
@@ -134,12 +138,13 @@ final class BackupUploadService implements OffsiteBackup
             // Sicherung muss nie ganz in den Arbeitsspeicher (Fotos, Dokumente und Anhänge machen sie schnell größer als
             // memory_limit).
             $date = self::PREFIX . $this->app->time()->format($now, 'Y-m-d-His');
+            $gzip = BackupEncryptionService::gzipAvailable();
             if ($this->encrypt()) {
-                $tmp = $this->app->backupEncryption()->exportToTempFile($backup);
+                $tmp = $this->app->backupEncryption()->exportToTempFile($backup, $gzip);
                 $this->store($tmp, $date . '-' . $this->keyTag() . BackupCrypto::EXTENSION, self::PREFIX, self::KEEP, $state);
             } else {
-                $tmp = $this->app->backupEncryption()->exportPlainToTempFile($backup);
-                $this->store($tmp, $date . '.json', self::PREFIX, self::KEEP, $state);
+                $tmp = $this->app->backupEncryption()->exportPlainToTempFile($backup, $gzip);
+                $this->store($tmp, $date . ($gzip ? self::GZIP_EXTENSION : '.json'), self::PREFIX, self::KEEP, $state);
             }
         } catch (\Throwable $e) {
             $state['error'] = $e instanceof \JsonException ? 'Die Sicherung ließ sich nicht erstellen: ' . $e->getMessage() : $e->getMessage();
@@ -163,14 +168,18 @@ final class BackupUploadService implements OffsiteBackup
         $now = $this->app->time()->timestamp();
         $state = $this->state();
         $state['last_try'] = $now;
-        $encrypted = null;
+        $packed = null;
         try {
             // Die Sicherung auf dem Server bleibt unverschlüsselt (sie liegt neben der Datenbank); mit Passwort für
             // Sicherungen geht sie verschlüsselt nach Drive.
             $date = self::PREFIX_UPDATE . $this->app->time()->format($now, 'Y-m-d-His');
+            $gzip = BackupEncryptionService::gzipAvailable();
             if ($this->encrypt()) {
-                $encrypted = $this->app->backupEncryption()->encryptFile($path);
-                $this->store($encrypted, $date . '-' . $this->keyTag() . '-' . $version . BackupCrypto::EXTENSION, self::PREFIX_UPDATE, self::KEEP_BEFORE_UPDATE, $state, $onProgress);
+                $packed = $this->app->backupEncryption()->encryptFile($path, $gzip);
+                $this->store($packed, $date . '-' . $this->keyTag() . '-' . $version . BackupCrypto::EXTENSION, self::PREFIX_UPDATE, self::KEEP_BEFORE_UPDATE, $state, $onProgress);
+            } elseif ($gzip) {
+                $packed = $this->app->backupEncryption()->gzipFile($path);
+                $this->store($packed, $date . '-' . $version . self::GZIP_EXTENSION, self::PREFIX_UPDATE, self::KEEP_BEFORE_UPDATE, $state, $onProgress);
             } else {
                 $this->store($path, $date . '-' . $version . '.json', self::PREFIX_UPDATE, self::KEEP_BEFORE_UPDATE, $state, $onProgress);
             }
@@ -178,7 +187,7 @@ final class BackupUploadService implements OffsiteBackup
             $state['error'] = $e->getMessage();
             throw $e;
         } finally {
-            $encrypted !== null && BackupEncryptionService::discard($encrypted);
+            $packed !== null && BackupEncryptionService::discard($packed);
             $this->app->settings->set(self::STATE_SETTING, $state);
         }
     }
@@ -192,7 +201,7 @@ final class BackupUploadService implements OffsiteBackup
     private function store(string $path, string $name, string $prefix, int $keep, array &$state, ?callable $onProgress = null): void
     {
         $folder = $this->folder();
-        $type = str_ends_with($name, BackupCrypto::EXTENSION) ? 'application/octet-stream' : 'application/json';
+        $type = str_ends_with($name, BackupCrypto::EXTENSION) ? 'application/octet-stream' : (str_ends_with($name, self::GZIP_EXTENSION) ? 'application/gzip' : 'application/json');
         $this->app->drive()->uploadFile($folder, $name, $path, $type, DriveClient::UPLOAD_CHUNK, $onProgress);
         $state['upload'] = $this->app->drive()->lastUploadStats();
         $this->prune($folder, $prefix, $keep);
@@ -254,12 +263,13 @@ final class BackupUploadService implements OffsiteBackup
                 if (DriveClient::isFolder($f) || !(str_starts_with($name, self::PREFIX) || str_starts_with($name, self::PREFIX_UPDATE))) {
                     continue;
                 }
+                $plainFile = str_ends_with($name, '.json') || str_ends_with($name, self::GZIP_EXTENSION);
                 if (!$encrypted) {
-                    // ohne Passwort: wie bisher die unverschlüsselten durchwechseln; verschlüsselte von früher bleiben
-                    if (str_starts_with($name, $prefix) && str_ends_with($name, '.json')) {
+                    // ohne Passwort: wie bisher die unverschlüsselten (gepackt oder nicht) durchwechseln; verschlüsselte von früher bleiben
+                    if (str_starts_with($name, $prefix) && $plainFile) {
                         $names[(string) $f['id']] = $name;
                     }
-                } elseif (str_ends_with($name, '.json')) {
+                } elseif ($plainFile) {
                     $verified && $plain[] = (string) $f['id'];
                 } elseif (str_starts_with($name, $prefix) && str_ends_with($name, BackupCrypto::EXTENSION) && ($verified || str_contains($name, $tag))) {
                     $names[(string) $f['id']] = $name;
