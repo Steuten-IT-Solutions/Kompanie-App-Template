@@ -940,6 +940,8 @@ $c->ok(!str_contains($html, 'Kpwp Kapitän') && !str_contains($html, 'Kpwp Brude
 $html = do_shortcode('[kompanie_mitglieder]');
 $c->ok(str_contains($html, 'class="ka ka-mitglieder"') && str_contains($html, '<span class="ka-mitglied-name">' . esc_html($memberName) . '</span>')
     && str_contains($html, esc_url((string) $app->memberPhotos()->urls(480)[$member])) && str_contains($html, 'href="' . esc_url((string) $app->memberPhotos()->urls(1024)[$member]) . '" data-ka-lightbox="mitglieder"'), '[kompanie_mitglieder]: Galerie mit Foto (480 Pixel), Name und Großansicht (1024 Pixel)');
+// Beim Blättern blendet die Großansicht das alte Bild aus, bis das neue geladen ist (sonst passt der Name nicht zum Bild).
+$c->ok(str_contains($html, '.ka-lb-laedt img{visibility:hidden}') && str_contains($html, 'box.classList.add("ka-lb-laedt");img.src=l.href'), 'Großansicht: Ladekreis statt altem Bild beim Blättern');
 // Foto von vor Datenbankversion 18 ohne 1024er (Issue #109): Großansicht mit der 480er statt einer Adresse mit 404, ohne srcset.
 $app->db->execute('UPDATE {member_photos} SET xlarge = NULL WHERE user_id = ?', [$member]);
 $medium480 = esc_url((string) $app->memberPhotos()->urls(480)[$member]);
