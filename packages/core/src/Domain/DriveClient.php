@@ -63,6 +63,8 @@ final class DriveClient implements GallerySource
     public const UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
     public const FOLDER_MIME = 'application/vnd.google-apps.folder';
     private const TOKEN_CACHE = 'drive_token';
+    /** @var array{bytes: int, chunks: int, start_seconds: float, read_seconds: float, send_seconds: float, slowest_seconds: float, total_seconds: float}|null */
+    private ?array $lastUpload = null;
 
     public function __construct(
         private readonly Settings $settings,
@@ -587,6 +589,8 @@ final class DriveClient implements GallerySource
      * Stücken von $chunk Bytes (Vielfaches von 256 KB, wie Google es verlangt): Die Datei muss nie ganz in den
      * Arbeitsspeicher (große Sicherungen).
      *
+     * Wie lange das gedauert hat, steht danach in lastUploadStats().
+     *
      * @param (callable(int, int): void)|null $onProgress nach jedem angenommenen Stück: übertragene Bytes, Größe
      * @throws \RuntimeException mit verständlicher Meldung
      */
@@ -597,19 +601,53 @@ final class DriveClient implements GallerySource
         if ($in === false) {
             throw new \RuntimeException('Google Drive: Die Datei zum Hochladen ließ sich nicht lesen.');
         }
+        $this->lastUpload = null;
+        $began = hrtime(true);
+        $stats = ['bytes' => $size, 'chunks' => 0, 'start_seconds' => 0.0, 'read_seconds' => 0.0, 'send_seconds' => 0.0, 'slowest_seconds' => 0.0];
+        // Lesen von der Platte und Senden getrennt messen: Auf geteiltem Webspace kann beides begrenzt sein.
+        $read = static function (int $length) use ($in, &$stats): string {
+            $t = hrtime(true);
+            $data = (string) ($length > 0 ? fread($in, $length) : stream_get_contents($in));
+            $stats['read_seconds'] += (hrtime(true) - $t) / 1e9;
+            return $data;
+        };
+        $send = function (string $location, array $headers, string $part) use (&$stats): array {
+            $t = hrtime(true);
+            $res = $this->http->request('PUT', $location, $headers, $part, 300);
+            $seconds = (hrtime(true) - $t) / 1e9;
+            $stats['chunks']++;
+            $stats['send_seconds'] += $seconds;
+            $stats['slowest_seconds'] = max($stats['slowest_seconds'], $seconds);
+            return $res;
+        };
+        $done = function () use (&$stats, $began): void {
+            $this->lastUpload = [
+                'bytes' => $stats['bytes'],
+                'chunks' => $stats['chunks'],
+                'start_seconds' => round($stats['start_seconds'], 3),
+                'read_seconds' => round($stats['read_seconds'], 3),
+                'send_seconds' => round($stats['send_seconds'], 3),
+                'slowest_seconds' => round($stats['slowest_seconds'], 3),
+                'total_seconds' => round((hrtime(true) - $began) / 1e9, 3),
+            ];
+        };
         try {
+            $t = hrtime(true);
             $location = $this->startUpload($folderId, $name, $mime, $size);
+            $stats['start_seconds'] = (hrtime(true) - $t) / 1e9;
             $onProgress && $onProgress(0, $size);
             if ($size <= $chunk) {
-                return self::uploadedId($this->http->request('PUT', $location, ['Content-Type' => $mime], (string) stream_get_contents($in), 300));
+                $id = self::uploadedId($send($location, ['Content-Type' => $mime], $read(0)));
+                $done();
+                return $id;
             }
             for ($start = 0; $start < $size; $start += $chunk) {
-                $part = (string) fread($in, $chunk);
+                $part = $read($chunk);
                 $end = $start + strlen($part) - 1;
-                $res = $this->http->request('PUT', $location, [
+                $res = $send($location, [
                     'Content-Type' => $mime,
                     'Content-Range' => sprintf('bytes %d-%d/%d', $start, $end, $size),
-                ], $part, 300);
+                ], $part);
                 if ($end + 1 < $size) {
                     // 308: Stück angenommen, weiter
                     if ($res['status'] !== 308) {
@@ -618,12 +656,26 @@ final class DriveClient implements GallerySource
                     $onProgress && $onProgress($end + 1, $size);
                     continue;
                 }
-                return self::uploadedId($res);
+                $id = self::uploadedId($res);
+                $done();
+                return $id;
             }
             throw new \RuntimeException('Google Drive: Das Hochladen ist fehlgeschlagen (unvollständig).');
         } finally {
             fclose($in);
         }
+    }
+
+    /**
+     * Messung des letzten erfolgreichen uploadFile() in diesem Lauf, sonst null. Sekunden: start (Sitzung bei Google
+     * beginnen, eine kleine Anfrage: Verbindungsaufbau und Antwortzeit), read (Datei von der Platte lesen), send (alle
+     * Stücke senden, bis Google sie bestätigt), slowest (langsamstes Stück), total (alles).
+     *
+     * @return array{bytes: int, chunks: int, start_seconds: float, read_seconds: float, send_seconds: float, slowest_seconds: float, total_seconds: float}|null
+     */
+    public function lastUploadStats(): ?array
+    {
+        return $this->lastUpload;
     }
 
     /** Beginnt ein fortsetzbares Hochladen; Rückgabe: Adresse der Sitzung. */
