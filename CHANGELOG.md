@@ -33,6 +33,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Großansicht auf der Webseite (WordPress)**: Beim Blättern in der Großansicht von `[kompanie_mitglieder]` und
+  `[kompanie_galerie]` bleibt nicht mehr das vorherige Bild stehen, während schon der neue Name darunter steht. Bis das
+  neue Bild geladen ist, dreht sich ein Ladekreis; das vorherige und das nächste Bild werden vorab geladen.
 - **Termine auf der Webseite (WordPress)**: Im Shortcode `[kompanie_termine]` steht beim Wochentag kein doppelter
   Punkt mehr („So., 6. Dezember 2026“ statt „So.., 6. Dezember 2026“).
 

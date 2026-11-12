@@ -79,6 +79,10 @@ final class Shortcodes
 .ka-lb button{position:absolute;background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:999px;width:48px;height:48px;font-size:1.6rem;cursor:pointer}
 .ka-lb .ka-lb-close{top:16px;right:16px}.ka-lb .ka-lb-prev{left:12px}.ka-lb .ka-lb-next{right:12px}
 .ka-lb-count{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:#fff;font-size:.9rem}
+.ka-lb-laedt img{visibility:hidden}
+.ka-lb-laedt::after{content:"";position:absolute;width:40px;height:40px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:ka-lb-dreh .8s linear infinite}
+@keyframes ka-lb-dreh{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.ka-lb-laedt::after{animation:none}}
 .ka-gruppe{margin:28px 0 12px;font-size:1.4rem;border-bottom:2px solid var(--ka-accent);padding-bottom:4px}
 .ka-aemter{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;align-items:start}
 .ka-amt{border:1px solid var(--ka-line);border-top:4px solid var(--ka-primary);border-radius:10px;padding:14px 16px}
@@ -106,7 +110,9 @@ final class Shortcodes
      * Großansicht. Das Skript schützt sich selbst vor doppelter Ausführung (window.kaLightbox). Erst erscheint das Bild
      * hinter href, data-ka-original (Originalauflösung) wird nachgeladen und ersetzt es, sobald es ganz da ist. Mit
      * data-ka-video ein Video (href ist dann seine Adresse, data-ka-poster das Vorschaubild); Wischen auf dem Video
-     * blättert nicht (dort bedient man den Player).
+     * blättert nicht (dort bedient man den Player). Beim Blättern zeigt der Browser das alte Bild, bis das neue geladen
+     * ist; solange blendet ka-lb-laedt es aus und zeigt einen Kreis, damit Bild und Name immer zusammenpassen. Das
+     * vorherige und das nächste Bild lädt das Skript vorab.
      */
     private static function lightbox(): string
     {
@@ -118,11 +124,14 @@ var box=document.createElement("div");box.className="ka-lb";box.setAttribute("ro
 box.innerHTML="<img alt=\"\"><video controls playsinline preload=\"metadata\" hidden></video><p class=\"ka-lb-fehler\" hidden>Dieses Video kann dein Browser nicht abspielen.</p><button class=\"ka-lb-close\" aria-label=\"Schließen\">✕</button><button class=\"ka-lb-prev\" aria-label=\"Vorheriges Bild\">‹</button><button class=\"ka-lb-next\" aria-label=\"Nächstes Bild\">›</button><div class=\"ka-lb-count\"></div>";
 var img=box.querySelector("img"),vid=box.querySelector("video"),err=box.querySelector(".ka-lb-fehler"),cnt=box.querySelector(".ka-lb-count");
 vid.onerror=function(){if(vid.getAttribute("src")){vid.hidden=true;err.hidden=false;}};
+img.onload=img.onerror=function(){box.classList.remove("ka-lb-laedt");};
 function show(n){i=(n+links.length)%links.length;var l=links[i],o=l.getAttribute("data-ka-original"),v=l.hasAttribute("data-ka-video");var t=l.getAttribute("data-ka-titel");
 vid.pause();err.hidden=true;img.hidden=v;vid.hidden=!v;
-if(v){img.removeAttribute("src");vid.poster=l.getAttribute("data-ka-poster")||"";vid.src=l.href;}else{vid.removeAttribute("src");vid.load();img.src=l.href;img.alt=t||"";}
+box.classList.remove("ka-lb-laedt");
+if(v){img.removeAttribute("src");vid.poster=l.getAttribute("data-ka-poster")||"";vid.src=l.href;}else{vid.removeAttribute("src");vid.load();box.classList.add("ka-lb-laedt");img.src=l.href;img.alt=t||"";if(img.complete&&img.naturalWidth)box.classList.remove("ka-lb-laedt");}
 cnt.textContent=(t?t+" · ":"")+(i+1)+" / "+links.length;
-if(o&&!v){var big=new Image();big.onload=function(){if(links[i]===l)img.src=o;};big.src=o;}}
+if(o&&!v){var big=new Image();big.onload=function(){if(links[i]===l)img.src=o;};big.src=o;}
+if(links.length>1)[i+1,i-1+links.length].forEach(function(n){var q=links[n%links.length];if(!q.hasAttribute("data-ka-video"))new Image().src=q.href;});}
 function close(){document.removeEventListener("keydown",key);vid.pause();box.remove();a.focus();}
 function key(ev){if(ev.key==="Escape")close();if(ev.key==="ArrowLeft")show(i-1);if(ev.key==="ArrowRight")show(i+1);}
 box.addEventListener("click",function(ev){if(ev.target===box||ev.target.classList.contains("ka-lb-close"))close();});
