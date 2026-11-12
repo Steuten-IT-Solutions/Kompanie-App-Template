@@ -340,6 +340,23 @@ final class App
      * Führt eine geplante Aufgabe aus. Fehler werden protokolliert und als Fehlercode gezählt
      * (Statusmeldungen, nur mit Zustimmung), nicht weitergeworfen.
      */
+    /**
+     * Änderungsprotokoll: Hat die tägliche Aufgabe ein Update eingespielt oder eine zurückgezogene Version ersetzt
+     * (UpdateService, Eintrag „last“ neu und erfolgreich), kommt das mit „System“ als Urheber hinein.
+     */
+    private function logAutoUpdate(mixed $before): void
+    {
+        $last = $this->updates()->status()['last'] ?? null;
+        if (!is_array($last) || $last === $before || empty($last['ok']) || !in_array($last['kind'] ?? '', ['auto', 'withdrawn'], true)) {
+            return;
+        }
+        $to = is_string($last['to'] ?? null) ? $last['to'] : '';
+        $from = is_string($last['from'] ?? null) ? $last['from'] : '';
+        $this->changeLog()->event(ChangeLogService::SYSTEM, $last['kind'] === 'auto'
+            ? 'Update auf Version ' . $to . ' automatisch eingespielt'
+            : 'Zurückgezogene Version ' . $from . ' automatisch durch Version ' . $to . ' ersetzt');
+    }
+
     public function runTask(string $task): void
     {
         $this->noteTaskRun();
@@ -366,7 +383,12 @@ final class App
                 }
             } elseif ($task === UpdateService::TASK) {
                 $this->updateUploads()->prune();
-                $this->updates()->runTask();
+                $last = $this->updates()->status()['last'] ?? null;
+                try {
+                    $this->updates()->runTask();
+                } finally {
+                    $this->logAutoUpdate($last);
+                }
             } elseif ($task === StatusReporter::TASK) {
                 $this->statusReporter()->runTask();
             } elseif ($task === PushService::TASK_SEND) {
@@ -390,9 +412,17 @@ final class App
             } elseif ($task === BugReportService::TASK) {
                 $this->bugReports()->runTask();
             } elseif ($task === BackupUploadService::TASK) {
+                $before = $this->backupUpload()->status()['last_ok'] ?? null;
                 $this->backupUpload()->runTask();
+                if (($this->backupUpload()->status()['last_ok'] ?? null) !== $before) {
+                    $this->changeLog()->event(ChangeLogService::SYSTEM, 'Sicherung automatisch in Google Drive hochgeladen');
+                }
             } elseif ($task === ServerBackupService::TASK) {
+                $before = $this->serverBackup()->status()['last_ok'] ?? null;
                 $this->serverBackup()->runTask();
+                if (($this->serverBackup()->status()['last_ok'] ?? null) !== $before) {
+                    $this->changeLog()->event(ChangeLogService::SYSTEM, 'Sicherung auf dem Server automatisch erstellt');
+                }
             } elseif ($task === ActivityService::TASK) {
                 $this->activity()->prune();
             } elseif ($task === ChangeLogService::TASK) {

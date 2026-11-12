@@ -1923,6 +1923,12 @@ WHERE title IS NULL",
                     'CREATE INDEX IF NOT EXISTS {change_log}_subject ON {change_log} (subject_user_id)',
                 ],
             ],
+            // Änderungsprotokoll: gemeinsame Kennung der Einträge einer Aktion (batch), damit die Ansicht sie als eine Zeile
+            // zeigt (z. B. Punkte für alle). Leer bei einzelnen Einträgen.
+            60 => [
+                'mysql' => ['ALTER TABLE {change_log} ADD COLUMN batch varchar(32) NOT NULL DEFAULT \'\''],
+                'sqlite' => ['ALTER TABLE {change_log} ADD COLUMN batch TEXT NOT NULL DEFAULT \'\''],
+            ],
         ];
     }
 

@@ -63,3 +63,27 @@ export function csvRows(entries: ChangeEntry[], time: (unix: number) => string, 
   }
   return rows;
 }
+
+/**
+ * Einträge einer Aktion (gleiche Kennung batch, in der Liste direkt hintereinander) als eine Gruppe; einzelne Einträge
+ * bilden eine Gruppe für sich. Die Reihenfolge bleibt.
+ */
+export function groupEntries<T extends Pick<ChangeEntry, 'batch'>>(entries: T[]): T[][] {
+  const groups: T[][] = [];
+  for (const e of entries) {
+    const last = groups[groups.length - 1];
+    if (e.batch && last && last[0].batch === e.batch) last.push(e);
+    else groups.push([e]);
+  }
+  return groups;
+}
+
+/** Titel einer Gruppe: ein Eintrag wie entryTitle, mehrere gleiche „25 × Punkte angelegt“, sonst „4 Änderungen auf einmal“. */
+export function groupTitle(group: Pick<ChangeEntry, 'type' | 'label' | 'action'>[]): string {
+  if (group.length === 1) return entryTitle(group[0]);
+  const first = group[0];
+  if (first.action !== 'event' && group.every((e) => e.type === first.type && e.action === first.action)) {
+    return `${group.length} × ${first.type} ${ACTION_TEXT[first.action] ?? first.action}`;
+  }
+  return `${group.length} Änderungen auf einmal`;
+}

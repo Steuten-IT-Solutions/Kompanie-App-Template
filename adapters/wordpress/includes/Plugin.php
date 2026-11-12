@@ -143,6 +143,7 @@ final class Plugin
         if (is_admin()) {
             SettingsPage::init();
             ProfileField::init();
+            UserAdminLog::init();
         }
         add_action('init', static fn () => Shortcodes::init(self::app()));
     }

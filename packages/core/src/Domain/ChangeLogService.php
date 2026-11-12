@@ -47,6 +47,12 @@ final class ChangeLogService
     public const ENTRIES_MAX = 2000;
     /** Bezeichnung von Einträgen ohne Bereich (Verwaltung, Konto, Einstellungen) */
     public const APP_AREA_LABEL = 'Verwaltung';
+    /** Urheber ohne Konto (actor_id 0): Aufgaben, die von selbst laufen (Updates, Sicherungen, Fristen) */
+    public const SYSTEM = 'System (automatisch)';
+    /** Urheber ohne Konto: Befehle auf dem Server (bin/kompanie.php) */
+    public const CLI = 'Kommandozeile auf dem Server';
+    /** Urheber ohne Konto: install.php */
+    public const INSTALLER = 'Installationsprogramm';
 
     private readonly ChangeLogRepository $repo;
 
@@ -111,24 +117,40 @@ final class ChangeLogService
      * Eine Änderung festhalten. Ohne Unterschied (Aktion update) entsteht kein Eintrag. Scheitert das Schreiben (z. B.
      * Tabelle fehlt nach einem abgebrochenen Update), bleibt die Änderung selbst davon unberührt.
      *
+     * @param User|string $actor Konto oder, ohne Konto, die Bezeichnung des Urhebers (SYSTEM, CLI, INSTALLER)
      * @param 'create'|'update'|'delete'|'event' $action event: etwas ohne vergleichbaren Stand (Update eingespielt), die Bezeichnung ist der Satz
      */
-    public function record(User $actor, string $area, string $action, ?Item $before, ?Item $after, bool $event = false): void
+    public function record(User|string $actor, string $area, string $action, ?Item $before, ?Item $after, bool $event = false): void
     {
         $this->recordMany($actor, $area, [[$action, $before, $after, $event]]);
+    }
+
+    /**
+     * Etwas ohne vergleichbaren Stand festhalten (z. B. „Update auf Version 1.2.3 automatisch eingespielt“).
+     *
+     * @param User|string $actor Konto oder Bezeichnung des Urhebers (SYSTEM, CLI, INSTALLER)
+     */
+    public function event(User|string $actor, string $label, string $area = 'app', string $type = 'Einstellungen', ?int $subject = null): void
+    {
+        $this->recordMany($actor, $area, [['event', null, new Item($type, '', $label, [], [], [], $subject), true]]);
     }
 
     /**
      * Mehrere Änderungen einer Anfrage festhalten, mit festen Kosten (ein Abruf der Konten, wenige INSERTs), auch bei
      * vielen Einträgen (Punkte für alle).
      *
+     * Mehrere Einträge bekommen eine gemeinsame Kennung (batch): Die Ansicht zeigt sie als eine Zeile.
+     *
+     * @param User|string $actor Konto oder, ohne Konto, die Bezeichnung des Urhebers (SYSTEM, CLI, INSTALLER)
      * @param list<array{0: string, 1: ?Item, 2: ?Item, 3: bool}> $changes je Aktion, Stand davor, danach, ohne vergleichbaren Stand
      */
-    public function recordMany(User $actor, string $area, array $changes): void
+    public function recordMany(User|string $actor, string $area, array $changes): void
     {
-        if ($actor->preview || $changes === []) {
+        if (($actor instanceof User && $actor->preview) || $changes === []) {
             return;
         }
+        $actorId = $actor instanceof User ? $actor->id : 0;
+        $actorName = $actor instanceof User ? $actor->name : $actor;
         try {
             if (!$this->enabled()) {
                 return;
@@ -147,8 +169,8 @@ final class ChangeLogService
                 }
                 $rows[] = [
                     'at' => $now,
-                    'actor_id' => $actor->id,
-                    'actor_name' => $actor->name,
+                    'actor_id' => $actorId,
+                    'actor_name' => $actorName,
                     'area' => $area,
                     'type' => $item->type,
                     'item' => $item->id,
@@ -162,6 +184,7 @@ final class ChangeLogService
             if ($rows === []) {
                 return;
             }
+            $batch = count($rows) > 1 ? bin2hex(random_bytes(8)) : '';
             // Konto gibt es nicht mehr (gerade gelöscht): keine Werte über die Person behalten.
             $subjects = array_values(array_unique(array_filter(array_column($rows, 'subject_user_id'), static fn (?int $id): bool => $id !== null)));
             $existing = $subjects === [] ? [] : $this->app->users->findMany($subjects);
@@ -170,6 +193,7 @@ final class ChangeLogService
                     $rows[$i]['changes'] = self::strip($row['changes'], false);
                 }
                 $rows[$i]['personal'] = self::hasPersonalValues($rows[$i]['changes']);
+                $rows[$i]['batch'] = $batch;
             }
             if (count($rows) === 1) {
                 $this->repo->insert($rows[0]);
@@ -324,7 +348,7 @@ final class ChangeLogService
     }
 
     /**
-     * @param array{id: int, at: int, actor_id: int, actor_name: string, area: string, type: string, item: string, label: string, action: string, subject_user_id: int|null, personal: bool, changes: list<array<string, mixed>>} $r
+     * @param array{id: int, at: int, actor_id: int, actor_name: string, area: string, type: string, item: string, label: string, action: string, subject_user_id: int|null, personal: bool, changes: list<array<string, mixed>>, batch: string} $r
      * @return array<string, mixed>
      */
     private function present(array $r, bool $personal): array
@@ -361,6 +385,7 @@ final class ChangeLogService
             'label' => $r['label'],
             'action' => $r['action'],
             'subject_user_id' => $r['subject_user_id'],
+            'batch' => $r['batch'],
             'changes' => $changes,
         ];
     }
