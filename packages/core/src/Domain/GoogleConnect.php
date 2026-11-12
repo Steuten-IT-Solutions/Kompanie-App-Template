@@ -80,12 +80,19 @@ final class GoogleConnect
                 : 'Google meldet einen Fehler: ' . $error, $return);
         }
         $hadCalendarIds = $this->app->calendar()->calendarIds() !== [];
-        try {
-            $drive->exchangeCode(is_string($query['code'] ?? null) ? $query['code'] : '', $this->app->env->googleRedirectUri());
-        } catch (\RuntimeException $e) {
-            return $this->result(false, 'Die Verbindung mit Google ist fehlgeschlagen: ' . $e->getMessage(), $return);
+        // Die Rückkehr läuft außerhalb der API: ins Änderungsprotokoll wie „Google-Zugang“ (POST /admin/google/connect).
+        $failed = $this->app->api()->track('POST /admin/google/connect', $user, function () use ($drive, $query, $hadCalendarIds): ?string {
+            try {
+                $drive->exchangeCode(is_string($query['code'] ?? null) ? $query['code'] : '', $this->app->env->googleRedirectUri());
+            } catch (\RuntimeException $e) {
+                return $e->getMessage();
+            }
+            $this->changed($hadCalendarIds);
+            return null;
+        });
+        if ($failed !== null) {
+            return $this->result(false, 'Die Verbindung mit Google ist fehlgeschlagen: ' . $failed, $return);
         }
-        $this->changed($hadCalendarIds);
         $email = $drive->oauthEmail();
         $message = 'Mit Google verbunden' . ($email !== '' ? ' (' . $email . ')' : '') . '.';
         $message .= $drive->calendarAccess()

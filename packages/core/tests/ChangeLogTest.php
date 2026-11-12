@@ -301,6 +301,112 @@ final class ChangeLogTest extends TestCase
         $this->assertSame(['delete', 'Fehlerprotokoll'], [$this->entries()[0]['action'], $this->entries()[0]['label']]);
     }
 
+    /** Geheimes von einem Wert auf einen anderen: ein Eintrag „geändert“, ohne Wert und ohne Prüfsumme in der Antwort. */
+    public function testSecretSettingsChangeIsRecordedWithoutValue(): void
+    {
+        foreach ([['/admin/mail', ['password' => 'alt-geheim'], ['password' => 'neu-geheim'], 'SMTP-Passwort'],
+            ['/admin/settings', ['calendar_ics_url' => 'https://a.example/x.ics'], ['calendar_ics_url' => 'https://b.example/y.ics'], 'iCal-Adresse'],
+            ['/admin/settings', ['google_api_key' => 'AAAA'], ['google_api_key' => 'BBBB'], 'Google-API-Schlüssel']] as [$path, $first, $second, $field]) {
+            $this->assertSame(200, $this->call('PATCH', $path, $first)->status);
+            $this->assertSame(200, $this->call('PATCH', $path, $second)->status);
+            [$e] = $this->entries();
+            $this->assertSame([['field' => $field, 'secret' => true]], $e['changes'], $field);
+        }
+        $all = (string) json_encode($this->entries()) . $this->app->db->scalar("SELECT GROUP_CONCAT(changes) FROM {change_log}");
+        foreach (['geheim', 'b.example', 'BBBB', hash('sha256', 'BBBB')] as $secret) {
+            $this->assertStringNotContainsString($secret, $all);
+        }
+    }
+
+    /** Einstellungen: jeder Schlüssel der GET-Antwort hat einen Anzeigenamen oder ist mit Grund ausgelassen. */
+    public function testEverySettingHasALabel(): void
+    {
+        $ignored = Subjects::settingsIgnored();
+        foreach (Subjects::SETTINGS_FIELDS as $path => $fields) {
+            $res = $this->call('GET', $path);
+            $this->assertSame(200, $res->status, $path);
+            $flat = [];
+            $walk = function (array $d, string $prefix) use (&$walk, &$flat): void {
+                foreach ($d as $k => $v) {
+                    is_array($v) && !array_is_list($v) && $v !== [] ? $walk($v, $prefix . $k . '.') : $flat[] = $prefix . $k;
+                }
+            };
+            $walk($res->data, '');
+            foreach ($flat as $key) {
+                $skip = array_filter($ignored[$path] ?? [], static fn (string $i): bool => $i === $key || (str_ends_with($i, '.') && str_starts_with($key, $i)));
+                $this->assertTrue(isset($fields[$key]) || $skip !== [], "$path: $key braucht einen Anzeigenamen (SETTINGS_FIELDS) oder einen Grund (settingsIgnored)");
+            }
+            foreach (array_keys($fields) as $key) {
+                $this->assertContains($key, $flat, "$path: $key gibt es nicht");
+            }
+        }
+    }
+
+    /** Mehrere Einträge einer Aktion teilen eine Kennung (batch), einzelne nicht. */
+    public function testBatchOfOneAction(): void
+    {
+        $other = $this->users->add('zweites', Roles::MEMBER);
+        $this->assertSame(201, $this->call('POST', '/points', ['user_ids' => [$this->member, $other], 'points' => 5, 'reason' => 'Fest'])->status);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->member}/personal", ['phone' => '+49 171 1234567'])->status);
+        [$single, $a, $b] = $this->entries();
+        $this->assertSame('', $single['batch']);
+        $this->assertSame(16, strlen($a['batch']));
+        $this->assertSame($a['batch'], $b['batch']);
+        $this->assertSame(['Punkte', 'Punkte'], [$a['type'], $b['type']]);
+    }
+
+    /** Ohne Konto (Aufgaben, Kommandozeile) und außerhalb der API (track); innerhalb einer erfassten Anfrage kein zweiter Eintrag. */
+    public function testSystemActorAndTrack(): void
+    {
+        $this->app->changeLog()->event(ChangeLogService::SYSTEM, 'Update auf Version 1.2.3 automatisch eingespielt');
+        [$e] = $this->entries();
+        $this->assertSame([0, ChangeLogService::SYSTEM, 'event', 'Update auf Version 1.2.3 automatisch eingespielt'], [$e['actor_id'], $e['actor_name'], $e['action'], $e['label']]);
+
+        $api = $this->app->api();
+        $api->track('PATCH /admin/birthdays', ChangeLogService::CLI, fn () => $this->app->birthdays()->setUpcomingDays(14));
+        [$e] = $this->entries();
+        $this->assertSame([ChangeLogService::CLI, 'Geburtstage', ['old' => '7', 'new' => '14']], [$e['actor_name'], $e['label'], array_intersect_key(self::fields($e)['Tage im Voraus'], ['old' => 1, 'new' => 1])]);
+
+        // Ohne Angabe: wer angemeldet ist
+        $api->track('PATCH /admin/birthdays', null, fn () => $this->app->birthdays()->setUpcomingDays(21));
+        $this->assertSame($this->admin, $this->entries()[0]['actor_id']);
+        $count = count($this->entries());
+        // Eigene Einstellung (z. B. WordPress), über custom()
+        $value = 'a';
+        $api->track($api->changeSubjects()->custom('Platzhalterbild', static function () use (&$value): array {
+            return ['Bild' => $value];
+        }), null, static function () use (&$value): void {
+            $value = 'b';
+        });
+        $this->assertSame([['field' => 'Bild', 'old' => 'a', 'new' => 'b']], $this->entries()[0]['changes']);
+        $this->assertCount($count + 1, $this->entries());
+    }
+
+    /** Folgen: Der Ämter-Import legt Gruppen und Ämter an; die Galerie nur auf dem Server löscht die Alben aus Drive. */
+    public function testSideEffectsAreRecorded(): void
+    {
+        $res = $this->call('POST', '/offices/import', ['csv' => "gruppe;amt;beginn;ende;art;personen\nKönigshaus;Minister;2021;2022;;Max", 'apply' => true]);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $types = array_column($this->entries(), 'type');
+        sort($types);
+        $this->assertSame(['Amt', 'Amtszeit', 'Ämtergruppe'], $types);
+        $this->assertCount(1, array_unique(array_column($this->entries(), 'batch')));
+
+        $this->app->db->insert('albums', ['drive_id' => 'A1', 'year' => '2026', 'title' => 'Sommerfest', 'sort_date' => '2026-06-27 18:00:00', 'synced_at' => '2026-06-28 00:00:00', 'source' => 'drive']);
+        $this->assertSame(200, $this->call('PATCH', '/admin/settings', ['gallery_source' => 'server'])->status);
+        $byType = array_column(array_slice($this->entries(), 0, 2), null, 'type');
+        $this->assertSame(['delete', 'Sommerfest'], [$byType['Album']['action'], $byType['Album']['label']]);
+        $this->assertSame(['old' => 'Google Drive', 'new' => 'nur dieser Server'], array_intersect_key(self::fields($byType['Einstellungen'])['Quelle der Galerie'], ['old' => 1, 'new' => 1]));
+    }
+
+    /** Frist der Ehemaligen: nur die Frist, nicht die Liste der fälligen Personen. */
+    public function testRetentionWithoutPeople(): void
+    {
+        $this->assertSame(200, $this->call('PUT', '/admin/former/retention', ['years' => 5])->status);
+        [$e] = $this->entries();
+        $this->assertSame([['field' => 'Frist (Jahre)', 'old' => '0', 'new' => '5']], $e['changes']);
+    }
+
     public function testNotRecorded(): void
     {
         // Vorschau, ohne Unterschied, abgelehnt, ausgeschaltet

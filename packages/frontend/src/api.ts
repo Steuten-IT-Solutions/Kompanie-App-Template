@@ -436,6 +436,8 @@ export interface ChangeEntry {
   label: string;
   action: ChangeAction;
   subject_user_id: number | null;
+  /** Gemeinsame Kennung der Einträge einer Aktion mit mehreren Einträgen (z. B. Punkte für alle), sonst leer */
+  batch: string;
   changes: ChangeField[];
 }
 

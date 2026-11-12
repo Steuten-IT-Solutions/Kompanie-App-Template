@@ -8191,11 +8191,11 @@ components:
               items: { $ref: '#/components/schemas/ChangeEntry' }
     ChangeEntry:
       type: object
-      required: [id, at, actor_id, actor_name, area, area_label, type, item, label, action, subject_user_id, changes]
+      required: [id, at, actor_id, actor_name, area, area_label, type, item, label, action, subject_user_id, batch, changes]
       properties:
         id: { type: integer }
         at: { type: integer, description: Unix-Zeit }
-        actor_id: { type: integer }
+        actor_id: { type: integer, description: '0 ohne Konto (System, Kommandozeile)' }
         actor_name: { type: string }
         area: { type: string }
         area_label: { type: string }
@@ -8204,6 +8204,7 @@ components:
         label: { type: string, description: 'Name des Eintrags zum Zeitpunkt der Änderung' }
         action: { type: string, enum: [create, update, delete, event], description: 'event: etwas ohne vergleichbaren Stand (z. B. Update eingespielt); label ist dann der ganze Satz' }
         subject_user_id: { type: [integer, 'null'], description: 'Konto, um das es geht (Mitglieder, Punkte, Strafen)' }
+        batch: { type: string, description: 'Gemeinsame Kennung der Einträge einer Aktion mit mehreren Einträgen, sonst leer' }
         changes:
           type: array
           items:

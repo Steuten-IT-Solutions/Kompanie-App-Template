@@ -48,6 +48,49 @@ final class Subjects
     /** Persönliche Angaben eines Mitglieds (nur mit view_personal sichtbar) */
     private const PERSONAL = ['E-Mail', 'Handynummer', 'Adresse', 'Geburtsdatum'];
 
+    /**
+     * Felder der Einstellungen mit Anzeigenamen: GET-Pfad => Schlüssel der Antwort (verschachtelt mit Punkt) => Anzeigename.
+     * Was hier fehlt, steht mit Grund in settingsIgnored() (Test ChangeLogTest).
+     */
+    public const SETTINGS_FIELDS = [
+        '/admin/settings' => [
+            'google.client_id' => 'Google-Client-ID', 'google.connected' => 'Mit Google verbunden', 'google.email' => 'Google-Konto',
+            'google.service_account_email' => 'Dienstkonto (Adresse)', 'calendar.choice' => 'Quelle des Kalenders', 'calendar.source' => 'Kalender wirksam aus',
+            'calendar.calendar_ids' => 'Kalender-IDs', 'calendar.cache_minutes' => 'Kalender zwischenspeichern (Minuten)', 'gallery.root' => 'Galerie-Ordner',
+            'gallery.source' => 'Quelle der Galerie', 'gallery.store' => 'Ablage hochgeladener Bilder', 'gallery.downloads' => 'Bilder herunterladen erlaubt',
+            'news.source' => 'Quelle der News', 'news.url' => 'Adresse der News', 'legal.imprint_url' => 'Impressum', 'legal.privacy_url' => 'Datenschutzerklärung',
+        ],
+        '/admin/mail' => [
+            'from' => 'Absenderadresse', 'from_name' => 'Absendername', 'host' => 'SMTP-Server', 'port' => 'Port', 'secure' => 'Verschlüsselung',
+            'user' => 'SMTP-Benutzer', 'batch_size' => 'Mails je Durchgang', 'batch_pause' => 'Pause zwischen Durchgängen (Sekunden)',
+        ],
+        '/admin/registration' => ['enabled' => 'Anfragen möglich', 'default_role' => 'Rolle für neue Konten', 'email_confirmation' => 'E-Mail-Adresse bestätigen'],
+        '/admin/push' => ['reminderHour' => 'Erinnerung um (Uhr)', 'birthdays.enabled' => 'Geburtstage melden', 'birthdays.hour' => 'Geburtstage um (Uhr)'],
+        '/admin/birthdays' => ['upcoming_days' => 'Tage im Voraus'],
+        '/admin/navigation' => [
+            'navigation' => 'Menü', 'names' => 'Namen der Bereiche', 'start' => 'Startseite', 'show_labels' => 'Beschriftungen zeigen',
+            'intern_order' => 'Reihenfolge Intern', 'admin_order' => 'Reihenfolge Verwaltung',
+        ],
+        '/admin/maintenance' => ['on' => 'Wartungsmodus an', 'reason' => 'Grund'],
+        '/admin/backup/drive' => ['enabled' => 'Automatisch sichern'],
+        '/admin/backup/server' => ['enabled' => 'Automatisch sichern'],
+        '/admin/former/retention' => ['years' => 'Frist (Jahre)'],
+    ];
+
+    /** Felder, deren Wert der Schlüssel einer Rolle ist (in der Anzeige ihr Name) */
+    private const ROLE_FIELDS = ['Rolle für neue Konten'];
+
+    /** Lesbare Werte von Auswahlfeldern der Einstellungen (Feld => Wert => Text) */
+    private const VALUE_LABELS = [
+        'Quelle des Kalenders' => ['' => 'nicht gewählt', 'app' => 'in der App', 'google' => 'Google Kalender', 'ics' => 'iCal-Adresse'],
+        'Kalender wirksam aus' => ['none' => 'keine Quelle', 'app' => 'in der App', 'google' => 'Google Kalender', 'ics' => 'iCal-Adresse'],
+        'Quelle der Galerie' => ['drive' => 'Google Drive', 'server' => 'nur dieser Server'],
+        'Ablage hochgeladener Bilder' => ['server' => 'dieser Server', 'drive' => 'Google Drive'],
+        'Quelle der News' => ['none' => 'keine', 'site' => 'Beiträge der Webseite', 'wordpress' => 'WordPress-Webseite', 'rss' => 'Feed', 'app' => 'in der App'],
+        'Verschlüsselung' => ['starttls' => 'STARTTLS', 'ssl' => 'SSL/TLS', 'none' => 'keine'],
+        'Kanal' => ['stable' => 'stabil', 'early' => 'Vorabversionen'],
+    ];
+
     /** @var array<string, Subject>|null */
     private ?array $map = null;
 
@@ -65,6 +108,16 @@ final class Subjects
     public function for(string $method, string $path): ?Subject
     {
         return ($this->map ??= $this->build())[$method . ' ' . $path] ?? null;
+    }
+
+    /**
+     * Einstellung außerhalb der Routen (z. B. der WordPress-Einstellungsseite) für Http\Api::track().
+     *
+     * @param \Closure(): array<string, mixed> $read Anzeigename => Wert
+     */
+    public function custom(string $label, \Closure $read): Subject
+    {
+        return $this->values($label, $read);
     }
 
     /** Vor jedem Stand (vorher, nachher): gemerkte Namen und Bezeichnungen vergessen. */
@@ -89,6 +142,7 @@ final class Subjects
         $password = $this->member(event: 'Passwort');
         $ownPassword = $this->member(self: true, event: 'Passwort');
         $role = $this->role();
+        $general = $this->generalSettings();
         $map = [
             // Mitglieder und Konten
             'POST /users' => $newMembers,
@@ -135,16 +189,34 @@ final class Subjects
             'POST /admin/roles' => $role,
             'PATCH /admin/roles/{key}' => $role,
             'DELETE /admin/roles/{key}' => $role,
-            // Einstellungen
-            'PATCH /admin/settings' => $this->settings('Allgemeine Einstellungen', '/admin/settings'),
-            'PATCH /admin/mail' => $this->settings('E-Mail', '/admin/mail'),
+            // Einstellungen: nur Felder mit Anzeigenamen (SETTING_FIELDS); Geheimes nur als „geändert“ (secrets)
+            'PATCH /admin/settings' => $general,
+            'PATCH /admin/mail' => $this->settings('E-Mail', '/admin/mail', ['SMTP-Passwort' => fn (): mixed => $this->app->settings->get('smtp_password', '')]),
             'PUT /admin/registration' => $this->settings('Zugang beantragen', '/admin/registration'),
-            'PATCH /admin/push' => $this->settings('Benachrichtigungen', '/admin/push', ['subscriptions', 'counts', 'devices']),
+            'PATCH /admin/push' => $this->settings('Benachrichtigungen', '/admin/push'),
             'PATCH /admin/birthdays' => $this->settings('Geburtstage', '/admin/birthdays'),
             'PUT /admin/navigation' => $this->settings('Navigation', '/admin/navigation'),
-            'PUT /admin/features' => $this->settings('Bereiche', '/admin/features'),
-            'POST /admin/maintenance' => $this->settings('Wartungsmodus', '/admin/maintenance', ['log']),
-            'PATCH /admin/update' => $this->settings('Updates', '/admin/update'),
+            'PUT /admin/features' => $this->values('Bereiche', function (): array {
+                $out = [];
+                $data = ($this->get)('/admin/features');
+                foreach (is_array($data) ? $data : [] as $f) {
+                    if (is_array($f) && is_string($f['label'] ?? null)) {
+                        $out[$f['label']] = (bool) ($f['enabled'] ?? false);
+                    }
+                }
+                return $out;
+            }),
+            'POST /admin/maintenance' => $this->settings('Wartungsmodus', '/admin/maintenance'),
+            'PATCH /admin/update' => $this->values('Updates', function (): array {
+                $data = ($this->get)('/admin/update');
+                $data = is_array($data) ? $data : [];
+                $channel = is_string($data['channel'] ?? null) ? $data['channel'] : '';
+                return [
+                    'Kanal' => self::VALUE_LABELS['Kanal'][$channel] ?? $channel,
+                    'Automatisch aktualisieren' => $data['auto'] ?? null,
+                    'Statusmeldungen senden' => $this->app->statusReporter()->enabled(),
+                ];
+            }),
             'PUT /admin/backup/drive' => $this->settings('Sicherung in Google Drive', '/admin/backup/drive'),
             'PUT /admin/backup/server' => $this->settings('Sicherung auf dem Server', '/admin/backup/server'),
             'PUT /admin/backup/encryption' => $this->event('Einstellungen', 'Verschlüsselung der Sicherung', 'update'),
@@ -155,9 +227,17 @@ final class Subjects
                 'Änderungen protokollieren' => $this->app->changeLog()->enabled(),
                 'Frist (Tage)' => $this->app->changeLog()->keepDays(),
             ]),
-            'PUT /attendance/groups' => $this->settings('Gruppen der Anwesenheit', '/attendance/groups'),
-            'POST /admin/google/connect' => $this->settings('Google-Zugang', '/admin/settings'),
-            'POST /admin/google/disconnect' => $this->settings('Google-Zugang', '/admin/settings'),
+            'PUT /attendance/groups' => $this->values('Gruppen der Anwesenheit', function (): array {
+                $groups = $this->app->attendance()->groups();
+                $labels = array_column($groups, 'label', 'key');
+                $out = [];
+                foreach ($groups as $g) {
+                    $out[$g['label']] = $g['counts_as'] === null ? 'eigene Gruppe' : 'zählt als ' . ($labels[$g['counts_as']] ?? $g['counts_as']);
+                }
+                return $out;
+            }),
+            'POST /admin/google/connect' => $general,
+            'POST /admin/google/disconnect' => $general,
             'DELETE /admin/error-log' => $this->event('Einstellungen', 'Fehlerprotokoll', 'delete'),
             'DELETE /admin/update/held' => $this->event('Einstellungen', 'Zurückgestelltes Update', 'delete'),
             'POST /admin/backup/server/delete' => $this->event('Sicherung', fn (Request $r): string => 'Sicherung ' . (is_string($r->input('id')) ? $r->input('id') : ''), 'delete'),
@@ -325,7 +405,9 @@ final class Subjects
             $name = $r->input('name');
             return is_string($name) && $name !== '' ? $this->column('SELECT id FROM {office_holders} WHERE name = ?', $name) : [];
         });
-        $map['POST /offices/import'] = $this->table($officeTerms, static fn (): array => [], true);
+        // Der Import legt auch Gruppen und Ämter an, die es noch nicht gibt
+        $none = static fn (): array => [];
+        $map['POST /offices/import'] = $this->combine(['g' => $this->table($officeGroups, $none, true), 'o' => $this->table($offices, $none, true), 't' => $this->table($officeTerms, $none, true)]);
         // Mailgruppen
         $map['POST /mails/groups'] = $this->mailGroup(true);
         $map['PATCH /mails/groups/{key}'] = $this->mailGroup();
@@ -574,17 +656,140 @@ final class Subjects
     }
 
     /**
-     * Einstellungen: die Antwort der GET-Route, flach (verschachtelte Schlüssel mit Punkt); $skip lässt Schlüssel aus, die
-     * sich ohne Zutun ändern (Protokolle, Zähler).
-     *
-     * @param list<string> $skip
+     * Allgemeine Einstellungen (Google-Zugang, Kalender, Galerie, News, Rechtliches); bei der Galerie als Quelle nur der
+     * Server verschwinden die Alben aus Google Drive (GalleryService::reset), sie kommen als gelöscht hinein.
      */
-    private function settings(string $label, string $getPath, array $skip = []): Subject
+    private function generalSettings(): Subject
     {
-        return $this->values($label, function () use ($getPath, $skip): array {
+        $settings = $this->settings('Allgemeine Einstellungen', '/admin/settings', [
+            'Google-Clientschlüssel' => fn (): mixed => $this->oauthPart('client_secret'),
+            'Google-Verbindung' => fn (): mixed => $this->oauthPart('refresh_token'),
+            'Dienstkonto' => fn (): mixed => $this->app->settings->get(\KompanieApp\Core\Domain\DriveClient::SETTING, ''),
+            'iCal-Adresse' => fn (): mixed => $this->app->settings->get('calendar_ics_url', ''),
+            'Google-API-Schlüssel' => fn (): mixed => $this->app->settings->get('google_api_key', ''),
+        ]);
+        $albums = $this->table($this->spec('Album', 'albums', 'title', ['title' => 'Titel', 'year' => 'Jahr']), fn (): array => $this->column('SELECT id FROM {albums} WHERE source = ?', 'drive'));
+        return $this->combine(['s' => $settings, 'a' => $albums]);
+    }
+
+    private function oauthPart(string $key): string
+    {
+        $o = $this->app->settings->get(\KompanieApp\Core\Domain\DriveClient::OAUTH_SETTING);
+        return is_array($o) && is_string($o[$key] ?? null) ? $o[$key] : '';
+    }
+
+    /**
+     * Mehrere Arten in einer Route (IDs mit Vorsilbe je Teil, z. B. s: und a:).
+     *
+     * @param array<string, Subject> $parts Vorsilbe => Subject
+     */
+    private function combine(array $parts): Subject
+    {
+        $split = static function (string $id) use ($parts): ?array {
+            $pos = strpos($id, ':');
+            $prefix = $pos === false ? '' : substr($id, 0, $pos);
+            return isset($parts[$prefix]) ? [$parts[$prefix], substr($id, (int) $pos + 1)] : null;
+        };
+        $hasAll = array_filter($parts, static fn (Subject $p): bool => $p->all !== null) !== [];
+        return new Subject(
+            static function (string $id) use ($split): ?Item {
+                $p = $split($id);
+                return $p === null ? null : ($p[0]->load)($p[1]);
+            },
+            static function (Request $r, mixed $result) use ($parts): array {
+                $out = [];
+                foreach ($parts as $prefix => $p) {
+                    foreach (($p->ids)($r, $result) as $id) {
+                        $out[] = $prefix . ':' . $id;
+                    }
+                }
+                return $out;
+            },
+            $hasAll ? static function () use ($parts): array {
+                $out = [];
+                foreach ($parts as $prefix => $p) {
+                    foreach ($p->all !== null ? ($p->all)() : [] as $id) {
+                        $out[] = $prefix . ':' . $id;
+                    }
+                }
+                return $out;
+            } : null,
+            loadMany: static function (array $ids) use ($parts): array {
+                $by = [];
+                foreach ($ids as $id) {
+                    $pos = strpos($id, ':');
+                    if ($pos !== false) {
+                        $by[substr($id, 0, $pos)][] = substr($id, $pos + 1);
+                    }
+                }
+                $out = [];
+                foreach ($by as $prefix => $list) {
+                    if (!isset($parts[$prefix])) {
+                        continue;
+                    }
+                    foreach ($parts[$prefix]->loadAll($list) as $id => $item) {
+                        if ($item !== null) {
+                            $out[$prefix . ':' . $id] = $item;
+                        }
+                    }
+                }
+                return $out;
+            },
+        );
+    }
+
+    /**
+     * Einstellungen aus der Antwort der GET-Route (verschachtelte Schlüssel mit Punkt): nur Felder aus $fields, mit
+     * Anzeigenamen aus SETTINGS_FIELDS (Zähler, Zustände und Hinweise fehlen absichtlich). $secrets: Werte, die nie ins Protokoll kommen; ihr
+     * Vergleich geht über eine Prüfsumme, im Eintrag steht nur „geändert“.
+     *
+     * @param array<string, \Closure(): mixed> $secrets Anzeigename => Wert
+     */
+    private function settings(string $label, string $getPath, array $secrets = []): Subject
+    {
+        return $this->values($label, function () use ($getPath, $secrets): array {
             $data = ($this->get)($getPath);
-            return is_array($data) ? self::flatten(array_diff_key($data, array_flip($skip))) : [];
-        });
+            $flat = is_array($data) ? self::flatten($data) : [];
+            $out = [];
+            foreach (self::SETTINGS_FIELDS[$getPath] ?? [] as $key => $name) {
+                $v = $flat[$key] ?? null;
+                if (is_string($v) && in_array($name, self::ROLE_FIELDS, true)) {
+                    $v = $this->app->roles()->label($v);
+                }
+                $out[$name] = is_string($v) && isset(self::VALUE_LABELS[$name][$v]) ? self::VALUE_LABELS[$name][$v] : $v;
+            }
+            foreach ($secrets as $name => $read) {
+                $v = $read();
+                $out[$name] = is_string($v) && trim($v) !== '' ? hash('sha256', $v) : null;
+            }
+            return $out;
+        }, array_keys($secrets));
+    }
+
+    /**
+     * Schlüssel der GET-Routen der Einstellungen, die nicht ins Protokoll kommen (Zustand, Zähler, Hinweise, feste Listen
+     * oder als Geheimnis erfasst). Ein Test prüft, dass jeder andere Schlüssel einen Anzeigenamen hat.
+     *
+     * @return array<string, list<string>> GET-Pfad => Schlüssel (Präfix mit Punkt am Ende gilt für alle darunter)
+     */
+    public static function settingsIgnored(): array
+    {
+        return [
+            '/admin/settings' => [
+                'google.redirect_uri', 'google.client_secret_set', 'google.last_result', 'google.calendar_access',
+                'calendar.connection_needs_calendar_access', 'calendar.ics_url_set', 'calendar.google_api_key_set', 'gallery.configured',
+                'gallery.media_bytes', 'gallery.service_account_email', 'gallery.oauth_connected', 'gallery.oauth_email', 'gallery.calendar_access',
+                'gallery.status.', 'news.sources',
+            ],
+            '/admin/mail' => ['from_name_default', 'password_set', 'configured', 'unavailable', 'server_max_size', 'pending'],
+            '/admin/registration' => ['pending', 'link'],
+            '/admin/push' => ['supported', 'missing', 'accounts', 'guests', 'queued', 'log.', 'devices', 'subscriptions', 'counts'],
+            '/admin/navigation' => ['targets', 'icons', 'max_menu_items', 'label_max'],
+            '/admin/maintenance' => ['since', 'by', 'log'],
+            '/admin/backup/drive' => ['available', 'access', 'encrypted', 'email', 'folder_url', 'last_ok', 'last_try', 'error', 'every_days', 'keep'],
+            '/admin/backup/server' => ['available', 'can_restore', 'last_ok', 'last_try', 'error', 'every_days', 'keep', 'files'],
+            '/admin/former/retention' => ['due', 'soon'],
+        ];
     }
 
     /** @param \Closure(): mixed $read */
@@ -593,10 +798,13 @@ final class Subjects
         return $this->values($label, static fn (): array => [$field => $read()]);
     }
 
-    /** @param \Closure(): array<string, mixed> $read */
-    private function values(string $label, \Closure $read): Subject
+    /**
+     * @param \Closure(): array<string, mixed> $read
+     * @param list<string> $secret Felder, deren Werte nie ins Protokoll kommen
+     */
+    private function values(string $label, \Closure $read, array $secret = []): Subject
     {
-        return new Subject(static fn (): Item => new Item('Einstellungen', '', $label, $read()), static fn (): array => ['']);
+        return new Subject(static fn (): Item => new Item('Einstellungen', '', $label, $read(), [], $secret), static fn (): array => ['']);
     }
 
     /**

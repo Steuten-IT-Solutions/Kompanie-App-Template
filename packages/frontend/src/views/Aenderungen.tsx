@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api, can, type ChangeEntry, type ChangeLog } from '../api';
 import { CAPABILITIES } from '../capabilities';
-import { csvRows, entryTitle, fieldText } from '../changeText';
+import { csvRows, entryTitle, fieldText, groupEntries, groupTitle } from '../changeText';
 import { formatDate, todayYmd } from '../format';
 import { toCsv } from '../lists';
 import { ErrorBox, Loading, Sheet, useAsync } from '../ui';
@@ -40,18 +40,20 @@ export function Aenderungen({ onToast }: { onToast: (msg: string) => void }) {
     [range.from, range.to, actor, area],
     'admin/changes',
   );
-  const [open, setOpen] = useState<ChangeEntry | null>(null);
+  const [open, setOpen] = useState<ChangeEntry[] | null>(null);
   if (loading && !data) return <Loading shape="list" />;
   if (error && !data) return <ErrorBox message={error} onRetry={reload} />;
   const log = data!;
   // Personen zur Auswahl: wer im Zeitraum etwas geändert hat (die gewählte bleibt in der Liste)
   const actors = new Map<number, string>();
-  for (const e of log.entries) actors.set(e.actor_id, e.actor_name);
+  // Ohne Konto (System, Kommandozeile) lässt sich nicht auswählen
+  for (const e of log.entries) if (e.actor_id > 0) actors.set(e.actor_id, e.actor_name);
   return (
     <div className="changes stack">
       <h2 className="section-title">Änderungen</h2>
       <p className="small muted">
-        Wer wann was angelegt, geändert oder gelöscht hat. Tippe auf einen Eintrag für die alten und neuen Werte.
+        Wer wann was angelegt, geändert oder gelöscht hat. Tippe auf einen Eintrag für die alten und neuen Werte. Was auf einmal geändert
+        wurde (z. B. Punkte für mehrere Mitglieder), steht in einer Zeile.
       </p>
       {!log.enabled && (
         <p className="small">
@@ -115,19 +117,19 @@ export function Aenderungen({ onToast }: { onToast: (msg: string) => void }) {
       {can('manage_settings') && (
         <ChangeLogSettings log={log} onChanged={(s) => setData({ ...log, ...s })} onReload={reload} onToast={onToast} />
       )}
-      {open && <Detail entry={open} onClose={() => setOpen(null)} />}
+      {open && <Detail group={open} onClose={() => setOpen(null)} />}
     </div>
   );
 }
 
-/** Einträge nach Tagen, neueste zuerst. */
-function Entries({ log, onOpen }: { log: ChangeLog; onOpen: (e: ChangeEntry) => void }) {
+/** Einträge nach Tagen, neueste zuerst; Einträge einer Aktion (batch) als eine Zeile. */
+function Entries({ log, onOpen }: { log: ChangeLog; onOpen: (group: ChangeEntry[]) => void }) {
   if (log.entries.length === 0) return <p className="muted">Im Zeitraum wurde nichts geändert.</p>;
-  const days: { day: string; entries: ChangeEntry[] }[] = [];
-  for (const e of log.entries) {
-    const day = dayOf(e.at);
-    if (days[days.length - 1]?.day !== day) days.push({ day, entries: [] });
-    days[days.length - 1].entries.push(e);
+  const days: { day: string; groups: ChangeEntry[][] }[] = [];
+  for (const g of groupEntries(log.entries)) {
+    const day = dayOf(g[0].at);
+    if (days[days.length - 1]?.day !== day) days.push({ day, groups: [] });
+    days[days.length - 1].groups.push(g);
   }
   return (
     <>
@@ -135,13 +137,13 @@ function Entries({ log, onOpen }: { log: ChangeLog; onOpen: (e: ChangeEntry) => 
         <section key={d.day} aria-label={formatDate(d.day)}>
           <h3 className="section-title">{formatDate(d.day)}</h3>
           <ul className="card-list">
-            {d.entries.map((e) => (
-              <li key={e.id}>
-                <button type="button" className="card row clickable settings-link" onClick={() => onOpen(e)}>
+            {d.groups.map((g) => (
+              <li key={g[0].id}>
+                <button type="button" className="card row clickable settings-link" onClick={() => onOpen(g)}>
                   <span className="row-main">
-                    <span className="row-title">{entryTitle(e)}</span>
+                    <span className="row-title">{groupTitle(g)}</span>
                     <span className="row-sub">
-                      {time(e.at)} · {e.actor_name} · {e.area_label}
+                      {time(g[0].at)} · {g[0].actor_name} · {g[0].area_label}
                     </span>
                   </span>
                   <span className="settings-chevron" aria-hidden="true">
@@ -158,23 +160,40 @@ function Entries({ log, onOpen }: { log: ChangeLog; onOpen: (e: ChangeEntry) => 
   );
 }
 
-function Detail({ entry: e, onClose }: { entry: ChangeEntry; onClose: () => void }) {
+/** Werte eines Eintrags */
+function Fields({ entry: e }: { entry: ChangeEntry }) {
+  if (e.changes.length === 0) return <p className="small">Keine einzelnen Werte gespeichert.</p>;
   return (
-    <Sheet title={entryTitle(e)} onClose={onClose}>
+    <dl className="change-fields">
+      {e.changes.map((c) => (
+        <div key={c.field} className="change-field">
+          <dt>{c.field}</dt>
+          <dd>{fieldText(c, capLabel)}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** Ein Eintrag mit seinen Werten; bei mehreren auf einmal jeder Eintrag mit Titel und Werten. */
+function Detail({ group, onClose }: { group: ChangeEntry[]; onClose: () => void }) {
+  const first = group[0];
+  return (
+    <Sheet title={groupTitle(group)} onClose={onClose}>
       <p className="small muted">
-        {dateTime(e.at)} · {e.actor_name} · {e.area_label}
+        {dateTime(first.at)} · {first.actor_name} · {first.area_label}
       </p>
-      {e.changes.length === 0 ? (
-        <p className="small">Keine einzelnen Werte gespeichert.</p>
+      {group.length === 1 ? (
+        <Fields entry={first} />
       ) : (
-        <dl className="change-fields">
-          {e.changes.map((c) => (
-            <div key={c.field} className="change-field">
-              <dt>{c.field}</dt>
-              <dd>{fieldText(c, capLabel)}</dd>
-            </div>
+        <div className="stack">
+          {group.map((e) => (
+            <section key={e.id} className="change-entry" aria-label={entryTitle(e)}>
+              <h4 className="change-entry-title">{entryTitle(e)}</h4>
+              <Fields entry={e} />
+            </section>
           ))}
-        </dl>
+        </div>
       )}
     </Sheet>
   );

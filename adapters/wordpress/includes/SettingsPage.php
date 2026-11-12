@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\WordPress;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\ChangeLog\Subject;
 use KompanieApp\Core\Domain\Features;
 use KompanieApp\Core\Domain\GoogleConnect;
 use KompanieApp\Core\Domain\MaintenanceService;
@@ -300,7 +301,11 @@ final class SettingsPage
     private static function saveMembersPlaceholder(App $app): never
     {
         self::guard('kompanie_app_members_placeholder');
-        [$message, $error] = self::applyMembersPlaceholder($app, wp_unslash($_POST));
+        $placeholder = $app->api()->changeSubjects()->custom('Platzhalterbild der Mitglieder (Webseite)', static function () use ($app): array {
+            $id = (int) $app->settings->get(Shortcodes::MEMBERS_PLACEHOLDER, 0);
+            return ['Bild' => $id > 0 ? (get_the_title($id) ?: '#' . $id) : null];
+        });
+        [$message, $error] = self::logged($app, $placeholder, static fn (): array => self::applyMembersPlaceholder($app, wp_unslash($_POST)));
         self::back($message, $error, 'webseite');
     }
 
@@ -400,7 +405,7 @@ final class SettingsPage
     {
         self::guard('kompanie_app_google_connect');
         try {
-            $url = self::googleConnectUrl($app, $_POST);
+            $url = self::logged($app, 'POST /admin/google/connect', static fn (): string => self::googleConnectUrl($app, $_POST));
         } catch (ApiError $e) {
             self::back($e->getMessage(), true, 'google');
         }
@@ -426,7 +431,7 @@ final class SettingsPage
     {
         self::guard('kompanie_app_google_disconnect');
         try {
-            $app->googleConnect()->disconnect();
+            self::logged($app, 'POST /admin/google/disconnect', static fn () => $app->googleConnect()->disconnect());
         } catch (ApiError $e) {
             self::back($e->getMessage(), true, 'google');
         }
@@ -478,16 +483,18 @@ final class SettingsPage
         self::guard('kompanie_app_service_account');
         $json = isset($_POST['drive_sa']) ? trim((string) wp_unslash($_POST['drive_sa'])) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- wird geprüft, nicht ausgegeben
         $hadCalendarIds = $app->calendar()->calendarIds() !== [];
+        if (!isset($_POST['remove']) && $json === '') {
+            self::back('Bitte den Inhalt der JSON-Datei einfügen.', true, 'google');
+        }
         try {
-            if (isset($_POST['remove'])) {
-                $app->drive()->removeServiceAccount();
-                $message = 'Schlüssel des Dienstkontos entfernt.';
-            } elseif ($json !== '') {
+            $message = self::logged($app, 'PATCH /admin/settings', static function () use ($app, $json): string {
+                if (isset($_POST['remove'])) {
+                    $app->drive()->removeServiceAccount();
+                    return 'Schlüssel des Dienstkontos entfernt.';
+                }
                 $app->drive()->saveServiceAccount($json);
-                $message = 'Schlüssel des Dienstkontos gespeichert.';
-            } else {
-                self::back('Bitte den Inhalt der JSON-Datei einfügen.', true, 'google');
-            }
+                return 'Schlüssel des Dienstkontos gespeichert.';
+            });
         } catch (\RuntimeException $e) {
             self::back($e->getMessage(), true, 'google');
         }
@@ -513,6 +520,18 @@ final class SettingsPage
         }
     }
 
+    /**
+     * Speichern ins Änderungsprotokoll wie die passende Route der App (ChangeLog\Subjects), mit dem angemeldeten Konto.
+     *
+     * @template T
+     * @param \Closure(): T $fn
+     * @return T
+     */
+    private static function logged(App $app, string|Subject $subject, \Closure $fn): mixed
+    {
+        return $app->api()->track($subject, null, $fn);
+    }
+
     private static function saveMaintenance(App $app): never
     {
         self::guard('kompanie_app_maintenance');
@@ -523,7 +542,7 @@ final class SettingsPage
             wp_die('Keine Berechtigung.');
         }
         try {
-            $app->maintenance()->set($on, $reason, $actor);
+            self::logged($app, 'POST /admin/maintenance', static fn () => $app->maintenance()->set($on, $reason, $actor));
         } catch (ApiError $e) {
             self::back($e->getMessage(), true, 'wartung');
         }
@@ -539,7 +558,7 @@ final class SettingsPage
             $state[$key] = in_array($key, $on, true);
         }
         try {
-            $app->features()->update($state);
+            self::logged($app, 'PUT /admin/features', static fn () => $app->features()->update($state));
         } catch (ApiError $e) {
             self::back($e->getMessage(), true, 'bereiche');
         }
@@ -549,7 +568,7 @@ final class SettingsPage
     private static function saveCalendar(App $app): never
     {
         self::guard('kompanie_app_calendar');
-        [$message, $error] = self::applyCalendar($app, wp_unslash($_POST));
+        [$message, $error] = self::logged($app, 'PATCH /admin/settings', static fn (): array => self::applyCalendar($app, wp_unslash($_POST)));
         $app->scheduleTasks();
         self::back($message, $error, 'kalender', $error ? [] : ['kompanie_test' => 1]);
     }
@@ -585,11 +604,13 @@ final class SettingsPage
         $error = false;
         try {
             $root = isset($_POST['gallery_root']) ? sanitize_text_field(wp_unslash($_POST['gallery_root'])) : '';
-            $before = $app->gallery()->root();
-            $app->gallery()->setRoot($root);
-            if ($before !== '' && $before !== $app->gallery()->root()) {
-                $app->gallery()->reset();
-            }
+            self::logged($app, 'PATCH /admin/settings', static function () use ($app, $root): void {
+                $before = $app->gallery()->root();
+                $app->gallery()->setRoot($root);
+                if ($before !== '' && $before !== $app->gallery()->root()) {
+                    $app->gallery()->reset();
+                }
+            });
         } catch (\RuntimeException $e) {
             $messages[] = $e->getMessage();
             $error = true;
