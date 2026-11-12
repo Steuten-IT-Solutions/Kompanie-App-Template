@@ -371,14 +371,36 @@ function ki_db()
 function ki_admin_ok($login, $password)
 {
     list($pdo, $prefix) = ki_db();
-    $stmt = $pdo->prepare('SELECT password_hash, level FROM ' . $prefix . 'users WHERE LOWER(login) = LOWER(?) OR (email <> \'\' AND LOWER(email) = LOWER(?))');
+    $stmt = $pdo->prepare('SELECT id, name, password_hash, level FROM ' . $prefix . 'users WHERE LOWER(login) = LOWER(?) OR (email <> \'\' AND LOWER(email) = LOWER(?))');
     $stmt->execute(array($login, $login));
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         if ($row['level'] === 'admin' && password_verify($password, $row['password_hash'])) {
-            return true;
+            return array('id' => (int) $row['id'], 'name' => (string) $row['name']);
         }
     }
-    return false;
+    return null;
+}
+
+/**
+ * Ins Änderungsprotokoll der App (Tabelle change_log, Domain\ChangeLogService), direkt in der Datenbank wie ki_admin_ok:
+ * Wer mit install.php eine Version neu eingespielt hat. Nichts, wenn das Protokoll aus ist oder die Tabelle fehlt (ältere
+ * Versionen); ein Fehler hier hält das Einspielen nicht auf.
+ */
+function ki_log_change($admin, $label)
+{
+    try {
+        list($pdo, $prefix) = ki_db();
+        $stmt = $pdo->prepare('SELECT value FROM ' . $prefix . "settings WHERE name = 'change_log'");
+        $stmt->execute();
+        $value = $stmt->fetchColumn();
+        if ($value !== false && json_decode((string) $value, true) === 'off') {
+            return;
+        }
+        $stmt = $pdo->prepare('INSERT INTO ' . $prefix . "change_log (at, actor_id, actor_name, area, type, item, label, action, subject_user_id, personal, changes) VALUES (?, ?, ?, 'app', 'Einstellungen', '', ?, 'event', NULL, 0, '[]')");
+        $stmt->execute(array(time(), $admin['id'], $admin['name'] . ' (Installationsprogramm)', $label));
+    } catch (Exception $e) {
+        // Tabelle fehlt (Version vor dem Änderungsprotokoll) oder Datenbank nicht erreichbar
+    }
 }
 
 /**
@@ -500,7 +522,8 @@ if (ki_installed()) {
             if ($tries['n'] >= 10) {
                 throw new RuntimeException('Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen.');
             }
-            if (!ki_admin_ok(ki_post('login'), isset($_POST['password']) ? (string) $_POST['password'] : '')) {
+            $admin = ki_admin_ok(ki_post('login'), isset($_POST['password']) ? (string) $_POST['password'] : '');
+            if ($admin === null) {
                 $tries['n']++;
                 file_put_contents($lock, json_encode($tries));
                 sleep(1);
@@ -518,6 +541,7 @@ if (ki_installed()) {
             } finally {
                 ki_remove($work);
             }
+            ki_log_change($admin, 'Version ' . $entry['version'] . ' mit install.php neu eingespielt');
             $deleted = ki_self_delete();
             ki_page('Fertig', '<div class="card"><h2>Version ' . ki_h($entry['version']) . ' ist eingespielt</h2><p>Die Daten sind unverändert. Die Datenbank wird beim nächsten Aufruf bei Bedarf ergänzt.</p>'
                 . ($deleted ? '' : '<p class="bad">Bitte die Datei install.php jetzt im Dateimanager löschen.</p>') . '<a class="btn" href="./">Zur App</a></div>');

@@ -576,6 +576,7 @@ final class FormerMemberService
             try {
                 $this->forgetPersonal($person['id']);
                 $done++;
+                $this->app->changeLog()->event(ChangeLogService::SYSTEM, 'Persönliche Angaben von ' . $user->name . ' nach Ablauf der Aufbewahrungsfrist gelöscht', 'app', 'Mitglied', $person['id']);
             } catch (\Throwable $e) {
                 $this->retentionFailed($person['id'], $e);
             }

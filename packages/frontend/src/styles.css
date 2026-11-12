@@ -2359,6 +2359,42 @@ code {
   display: grid;
   gap: 6px;
 }
+/* Änderungsprotokoll (Verwaltung → Änderungen): Felder eines Eintrags mit altem und neuem Wert, Frist */
+.change-fields {
+  margin: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.change-field dt {
+  font-weight: 600;
+}
+.change-field dd {
+  margin: var(--space-1) 0 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.change-entry {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-3);
+}
+.change-entry:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.change-entry-title {
+  margin: 0 0 var(--space-2);
+  font-size: 1rem;
+}
+.change-keep {
+  display: grid;
+  gap: var(--space-2);
+}
+@media (min-width: 600px) {
+  .change-keep {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+}
 
 .error-log {
   list-style: none;

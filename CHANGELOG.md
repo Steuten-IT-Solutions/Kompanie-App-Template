@@ -24,6 +24,31 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.11.0] – 2026-11-12
+
+### Neu
+
+- **Änderungsprotokoll**: Unter [Verwaltung → Änderungen](app:verwaltung/aenderungen) siehst du, wer wann was in der
+  App angelegt, geändert oder gelöscht hat, mit den alten und neuen Werten, z. B. wer einen Termin gelöscht oder die
+  Rolle einer Person geändert hat. Aufgezeichnet werden Mitglieder und Konten (auch Dienstgrad, Titel und Kompanien),
+  Rollen und Rechte, Einstellungen, Updates und Sicherungen sowie alles, was in den Bereichen angelegt, geändert oder
+  gelöscht wird, z. B. Termine, News, Punkte, Strafen, Listen, Anwesenheit, Ämter und die Galerie. Auch was von selbst
+  passiert (automatische Updates und Sicherungen, Löschen nach der Frist für Ehemalige, als „System (automatisch)“),
+  was auf dem Server über die Kommandozeile oder `install.php` geschieht und was unter WordPress auf der
+  Einstellungsseite der App und in der Benutzerverwaltung geändert wird. Was auf einmal geändert wird (z. B. Punkte für
+  mehrere Mitglieder), steht in einer Zeile; beim Antippen siehst du jede einzelne Änderung. Du kannst nach Zeitraum,
+  Person und Bereich auswählen und alles als CSV-Datei herunterladen. Sehen dürfen
+  es Admins und alle mit dem neuen Recht „Änderungen ansehen“. Werte persönlicher Angaben sieht nur, wer „Persönliches
+  sehen“ hat; Passwörter und Zugangsdaten kommen nie ins Protokoll, nur dass sie geändert wurden. Das Protokoll ist eingeschaltet, Einträge werden
+  nach 365 Tagen gelöscht; beides stellst du unten auf der Seite ein (30 bis 730 Tage). Es enthält persönliche Angaben:
+  Bitte nennt es in eurer Datenschutzerklärung.
+
+### Geändert
+
+- Das An- und Abmelden der Benachrichtigungen auf einem Gerät zählt unter
+  [Einstellungen → Nutzung](app:einstellungen/nutzung) nicht mehr als Nutzung (bisher z. B. „Allgemein: gelöscht“
+  beim Abmelden).
+
 ## [0.10.0] – 2026-11-11
 
 ### Neu

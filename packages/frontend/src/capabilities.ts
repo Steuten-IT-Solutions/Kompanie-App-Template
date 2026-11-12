@@ -223,6 +223,12 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         label: 'Fehlermeldungen der Mitglieder sehen, mit Begründung schließen oder an die Betreuer der App weiterleiten',
         short: 'Fehlermeldungen bearbeiten',
       },
+      {
+        key: 'view_changes',
+        label:
+          'Änderungsprotokoll ansehen: wer wann was angelegt, geändert oder gelöscht hat, mit alten und neuen Werten (persönliche Angaben darin nur mit „Persönliches sehen“)',
+        short: 'Änderungen ansehen',
+      },
     ],
   },
 ];

@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\PreviewEnvironment;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Domain\ActivityService;
+use KompanieApp\Core\Domain\ChangeLogService;
 use KompanieApp\Core\Domain\AttendanceService;
 use KompanieApp\Core\Domain\BackupEncryptionService;
 use KompanieApp\Core\Domain\BackupUploadService;
@@ -125,6 +126,7 @@ final class App
         BackupUploadService::TASK => BackupUploadService::INTERVAL,
         ServerBackupService::TASK => ServerBackupService::INTERVAL,
         ActivityService::TASK => ActivityService::INTERVAL,
+        ChangeLogService::TASK => ChangeLogService::INTERVAL,
         FormerMemberService::RETENTION_TASK => FormerMemberService::RETENTION_INTERVAL,
         RegistrationService::TASK => RegistrationService::INTERVAL,
     ];
@@ -311,6 +313,8 @@ final class App
             ServerBackupService::TASK => $this->serverBackup()->active(),
             // Nutzungsauswertung (Issue #175): täglich Einträge je Person nach 90 Tagen und Pseudonyme nach 31 Tagen löschen.
             ActivityService::TASK => true,
+            // Änderungsprotokoll: täglich Einträge nach der eingestellten Frist löschen.
+            ChangeLogService::TASK => true,
             // Ehemalige nach Ablauf der Aufbewahrungsfrist löschen: täglich, nur mit eingestellter Frist.
             FormerMemberService::RETENTION_TASK => $this->formerMembers()->retention()['years'] > 0,
             // Selbstregistrierung (Issue #314): stündlich abgelaufene Anfragen löschen, auch nach dem Ausschalten.
@@ -336,6 +340,23 @@ final class App
      * Führt eine geplante Aufgabe aus. Fehler werden protokolliert und als Fehlercode gezählt
      * (Statusmeldungen, nur mit Zustimmung), nicht weitergeworfen.
      */
+    /**
+     * Änderungsprotokoll: Hat die tägliche Aufgabe ein Update eingespielt oder eine zurückgezogene Version ersetzt
+     * (UpdateService, Eintrag „last“ neu und erfolgreich), kommt das mit „System“ als Urheber hinein.
+     */
+    private function logAutoUpdate(mixed $before): void
+    {
+        $last = $this->updates()->status()['last'] ?? null;
+        if (!is_array($last) || $last === $before || empty($last['ok']) || !in_array($last['kind'] ?? '', ['auto', 'withdrawn'], true)) {
+            return;
+        }
+        $to = is_string($last['to'] ?? null) ? $last['to'] : '';
+        $from = is_string($last['from'] ?? null) ? $last['from'] : '';
+        $this->changeLog()->event(ChangeLogService::SYSTEM, $last['kind'] === 'auto'
+            ? 'Update auf Version ' . $to . ' automatisch eingespielt'
+            : 'Zurückgezogene Version ' . $from . ' automatisch durch Version ' . $to . ' ersetzt');
+    }
+
     public function runTask(string $task): void
     {
         $this->noteTaskRun();
@@ -362,7 +383,12 @@ final class App
                 }
             } elseif ($task === UpdateService::TASK) {
                 $this->updateUploads()->prune();
-                $this->updates()->runTask();
+                $last = $this->updates()->status()['last'] ?? null;
+                try {
+                    $this->updates()->runTask();
+                } finally {
+                    $this->logAutoUpdate($last);
+                }
             } elseif ($task === StatusReporter::TASK) {
                 $this->statusReporter()->runTask();
             } elseif ($task === PushService::TASK_SEND) {
@@ -386,11 +412,21 @@ final class App
             } elseif ($task === BugReportService::TASK) {
                 $this->bugReports()->runTask();
             } elseif ($task === BackupUploadService::TASK) {
+                $before = $this->backupUpload()->status()['last_ok'] ?? null;
                 $this->backupUpload()->runTask();
+                if (($this->backupUpload()->status()['last_ok'] ?? null) !== $before) {
+                    $this->changeLog()->event(ChangeLogService::SYSTEM, 'Sicherung automatisch in Google Drive hochgeladen');
+                }
             } elseif ($task === ServerBackupService::TASK) {
+                $before = $this->serverBackup()->status()['last_ok'] ?? null;
                 $this->serverBackup()->runTask();
+                if (($this->serverBackup()->status()['last_ok'] ?? null) !== $before) {
+                    $this->changeLog()->event(ChangeLogService::SYSTEM, 'Sicherung auf dem Server automatisch erstellt');
+                }
             } elseif ($task === ActivityService::TASK) {
                 $this->activity()->prune();
+            } elseif ($task === ChangeLogService::TASK) {
+                $this->changeLog()->prune();
             } elseif ($task === FormerMemberService::RETENTION_TASK) {
                 $this->formerMembers()->purgeExpired();
             } elseif ($task === RegistrationService::TASK) {
@@ -516,6 +552,14 @@ final class App
         } catch (\Throwable $e) {
             $ok = false;
             error_log('Kompanie-App: Pseudonym der Nutzungsauswertung nicht gelöscht: ' . $e->getMessage());
+        }
+        // Änderungsprotokoll: Einträge über die Person verlieren ihre Werte (nach der Aufbewahrungsfrist für Ehemalige nur
+        // die persönlicher Angaben); was sie selbst geändert hat, bleibt mit ihrem Namen bis zur Frist.
+        try {
+            $this->changeLog()->forgetSubject($userId, $keepChronicle);
+        } catch (\Throwable $e) {
+            $ok = false;
+            error_log('Kompanie-App: Werte im Änderungsprotokoll nicht gelöscht: ' . $e->getMessage());
         }
         return $ok;
     }
@@ -683,6 +727,12 @@ final class App
     public function activity(): ActivityService
     {
         return $this->service(ActivityService::class, fn () => new ActivityService($this));
+    }
+
+    /** Änderungsprotokoll: wer wann was angelegt, geändert oder gelöscht hat */
+    public function changeLog(): ChangeLogService
+    {
+        return $this->service(ChangeLogService::class, fn () => new ChangeLogService($this));
     }
 
     public function titles(): TitleService

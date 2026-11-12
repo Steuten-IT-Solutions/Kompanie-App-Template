@@ -55,6 +55,8 @@ export function adminTabs(): AdminTab[] {
       },
       // Fehlermeldungen aus der App: Zahl der offenen im Kreis
       { id: 'meldungen', label: 'Fehlermeldungen', on: can('review_reports') },
+      // Änderungsprotokoll: wer wann was angelegt, geändert oder gelöscht hat
+      { id: 'aenderungen', label: 'Änderungen', on: can('view_changes') },
       { id: 'punkte', label: `${sec.points} +`, on: points },
       { id: 'strafe', label: `${sec.penalties} +`, on: canPenalties() },
       { id: 'katalog', label: sec.catalog, on: points, group: SETUP },
@@ -90,6 +92,7 @@ export function adminTileCatalog(): Record<string, { label: string; on: boolean 
     ehemalige: { label: 'Ehemalige', on: true },
     anfragen: { label: 'Anfragen', on: !!config?.registration || (config?.pendingRegistrations ?? 0) > 0 },
     meldungen: { label: 'Fehlermeldungen', on: true },
+    aenderungen: { label: 'Änderungen', on: true },
     punkte: { label: `${sec.points} +`, on: on('points') },
     strafe: { label: `${sec.penalties} +`, on: on('penalties') },
     befoerderungen: { label: 'Beförderungen', on: on('ranks', 'points') },
@@ -266,6 +269,14 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
     <>
       <path d="M4 5h16v11H9l-5 4z" />
       <path d="M12 8v4M12 14.5h.01" />
+    </>
+  ),
+  // Änderungen: Uhr mit Pfeil zurück (Verlauf)
+  aenderungen: (
+    <>
+      <path d="M3.5 12a8.5 8.5 0 1 0 2.5-6" />
+      <path d="M3 3.5V8h4.5" />
+      <path d="M12 7.5V12l3 2" />
     </>
   ),
   punkte: <path d="M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6L12 16.3l-5.4 3 1.3-6-4.6-4.1 6.1-.6z" />,

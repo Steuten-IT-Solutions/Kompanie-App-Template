@@ -43,7 +43,7 @@ final class NavigationService
 
     /** Kacheln der Startseite der Verwaltung (wie adminTabs() in der App), „einrichtungen“ ist der Sammelknopf. */
     public const ADMIN_START = [
-        'mitglieder', 'ehemalige', 'anfragen', 'meldungen', 'punkte', 'strafe', 'befoerderungen', 'anwesenheit', 'brett', 'umfragen',
+        'mitglieder', 'ehemalige', 'anfragen', 'meldungen', 'aenderungen', 'punkte', 'strafe', 'befoerderungen', 'anwesenheit', 'brett', 'umfragen',
         'inventar', 'listen', 'mail', 'einrichtungen', 'einstellungen',
     ];
     /** Kacheln unter „Einrichtungen“ in der Verwaltung. */
