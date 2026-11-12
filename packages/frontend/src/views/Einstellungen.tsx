@@ -6,6 +6,7 @@ import {
   config,
   applyBirthdayUpcomingDays,
   applyFeatures,
+  applyGallerySubmissions,
   applyRegistration,
   registrationRoles,
   newsTitle,
@@ -1280,6 +1281,11 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
   const [root, setRoot] = useState(g.root);
   const [source, setSource] = useState<GallerySourceType>(g.source ?? 'drive');
   const [downloads, setDownloads] = useState(!!g.downloads);
+  const [submissions, setSubmissions] = useState(!!g.submissions);
+  // Gespeicherten Haken „Einreichen erlauben“ übernehmen: Knopf „einreichen“ in der Galerie
+  useEffect(() => {
+    if (g.submissions !== undefined) applyGallerySubmissions(g.submissions);
+  }, [g.submissions]);
   const [progress, setProgress] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const { busy, error, setError, save } = useSave(onSaved, onToast);
@@ -1333,6 +1339,7 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
                 gallery_store: 'server',
                 ...(source === 'drive' ? { gallery_root: root.trim() } : {}),
                 ...(g.downloads !== undefined ? { gallery_downloads: downloads ? '1' : '0' } : {}),
+                ...(g.submissions !== undefined ? { gallery_submissions: submissions ? '1' : '0' } : {}),
               },
         );
       }}
@@ -1392,6 +1399,18 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
             <span className="small muted feature-desc">
               Wer die {sec.gallery} sieht, kann dann jedes Bild und Video in der Großansicht und jedes Album als ZIP herunterladen (Bilder
               in Originalauflösung, Videos unverändert).
+            </span>
+          </span>
+        </label>
+      )}
+      {g.submissions !== undefined && (
+        <label className="toggle feature-toggle">
+          <input type="checkbox" checked={submissions} onChange={(e) => setSubmissions(e.target.checked)} />
+          <span>
+            Einreichen von Bildern und Videos durch Mitglieder erlauben
+            <span className="small muted feature-desc">
+              Wer das Recht „Bilder und Videos einreichen“ hat, kann dann Bilder und Videos für die {sec.gallery} einreichen. Sie erscheinen
+              erst, wenn jemand sie unter „Einreichungen prüfen“ freigibt.
             </span>
           </span>
         </label>

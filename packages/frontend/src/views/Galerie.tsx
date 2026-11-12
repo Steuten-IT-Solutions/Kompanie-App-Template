@@ -10,7 +10,7 @@ import {
   type TouchList,
   type ReactNode,
 } from 'react';
-import { api, can, type GalleryAlbum, type GalleryPhoto } from '../api';
+import { api, can, gallerySubmissionsOpen, type GalleryAlbum, type GalleryPhoto } from '../api';
 import { downloadablePhotos } from '../downloadFiles';
 import { downloadAlbum, downloadMedia } from '../galleryDownload';
 import { afterBackSync, useBackClose } from '../backClose';
@@ -185,13 +185,12 @@ function Overview({ onToast }: { onToast: Toast }) {
     );
   }
 
-  // Einreichungen (Issue #286), Verwalten (manage_gallery)
+  // Einreichungen (Issue #286), nur mit Haken „Einreichen erlauben“ (Einstellungen → Galerie); Verwalten (manage_gallery)
+  const submit = can('submit_gallery') && gallerySubmissionsOpen();
   const actions =
-    can('submit_gallery') || can('review_gallery') || manage ? (
+    submit || can('review_gallery') || manage ? (
       <div className="button-row gallery-actions">
-        {can('submit_gallery') && (
-          <IconButton icon="submit" label="Bilder und Videos einreichen" onClick={() => navigate('galerie/einreichen')} />
-        )}
+        {submit && <IconButton icon="submit" label="Bilder und Videos einreichen" onClick={() => navigate('galerie/einreichen')} />}
         {can('review_gallery') && <IconButton icon="review" label="Einreichungen prüfen" onClick={() => navigate('galerie/pruefen')} />}
         {manage && <IconButton icon="albumAdd" label="Alben anlegen und hochladen" onClick={() => navigate('galerie/verwalten')} />}
       </div>

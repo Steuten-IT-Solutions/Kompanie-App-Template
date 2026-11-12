@@ -65,6 +65,8 @@ final class SettingsService
                 'store' => $a->gallery()->store(),
                 'media_bytes' => $a->gallery()->mediaBytes(),
                 'downloads' => $a->gallery()->downloadsEnabled(),
+                // Einreichen von Bildern und Videos durch Mitglieder erlaubt (Haken, Vorgabe bei Neuinstallation: aus)
+                'submissions' => $a->gallerySubmissions()->enabled(),
                 // Wie google.* (für ältere Fassungen der App)
                 'service_account_email' => $drive->clientEmail(),
                 'oauth_connected' => $drive->oauth() !== null,
@@ -192,6 +194,13 @@ final class SettingsService
             }
             $downloads = $in['gallery_downloads'] === '1';
         }
+        $submissions = null;
+        if (array_key_exists('gallery_submissions', $in)) {
+            if (!in_array($in['gallery_submissions'], ['0', '1'], true)) {
+                throw ApiError::invalid('Ungültiger Wert für gallery_submissions (0 oder 1).');
+            }
+            $submissions = $in['gallery_submissions'] === '1';
+        }
         if (array_key_exists('news_source', $in)) {
             if (!in_array($in['news_source'], $a->newsService()->sources(), true)) {
                 throw ApiError::invalid('Unbekannte Quelle für Neuigkeiten.');
@@ -239,6 +248,9 @@ final class SettingsService
         }
         if ($downloads !== null) {
             $a->gallery()->setDownloads($downloads);
+        }
+        if ($submissions !== null) {
+            $a->gallerySubmissions()->setEnabled($submissions);
         }
         if ($root !== null) {
             $before = $a->gallery()->root();

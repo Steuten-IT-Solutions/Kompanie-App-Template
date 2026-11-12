@@ -2051,6 +2051,12 @@ test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)',
   }, title);
   expect(albumId).toBeGreaterThan(0);
 
+  // Einreichen erst erlauben (Einstellungen → Galerie; neue Installationen: aus)
+  await page.goto('/app/#/einstellungen/galerie');
+  await page.getByLabel(/Einreichen von Bildern und Videos durch Mitglieder erlauben/).check();
+  await page.locator('#einstellungen-galerie').getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+
   await page.goto('/app/#/galerie');
   await page.getByRole('button', { name: 'Bilder und Videos einreichen' }).click();
   const form = page.locator('form', { hasText: 'Bilder und Videos einreichen' });
@@ -2101,6 +2107,18 @@ test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)',
   await page.goto('/app/#/galerie/einreichen');
   await expect(page.locator('.gallery-upload', { hasText: 'zweites.jpg' })).toContainText('nicht freigegeben: Unscharf');
   await expect(page.locator('.gallery-upload', { hasText: 'foto.jpg' }).filter({ hasText: title })).toContainText('freigegeben');
+
+  // Ausgeschaltet: kein Knopf mehr, das Formular sagt es; eigene Einreichungen bleiben sichtbar
+  await page.goto('/app/#/einstellungen/galerie');
+  await page.getByLabel(/Einreichen von Bildern und Videos durch Mitglieder erlauben/).uncheck();
+  await page.locator('#einstellungen-galerie').getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  await page.goto('/app/#/galerie');
+  await expect(page.getByRole('button', { name: 'Einreichungen prüfen' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Bilder und Videos einreichen' })).toHaveCount(0);
+  await page.goto('/app/#/galerie/einreichen');
+  await expect(page.getByText('Das Einreichen ist zurzeit ausgeschaltet.')).toBeVisible();
+  await expect(page.locator('.gallery-upload', { hasText: 'zweites.jpg' })).toContainText('nicht freigegeben: Unscharf');
 
   // Aufräumen: das Album mit dem freigegebenen Bild löschen
   const status = await page.evaluate(async (id) => {

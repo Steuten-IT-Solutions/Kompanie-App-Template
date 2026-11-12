@@ -725,6 +725,8 @@ final class Api
             // für alle, die freigeben (Zähler in der Verwaltung), sonst null
             'registration' => $a->registrations()->enabled(),
             'pendingRegistrations' => $user !== null && $this->can(Cap::CreateUsers) ? $a->registrations()->countPending() : null,
+            // Einreichen von Bildern und Videos erlaubt (Einstellungen → Galerie): sonst kein Knopf „einreichen“
+            'gallerySubmissions' => ($features['gallery'] ?? false) && $a->gallerySubmissions()->enabled(),
             // Impressum und Datenschutzerklärung der Kompanie (Einstellungen → Impressum und Datenschutz): für alle, auch Gäste
             'legal' => self::legalLinks($a->settingsService()->legal()),
             // Handbuch auf GitHub Pages der Kompanie: neben updates.json (Issue #12)
