@@ -271,6 +271,34 @@ final class BackupUploadTest extends TestCase
         $this->assertSame(['bytes 0-262143/614400', 'bytes 262144-524287/614400', 'bytes 524288-614399/614400'], $this->puts);
         $this->assertSame(['0/614400', '262144/614400', '524288/614400'], $seen, 'Fortschritt nach jedem angenommenen Stück');
         $this->assertSame($content, $this->drive[$id]['content']);
+        $stats = $this->app->drive()->lastUploadStats();
+        $this->assertNotNull($stats);
+        $this->assertSame(614400, $stats['bytes']);
+        $this->assertSame(3, $stats['chunks'], 'Messung: drei Stücke');
+        $this->assertGreaterThanOrEqual($stats['slowest_seconds'], $stats['send_seconds']);
+        $this->assertGreaterThanOrEqual($stats['send_seconds'] + $stats['start_seconds'], $stats['total_seconds'] + 0.002);
+    }
+
+    public function testDurationOfTheLastUploadIsShown(): void
+    {
+        $this->connect();
+        $this->api('PUT', '/admin/backup/drive', ['enabled' => true]);
+        $this->assertNull($this->app->backupUpload()->status()['last_upload'], 'vor dem ersten Hochladen keine Messung');
+        [$s, $r] = $this->api('POST', '/admin/backup/drive/upload');
+        $this->assertSame(200, $s, (string) json_encode($r));
+        $stats = $r['last_upload'];
+        $this->assertSame(strlen(array_values($this->drive)[0]['content']), $stats['bytes']);
+        $this->assertSame(1, $stats['chunks'], 'klein: ein Stück');
+        foreach (['start_seconds', 'read_seconds', 'send_seconds', 'slowest_seconds', 'total_seconds'] as $k) {
+            // JSON ohne Nachkommastellen bei ganzen Zahlen (0.0 → 0)
+            $this->assertTrue(is_int($stats[$k]) || is_float($stats[$k]), $k);
+            $this->assertGreaterThanOrEqual(0, $stats[$k], $k);
+        }
+
+        // Scheitert das nächste Hochladen, bleibt die Messung des letzten erfolgreichen stehen.
+        $this->putStatus = 403;
+        $this->api('POST', '/admin/backup/drive/upload');
+        $this->assertEquals($stats, $this->app->backupUpload()->status()['last_upload']);
     }
 
     public function testDownloadAsFileOnlyForAdminsAndNotInPreview(): void

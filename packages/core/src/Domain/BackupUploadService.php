@@ -35,7 +35,10 @@ final class BackupUploadService implements OffsiteBackup
     public const KEEP_BEFORE_UPDATE = 5;
     /** Einstellung (gehört zu den Daten): {enabled: bool, folder_id: string} */
     public const SETTING = 'backup_drive';
-    /** Zustand dieser Installation (nicht in Sicherungen): {last_ok: int, last_try: int, error: string} */
+    /**
+     * Zustand dieser Installation (nicht in Sicherungen): {last_ok: int, last_try: int, error: string, upload: Messung des
+     * letzten erfolgreichen Hochladens (DriveClient::lastUploadStats) oder null}
+     */
     public const STATE_SETTING = 'backup_drive_state';
     private const PREFIX = 'sicherung-';
     private const PREFIX_UPDATE = 'vor-update-';
@@ -77,6 +80,8 @@ final class BackupUploadService implements OffsiteBackup
             'last_ok' => $state['last_ok'] > 0 ? $state['last_ok'] : null,
             'last_try' => $state['last_try'] > 0 ? $state['last_try'] : null,
             'error' => $state['error'] !== '' ? $state['error'] : null,
+            // Wie lange das letzte Hochladen gedauert hat (Größe, Stücke, Sekunden), damit sich langsame Uploads einordnen lassen
+            'last_upload' => $state['upload'],
             'every_days' => self::EVERY_DAYS,
             'keep' => self::KEEP,
         ];
@@ -181,7 +186,7 @@ final class BackupUploadService implements OffsiteBackup
     /**
      * Datei in den Ordner hochladen, ältere mit demselben Anfang über $keep hinaus löschen.
      *
-     * @param array{last_ok: int, last_try: int, error: string} $state
+     * @param array{last_ok: int, last_try: int, error: string, upload: array<string, int|float>|null} $state
      * @param (callable(int, int): void)|null $onProgress übertragene Bytes, Größe
      */
     private function store(string $path, string $name, string $prefix, int $keep, array &$state, ?callable $onProgress = null): void
@@ -189,6 +194,7 @@ final class BackupUploadService implements OffsiteBackup
         $folder = $this->folder();
         $type = str_ends_with($name, BackupCrypto::EXTENSION) ? 'application/octet-stream' : 'application/json';
         $this->app->drive()->uploadFile($folder, $name, $path, $type, DriveClient::UPLOAD_CHUNK, $onProgress);
+        $state['upload'] = $this->app->drive()->lastUploadStats();
         $this->prune($folder, $prefix, $keep);
         $state['last_ok'] = $state['last_try'];
         $state['error'] = '';
@@ -285,7 +291,7 @@ final class BackupUploadService implements OffsiteBackup
         return $out;
     }
 
-    /** @return array{last_ok: int, last_try: int, error: string} */
+    /** @return array{last_ok: int, last_try: int, error: string, upload: array<string, int|float>|null} */
     private function state(): array
     {
         $s = $this->app->settings->get(self::STATE_SETTING);
@@ -294,6 +300,24 @@ final class BackupUploadService implements OffsiteBackup
             'last_ok' => is_int($s['last_ok'] ?? null) ? $s['last_ok'] : 0,
             'last_try' => is_int($s['last_try'] ?? null) ? $s['last_try'] : 0,
             'error' => is_string($s['error'] ?? null) ? $s['error'] : '',
+            'upload' => self::uploadStats($s['upload'] ?? null),
         ];
+    }
+
+    /**
+     * Gespeicherte Messung prüfen: nur bekannte Schlüssel mit Zahlen.
+     *
+     * @return array<string, int|float>|null
+     */
+    private static function uploadStats(mixed $raw): ?array
+    {
+        if (!is_array($raw) || !is_int($raw['bytes'] ?? null) || !is_int($raw['chunks'] ?? null)) {
+            return null;
+        }
+        $out = ['bytes' => $raw['bytes'], 'chunks' => $raw['chunks']];
+        foreach (['start_seconds', 'read_seconds', 'send_seconds', 'slowest_seconds', 'total_seconds'] as $k) {
+            $out[$k] = is_int($raw[$k] ?? null) || is_float($raw[$k] ?? null) ? (float) $raw[$k] : 0.0;
+        }
+        return $out;
     }
 }

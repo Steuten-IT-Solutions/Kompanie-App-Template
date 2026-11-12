@@ -786,7 +786,7 @@ final class Subjects
             '/admin/push' => ['supported', 'missing', 'accounts', 'guests', 'queued', 'log.', 'devices', 'subscriptions', 'counts'],
             '/admin/navigation' => ['targets', 'icons', 'max_menu_items', 'label_max'],
             '/admin/maintenance' => ['since', 'by', 'log'],
-            '/admin/backup/drive' => ['available', 'access', 'encrypted', 'email', 'folder_url', 'last_ok', 'last_try', 'error', 'every_days', 'keep'],
+            '/admin/backup/drive' => ['available', 'access', 'encrypted', 'email', 'folder_url', 'last_ok', 'last_try', 'error', 'last_upload', 'last_upload.', 'every_days', 'keep'],
             '/admin/backup/server' => ['available', 'can_restore', 'last_ok', 'last_try', 'error', 'every_days', 'keep', 'files'],
             '/admin/former/retention' => ['due', 'soon'],
         ];

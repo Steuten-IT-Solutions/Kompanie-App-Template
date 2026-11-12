@@ -2969,8 +2969,24 @@ export interface BackupDriveStatus {
   last_ok: number | null;
   last_try: number | null;
   error: string | null;
+  /** Messung des letzten erfolgreichen Hochladens; null, solange es keine gibt */
+  last_upload: BackupUploadStats | null;
   every_days: number;
   keep: number;
+}
+
+/** Wie lange das Hochladen einer Sicherung nach Google Drive gedauert hat (Sekunden) */
+export interface BackupUploadStats {
+  bytes: number;
+  chunks: number;
+  /** Sitzung bei Google beginnen (eine kleine Anfrage: Verbindungsaufbau und Antwortzeit) */
+  start_seconds: number;
+  /** Datei von der Platte des Servers lesen */
+  read_seconds: number;
+  /** alle Stücke senden, bis Google sie bestätigt */
+  send_seconds: number;
+  slowest_seconds: number;
+  total_seconds: number;
 }
 
 /** Eine Sicherung im geschützten Ordner auf dem Server: wöchentlich oder vor einem Update */
