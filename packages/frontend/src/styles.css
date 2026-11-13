@@ -3497,6 +3497,12 @@ fieldset.rights-tree legend {
   background: #a3301a;
   border-color: #a3301a;
 }
+/* Kommender Termin: anwesend/fehlt gesperrt (gestrichelt, blass). */
+.attendance-check:disabled {
+  cursor: not-allowed;
+  border-style: dashed;
+  opacity: 0.35;
+}
 .attendance-check:focus-visible {
   outline: 3px solid var(--primary);
   outline-offset: 2px;
