@@ -26,6 +26,7 @@ final class AttendanceServiceTest extends TestCase
     private int $admin;
     private int $m;
     private int $cand;
+    private FixedClock $clock;
 
     /** @param array<string, bool> $features */
     private function setUpApp(array $features = ['attendance' => true, 'calendar' => true, 'points' => true, 'penalties' => true], ?\PDO $pdo = null): void
@@ -38,12 +39,17 @@ final class AttendanceServiceTest extends TestCase
         $http = new FakeHttpClient(fn () => ['status' => 200, 'body' => $this->ics]);
         $all = ['events' => false, 'calendar' => false, 'news' => false, 'gallery' => false, 'points' => false, 'penalties' => false, 'ranks' => false, 'titles' => false, 'attendance' => false];
         $db = $pdo === null ? TestApp::connection() : new PdoConnection($pdo, 'kompanie_');
-        $this->app = TestApp::create($db, $this->users, [], $http, null, new MemorySettings(['calendar_ics_url' => 'https://example.test/k.ics']), new FixedClock(new \DateTimeImmutable('2026-10-20 12:00:00')), $features + $all);
+        $this->app = TestApp::create($db, $this->users, [], $http, null, new MemorySettings(['calendar_ics_url' => 'https://example.test/k.ics']), $this->clock = new FixedClock(new \DateTimeImmutable('2026-10-20 12:00:00')), $features + $all);
         $this->admin = $this->users->add('admin', Roles::ADMIN);
         $this->m = $this->users->add('mitglied', Roles::MEMBER);
         $this->cand = $this->users->add('anwaerter', TestApp::candidateRole($this->app));
         $this->users->add('gast', Roles::GUEST);
         $this->users->current = $this->admin;
+    }
+
+    private function setClock(string $at): void
+    {
+        $this->clock->at = new \DateTimeImmutable($at);
     }
 
     private function call(string $method, string $path, array $body = [], array $query = []): Response
@@ -55,7 +61,8 @@ final class AttendanceServiceTest extends TestCase
     private function createForEvent(string $key = ''): array
     {
         if ($key === '') {
-            $key = (string) $this->call('GET', '/attendance/events')->data[0]['key'];
+            $past = array_values(array_filter($this->call('GET', '/attendance/events')->data, static fn (array $e): bool => !$e['upcoming']));
+            $key = (string) $past[0]['key'];
         }
         $res = $this->call('PUT', '/attendance', ['source' => 'calendar', 'event_key' => $key]);
         $this->assertContains($res->status, [200, 201], (string) json_encode($res->data));
@@ -65,8 +72,10 @@ final class AttendanceServiceTest extends TestCase
     public function testCalendarListKeepsSnapshot(): void
     {
         $this->setUpApp();
-        $events = $this->call('GET', '/attendance/events')->data;
-        $this->assertSame(['Probe'], array_column($events, 'title'), 'nur die letzten Wochen bis heute');
+        $all = $this->call('GET', '/attendance/events')->data;
+        $this->assertSame(['Fest', 'Probe'], array_column($all, 'title'), 'die letzten Wochen und kommende, die spätesten zuerst');
+        $this->assertSame([true, false], array_column($all, 'upcoming'));
+        $events = [$all[1]];
         $this->assertSame('2026-10-15', $events[0]['date']);
         $this->assertNull($events[0]['list_id']);
 
@@ -82,12 +91,53 @@ final class AttendanceServiceTest extends TestCase
 
         // Dieselbe Liste beim zweiten Öffnen; die Momentaufnahme bleibt, auch ohne den Termin im Kalender.
         $this->assertSame(200, $this->call('PUT', '/attendance', ['source' => 'calendar', 'event_key' => $events[0]['key']])->status);
-        $this->assertSame($list['id'], $this->call('GET', '/attendance/events')->data[0]['list_id']);
+        $this->assertSame($list['id'], $this->call('GET', '/attendance/events')->data[1]['list_id']);
         $this->ics = "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n";
         $this->app->calendar()->clearCache();
         $this->assertSame('Probe', $this->call('GET', '/attendance/' . $list['id'])->data['title']);
         $this->assertSame(400, $this->call('PUT', '/attendance', ['source' => 'calendar', 'event_key' => 'gibtsnicht'])->status);
         $this->assertSame(['Probe'], array_column($this->call('GET', '/attendance')->data, 'title'));
+    }
+
+    public function testUpcomingEventsOnlyExcused(): void
+    {
+        $this->setUpApp();
+        $fest = $this->call('GET', '/attendance/events')->data[0];
+        $this->assertSame(['Fest', '2026-11-01', true], [$fest['title'], $fest['date'], $fest['upcoming']]);
+
+        // Neu mit „anwesend“ oder „fehlt“: abgelehnt, und es entsteht keine Liste.
+        foreach (['present', 'absent'] as $status) {
+            $res = $this->call('PUT', '/attendance', ['source' => 'calendar', 'event_key' => $fest['key'], 'entries' => [$this->m => $status]]);
+            $this->assertSame(400, $res->status, $status);
+        }
+        $this->assertSame([], $this->call('GET', '/attendance')->data);
+
+        $res = $this->call('PUT', '/attendance', ['source' => 'calendar', 'event_key' => $fest['key'], 'entries' => [$this->m => 'excused']]);
+        $this->assertSame(201, $res->status, (string) json_encode($res->data));
+        $this->assertTrue($res->data['upcoming']);
+        $this->assertSame(['present' => 0, 'excused' => 1, 'absent' => 0], $res->data['counts']);
+        $id = $res->data['id'];
+        $this->assertSame(400, $this->call('PUT', '/attendance', ['id' => $id, 'entries' => [$this->cand => 'present']])->status);
+        $this->assertSame(400, $this->call('PUT', '/attendance', ['source' => 'calendar', 'event_key' => $fest['key'], 'entries' => [$this->cand => 'absent']])->status, 'auch über den Termin');
+        $this->assertSame(200, $this->call('PUT', '/attendance', ['id' => $id, 'entries' => [$this->m => null, $this->cand => 'excused']])->status);
+        $this->assertSame([true], array_column($this->call('GET', '/attendance')->data, 'upcoming'));
+
+        // Am Tag des Termins geht alles.
+        $this->setClock('2026-11-01 09:00:00');
+        $this->assertFalse($this->call('GET', "/attendance/$id")->data['upcoming']);
+        $this->assertSame(200, $this->call('PUT', '/attendance', ['id' => $id, 'entries' => [$this->m => 'present', $this->cand => 'absent']])->status);
+    }
+
+    public function testFreeListDateMovedToFuture(): void
+    {
+        $this->setUpApp(['attendance' => true]);
+        $this->assertSame(400, $this->call('PUT', '/attendance', ['source' => 'free', 'title' => 'Ausflug', 'date' => '2026-10-21', 'entries' => [$this->m => 'present']])->status);
+        $this->assertSame([], $this->call('GET', '/attendance')->data, 'keine halbe Liste');
+        $id = $this->call('PUT', '/attendance', ['source' => 'free', 'title' => 'Übung', 'date' => '2026-10-20', 'entries' => [$this->m => 'present', $this->cand => 'excused']])->data['id'];
+        $this->assertSame(400, $this->call('PUT', '/attendance', ['id' => $id, 'date' => '2026-10-21'])->status, 'gespeichertes „anwesend“ bleibt sonst stehen');
+        $res = $this->call('PUT', '/attendance', ['id' => $id, 'date' => '2026-10-21', 'entries' => [$this->m => null]]);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame(['2026-10-21', true], [$res->data['date'], $res->data['upcoming']]);
     }
 
     public function testFreeListAndStatusChanges(): void

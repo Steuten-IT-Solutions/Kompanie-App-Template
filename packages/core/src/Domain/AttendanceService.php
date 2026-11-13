@@ -17,6 +17,9 @@ use KompanieApp\Core\Storage\AttendanceRepository;
  * - Eine Liste je Termin: aus dem internen Kalender (source calendar, event_key = ID des Termins) oder frei angelegt
  *   (source free). Titel und Datum sind eine Momentaufnahme; die Liste bleibt, auch wenn der Termin verschwindet.
  * - In jeder Liste stehen alle mit einer Rolle (alle außer Gästen); Status anwesend, entschuldigt oder fehlt.
+ * - Kommende Termine (Datum nach heute in der Zeitzone der Kompanie): Listen lassen sich schon vorher anlegen, damit
+ *   man Personen vorab entschuldigen kann. Bis zum Tag des Termins ist nur „entschuldigt“ erlaubt; anwesend und fehlt
+ *   stehen erst fest, wenn der Termin da ist.
  * - Punkte für Anwesende und Strafen für Fehlende bucht man über die üblichen Formulare (Vorschlag). Punkte tragen
  *   die ID der Liste (points.attendance_id); daran erkennt die App, wer schon welche hat. Punkte und Strafen gibt es
  *   nur für Mitglieder.
@@ -65,37 +68,39 @@ final class AttendanceService
             $people[$u->id] = true;
         }
         $counts = $this->repository()->counts(array_column($lists, 'id'), $people);
+        $today = $this->today();
         return array_map(static fn (array $l): array => [
             'id' => $l['id'],
             'source' => $l['source'],
             'title' => $l['title'],
             'date' => $l['event_date'],
+            'upcoming' => $l['event_date'] > $today,
             'counts' => self::statusCounts($counts[$l['id']] ?? []),
         ], $lists);
     }
 
     /**
-     * Termine aus dem internen Kalender der letzten Wochen bis heute zur Auswahl, die jüngsten zuerst, mit der ID einer
-     * schon angelegten Liste. Ohne Bereich Kalender leer.
+     * Termine aus dem internen Kalender zur Auswahl: die der letzten Wochen und alle kommenden, die spätesten zuerst, mit
+     * der ID einer schon angelegten Liste und ob der Termin noch kommt (upcoming). Ohne Bereich Kalender leer.
      *
-     * @return list<array{key: string, title: string, date: string, start: string, end: string, all_day: bool, list_id: int|null}>
+     * @return list<array{key: string, title: string, date: string, start: string, end: string, all_day: bool, upcoming: bool, list_id: int|null}>
      */
     public function events(): array
     {
         if (!$this->app->features()->enabled('calendar') || !$this->app->calendar()->isConfigured()) {
             return [];
         }
-        $today = $this->app->time()->today()->format('Y-m-d');
+        $today = $this->today();
         $from = $this->app->time()->today()->modify('-' . CalendarService::PAST_DAYS . ' days')->format('Y-m-d');
         $lists = $this->repository()->calendarListIds();
         $out = [];
         foreach ($this->app->calendar()->events() as $e) {
             $date = $this->localDate((string) $e['start']);
-            if ($date < $from || $date > $today) {
+            if ($date < $from) {
                 continue;
             }
             $key = (string) $e['id'];
-            $out[] = ['key' => $key, 'title' => (string) $e['title'], 'date' => $date, 'start' => (string) $e['start'], 'end' => (string) $e['end'], 'all_day' => (bool) ($e['all_day'] ?? false), 'list_id' => $lists[$key] ?? null];
+            $out[] = ['key' => $key, 'title' => (string) $e['title'], 'date' => $date, 'start' => (string) $e['start'], 'end' => (string) $e['end'], 'all_day' => (bool) ($e['all_day'] ?? false), 'upcoming' => $date > $today, 'list_id' => $lists[$key] ?? null];
         }
         return array_reverse($out);
     }
@@ -146,6 +151,7 @@ final class AttendanceService
             'event_key' => $list['source'] === self::SOURCE_CALENDAR ? $list['event_key'] : null,
             'title' => $list['title'],
             'date' => $list['event_date'],
+            'upcoming' => $list['event_date'] > $this->today(),
             'updated_by_name' => $names->name($list['updated_by']),
             'updated_at' => $list['updated_at'],
             'people' => $people,
@@ -179,6 +185,7 @@ final class AttendanceService
                     $data['event_date'] = self::validDate($in['date']);
                 }
             }
+            $this->checkUpcoming($changes, $data['event_date'] ?? $list['event_date'], $id);
         } else {
             $source = $in['source'] ?? null;
             if ($source === self::SOURCE_CALENDAR) {
@@ -186,8 +193,10 @@ final class AttendanceService
                 $list = $key === '' ? null : $repo->findByEvent(self::SOURCE_CALENDAR, $key);
                 if ($list === null) {
                     $event = $this->calendarEvent($key);
+                    $date = $this->localDate((string) $event['start']);
+                    $this->checkUpcoming($changes, $date);
                     try {
-                        $id = $repo->insert(self::SOURCE_CALENDAR, $key, mb_substr(Text::line($event['title'], self::TITLE_MAX + 1), 0, self::TITLE_MAX), $this->localDate((string) $event['start']), $actor->id, $now);
+                        $id = $repo->insert(self::SOURCE_CALENDAR, $key, mb_substr(Text::line($event['title'], self::TITLE_MAX + 1), 0, self::TITLE_MAX), $date, $actor->id, $now);
                         $created = true;
                     } catch (\RuntimeException $e) {
                         // Gleichzeitig angelegt (eindeutig je Termin): die andere Liste nehmen.
@@ -195,9 +204,13 @@ final class AttendanceService
                     }
                 } else {
                     $id = $list['id'];
+                    $this->checkUpcoming($changes, $list['event_date'], $id);
                 }
             } elseif ($source === self::SOURCE_FREE) {
-                $id = $repo->insert(self::SOURCE_FREE, bin2hex(random_bytes(8)), self::validTitle($in['title'] ?? null), self::validDate($in['date'] ?? null), $actor->id, $now);
+                $title = self::validTitle($in['title'] ?? null);
+                $date = self::validDate($in['date'] ?? null);
+                $this->checkUpcoming($changes, $date);
+                $id = $repo->insert(self::SOURCE_FREE, bin2hex(random_bytes(8)), $title, $date, $actor->id, $now);
                 $created = true;
             } else {
                 throw ApiError::invalid('Bitte einen Termin aus dem Kalender wählen oder einen freien Termin anlegen.');
@@ -390,6 +403,34 @@ final class AttendanceService
             $out[$id] = $status;
         }
         return $out;
+    }
+
+    /**
+     * Kommender Termin: nur „entschuldigt“ oder leer. Mit $listId zählen auch die gespeicherten Einträge, die bleiben
+     * (z. B. wenn das Datum einer freien Liste in die Zukunft rückt).
+     *
+     * @param array<int, string|null> $changes
+     */
+    private function checkUpcoming(array $changes, string $date, ?int $listId = null): void
+    {
+        if ($date <= $this->today()) {
+            return;
+        }
+        $statuses = $changes;
+        if ($listId !== null) {
+            $statuses += array_map(static fn (array $e): string => $e['status'], $this->repository()->entries($listId));
+        }
+        foreach ($statuses as $status) {
+            if ($status !== null && $status !== self::EXCUSED) {
+                throw ApiError::invalid('Für einen kommenden Termin lässt sich nur „entschuldigt“ eintragen. „Anwesend“ und „fehlt“ gehen erst ab dem Tag des Termins.');
+            }
+        }
+    }
+
+    /** Heute in der Zeitzone der Kompanie (Y-m-d). */
+    private function today(): string
+    {
+        return $this->app->time()->today()->format('Y-m-d');
     }
 
     /** @return array<string, mixed> */

@@ -1589,19 +1589,24 @@ export type AttendanceStatus = 'present' | 'excused' | 'absent';
 export const ATTENDANCE_LABELS: Record<AttendanceStatus, string> = { present: 'anwesend', excused: 'entschuldigt', absent: 'fehlt' };
 export type AttendanceCounts = Record<AttendanceStatus, number>;
 
-/** „3 anwesend · 1 entschuldigt · 0 fehlt“ */
-export const countsText = (c: AttendanceCounts): string =>
-  (['present', 'excused', 'absent'] as AttendanceStatus[]).map((s) => `${c[s]} ${ATTENDANCE_LABELS[s]}`).join(' · ');
+/** „3 anwesend · 1 entschuldigt · 0 fehlt“, mit open zusätzlich „· 5 ohne Auswahl“ */
+export const countsText = (c: AttendanceCounts, open?: number): string =>
+  (['present', 'excused', 'absent'] as AttendanceStatus[])
+    .map((s) => `${c[s]} ${ATTENDANCE_LABELS[s]}`)
+    .concat(open === undefined ? [] : [`${open} ohne Auswahl`])
+    .join(' · ');
 
 export interface AttendanceSummary {
   id: number;
   source: 'calendar' | 'free';
   title: string;
   date: string;
+  /** Termin nach heute: nur „entschuldigt“ möglich */
+  upcoming: boolean;
   counts: AttendanceCounts;
 }
 
-/** Termin aus dem internen Kalender zur Auswahl (letzte Wochen bis heute) */
+/** Termin aus dem internen Kalender zur Auswahl (letzte Wochen und alle kommenden, die spätesten zuerst) */
 export interface AttendanceEvent {
   key: string;
   title: string;
@@ -1609,6 +1614,8 @@ export interface AttendanceEvent {
   start: string;
   end: string;
   all_day: boolean;
+  /** Termin nach heute */
+  upcoming: boolean;
   list_id: number | null;
 }
 

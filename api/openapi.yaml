@@ -3354,7 +3354,9 @@ paths:
         Mit `id` eine vorhandene Liste (bei freien Listen auch Titel und Datum). Ohne `id` neu: `source: calendar` mit
         `event_key` (gibt es schon eine Liste zu diesem Termin, wird sie genommen, 200) oder `source: free` mit `title` und
         `date`. Titel und Datum sind eine Momentaufnahme. `entries` setzt den Status je Person (null entfernt ihn);
-        nur Personen mit einer Rolle (keine Gäste).
+        nur Personen mit einer Rolle (keine Gäste). Liegt das Datum nach heute (Zeitzone der Kompanie), ist nur
+        `excused` erlaubt; das gilt auch für schon gespeicherte Einträge, wenn das Datum einer freien Liste in die Zukunft
+        rückt (sonst 400, ohne dass eine Liste entsteht).
       x-capability: manage_attendance
       requestBody:
         required: true
@@ -3393,7 +3395,7 @@ paths:
   /attendance/events:
     get:
       tags: [Verwaltung]
-      summary: Termine aus dem internen Kalender der letzten 90 Tage bis heute (jüngste zuerst)
+      summary: Termine aus dem internen Kalender der letzten 90 Tage und alle kommenden (späteste zuerst)
       description: Ohne Bereich Kalender bzw. ohne eingerichteten Kalender eine leere Liste.
       x-capability: manage_attendance
       responses:
@@ -3412,6 +3414,7 @@ paths:
                     start: { type: string }
                     end: { type: string }
                     all_day: { type: boolean }
+                    upcoming: { type: boolean, description: Datum nach heute (Zeitzone der Kompanie) }
                     list_id: { type: [integer, 'null'], description: Schon angelegte Liste }
         '403': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }
@@ -11070,6 +11073,9 @@ components:
         source: { type: string, enum: [calendar, free] }
         title: { type: string, description: Momentaufnahme beim Anlegen }
         date: { type: string, format: date }
+        upcoming:
+          type: boolean
+          description: Datum nach heute (Zeitzone der Kompanie); dann ist nur der Status excused erlaubt.
         counts: { $ref: '#/components/schemas/AttendanceCounts' }
 
     AttendanceDetail:

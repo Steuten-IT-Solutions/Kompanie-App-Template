@@ -36,6 +36,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Webseite) ersetzt die App nie. Das neue Recht _Webseite pflegen_ (`manage_website`) vergebt ihr unter
   [Einstellungen → Rollen](app:einstellungen/rollen); beim Einschalten entsteht die Rolle _Webseite verwalten_. Die
   Statusseite zeigt, ob die Webseite erreichbar ist. Weitere Seiten, ein Menü und Entwürfe folgen.
+- **Anwesenheit für kommende Termine**: Unter [Verwaltung → Anwesenheit](app:verwaltung/anwesenheit) stehen jetzt auch
+  die kommenden Termine aus dem Kalender (eigener Abschnitt „Kommende Termine“, der nächste oben). So könnt ihr schon
+  vorher eintragen, wer entschuldigt ist. Bis zum Tag des Termins lässt sich nur „entschuldigt“ wählen; „anwesend“ und
+  „fehlt“, „Alle anwesend“ und das Buchen von Punkten und Strafen gehen erst ab dem Tag selbst. Das gilt auch für freie
+  Termine mit einem Datum in der Zukunft.
+- **Anwesenheitsliste zählt Offene**: Der Zähler über der Liste nennt zusätzlich, für wie viele Personen noch nichts
+  gewählt ist, z. B. „3 anwesend · 1 entschuldigt · 0 fehlt · 5 ohne Auswahl“.
 
 ### Behoben
 
