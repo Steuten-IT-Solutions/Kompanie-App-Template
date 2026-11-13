@@ -24,6 +24,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+## [0.12.0] – 2026-11-13
+
 ### Neu
 
 - **Sicherungen in Google Drive gepackt, Dauer des Hochladens**: Die App packt Sicherungen vor dem Hochladen nach
