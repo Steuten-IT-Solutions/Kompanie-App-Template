@@ -79,7 +79,9 @@ function Submit({ onToast }: { onToast: (msg: string) => void }) {
         }}
       >
         <h2>Bilder und Videos einreichen</h2>
-        {albums.length === 0 ? (
+        {data?.enabled === false ? (
+          <p className="muted small">Das Einreichen ist zurzeit ausgeschaltet.</p>
+        ) : albums.length === 0 ? (
           <p className="muted small">Noch keine Alben, in die du einreichen kannst.</p>
         ) : (
           <>

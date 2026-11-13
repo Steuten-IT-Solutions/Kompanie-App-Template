@@ -17,7 +17,7 @@ import RichTextView from '../richtext/RichTextView';
 import { setBrowseOrder } from '../memberSort';
 import { MemberRow } from '../MemberRow';
 import { navigate } from '../router';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { Caps, Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 
 const sec = brand.labels.sections;
@@ -92,7 +92,7 @@ function CompanyList() {
   if (error || !data) return <ErrorBox message={error ?? `Die ${sec.companies} konnten nicht geladen werden.`} onRetry={reload} />;
   const manage = can('manage_companies') && (
     <button type="button" className="btn btn-secondary btn-block manage-events" onClick={() => navigate('verwaltung/kompanien')}>
-      {sec.companies} verwalten
+      <Caps text={sec.companies} /> verwalten
     </button>
   );
   if (data.length === 0)

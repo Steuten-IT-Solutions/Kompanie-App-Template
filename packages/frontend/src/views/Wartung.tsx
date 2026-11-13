@@ -15,6 +15,7 @@ import {
   type UpdateStep,
 } from '../api';
 import { filePayload, isEncryptedFile } from '../backupFile';
+import { uploadStatsText } from '../backupUploadStats';
 import brand from '../generated/brand';
 import { ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
@@ -838,7 +839,7 @@ function Datensicherung({
       <input
         ref={fileInput}
         type="file"
-        accept="application/json,application/octet-stream,.json,.enc"
+        accept="application/json,application/octet-stream,application/gzip,.json,.enc,.gz"
         hidden
         onChange={(e) => void restore(e)}
       />
@@ -1145,6 +1146,7 @@ function DriveSicherung({ onToast, noSodium }: { onToast: (msg: string) => void;
           )}
         </p>
       )}
+      {d.enabled && d.last_upload && <p className="small">Letztes Hochladen: {uploadStatsText(d.last_upload)}</p>}
       {d.enabled && d.error && (
         <p className="form-error" role="alert">
           Letzter Versuch ({date(d.last_try)}) fehlgeschlagen: {d.error}

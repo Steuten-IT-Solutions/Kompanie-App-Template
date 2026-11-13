@@ -127,6 +127,8 @@ export interface AppConfig {
   registration?: boolean;
   /** Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null */
   pendingRegistrations?: number | null;
+  /** Einreichen von Bildern und Videos erlaubt (Einstellungen → Galerie); fehlt bei älteren Servern (dann erlaubt) */
+  gallerySubmissions?: boolean;
   /** Rollen der Installation (Einstellungen → Rollen): Bezeichnung und Punktefaktor */
   roles?: RoleInfo[];
   /** null = Gast ohne Anmeldung. */
@@ -517,6 +519,18 @@ export function applyOpenReports(count: number): void {
   if (!config || config.openReports == null || config.openReports === count) return;
   config.openReports = count;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/** Übernimmt den Haken „Einreichen erlauben“ der Galerie in die geladene Konfiguration (nach dem Speichern). */
+export function applyGallerySubmissions(enabled: boolean): void {
+  if (!config || config.gallerySubmissions === enabled) return;
+  config.gallerySubmissions = enabled;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/** Darf, wer submit_gallery hat, gerade einreichen? Ältere Server kennen den Haken nicht (dann ja). */
+export function gallerySubmissionsOpen(): boolean {
+  return config?.gallerySubmissions !== false;
 }
 
 /** Übernimmt die Einstellung „Zugang beantragen“ in die geladene Konfiguration (nach dem Speichern). */
@@ -2969,8 +2983,24 @@ export interface BackupDriveStatus {
   last_ok: number | null;
   last_try: number | null;
   error: string | null;
+  /** Messung des letzten erfolgreichen Hochladens; null, solange es keine gibt */
+  last_upload: BackupUploadStats | null;
   every_days: number;
   keep: number;
+}
+
+/** Wie lange das Hochladen einer Sicherung nach Google Drive gedauert hat (Sekunden) */
+export interface BackupUploadStats {
+  bytes: number;
+  chunks: number;
+  /** Sitzung bei Google beginnen (eine kleine Anfrage: Verbindungsaufbau und Antwortzeit) */
+  start_seconds: number;
+  /** Datei von der Platte des Servers lesen */
+  read_seconds: number;
+  /** alle Stücke senden, bis Google sie bestätigt */
+  send_seconds: number;
+  slowest_seconds: number;
+  total_seconds: number;
 }
 
 /** Eine Sicherung im geschützten Ordner auf dem Server: wöchentlich oder vor einem Update */
@@ -3149,6 +3179,8 @@ export interface AdminSettings {
     media_bytes?: number;
     /** Knöpfe zum Herunterladen in der Galerie; fehlt bei älteren Servern */
     downloads?: boolean;
+    /** Einreichen von Bildern und Videos durch Mitglieder erlaubt; fehlt bei älteren Servern */
+    submissions?: boolean;
     service_account_email: string;
     oauth_connected: boolean;
     oauth_email: string;
@@ -3187,6 +3219,8 @@ export interface GallerySubmission {
 }
 
 export interface GallerySubmissionsOwn {
+  /** Einreichen erlaubt (Einstellungen → Galerie); fehlt bei älteren Servern (dann erlaubt) */
+  enabled?: boolean;
   albums: { id: number; title: string; year: string }[];
   submissions: GallerySubmission[];
 }
@@ -3240,6 +3274,7 @@ export interface AdminSettingsInput {
   gallery_source?: GallerySourceType;
   gallery_store?: 'server';
   gallery_downloads?: '0' | '1';
+  gallery_submissions?: '0' | '1';
   news_source?: NewsSourceType;
   news_url?: string;
   legal_imprint_url?: string;

@@ -21,7 +21,9 @@ use KompanieApp\Core\Update\OffsiteBackup;
  * KEEP_BEFORE_UPDATE); scheitert das, fragt UpdateService nach, ob trotzdem aktualisiert werden soll.
  *
  * Ist ein Passwort für Sicherungen eingerichtet (BackupEncryptionService), gehen sie verschlüsselt nach Drive (Endung
- * .json.enc), sonst wie bisher als .json.
+ * .json.enc), sonst unverschlüsselt. Vorher packt die App sie mit gzip (etwa ein Viertel kleiner, Text deutlich mehr;
+ * Fotos und Dateien stehen als Base64 darin): ohne Passwort als .json.gz, mit Passwort gepackt und dann verschlüsselt.
+ * Fehlt PHP die Erweiterung zlib, gehen sie ungepackt (.json) wie früher. Wiederherstellen erkennt beides.
  */
 final class BackupUploadService implements OffsiteBackup
 {
@@ -35,9 +37,14 @@ final class BackupUploadService implements OffsiteBackup
     public const KEEP_BEFORE_UPDATE = 5;
     /** Einstellung (gehört zu den Daten): {enabled: bool, folder_id: string} */
     public const SETTING = 'backup_drive';
-    /** Zustand dieser Installation (nicht in Sicherungen): {last_ok: int, last_try: int, error: string} */
+    /**
+     * Zustand dieser Installation (nicht in Sicherungen): {last_ok: int, last_try: int, error: string, upload: Messung des
+     * letzten erfolgreichen Hochladens (DriveClient::lastUploadStats) oder null}
+     */
     public const STATE_SETTING = 'backup_drive_state';
     private const PREFIX = 'sicherung-';
+    /** Endung unverschlüsselter, gepackter Sicherungen (mit Passwort: gepackt und verschlüsselt, Endung wie bisher .json.enc) */
+    public const GZIP_EXTENSION = '.json.gz';
     private const PREFIX_UPDATE = 'vor-update-';
 
     public function __construct(private readonly App $app)
@@ -77,6 +84,8 @@ final class BackupUploadService implements OffsiteBackup
             'last_ok' => $state['last_ok'] > 0 ? $state['last_ok'] : null,
             'last_try' => $state['last_try'] > 0 ? $state['last_try'] : null,
             'error' => $state['error'] !== '' ? $state['error'] : null,
+            // Wie lange das letzte Hochladen gedauert hat (Größe, Stücke, Sekunden), damit sich langsame Uploads einordnen lassen
+            'last_upload' => $state['upload'],
             'every_days' => self::EVERY_DAYS,
             'keep' => self::KEEP,
         ];
@@ -129,12 +138,13 @@ final class BackupUploadService implements OffsiteBackup
             // Sicherung muss nie ganz in den Arbeitsspeicher (Fotos, Dokumente und Anhänge machen sie schnell größer als
             // memory_limit).
             $date = self::PREFIX . $this->app->time()->format($now, 'Y-m-d-His');
+            $gzip = BackupEncryptionService::gzipAvailable();
             if ($this->encrypt()) {
-                $tmp = $this->app->backupEncryption()->exportToTempFile($backup);
+                $tmp = $this->app->backupEncryption()->exportToTempFile($backup, $gzip);
                 $this->store($tmp, $date . '-' . $this->keyTag() . BackupCrypto::EXTENSION, self::PREFIX, self::KEEP, $state);
             } else {
-                $tmp = $this->app->backupEncryption()->exportPlainToTempFile($backup);
-                $this->store($tmp, $date . '.json', self::PREFIX, self::KEEP, $state);
+                $tmp = $this->app->backupEncryption()->exportPlainToTempFile($backup, $gzip);
+                $this->store($tmp, $date . ($gzip ? self::GZIP_EXTENSION : '.json'), self::PREFIX, self::KEEP, $state);
             }
         } catch (\Throwable $e) {
             $state['error'] = $e instanceof \JsonException ? 'Die Sicherung ließ sich nicht erstellen: ' . $e->getMessage() : $e->getMessage();
@@ -158,14 +168,18 @@ final class BackupUploadService implements OffsiteBackup
         $now = $this->app->time()->timestamp();
         $state = $this->state();
         $state['last_try'] = $now;
-        $encrypted = null;
+        $packed = null;
         try {
             // Die Sicherung auf dem Server bleibt unverschlüsselt (sie liegt neben der Datenbank); mit Passwort für
             // Sicherungen geht sie verschlüsselt nach Drive.
             $date = self::PREFIX_UPDATE . $this->app->time()->format($now, 'Y-m-d-His');
+            $gzip = BackupEncryptionService::gzipAvailable();
             if ($this->encrypt()) {
-                $encrypted = $this->app->backupEncryption()->encryptFile($path);
-                $this->store($encrypted, $date . '-' . $this->keyTag() . '-' . $version . BackupCrypto::EXTENSION, self::PREFIX_UPDATE, self::KEEP_BEFORE_UPDATE, $state, $onProgress);
+                $packed = $this->app->backupEncryption()->encryptFile($path, $gzip);
+                $this->store($packed, $date . '-' . $this->keyTag() . '-' . $version . BackupCrypto::EXTENSION, self::PREFIX_UPDATE, self::KEEP_BEFORE_UPDATE, $state, $onProgress);
+            } elseif ($gzip) {
+                $packed = $this->app->backupEncryption()->gzipFile($path);
+                $this->store($packed, $date . '-' . $version . self::GZIP_EXTENSION, self::PREFIX_UPDATE, self::KEEP_BEFORE_UPDATE, $state, $onProgress);
             } else {
                 $this->store($path, $date . '-' . $version . '.json', self::PREFIX_UPDATE, self::KEEP_BEFORE_UPDATE, $state, $onProgress);
             }
@@ -173,7 +187,7 @@ final class BackupUploadService implements OffsiteBackup
             $state['error'] = $e->getMessage();
             throw $e;
         } finally {
-            $encrypted !== null && BackupEncryptionService::discard($encrypted);
+            $packed !== null && BackupEncryptionService::discard($packed);
             $this->app->settings->set(self::STATE_SETTING, $state);
         }
     }
@@ -181,14 +195,15 @@ final class BackupUploadService implements OffsiteBackup
     /**
      * Datei in den Ordner hochladen, ältere mit demselben Anfang über $keep hinaus löschen.
      *
-     * @param array{last_ok: int, last_try: int, error: string} $state
+     * @param array{last_ok: int, last_try: int, error: string, upload: array<string, int|float>|null} $state
      * @param (callable(int, int): void)|null $onProgress übertragene Bytes, Größe
      */
     private function store(string $path, string $name, string $prefix, int $keep, array &$state, ?callable $onProgress = null): void
     {
         $folder = $this->folder();
-        $type = str_ends_with($name, BackupCrypto::EXTENSION) ? 'application/octet-stream' : 'application/json';
+        $type = str_ends_with($name, BackupCrypto::EXTENSION) ? 'application/octet-stream' : (str_ends_with($name, self::GZIP_EXTENSION) ? 'application/gzip' : 'application/json');
         $this->app->drive()->uploadFile($folder, $name, $path, $type, DriveClient::UPLOAD_CHUNK, $onProgress);
+        $state['upload'] = $this->app->drive()->lastUploadStats();
         $this->prune($folder, $prefix, $keep);
         $state['last_ok'] = $state['last_try'];
         $state['error'] = '';
@@ -248,12 +263,13 @@ final class BackupUploadService implements OffsiteBackup
                 if (DriveClient::isFolder($f) || !(str_starts_with($name, self::PREFIX) || str_starts_with($name, self::PREFIX_UPDATE))) {
                     continue;
                 }
+                $plainFile = str_ends_with($name, '.json') || str_ends_with($name, self::GZIP_EXTENSION);
                 if (!$encrypted) {
-                    // ohne Passwort: wie bisher die unverschlüsselten durchwechseln; verschlüsselte von früher bleiben
-                    if (str_starts_with($name, $prefix) && str_ends_with($name, '.json')) {
+                    // ohne Passwort: wie bisher die unverschlüsselten (gepackt oder nicht) durchwechseln; verschlüsselte von früher bleiben
+                    if (str_starts_with($name, $prefix) && $plainFile) {
                         $names[(string) $f['id']] = $name;
                     }
-                } elseif (str_ends_with($name, '.json')) {
+                } elseif ($plainFile) {
                     $verified && $plain[] = (string) $f['id'];
                 } elseif (str_starts_with($name, $prefix) && str_ends_with($name, BackupCrypto::EXTENSION) && ($verified || str_contains($name, $tag))) {
                     $names[(string) $f['id']] = $name;
@@ -285,7 +301,7 @@ final class BackupUploadService implements OffsiteBackup
         return $out;
     }
 
-    /** @return array{last_ok: int, last_try: int, error: string} */
+    /** @return array{last_ok: int, last_try: int, error: string, upload: array<string, int|float>|null} */
     private function state(): array
     {
         $s = $this->app->settings->get(self::STATE_SETTING);
@@ -294,6 +310,24 @@ final class BackupUploadService implements OffsiteBackup
             'last_ok' => is_int($s['last_ok'] ?? null) ? $s['last_ok'] : 0,
             'last_try' => is_int($s['last_try'] ?? null) ? $s['last_try'] : 0,
             'error' => is_string($s['error'] ?? null) ? $s['error'] : '',
+            'upload' => self::uploadStats($s['upload'] ?? null),
         ];
+    }
+
+    /**
+     * Gespeicherte Messung prüfen: nur bekannte Schlüssel mit Zahlen.
+     *
+     * @return array<string, int|float>|null
+     */
+    private static function uploadStats(mixed $raw): ?array
+    {
+        if (!is_array($raw) || !is_int($raw['bytes'] ?? null) || !is_int($raw['chunks'] ?? null)) {
+            return null;
+        }
+        $out = ['bytes' => $raw['bytes'], 'chunks' => $raw['chunks']];
+        foreach (['start_seconds', 'read_seconds', 'send_seconds', 'slowest_seconds', 'total_seconds'] as $k) {
+            $out[$k] = is_int($raw[$k] ?? null) || is_float($raw[$k] ?? null) ? (float) $raw[$k] : 0.0;
+        }
+        return $out;
     }
 }

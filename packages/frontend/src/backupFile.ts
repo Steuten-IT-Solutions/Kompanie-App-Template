@@ -27,12 +27,19 @@ export async function isEncryptedFile(file: Blob): Promise<boolean> {
   return isEncryptedBackup(new Uint8Array(await file.slice(0, BACKUP_MAGIC.length).arrayBuffer()));
 }
 
+/** Ob die gewählte Datei gepackt ist (gzip, z. B. eine Sicherung aus Google Drive als .json.gz); liest nur den Anfang. */
+export async function isGzipFile(file: Blob): Promise<boolean> {
+  const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
+  return head.length === 2 && head[0] === 0x1f && head[1] === 0x8b;
+}
+
 /**
- * Inhalt einer gewählten Datei für die API. Im Browser kodiert FileReader die verschlüsselte Datei selbst als Base64,
- * ohne Zwischenschritt über eine Zeichenkette der ganzen Datei (große Sicherungen mit vielen Fotos).
+ * Inhalt einer gewählten Datei für die API. Verschlüsselte und gepackte Dateien gehen als Base64 (der Server entpackt
+ * sie); im Browser kodiert FileReader sie selbst, ohne Zwischenschritt über eine Zeichenkette der ganzen Datei (große
+ * Sicherungen mit vielen Fotos).
  */
 export async function filePayload(file: Blob, encrypted?: boolean): Promise<{ backup: string } | { backup_base64: string }> {
-  if (!(encrypted ?? (await isEncryptedFile(file)))) return { backup: await file.text() };
+  if (!(encrypted ?? (await isEncryptedFile(file))) && !(await isGzipFile(file))) return { backup: await file.text() };
   if (typeof FileReader === 'undefined') return { backup_base64: toBase64(new Uint8Array(await file.arrayBuffer())) };
   return { backup_base64: await readBase64(file) };
 }

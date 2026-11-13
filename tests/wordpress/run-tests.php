@@ -22,6 +22,7 @@ require_once __DIR__ . '/WpDriver.php';
 use KompanieApp\Contract\ApiScenario;
 use KompanieApp\Contract\Checks;
 use KompanieApp\Contract\WpDriver;
+use KompanieApp\WordPress\FastLoad;
 use KompanieApp\WordPress\Plugin;
 use KompanieApp\WordPress\Roles;
 use KompanieApp\WordPress\WpUsers;
@@ -315,6 +316,14 @@ $tomorrow = wp_date('Y-m-d', time() + DAY_IN_SECONDS);
 [, $ev] = $d->request('POST', '/events', ['title' => 'Kpwp Fest', 'start_date' => $tomorrow, 'start_time' => '19:00', 'end_time' => '23:00', 'url' => 'https://example.org/fest']);
 $html = do_shortcode('[kompanie_termine anzahl="50"]');
 $c->ok(str_contains($html, 'Kpwp Fest') && str_contains($html, 'href="https://example.org/fest"') && str_contains($html, '19:00–23:00 Uhr'), '[kompanie_termine] mit Link und Uhrzeit');
+// Wie de_DE: Abkürzung des Wochentags schon mit Punkt (2026-12-06 ist ein Sonntag).
+global $wp_locale;
+$sunday = $wp_locale->get_weekday(0);
+$abbrev = $wp_locale->weekday_abbrev[$sunday];
+$wp_locale->weekday_abbrev[$sunday] = 'So.';
+$when = KompanieApp\WordPress\Shortcodes::when(['start_date' => '2026-12-06', 'end_date' => null, 'start_time' => '', 'end_time' => '']);
+$wp_locale->weekday_abbrev[$sunday] = $abbrev;
+$c->ok(str_starts_with($when, 'So., 6. '), 'Wochentag mit Punkt in der Übersetzung bekommt keinen zweiten (' . $when . ')');
 $c->ok(!str_contains($html, '⚓'), 'Keine Motive einer bestimmten Kompanie');
 $d->request('DELETE', '/events/' . $ev['id']);
 
@@ -536,6 +545,42 @@ $app->calendar()->clearCache();
 [$s, $cal] = $d->request('GET', '/calendar');
 remove_filter('pre_http_request', $icsFilter, 10);
 $c->ok($s === 200 && in_array('Vereinsabend', array_column($cal, 'title'), true), 'Kalender aus iCal-Link der Test-Instanz');
+
+// [kompanie_kalender]: interner Kalender für Angemeldete mit dem Recht calendar (Quelle app).
+$sourceBefore = $app->settings->get(KompanieApp\Core\Domain\CalendarService::SOURCE_SETTING);
+$app->settings->set(KompanieApp\Core\Domain\CalendarService::SOURCE_SETTING, 'app');
+$d->actAs($admin);
+$day = (new DateTimeImmutable('today', wp_timezone()))->modify('+40 days');
+[$s1, $timed] = $d->request('POST', '/calendar/entries', ['title' => 'Kpwp Vorstandssitzung', 'start_date' => $day->format('Y-m-d'), 'start_time' => '19:00', 'end_time' => '21:00', 'location' => 'Vereinsheim']);
+[$s2, $multi] = $d->request('POST', '/calendar/entries', ['title' => 'Kpwp Fahrt', 'start_date' => $day->modify('+1 day')->format('Y-m-d'), 'end_date' => $day->modify('+3 days')->format('Y-m-d')]);
+$past = $d->request('POST', '/calendar/entries', ['title' => 'Kpwp Vorbei', 'start_date' => (new DateTimeImmutable('today', wp_timezone()))->modify('-3 days')->format('Y-m-d')])[1];
+$c->ok($s1 === 201 && $s2 === 201, 'Interne Termine für den Shortcode angelegt');
+$d->actAs($member);
+wp_set_current_user($member);
+$html = do_shortcode('[kompanie_kalender]');
+$c->ok(str_contains($html, 'Kpwp Vorstandssitzung') && str_contains($html, '19:00–21:00 Uhr') && str_contains($html, 'Ort: Vereinsheim') && !str_contains($html, 'Kpwp Vorbei'), '[kompanie_kalender] zeigt kommende interne Termine mit Uhrzeit und Ort, keine vergangenen');
+$from = $day->modify('+1 day')->getTimestamp();
+$to = $day->modify('+3 days')->getTimestamp();
+$range = (wp_date('Y-m', $from) === wp_date('Y-m', $to) ? wp_date('j.', $from) : wp_date('j. F', $from)) . '–' . wp_date('j. F Y', $to);
+$c->ok(str_contains($html, $range), '[kompanie_kalender]: mehrtägiger ganztägiger Termin bis zum letzten Tag (' . $range . ')');
+$c->ok(substr_count(do_shortcode('[kompanie_kalender anzahl="1"]'), 'class="ka-termin"') === 1, '[kompanie_kalender anzahl="1"] begrenzt');
+$c->ok(substr_count(do_shortcode('[kompanie_kalender anzahl="0"]'), 'class="ka-termin"') >= 2, '[kompanie_kalender anzahl="0"] zeigt alle kommenden Termine');
+wp_set_current_user(0);
+$d->actAs(null);
+$html = do_shortcode('[kompanie_kalender]');
+$c->ok(!str_contains($html, 'Kpwp Vorstandssitzung') && str_contains($html, 'wenn du angemeldet bist'), '[kompanie_kalender] ohne Anmeldung: nur ein Hinweis, keine Termine');
+$d->actAs($admin);
+foreach ([$timed, $multi, $past] as $ev) {
+    $d->request('DELETE', '/calendar/entries/' . (int) ($ev['id'] ?? 0));
+}
+if ($sourceBefore === null) {
+    $app->settings->delete(KompanieApp\Core\Domain\CalendarService::SOURCE_SETTING);
+} else {
+    $app->settings->set(KompanieApp\Core\Domain\CalendarService::SOURCE_SETTING, $sourceBefore);
+}
+$app->calendar()->clearCache();
+wp_set_current_user($member);
+$d->actAs($member);
 
 // Kalender-IDs über den Google-Zugang der Galerie (Dienstkonto der Test-Instanz): Bearer-Token, kein API-Schlüssel.
 $calendarRequests = [];
@@ -896,6 +941,8 @@ $c->ok(!str_contains($html, 'Kpwp Kapitän') && !str_contains($html, 'Kpwp Brude
 $html = do_shortcode('[kompanie_mitglieder]');
 $c->ok(str_contains($html, 'class="ka ka-mitglieder"') && str_contains($html, '<span class="ka-mitglied-name">' . esc_html($memberName) . '</span>')
     && str_contains($html, esc_url((string) $app->memberPhotos()->urls(480)[$member])) && str_contains($html, 'href="' . esc_url((string) $app->memberPhotos()->urls(1024)[$member]) . '" data-ka-lightbox="mitglieder"'), '[kompanie_mitglieder]: Galerie mit Foto (480 Pixel), Name und Großansicht (1024 Pixel)');
+// Beim Blättern blendet die Großansicht das alte Bild aus, bis das neue geladen ist (sonst passt der Name nicht zum Bild).
+$c->ok(str_contains($html, '.ka-lb-laedt img{visibility:hidden}') && str_contains($html, 'box.classList.add("ka-lb-laedt");img.src=l.href'), 'Großansicht: Ladekreis statt altem Bild beim Blättern');
 // Foto von vor Datenbankversion 18 ohne 1024er (Issue #109): Großansicht mit der 480er statt einer Adresse mit 404, ohne srcset.
 $app->db->execute('UPDATE {member_photos} SET xlarge = NULL WHERE user_id = ?', [$member]);
 $medium480 = esc_url((string) $app->memberPhotos()->urls(480)[$member]);
@@ -1094,6 +1141,84 @@ try {
 }
 $c->ok(is_file(KOMPANIE_APP_FILE) && is_link(WP_PLUGIN_DIR . '/kompanie-app'), 'Plugin-Ordner unverändert');
 @unlink($zipFile);
+
+// App schneller laden (FastLoad): bei App-Aufrufen nur dieses Plugin und die ausgewählten.
+$c->section('App schneller laden');
+$c->ok(FastLoad::NAMESPACE === KompanieApp\WordPress\WpEnvironment::NAMESPACE && FastLoad::QUERY_VAR === KompanieApp\WordPress\AppPage::QUERY_VAR, 'Namensraum und Parameter wie in WpEnvironment und AppPage');
+$isApp = static fn (string $uri, array $get = [], string $home = '/'): bool => FastLoad::isAppRequest($uri, $get, $home);
+$c->ok($isApp('/wp-json/kompanie-app/v1/config') && $isApp('/wp-json/kompanie-app/v1/events/5?x=1') && $isApp('/wp-json/kompanie-app/v1'), 'Schnittstelle der App erkannt');
+$c->ok($isApp('/app/') && $isApp('/app') && $isApp('/app/foto/3/thumb') && $isApp('/app/sw.js'), 'App-Seite und ihre Dateien erkannt');
+$c->ok($isApp('/index.php/wp-json/kompanie-app/v1/config') && $isApp('/?rest_route=/kompanie-app/v1/config', ['rest_route' => '/kompanie-app/v1/config']) && $isApp('/?kompanie_app=index', ['kompanie_app' => 'index']), 'Auch ohne schöne Permalinks');
+$c->ok($isApp('/verein/wp-json/kompanie-app/v1/config', [], '/verein/') && $isApp('/verein/app/', [], '/verein') && !$isApp('/wp-json/kompanie-app/v1/config', [], '/verein/'), 'WordPress in einem Unterordner');
+$c->ok(!$isApp('/') && !$isApp('/termine/') && !$isApp('/wp-json/') && !$isApp('/wp-json/wp/v2/posts') && !$isApp('/wp-json/kompanie-app/v10/x') && !$isApp('/apps/') && !$isApp('/application') && !$isApp('/wp-login.php') && !$isApp('/wp-cron.php') && !$isApp('/wp-admin/'), 'Webseite, andere Schnittstellen, Anmeldung, WP-Cron und wp-admin nicht');
+$c->ok(!$isApp('/?rest_route=/wp/v2/posts', ['rest_route' => '/wp/v2/posts']) && !$isApp('/blog/app/', [], '/'), 'Andere REST-Routen und Seiten namens app weiter unten nicht');
+$c->ok(!$isApp('/wp-json/kompanie-app/v1/news') && !$isApp('/wp-json/kompanie-app/v1/news/12') && !$isApp('/?rest_route=/kompanie-app/v1/news/12', ['rest_route' => '/kompanie-app/v1/news/12']) && $isApp('/wp-json/kompanie-app/v1/newsletter'), 'Neuigkeiten (Inhalt der Beiträge) mit allen Plugins');
+$opt = ['on' => true, 'plugin' => 'kompanie-app/kompanie-app.php', 'keep' => [], 'key' => str_repeat('ab', 16)];
+$applies = static fn (array $o, array $get = [], ?bool $const = null, bool $ctx = false): bool => FastLoad::applies($o, '/wp-json/kompanie-app/v1/config', $get, '/', 'wp-json', $const, $ctx);
+$c->ok($applies($opt) && !$applies(['on' => false] + $opt) && !$applies(['plugin' => ''] + $opt) && !$applies([]), 'Nur eingeschaltet und mit eigenem Pfad');
+$c->ok(!$applies($opt, [], false) && $applies($opt, [], true) && !$applies($opt, [], null, true), 'Notschalter in wp-config.php und wp-admin/WP-Cron gehen vor');
+$c->ok(!$applies($opt, ['kompanie_app_alle' => '1']) && !$applies($opt, ['doing_wp_cron' => '1']), 'Vergleichsaufruf mit allen Plugins; ALTERNATE_WP_CRON nie schnell');
+$off = ['on' => false] + $opt;
+$c->ok($applies($off, ['kompanie_app_schnell' => $opt['key']]) && !$applies($off, ['kompanie_app_schnell' => 'falsch']) && !$applies(['key' => ''] + $off, ['kompanie_app_schnell' => '']), 'Messung vor dem Einschalten nur mit dem Schlüssel');
+$c->ok(FastLoad::filterPlugins(['a/a.php', 'kompanie-app/kompanie-app.php', 'b/b.php'], 'kompanie-app/kompanie-app.php', ['b/b.php']) === ['kompanie-app/kompanie-app.php', 'b/b.php'], 'Nur dieses Plugin und die behaltenen');
+$c->ok(FastLoad::filterPlugins(['a/a.php', 'b/b.php'], 'kompanie-app/kompanie-app.php', []) === ['a/a.php', 'b/b.php'], 'Ist dieses Plugin nicht aktiv, bleibt die Liste, wie sie ist');
+$c->ok(FastLoad::median([0.9, 0.5, 0.7]) === 0.7 && FastLoad::median([1.0, 0.2, 0.4, 0.6]) === 0.5 && FastLoad::median([]) === 0.0, 'Median der Messung');
+
+// Datei in mu-plugins: anlegen, aktuell halten, entfernen; eine fremde Datei bleibt.
+$optionBefore = get_option(FastLoad::OPTION);
+$c->ok(FastLoad::install() && FastLoad::installed() && is_array(get_option(FastLoad::OPTION)) && strlen(FastLoad::option()['key']) === 32, 'Datei in mu-plugins angelegt, Einstellung mit Schlüssel');
+exec(escapeshellarg(PHP_BINARY) . ' -l ' . escapeshellarg(FastLoad::muPath()) . ' 2>&1', $lint, $lintCode);
+$c->ok($lintCode === 0, 'Datei in mu-plugins ist gültiges PHP');
+file_put_contents(FastLoad::muPath(), str_replace('@kompanie-app-fast-load 1', '@kompanie-app-fast-load 0', FastLoad::stub()));
+$c->ok(!FastLoad::installed() && FastLoad::install() && FastLoad::installed(), 'Ältere Fassung wird ersetzt');
+FastLoad::remove();
+$c->ok(!is_file(FastLoad::muPath()), 'Beim Deaktivieren entfernt');
+file_put_contents(FastLoad::muPath(), "<?php\n// fremd\n");
+$c->ok(!FastLoad::install() && (string) file_get_contents(FastLoad::muPath()) === "<?php\n// fremd\n", 'Fremde Datei gleichen Namens wird nicht überschrieben');
+FastLoad::remove();
+$c->ok(is_file(FastLoad::muPath()), 'Fremde Datei wird nicht gelöscht');
+unlink(FastLoad::muPath());
+FastLoad::install();
+
+// Wirkung in echten Aufrufen von WordPress (eigener Prozess je Adresse; WP-CLI setzt die Adresse aus --url).
+$testPlugin = WP_PLUGIN_DIR . '/kpwp-schnell/kpwp-schnell.php';
+wp_mkdir_p(dirname($testPlugin));
+file_put_contents($testPlugin, "<?php\n/**\n * Plugin Name: Kpwp Schnell-Test\n */\ndefine('KPWP_SCHNELL_LOADED', true);\n");
+wp_clean_plugins_cache();
+activate_plugin('kpwp-schnell/kpwp-schnell.php');
+$c->ok(array_key_exists('kpwp-schnell/kpwp-schnell.php', FastLoad::otherPlugins()) && !array_key_exists(plugin_basename(KOMPANIE_APP_FILE), FastLoad::otherPlugins()), 'Auswahl zeigt die anderen aktiven Plugins');
+$loaded = static function (string $path): ?bool {
+    $out = WP_CLI::runcommand('eval "echo defined(\'KPWP_SCHNELL_LOADED\') ? \'mit\' : \'ohne\'; echo class_exists(\'KompanieApp\\\\WordPress\\\\Plugin\', false) ? \'+app\' : \'\';" --url=' . escapeshellarg(home_url($path)), ['launch' => true, 'return' => true, 'exit_error' => false]);
+    $out = trim((string) $out);
+    return str_ends_with($out, '+app') ? str_starts_with($out, 'mit') : null;
+};
+// Ob die functions.php des Themes geladen wurde (und die Pfade des Themes danach wieder stimmen).
+$themeFunctions = get_stylesheet_directory() . '/functions.php';
+$themeLoaded = static function (string $path) use ($themeFunctions): ?string {
+    $out = WP_CLI::runcommand('eval "echo in_array(realpath(get_stylesheet_directory() . \'/functions.php\'), get_included_files(), true) ? \'mit\' : \'ohne\'; echo \$GLOBALS[\'wp_stylesheet_path\'] === get_stylesheet_directory() && is_dir(get_stylesheet_directory()) ? \'+pfad\' : \'\';" --url=' . escapeshellarg(home_url($path)), ['launch' => true, 'return' => true, 'exit_error' => false]);
+    return trim((string) $out);
+};
+FastLoad::save(true, []);
+$c->ok($loaded('/wp-json/kompanie-app/v1/config') === false && $loaded('/app/') === false, 'Eingeschaltet: App-Aufrufe ohne das andere Plugin, mit der Kompanie-App');
+$c->ok($loaded('/') === true && $loaded('/wp-json/wp/v2/posts') === true && $loaded('/wp-json/kompanie-app/v1/news') === true, 'Webseite, andere Schnittstellen und Neuigkeiten mit dem anderen Plugin');
+[$saveMsg, $saveErr] = KompanieApp\WordPress\SettingsPage::applyFastLoad(['fast_on' => '1', 'fast_keep' => ['kpwp-schnell/kpwp-schnell.php', 'nicht/aktiv.php']]);
+$c->ok(!$saveErr && FastLoad::option()['keep'] === ['kpwp-schnell/kpwp-schnell.php'] && $loaded('/wp-json/kompanie-app/v1/config') === true, 'Mit Häkchen lädt es auch in der App; nur aktive Plugins lassen sich behalten');
+if (is_file($themeFunctions)) {
+    $c->ok($themeLoaded('/wp-json/kompanie-app/v1/config') === 'ohne+pfad' && $themeLoaded('/') === 'mit+pfad', 'Ohne Haken beim Theme: App-Aufrufe ohne functions.php des Themes, Webseite mit; Pfade des Themes stimmen danach');
+    KompanieApp\WordPress\SettingsPage::applyFastLoad(['fast_on' => '1', 'fast_theme' => '1']);
+    $c->ok(FastLoad::option()['theme'] && $themeLoaded('/wp-json/kompanie-app/v1/config') === 'mit+pfad', 'Mit Haken lädt das Theme auch in der App');
+} else {
+    $c->ok(true, 'Theme ohne functions.php: Prüfung des Themes übersprungen');
+}
+$c->ok(FastLoad::keepTheme(['on' => true]) && !FastLoad::keepTheme(['theme' => false]), 'Vorgabe ohne Angabe: Theme laden');
+KompanieApp\WordPress\SettingsPage::applyFastLoad([]);
+$c->ok(!FastLoad::option()['on'] && $loaded('/wp-json/kompanie-app/v1/config') === true, 'Ausgeschaltet: alle Plugins');
+deactivate_plugins('kpwp-schnell/kpwp-schnell.php', true);
+unlink($testPlugin);
+rmdir(dirname($testPlugin));
+if (is_array($optionBefore)) {
+    update_option(FastLoad::OPTION, $optionBefore, true);
+}
 
 foreach ([$member, $organizer, $manager, $admin] as $id) {
     $d->deleteUser($id);

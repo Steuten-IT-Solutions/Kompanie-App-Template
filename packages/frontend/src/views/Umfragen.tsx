@@ -4,7 +4,7 @@ import { canManagePolls, pollsVisible, refreshBoard } from '../board';
 import { formatShortTime, fromLocalInput, toLocalInput } from '../format';
 import brand from '../generated/brand';
 import { navigate } from '../router';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { Caps, Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { prefetchOnTap, sources } from '../viewData';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
@@ -259,7 +259,7 @@ function PollList() {
     <div className="poll-list">
       {canManagePolls() && (
         <button className="btn btn-secondary btn-block poll-manage-link" onClick={() => navigate('umfragen/verwalten')}>
-          {sec.polls} verwalten
+          <Caps text={sec.polls} /> verwalten
         </button>
       )}
       <h2 className="board-page-title">Laufend</h2>

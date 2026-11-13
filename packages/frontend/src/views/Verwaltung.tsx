@@ -25,6 +25,7 @@ import { batchFrom, neighbors, prefetchOrder, usePrefetchChain, useSwipeDrag } f
 import { AdminBack, AdminMenu, adminTabs, setupTabs } from '../adminNav';
 import {
   AddressFields,
+  Caps,
   DateRow,
   emptyName,
   EmailField,
@@ -1664,7 +1665,9 @@ function NewMember() {
       {extras && canPoints() && (
         <>
           <label className="field">
-            <span>{sec.points} (Anfangsbestand, optional)</span>
+            <span>
+              <Caps text={sec.points} /> (Anfangsbestand, optional)
+            </span>
             <input type="number" inputMode="numeric" min={0} value={initialPoints} onChange={(e) => setInitialPoints(e.target.value)} />
           </label>
           <label className="field">
@@ -1675,7 +1678,9 @@ function NewMember() {
       )}
       {extras && canRanks() && (ranks.data ?? []).length > 0 && (
         <label className="field">
-          <span>{brand.labels.rank} (optional)</span>
+          <span>
+            <Caps text={brand.labels.rank} /> (optional)
+          </span>
           <select value={rankOptions.some((r) => String(r.id) === rankId) ? rankId : ''} onChange={(e) => setRankId(e.target.value)}>
             <option value="">Kein {brand.labels.rank}</option>
             {rankOptions.map((r) => (
@@ -1856,7 +1861,9 @@ function GivePoints({
       </label>
       <div className="field-row">
         <label className="field">
-          <span>{sec.points}</span>
+          <span>
+            <Caps text={sec.points} />
+          </span>
           <input type="number" inputMode="numeric" step="1" value={points} onChange={(e) => setPoints(e.target.value)} required />
         </label>
         <label className="field">
@@ -2148,7 +2155,9 @@ function Catalog({ onToast }: { onToast: (msg: string) => void }) {
             <input type="text" placeholder="z. B. Teilnahme am Sommerfest" value={title} onChange={(e) => setTitle(e.target.value)} />
           </label>
           <label className="field narrow">
-            <span>{sec.points}</span>
+            <span>
+              <Caps text={sec.points} />
+            </span>
             <input type="number" inputMode="numeric" step="1" value={points} onChange={(e) => setPoints(e.target.value)} />
           </label>
         </div>

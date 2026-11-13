@@ -1,7 +1,7 @@
 import { can, type Sponsor } from '../api';
 import brand from '../generated/brand';
 import { navigate } from '../router';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { Caps, Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 
 const sec = brand.labels.sections;
@@ -27,7 +27,7 @@ export default function Sponsoren() {
     <div>
       {can('manage_sponsors') && (
         <button type="button" className="btn btn-secondary btn-block manage-events" onClick={() => navigate('verwaltung/sponsoren')}>
-          {sec.sponsors} verwalten
+          <Caps text={sec.sponsors} /> verwalten
         </button>
       )}
       {data.length === 0 ? (

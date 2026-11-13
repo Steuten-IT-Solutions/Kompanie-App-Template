@@ -17,7 +17,7 @@ import { pruneDocumentCache, whenControlled } from '../offline';
 import { navigate } from '../router';
 import { safeFileName } from '../downloadFiles';
 import { saveFile } from '../saveFile';
-import { Empty, ErrorBox, FoldSection, lazyView, Loading, useAsync } from '../ui';
+import { Caps, Empty, ErrorBox, FoldSection, lazyView, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 
 const PdfViewer = lazyView(() => import('./PdfViewer'));
@@ -272,7 +272,7 @@ export default function Dokumente({ docId, onToast }: { docId?: number; onToast:
     <div>
       {can('manage_documents') && (
         <button className="btn btn-secondary btn-block manage-events" onClick={() => navigate('dokumente/verwalten')}>
-          {brand.labels.sections.documents} verwalten
+          <Caps text={brand.labels.sections.documents} /> verwalten
         </button>
       )}
       {docs.length === 0 ? <Empty>Es sind noch keine Dateien hinterlegt.</Empty> : <DocSortSelect value={sort} onChange={setSort} />}

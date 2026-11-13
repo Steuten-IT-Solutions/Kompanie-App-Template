@@ -16,7 +16,7 @@ import brand from '../generated/brand';
 import { todayYmd } from '../format';
 import { installUrl } from '../install';
 import { navigate } from '../router';
-import { AddressFields, EmailField, Loading, NameFields, PhoneField, trimName, useAsync } from '../ui';
+import { AddressFields, Caps, EmailField, Loading, NameFields, PhoneField, trimName, useAsync } from '../ui';
 import { normalizeEmail } from '../email';
 import { normalizePhone } from '../phone';
 import { addressInput, EMPTY_ADDRESS, isEmptyAddress, type Address } from '../address';
@@ -354,7 +354,9 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
           </details>
           {points && (
             <label className="field">
-              <span>{brand.labels.sections.points} (Anfangsbestand, optional)</span>
+              <span>
+                <Caps text={brand.labels.sections.points} /> (Anfangsbestand, optional)
+              </span>
               <input type="number" inputMode="numeric" min={0} value={r.points} onChange={(e) => update(i, { points: e.target.value })} />
             </label>
           )}

@@ -23,6 +23,7 @@
 
 declare(strict_types=1);
 
+use KompanieApp\Core\Domain\BackupEncryptionService;
 use KompanieApp\Core\Domain\ChangeLogService;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Http\Request;
@@ -187,6 +188,8 @@ try {
             } else {
                 $data = (string) file_get_contents($file);
             }
+            // Sicherungen aus Google Drive sind gepackt (gzip; .json.gz oder in der verschlüsselten Datei).
+            $data = BackupEncryptionService::unpack($data);
             // Vorher den jetzigen Stand sichern, damit ein falscher Import rückgängig zu machen ist.
             $before = $kernel->dataDir() . '/vor-import-' . gmdate('Ymd-His') . '-' . bin2hex(random_bytes(8)) . '.json';
             $out = fopen($before, 'wb');

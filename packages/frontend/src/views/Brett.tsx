@@ -25,7 +25,7 @@ import { navigate } from '../router';
 import { useFocusEntry } from '../focus';
 import { formatShortTime, formatUntil, fromLocalInput, toLocalInput } from '../format';
 import RichTextView from '../richtext/RichTextView';
-import { Empty, ErrorBox, Loading } from '../ui';
+import { Caps, Empty, ErrorBox, Loading } from '../ui';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
 
@@ -809,7 +809,7 @@ export default function Brett({ focus, onToast }: { focus?: string; onToast: (ms
             </button>
             {canManagePolls() && (
               <button className="btn btn-secondary board-polls-manage" onClick={() => navigate('umfragen/verwalten')}>
-                {brand.labels.sections.polls} verwalten
+                <Caps text={brand.labels.sections.polls} /> verwalten
               </button>
             )}
           </div>

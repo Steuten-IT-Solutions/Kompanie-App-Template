@@ -20,7 +20,8 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **{bereich.ga
 - **Jetzt abgleichen**: liest den Ordner sofort ein (erscheint, sobald ein Ordner eingetragen ist).
 - **… Bilder ließen sich nicht laden – anzeigen**: erscheint nur, wenn Bilder nicht geladen werden konnten.
 - **Knöpfe zum Herunterladen zeigen**: Ist der Haken gesetzt, kann jeder, der die {bereich.gallery} sieht, Bilder und Videos herunterladen: jedes einzeln in der Großansicht und jedes Album als ZIP. Ohne Haken (Vorgabe) gibt es diese Knöpfe nicht.
-- **Speichern**: übernimmt Quelle, Link und den Haken für die Knöpfe zum Herunterladen.
+- **Einreichen von Bildern und Videos durch Mitglieder erlauben**: Ist der Haken gesetzt, können alle mit dem Recht *Bilder und Videos einreichen* Bilder und Videos vorschlagen. Ohne Haken gibt es in der {bereich.gallery} keinen Knopf zum Einreichen, und die App nimmt keine Einreichungen an. Neu eingerichtete Apps starten ohne Haken; wer die {bereich.gallery} schon vor dem Haken genutzt hat, hat ihn gesetzt.
+- **Speichern**: übernimmt Quelle, Link und die Haken für die Knöpfe zum Herunterladen und das Einreichen.
 - **Alben und eigene Bilder**: alle Alben mit der Zahl der Bilder aus Drive und der hochgeladenen, darunter **Neues Album in der App** mit **Titel**, **Jahr** und **Album anlegen**.
 
 ## So gehst du vor
@@ -57,6 +58,11 @@ Verschieben, mehrere auf einmal löschen und Alben bearbeiten geht auch direkt i
 2. In jedem Album steht dann rechts neben dem Titel ein runder Knopf mit Pfeil nach unten (ganzes Album als ZIP), in der Großansicht oben rechts neben **✕** derselbe Knopf für das einzelne Bild oder Video.
 3. Zum Abschalten nimmst du den Haken wieder heraus und tippst auf **Speichern**.
 
+### Einreichen erlauben
+1. Setze den Haken **Einreichen von Bildern und Videos durch Mitglieder erlauben** und tippe auf **Speichern**.
+2. Wer das Recht *Bilder und Videos einreichen* hat, sieht in der {bereich.gallery} oben den Knopf **Bilder und Videos einreichen** (Pfeil nach oben). Das Recht vergibst du unter [Rollen](seite:admin-rollen-und-mitglieder).
+3. Zum Abschalten nimmst du den Haken wieder heraus und tippst auf **Speichern**. Schon eingereichte Bilder und Videos bleiben und lassen sich weiter prüfen.
+
 ### Bilder ansehen, die sich nicht laden ließen
 1. Tippe auf **… Bilder ließen sich nicht laden – anzeigen**. Die Liste zeigt je Bild Dateiname, Album, Anzahl der Versuche, die Fehlermeldung und **In Google Drive öffnen**.
 2. Lege das Bild als JPG in denselben Ordner in Google Drive und entferne das alte.
@@ -66,7 +72,7 @@ Verschieben, mehrere auf einmal löschen und Alben bearbeiten geht auch direkt i
 - Beim Hochladen entfernt der Server Metadaten wie Aufnahmeort (GPS) und Kamera und speichert das Bild neu als JPG mit höchstens 8192 Pixeln an der längeren Kante. Wie groß ein Bild sein darf, hängt vom Webspace ab; ist es zu groß, sagt die App, woran es liegt.
 - Hochgeladene Bilder liegen auf dem eigenen Server und sind in der [Sicherung](seite:admin-updates-und-sicherung) enthalten. Hochgeladene Videos liegen ebenfalls dort, sind aber wegen ihrer Größe nicht in der Sicherung; bewahre ihre Originale selbst auf. Die App setzt keine Grenze für den Speicherplatz; wie viel belegt ist, steht hier und unter [Zustand und Updates](seite:admin-zustand).
 - Der Abgleich mit Google Drive ändert und löscht keine hochgeladenen Bilder. Verschwindet ein Album aus Drive, in das du Bilder hochgeladen hast, bleibt es mit diesen Bildern.
-- Mitglieder mit dem Recht *Bilder und Videos einreichen* schlagen Bilder und Videos für jedes Album vor; wer *Einreichungen prüfen* hat, gibt sie frei. Beide Rechte vergibst du unter [Rollen](seite:admin-rollen-und-mitglieder); mit der {bereich.gallery} entsteht die Rolle *{bereich.gallery} verwalten* mit dem Recht zum Prüfen. Freigegebene Bilder stehen hier wie hochgeladene.
+- Mitglieder mit dem Recht *Bilder und Videos einreichen* schlagen Bilder und Videos für jedes Album vor, sobald der Haken zum Einreichen gesetzt ist; wer *Einreichungen prüfen* hat, gibt sie frei. Beide Rechte vergibst du unter [Rollen](seite:admin-rollen-und-mitglieder); mit der {bereich.gallery} entsteht die Rolle *{bereich.gallery} verwalten* mit dem Recht zum Prüfen. Freigegebene Bilder stehen hier wie hochgeladene.
 - Was beim Abgleich nicht fertig wird, bereitet die App stündlich im Hintergrund weiter auf. Neue Bilder in Google Drive kommen ebenso stündlich dazu.
 - Videos zeigt die {bereich.gallery} als MP4 oder WebM. Andere Formate (z. B. MOV vom iPhone, AVI) stehen in der Liste als „Videoformat nicht unterstützt“. Abhilfe: das Video als MP4 speichern (viele Handys bieten das beim Teilen oder Exportieren an) und in denselben Ordner legen.
 - Videos aus Google Drive speichert die App nicht auf dem Server, sie spielt sie beim Ansehen aus Google Drive ab. Nur ihr Vorschaubild kommt von Google und liegt neben den Bildern.

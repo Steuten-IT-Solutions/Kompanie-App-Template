@@ -32,6 +32,9 @@ final class SettingsPage
         add_action('admin_post_kompanie_app_gallery', static fn () => self::saveGallery(Plugin::app()));
         add_action('admin_post_kompanie_app_gallery_sync', static fn () => self::syncGallery(Plugin::app()));
         add_action('admin_post_kompanie_app_members_placeholder', static fn () => self::saveMembersPlaceholder(Plugin::app()));
+        add_action('admin_post_kompanie_app_fast_load', static fn () => self::saveFastLoad(Plugin::app()));
+        add_action('admin_post_kompanie_app_fast_measure', [self::class, 'measureFastLoad']);
+        add_action('admin_post_kompanie_app_fast_download', [self::class, 'downloadFastLoad']);
         // Auswahl des Platzhalterbilds aus der Mediathek.
         add_action('admin_enqueue_scripts', static function (string $hook): void {
             if ($hook === 'settings_page_' . self::PAGE) {
@@ -47,6 +50,8 @@ final class SettingsPage
         add_action('admin_post_nopriv', static fn () => self::googleCallback(Plugin::app()));
         // Beim Öffnen der Einstellungsseite die Planung prüfen (falls WP-Cron-Einträge verloren gingen).
         add_action('load-settings_page_' . self::PAGE, static fn () => Plugin::app()->scheduleTasks());
+        // Ebenso die Datei für „App schneller laden“ (z. B. nach einem Umzug oder wenn sie jemand gelöscht hat).
+        add_action('load-settings_page_' . self::PAGE, [FastLoad::class, 'install']);
     }
 
     /** Ohne „schöne“ Permalinks läuft die App unter ?kompanie_app=…; /app/ ist einprägsamer. */
@@ -106,7 +111,7 @@ final class SettingsPage
                 <a href="<?php echo esc_url($app->env->appUrl()); ?>" target="_blank"><?php echo esc_html($app->env->appUrl()); ?></a>.
                 Rollen in der App legt ein Admin in der App unter Mitglieder fest oder im jeweiligen
                 <a href="<?php echo esc_url(admin_url('users.php')); ?>">Benutzerprofil</a>.
-                Öffentliche Termine zeigt auf der Webseite der Shortcode <code>[kompanie_termine]</code>, die Galerie <code>[kompanie_galerie]</code>,
+                Öffentliche Termine zeigt auf der Webseite der Shortcode <code>[kompanie_termine]</code>, den internen Kalender für angemeldete Mitglieder <code>[kompanie_kalender]</code>, die Galerie <code>[kompanie_galerie]</code>,
                 die Ämter <code>[kompanie_aemter]</code> (nur eine Gruppe: <code>[kompanie_aemter gruppe="…"]</code>) und die Mitgliederliste <code>[kompanie_mitglieder]</code>.
             </p>
 
@@ -256,6 +261,9 @@ final class SettingsPage
 
             <hr />
             <?php self::renderMembersPlaceholder($app); ?>
+
+            <hr />
+            <?php self::renderFastLoad(); ?>
         </div>
         <?php
     }
@@ -296,6 +304,144 @@ final class SettingsPage
         f.open();});})();
         </script>
         <?php
+    }
+
+    /**
+     * „App schneller laden“ (FastLoad): Schalter, Auswahl der Plugins, die auch in der App laden, Messung und Hinweise, wenn
+     * die Datei in mu-plugins fehlt oder der Notschalter in wp-config.php gesetzt ist.
+     */
+    private static function renderFastLoad(): void
+    {
+        $o = FastLoad::option();
+        $others = FastLoad::otherPlugins();
+        $installed = FastLoad::installed();
+        $disabled = defined(FastLoad::CONSTANT) && !constant(FastLoad::CONSTANT);
+        $measure = get_transient('kompanie_app_fast_measure_' . get_current_user_id());
+        ?>
+        <h2 id="schnell">App schneller laden</h2>
+        <p>Bei jedem Aufruf der App startet WordPress samt allen aktiven Plugins, auch solchen, die die App nie braucht
+           (Seitenbaukästen, Statistik, Formulare …). Eingeschaltet lädt WordPress bei Aufrufen der App nur die Kompanie-App,
+           die Plugins mit Häkchen und, wenn gewählt, das Theme. Die Webseite, wp-admin, die Anmeldung und geplante Aufgaben laufen weiter mit allen Plugins,
+           ebenso die Neuigkeiten aus den Beiträgen der Webseite. In der Datenbank ändert sich nichts.</p>
+        <?php if ($disabled) : ?>
+            <div class="notice notice-warning inline"><p>In <code>wp-config.php</code> ist <code>define('<?php echo esc_html(FastLoad::CONSTANT); ?>', false);</code> gesetzt: Die App lädt immer alle Plugins, egal was hier eingestellt ist.</p></div>
+        <?php endif; ?>
+        <?php if (!$installed) : ?>
+            <div class="notice notice-warning inline"><p>Die Datei für diese Funktion fehlt und ließ sich nicht anlegen (fehlende Schreibrechte oder eine andere Datei gleichen Namens).
+                <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin-post.php?action=kompanie_app_fast_download'), 'kompanie_app_fast_download')); ?>">Datei herunterladen</a>
+                und per FTP in den Ordner <code><?php echo esc_html(self::relativePath(WPMU_PLUGIN_DIR)); ?></code> legen (den Ordner anlegen, falls es ihn nicht gibt).</p></div>
+        <?php endif; ?>
+        <?php if (is_array($measure)) : ?>
+            <?php if (($measure['error'] ?? '') !== '') : ?>
+                <div class="notice notice-error inline"><p><?php echo esc_html((string) $measure['error']); ?></p></div>
+            <?php else : ?>
+                <div class="notice notice-info inline"><p>Messung vom Server aus, je <?php echo (int) count($measure['all']); ?> Aufrufe (Median):
+                    mit allen Plugins <strong><?php echo esc_html(self::seconds(FastLoad::median($measure['all']))); ?></strong>,
+                    schnell <strong><?php echo esc_html(self::seconds(FastLoad::median($measure['fast']))); ?></strong>.
+                    <?php if (!$measure['checked']) : ?>
+                        <br />Die schnellen Aufrufe liefen nicht ohne die anderen Plugins (Datei fehlt oder Notschalter gesetzt); die Zeiten sind daher nicht aussagekräftig.
+                    <?php endif; ?></p></div>
+            <?php endif; ?>
+        <?php endif; ?>
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+            <input type="hidden" name="action" value="kompanie_app_fast_load" />
+            <?php wp_nonce_field('kompanie_app_fast_load'); ?>
+            <p><label><input type="checkbox" name="fast_on" value="1" <?php checked($o['on']); ?> />
+                <strong>Bei Aufrufen der App nur die nötigen Plugins laden</strong></label></p>
+            <?php if ($others === []) : ?>
+                <p class="description">Außer der Kompanie-App ist kein Plugin aktiv.</p>
+            <?php else : ?>
+                <p>Auch in der App laden (Häkchen setzen bei Plugins, die die App brauchen könnte, z. B. Sicherheits-Plugins, Plugins
+                   für die Benutzerrollen oder für einen anderen Speicherort der Mediathek):</p>
+                <fieldset>
+                    <?php foreach ($others as $plugin => $name) : ?>
+                        <label style="display:block;margin:.25em 0"><input type="checkbox" name="fast_keep[]" value="<?php echo esc_attr($plugin); ?>" <?php checked(in_array($plugin, $o['keep'], true)); ?> />
+                            <?php echo esc_html($name); ?></label>
+                    <?php endforeach; ?>
+                </fieldset>
+            <?php endif; ?>
+            <p><label><input type="checkbox" name="fast_theme" value="1" <?php checked($o['theme']); ?> />
+                Theme auch in der App laden (<?php echo esc_html(wp_get_theme()->get('Name')); ?>)</label><br />
+               <span class="description">Die App zeigt nichts vom Theme. Manche Themes ändern aber in ihrer functions.php Dinge, die auch
+               die App betreffen (z. B. den Ordner für Uploads oder eigene Filter der App). Ohne Haken vorher messen und die App danach prüfen.</span></p>
+            <?php submit_button('Speichern', 'secondary'); ?>
+        </form>
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+            <input type="hidden" name="action" value="kompanie_app_fast_measure" />
+            <?php wp_nonce_field('kompanie_app_fast_measure'); ?>
+            <p>Was es bringt, zeigt eine Messung: Sie ruft die Schnittstelle der App einige Male mit allen Plugins und schnell (mit
+               der gespeicherten Auswahl) auf, auch wenn der Schalter noch aus ist. Das dauert einige Sekunden.</p>
+            <?php submit_button('Jetzt messen', 'secondary', 'submit', false); ?>
+        </form>
+        <p class="description">Notschalter, falls die App nach dem Einschalten nicht mehr richtig läuft und wp-admin nicht erreichbar ist:
+           in <code>wp-config.php</code> die Zeile <code>define('<?php echo esc_html(FastLoad::CONSTANT); ?>', false);</code> eintragen.</p>
+        <?php
+    }
+
+    private static function seconds(float $s): string
+    {
+        return number_format_i18n($s, 2) . ' s';
+    }
+
+    /** Pfad relativ zum WordPress-Ordner (für Hinweise; ohne den Pfad auf dem Server zu verraten). */
+    private static function relativePath(string $dir): string
+    {
+        $root = wp_normalize_path(untrailingslashit(ABSPATH));
+        $dir = wp_normalize_path($dir);
+        return str_starts_with($dir, $root . '/') ? substr($dir, strlen($root) + 1) : 'wp-content/mu-plugins';
+    }
+
+    private static function saveFastLoad(App $app): never
+    {
+        self::guard('kompanie_app_fast_load');
+        $subject = $app->api()->changeSubjects()->custom('App schneller laden', static function (): array {
+            $o = FastLoad::option();
+            $names = FastLoad::otherPlugins();
+            $keep = array_map(static fn (string $p): string => $names[$p] ?? $p, $o['keep']);
+            sort($keep);
+            return ['Eingeschaltet' => $o['on'], 'Auch in der App' => $keep === [] ? null : implode(', ', $keep), 'Theme in der App' => $o['theme']];
+        });
+        [$message, $error] = self::logged($app, $subject, static fn (): array => self::applyFastLoad(wp_unslash($_POST)));
+        self::back($message, $error, 'schnell');
+    }
+
+    /**
+     * Auswahl aus dem Formular speichern (ohne Weiterleitung, damit testbar). Behalten werden nur aktive Plugins.
+     *
+     * @param array<string, mixed> $post
+     * @return array{0: string, 1: bool} Meldung und ob sie ein Fehler ist
+     */
+    public static function applyFastLoad(array $post): array
+    {
+        $active = array_keys(FastLoad::otherPlugins());
+        $keep = isset($post['fast_keep']) && is_array($post['fast_keep']) ? array_values(array_intersect(array_map('strval', array_filter($post['fast_keep'], 'is_scalar')), $active)) : [];
+        $on = !empty($post['fast_on']);
+        FastLoad::save($on, $keep, !empty($post['fast_theme']));
+        $installed = FastLoad::install();
+        if ($on && !$installed) {
+            return ['Gespeichert. Damit es wirkt, fehlt noch die Datei in mu-plugins (siehe Hinweis).', true];
+        }
+        return [$on ? 'Gespeichert: Die App lädt jetzt nur die nötigen Plugins.' : 'Gespeichert: Die App lädt alle Plugins.', false];
+    }
+
+    public static function measureFastLoad(): never
+    {
+        self::guard('kompanie_app_fast_measure');
+        FastLoad::install();
+        set_transient('kompanie_app_fast_measure_' . get_current_user_id(), FastLoad::measure(), 10 * MINUTE_IN_SECONDS);
+        wp_safe_redirect(self::url() . '#schnell');
+        exit;
+    }
+
+    /** Datei für mu-plugins zum Hochladen per FTP, falls das Plugin sie nicht selbst anlegen darf. */
+    public static function downloadFastLoad(): never
+    {
+        self::guard('kompanie_app_fast_download');
+        nocache_headers();
+        header('Content-Type: application/x-php; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . FastLoad::MU_FILE . '"');
+        echo FastLoad::stub(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Datei zum Herunterladen
+        exit;
     }
 
     private static function saveMembersPlaceholder(App $app): never

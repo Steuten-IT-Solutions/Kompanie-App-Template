@@ -21,7 +21,7 @@ import { useDragSort, useSaveQueue } from '../dragSort';
 import brand from '../generated/brand';
 import { MemberAvatar } from '../memberPhoto';
 import { navigate } from '../router';
-import { Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
+import { Caps, Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
 import { nameWithCompanions, termYears } from './Aemter';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
@@ -590,7 +590,9 @@ function TitleLink({ office, onToast, reload }: { office: Office; onToast: Toast
       ) : (
         <>
           <label className="field">
-            <span>Verknüpfter {sec.titles}</span>
+            <span>
+              Verknüpfter <Caps text={sec.titles} />
+            </span>
             <select value={choice} onChange={(e) => choose(e.target.value)} disabled={busy}>
               <option value="">Keiner</option>
               {(titles.data ?? [])
