@@ -7,6 +7,8 @@ import {
   config,
   type AttendanceCounts,
   type AttendanceDetail,
+  type AttendanceEvent,
+  type AttendanceInput,
   type AttendanceStatus,
 } from '../api';
 import { formatDate, formatEventWhen, roleCount, todayYmd } from '../format';
@@ -34,7 +36,6 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
     sources.attendanceOverview.deps,
     sources.attendanceOverview.key,
   );
-  const [showAll, setShowAll] = useState(false);
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(todayYmd());
   const [busy, setBusy] = useState(false);
@@ -43,7 +44,7 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const [events, lists] = data!;
 
-  async function open(body: Parameters<typeof api.saveAttendance>[0]) {
+  async function open(body: AttendanceInput) {
     setBusy(true);
     try {
       const list = await api.saveAttendance(body);
@@ -62,49 +63,33 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <div className="attendance">
-      {config?.features.calendar && (
-        <>
-          <h3 className="section-title">Termin aus dem Kalender</h3>
-          {typeof events === 'string' ? (
+      {config?.features.calendar &&
+        (typeof events === 'string' ? (
+          <>
+            <h3 className="section-title">Termin aus dem Kalender</h3>
             <ErrorBox message={events} onRetry={reload} />
-          ) : events.length === 0 ? (
-            <Empty>In den letzten 90 Tagen stand nichts an.</Empty>
-          ) : (
-            <>
-              <ul className="card-list attendance-events">
-                {(showAll ? events : events.slice(0, EVENTS_SHOWN)).map((ev) => (
-                  <li
-                    key={ev.key}
-                    className={`card row clickable ${busy ? 'disabled' : ''}`}
-                    onClick={() =>
-                      busy
-                        ? undefined
-                        : ev.list_id
-                          ? navigate(`verwaltung/anwesenheit/${ev.list_id}`)
-                          : void open({ source: 'calendar', event_key: ev.key })
-                    }
-                  >
-                    <div className="row-main">
-                      <div className="row-title">
-                        {ev.title} {ev.list_id && <span className="badge badge-level-guest">Liste vorhanden</span>}
-                      </div>
-                      <div className="row-sub">{formatEventWhen(ev)}</div>
-                    </div>
-                    <span className="chevron" aria-hidden="true">
-                      ›
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              {!showAll && events.length > EVENTS_SHOWN && (
-                <button className="btn btn-link" onClick={() => setShowAll(true)}>
-                  Ältere Termine anzeigen ({events.length - EVENTS_SHOWN})
-                </button>
-              )}
-            </>
-          )}
-        </>
-      )}
+          </>
+        ) : (
+          <>
+            <h3 className="section-title">Kommende Termine</h3>
+            <p className="muted small">Hier kannst du schon vorher eintragen, wer entschuldigt ist.</p>
+            <EventList
+              events={events.filter((ev) => ev.upcoming).reverse()}
+              empty="Im Kalender steht nichts an."
+              more="Weitere kommende Termine anzeigen"
+              busy={busy}
+              onOpen={open}
+            />
+            <h3 className="section-title">Vergangene Termine</h3>
+            <EventList
+              events={events.filter((ev) => !ev.upcoming)}
+              empty="In den letzten 90 Tagen stand nichts an."
+              more="Ältere Termine anzeigen"
+              busy={busy}
+              onOpen={open}
+            />
+          </>
+        ))}
 
       <form className="form card free-event" onSubmit={createFree}>
         <h3>Freier Termin</h3>
@@ -153,6 +138,58 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
   );
 }
 
+/** Termine aus dem Kalender: die ersten EVENTS_SHOWN, der Rest auf Tipp. */
+function EventList({
+  events,
+  empty,
+  more,
+  busy,
+  onOpen,
+}: {
+  events: AttendanceEvent[];
+  empty: string;
+  more: string;
+  busy: boolean;
+  onOpen: (body: AttendanceInput) => void;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  if (events.length === 0) return <Empty>{empty}</Empty>;
+  return (
+    <>
+      <ul className="card-list attendance-events">
+        {(showAll ? events : events.slice(0, EVENTS_SHOWN)).map((ev) => (
+          <li
+            key={ev.key}
+            className={`card row clickable ${busy ? 'disabled' : ''}`}
+            onClick={() =>
+              busy
+                ? undefined
+                : ev.list_id
+                  ? navigate(`verwaltung/anwesenheit/${ev.list_id}`)
+                  : onOpen({ source: 'calendar', event_key: ev.key })
+            }
+          >
+            <div className="row-main">
+              <div className="row-title">
+                {ev.title} {ev.list_id && <span className="badge badge-level-guest">Liste vorhanden</span>}
+              </div>
+              <div className="row-sub">{formatEventWhen(ev)}</div>
+            </div>
+            <span className="chevron" aria-hidden="true">
+              ›
+            </span>
+          </li>
+        ))}
+      </ul>
+      {!showAll && events.length > EVENTS_SHOWN && (
+        <button className="btn btn-link" onClick={() => setShowAll(true)}>
+          {more} ({events.length - EVENTS_SHOWN})
+        </button>
+      )}
+    </>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 
 function ListView({ id, onToast }: { id: number; onToast: (msg: string) => void }) {
@@ -181,18 +218,22 @@ function Editor({
   const free = list.source === 'free';
   const changes = Object.fromEntries(list.people.filter((p) => statuses[p.id] !== initial[p.id]).map((p) => [p.id, statuses[p.id]]));
   const dirty = Object.keys(changes).length > 0 || (free && (title.trim() !== list.title || date !== list.date));
+  // Kommender Termin: nur „entschuldigt“ (bei freien Listen nach dem Datum im Feld)
+  const upcoming = free && date !== list.date ? date > todayYmd() : list.upcoming;
 
   const filtered = useMemo(
     () => list.people.filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase())),
     [list.people, query],
   );
   const counts: AttendanceCounts = { present: 0, excused: 0, absent: 0 };
+  let open = 0;
   for (const p of list.people) {
     const s = statuses[p.id];
     if (s) counts[s]++;
+    else open++;
   }
-  const points = !!config?.features.points && can('manage_points');
-  const penalties = !!config?.features.penalties && can('manage_penalties');
+  const points = !upcoming && !!config?.features.points && can('manage_points');
+  const penalties = !upcoming && !!config?.features.penalties && can('manage_penalties');
   const toBook = list.people.filter((p) => statuses[p.id] === 'present' && p.member && !p.booked).length;
   const presentMembers = list.people.filter((p) => statuses[p.id] === 'present' && p.member).length;
   const toPenalize = list.people.filter((p) => statuses[p.id] === 'absent' && p.member).length;
@@ -254,8 +295,9 @@ function Editor({
         </>
       )}
       <p className="attendance-counts" role="status">
-        {countsText(counts)}
+        {countsText(counts, open)}
       </p>
+      {upcoming && <p className="muted small">Der Termin kommt erst noch. Bis dahin kannst du nur „entschuldigt“ eintragen.</p>}
       {!dirty && <GroupCounts list={list} />}
 
       <div className="picker">
@@ -267,13 +309,15 @@ function Editor({
             onChange={(e) => setQuery(e.target.value)}
             aria-label="Person suchen"
           />
-          <button
-            type="button"
-            className="btn btn-link nowrap"
-            onClick={() => setStatuses({ ...statuses, ...Object.fromEntries(filtered.map((p) => [p.id, 'present' as const])) })}
-          >
-            Alle anwesend
-          </button>
+          {!upcoming && (
+            <button
+              type="button"
+              className="btn btn-link nowrap"
+              onClick={() => setStatuses({ ...statuses, ...Object.fromEntries(filtered.map((p) => [p.id, 'present' as const])) })}
+            >
+              Alle anwesend
+            </button>
+          )}
         </div>
         <div className="attendance-grid attendance-head" aria-hidden="true">
           <span />
@@ -297,6 +341,8 @@ function Editor({
                     className={`attendance-check attendance-check-${st}`}
                     name={`att-${p.id}`}
                     checked={statuses[p.id] === st}
+                    // Kommender Termin: anwesend/fehlt gesperrt; ein schon gesetztes Häkchen lässt sich noch entfernen.
+                    disabled={upcoming && st !== 'excused' && statuses[p.id] !== st}
                     onChange={() => setStatuses({ ...statuses, [p.id]: st })}
                     onClick={() => statuses[p.id] === st && setStatuses({ ...statuses, [p.id]: null })}
                     aria-label={`${p.name}: ${ATTENDANCE_LABELS[st]}`}

@@ -173,8 +173,9 @@ final class InternalCalendarTest extends TestCase
         $this->ok('POST', '/calendar/entries', ['title' => 'Übungsabend', 'start_date' => '2026-11-03', 'start_time' => '19:00']);
         $this->ok('POST', '/calendar/entries', ['title' => 'Später', 'start_date' => '2026-12-03']);
         $events = $this->app->attendance()->events();
-        $this->assertSame(['Übungsabend'], array_column($events, 'title'), 'vergangene Termine zur Auswahl');
-        $this->assertStringStartsWith('i', $events[0]['key']);
+        $this->assertSame(['Später', 'Übungsabend'], array_column($events, 'title'), 'kommende und vergangene Termine zur Auswahl');
+        $this->assertSame([true, false], array_column($events, 'upcoming'));
+        $this->assertStringStartsWith('i', $events[1]['key']);
     }
 
     public function testBackupContainsEntries(): void

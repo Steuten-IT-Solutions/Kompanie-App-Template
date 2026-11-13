@@ -14,7 +14,7 @@ Tippe unten auf **Verwaltung**, dann auf **{bereich.attendance}**. Tippe dort au
 ## Was du hier siehst
 - **‹ {bereich.attendance}**: führt zurück zur Übersicht.
 - **Titel und Datum**: Bei einem Termin aus dem {bereich.calendar} stehen sie fest. Bei einem freien Termin stehen sie in Feldern, die du ändern kannst.
-- **Zähler**: z. B. „3 anwesend · 0 entschuldigt · 1 fehlt“. Ist alles gespeichert, steht darunter die Aufteilung nach Gruppen, z. B. „anwesend: Mitglieder 3“.
+- **Zähler**: z. B. „3 anwesend · 0 entschuldigt · 1 fehlt · 5 ohne Auswahl“. **Ohne Auswahl** sind die Personen, bei denen noch kein Kästchen angekreuzt ist. Ist alles gespeichert, steht darunter die Aufteilung nach Gruppen, z. B. „anwesend: Mitglieder 3“.
 - **Person suchen …**: zeigt nur Personen, deren Name passt.
 - **Alle anwesend**: setzt alle gezeigten Personen auf anwesend (bei einer Suche nur die gefundenen).
 - **Die Liste**: alle Personen mit einer Rolle, außer {rolle.guest}. Je Person gibt es ein Kästchen für **anwesend**, **entschuldigt** und **fehlt**. Neben dem Namen steht die Rolle, wenn sie nicht {rolle.member} ist. **{bereich.points} gebucht** heißt: Diese Person hat für diese Liste schon {bereich.points} bekommen.
@@ -29,6 +29,12 @@ Tippe unten auf **Verwaltung**, dann auf **{bereich.attendance}**. Tippe dort au
 3. Tippe auf **Speichern**.
 
 ![Häkchen setzen in der Liste](bild:anwesenheitsliste-eintragen)
+
+### Vorab entschuldigen (kommender Termin)
+1. Öffne die Liste über **Kommende Termine** (oder lege einen freien Termin mit einem Datum in der Zukunft an).
+2. Über der Liste steht „Der Termin kommt erst noch. Bis dahin kannst du nur „entschuldigt“ eintragen.“ Die Kästchen für **anwesend** und **fehlt** sind gesperrt, **Alle anwesend** und die Knöpfe zum Buchen fehlen.
+3. Setze bei jeder entschuldigten Person das Häkchen bei **entschuldigt** und tippe auf **Speichern**.
+4. Ab dem Tag des Termins trägst du in derselben Liste wie gewohnt die übrigen ein.
 
 ### {bereich.points} für die Anwesenden buchen
 1. Tippe auf **{bereich.points} für … Anwesende**. Ungespeicherte Änderungen speichert die App vorher.
@@ -51,6 +57,7 @@ Tippe unten auf **Verwaltung**, dann auf **{bereich.attendance}**. Tippe dort au
 - Wer für diese Liste schon {bereich.points} hat, bekommt sie kein zweites Mal. Haben alle Anwesenden schon welche, steht dort „{bereich.points} für alle Anwesenden bereits gebucht.“
 - Bei {bereich.penalties} merkt sich die Liste nicht, wer schon einen Eintrag hat. Lege ihn also nicht zweimal an.
 - Löschst du eine Liste, bleiben die schon gebuchten {bereich.points} erhalten.
+- Verschiebst du einen freien Termin in die Zukunft, entferne vorher die Häkchen bei **anwesend** und **fehlt**. Sonst lässt sich die Liste nicht speichern.
 - Unten steht, wer die Liste zuletzt gespeichert hat.
 - Was im Zähler als eigene Gruppe erscheint, legt ein {rolle.admin} unter **Einstellungen** → **Rollen** im Abschnitt **{bereich.attendance}: Gruppen im Zähler** fest. Ohne Einstellung zählen alle Rollen, die zur Kompanie gehören, als {rolle.member}, die übrigen (z. B. Anwärter) je für sich.
 - Jede Person sieht ihre eigenen Einträge unter **Meins** → **{bereich.attendance}**.

@@ -36,7 +36,7 @@ Tippe unten auf **{bereich.events}** und dann oben auf **Internen Kalender verwa
 
 ## Gut zu wissen
 - Jeder Termin ist ein einzelner Termin. Termine, die sich wiederholen (z. B. jeden ersten Dienstag), legst du einzeln an.
-- Vergangene Termine verschwinden von selbst aus der Liste. Für Anwesenheitslisten stehen die Termine der letzten Wochen weiter zur Auswahl.
+- Vergangene Termine verschwinden von selbst aus der Liste. Für Anwesenheitslisten stehen die Termine der letzten Wochen weiter zur Auswahl, ebenso alle kommenden.
 - Wer Benachrichtigungen für {bereich.events} eingeschaltet hat und den internen Kalender sieht, bekommt bei einem neuen Termin „{bereich.events}: neu“. Änderst du später Datum, Uhrzeit oder Ort, kommt „{bereich.events}: geändert“. Am Vortag erinnert die App an die Termine von morgen, wenn das eingeschaltet ist.
 - Wählt ein Admin später eine andere Quelle, bleiben die Termine hier gespeichert. Sie erscheinen wieder, sobald die Quelle wieder **In der App pflegen** ist.
 
