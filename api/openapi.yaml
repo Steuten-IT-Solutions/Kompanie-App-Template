@@ -110,7 +110,8 @@ paths:
               properties:
                 username: { type: string, description: Benutzername oder E-Mail-Adresse }
                 password: { type: string }
-                remember: { type: boolean, default: true, description: "„Angemeldet bleiben“: 400 Tage, verlängert sich beim Öffnen der App" }
+                remember:
+                  { type: boolean, default: true, description: '„Angemeldet bleiben“: 400 Tage, verlängert sich beim Öffnen der App' }
       responses:
         '200':
           description: Angemeldet; setzt das Sitzungs-Cookie.
@@ -441,7 +442,8 @@ paths:
               type: object
               properties:
                 email: { type: string, description: 'Leer entfernt sie' }
-                phone: { type: string, maxLength: 30, description: 'Ziffern, Leerzeichen und + ( ) / -, 5 bis 20 Ziffern; leer entfernt sie' }
+                phone:
+                  { type: string, maxLength: 30, description: 'Ziffern, Leerzeichen und + ( ) / -, 5 bis 20 Ziffern; leer entfernt sie' }
                 address: { $ref: '#/components/schemas/AddressInput' }
                 current_password: { type: string, description: 'Pflicht, wenn sich die E-Mail-Adresse ändert' }
       responses:
@@ -497,7 +499,8 @@ paths:
                   token: { type: string, description: 'Zeitpunkt.HMAC; beim Absenden mitschicken' }
                   minSeconds: { type: integer }
                   maxBytes: { type: integer, description: Höchstgröße des Bildschirmfotos (dekodiert) }
-                  forward: { type: boolean, description: 'Ob die Admins Meldungen an die Betreuer weiterleiten können (reportUrl in update.json)' }
+                  forward:
+                    { type: boolean, description: 'Ob die Admins Meldungen an die Betreuer weiterleiten können (reportUrl in update.json)' }
                   details:
                     type: object
                     required: [version, role]
@@ -531,12 +534,20 @@ paths:
                 page: { type: string, maxLength: 200, description: 'Seite in der App, z. B. #/termine/verwalten' }
                 userAgent: { type: string, maxLength: 400 }
                 lastError: { type: [string, 'null'], maxLength: 500, description: Letzte Fehlermeldung der App }
-                includeName: { type: boolean, description: 'Nur angemeldet; dann geht der Name beim Weiterleiten an die Betreuer mit (die Admins sehen ihn immer)' }
+                includeName:
+                  {
+                    type: boolean,
+                    description: 'Nur angemeldet; dann geht der Name beim Weiterleiten an die Betreuer mit (die Admins sehen ihn immer)',
+                  }
                 screenshot:
                   type: [object, 'null']
                   properties:
                     type: { type: string, enum: [image/png, image/jpeg, image/webp] }
-                    data: { type: string, description: 'Base64 (auch als data:-Adresse), dekodiert höchstens 2 MB, höchstens 10000 Pixel je Kante' }
+                    data:
+                      {
+                        type: string,
+                        description: 'Base64 (auch als data:-Adresse), dekodiert höchstens 2 MB, höchstens 10000 Pixel je Kante',
+                      }
                 website: { type: string, description: Verstecktes Feld; muss leer bleiben }
       responses:
         '201':
@@ -865,7 +876,11 @@ paths:
               properties:
                 endpoint: { type: string }
                 types: { type: array, items: { $ref: '#/components/schemas/PushType' } }
-                details: { type: boolean, description: 'Bei Strafen Betrag und Grund in der Nachricht zeigen (sonst nur ein Hinweis); Punkte zeigen immer Wert und Grund' }
+                details:
+                  {
+                    type: boolean,
+                    description: 'Bei Strafen Betrag und Grund in der Nachricht zeigen (sonst nur ein Hinweis); Punkte zeigen immer Wert und Grund',
+                  }
       responses:
         '200': { $ref: '#/components/responses/PushSubscription' }
         '401': { $ref: '#/components/responses/Error' }
@@ -1180,8 +1195,19 @@ paths:
               properties:
                 title: { type: string, maxLength: 150 }
                 body: { type: string, description: 'Für ältere Apps: formatierter Text als ein Textblock (wird bereinigt)' }
-                blocks: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Block' }, description: 'Inhalt aus Blöcken wie bei eigenen Seiten (hat Vorrang vor body); ohne Titelbild ist das erste Bild in einem Textblock für alle das Vorschaubild' }
-                cover: { type: [string, 'null'], pattern: '^[a-f0-9]{32}$', description: 'Titelbild (Issue #351): Kennung eines Bildes aus `POST /rich-images` oder das bisherige `cover_uid`; null oder leer entfernt es. Vorschaubild der Liste und groß oben im Beitrag; ohne Titelbild das erste Bild im Text' }
+                blocks:
+                  {
+                    type: array,
+                    maxItems: 50,
+                    items: { $ref: '#/components/schemas/Block' },
+                    description: 'Inhalt aus Blöcken wie bei eigenen Seiten (hat Vorrang vor body); ohne Titelbild ist das erste Bild in einem Textblock für alle das Vorschaubild',
+                  }
+                cover:
+                  {
+                    type: [string, 'null'],
+                    pattern: '^[a-f0-9]{32}$',
+                    description: 'Titelbild (Issue #351): Kennung eines Bildes aus `POST /rich-images` oder das bisherige `cover_uid`; null oder leer entfernt es. Vorschaubild der Liste und groß oben im Beitrag; ohne Titelbild das erste Bild im Text',
+                  }
       responses:
         '201':
           description: Angelegt
@@ -1226,7 +1252,8 @@ paths:
                 title: { type: string, maxLength: 150 }
                 body: { type: string, description: 'Für ältere Apps, wie bei POST' }
                 blocks: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Block' }, description: 'wie bei POST' }
-                cover: { type: [string, 'null'], pattern: '^[a-f0-9]{32}$', description: 'wie bei POST; fehlt das Feld, bleibt das Titelbild' }
+                cover:
+                  { type: [string, 'null'], pattern: '^[a-f0-9]{32}$', description: 'wie bei POST; fehlt das Feld, bleibt das Titelbild' }
                 updated_at: { type: string, format: date-time }
       responses:
         '200':
@@ -1297,6 +1324,11 @@ paths:
                 type: object
                 required: [albums, submissions]
                 properties:
+                  enabled:
+                    {
+                      type: boolean,
+                      description: 'Einreichen erlaubt (Einstellung gallery_submissions); ohne lassen sich die eigenen Einreichungen nur ansehen und zurückziehen',
+                    }
                   albums:
                     type: array
                     items:
@@ -1313,7 +1345,7 @@ paths:
     post:
       tags: [Galerie]
       summary: Ein Bild einreichen
-      description: 'JPG, PNG oder WebP; neu kodiert als JPEG ohne Metadaten (auch ohne Aufnahmeort). Alle mit review_gallery bekommen eine Benachrichtigung (je Person und Schub höchstens eine in zehn Minuten).'
+      description: 'JPG, PNG oder WebP; neu kodiert als JPEG ohne Metadaten (auch ohne Aufnahmeort). Alle mit review_gallery bekommen eine Benachrichtigung (je Person und Schub höchstens eine in zehn Minuten). 403, solange das Einreichen ausgeschaltet ist (Einstellung gallery_submissions).'
       x-capability: submit_gallery
       requestBody:
         required: true
@@ -1385,8 +1417,9 @@ paths:
         Danach die Datei in Stücken von höchstens chunk_size Bytes an /gallery/video-uploads/chunk schicken (chunk_size
         richtet sich nach post_max_size des Servers), zum Schluss /gallery/video-uploads/finish. Die Datei bleibt
         unverändert. Zweck album braucht manage_settings (direkt ins Album), Zweck submission submit_gallery (als
-        Einreichung). Prüft vorher, ob auf dem Server genug Platz frei ist (400).
-      x-capability: 'manage_settings oder submit_gallery (je nach purpose)'
+        Einreichung; 403, solange das Einreichen ausgeschaltet ist, Einstellung gallery_submissions, auch noch beim
+        Abschließen). Prüft vorher, ob auf dem Server genug Platz frei ist (400).
+      x-capability: 'manage_settings oder manage_gallery (purpose album) bzw. submit_gallery (purpose submission)'
       requestBody:
         required: true
         content:
@@ -1420,7 +1453,7 @@ paths:
       tags: [Galerie]
       summary: Video hochladen, Schritt 2 von 3, ein Stück
       description: 'Stücke in Reihenfolge (offset = bisher angekommene Bytes). Das letzte Stück darf noch einmal kommen (Antwort verloren); es zählt nur einmal. Nur die Person, die die Sitzung angelegt hat.'
-      x-capability: 'manage_settings oder submit_gallery'
+      x-capability: 'manage_settings, manage_gallery oder submit_gallery'
       requestBody:
         required: true
         content:
@@ -1454,7 +1487,7 @@ paths:
         Übernimmt die vollständige Datei in die Ablage. Zweck album: Video im Album (Antwort wie beim Hochladen von
         Bildern), Zweck submission: offene Einreichung (consent muss true sein, Benachrichtigung wie bei Bildern).
         Das Standbild (JPEG aus dem Browser) wird neu kodiert und ist die Vorschau; ohne erscheint das Video mit ▶.
-      x-capability: 'manage_settings oder submit_gallery'
+      x-capability: 'manage_settings, manage_gallery oder submit_gallery'
       requestBody:
         required: true
         content:
@@ -1488,7 +1521,7 @@ paths:
       tags: [Galerie]
       summary: Video hochladen abbrechen
       description: 'Löscht die Sitzung und das Angekommene. Liegengebliebene Sitzungen löscht der Server nach einem Tag.'
-      x-capability: 'manage_settings oder submit_gallery'
+      x-capability: 'manage_settings, manage_gallery oder submit_gallery'
       requestBody:
         required: true
         content:
@@ -1522,7 +1555,7 @@ paths:
         Bilder aus Google Drive stellt der Ordner „intern“ in Drive um (400). Bei einem Wechsel löscht der Server die
         aufbereiteten Größen (öffentliche lagen als statische Dateien vor), vergibt neue Adressen und bereitet im
         Hintergrund neu auf; die alten öffentlichen Adressen liefern danach nichts mehr. Das Original bleibt.
-      x-capability: 'manage_settings oder review_gallery'
+      x-capability: 'manage_settings, manage_gallery oder review_gallery'
       requestBody:
         required: true
         content:
@@ -1543,6 +1576,104 @@ paths:
                 properties:
                   id: { type: integer }
                   intern: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /gallery/albums:
+    get:
+      tags: [Galerie]
+      summary: Alle Alben als Ziel zum Verschieben
+      description: Auch leere Alben und Alben aus Google Drive (source drive); hochgeladene Bilder dürfen in jedes Album.
+      x-capability: 'manage_settings oder manage_gallery'
+      responses:
+        '200':
+          description: Alben
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [albums]
+                properties:
+                  albums:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, title, year, source]
+                      properties:
+                        id: { type: integer }
+                        title: { type: string }
+                        year: { type: string }
+                        source: { type: string, enum: [app, drive] }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /gallery/photos/move:
+    post:
+      tags: [Galerie]
+      summary: Hochgeladene Bilder und Videos in ein anderes Album verschieben
+      description: |
+        Höchstens 500 auf einmal. Erst prüft der Server alle (404, wenn eines fehlt; 400 bei Bildern aus Google Drive),
+        dann verschiebt er; bei einem Fehler bleibt alles, wie es war. Das Original zieht in der Ablage mit, die
+        aufbereiteten Größen öffentlicher Bilder ins Verzeichnis des neuen Albums: Ihre alten öffentlichen Adressen
+        liefern danach nichts mehr. Eine freigegebene Einreichung zum Bild zählt danach zum neuen Album. Bilder, die
+        schon im Ziel liegen, zählen nicht mit.
+      x-capability: 'manage_settings oder manage_gallery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids, album_id]
+              properties:
+                ids: { type: array, minItems: 1, maxItems: 500, items: { type: integer } }
+                album_id: { type: integer, description: Ziel, auch ein Album aus Google Drive }
+      responses:
+        '200':
+          description: Verschoben
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [moved, album_id]
+                properties:
+                  moved: { type: integer }
+                  album_id: { type: integer }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /gallery/photos/delete:
+    post:
+      tags: [Galerie]
+      summary: Hochgeladene Bilder und Videos löschen, mehrere auf einmal
+      description: |
+        Höchstens 500 auf einmal; erst geprüft, dann gelöscht (alles oder nichts, 404 bzw. 400 wie beim Verschieben).
+        Löscht die Originale und alle aufbereiteten Größen. Kam ein Bild aus einer Einreichung, gilt diese als wieder
+        entfernt.
+      x-capability: 'manage_settings oder manage_gallery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, minItems: 1, maxItems: 500, items: { type: integer } }
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted: { type: integer }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
@@ -2339,7 +2470,11 @@ paths:
                 required: [available, recipients, reason]
                 properties:
                   available: { type: boolean, description: 'Kompanieadresse und SMTP eingerichtet, PHPMailer vorhanden' }
-                  recipients: { type: integer, description: 'Zahl der Empfänger einer neuen Nachricht (samt Verfasser, sofern er Mails vom Brett bekommt)' }
+                  recipients:
+                    {
+                      type: integer,
+                      description: 'Zahl der Empfänger einer neuen Nachricht (samt Verfasser, sofern er Mails vom Brett bekommt)',
+                    }
                   reason: { type: [string, 'null'], description: 'Warum nicht verfügbar' }
                   server_max_size: { type: [integer, 'null'], description: 'Vom Mailserver gemeldete Höchstgröße (SIZE) in Bytes' }
         '403': { $ref: '#/components/responses/Error' }
@@ -2419,7 +2554,13 @@ paths:
               type: object
               properties:
                 title: { type: string }
-                blocks: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Block' }, description: 'Wie bei POST (hat Vorrang vor text). Bilder, die in keinem Block mehr stehen, bleiben für den Verlauf.' }
+                blocks:
+                  {
+                    type: array,
+                    maxItems: 50,
+                    items: { $ref: '#/components/schemas/Block' },
+                    description: 'Wie bei POST (hat Vorrang vor text). Bilder, die in keinem Block mehr stehen, bleiben für den Verlauf.',
+                  }
                 text: { type: string, description: 'Formatierter Inhalt (HTML), wird bereinigt (ältere Apps: danach ein Textblock)' }
                 expires_at: { type: string, description: 'Wie bei POST; muss in der Zukunft liegen' }
                 audience: { $ref: '#/components/schemas/BoardAudience' }
@@ -2479,7 +2620,8 @@ paths:
                   reason: { type: [string, 'null'], description: 'Warum nicht verfügbar' }
                   from: { type: string, description: Kompanieadresse (Absender) }
                   from_name: { type: string, description: Absendername }
-                  groups: { type: array, items: { $ref: '#/components/schemas/MailGroup' }, description: 'Mailgruppen (wie `GET /mails/groups`)' }
+                  groups:
+                    { type: array, items: { $ref: '#/components/schemas/MailGroup' }, description: 'Mailgruppen (wie `GET /mails/groups`)' }
                   roles:
                     type: array
                     items:
@@ -2768,7 +2910,11 @@ paths:
                 required: [uid, url, width, height]
                 properties:
                   uid: { type: string, pattern: '^[a-f0-9]{32}$' }
-                  url: { type: string, description: '<App>/bild/<uid>, ausgeliefert nach Prüfung der Rechte; ohne Anmeldung nur Bilder öffentlicher Inhalte (Beschreibung einer Kompanie, wenn Gäste view_companies haben; sonst 401)' }
+                  url:
+                    {
+                      type: string,
+                      description: '<App>/bild/<uid>, ausgeliefert nach Prüfung der Rechte; ohne Anmeldung nur Bilder öffentlicher Inhalte (Beschreibung einer Kompanie, wenn Gäste view_companies haben; sonst 401)',
+                    }
                   width: { type: integer }
                   height: { type: integer }
         '400': { $ref: '#/components/responses/Error' }
@@ -3554,8 +3700,18 @@ paths:
               properties:
                 title: { type: string, maxLength: 100 }
                 audience: { type: string, enum: [public, members], default: members }
-                blocks: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Block' }, description: 'Inhalt aus Blöcken; hat Vorrang vor body. Vom Server berechnete Felder (starts_at, ends_at, event_title) werden ignoriert, fehlende oder doppelte id neu vergeben.' }
-                body: { type: string, description: 'Für ältere Apps: formatierter Text als ein Textblock (wird bereinigt, höchstens 200000 Bytes); Bilder aus POST /rich-images als <img data-image="<uid>">' }
+                blocks:
+                  {
+                    type: array,
+                    maxItems: 50,
+                    items: { $ref: '#/components/schemas/Block' },
+                    description: 'Inhalt aus Blöcken; hat Vorrang vor body. Vom Server berechnete Felder (starts_at, ends_at, event_title) werden ignoriert, fehlende oder doppelte id neu vergeben.',
+                  }
+                body:
+                  {
+                    type: string,
+                    description: 'Für ältere Apps: formatierter Text als ein Textblock (wird bereinigt, höchstens 200000 Bytes); Bilder aus POST /rich-images als <img data-image="<uid>">',
+                  }
       responses:
         '201':
           description: Angelegt
@@ -3673,7 +3829,12 @@ paths:
               required: [name]
               properties:
                 name: { type: string, maxLength: 100, description: 'Mehrfache Leerzeichen werden zu einem' }
-                url: { type: string, maxLength: 255, description: 'https://… oder ohne Schema (beispiel.de, https:// wird ergänzt); http und Rechner ohne Endung werden abgelehnt; leer ohne Link' }
+                url:
+                  {
+                    type: string,
+                    maxLength: 255,
+                    description: 'https://… oder ohne Schema (beispiel.de, https:// wird ergänzt); http und Rechner ohne Endung werden abgelehnt; leer ohne Link',
+                  }
       responses:
         '201':
           description: Angelegt
@@ -4177,7 +4338,8 @@ paths:
                   properties:
                     name: { type: string }
                     entries: { type: integer }
-                    terms: { type: array, items: { type: string }, description: 'z. B. „König 1999“, „Vorsitz 2001–2005“, „Vorsitz seit 2020“' }
+                    terms:
+                      { type: array, items: { type: string }, description: 'z. B. „König 1999“, „Vorsitz 2001–2005“, „Vorsitz seit 2020“' }
                     candidates:
                       type: array
                       items:
@@ -5041,7 +5203,12 @@ paths:
               properties:
                 first_name: { type: string, description: 'Vorname (Pflicht)' }
                 last_name: { type: string, description: 'Nachname (darf leer sein)' }
-                name: { type: string, deprecated: true, description: 'Früher ein Feld; nur ohne first_name/last_name ausgewertet, das letzte Wort ist dann der Nachname' }
+                name:
+                  {
+                    type: string,
+                    deprecated: true,
+                    description: 'Früher ein Feld; nur ohne first_name/last_name ausgewertet, das letzte Wort ist dann der Nachname',
+                  }
                 email: { type: string }
                 phone: { type: string, maxLength: 30, description: 'Leer entfernt sie' }
                 username: { type: string }
@@ -5273,15 +5440,30 @@ paths:
               properties:
                 first_name: { type: string, description: 'Vorname (Pflicht)' }
                 last_name: { type: string, description: 'Nachname (darf leer sein)' }
-                name: { type: string, deprecated: true, description: 'Früher ein Feld; nur ohne first_name/last_name ausgewertet, das letzte Wort ist dann der Nachname' }
+                name:
+                  {
+                    type: string,
+                    deprecated: true,
+                    description: 'Früher ein Feld; nur ohne first_name/last_name ausgewertet, das letzte Wort ist dann der Nachname',
+                  }
                 username: { type: string, description: 'Optional; erlaubt sind a–z, Ziffern, . _ - @' }
                 email: { type: string, format: email }
                 phone: { type: string, maxLength: 30, description: 'Handynummer (optional), Prüfung wie bei `PATCH /me/account`' }
                 address: { $ref: '#/components/schemas/AddressInput' }
-                level: { allOf: [{ $ref: '#/components/schemas/Level' }], default: member, description: 'Eine Rolle aus `/config` → `user.create_roles` (siehe `POST /users`)' }
-                initial_points: { type: integer, minimum: 0, description: 'Anfangsbestand (nur Mitglieder, Bereich Punkte und Recht manage_points)' }
+                level:
+                  {
+                    allOf: [{ $ref: '#/components/schemas/Level' }],
+                    default: member,
+                    description: 'Eine Rolle aus `/config` → `user.create_roles` (siehe `POST /users`)',
+                  }
+                initial_points:
+                  { type: integer, minimum: 0, description: 'Anfangsbestand (nur Mitglieder, Bereich Punkte und Recht manage_points)' }
                 initial_points_date: { type: string, format: date, description: Datum der Buchung (Standard heute) }
-                rank_id: { type: integer, description: 'Dienstgrad (Bereich Dienstgrade, Recht manage_ranks); mit Punkten muss der Anfangsbestand die Schwelle erreichen' }
+                rank_id:
+                  {
+                    type: integer,
+                    description: 'Dienstgrad (Bereich Dienstgrade, Recht manage_ranks); mit Punkten muss der Anfangsbestand die Schwelle erreichen',
+                  }
                 birthday: { $ref: '#/components/schemas/BirthdayString' }
                 photo:
                   description: Foto (optional), vorab geprüft wie bei `PUT /members/{id}/photo`
@@ -5332,8 +5514,16 @@ paths:
                         last_name: { type: string }
                         email: { type: string }
                         username: { type: string }
-                        username_taken: { type: boolean, description: Benutzername inzwischen vergeben (nicht von einem Mitglied ohne Zugang); beim Freigeben einen anderen wählen }
-                        email_taken: { type: boolean, description: Zur Adresse gibt es inzwischen ein Konto (nicht ein Mitglied ohne Zugang); Freigeben geht nicht }
+                        username_taken:
+                          {
+                            type: boolean,
+                            description: Benutzername inzwischen vergeben (nicht von einem Mitglied ohne Zugang); beim Freigeben einen anderen wählen,
+                          }
+                        email_taken:
+                          {
+                            type: boolean,
+                            description: Zur Adresse gibt es inzwischen ein Konto (nicht ein Mitglied ohne Zugang); Freigeben geht nicht,
+                          }
                         message: { type: string }
                         created_at: { type: string, format: date-time }
                         email_confirmed: { type: boolean, description: Adresse per Link bestätigt (nur mit Mailversand) }
@@ -5381,7 +5571,8 @@ paths:
               properties:
                 level: { type: string, description: Rolle; ohne Angabe die vorgeschlagene }
                 username: { type: string, description: Anderer Benutzername, wenn der gewünschte vergeben ist }
-                user_id: { type: integer, description: Mit diesem Mitglied ohne Zugang verbinden statt ein Konto anzulegen; level gilt dann nicht }
+                user_id:
+                  { type: integer, description: Mit diesem Mitglied ohne Zugang verbinden statt ein Konto anzulegen; level gilt dann nicht }
       responses:
         '200':
           description: Freigegeben
@@ -5456,8 +5647,14 @@ paths:
               type: object
               required: [people]
               properties:
-                level: { allOf: [{ $ref: '#/components/schemas/Level' }], default: member, description: 'Eine Rolle aus `/config` → `user.create_roles` (siehe `POST /users`)' }
-                extra_roles: { allOf: [{ $ref: '#/components/schemas/ExtraRoles' }], description: 'Zusatzrollen für alle (wie bei `POST /users`)' }
+                level:
+                  {
+                    allOf: [{ $ref: '#/components/schemas/Level' }],
+                    default: member,
+                    description: 'Eine Rolle aus `/config` → `user.create_roles` (siehe `POST /users`)',
+                  }
+                extra_roles:
+                  { allOf: [{ $ref: '#/components/schemas/ExtraRoles' }], description: 'Zusatzrollen für alle (wie bei `POST /users`)' }
                 people:
                   type: array
                   maxItems: 50
@@ -5517,7 +5714,11 @@ paths:
                 catalog_id: { type: integer }
                 reason: { type: string, description: 'Ohne Angabe: Titel des Katalogeintrags.' }
                 date: { type: string, format: date }
-                attendance_id: { type: integer, description: 'Aus dem Vorschlag einer Anwesenheitsliste (Issue #21): bucht nur für, wer für diese Liste noch keine Punkte hat; sonst 400' }
+                attendance_id:
+                  {
+                    type: integer,
+                    description: 'Aus dem Vorschlag einer Anwesenheitsliste (Issue #21): bucht nur für, wer für diese Liste noch keine Punkte hat; sonst 400',
+                  }
                 apply_factor:
                   type: boolean
                   default: true
@@ -5795,8 +5996,18 @@ paths:
         Tageszahlen ohne Personenbezug bleiben. Nicht in Sicherungen.
       x-capability: view_activity
       parameters:
-        - { name: from, in: query, schema: { type: string, format: date }, description: 'Beginn (JJJJ-MM-TT); Standard 29 Tage vor dem Ende' }
-        - { name: to, in: query, schema: { type: string, format: date }, description: 'Ende einschließlich; Standard heute. Höchstens 366 Tage.' }
+        - {
+            name: from,
+            in: query,
+            schema: { type: string, format: date },
+            description: 'Beginn (JJJJ-MM-TT); Standard 29 Tage vor dem Ende',
+          }
+        - {
+            name: to,
+            in: query,
+            schema: { type: string, format: date },
+            description: 'Ende einschließlich; Standard heute. Höchstens 366 Tage.',
+          }
       responses:
         '200':
           description: OK
@@ -5859,6 +6070,67 @@ paths:
                 required: [personal]
                 properties:
                   personal: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /admin/changes:
+    get:
+      tags: [Einstellungen]
+      summary: Änderungsprotokoll (wer hat wann was angelegt, geändert oder gelöscht)
+      description: |
+        Mit `view_changes` (Admins immer, an Rollen und Personen vergebbar). Aufgezeichnet werden Änderungen über die App
+        (nicht in der Vorschau): Mitglieder und Konten, Rollen, Einstellungen, Updates und Sicherungen sowie Anlegen, Ändern
+        und Löschen in allen Bereichen, mit den Werten vorher und nachher. Nicht erfasst werden Anmelden, Abstimmungen,
+        Push-Abos, Prüfungen und Tests sowie Teile von Uploads (Liste `ChangeLog\Subjects::NOT_RECORDED`). Werte persönlicher Angaben nur mit `view_personal` (sonst `hidden`), Geheimes nie
+        (`secret`). Neueste zuerst, höchstens 2000 (`truncated` = es gab mehr). Nicht in Sicherungen. Einträge werden nach
+        `keep_days` Tagen gelöscht; wird ein Konto gelöscht, verlieren die Einträge über diese Person ihre Werte.
+      x-capability: view_changes
+      parameters:
+        - {
+            name: from,
+            in: query,
+            schema: { type: string, format: date },
+            description: 'Beginn (JJJJ-MM-TT); Standard 29 Tage vor dem Ende',
+          }
+        - {
+            name: to,
+            in: query,
+            schema: { type: string, format: date },
+            description: 'Ende einschließlich; Standard heute. Höchstens 731 Tage.',
+          }
+        - { name: user_id, in: query, schema: { type: integer }, description: Nur Änderungen dieses Kontos }
+        - { name: subject_id, in: query, schema: { type: integer }, description: Nur Änderungen über dieses Konto }
+        - { name: area, in: query, schema: { type: string, pattern: '^[a-z_]{1,20}$' }, description: Nur dieser Bereich }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChangeLog' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /admin/changes/settings:
+    put:
+      tags: [Einstellungen]
+      summary: Änderungsprotokoll ein- oder ausschalten, Frist ändern
+      description: Standard an, 365 Tage. Ausschalten löscht sofort alle Einträge; eine kürzere Frist löscht ältere Einträge sofort.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled: { type: boolean }
+                keep_days: { type: integer, minimum: 30, maximum: 730 }
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChangeLogSettings' }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
@@ -5952,7 +6224,12 @@ paths:
               required: ['on']
               properties:
                 'on': { type: boolean }
-                reason: { type: string, maxLength: 500, description: 'Klartext, Zeilenumbrüche bleiben; ohne Angabe bleibt die bisherige Begründung' }
+                reason:
+                  {
+                    type: string,
+                    maxLength: 500,
+                    description: 'Klartext, Zeilenumbrüche bleiben; ohne Angabe bleibt die bisherige Begründung',
+                  }
       responses:
         '200':
           description: Neuer Stand
@@ -6109,21 +6386,66 @@ paths:
             schema:
               type: object
               properties:
-                calendar_source: { type: string, enum: [app, google, ics], description: 'Quelle des internen Kalenders: in der App gepflegt, Google-Kalender-IDs oder iCal-Adresse. Die Angaben der anderen Quellen bleiben gespeichert. Der Wechsel zu bzw. weg von app legt die Standardrolle „Kalender verwalten“ an bzw. entfernt sie, wenn niemand sie hat.' }
-                calendar_ics_url: { type: string, description: 'iCal-Adresse; webcal:// wird als https:// gespeichert. Ohne calendar_source und calendar_ids leert eine neue Adresse die Kalender-IDs (wie bisher).' }
+                calendar_source:
+                  {
+                    type: string,
+                    enum: [app, google, ics],
+                    description: 'Quelle des internen Kalenders: in der App gepflegt, Google-Kalender-IDs oder iCal-Adresse. Die Angaben der anderen Quellen bleiben gespeichert. Der Wechsel zu bzw. weg von app legt die Standardrolle „Kalender verwalten“ an bzw. entfernt sie, wenn niemand sie hat.',
+                  }
+                calendar_ics_url:
+                  {
+                    type: string,
+                    description: 'iCal-Adresse; webcal:// wird als https:// gespeichert. Ohne calendar_source und calendar_ids leert eine neue Adresse die Kalender-IDs (wie bisher).',
+                  }
                 google_api_key: { type: string }
-                calendar_ids: { type: string, description: 'Kommagetrennte Kalender-IDs; gelesen mit API-Schlüssel (öffentliche Kalender) oder über den Google-Zugang' }
+                calendar_ids:
+                  {
+                    type: string,
+                    description: 'Kommagetrennte Kalender-IDs; gelesen mit API-Schlüssel (öffentliche Kalender) oder über den Google-Zugang',
+                  }
                 calendar_cache_minutes: { type: integer, minimum: 1, maximum: 1440 }
                 drive_service_account: { type: string, description: JSON-Schlüssel des Dienstkontos }
-                drive_oauth: { type: string, enum: [''], description: 'Leer trennt die OAuth-Verbindung zu Google wie POST /admin/google/disconnect (Widerruf bei Google, der Client bleibt gespeichert)' }
+                drive_oauth:
+                  {
+                    type: string,
+                    enum: [''],
+                    description: 'Leer trennt die OAuth-Verbindung zu Google wie POST /admin/google/disconnect (Widerruf bei Google, der Client bleibt gespeichert)',
+                  }
                 gallery_root: { type: string, description: Link oder ID des Galerie-Ordners in Google Drive }
-                gallery_source: { type: string, enum: [drive, server], description: 'Quelle der Galerie: Google Drive oder eigener Server (nur Alben der App und hochgeladene Bilder). Der Wechsel zu server entfernt Alben und Bilder aus Drive aus der App; hochgeladene bleiben.' }
-                gallery_store: { type: string, enum: [server], description: Ablageort für hochgeladene Bilder (heute nur der eigene Server) }
-                gallery_downloads: { type: string, enum: ['0', '1'], description: 'Knöpfe zum Herunterladen in der Galerie zeigen (1) oder nicht (0, Vorgabe): je Bild in der Großansicht und je Album als ZIP' }
-                news_source: { type: string, enum: [none, wordpress, rss, site, app], description: 'Quelle der News, erlaubt sind die Werte aus news.sources: WordPress-Plugin site (Beiträge der eigenen Seite) oder app (in der App geschrieben); eigenständige Version none, wordpress, rss oder app. Beim Wechsel bleiben die Beiträge der anderen Quelle gespeichert; mit app entsteht die Standardrolle „News verwalten“ (member, manage_news), beim Wechsel weg verschwindet sie, wenn niemand sie hat.' }
+                gallery_source:
+                  {
+                    type: string,
+                    enum: [drive, server],
+                    description: 'Quelle der Galerie: Google Drive oder eigener Server (nur Alben der App und hochgeladene Bilder). Der Wechsel zu server entfernt Alben und Bilder aus Drive aus der App; hochgeladene bleiben.',
+                  }
+                gallery_store:
+                  { type: string, enum: [server], description: Ablageort für hochgeladene Bilder (heute nur der eigene Server) }
+                gallery_downloads:
+                  {
+                    type: string,
+                    enum: ['0', '1'],
+                    description: 'Knöpfe zum Herunterladen in der Galerie zeigen (1) oder nicht (0, Vorgabe): je Bild in der Großansicht und je Album als ZIP',
+                  }
+                gallery_submissions:
+                  {
+                    type: string,
+                    enum: ['0', '1'],
+                    description: 'Einreichen von Bildern und Videos durch Mitglieder mit submit_gallery erlauben (1) oder nicht (0). Neue Installationen: 0; bestehende bekamen beim Update einmalig 1',
+                  }
+                news_source:
+                  {
+                    type: string,
+                    enum: [none, wordpress, rss, site, app],
+                    description: 'Quelle der News, erlaubt sind die Werte aus news.sources: WordPress-Plugin site (Beiträge der eigenen Seite) oder app (in der App geschrieben); eigenständige Version none, wordpress, rss oder app. Beim Wechsel bleiben die Beiträge der anderen Quelle gespeichert; mit app entsteht die Standardrolle „News verwalten“ (member, manage_news), beim Wechsel weg verschwindet sie, wenn niemand sie hat.',
+                  }
                 news_url: { type: string, description: Nur eigenständige Version }
-                legal_imprint_url: { type: string, description: 'Link auf das Impressum (http:// oder https://, höchstens 255 Zeichen); leer entfernt ihn' }
-                legal_privacy_url: { type: string, description: 'Link auf die Datenschutzerklärung (http:// oder https://, höchstens 255 Zeichen); leer entfernt ihn' }
+                legal_imprint_url:
+                  { type: string, description: 'Link auf das Impressum (http:// oder https://, höchstens 255 Zeichen); leer entfernt ihn' }
+                legal_privacy_url:
+                  {
+                    type: string,
+                    description: 'Link auf die Datenschutzerklärung (http:// oder https://, höchstens 255 Zeichen); leer entfernt ihn',
+                  }
       responses:
         '200':
           description: Neuer Stand
@@ -6265,7 +6587,11 @@ paths:
                   photos: { type: integer }
                   processed: { type: integer }
                   pending: { type: integer }
-                  failed: { type: integer, description: 'Bilder, die sich nicht laden ließen (der nächste Abgleich versucht sie erneut, höchstens fünfmal; Liste unter /admin/gallery/failed)' }
+                  failed:
+                    {
+                      type: integer,
+                      description: 'Bilder, die sich nicht laden ließen (der nächste Abgleich versucht sie erneut, höchstens fünfmal; Liste unter /admin/gallery/failed)',
+                    }
                   error: { type: string, description: Fehler des Abgleichs, sonst leer }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
@@ -6298,7 +6624,11 @@ paths:
                         intern: { type: boolean }
                         error: { type: string, description: Fehlermeldung der letzten Aufbereitung }
                         attempts: { type: integer }
-                        unsupported: { type: boolean, description: 'Video in einem Format, das die Galerie nicht abspielt (nur MP4 und WebM); ohne Versuche' }
+                        unsupported:
+                          {
+                            type: boolean,
+                            description: 'Video in einem Format, das die Galerie nicht abspielt (nur MP4 und WebM); ohne Versuche',
+                          }
                         drive_url: { type: string, description: Adresse der Datei in Google Drive }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
@@ -6329,7 +6659,7 @@ paths:
     get:
       tags: [Einstellungen]
       summary: Alle Alben mit Herkunft und Anzahl der Bilder
-      x-capability: manage_settings
+      x-capability: 'manage_settings oder manage_gallery'
       responses:
         '200':
           description: OK
@@ -6348,7 +6678,7 @@ paths:
       tags: [Einstellungen]
       summary: Album nur in der App anlegen
       description: Der Abgleich mit Google Drive lässt Alben der App in Ruhe.
-      x-capability: manage_settings
+      x-capability: 'manage_settings oder manage_gallery'
       requestBody:
         required: true
         content:
@@ -6370,7 +6700,7 @@ paths:
     get:
       tags: [Einstellungen]
       summary: Album mit seinen hochgeladenen Bildern
-      x-capability: manage_settings
+      x-capability: 'manage_settings oder manage_gallery'
       responses:
         '200':
           description: OK
@@ -6384,7 +6714,7 @@ paths:
       tags: [Einstellungen]
       summary: Titel oder Jahr eines Albums der App ändern
       description: Alben aus Google Drive ändert man in Drive (400).
-      x-capability: manage_settings
+      x-capability: 'manage_settings oder manage_gallery'
       requestBody:
         required: true
         content:
@@ -6404,7 +6734,7 @@ paths:
       tags: [Einstellungen]
       summary: Album der App mit allen Bildern darin löschen
       description: Alben aus Google Drive lassen sich hier nicht löschen (400).
-      x-capability: manage_settings
+      x-capability: 'manage_settings oder manage_gallery'
       responses:
         '200': { $ref: '#/components/responses/Deleted' }
         '400': { $ref: '#/components/responses/Error' }
@@ -6419,7 +6749,7 @@ paths:
       tags: [Einstellungen]
       summary: Ein Bild in ein Album hochladen (auch in eines aus Google Drive)
       description: 'JPG, PNG oder WebP. Der Server prüft Format, Größe und Arbeitsspeicher, kodiert das Bild neu als JPEG ohne Metadaten (auch ohne Aufnahmeort) und bereitet es danach wie Bilder aus Drive auf.'
-      x-capability: manage_settings
+      x-capability: 'manage_settings oder manage_gallery'
       requestBody:
         required: true
         content:
@@ -6453,7 +6783,7 @@ paths:
       tags: [Einstellungen]
       summary: Ein hochgeladenes Bild löschen
       description: Nur hochgeladene Bilder (Bilder aus Drive kämen beim nächsten Abgleich wieder; sonst 404).
-      x-capability: manage_settings
+      x-capability: 'manage_settings oder manage_gallery'
       responses:
         '200': { $ref: '#/components/responses/Deleted' }
         '401': { $ref: '#/components/responses/Error' }
@@ -6482,7 +6812,13 @@ paths:
               properties:
                 reminder_hour: { type: integer, minimum: 0, maximum: 23 }
                 birthday_notify: { type: boolean, description: 'Benachrichtigung am Geburtstag an oder aus (Standard an)' }
-                birthday_hour: { type: integer, minimum: 0, maximum: 23, description: 'Ab dieser Stunde (Ortszeit) am Geburtstag benachrichtigen (Standard 7)' }
+                birthday_hour:
+                  {
+                    type: integer,
+                    minimum: 0,
+                    maximum: 23,
+                    description: 'Ab dieser Stunde (Ortszeit) am Geburtstag benachrichtigen (Standard 7)',
+                  }
       responses:
         '200': { $ref: '#/components/responses/PushAdmin' }
         '400': { $ref: '#/components/responses/Error' }
@@ -6510,7 +6846,13 @@ paths:
               type: object
               required: [upcoming_days]
               properties:
-                upcoming_days: { type: integer, minimum: 0, maximum: 30, description: 'Anstehend: heute und die nächsten N Tage (0 = nur heute, Standard 7)' }
+                upcoming_days:
+                  {
+                    type: integer,
+                    minimum: 0,
+                    maximum: 30,
+                    description: 'Anstehend: heute und die nächsten N Tage (0 = nur heute, Standard 7)',
+                  }
       responses:
         '200': { $ref: '#/components/responses/BirthdaySettings' }
         '400': { $ref: '#/components/responses/Error' }
@@ -6548,7 +6890,11 @@ paths:
                     properties:
                       enabled: { type: boolean, description: Der Admin hat Statusmeldungen zugestimmt }
                       available: { type: boolean, description: Das Paket nennt einen Empfänger }
-                      payload: { type: object, description: 'Genau das, was gesendet würde (ohne Namen oder Inhalte), Format 3 mit usage (ActivityUsage und areas: Personen je Bereich in 30 Tagen)' }
+                      payload:
+                        {
+                          type: object,
+                          description: 'Genau das, was gesendet würde (ohne Namen oder Inhalte), Format 3 mit usage (ActivityUsage und areas: Personen je Bereich in 30 Tagen)',
+                        }
                   setupDone: { type: boolean }
                   errorLog: { $ref: '#/components/schemas/ErrorLog' }
         '401': { $ref: '#/components/responses/Error' }
@@ -7107,6 +7453,104 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }
 
+  /admin/backup/server:
+    get:
+      tags: [Wartung]
+      summary: Sicherungen auf dem eigenen Server – Stand und Liste
+      description: |
+        Liste aller Sicherungen im geschützten Ordner auf dem Server, neueste zuerst: die wöchentlichen (`weekly`) und
+        die vor Updates (`update`). Herunterladen als Datei über `<App>/sicherung?datei=<id>` (nur Admins, nicht in der
+        Vorschau).
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/BackupServerStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Wartung]
+      summary: Wöchentliche Sicherungen auf dem eigenen Server ein- oder ausschalten
+      description: |
+        Eingeschaltet legt die App einmal pro Woche eine unverschlüsselte Sicherung im geschützten Ordner auf dem Server
+        ab und behält die letzten vier (die vor Updates zählen nicht mit). Schalter und Zustand gehören zur Installation
+        und kommen nicht aus einer Sicherung.
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/BackupServerStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/backup/server/create:
+    post:
+      tags: [Wartung]
+      summary: Sicherung jetzt auf dem Server ablegen
+      x-capability: manage_settings
+      responses:
+        '200': { $ref: '#/components/responses/BackupServerStatus' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '500': { $ref: '#/components/responses/Error' }
+
+  /admin/backup/server/restore:
+    post:
+      tags: [Wartung]
+      summary: Alle Daten durch eine Sicherung auf dem Server ersetzen
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, confirm]
+              properties:
+                id: { type: string, description: id aus der Liste }
+                confirm: { type: boolean, description: Muss true sein }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  restored: { type: boolean }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/backup/server/delete:
+    post:
+      tags: [Wartung]
+      summary: Eine Sicherung auf dem Server löschen
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id: { type: string, description: id aus der Liste }
+      responses:
+        '200': { $ref: '#/components/responses/BackupServerStatus' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /admin/setup/done:
     post:
       tags: [Wartung]
@@ -7174,19 +7618,60 @@ components:
         application/json:
           schema:
             type: object
-            required: [available, access, enabled, encrypted, email, folder_url, last_ok, last_try, error, every_days, keep]
+            required: [available, access, enabled, encrypted, email, folder_url, last_ok, last_try, error, last_upload, every_days, keep]
             properties:
               available: { type: boolean, description: Datensicherung und Verbindung über „Mit Google verbinden“ vorhanden }
               access: { type: boolean, description: Google hat drive.file erlaubt }
               enabled: { type: boolean }
-              encrypted: { type: boolean, description: Mit Passwort für Sicherungen verschlüsselt (.json.enc), sonst unverschlüsselt (.json) }
+              encrypted:
+                { type: boolean, description: Mit Passwort für Sicherungen verschlüsselt (.json.enc), sonst unverschlüsselt (.json) }
               email: { type: string, description: Verbundenes Google-Konto ('' wenn unbekannt) }
               folder_url: { type: [string, 'null'] }
               last_ok: { type: [integer, 'null'], description: Letztes erfolgreiches Hochladen (Unix-Zeit) }
               last_try: { type: [integer, 'null'] }
               error: { type: [string, 'null'], description: Fehler beim letzten Versuch }
+              last_upload:
+                type: [object, 'null']
+                description: Messung des letzten erfolgreichen Hochladens (Sekunden); null, solange es keine gibt
+                required: [bytes, chunks, start_seconds, read_seconds, send_seconds, slowest_seconds, total_seconds]
+                properties:
+                  bytes: { type: integer }
+                  chunks: { type: integer, description: Anzahl der Anfragen mit Daten (Stücke von 8 MB) }
+                  start_seconds:
+                    { type: number, description: Sitzung bei Google beginnen (kleine Anfrage, Verbindungsaufbau und Antwortzeit) }
+                  read_seconds: { type: number, description: Datei von der Platte des Servers lesen }
+                  send_seconds: { type: number, description: Alle Stücke senden, bis Google sie bestätigt }
+                  slowest_seconds: { type: number }
+                  total_seconds: { type: number }
               every_days: { type: integer }
               keep: { type: integer }
+    BackupServerStatus:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [available, enabled, can_restore, last_ok, last_try, error, every_days, keep, files]
+            properties:
+              available: { type: boolean, description: Datensicherung in dieser Installation vorhanden }
+              enabled: { type: boolean, description: Wöchentlich auf dem Server sichern }
+              can_restore: { type: boolean, description: Wiederherstellen ist hier möglich }
+              last_ok: { type: [integer, 'null'], description: Letzte erfolgreiche Sicherung auf dem Server (Unix-Zeit) }
+              last_try: { type: [integer, 'null'] }
+              error: { type: [string, 'null'], description: Fehler beim letzten Versuch }
+              every_days: { type: integer }
+              keep: { type: integer, description: So viele wöchentliche Sicherungen bleiben }
+              files:
+                type: array
+                items:
+                  type: object
+                  required: [id, kind, created, size, version]
+                  properties:
+                    id: { type: string, description: Dateiname im Ordner der Sicherungen }
+                    kind: { type: string, enum: [weekly, update] }
+                    created: { type: integer, description: Unix-Zeit }
+                    size: { type: integer, description: Bytes }
+                    version: { type: [string, 'null'], description: Version vor dem Update (nur update) }
     FormerRetention:
       description: OK
       content:
@@ -7213,7 +7698,11 @@ components:
               available: { type: boolean, description: PHP hat die Erweiterung sodium }
               configured: { type: boolean, description: Eingerichtet und nutzbar (mit sodium) }
               stored: { type: boolean, description: 'Eingerichtet, auch wenn sodium fehlt (dann lässt es sich nur entfernen)' }
-              verified: { type: boolean, description: 'Seit dem Einrichten einmal richtig geprüft; erst dann löscht Google Drive alte unverschlüsselte Sicherungen' }
+              verified:
+                {
+                  type: boolean,
+                  description: 'Seit dem Einrichten einmal richtig geprüft; erst dann löscht Google Drive alte unverschlüsselte Sicherungen',
+                }
               fingerprint: { type: [string, 'null'], description: 'Fingerabdruck des öffentlichen Schlüssels, z. B. „3f2a 9c41 07be d5e0“' }
               set_at: { type: [integer, 'null'], description: Eingerichtet am (Unix-Zeit) }
               min_length: { type: integer }
@@ -7261,7 +7750,8 @@ components:
             type: object
             required: [upcoming_days]
             properties:
-              upcoming_days: { type: integer, minimum: 0, maximum: 30, description: 'Anstehend: heute und die nächsten N Tage (Standard 7)' }
+              upcoming_days:
+                { type: integer, minimum: 0, maximum: 30, description: 'Anstehend: heute und die nächsten N Tage (Standard 7)' }
     PushAdmin:
       description: OK
       content:
@@ -7332,8 +7822,13 @@ components:
               last_name: { type: string, description: 'Leer, wenn es keinen gibt' }
               login: { type: string }
               email: { type: string }
-              phone: { type: string, description: 'Handynummer; leer, wenn keine hinterlegt ist oder der Betrachter view_personal nicht hat' }
-              can_change_login: { type: boolean, description: 'Ob sich der Benutzername ändern lässt; ein neuer meldet das Konto auf allen Geräten ab (das eigene: dieses bleibt angemeldet)' }
+              phone:
+                { type: string, description: 'Handynummer; leer, wenn keine hinterlegt ist oder der Betrachter view_personal nicht hat' }
+              can_change_login:
+                {
+                  type: boolean,
+                  description: 'Ob sich der Benutzername ändern lässt; ein neuer meldet das Konto auf allen Geräten ab (das eigene: dieses bleibt angemeldet)',
+                }
               can_export: { type: boolean, description: 'Ob der Betrachter die Auskunft (GET /members/{id}/data) bekommt' }
     OwnAccount:
       description: Eigene Kontaktangaben
@@ -7433,7 +7928,11 @@ components:
       required: [title]
       description: Mit blocks oder text; fehlt beides → 400.
       properties:
-        title: { type: string, description: 'Titel (reiner Text, eine Zeile, keine Längengrenze); Banner, Benachrichtigung und Betreff der Mail. Leer → 400.' }
+        title:
+          {
+            type: string,
+            description: 'Titel (reiner Text, eine Zeile, keine Längengrenze); Banner, Benachrichtigung und Betreff der Mail. Leer → 400.',
+          }
         blocks:
           type: array
           maxItems: 50
@@ -7488,8 +7987,17 @@ components:
         kind: { type: string, enum: [message], description: 'Art des Eintrags; weitere können dazukommen' }
         id: { type: integer }
         title: { type: string }
-        text: { type: string, description: 'Bereinigter formatierter Inhalt (HTML) der Textblöcke für alle (für ältere Apps); Bilder mit src (Adresse der App) und data-image' }
-        blocks: { type: array, items: { $ref: '#/components/schemas/Block' }, description: 'Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur mit view_board bzw. post_board). Ältere Nachrichten: ein Textblock aus text.' }
+        text:
+          {
+            type: string,
+            description: 'Bereinigter formatierter Inhalt (HTML) der Textblöcke für alle (für ältere Apps); Bilder mit src (Adresse der App) und data-image',
+          }
+        blocks:
+          {
+            type: array,
+            items: { $ref: '#/components/schemas/Block' },
+            description: 'Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur mit view_board bzw. post_board). Ältere Nachrichten: ein Textblock aus text.',
+          }
         excerpt: { type: string, description: 'Reiner Textauszug aller sichtbaren Blöcke' }
         author_name: { type: [string, 'null'], description: '„gelöschtes Konto“, wenn das Konto des Verfassers gelöscht wurde' }
         created_at: { type: string, format: date-time }
@@ -7501,7 +8009,12 @@ components:
           type: array
           items: { type: string }
           description: 'Bei company: Namen der Kompanien (für alle, die die Nachricht lesen); bei person: Namen der Personen (nur mit post_board)'
-        attachments: { type: array, items: { $ref: '#/components/schemas/Attachment' }, description: 'Dateianhänge; sehen alle, die die Nachricht sehen (bei öffentlichen auch ohne Anmeldung)' }
+        attachments:
+          {
+            type: array,
+            items: { $ref: '#/components/schemas/Attachment' },
+            description: 'Dateianhänge; sehen alle, die die Nachricht sehen (bei öffentlichen auch ohne Anmeldung)',
+          }
         last_edit:
           description: 'Nur mit post_board: wer zuletzt Titel, Inhalt, Enddatum oder Sichtbarkeit geändert hat (null: unverändert)'
           oneOf:
@@ -7529,7 +8042,11 @@ components:
         name: { type: string, description: Dateiname }
         size: { type: integer, description: Bytes }
         mime: { type: string, description: 'Typ aus der Endung (für die Mail), sonst application/octet-stream' }
-        url: { type: string, description: 'Download (<App>/anhang/<uid>) nach Anmeldung, bei öffentlichen Nachrichten am Brett auch ohne; immer als Anhang (Content-Disposition attachment)' }
+        url:
+          {
+            type: string,
+            description: 'Download (<App>/anhang/<uid>) nach Anmeldung, bei öffentlichen Nachrichten am Brett auch ohne; immer als Anhang (Content-Disposition attachment)',
+          }
     MailSelection:
       type: object
       description: Empfänger eines Felds (An, Cc oder Bcc)
@@ -7547,7 +8064,19 @@ components:
     MailSelectionDescribed:
       type: object
       properties:
-        groups: { type: array, items: { type: object, properties: { key: { type: string }, label: { type: string, description: 'Aktuelle Bezeichnung, „Gelöschte Gruppe“ wenn es sie nicht mehr gibt' } } } }
+        groups:
+          {
+            type: array,
+            items:
+              {
+                type: object,
+                properties:
+                  {
+                    key: { type: string },
+                    label: { type: string, description: 'Aktuelle Bezeichnung, „Gelöschte Gruppe“ wenn es sie nicht mehr gibt' },
+                  },
+              },
+          }
         roles: { type: array, items: { type: object, properties: { key: { type: string }, label: { type: string } } } }
         users: { type: array, items: { type: object, properties: { id: { type: integer }, name: { type: [string, 'null'] } } } }
         emails: { type: array, items: { type: string } }
@@ -7626,8 +8155,14 @@ components:
         action: { type: string, enum: [created, title, content, expires, audience, attachments, deleted, mailed] }
         user_name: { type: [string, 'null'], description: '„gelöschtes Konto“, wenn es das Konto nicht mehr gibt' }
         at: { type: string, format: date-time }
-        before: { description: 'Vorheriger Stand (Titel, Inhalt als HTML (Blöcke außer Text als Absatz mit ihrem reinen Text, Blöcke nur für Mitglieder mit „Nur für Mitglieder:“ davor), Enddatum, Sichtbarkeit, bei attachments die Dateinamen; bei deleted {expires_at}); null bei created und mailed. Sichtbarkeit: members, public oder „company: Namen“ bzw. „person: Namen“ (durch Komma getrennt)' }
-        after: { description: 'Neuer Stand; bei created {title, text, expires_at, audience, audience_ids?, audience_names?, attachments?}, bei attachments die Dateinamen, bei mailed {recipients}, bei deleted null' }
+        before:
+          {
+            description: 'Vorheriger Stand (Titel, Inhalt als HTML (Blöcke außer Text als Absatz mit ihrem reinen Text, Blöcke nur für Mitglieder mit „Nur für Mitglieder:“ davor), Enddatum, Sichtbarkeit, bei attachments die Dateinamen; bei deleted {expires_at}); null bei created und mailed. Sichtbarkeit: members, public oder „company: Namen“ bzw. „person: Namen“ (durch Komma getrennt)',
+          }
+        after:
+          {
+            description: 'Neuer Stand; bei created {title, text, expires_at, audience, audience_ids?, audience_names?, attachments?}, bei attachments die Dateinamen, bei mailed {recipients}, bei deleted null',
+          }
     SignatureResponse:
       type: object
       required: [signature]
@@ -7712,7 +8247,27 @@ components:
         text: { type: string, maxLength: 1000, description: Nur bei Freitext }
     Poll:
       type: object
-      required: [id, title, description, type, anonymous, results, status, ends_at, closed_at, created_at, updated_at, created_by_name, options, locked, has_voted, my_answer, results_visible, results_data]
+      required:
+        [
+          id,
+          title,
+          description,
+          type,
+          anonymous,
+          results,
+          status,
+          ends_at,
+          closed_at,
+          created_at,
+          updated_at,
+          created_by_name,
+          options,
+          locked,
+          has_voted,
+          my_answer,
+          results_visible,
+          results_data,
+        ]
       properties:
         id: { type: integer }
         title: { type: string }
@@ -7768,7 +8323,25 @@ components:
                   name: { type: string, description: Nur bei namentlichen Umfragen }
     PushType:
       type: string
-      enum: [board, board_public, polls, birthdays, gallery_review, gallery_submissions, registrations, reports_review, reports, penalties, points, ranks, titles, events, reminder, news]
+      enum:
+        [
+          board,
+          board_public,
+          polls,
+          birthdays,
+          gallery_review,
+          gallery_submissions,
+          registrations,
+          reports_review,
+          reports,
+          penalties,
+          points,
+          ranks,
+          titles,
+          events,
+          reminder,
+          news,
+        ]
       description: '`board` (Schwarzes Brett, Issue #5) nur für Mitglieder und Anwärter (view_board); dringend (Urgency high), TTL höchstens bis zum Ablauf der Nachricht. `board_public`: öffentliche Nachrichten am Brett für alle anderen (Gäste ohne Konto, Konten ohne view_board), sonst wie `board`. `polls` (Umfragen, Issue #4) nur für Mitglieder: neue Umfrage und Erinnerung 24 Stunden vor dem Ende an alle ohne Antwort. `birthdays` (Geburtstage, Issue #1) nur für Mitglieder: am Tag selbst ab 7 Uhr (Zeitzone der Kompanie), nicht an das Geburtstagskind, nur für sichtbare Geburtstage; TTL bis Mitternacht.'
     PushSubscribe:
       type: object
@@ -7796,7 +8369,30 @@ components:
       properties:
         key:
           type: string
-          enum: [events, calendar, news, gallery, points, penalties, ranks, titles, attendance, documents, board, polls, birthdays, inventory, directory, offices, lists, mail, companies, sponsors, pages]
+          enum:
+            [
+              events,
+              calendar,
+              news,
+              gallery,
+              points,
+              penalties,
+              ranks,
+              titles,
+              attendance,
+              documents,
+              board,
+              polls,
+              birthdays,
+              inventory,
+              directory,
+              offices,
+              lists,
+              mail,
+              companies,
+              sponsors,
+              pages,
+            ]
         label: { type: string, description: Bezeichnung (aus kompanie.json oder Standard) }
         description: { type: string, description: Ein Satz, wofür der Bereich da ist }
         enabled: { type: boolean }
@@ -7886,6 +8482,69 @@ components:
                   name: { type: string }
                   last_active: { type: [integer, 'null'], description: 'Unix-Zeit; null = nicht aktiv, seit die Erfassung je Person läuft' }
                   actions: { type: integer, description: 'Einträge je Person im Zeitraum (0 = im Zeitraum nicht aktiv)' }
+    ChangeLogSettings:
+      type: object
+      required: [enabled, keep_days, keep_min, keep_max]
+      properties:
+        enabled: { type: boolean }
+        keep_days: { type: integer, description: 'Tage, nach denen Einträge gelöscht werden' }
+        keep_min: { type: integer }
+        keep_max: { type: integer }
+    ChangeLog:
+      allOf:
+        - $ref: '#/components/schemas/ChangeLogSettings'
+        - type: object
+          required: [from, to, entries, truncated, areas]
+          properties:
+            from: { type: string, format: date }
+            to: { type: string, format: date }
+            truncated: { type: boolean }
+            areas:
+              type: array
+              description: Bereiche, zu denen es Einträge gibt
+              items:
+                type: object
+                required: [area, label]
+                properties:
+                  area: { type: string }
+                  label: { type: string }
+            entries:
+              type: array
+              items: { $ref: '#/components/schemas/ChangeEntry' }
+    ChangeEntry:
+      type: object
+      required: [id, at, actor_id, actor_name, area, area_label, type, item, label, action, subject_user_id, batch, changes]
+      properties:
+        id: { type: integer }
+        at: { type: integer, description: Unix-Zeit }
+        actor_id: { type: integer, description: '0 ohne Konto (System, Kommandozeile)' }
+        actor_name: { type: string }
+        area: { type: string }
+        area_label: { type: string }
+        type: { type: string, description: 'Art des Eintrags, z. B. Mitglied, Rolle, Termin, Einstellungen' }
+        item: { type: string, description: ID des Eintrags }
+        label: { type: string, description: 'Name des Eintrags zum Zeitpunkt der Änderung' }
+        action:
+          {
+            type: string,
+            enum: [create, update, delete, event],
+            description: 'event: etwas ohne vergleichbaren Stand (z. B. Update eingespielt); label ist dann der ganze Satz',
+          }
+        subject_user_id: { type: [integer, 'null'], description: 'Konto, um das es geht (Mitglieder, Punkte, Strafen)' }
+        batch: { type: string, description: 'Gemeinsame Kennung der Einträge einer Aktion mit mehreren Einträgen, sonst leer' }
+        changes:
+          type: array
+          items:
+            type: object
+            required: [field]
+            description: 'old fehlt beim Anlegen, new beim Löschen; beide fehlen bei secret, hidden und entfernten Werten'
+            properties:
+              field: { type: string }
+              old: { type: [string, 'null'] }
+              new: { type: [string, 'null'] }
+              secret: { type: boolean, description: 'Geheim (z. B. Passwort, Foto): nur „geändert“' }
+              hidden: { type: boolean, description: 'Persönliche Angabe ohne view_personal' }
+              personal: { type: boolean }
     ActivityEntry:
       type: object
       required: [user_id, name, area, label, action, at]
@@ -7926,7 +8585,32 @@ components:
     NavigationIcon:
       type: string
       description: 'Symbol eines Untermenüs oder Bereichs; ab info neutrale Symbole ohne festen Bereich (Issue #362)'
-      enum: [ordner, termine, news, galerie, kompanien, sponsoren, mitglieder, dokumente, brett, dienstgrade, punktekatalog, seiten, stern, info, karte, musik, pokal, glocke, fahne, kamera, haus, buch, uhr]
+      enum:
+        [
+          ordner,
+          termine,
+          news,
+          galerie,
+          kompanien,
+          sponsoren,
+          mitglieder,
+          dokumente,
+          brett,
+          dienstgrade,
+          punktekatalog,
+          seiten,
+          stern,
+          info,
+          karte,
+          musik,
+          pokal,
+          glocke,
+          fahne,
+          kamera,
+          haus,
+          buch,
+          uhr,
+        ]
     NavigationNames:
       type: object
       description: 'Eigene Namen und Symbole (Issue #362) je Bereich (NavigationTarget) oder intern (Untermenü der Standardnavigation). Der Name gilt überall, wo die App den Bereich nennt; bei eigenen Seiten nur in der Leiste. Leer kommt als [] an.'
@@ -7954,7 +8638,28 @@ components:
         start:
           type: array
           uniqueItems: true
-          items: { type: string, enum: [mitglieder, ehemalige, anfragen, meldungen, punkte, strafe, befoerderungen, anwesenheit, brett, umfragen, inventar, listen, mail, einrichtungen, einstellungen] }
+          items:
+            {
+              type: string,
+              enum:
+                [
+                  mitglieder,
+                  ehemalige,
+                  anfragen,
+                  meldungen,
+                  punkte,
+                  strafe,
+                  befoerderungen,
+                  anwesenheit,
+                  brett,
+                  umfragen,
+                  inventar,
+                  listen,
+                  mail,
+                  einrichtungen,
+                  einstellungen,
+                ],
+            }
         setup:
           type: array
           uniqueItems: true
@@ -8018,7 +8723,27 @@ components:
     ReviewReport:
       type: object
       description: Fehlermeldung im Eingang der Admins (review_reports)
-      required: [id, status, description, expected, page, version, variant, user_agent, role, last_error, user_id, name, share_name, screenshot, created, reason, reviewed_by, reviewed_at]
+      required:
+        [
+          id,
+          status,
+          description,
+          expected,
+          page,
+          version,
+          variant,
+          user_agent,
+          role,
+          last_error,
+          user_id,
+          name,
+          share_name,
+          screenshot,
+          created,
+          reason,
+          reviewed_by,
+          reviewed_at,
+        ]
       properties:
         id: { type: integer }
         status: { type: string, enum: [open, closed, forwarded] }
@@ -8054,9 +8779,14 @@ components:
         photo_id: { type: [integer, 'null'] }
         user_id: { type: integer, description: Nur beim Prüfen }
         user_name: { type: string, description: Nur beim Prüfen }
-        intern: { type: [boolean, 'null'], description: 'Nur beim Prüfen: ob das freigegebene Bild in der Galerie intern ist; null ohne Bild' }
+        intern:
+          { type: [boolean, 'null'], description: 'Nur beim Prüfen: ob das freigegebene Bild in der Galerie intern ist; null ohne Bild' }
         type: { type: string, enum: [image, video], description: 'video: MP4 oder WebM (Issue #350), thumb ist dann das Standbild' }
-        video: { type: string, description: 'Nur beim Prüfen offener Videos: Adresse zum Abspielen vor der Freigabe (<App>/foto/<id der Einreichung>/einreichung, Range, nur mit review_gallery)' }
+        video:
+          {
+            type: string,
+            description: 'Nur beim Prüfen offener Videos: Adresse zum Abspielen vor der Freigabe (<App>/foto/<id der Einreichung>/einreichung, Range, nur mit review_gallery)',
+          }
     GalleryAlbumInput:
       type: object
       properties:
@@ -8102,7 +8832,8 @@ components:
           description: Gemeinsamer Google-Zugang für Galerie und Kalender („Mit Google verbinden“ oder Dienstkonto)
           required: [redirect_uri, client_id, client_secret_set, connected, email, calendar_access, service_account_email, last_result]
           properties:
-            redirect_uri: { type: string, format: uri, description: 'Weiterleitungs-URI, die der Admin im OAuth-Client bei Google einträgt' }
+            redirect_uri:
+              { type: string, format: uri, description: 'Weiterleitungs-URI, die der Admin im OAuth-Client bei Google einträgt' }
             client_id: { type: string, description: Gespeicherte Client-ID (auch ohne Verbindung) }
             client_secret_set: { type: boolean }
             connected: { type: boolean, description: OAuth-Verbindung besteht (geht dem Dienstkonto vor) }
@@ -8147,10 +8878,15 @@ components:
             store: { type: string, enum: [server] }
             media_bytes: { type: integer, description: Belegter Platz der hochgeladenen Bilder in Bytes }
             downloads: { type: boolean, description: 'Knöpfe zum Herunterladen in der Galerie (Einstellung gallery_downloads)' }
+            submissions: { type: boolean, description: 'Einreichen durch Mitglieder erlaubt (Einstellung gallery_submissions)' }
             service_account_email: { type: string, description: wie google.service_account_email (für ältere Fassungen der App) }
             oauth_connected: { type: boolean, description: 'wie google.connected: OAuth-Verbindung zu Google (geht dem Dienstkonto vor)' }
             oauth_email: { type: string, description: Google-Konto der OAuth-Verbindung, leer wenn unbekannt }
-            calendar_access: { type: boolean, description: 'Darf der Google-Zugang auch den Kalender lesen? OAuth nur mit erlaubtem calendar.readonly; Dienstkonto immer (Kalender muss freigegeben sein)' }
+            calendar_access:
+              {
+                type: boolean,
+                description: 'Darf der Google-Zugang auch den Kalender lesen? OAuth nur mit erlaubtem calendar.readonly; Dienstkonto immer (Kalender muss freigegeben sein)',
+              }
             status:
               type: object
               description: Stand des letzten Abgleichs (albums, photos, new, pending, last_sync, error)
@@ -8199,9 +8935,18 @@ components:
         label: { type: string }
         points_factor: { type: number, description: 'Gilt beim Buchen von Punkten, z. B. 0.5; bei mehreren Rollen der kleinste' }
         extra: { type: boolean, description: 'Als Zusatzrolle vergebbar (eigene Rollen; nicht guest, member, admin)' }
-        company: { type: boolean, description: 'Gehört zur Kompanie (Recht member, nicht admin): nur zu solchen Grundrollen gibt es Zusatzrollen' }
-        new_accounts: { type: boolean, description: 'Beim Anlegen von Konten für alle mit create_users wählbar: immer bei member, sonst nach Einstellung (wer Rollen vergeben darf, siehe user.create_roles)' }
-        promotable: { type: boolean, description: 'Personen mit dieser Rolle lassen sich mit create_users als Mitglied aufnehmen (POST /members/{id}/promote), z. B. Anwärter' }
+        company:
+          { type: boolean, description: 'Gehört zur Kompanie (Recht member, nicht admin): nur zu solchen Grundrollen gibt es Zusatzrollen' }
+        new_accounts:
+          {
+            type: boolean,
+            description: 'Beim Anlegen von Konten für alle mit create_users wählbar: immer bei member, sonst nach Einstellung (wer Rollen vergeben darf, siehe user.create_roles)',
+          }
+        promotable:
+          {
+            type: boolean,
+            description: 'Personen mit dieser Rolle lassen sich mit create_users als Mitglied aufnehmen (POST /members/{id}/promote), z. B. Anwärter',
+          }
 
     RoleAdmin:
       allOf:
@@ -8211,11 +8956,72 @@ components:
           properties:
             capabilities:
               type: array
-              items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_calendar, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports, view_activity, manage_settings] }
-              description: 'Rechte der Rolle, jedes für sich (member schließt nichts ein); bei admin alle; vergebbar sind alle außer view_activity und manage_settings. Rechte zum Verwalten und view_own_* nur zusammen mit member. guest gilt auch ohne Anmeldung.'
+              items:
+                {
+                  type: string,
+                  enum:
+                    [
+                      member,
+                      calendar,
+                      view_intern,
+                      view_events,
+                      view_news,
+                      view_gallery,
+                      view_companies,
+                      view_sponsors,
+                      view_gallery_internal,
+                      view_own_points,
+                      view_own_penalties,
+                      view_own_rank,
+                      view_own_attendance,
+                      view_birthdays,
+                      vote_polls,
+                      view_directory,
+                      view_offices,
+                      view_former,
+                      view_documents,
+                      view_board,
+                      view_ranks,
+                      view_catalog,
+                      manage_points,
+                      manage_penalties,
+                      manage_ranks,
+                      manage_titles,
+                      manage_attendance,
+                      manage_events,
+                      manage_calendar,
+                      manage_documents,
+                      post_board,
+                      manage_polls,
+                      manage_inventory,
+                      manage_offices,
+                      manage_lists,
+                      send_mail,
+                      manage_sponsors,
+                      manage_companies,
+                      submit_gallery,
+                      review_gallery,
+                      manage_gallery,
+                      manage_pages,
+                      manage_news,
+                      view_personal,
+                      manage_personal,
+                      create_users,
+                      promote_users,
+                      review_reports,
+                      view_activity,
+                      view_changes,
+                      manage_settings,
+                    ],
+                }
+              description: 'Rechte der Rolle, jedes für sich (member schließt nichts ein); bei admin alle; vergebbar sind alle außer view_activity und manage_settings (view_changes ist vergebbar). Rechte zum Verwalten und view_own_* nur zusammen mit member. guest gilt auch ohne Anmeldung.'
             users: { type: integer, description: 'Anzahl der Personen mit dieser Rolle, als Grundrolle oder als Zusatzrolle' }
             extra_users: { type: integer, description: Davon als Zusatzrolle }
-            system: { type: boolean, description: 'guest, member und admin: nicht löschbar; bei guest und member nur die Rechte zum Sehen änderbar, bei admin keine' }
+            system:
+              {
+                type: boolean,
+                description: 'guest, member und admin: nicht löschbar; bei guest und member nur die Rechte zum Sehen änderbar, bei admin keine',
+              }
             deletable: { type: boolean, description: 'false für guest, member und admin' }
 
     RoleInput:
@@ -8224,7 +9030,61 @@ components:
         label: { type: string, maxLength: 30 }
         capabilities:
           type: array
-          items: { type: string, enum: [member, calendar, view_intern, view_events, view_news, view_gallery, view_companies, view_sponsors, view_gallery_internal, view_own_points, view_own_penalties, view_own_rank, view_own_attendance, view_birthdays, vote_polls, view_directory, view_offices, view_former, view_documents, view_board, view_ranks, view_catalog, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_calendar, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports] }
+          items:
+            {
+              type: string,
+              enum:
+                [
+                  member,
+                  calendar,
+                  view_intern,
+                  view_events,
+                  view_news,
+                  view_gallery,
+                  view_companies,
+                  view_sponsors,
+                  view_gallery_internal,
+                  view_own_points,
+                  view_own_penalties,
+                  view_own_rank,
+                  view_own_attendance,
+                  view_birthdays,
+                  vote_polls,
+                  view_directory,
+                  view_offices,
+                  view_former,
+                  view_documents,
+                  view_board,
+                  view_ranks,
+                  view_catalog,
+                  manage_points,
+                  manage_penalties,
+                  manage_ranks,
+                  manage_titles,
+                  manage_attendance,
+                  manage_events,
+                  manage_calendar,
+                  manage_documents,
+                  post_board,
+                  manage_polls,
+                  manage_inventory,
+                  manage_offices,
+                  manage_lists,
+                  send_mail,
+                  manage_sponsors,
+                  manage_companies,
+                  submit_gallery,
+                  review_gallery,
+                  manage_gallery,
+                  manage_pages,
+                  manage_news,
+                  view_personal,
+                  manage_personal,
+                  create_users,
+                  promote_users,
+                  review_reports,
+                ],
+            }
           description: 'Jedes Recht für sich. Rechte zum Verwalten und view_own_* nur zusammen mit member; die übrigen Rechte zum Sehen gehen auch allein (wie bei Anwärtern). guest: nur Rechte zum Sehen ohne member; member: immer member, sonst nur Rechte zum Sehen; admin: nicht änderbar.'
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
         new_accounts: { type: boolean, description: 'Nur eigene Rollen: beim Anlegen von Konten wählbar' }
@@ -8252,7 +9112,41 @@ components:
           type: array
           items:
             type: string
-            enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_calendar, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports, view_activity, manage_settings]
+            enum:
+              [
+                member,
+                calendar,
+                view_intern,
+                manage_points,
+                manage_penalties,
+                manage_ranks,
+                manage_titles,
+                manage_attendance,
+                manage_events,
+                manage_calendar,
+                manage_documents,
+                post_board,
+                manage_polls,
+                manage_inventory,
+                manage_offices,
+                manage_lists,
+                send_mail,
+                manage_sponsors,
+                manage_companies,
+                submit_gallery,
+                review_gallery,
+                manage_gallery,
+                manage_pages,
+                manage_news,
+                view_personal,
+                manage_personal,
+                create_users,
+                promote_users,
+                review_reports,
+                view_activity,
+                view_changes,
+                manage_settings,
+              ]
           description: 'Wirksame Rechte aller Rollen zusammen (Grundrolle und Zusatzrollen); member bringt calendar mit.'
 
     ErrorLog:
@@ -8322,7 +9216,12 @@ components:
           properties:
             version: { type: string }
             step: { type: string, enum: [download, backup, drive, install] }
-            steps: { type: array, items: { type: string, enum: [download, backup, drive, install] }, description: Schritte dieses Updates in ihrer Reihenfolge }
+            steps:
+              {
+                type: array,
+                items: { type: string, enum: [download, backup, drive, install] },
+                description: Schritte dieses Updates in ihrer Reihenfolge,
+              }
             at: { type: integer, description: Beginn des Schritts }
             done: { type: [integer, 'null'], description: 'Bytes: bei backup schon geschrieben, bei drive schon hochgeladen; sonst null' }
             total: { type: [integer, 'null'], description: 'Größe in Bytes; null = unbekannt' }
@@ -8338,7 +9237,11 @@ components:
         version: { type: string, description: 'Version der Installation, z. B. 1.4.0.3' }
         variant: { type: string, enum: [wordpress, standalone], description: Art der Installation }
         siteUrl: { type: [string, 'null'], description: Startseite der Webseite, falls vorhanden }
-        handbookUrl: { type: [string, 'null'], description: 'Handbuch der Kompanie auf ihrer GitHub-Pages-Seite (…/handbuch/), aus der Adresse der Update-Liste abgeleitet; sonst null' }
+        handbookUrl:
+          {
+            type: [string, 'null'],
+            description: 'Handbuch der Kompanie auf ihrer GitHub-Pages-Seite (…/handbuch/), aus der Adresse der Update-Liste abgeleitet; sonst null',
+          }
         legal:
           type: object
           description: 'Links auf Impressum und Datenschutzerklärung der Kompanie, für alle (auch ohne Anmeldung); null, solange keiner eingetragen ist'
@@ -8349,9 +9252,16 @@ components:
         reports: { type: boolean, description: 'Fehler melden möglich (Knopf „Fehler melden“); Meldungen gehen zuerst an die Admins' }
         openReports: { type: [integer, 'null'], description: 'Offene Fehlermeldungen; nur für Angemeldete mit review_reports, sonst null' }
         registration: { type: boolean, description: 'Zugang beantragen eingeschaltet (Issue #314): Link „Zugang beantragen“ für Gäste' }
-        pendingRegistrations: { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null' }
+        pendingRegistrations:
+          { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null' }
+        gallerySubmissions:
+          { type: boolean, description: 'Galerie an und Einreichen erlaubt (Einstellung gallery_submissions): sonst kein Knopf zum Einreichen' }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
-        backupUrl: { type: [string, 'null'], description: 'Nur für Admins (nicht in der Vorschau): Adresse zum Herunterladen der Datensicherung als Datei (<App>/sicherung), Stück für Stück erzeugt; sonst null' }
+        backupUrl:
+          {
+            type: [string, 'null'],
+            description: 'Nur für Admins (nicht in der Vorschau): Adresse zum Herunterladen der Datensicherung als Datei (<App>/sicherung), Stück für Stück erzeugt; mit ?datei=<id> eine Sicherung, die auf dem Server liegt (GET /admin/backup/server); sonst null',
+          }
         maintenance: { $ref: '#/components/schemas/MaintenanceInfo' }
         navigation:
           description: 'Einrichtbare Navigation (Issue #277, Einstellungen → Navigation), für alle; null = Standardnavigation'
@@ -8559,7 +9469,12 @@ components:
         image: { type: [string, 'null'] }
         link: { type: string, description: Adresse auf der Webseite; leer bei Beiträgen der App }
         content: { type: string, description: 'Nur bei der Einzelansicht; Quelle app: Text der Textblöcke für alle (für ältere Apps)' }
-        blocks: { type: array, items: { $ref: '#/components/schemas/Block' }, description: 'Nur Einzelansicht, Quelle app: Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur für Mitglieder bzw. mit manage_news)' }
+        blocks:
+          {
+            type: array,
+            items: { $ref: '#/components/schemas/Block' },
+            description: 'Nur Einzelansicht, Quelle app: Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur für Mitglieder bzw. mit manage_news)',
+          }
         cover: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app: Adresse des Titelbilds (Issue #351)' }
         cover_uid: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app: Kennung des Titelbilds, für PATCH' }
         updated_at: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app, mit manage_news: Stand für PATCH' }
@@ -8570,6 +9485,7 @@ components:
       properties:
         id: { type: integer }
         title: { type: string }
+        source: { type: string, enum: [app, drive], description: 'Album der App (in der App änderbar) oder aus Google Drive' }
         count: { type: integer, description: Bilder und Videos zusammen }
         video_count: { type: integer, description: davon Videos }
         intern_count: { type: integer }
@@ -8609,7 +9525,11 @@ components:
             Seitenverhältnis des Fotos, `Cache-Control: no-store` und `Retry-After` (Sekunden); dann läuft
             die Aufbereitung im Hintergrund. Fertige Bilder: 200 mit JPEG. Interne Bilder ohne
             Mitgliedschaft: 401/403. Scheitert die Aufbereitung: 404.
-        large: { type: string, description: 'Adresse der Großansicht (Verhalten wie thumb). Bei Videos das Vorschaubild aus Google Drive; leer, wenn Drive keines hat' }
+        large:
+          {
+            type: string,
+            description: 'Adresse der Großansicht (Verhalten wie thumb). Bei Videos das Vorschaubild aus Google Drive; leer, wenn Drive keines hat',
+          }
         original:
           type: string
           description: |
@@ -8620,7 +9540,11 @@ components:
         width: { type: integer }
         height: { type: integer }
         intern: { type: boolean }
-        upload: { type: boolean, description: 'In der App hochgeladen (auch über Einreichungen): intern/öffentlich mit PATCH /gallery/photos/{id} umstellbar' }
+        upload:
+          {
+            type: boolean,
+            description: 'In der App hochgeladen (auch über Einreichungen): intern/öffentlich mit PATCH /gallery/photos/{id} umstellbar',
+          }
         name: { type: string }
         ready:
           type: boolean
@@ -8632,6 +9556,7 @@ components:
         id: { type: integer }
         title: { type: string }
         year: { type: string }
+        source: { type: string, enum: [app, drive], description: 'Album der App (in der App änderbar) oder aus Google Drive' }
         downloads:
           type: boolean
           description: |
@@ -8650,11 +9575,23 @@ components:
         last_name: { type: string, description: 'Leer, wenn es keinen gibt' }
         level: { $ref: '#/components/schemas/Level' }
         extra_roles: { $ref: '#/components/schemas/ExtraRoles' }
-        member: { type: boolean, description: 'Mit Mitgliederbereich (Punkte und Strafen möglich); false bei Anwärtern, Rollen nur mit Kalender und Gästen' }
-        group: { type: [string, 'null'], description: 'Gruppe im Zähler über der Liste, wie in der Anwesenheit (Einstellung attendance_groups); null bei Gästen' }
+        member:
+          {
+            type: boolean,
+            description: 'Mit Mitgliederbereich (Punkte und Strafen möglich); false bei Anwärtern, Rollen nur mit Kalender und Gästen',
+          }
+        group:
+          {
+            type: [string, 'null'],
+            description: 'Gruppe im Zähler über der Liste, wie in der Anwesenheit (Einstellung attendance_groups); null bei Gästen',
+          }
         points: { type: [number, 'null'], description: 'Summe mit Punktefaktor, höchstens zwei Nachkommastellen; null ohne manage_points' }
         open_cents: { type: [integer, 'null'], description: 'null ohne manage_penalties' }
-        rank_title: { type: [string, 'null'], description: 'Aktueller Dienstgrad (nur mit Bereich Dienstgrade; für alle mit Zugang zur Mitgliederliste)' }
+        rank_title:
+          {
+            type: [string, 'null'],
+            description: 'Aktueller Dienstgrad (nur mit Bereich Dienstgrade; für alle mit Zugang zur Mitgliederliste)',
+          }
         rank_badge_url: { $ref: '#/components/schemas/BadgeUrl' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
         titles:
@@ -8716,7 +9653,8 @@ components:
         month: { type: integer, minimum: 1, maximum: 12 }
         day: { type: integer, minimum: 1, maximum: 31 }
         year: { type: [integer, 'null'] }
-        age: { type: [integer, 'null'], description: 'Heutiges Alter (Zeitzone der Kompanie; 29.02. in Jahren ohne Schalttag ab dem 28.02.)' }
+        age:
+          { type: [integer, 'null'], description: 'Heutiges Alter (Zeitzone der Kompanie; 29.02. in Jahren ohne Schalttag ab dem 28.02.)' }
 
     ProfileVisibility:
       type: string
@@ -8801,7 +9739,8 @@ components:
               oneOf:
                 - $ref: '#/components/schemas/MemberRights'
                 - type: 'null'
-            photo_editable: { type: boolean, description: 'Ob der Betrachter das Foto ändern darf (create_users und dieses Konto verwalten)' }
+            photo_editable:
+              { type: boolean, description: 'Ob der Betrachter das Foto ändern darf (create_users und dieses Konto verwalten)' }
             former:
               description: Ehemalig (Grund, Eintritt, Ausscheiden); null, wenn die Person nicht ehemalig ist
               oneOf:
@@ -8836,7 +9775,11 @@ components:
         founder: { type: boolean }
         left_on: { $ref: '#/components/schemas/FormerDate' }
         previous_level: { $ref: '#/components/schemas/Level', description: 'Grundrolle vor dem Ausscheiden' }
-        personal_deleted: { type: boolean, description: 'Persönliche Angaben nach Ablauf der Aufbewahrungsfrist gelöscht (eigenständige Version: auch Benutzername und E-Mail-Adresse; WordPress: der Benutzer der Webseite bleibt)' }
+        personal_deleted:
+          {
+            type: boolean,
+            description: 'Persönliche Angaben nach Ablauf der Aufbewahrungsfrist gelöscht (eigenständige Version: auch Benutzername und E-Mail-Adresse; WordPress: der Benutzer der Webseite bleibt)',
+          }
 
     FormerRetentionPerson:
       type: object
@@ -8888,7 +9831,8 @@ components:
               error: { type: string }
         new: { type: integer }
         existing: { type: integer }
-        offices_linked: { type: integer, description: 'Einträge in Amtszeiten (nur freier Name), die mit den Konten verknüpft werden bzw. wurden' }
+        offices_linked:
+          { type: integer, description: 'Einträge in Amtszeiten (nur freier Name), die mit den Konten verknüpft werden bzw. wurden' }
         applied: { type: boolean }
 
     MemberImportResult:
@@ -8899,7 +9843,12 @@ components:
           type: object
           required: [used, ignored]
           properties:
-            used: { type: array, items: { type: string }, description: 'erkannte Spalten (first_name, last_name, status, username, email, birthday, joined, points, rank, titles, left, reason, access)' }
+            used:
+              {
+                type: array,
+                items: { type: string },
+                description: 'erkannte Spalten (first_name, last_name, status, username, email, birthday, joined, points, rank, titles, left, reason, access)',
+              }
             ignored:
               type: array
               items:
@@ -8931,7 +9880,8 @@ components:
               founder: { type: boolean }
               left_on: { $ref: '#/components/schemas/FormerDate' }
               no_access: { type: boolean, description: 'Spalte zugang „nein“: Mitglied ohne Zugang; fehlt sonst' }
-              extra_roles: { type: array, items: { type: string }, description: 'Spalte zusatzrollen: Bezeichnungen der Zusatzrollen; fehlt ohne' }
+              extra_roles:
+                { type: array, items: { type: string }, description: 'Spalte zusatzrollen: Bezeichnungen der Zusatzrollen; fehlt ohne' }
               existing:
                 description: Konto mit genau diesem Namen gibt es schon (wird übersprungen)
                 type: object
@@ -8959,7 +9909,38 @@ components:
     GrantableCapability:
       type: string
       description: Recht, das sich einer Rolle oder einer Person geben lässt (alle außer `manage_settings`).
-      enum: [member, calendar, view_intern, manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_events, manage_calendar, manage_documents, post_board, manage_polls, manage_inventory, manage_offices, manage_lists, send_mail, manage_sponsors, manage_companies, submit_gallery, review_gallery, manage_pages, manage_news, view_personal, manage_personal, create_users, promote_users, review_reports]
+      enum:
+        [
+          member,
+          calendar,
+          view_intern,
+          manage_points,
+          manage_penalties,
+          manage_ranks,
+          manage_titles,
+          manage_attendance,
+          manage_events,
+          manage_calendar,
+          manage_documents,
+          post_board,
+          manage_polls,
+          manage_inventory,
+          manage_offices,
+          manage_lists,
+          send_mail,
+          manage_sponsors,
+          manage_companies,
+          submit_gallery,
+          review_gallery,
+          manage_gallery,
+          manage_pages,
+          manage_news,
+          view_personal,
+          manage_personal,
+          create_users,
+          promote_users,
+          review_reports,
+        ]
 
     MemberRights:
       type: object
@@ -9013,7 +9994,8 @@ components:
         street: { type: string, maxLength: 100 }
         house_number: { type: string, maxLength: 10 }
         extra: { type: string, maxLength: 100, description: 'Adresszusatz, z. B. c/o' }
-        postal_code: { type: string, maxLength: 12, description: 'Wie im Land üblich geschrieben (12345, 1234 AB, 00-950, 110 00, SW1A 1AA)' }
+        postal_code:
+          { type: string, maxLength: 12, description: 'Wie im Land üblich geschrieben (12345, 1234 AB, 00-950, 110 00, SW1A 1AA)' }
         city: { type: string, maxLength: 60 }
         country: { type: string, description: 'ISO-Code oder leer (anderes Land)' }
         country_name: { type: string, maxLength: 60, description: 'Nur bei anderem Land' }
@@ -9064,7 +10046,8 @@ components:
         date: { type: string, format: date, description: 'Tag des nächsten Geburtstags (29.02. in Jahren ohne Schalttag: 28.02.)' }
         days_until: { type: integer, minimum: 0, description: 'Tage bis dahin; 0 = heute' }
         today: { type: boolean }
-        age: { type: [integer, 'null'], description: 'Alter, das die Person an diesem Geburtstag erreicht; nur mit Jahr und „Alter anzeigen“' }
+        age:
+          { type: [integer, 'null'], description: 'Alter, das die Person an diesem Geburtstag erreicht; nur mit Jahr und „Alter anzeigen“' }
 
     Rank:
       type: object
@@ -9077,8 +10060,13 @@ components:
         active: { type: boolean }
         assigned: { type: integer, description: 'Wie oft vergeben (nur mit all=1)' }
         badge_url: { $ref: '#/components/schemas/BadgeUrl' }
-        badge_type: { type: [string, 'null'], enum: [png, jpg, webp, svg, null], description: 'Format des hochgeladenen Abzeichens (nur mit all=1)' }
-        badge_push: { type: boolean, description: 'Es gibt eine PNG-Fassung für Benachrichtigungen (nur mit all=1; bei SVG nur, wenn die App eine mitgeschickt hat)' }
+        badge_type:
+          { type: [string, 'null'], enum: [png, jpg, webp, svg, null], description: 'Format des hochgeladenen Abzeichens (nur mit all=1)' }
+        badge_push:
+          {
+            type: boolean,
+            description: 'Es gibt eine PNG-Fassung für Benachrichtigungen (nur mit all=1; bei SVG nur, wenn die App eine mitgeschickt hat)',
+          }
 
     PhotoFile:
       type: object
@@ -9127,10 +10115,36 @@ components:
         kind: { type: string, enum: [field, blank], description: 'field: Wert aus der App, blank: leer zum Ausfüllen auf Papier' }
         field:
           type: [string, 'null']
-          enum: [nr, name, first_name, last_name, role, rank, titles, birthday, address, street, postal_code, city, country, phone, email, points, penalties, null]
+          enum:
+            [
+              nr,
+              name,
+              first_name,
+              last_name,
+              role,
+              rank,
+              titles,
+              birthday,
+              address,
+              street,
+              postal_code,
+              city,
+              country,
+              phone,
+              email,
+              points,
+              penalties,
+              null,
+            ]
           description: 'Nur bei field; nr zählt die Zeilen (macht die App)'
         label: { type: string, maxLength: 60, description: 'Überschrift; leer: die App nimmt die Standardbezeichnung' }
-        width: { type: string, enum: [narrow, normal, wide, auto], default: normal, description: 'auto: so breit wie der längste Inhalt (misst die App)' }
+        width:
+          {
+            type: string,
+            enum: [narrow, normal, wide, auto],
+            default: normal,
+            description: 'auto: so breit wie der längste Inhalt (misst die App)',
+          }
         checkbox: { type: boolean, description: Kästchen zum Abhaken (nur bei blank) }
         available: { type: boolean, description: 'Nur in Antworten: ob die anfragende Person die Werte sieht (blank immer)' }
 
@@ -9159,7 +10173,23 @@ components:
 
     PrintList:
       type: object
-      required: [id, title, subtitle, date, orientation, groups, group_options, created_by_name, created_at, updated_by_name, updated_at, columns, rows, fields]
+      required:
+        [
+          id,
+          title,
+          subtitle,
+          date,
+          orientation,
+          groups,
+          group_options,
+          created_by_name,
+          created_at,
+          updated_by_name,
+          updated_at,
+          columns,
+          rows,
+          fields,
+        ]
       properties:
         id: { type: integer }
         title: { type: string, maxLength: 120 }
@@ -9235,7 +10265,11 @@ components:
         id: { type: integer }
         title: { type: string, maxLength: 60, description: 'Bezeichnung, Überschrift der Gruppe (meist Mehrzahl, „Königshäuser“)' }
         singular:
-          { type: string, maxLength: 60, description: 'Eigene Einzahl für eine einzelne gemeinsame Amtszeit („Königshaus“); leer ohne (dann title)' }
+          {
+            type: string,
+            maxLength: 60,
+            description: 'Eigene Einzahl für eine einzelne gemeinsame Amtszeit („Königshaus“); leer ohne (dann title)',
+          }
         joint_terms: { type: boolean, description: 'Gemeinsame Amtszeiten mit Gruppenbild (z. B. ein Königshaus)' }
 
     OfficeGroupTerm:
@@ -9300,7 +10334,11 @@ components:
         name: { type: string, description: 'Anzeigename des Kontos, sonst der gespeicherte Name (auch nach dem Löschen des Kontos)' }
         user_id: { type: integer, description: 'Nur bei Personen der Mitgliederliste, für manage_offices und das eigene Konto' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
-        image_uid: { type: [string, 'null'], description: 'Nur freie Namen mit Foto, nur mit manage_offices (Issue #283); photo_url ist dann das öffentliche Foto' }
+        image_uid:
+          {
+            type: [string, 'null'],
+            description: 'Nur freie Namen mit Foto, nur mit manage_offices (Issue #283); photo_url ist dann das öffentliche Foto',
+          }
         companions:
           type: array
           maxItems: 5
@@ -9342,7 +10380,11 @@ components:
             properties:
               user_id: { type: integer }
               name: { type: string, maxLength: 100 }
-              image_uid: { type: [string, 'null'], description: 'Nur bei freien Namen: Foto (Kennung aus POST /rich-images), öffentlich wie die Ämter; bei Konten ignoriert' }
+              image_uid:
+                {
+                  type: [string, 'null'],
+                  description: 'Nur bei freien Namen: Foto (Kennung aus POST /rich-images), öffentlich wie die Ämter; bei Konten ignoriert',
+                }
               companions:
                 type: array
                 maxItems: 5
@@ -9458,7 +10500,12 @@ components:
         short_name: { type: string, maxLength: 30 }
         founded_year: { type: [integer, 'null'], description: 'Von 1800 bis zum laufenden Jahr' }
         description: { type: string, maxLength: 20000, description: 'HTML wie bei News, wird bereinigt; Bilder werden entfernt' }
-        website_url: { type: string, maxLength: 255, description: 'https://… oder ohne Schema (beispiel.de, https:// wird ergänzt); http und Rechner ohne Endung werden abgelehnt; leer ohne' }
+        website_url:
+          {
+            type: string,
+            maxLength: 255,
+            description: 'https://… oder ohne Schema (beispiel.de, https:// wird ergänzt); http und Rechner ohne Endung werden abgelehnt; leer ohne',
+          }
         app_url: { type: string, maxLength: 255, description: 'Wie website_url' }
         active: { type: boolean, description: 'false: aufgelöst' }
 
@@ -9480,7 +10527,12 @@ components:
       properties:
         id: { type: integer }
         title: { type: string, maxLength: 100 }
-        audience: { type: string, enum: [public, members], description: 'public: alle, auch ohne Anmeldung; members: wer das Schwarze Brett liest (view_board)' }
+        audience:
+          {
+            type: string,
+            enum: [public, members],
+            description: 'public: alle, auch ohne Anmeldung; members: wer das Schwarze Brett liest (view_board)',
+          }
         updated_at: { type: string, format: date-time, description: 'Nur mit manage_pages: Stand der Seite (für PATCH mitschicken)' }
         updated_by_name: { type: [string, 'null'], description: 'Nur mit manage_pages: wer zuletzt gespeichert hat' }
     PageDetail:
@@ -9489,8 +10541,17 @@ components:
         - type: object
           required: [body, blocks]
           properties:
-            body: { type: string, description: 'Für ältere Apps: Text aller Textblöcke für alle (bereinigt wie RichText), Bilder mit Adresse (`<App>/bild/<uid>`); leer ohne Text' }
-            blocks: { type: array, items: { $ref: '#/components/schemas/Block' }, description: 'Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur für Mitglieder bzw. mit manage_pages). Bestehende Seiten: ein Textblock aus body. Leere Textblöcke nur mit manage_pages.' }
+            body:
+              {
+                type: string,
+                description: 'Für ältere Apps: Text aller Textblöcke für alle (bereinigt wie RichText), Bilder mit Adresse (`<App>/bild/<uid>`); leer ohne Text',
+              }
+            blocks:
+              {
+                type: array,
+                items: { $ref: '#/components/schemas/Block' },
+                description: 'Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur für Mitglieder bzw. mit manage_pages). Bestehende Seiten: ein Textblock aus body. Leere Textblöcke nur mit manage_pages.',
+              }
 
     Block:
       description: 'Vorgefertigter Block (eigene Seiten, News in der App, Schwarzes Brett). Unbekannte type lehnt der Server beim Speichern ab (400 invalid); die App übergeht sie beim Anzeigen.'
@@ -9532,7 +10593,13 @@ components:
       properties:
         id: { type: string, pattern: '^[a-z0-9]{1,16}$', description: 'Kennung des Blocks in der Seite (in Antworten immer gesetzt)' }
         type: { type: string }
-        audience: { type: string, enum: [all, members], default: all, description: 'all: alle, die die Seite sehen; members: nur Mitglieder (view_board), auch auf öffentlichen Seiten. Bilder in members-Blöcken sind ohne Anmeldung nicht abrufbar.' }
+        audience:
+          {
+            type: string,
+            enum: [all, members],
+            default: all,
+            description: 'all: alle, die die Seite sehen; members: nur Mitglieder (view_board), auch auf öffentlichen Seiten. Bilder in members-Blöcken sind ohne Anmeldung nicht abrufbar.',
+          }
     BlockText:
       allOf:
         - $ref: '#/components/schemas/BlockBase'
@@ -9540,7 +10607,11 @@ components:
           required: [html]
           properties:
             type: { type: string, const: text }
-            html: { type: string, description: 'Formatierter Text (bereinigt wie RichText); in Antworten Bilder mit Adresse, beim Speichern als <img data-image="<uid>">. Alle Textblöcke zusammen höchstens 200000 Bytes.' }
+            html:
+              {
+                type: string,
+                description: 'Formatierter Text (bereinigt wie RichText); in Antworten Bilder mit Adresse, beim Speichern als <img data-image="<uid>">. Alle Textblöcke zusammen höchstens 200000 Bytes.',
+              }
     BlockCountdown:
       allOf:
         - $ref: '#/components/schemas/BlockBase'
@@ -9549,19 +10620,53 @@ components:
           properties:
             type: { type: string, const: countdown }
             title: { type: string, maxLength: 100, description: 'Überschrift (optional; beim Termin sonst dessen Titel)' }
-            source: { type: string, enum: [date, event], default: date, description: 'date: eigenes Datum; event: Termin aus dem Bereich Termine (verschoben: zählt mit)' }
+            source:
+              {
+                type: string,
+                enum: [date, event],
+                default: date,
+                description: 'date: eigenes Datum; event: Termin aus dem Bereich Termine (verschoben: zählt mit)',
+              }
             date: { type: string, format: date, description: 'Beginn bei source date (Pflicht), in der Zeitzone der Installation' }
             time: { type: [string, 'null'], pattern: '^\d{2}:\d{2}$', description: 'Uhrzeit des Beginns; ohne: 0:00 Uhr' }
             end_date: { type: [string, 'null'], format: date, description: 'Ende (optional); nur Datum: bis zum Ende dieses Tages' }
-            end_time: { type: [string, 'null'], pattern: '^\d{2}:\d{2}$', description: 'Uhrzeit des Endes (ohne end_date: am Tag des Beginns); muss nach dem Beginn liegen' }
+            end_time:
+              {
+                type: [string, 'null'],
+                pattern: '^\d{2}:\d{2}$',
+                description: 'Uhrzeit des Endes (ohne end_date: am Tag des Beginns); muss nach dem Beginn liegen',
+              }
             event_id: { type: integer, description: 'Termin bei source event (Pflicht, muss existieren)' }
             running_text: { type: string, maxLength: 200, description: 'Text zwischen Beginn und Ende' }
-            after: { type: string, enum: [text, hide], default: text, description: 'Nach dem Ende (ohne Ende: nach dem Beginn): after_text zeigen oder Block ausblenden' }
+            after:
+              {
+                type: string,
+                enum: [text, hide],
+                default: text,
+                description: 'Nach dem Ende (ohne Ende: nach dem Beginn): after_text zeigen oder Block ausblenden',
+              }
             after_text: { type: string, maxLength: 200 }
-            starts_at: { type: [string, 'null'], format: date-time, readOnly: true, description: 'Nur in Antworten: Beginn in UTC; null, wenn der Termin fehlt oder für die Person nicht sichtbar ist (Bereich events, view_events): dann wie nach dem Ende' }
-            ends_at: { type: [string, 'null'], format: date-time, readOnly: true, description: 'Nur in Antworten: Ende in UTC; null ohne Ende' }
-            timezone: { type: string, readOnly: true, description: 'Nur in Antworten: Zeitzone der Installation (z. B. Europe/Berlin). Die App zählt die Restzeit nach Kalender in dieser Zeitzone (Wanduhr): Eine Zeitumstellung vor dem Beginn ändert sie nicht.' }
-            event_title: { type: [string, 'null'], readOnly: true, description: 'Nur in Antworten bei source event: Titel des Termins, null wenn nicht sichtbar' }
+            starts_at:
+              {
+                type: [string, 'null'],
+                format: date-time,
+                readOnly: true,
+                description: 'Nur in Antworten: Beginn in UTC; null, wenn der Termin fehlt oder für die Person nicht sichtbar ist (Bereich events, view_events): dann wie nach dem Ende',
+              }
+            ends_at:
+              { type: [string, 'null'], format: date-time, readOnly: true, description: 'Nur in Antworten: Ende in UTC; null ohne Ende' }
+            timezone:
+              {
+                type: string,
+                readOnly: true,
+                description: 'Nur in Antworten: Zeitzone der Installation (z. B. Europe/Berlin). Die App zählt die Restzeit nach Kalender in dieser Zeitzone (Wanduhr): Eine Zeitumstellung vor dem Beginn ändert sie nicht.',
+              }
+            event_title:
+              {
+                type: [string, 'null'],
+                readOnly: true,
+                description: 'Nur in Antworten bei source event: Titel des Termins, null wenn nicht sichtbar',
+              }
     BlockButton:
       allOf:
         - $ref: '#/components/schemas/BlockBase'
@@ -9570,8 +10675,19 @@ components:
           properties:
             type: { type: string, const: button }
             label: { type: string, minLength: 1, maxLength: 60, description: Beschriftung }
-            url: { type: string, maxLength: 2000, description: 'Ziel: https://…, mailto:…, tel:… (Leerzeichen werden entfernt) oder eine Seite der App (#/…); sonst 400. In Mails als „Beschriftung: Ziel“, Seiten der App mit voller Adresse.' }
-            style: { type: string, enum: [primary, secondary], default: primary, description: 'primary: hervorgehoben; secondary: zurückhaltend' }
+            url:
+              {
+                type: string,
+                maxLength: 2000,
+                description: 'Ziel: https://…, mailto:…, tel:… (Leerzeichen werden entfernt) oder eine Seite der App (#/…); sonst 400. In Mails als „Beschriftung: Ziel“, Seiten der App mit voller Adresse.',
+              }
+            style:
+              {
+                type: string,
+                enum: [primary, secondary],
+                default: primary,
+                description: 'primary: hervorgehoben; secondary: zurückhaltend',
+              }
     BlockEvents:
       allOf:
         - $ref: '#/components/schemas/BlockBase'
@@ -9605,7 +10721,14 @@ components:
           properties:
             type: { type: string, const: contacts }
             title: { type: string, maxLength: 100, description: Überschrift (optional) }
-            office_ids: { type: array, minItems: 1, maxItems: 20, items: { type: integer }, description: 'Ämter in der Reihenfolge der Anzeige (müssen existieren; doppelte zählen einmal); gelöschte fallen beim Lesen weg' }
+            office_ids:
+              {
+                type: array,
+                minItems: 1,
+                maxItems: 20,
+                items: { type: integer },
+                description: 'Ämter in der Reihenfolge der Anzeige (müssen existieren; doppelte zählen einmal); gelöschte fallen beim Lesen weg',
+              }
             offices:
               type: array
               readOnly: true
@@ -9615,7 +10738,11 @@ components:
                 properties:
                   id: { type: integer }
                   title: { type: string }
-                  holder_title: { type: [string, 'null'], description: 'Einzahl des Amts wie in GET /offices (eigene Einzahl oder verknüpfter Titel), null ohne' }
+                  holder_title:
+                    {
+                      type: [string, 'null'],
+                      description: 'Einzahl des Amts wie in GET /offices (eigene Einzahl oder verknüpfter Titel), null ohne',
+                    }
                   holders:
                     type: array
                     items:
@@ -9641,7 +10768,8 @@ components:
         - type: object
           properties:
             type: { type: string, const: divider }
-            style: { type: string, enum: [line, space], default: line, description: 'line: Trennlinie; space: nur Abstand. In Mails nichts.' }
+            style:
+              { type: string, enum: [line, space], default: line, description: 'line: Trennlinie; space: nur Abstand. In Mails nichts.' }
     BlockSchedule:
       allOf:
         - $ref: '#/components/schemas/BlockBase'
@@ -9774,7 +10902,8 @@ components:
           properties:
             type: { type: string, const: map }
             title: { type: string, maxLength: 100 }
-            place: { type: string, minLength: 1, maxLength: 200, description: 'Ort oder Adresse als freier Text, wie der Ort eines Termins' }
+            place:
+              { type: string, minLength: 1, maxLength: 200, description: 'Ort oder Adresse als freier Text, wie der Ort eines Termins' }
 
     Title:
       type: object
@@ -9822,7 +10951,11 @@ components:
       required: [name, data]
       description: Datei für das Hochladen (beide Adapter nehmen nur JSON an)
       properties:
-        name: { type: string, description: 'Dateiname; die Endung bestimmt den Typ (pdf, jpg, jpeg, png, doc, docx, xls, xlsx, ppt, pptx, odt, ods, odp)' }
+        name:
+          {
+            type: string,
+            description: 'Dateiname; die Endung bestimmt den Typ (pdf, jpg, jpeg, png, doc, docx, xls, xlsx, ppt, pptx, odt, ods, odp)',
+          }
         data: { type: string, description: 'Inhalt Base64-kodiert, auch als data:-Adresse; die Signatur muss zur Endung passen' }
 
     AttendanceStatus:
@@ -9921,7 +11054,8 @@ components:
           oneOf:
             - $ref: '#/components/schemas/RankRef'
             - type: 'null'
-        threshold_reached_since: { type: [string, 'null'], format: date, description: 'Seit wann die Summe durchgehend die Schwelle des nächsten erreicht' }
+        threshold_reached_since:
+          { type: [string, 'null'], format: date, description: 'Seit wann die Summe durchgehend die Schwelle des nächsten erreicht' }
         below_current_threshold: { type: boolean }
 
     RankHistoryEntry:
@@ -9948,7 +11082,11 @@ components:
         username: { type: string }
         email: { type: string }
         level: { $ref: '#/components/schemas/Level' }
-        extra_roles: { allOf: [{ $ref: '#/components/schemas/ExtraRoles' }], description: 'Zusatzrollen, wenn welche mitgeschickt wurden; fehlt sonst' }
+        extra_roles:
+          {
+            allOf: [{ $ref: '#/components/schemas/ExtraRoles' }],
+            description: 'Zusatzrollen, wenn welche mitgeschickt wurden; fehlt sonst',
+          }
         warning: { type: string, description: 'Konto angelegt, aber Anfangspunkte, Dienstgrad, Geburtstag bzw. Foto nicht übernommen' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
         password: { type: string, description: Startpasswort; steht nur in dieser Antwort; fehlt bei no_access }

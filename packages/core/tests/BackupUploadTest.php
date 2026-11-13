@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Tests;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Domain\BackupEncryptionService;
 use KompanieApp\Core\Domain\BackupUploadService;
 use KompanieApp\Core\Domain\DriveClient;
 use KompanieApp\Core\Domain\StatusService;
@@ -81,7 +82,7 @@ final class BackupUploadTest extends TestCase
 
     private static function decrypt(string $content): string
     {
-        return Crypt::string($content, self::PASS);
+        return BackupEncryptionService::unpack(Crypt::string($content, self::PASS)); // in Google Drive gepackt (gzip), dann verschlüsselt
     }
 
     private function http(): FakeHttpClient
@@ -271,6 +272,69 @@ final class BackupUploadTest extends TestCase
         $this->assertSame(['bytes 0-262143/614400', 'bytes 262144-524287/614400', 'bytes 524288-614399/614400'], $this->puts);
         $this->assertSame(['0/614400', '262144/614400', '524288/614400'], $seen, 'Fortschritt nach jedem angenommenen Stück');
         $this->assertSame($content, $this->drive[$id]['content']);
+        $stats = $this->app->drive()->lastUploadStats();
+        $this->assertNotNull($stats);
+        $this->assertSame(614400, $stats['bytes']);
+        $this->assertSame(3, $stats['chunks'], 'Messung: drei Stücke');
+        $this->assertGreaterThanOrEqual($stats['slowest_seconds'], $stats['send_seconds']);
+        $this->assertGreaterThanOrEqual($stats['send_seconds'] + $stats['start_seconds'], $stats['total_seconds'] + 0.002);
+    }
+
+    public function testDurationOfTheLastUploadIsShown(): void
+    {
+        $this->connect();
+        $this->api('PUT', '/admin/backup/drive', ['enabled' => true]);
+        $this->assertNull($this->app->backupUpload()->status()['last_upload'], 'vor dem ersten Hochladen keine Messung');
+        [$s, $r] = $this->api('POST', '/admin/backup/drive/upload');
+        $this->assertSame(200, $s, (string) json_encode($r));
+        $stats = $r['last_upload'];
+        $this->assertSame(strlen(array_values($this->drive)[0]['content']), $stats['bytes']);
+        $this->assertSame(1, $stats['chunks'], 'klein: ein Stück');
+        foreach (['start_seconds', 'read_seconds', 'send_seconds', 'slowest_seconds', 'total_seconds'] as $k) {
+            // JSON ohne Nachkommastellen bei ganzen Zahlen (0.0 → 0)
+            $this->assertTrue(is_int($stats[$k]) || is_float($stats[$k]), $k);
+            $this->assertGreaterThanOrEqual(0, $stats[$k], $k);
+        }
+
+        // Scheitert das nächste Hochladen, bleibt die Messung des letzten erfolgreichen stehen.
+        $this->putStatus = 403;
+        $this->api('POST', '/admin/backup/drive/upload');
+        $this->assertEquals($stats, $this->app->backupUpload()->status()['last_upload']);
+    }
+
+    /** Gepackt (gzip) nach Drive; Wiederherstellen liest die Dateien aus Drive wie ungepackte; alte .json wechseln mit durch. */
+    public function testDriveBackupsArePackedAndCanBeRestored(): void
+    {
+        $this->connect();
+        $this->api('PUT', '/admin/backup/drive', ['enabled' => true]);
+        $tables = (new Backup($this->app->db))->dump(Backup::CORE_TABLES);
+        $this->app->backupUpload()->upload();
+        $encrypted = array_values($this->drive)[0]['content'];
+        $inner = Crypt::string($encrypted, self::PASS);
+        $this->assertStringStartsWith(BackupEncryptionService::GZIP_MAGIC, $inner, 'erst gepackt, dann verschlüsselt');
+        $json = $this->app->backupEncryption()->readUpload(base64_encode($encrypted), self::PASS);
+        $this->assertSame($tables, json_decode($json, true)['tables'], 'Wiederherstellen entpackt nach dem Entschlüsseln');
+        $this->assertGreaterThan(strlen($inner), strlen($json));
+
+        // Ohne Passwort: .json.gz, Wiederherstellen als Datei (Base64) ohne Passwort; ungepackte gehen weiter.
+        $this->app->settings->delete(BackupCrypto::SETTING);
+        $this->drive = [];
+        $this->drive['ALT'] = ['name' => 'sicherung-2026-01-01-120000.json', 'parent' => $this->folders[0], 'content' => '{}'];
+        for ($i = 1; $i <= BackupUploadService::KEEP; $i++) {
+            $this->clock->at = (new \DateTimeImmutable('2026-10-20 12:00:00 UTC'))->modify('+' . (7 * $i) . ' days');
+            $this->app->backupUpload()->upload();
+        }
+        $this->assertArrayNotHasKey('ALT', $this->drive, 'die alte, ungepackte wechselt mit durch');
+        $packed = array_values($this->drive)[0];
+        $this->assertStringEndsWith('.json.gz', $packed['name']);
+        $this->assertSame($tables, json_decode($this->app->backupEncryption()->readUpload(base64_encode($packed['content']), null), true)['tables']);
+        $this->assertSame('{"a":1}', $this->app->backupEncryption()->readUpload(base64_encode('{"a":1}'), null), 'ungepackt wie bisher');
+        try {
+            $this->app->backupEncryption()->readUpload(base64_encode(substr($packed['content'], 0, 40)), null);
+            $this->fail('abgeschnittene gzip-Datei');
+        } catch (\KompanieApp\Core\Http\ApiError $e) {
+            $this->assertStringContainsString('beschädigt', $e->getMessage());
+        }
     }
 
     public function testDownloadAsFileOnlyForAdminsAndNotInPreview(): void
@@ -379,14 +443,17 @@ final class BackupUploadTest extends TestCase
         $names = array_column($this->drive, 'name');
         $this->assertCount(8, $names, 'die letzten acht');
         foreach ($names as $n) {
-            $this->assertMatchesRegularExpression('/^sicherung-[\d-]+\.json$/', $n);
+            $this->assertMatchesRegularExpression('/^sicherung-[\d-]+\.json\.gz$/', $n, 'gepackt');
         }
+        $packed = array_values($this->drive)[0]['content'];
+        $this->assertStringStartsWith(BackupEncryptionService::GZIP_MAGIC, $packed);
+        $this->assertSame(Backup::FORMAT, json_decode((string) gzdecode($packed), true)['format'] ?? null, 'gzip mit der Sicherung');
         $this->assertSame('ok', $this->backupItem()['level'], 'keine Warnung ohne Passwort');
         $local = $this->app->files->tempFile();
         file_put_contents($local, '{"format":"kompanie-app-backup"}');
         $offsite->storeBeforeUpdate($local, '1.2.3');
         @unlink($local);
-        $this->assertContains('{"format":"kompanie-app-backup"}', array_column(array_filter($this->drive, static fn (array $f): bool => str_starts_with($f['name'], 'vor-update-') && str_ends_with($f['name'], '-1.2.3.json')), 'content'), 'vor dem Update unverschlüsselt');
+        $this->assertContains('{"format":"kompanie-app-backup"}', array_map(static fn (string $c): string => (string) gzdecode($c), array_column(array_filter($this->drive, static fn (array $f): bool => str_starts_with($f['name'], 'vor-update-') && str_ends_with($f['name'], '-1.2.3.json.gz')), 'content')), 'vor dem Update unverschlüsselt, gepackt');
 
         // Passwort einrichten (Mindestlänge, beide gleich), dann verschlüsselt.
         $this->assertSame(400, $this->api('PUT', '/admin/backup/encryption', ['passphrase' => 'kurz', 'passphrase_confirm' => 'kurz'])[0]);

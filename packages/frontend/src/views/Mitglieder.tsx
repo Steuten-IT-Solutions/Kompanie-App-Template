@@ -6,7 +6,7 @@ import { formatYearOrDate, groupCounts } from '../format';
 import { MemberAvatar, preloadAvatar, ZoomableAvatar } from '../memberPhoto';
 import { preloadBadge, RankStack } from '../RankBadge';
 import { TitleBadges } from '../TitleBadges';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { Caps, Empty, ErrorBox, Loading, useAsync } from '../ui';
 import {
   DEFAULT_MEMBER_SORT,
   defaultDir,
@@ -123,7 +123,7 @@ export default function Mitglieder({ path = [] }: { path?: string[] }) {
   };
   const tab = (key: Section, label: string) => (
     <button className={section === key ? 'active' : ''} aria-pressed={section === key} onClick={() => open(key)}>
-      {label}
+      <Caps text={label} />
     </button>
   );
   return (
@@ -473,7 +473,9 @@ function MemberList({ former = false }: { former?: boolean }) {
       />
       {companies.length > 0 && (
         <label className="field member-company-filter">
-          <span>{sec.companies}</span>
+          <span>
+            <Caps text={sec.companies} />
+          </span>
           <select value={companyFilter} onChange={(e) => setCompanyId(Number(e.target.value))}>
             <option value={0}>alle</option>
             {companies.map((c) => (

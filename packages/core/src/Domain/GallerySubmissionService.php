@@ -42,6 +42,11 @@ final class GallerySubmissionService
     public const SETUP_SETTING = 'gallery_submissions_setup';
     /** „Größe“ in Environment::photoUrl für das Video einer offenen Einreichung (Adresse foto/<Einreichung>/einreichung). */
     public const VIDEO_SIZE = 'einreichung';
+    /**
+     * Einreichen erlaubt? '1' oder '0' (Einstellungen → Galerie). Neue Installationen: aus; bestehende bekommen beim
+     * Update einmalig '1', damit sich dort nichts ändert (initialize()).
+     */
+    public const ENABLED_SETTING = 'gallery_submissions_enabled';
 
     public function __construct(private readonly App $app)
     {
@@ -58,6 +63,11 @@ final class GallerySubmissionService
      */
     public function initialize(bool $existingInstallation): void
     {
+        // Haken „Einreichen erlauben“: einmalig festlegen, bestehende Installationen behalten das Einreichen.
+        $enabled = $this->app->settings->get(self::ENABLED_SETTING);
+        if ($enabled !== '0' && $enabled !== '1') {
+            $this->setEnabled($existingInstallation);
+        }
         if ($this->app->settings->get(self::SETUP_SETTING, false)) {
             return;
         }
@@ -76,10 +86,31 @@ final class GallerySubmissionService
         }
     }
 
+    /** Dürfen Mitglieder mit submit_gallery Bilder und Videos einreichen? Vorgabe: nein. */
+    public function enabled(): bool
+    {
+        return (string) $this->app->settings->get(self::ENABLED_SETTING, '0') === '1';
+    }
+
+    public function setEnabled(bool $on): void
+    {
+        $this->app->settings->set(self::ENABLED_SETTING, $on ? '1' : '0');
+    }
+
+    /** Neue Einreichungen nur, wenn das Einreichen in den Einstellungen erlaubt ist. */
+    public function assertEnabled(): void
+    {
+        if (!$this->enabled()) {
+            throw ApiError::forbidden('Das Einreichen von Bildern und Videos ist ausgeschaltet.');
+        }
+    }
+
     /** @return array<string, mixed> Alben zur Auswahl und die eigenen Einreichungen */
     public function own(User $user): array
     {
         return [
+            // Einreichen erlaubt (Einstellungen → Galerie); sonst nur die eigenen Einreichungen sehen und zurückziehen
+            'enabled' => $this->enabled(),
             'albums' => array_map(static fn (array $a): array => ['id' => $a['id'], 'title' => $a['title'], 'year' => $a['year']], $this->app->galleryUploads()->albums()),
             'submissions' => array_map(fn (array $s): array => $this->out($s, false), $this->repo()->ofUser($user->id)),
         ];
@@ -108,6 +139,7 @@ final class GallerySubmissionService
      */
     public function submit(User $user, mixed $albumId, mixed $file, mixed $consent): array
     {
+        $this->assertEnabled();
         if ($consent !== true) {
             throw ApiError::invalid('Bitte bestätigen, dass du die Rechte an den Bildern hast und die erkennbaren Personen einverstanden sind.');
         }

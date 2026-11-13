@@ -21,9 +21,10 @@ import { useDragSort, useSaveQueue } from '../dragSort';
 import brand from '../generated/brand';
 import { MemberAvatar } from '../memberPhoto';
 import { navigate } from '../router';
-import { Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
+import { Caps, Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
 import { nameWithCompanions, termYears } from './Aemter';
 import { confirmAsk } from '../ask';
+import { IconButton } from '../icons';
 
 const sec = brand.labels.sections;
 
@@ -278,7 +279,7 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
   );
 
   return (
-    <section>
+    <section className="stack">
       <h3 className="section-title">Gruppen</h3>
       <FormError error={error} />
       {list.length > 0 && (
@@ -327,17 +328,16 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
                     {g.singular && <span className="muted small"> · Einzahl: {g.singular}</span>}
                   </div>
                   <div className="row-actions">
-                    <button
-                      className="btn btn-small btn-secondary"
+                    <IconButton
+                      icon="edit"
+                      label="Bearbeiten"
                       disabled={busy}
                       onClick={() => {
                         setEditTitle(g.title);
                         setEditSingular(g.singular ?? '');
                         setEditing(g.id);
                       }}
-                    >
-                      Bearbeiten
-                    </button>
+                    />
                     <label className="toggle joint-toggle">
                       <input
                         type="checkbox"
@@ -352,15 +352,15 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
                       />
                       <span>Amtszeiten gemeinsam</span>
                     </label>
-                    <button
-                      className="btn btn-small btn-danger"
+                    <IconButton
+                      icon="delete"
+                      label="Löschen"
+                      variant="danger"
                       disabled={busy}
                       onClick={async () =>
                         (await confirmAsk(`Gruppe „${g.title}“ löschen?`)) && run(() => api.deleteOfficeGroup(g.id), 'Gelöscht')
                       }
-                    >
-                      Löschen
-                    </button>
+                    />
                   </div>
                 </div>
               </li>
@@ -456,18 +456,16 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
               {t.honor && <span className="badge timeline-honor">Ehrung</span>}
               {t.current && <span className="badge timeline-now">aktuell</span>}
               <span className="row-actions">
-                <button className="btn btn-small btn-secondary" disabled={busy || editing !== null} onClick={() => setEditing(t.id)}>
-                  Bearbeiten
-                </button>
-                <button
-                  className="btn btn-small btn-danger"
+                <IconButton icon="edit" label="Bearbeiten" disabled={busy || editing !== null} onClick={() => setEditing(t.id)} />
+                <IconButton
+                  icon="delete"
+                  label="Löschen"
+                  variant="danger"
                   disabled={busy || editing !== null}
                   onClick={async () =>
                     (await confirmAsk(`Amtszeit ${termYears(t)} löschen?`)) && run(() => api.deleteOfficeTerm(t.id), 'Gelöscht')
                   }
-                >
-                  Löschen
-                </button>
+                />
               </span>
             </div>
           ),
@@ -592,7 +590,9 @@ function TitleLink({ office, onToast, reload }: { office: Office; onToast: Toast
       ) : (
         <>
           <label className="field">
-            <span>Verknüpfter {sec.titles}</span>
+            <span>
+              Verknüpfter <Caps text={sec.titles} />
+            </span>
             <select value={choice} onChange={(e) => choose(e.target.value)} disabled={busy}>
               <option value="">Keiner</option>
               {(titles.data ?? [])
@@ -707,19 +707,17 @@ function JointTermAdmin({
                     .join(' · ') || 'Noch keine Personen'}
                 </div>
                 <div className="row-actions">
-                  <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => setEditing(gt.id)}>
-                    Bearbeiten
-                  </button>
-                  <button
-                    className="btn btn-small btn-danger"
+                  <IconButton icon="edit" label="Bearbeiten" disabled={busy} onClick={() => setEditing(gt.id)} />
+                  <IconButton
+                    icon="delete"
+                    label="Löschen"
+                    variant="danger"
                     disabled={busy}
                     onClick={async () =>
                       (await confirmAsk(`Gemeinsame Amtszeit ${termYears(gt)} mit allen Amtszeiten darin und dem Bild löschen?`)) &&
                       run(() => api.deleteOfficeGroupTerm(gt.id), 'Gelöscht')
                     }
-                  >
-                    Löschen
-                  </button>
+                  />
                 </div>
               </div>
             </li>

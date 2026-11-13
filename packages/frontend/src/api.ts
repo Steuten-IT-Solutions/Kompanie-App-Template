@@ -53,6 +53,7 @@ export type Capability =
   | 'manage_companies'
   | 'submit_gallery'
   | 'review_gallery'
+  | 'manage_gallery'
   | 'manage_pages'
   | 'manage_news'
   | 'view_personal'
@@ -61,6 +62,7 @@ export type Capability =
   | 'promote_users'
   | 'review_reports'
   | 'view_activity'
+  | 'view_changes'
   | 'manage_settings';
 export type Feature =
   | 'events'
@@ -125,6 +127,8 @@ export interface AppConfig {
   registration?: boolean;
   /** Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null */
   pendingRegistrations?: number | null;
+  /** Einreichen von Bildern und Videos erlaubt (Einstellungen → Galerie); fehlt bei älteren Servern (dann erlaubt) */
+  gallerySubmissions?: boolean;
   /** Rollen der Installation (Einstellungen → Rollen): Bezeichnung und Punktefaktor */
   roles?: RoleInfo[];
   /** null = Gast ohne Anmeldung. */
@@ -403,6 +407,57 @@ export interface ActivityEntry {
   at: number;
 }
 
+/** Änderungsprotokoll: ein Feld mit altem und neuem Wert */
+export interface ChangeField {
+  field: string;
+  /** fehlt beim Anlegen */
+  old?: string | null;
+  /** fehlt beim Löschen */
+  new?: string | null;
+  /** persönliche Angabe (E-Mail, Telefon, Adresse, Geburtsdatum) */
+  personal?: boolean;
+  /** Werte ohne view_personal ausgeblendet */
+  hidden?: boolean;
+  /** geheim (Passwort, Foto, Logo): nur „geändert“ */
+  secret?: boolean;
+}
+
+/** event: etwas ohne vergleichbaren Stand (z. B. Update eingespielt); label ist dann der ganze Satz */
+export type ChangeAction = 'create' | 'update' | 'delete' | 'event';
+
+export interface ChangeEntry {
+  id: number;
+  at: number;
+  actor_id: number;
+  actor_name: string;
+  area: string;
+  area_label: string;
+  /** Art des Eintrags, z. B. „Mitglied“ */
+  type: string;
+  item: string;
+  label: string;
+  action: ChangeAction;
+  subject_user_id: number | null;
+  /** Gemeinsame Kennung der Einträge einer Aktion mit mehreren Einträgen (z. B. Punkte für alle), sonst leer */
+  batch: string;
+  changes: ChangeField[];
+}
+
+export interface ChangeLogSettings {
+  enabled: boolean;
+  keep_days: number;
+  keep_min: number;
+  keep_max: number;
+}
+
+export interface ChangeLog extends ChangeLogSettings {
+  from: string;
+  to: string;
+  entries: ChangeEntry[];
+  truncated: boolean;
+  areas: { area: string; label: string }[];
+}
+
 declare global {
   interface Window {
     KOMPANIE_CONFIG?: AppConfig;
@@ -454,16 +509,28 @@ export function applyNavigation(next: Pick<NavigationAdmin, 'navigation' | 'inte
 
 /** Zahl der offenen Anfragen auf einen Zugang (Issue #314) nach dem Freigeben oder Ablehnen: Zähler in der Verwaltung. */
 export function applyPendingRegistrations(count: number): void {
-  if (!config || config.pendingRegistrations == null) return;
+  if (!config || config.pendingRegistrations == null || config.pendingRegistrations === count) return;
   config.pendingRegistrations = count;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
 /** Zahl der offenen Fehlermeldungen nach dem Schließen oder Weiterleiten: Zähler in der Verwaltung. */
 export function applyOpenReports(count: number): void {
-  if (!config || config.openReports == null) return;
+  if (!config || config.openReports == null || config.openReports === count) return;
   config.openReports = count;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/** Übernimmt den Haken „Einreichen erlauben“ der Galerie in die geladene Konfiguration (nach dem Speichern). */
+export function applyGallerySubmissions(enabled: boolean): void {
+  if (!config || config.gallerySubmissions === enabled) return;
+  config.gallerySubmissions = enabled;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/** Darf, wer submit_gallery hat, gerade einreichen? Ältere Server kennen den Haken nicht (dann ja). */
+export function gallerySubmissionsOpen(): boolean {
+  return config?.gallerySubmissions !== false;
 }
 
 /** Übernimmt die Einstellung „Zugang beantragen“ in die geladene Konfiguration (nach dem Speichern). */
@@ -716,6 +783,8 @@ export interface NewsInput {
 export interface GalleryAlbumSummary {
   id: number;
   title: string;
+  /** Album der App (in der App änderbar) oder aus Google Drive; fehlt bei älteren Servern */
+  source?: 'app' | 'drive';
   /** Bilder und Videos zusammen */
   count: number;
   /** davon Videos; fehlt bei älteren Servern */
@@ -756,6 +825,8 @@ export interface GalleryAlbum {
   id: number;
   title: string;
   year: string;
+  /** Album der App (in der App änderbar) oder aus Google Drive; fehlt bei älteren Servern */
+  source?: 'app' | 'drive';
   /** Knöpfe zum Herunterladen zeigen (je Bild in der Großansicht, das Album als ZIP); fehlt bei älteren Servern */
   downloads?: boolean;
   photos: GalleryPhoto[];
@@ -2506,6 +2577,15 @@ export const api = {
       ...(userId ? { user_id: String(userId) } : {}),
     }),
   setActivityPersonal: (personal: boolean) => request<{ personal: boolean }>('PUT', '/admin/activity/settings', { personal }),
+  changes: (q: { from: string; to: string; userId?: number; area?: string }) =>
+    request<ChangeLog>('GET', '/admin/changes', undefined, {
+      from: q.from,
+      to: q.to,
+      ...(q.userId ? { user_id: String(q.userId) } : {}),
+      ...(q.area ? { area: q.area } : {}),
+    }),
+  setChangeLogSettings: (data: Partial<Pick<ChangeLogSettings, 'enabled' | 'keep_days'>>) =>
+    request<ChangeLogSettings>('PUT', '/admin/changes/settings', data),
   maintenance: () => request<MaintenanceState>('GET', '/admin/maintenance'),
   navigation: () => request<NavigationAdmin>('GET', '/admin/navigation'),
   saveNavigation: (body: {
@@ -2553,9 +2633,17 @@ export const api = {
   uploadGalleryPhoto: async (albumId: number, file: File, intern: boolean) =>
     request<GalleryAdminAlbumDetail>('POST', `/admin/gallery/albums/${albumId}/photos`, { file: await encodeFile(file), intern }),
   deleteGalleryPhoto: (id: number) => request<{ deleted: boolean }>('DELETE', `/admin/gallery/photos/${id}`),
-  /** Hochgeladenes Bild oder Video nachträglich intern oder öffentlich stellen (manage_settings oder review_gallery) */
+  /** Hochgeladenes Bild oder Video nachträglich intern oder öffentlich stellen (manage_gallery oder review_gallery) */
   setGalleryPhotoIntern: (id: number, intern: boolean) =>
     request<{ id: number; intern: boolean }>('PATCH', `/gallery/photos/${id}`, { intern }),
+  /** Alben als Ziel zum Verschieben (manage_gallery) */
+  galleryMoveTargets: () =>
+    request<{ albums: { id: number; title: string; year: string; source: 'app' | 'drive' }[] }>('GET', '/gallery/albums'),
+  /** Hochgeladene Bilder und Videos in ein anderes Album verschieben (manage_gallery) */
+  moveGalleryPhotos: (ids: number[], albumId: number) =>
+    request<{ moved: number; album_id: number }>('POST', '/gallery/photos/move', { ids, album_id: albumId }),
+  /** Hochgeladene Bilder und Videos löschen, mehrere auf einmal (manage_gallery) */
+  deleteGalleryPhotos: (ids: number[]) => request<{ deleted: number }>('POST', '/gallery/photos/delete', { ids }),
   // Einreichungen (Issue #286)
   // Videos in Stücken hochladen (Issue #350), siehe videoUpload.ts
   startVideoUpload: (input: { album_id: number; name: string; size: number; purpose: 'album' | 'submission' }) =>
@@ -2622,6 +2710,11 @@ export const api = {
   backupDrive: () => request<BackupDriveStatus>('GET', '/admin/backup/drive'),
   setBackupDrive: (enabled: boolean) => request<BackupDriveStatus>('PUT', '/admin/backup/drive', { enabled }),
   uploadBackupDrive: () => request<BackupDriveStatus>('POST', '/admin/backup/drive/upload', {}),
+  backupServer: () => request<BackupServerStatus>('GET', '/admin/backup/server'),
+  setBackupServer: (enabled: boolean) => request<BackupServerStatus>('PUT', '/admin/backup/server', { enabled }),
+  createBackupServer: () => request<BackupServerStatus>('POST', '/admin/backup/server/create', {}),
+  restoreBackupServer: (id: string) => request<{ restored: boolean }>('POST', '/admin/backup/server/restore', { id, confirm: true }),
+  deleteBackupServer: (id: string) => request<BackupServerStatus>('POST', '/admin/backup/server/delete', { id }),
   clearErrorLog: () => request<{ errorLog: ErrorLogEntry[] }>('DELETE', '/admin/error-log'),
   setupDone: () => request<{ done: boolean }>('POST', '/admin/setup/done', {}),
 
@@ -2890,8 +2983,49 @@ export interface BackupDriveStatus {
   last_ok: number | null;
   last_try: number | null;
   error: string | null;
+  /** Messung des letzten erfolgreichen Hochladens; null, solange es keine gibt */
+  last_upload: BackupUploadStats | null;
   every_days: number;
   keep: number;
+}
+
+/** Wie lange das Hochladen einer Sicherung nach Google Drive gedauert hat (Sekunden) */
+export interface BackupUploadStats {
+  bytes: number;
+  chunks: number;
+  /** Sitzung bei Google beginnen (eine kleine Anfrage: Verbindungsaufbau und Antwortzeit) */
+  start_seconds: number;
+  /** Datei von der Platte des Servers lesen */
+  read_seconds: number;
+  /** alle Stücke senden, bis Google sie bestätigt */
+  send_seconds: number;
+  slowest_seconds: number;
+  total_seconds: number;
+}
+
+/** Eine Sicherung im geschützten Ordner auf dem Server: wöchentlich oder vor einem Update */
+export interface ServerBackupFile {
+  id: string;
+  kind: 'weekly' | 'update';
+  created: number;
+  size: number;
+  /** Version vor dem Update (nur kind update, ältere Namen ohne) */
+  version: string | null;
+}
+
+/** Sicherungen auf dem eigenen Server */
+export interface BackupServerStatus {
+  /** Datensicherung hier vorhanden */
+  available: boolean;
+  enabled: boolean;
+  /** Wiederherstellen ist hier möglich */
+  can_restore: boolean;
+  last_ok: number | null;
+  last_try: number | null;
+  error: string | null;
+  every_days: number;
+  keep: number;
+  files: ServerBackupFile[];
 }
 
 /** Aufbewahrungsfrist für Ehemalige: 0 = aus; due wird beim nächsten Lauf gelöscht, soon in den nächsten 30 Tagen fällig */
@@ -3045,6 +3179,8 @@ export interface AdminSettings {
     media_bytes?: number;
     /** Knöpfe zum Herunterladen in der Galerie; fehlt bei älteren Servern */
     downloads?: boolean;
+    /** Einreichen von Bildern und Videos durch Mitglieder erlaubt; fehlt bei älteren Servern */
+    submissions?: boolean;
     service_account_email: string;
     oauth_connected: boolean;
     oauth_email: string;
@@ -3083,6 +3219,8 @@ export interface GallerySubmission {
 }
 
 export interface GallerySubmissionsOwn {
+  /** Einreichen erlaubt (Einstellungen → Galerie); fehlt bei älteren Servern (dann erlaubt) */
+  enabled?: boolean;
   albums: { id: number; title: string; year: string }[];
   submissions: GallerySubmission[];
 }
@@ -3136,6 +3274,7 @@ export interface AdminSettingsInput {
   gallery_source?: GallerySourceType;
   gallery_store?: 'server';
   gallery_downloads?: '0' | '1';
+  gallery_submissions?: '0' | '1';
   news_source?: NewsSourceType;
   news_url?: string;
   legal_imprint_url?: string;

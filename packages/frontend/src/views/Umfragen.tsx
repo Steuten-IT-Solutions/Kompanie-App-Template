@@ -4,9 +4,10 @@ import { canManagePolls, pollsVisible, refreshBoard } from '../board';
 import { formatShortTime, fromLocalInput, toLocalInput } from '../format';
 import brand from '../generated/brand';
 import { navigate } from '../router';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { Caps, Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { prefetchOnTap, sources } from '../viewData';
 import { confirmAsk } from '../ask';
+import { IconButton } from '../icons';
 
 // Umfragen (Issue #4): #/umfragen (alle, auch beendete), #/umfragen/<id> (antworten, ändern, zurückziehen, Ergebnisse)
 // und #/umfragen/verwalten (anlegen, ändern, beenden, löschen; nur mit manage_polls). Laufende Umfragen stehen am
@@ -225,12 +226,13 @@ function PollPage({ id, onToast }: { id: number; onToast: (msg: string) => void 
           <p className="muted small poll-results-hidden">Ergebnisse: {resultsHint(poll)}</p>
         )}
       </article>
-      <div className="button-row">
-        <button className="btn btn-secondary" onClick={() => navigate('brett')}>
-          Zum {sec.board}
+      {/* Als Verweise statt großer Knöpfe; ohne „Zum …“, weil der Name des Bereichs frei wählbar ist (Beugung) */}
+      <div className="poll-nav">
+        <button className="btn btn-link" onClick={() => navigate('brett')}>
+          ‹ {sec.board}
         </button>
-        <button className="btn btn-secondary" onClick={() => navigate('umfragen')}>
-          Alle {sec.polls}
+        <button className="btn btn-link" onClick={() => navigate('umfragen')}>
+          Alle {sec.polls} ›
         </button>
       </div>
     </div>
@@ -257,7 +259,7 @@ function PollList() {
     <div className="poll-list">
       {canManagePolls() && (
         <button className="btn btn-secondary btn-block poll-manage-link" onClick={() => navigate('umfragen/verwalten')}>
-          {sec.polls} verwalten
+          <Caps text={sec.polls} /> verwalten
         </button>
       )}
       <h2 className="board-page-title">Laufend</h2>
@@ -457,14 +459,12 @@ function ManagedPoll({ poll, onChanged, onToast }: { poll: Poll; onChanged: () =
           {error}
         </p>
       )}
-      <div className="button-row">
+      <div className="icon-row poll-manage-actions">
         {poll.status === 'running' && (
           <>
-            <button className="btn btn-secondary" disabled={busy} onClick={() => setEditing(true)}>
-              Bearbeiten
-            </button>
+            <IconButton icon="edit" label="Bearbeiten" disabled={busy} onClick={() => setEditing(true)} />
             <button
-              className="btn btn-secondary"
+              className="btn btn-secondary poll-close"
               disabled={busy}
               onClick={async () =>
                 (await confirmAsk('Umfrage jetzt beenden? Danach kann niemand mehr antworten.')) &&
@@ -475,15 +475,15 @@ function ManagedPoll({ poll, onChanged, onToast }: { poll: Poll; onChanged: () =
             </button>
           </>
         )}
-        <button
-          className="btn btn-danger"
+        <IconButton
+          icon="delete"
+          label="Löschen"
+          variant="danger"
           disabled={busy}
           onClick={async () =>
             (await confirmAsk('Umfrage mit allen Antworten löschen?')) && run(() => api.deletePoll(poll.id), 'Umfrage gelöscht')
           }
-        >
-          Löschen
-        </button>
+        />
       </div>
     </article>
   );

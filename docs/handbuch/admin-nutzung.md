@@ -14,7 +14,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Nutzung**.
 - **Konten** und **Aktiv (24 Std.)**, **Aktiv (7 Tage)**, **Aktiv (30 Tage)**: wie viele Konten es gibt und wie viele davon in dieser Zeit etwas in der App gemacht haben.
 - **Zeitraum** mit **Von** und **Bis**: für die Zahlen darunter. Am Anfang sind es die letzten 30 Tage, höchstens geht ein Jahr.
 - **Aktive Personen je Tag**: ein Balken je Tag, an dem jemand die App genutzt hat.
-- **Nutzung je Bereich**: welcher Bereich wie oft genutzt wurde und von wie vielen Personen in den letzten 30 Tagen. **Allgemein** sind Seiten wie die Verwaltung, das eigene Konto und die Einstellungen.
+- **Nutzung je Bereich**: welcher Bereich wie oft genutzt wurde und von wie vielen Personen in den letzten 30 Tagen. **Allgemein** sind Seiten wie die Verwaltung, das eigene Konto und die Einstellungen. Ein **gelöscht** unter **Allgemein** ist z. B. ein gelöschtes Geburtsdatum oder eine gelöschte Signatur im eigenen Konto, eine gelöschte Rolle oder ein gelöschtes Mitglied. Was genau gelöscht wurde, steht nicht hier, sondern bei **Änderungen** in der Verwaltung, wenn du das Recht **Änderungen ansehen** hast. Das An- und Abmelden der Benachrichtigungen auf einem Gerät zählt nicht als Nutzung.
 - **Als CSV-Datei herunterladen**: alle Einträge im Zeitraum mit Zeit, Name, Bereich und Aktion, z. B. für Excel.
 - **Mitglieder**: alle Konten, die im gewählten Zeitraum aktiv waren, mit dem Zeitpunkt, an dem sie zuletzt aktiv waren. Wer am längsten nicht aktiv war, steht oben.
 - **Erfassung je Person**: der Schalter, ob die App sich merkt, wer wann was genutzt hat.

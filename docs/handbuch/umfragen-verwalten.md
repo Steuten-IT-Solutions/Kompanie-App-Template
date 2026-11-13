@@ -14,7 +14,7 @@ Tippe unten auf **Verwaltung** und dann auf **{bereich.polls}**. Auch am {bereic
 ## Was du hier siehst
 - **‹ Verwaltung**: zurück zur Startseite der Verwaltung (nur, wenn du dort mehrere Aufgaben hast).
 - **Neue Umfrage**: das Formular zum Anlegen.
-- **Alle {bereich.polls}**: alle {bereich.polls}, laufende und beendete, neueste zuerst. Bei jeder stehen Frage, Art, Ende, **Namentlich** oder **Anonym**, wer die Ergebnisse sieht, und die Ergebnisse. Darunter die Knöpfe **Bearbeiten** und **Beenden** (nur, solange sie läuft) und **Löschen**.
+- **Alle {bereich.polls}**: alle {bereich.polls}, laufende und beendete, neueste zuerst. Bei jeder stehen Frage, Art, Ende, **Namentlich** oder **Anonym**, wer die Ergebnisse sieht, und die Ergebnisse. Darunter **Bearbeiten** (Stift) und **Beenden** (beide nur, solange sie läuft) und **Löschen** (Mülleimer).
 
 ## So gehst du vor
 ### Eine Umfrage anlegen

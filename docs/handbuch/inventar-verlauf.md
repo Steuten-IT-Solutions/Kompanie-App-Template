@@ -9,7 +9,7 @@ Im Verlauf siehst du jede Änderung im {bereich.inventory}: wann, wer, was sich 
 ![Der gesamte Verlauf im {bereich.inventory}](bild:inventar-verlauf)
 
 ## So öffnest du die Seite
-Öffne das {bereich.inventory} über **Verwaltung** und tippe oben auf **Gesamter Verlauf**. Den Verlauf eines einzelnen Eintrags öffnest du, indem du das Material aufklappst und beim Ort auf **Verlauf** tippst.
+Öffne das {bereich.inventory} über **Verwaltung** und tippe oben auf **Gesamter Verlauf**. Den Verlauf eines einzelnen Eintrags öffnest du, indem du das Material aufklappst und beim Ort auf **Verlauf** (Uhr) tippst.
 
 ## Was du hier siehst
 - **‹ Zurück zum {bereich.inventory}**: führt zurück zur Liste.

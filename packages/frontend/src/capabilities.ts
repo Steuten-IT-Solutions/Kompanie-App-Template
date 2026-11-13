@@ -147,6 +147,12 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         features: ['gallery'],
       },
       {
+        key: 'manage_gallery',
+        label: `${sec.gallery}: Alben anlegen, ändern und löschen, Bilder und Videos hochladen, verschieben, löschen und intern stellen`,
+        short: `${sec.gallery} verwalten`,
+        features: ['gallery'],
+      },
+      {
         key: 'manage_pages',
         label: `${sec.pages}: eigene Seiten anlegen, bearbeiten, sortieren und löschen (sieht alle Seiten)`,
         short: `${sec.pages} pflegen`,
@@ -216,6 +222,12 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         key: 'review_reports',
         label: 'Fehlermeldungen der Mitglieder sehen, mit Begründung schließen oder an die Betreuer der App weiterleiten',
         short: 'Fehlermeldungen bearbeiten',
+      },
+      {
+        key: 'view_changes',
+        label:
+          'Änderungsprotokoll ansehen: wer wann was angelegt, geändert oder gelöscht hat, mit alten und neuen Werten (persönliche Angaben darin nur mit „Persönliches sehen“)',
+        short: 'Änderungen ansehen',
       },
     ],
   },

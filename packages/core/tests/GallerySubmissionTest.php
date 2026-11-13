@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Tests;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Domain\GallerySubmissionService;
+use KompanieApp\Core\Domain\GalleryUploadService;
 use KompanieApp\Core\Domain\PersonalDataExport;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Http\Response;
@@ -43,7 +45,7 @@ final class GallerySubmissionTest extends TestCase
         $this->grant($this->sub, ['submit_gallery']);
         $this->grant($this->rev, ['review_gallery']);
         $this->users->current = $this->admin;
-        $this->ok('PATCH', '/admin/settings', ['gallery_source' => 'server']);
+        $this->ok('PATCH', '/admin/settings', ['gallery_source' => 'server', 'gallery_submissions' => '1']);
         $this->album = (int) $this->ok('POST', '/admin/gallery/albums', ['title' => 'Sommerfest', 'year' => 2026])['id'];
     }
 
@@ -238,8 +240,86 @@ final class GallerySubmissionTest extends TestCase
     {
         $this->app->settings->set(GallerySubmissionService::SETUP_SETTING, false);
         $this->app->gallerySubmissions()->initialize(true);
-        $this->assertSame(TestApp::caps(['member', 'review_gallery']), $this->app->roles()->find('gallery')['capabilities'] ?? null);
+        $this->assertSame(TestApp::caps(['member', 'review_gallery', 'manage_gallery']), $this->app->roles()->find('gallery')['capabilities'] ?? null);
         $this->assertSame('Galerie verwalten', $this->app->roles()->find('gallery')['label'] ?? null);
         $this->assertTrue($this->app->settings->get(GallerySubmissionService::SETUP_SETTING));
+    }
+
+    /** Die schon bestehende Standardrolle „Galerie verwalten“ bekommt manage_gallery einmal; nimmt der Admin es weg, bleibt es weg. */
+    public function testManageGalleryAddedOnceToExistingRole(): void
+    {
+        $this->app->settings->set(GallerySubmissionService::SETUP_SETTING, false);
+        $this->app->gallerySubmissions()->initialize(true);
+        $roles = $this->app->roles();
+        $without = array_values(array_diff($roles->find('gallery')['capabilities'] ?? [], ['manage_gallery']));
+        // Stand vor dem Update: Rolle ohne das neue Recht, noch nicht ergänzt
+        $roles->update('gallery', ['capabilities' => $without]);
+        $this->app->settings->set(GalleryUploadService::MANAGE_SETTING, false);
+        $this->assertNotContains('manage_gallery', $roles->find('gallery')['capabilities'] ?? []);
+        $this->app->galleryUploads()->initialize();
+        $this->assertContains('manage_gallery', $roles->find('gallery')['capabilities'] ?? []);
+        $roles->update('gallery', ['capabilities' => $without]);
+        $this->app->galleryUploads()->initialize();
+        $this->assertNotContains('manage_gallery', $roles->find('gallery')['capabilities'] ?? [], 'nur einmal');
+        $this->assertContains(Capability::ManageGallery, Roles::GRANTABLE);
+        $this->assertSame(Capability::Member, Capability::ManageGallery->requires());
+    }
+
+    /** Haken „Einreichen erlauben“: neue Installationen aus; aus heißt kein Einreichen über API und keine Knöpfe in der App. */
+    public function testSubmissionsSwitchOffByDefaultAndBlocked(): void
+    {
+        $fresh = TestApp::create(TestApp::connection(), new FakeUsers(), [], null, $this->dir . '-neu');
+        try {
+            $this->assertSame('0', $fresh->settings->get(GallerySubmissionService::ENABLED_SETTING), 'neue Installation: aus');
+        } finally {
+            exec('rm -rf ' . escapeshellarg($this->dir . '-neu'));
+        }
+
+        $this->assertTrue($this->ok('GET', '/admin/settings')['gallery']['submissions']);
+        $this->assertFalse($this->ok('PATCH', '/admin/settings', ['gallery_submissions' => '0'])['gallery']['submissions']);
+        foreach (['', 'ja', '2'] as $bad) {
+            $this->assertSame(400, $this->call('PATCH', '/admin/settings', ['gallery_submissions' => $bad])->status, $bad);
+        }
+        $this->assertSame(400, $this->call('PATCH', '/admin/settings', ['gallery_submissions' => true])->status, 'nur Text wie alle Felder');
+        $this->users->current = $this->rev;
+        $this->assertSame(403, $this->call('PATCH', '/admin/settings', ['gallery_submissions' => '1'])->status, 'nur mit manage_settings');
+
+        $this->users->current = $this->sub;
+        $this->assertFalse($this->call('GET', '/config')->data['gallerySubmissions']);
+        $own = $this->ok('GET', '/gallery/submissions');
+        $this->assertFalse($own['enabled'], 'eigene Einreichungen bleiben sichtbar');
+        $res = $this->call('POST', '/gallery/submissions', ['album_id' => $this->album, 'file' => ['name' => 'a.jpg', 'data' => base64_encode($this->jpeg())], 'consent' => true]);
+        $this->assertSame(403, $res->status);
+        $this->assertSame(403, $this->call('POST', '/gallery/video-uploads', ['album_id' => $this->album, 'name' => 'a.mp4', 'size' => 10, 'purpose' => 'submission'])->status);
+        $this->assertSame([], $this->stored());
+        $this->assertSame(0, $this->app->gallerySubmissions()->countPending());
+
+        $this->users->current = $this->admin;
+        $this->ok('PATCH', '/admin/settings', ['gallery_submissions' => '1']);
+        $this->users->current = $this->sub;
+        $this->assertTrue($this->call('GET', '/config')->data['gallerySubmissions']);
+        $this->assertTrue($this->ok('GET', '/gallery/submissions')['enabled']);
+        $this->submit();
+        $this->assertSame(1, $this->app->gallerySubmissions()->countPending());
+    }
+
+    /** Update einer bestehenden Installation: Der Haken wird einmalig gesetzt, damit sich dort nichts ändert. */
+    public function testExistingInstallationKeepsSubmissionsOnce(): void
+    {
+        $settings = $this->app->settings;
+        $settings->delete(GallerySubmissionService::ENABLED_SETTING);
+        $this->app->gallerySubmissions()->initialize(true);
+        $this->assertSame('1', $settings->get(GallerySubmissionService::ENABLED_SETTING));
+        $this->assertTrue($this->app->gallerySubmissions()->enabled());
+
+        // Schaltet der Admin es aus, bleibt es aus
+        $this->app->gallerySubmissions()->setEnabled(false);
+        $this->app->gallerySubmissions()->initialize(true);
+        $this->assertFalse($this->app->gallerySubmissions()->enabled(), 'nur einmal');
+
+        // Neue Installation
+        $settings->delete(GallerySubmissionService::ENABLED_SETTING);
+        $this->app->gallerySubmissions()->initialize(false);
+        $this->assertSame('0', $settings->get(GallerySubmissionService::ENABLED_SETTING));
     }
 }

@@ -25,8 +25,9 @@ import { navigate } from '../router';
 import { useFocusEntry } from '../focus';
 import { formatShortTime, formatUntil, fromLocalInput, toLocalInput } from '../format';
 import RichTextView from '../richtext/RichTextView';
-import { Empty, ErrorBox, Loading } from '../ui';
+import { Caps, Empty, ErrorBox, Loading } from '../ui';
 import { confirmAsk } from '../ask';
+import { IconButton } from '../icons';
 
 /** Entwurf der neuen Nachricht (auf diesem Gerät): geht beim Sprung zur Signatur-Einrichtung nicht verloren. */
 const DRAFT_KEY = 'kompanie-board-draft';
@@ -629,9 +630,10 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
       {error && <p className="form-error small">{error}</p>}
       {canPost &&
         (edit === null ? (
-          <div className="button-row">
-            <button
-              className="btn btn-secondary"
+          <div className="icon-row board-item-actions">
+            <IconButton
+              icon="edit"
+              label="Bearbeiten"
               disabled={busy}
               onClick={() =>
                 setEdit({
@@ -643,21 +645,23 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
                   attachments: item.attachments ?? [],
                 })
               }
-            >
-              Bearbeiten
-            </button>
-            <button
-              className="btn btn-danger"
+            />
+            <IconButton
+              icon="delete"
+              label="Löschen"
+              variant="danger"
               disabled={busy}
               onClick={async () =>
                 (await confirmAsk(`Nachricht „${item.title}“ jetzt löschen?`)) && run(() => api.deleteBoard(item.id), 'Nachricht gelöscht')
               }
-            >
-              Löschen
-            </button>
-            <button className="btn btn-link board-history-toggle" aria-expanded={history} onClick={() => setHistory(!history)}>
-              {history ? 'Verlauf ausblenden' : 'Verlauf'}
-            </button>
+            />
+            <IconButton
+              icon="history"
+              label={history ? 'Verlauf ausblenden' : 'Verlauf'}
+              className="board-history-toggle"
+              expanded={history}
+              onClick={() => setHistory(!history)}
+            />
           </div>
         ) : (
           <>
@@ -792,7 +796,7 @@ export default function Brett({ focus, onToast }: { focus?: string; onToast: (ms
       )}
       {canPostBoard() && <Ended />}
       {(pollsVisible() || canManagePolls()) && boardLoaded() && (
-        <section className="board-polls">
+        <section className="board-polls stack">
           <h2 className="board-page-title">Laufende {brand.labels.sections.polls}</h2>
           {polls.length === 0 ? (
             <p className="muted small">Zurzeit läuft keine Umfrage.</p>
@@ -805,7 +809,7 @@ export default function Brett({ focus, onToast }: { focus?: string; onToast: (ms
             </button>
             {canManagePolls() && (
               <button className="btn btn-secondary board-polls-manage" onClick={() => navigate('umfragen/verwalten')}>
-                {brand.labels.sections.polls} verwalten
+                <Caps text={brand.labels.sections.polls} /> verwalten
               </button>
             )}
           </div>

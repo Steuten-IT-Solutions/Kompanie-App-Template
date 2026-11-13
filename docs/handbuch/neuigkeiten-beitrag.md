@@ -16,7 +16,7 @@ Tippe unten auf **{bereich.news}** und dann auf einen Beitrag.
 - **Bild, Datum und Titel** des Beitrags, sofern die Quelle sie liefert.
 - **Text** des Beitrags. Links darin kannst du antippen.
 - **Auf der Webseite öffnen**: zeigt den Beitrag im Browser auf der Webseite, von der er stammt. Bei Beiträgen, die in der App geschrieben wurden, fehlt der Knopf.
-- **Bearbeiten** und **Löschen**: nur bei Beiträgen aus der App und mit dem Recht dazu (Hilfeseite „{bereich.news} schreiben“).
+- **Bearbeiten** (Stift) und **Löschen** (Mülleimer): nur bei Beiträgen aus der App und mit dem Recht dazu (Hilfeseite „{bereich.news} schreiben“).
 
 ## Gut zu wissen
 - Den Beitrag kannst du mit dem Teilen-Symbol oben als Link verschicken. Wer ihn öffnet, sieht genau diesen Beitrag.

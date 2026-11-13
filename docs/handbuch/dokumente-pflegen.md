@@ -14,7 +14,7 @@ Tippe unten auf **Intern**, dann auf **{bereich.documents}** und oben auf **{ber
 ## Was du hier siehst
 - **‹ Alle {bereich.documents}**: zurück zur Liste, wie die {rolle.member} sie sehen.
 - **Dokument hochladen**: Formular für ein neues Dokument.
-- **Dokumente**: alle {bereich.documents}, nach Kategorien geordnet, mit **Sortierung**. Bei jedem stehen Kategorie, Stand, Art und Größe der Datei und für wen es sichtbar ist, dazu die Knöpfe **Bearbeiten**, **Neue Fassung** und **Löschen**.
+- **Dokumente**: alle {bereich.documents}, nach Kategorien geordnet, mit **Sortierung**. Bei jedem stehen Kategorie, Stand, Art und Größe der Datei und für wen es sichtbar ist, dazu **Bearbeiten** (Stift), **Neue Fassung** und **Löschen** (Mülleimer).
 - **Kategorien**: Feld **Neue Kategorie** mit dem Knopf **Kategorie hinzufügen** und darunter die Liste der Kategorien mit der Zahl ihrer {bereich.documents}, **Umbenennen** und **Löschen**.
 
 ## So gehst du vor

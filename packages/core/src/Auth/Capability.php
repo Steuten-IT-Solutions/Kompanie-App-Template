@@ -97,6 +97,12 @@ enum Capability: string
     case SubmitGallery = 'submit_gallery';
     /** Einreichungen sehen, freigeben (öffentlich oder intern), ablehnen und freigegebene wieder entfernen (Issue #286). */
     case ReviewGallery = 'review_gallery';
+    /**
+     * Galerie verwalten: Alben der App anlegen, umbenennen, ins andere Jahr setzen und löschen, Bilder und Videos
+     * hochladen, verschieben, löschen und intern oder öffentlich stellen, direkt in der Galerie. Quelle und Abgleich mit
+     * Drive bleiben bei manage_settings.
+     */
+    case ManageGallery = 'manage_gallery';
     /** News in der App schreiben, bearbeiten und löschen (nur mit der Quelle „In der App“, NewsService). */
     case ManageNews = 'manage_news';
     /** Eigene Seiten anlegen, bearbeiten, sortieren und löschen (Bereich Seiten, Issue #287). */
@@ -122,6 +128,11 @@ enum Capability: string
      * (Roles::GRANTABLE), solange offen ist, wer außer dem Admin die Auswertung je Person sehen darf.
      */
     case ViewActivity = 'view_activity';
+    /**
+     * Änderungsprotokoll ansehen: wer wann welchen Eintrag angelegt, geändert oder gelöscht hat, mit alten und neuen Werten
+     * (Domain\ChangeLogService). Werte persönlicher Angaben darin nur zusammen mit view_personal. An Rollen vergebbar.
+     */
+    case ViewChanges = 'view_changes';
     /** Einstellungen und Updates (WordPress: Recht manage_options; zusätzlich gibt es dort das Formular im WP-Admin). */
     case ManageSettings = 'manage_settings';
 

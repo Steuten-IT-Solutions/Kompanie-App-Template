@@ -142,6 +142,28 @@ async function gapBetween(a: Locator, b: Locator): Promise<number> {
   return Math.round(rb!.y - (ra!.y + ra!.height));
 }
 
+/**
+ * Kleinster senkrechter Abstand zwischen zwei untereinander stehenden, sichtbaren Kindern von `scope` (Pixel). Bausteine
+ * im normalen Fluss (Liste, Knopf, Feld, Zwischenzeile) dürfen nicht aneinanderkleben; erwartet sind mindestens 12 px.
+ */
+async function smallestStackGap(scope: Locator): Promise<{ gap: number; between: string }> {
+  return scope.evaluate((el) => {
+    const name = (e: Element) => `${e.tagName.toLowerCase()}.${[...e.classList].join('.')} „${(e.textContent ?? '').trim().slice(0, 30)}“`;
+    const kids = [...el.children].filter((k) => {
+      const r = k.getBoundingClientRect();
+      return r.height > 0 && getComputedStyle(k).position !== 'absolute';
+    });
+    let best = { gap: Infinity, between: '' };
+    for (let i = 1; i < kids.length; i++) {
+      const [a, b] = [kids[i - 1].getBoundingClientRect(), kids[i].getBoundingClientRect()];
+      if (b.top < a.bottom - 1) continue; // nebeneinander
+      const gap = Math.round(b.top - a.bottom);
+      if (gap < best.gap) best = { gap, between: `${name(kids[i - 1])} / ${name(kids[i])}` };
+    }
+    return best;
+  });
+}
+
 /** Bildschirmfotos schmal (360 px) und breit, hell und dunkel; danach wieder wie vorher. */
 async function shotsNarrowAndWide(page: Page, name: string) {
   if (!SHOTS) return;
@@ -1147,6 +1169,10 @@ test('Navigation einrichten (Issue #277): Untermenü umbenennen, Termine hineins
     await card.getByRole('button', { name: 'Navigation speichern' }).click();
     await expect(page.getByText('Navigation gespeichert')).toBeVisible();
     await expect(card.getByText('Zurzeit gilt eure eigene Navigation.')).toBeVisible();
+    // Kein Baustein klebt am vorigen: Listen, Zwischenüberschriften, Felder der Startseite, beide Knöpfe unten und das
+    // Untermenü (Felder, Liste, „Untermenü entfernen“).
+    expect((await smallestStackGap(card)).gap).toBeGreaterThanOrEqual(12);
+    expect((await smallestStackGap(card.locator('.nav-menu').first())).gap).toBeGreaterThanOrEqual(12);
 
     const tabbar = page.locator('.tabbar');
     await expect(tabbar.getByRole('button', { name: 'Verein' })).toBeVisible();
@@ -1868,6 +1894,147 @@ test('Galerie: Knöpfe zum Herunterladen für ein Bild und das Album als ZIP, nu
   }
 });
 
+test('Galerie verwalten: Bilder auswählen, verschieben und löschen, Alben ins andere Jahr setzen und löschen', async ({ page }) => {
+  const n = Date.now() % 1000000;
+  const from = `Alt ${n}`;
+  const to = `Neu ${n}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json()) as { id?: number } };
+      },
+      [path, method, body] as const,
+    );
+  const fromId = (await api('admin/gallery/albums', 'POST', { title: from, year: 2026 })).data.id!;
+  const toId = (await api('admin/gallery/albums', 'POST', { title: to, year: 2026 })).data.id!;
+  for (const name of ['eins.png', 'zwei.png', 'drei.png']) {
+    expect(
+      (await api(`admin/gallery/albums/${fromId}/photos`, 'POST', { file: { name, data: PNG.buffer.toString('base64') } })).status,
+    ).toBe(201);
+  }
+  try {
+    // Zwei auswählen und ins andere Album verschieben
+    await page.goto(`/app/#/galerie/${fromId}`);
+    await expect(page.locator('.photo-grid .photo')).toHaveCount(3);
+    // Langes Drücken auf ein Bild beginnt das Auswählen, mit diesem Bild; danach genügt Tippen
+    await page.getByRole('button', { name: 'Bild 1 öffnen' }).hover();
+    await page.mouse.down();
+    await page.waitForTimeout(700);
+    await page.mouse.up();
+    await expect(page.locator('.lightbox')).toHaveCount(0);
+    await expect(page.locator('.gallery-select-bar')).toContainText('1 Bild oder Video gewählt');
+    // Kein Knopf zum Beenden: Ist nichts mehr gewählt, endet das Auswählen von selbst; Escape (bzw. Zurück) ebenso
+    await expect(page.getByRole('button', { name: /^(Auswählen|Fertig)$/ })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Bild 1 wählen' }).click();
+    await expect(page.locator('.gallery-select-bar')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Bild 1 öffnen' })).toBeVisible();
+    await page.getByRole('button', { name: 'Bild 2 öffnen' }).hover();
+    await page.mouse.down();
+    await page.waitForTimeout(700);
+    await page.mouse.up();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.gallery-select-bar')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Bild 1 öffnen' }).hover();
+    await page.mouse.down();
+    await page.waitForTimeout(700);
+    await page.mouse.up();
+    await page.getByRole('button', { name: 'Bild 2 wählen' }).click();
+    await expect(page.locator('.gallery-select-bar')).toContainText('2 Bilder und Videos gewählt');
+    // Knöpfe der Leiste nur mit Symbol: Name als aria-label und Tooltip, kein sichtbarer Text
+    const moveButton = page.locator('.gallery-select-bar').getByRole('button', { name: 'Verschieben' });
+    await expect(moveButton).toHaveText('');
+    await expect(moveButton).toHaveAttribute('title', 'Verschieben');
+    await page.locator('.gallery-select-bar').getByRole('button', { name: 'Verschieben' }).click();
+    const sheet = page.locator('.sheet', { hasText: '2 Bilder und Videos verschieben' });
+    // „Zurück“ des Geräts schließt zuerst das Fenster (das Auswählen bleibt), dann das Auswählen, erst dann die Seite.
+    const albumUrl = page.url();
+    await expect(sheet).toBeVisible();
+    await page.goBack();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.locator('.gallery-select-bar')).toContainText('2 Bilder und Videos gewählt');
+    expect(page.url()).toBe(albumUrl);
+    await page.locator('.gallery-select-bar').getByRole('button', { name: 'Verschieben' }).click();
+    // Mit ✕ geschlossen bleibt kein Eintrag übrig: Das nächste „Zurück“ beendet das Auswählen.
+    await sheet.getByRole('button', { name: 'Schließen' }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    // Die App nimmt den Eintrag des Fensters gleich danach weg (ein Mensch drückt nicht innerhalb von Millisekunden).
+    await page.waitForFunction(() => (history.state as { backLayers?: number } | null)?.backLayers === 1);
+    await page.goBack();
+    await expect(page.locator('.gallery-select-bar')).toHaveCount(0);
+    expect(page.url()).toBe(albumUrl);
+    await page.getByRole('button', { name: 'Bild 1 öffnen' }).hover();
+    await page.mouse.down();
+    await page.waitForTimeout(700);
+    await page.mouse.up();
+    await page.getByRole('button', { name: 'Bild 2 wählen' }).click();
+    await page.locator('.gallery-select-bar').getByRole('button', { name: 'Verschieben' }).click();
+    await sheet.getByLabel('In das Album').selectOption({ label: to });
+    await sheet.getByRole('button', { name: 'Verschieben' }).click();
+    await expect(page.locator('.toast')).toHaveText(`2 Bilder und Videos nach „${to}“ verschoben`);
+    await expect(page.locator('.photo-grid .photo')).toHaveCount(1);
+
+    // Großansicht: „Zurück“ schließt erst die Rückfrage bzw. das Fenster zum Verschieben, die Großansicht bleibt offen.
+    await page.locator('.photo-grid .photo').first().click();
+    await page.locator('.lb-count').getByRole('button', { name: 'Verschieben' }).click();
+    await expect(page.locator('.sheet', { hasText: '1 Bild oder Video verschieben' })).toBeVisible();
+    await page.goBack();
+    await expect(page.locator('.sheet')).toHaveCount(0);
+    await expect(page.locator('.lightbox')).toHaveCount(1);
+    await page.locator('.lb-count').getByRole('button', { name: 'Löschen' }).click();
+    await expect(page.locator('.ask-dialog')).toBeVisible();
+    await page.goBack();
+    await expect(page.locator('.ask-dialog')).toHaveCount(0);
+    await expect(page.locator('.lightbox')).toHaveCount(1);
+    await expect(page.locator('.photo-grid .photo')).toHaveCount(1);
+
+    // Das letzte in der Großansicht löschen: Das Album ist leer, zurück zur Übersicht
+    await page.locator('.lb-count').getByRole('button', { name: 'Löschen' }).click();
+    await expect(page.locator('.ask-dialog')).toContainText('1 Bild oder Video löschen?');
+    await askOk(page);
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+    await expect(page).toHaveURL(/#\/galerie$/);
+    // Das leere Album ist durch die Übersicht ersetzt: „Zurück“ führt nicht dorthin.
+    await page.goBack();
+    await expect(page).not.toHaveURL(new RegExp(`#/galerie/${fromId}$`));
+    await page.goto('/app/#/galerie');
+
+    // Übersicht: Album wählen, ins Jahr 2025 setzen, dann löschen
+    await page.locator('.album-card', { hasText: to }).hover();
+    await page.mouse.down();
+    await page.waitForTimeout(700);
+    await page.mouse.up();
+    await expect(page).toHaveURL(/#\/galerie$/);
+    await expect(page.locator('.gallery-select-bar')).toContainText('1 Album gewählt');
+    await page.locator('.gallery-select-bar').getByRole('button', { name: 'Jahr ändern' }).click();
+    await askOk(page, '2025');
+    await expect(page.locator('.toast')).toHaveText('Album ins Jahr 2025 gesetzt');
+    await expect(
+      page.locator('section', { has: page.locator('h2', { hasText: '2025' }) }).locator('.album-card', { hasText: to }),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Alben auswählen' })).toHaveCount(0);
+    await page.locator('.album-card', { hasText: to }).hover();
+    await page.mouse.down();
+    await page.waitForTimeout(700);
+    await page.mouse.up();
+    await page.locator('.gallery-select-bar').getByRole('button', { name: 'Löschen' }).click();
+    await expect(page.locator('.ask-dialog')).toContainText(`Album „${to}“ löschen? Dabei werden 2 Bilder und Videos mitgelöscht.`);
+    await askOk(page);
+    await expect(page.locator('.toast')).toHaveText('Album gelöscht');
+    await expect(page.locator('.album-card', { hasText: to })).toHaveCount(0);
+  } finally {
+    await api(`admin/gallery/albums/${fromId}`, 'DELETE');
+    await api(`admin/gallery/albums/${toId}`, 'DELETE');
+  }
+});
+
 test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)', async ({ page }) => {
   const n = Date.now() % 1000000;
   const title = `Einreichung ${n}`;
@@ -1883,6 +2050,12 @@ test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)',
     return ((await res.json()) as { id: number }).id;
   }, title);
   expect(albumId).toBeGreaterThan(0);
+
+  // Einreichen erst erlauben (Einstellungen → Galerie; neue Installationen: aus)
+  await page.goto('/app/#/einstellungen/galerie');
+  await page.getByLabel(/Einreichen von Bildern und Videos durch Mitglieder erlauben/).check();
+  await page.locator('#einstellungen-galerie').getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
 
   await page.goto('/app/#/galerie');
   await page.getByRole('button', { name: 'Bilder und Videos einreichen' }).click();
@@ -1934,6 +2107,18 @@ test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)',
   await page.goto('/app/#/galerie/einreichen');
   await expect(page.locator('.gallery-upload', { hasText: 'zweites.jpg' })).toContainText('nicht freigegeben: Unscharf');
   await expect(page.locator('.gallery-upload', { hasText: 'foto.jpg' }).filter({ hasText: title })).toContainText('freigegeben');
+
+  // Ausgeschaltet: kein Knopf mehr, das Formular sagt es; eigene Einreichungen bleiben sichtbar
+  await page.goto('/app/#/einstellungen/galerie');
+  await page.getByLabel(/Einreichen von Bildern und Videos durch Mitglieder erlauben/).uncheck();
+  await page.locator('#einstellungen-galerie').getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  await page.goto('/app/#/galerie');
+  await expect(page.getByRole('button', { name: 'Einreichungen prüfen' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Bilder und Videos einreichen' })).toHaveCount(0);
+  await page.goto('/app/#/galerie/einreichen');
+  await expect(page.getByText('Das Einreichen ist zurzeit ausgeschaltet.')).toBeVisible();
+  await expect(page.locator('.gallery-upload', { hasText: 'zweites.jpg' })).toContainText('nicht freigegeben: Unscharf');
 
   // Aufräumen: das Album mit dem freigegebenen Bild löschen
   const status = await page.evaluate(async (id) => {
@@ -2263,8 +2448,8 @@ test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, C
   const count = page.locator('.list-column').last();
   await count.getByLabel('Überschrift').fill('Anzahl Kinder');
   await count.getByLabel('Breite').selectOption('narrow');
-  await page.getByRole('button', { name: '+ Leere Zeile' }).click();
-  await page.getByRole('button', { name: '+ Leere Zeile' }).click();
+  await page.getByRole('button', { name: '+ Zeile' }).click();
+  await page.getByRole('button', { name: '+ Zeile' }).click();
   await page.getByLabel(`Zeile ${members + 1}: Name`).fill('Gast vom Nachbarverein');
   await page.getByRole('button', { name: 'Speichern' }).click();
   await expect(page.locator('.toast')).toHaveText('Gespeichert');
@@ -2334,7 +2519,7 @@ test('Listen: anlegen, Mitglieder aktualisieren, Spalten und Zeilen, Vorschau, C
 
   // Auch im dunklen Modus schwarz auf weiß; Zeilen werden nicht geteilt, der Kopf steht auf jeder Seite (Issue #121).
   // Mit vielen Zeilen über mehrere Seiten (nicht gespeichert, die Druckansicht zeigt den Entwurf).
-  for (let i = 0; i < 8; i++) await page.getByRole('button', { name: '+ 5 leere Zeilen' }).click();
+  for (let i = 0; i < 8; i++) await page.getByRole('button', { name: '+ 5 Zeilen' }).click();
   await page.emulateMedia({ media: 'print', colorScheme: 'dark' });
   const printed = await page.evaluate(() => {
     const css = (sel: string) => getComputedStyle(document.querySelector(sel)!);
@@ -2936,11 +3121,15 @@ test.describe('Vorabladen (Issue #104)', () => {
     page.addInitScript(() => Object.defineProperty(navigator, 'connection', { value: { saveData: true, effectiveType: '4g' } }));
 
   /** API ab jetzt sehr langsam: Was nicht schon vorab da ist, zeigt „Lädt …“ bzw. das Gerüst. */
+  // Nur Anfragen an die API bremsen, nicht Programmteile, deren Name zufällig passt (z. B. galleryIcons-….js)
   const slowApi = (page: Page, re: RegExp) =>
-    page.route(re, async (route) => {
-      await new Promise((r) => setTimeout(r, 8000));
-      await route.continue().catch(() => undefined);
-    });
+    page.route(
+      (url) => re.test(decodeURIComponent(url.toString()).match(API_PATH)?.[1] ?? ''),
+      async (route) => {
+        await new Promise((r) => setTimeout(r, 8000));
+        await route.continue().catch(() => undefined);
+      },
+    );
 
   test('Leerlauf: Die übrigen Tabs sind beim ersten Öffnen sofort da, ohne 403', async ({ page }) => {
     const api = watchApi(page);
@@ -3128,7 +3317,13 @@ test('Admin legt eine eigene Rolle an, vergibt sie und löscht sie wieder', asyn
     .click();
   const rollen = page.locator('#einstellungen-rollen');
   await expect(rollen.locator('.row-title', { hasText: SPIESS })).toBeVisible();
+  // Rollenname in einer Feldbeschriftung in Großbuchstaben: „SPIEẞ“ statt „SPIESS“; das Feld heißt weiter „Spieß“.
+  const gruppen = rollen.locator('.attendance-group-form');
+  await expect(gruppen.getByText('Spieẞ', { exact: true })).toBeVisible();
+  await expect(gruppen.getByLabel(SPIESS)).toBeVisible();
   await expect(rollen.locator('.row-title', { hasText: 'Kasse verwalten' })).toBeVisible(); // Standardrolle des Bereichs
+  // „+ Neue Rolle“ klebt nicht an der letzten Rolle.
+  expect(await gapBetween(rollen.locator('.role-list'), rollen.getByRole('button', { name: '+ Neue Rolle' }))).toBeGreaterThanOrEqual(12);
   await rollen.getByRole('button', { name: '+ Neue Rolle' }).click();
   await rollen.getByLabel('Name der Rolle').fill('Kassenwart');
   await rollen.getByRole('button', { name: /^Kompanie verwalten/ }).click();
@@ -4153,12 +4348,13 @@ test('Fehler melden: Gast und Mitglied, Eingang der Admins (schließen, weiterle
 
   // Admin: Gastmeldung mit Begründung schließen, Meldung des Mitglieds weiterleiten
   await login(page, 'admin', ADMIN_PASSWORD);
-  // Der Knopf trägt die Zahl der offenen Meldungen, z. B. „Fehlermeldungen (2)“.
+  // Der Knopf trägt die Zahl der offenen Meldungen als Zahl im Kreis an der Ecke (mindestens die beiden von oben).
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
-  await page
-    .locator('.admin-tiles')
-    .getByRole('button', { name: /^Fehlermeldungen \(\d+\)$/ })
-    .click();
+  const reportsTile = page.locator('.admin-tiles').getByRole('button', { name: 'Fehlermeldungen', exact: true });
+  await expect(reportsTile.locator('.count-badge')).toHaveText(/^(\d+|99\+)$/);
+  expect(Number((await reportsTile.locator('.count-badge').textContent())?.replace('+', ''))).toBeGreaterThanOrEqual(2);
+  await expect(reportsTile).toHaveAttribute('title', /offene Fehlermeldungen$/);
+  await reportsTile.click();
   const guestCard = page.locator('.report-review', { hasText: guestText });
   await expect(guestCard).toContainText('Ohne Anmeldung');
   await guestCard.getByRole('button', { name: 'Bildschirmfoto anzeigen' }).click();
@@ -6571,6 +6767,8 @@ test('Vorabversionen erhalten: nach dem Bestätigen der Rückfrage wird der Vora
   await box.click();
   await expect(box).not.toBeChecked();
   expect(sent).toEqual([{ channel: 'early' }, { channel: 'stable' }]);
+  // Eine Abfrage des Zustands, die beim Ende des Tests noch läuft, soll ihn nicht rot machen („Response has been disposed“).
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
 });
 
 test('Update-Paket hochladen: in Stücken, Version aus der Datei zeigen, nach Bestätigung einspielen', async ({ page }) => {

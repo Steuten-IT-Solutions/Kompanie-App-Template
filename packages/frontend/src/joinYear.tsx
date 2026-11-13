@@ -6,7 +6,7 @@ import { useState, type FormEvent } from 'react';
 import { api, can, config, type JoinYear, type ProfileVisibility } from './api';
 import { editYearOrDate, formatYearOrDate } from './format';
 import brand from './generated/brand';
-import { ErrorBox, useAsync } from './ui';
+import { Caps, ErrorBox, useAsync } from './ui';
 import { confirmAsk } from './ask';
 
 const sec = brand.labels.sections;
@@ -34,7 +34,9 @@ export function ProfileSelect({
 }) {
   return (
     <label className="field profile-select">
-      <span>Auf meiner Seite unter „{sec.directory}“</span>
+      <span>
+        Auf meiner Seite unter „<Caps text={sec.directory} />“
+      </span>
       <select value={value} disabled={disabled} onChange={(e) => onChange(e.target.value as ProfileVisibility)}>
         {(Object.keys(PROFILE_OPTIONS) as ProfileVisibility[]).map((k) => (
           <option key={k} value={k}>

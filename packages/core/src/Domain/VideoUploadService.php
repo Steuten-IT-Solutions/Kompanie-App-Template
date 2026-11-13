@@ -52,7 +52,10 @@ final class VideoUploadService
         $in = is_array($in) ? $in : [];
         $purpose = in_array($in['purpose'] ?? null, self::PURPOSES, true) ? (string) $in['purpose'] : 'album';
         if (!($purpose === 'album' ? $mayManage : $maySubmit)) {
-            throw ApiError::forbidden($purpose === 'album' ? 'Videos in Alben laden nur Admins hoch.' : 'Du darfst keine Videos einreichen.');
+            throw ApiError::forbidden($purpose === 'album' ? 'Videos in Alben lädt nur hoch, wer die Galerie verwaltet.' : 'Du darfst keine Videos einreichen.');
+        }
+        if ($purpose !== 'album') {
+            $this->app->gallerySubmissions()->assertEnabled();
         }
         $albumId = Input::integer($in['album_id'] ?? null) ?? 0;
         $this->app->gallerySubmissions()->album($albumId);
@@ -147,6 +150,10 @@ final class VideoUploadService
         $in = is_array($in) ? $in : [];
         [$id, $session] = $this->load($user, $in['upload'] ?? null);
         $submission = $session['purpose'] === 'submission';
+        if ($submission) {
+            // Inzwischen ausgeschaltet: das Video nicht mehr als Einreichung aufnehmen (abbrechen räumt es auf)
+            $this->app->gallerySubmissions()->assertEnabled();
+        }
         if ($submission && ($in['consent'] ?? null) !== true) {
             throw ApiError::invalid('Bitte bestätigen, dass du die Rechte an dem Video hast und die erkennbaren Personen einverstanden sind.');
         }

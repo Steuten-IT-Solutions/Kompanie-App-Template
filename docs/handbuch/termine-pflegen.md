@@ -14,7 +14,7 @@ Tippe unten auf **{bereich.events}** und dann oben auf **Öffentliche Termine ve
 ## Was du hier siehst
 - **‹ Zu den Terminen**: zurück zu **{bereich.events}**.
 - **+ Öffentlichen Termin anlegen**: öffnet das Formular für einen neuen Termin.
-- **Kommend und öffentlich**: alle kommenden Termine mit Datum, Uhrzeit und Ort, jeder mit **Bearbeiten** und **Löschen**.
+- **Kommend und öffentlich**: alle kommenden Termine mit Datum, Uhrzeit und Ort, jeder mit den runden Symbolen **Bearbeiten** (Stift) und **Löschen** (Mülleimer).
 
 ## So gehst du vor
 ### Einen Termin anlegen

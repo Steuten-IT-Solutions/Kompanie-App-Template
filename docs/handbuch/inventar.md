@@ -18,7 +18,7 @@ Tippe unten auf **Verwaltung** und dann auf den Knopf **{bereich.inventory}**. G
 - **Die Liste**: Jede Zeile ist ein Material mit der Summe über alle Orte, z. B. „18 Stück“. Darunter steht der Ort oder „an 2 Orten“. Gleiche Bezeichnungen gehören zusammen, auch in anderer Groß- und Kleinschreibung. Verschiedene Einheiten zählt die App nicht zusammen, sondern zeigt sie nebeneinander, z. B. „12 Stück · 3 kg“.
 - **Ein Material antippen**: klappt es auf. Du siehst je Ort die Menge, die Kategorie und die Notiz.
 - **−** und **+**: ändern die Menge an diesem Ort um 1.
-- **Umlagern**, **Bearbeiten**, **Verlauf**, **Löschen**: Knöpfe für den Eintrag an diesem Ort.
+- **Umlagern**, **Bearbeiten** (Stift), **Verlauf** (Uhr), **Löschen** (Mülleimer): Knöpfe für den Eintrag an diesem Ort.
 
 ## So gehst du vor
 ### Material anlegen

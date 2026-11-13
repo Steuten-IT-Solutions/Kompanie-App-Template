@@ -9,6 +9,9 @@ use KompanieApp\Core\Auth\Capability as Cap;
 use KompanieApp\Core\Auth\Preview;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
+use KompanieApp\Core\ChangeLog\Item;
+use KompanieApp\Core\ChangeLog\Subject;
+use KompanieApp\Core\ChangeLog\Subjects;
 use KompanieApp\Core\Domain\AttachmentService;
 use KompanieApp\Core\Domain\BoardService;
 use KompanieApp\Core\Domain\EventService;
@@ -44,12 +47,16 @@ final class Api
     public const PREVIEW_OPEN = ['/auth/logout'];
     /**
      * Zählen nicht als Nutzung (Issue #175): ruft die App von selbst auf (Konfiguration, Abgleich der Benachrichtigungen,
-     * Formular zum Fehlermelden). Die Anmeldung erfasst ihre Route selbst (Aktion login), die Abmeldung gar nicht.
+     * Formular zum Fehlermelden) oder ist Technik des Geräts (Push-Abo an- und abmelden, auch beim Abmelden vom Konto). Die
+     * Anmeldung erfasst ihre Route selbst (Aktion login), die Abmeldung gar nicht.
      */
-    private const NOT_TRACKED = ['/config', '/auth/csrf', '/auth/login', '/auth/logout', '/push/status', '/me/push/status', '/reports/form', '/registration/form'];
+    private const NOT_TRACKED = ['/config', '/auth/csrf', '/auth/login', '/auth/logout', '/push/status', '/me/push/status', '/push', '/me/push', '/reports/form', '/registration/form'];
 
     /** @var Route[]|null */
     private ?array $routes = null;
+    private ?Subjects $changeSubjects = null;
+    /** Läuft gerade eine erfasste Anfrage (track() darin erfasst nichts zusätzlich) */
+    private int $tracking = 0;
 
     public function __construct(private readonly App $app)
     {
@@ -109,10 +116,19 @@ final class Api
                 throw $this->app->maintenance()->error();
             }
             $this->authorize($route);
-            $result = ($route->handler)($request);
+            $changes = $this->routeChangesBefore($route, $request);
+            $this->tracking++;
+            try {
+                $result = ($route->handler)($request);
+            } finally {
+                $this->tracking--;
+            }
             $response = $result instanceof Response ? $result : new Response($result);
             if ($response->status < 400 && !in_array($route->path, self::NOT_TRACKED, true)) {
                 $this->app->activity()->record($this->app->authContext->currentUser(), $route->feature ?? 'app', self::action($route));
+            }
+            if ($response->status < 400 && $changes !== null) {
+                $this->changesAfter($changes, $response->data);
             }
             return $response;
         } catch (ApiError $e) {
@@ -125,6 +141,159 @@ final class Api
             $this->app->telemetry()->record($db ? Code::DbError : Code::ServerError, Detail::of($kind, $route->method, $route->path), Detail::describe($e));
             return Response::error(new ApiError(500, 'internal_error', 'Es ist ein Fehler aufgetreten. Bitte versuche es später erneut.'));
         }
+    }
+
+    /** Erfasste Routen des Änderungsprotokolls (ChangeLog\Subjects) */
+    public function changeSubjects(): Subjects
+    {
+        return $this->changeSubjects ??= new Subjects($this->app, fn (string $path): mixed => $this->getResult($path));
+    }
+
+    /**
+     * Änderung außerhalb einer Route erfassen (WordPress-Einstellungsseite, Rückkehr von Google, Kommandozeile, Aufgaben):
+     * Stand wie bei $subject (Schlüssel „METHODE /pfad“ aus ChangeLog\Subjects oder ein Subject) vor und nach $fn.
+     * $actor null: wer angemeldet ist (sonst nichts erfassen); Text: Urheber ohne Konto (ChangeLogService::SYSTEM, CLI).
+     * Innerhalb einer schon erfassten Anfrage (z. B. WordPress-Hook beim Löschen über die App) entsteht kein zweiter Eintrag.
+     *
+     * @template T
+     * @param \Closure(): T $fn
+     * @return T
+     */
+    public function track(string|Subject $subject, User|string|null $actor, \Closure $fn, ?Request $request = null, ?string $area = null): mixed
+    {
+        $state = $this->beginTrack($subject, $actor, $request, $area);
+        $result = $fn();
+        if ($state !== null) {
+            $this->finishTrack($state, $result);
+        }
+        return $result;
+    }
+
+    /**
+     * Stand vor einer Route (ChangeLog\Subjects); nicht bei GET und ohne Anmeldung.
+     *
+     * @return array{subject: Subject, user: User|string, before: array<string, Item|null>, all: list<string>|null, method: string, path: string, area: string, request: Request}|null
+     */
+    private function routeChangesBefore(Route $route, Request $request): ?array
+    {
+        if ($request->method === 'GET' || $request->method === 'HEAD') {
+            return null;
+        }
+        $subject = $this->changeSubjects()->for($route->method, $route->path);
+        $user = $this->app->authContext->currentUser();
+        if ($subject === null || $user === null) {
+            return null;
+        }
+        return $this->changesBefore($subject, $route->method, $route->path, $request, $user, $route->feature ?? 'app');
+    }
+
+    /**
+     * Erster Teil von track(), wenn vorher und nachher in verschiedenen Aufrufen liegen (WordPress-Hooks).
+     *
+     * @return array{subject: Subject, user: User|string, before: array<string, Item|null>, all: list<string>|null, method: string, path: string, area: string, request: Request}|null
+     */
+    public function beginTrack(string|Subject $subject, User|string|null $actor, ?Request $request = null, ?string $area = null): ?array
+    {
+        $method = 'POST';
+        $path = '';
+        if (is_string($subject)) {
+            [$method, $path] = explode(' ', $subject, 2) + [1 => ''];
+        }
+        $actor ??= $this->app->authContext->currentUser();
+        if ($this->tracking > 0 || $actor === null) {
+            return null;
+        }
+        $sub = is_string($subject) ? $this->changeSubjects()->for($method, $path) : $subject;
+        if ($sub === null) {
+            return null;
+        }
+        return $this->changesBefore($sub, $method, $path, $request ?? new Request($method, $path), $actor, $area ?? 'app');
+    }
+
+    /**
+     * Zweiter Teil von track().
+     *
+     * @param array{subject: Subject, user: User|string, before: array<string, Item|null>, all: list<string>|null, method: string, path: string, area: string, request: Request} $state
+     */
+    public function finishTrack(array $state, mixed $result = null): void
+    {
+        $this->changesAfter($state, $result);
+    }
+
+    /**
+     * Änderungsprotokoll: Stand der betroffenen Einträge vor dem Ausführen. null, wenn das Protokoll aus ist oder in der
+     * Vorschau. Fehler hier halten die Anfrage nicht auf.
+     *
+     * @return array{subject: Subject, user: User|string, before: array<string, Item|null>, all: list<string>|null, method: string, path: string, area: string, request: Request}|null
+     */
+    private function changesBefore(Subject $subject, string $method, string $path, Request $request, User|string $user, string $area): ?array
+    {
+        try {
+            // Auch das Einschalten des Protokolls selbst kommt hinein.
+            if (($user instanceof User && $user->preview) || (!$this->app->changeLog()->enabled() && $path !== '/admin/changes/settings')) {
+                return null;
+            }
+            $this->changeSubjects()->reset();
+            $before = $subject->loadAll(array_values(array_unique(array_map('strval', ($subject->ids)($request, null)))));
+            $all = $subject->all !== null ? ($subject->all)() : null;
+            return ['subject' => $subject, 'user' => $user, 'before' => $before, 'all' => $all, 'method' => $method, 'path' => $path, 'area' => $area, 'request' => $request];
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Stand für das Änderungsprotokoll nicht gelesen: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Änderungsprotokoll nach dem Ausführen: Stand danach laden und je Eintrag festhalten (angelegt, geändert, gelöscht).
+     *
+     * @param array{subject: Subject, user: User|string, before: array<string, Item|null>, all: list<string>|null, method: string, path: string, area: string, request: Request} $state
+     */
+    private function changesAfter(array $state, mixed $result): void
+    {
+        try {
+            $subject = $state['subject'];
+            $request = $state['request'];
+            $ids = [...array_keys($state['before']), ...($subject->ids)($request, $result)];
+            if ($state['all'] !== null && $subject->all !== null) {
+                $ids = [...$ids, ...array_diff(($subject->all)(), $state['all'])];
+            }
+            // Ein Platzhalter am Ende der Adresse ({id}, {key}): DELETE löscht den Eintrag (auch wenn er nur als gelöscht
+            // markiert bleibt); DELETE auf einen Teil (…/{id}/photo) ändert ihn.
+            $whole = preg_match('#/\{[a-z]+\}$#', $state['path']) === 1;
+            $ids = array_values(array_unique(array_map('strval', $ids)));
+            $this->changeSubjects()->reset();
+            $afters = $subject->event === 'delete' ? [] : $subject->loadAll($ids);
+            $changes = [];
+            foreach ($ids as $id) {
+                $before = $state['before'][$id] ?? null;
+                $after = $afters[$id] ?? null;
+                if ($subject->secretField !== null && $before !== null && $after !== null) {
+                    $before = new Item($before->type, $before->id, $before->label, $before->fields + [$subject->secretField => '0'], $before->personal, [...$before->secret, $subject->secretField], $before->subject);
+                    $after = new Item($after->type, $after->id, $after->label, $after->fields + [$subject->secretField => '1'], $after->personal, [...$after->secret, $subject->secretField], $after->subject);
+                }
+                $action = $subject->event ?? match (true) {
+                    $before === null => 'create',
+                    $after === null, $state['method'] === 'DELETE' && $whole => 'delete',
+                    default => 'update',
+                };
+                $changes[] = [$action, $before, $after, $subject->event !== null];
+            }
+            $this->app->changeLog()->recordMany($state['user'], $state['area'], $changes);
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Änderung nicht protokolliert: ' . $e->getMessage());
+        }
+    }
+
+    /** Antwort einer GET-Route ohne Prüfung und Erfassung (Stand von Einstellungen für das Änderungsprotokoll). */
+    private function getResult(string $path): mixed
+    {
+        foreach ($this->routes() as $route) {
+            if ($route->method === 'GET' && $route->path === $path) {
+                $result = ($route->handler)(new Request('GET', $path));
+                return $result instanceof Response ? $result->data : $result;
+            }
+        }
+        return null;
     }
 
     /** Art der Nutzung einer Route für die Nutzungsauswertung (Domain\ActivityService::ACTIONS). */
@@ -556,6 +725,8 @@ final class Api
             // für alle, die freigeben (Zähler in der Verwaltung), sonst null
             'registration' => $a->registrations()->enabled(),
             'pendingRegistrations' => $user !== null && $this->can(Cap::CreateUsers) ? $a->registrations()->countPending() : null,
+            // Einreichen von Bildern und Videos erlaubt (Einstellungen → Galerie): sonst kein Knopf „einreichen“
+            'gallerySubmissions' => ($features['gallery'] ?? false) && $a->gallerySubmissions()->enabled(),
             // Impressum und Datenschutzerklärung der Kompanie (Einstellungen → Impressum und Datenschutz): für alle, auch Gäste
             'legal' => self::legalLinks($a->settingsService()->legal()),
             // Handbuch auf GitHub Pages der Kompanie: neben updates.json (Issue #12)
@@ -802,18 +973,25 @@ final class Api
                 $a->gallerySubmissions()->withdraw($this->user(), $r->id());
                 return ['deleted' => true];
             }, 'gallery'),
-            // Videos in Stücken hochladen (Issue #350): ins Album (manage_settings) oder als Einreichung (submit_gallery)
-            new Route('POST', '/gallery/video-uploads', [Cap::ManageSettings, Cap::SubmitGallery], fn (Request $r) => Response::created(
-                $a->videoUploads()->start($this->user(), $r->body, $this->can(Cap::ManageSettings), $this->can(Cap::SubmitGallery)),
+            // Videos in Stücken hochladen (Issue #350): ins Album (manage_gallery) oder als Einreichung (submit_gallery)
+            new Route('POST', '/gallery/video-uploads', [Cap::ManageSettings, Cap::ManageGallery, Cap::SubmitGallery], fn (Request $r) => Response::created(
+                $a->videoUploads()->start($this->user(), $r->body, $this->can(Cap::ManageSettings) || $this->can(Cap::ManageGallery), $this->can(Cap::SubmitGallery)),
             ), 'gallery'),
-            new Route('POST', '/gallery/video-uploads/chunk', [Cap::ManageSettings, Cap::SubmitGallery], fn (Request $r) => $a->videoUploads()->chunk($this->user(), $r->input('upload'), $r->input('offset'), $r->input('data')), 'gallery'),
-            new Route('POST', '/gallery/video-uploads/finish', [Cap::ManageSettings, Cap::SubmitGallery], fn (Request $r) => Response::created($a->videoUploads()->finish($this->user(), $r->body)), 'gallery'),
-            new Route('POST', '/gallery/video-uploads/cancel', [Cap::ManageSettings, Cap::SubmitGallery], function (Request $r) use ($a) {
+            new Route('POST', '/gallery/video-uploads/chunk', [Cap::ManageSettings, Cap::ManageGallery, Cap::SubmitGallery], fn (Request $r) => $a->videoUploads()->chunk($this->user(), $r->input('upload'), $r->input('offset'), $r->input('data')), 'gallery'),
+            new Route('POST', '/gallery/video-uploads/finish', [Cap::ManageSettings, Cap::ManageGallery, Cap::SubmitGallery], fn (Request $r) => Response::created($a->videoUploads()->finish($this->user(), $r->body)), 'gallery'),
+            new Route('POST', '/gallery/video-uploads/cancel', [Cap::ManageSettings, Cap::ManageGallery, Cap::SubmitGallery], function (Request $r) use ($a) {
                 $a->videoUploads()->cancel($this->user(), $r->input('upload'));
                 return ['cancelled' => true];
             }, 'gallery'),
             // Hochgeladene Bilder und Videos nachträglich intern oder öffentlich stellen (Alben, Prüfen, Großansicht)
-            new Route('PATCH', '/gallery/photos/{id}', [Cap::ManageSettings, Cap::ReviewGallery], fn (Request $r) => $a->galleryUploads()->setIntern($r->id(), $r->input('intern')), 'gallery'),
+            new Route('PATCH', '/gallery/photos/{id}', [Cap::ManageSettings, Cap::ManageGallery, Cap::ReviewGallery], fn (Request $r) => $a->galleryUploads()->setIntern($r->id(), $r->input('intern')), 'gallery'),
+            // Hochgeladene Bilder und Videos verschieben oder löschen, mehrere auf einmal (manage_gallery)
+            new Route('GET', '/gallery/albums', [Cap::ManageSettings, Cap::ManageGallery], fn () => ['albums' => array_map(
+                static fn (array $al): array => ['id' => $al['id'], 'title' => $al['title'], 'year' => $al['year'], 'source' => $al['source']],
+                $a->galleryUploads()->albums(),
+            )], 'gallery'),
+            new Route('POST', '/gallery/photos/move', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => $a->galleryUploads()->movePhotos($r->input('ids'), $r->input('album_id')), 'gallery'),
+            new Route('POST', '/gallery/photos/delete', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => $a->galleryUploads()->deletePhotos($r->input('ids'), $this->user()), 'gallery'),
             new Route('GET', '/gallery/review', Cap::ReviewGallery, fn () => $a->gallerySubmissions()->review(), 'gallery'),
             new Route('POST', '/gallery/review/{id}/approve', Cap::ReviewGallery, fn (Request $r) => $a->gallerySubmissions()->approve($this->user(), $r->id(), Input::bool($r->input('intern'))), 'gallery'),
             new Route('POST', '/gallery/review/{id}/reject', Cap::ReviewGallery, fn (Request $r) => $a->gallerySubmissions()->reject($this->user(), $r->id(), $r->input('reason')), 'gallery'),
@@ -1295,6 +1473,9 @@ final class Api
             new Route('GET', '/admin/activity', Cap::ViewActivity, fn (Request $r) => $a->activity()->overview($r->query['from'] ?? null, $r->query['to'] ?? null), null, $denySettings),
             new Route('GET', '/admin/activity/entries', Cap::ViewActivity, fn (Request $r) => $a->activity()->entries($r->query['from'] ?? null, $r->query['to'] ?? null, $r->query['user_id'] ?? null), null, $denySettings),
             new Route('PUT', '/admin/activity/settings', Cap::ManageSettings, fn (Request $r) => ['personal' => $a->activity()->setPersonal($r->input('personal'))], null, $denySettings),
+            // Änderungsprotokoll (Domain\ChangeLogService): ansehen mit view_changes, ein/aus und Frist mit den Einstellungen
+            new Route('GET', '/admin/changes', Cap::ViewChanges, fn (Request $r) => $a->changeLog()->entries($this->user(), $r->query['from'] ?? null, $r->query['to'] ?? null, $r->query['user_id'] ?? null, $r->query['subject_id'] ?? null, $r->query['area'] ?? null), null, $denyRights),
+            new Route('PUT', '/admin/changes/settings', Cap::ManageSettings, fn (Request $r) => $a->changeLog()->updateSettings($r->body), null, $denySettings),
             new Route('GET', '/admin/maintenance', Cap::ManageSettings, fn () => $a->maintenance()->state() + ['log' => $a->maintenance()->log()], null, $denySettings),
             new Route('POST', '/admin/maintenance', Cap::ManageSettings, fn (Request $r) => $a->maintenance()->set($r->input('on'), $r->body['reason'] ?? null, $this->user()) + ['log' => $a->maintenance()->log()], null, $denySettings),
             new Route('GET', '/admin/navigation', Cap::ManageSettings, fn () => $a->navigation()->describe(), null, $denySettings),
@@ -1364,19 +1545,19 @@ final class Api
             new Route('POST', '/admin/gallery/retry', Cap::ManageSettings, fn () => ['retried' => $a->gallery()->retryFailedNow(), 'pending' => $a->gallery()->countPending()], null, $denySettings),
             new Route('POST', '/admin/gallery/sync', Cap::ManageSettings, fn (Request $r) => $a->settingsService()->syncGallery(Input::bool($r->input('only_process'))), null, $denySettings),
             // Alben der App und hochgeladene Bilder (Issue #285)
-            new Route('GET', '/admin/gallery/albums', Cap::ManageSettings, fn () => ['albums' => $a->galleryUploads()->albums()], null, $denySettings),
-            new Route('POST', '/admin/gallery/albums', Cap::ManageSettings, fn (Request $r) => Response::created($a->galleryUploads()->createAlbum($r->body)), null, $denySettings),
-            new Route('GET', '/admin/gallery/albums/{id}', Cap::ManageSettings, fn (Request $r) => $a->galleryUploads()->album($r->id()), null, $denySettings),
-            new Route('PATCH', '/admin/gallery/albums/{id}', Cap::ManageSettings, fn (Request $r) => $a->galleryUploads()->updateAlbum($r->id(), $r->body), null, $denySettings),
-            new Route('DELETE', '/admin/gallery/albums/{id}', Cap::ManageSettings, function (Request $r) use ($a) {
+            new Route('GET', '/admin/gallery/albums', [Cap::ManageSettings, Cap::ManageGallery], fn () => ['albums' => $a->galleryUploads()->albums()], null, $denyRights),
+            new Route('POST', '/admin/gallery/albums', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => Response::created($a->galleryUploads()->createAlbum($r->body)), null, $denyRights),
+            new Route('GET', '/admin/gallery/albums/{id}', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => $a->galleryUploads()->album($r->id()), null, $denyRights),
+            new Route('PATCH', '/admin/gallery/albums/{id}', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => $a->galleryUploads()->updateAlbum($r->id(), $r->body), null, $denyRights),
+            new Route('DELETE', '/admin/gallery/albums/{id}', [Cap::ManageSettings, Cap::ManageGallery], function (Request $r) use ($a) {
                 $a->galleryUploads()->deleteAlbum($r->id());
                 return ['deleted' => true];
-            }, null, $denySettings),
-            new Route('POST', '/admin/gallery/albums/{id}/photos', Cap::ManageSettings, fn (Request $r) => Response::created($a->galleryUploads()->upload($r->id(), $r->input('file'), Input::bool($r->input('intern')))), null, $denySettings),
-            new Route('DELETE', '/admin/gallery/photos/{id}', Cap::ManageSettings, function (Request $r) use ($a) {
+            }, null, $denyRights),
+            new Route('POST', '/admin/gallery/albums/{id}/photos', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => Response::created($a->galleryUploads()->upload($r->id(), $r->input('file'), Input::bool($r->input('intern')))), null, $denyRights),
+            new Route('DELETE', '/admin/gallery/photos/{id}', [Cap::ManageSettings, Cap::ManageGallery], function (Request $r) use ($a) {
                 $a->galleryUploads()->deletePhoto($r->id(), $this->user());
                 return ['deleted' => true];
-            }, null, $denySettings),
+            }, null, $denyRights),
 
             // Status, Updates, Datensicherung, Einrichtung (Admins)
             new Route('GET', '/admin/status', Cap::ManageSettings, fn () => $a->status()->report() + [
@@ -1524,6 +1705,28 @@ final class Api
                     throw $e instanceof ApiError ? $e : new ApiError(502, 'upload_failed', $e->getMessage());
                 }
             }, null, $denySettings),
+            // Sicherungen auf dem eigenen Server: wöchentlich (Schalter), Liste mit Herunterladen (<App>/sicherung?datei=…),
+            // Wiederherstellen und Löschen
+            new Route('GET', '/admin/backup/server', Cap::ManageSettings, fn () => $a->serverBackup()->status(), null, $denySettings),
+            new Route('PUT', '/admin/backup/server', Cap::ManageSettings, function (Request $r) use ($a) {
+                $status = $a->serverBackup()->setEnabled(Input::bool($r->input('enabled')));
+                $a->scheduleTasks();
+                return $status;
+            }, null, $denySettings),
+            new Route('POST', '/admin/backup/server/create', Cap::ManageSettings, function () use ($a) {
+                try {
+                    return $a->serverBackup()->create();
+                } catch (\RuntimeException $e) {
+                    throw $e instanceof ApiError ? $e : new ApiError(500, 'backup_failed', $e->getMessage());
+                }
+            }, null, $denySettings),
+            new Route('POST', '/admin/backup/server/restore', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->serverBackup()->restore($r->input('id'), Input::bool($r->input('confirm')));
+                // wie POST /admin/backup: Bereiche und Verbindungen kommen aus der Sicherung
+                $a->settings->set(self::SETUP_SETTING, true);
+                return ['restored' => true];
+            }, null, $denySettings),
+            new Route('POST', '/admin/backup/server/delete', Cap::ManageSettings, fn (Request $r) => $a->serverBackup()->delete($r->input('id')), null, $denySettings),
             new Route('POST', '/admin/setup/done', Cap::ManageSettings, function () use ($a) {
                 $a->settings->set(self::SETUP_SETTING, true);
                 return ['done' => true];

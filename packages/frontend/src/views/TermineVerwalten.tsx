@@ -5,6 +5,7 @@ import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { confirmAsk } from '../ask';
+import { IconButton } from '../icons';
 
 const EMPTY: EventInput = {
   title: '',
@@ -195,13 +196,9 @@ export default function TermineVerwalten({ onToast, internal = false }: { onToas
                   {formatEventWhen(ev)}
                   {ev.location && ` · ${ev.location}`}
                 </div>
-                <div className="row-actions">
-                  <button className="btn btn-small btn-secondary" onClick={() => startEdit(ev)}>
-                    Bearbeiten
-                  </button>
-                  <button className="btn btn-small btn-danger" onClick={() => remove(ev)}>
-                    Löschen
-                  </button>
+                <div className="row-actions icon-row">
+                  <IconButton icon="edit" label="Bearbeiten" onClick={() => startEdit(ev)} />
+                  <IconButton icon="delete" label="Löschen" variant="danger" onClick={() => remove(ev)} />
                 </div>
               </div>
             </li>

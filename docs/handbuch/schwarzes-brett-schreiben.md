@@ -14,7 +14,7 @@ Tippe unten auf **Verwaltung** und dann auf **{bereich.board}**. Ist das deine e
 ## Was du hier siehst
 - **‹ Verwaltung**: zurück zur Startseite der Verwaltung (nur, wenn du dort mehrere Aufgaben hast).
 - **Neue Nachricht**: das Feld **Titel** und darunter der **Inhalt** aus Blöcken: zuerst ein Textblock mit der Werkzeugleiste zum Gestalten, mit **+ Block einfügen** weitere Blöcke. Dann **Anhänge** mit **Datei anhängen**, die Auswahl **Sichtbar für**, das Feld **Sichtbar bis**, die Haken **Benachrichtigung senden** und **E-Mail senden** und der Knopf **Veröffentlichen**.
-- **Aktuelle Nachrichten**: alle Nachrichten, die gerade stehen, öffentliche mit dem Hinweis **öffentlich**, die für {bereich.companies} oder Personen mit **nur …** und den Namen, mit **Sichtbar bis**, **Bearbeiten**, **Löschen** und **Verlauf**. Darunter steht, wer die Nachricht zuletzt wann geändert hat und wie weit der Mailversand ist.
+- **Aktuelle Nachrichten**: alle Nachrichten, die gerade stehen, öffentliche mit dem Hinweis **öffentlich**, die für {bereich.companies} oder Personen mit **nur …** und den Namen, mit **Sichtbar bis** und den runden Symbolen **Bearbeiten** (Stift), **Löschen** (Mülleimer) und **Verlauf** (Uhr). Darunter steht, wer die Nachricht zuletzt wann geändert hat und wie weit der Mailversand ist.
 - **Verlauf: abgelaufene und gelöschte Nachrichten**: Nachrichten der letzten 30 Tage, die abgelaufen sind oder jemand gelöscht hat, mit ihrem Verlauf.
 - **Laufende {bereich.polls}**: wie bei allen {rolle.member}n, wenn die {kompanie.name} {bereich.polls} nutzt; darunter **Beendete {bereich.polls}** und, wenn du {bereich.polls} verwalten darfst, **{bereich.polls} verwalten**.
 

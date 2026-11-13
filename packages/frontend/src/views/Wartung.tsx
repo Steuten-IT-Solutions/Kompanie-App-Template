@@ -7,17 +7,22 @@ import {
   type AdminStatus,
   type BackupDriveStatus,
   type BackupEncryptionStatus,
+  type BackupServerStatus,
+  type ServerBackupFile,
   type ErrorLogEntry,
   type UpdateProgress,
   type UpdateStatus,
   type UpdateStep,
 } from '../api';
 import { filePayload, isEncryptedFile } from '../backupFile';
+import { uploadStatsText } from '../backupUploadStats';
 import brand from '../generated/brand';
 import { ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { confirmAsk } from '../ask';
 import { UPDATE_ACCEPT, uploadUpdatePackage } from '../updateUpload';
+import { IconButton } from '../icons';
+import { serverBackupLabel, serverBackupUrl } from '../serverBackup';
 
 /**
  * Wartung für Admins: Ampel (Status), Updates mit Zurückrollen, Statusmeldungen (nur mit
@@ -697,6 +702,7 @@ function DatensicherungSeite({ onToast, onChanged }: { onToast: (msg: string) =>
       )}
       {/* key: nach einer Änderung am Passwort den Zustand von Drive neu laden (verschlüsselt oder nicht) */}
       <DriveSicherung key={String(e?.configured)} onToast={onToast} noSodium={e?.available === false} />
+      <ServerSicherung onToast={onToast} onChanged={onChanged} />
     </>
   );
 }
@@ -833,7 +839,7 @@ function Datensicherung({
       <input
         ref={fileInput}
         type="file"
-        accept="application/json,application/octet-stream,.json,.enc"
+        accept="application/json,application/octet-stream,application/gzip,.json,.enc,.gz"
         hidden
         onChange={(e) => void restore(e)}
       />
@@ -1140,6 +1146,7 @@ function DriveSicherung({ onToast, noSodium }: { onToast: (msg: string) => void;
           )}
         </p>
       )}
+      {d.enabled && d.last_upload && <p className="small">Letztes Hochladen: {uploadStatsText(d.last_upload)}</p>}
       {d.enabled && d.error && (
         <p className="form-error" role="alert">
           Letzter Versuch ({date(d.last_try)}) fehlgeschlagen: {d.error}
@@ -1158,6 +1165,149 @@ function DriveSicherung({ onToast, noSodium }: { onToast: (msg: string) => void;
         </div>
       )}
       {actionError && !(d.enabled && d.error === actionError) && (
+        <p className="form-error" role="alert">
+          {actionError}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Sicherungen automatisch auf dem eigenen Server (wöchentlich, die letzten vier bleiben) und die Liste aller Sicherungen
+ * dort (auch die vor Updates) zum Herunterladen, Wiederherstellen und Löschen.
+ */
+function ServerSicherung({ onToast, onChanged }: { onToast: (msg: string) => void; onChanged: () => void }) {
+  const { data, error, loading, reload } = useAsync(() => api.backupServer(), [], 'admin/backup/server');
+  const [state, setState] = useState<BackupServerStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  if (loading && !data) return <Loading shape="form" />;
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+  const d = state ?? data!;
+  if (!d.available) return null;
+
+  async function run(fn: () => Promise<BackupServerStatus>, done?: string) {
+    setBusy(true);
+    setActionError(null);
+    try {
+      setState(await fn());
+      if (done) onToast(done);
+      onChanged(); // Ampel
+    } catch (err) {
+      setActionError((err as Error).message);
+      setState(await api.backupServer().catch(() => d));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function download(f: ServerBackupFile) {
+    if (!config?.backupUrl) return;
+    const a = document.createElement('a');
+    a.href = serverBackupUrl(config.backupUrl, f.id);
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    onToast('Sicherung wird heruntergeladen');
+  }
+
+  async function restore(f: ServerBackupFile) {
+    const { title } = serverBackupLabel(f);
+    if (
+      !(await confirmAsk(
+        `Alle Daten der App durch die Sicherung „${title}“ ersetzen? Das lässt sich nur mit einer anderen Sicherung rückgängig machen.`,
+      ))
+    )
+      return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await api.restoreBackupServer(f.id);
+      onToast('Sicherung wiederhergestellt');
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err) {
+      setActionError((err as Error).message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card settings-section" aria-labelledby="backup-server-title">
+      <h3 id="backup-server-title">Sicherungen auf dem Server</h3>
+      <p className="small">
+        Die App legt die Sicherungen in einem geschützten Ordner auf dem eigenen Webspace ab, unverschlüsselt wie die Sicherungen vor
+        Updates. Das hilft, wenn Daten versehentlich gelöscht oder geändert wurden. Geht der Server verloren, sind sie mit ihm weg: Lade
+        deshalb trotzdem ab und zu eine Sicherung herunter oder schalte die Sicherungen in Google Drive ein.
+      </p>
+      <label className="toggle">
+        <input
+          type="checkbox"
+          checked={d.enabled}
+          disabled={busy}
+          onChange={(e) => {
+            const on = e.target.checked;
+            void run(
+              () => api.setBackupServer(on),
+              on ? 'Sicherungen auf dem Server eingeschaltet' : 'Sicherungen auf dem Server ausgeschaltet',
+            );
+          }}
+        />
+        <span>Wöchentlich auf dem Server sichern (die letzten {d.keep} bleiben)</span>
+      </label>
+      {d.enabled && <p className="small">Letzte Sicherung auf dem Server: {date(d.last_ok)}</p>}
+      {d.error && (
+        <p className="form-error" role="alert">
+          Letzter Versuch ({date(d.last_try)}) fehlgeschlagen: {d.error}
+        </p>
+      )}
+      <div className="button-row">
+        <button
+          type="button"
+          className="btn btn-secondary"
+          disabled={busy}
+          onClick={() => void run(() => api.createBackupServer(), 'Sicherung auf dem Server abgelegt')}
+        >
+          {busy ? 'Sichert …' : 'Jetzt auf dem Server sichern'}
+        </button>
+      </div>
+      {d.files.length === 0 ? (
+        <p className="small muted">Noch keine Sicherungen auf dem Server.</p>
+      ) : (
+        <ul className="server-backups">
+          {d.files.map((f) => {
+            const { title, sub } = serverBackupLabel(f);
+            return (
+              <li key={f.id} className="card row">
+                <div className="row-main">
+                  <div className="row-title">{title}</div>
+                  <div className="row-sub">{sub}</div>
+                  <div className="row-actions">
+                    {config?.backupUrl && <IconButton icon="download" label="Herunterladen" disabled={busy} onClick={() => download(f)} />}
+                    {d.can_restore && (
+                      <button type="button" className="btn btn-small btn-secondary" disabled={busy} onClick={() => void restore(f)}>
+                        Wiederherstellen
+                      </button>
+                    )}
+                    <IconButton
+                      icon="delete"
+                      label="Löschen"
+                      variant="danger"
+                      disabled={busy}
+                      onClick={async () =>
+                        (await confirmAsk(`Die Sicherung „${title}“ vom Server löschen?`)) &&
+                        void run(() => api.deleteBackupServer(f.id), 'Sicherung gelöscht')
+                      }
+                    />
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {actionError && !(d.error === actionError) && (
         <p className="form-error" role="alert">
           {actionError}
         </p>

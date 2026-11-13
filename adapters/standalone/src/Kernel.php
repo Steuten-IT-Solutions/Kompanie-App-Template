@@ -44,7 +44,8 @@ use KompanieApp\Core\Storage\Sql\PdoConnection;
  *   /kompanielogo/<id>?v=…   Logo einer Kompanie (index.php?r=/kompanielogo/…&v=…)
  *   /bild/<kennung>          Bild in formatiertem Inhalt (index.php?r=/bild/…)
  *   /anhang/<kennung>        Dateianhang (index.php?r=/anhang/…), immer als Download
- *   /sicherung               Datensicherung herunterladen, nur Admins (index.php?r=/sicherung)
+ *   /sicherung               Datensicherung herunterladen, nur Admins (index.php?r=/sicherung);
+ *                            ?datei=<Name> eine Sicherung, die auf dem Server liegt
  *   /cron?key=…              Aufgaben         (index.php?r=/cron&key=…)
  *   /google/callback         Rückkehr von Google („Mit Google verbinden“, index.php?r=/google/callback)
  */
@@ -363,7 +364,7 @@ final class Kernel
             $this->sendBody($app->richImages()->forDelivery($app->authContext->currentUser(), $m[1]));
         } elseif ($path === '/sicherung') {
             $app = $this->app();
-            $this->sendBody($app->backupDownload()->forDelivery($app->authContext->currentUser(), ($_GET['verschluesselt'] ?? '') === '1'));
+            $this->sendBody($app->backupDownload()->forDelivery($app->authContext->currentUser(), ($_GET['verschluesselt'] ?? '') === '1', is_string($_GET['datei'] ?? null) ? $_GET['datei'] : null));
         } elseif (preg_match('#^/anhang/([a-f0-9]{32})$#', $path, $m)) {
             $this->beginPreview();
             $app = $this->app();

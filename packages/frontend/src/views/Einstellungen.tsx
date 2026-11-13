@@ -6,6 +6,7 @@ import {
   config,
   applyBirthdayUpcomingDays,
   applyFeatures,
+  applyGallerySubmissions,
   applyRegistration,
   registrationRoles,
   newsTitle,
@@ -20,7 +21,7 @@ import {
   type NewsSourceType,
   type PushAdmin,
 } from '../api';
-import { EmailField, ErrorBox, Loading, useAsync } from '../ui';
+import { Caps, EmailField, ErrorBox, Loading, useAsync } from '../ui';
 import { normalizeEmail } from '../email';
 import Neuerungen from './Neuerungen';
 import NavigationEinstellen from './NavigationEinstellen';
@@ -33,6 +34,7 @@ import { navigate } from '../router';
 import { formatBytes, formatUntil } from '../format';
 import { menuSources, prefetchOnTap, sources, usePrefetchMenu } from '../viewData';
 import { confirmAsk } from '../ask';
+import { IconButton } from '../icons';
 
 const sec = brand.labels.sections;
 
@@ -435,7 +437,9 @@ function BirthdaySettingsSection({ onToast }: { onToast: (msg: string) => void }
     <section className="card settings-section" id="einstellungen-geburtstage">
       <h3>{sec.birthdays}</h3>
       <label className="field">
-        <span>Anstehende {sec.birthdays} anzeigen</span>
+        <span>
+          Anstehende <Caps text={sec.birthdays} /> anzeigen
+        </span>
         <select value={data!.upcoming_days} disabled={busy} onChange={(e) => save(Number(e.target.value))}>
           {Array.from({ length: UPCOMING_DAYS_MAX + 1 }, (_, d) => (
             <option key={d} value={d}>
@@ -913,14 +917,19 @@ export function GoogleAccess({ settings, onSaved, onToast }: SectionProps) {
           {result.message}
         </p>
       )}
-      <label className="field">
-        <span>Weiterleitungs-URI (im OAuth-Client bei Google eintragen)</span>
-        <input type="text" readOnly value={g.redirect_uri} onFocus={(e) => e.currentTarget.select()} />
-      </label>
-      <div className="button-row">
-        <button type="button" className="btn btn-secondary" onClick={copy}>
-          Adresse kopieren
-        </button>
+      <div className="field">
+        <span id="google-redirect-label">Weiterleitungs-URI (im OAuth-Client bei Google eintragen)</span>
+        {/* Kopieren als Symbol direkt neben dem Feld */}
+        <div className="copy-field">
+          <input
+            type="text"
+            readOnly
+            aria-labelledby="google-redirect-label"
+            value={g.redirect_uri}
+            onFocus={(e) => e.currentTarget.select()}
+          />
+          <IconButton icon="copy" label="Adresse kopieren" onClick={() => void copy()} />
+        </div>
       </div>
       {g.connected ? (
         <div className="small">
@@ -1244,7 +1253,7 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
         </label>
       )}
       {c.source !== 'none' && c.source !== 'app' && external && (
-        <div className="button-row">
+        <div className="button-row single">
           <button type="button" className="btn btn-secondary" onClick={test} disabled={testing}>
             {testing ? 'Prüft …' : 'Kalender testen'}
           </button>
@@ -1274,6 +1283,11 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
   const [root, setRoot] = useState(g.root);
   const [source, setSource] = useState<GallerySourceType>(g.source ?? 'drive');
   const [downloads, setDownloads] = useState(!!g.downloads);
+  const [submissions, setSubmissions] = useState(!!g.submissions);
+  // Gespeicherten Haken „Einreichen erlauben“ übernehmen: Knopf „einreichen“ in der Galerie
+  useEffect(() => {
+    if (g.submissions !== undefined) applyGallerySubmissions(g.submissions);
+  }, [g.submissions]);
   const [progress, setProgress] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const { busy, error, setError, save } = useSave(onSaved, onToast);
@@ -1327,6 +1341,7 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
                 gallery_store: 'server',
                 ...(source === 'drive' ? { gallery_root: root.trim() } : {}),
                 ...(g.downloads !== undefined ? { gallery_downloads: downloads ? '1' : '0' } : {}),
+                ...(g.submissions !== undefined ? { gallery_submissions: submissions ? '1' : '0' } : {}),
               },
         );
       }}
@@ -1386,6 +1401,18 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
             <span className="small muted feature-desc">
               Wer die {sec.gallery} sieht, kann dann jedes Bild und Video in der Großansicht und jedes Album als ZIP herunterladen (Bilder
               in Originalauflösung, Videos unverändert).
+            </span>
+          </span>
+        </label>
+      )}
+      {g.submissions !== undefined && (
+        <label className="toggle feature-toggle">
+          <input type="checkbox" checked={submissions} onChange={(e) => setSubmissions(e.target.checked)} />
+          <span>
+            Einreichen von Bildern und Videos durch Mitglieder erlauben
+            <span className="small muted feature-desc">
+              Wer das Recht „Bilder und Videos einreichen“ hat, kann dann Bilder und Videos für die {sec.gallery} einreichen. Sie erscheinen
+              erst, wenn jemand sie unter „Einreichungen prüfen“ freigibt.
             </span>
           </span>
         </label>

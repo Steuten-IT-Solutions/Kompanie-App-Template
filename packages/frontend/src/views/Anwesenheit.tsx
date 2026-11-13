@@ -12,7 +12,7 @@ import {
 import { formatDate, formatEventWhen, roleCount, todayYmd } from '../format';
 import brand from '../generated/brand';
 import { navigate } from '../router';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { Caps, Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { prefetchOnTap, sources } from '../viewData';
 import { confirmAsk } from '../ask';
 
@@ -320,7 +320,7 @@ function Editor({
         <div className="button-row attendance-book">
           {points && (
             <button className="btn" disabled={busy || toBook === 0} onClick={() => saveAndGo('punkte')}>
-              {sec.points} für {toBook} {toBook === 1 ? 'Anwesenden' : 'Anwesende'}
+              <Caps text={sec.points} /> für {toBook} {toBook === 1 ? 'Anwesenden' : 'Anwesende'}
             </button>
           )}
           {penalties && (

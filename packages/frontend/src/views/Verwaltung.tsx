@@ -25,6 +25,7 @@ import { batchFrom, neighbors, prefetchOrder, usePrefetchChain, useSwipeDrag } f
 import { AdminBack, AdminMenu, adminTabs, setupTabs } from '../adminNav';
 import {
   AddressFields,
+  Caps,
   DateRow,
   emptyName,
   EmailField,
@@ -105,6 +106,7 @@ import { FORMER_SORTS, FormerImport, FormerList, FormerPanel, NewFormer, REASON_
 import { MemberImport } from './MitgliederImport';
 import { Anfragen } from './Anfragen';
 import { Meldungen } from './Meldungen';
+import { Aenderungen } from './Aenderungen';
 import { newlyDue } from '../promotionCheck';
 import { promotionsAllowed, refreshPromotions, setReached, useReached } from '../promotionsDue';
 import { confirmAsk, promptAsk } from '../ask';
@@ -114,6 +116,7 @@ type Sub =
   | 'ehemalige'
   | 'anfragen'
   | 'meldungen'
+  | 'aenderungen'
   | 'punkte'
   | 'strafe'
   | 'katalog'
@@ -218,6 +221,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <Anfragen onToast={onToast} />
       ) : active === 'meldungen' ? (
         <Meldungen onToast={onToast} />
+      ) : active === 'aenderungen' ? (
+        <Aenderungen onToast={onToast} />
       ) : (active === 'punkte' || active === 'strafe') && fromList !== null ? (
         <FromAttendance key={path.join('/')} listId={fromList} kind={active} onToast={onToast} />
       ) : active === 'punkte' ? (
@@ -1164,7 +1169,7 @@ function MemberDetailView({
       </FoldSection>
 
       {sheet === 'punkte' && canPoints() && (
-        <Sheet title={sec.points} onClose={closeSheet}>
+        <Sheet title={sec.points} onClose={closeSheet} routed>
           {m.member && <GivePoints preselect={[m.id]} fixed onToast={onToast} onDone={reload} />}
           <h3 className="section-title">Einträge</h3>
           <PointEntries entries={m.point_list} busy={busy} run={run} />
@@ -1172,7 +1177,7 @@ function MemberDetailView({
       )}
 
       {sheet === 'strafen' && canPenalties() && (
-        <Sheet title={sec.penalties} onClose={closeSheet}>
+        <Sheet title={sec.penalties} onClose={closeSheet} routed>
           {m.member && <GivePenalty preselect={[m.id]} fixed onToast={onToast} onDone={reload} />}
           <h3 className="section-title">Einträge</h3>
           <PenaltyEntries entries={m.penalties} busy={busy} run={run} />
@@ -1180,7 +1185,7 @@ function MemberDetailView({
       )}
 
       {sheet === 'dienstgrad' && rankOn && m.rank && (
-        <Sheet title={brand.labels.rank} onClose={closeSheet}>
+        <Sheet title={brand.labels.rank} onClose={closeSheet} routed>
           <MemberRank
             id={m.id}
             member={m.member}
@@ -1194,7 +1199,7 @@ function MemberDetailView({
       )}
 
       {sheet === 'titel' && titlesOn && m.titles && (
-        <Sheet title={sec.titles} onClose={closeSheet}>
+        <Sheet title={sec.titles} onClose={closeSheet} routed>
           <MemberTitles
             key={`${m.id}:${m.titles.map((t) => t.id).join(',')}`}
             id={m.id}
@@ -1207,7 +1212,7 @@ function MemberDetailView({
       )}
 
       {sheet === 'kompanien' && companiesOn && m.companies && (
-        <Sheet title={sec.companies} onClose={closeSheet}>
+        <Sheet title={sec.companies} onClose={closeSheet} routed>
           <MemberCompanies
             key={`${m.id}:${m.companies.map((c) => c.id).join(',')}`}
             id={m.id}
@@ -1219,19 +1224,19 @@ function MemberDetailView({
         </Sheet>
       )}
       {sheet === 'geburtstag' && birthdayOn && m.birthday !== undefined && (
-        <Sheet title="Geburtstag" onClose={closeSheet}>
+        <Sheet title="Geburtstag" onClose={closeSheet} routed>
           <MemberBirthday key={JSON.stringify(m.birthday)} id={m.id} birthday={m.birthday} onChanged={reload} onToast={onToast} />
         </Sheet>
       )}
 
       {sheet === 'eintritt' && joinOn && m.join_year !== undefined && (
-        <Sheet title="Eintritt" onClose={closeSheet}>
+        <Sheet title="Eintritt" onClose={closeSheet} routed>
           <MemberJoinYear key={JSON.stringify(m.join_year)} id={m.id} joinYear={m.join_year} onChanged={reload} onToast={onToast} />
         </Sheet>
       )}
 
       {sheet === 'austritt' && formerEditable && (
-        <Sheet title="Austritt" onClose={closeSheet}>
+        <Sheet title="Austritt" onClose={closeSheet} routed>
           {formerPanel(true)}
         </Sheet>
       )}
@@ -1660,7 +1665,9 @@ function NewMember() {
       {extras && canPoints() && (
         <>
           <label className="field">
-            <span>{sec.points} (Anfangsbestand, optional)</span>
+            <span>
+              <Caps text={sec.points} /> (Anfangsbestand, optional)
+            </span>
             <input type="number" inputMode="numeric" min={0} value={initialPoints} onChange={(e) => setInitialPoints(e.target.value)} />
           </label>
           <label className="field">
@@ -1671,7 +1678,9 @@ function NewMember() {
       )}
       {extras && canRanks() && (ranks.data ?? []).length > 0 && (
         <label className="field">
-          <span>{brand.labels.rank} (optional)</span>
+          <span>
+            <Caps text={brand.labels.rank} /> (optional)
+          </span>
           <select value={rankOptions.some((r) => String(r.id) === rankId) ? rankId : ''} onChange={(e) => setRankId(e.target.value)}>
             <option value="">Kein {brand.labels.rank}</option>
             {rankOptions.map((r) => (
@@ -1852,7 +1861,9 @@ function GivePoints({
       </label>
       <div className="field-row">
         <label className="field">
-          <span>{sec.points}</span>
+          <span>
+            <Caps text={sec.points} />
+          </span>
           <input type="number" inputMode="numeric" step="1" value={points} onChange={(e) => setPoints(e.target.value)} required />
         </label>
         <label className="field">
@@ -2144,7 +2155,9 @@ function Catalog({ onToast }: { onToast: (msg: string) => void }) {
             <input type="text" placeholder="z. B. Teilnahme am Sommerfest" value={title} onChange={(e) => setTitle(e.target.value)} />
           </label>
           <label className="field narrow">
-            <span>{sec.points}</span>
+            <span>
+              <Caps text={sec.points} />
+            </span>
             <input type="number" inputMode="numeric" step="1" value={points} onChange={(e) => setPoints(e.target.value)} />
           </label>
         </div>

@@ -31,7 +31,15 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
     case 'news':
       return sub ? 'neuigkeiten-beitrag' : 'neuigkeiten';
     case 'galerie':
-      return id ? 'galerie-album' : sub === 'einreichen' ? 'galerie-einreichen' : sub === 'pruefen' ? 'galerie-pruefen' : 'galerie';
+      return id
+        ? 'galerie-album'
+        : sub === 'einreichen'
+          ? 'galerie-einreichen'
+          : sub === 'pruefen'
+            ? 'galerie-pruefen'
+            : sub === 'verwalten'
+              ? 'galerie-verwalten'
+              : 'galerie';
     case 'kompanien':
       return 'kompanien';
     case 'sponsoren':
@@ -134,6 +142,7 @@ function adminSlug([sub, arg, page]: string[], ctx: HelpContext): string | null 
     import: 'mitglieder-import',
     anfragen: 'anfragen-freigeben',
     meldungen: 'fehlermeldungen-bearbeiten',
+    aenderungen: 'admin-aenderungen',
   };
   // „Einrichtungen“ sammelt nur Knöpfe der Startseite; ihre Anleitung steht dort.
   if (!sub || sub === 'einrichtungen') return 'verwaltung';

@@ -6,8 +6,9 @@ import RechteMatrix from './RechteMatrix';
 import { useDragSort, useSaveQueue } from '../dragSort';
 import brand from '../generated/brand';
 import { PUBLIC_PREVIEW, startPreview } from '../preview';
-import { ErrorBox, Loading, useAsync } from '../ui';
+import { Caps, ErrorBox, Loading, useAsync } from '../ui';
 import { confirmAsk } from '../ask';
+import { IconButton } from '../icons';
 
 const sec = brand.labels.sections;
 
@@ -121,24 +122,9 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
                   </div>
                   <div className="role-actions">
                     {r.key !== 'admin' && (
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => startPreview(r.key)}
-                        aria-label={`App als ${r.label} ansehen`}
-                        title="App als diese Rolle ansehen"
-                      >
-                        Ansehen
-                      </button>
+                      <IconButton icon="view" label={`App als ${r.label} ansehen`} onClick={() => startPreview(r.key)} />
                     )}
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => setEditing(r.key)}
-                      aria-label={`${r.label} bearbeiten`}
-                    >
-                      Bearbeiten
-                    </button>
+                    <IconButton icon="edit" label={`${r.label} bearbeiten`} onClick={() => setEditing(r.key)} />
                   </div>
                 </li>
               ),
@@ -201,7 +187,9 @@ function AttendanceGroups({ roles, onToast }: { roles: RoleAdmin[]; onToast: (ms
       <h4>{sec.attendance}: Gruppen im Zähler</h4>
       {groups.map((g) => (
         <label key={g.key} className="field field-inline">
-          <span>{g.label}</span>
+          <span>
+            <Caps text={g.label} />
+          </span>
           <select value={current[g.key] ?? ''} disabled={busy} onChange={(e) => setDraft({ ...current, [g.key]: e.target.value })}>
             <option value="">Eigene Gruppe</option>
             {targets
@@ -363,7 +351,10 @@ function RoleForm({
       )}
       {withFactor && (
         <label className="field">
-          <span>{sec.points}faktor (z. B. 0,5 für die Hälfte)</span>
+          <span>
+            <Caps text={sec.points} />
+            faktor (z. B. 0,5 für die Hälfte)
+          </span>
           <input type="text" inputMode="decimal" value={factor} onChange={(e) => setFactor(e.target.value)} />
         </label>
       )}

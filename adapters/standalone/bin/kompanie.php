@@ -23,7 +23,10 @@
 
 declare(strict_types=1);
 
+use KompanieApp\Core\Domain\BackupEncryptionService;
+use KompanieApp\Core\Domain\ChangeLogService;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Storage\BackupCrypto;
 use KompanieApp\Core\Update\UpdateService;
 use KompanieApp\Standalone\HttpContext;
@@ -74,7 +77,8 @@ try {
 
         case 'create-admin':
             $kernel->upgrade();
-            $r = Setup::createAdmin($kernel, $str('name'), $str('login'), $str('email'), isset($opt['password']) ? $str('password') : null);
+            // Ins Änderungsprotokoll wie ein neues Konto in der App, mit der Kommandozeile als Urheber
+            $r = $kernel->app()->api()->track('POST /users', ChangeLogService::CLI, static fn (): array => Setup::createAdmin($kernel, $str('name'), $str('login'), $str('email'), isset($opt['password']) ? $str('password') : null));
             echo "Admin angelegt.\n  Benutzername: {$r['login']}\n";
             if (!isset($opt['password'])) {
                 echo "  Startpasswort: {$r['password']}\n  (Bitte nach der ersten Anmeldung unter Konto ändern.)\n";
@@ -89,7 +93,9 @@ try {
                 throw new RuntimeException('Diesen Benutzer gibt es nicht.');
             }
             $password = KompanieApp\Core\Domain\Passwords::readable(12);
-            $users->setPassword((int) $row['id'], $password);
+            $request = new Request('POST', '/members/' . (int) $row['id'] . '/password');
+            $request->params = ['id' => (string) (int) $row['id']];
+            $kernel->app()->api()->track('POST /members/{id}/password', ChangeLogService::CLI, static fn () => $users->setPassword((int) $row['id'], $password), $request);
             echo "Neues Startpasswort für {$row['login']}: $password\n";
             break;
 
@@ -182,6 +188,8 @@ try {
             } else {
                 $data = (string) file_get_contents($file);
             }
+            // Sicherungen aus Google Drive sind gepackt (gzip; .json.gz oder in der verschlüsselten Datei).
+            $data = BackupEncryptionService::unpack($data);
             // Vorher den jetzigen Stand sichern, damit ein falscher Import rückgängig zu machen ist.
             $before = $kernel->dataDir() . '/vor-import-' . gmdate('Ymd-His') . '-' . bin2hex(random_bytes(8)) . '.json';
             $out = fopen($before, 'wb');
@@ -193,6 +201,7 @@ try {
             }
             echo "Bisheriger Stand gesichert: $before\n";
             $backup->import($data);
+            $kernel->app()->changeLog()->event(ChangeLogService::CLI, 'Sicherung aus einer Datei wiederhergestellt');
             echo "Sicherung wiederhergestellt. Alle Geräte müssen sich neu anmelden; die Galeriebilder werden neu aufbereitet.\n";
             break;
 
@@ -244,6 +253,7 @@ try {
                     throw new RuntimeException('Bitte die Version angeben: rollback --version=…');
                 }
                 $updates->rollback($version, isset($opt['without-drive']));
+                $kernel->app()->changeLog()->event(ChangeLogService::CLI, 'Zurück auf Version ' . $version);
             } else {
                 $st = $updates->status();
                 $version = $version !== '' ? $version : (string) ($st['available'] ? $st['latest'] : ($st['withdrawn'] ? $st['fallback'] : ''));
@@ -255,6 +265,7 @@ try {
                     break;
                 }
                 $updates->install($version, 'manual', isset($opt['major']), isset($opt['without-drive']));
+                $kernel->app()->changeLog()->event(ChangeLogService::CLI, 'Update auf Version ' . $version . ' eingespielt');
             }
             echo "Version $version eingespielt.\n";
             break;

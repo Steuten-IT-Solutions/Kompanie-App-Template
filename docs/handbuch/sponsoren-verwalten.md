@@ -12,7 +12,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{
 ## Was du hier siehst
 - Alle {bereich.sponsors} in der Reihenfolge, in der sie angezeigt werden, mit einer kleinen Vorschau des Logos, dem Namen und dem Link (oder „ohne Link“).
 - Links der **Griff** (sechs Punkte) zum Verschieben.
-- Bei jedem Eintrag **Bearbeiten**, **Logo hochladen** (bzw. **Logo ersetzen**), **Logo entfernen** und **Löschen**.
+- Bei jedem Eintrag **Bearbeiten** (Stift), **Logo hochladen** (bzw. **Logo ersetzen**), **Logo entfernen** und **Löschen** (Mülleimer).
 - Unten das Formular **Neuer Sponsor** mit **Name**, **Link (optional)** und **Anlegen**.
 
 ## So gehst du vor

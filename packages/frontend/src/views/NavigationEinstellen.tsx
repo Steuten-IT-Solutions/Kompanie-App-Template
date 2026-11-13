@@ -398,7 +398,7 @@ function Editor({
           );
         }}
       />
-      <button type="button" className="btn btn-secondary" disabled={busy} onClick={addMenu}>
+      <button type="button" className="btn btn-secondary btn-block" disabled={busy} onClick={addMenu}>
         Untermenü hinzufügen
       </button>
 
@@ -644,7 +644,7 @@ function AdminOrderList({
   if (shown.length === 0) return null;
   return (
     <>
-      <p className="small">
+      <p className="small nav-order-title">
         <strong>{title}</strong>
       </p>
       <ul className="card-list">

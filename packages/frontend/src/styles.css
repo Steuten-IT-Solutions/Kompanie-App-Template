@@ -46,11 +46,11 @@ select {
 }
 
 /* Lange Wörter in Überschriften, Kacheln und Titeln nach deutschen Regeln trennen (lang="de"), statt sie an
-   beliebiger Stelle umzubrechen (overflow-wrap: anywhere greift erst, wenn keine Trennstelle passt). */
+   beliebiger Stelle umzubrechen (overflow-wrap: anywhere greift erst, wenn keine Trennstelle passt). Knöpfe nicht:
+   siehe .btn. */
 h1,
 h2,
 h3,
-.btn,
 .row-title,
 .event-title,
 .page-tile,
@@ -646,12 +646,24 @@ p.small + p.small:not(.muted) {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   font-size: 0.95rem;
+  /* Wörter in Knöpfen nicht trennen, sondern ganz in die nächste Zeile schieben („Bilder und Videos einreichen“),
+     auch nicht von einer Kachel oder Überschrift geerbt. Höchstens so breit wie der Platz, damit ein zu langes Wort
+     im Knopf überläuft; das erkennt buttonWords.ts und erlaubt dann die Trennung (data-hyphenate). */
+  max-width: 100%;
+  hyphens: manual;
+  -webkit-hyphens: manual;
   box-shadow:
     inset 0 -2px 0 rgb(0 0 0 / 18%),
     0 1px 2px color-mix(in srgb, var(--primary-ink) 20%, transparent);
   transition:
     transform 0.08s ease,
     filter 0.15s ease;
+}
+/* Ein Wort passt allein nicht in den Knopf: nach deutschen Regeln trennen, notfalls an beliebiger Stelle */
+.btn[data-hyphenate] {
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  overflow-wrap: anywhere;
 }
 .btn:active {
   transform: translateY(1px);
@@ -732,6 +744,11 @@ p.small + p.small:not(.muted) {
 /* Knöpfe dürfen schmaler als ihr längstes Wort werden (Trennung statt Überlauf über den Rand) */
 .button-row > * {
   min-width: 0;
+}
+/* Ein einzelner Knopf in der Reihe (bzw. der letzte bei ungerader Zahl) nimmt die ganze Breite, statt in der halben
+ * Spalte links zu stehen und umzubrechen */
+.button-row > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 
 /* Gerüst der Seite beim Laden (skeleton.tsx): ohne eigene Box, damit es im Raster bzw. Flex des Bereichs genauso
@@ -2351,10 +2368,53 @@ code {
   display: grid;
   gap: 6px;
 }
+/* Änderungsprotokoll (Verwaltung → Änderungen): Felder eines Eintrags mit altem und neuem Wert, Frist */
+.change-fields {
+  margin: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.change-field dt {
+  font-weight: 600;
+}
+.change-field dd {
+  margin: var(--space-1) 0 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.change-entry {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-3);
+}
+.change-entry:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.change-entry-title {
+  margin: 0 0 var(--space-2);
+  font-size: 1rem;
+}
+.change-keep {
+  display: grid;
+  gap: var(--space-2);
+}
+@media (min-width: 600px) {
+  .change-keep {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+}
 
 .error-log {
   list-style: none;
   margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.server-backups {
+  list-style: none;
+  margin: 0;
   padding: 0;
   display: grid;
   gap: 10px;
@@ -4705,7 +4765,7 @@ fieldset.board-targets legend {
 .year-grid-wrap {
   --yg-years: 3.5rem;
   --yg-col: 6.5rem;
-  --yg-row: 1.6rem;
+  --yg-row: 1.6rem; /* Mindesthöhe: ein Jahr mit zweizeiligem Namen wird höher */
   margin-top: 12px;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -4768,6 +4828,10 @@ fieldset.board-targets legend {
   display: flex;
   align-items: flex-end;
   border-bottom: 1px solid var(--line);
+}
+.yg-office span {
+  /* sonst bricht die Bezeichnung im Flex-Kasten nicht um und läuft über die Nachbarspalte */
+  min-width: 0;
 }
 .yg-group.empty {
   border-bottom-color: transparent;
@@ -5021,13 +5085,15 @@ fieldset.board-targets legend {
   background: color-mix(in srgb, var(--primary-text) 3%, var(--card));
 }
 
-/* „Im Amt“: die aktuellen Inhaber auf der Kompaniefarbe, wie die Kopfleiste */
+/* „Im Amt“: die aktuellen Inhaber hervorgehoben. Hell auf einer zarten Tönung der Kompaniefarbe (die volle Farbe wirkte
+   in der hellen Karte zu schwer), dunkel auf der Kompaniefarbe wie die Kopfleiste; unten immer der Strich in der
+   Akzentfarbe. */
 .spotlight {
   position: relative;
   padding: 14px 14px 16px;
-  background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 55%),
-    linear-gradient(160deg, var(--primary) 0%, var(--primary-deep) 100%);
-  color: var(--on-primary);
+  background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--accent) 14%, transparent) 0%, transparent 55%),
+    color-mix(in srgb, var(--primary-text) 8%, var(--card));
+  color: var(--ink);
   border-bottom: 3px solid var(--accent);
 }
 .spotlight-label {
@@ -5036,7 +5102,7 @@ fieldset.board-targets legend {
   font-size: 0.75rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--accent-on-primary);
+  color: var(--accent-text);
   margin-bottom: 10px;
 }
 .spotlight-list {
@@ -5053,9 +5119,9 @@ fieldset.board-targets legend {
   gap: 12px;
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid color-mix(in srgb, var(--on-primary) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary-text) 18%, transparent);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--on-primary) 8%, transparent);
+  background: var(--card);
   color: inherit;
   font: inherit;
   text-align: left;
@@ -5065,7 +5131,25 @@ button.spotlight-person {
 }
 button.spotlight-person:hover,
 button.spotlight-person:focus-visible {
-  background: color-mix(in srgb, var(--on-primary) 16%, transparent);
+  background: color-mix(in srgb, var(--primary-text) 8%, var(--card));
+}
+@media (prefers-color-scheme: dark) {
+  .spotlight {
+    background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 55%),
+      linear-gradient(160deg, var(--primary) 0%, var(--primary-deep) 100%);
+    color: var(--on-primary);
+  }
+  .spotlight-label {
+    color: var(--accent-on-primary);
+  }
+  .spotlight-person {
+    border-color: color-mix(in srgb, var(--on-primary) 18%, transparent);
+    background: color-mix(in srgb, var(--on-primary) 8%, transparent);
+  }
+  button.spotlight-person:hover,
+  button.spotlight-person:focus-visible {
+    background: color-mix(in srgb, var(--on-primary) 16%, transparent);
+  }
 }
 .spotlight-avatar {
   flex: none;
@@ -6454,15 +6538,32 @@ button.spotlight-person:focus-visible {
 .joint-term-offices {
   margin: 0;
   display: grid;
-  gap: 6px;
+  /* Bezeichnungen so breit wie die längste (höchstens 45 %, die Namen brauchen auch Platz), damit „Ordonnanzoffizier*in“ möglichst in eine Zeile
+     passt; alle Zeilen teilen sich die Spalten (subgrid), die Namen stehen also bündig */
+  grid-template-columns: fit-content(45%) 1fr;
+  /* Abstand und feine Linie zwischen den Ämtern, damit eine zweizeilige Bezeichnung nicht an der nächsten klebt */
+  gap: 10px 8px;
 }
 .joint-term-offices > div {
   display: grid;
-  grid-template-columns: minmax(110px, 40%) 1fr;
-  gap: 8px;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+.joint-term-offices > div + div {
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+}
+@supports not (grid-template-columns: subgrid) {
+  .joint-term-offices > div {
+    grid-template-columns: minmax(110px, 40%) 1fr;
+    gap: 8px;
+  }
 }
 .joint-term-offices dt {
   color: var(--muted);
+  /* Lange Bezeichnungen brechen an den Stellen aus titleBreaks um (nach „/“, vor „*in“), nicht mitten im Wort; die
+     Spalte ist nie schmaler als das längste Stück (break-word zählt nicht zur Mindestbreite, anders als anywhere) */
+  overflow-wrap: break-word;
 }
 .joint-term-offices dd {
   margin: 0;
@@ -6570,6 +6671,40 @@ button.spotlight-person:focus-visible {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+/* Zuletzt freigegeben: Vorschau links, rechts Name und darunter Haken und Knopf, damit der Name die volle Breite hat */
+.gallery-approved {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  column-gap: 10px;
+  row-gap: 6px;
+  padding: 8px 0;
+}
+.gallery-approved + .gallery-approved {
+  border-top: 1px solid var(--line);
+}
+.gallery-approved > img,
+.gallery-approved > .gallery-upload-video {
+  grid-row: span 2;
+  align-self: start;
+}
+/* auch ohne Vorschau (kein Standbild) rechts */
+.gallery-approved > .small,
+.gallery-approved-actions {
+  grid-column: 2;
+}
+.gallery-approved-actions .toggle {
+  margin: 0;
+}
+section.settings-section > .gallery-upload-list:last-child {
+  margin-bottom: 0;
+}
+.gallery-approved-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
 }
 
 /* Einreichungen der Galerie (Issue #286) */
@@ -7011,4 +7146,231 @@ fieldset.block-source legend {
 }
 .block-row-short {
   flex: 0 0 7em;
+}
+
+/*
+ * Bausteine untereinander: Bereiche, die ihre Teile im normalen Fluss stapeln (kein Flex oder Grid mit gap), halten
+ * zwischen zwei Bausteinen den Abstand zwischen Elementen (--space-3). Sonst klebt z. B. ein Knopf, eine Zwischenzeile
+ * oder ein Feld an der Karte darüber, weil .card-list, .small, .btn und .toggle keinen eigenen Rand oben haben.
+ * Steht am Ende der Datei und wiegt so viel wie eine Klasse (:where): Es gewinnt gegen die allgemeinen „margin: 0“ der
+ * Bausteine, Regeln für ein bestimmtes Paar (z. B. .card-list + .form.card) gehen weiter vor. Ränder fallen im Fluss
+ * zusammen, ein größerer Rand unten am Baustein darüber bleibt. Überschriften behalten ihren eigenen Abstand.
+ * Gilt für alle Einstellungen ohne Formular-Raster, für Untermenüs der Navigation und für Bereiche mit .stack.
+ */
+:where(section.settings-section:not(.form), .nav-menu, .stack) > :not(:first-child, h1, h2, h3, h4, h5, h6) {
+  margin-top: var(--space-3);
+}
+/* Zwischenüberschrift einer Liste (z. B. „Einrichtungen“ in der Navigation): etwas weiter weg von der Liste darüber als
+   von der eigenen, damit sie sichtbar zur Liste darunter gehört. */
+.settings-section > p.nav-order-title {
+  margin-top: var(--space-4);
+}
+
+/* Galerie verwalten (manage_gallery): Alben, Bilder und Videos auswählen */
+.gallery-select-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.gallery-select-bar .button-row {
+  flex-wrap: wrap;
+}
+.album-card.selected,
+.photo.selected {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+}
+.album-card:disabled,
+.photo-grid.selecting .photo:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.photo-grid.selecting .photo {
+  cursor: pointer;
+}
+.photo-check {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.photo.selected .photo-check {
+  background: var(--accent);
+}
+/* Zahl und Knöpfe der Großansicht: auf schmalen Handys umbrechen mit Abstand statt aneinander zu kleben */
+.lb-count {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 0;
+}
+/* Runde Knöpfe nur mit Symbol in der Galerie (Name als aria-label und Tooltip) */
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1.5px solid var(--line-strong);
+  background: transparent;
+  color: var(--accent-text);
+  cursor: pointer;
+}
+.icon-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent-text) 10%, transparent);
+}
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.icon-btn-danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+.icon-btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+/* Aufgeklappt (z. B. Verlauf einer Nachricht): Knopf bleibt hinterlegt */
+.icon-btn[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--accent-text) 14%, transparent);
+}
+/* Reihe von Symbol-Knöpfen (Bearbeiten, Löschen, …) außerhalb der Galerie */
+.icon-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+/* Steht die Reihe für sich (nicht in einer Listenzeile unter deren Text), mittig */
+.icon-row:not(.row-actions) {
+  justify-content: center;
+}
+/* Knopf mit Symbol vor kurzem Text (z. B. Herunterladen als PDF) */
+.btn-icon-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn-icon-text svg {
+  flex: none;
+}
+.lb-count .icon-btn-lb,
+.lb-count .icon-btn-lb-danger {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  background: rgb(255 255 255 / 14%);
+  color: #fff;
+}
+.lb-count .icon-btn-lb-danger {
+  background: rgb(190 40 40 / 75%);
+}
+.gallery-actions,
+.gallery-select-bar .button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.gallery-select-bar .button-row {
+  margin: 0;
+}
+/* Langes Drücken beginnt das Auswählen: dabei kein Markieren von Text und kein Menü „Bild sichern“ (iOS) */
+.gallery-manage .photo,
+.gallery-manage .album-card {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Umfrage verwalten: Bearbeiten und Löschen als Symbole, „Beenden“ als Text dahinter */
+.poll-manage-actions {
+  margin: 14px 0 0;
+}
+.poll-manage-actions .poll-close {
+  order: 1;
+}
+/* Umfrage ansehen: zurück zum Brett und zur Liste als Verweise */
+.poll-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin: 10px 0;
+}
+.board-item-actions {
+  margin: 14px 0;
+}
+.news-article-actions {
+  margin: 14px 0;
+}
+/* In Zeilen mit kleinen Text-Knöpfen (.btn-small) etwas kleiner, damit die Reihe nicht höher wird als nötig */
+.row-actions .icon-btn {
+  width: 38px;
+  height: 38px;
+}
+.row-actions {
+  align-items: center;
+}
+/* Liste bearbeiten: „Mitglieder aktualisieren“ über die ganze Breite, darunter „+ Zeile“ und „+ 5 Zeilen“ */
+.list-row-buttons > :first-child {
+  grid-column: 1 / -1;
+}
+/* Liste ausgeben: PDF und CSV mit Symbol und kurzem Text, Drucken nur als Symbol */
+.list-output-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+}
+.list-output-buttons .btn {
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* Feld mit Knopf „Kopieren“ (Symbol) rechts daneben */
+.copy-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.copy-field input {
+  flex: 1;
+  min-width: 0;
+}
+/* Ämter verwalten: zuerst der Schalter „Amtszeiten gemeinsam“ in eigener Zeile, darunter die Symbole für Bearbeiten
+ * und Löschen nebeneinander */
+.row-actions .joint-toggle {
+  order: -1;
+  flex-basis: 100%;
+}
+/* Bei „Mitglieder aktualisieren“ über die ganze Breite stehen „+ Zeile“ und „+ 5 Zeilen“ darunter nebeneinander */
+.list-row-buttons > :last-child:nth-child(odd) {
+  grid-column: auto;
+}
+/* „Erneut versuchen“ in Fehlermeldungen mittig */
+.error > .btn {
+  display: block;
+  margin: 0 auto;
 }

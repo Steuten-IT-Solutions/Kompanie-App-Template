@@ -1,14 +1,32 @@
-import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactElement } from 'react';
+import { Fragment, useLayoutEffect, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 import { type Office, type OfficeGroup, type OfficeGroupTerm, type OfficeHolder, type OfficesOverview, type OfficeTerm } from '../api';
 import brand from '../generated/brand';
 import { MemberAvatar } from '../memberPhoto';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
-import { lanes, yearRange } from '../yearGrid';
+import { titleBreaks, columnChars, lanes, yearRange } from '../yearGrid';
 import { officeSingular } from '../officeName';
 
 const sec = brand.labels.sections;
+
+/**
+ * Bezeichnung mit den Umbruchstellen aus titleBreaks. Die Stellen ohne Strich werden zu <wbr>: Das Zeichen U+200B
+ * zeigen manche Handy-Schriften als Leerzeichen an („Prinz/ Prinzessin“).
+ */
+function Title({ text }: { text: string }) {
+  const pieces = titleBreaks(text).split('\u200B');
+  return (
+    <>
+      {pieces.map((piece, i) => (
+        <Fragment key={i}>
+          {i > 0 && <wbr />}
+          {piece}
+        </Fragment>
+      ))}
+    </>
+  );
+}
 
 /** „2007–2020“, „seit 2020“ (läuft), „2025“ (einzelnes Jahr oder Anfang und Ende im selben Jahr). */
 export function termYears(t: Pick<OfficeTerm, 'kind' | 'start_year' | 'end_year'>): string {
@@ -343,7 +361,9 @@ export function JointTerms({
               <dl className="joint-term-offices">
                 {rows.map((r) => (
                   <div key={r.office.id}>
-                    <dt>{officeSingular(r.office)}</dt>
+                    <dt>
+                      <Title text={officeSingular(r.office)} />
+                    </dt>
                     <dd>
                       <Holders holders={r.holders} to={memberPath} />
                     </dd>
@@ -443,14 +463,24 @@ export function YearGrid({
   const grouped = ordered.some((s) => s.title);
   const heads: ReactElement[] = []; // Kopf: Zeile 1 Gruppen, Zeile 2 Ämter
   const cells: ReactElement[] = [];
-  let column = 2; // Spalte 1: Jahre
+  const tracks: string[] = []; // Spalten der Ämter, Spalte 1 sind die Jahre
+  let column = 2;
   for (const section of ordered) {
     const sectionStart = column;
     for (const o of section.offices) {
       const { bars, count } = lanes(o.terms, thisYear);
+      // Breit genug, dass Bezeichnung und Namen nicht abgeschnitten werden (verteilt auf die Spuren des Amts)
+      const chars = columnChars(
+        o.title,
+        o.terms.flatMap((t) => t.holders.map((h) => h.name)),
+      );
+      const min = `max(var(--yg-col), calc(${(chars * 1.1) / count}ch + ${Math.ceil(16 / count)}px))`;
+      for (let i = 0; i < count; i++) tracks.push(`minmax(${min}, 1fr)`);
       heads.push(
         <div key={`o${o.id}`} className="yg-office" style={{ gridColumn: `${column} / span ${count}`, gridRow: 2 }}>
-          {o.title}
+          <span>
+            <Title text={o.title} />
+          </span>
         </div>,
       );
       for (const { term, lane, first, last } of bars) {
@@ -489,8 +519,8 @@ export function YearGrid({
       );
     }
   }
-  // Kopf und Raster mit denselben Spalten, damit sie genau übereinanderstehen; Breiten aus styles.css (Handy schmaler)
-  const columns = `var(--yg-years) repeat(${column - 2}, minmax(var(--yg-col), 1fr))`;
+  // Kopf und Raster mit denselben Spalten, damit sie genau übereinanderstehen; Grundbreiten aus styles.css (Handy schmaler)
+  const columns = `var(--yg-years) ${tracks.join(' ')}`;
   return (
     <>
       <p className="yg-rotate-hint muted small">Tipp: Dreh das Handy quer, dann passen mehr {sec.offices} nebeneinander.</p>
@@ -510,7 +540,7 @@ export function YearGrid({
             className="year-grid"
             role="list"
             aria-label={`${sec.offices} nach Jahren`}
-            style={{ gridTemplateColumns: columns, gridTemplateRows: `repeat(${years.length}, var(--yg-row))` }}
+            style={{ gridTemplateColumns: columns, gridTemplateRows: `repeat(${years.length}, minmax(var(--yg-row), auto))` }}
           >
             {years.map((y) => (
               <div

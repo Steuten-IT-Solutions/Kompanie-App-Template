@@ -143,6 +143,7 @@ final class Plugin
         if (is_admin()) {
             SettingsPage::init();
             ProfileField::init();
+            UserAdminLog::init();
         }
         add_action('init', static fn () => Shortcodes::init(self::app()));
     }
@@ -172,6 +173,8 @@ final class Plugin
                 WpUsers::splitLegacyNames();
                 update_option(WpSettings::PREFIX . 'names_split', '1', false);
             }
+            // Datei für „App schneller laden“ auf den Stand dieser Version bringen (auch nach einem Update über die App).
+            FastLoad::install();
             update_option(WpSettings::PREFIX . 'roles_version', KOMPANIE_APP_VERSION, true);
         }
     }
@@ -213,6 +216,7 @@ final class Plugin
         self::app()->scheduleTasks();
         AppPage::addRewriteRules();
         flush_rewrite_rules();
+        FastLoad::install();
     }
 
     public static function deactivate(): void
@@ -222,5 +226,6 @@ final class Plugin
         }
         AppPage::removeRewriteRules();
         flush_rewrite_rules();
+        FastLoad::remove();
     }
 }
