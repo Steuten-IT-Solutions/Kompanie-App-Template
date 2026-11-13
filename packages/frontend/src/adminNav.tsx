@@ -22,6 +22,7 @@ const canMail = (): boolean => !!config?.features.mail && can('send_mail');
 const canCompanies = (): boolean => !!config?.features.companies && can('manage_companies');
 const canSponsors = (): boolean => !!config?.features.sponsors && can('manage_sponsors');
 const canPages = (): boolean => !!config?.features.pages && can('manage_pages');
+const canWebsite = (): boolean => !!config?.features.website && can('manage_website');
 
 /** Mitgliederliste: für alle, die Punkte oder Strafen vergeben, Dienstgrade, Titel oder Anwesenheit pflegen, Mitglieder
  * anlegen, Rollen vergeben oder Kompanien zuordnen. */
@@ -68,6 +69,7 @@ export function adminTabs(): AdminTab[] {
       { id: 'kompanien', label: sec.companies, on: canCompanies(), group: SETUP },
       { id: 'sponsoren', label: sec.sponsors, on: canSponsors(), group: SETUP },
       { id: 'seiten', label: sec.pages, on: canPages(), group: SETUP },
+      { id: 'webseite', label: 'Webseite', on: canWebsite(), group: SETUP },
       { id: 'anwesenheit', label: sec.attendance, on: canAttendance() },
       { id: 'brett', label: sec.board, on: canPostBoard(), route: 'brett' },
       { id: 'umfragen', label: sec.polls, on: canManagePolls(), route: 'umfragen/verwalten' },
@@ -112,6 +114,7 @@ export function adminTileCatalog(): Record<string, { label: string; on: boolean 
     kompanien: { label: sec.companies, on: on('companies') },
     sponsoren: { label: sec.sponsors, on: on('sponsors') },
     seiten: { label: sec.pages, on: on('pages') },
+    webseite: { label: 'Webseite', on: on('website') },
   };
 }
 
@@ -242,6 +245,13 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
     <>
       <path d="M6 3h9l4 4v14H6z" />
       <path d="M9 11h7M9 14.5h7M9 18h4" />
+    </>
+  ),
+  // Webseite: Globus
+  webseite: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z" />
     </>
   ),
   mitglieder: (

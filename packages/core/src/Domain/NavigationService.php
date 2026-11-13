@@ -47,7 +47,7 @@ final class NavigationService
         'inventar', 'listen', 'mail', 'einrichtungen', 'einstellungen',
     ];
     /** Kacheln unter „Einrichtungen“ in der Verwaltung. */
-    public const ADMIN_SETUP = ['katalog', 'dienstgrade', 'titel', 'aemter', 'kompanien', 'sponsoren', 'seiten'];
+    public const ADMIN_SETUP = ['katalog', 'dienstgrade', 'titel', 'aemter', 'kompanien', 'sponsoren', 'seiten', 'webseite'];
 
     /** Abschnitt (KompanieConfig::sectionLabel) je Bereich der Navigation; „mitglieder“ wählt sectionOverrides. */
     private const SECTIONS = [

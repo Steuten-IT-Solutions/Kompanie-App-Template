@@ -23,7 +23,7 @@ final class StatusService
     /** @return array{items: array<int, array<string, string>>, support: string} */
     public function report(): array
     {
-        $items = [$this->updates(), $this->gallery(), $this->calendar(), $this->backup(), $this->legal(), $this->server(), $this->push()];
+        $items = array_values(array_filter([$this->updates(), $this->gallery(), $this->calendar(), $this->backup(), $this->legal(), $this->server(), $this->push(), $this->app->website()->statusItem()]));
         foreach ($this->app->healthChecks?->checks() ?? [] as $check) {
             $items[] = $check;
         }

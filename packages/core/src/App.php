@@ -174,6 +174,8 @@ final class App
         public readonly array $packageConfig = [],
         /** Mailversand; ohne Angabe PHPMailer über SMTP mit den Einstellungen (MailService). Tests setzen einen Test-Mailer. */
         private readonly ?Mailer $customMailer = null,
+        /** Where the website is served (Issue #273); null where there is none (WordPress manages its own pages). */
+        public readonly ?\KompanieApp\Core\Port\WebsiteHost $websiteHost = null,
     ) {
         // Vorschau „App als Rolle ansehen“ (Issue #63): Wer die Anfrage stellt und die Adressen geschützter Dateien gehen
         // über die Vorschau – so gilt sie überall gleich, ohne dass Dienste oder Adapter sie kennen müssen.
@@ -922,6 +924,12 @@ final class App
     public function pages(): PageService
     {
         return $this->service(PageService::class, fn () => new PageService($this));
+    }
+
+    /** Website for visitors (Issue #273, area website) */
+    public function website(): \KompanieApp\Core\Domain\WebsiteService
+    {
+        return $this->service(\KompanieApp\Core\Domain\WebsiteService::class, fn () => new \KompanieApp\Core\Domain\WebsiteService($this));
     }
 
     /** Vorgefertigte Blöcke (eigene Seiten): Typen, Prüfung, Ausgabe. */

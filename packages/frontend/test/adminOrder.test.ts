@@ -17,9 +17,10 @@ test('Ohne Einstellung: Standardreihenfolge, die Folge im Code bleibt', () => {
 test('Eingestellte Reihenfolge je Gruppe, Einrichtungen an der Stelle ihres Sammelknopfs', () => {
   const order = { start: ['einstellungen', 'einrichtungen', 'mitglieder'], setup: ['seiten', 'katalog'] };
   assert.deepEqual(startOrder(order).slice(0, 3), ['einstellungen', 'einrichtungen', 'mitglieder']);
-  assert.deepEqual(setupOrder(order).slice(0, 3), ['seiten', 'katalog', 'dienstgrade']);
+  // „webseite“ kennt die Einstellung nicht: Sie bleibt hinter ihrem Vorgänger „seiten“.
+  assert.deepEqual(setupOrder(order).slice(0, 4), ['seiten', 'webseite', 'katalog', 'dienstgrade']);
   const flat = flatOrder(order) ?? [];
-  assert.deepEqual(flat.slice(0, 4), ['einstellungen', 'seiten', 'katalog', 'dienstgrade']);
+  assert.deepEqual(flat.slice(0, 5), ['einstellungen', 'seiten', 'webseite', 'katalog', 'dienstgrade']);
   const tabs = [{ id: 'mitglieder' }, { id: 'katalog' }, { id: 'mail' }, { id: 'einstellungen' }];
   assert.deepEqual(ids(sortByIds(tabs, flat)), ['einstellungen', 'katalog', 'mitglieder', 'mail']);
 });

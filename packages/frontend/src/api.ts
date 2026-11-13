@@ -55,6 +55,7 @@ export type Capability =
   | 'review_gallery'
   | 'manage_gallery'
   | 'manage_pages'
+  | 'manage_website'
   | 'manage_news'
   | 'view_personal'
   | 'manage_personal'
@@ -85,7 +86,8 @@ export type Feature =
   | 'mail'
   | 'sponsors'
   | 'companies'
-  | 'pages';
+  | 'pages'
+  | 'website';
 
 export interface AppUser {
   id: number;
@@ -1689,6 +1691,32 @@ export interface CompanyInput {
 }
 
 /** Sponsor (Issue #279): Name (auch Alternativtext), Link (nur https, leer ohne), Logo. */
+/** Zustand der Einstiegsdatei der Webseite (Issue #273, eigenständige Version). */
+export type WebsiteEntryState = 'installed' | 'missing' | 'outdated' | 'occupied' | 'not_writable' | 'root';
+
+/** Verwaltung → Webseite: Startseite und Einstiegsdatei (manage_website). */
+export interface WebsiteSettings {
+  home_page_id: number | null;
+  home_page_title: string | null;
+  /** Startseite gewählt, aber gelöscht oder nicht mehr für alle sichtbar */
+  home_page_missing: boolean;
+  /** Seiten, die Startseite sein können (für alle sichtbar) */
+  pages: { id: number; title: string }[];
+  pages_enabled: boolean;
+  /** Adresse der Webseite; null, wenn die App nicht in einem eigenen Ordner liegt */
+  url: string | null;
+  entry: {
+    state: WebsiteEntryState;
+    /** andere Startseite im Ordner (bei occupied) */
+    file: string | null;
+    /** Ordner der App, z. B. app */
+    folder: string;
+    /** Inhalt der Einstiegsdatei (zum Hochladen von Hand) */
+    content: string;
+    message: string;
+  };
+}
+
 export interface Sponsor {
   id: number;
   name: string;
@@ -2481,6 +2509,10 @@ export const api = {
   updatePage: (id: number, data: PageInput) => request<PageDetail>('PATCH', `/pages/${id}`, data),
   deletePage: (id: number) => request<{ deleted: boolean }>('DELETE', `/pages/${id}`),
   reorderPages: (ids: number[]) => request<{ pages: PageSummary[] }>('PUT', '/pages/order', { ids }).then((r) => r.pages),
+  // Webseite (Issue #273)
+  website: () => request<WebsiteSettings>('GET', '/admin/website'),
+  updateWebsite: (data: { home_page_id: number | null }) => request<WebsiteSettings>('PATCH', '/admin/website', data),
+  installWebsiteEntry: () => request<WebsiteSettings>('POST', '/admin/website/entry'),
   // Sponsoren (Issue #279)
   sponsors: () => request<Sponsor[]>('GET', '/sponsors'),
   createSponsor: (data: { name: string; url: string }) => request<Sponsor>('POST', '/sponsors', data),

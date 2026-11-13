@@ -47,6 +47,10 @@ use KompanieApp\Core\Storage\Sql\PdoConnection;
  *   /sicherung               Datensicherung herunterladen, nur Admins (index.php?r=/sicherung);
  *                            ?datei=<Name> eine Sicherung, die auf dem Server liegt
  *   /cron?key=…              Aufgaben         (index.php?r=/cron&key=…)
+ *   /webseite.css?v=…        Stylesheet der Webseite (index.php?r=/webseite.css&v=…)
+ *
+ * Website (Issue #273): index.php in the folder above <root> (StandaloneWebsiteHost) defines KOMPANIE_WEBSITE and
+ * includes <root>/index.php; handleHttp() then answers with the website (handleWebsite()).
  *   /google/callback         Rückkehr von Google („Mit Google verbinden“, index.php?r=/google/callback)
  */
 final class Kernel
@@ -83,7 +87,14 @@ final class Kernel
         private readonly ?HttpClient $httpClient = null,
         private readonly array $packageOverride = [],
     ) {
-        $this->http = $http ?? HttpContext::fromGlobals(self::basePath($_SERVER));
+        // Through the website's entry file (StandaloneWebsiteHost) SCRIPT_NAME is the folder above the program.
+        $this->http = $http ?? HttpContext::fromGlobals(self::basePath($_SERVER) . (self::website() ? basename($root) . '/' : ''));
+    }
+
+    /** Called through the website's entry file (Issue #273)? */
+    public static function website(): bool
+    {
+        return defined('KOMPANIE_WEBSITE');
     }
 
     /** Pfad der Installation in der Adresse, z. B. /app/ (aus SCRIPT_NAME von index.php). */
@@ -235,6 +246,7 @@ final class Kernel
             backup: new StandaloneBackup($this),
             healthChecks: new StandaloneHealthChecks($config, $httpClient, $cache, $settings, $this),
             packageConfig: $this->packageConfig(),
+            websiteHost: new StandaloneWebsiteHost($this->root, $this->env),
         );
         $this->app->watchFatals();
         return $this->app;
@@ -296,6 +308,10 @@ final class Kernel
 
     public function handleHttp(): void
     {
+        if (self::website()) {
+            $this->handleWebsite();
+            return;
+        }
         $path = $this->requestPath();
         try {
             $this->route($path);
@@ -310,27 +326,14 @@ final class Kernel
 
     private function route(string $path): void
     {
-        if (!$this->installed()) {
-            $this->sendNotInstalled($path);
-            return;
-        }
-        try {
-            $this->config()->secret();
-        } catch (\Throwable $e) {
-            error_log('Kompanie-App: config.php: ' . $e->getMessage());
-            $this->sendError($path, 503, 'config_invalid', 'Die Einrichtung ist unvollständig oder beschädigt (data/config.php). Bitte install.php erneut hochladen und „Reparieren“ wählen.');
-            return;
-        }
-        try {
-            $this->upgrade();
-        } catch (\Throwable $e) {
-            error_log('Kompanie-App: Datenbank nicht erreichbar: ' . $e->getMessage());
-            $this->sendError($path, 503, 'database_unavailable', 'Die Datenbank ist gerade nicht erreichbar. Bitte später erneut versuchen.');
+        if (!$this->ready($path)) {
             return;
         }
 
         if (str_starts_with($path, '/api/v1/') || $path === '/api/v1') {
             $this->sendApi(substr($path, strlen('/api/v1')) ?: '/');
+        } elseif ($path === '/webseite.css') {
+            $this->sendWebsiteCss();
         } elseif ($path === '/manifest.webmanifest') {
             $this->sendManifest();
         } elseif ($path === '/sw.js') {
@@ -378,6 +381,81 @@ final class Kernel
             $this->sendApp();
         }
         $this->afterResponse();
+    }
+
+    /** Eingerichtet, config.php lesbar und die Datenbank auf Stand? Sonst ist die Antwort (503) schon verschickt. */
+    private function ready(string $path): bool
+    {
+        if (!$this->installed()) {
+            $this->sendNotInstalled($path);
+            return false;
+        }
+        try {
+            $this->config()->secret();
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: config.php: ' . $e->getMessage());
+            $this->sendError($path, 503, 'config_invalid', 'Die Einrichtung ist unvollständig oder beschädigt (data/config.php). Bitte install.php erneut hochladen und „Reparieren“ wählen.');
+            return false;
+        }
+        try {
+            $this->upgrade();
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Datenbank nicht erreichbar: ' . $e->getMessage());
+            $this->sendError($path, 503, 'database_unavailable', 'Die Datenbank ist gerade nicht erreichbar. Bitte später erneut versuchen.');
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Website (Issue #273), through the entry file in the folder above the program: the home page as plain HTML for
+     * everyone, without session or cookies. While the area is off, visitors go to the App.
+     */
+    private function handleWebsite(): void
+    {
+        try {
+            if (!$this->ready('/')) {
+                return;
+            }
+            $site = $this->app()->website();
+            if (!$site->enabled()) {
+                header('Cache-Control: no-store');
+                header('Location: ' . $this->env->appUrl(), true, 302);
+                return;
+            }
+            if (!in_array($this->http->method(), ['GET', 'HEAD'], true)) {
+                header('Allow: GET, HEAD');
+                $this->sendPlain(405, 'Diese Adresse lässt sich nur aufrufen.');
+                return;
+            }
+            $res = $site->renderHome();
+            http_response_code($res['status']);
+            header('Content-Type: text/html; charset=utf-8');
+            // Always fresh (upcoming events, countdown), but without personal data: no-cache, not no-store.
+            header('Cache-Control: no-cache');
+            $this->securityHeaders();
+            header("Content-Security-Policy: default-src 'none'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'");
+            echo $res['html'];
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Webseite: ' . $e::class . ': ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+            if (!headers_sent()) {
+                $this->sendPlain(500, 'Es ist ein Fehler aufgetreten. Bitte später erneut versuchen.');
+            }
+            return;
+        }
+        $this->afterResponse();
+    }
+
+    /** Stylesheet of the website; with the version from its address a year in the browser cache. */
+    private function sendWebsiteCss(): void
+    {
+        $app = $this->app();
+        $css = $app->website()->stylesheet();
+        $current = \KompanieApp\Core\Website\WebsiteRenderer::stylesheetVersion($app);
+        header('Content-Type: text/css; charset=utf-8');
+        header('Cache-Control: ' . (($_GET['v'] ?? null) === $current ? 'public, max-age=31536000, immutable' : 'public, max-age=300'));
+        $this->securityHeaders();
+        echo $css;
     }
 
     /**

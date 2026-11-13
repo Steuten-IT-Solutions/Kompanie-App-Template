@@ -24,6 +24,19 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Neu
+
+- **Webseite für Besucher (eigenständige Version)**: Mit dem neuen Bereich _Webseite_ (unter
+  [Einstellungen → Bereiche](app:einstellungen/bereiche), braucht _Seiten_) bekommt ihr eine Webseite unter der Adresse
+  eures Webspace, z. B. `eure-webseite.de`, während die App in ihrem Ordner bleibt (z. B. `eure-webseite.de/app/`).
+  Unter [Verwaltung → Einrichtungen → Webseite](app:verwaltung/webseite) legt die App die Einstiegsdatei `index.php` im
+  Ordner über der App an und ihr wählt als Startseite eine eurer Seiten, die für alle sichtbar ist. Die Webseite zeigt
+  sie, wie Gäste sie sehen (Blöcke nur für Mitglieder fehlen), ohne Anmeldung, ohne Cookies und ohne Inhalte fremder
+  Server; im Fuß stehen Impressum und Datenschutzerklärung. Eine vorhandene Startseite im Ordner (z. B. eine bisherige
+  Webseite) ersetzt die App nie. Das neue Recht _Webseite pflegen_ (`manage_website`) vergebt ihr unter
+  [Einstellungen → Rollen](app:einstellungen/rollen); beim Einschalten entsteht die Rolle _Webseite verwalten_. Die
+  Statusseite zeigt, ob die Webseite erreichbar ist. Weitere Seiten, ein Menü und Entwürfe folgen.
+
 ### Behoben
 
 - **Ämter-Liste**: Unter [Verwaltung → Ämter](app:verwaltung/aemter) steht ein langer, zweizeiliger Name eines Amts jetzt

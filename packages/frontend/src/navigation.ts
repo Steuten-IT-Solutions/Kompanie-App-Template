@@ -355,7 +355,7 @@ export const ADMIN_START = [
 ] as const;
 
 /** Kacheln unter „Einrichtungen“ in der Standardreihenfolge (wie NavigationService::ADMIN_SETUP). */
-export const ADMIN_SETUP = ['katalog', 'dienstgrade', 'titel', 'aemter', 'kompanien', 'sponsoren', 'seiten'] as const;
+export const ADMIN_SETUP = ['katalog', 'dienstgrade', 'titel', 'aemter', 'kompanien', 'sponsoren', 'seiten', 'webseite'] as const;
 
 export type AdminTileId = (typeof ADMIN_START)[number] | (typeof ADMIN_SETUP)[number];
 

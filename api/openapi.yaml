@@ -49,6 +49,7 @@ tags:
   - name: Kompanien
   - name: Sponsoren
   - name: Seiten
+  - name: Webseite
   - name: Verwaltung
   - name: Schwarzes Brett
   - name: Umfragen
@@ -3800,6 +3801,63 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /admin/website:
+    get:
+      tags: [Webseite]
+      summary: Startseite und Einstiegsdatei der Webseite
+      description: |
+        Issue #273. Die Webseite liegt im Ordner über der App (eigenständige Version, Einstiegsdatei index.php) und zeigt
+        als Startseite eine eigene Seite mit audience public, so wie Gäste sie sehen. Unter WordPress und mit Bereich
+        `website` aus → 403 `feature_disabled`.
+      x-capability: manage_website
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebsiteSettings' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Webseite]
+      summary: Startseite wählen
+      x-capability: manage_website
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                home_page_id:
+                  type: [integer, 'null']
+                  description: 'Eigene Seite mit audience public; null = keine Startseite (die Webseite zeigt einen Hinweis mit dem Weg zur App)'
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebsiteSettings' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /admin/website/entry:
+    post:
+      tags: [Webseite]
+      summary: Einstiegsdatei der Webseite anlegen
+      description: |
+        Legt index.php im Ordner über der App an (nur bei entry.state missing oder outdated). Eine andere Startseite im
+        Ordner (index.php, index.html …) ersetzt die App nie → 409 `conflict`.
+      x-capability: manage_website
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebsiteSettings' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
   /sponsors:
     get:
       tags: [Sponsoren]
@@ -8663,7 +8721,7 @@ components:
         setup:
           type: array
           uniqueItems: true
-          items: { type: string, enum: [katalog, dienstgrade, titel, aemter, kompanien, sponsoren, seiten] }
+          items: { type: string, enum: [katalog, dienstgrade, titel, aemter, kompanien, sponsoren, seiten, webseite] }
     NavigationAdmin:
       type: object
       required: [navigation, names, start, show_labels, intern_order, admin_order, targets, icons, max_menu_items, label_max]
@@ -9003,6 +9061,7 @@ components:
                       review_gallery,
                       manage_gallery,
                       manage_pages,
+                      manage_website,
                       manage_news,
                       view_personal,
                       manage_personal,
@@ -9077,6 +9136,7 @@ components:
                   review_gallery,
                   manage_gallery,
                   manage_pages,
+                  manage_website,
                   manage_news,
                   view_personal,
                   manage_personal,
@@ -9137,6 +9197,7 @@ components:
                 review_gallery,
                 manage_gallery,
                 manage_pages,
+                manage_website,
                 manage_news,
                 view_personal,
                 manage_personal,
@@ -9354,6 +9415,7 @@ components:
             companies: { type: boolean }
             sponsors: { type: boolean }
             pages: { type: boolean }
+            website: { type: boolean, description: 'Webseite (Issue #273); nur in der eigenständigen Version, sonst immer false' }
         user:
           oneOf:
             - $ref: '#/components/schemas/AppUser'
@@ -9934,6 +9996,7 @@ components:
           review_gallery,
           manage_gallery,
           manage_pages,
+          manage_website,
           manage_news,
           view_personal,
           manage_personal,
@@ -10521,6 +10584,36 @@ components:
           description: 'Adresse des Logos (`/sponsorlogo/<id>?v=<Fassung>`, öffentlich und lange zwischengespeichert, solange Gäste `view_sponsors` haben); null ohne Logo'
         logo_type: { type: [string, 'null'], enum: [png, svg, null] }
 
+    WebsiteSettings:
+      type: object
+      required: [home_page_id, home_page_title, home_page_missing, pages, pages_enabled, url, entry]
+      properties:
+        home_page_id: { type: [integer, 'null'] }
+        home_page_title: { type: [string, 'null'] }
+        home_page_missing: { type: boolean, description: 'Startseite gewählt, aber gelöscht oder nicht mehr für alle sichtbar' }
+        pages:
+          type: array
+          description: Seiten, die Startseite sein können (audience public), in ihrer Reihenfolge
+          items:
+            type: object
+            required: [id, title]
+            properties:
+              id: { type: integer }
+              title: { type: string }
+        pages_enabled: { type: boolean, description: Bereich pages an }
+        url: { type: [string, 'null'], description: 'Adresse der Webseite; null, wenn die App nicht in einem eigenen Ordner liegt' }
+        entry:
+          type: object
+          required: [state, file, folder, content, message]
+          properties:
+            state:
+              type: string
+              enum: [installed, missing, outdated, occupied, not_writable, root]
+              description: 'installed: da; missing: fehlt, anlegbar; outdated: eigene Datei für einen anderen Ordner; occupied: andere Startseite im Ordner; not_writable: Ordner nicht beschreibbar; root: App liegt nicht in einem eigenen Ordner'
+            file: { type: [string, 'null'], description: 'Name der anderen Startseite bei occupied' }
+            folder: { type: string, description: 'Ordner der App, z. B. app' }
+            content: { type: string, description: 'Inhalt der Einstiegsdatei (zum Hochladen von Hand)' }
+            message: { type: string, description: Hinweis für die Verwaltung }
     PageSummary:
       type: object
       required: [id, title, audience]
