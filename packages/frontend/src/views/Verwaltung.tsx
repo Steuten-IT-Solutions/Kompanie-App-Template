@@ -70,6 +70,7 @@ import { MemberTitles, TitleList } from './TitelVerwalten';
 import { OfficeAdmin } from './AemterVerwalten';
 import { SponsorAdmin } from './SponsorenVerwalten';
 import { PageAdmin } from './SeitenVerwalten';
+import { WebsiteAdmin } from './WebseiteVerwalten';
 import { CompanyAdmin, MemberCompanies } from './KompanienVerwalten';
 import { ListAdmin } from './ListenVerwalten';
 import { MailAdmin } from './EmailsVerwalten';
@@ -127,6 +128,7 @@ type Sub =
   | 'kompanien'
   | 'sponsoren'
   | 'seiten'
+  | 'webseite'
   | 'anwesenheit'
   | 'listen'
   | 'mail';
@@ -247,6 +249,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <SponsorAdmin onToast={onToast} />
       ) : active === 'seiten' ? (
         <PageAdmin onToast={onToast} />
+      ) : active === 'webseite' ? (
+        <WebsiteAdmin onToast={onToast} />
       ) : active === 'anwesenheit' ? (
         <Anwesenheit key={arg ?? ''} id={arg && /^\d+$/.test(arg) ? Number(arg) : undefined} onToast={onToast} />
       ) : active === 'listen' ? (

@@ -11,10 +11,10 @@ Hier legst du fest, welche Bereiche die App für alle hat, zum Beispiel {bereich
 Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Bereiche**.
 
 ## Was du hier siehst
-Je Bereich ein Schalter mit seinem Namen und einem Satz, wofür er da ist: {bereich.events}, {bereich.calendar}, {bereich.news}, {bereich.gallery}, {bereich.points}, {bereich.penalties}, {bereich.ranks}, {bereich.titles}, {bereich.attendance}, {bereich.documents}, {bereich.board}, {bereich.polls}, {bereich.birthdays}, {bereich.inventory}, {bereich.directory}, {bereich.offices}, {bereich.lists}, {bereich.mail}, {bereich.companies}, {bereich.sponsors} und {bereich.pages}.
+Je Bereich ein Schalter mit seinem Namen und einem Satz, wofür er da ist: {bereich.events}, {bereich.calendar}, {bereich.news}, {bereich.gallery}, {bereich.points}, {bereich.penalties}, {bereich.ranks}, {bereich.titles}, {bereich.attendance}, {bereich.documents}, {bereich.board}, {bereich.polls}, {bereich.birthdays}, {bereich.inventory}, {bereich.directory}, {bereich.offices}, {bereich.lists}, {bereich.mail}, {bereich.companies}, {bereich.sponsors} und {bereich.pages}, in der eigenständigen Version außerdem **Webseite**.
 
 Unter einem Schalter steht außerdem, falls nötig:
-- **Braucht …**: Der Bereich lässt sich erst einschalten, wenn der genannte an ist. Das betrifft {bereich.polls}; sie brauchen das {bereich.board}.
+- **Braucht …**: Der Bereich lässt sich erst einschalten, wenn der genannte an ist. Das betrifft {bereich.polls}; sie brauchen das {bereich.board}. Die **Webseite** braucht {bereich.pages}.
 - **Noch nicht eingerichtet.** mit **Jetzt einrichten**: Der Bereich ist an, aber noch nicht verbunden (bei {bereich.calendar}, {bereich.gallery} und {bereich.news}; bei {bereich.mail} fehlt der Mailversand unter **E-Mail**). **Jetzt einrichten** öffnet die passende Seite der Einstellungen.
 
 ## So gehst du vor

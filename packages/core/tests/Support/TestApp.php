@@ -61,6 +61,7 @@ final class TestApp
         ?NewsSource $news = null,
         ?BackupProvider $backup = null,
         ?Mailer $mailer = null,
+        ?\KompanieApp\Core\Port\WebsiteHost $websiteHost = null,
     ): App {
         $filesDir ??= sys_get_temp_dir() . '/kompanie-test-' . bin2hex(random_bytes(4));
         $app = new App(
@@ -81,6 +82,7 @@ final class TestApp
             backup: $backup,
             packageConfig: $packageConfig,
             customMailer: $mailer,
+            websiteHost: $websiteHost,
         );
         $users->capabilities = static fn (string $role, int $id): array => $app->roles()->capabilitiesFor($id, $role);
         $app->upgrade();

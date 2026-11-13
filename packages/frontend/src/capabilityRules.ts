@@ -138,6 +138,7 @@ const ORDER: Capability[] = [
   'review_gallery',
   'manage_gallery',
   'manage_pages',
+  'manage_website',
   'manage_points',
   'manage_penalties',
   'manage_ranks',

@@ -67,7 +67,16 @@ final class Features
         'sponsors' => ['label' => 'Sponsoren', 'description' => 'Eure Sponsoren mit Logo und Link, in eurer Reihenfolge, für alle sichtbar, auch ohne Anmeldung.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_sponsors']],
         // Eigene Seiten (Issue #287): freie Texte mit Bildern, öffentlich oder für Mitglieder.
         'pages' => ['label' => 'Seiten', 'description' => 'Eigene Seiten mit formatiertem Text und Bildern, z. B. Geschichte, Festprogramm oder Anfahrt; je Seite für alle oder nur für Mitglieder.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_pages']],
+        // Webseite (Issue #273): eine eigene Seite als Startseite unter der Adresse des Webspace, ohne App und Anmeldung;
+        // nur in der eigenständigen Version (HOSTED).
+        'website' => ['label' => 'Webseite', 'description' => 'Eine Webseite für Besucher unter eurer Adresse, gebaut aus euren Seiten, die für alle sichtbar sind; ohne Anmeldung und ohne Cookies.', 'requires' => ['pages'], 'setup' => null, 'role' => ['member', 'manage_website']],
     ];
+
+    /**
+     * Bereiche, die der Adapter anbieten muss: die Webseite nur mit einem Ort dafür (App::$websiteHost; WordPress
+     * pflegt seine Seiten selbst). Ohne ihn fehlt der Bereich in der Liste und ist immer aus.
+     */
+    private const HOSTED = ['website'];
 
     /** @var array<string, bool>|null */
     private ?array $state = null;
@@ -100,10 +109,16 @@ final class Features
             $saved = is_array($saved) ? $saved : [];
             $this->state = [];
             foreach (self::keys() as $key) {
-                $this->state[$key] = (bool) ($saved[$key] ?? false);
+                $this->state[$key] = (bool) ($saved[$key] ?? false) && $this->available($key);
             }
         }
         return $this->state;
+    }
+
+    /** Gibt es den Bereich in dieser Installation? (Siehe HOSTED.) */
+    public function available(string $feature): bool
+    {
+        return !in_array($feature, self::HOSTED, true) || $this->app->websiteHost !== null;
     }
 
     /**
@@ -129,6 +144,9 @@ final class Features
     {
         $out = [];
         foreach (self::DEFINITIONS as $key => $def) {
+            if (!$this->available($key)) {
+                continue;
+            }
             $out[] = [
                 'key' => $key,
                 'label' => $this->app->config->sectionLabel($key, $def['label']),
@@ -172,7 +190,8 @@ final class Features
             if (!is_bool($value)) {
                 throw ApiError::invalid('Ungültiger Wert für ' . $key . ' (an oder aus erwartet).');
             }
-            $next[(string) $key] = $value;
+            // Bereiche, die es hier nicht gibt (HOSTED), bleiben aus.
+            $next[(string) $key] = $value && $this->available((string) $key);
         }
         foreach ($next as $key => $on) {
             foreach (self::DEFINITIONS[$key]['requires'] as $required) {
@@ -247,7 +266,7 @@ final class Features
         foreach (self::keys() as $key) {
             // Dienstgrade, Titel, Anwesenheit, Dokumente, das Schwarze Brett, Umfragen, Geburtstage, Inventar, die
             // Mitgliederliste, Ämter, Listen, E-Mails und Sponsoren gab es in den alten Versionen nicht: nie aus kompanie.json einschalten.
-            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices', 'lists', 'mail', 'sponsors', 'companies', 'pages'], true) && $this->app->config->legacyFeature($key);
+            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices', 'lists', 'mail', 'sponsors', 'companies', 'pages', 'website'], true) && $this->app->config->legacyFeature($key);
         }
         $this->save($state);
     }

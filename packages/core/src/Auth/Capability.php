@@ -107,6 +107,8 @@ enum Capability: string
     case ManageNews = 'manage_news';
     /** Eigene Seiten anlegen, bearbeiten, sortieren und löschen (Bereich Seiten, Issue #287). */
     case ManagePages = 'manage_pages';
+    /** Webseite pflegen: Startseite wählen, Einstiegsdatei anlegen (Bereich Webseite, Issue #273). */
+    case ManageWebsite = 'manage_website';
     /**
      * Persönliche Angaben anderer sehen: Adresse, Handynummer, E-Mail-Adresse und das ganze Geburtsdatum (in der
      * Verwaltung auf der Seite der Person). Die eigenen sieht jede Person unter Meins → Konto.

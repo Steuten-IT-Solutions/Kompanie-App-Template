@@ -75,6 +75,7 @@ final class Subjects
         '/admin/backup/drive' => ['enabled' => 'Automatisch sichern'],
         '/admin/backup/server' => ['enabled' => 'Automatisch sichern'],
         '/admin/former/retention' => ['years' => 'Frist (Jahre)'],
+        '/admin/website' => ['home_page_title' => 'Startseite der Webseite', 'entry.state' => 'Einstiegsdatei'],
     ];
 
     /** Felder, deren Wert der Schlüssel einer Rolle ist (in der Anzeige ihr Name) */
@@ -89,6 +90,7 @@ final class Subjects
         'Quelle der News' => ['none' => 'keine', 'site' => 'Beiträge der Webseite', 'wordpress' => 'WordPress-Webseite', 'rss' => 'Feed', 'app' => 'in der App'],
         'Verschlüsselung' => ['starttls' => 'STARTTLS', 'ssl' => 'SSL/TLS', 'none' => 'keine'],
         'Kanal' => ['stable' => 'stabil', 'early' => 'Vorabversionen'],
+        'Einstiegsdatei' => ['installed' => 'angelegt', 'missing' => 'fehlt', 'outdated' => 'veraltet', 'occupied' => 'andere Startseite im Ordner', 'not_writable' => 'Ordner nicht beschreibbar', 'root' => 'nicht möglich'],
     ];
 
     /** @var array<string, Subject>|null */
@@ -196,6 +198,8 @@ final class Subjects
             'PATCH /admin/push' => $this->settings('Benachrichtigungen', '/admin/push'),
             'PATCH /admin/birthdays' => $this->settings('Geburtstage', '/admin/birthdays'),
             'PUT /admin/navigation' => $this->settings('Navigation', '/admin/navigation'),
+            'PATCH /admin/website' => $this->settings('Webseite', '/admin/website'),
+            'POST /admin/website/entry' => $this->settings('Webseite', '/admin/website'),
             'PUT /admin/features' => $this->values('Bereiche', function (): array {
                 $out = [];
                 $data = ($this->get)('/admin/features');
@@ -789,6 +793,8 @@ final class Subjects
             '/admin/backup/drive' => ['available', 'access', 'encrypted', 'email', 'folder_url', 'last_ok', 'last_try', 'error', 'last_upload', 'last_upload.', 'every_days', 'keep'],
             '/admin/backup/server' => ['available', 'can_restore', 'last_ok', 'last_try', 'error', 'every_days', 'keep', 'files'],
             '/admin/former/retention' => ['due', 'soon'],
+            // Startseite als Titel (home_page_title), Liste und Hinweise ändern sich nicht durch die Route
+            '/admin/website' => ['home_page_id', 'home_page_missing', 'pages', 'pages_enabled', 'url', 'entry.file', 'entry.folder', 'entry.content', 'entry.message'],
         ];
     }
 

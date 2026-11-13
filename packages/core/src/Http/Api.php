@@ -1102,6 +1102,10 @@ final class Api
                 $a->pages()->delete($r->id());
                 return ['deleted' => true];
             }, 'pages', $denyRights),
+            // Webseite (Issue #273): Startseite und Einstiegsdatei, pflegen mit manage_website
+            new Route('GET', '/admin/website', Cap::ManageWebsite, fn () => $a->website()->describe(), 'website', $denyRights),
+            new Route('PATCH', '/admin/website', Cap::ManageWebsite, fn (Request $r) => $a->website()->update((array) $r->body), 'website', $denyRights),
+            new Route('POST', '/admin/website/entry', Cap::ManageWebsite, fn () => $a->website()->installEntry(), 'website', $denyRights),
             new Route('GET', '/sponsors', [Cap::ViewSponsors, Cap::ManageSponsors], fn () => $a->sponsors()->list(), 'sponsors', $denyView),
             new Route('POST', '/sponsors', Cap::ManageSponsors, fn (Request $r) => Response::created($a->sponsors()->create($r->body)), 'sponsors', $denyRights),
             new Route('PUT', '/sponsors/order', Cap::ManageSponsors, fn (Request $r) => $a->sponsors()->reorder($r->input('ids')), 'sponsors', $denyRights),

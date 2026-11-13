@@ -158,6 +158,12 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         short: `${sec.pages} pflegen`,
         features: ['pages'],
       },
+      {
+        key: 'manage_website',
+        label: 'Webseite: Startseite wählen und die Einstiegsdatei anlegen',
+        short: 'Webseite pflegen',
+        features: ['website'],
+      },
     ],
   },
   {

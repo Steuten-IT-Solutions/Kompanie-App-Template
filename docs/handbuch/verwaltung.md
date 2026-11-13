@@ -29,18 +29,19 @@ Du siehst nur die Knöpfe, für die du das Recht hast und deren Bereich die Komp
   - **{bereich.offices}**: wer welches Amt wann hatte,
   - **{bereich.companies}**: eure {bereich.companies} mit Logo, Beschreibung und Mitgliedern,
   - **{bereich.sponsors}**: eure {bereich.sponsors} mit Logo und Link,
-  - **{bereich.pages}**: eigene Seiten wie Geschichte oder Anfahrt.
+  - **{bereich.pages}**: eigene Seiten wie Geschichte oder Anfahrt,
+  - **Webseite**: die Webseite für Besucher mit ihrer Startseite (nur in der eigenständigen Version).
 - **Einstellungen**: nur für {rolle.admin}s.
 
 ## So gehst du vor
 ### Eine Aufgabe öffnen
 1. Tippe unten auf **Verwaltung**.
 2. Tippe auf den Knopf der Aufgabe.
-3. Für {bereich.catalog}, {bereich.ranks}, {bereich.titles}, {bereich.offices}, {bereich.companies}, {bereich.sponsors} und {bereich.pages} tippst du zuerst auf **Einrichtungen**.
+3. Für {bereich.catalog}, {bereich.ranks}, {bereich.titles}, {bereich.offices}, {bereich.companies}, {bereich.sponsors}, {bereich.pages} und die Webseite tippst du zuerst auf **Einrichtungen**.
 4. Mit **‹ Verwaltung** oben links kommst du zurück auf diese Startseite, aus den Bereichen der Einrichtungen mit **‹ Einrichtungen** erst auf deren Seite.
 
 ## Gut zu wissen
-- Hast du von {bereich.catalog}, {bereich.ranks}, {bereich.titles}, {bereich.offices}, {bereich.companies}, {bereich.sponsors} und {bereich.pages} nur einen Bereich oder sonst keine Aufgabe in der Verwaltung, stehen ihre Knöpfe direkt auf der Startseite statt unter **Einrichtungen**.
+- Hast du von {bereich.catalog}, {bereich.ranks}, {bereich.titles}, {bereich.offices}, {bereich.companies}, {bereich.sponsors}, {bereich.pages} und der Webseite nur einen Bereich oder sonst keine Aufgabe in der Verwaltung, stehen ihre Knöpfe direkt auf der Startseite statt unter **Einrichtungen**.
 - Hast du nur eine einzige Aufgabe, gibt es keine Startseite: **Verwaltung** öffnet diese Aufgabe gleich.
 - Unterseiten, z. B. die Seite eines Mitglieds oder ein einzelnes Amt, haben ihren eigenen Rückweg (z. B. **‹ Alle Mitglieder**).
 - Welche Knöpfe jemand sieht, hängt von seiner Rolle ab. Die Rollen legen die {rolle.admin}s fest.

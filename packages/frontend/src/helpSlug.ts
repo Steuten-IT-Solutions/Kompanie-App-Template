@@ -136,6 +136,7 @@ function adminSlug([sub, arg, page]: string[], ctx: HelpContext): string | null 
     aemter: 'aemter-verwalten',
     sponsoren: 'sponsoren-verwalten',
     seiten: 'seiten-verwalten',
+    webseite: 'webseite-verwalten',
     kompanien: 'kompanien-verwalten',
     neu: 'mitglieder-anlegen',
     'neu-mehrere': 'mitglieder-mehrere-anlegen',

@@ -125,6 +125,7 @@ final class Roles
         Capability::ReviewGallery,
         Capability::ManageGallery,
         Capability::ManagePages,
+        Capability::ManageWebsite,
         // Kompanie verwalten
         Capability::ManagePoints,
         Capability::ManagePenalties,
