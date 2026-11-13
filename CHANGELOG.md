@@ -24,6 +24,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ## [Unveröffentlicht]
 
+### Behoben
+
+- **Ämter-Liste**: Unter [Verwaltung → Ämter](app:verwaltung/aemter) steht ein langer, zweizeiliger Name eines Amts jetzt
+  linksbündig wie die übrigen statt mittig. Unter „Gemeinsame Amtszeiten“ hat der Knopf „Neue gemeinsame Amtszeit“ wieder
+  Abstand zur Karte darüber.
+
 ## [0.12.0] – 2026-11-13
 
 ### Neu
