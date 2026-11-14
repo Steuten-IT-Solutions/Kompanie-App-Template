@@ -71,6 +71,18 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
           </>
         ) : (
           <>
+            {events.some((ev) => ev.today) && (
+              <>
+                <h3 className="section-title">Heute</h3>
+                <EventList
+                  events={events.filter((ev) => ev.today).reverse()}
+                  empty=""
+                  more="Weitere Termine von heute anzeigen"
+                  busy={busy}
+                  onOpen={open}
+                />
+              </>
+            )}
             <h3 className="section-title">Kommende Termine</h3>
             <p className="muted small">Hier kannst du schon vorher eintragen, wer entschuldigt ist.</p>
             <EventList
@@ -82,7 +94,7 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
             />
             <h3 className="section-title">Vergangene Termine</h3>
             <EventList
-              events={events.filter((ev) => !ev.upcoming)}
+              events={events.filter((ev) => !ev.upcoming && !ev.today)}
               empty="In den letzten 90 Tagen stand nichts an."
               more="Ältere Termine anzeigen"
               busy={busy}
