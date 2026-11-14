@@ -60,6 +60,7 @@ export type Capability =
   | 'view_personal'
   | 'manage_personal'
   | 'create_users'
+  | 'manage_former'
   | 'promote_users'
   | 'review_reports'
   | 'view_activity'
@@ -974,7 +975,7 @@ export interface FormerOfficesPreview {
   }[];
 }
 
-/** Eintrag der Liste „Ehemalige“ (create_users). */
+/** Eintrag der Liste „Ehemalige“ (manage_former). */
 export interface FormerMember extends FormerInfo {
   id: number;
   name: string;

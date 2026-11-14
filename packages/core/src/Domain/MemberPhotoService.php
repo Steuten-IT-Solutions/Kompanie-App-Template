@@ -13,8 +13,9 @@ use KompanieApp\Core\Storage\MemberPhotoRepository;
 /**
  * Fotos der Mitglieder.
  *
- * - Hochladen, ersetzen und entfernen nur, wer Konten anlegen darf (create_users), und nur bei Konten, die er verwalten
- *   darf (MemberService::guardAccount); optional schon beim Anlegen (auch mehrere auf einmal).
+ * - Hochladen, ersetzen und entfernen nur, wer Konten anlegen darf (create_users), bei Ehemaligen auch, wer Ehemalige
+ *   verwaltet (manage_former), und nur bei Konten, die er verwalten darf (MemberService::guardAccount); optional schon
+ *   beim Anlegen (auch mehrere auf einmal).
  * - Erlaubt sind JPG, PNG und WebP bis 5 MB und 4096 × 4096 Pixel (die App verkleinert Fotos vorher). Gespeichert werden nur neu erzeugte JPEGs (nach EXIF
  *   gedreht, ohne Metadaten wie GPS) in 128, 480 und 1024 Pixeln an der längeren Kante (nie vergrößert) und, soweit
  *   möglich, in Originalauflösung (MAX_EDGE), in der Datenbank (MemberPhotoRepository).
@@ -269,7 +270,7 @@ final class MemberPhotoService
     /** Ob $actor das Foto dieses Kontos ändern darf (für die App: Knöpfe zeigen oder nicht). */
     public function canEdit(User $actor, int $userId): bool
     {
-        if (!$actor->can(Capability::CreateUsers)) {
+        if (!$actor->can(Capability::CreateUsers) && !$actor->can(Capability::ManageFormer)) {
             return false;
         }
         // Admins verwalten jedes Konto (ohne das Konto noch einmal zu laden).
@@ -339,8 +340,9 @@ final class MemberPhotoService
     private function guard(User $actor, int $userId, string $message): void
     {
         $target = $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
-        if (!$actor->can(Capability::CreateUsers)) {
-            throw ApiError::forbidden('Fotos ändert, wer Mitglieder anlegen darf.');
+        $former = $actor->can(Capability::ManageFormer) && $this->app->formerMembers()->previousRole($target) !== null;
+        if (!$actor->can(Capability::CreateUsers) && !$former) {
+            throw ApiError::forbidden('Fotos ändert, wer Mitglieder anlegen darf (bei Ehemaligen auch, wer Ehemalige verwaltet).');
         }
         if ($actor->id !== $userId) {
             $this->app->members()->guardAccount($actor, $target, $message);

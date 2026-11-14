@@ -47,7 +47,7 @@ final class PersonalDataExport
      * Umfragen, E-Mails, Listen, Änderungen am Schwarzen Brett und Ämter; wer davon etwas in der App nicht sehen darf, bekommt es auch so nicht (in der Regel: Admins).
      */
     public const OTHERS_REQUIRE = [
-        Capability::CreateUsers, Capability::ViewPersonal, Capability::ManagePoints, Capability::ManagePenalties,
+        Capability::CreateUsers, Capability::ManageFormer, Capability::ViewPersonal, Capability::ManagePoints, Capability::ManagePenalties,
         Capability::ManageRanks, Capability::ManageTitles, Capability::ManageAttendance, Capability::ManagePolls, Capability::SendMail,
         Capability::ManageLists, Capability::PostBoard, Capability::ViewOffices,
     ];

@@ -231,6 +231,7 @@ test('Eine eigene Seite je Bildschirm', () => {
 test('Mitgliederliste und Seite eines Mitglieds: für jede Aufgabe, die sie öffnet, sichtbar', () => {
   const cases: [string, string][] = [
     ['create_users', ''],
+    ['manage_former', ''],
     ['promote_users', ''],
     ['manage_points', 'points'],
     ['manage_penalties', 'penalties'],
@@ -255,8 +256,9 @@ test('Mitgliederliste und Seite eines Mitglieds: für jede Aufgabe, die sie öff
     helpSlug(['verwaltung', 'mitglied', '7', 'geburtstag'], withRights(['manage_points'], ['points', 'birthdays'])),
     'mitglied-uebersicht',
   );
-  assert.equal(helpSlug(['verwaltung', 'ehemalige'], withRights(['create_users'])), 'ehemalige-mitglieder');
-  assert.equal(helpSlug(['verwaltung', 'ehemalige', 'import'], withRights(['create_users'])), 'ehemalige-mitglieder');
+  assert.equal(helpSlug(['verwaltung', 'ehemalige'], withRights(['manage_former'])), 'ehemalige-mitglieder');
+  assert.equal(helpSlug(['verwaltung', 'ehemalige', 'import'], withRights(['manage_former'])), 'ehemalige-mitglieder');
+  assert.equal(helpSlug(['verwaltung', 'ehemalige', 'neu'], withRights(['manage_former'])), 'ehemalige-anlegen');
 });
 
 test('Schwarzes Brett: lesen oder schreiben', () => {

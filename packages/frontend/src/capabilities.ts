@@ -220,8 +220,15 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         short: 'Mitglieder anlegen',
       },
       {
+        key: 'manage_former',
+        label:
+          'Ehemalige verwalten: Liste der Ehemaligen, Ehemalige anlegen und importieren, Mitglieder als ehemalig eintragen und wieder aufnehmen (persönliche Angaben nur mit den Rechten dazu)',
+        short: 'Ehemalige verwalten',
+      },
+      {
         key: 'promote_users',
-        label: 'Rollen vergeben (nur Rollen mit eigenen Rechten, ohne diese beiden Rechte)',
+        label:
+          'Rollen vergeben (nur Rollen mit eigenen Rechten, ohne die Rechte Mitglieder anlegen, Ehemalige verwalten und Rollen vergeben)',
         short: 'Rollen vergeben',
       },
       {

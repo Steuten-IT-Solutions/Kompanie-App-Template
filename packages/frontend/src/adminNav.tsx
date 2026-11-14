@@ -25,7 +25,7 @@ const canPages = (): boolean => !!config?.features.pages && can('manage_pages');
 const canWebsite = (): boolean => !!config?.features.website && can('manage_website');
 
 /** Mitgliederliste: für alle, die Punkte oder Strafen vergeben, Dienstgrade, Titel oder Anwesenheit pflegen, Mitglieder
- * anlegen, Rollen vergeben oder Kompanien zuordnen. */
+ * anlegen, Ehemalige verwalten, Rollen vergeben oder Kompanien zuordnen. */
 export function memberListAllowed(): boolean {
   return (
     canPoints() ||
@@ -36,6 +36,7 @@ export function memberListAllowed(): boolean {
     canCompanies() ||
     can('view_personal') ||
     can('create_users') ||
+    can('manage_former') ||
     can('promote_users')
   );
 }
@@ -48,7 +49,7 @@ export function adminTabs(): AdminTab[] {
   const tabs = (
     [
       { id: 'mitglieder', label: 'Mitglieder', on: memberListAllowed() },
-      { id: 'ehemalige', label: 'Ehemalige', on: can('create_users') },
+      { id: 'ehemalige', label: 'Ehemalige', on: can('manage_former') },
       // Anfragen auf einen Zugang (Issue #314): auch nach dem Ausschalten, solange welche warten; Zahl der offenen im Kreis
       {
         id: 'anfragen',

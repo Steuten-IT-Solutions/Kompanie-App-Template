@@ -396,7 +396,7 @@ type People = { members: Person[]; former: Person[] };
  */
 function usePeople() {
   const source = memberListAllowed() ? 'members' : config?.features.directory ? 'directory' : null;
-  const formerSource = can('create_users') ? 'members' : config?.features.directory ? 'directory' : null;
+  const formerSource = can('manage_former') ? 'members' : config?.features.directory ? 'directory' : null;
   return useAsync(
     async (): Promise<People> => {
       const [members, former] = await Promise.all([

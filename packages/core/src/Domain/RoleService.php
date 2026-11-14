@@ -55,6 +55,8 @@ final class RoleService
     public const VIEW_SETTING = 'roles_view_split';
     /** Gesetzt, sobald Rollen mit create_users die Rechte für persönliche Angaben haben (migratePersonalRights). */
     public const PERSONAL_SETTING = 'roles_personal_split';
+    /** Gesetzt, sobald Rollen mit create_users das Recht manage_former haben (migrateFormerRights). */
+    public const FORMER_SETTING = 'roles_former_split';
     /** Rechte aus Roles::ADDED_VIEW, die die Rollen schon bekommen haben (migrateAddedViewRights). */
     public const ADDED_VIEW_SETTING = 'roles_view_added';
     public const LABEL_MAX = 30;
@@ -365,7 +367,7 @@ final class RoleService
         }
         return array_values(array_filter(
             Roles::GRANTABLE,
-            static fn (Capability $c): bool => $actor->can($c) && $c !== Capability::PromoteUsers && $c !== Capability::CreateUsers,
+            static fn (Capability $c): bool => $actor->can($c) && !in_array($c, Capability::accountRights(), true),
         ));
     }
 
@@ -666,6 +668,7 @@ final class RoleService
             $this->migrateCandidate();
             $this->migrateViewRights();
             $this->migratePersonalRights();
+            $this->migrateFormerRights();
             $this->migrateAddedViewRights();
             return;
         }
@@ -776,16 +779,36 @@ final class RoleService
      */
     private function migratePersonalRights(): void
     {
-        if ($this->settings->get(self::PERSONAL_SETTING)) {
+        $this->migrateFromCreateUsers(self::PERSONAL_SETTING, [Capability::ViewPersonal->value, Capability::ManagePersonal->value]);
+    }
+
+    /**
+     * Einmalig nach dem Update: Ehemalige verwaltete früher, wer Mitglieder anlegt (create_users); jetzt gibt es dafür
+     * manage_former. Jede Rolle mit create_users bekommt es, ebenso jede Person, der create_users zusätzlich gegeben ist;
+     * wem es entzogen ist, dem wird auch dieses entzogen. Danach darf jede Person bei den Ehemaligen dasselbe wie vorher.
+     */
+    private function migrateFormerRights(): void
+    {
+        $this->migrateFromCreateUsers(self::FORMER_SETTING, [Capability::ManageFormer->value]);
+    }
+
+    /**
+     * Rechte, die von create_users abgetrennt wurden, einmalig (gemerkt unter $setting) jeder Rolle mit create_users geben
+     * und den Ausnahmen einzelner Personen folgen lassen: zusätzlich gegeben bzw. entzogen wie create_users.
+     *
+     * @param list<string> $added
+     */
+    private function migrateFromCreateUsers(string $setting, array $added): void
+    {
+        if ($this->settings->get($setting)) {
             return;
         }
         $create = Capability::CreateUsers->value;
-        $personal = [Capability::ViewPersonal->value, Capability::ManagePersonal->value];
         $roles = $this->all();
         $changed = false;
         foreach ($roles as $key => $r) {
             if ($key !== Roles::ADMIN && in_array($create, $r['capabilities'], true)) {
-                $roles[$key]['capabilities'] = self::ordered([...$r['capabilities'], ...$personal]);
+                $roles[$key]['capabilities'] = self::ordered([...$r['capabilities'], ...$added]);
                 $changed = true;
             }
         }
@@ -797,13 +820,13 @@ final class RoleService
             if ($u === null || !self::overridable($u->role)) {
                 continue;
             }
-            $grant = in_array($create, $o['grant'], true) ? [...$o['grant'], ...$personal] : $o['grant'];
-            $revoke = in_array($create, $o['revoke'], true) ? [...$o['revoke'], ...$personal] : $o['revoke'];
+            $grant = in_array($create, $o['grant'], true) ? [...$o['grant'], ...$added] : $o['grant'];
+            $revoke = in_array($create, $o['revoke'], true) ? [...$o['revoke'], ...$added] : $o['revoke'];
             if ($grant !== $o['grant'] || $revoke !== $o['revoke']) {
                 $this->storeOverrides($id, self::normalized($this->grantedFor($id, $u->role), ['grant' => self::ordered($grant), 'revoke' => self::ordered($revoke)]));
             }
         }
-        $this->settings->set(self::PERSONAL_SETTING, true);
+        $this->settings->set($setting, true);
     }
 
     /**
@@ -1113,8 +1136,9 @@ final class RoleService
 
     /**
      * Darf $actor einer Person diese Rolle geben bzw. ihre Rolle ändern (oder ihr Passwort zurücksetzen)?
-     * Admins immer. Sonst nur Rollen, deren Rechte er selbst hat, und keine Rollen, die Konten anlegen
-     * oder Rollen vergeben dürfen: Diese Rechte weitergeben bleibt den Admins vorbehalten.
+     * Admins immer. Sonst nur Rollen, deren Rechte er selbst hat, und keine Rollen mit Rechten über Konten anderer
+     * (Capability::accountRights: Konten anlegen, Ehemalige verwalten, Rollen vergeben): Diese Rechte weitergeben bleibt
+     * den Admins vorbehalten.
      */
     public function canHandle(User $actor, string $key): bool
     {
@@ -1125,7 +1149,7 @@ final class RoleService
             return false;
         }
         foreach ($this->capabilities($key) as $cap) {
-            if (!$actor->can($cap) || $cap === Capability::PromoteUsers || $cap === Capability::CreateUsers) {
+            if (!$actor->can($cap) || in_array($cap, Capability::accountRights(), true)) {
                 return false;
             }
         }
@@ -1145,7 +1169,7 @@ final class RoleService
             return false;
         }
         foreach ($target->capabilities as $cap) {
-            if (!$actor->can($cap) || $cap === Capability::PromoteUsers || $cap === Capability::CreateUsers) {
+            if (!$actor->can($cap) || in_array($cap, Capability::accountRights(), true)) {
                 return false;
             }
         }

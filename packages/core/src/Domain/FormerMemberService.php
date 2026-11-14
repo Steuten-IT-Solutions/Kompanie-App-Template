@@ -24,8 +24,9 @@ use KompanieApp\Core\Telemetry\Detail;
  * - Laufende Ämter enden mit dem Ausscheiden (Issue #181, OfficeService::endFor), im selben Vorgang wie das Eintragen:
  *   Endjahr ist das Jahr des Austritts (leer: dieses Jahr), nie vor dem Beginn. Ändert sich das Austrittsdatum, zieht
  *   die App das Ende nach, solange niemand die Amtszeit von Hand geändert hat; „Wieder aufnehmen“ öffnet nichts wieder.
- * - Verwalten darf, wer Konten anlegt (create_users), mit denselben Grenzen wie beim Löschen (MemberService::guardAccount,
- *   bei Ehemaligen mit ihrer Grundrolle von vorher).
+ * - Verwalten darf, wer das Recht Ehemalige verwalten hat (manage_former; früher hing es an create_users), mit denselben
+ *   Grenzen wie beim Löschen (MemberService::guardAccount, bei Ehemaligen mit ihrer Grundrolle von vorher). Persönliche
+ *   Angaben Ehemaliger sieht und ändert man wie bei Mitgliedern nur mit view_personal bzw. manage_personal.
  * - Import (Ersterfassung, z. B. aus einer Chronik): CSV vorname;nachname;eintritt;ausgeschieden;grund. Für jede Person
  *   entsteht ein Konto (zufälliges Passwort, das niemand erfährt), das gleich als ehemalig eingetragen wird. Wer schon
  *   ein Konto mit genau diesem Namen hat, wird übersprungen.

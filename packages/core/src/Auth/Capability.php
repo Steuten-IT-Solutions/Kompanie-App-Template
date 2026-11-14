@@ -118,6 +118,12 @@ enum Capability: string
     case ManagePersonal = 'manage_personal';
     /** Mitglieder anlegen (auch mit ihren persönlichen Angaben), Startpasswörter erzeugen. */
     case CreateUsers = 'create_users';
+    /**
+     * Ehemalige verwalten: Liste der Ehemaligen in der Verwaltung, Ehemalige anlegen und importieren, Mitglieder als
+     * ehemalig eintragen, die Angaben dazu ändern und wieder aufnehmen (FormerMemberService). Persönliche Angaben
+     * Ehemaliger weiterhin nur mit view_personal bzw. manage_personal; die Aufbewahrungsfrist bleibt bei manage_settings.
+     */
+    case ManageFormer = 'manage_former';
     /** Rollen vergeben. */
     case PromoteUsers = 'promote_users';
     /**
@@ -182,14 +188,28 @@ enum Capability: string
 
     /**
      * Wer die Mitgliederliste der Verwaltung sieht: wer Punkte oder Strafen vergibt, Dienstgrade, Titel oder die
-     * Anwesenheit pflegt, Mitglieder Kompanien zuordnet (Issue #280), persönliche Angaben sieht, Mitglieder anlegt oder Rollen vergibt (wie memberListAllowed() in
-     * adminNav.tsx). Punkte und Strafen der Mitglieder zeigt sie nur mit dem jeweiligen Recht
+     * Anwesenheit pflegt, Mitglieder Kompanien zuordnet (Issue #280), persönliche Angaben sieht, Mitglieder anlegt,
+     * Ehemalige verwaltet (Mitglieder als ehemalig eintragen geht auf ihrer Seite) oder Rollen vergibt (wie
+     * memberListAllowed() in adminNav.tsx). Punkte und Strafen der Mitglieder zeigt sie nur mit dem jeweiligen Recht
      * (MemberService::visibleParts).
      *
      * @return list<self>
      */
     public static function memberList(): array
     {
-        return [self::ManagePoints, self::ManagePenalties, self::ManageRanks, self::ManageTitles, self::ManageAttendance, self::ManageCompanies, self::ViewPersonal, self::CreateUsers, self::PromoteUsers];
+        return [self::ManagePoints, self::ManagePenalties, self::ManageRanks, self::ManageTitles, self::ManageAttendance, self::ManageCompanies, self::ViewPersonal, self::CreateUsers, self::ManageFormer, self::PromoteUsers];
+    }
+
+    /**
+     * Rechte über Konten anderer: Konten anlegen und Passwörter setzen, Mitglieder als ehemalig eintragen (das Konto
+     * stilllegen) und wieder aufnehmen, Rollen vergeben. Wer nicht Admin ist, vergibt sie nicht weiter (weder mit einer
+     * Rolle noch einzeln) und verwaltet keine Personen, die eines davon haben (RoleService::canHandle); so kann niemand
+     * sich gegenseitig stilllegen oder sich über eine andere Person mehr Rechte verschaffen.
+     *
+     * @return list<self>
+     */
+    public static function accountRights(): array
+    {
+        return [self::CreateUsers, self::ManageFormer, self::PromoteUsers];
     }
 }

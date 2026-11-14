@@ -135,7 +135,7 @@ final class CapabilityOverridesTest extends TestCase
 
     public function testDelegatedPromoterOnlyChangesOwnRights(): void
     {
-        $chef = $this->users->add('chef', $this->role('Chef', TestApp::caps(['member', 'promote_users', 'manage_points'])));
+        $chef = $this->users->add('chef', $this->role('Chef', TestApp::caps(['member', 'promote_users', 'manage_points', 'manage_former'])));
         $this->users->current = $chef;
 
         $res = $this->rights($this->m, ['manage_points']);
@@ -143,6 +143,7 @@ final class CapabilityOverridesTest extends TestCase
         $this->assertSame(TestApp::caps(['member', 'manage_points']), $res->data['editable']);
         $this->assertSame(403, $this->rights($this->m, ['manage_points', 'manage_events'])->status, 'hat er selbst nicht');
         $this->assertSame(403, $this->rights($this->m, ['manage_points', 'create_users'])->status, 'bleibt den Admins vorbehalten');
+        $this->assertSame(403, $this->rights($this->m, ['manage_points', 'manage_former'])->status, 'auch Ehemalige verwalten');
         $this->assertSame(400, $this->rights($chef, [])->status, 'nicht die eigenen');
         $this->assertNull($this->call('GET', "/members/$chef")->data['rights']);
 

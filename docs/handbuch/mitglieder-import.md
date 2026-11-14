@@ -39,7 +39,7 @@ Tippe unten auf **Verwaltung**, dann auf **Mitglieder**, auf **+ Mitglied anlege
 - Ältere Excel-Dateien (.xls) speicherst du vorher als .xlsx; die App liest das erste Tabellenblatt.
 - Wer schon ein Konto mit genau diesem Vor- und Nachnamen hat, wird übersprungen; ein zweiter Import derselben Datei legt also niemanden doppelt an. Zwei Personen mit gleichem Namen in der Datei sind ein Fehler: Mach sie unterscheidbar, z. B. mit „I“ und „II“ am Nachnamen.
 - Höchstens 500 Personen auf einmal. Fotos trägst du danach einzeln auf der Seite jedes Mitglieds nach.
-- Die Startpasswörter stehen **nur dieses eine Mal** da. Mitglieder ohne Zugang stehen dort nicht. Ehemalige bekommen ein Konto ohne Anmeldung (siehe [Ehemalige](seite:ehemalige-mitglieder)).
+- Die Startpasswörter stehen **nur dieses eine Mal** da. Mitglieder ohne Zugang stehen dort nicht. Ehemalige bekommen ein Konto ohne Anmeldung (siehe **Ehemalige** im Handbuch, mit dem Recht **Ehemalige verwalten**).
 - Die Datei enthält persönliche Daten: Lösche sie nach dem Import, wenn du sie nicht mehr brauchst.
 
 ## Siehe auch

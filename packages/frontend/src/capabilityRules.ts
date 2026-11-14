@@ -149,6 +149,7 @@ const ORDER: Capability[] = [
   'view_personal',
   'manage_personal',
   'create_users',
+  'manage_former',
   'promote_users',
   'review_reports',
   'view_changes',

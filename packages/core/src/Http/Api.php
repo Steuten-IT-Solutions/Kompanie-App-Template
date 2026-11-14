@@ -818,6 +818,7 @@ final class Api
         $denyManage = 'Dafür fehlen dir die Rechte.';
         $denyEvents = 'Nur Administratoren dürfen öffentliche Termine pflegen.';
         $denyUsers = 'Nur Administratoren dürfen Mitglieder anlegen.';
+        $denyFormer = 'Ehemalige verwaltet nur, wer das Recht dazu hat.';
         $denyRoles = 'Nur Administratoren dürfen Rollen ändern.';
         $denyRights = 'Dafür fehlen dir die Rechte.';
         $denyPolls = 'An Umfragen darfst du nicht teilnehmen.';
@@ -1402,29 +1403,33 @@ final class Api
                 return $out;
             }, null, $denyManage),
             // Ehemalige Mitglieder: Liste, eintragen (Konto stilllegen, Daten bleiben), ändern, wieder aufnehmen, Import
-            new Route('GET', '/members/former', Cap::CreateUsers, function () use ($a) {
+            new Route('GET', '/members/former', Cap::ManageFormer, function () use ($a) {
                 $photos = $a->memberPhotos()->urls();
                 return array_map(static fn (array $m): array => $m + ['photo_url' => $photos[$m['id']] ?? null], $a->formerMembers()->list($this->user()));
-            }, null, $denyUsers),
-            // Eine ehemalige Person neu anlegen (Konto ohne Anmeldung), wie beim Mitglied mit Geburtstag und Foto
-            new Route('POST', '/members/former', Cap::CreateUsers, function (Request $r) use ($a) {
+            }, null, $denyFormer),
+            // Eine ehemalige Person neu anlegen (Konto ohne Anmeldung), wie beim Mitglied mit Geburtstag und Foto; den
+            // Geburtstag (persönliche Angabe) nur, wer auch Mitglieder anlegt oder persönliche Angaben pflegt
+            new Route('POST', '/members/former', Cap::ManageFormer, function (Request $r) use ($a) {
                 $birthday = $this->birthdayInput($r->body['birthday'] ?? null);
+                if ($birthday !== null && !$this->can(Cap::CreateUsers) && !$this->can(Cap::ManagePersonal)) {
+                    throw ApiError::forbidden('Den Geburtstag trägt nur ein, wer persönliche Angaben pflegen darf.');
+                }
                 $photo = $this->photoInput($r->body['photo'] ?? null);
                 $created = $a->formerMembers()->create($this->user(), $r->body);
                 $this->storeBirthday($created['id'], $birthday, $created);
                 $this->storePhoto($created['id'], $photo, $created);
                 return Response::created($created);
-            }, null, $denyUsers),
+            }, null, $denyFormer),
             // Import (Ersterfassung, z. B. aus einer Chronik): ohne apply nur die Vorschau
-            new Route('POST', '/members/former/import', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->import($this->user(), $r->input('csv'), Input::bool($r->input('apply'))), null, $denyUsers),
+            new Route('POST', '/members/former/import', Cap::ManageFormer, fn (Request $r) => $a->formerMembers()->import($this->user(), $r->input('csv'), Input::bool($r->input('apply'))), null, $denyFormer),
             // Mitglieder aus einer Tabelle (CSV, in der App auch aus Excel gelesen), mit Anwärtern und Ehemaligen: ohne apply
             // nur die Vorschau; mit apply stehen die Startpasswörter der neuen aktiven Konten in der Antwort
             new Route('POST', '/members/import', Cap::CreateUsers, fn (Request $r) => $a->memberImport()->import($this->user(), $r->input('csv'), Input::bool($r->input('apply'))), null, $denyUsers),
             // Vorschau zu „Als ehemalig eintragen“: laufende Ämter, die mit dem Ausscheiden enden (Issue #181)
-            new Route('GET', '/members/{id}/former/offices', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->officesPreview($this->user(), $r->id(), $r->query['left_on'] ?? ''), null, $denyUsers),
-            new Route('PUT', '/members/{id}/former', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->mark($this->user(), $r->id(), $r->body), null, $denyUsers),
-            new Route('PATCH', '/members/{id}/former', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->update($this->user(), $r->id(), $r->body), null, $denyUsers),
-            new Route('DELETE', '/members/{id}/former', Cap::CreateUsers, fn (Request $r) => $a->formerMembers()->reactivate($this->user(), $r->id()), null, $denyUsers),
+            new Route('GET', '/members/{id}/former/offices', Cap::ManageFormer, fn (Request $r) => $a->formerMembers()->officesPreview($this->user(), $r->id(), $r->query['left_on'] ?? ''), null, $denyFormer),
+            new Route('PUT', '/members/{id}/former', Cap::ManageFormer, fn (Request $r) => $a->formerMembers()->mark($this->user(), $r->id(), $r->body), null, $denyFormer),
+            new Route('PATCH', '/members/{id}/former', Cap::ManageFormer, fn (Request $r) => $a->formerMembers()->update($this->user(), $r->id(), $r->body), null, $denyFormer),
+            new Route('DELETE', '/members/{id}/former', Cap::ManageFormer, fn (Request $r) => $a->formerMembers()->reactivate($this->user(), $r->id()), null, $denyFormer),
             // Grundrolle (level) und/oder Zusatzrollen (extra_roles, Issue #66)
             new Route('PATCH', '/members/{id}/role', Cap::PromoteUsers, fn (Request $r) => $a->members()->setLevel($this->user(), $r->id(), $r->input('level'), $r->input('extra_roles')), null, $denyRoles),
             // Rechte einzelner Personen zusätzlich zu ihren Rollen geben oder entziehen
@@ -1443,8 +1448,9 @@ final class Api
                 return ['deleted' => true];
             }, null, $denyUsers),
             // Foto des Mitglieds: hochladen bzw. ersetzen und entfernen
-            new Route('PUT', '/members/{id}/photo', Cap::CreateUsers, fn (Request $r) => $a->memberPhotos()->upload($this->user(), $r->id(), $r->input('file')), null, $denyUsers),
-            new Route('DELETE', '/members/{id}/photo', Cap::CreateUsers, fn (Request $r) => $a->memberPhotos()->remove($this->user(), $r->id()), null, $denyUsers),
+            // Fotos: wer Mitglieder anlegt; bei Ehemaligen auch, wer sie verwaltet (MemberPhotoService::guard)
+            new Route('PUT', '/members/{id}/photo', [Cap::CreateUsers, Cap::ManageFormer], fn (Request $r) => $a->memberPhotos()->upload($this->user(), $r->id(), $r->input('file')), null, $denyUsers),
+            new Route('DELETE', '/members/{id}/photo', [Cap::CreateUsers, Cap::ManageFormer], fn (Request $r) => $a->memberPhotos()->remove($this->user(), $r->id()), null, $denyUsers),
             new Route('POST', '/members/{id}/password', Cap::CreateUsers, fn (Request $r) => $a->members()->resetPassword($this->user(), $r->id()), null, $denyUsers),
             new Route('POST', '/users', Cap::CreateUsers, function (Request $r) use ($a) {
                 // Anfangspunkte und Dienstgrad: alles prüfen, bevor das Konto entsteht.

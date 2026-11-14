@@ -388,7 +388,7 @@ final class WpUsers implements UserDirectory, AuthContext
         if (in_array('administrator', (array) $user->roles, true) || is_super_admin($id)) {
             throw new \DomainException('Administratoren werden im WordPress-Backend verwaltet.');
         }
-        $this->guardAccount($id, 'Diesen Benutzer darfst du in WordPress nicht ändern.');
+        $this->guardAccount($id, 'Diesen Benutzer darfst du in WordPress nicht ändern.', Capability::ManageFormer);
         update_user_option($id, self::ROLE_META, AppRoles::GUEST, false);
         $user->remove_role(Roles::ROLE_MANAGER);
         $user->remove_role(Roles::ROLE_ORGANIZER);
@@ -432,7 +432,7 @@ final class WpUsers implements UserDirectory, AuthContext
         if ($role === AppRoles::ADMIN) {
             throw new \DomainException('Administratoren werden im WordPress-Backend verwaltet.');
         }
-        $this->guardAccount($id, 'Diesen Benutzer darfst du in WordPress nicht ändern.');
+        $this->guardAccount($id, 'Diesen Benutzer darfst du in WordPress nicht ändern.', Capability::ManageFormer);
         update_user_option($id, self::ROLE_META, $role, false);
         if (isset(self::LEGACY_WP_ROLES[$role])) {
             $user->add_role(self::LEGACY_WP_ROLES[$role]);
@@ -462,15 +462,18 @@ final class WpUsers implements UserDirectory, AuthContext
 
     /**
      * Wie beim Passwort: Benutzer der Webseite (Redakteure usw.) oder Konten, die nicht von der Kompanie sind, nur mit
-     * dem Recht aus WordPress; Konten der Kompanie auch mit „Mitglieder anlegen“ aus der App.
+     * dem Recht aus WordPress; Konten der Kompanie auch mit „Mitglieder anlegen“ aus der App (beim Stilllegen und Wieder
+     * aufnehmen als Ehemalige auch mit „Ehemalige verwalten“, $alsoAppCap).
      */
-    private function guardAccount(int $id, string $message): void
+    private function guardAccount(int $id, string $message, ?Capability $alsoAppCap = null): void
     {
         $actor = get_current_user_id();
         if ($actor === 0) {
             return;
         }
-        $may = $this->needsWpRight($id) ? current_user_can('edit_user', $id) : $this->actorMay('edit_user', $id, Capability::CreateUsers);
+        $may = $this->needsWpRight($id)
+            ? current_user_can('edit_user', $id)
+            : $this->actorMay('edit_user', $id, Capability::CreateUsers) || ($alsoAppCap !== null && $this->actorMay('edit_user', $id, $alsoAppCap));
         if (!$may) {
             throw new \DomainException($message);
         }
@@ -547,6 +550,11 @@ final class WpUsers implements UserDirectory, AuthContext
             if (!in_array($cap, $caps, true) && user_can($u, $wpCap)) {
                 $caps[] = $cap;
             }
+        }
+        // Ehemalige verwaltete früher, wer Mitglieder anlegt: Wem WordPress das gibt, der behält auch das (wie die Migration
+        // RoleService::migrateFormerRights für die Rollen der App).
+        if (is_array($wp) && ($wp['create_users'] ?? null) === Capability::CreateUsers && user_can($u, 'create_users') && !in_array(Capability::ManageFormer, $caps, true)) {
+            $caps[] = Capability::ManageFormer;
         }
         // Wer die Einstellungen der Webseite verwaltet, ist dort Admin und sieht auch die Nutzungsauswertung (Issue #175) und
         // das Änderungsprotokoll.

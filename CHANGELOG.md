@@ -45,6 +45,17 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Anwesenheitsliste zählt Offene**: Der Zähler über der Liste nennt zusätzlich, für wie viele Personen noch nichts
   gewählt ist, z. B. „3 anwesend · 1 entschuldigt · 0 fehlt · 5 ohne Auswahl“.
 
+### Geändert
+
+- **Eigenes Recht „Ehemalige verwalten“**: Die Kachel [Ehemalige](app:verwaltung/ehemalige) und alles dazu (Ehemalige
+  anlegen und importieren, Mitglieder als ehemalig eintragen, die Angaben ändern und wieder aufnehmen) hängt nicht mehr
+  an _Mitglieder anlegen_, sondern am neuen Recht _Ehemalige verwalten_. Rollen und Personen, die _Mitglieder anlegen_
+  hatten, haben nach dem Update auch dieses Recht; es ändert sich also zunächst nichts. Unter
+  [Einstellungen → Rollen](app:einstellungen/rollen) könnt ihr es jetzt auch anderen Rollen geben, z. B. der Rolle, die
+  Punkte vergibt. Wer es hat, sieht auch die Mitgliederliste in der Verwaltung. Persönliche Angaben Ehemaliger gibt es
+  weiter nur mit _Persönliche Angaben sehen_ bzw. _pflegen_, die Aufbewahrungsfrist stellen weiter nur Admins ein. Wie
+  _Mitglieder anlegen_ und _Rollen vergeben_ geben Nicht-Admins dieses Recht nicht weiter.
+
 ### Behoben
 
 - **Ämter-Liste**: Unter [Verwaltung → Ämter](app:verwaltung/aemter) steht ein langer, zweizeiliger Name eines Amts jetzt

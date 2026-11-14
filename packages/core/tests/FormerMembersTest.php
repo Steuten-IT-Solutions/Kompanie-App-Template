@@ -111,7 +111,7 @@ final class FormerMembersTest extends TestCase
 
     public function testLimitsForNonAdmins(): void
     {
-        $this->call('POST', '/admin/roles', ['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'create_users'])]);
+        $this->call('POST', '/admin/roles', ['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'manage_former'])]);
         $clerk = $this->users->add('schrift', 'r1');
         $admin2 = $this->users->add('admin2', Roles::ADMIN);
         $this->users->current = $clerk;
@@ -129,7 +129,51 @@ final class FormerMembersTest extends TestCase
         $this->assertSame(200, $this->call('DELETE', "/members/{$this->m}/former")->status);
 
         $this->users->current = $this->m;
-        $this->assertSame(403, $this->call('GET', '/members/former')->status, 'nur wer Konten anlegt');
+        $this->assertSame(403, $this->call('GET', '/members/former')->status, 'nur wer Ehemalige verwaltet');
+    }
+
+    /**
+     * Eigenes Recht manage_former: Mitglieder anlegen allein genügt nicht mehr; mit dem Recht gibt es die Liste, das
+     * Eintragen, Ändern, Wieder aufnehmen, Anlegen und den Import, dazu die Mitgliederliste der Verwaltung. Den Geburtstag
+     * beim Anlegen und persönliche Angaben gibt es nur mit den Rechten dafür.
+     */
+    public function testOwnRightManageFormer(): void
+    {
+        $this->app->features()->update(['birthdays' => true]);
+        $roles = $this->app->roles();
+        $creator = $this->users->add('anleger', $roles->create(['label' => 'Anleger', 'capabilities' => TestApp::caps(['member', 'create_users'])])['key']);
+        $keeper = $this->users->add('chronist', $roles->create(['label' => 'Chronist', 'capabilities' => TestApp::caps(['member', 'manage_former'])])['key']);
+
+        $this->users->current = $creator;
+        $this->assertSame(403, $this->call('GET', '/members/former')->status, 'Mitglieder anlegen allein genügt nicht');
+        $this->assertSame(403, $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left'])->status);
+        $this->assertSame(403, $this->call('POST', '/members/former', ['first_name' => 'Karl', 'reason' => 'left'])->status);
+        $this->assertSame(403, $this->call('POST', '/members/former/import', ['csv' => "Karl;Alt;;;"])->status);
+
+        $this->users->current = $keeper;
+        $this->assertContains($this->m, $this->memberIds(), 'Mitgliederliste der Verwaltung');
+        $detail = $this->call('GET', "/members/{$this->m}")->data;
+        $this->assertArrayNotHasKey('personal', $detail, 'persönliche Angaben nur mit view_personal');
+        $this->assertSame(200, $this->call('GET', "/members/{$this->m}/former/offices")->status);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'left'])->status);
+        $this->assertSame(200, $this->call('PATCH', "/members/{$this->m}/former", ['reason' => 'deceased'])->status);
+        $this->assertSame([$this->m], array_column($this->call('GET', '/members/former')->data, 'id'));
+        $this->assertSame(200, $this->call('DELETE', "/members/{$this->m}/former")->status);
+        $this->assertSame(Roles::MEMBER, $this->users->find($this->m)?->role);
+        $this->assertSame(200, $this->call('POST', '/members/former/import', ['csv' => "Karl;Alt;1950;1990;"])->status);
+        $res = $this->call('POST', '/members/former', ['first_name' => 'Erna', 'last_name' => 'Früher', 'reason' => 'left', 'birthday' => '1930-04-02']);
+        $this->assertSame(403, $res->status, 'Geburtstag nur mit manage_personal oder create_users');
+        $this->assertSame(201, $this->call('POST', '/members/former', ['first_name' => 'Erna', 'last_name' => 'Früher', 'reason' => 'left'])->status);
+        // Konten anlegen, Passwörter und Rollen bleiben bei ihren Rechten
+        $this->assertSame(403, $this->call('POST', "/members/{$this->m}/password")->status);
+        $this->assertSame(403, $this->call('DELETE', "/members/{$this->m}")->status);
+        // Wer selbst Ehemalige verwaltet, wird von anderen ohne Admin nicht stillgelegt (wie bei create_users).
+        $peer = $this->users->add('chronist2', (string) $this->users->find($keeper)?->role);
+        $this->assertSame(403, $this->call('PUT', "/members/$peer/former", ['reason' => 'left'])->status);
+
+        $this->users->current = $this->admin;
+        $res = $this->call('POST', '/members/former', ['first_name' => 'Otto', 'last_name' => 'Früher', 'reason' => 'left', 'birthday' => '1930-04-02']);
+        $this->assertSame(201, $res->status, (string) json_encode($res->data));
     }
 
     public function testLastAdminAndDeletion(): void
