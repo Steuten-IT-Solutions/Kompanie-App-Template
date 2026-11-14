@@ -55,7 +55,7 @@ export const BLOCK_KINDS: { type: BlockKind; label: string; hint: string }[] = [
   { type: 'text', label: 'Text', hint: 'Formatierter Text mit Bildern' },
   { type: 'countdown', label: 'Countdown', hint: 'Zählt bis zu einem Datum oder Termin herunter' },
   { type: 'button', label: 'Knopf mit Link', hint: 'Führt zu einer Webseite, Mail, Telefonnummer oder Seite der App' },
-  { type: 'events', label: 'Nächste Einträge', hint: 'Was als Nächstes ansteht, immer aktuell' },
+  { type: 'events', label: 'Nächste Termine', hint: 'Was als Nächstes ansteht, immer aktuell' },
   { type: 'contacts', label: 'Ansprechpartner', hint: 'Wer ein Amt gerade innehat, mit Foto' },
   { type: 'notice', label: 'Hinweis-Kasten', hint: 'Kurzer Text, farbig hervorgehoben' },
   { type: 'divider', label: 'Trennlinie', hint: 'Linie oder Abstand zwischen Blöcken' },

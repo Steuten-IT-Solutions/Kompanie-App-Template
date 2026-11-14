@@ -25,7 +25,7 @@ Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum 
 
 ### Weitere Blöcke einfügen
 - **Knopf mit Link**: Trage eine **Beschriftung** und ein **Ziel** ein: eine Webseite mit https://, eine E-Mail-Adresse mit mailto:, eine Telefonnummer mit tel: oder eine Seite der App wie #/termine. Bei **Aussehen** wählst du **Hervorgehoben** oder **Zurückhaltend**.
-- **Nächste Einträge**: Wähle eine **Überschrift** und **Wie viele Einträge** (1 bis 20). Der Block zeigt immer die nächsten Einträge ab heute aus {bereich.events}.
+- **Nächste Termine**: Wähle eine **Überschrift** und **Wie viele Termine** (1 bis 20). Der Block zeigt immer die nächsten Termine ab heute aus {bereich.events}.
 - **Ansprechpartner**: Hake bei **Ämter** die Ämter an, deren Inhaber erscheinen sollen. E-Mail-Adresse und Handynummer sehen nur Personen, die persönliche Angaben sehen dürfen.
 - **Hinweis-Kasten**: ein kurzer **Hinweis**, farbig als **Info**, **Warnung** oder **Erfolg**.
 - **Trennlinie**: eine **Linie** oder **Nur Abstand** zwischen zwei Blöcken.

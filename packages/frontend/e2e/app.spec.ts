@@ -5220,7 +5220,7 @@ test('Eigene Seiten: Knopf mit Link und Nächste Termine, Gast sieht beide', asy
   await form.locator('.block-button-fields input[inputmode="url"]').fill('#/termine');
   await insertBlock(form, '+ Block einfügen', 'events');
   await form.getByLabel('Überschrift (optional)').fill('Demnächst');
-  await form.getByLabel('Wie viele Einträge').fill('2');
+  await form.getByLabel('Wie viele Termine').fill('2');
   await form.getByRole('button', { name: 'Anlegen' }).click();
   await expect(page.locator('.toast')).toHaveText('Seite angelegt');
   const row = page.locator('.page-admin-list .row', { hasText: title });
