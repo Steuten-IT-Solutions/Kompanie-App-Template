@@ -57,7 +57,7 @@ grep -qF 'quelle.md: Verweis auf „ziel-eng“, die nicht jeder sieht' <<< "$OU
 ok "einrecht: Verweise nur auf Seiten, die jeder mit einem dieser Rechte sieht (Admins sehen alles)"
 # Pflichtseite für ein Recht auch über einrecht
 mkdir -p "$T/ein3"
-printf -- '---\ntitel: Rollen\nreihenfolge: 6\nrechte: []\neinrecht: [promote_users, create_users, review_reports, view_changes]\n---\nText.\n' > "$T/ein3/rollen.md"
+printf -- '---\ntitel: Rollen\nreihenfolge: 6\nrechte: []\neinrecht: [promote_users, create_users, manage_former, review_reports, view_changes]\n---\nText.\n' > "$T/ein3/rollen.md"
 printf -- '---\ntitel: Anlegen\nreihenfolge: 7\nrechte: [create_users]\n---\nText.\n' > "$T/ein3/anlegen.md"
 OUT="$(php scripts/handbuch.php --check --src="$T/ein3" 2>&1 || true)"
 grep -q 'Bereich „' <<< "$OUT" && ! grep -q 'Für das Recht' <<< "$OUT" || fail "Pflichtseite über einrecht abgelehnt: $OUT"
