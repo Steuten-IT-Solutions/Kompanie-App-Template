@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useState, type ReactNode } from 'react';
 import { api, type BlockAudience, type DocumentInfo, type GalleryAlbumSummary, type Office, type Poll, type PublicEvent } from '../api';
-import { Loading, lazyView } from '../ui';
+import { Loading, Sheet, lazyView } from '../ui';
 import {
   BLOCK_KINDS,
   moveBlock,
@@ -21,6 +21,7 @@ import {
   type SponsorsDraft,
   type MapDraft,
 } from './blockDrafts';
+import { BlockIcon } from './blockIcons';
 import Countdown from './Countdown';
 import { previewRange } from './countdown';
 import { confirmAsk } from '../ask';
@@ -499,24 +500,44 @@ function EventsFields({ block, onChange }: { block: EventsDraft; onChange: (b: E
   );
 }
 
-/** Auswahl „+ Block einfügen“ an einer Stelle der Liste. */
+/**
+ * Knopf „+ Block einfügen“ an einer Stelle der Liste. Er öffnet ein Fenster mit allen Blockarten, je mit Symbol, Name
+ * und kurzer Erklärung; Tippen fügt den Block ein und schließt das Fenster („Zurück“ schließt es ebenso, Sheet).
+ */
 function InsertBlock({ onInsert, label = '+ Block einfügen' }: { onInsert: (type: BlockKind) => void; label?: string }) {
+  const [open, setOpen] = useState(false);
   return (
     <div className="block-insert">
-      <select
-        aria-label={label}
-        value=""
-        onChange={(e) => {
-          if (e.target.value) onInsert(e.target.value as BlockKind);
-        }}
-      >
-        <option value="">{label}</option>
-        {BLOCK_KINDS.map((k) => (
-          <option key={k.type} value={k.type}>
-            {kindLabel(k)}: {k.hint}
-          </option>
-        ))}
-      </select>
+      <button type="button" className="btn btn-secondary block-insert-btn" aria-haspopup="dialog" onClick={() => setOpen(true)}>
+        {label}
+      </button>
+      {open && (
+        <Sheet title="Block einfügen" onClose={() => setOpen(false)}>
+          <ul className="block-kinds" aria-label="Blockarten">
+            {BLOCK_KINDS.map((k) => (
+              <li key={k.type}>
+                <button
+                  type="button"
+                  className="block-kind"
+                  data-kind={k.type}
+                  onClick={() => {
+                    setOpen(false);
+                    onInsert(k.type);
+                  }}
+                >
+                  <span className="block-kind-icon">
+                    <BlockIcon type={k.type} />
+                  </span>
+                  <span className="block-kind-text">
+                    <strong>{kindLabel(k)}</strong>
+                    <span className="muted small">{k.hint}</span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Sheet>
+      )}
     </div>
   );
 }
