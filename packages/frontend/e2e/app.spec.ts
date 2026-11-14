@@ -132,6 +132,17 @@ async function login(page: Page, user: string, password = PASSWORD) {
   await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
 }
 
+/**
+ * „+ Block einfügen“ (bzw. „+ Block darunter einfügen“) in `scope` antippen und im Fenster die Blockart `type` wählen.
+ * Die Kacheln tragen die Blockart in data-kind, weil der Name (z. B. Sponsoren) aus der Konfiguration kommen kann.
+ */
+async function insertBlock(scope: Locator, label: string, type: string) {
+  await scope.getByRole('button', { name: label, exact: true }).click();
+  const dialog = scope.page().getByRole('dialog', { name: 'Block einfügen' });
+  await dialog.locator(`.block-kind[data-kind="${type}"]`).click();
+  await expect(dialog).toHaveCount(0);
+}
+
 async function shot(page: Page, name: string) {
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png` });
 }
@@ -5122,6 +5133,30 @@ test('Eigene Seiten (Issue #287): anlegen öffentlich und nur für Mitglieder, j
   }
 });
 
+test('Block einfügen: Fenster mit allen Blockarten, Zurück und Esc schließen es ohne Block', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Seiten');
+  const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neue Seite' }) });
+  // Eine neue Seite beginnt mit einem Textblock.
+  const blocks = form.locator('.block-edit');
+  await expect(blocks).toHaveCount(1);
+  const open = form.getByRole('button', { name: '+ Block einfügen', exact: true });
+  const dialog = page.getByRole('dialog', { name: 'Block einfügen' });
+  await open.click();
+  await expect(dialog.locator('.block-kind')).toHaveCount(14);
+  await expect(dialog.locator('.block-kind[data-kind="countdown"]')).toContainText('Zählt bis zu einem Datum');
+  await shot(page, 'seiten-block-einfuegen');
+  // „Zurück“ schließt nur das Fenster, die Seite bleibt
+  const url = page.url();
+  await page.goBack();
+  await expect(dialog).toHaveCount(0);
+  expect(page.url()).toBe(url);
+  await open.click();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(blocks).toHaveCount(1);
+});
+
 test('Eigene Seiten aus Blöcken: Countdown einfügen, Block nur für Mitglieder, Gast sieht Countdown ohne den Block', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   await adminMenu(page, 'Seiten');
@@ -5130,7 +5165,7 @@ test('Eigene Seiten aus Blöcken: Countdown einfügen, Block nur für Mitglieder
   await form.getByLabel('Für wen?').selectOption({ label: 'Alle, auch ohne Anmeldung' });
   await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Herzlich willkommen.');
   // Countdown darunter, ein Jahr im Voraus
-  await form.getByLabel('+ Block darunter einfügen').selectOption('countdown');
+  await insertBlock(form, '+ Block darunter einfügen', 'countdown');
   const next = new Date();
   next.setFullYear(next.getFullYear() + 1);
   const date = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
@@ -5141,7 +5176,7 @@ test('Eigene Seiten aus Blöcken: Countdown einfügen, Block nur für Mitglieder
   await form.locator('.block-countdown-fields').scrollIntoViewIfNeeded();
   await shot(page, 'seiten-countdown-bearbeiten');
   // Am Ende ein Text nur für Mitglieder
-  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('text');
+  await insertBlock(form, '+ Block einfügen', 'text');
   await form.getByLabel('Zielgruppe des Blocks (Text)').last().selectOption('members');
   await form.getByRole('textbox', { name: 'Text', exact: true }).last().fill('Treffpunkt intern.');
   await form.getByRole('button', { name: 'Anlegen' }).click();
@@ -5180,10 +5215,10 @@ test('Eigene Seiten: Knopf mit Link und Nächste Termine, Gast sieht beide', asy
   await form.getByLabel('Titel').fill(title);
   await form.getByLabel('Für wen?').selectOption({ label: 'Alle, auch ohne Anmeldung' });
   await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Sei dabei.');
-  await form.getByLabel('+ Block darunter einfügen').selectOption('button');
+  await insertBlock(form, '+ Block darunter einfügen', 'button');
   await form.getByLabel('Beschriftung').fill('Zu den Terminen');
   await form.locator('.block-button-fields input[inputmode="url"]').fill('#/termine');
-  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('events');
+  await insertBlock(form, '+ Block einfügen', 'events');
   await form.getByLabel('Überschrift (optional)').fill('Demnächst');
   await form.getByLabel('Wie viele Einträge').fill('2');
   await form.getByRole('button', { name: 'Anlegen' }).click();
@@ -5215,16 +5250,16 @@ test('Eigene Seiten: Hinweis-Kasten, Trennlinie, Ablauf und Zahlen', async ({ pa
   const title = `Hinweise ${Date.now().toString(36)}`;
   await form.getByLabel('Titel').fill(title);
   await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Oben.');
-  await form.getByLabel('+ Block darunter einfügen').selectOption('notice');
+  await insertBlock(form, '+ Block darunter einfügen', 'notice');
   await form.getByLabel('Hinweis', { exact: true }).fill('Halle gesperrt.');
   await form.locator('.block-notice-fields select').selectOption('warning');
-  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('divider');
-  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('schedule');
+  await insertBlock(form, '+ Block einfügen', 'divider');
+  await insertBlock(form, '+ Block einfügen', 'schedule');
   await form.getByLabel('Zeit 1').fill('14:00');
   await form.getByLabel('Programmpunkt 1').fill('Treffen');
   await form.getByRole('button', { name: '+ Programmpunkt' }).click();
   await form.getByLabel('Programmpunkt 2').fill('Umzug');
-  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('facts');
+  await insertBlock(form, '+ Block einfügen', 'facts');
   await form.getByLabel('Wert 1').fill('1848');
   await form.getByLabel('Bezeichnung 1').fill('gegründet');
   await form.getByRole('button', { name: 'Anlegen' }).click();
@@ -5261,7 +5296,7 @@ test('Eigene Seiten: Block Sponsoren zeigt die Sponsoren mit Link', async ({ pag
     const form = page.locator('form', { has: page.getByRole('heading', { name: 'Neue Seite' }) });
     await form.getByLabel('Titel').fill(title);
     await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Oben.');
-    await form.getByLabel('+ Block darunter einfügen').selectOption('sponsors');
+    await insertBlock(form, '+ Block darunter einfügen', 'sponsors');
     await form.locator('.block-edit').last().getByLabel('Überschrift (optional)').fill('Mit Dank an');
     await form.getByRole('button', { name: 'Anlegen' }).click();
     await expect(page.locator('.toast')).toHaveText('Seite angelegt');
@@ -5297,7 +5332,7 @@ test('Eigene Seiten: Karte zur Anfahrt öffnet den Ort in der Karten-App', async
   const title = `Anfahrt ${Date.now().toString(36)}`;
   await form.getByLabel('Titel').fill(title);
   await form.getByRole('textbox', { name: 'Text', exact: true }).fill('Oben.');
-  await form.getByLabel('+ Block darunter einfügen').selectOption('map');
+  await insertBlock(form, '+ Block darunter einfügen', 'map');
   await form.locator('.block-map-fields input').nth(1).fill('Am Markt 1, 12345 Musterstadt');
   await form.getByRole('button', { name: 'Anlegen' }).click();
   await expect(page.locator('.toast')).toHaveText('Seite angelegt');
@@ -5923,13 +5958,13 @@ test('Schwarzes Brett aus Blöcken: Countdown und Text nur für Mitglieder, ohne
   const form = admin.locator('.board-form');
   await form.getByLabel('Titel').fill(title);
   await form.getByLabel('Text der Nachricht').fill('Alle sind eingeladen.');
-  await form.getByLabel('+ Block darunter einfügen').selectOption('countdown');
+  await insertBlock(form, '+ Block darunter einfügen', 'countdown');
   const next = new Date();
   next.setFullYear(next.getFullYear() + 1);
   const date = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`;
   await form.getByLabel('Überschrift (optional)').fill('Bis zum Fest');
   await form.locator('.block-countdown-fields input[type="date"]').first().fill(date);
-  await form.getByLabel('+ Block einfügen', { exact: true }).selectOption('text');
+  await insertBlock(form, '+ Block einfügen', 'text');
   await form.getByLabel('Zielgruppe des Blocks (Text)').last().selectOption('members');
   await form.getByLabel('Text der Nachricht').last().fill('Treffpunkt intern.');
   await form.locator('.board-audience').selectOption('public');

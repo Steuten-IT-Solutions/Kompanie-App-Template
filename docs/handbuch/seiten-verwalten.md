@@ -31,7 +31,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{
 Hat jemand anderes die Seite gespeichert, während du sie bearbeitet hast, speichert die App deine Fassung nicht und sagt, wer sie geändert hat. Kopiere dann deine Änderungen, tippe auf **Neu laden** und trage sie noch einmal ein. Beim Neu laden gehen deine Änderungen verloren.
 
 ### Blöcke einfügen, verschieben und entfernen
-- Wähle bei **+ Block einfügen** die Art des Blocks: **Text**, **Countdown**, **Knopf mit Link**, **Nächste Einträge**, **Ansprechpartner**, **Hinweis-Kasten**, **Trennlinie**, **Ablauf**, **Zahlen und Fakten**, **Umfrage**, **Album**, **Dokument**, **{bereich.sponsors}** oder **Karte zur Anfahrt**. Mit **+ Block darunter einfügen** kommt der neue Block direkt unter einen bestehenden.
+- Tippe auf **+ Block einfügen**. Im Fenster steht jede Art des Blocks mit Symbol und kurzer Erklärung; tippe die gewünschte an: **Text**, **Countdown**, **Knopf mit Link**, **Nächste Einträge**, **Ansprechpartner**, **Hinweis-Kasten**, **Trennlinie**, **Ablauf**, **Zahlen und Fakten**, **Umfrage**, **Album**, **Dokument**, **{bereich.sponsors}** oder **Karte zur Anfahrt**. Mit **+ Block darunter einfügen** kommt der neue Block direkt unter einen bestehenden.
 - Mit **↑** und **↓** verschiebst du einen Block nach oben oder unten, mit **Entfernen** nimmst du ihn heraus.
 - Bei jedem Block wählst du, für wen er ist: **Für alle, die die Seite sehen** oder **Nur Mitglieder**. So kann eine öffentliche Seite einzelne Teile nur für Mitglieder enthalten, zum Beispiel einen internen Treffpunkt. Ohne Anmeldung und für Gäste fehlen diese Blöcke samt ihren Bildern.
 - Erst **Speichern** (bzw. **Anlegen**) übernimmt die Änderungen.

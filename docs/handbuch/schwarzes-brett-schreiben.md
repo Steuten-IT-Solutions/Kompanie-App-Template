@@ -70,7 +70,7 @@ Mit der Leiste über dem Text gestaltest du die Nachricht wie in einem Mailprogr
 - **Karte zur Anfahrt**: Trage einen **Ort oder eine Adresse** ein. Der Block zeigt den Ort mit dem Knopf **Karte**, der ihn in der Karten-App des Geräts öffnet, wie beim Ort eines Termins.
 
 ### Einen Countdown einfügen
-1. Wähle bei **+ Block einfügen** **Countdown**.
+1. Tippe auf **+ Block einfügen** und wähle im Fenster **Countdown**.
 2. Trage bei Bedarf eine **Überschrift** ein und wähle bei **Zählt bis** ein **Datum** (mit **Uhrzeit**) oder einen **Termin** aus den {bereich.events}. Ein verschobener Termin zählt von selbst mit.
 3. Optional: ein Ende (**Ende am**, **Ende um**) mit einem **Text, solange es läuft**, und bei **Danach** einen **Text danach** oder **Block ausblenden**.
 4. Die **Vorschau** zeigt, wie der Countdown gerade aussieht. Er zeigt immer zwei Angaben: Tage und Stunden, am letzten Tag Stunden und Minuten, in der letzten Stunde Minuten und Sekunden. Er zählt nach dem Kalender in der Zeitzone eurer App: Liegt bis dahin eine Zeitumstellung, zeigt er die Restzeit wie auf der Uhr, also z. B. von 21:47 Uhr bis 0:00 Uhr immer 2 Stunden 13 Minuten.
