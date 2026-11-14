@@ -486,7 +486,7 @@ function EventsFields({ block, onChange }: { block: EventsDraft; onChange: (b: E
         />
       </label>
       <label className="field">
-        <span>Wie viele Einträge</span>
+        <span>Wie viele Termine</span>
         <input
           type="number"
           min={1}
@@ -494,7 +494,7 @@ function EventsFields({ block, onChange }: { block: EventsDraft; onChange: (b: E
           value={block.count}
           onChange={(e) => set({ count: Math.max(1, Math.min(EVENTS_MAX, Number(e.target.value) || 1)) })}
         />
-        <span className="muted small">Die App zeigt immer die nächsten Einträge ab heute.</span>
+        <span className="muted small">Die App zeigt immer die nächsten Termine ab heute.</span>
       </label>
     </div>
   );

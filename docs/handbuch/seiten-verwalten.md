@@ -31,7 +31,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{
 Hat jemand anderes die Seite gespeichert, während du sie bearbeitet hast, speichert die App deine Fassung nicht und sagt, wer sie geändert hat. Kopiere dann deine Änderungen, tippe auf **Neu laden** und trage sie noch einmal ein. Beim Neu laden gehen deine Änderungen verloren.
 
 ### Blöcke einfügen, verschieben und entfernen
-- Tippe auf **+ Block einfügen**. Im Fenster steht jede Art des Blocks mit Symbol und kurzer Erklärung; tippe die gewünschte an: **Text**, **Countdown**, **Knopf mit Link**, **Nächste Einträge**, **Ansprechpartner**, **Hinweis-Kasten**, **Trennlinie**, **Ablauf**, **Zahlen und Fakten**, **Umfrage**, **Album**, **Dokument**, **{bereich.sponsors}** oder **Karte zur Anfahrt**. Mit **+ Block darunter einfügen** kommt der neue Block direkt unter einen bestehenden.
+- Tippe auf **+ Block einfügen**. Im Fenster steht jede Art des Blocks mit Symbol und kurzer Erklärung; tippe die gewünschte an: **Text**, **Countdown**, **Knopf mit Link**, **Nächste Termine**, **Ansprechpartner**, **Hinweis-Kasten**, **Trennlinie**, **Ablauf**, **Zahlen und Fakten**, **Umfrage**, **Album**, **Dokument**, **{bereich.sponsors}** oder **Karte zur Anfahrt**. Mit **+ Block darunter einfügen** kommt der neue Block direkt unter einen bestehenden.
 - Mit **↑** und **↓** verschiebst du einen Block nach oben oder unten, mit **Entfernen** nimmst du ihn heraus.
 - Bei jedem Block wählst du, für wen er ist: **Für alle, die die Seite sehen** oder **Nur Mitglieder**. So kann eine öffentliche Seite einzelne Teile nur für Mitglieder enthalten, zum Beispiel einen internen Treffpunkt. Ohne Anmeldung und für Gäste fehlen diese Blöcke samt ihren Bildern.
 - Erst **Speichern** (bzw. **Anlegen**) übernimmt die Änderungen.
@@ -54,8 +54,8 @@ Ein Countdown zählt bis zu einem Zeitpunkt herunter und zeigt immer zwei Angabe
 Webseiten öffnen sich in einem neuen Fenster, Seiten der App im selben.
 
 ### Die nächsten Termine zeigen
-1. Füge einen Block **Nächste Einträge** ein.
-2. Trage bei Bedarf eine **Überschrift** ein und wähle bei **Wie viele Einträge**, wie viele erscheinen (1 bis 20).
+1. Füge einen Block **Nächste Termine** ein.
+2. Trage bei Bedarf eine **Überschrift** ein und wähle bei **Wie viele Termine**, wie viele erscheinen (1 bis 20).
 
 Der Block zeigt immer die nächsten Termine ab heute aus den {bereich.events}, mit Datum, Uhrzeit und Ort, darunter **Alle Termine**. Du musst ihn nie anpassen. Wer die {bereich.events} nicht sehen darf, sieht dort „Zurzeit keine anstehenden Termine.“ Sind die {bereich.events} ausgeschaltet, fehlt der Block.
 

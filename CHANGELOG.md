@@ -51,6 +51,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   **+ Block einfügen** jetzt ein Fenster statt einer langen Auswahlliste. Jede Blockart steht dort als Kachel mit
   Symbol, Name und kurzer Erklärung (am Computer in zwei Spalten); Antippen fügt den Block ein, ✕ oder „Zurück“
   schließen das Fenster ohne Block.
+- **Block „Nächste Termine“**: Der Block, der die nächsten Termine ab heute zeigt, heißt in der Auswahl und beim
+  Bearbeiten jetzt _Nächste Termine_ statt _Nächste Einträge_; das Feld heißt _Wie viele Termine_. Bestehende Blöcke
+  bleiben, wie sie sind.
 - **Eigenes Recht „Ehemalige verwalten“**: Die Kachel [Ehemalige](app:verwaltung/ehemalige) und alles dazu (Ehemalige
   anlegen und importieren, Mitglieder als ehemalig eintragen, die Angaben ändern und wieder aufnehmen) hängt nicht mehr
   an _Mitglieder anlegen_, sondern am neuen Recht _Ehemalige verwalten_. Rollen und Personen, die _Mitglieder anlegen_
