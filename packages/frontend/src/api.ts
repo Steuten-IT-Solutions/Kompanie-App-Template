@@ -1616,6 +1616,8 @@ export interface AttendanceEvent {
   all_day: boolean;
   /** Termin nach heute */
   upcoming: boolean;
+  /** Termin heute (Zeitzone der Kompanie) */
+  today: boolean;
   list_id: number | null;
 }
 

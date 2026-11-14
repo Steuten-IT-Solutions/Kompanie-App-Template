@@ -81,9 +81,10 @@ final class AttendanceService
 
     /**
      * Termine aus dem internen Kalender zur Auswahl: die der letzten Wochen und alle kommenden, die spätesten zuerst, mit
-     * der ID einer schon angelegten Liste und ob der Termin noch kommt (upcoming). Ohne Bereich Kalender leer.
+     * der ID einer schon angelegten Liste, ob der Termin noch kommt (upcoming) und ob er heute ist (today). Ohne Bereich
+     * Kalender leer.
      *
-     * @return list<array{key: string, title: string, date: string, start: string, end: string, all_day: bool, upcoming: bool, list_id: int|null}>
+     * @return list<array{key: string, title: string, date: string, start: string, end: string, all_day: bool, upcoming: bool, today: bool, list_id: int|null}>
      */
     public function events(): array
     {
@@ -100,7 +101,7 @@ final class AttendanceService
                 continue;
             }
             $key = (string) $e['id'];
-            $out[] = ['key' => $key, 'title' => (string) $e['title'], 'date' => $date, 'start' => (string) $e['start'], 'end' => (string) $e['end'], 'all_day' => (bool) ($e['all_day'] ?? false), 'upcoming' => $date > $today, 'list_id' => $lists[$key] ?? null];
+            $out[] = ['key' => $key, 'title' => (string) $e['title'], 'date' => $date, 'start' => (string) $e['start'], 'end' => (string) $e['end'], 'all_day' => (bool) ($e['all_day'] ?? false), 'upcoming' => $date > $today, 'today' => $date === $today, 'list_id' => $lists[$key] ?? null];
         }
         return array_reverse($out);
     }

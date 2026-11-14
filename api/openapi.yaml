@@ -3415,6 +3415,7 @@ paths:
                     end: { type: string }
                     all_day: { type: boolean }
                     upcoming: { type: boolean, description: Datum nach heute (Zeitzone der Kompanie) }
+                    today: { type: boolean, description: Datum ist heute (Zeitzone der Kompanie) }
                     list_id: { type: [integer, 'null'], description: Schon angelegte Liste }
         '403': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }

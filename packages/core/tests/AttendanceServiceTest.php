@@ -99,6 +99,21 @@ final class AttendanceServiceTest extends TestCase
         $this->assertSame(['Probe'], array_column($this->call('GET', '/attendance')->data, 'title'));
     }
 
+    public function testEventsOfTodayAreMarkedToday(): void
+    {
+        $this->setUpApp();
+        // Am Tag der Probe (19 Uhr Ortszeit), vor und nach Beginn: weder kommend noch vergangen, sondern heute.
+        foreach (['2026-10-15 08:00:00', '2026-10-15 21:30:00'] as $at) {
+            $this->setClock($at);
+            $events = array_column($this->call('GET', '/attendance/events')->data, null, 'title');
+            $this->assertSame([false, true], [$events['Probe']['upcoming'], $events['Probe']['today']], $at);
+            $this->assertSame([true, false], [$events['Fest']['upcoming'], $events['Fest']['today']], $at);
+        }
+        $this->setClock('2026-10-16 08:00:00');
+        $probe = array_column($this->call('GET', '/attendance/events')->data, null, 'title')['Probe'];
+        $this->assertSame([false, false], [$probe['upcoming'], $probe['today']], 'am Tag danach vergangen');
+    }
+
     public function testUpcomingEventsOnlyExcused(): void
     {
         $this->setUpApp();
