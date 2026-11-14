@@ -4769,7 +4769,7 @@ paths:
       tags: [Verwaltung]
       summary: Mitglieder mit Summen
       description: Wer Dienstgrade bzw. Titel verwaltet, sieht zusätzlich frühere Mitglieder, die noch einen Dienstgrad bzw. Titel haben.
-      x-capability: 'manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, create_users oder promote_users (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, sonst null)'
+      x-capability: 'manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, create_users, manage_former oder promote_users (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, sonst null)'
       parameters:
         - name: all
           in: query
@@ -4820,7 +4820,7 @@ paths:
       tags: [Verwaltung]
       summary: Mitglied mit Punkten und Strafen
       description: Mit Bereich Geburtstage und Recht `create_users` auch `birthday` (mit Jahr und den Schaltern der Person, null ohne Eintrag).
-      x-capability: 'manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, create_users oder promote_users (Punkte bzw. Strafen nur mit dem jeweiligen Recht)'
+      x-capability: 'manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, create_users, manage_former oder promote_users (Punkte bzw. Strafen nur mit dem jeweiligen Recht)'
       responses:
         '200':
           description: OK
@@ -4900,7 +4900,7 @@ paths:
         setzen die Person auf die Rechte ihrer Rolle zurück. Nicht für Admins (haben alle Rechte), Gäste und sich selbst;
         `manage_settings` bleibt den Admins vorbehalten. Rechte zum Verwalten brauchen den Mitgliederbereich, der interne
         Kalender lässt sich nur mit ihm entziehen. Wer Rollen vergeben darf, ohne Admin zu sein, ändert nur Rechte, die er
-        selbst hat, ohne `create_users` und `promote_users`, und nur bei Personen, die er verwalten darf.
+        selbst hat, ohne `create_users`, `manage_former` und `promote_users`, und nur bei Personen, die er verwalten darf.
       x-capability: promote_users
       requestBody:
         required: true
@@ -4961,7 +4961,7 @@ paths:
         eigene Bilder (Signatur, Entwürfe) mit Inhalt). Ohne Pseudonyme. Nicht in der Vorschau (403).
         Wie `GET /me/data`, aber ohne Antworten in anonymen Umfragen und die Nutzungsauswertung nur mit `view_activity`.
         Grenzen wie beim Löschen (Konten von Admins nur für Admins); zusätzlich alle Rechte der enthaltenen Bereiche
-        (sonst 403), damit niemand über die Auskunft sieht, was ihm in der App verborgen ist: `view_personal`,
+        (sonst 403), damit niemand über die Auskunft sieht, was ihm in der App verborgen ist: `manage_former`, `view_personal`,
         `manage_points`, `manage_penalties`, `manage_ranks`, `manage_titles`, `manage_attendance`, `manage_polls`,
         `send_mail`, `manage_lists`, `post_board`, `view_offices`.
       x-capability: create_users und die Rechte aller enthaltenen Bereiche (in der Regel Admins)
@@ -4982,7 +4982,7 @@ paths:
       tags: [Verwaltung]
       summary: Ehemalige Mitglieder (ausgetreten, verstorben, sonst ausgeschieden)
       description: Nach Namen. `points` bzw. `open_cents` nur mit manage_points bzw. manage_penalties (sonst null).
-      x-capability: create_users
+      x-capability: manage_former
       responses:
         '200':
           description: OK
@@ -4998,10 +4998,10 @@ paths:
       description: |
         Wie eine Zeile von `/members/former/import`, mit den Feldern von `PUT /members/{id}/former` (Daten als TT.MM.JJJJ,
         JJJJ-MM-TT, nur das Jahr oder leer). Erst wird alles geprüft, dann angelegt. Wer genau so heißt wie ein vorhandenes
-        Konto (Groß- und Kleinschreibung egal), wird nicht angelegt → 400. Geburtstag (nur mit dem Bereich Geburtstage) und
-        Foto wie bei `POST /users`; klappt das Speichern nicht, ist die Person trotzdem angelegt und `warning` sagt es. Freie
+        Konto (Groß- und Kleinschreibung egal), wird nicht angelegt → 400. Geburtstag (nur mit dem Bereich Geburtstage und nur, wer auch
+        `create_users` oder `manage_personal` hat, sonst 403) und Foto wie bei `POST /users`; klappt das Speichern nicht, ist die Person trotzdem angelegt und `warning` sagt es. Freie
         Namen in Amtszeiten, die genau passen, werden mit dem Konto verknüpft (`offices_linked`).
-      x-capability: create_users
+      x-capability: manage_former
       requestBody:
         required: true
         content:
@@ -5052,7 +5052,7 @@ paths:
         `apply` entsteht je Person ein Konto (zufälliges Passwort, das niemand erfährt), das gleich als ehemalig eingetragen
         wird; enthält eine Zeile einen Fehler → 400 (nichts angelegt). Freie Namen in Amtszeiten, die genau zu einer neu
         angelegten (oder schon früher als ehemalig importierten) Person passen, werden mit ihrem Konto verknüpft.
-      x-capability: create_users
+      x-capability: manage_former
       requestBody:
         required: true
         content:
@@ -5125,7 +5125,7 @@ paths:
         Laufende Amtszeiten (Zeitraum ohne Ende, auch mit Haken „Ehrung“) der Person mit dem Jahr, mit dem sie enden würden:
         Jahr aus `left_on`, leer dieses Jahr, nie vor dem Beginn (`clamped`). Prüfung und Grenzen wie bei
         `PUT /members/{id}/former`; ungültiges Datum → 400. Ändert nichts.
-      x-capability: create_users
+      x-capability: manage_former
       parameters:
         - name: left_on
           in: query
@@ -5169,7 +5169,7 @@ paths:
         nicht den letzten Admin, keine Gäste. Im selben Vorgang enden die laufenden Ämter der Person (siehe
         `GET /members/{id}/former/offices`); gemeinsame Amtszeiten werden geteilt, die anderen laufen weiter. Verknüpfte
         Titel entfallen damit, andere Titel bleiben.
-      x-capability: create_users
+      x-capability: manage_former
       requestBody:
         required: true
         content:
@@ -5196,7 +5196,7 @@ paths:
       description: |
         Ändert sich das Austrittsdatum, enden die beim Eintragen automatisch beendeten Amtszeiten mit dem neuen Jahr (nie vor
         ihrem Beginn), solange niemand sie seither von Hand geändert hat.
-      x-capability: create_users
+      x-capability: manage_former
       requestBody:
         required: true
         content:
@@ -5218,7 +5218,7 @@ paths:
         Grundrolle von vorher (Mitglied, wenn es sie nicht mehr gibt), Zusatzrollen, soweit es sie gibt und der Handelnde
         sie vergeben darf; Ausnahmen bei den Rechten nur durch Admins. Ein Startpasswort danach über
         `POST /members/{id}/password`. Beendete Ämter bleiben beendet.
-      x-capability: create_users
+      x-capability: manage_former
       responses:
         '200':
           description: OK
@@ -5324,7 +5324,7 @@ paths:
         Neu gegenüber der ersten Umsetzung. Ersetzt „Passwort vergessen“ per E-Mail: Ein Admin erzeugt ein
         neues Startpasswort, das nur in dieser Antwort steht. Alle Geräte des Mitglieds
         werden abgemeldet. Wer kein Admin ist, darf das nur bei Anwärtern (auch eigenen Rollen nur mit dem Kalender)
-        und Mitgliedern, deren Rechte er selbst hat (ohne create_users und promote_users), nicht bei Gästen und Admins.
+        und Mitgliedern, deren Rechte er selbst hat (ohne create_users, manage_former und promote_users), nicht bei Gästen und Admins.
         Bei einem Mitglied ohne Zugang („Zugang einrichten“) hat es danach einen (`no_access` fällt weg).
       x-capability: create_users
       responses:
@@ -5355,7 +5355,7 @@ paths:
         Metadaten) in der Datenbank. Ein vorhandenes Foto wird ersetzt; die Fassung (und damit
         `photo_url`) ändert sich. Wer kein Admin ist, nur bei Konten, die er verwalten darf (wie `PATCH
         /members/{id}/account`).
-      x-capability: create_users
+      x-capability: create_users (bei Ehemaligen auch manage_former)
       requestBody:
         required: true
         content:
@@ -5381,7 +5381,7 @@ paths:
     delete:
       tags: [Verwaltung]
       summary: Foto eines Mitglieds entfernen
-      x-capability: create_users
+      x-capability: create_users (bei Ehemaligen auch manage_former)
       responses:
         '200':
           description: Entfernt (`photo_url` ist null)
@@ -5904,7 +5904,7 @@ paths:
         Anwärter (Issue #23) sind eine eigene Rolle; die frühere feste Rolle `candidate` bleibt in Installationen, die
         sie hatten, als eigene Rolle mit `new_accounts` und `promotable` erhalten. Schaltet der Admin einen Bereich mit eigenen Rechten ein
         (Termine, Punkte, Strafen), kommt dessen Standardrolle dazu; schaltet er ihn aus, verschwindet sie, wenn niemand sie hat.
-        Wer Rollen vergeben darf, ohne Admin zu sein, vergibt nur Rollen mit eigenen Rechten, ohne `create_users` und `promote_users`.
+        Wer Rollen vergeben darf, ohne Admin zu sein, vergibt nur Rollen mit eigenen Rechten, ohne `create_users`, `manage_former` und `promote_users`.
       x-capability: manage_settings
       responses:
         '200':
@@ -9070,6 +9070,7 @@ components:
                       view_personal,
                       manage_personal,
                       create_users,
+                      manage_former,
                       promote_users,
                       review_reports,
                       view_activity,
@@ -9145,6 +9146,7 @@ components:
                   view_personal,
                   manage_personal,
                   create_users,
+                  manage_former,
                   promote_users,
                   review_reports,
                 ],
@@ -9206,6 +9208,7 @@ components:
                 view_personal,
                 manage_personal,
                 create_users,
+                manage_former,
                 promote_users,
                 review_reports,
                 view_activity,
@@ -9806,7 +9809,7 @@ components:
                 - $ref: '#/components/schemas/MemberRights'
                 - type: 'null'
             photo_editable:
-              { type: boolean, description: 'Ob der Betrachter das Foto ändern darf (create_users und dieses Konto verwalten)' }
+              { type: boolean, description: 'Ob der Betrachter das Foto ändern darf (create_users, bei Ehemaligen auch manage_former, und dieses Konto verwalten)' }
             former:
               description: Ehemalig (Grund, Eintritt, Ausscheiden); null, wenn die Person nicht ehemalig ist
               oneOf:
@@ -10005,6 +10008,7 @@ components:
           view_personal,
           manage_personal,
           create_users,
+          manage_former,
           promote_users,
           review_reports,
         ]
@@ -10147,7 +10151,7 @@ components:
       description: |
         Foto des Mitglieds oder null: `<App>/mitgliedsfoto/<id>?v=<Fassung>&s=128`. Die App ersetzt `s` bei Bedarf
         durch 480, 1024 oder 4096 (Originalauflösung, für die Großansicht nachgeladen; 404, wenn es sie nicht gibt). Ausgeliefert als image/jpeg an die Person selbst und an alle, die die Mitglieder in der Verwaltung
-        sehen (manage_points, manage_penalties, manage_ranks, manage_titles, create_users oder promote_users); mit dem
+        sehen (manage_points, manage_penalties, manage_ranks, manage_titles, create_users, manage_former oder promote_users); mit dem
         Bereich directory an alle, auch ohne Anmeldung, wenn das Foto zu einem Mitglied oder Anwärter gehört (Issue #112,
         dann `Cache-Control: public`); sonst 401/403, im Wartungsmodus 503. Sonst `Cache-Control: private`, bei passender
         Fassung einen Tag; immer `X-Robots-Tag: noindex`. Die Adresse wechselt mit jedem Foto.

@@ -142,6 +142,28 @@ final class MemberPhotoTest extends TestCase
         $this->assertFalse($this->call('GET', "/members/{$this->admin}")->data['photo_editable']);
     }
 
+    /** Wer Ehemalige verwaltet (manage_former), ändert Fotos von Ehemaligen, nicht aber von aktiven Mitgliedern. */
+    public function testFormerManagersChangePhotosOfFormerOnly(): void
+    {
+        $keeper = $this->users->add('chronist', $this->roleWith('Chronist', ['member', 'manage_former']));
+        $former = $this->users->add('alt', Roles::MEMBER);
+        $this->assertSame(200, $this->call('PUT', "/members/$former/former", ['reason' => 'left'])->status);
+        $photo = ['file' => self::file('a.jpg', self::image(10, 10))];
+
+        $this->users->current = $keeper;
+        $this->assertSame(403, $this->call('PUT', "/members/{$this->m}/photo", $photo)->status, 'aktives Mitglied');
+        $this->assertFalse($this->call('GET', "/members/{$this->m}")->data['photo_editable']);
+        $this->assertTrue($this->call('GET', "/members/$former")->data['photo_editable']);
+        $res = $this->call('PUT', "/members/$former/photo", $photo);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame(200, $this->call('DELETE', "/members/$former/photo")->status);
+        // Beim Anlegen einer ehemaligen Person gleich mit Foto
+        $res = $this->call('POST', '/members/former', ['first_name' => 'Karl', 'last_name' => 'Früher', 'reason' => 'deceased', 'photo' => $photo['file']]);
+        $this->assertSame(201, $res->status, (string) json_encode($res->data));
+        $this->assertArrayNotHasKey('warning', $res->data);
+        $this->assertNotNull($res->data['photo_url']);
+    }
+
     public function testDeliveryChecksViewer(): void
     {
         $this->call('PUT', "/members/{$this->m}/photo", ['file' => self::file('a.jpg', self::image(600, 600))]);

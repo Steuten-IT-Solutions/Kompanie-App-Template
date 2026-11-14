@@ -1,9 +1,9 @@
 ---
 titel: Ehemalige
 reihenfolge: 74
-rechte: [create_users]
+rechte: [manage_former]
 ---
-Wer austritt, verstirbt oder sonst ausscheidet, muss nicht gelöscht werden. Als ehemalig eingetragen bleibt das Konto mit allen Daten erhalten: {bereich.points}, {bereich.penalties}, Anwesenheit, {begriff.rank} mit Verlauf, {bereich.titles}, {bereich.offices}, Geburtstag und Foto. Unter **Ehemalige** findest du alle diese Personen.
+Wer austritt, verstirbt oder sonst ausscheidet, muss nicht gelöscht werden. Als ehemalig eingetragen bleibt das Konto mit allen Daten erhalten: {bereich.points}, {bereich.penalties}, Anwesenheit, {begriff.rank} mit Verlauf, {bereich.titles}, {bereich.offices}, Geburtstag und Foto. Unter **Ehemalige** findest du alle diese Personen. Alles auf dieser Seite darf, wer das Recht **Ehemalige verwalten** hat.
 
 ![Liste der Ehemaligen in der Verwaltung](bild:ehemalige-mitglieder)
 
@@ -63,11 +63,13 @@ Gelöscht werden die persönlichen Angaben: Adresse, Handynummer, E-Mail-Adresse
 - Änderst du später **Ausgeschieden am**, ziehen die beim Eintragen beendeten Amtszeiten mit: Sie enden dann mit dem neuen Jahr. Das gilt nicht für Amtszeiten, die inzwischen jemand unter {bereich.offices} von Hand geändert hat.
 - **Wieder aufnehmen** öffnet beendete Amtszeiten nicht wieder. Hat die Person ein Amt weiter inne, trage unter {bereich.offices} eine neue Amtszeit ein oder entferne dort das Ende.
 - Beim Wiederaufnehmen bekommt die Person ihre Rolle von vorher zurück, dazu ihre Zusatzrollen, soweit es sie noch gibt und du sie vergeben darfst. Ausnahmen bei den Rechten stellt nur ein {rolle.admin} wieder her. Gibt es die Rolle nicht mehr, wird sie {rolle.member}.
+- Wer kein {rolle.admin} ist, trägt nur Personen als ehemalig ein (und nimmt nur solche wieder auf), die keine weiteren Rechte als er selbst haben und weder Mitglieder anlegen, Ehemalige verwalten noch Rollen vergeben dürfen.
+- Persönliche Angaben Ehemaliger (Adresse, Handynummer, E-Mail-Adresse, Geburtsdatum) siehst und änderst du wie bei Mitgliedern nur mit **Persönliche Angaben sehen** bzw. **Persönliche Angaben pflegen**. Das Foto einer ehemaligen Person änderst du mit **Ehemalige verwalten**.
 - Konten von {rolle.admin}s tragen nur {rolle.admin}s als ehemalig ein. Das eigene Konto kannst du nicht als ehemalig eintragen.
 - Import: **eintritt** und **ausgeschieden** als TT.MM.JJJJ, nur das Jahr oder leer; „Gründer“ als Eintritt trägt ein Gründungsmitglied ohne Datum ein. **grund**: ausgetreten (auch leer), verstorben oder sonstiges. Eine Kopfzeile mit genau diesen Spaltennamen ist erlaubt. Höchstens 500 Zeilen auf einmal.
 - Für jede importierte Person entsteht ein Konto ohne Anmeldung, das gleich als ehemalig eingetragen ist. Wer schon ein Konto mit genau diesem Vor- und Nachnamen hat, wird übersprungen; ein zweiter Import legt also niemanden doppelt an. Zwei Personen mit gleichem Namen in der Tabelle sind ein Fehler: Mach sie unterscheidbar, z. B. mit „I“ und „II“ am Nachnamen.
 - Steht eine importierte Person in den {bereich.offices} bisher nur mit ihrem Namen, verknüpft der Import diesen Eintrag mit ihrem neuen Konto, wenn der Name genau passt (Groß- und Kleinschreibung egal). Die Vorschau sagt vorher, wie viele Einträge verknüpft werden.
-- Aktive und Ehemalige aus einer gemeinsamen Liste übernimmst du unter [Mitglieder importieren](seite:mitglieder-import).
+- Aktive und Ehemalige aus einer gemeinsamen Liste übernimmst du unter **Mitglieder importieren** (mit dem Recht **Mitglieder anlegen**).
 
 > **Für Fortgeschrittene:** In der WordPress-Version bleibt der Benutzer der Webseite bestehen, hat in der App aber keine Rolle mehr. Das gilt auch, wenn die Aufbewahrungsfrist die Person löscht: Name und E-Mail-Adresse löscht ein Administrator der Webseite im WordPress-Backend unter **Benutzer**.
 

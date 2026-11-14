@@ -10,6 +10,7 @@ test('eigene Daten und Verwalten setzen die Mitgliedschaft voraus, Sehen nicht',
   assert.equal(requires('view_own_points'), 'member');
   assert.equal(requires('manage_events'), 'member');
   assert.equal(requires('create_users'), 'member');
+  assert.equal(requires('manage_former'), 'member');
   assert.equal(requires('view_ranks'), null);
   assert.equal(requires('calendar'), null);
   assert.equal(requires('member'), null);

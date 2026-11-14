@@ -138,6 +138,7 @@ final class Roles
         Capability::ViewPersonal,
         Capability::ManagePersonal,
         Capability::CreateUsers,
+        Capability::ManageFormer,
         Capability::PromoteUsers,
         Capability::ReviewReports,
         Capability::ViewChanges,

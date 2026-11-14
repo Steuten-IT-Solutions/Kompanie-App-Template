@@ -23,6 +23,11 @@ export function canEnterBirthdays(): boolean {
   return !!config?.features.birthdays && can('create_users');
 }
 
+/** Das Datum beim Anlegen einer ehemaligen Person: wer Mitglieder anlegt oder persönliche Angaben pflegt (wie der Server). */
+export function canEnterFormerBirthdays(): boolean {
+  return canEnterBirthdays() || canSetBirthdays();
+}
+
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
 const pad2 = (n: number) => String(n).padStart(2, '0');

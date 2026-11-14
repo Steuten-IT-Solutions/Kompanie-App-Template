@@ -982,7 +982,7 @@ function MemberDetailView({
   // Eintritt aktiver Mitglieder (create_users); Ehemalige haben ihren Eintritt bei den Angaben zum Ausscheiden, Gäste keinen.
   const joinOn = m.join_year !== undefined && !m.former && m.level !== 'guest';
   // Als ehemalig eintragen bzw. die Angaben ändern; m.former fehlt bei älteren Servern (dann nicht).
-  const formerEditable = can('create_users') && !self && m.former !== undefined && (m.former !== null || m.level !== 'guest');
+  const formerEditable = can('manage_former') && !self && m.former !== undefined && (m.former !== null || m.level !== 'guest');
   const avatar = !!m.photo_url || !!m.photo_editable;
   const rankBadge = m.rank_title ? (
     <>

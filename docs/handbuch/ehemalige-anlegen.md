@@ -1,7 +1,7 @@
 ---
 titel: Ehemalige Person anlegen
 reihenfolge: 75
-rechte: [create_users]
+rechte: [manage_former]
 ---
 Wer schon vor der App ausgeschieden ist (z. B. aus der Chronik), hat noch kein Konto. Hier trägst du so eine Person einzeln nach. Es entsteht ein Konto ohne Anmeldung, das gleich als ehemalig eingetragen ist.
 
@@ -14,7 +14,7 @@ Tippe unten auf **Verwaltung**, dann auf **Ehemalige** und auf **+ Ehemalige Per
 - **Tabelle importieren (z. B. Chronik)**: viele frühere Mitglieder auf einmal übernehmen (siehe [Ehemalige](seite:ehemalige-mitglieder)).
 - **Vorname** und **Nachname**.
 - **Grund des Ausscheidens**, **Ausgeschieden am** (bei Verstorbenen **Verstorben am**), **Eintritt** und **Gründungsmitglied**.
-- **Geburtstag (optional)**, wenn eure Kompanie {bereich.birthdays} nutzt, und **Foto (optional)**.
+- **Geburtstag (optional)**, wenn eure Kompanie {bereich.birthdays} nutzt und du Mitglieder anlegen oder persönliche Angaben pflegen darfst, und **Foto (optional)**.
 - Den Knopf **Ehemalige Person anlegen**.
 
 ## So gehst du vor
@@ -34,4 +34,3 @@ Tippe unten auf **Verwaltung**, dann auf **Ehemalige** und auf **+ Ehemalige Per
 
 ## Siehe auch
 - [Ehemalige](seite:ehemalige-mitglieder)
-- [Mitglied anlegen](seite:mitglieder-anlegen)

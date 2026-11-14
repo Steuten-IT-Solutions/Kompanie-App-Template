@@ -2,7 +2,7 @@
 titel: Seite eines Mitglieds
 reihenfolge: 52
 rechte: []
-einrecht: [manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, view_personal, manage_personal, create_users, promote_users]
+einrecht: [manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, view_personal, manage_personal, create_users, manage_former, promote_users]
 ---
 Auf der Seite eines Mitglieds steht alles, was du als Verwaltung über diese Person pflegst. Zum Ändern tippst du einfach auf die jeweilige Angabe; dann öffnet sich ein Fenster.
 
@@ -21,7 +21,7 @@ Du siehst nur, wofür du das Recht hast und was die Kompanie nutzt.
 - Kacheln **{bereich.points}** und **Offen**: Stand der {bereich.points} und offene {bereich.penalties}. Ein Tipp öffnet die Einträge der Person.
 - Kachel **{bereich.titles}**: ihre {bereich.titles} (oder „Keine“); ein Tipp öffnet die Auswahl.
 - Kachel **{bereich.companies}** (mit dem Recht **{bereich.companies} verwalten**): ihre {bereich.companies} (oder „Keine“); ein Tipp öffnet die Auswahl zum Ankreuzen.
-- **Geburtstag**: nur mit dem Recht **Persönliche Angaben sehen**. **Eintritt** und **Austritt**: nur für alle, die Mitglieder anlegen dürfen. „Nicht eingetragen“ heißt: Es fehlt noch.
+- **Geburtstag**: nur mit dem Recht **Persönliche Angaben sehen**. **Eintritt**: nur für alle, die Mitglieder anlegen dürfen; **Austritt** (und bei Ehemaligen auch ihr Eintritt): für alle, die Ehemalige verwalten dürfen. „Nicht eingetragen“ heißt: Es fehlt noch.
 - **Persönliche Angaben**: E-Mail-Adresse, Handynummer und Adresse der Person, nur mit dem Recht **Persönliche Angaben sehen**. Ein Tipp auf die E-Mail-Adresse oder Handynummer schreibt bzw. ruft an.
 - **{bereich.offices}**: die Ämter der Person als Zeitstrahl, nur zum Ansehen.
 - **Konto und Rolle** ganz unten: klappt beim Antippen auf (siehe [Konto und Rolle](seite:rollen-vergeben)).
@@ -34,7 +34,7 @@ Du siehst nur, wofür du das Recht hast und was die Kompanie nutzt.
 4. Nach dem letzten Mitglied kommt wieder das erste, und vom ersten geht es zurück zum letzten. Wischen geht auch, während eine Seite noch lädt.
 
 ### Das Foto ändern
-Das dürfen alle, die Mitglieder anlegen dürfen.
+Das dürfen alle, die Mitglieder anlegen dürfen, bei Ehemaligen auch alle, die Ehemalige verwalten dürfen.
 1. Tippe auf das Foto (oder auf die Anfangsbuchstaben).
 2. Tippe auf **Foto ersetzen** oder **Foto entfernen**; ohne Foto auf **Foto hochladen**.
 3. Wähle ein Foto aus. Es gilt sofort.
@@ -63,7 +63,7 @@ Tippe auf **✕**, neben das Fenster oder auf die Zurück-Taste des Geräts.
 - Die E-Mail-Adresse von Admins und von Personen mit mehr Rechten als du ändert nur, wer deren Konto verwalten darf: Über die E-Mail-Adresse lässt sich das Passwort zurücksetzen. Handynummer und Adresse pflegst du mit dem Recht bei allen.
 - Jede Person sieht und ändert ihre eigenen Angaben unter **Meins → Konto**.
 - Der Eintritt geht ab dem Jahr 1800 und nicht in der Zukunft. Ob er auf der Seite der Person unter **{bereich.directory}** steht, wählt nur sie selbst unter **Meins → Konto**; im Fenster siehst du ihre Wahl nur zur Information.
-- Wie du Geburtstag und Austritt einträgst, steht im Handbuch unter **{bereich.birthdays} pflegen** (mit dem Recht **Persönliche Angaben pflegen**) und **Ehemalige Mitglieder** (für alle, die Mitglieder anlegen dürfen). Was die Kacheln für {bereich.points}, {bereich.penalties}, {begriff.rank} und {bereich.titles} öffnen, erklären die Handbuchseiten zu diesen Bereichen.
+- Wie du Geburtstag und Austritt einträgst, steht im Handbuch unter **{bereich.birthdays} pflegen** (mit dem Recht **Persönliche Angaben pflegen**) und **Ehemalige** (für alle, die Ehemalige verwalten dürfen). Was die Kacheln für {bereich.points}, {bereich.penalties}, {begriff.rank} und {bereich.titles} öffnen, erklären die Handbuchseiten zu diesen Bereichen.
 
 ## Siehe auch
 - [Mitgliederliste](seite:mitgliederliste)

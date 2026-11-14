@@ -12,7 +12,7 @@ import {
   type FormerOfficesPreview,
   type FormerReason,
 } from '../api';
-import { BirthdayFields, birthdayString, canEnterBirthdays, emptyBirthday, readBirthday } from '../birthdays';
+import { BirthdayFields, birthdayString, canEnterFormerBirthdays, emptyBirthday, readBirthday } from '../birthdays';
 import brand from '../generated/brand';
 import { editYearOrDate, formatEuro, formatYearOrDate } from '../format';
 import { navigate } from '../router';
@@ -56,7 +56,7 @@ export function formerSummary(f: Pick<FormerInfo, 'reason' | 'joined_on' | 'foun
 }
 
 /**
- * Verwaltung → Ehemalige (create_users): ausgetretene, verstorbene und sonst ausgeschiedene Personen mit ihren Daten.
+ * Verwaltung → Ehemalige (manage_former): ausgetretene, verstorbene und sonst ausgeschiedene Personen mit ihren Daten.
  * Antippen öffnet die Seite der Person wie in der Mitgliederliste.
  */
 export function FormerList() {
@@ -337,7 +337,7 @@ function FormerFields({ value, onChange }: { value: FormerInput; onChange: (v: F
 const emptyFormer = (): FormerInput => ({ reason: 'left', joined_on: '', founder: false, left_on: '' });
 
 /**
- * Verwaltung → Ehemalige → „+ Ehemalige Person anlegen“ (create_users), aufgebaut wie „+ Mitglied anlegen“: Name, Angaben zum
+ * Verwaltung → Ehemalige → „+ Ehemalige Person anlegen“ (manage_former), aufgebaut wie „+ Mitglied anlegen“: Name, Angaben zum
  * Ausscheiden, Geburtstag und Foto. Es entsteht ein Konto ohne Anmeldung, das gleich als ehemalig eingetragen ist. Darüber
  * führt „Tabelle importieren“ zum Import vieler auf einmal.
  */
@@ -354,7 +354,7 @@ export function NewFormer() {
     e.preventDefault();
     setFormError(null);
     if (!name.first_name.trim()) return setFormError('Bitte einen Vornamen angeben.');
-    const bday = canEnterBirthdays() ? readBirthday(birthday) : null;
+    const bday = canEnterFormerBirthdays() ? readBirthday(birthday) : null;
     if (typeof bday === 'string') return setFormError(bday);
     setBusy(true);
     try {
@@ -420,7 +420,7 @@ export function NewFormer() {
       </button>
       <NameFields value={name} onChange={setName} />
       <FormerFields value={former} onChange={setFormer} />
-      {canEnterBirthdays() && (
+      {canEnterFormerBirthdays() && (
         <fieldset className="fieldset new-member-birthday">
           <legend>Geburtstag (optional)</legend>
           <BirthdayFields value={birthday} onChange={setBirthday} />
@@ -443,7 +443,7 @@ export function NewFormer() {
 }
 
 /**
- * Im Mitglied unter „Konto und Rolle“ und hinter „Austritt“ (create_users): als ehemalig eintragen bzw. die Angaben
+ * Im Mitglied unter „Konto und Rolle“ und hinter „Austritt“ (manage_former): als ehemalig eintragen bzw. die Angaben
  * ändern und wieder aufnehmen. Offene Beträge werden vor dem Eintragen genannt, damit sie nicht in Vergessenheit geraten.
  * Mit `editing` steht gleich das Formular da; „Abbrechen“ ruft dann `onCancel` (z. B. schließt das Fenster).
  */
