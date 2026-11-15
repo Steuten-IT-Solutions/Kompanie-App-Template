@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import {
   api,
+  ApiError,
   can,
   config,
   inBackground,
@@ -51,6 +52,9 @@ import { PersonName, PersonSkeleton } from '../skeleton';
 import { memberPreview, type MemberPreview } from '../memberPreview';
 import { createImageQueue } from '../imageQueue';
 import Anwesenheit from './Anwesenheit';
+import { newRequestId, type BookingKind, type PendingBooking } from '../bookingOutbox';
+import { bookingOutbox, usePendingBookings } from '../bookingSync';
+import { markSaved } from '../unsaved';
 import { preloadBadge, RankBadge, RankStack } from '../RankBadge';
 import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
 import { installUrl } from '../install';
@@ -1762,6 +1766,34 @@ function FromAttendance({ listId, kind, onToast }: { listId: number; kind: 'punk
   );
 }
 
+const OFFLINE_BOOKED = 'Keine Verbindung – auf dem Gerät gespeichert. Die App bucht es, sobald du wieder online bist.';
+
+/**
+ * Buchen; ohne Verbindung (status 0) stattdessen in die Warteschlange (bookingSync.ts) mit derselben Kennung, damit
+ * eine Buchung, deren Antwort nur unterwegs verloren ging, nicht doppelt ankommt. null: vorgemerkt.
+ */
+async function bookOrQueue<T>(kind: BookingKind, body: PendingBooking['body'], label: string, send: () => Promise<T>): Promise<T | null> {
+  try {
+    return await send();
+  } catch (err) {
+    if (!(err instanceof ApiError) || err.status !== 0 || !bookingOutbox.add({ kind, body, label, at: Date.now() })) throw err;
+    // Vorgemerkt gilt wie gespeichert: keine Rückfrage beim Verlassen des Formulars (unsaved.ts).
+    markSaved();
+    return null;
+  }
+}
+
+/** Hinweis im Formular, solange offline gebuchte Einträge noch nicht beim Server sind. */
+function PendingBookings({ kind }: { kind: BookingKind }) {
+  const count = usePendingBookings(kind);
+  if (count === 0) return null;
+  return (
+    <p className="muted small pending-bookings" role="status">
+      {count === 1 ? '1 Buchung' : `${count} Buchungen`} noch nicht übertragen – die App sendet sie, sobald du wieder online bist.
+    </p>
+  );
+}
+
 function GivePoints({
   preselect,
   attendance,
@@ -1822,7 +1854,7 @@ function GivePoints({
     try {
       // Stand vor der Buchung, um danach neu erreichte Beförderungsschwellen zu erkennen (nur wer Beförderungen sehen darf).
       const before = promotionsAllowed() ? await api.promotions().catch(() => null) : null;
-      const rows = await api.givePoints({
+      const body = {
         user_ids: selected,
         points: n,
         reason: reason.trim(),
@@ -1830,11 +1862,17 @@ function GivePoints({
         apply_factor: applyFactor,
         ...(catalogId ? { catalog_id: Number(catalogId) } : {}),
         ...(attendance ? { attendance_id: attendance.id } : {}),
-      });
-      // Aus einer Anwesenheitsliste bucht der Server nur für, wer noch keine Punkte für sie hat.
-      onToast(`${formatPoints(n)} ${sec.points} an ${rows.length} ${rows.length === 1 ? 'Mitglied' : 'Mitglieder'} vergeben`);
-      const after = before && (await refreshPromotions());
-      if (before && after) setReached(newlyDue(before, after));
+        request_id: newRequestId(),
+      };
+      const rows = await bookOrQueue('points', body, `${formatPoints(n)} ${sec.points}: ${body.reason}`, () => api.givePoints(body));
+      if (rows === null) {
+        onToast(OFFLINE_BOOKED);
+      } else {
+        // Aus einer Anwesenheitsliste bucht der Server nur für, wer noch keine Punkte für sie hat.
+        onToast(`${formatPoints(n)} ${sec.points} an ${rows.length} ${rows.length === 1 ? 'Mitglied' : 'Mitglieder'} vergeben`);
+        const after = before && (await refreshPromotions());
+        if (before && after) setReached(newlyDue(before, after));
+      }
       if (fixed) {
         setCatalogId('');
         setPoints('');
@@ -1852,6 +1890,7 @@ function GivePoints({
 
   return (
     <form className="form" onSubmit={submit}>
+      <PendingBookings kind="points" />
       <label className="field">
         <span>Vorlage aus dem Katalog</span>
         <select value={catalogId} onChange={(e) => chooseCatalog(e.target.value)}>
@@ -1961,8 +2000,13 @@ function GivePenalty({
     if (!reason.trim()) return setFormError('Bitte einen Grund angeben.');
     setBusy(true);
     try {
-      await api.givePenalty({ user_ids: selected, amount_cents: cents, reason: reason.trim(), date });
-      onToast(`${formatEuro(cents)} an ${selected.length} ${selected.length === 1 ? 'Mitglied' : 'Mitglieder'} eingetragen`);
+      const body = { user_ids: selected, amount_cents: cents, reason: reason.trim(), date, request_id: newRequestId() };
+      const rows = await bookOrQueue('penalty', body, `${formatEuro(cents)}: ${body.reason}`, () => api.givePenalty(body));
+      onToast(
+        rows === null
+          ? OFFLINE_BOOKED
+          : `${formatEuro(cents)} an ${selected.length} ${selected.length === 1 ? 'Mitglied' : 'Mitglieder'} eingetragen`,
+      );
       if (!fixed) setSelected([]);
       setAmount('');
       setReason('');
@@ -1977,6 +2021,7 @@ function GivePenalty({
 
   return (
     <form className="form" onSubmit={submit}>
+      <PendingBookings kind="penalty" />
       {!noTotal && totalOpen !== undefined && (
         <StatCard
           label={`Offen gesamt: ${sec.penalties}`}

@@ -69,9 +69,9 @@ final class PenaltyRepository
      * @param int[] $userIds
      * @return int[]
      */
-    public function add(array $userIds, int $cents, string $reason, string $date, int $by, string $now): array
+    public function add(array $userIds, int $cents, string $reason, string $date, int $by, string $now, ?string $requestId = null): array
     {
-        return $this->db->transaction(function () use ($userIds, $cents, $reason, $date, $by, $now): array {
+        return $this->db->transaction(function () use ($userIds, $cents, $reason, $date, $by, $now, $requestId): array {
             $ids = [];
             foreach ($userIds as $userId) {
                 $ids[] = $this->db->insert('penalties', [
@@ -82,10 +82,21 @@ final class PenaltyRepository
                     'status' => self::OPEN,
                     'created_by' => $by,
                     'created_at' => $now,
+                    'request_id' => $requestId,
                 ]);
             }
             return $ids;
         });
+    }
+
+    /**
+     * Einträge einer früheren Buchung mit derselben Kennung (von derselben Person gebucht), auch storniert.
+     *
+     * @return int[]
+     */
+    public function idsForRequest(string $requestId, int $by): array
+    {
+        return array_map('intval', array_column($this->db->select('SELECT id FROM {penalties} WHERE request_id = ? AND created_by = ? ORDER BY id', [$requestId, $by]), 'id'));
     }
 
     public function setStatus(int $id, string $status, int $by, string $now): void

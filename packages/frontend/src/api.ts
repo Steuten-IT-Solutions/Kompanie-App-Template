@@ -2672,10 +2672,12 @@ export const api = {
     apply_factor?: boolean;
     /** Aus dem Vorschlag einer Anwesenheitsliste: bucht nur für, wer dafür noch keine Punkte hat. */
     attendance_id?: number;
+    /** Kennung der Buchung (bookingOutbox.ts): dieselbe noch einmal bucht nicht doppelt. */
+    request_id?: string;
   }) => request<PointEntry[]>('POST', '/points', data),
   deletePoints: (id: number) => request<{ deleted: boolean }>('DELETE', `/points/${id}`),
 
-  givePenalty: (data: { user_ids: number[]; amount_cents: number; reason: string; date?: string }) =>
+  givePenalty: (data: { user_ids: number[]; amount_cents: number; reason: string; date?: string; request_id?: string }) =>
     request<Penalty[]>('POST', '/penalties', data),
   openPenalties: () => request<OpenPenalty[]>('GET', '/penalties/open'),
   setPenaltyStatus: (id: number, status: 'open' | 'paid') => request<Penalty>('PATCH', `/penalties/${id}`, { status }),

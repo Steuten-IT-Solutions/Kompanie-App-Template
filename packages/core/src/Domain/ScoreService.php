@@ -71,7 +71,7 @@ final class ScoreService
      *
      * attendance_id: die Anwesenheitsliste, aus deren Vorschlag gebucht wird (geprüft von AttendanceService::forBooking).
      *
-     * @param array<string, mixed> $in user_ids, points, catalog_id, reason, date, apply_factor, attendance_id
+     * @param array<string, mixed> $in user_ids, points, catalog_id, reason, date, apply_factor, attendance_id, request_id
      * @return array<int, array<string, mixed>>
      */
     public function givePoints(array $in, int $by): array
@@ -105,8 +105,58 @@ final class ScoreService
         }
 
         $attendanceId = Input::integer($in['attendance_id'] ?? null) ?: null;
-        $ids = $this->points->add($factors, $points, $reason, $catalogId, $date, $by, $this->time->nowUtc(), $attendanceId);
+        $ids = $this->points->add($factors, $points, $reason, $catalogId, $date, $by, $this->time->nowUtc(), $attendanceId, self::requestId($in));
         return $this->formatPointRows($this->points->findMany($ids));
+    }
+
+    /**
+     * Dieselbe Buchung schon einmal angekommen (request_id, z. B. offline vorgemerkt und erneut gesendet, nachdem die
+     * Antwort unterwegs verloren ging)? Dann die Einträge von damals, sonst null.
+     *
+     * @param array<string, mixed> $in
+     * @return array<int, array<string, mixed>>|null
+     */
+    public function pointsForRequest(array $in, int $by): ?array
+    {
+        $requestId = self::requestId($in);
+        $ids = $requestId === null ? [] : $this->points->idsForRequest($requestId, $by);
+        return $ids === [] ? null : $this->formatPointRows($this->points->findMany($ids));
+    }
+
+    /**
+     * Wie pointsForRequest, für Strafen.
+     *
+     * @param array<string, mixed> $in
+     * @return array<int, array<string, mixed>>|null
+     */
+    public function penaltiesForRequest(array $in, int $by): ?array
+    {
+        $requestId = self::requestId($in);
+        $ids = $requestId === null ? [] : $this->penalties->idsForRequest($requestId, $by);
+        if ($ids === []) {
+            return null;
+        }
+        $rows = $this->penalties->findMany($ids);
+        $this->names->prime(array_column($rows, 'created_by'));
+        return array_map([$this, 'formatPenalty'], $rows);
+    }
+
+    /**
+     * Kennung einer Buchung aus der App (request_id): 8 bis 36 Zeichen aus Buchstaben, Ziffern und Bindestrich, sonst
+     * keine (ältere Apps senden keine).
+     *
+     * @param array<string, mixed> $in
+     */
+    private static function requestId(array $in): ?string
+    {
+        $raw = $in['request_id'] ?? null;
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+        if (!is_string($raw) || preg_match('/^[A-Za-z0-9-]{8,36}$/', $raw) !== 1) {
+            throw ApiError::invalid('Ungültige Kennung der Buchung.');
+        }
+        return $raw;
     }
 
     public function cancelPoints(int $id, int $by): void
@@ -148,7 +198,7 @@ final class ScoreService
     }
 
     /**
-     * @param array<string, mixed> $in user_ids, amount_cents, reason, date
+     * @param array<string, mixed> $in user_ids, amount_cents, reason, date, request_id
      * @return array<int, array<string, mixed>>
      */
     public function givePenalty(array $in, int $by): array
@@ -163,7 +213,7 @@ final class ScoreService
         if ($reason === '') {
             throw ApiError::invalid('Bitte einen Grund angeben.');
         }
-        $ids = $this->penalties->add($userIds, $cents, $reason, $date, $by, $this->time->nowUtc());
+        $ids = $this->penalties->add($userIds, $cents, $reason, $date, $by, $this->time->nowUtc(), self::requestId($in));
         $rows = $this->penalties->findMany($ids);
         $this->names->prime(array_column($rows, 'created_by'));
         return array_map([$this, 'formatPenalty'], $rows);

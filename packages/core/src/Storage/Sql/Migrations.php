@@ -1971,6 +1971,21 @@ WHERE title IS NULL",
                     'ALTER TABLE {internal_events} ADD COLUMN respond_until TEXT DEFAULT NULL',
                 ],
             ],
+            // Punkte und Strafen offline gebucht (Warteschlange der App): Kennung der Buchung (request_id, von der App erzeugt).
+            // Kommt dieselbe Buchung noch einmal (Antwort ging unterwegs verloren), liefert der Server die Einträge von damals,
+            // statt doppelt zu buchen. Eindeutig je Person: Ein gleichzeitiges zweites Senden scheitert, statt zu doppeln.
+            62 => [
+                'mysql' => [
+                    'ALTER TABLE {points} ADD COLUMN request_id varchar(36) DEFAULT NULL, ADD UNIQUE KEY request_user (request_id, user_id)',
+                    'ALTER TABLE {penalties} ADD COLUMN request_id varchar(36) DEFAULT NULL, ADD UNIQUE KEY request_user (request_id, user_id)',
+                ],
+                'sqlite' => [
+                    'ALTER TABLE {points} ADD COLUMN request_id TEXT DEFAULT NULL',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {points}_request_user ON {points} (request_id, user_id)',
+                    'ALTER TABLE {penalties} ADD COLUMN request_id TEXT DEFAULT NULL',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {penalties}_request_user ON {penalties} (request_id, user_id)',
+                ],
+            ],
         ];
     }
 

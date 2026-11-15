@@ -5898,6 +5898,10 @@ paths:
                   type: boolean
                   default: true
                   description: Punktefaktor der Rolle anwenden (z. B. 0,5). false bucht für alle mit Faktor 1.
+                request_id:
+                  type: string
+                  pattern: '^[A-Za-z0-9-]{8,36}$'
+                  description: 'Kennung der Buchung aus der App (Warteschlange offline). Kam sie schon einmal an, liefert der Server die Einträge von damals, statt erneut zu buchen.'
       responses:
         '201':
           description: Angelegt (ein Eintrag pro Mitglied)
@@ -5941,6 +5945,10 @@ paths:
                 amount_cents: { type: integer, minimum: 1, maximum: 100000 }
                 reason: { type: string }
                 date: { type: string, format: date }
+                request_id:
+                  type: string
+                  pattern: '^[A-Za-z0-9-]{8,36}$'
+                  description: 'Kennung der Buchung aus der App (Warteschlange offline). Kam sie schon einmal an, liefert der Server die Einträge von damals, statt erneut zu buchen.'
       responses:
         '201':
           description: Angelegt (eine Strafe pro Mitglied)
