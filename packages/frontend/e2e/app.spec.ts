@@ -3953,7 +3953,7 @@ test('Admin wird durch die Einrichtung geführt', async ({ page }) => {
   }
   expect(importStep).toBe(true);
   await page.getByRole('button', { name: 'Einrichtung abschließen' }).click();
-  await expect(page).toHaveURL(/#\/verwaltung\/einrichtungen$/);
+  await expect(page).toHaveURL(/#\/verwaltung$/);
   await expect(hint).toHaveCount(0);
   const nav = page.getByRole('navigation', { name: 'Hauptnavigation' });
   await expect(nav.getByRole('button', { name: 'Galerie' })).toHaveCount(0);
@@ -4666,7 +4666,7 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
   await expect(page).toHaveURL(/#\/verwaltung\/einrichtungen$/);
   await expect(page.locator('.admin-tiles').getByRole('button', { name: 'Punktekatalog', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '‹ Verwaltung' }).click();
-  await expect(page).toHaveURL(/#\/verwaltung\/einrichtungen$/);
+  await expect(page).toHaveURL(/#\/verwaltung$/);
   const tiles = page.locator('.admin-tiles');
   await expect(tiles.getByRole('button', { name: 'Beförderungen', exact: true })).toBeVisible();
   await expect(tiles.getByRole('button', { name: 'Dienstgrade', exact: true })).toHaveCount(0);
