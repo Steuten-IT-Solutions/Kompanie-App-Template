@@ -26,6 +26,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Zu- und Absagen ohne Internet**: Ohne Verbindung merkt sich die App Zusagen, Absagen, Hinweise und das Zurücknehmen
+  auf dem Gerät, zeigt sie gleich an (mit „Noch nicht übertragen“) und sendet sie von selbst, sobald wieder Netz da ist.
+  Wie bei der Anwesenheit fragt die App beim Abmelden nach, wenn noch etwas nicht übertragen ist.
 - **Webseite für Besucher (eigenständige Version)**: Mit dem neuen Bereich _Webseite_ (unter
   [Einstellungen → Bereiche](app:einstellungen/bereiche), braucht _Seiten_) bekommt ihr eine Webseite unter der Adresse
   eures Webspace, z. B. `eure-webseite.de`, während die App in ihrem Ordner bleibt (z. B. `eure-webseite.de/app/`).

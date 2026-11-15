@@ -32,6 +32,7 @@ Tippe unten auf **{bereich.events}**. Unter jedem kommenden Termin stehen die Kn
 - Tippe noch einmal auf **Zugesagt** bzw. **Abgesagt**, um deine Antwort zurückzunehmen. Dann giltst du wieder als „noch keine Rückmeldung“.
 
 ## Gut zu wissen
+- Ohne Internetverbindung merkt sich die App deine Antwort (auch einen Hinweis oder das Zurücknehmen) auf dem Gerät und zeigt sie gleich an, darunter **Noch nicht übertragen – die App sendet es, sobald du wieder online bist.** Sobald wieder Netz da ist, schickt sie die Antwort von selbst und meldet das. Ist der Anmeldeschluss inzwischen vorbei, nimmt der Server sie nicht mehr an; auch das meldet die App. Beim Abmelden fragt die App nach, wenn noch etwas nicht übertragen ist.
 - Hast du noch nicht geantwortet, erinnert dich die App einige Tage vor dem Termin (bei einem Anmeldeschluss am Tag davor), wenn du Benachrichtigungen eingeschaltet hast und ein {rolle.admin} die Erinnerung nicht abgeschaltet hat. Hast du abgesagt, kommt zu diesem Termin auch keine Erinnerung am Vortag.
 - Zu- und absagen geht bis zum Beginn des Termins. Bei Terminen ohne Uhrzeit endet das um 0 Uhr des Tages. Hat der Termin einen Anmeldeschluss, geht es nur bis zum Ende dieses Tages. Danach siehst du nur noch deine Antwort.
 - Deinen Namen und deinen Hinweis sehen die, die Termine des Kalenders pflegen dürfen, und in der Anwesenheitsliste die, die die Anwesenheit erfassen. Alle anderen sehen nur die Zahl der Zusagen und Absagen.
