@@ -19,6 +19,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und unter **Termine u
 - **Aktualisieren alle … Minuten**: nur bei Google Kalender und iCal-Adresse; wie lange die App die geladenen Termine zeigt, bevor sie neu nachfragt (Standard 15). Für die Benachrichtigungen über neue und geänderte Termine fragt die App unabhängig davon alle 15 Minuten nach.
 - **Kalender testen** und **Entfernen**: erscheinen bei Google Kalender und iCal-Adresse, sobald der Kalender eingerichtet ist.
 - **Speichern**: übernimmt die Eingaben.
+- **Zu- und Absagen**: ein eigener Abschnitt darunter mit eigenem **Speichern**. **An Zu- und Absage erinnern** (anfangs an) schickt allen, die bei einem Termin noch nicht geantwortet haben, eine Benachrichtigung. **Erinnerung … Tage vor dem Termin** legt fest, wie lange vorher (1 bis 30, anfangs 3).
 
 ## So gehst du vor
 ### Termine direkt in der App pflegen (ohne Google)
@@ -47,6 +48,11 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und unter **Termine u
 1. Trage bei **Aktualisieren alle … Minuten** eine Zahl von 1 bis 1440 ein (1440 Minuten sind ein Tag).
 2. Tippe auf **Speichern**. Der neue Wert gilt sofort, und die Termine werden neu geladen.
 
+### Die Erinnerung an Zu- und Absagen einstellen
+1. Setze oder entferne im Abschnitt **Zu- und Absagen** den Haken bei **An Zu- und Absage erinnern**.
+2. Trage bei **Erinnerung … Tage vor dem Termin** ein, wie viele Tage vor Beginn die Erinnerung kommen soll.
+3. Tippe in diesem Abschnitt auf **Speichern**.
+
 ### Prüfen, ob der Kalender ankommt
 1. Tippe auf **Kalender testen**.
 2. Die App zeigt, wie viele kommende Termine sie gefunden hat, z. B. „5 Termine gefunden, z. B. „Schützenfest“.“ Lehnt Google ab, nennt die Meldung die wahrscheinliche Ursache.
@@ -62,6 +68,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und unter **Termine u
 - Hast du den Kalender eingerichtet, bevor es die Auswahl der Quelle gab, gilt bis zum nächsten Speichern das Eingetragene wie bisher: Kalender-IDs vor der iCal-Adresse.
 - Darf die Verbindung mit Google den Kalender nicht lesen, steht das auf dieser Seite und unter [Zustand und Updates](seite:admin-zustand). Dann trennst du unter **Google-Zugang** die Verbindung und verbindest neu, mit dem Häkchen für den Kalender.
 - Bei jedem Termin des internen Kalenders können alle mit dem Recht **Bei Terminen des internen Kalenders zu- und absagen** zu- oder absagen, bei jeder Quelle. {rolle.member} haben das Recht anfangs, {rolle.guest} nicht. Wer wie geantwortet hat, sehen nur Personen mit dem Recht **Kalender pflegen**, auch bei Google Kalender und iCal-Adresse, unter **{bereich.events}** im aufgeklappten Termin.
+- Die Erinnerung an Zu- und Absagen kommt einmal am Tag zur Uhrzeit der Erinnerung (unter **Benachrichtigungen**, üblich 18 Uhr), nur auf Geräten mit eingeschalteten Benachrichtigungen und nie per E-Mail. Hat ein Termin aus der App einen Anmeldeschluss, kommt sie am Tag vor dem Anmeldeschluss statt die eingestellten Tage vor Beginn. Wer abgesagt hat, bekommt auch die Erinnerung am Vortag zu diesem Termin nicht.
 - Der {bereich.calendar} erscheint für die anderen erst, wenn der Bereich an und ein Kalender eingerichtet ist (siehe [Bereiche](seite:admin-bereiche)).
 - Mit WordPress gibt es die Felder für Google Kalender und die iCal-Adresse auch im WordPress-Backend auf der Seite der App (dort mit **Speichern und testen**), auch **Aktualisieren alle … Minuten**, dazu ein Feld für einen eigenen Google-API-Schlüssel für öffentliche Kalender. Ist er eingetragen, geht er bei Kalender-IDs vor. Die Quelle wählst du nur hier in der App.
 

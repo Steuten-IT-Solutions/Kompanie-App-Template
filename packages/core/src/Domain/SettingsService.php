@@ -56,6 +56,9 @@ final class SettingsService
                 'google_api_key_set' => trim((string) $s->get('google_api_key', '')) !== '',
                 'calendar_ids' => (string) $s->get('calendar_ids', ''),
                 'cache_minutes' => max(1, (int) $s->get('calendar_cache_minutes', 15)),
+                // Erinnerung an alle ohne Zu- oder Absage (Push), Vorlauf in Tagen vor Beginn
+                'response_reminder' => $a->eventResponses()->reminderSettings()['enabled'],
+                'response_reminder_days' => $a->eventResponses()->reminderSettings()['days'],
             ],
             'gallery' => [
                 'configured' => $a->gallery()->isConfigured(),
@@ -114,7 +117,7 @@ final class SettingsService
         $newsBefore = $a->newsService()->sourceType();
         $calendarBefore = $a->calendar()->source();
         foreach ($in as $key => $value) {
-            if (!is_string($value) && !($key === 'calendar_cache_minutes' && is_int($value))) {
+            if (!is_string($value) && !(in_array($key, ['calendar_cache_minutes', 'calendar_response_reminder_days'], true) && is_int($value))) {
                 throw ApiError::invalid('Ungültiger Wert für ' . $key . '.');
             }
         }
@@ -159,6 +162,7 @@ final class SettingsService
             }
             $set['calendar_cache_minutes'] = $min;
         }
+        $set += EventResponseService::validReminder($in['calendar_response_reminder'] ?? null, $in['calendar_response_reminder_days'] ?? null);
         $serviceAccount = null;
         if (array_key_exists('drive_service_account', $in) && trim($in['drive_service_account']) !== '') {
             try {

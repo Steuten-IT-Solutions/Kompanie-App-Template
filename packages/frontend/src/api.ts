@@ -3031,6 +3031,7 @@ export type PushType =
   | 'titles'
   | 'events'
   | 'reminder'
+  | 'responses'
   | 'news';
 
 /** Angaben des Browsers zu seinem Push-Abo (PushSubscription.toJSON()). */
@@ -3273,6 +3274,10 @@ export interface AdminSettings {
     google_api_key_set: boolean;
     calendar_ids: string;
     cache_minutes: number;
+    /** Erinnerung an alle ohne Zu- oder Absage (Push); fehlt bei älteren Servern */
+    response_reminder?: boolean;
+    /** Vorlauf der Erinnerung in Tagen vor Beginn (1 bis 30) */
+    response_reminder_days?: number;
   };
   gallery: {
     configured: boolean;
@@ -3374,6 +3379,8 @@ export interface AdminSettingsInput {
   google_api_key?: string;
   calendar_ids?: string;
   calendar_cache_minutes?: number;
+  calendar_response_reminder?: '0' | '1';
+  calendar_response_reminder_days?: number;
   drive_service_account?: string;
   drive_oauth?: '';
   gallery_root?: string;

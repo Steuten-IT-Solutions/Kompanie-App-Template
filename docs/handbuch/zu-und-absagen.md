@@ -32,6 +32,7 @@ Tippe unten auf **{bereich.events}**. Unter jedem kommenden Termin stehen die Kn
 - Tippe noch einmal auf **Zugesagt** bzw. **Abgesagt**, um deine Antwort zurückzunehmen. Dann giltst du wieder als „noch keine Rückmeldung“.
 
 ## Gut zu wissen
+- Hast du noch nicht geantwortet, erinnert dich die App einige Tage vor dem Termin (bei einem Anmeldeschluss am Tag davor), wenn du Benachrichtigungen eingeschaltet hast und ein {rolle.admin} die Erinnerung nicht abgeschaltet hat. Hast du abgesagt, kommt zu diesem Termin auch keine Erinnerung am Vortag.
 - Zu- und absagen geht bis zum Beginn des Termins. Bei Terminen ohne Uhrzeit endet das um 0 Uhr des Tages. Hat der Termin einen Anmeldeschluss, geht es nur bis zum Ende dieses Tages. Danach siehst du nur noch deine Antwort.
 - Deinen Namen und deinen Hinweis sehen die, die Termine des Kalenders pflegen dürfen, und in der Anwesenheitsliste die, die die Anwesenheit erfassen. Alle anderen sehen nur die Zahl der Zusagen und Absagen.
 - Eine Absage trägt dich nicht selbst als entschuldigt ein. In der Anwesenheitsliste ist sie nur vorausgewählt; eingetragen wird sie von denen, die die Anwesenheit erfassen.

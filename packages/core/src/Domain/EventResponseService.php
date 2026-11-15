@@ -31,6 +31,11 @@ final class EventResponseService
     public const NOTE_MAX = 191;
     /** Zahl an der Kachel: Termine, deren Frist in so vielen Tagen endet */
     public const BADGE_DAYS = 30;
+    /** Erinnerung an alle ohne Rückmeldung (Einstellungen → Kalender): an/aus und Vorlauf in Tagen vor Beginn */
+    public const REMINDER_SETTING = 'event_response_reminder';
+    public const REMINDER_DAYS_SETTING = 'event_response_reminder_days';
+    public const REMINDER_DAYS_DEFAULT = 3;
+    public const REMINDER_DAYS_MAX = 30;
 
     private ?EventResponseRepository $repo = null;
 
@@ -248,6 +253,118 @@ final class EventResponseService
         } catch (ApiError) {
             return null;
         }
+    }
+
+    /** @return array{enabled: bool, days: int} Erinnerung an alle ohne Rückmeldung (Standard: an, 3 Tage vorher) */
+    public function reminderSettings(): array
+    {
+        $s = $this->app->settings;
+        $days = $s->get(self::REMINDER_DAYS_SETTING, self::REMINDER_DAYS_DEFAULT);
+        return [
+            'enabled' => (bool) $s->get(self::REMINDER_SETTING, true),
+            'days' => is_numeric($days) && (int) $days >= 1 && (int) $days <= self::REMINDER_DAYS_MAX ? (int) $days : self::REMINDER_DAYS_DEFAULT,
+        ];
+    }
+
+    /**
+     * Einstellungen der Erinnerung ändern; nur die mitgeschickten Felder (für SettingsService::update, schon geprüft).
+     *
+     * @return array<string, bool|int> Einstellung => Wert
+     */
+    public static function validReminder(mixed $enabled, mixed $days): array
+    {
+        $out = [];
+        if ($enabled !== null) {
+            if (!in_array($enabled, ['0', '1', true, false], true)) {
+                throw ApiError::invalid('Ungültiger Wert für die Erinnerung (0 oder 1).');
+            }
+            $out[self::REMINDER_SETTING] = $enabled === '1' || $enabled === true;
+        }
+        if ($days !== null) {
+            $n = Input::integer($days);
+            if ($n === null || $n < 1 || $n > self::REMINDER_DAYS_MAX) {
+                throw ApiError::invalid('Die Erinnerung geht 1 bis ' . self::REMINDER_DAYS_MAX . ' Tage vor dem Termin.');
+            }
+            $out[self::REMINDER_DAYS_SETTING] = $n;
+        }
+        return $out;
+    }
+
+    /**
+     * Termine, an die heute ($today, Zeitzone der Kompanie) erinnert wird: mit Anmeldeschluss am Tag davor (rund 24
+     * Stunden vor seinem Ende), sonst die Tage des Vorlaufs vor Beginn. Nur solange man noch zu- und absagen kann.
+     *
+     * @param array<int, array<string, mixed>> $events
+     * @return list<array<string, mixed>>
+     */
+    public function dueForReminder(array $events, string $today): array
+    {
+        $days = $this->reminderSettings()['days'];
+        $tz = $this->app->time()->timezone();
+        $tomorrow = (new \DateTimeImmutable($today, $tz))->modify('+1 day')->format('Y-m-d');
+        $target = (new \DateTimeImmutable($today, $tz))->modify('+' . $days . ' days')->format('Y-m-d');
+        $now = $this->app->time()->timestamp();
+        $out = [];
+        foreach ($events as $e) {
+            if ($now >= $this->deadline($e)) {
+                continue;
+            }
+            $until = $e['respond_until'] ?? null;
+            $due = is_string($until) && Input::isDate($until) ? $until === $tomorrow : $this->localDate((string) $e['start']) === $target;
+            if ($due) {
+                $out[] = $e;
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Je Person (alle, die zu- und absagen dürfen) die Termine ohne ihre Rückmeldung.
+     *
+     * @param list<array<string, mixed>> $events
+     * @return array<int, list<array<string, mixed>>> Benutzer-ID => Termine
+     */
+    public function withoutResponse(array $events): array
+    {
+        $rows = $this->repository()->forEvents(array_map(self::key(...), $events));
+        $out = [];
+        foreach ($this->audience() as $uid => $u) {
+            foreach ($events as $e) {
+                $answered = false;
+                foreach ($rows[self::key($e)] ?? [] as $r) {
+                    $answered = $answered || $r['user_id'] === $uid;
+                }
+                if (!$answered) {
+                    $out[$uid][] = $e;
+                }
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Wer bei welchen dieser Termine abgesagt hat (für die Erinnerung am Vortag).
+     *
+     * @param list<array<string, mixed>> $events
+     * @return array<int, array<string, true>> Benutzer-ID => Kennungen der Termine (id)
+     */
+    public function declined(array $events): array
+    {
+        $byKey = [];
+        foreach ($events as $e) {
+            $byKey[self::key($e)][] = (string) $e['id'];
+        }
+        $out = [];
+        foreach ($this->repository()->forEvents(array_map(strval(...), array_keys($byKey))) as $key => $rows) {
+            foreach ($rows as $r) {
+                if ($r['status'] === self::NO) {
+                    foreach ($byKey[$key] ?? [] as $id) {
+                        $out[$r['user_id']][$id] = true;
+                    }
+                }
+            }
+        }
+        return $out;
     }
 
     /** Rückmeldungen zu Terminen löschen, die länger als CalendarService::PAST_DAYS vorbei sind. */

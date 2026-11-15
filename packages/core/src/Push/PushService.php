@@ -67,6 +67,10 @@ final class PushService
     /** Ebenso für die Art „Geburtstage“ (Issue #1). */
     public const BIRTHDAYS_OFFERED_SETTING = 'push_birthdays_offered';
     public const REMINDER_DATE_SETTING = 'push_reminder_date';
+    /** Tag der letzten Erinnerung an Zu- und Absagen (PushTriggers::sendResponseReminders) */
+    public const RESPONSES_DATE_SETTING = 'push_responses_date';
+    /** Wie POLLS_OFFERED_SETTING für die Art „Zu- und Absagen“ */
+    public const RESPONSES_OFFERED_SETTING = 'push_responses_offered';
     /**
      * Protokoll für die Einstellungen (Admins): je Art der letzte Versand (Unix-Zeit, Zahl der Geräte, auch 0), dazu die
      * letzte vom Push-Dienst angenommene und die letzte abgelehnte Nachricht (mit Grund). Gehört zur Installation.
@@ -84,6 +88,8 @@ final class PushService
     public const TYPE_TITLES = 'titles';
     public const TYPE_EVENTS = 'events';
     public const TYPE_REMINDER = 'reminder';
+    /** Erinnerung an die eigene Zu- oder Absage (EventResponseService), nur an alle ohne Rückmeldung */
+    public const TYPE_RESPONSES = 'responses';
     public const TYPE_NEWS = 'news';
     public const TYPE_BOARD = 'board';
     /** Öffentliche Nachrichten am Brett für alle, die das Brett sonst nicht lesen (Gäste, Konten ohne view_board). */
@@ -201,6 +207,7 @@ final class PushService
             self::TYPE_TITLES => ['label' => $c->sectionLabel('titles', 'Titel') . ': neu verliehen', 'features' => ['titles'], 'audience' => 'view_own_rank'],
             self::TYPE_EVENTS => ['label' => $c->sectionLabel('events', 'Termine') . ': neue und geänderte', 'features' => ['events', 'calendar'], 'audience' => 'all'],
             self::TYPE_REMINDER => ['label' => 'Erinnerung am Vortag', 'features' => ['events', 'calendar'], 'audience' => 'all'],
+            self::TYPE_RESPONSES => ['label' => $c->sectionLabel('events', 'Termine') . ': Erinnerung an deine Zu- oder Absage', 'features' => ['calendar'], 'audience' => 'respond_calendar'],
             self::TYPE_NEWS => ['label' => $c->sectionLabel('news', 'News') . ': neue Beiträge', 'features' => ['news'], 'audience' => 'all'],
         ];
     }
@@ -558,8 +565,9 @@ final class PushService
      *
      * @param Message $message
      * @param bool|null $calendar true = nur Mitglieder mit Kalender, false = alle anderen (Gäste, Konten ohne Kalender)
+     * @param (\Closure(int): bool)|null $include Benutzer-ID → bekommt die Nachricht (z. B. nicht, wer abgesagt hat)
      */
-    public function notifyAll(string $type, array $message, ?bool $calendar = null): int
+    public function notifyAll(string $type, array $message, ?bool $calendar = null, ?\Closure $include = null): int
     {
         if (!$this->typeEnabled($type)) {
             return 0;
@@ -570,6 +578,9 @@ final class PushService
         $subs = array_values(array_filter($this->repository()->all(), static fn (array $sub): bool => in_array($type, $sub['types'], true)));
         $accounts = $calendar !== null ? $this->accountsOf($subs) : [];
         foreach ($subs as $sub) {
+            if ($include !== null && !$include($sub['user_id'])) {
+                continue;
+            }
             if ($calendar !== null) {
                 $uid = $sub['user_id'];
                 $calendarUsers[$uid] ??= $uid > 0 && $this->usesCalendar($accounts[$uid] ?? null);

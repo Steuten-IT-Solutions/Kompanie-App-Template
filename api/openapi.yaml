@@ -6579,6 +6579,8 @@ paths:
                     description: 'Kommagetrennte Kalender-IDs; gelesen mit API-Schlüssel (öffentliche Kalender) oder über den Google-Zugang',
                   }
                 calendar_cache_minutes: { type: integer, minimum: 1, maximum: 1440 }
+                calendar_response_reminder: { type: string, enum: ['0', '1'], description: An Zu- und Absage erinnern (Push an alle ohne Rückmeldung) }
+                calendar_response_reminder_days: { type: integer, minimum: 1, maximum: 30, description: Erinnerung so viele Tage vor Beginn }
                 drive_service_account: { type: string, description: JSON-Schlüssel des Dienstkontos }
                 drive_oauth:
                   {
@@ -8515,9 +8517,10 @@ components:
           titles,
           events,
           reminder,
+          responses,
           news,
         ]
-      description: '`board` (Schwarzes Brett, Issue #5) nur für Mitglieder und Anwärter (view_board); dringend (Urgency high), TTL höchstens bis zum Ablauf der Nachricht. `board_public`: öffentliche Nachrichten am Brett für alle anderen (Gäste ohne Konto, Konten ohne view_board), sonst wie `board`. `polls` (Umfragen, Issue #4) nur für Mitglieder: neue Umfrage und Erinnerung 24 Stunden vor dem Ende an alle ohne Antwort. `birthdays` (Geburtstage, Issue #1) nur für Mitglieder: am Tag selbst ab 7 Uhr (Zeitzone der Kompanie), nicht an das Geburtstagskind, nur für sichtbare Geburtstage; TTL bis Mitternacht.'
+      description: '`board` (Schwarzes Brett, Issue #5) nur für Mitglieder und Anwärter (view_board); dringend (Urgency high), TTL höchstens bis zum Ablauf der Nachricht. `board_public`: öffentliche Nachrichten am Brett für alle anderen (Gäste ohne Konto, Konten ohne view_board), sonst wie `board`. `polls` (Umfragen, Issue #4) nur für Mitglieder: neue Umfrage und Erinnerung 24 Stunden vor dem Ende an alle ohne Antwort. `birthdays` (Geburtstage, Issue #1) nur für Mitglieder: am Tag selbst ab 7 Uhr (Zeitzone der Kompanie), nicht an das Geburtstagskind, nur für sichtbare Geburtstage; TTL bis Mitternacht. `responses` (Zu- und Absagen) nur mit respond_calendar: einmal am Tag zur Uhrzeit der Erinnerung an alle ohne Rückmeldung zu Terminen, die in den eingestellten Tagen beginnen bzw. deren Anmeldeschluss morgen ist. `reminder` (Erinnerung am Vortag) nennt keine Termine, bei denen die Person abgesagt hat.'
     PushSubscribe:
       type: object
       required: [endpoint, keys]
@@ -9044,6 +9047,8 @@ components:
             google_api_key_set: { type: boolean }
             calendar_ids: { type: string }
             cache_minutes: { type: integer }
+            response_reminder: { type: boolean, description: An Zu- und Absage erinnern (Standard an) }
+            response_reminder_days: { type: integer, minimum: 1, maximum: 30, description: Vorlauf in Tagen vor Beginn (Standard 3) }
         gallery:
           type: object
           properties:
