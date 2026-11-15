@@ -356,6 +356,41 @@ test('Mitglied: Punkte-Kachel vergibt Punkte nur an diese Person, Einträge im s
   await expect(page.locator('.member-stats .stat', { hasText: 'Punkte' }).locator('.stat-value')).toHaveText(String(before));
 });
 
+test('Punkte offline: Antwort geht verloren, die App sendet später dieselbe Buchung, gebucht wird nur einmal', async ({ page }) => {
+  await login(page, 'verwalter');
+  await adminMenu(page, 'Mitglieder');
+  await page.locator('.row', { hasText: 'Mitglied1' }).click();
+  await page.locator('.member-stats .stat-button', { hasText: 'Punkte' }).click();
+  const sheet = page.getByRole('dialog', { name: 'Punkte' });
+  const reason = `E2E verloren ${Date.now().toString(36)}`;
+  // Die Buchung kommt beim Server an, die Antwort aber nicht bei der App (Funkloch nach dem Senden).
+  let lost = 0;
+  const points = (url: URL) => decodeURIComponent(url.href).includes('/points');
+  await page.route(points, async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    lost++;
+    await route.fetch();
+    await route.abort('internetdisconnected');
+  });
+  await sheet.getByLabel('Punkte', { exact: true }).fill('2');
+  await sheet.getByLabel('Grund').fill(reason);
+  await sheet.getByRole('button', { name: 'Punkte vergeben' }).click();
+  await expect(page.locator('.toast')).toHaveText(/Keine Verbindung – auf dem Gerät gespeichert/);
+  await expect(sheet.getByRole('status').filter({ hasText: '1 Buchung noch nicht übertragen' })).toBeVisible();
+  await expect(sheet.getByLabel('Grund')).toHaveValue('');
+  expect(lost).toBe(1);
+  // Wieder online: Die App sendet die Buchung mit derselben Kennung, der Server bucht nicht noch einmal.
+  await page.unroute(points);
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await expect(page.locator('.toast')).toHaveText('Offline vorgemerkte Punkte und Strafen übertragen');
+  await expect(sheet.getByRole('status').filter({ hasText: 'noch nicht übertragen' })).toHaveCount(0);
+  await expect(sheet.locator('.row', { hasText: reason })).toHaveCount(1);
+  // Wieder stornieren, damit die Summen anderer Tests stimmen
+  await sheet.locator('.row', { hasText: reason }).getByRole('button', { name: 'Stornieren' }).click();
+  await askOk(page);
+  await expect(page.locator('.toast')).toHaveText('Storniert');
+});
+
 test('Mitgliederliste: Zurück aus einem Mitglied steht wieder an derselben Stelle', async ({ page }) => {
   await login(page, 'verwalter');
   // Niedriges Fenster, damit die wenigen Testmitglieder schon scrollen.

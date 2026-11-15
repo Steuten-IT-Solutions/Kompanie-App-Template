@@ -1753,6 +1753,12 @@ final class Api
             // Punkte und Strafen
             new Route('POST', '/points', Cap::ManagePoints, function (Request $r) use ($a) {
                 $body = $r->body;
+                // Dieselbe Buchung noch einmal (Warteschlange der App, Antwort ging verloren): Einträge von damals, ohne
+                // erneut zu buchen oder zu benachrichtigen.
+                $again = $a->scores()->pointsForRequest($body, $this->user()->id);
+                if ($again !== null) {
+                    return Response::created($again);
+                }
                 // Aus dem Vorschlag einer Anwesenheitsliste: nur, wer für diese Liste noch keine Punkte hat.
                 if (($body['attendance_id'] ?? null) !== null && $body['attendance_id'] !== '') {
                     [$body['attendance_id'], $body['user_ids']] = $a->attendance()->forBooking($body['attendance_id'], $body['user_ids'] ?? null);
@@ -1766,6 +1772,10 @@ final class Api
                 return ['deleted' => true];
             }, 'points', $denyManage),
             new Route('POST', '/penalties', Cap::ManagePenalties, function (Request $r) use ($a) {
+                $again = $a->scores()->penaltiesForRequest($r->body, $this->user()->id);
+                if ($again !== null) {
+                    return Response::created($again);
+                }
                 $rows = $a->scores()->givePenalty($r->body, $this->user()->id);
                 $this->notify(static fn () => $a->pushTriggers()->penaltiesAdded($rows));
                 return Response::created($rows);

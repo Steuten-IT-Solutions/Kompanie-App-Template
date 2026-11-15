@@ -29,6 +29,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Zu- und Absagen ohne Internet**: Ohne Verbindung merkt sich die App Zusagen, Absagen, Hinweise und das Zurücknehmen
   auf dem Gerät, zeigt sie gleich an (mit „Noch nicht übertragen“) und sendet sie von selbst, sobald wieder Netz da ist.
   Wie bei der Anwesenheit fragt die App beim Abmelden nach, wenn noch etwas nicht übertragen ist.
+- **Punkte und Strafen ohne Internet**: Wer ohne Verbindung Punkte oder Strafen vergibt, verliert die Eingabe nicht mehr:
+  Die App speichert die Buchung auf dem Gerät, zeigt im Formular „noch nicht übertragen“ und bucht sie von selbst, sobald
+  wieder Netz da ist. Jede Buchung hat eine eigene Kennung; ging nur die Antwort unterwegs verloren, bucht der Server
+  beim erneuten Senden nicht doppelt.
 - **Webseite für Besucher (eigenständige Version)**: Mit dem neuen Bereich _Webseite_ (unter
   [Einstellungen → Bereiche](app:einstellungen/bereiche), braucht _Seiten_) bekommt ihr eine Webseite unter der Adresse
   eures Webspace, z. B. `eure-webseite.de`, während die App in ihrem Ordner bleibt (z. B. `eure-webseite.de/app/`).

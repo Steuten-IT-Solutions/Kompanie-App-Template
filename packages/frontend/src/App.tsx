@@ -344,7 +344,7 @@ async function logout(onError: (msg: string) => void) {
     if (
       pendingOfflineCount() > 0 &&
       !(await confirmAsk(
-        'Offline gespeicherte Änderungen (Anwesenheit, Zu- und Absagen) sind noch nicht übertragen und gehen beim Abmelden verloren. Trotzdem abmelden?',
+        'Offline gespeicherte Änderungen (Anwesenheit, Zu- und Absagen, Punkte und Strafen) sind noch nicht übertragen und gehen beim Abmelden verloren. Trotzdem abmelden?',
         {
           okLabel: 'Abmelden',
         },
