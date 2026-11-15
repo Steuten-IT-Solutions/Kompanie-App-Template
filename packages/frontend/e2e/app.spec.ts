@@ -5548,6 +5548,9 @@ test('Anwesenheit offline: auf dem Gerät gespeichert, nach dem Neustart noch da
   await adminMenu(page, 'Anwesenheit');
   await page.locator('.free-event').getByLabel('Titel').fill(title);
   await page.getByRole('button', { name: 'Liste anlegen' }).click();
+  // Erst die geöffnete Liste: Das Feld „Titel“ der Übersicht hat denselben Text, und solange die Liste nicht angelegt
+  // ist, fragt die App vor dem Neuladen nach (nicht gespeicherte Eingabe).
+  await expect(page).toHaveURL(/#\/verwaltung\/anwesenheit\/\d+$/);
   await expect(page.locator('.attendance .field').first().locator('input')).toHaveValue(title);
   const openList = async () => {
     await adminMenu(page, 'Anwesenheit');
