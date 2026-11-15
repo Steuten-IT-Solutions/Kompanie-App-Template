@@ -47,6 +47,9 @@ final class Subjects
     /** Stand eines Eintrags der Anwesenheit (AttendanceService) */
     private const ATTENDANCE = ['present' => 'anwesend', 'excused' => 'entschuldigt', 'absent' => 'fehlt'];
 
+    /** Zu- oder Absage bei einem Termin (EventResponseService) */
+    private const RESPONSE = ['yes' => 'zugesagt', 'no' => 'abgesagt'];
+
     /** Persönliche Angaben eines Mitglieds (nur mit view_personal sichtbar) */
     private const PERSONAL = ['E-Mail', 'Handynummer', 'Adresse', 'Geburtsdatum'];
 
@@ -406,6 +409,15 @@ final class Subjects
             return array_values(array_unique($ids));
         }, true);
         $map['DELETE /attendance/{id}'] = $this->table($attendance);
+        // Zu- oder Absage für eine andere Person (wer die Anwesenheit erfasst); die eigene steht in NOT_RECORDED
+        $responses = $this->spec('Rückmeldung zu einem Termin', 'event_responses', fn (array $r): string => $r['event_title'] . ': ' . $this->name((int) $r['user_id']), [
+            'user_id' => ['Person', 'user'], 'event_date' => 'Datum', 'note' => 'Hinweis',
+        ], subject: 'user_id', extra: static fn (array $r): array => ['Rückmeldung' => self::RESPONSE[$r['status']] ?? $r['status']]);
+        $map['PUT /calendar/{key}/responses/{id}'] = $this->table($responses, function (Request $r): array {
+            $key = $this->app->eventResponses()->keyOf((string) ($r->params['key'] ?? ''));
+            $id = $key === null ? null : $this->app->db->scalar('SELECT id FROM {event_responses} WHERE event_key = ? AND user_id = ?', [$key, $r->id()]);
+            return is_scalar($id) ? [(string) $id] : [];
+        }, true);
         // Ämter: Namen mit Mitgliedern verbinden, Import aus einer CSV-Datei (ohne apply nur die Vorschau, ändert nichts)
         $map['POST /offices/link'] = $this->table($this->spec('Amtsinhaber', 'office_holders', 'name', ['name' => 'Name', 'user_id' => ['Mitglied', 'user']]), function (Request $r): array {
             $name = $r->input('name');

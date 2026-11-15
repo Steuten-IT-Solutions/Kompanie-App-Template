@@ -16,6 +16,7 @@ import { focusId } from './focus';
 import { AdminBack, adminTabs } from './adminNav';
 import { MenuBack, InternMenu } from './internNav';
 import { targetIcons, targetLabels } from './navLabels';
+import { tileCount } from './tileCount';
 import { buildNav, isPageTarget, menuOf, pageTarget, startOf, tabbarClass, viewPath, type NavEntry, type NavTarget } from './navigation';
 import { helpSlug } from './helpSlug';
 import { setReportOrigin } from './lastError';
@@ -741,20 +742,33 @@ export default function App({ notice = null }: { notice?: string | null }) {
 
       {tabs.length > 1 && (
         <nav className={tabbarClass(tabs.length, config?.navigation_labels !== false)} aria-label="Hauptnavigation">
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              className={activeTab === t.key ? 'active' : ''}
-              aria-label={t.label}
-              onClick={() => navigate(t.key)}
-              onPointerDown={() => prefetchTab(t)}
-              onFocus={() => prefetchTab(t)}
-              aria-current={activeTab === t.key ? 'page' : undefined}
-            >
-              <Icon name={t.icon} />
-              <span>{caps(t.label)}</span>
-            </button>
-          ))}
+          {tabs.map((t) => {
+            // Zahl im Kreis: Termine ohne eigene Zu- oder Absage (am Kalender oder am Untermenü, in dem er steht)
+            const badge =
+              t.key === 'termine' || t.children?.includes('termine')
+                ? tileCount('termine', { responses: config?.awaitingResponses })
+                : null;
+            return (
+              <button
+                key={t.key}
+                className={activeTab === t.key ? 'active' : ''}
+                aria-label={badge ? `${t.label}, ${badge.title}` : t.label}
+                title={badge?.title}
+                onClick={() => navigate(t.key)}
+                onPointerDown={() => prefetchTab(t)}
+                onFocus={() => prefetchTab(t)}
+                aria-current={activeTab === t.key ? 'page' : undefined}
+              >
+                <Icon name={t.icon} />
+                <span>{caps(t.label)}</span>
+                {badge && (
+                  <span className="count-badge" aria-hidden="true">
+                    {badge.text}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </nav>
       )}
     </div>

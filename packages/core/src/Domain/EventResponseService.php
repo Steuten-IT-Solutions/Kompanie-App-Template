@@ -29,6 +29,8 @@ final class EventResponseService
     public const NO = 'no';
     public const STATUSES = [self::YES, self::NO];
     public const NOTE_MAX = 191;
+    /** Zahl an der Kachel: Termine, deren Frist in so vielen Tagen endet */
+    public const BADGE_DAYS = 30;
 
     private ?EventResponseRepository $repo = null;
 
@@ -147,6 +149,105 @@ final class EventResponseService
             }
         }
         return $out;
+    }
+
+    /**
+     * Für eine andere Person zu- oder absagen bzw. ihre Rückmeldung entfernen ($status null), z. B. nach einem Anruf (wer
+     * die Anwesenheit erfasst). Es gilt dieselbe Frist; ein vorhandener Hinweis bleibt.
+     *
+     * @return array{user_id: int, status: string|null, note: string}
+     */
+    public function respondFor(User $actor, string $id, int $userId, mixed $status): array
+    {
+        if ($status !== null && (!is_string($status) || !in_array($status, self::STATUSES, true))) {
+            throw ApiError::invalid('Bitte zusagen, absagen oder die Rückmeldung entfernen.');
+        }
+        if (!isset($this->audience()[$userId])) {
+            throw ApiError::invalid('Diese Person kann bei Terminen nicht zu- oder absagen.');
+        }
+        $event = $this->openEvent($id);
+        $key = self::key($event);
+        if ($status === null) {
+            $this->repository()->delete($key, $userId);
+            return ['user_id' => $userId, 'status' => null, 'note' => ''];
+        }
+        $note = $this->repository()->find($key, $userId)['note'] ?? '';
+        $this->repository()->save(
+            $key,
+            $userId,
+            $status,
+            $note,
+            mb_substr(Text::line((string) $event['title']), 0, 191),
+            $this->localDate((string) $event['start']),
+            $actor->id,
+            $this->app->time()->nowUtc(),
+        );
+        return ['user_id' => $userId, 'status' => $status, 'note' => $note];
+    }
+
+    /**
+     * Rückmeldungen zu einem Termin für seine Anwesenheitsliste: ob es den Termin noch gibt, ob die Frist läuft, wer
+     * zu- und absagen darf und wer wie geantwortet hat. Ohne den Termin (gelöscht, Kalender gestört) null.
+     *
+     * @return array{open: bool, audience: array<int, true>, rows: array<int, array{status: string, note: string}>}|null
+     */
+    public function forAttendance(string $id): ?array
+    {
+        try {
+            $event = $this->event($id);
+        } catch (ApiError) {
+            return null;
+        }
+        $rows = [];
+        foreach ($this->repository()->forEvents([self::key($event)])[self::key($event)] ?? [] as $r) {
+            if (in_array($r['status'], self::STATUSES, true)) {
+                $rows[$r['user_id']] = ['status' => $r['status'], 'note' => $r['note']];
+            }
+        }
+        return [
+            'open' => $this->app->time()->timestamp() < $this->deadline($event),
+            'audience' => array_map(static fn (): bool => true, $this->audience()),
+            'rows' => $rows,
+        ];
+    }
+
+    /**
+     * Kommende Termine der nächsten BADGE_DAYS Tage, bei denen $user noch zu- oder absagen kann und es noch nicht getan
+     * hat (Zahl an der Kachel des Kalenders). Wartet nicht auf den Kalender: ohne gespeicherte Fassung null.
+     */
+    public function awaitingCount(User $user): ?int
+    {
+        if ($user->id <= 0 || !$user->can(Capability::RespondCalendar)) {
+            return null;
+        }
+        $events = $this->app->calendar()->cached();
+        if ($events === null) {
+            return null;
+        }
+        $now = $this->app->time()->timestamp();
+        $until = $now + self::BADGE_DAYS * 86400;
+        $keys = [];
+        foreach ($events as $e) {
+            $deadline = $this->deadline($e);
+            if ($deadline > $now && $deadline <= $until) {
+                $keys[] = self::key($e);
+            }
+        }
+        if ($keys === []) {
+            return 0;
+        }
+        $answered = array_flip($this->repository()->keysOfUser($user->id, $keys));
+        return count(array_filter(array_unique($keys), static fn (string $k): bool => !isset($answered[$k])));
+    }
+
+    /** Stabile Kennung, unter der die Rückmeldungen zu diesem Termin gespeichert sind (für das Änderungsprotokoll). */
+    public function keyOf(string $id): ?string
+    {
+        try {
+            return self::key($this->event($id));
+        } catch (ApiError) {
+            return null;
+        }
     }
 
     /** Rückmeldungen zu Terminen löschen, die länger als CalendarService::PAST_DAYS vorbei sind. */

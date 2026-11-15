@@ -23,6 +23,8 @@ use KompanieApp\Core\Storage\AttendanceRepository;
  * - Punkte für Anwesende und Strafen für Fehlende bucht man über die üblichen Formulare (Vorschlag). Punkte tragen
  *   die ID der Liste (points.attendance_id); daran erkennt die App, wer schon welche hat. Punkte und Strafen gibt es
  *   nur für Mitglieder.
+ * - Listen zu Terminen des Kalenders zeigen je Person ihre Zu- oder Absage (EventResponseService). Eine Absage schlägt
+ *   „entschuldigt“ nur vor; gespeichert wird erst mit der Liste.
  * - Der Zähler teilt nach Gruppen auf: Jede Rolle zählt als eigene Gruppe oder als eine andere Rolle (Einstellung
  *   attendance_groups, z. B. „Punkte verwalten“ zählt als Mitglied).
  *
@@ -119,12 +121,16 @@ final class AttendanceService
         $booked = array_flip($this->repository()->bookedUserIds($id));
         $groups = $this->groupMap();
         $roles = $this->app->roles();
+        // Zu- und Absagen zum Termin (nur Listen aus dem Kalender, solange es den Termin gibt)
+        $responses = $list['source'] === self::SOURCE_CALENDAR && $this->app->features()->enabled('calendar')
+            ? $this->app->eventResponses()->forAttendance($list['event_key'])
+            : null;
         $people = [];
         $counts = [];
         foreach ($this->people() as $u) {
             $status = $entries[$u->id]['status'] ?? null;
             $group = $groups[$u->role] ?? $u->role;
-            $people[] = [
+            $person = [
                 'id' => $u->id,
                 'name' => $u->name,
                 'role' => $u->role,
@@ -133,6 +139,12 @@ final class AttendanceService
                 'status' => $status,
                 'booked' => isset($booked[$u->id]),
             ];
+            if ($responses !== null) {
+                $person['response'] = $responses['rows'][$u->id]['status'] ?? null;
+                $person['response_note'] = $responses['rows'][$u->id]['note'] ?? '';
+                $person['may_respond'] = isset($responses['audience'][$u->id]);
+            }
+            $people[] = $person;
             if ($status !== null) {
                 $counts[$status][$group] = ($counts[$status][$group] ?? 0) + 1;
             }
@@ -153,6 +165,8 @@ final class AttendanceService
             'title' => $list['title'],
             'date' => $list['event_date'],
             'upcoming' => $list['event_date'] > $this->today(),
+            // null: keine Rückmeldungen (freie Liste, Termin nicht mehr im Kalender); sonst ob man noch zu- und absagen kann
+            'responses_open' => $responses === null ? null : $responses['open'],
             'updated_by_name' => $names->name($list['updated_by']),
             'updated_at' => $list['updated_at'],
             'people' => $people,

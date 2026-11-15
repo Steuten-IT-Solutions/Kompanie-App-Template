@@ -38,6 +38,24 @@ final class EventResponseRepository
         return $out;
     }
 
+    /**
+     * Von diesen Terminen die, zu denen die Person geantwortet hat.
+     *
+     * @param list<string> $keys
+     * @return list<string>
+     */
+    public function keysOfUser(int $userId, array $keys): array
+    {
+        $out = [];
+        foreach (array_chunk(array_values(array_unique($keys)), 500) as $chunk) {
+            $marks = implode(', ', array_fill(0, count($chunk), '?'));
+            foreach ($this->db->select("SELECT event_key FROM {event_responses} WHERE user_id = ? AND event_key IN ($marks)", [$userId, ...$chunk]) as $r) {
+                $out[] = (string) $r['event_key'];
+            }
+        }
+        return $out;
+    }
+
     /** @return EventResponse|null */
     public function find(string $key, int $userId): ?array
     {
