@@ -493,9 +493,11 @@ async function networkOrStale(request, event, fallback) {
   const saving = network.then(
     async (res) => {
       if (!cacheable(res)) return;
-      const text = await res.clone().text();
-      await store(key, tagged(res.clone(), request, startedAt));
-      if (delivered !== null && text !== (await delivered)) await announce(key, true);
+      // Beide Kopien sofort: Danach liest die App den Körper, und eine spätere Kopie schlüge fehl.
+      const copy = res.clone();
+      const text = res.clone().text();
+      await store(key, tagged(copy, request, startedAt));
+      if (delivered !== null && (await text) !== (await delivered)) await announce(key, true);
     },
     () => undefined,
   );

@@ -725,6 +725,18 @@ test('Schlechtes Netz nach einer eigenen Änderung: nach dem Zeitlimit die gespe
   assert.equal(again.headers.get('X-Kompanie-Stale'), null);
 });
 
+test('Erste Anfrage mit Stale-Ok: gespeichert, auch wenn die App den Körper sofort liest', async () => {
+  const net = { [`${API}events`]: json('[7]') };
+  const sw = load({ net });
+  const { answer, done } = sw.requestSplit(`${API}events`, 'cors', STALE_OK);
+  // Wie im Browser: Die App liest die Antwort, bevor der Service Worker sie gespeichert hat.
+  assert.equal(await (await answer).text(), '[7]');
+  await done;
+  delete net[`${API}events`];
+  const res = await sw.request(`${API}events`, 'cors', STALE_OK);
+  assert.equal(await res.text(), '[7]');
+});
+
 test('Ohne Netz nach einer eigenen Änderung: gespeicherte Version gekennzeichnet; nie die einer anderen Person', async () => {
   let t = 1000;
   const net = { [`${API}members`]: json('[1]') };
