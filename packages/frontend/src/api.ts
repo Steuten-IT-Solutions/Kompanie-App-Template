@@ -8,6 +8,7 @@ import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
 import { noteError } from './lastError';
 import { rememberRoute } from './share';
+import { markSaved } from './unsaved';
 import type { AdminOrder, NavigationSetting, NavNames, NavStart } from './navigation';
 
 /** Schlüssel einer Rolle: guest, member, admin, früher fest (organizer, manager, candidate) oder vom Admin angelegt (r1, r2, …). */
@@ -2218,6 +2219,9 @@ export function inBackground<T>(start: () => Promise<T>): Promise<T> {
     background--;
   }
 }
+/** Meldung, wenn eine Änderung ohne Verbindung nicht beim Server ankam. */
+export const OFFLINE_NOT_SAVED = 'Keine Verbindung – nicht gespeichert. Deine Eingaben stehen noch hier; bitte später erneut speichern.';
+
 /** Header für den Service Worker (public/sw.js): Antwort darf zuerst aus seinem Speicher kommen. */
 const STALE_OK_HEADER = 'X-Kompanie-Stale-Ok';
 const USER_HEADER = 'X-Kompanie-User';
@@ -2260,7 +2264,8 @@ async function requestFull<T>(
     });
   } catch {
     if (!path.startsWith('/reports') && !silent) noteError('Keine Verbindung zum Server');
-    throw new ApiError('Keine Verbindung. Bitte später erneut versuchen.', 0);
+    // Bei Änderungen sagen, dass nichts gespeichert ist (Offline-Prüfung): Die Eingaben stehen noch in der Ansicht.
+    throw new ApiError(method === 'GET' ? 'Keine Verbindung. Bitte später erneut versuchen.' : OFFLINE_NOT_SAVED, 0);
   }
   // Eigene Änderung (auch eine abgelehnte könnte etwas geändert haben): zwischengespeicherte Daten verwerfen.
   // Ausnahmen ohne Änderung an den angezeigten Daten: die Abfrage des Push-Status beim Start und Vorschauen ({preview: true},
@@ -2281,6 +2286,8 @@ async function requestFull<T>(
   if (res.status === 503 && data?.code === 'maintenance') {
     applyMaintenance({ on: true, reason: String(data.reason ?? ''), since: config.maintenance?.since ?? 0 });
   }
+  // Angekommen: Eingaben in Formularen gelten als gespeichert (unsaved.ts).
+  if (res.ok && method !== 'GET' && !readOnly && !silent) markSaved();
   if (!res.ok) {
     const message: string = data?.message ?? `Fehler ${res.status}`;
     // Für „Fehler melden“ (Issue #64); Fehler des Formulars selbst nicht.

@@ -14,6 +14,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useBackClose } from './backClose';
+import { setUnsaved } from './unsaved';
 import type { MemberSummary, PersonName } from './api';
 import { cacheKey as keyOf, DATA_UPDATED, dataCache, pendingPrefetch, takeFresh } from './dataCache';
 import { noteError } from './lastError';
@@ -111,6 +112,19 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: st
     return () => window.removeEventListener(DATA_UPDATED, reload);
   }, [reload]);
   return { data, error, loading, reload, setData, revision };
+}
+
+/**
+ * Für Ansichten, deren Eingaben keine Formularfelder sind (z. B. Knöpfe zum Abhaken): Solange dirty, fragt die App vor
+ * dem Verlassen nach (unsaved.ts). Formulare mit Feldern erkennt die App von selbst.
+ */
+export function useUnsaved(dirty: boolean): void {
+  const token = useRef(Symbol('unsaved'));
+  useEffect(() => {
+    const t = token.current;
+    setUnsaved(t, dirty);
+    return () => setUnsaved(t, false);
+  }, [dirty]);
 }
 
 // Lädt …, mit dem Gerüst der Seite, sobald die App es kennt (skeleton.tsx)

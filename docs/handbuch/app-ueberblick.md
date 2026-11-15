@@ -71,6 +71,7 @@ Unter der Kopfleiste erscheinen manchmal Hinweise:
 ## Gut zu wissen
 - Fragt die App nach, bevor sie etwas tut (z. B. „Wirklich löschen?“), öffnet sich ein eigenes Fenster der App mit **Abbrechen** und **OK**. Der Rest der Seite ist dabei abgedunkelt. Löschen und Entfernen steht auf einem roten Knopf. **Abbrechen**, **✕** oder die Taste Esc ändern nichts.
 - Ist ein Fenster der App offen (z. B. zum Verschieben eines Fotos oder eine Rückfrage), schließt **Zurück** (Taste oder Geste des Handys, Zurück-Knopf des Browsers) zuerst das Fenster, ohne etwas zu ändern. Du bleibst auf der Seite. Erst wenn nichts mehr offen ist, führt **Zurück** auf die Seite davor.
+- Hast du etwas eingegeben und noch nicht gespeichert (z. B. weil gerade keine Internetverbindung besteht), fragt die App, bevor du die Seite verlässt: **Verlassen** verwirft die Eingaben, **Abbrechen** bleibt auf der Seite. Das gilt auch für **Zurück** und für das Neuladen der Seite. Kommt eine Änderung ohne Verbindung nicht an, meldet die App „Keine Verbindung – nicht gespeichert“; speichere dann erneut, sobald du wieder Netz hast.
 - Wird die App gerade gewartet, siehst du statt der Inhalte nur einen Hinweis darauf. Mit **Erneut versuchen** prüfst du, ob sie wieder da ist.
 - Die Bezeichnungen der Bereiche (z. B. **{bereich.events}**) legt jede Kompanie selbst fest. Deshalb können sie bei dir anders heißen als in anderen Apps.
 

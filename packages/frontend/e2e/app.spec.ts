@@ -1627,6 +1627,46 @@ test('Ämter: Haken „Ehrung“ an der Amtszeit, einzelnes Jahr ohne Ehrung (Is
   await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
 });
 
+test('Nicht gespeicherte Eingaben: Rückfrage vor dem Verlassen, mit Tab und mit „Zurück“', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Ämter');
+  const field = page.locator('form', { hasText: 'Neues Amt' }).getByLabel('Bezeichnung');
+  await field.fill('Nur getippt');
+  const ask = page.locator('.ask-dialog');
+
+  // Tab unten: Rückfrage, Abbrechen bleibt mit der Eingabe auf der Seite
+  await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
+  await expect(ask).toContainText('noch nicht gespeichert');
+  await askCancel(page);
+  await expect(page).toHaveURL(/#\/verwaltung\/aemter/);
+  await expect(field).toHaveValue('Nur getippt');
+
+  // „Zurück“: ebenso, Bleiben und dann Verlassen
+  await page.goBack();
+  await expect(ask).toContainText('noch nicht gespeichert');
+  await askCancel(page);
+  await expect(page).toHaveURL(/#\/verwaltung\/aemter/);
+  await expect(field).toHaveValue('Nur getippt');
+  await page.goBack();
+  await askOk(page);
+  await expect(page).toHaveURL(/#\/verwaltung\/einrichtungen$/);
+
+  // Nach dem Speichern keine Rückfrage
+  await page.locator('.admin-tiles').getByRole('button', { name: 'Ämter', exact: true }).click();
+  const office = `Ohne Rückfrage ${Date.now() % 1000000}`;
+  await field.fill(office);
+  await page.locator('form', { hasText: 'Neues Amt' }).getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amt angelegt');
+  await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
+  await expect(page).toHaveURL(/#\/meins/);
+  await expect(ask).toHaveCount(0);
+  await page.goto('/app/#/verwaltung/aemter');
+  await page.getByRole('button', { name: office, exact: true }).click();
+  await page.getByRole('button', { name: 'Amt löschen' }).click();
+  await askOk(page);
+  await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
+});
+
 test('Ämter: gemeinsame Amtszeiten einer Gruppe mit Gruppenbild, öffentlich als Karte (Issue #282)', async ({ page }) => {
   const n = Date.now() % 1000000;
   const group = `Königshaus ${n}`;
@@ -5508,6 +5548,9 @@ test('Anwesenheit offline: auf dem Gerät gespeichert, nach dem Neustart noch da
   await adminMenu(page, 'Anwesenheit');
   await page.locator('.free-event').getByLabel('Titel').fill(title);
   await page.getByRole('button', { name: 'Liste anlegen' }).click();
+  // Erst die geöffnete Liste: Das Feld „Titel“ der Übersicht hat denselben Text, und solange die Liste nicht angelegt
+  // ist, fragt die App vor dem Neuladen nach (nicht gespeicherte Eingabe).
+  await expect(page).toHaveURL(/#\/verwaltung\/anwesenheit\/\d+$/);
   await expect(page.locator('.attendance .field').first().locator('input')).toHaveValue(title);
   const openList = async () => {
     await adminMenu(page, 'Anwesenheit');

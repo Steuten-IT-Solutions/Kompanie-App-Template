@@ -16,7 +16,10 @@ import { takeRememberedRoute } from './share';
 import { watchRuntimeErrors } from './lastError';
 import { watchSharpS } from './sharpS';
 import { watchButtonWords } from './buttonWords';
-import { initBackClose } from './backClose';
+import { afterBackSync, initBackClose, openBackLayer } from './backClose';
+import { beforeLeave, initUnsaved } from './unsaved';
+import { setLeaveGuard } from './router';
+import { confirmAsk } from './ask';
 // Gewählte Schrift aus kompanie.json, lokal gebündelt (kein Abruf bei Google).
 import './generated/fonts';
 import './generated/theme.css';
@@ -49,6 +52,9 @@ if (isStandalone() && window.location.hash.startsWith('#/installieren')) {
 
 // „Zurück“ schließt offene Fenster; nach dem Neuladen mit offenem Fenster den übrigen Eintrag im Verlauf überspringen.
 initBackClose();
+// Nicht gespeicherte Eingaben: vor dem Verlassen nachfragen (unsaved.ts).
+initUnsaved((message) => confirmAsk(message, { title: 'Nicht gespeichert', okLabel: 'Verlassen' }), { openBackLayer, afterBackSync });
+setLeaveGuard(beforeLeave);
 
 // Letzte Fehlermeldung für „Fehler melden“ (Issue #64)
 watchRuntimeErrors();

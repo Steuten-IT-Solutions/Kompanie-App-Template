@@ -64,6 +64,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Nicht gespeicherte Eingaben**: Wer etwas eingegeben, aber noch nicht gespeichert hat, wird jetzt gefragt, bevor
+  die Seite verlassen wird (auch mit „Zurück“ und beim Neuladen); **Verlassen** verwirft die Eingaben. Kommt eine
+  Änderung ohne Internetverbindung nicht an, sagt die Meldung jetzt ausdrücklich „Keine Verbindung – nicht gespeichert“.
 - **Block einfügen übersichtlicher**: Beim Bearbeiten von Seiten, News und Nachrichten am Schwarzen Brett öffnet
   **+ Block einfügen** jetzt ein Fenster statt einer langen Auswahlliste. Jede Blockart steht dort als Kachel mit
   Symbol, Name und kurzer Erklärung (am Computer in zwei Spalten); Antippen fügt den Block ein, ✕ oder „Zurück“
