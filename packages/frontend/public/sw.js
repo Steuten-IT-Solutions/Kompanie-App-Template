@@ -37,6 +37,10 @@
  *   Nur fertige Bilder (200, kein Platzhalter), nur mit Fassung in der Adresse; je Bild und Größe nur die aktuelle
  *   Fassung, höchstens PHOTOS_MAX Vorschaubilder und PHOTOS_LARGE_MAX große, die ältesten fallen heraus. Wer gerade
  *   dasselbe Bild lädt (Vorladen und Ansicht), wartet auf diese eine Anfrage. Beim Abmelden gelöscht wie alles.
+ * - Weitere Bilder über die App (Offline-Prüfung): Mitgliedsfotos (<App>/mitgliedsfoto/<id>?v=…&s=…), Logos von Sponsoren
+ *   und Kompanien (<App>/sponsorlogo/<id>?v=…, <App>/kompanielogo/<id>?v=…) und Bilder in Texten (<App>/bild/<Kennung>,
+ *   eine Kennung hat immer denselben Inhalt) → zuerst aus dem Speicher, auch offline; je Bild (und Größe) nur die aktuelle
+ *   Fassung, höchstens IMAGES_MAX, die ältesten fallen heraus. Ohne Fassung in der Adresse (außer bild/) durchgereicht.
  * - Bildschirmfotos des Handbuchs (<Programmdateien>/handbuch/bilder/<name>.jpg?v=<Version>) → zuerst aus dem Speicher;
  *   je Foto nur die Fassung der aktuellen Version. Vorab geladen wird nichts (die App bliebe sonst nicht klein); was
  *   einmal in der Hilfe angesehen wurde, ist offline da.
@@ -64,13 +68,16 @@ const HELP_IMAGES_CACHE = 'kompanie-hilfebilder-v1';
 const PHOTOS_CACHE = 'kompanie-fotos-v1';
 const PHOTOS_MAX = 600;
 const PHOTOS_LARGE_MAX = 80;
+const IMAGES_CACHE = 'kompanie-bilder-v1';
+const IMAGES_MAX = 500;
 // Gerüste der Seiten, von der App selbst gespeichert (src/skeleton.tsx); bleiben bei einem Update.
 const VIEWS_CACHE = 'kompanie-ansicht-';
 const params = new URL(self.location.href).searchParams;
 const API = params.get('api') || '';
 const ASSETS = params.get('assets') || '';
 const NAVIGATION_TIMEOUT_MS = 2500;
-const DATA_MAX = 100;
+// Je Adresse ein Eintrag (jedes Mitglied, jede Liste, jede Umfrage …): genug für einen Tag in der App.
+const DATA_MAX = 300;
 const FRESH_MS = 10000;
 /** So lange wartet eine Anfrage der App auf das Netz, bevor die gespeicherte Version kommt (schlechtes Netz). */
 const API_TIMEOUT_MS = 6000;
@@ -151,7 +158,7 @@ self.addEventListener('activate', (event) => {
           keys
             .filter(
               (k) =>
-                ![STATIC_CACHE, DATA_CACHE, DOCS_CACHE, BADGES_CACHE, HELP_IMAGES_CACHE, PHOTOS_CACHE].includes(k) &&
+                ![STATIC_CACHE, DATA_CACHE, DOCS_CACHE, BADGES_CACHE, HELP_IMAGES_CACHE, PHOTOS_CACHE, IMAGES_CACHE].includes(k) &&
                 !k.startsWith(VIEWS_CACHE),
             )
             .map((k) => caches.delete(k)),
@@ -324,6 +331,40 @@ async function photoFirst(request, key) {
     photoRequests.set(request.url, running);
   }
   return (await running).clone();
+}
+
+/**
+ * Weitere Bilder über die App: Schlüssel für Bild und Größe (ohne Fassung), sonst null. Mitgliedsfotos und Logos nur mit
+ * Fassung (v), Bilder in Texten (bild/<Kennung>) immer.
+ */
+function imageKey(url) {
+  const scope = new URL(self.registration.scope);
+  const path = url.pathname.startsWith(scope.pathname) ? url.pathname.slice(scope.pathname.length) : '';
+  const param = (url.searchParams.get('kompanie_app') || url.searchParams.get('r') || '').replace(/^\//, '');
+  const match = (re) => path.match(re) || param.match(re);
+  const rich = match(/^bild\/([A-Za-z0-9_-]+)\/?$/);
+  if (rich) return 'bild:' + rich[1];
+  if (!url.searchParams.get('v')) return null;
+  const photo = match(/^mitgliedsfoto\/(\d+)\/?$/);
+  if (photo) return 'mitgliedsfoto:' + photo[1] + ':' + (url.searchParams.get('s') || '');
+  const logo = match(/^(sponsorlogo|kompanielogo)\/(\d+)\/?$/);
+  return logo ? logo[1] + ':' + logo[2] : null;
+}
+
+/** Weitere Bilder: gespeicherte Fassung, sonst laden, ältere Fassungen ersetzen, Anzahl begrenzen. */
+async function imageFirst(request, key) {
+  const cache = await caches.open(IMAGES_CACHE);
+  const cached = await cache.match(request, MATCH);
+  if (cached) return cached;
+  const res = await fetch(request);
+  if (cacheable(res) && res.status === 200) {
+    const keys = await cache.keys();
+    await Promise.all(keys.filter((k) => imageKey(new URL(k.url)) === key).map((k) => cache.delete(k)));
+    await cache.put(request, res.clone());
+    const all = await cache.keys();
+    await Promise.all(all.slice(0, Math.max(0, all.length - IMAGES_MAX)).map((k) => cache.delete(k)));
+  }
+  return res;
 }
 
 function isHelpImage(url) {
@@ -666,7 +707,10 @@ self.addEventListener('fetch', (event) => {
   const doc = documentId(url);
   const badge = doc === null ? badgeKey(url) : null;
   const photo = doc === null && badge === null ? photoKey(url) : null;
-  if (photo !== null) {
+  const image = doc === null && badge === null && photo === null ? imageKey(url) : null;
+  if (image !== null) {
+    if (request.mode !== 'navigate') event.respondWith(imageFirst(request, image));
+  } else if (photo !== null) {
     if (request.mode !== 'navigate') event.respondWith(photoFirst(request, photo));
   } else if (badge !== null) {
     if (request.mode !== 'navigate') event.respondWith(badgeFirst(request, badge));

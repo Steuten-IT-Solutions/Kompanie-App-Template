@@ -250,21 +250,21 @@ test('Als App-Seite wird nur HTML gespeichert', async () => {
 
 test('App-Seite ohne Netz aus dem Speicher; Daten-Speicher begrenzt, die App-Seite bleibt', async () => {
   const net = { [SCOPE]: () => response('<html>app</html>', 'text/html') };
-  for (let i = 0; i < 130; i++) net[`${API}events?i=${i}`] = () => response('[]', 'application/json');
+  for (let i = 0; i < 330; i++) net[`${API}events?i=${i}`] = () => response('[]', 'application/json');
   const sw = load({ net });
   await sw.request(SCOPE, 'navigate');
-  for (let i = 0; i < 130; i++) await sw.request(`${API}events?i=${i}`);
+  for (let i = 0; i < 330; i++) await sw.request(`${API}events?i=${i}`);
   await sw.lifecycle('activate'); // räumt ebenfalls auf
   const keys = (await (await sw.storage.open('kompanie-data-v2')).keys()).map((r) => r.url);
   assert.ok(keys.includes(SCOPE), 'App-Seite bleibt');
-  assert.equal(keys.length, 101, 'höchstens 100 Daten-Einträge und die App-Seite');
-  assert.ok(keys.includes(`${API}events?i=129`) && !keys.includes(`${API}events?i=0`), 'die ältesten fallen heraus');
+  assert.equal(keys.length, 301, 'höchstens 300 Daten-Einträge und die App-Seite');
+  assert.ok(keys.includes(`${API}events?i=329`) && !keys.includes(`${API}events?i=0`), 'die ältesten fallen heraus');
 
   // Ohne Netz: gespeicherte App-Seite und Daten.
   delete net[SCOPE];
-  delete net[`${API}events?i=129`];
+  delete net[`${API}events?i=329`];
   assert.equal(await (await sw.request(`${SCOPE}`, 'navigate')).text(), '<html>app</html>');
-  assert.equal(await (await sw.request(`${API}events?i=129`)).text(), '[]');
+  assert.equal(await (await sw.request(`${API}events?i=329`)).text(), '[]');
 });
 
 test('Verwaltung (/admin/) wird nie gespeichert', async () => {
@@ -738,4 +738,28 @@ test('Ohne Netz nach einer eigenen Änderung: gespeicherte Version gekennzeichne
   assert.equal(res.headers.get('X-Kompanie-Stale'), '1');
   await assert.rejects(sw.request(`${API}members`, 'cors', { ...STALE_OK, 'X-Kompanie-User': '6' }));
   await assert.rejects(sw.request(`${API}members`, 'cors', { 'X-Kompanie-User': '6' }), 'auch ohne Stale-Ok');
+});
+
+test('Mitgliedsfotos, Logos und Bilder in Texten: zuerst aus dem Speicher, auch offline; neue Fassung ersetzt die alte', async () => {
+  const photo = (v) => `${SCOPE}mitgliedsfoto/7?v=${v}&s=128`;
+  const logo = `${SCOPE}?kompanie_app=sponsorlogo/3&v=a`;
+  const rich = `${SCOPE}bild/0123456789abcdef0123456789abcdef`;
+  const net = {
+    [photo('a')]: () => response('foto-a', 'image/webp'),
+    [photo('b')]: () => response('foto-b', 'image/webp'),
+    [logo]: () => response('logo', 'image/png'),
+    [rich]: () => response('bild', 'image/jpeg'),
+  };
+  const sw = load({ net });
+  for (const u of [photo('a'), logo, rich]) await sw.request(u, 'no-cors');
+  for (const u of [photo('a'), logo, rich]) delete net[u];
+  assert.equal(await (await sw.request(photo('a'), 'no-cors')).text(), 'foto-a', 'offline aus dem Speicher');
+  assert.equal(await (await sw.request(logo, 'no-cors')).text(), 'logo');
+  assert.equal(await (await sw.request(rich, 'no-cors')).text(), 'bild');
+  await sw.request(photo('b'), 'no-cors');
+  const keys = (await (await sw.storage.open('kompanie-bilder-v1')).keys()).map((r) => r.url);
+  assert.ok(keys.includes(photo('b')) && !keys.includes(photo('a')), 'nur die aktuelle Fassung');
+  // Ohne Fassung und in der Vorschau durchgereicht
+  assert.equal(await sw.request(`${SCOPE}mitgliedsfoto/7?s=128`, 'no-cors'), undefined);
+  assert.equal(await sw.request(`${photo('b')}&vorschau=member`, 'no-cors'), undefined);
 });

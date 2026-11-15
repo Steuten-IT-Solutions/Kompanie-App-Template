@@ -63,7 +63,7 @@ Fest einstellen kannst du die Darstellung unter **Meins** → **Konto**, siehe [
 Unter der Kopfleiste erscheinen manchmal Hinweise:
 - **Die App aufs Handy holen**: Tippe auf **So geht's** für die bebilderte Anleitung oder, wenn dein Browser es anbietet, auf **Installieren**. Mit **✕** blendest du den Hinweis aus. Steht oben schon eine Nachricht vom {bereich.board} oder der Hinweis auf die Wartung, wartet dieser Hinweis, bis sie weg ist. Mehr dazu unter [Die App aufs Handy holen](seite:app-installieren).
 - **{bereich.board}**: Angemeldete {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter) sehen hier dringende Nachrichten der Kompanie, {rolle.member} außerdem {bereich.polls}, die sie noch nicht beantwortet haben. Ein Tipp auf den Titel öffnet die Nachricht am Brett, mit **×** blendest du einen Eintrag auf diesem Gerät aus.
-- **Offline – angezeigt werden die zuletzt geladenen Daten.**: Du hast gerade keine Internetverbindung. Was du zuletzt geladen hast, bleibt sichtbar.
+- **Offline – angezeigt werden die zuletzt geladenen Daten.**: Du hast gerade keine Internetverbindung. Was du zuletzt geladen hast, bleibt sichtbar, auch Fotos und Logos, die du schon einmal gesehen hast.
 - **Schlechte Verbindung – angezeigt werden die zuletzt geladenen Daten.**: Das Netz antwortet gerade nicht oder nur sehr langsam. Nach einigen Sekunden zeigt die App, was du zuletzt geladen hast; kommt die Antwort doch noch, erscheint der neue Stand von selbst.
 - **Diese Seite ist erst nach der Anmeldung zu sehen.**: Du hast einen Link auf einen Bildschirm für Angemeldete geöffnet. Tippe auf **Anmelden**.
 
