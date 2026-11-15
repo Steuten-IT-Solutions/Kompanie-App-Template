@@ -27,6 +27,8 @@ import Termine, { canManageCalendar } from './views/Termine';
 import { canManageGallery } from './galleryManage';
 import { hasEvents, prefetcher, tabSources, type TabId } from './viewData';
 import { whenIdle } from './prefetch';
+import { attendanceOutbox, clearOfflineChanges, syncAttendance, syncMessage } from './attendanceSync';
+import { confirmAsk } from './ask';
 
 // Erst bei Bedarf laden: Der App-Start braucht nur die Ansichten, mit denen Gäste meist beginnen (Termine, News).
 // Der Service Worker speichert alle Teile trotzdem vorab, damit sie auch offline da sind.
@@ -334,6 +336,18 @@ async function clearCaches() {
 async function logout(onError: (msg: string) => void) {
   // In der Vorschau: erst beenden, sonst lehnte der Server das Abmelden der Benachrichtigungen ab.
   if (previewRole()) stopPreview();
+  // Offline gespeicherte Anwesenheit (attendanceSync.ts) erst übertragen: Beim Abmelden löscht die App sie vom Gerät.
+  if (attendanceOutbox.ids().length > 0) {
+    await syncAttendance();
+    if (
+      attendanceOutbox.ids().length > 0 &&
+      !(await confirmAsk('Offline gespeicherte Anwesenheit ist noch nicht übertragen und geht beim Abmelden verloren. Trotzdem abmelden?', {
+        okLabel: 'Abmelden',
+      }))
+    ) {
+      return;
+    }
+  }
   // Solange die Sitzung noch gilt: Dieses Gerät bekommt keine Nachrichten des Kontos mehr.
   const finishPush = await forgetPushOnLogout();
   if (config?.auth.mode === 'form') {
@@ -349,6 +363,7 @@ async function logout(onError: (msg: string) => void) {
     }
   }
   await finishPush(true);
+  clearOfflineChanges();
   await clearCaches().catch(() => undefined);
   if (config?.auth.mode === 'redirect' && config.auth.logoutUrl) {
     window.location.href = config.auth.logoutUrl;
@@ -519,6 +534,18 @@ export default function App({ notice = null }: { notice?: string | null }) {
     const t = setTimeout(() => setToast(null), 3500);
     return () => clearTimeout(t);
   }, [toast]);
+
+  // Offline gespeicherte Anwesenheit übertragen: beim Start und sobald wieder Netz da ist (attendanceSync.ts).
+  useEffect(() => {
+    const sync = () =>
+      void syncAttendance().then((r) => {
+        const msg = syncMessage(r);
+        if (msg) showToast(msg);
+      });
+    sync();
+    window.addEventListener('online', sync);
+    return () => window.removeEventListener('online', sync);
+  }, [showToast]);
 
   useEffect(() => {
     const on = () => setOnline(true);

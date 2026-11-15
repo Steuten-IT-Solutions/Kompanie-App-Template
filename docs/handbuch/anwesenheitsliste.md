@@ -20,7 +20,8 @@ Tippe unten auf **Verwaltung**, dann auf **{bereich.attendance}**. Tippe dort au
 - **Die Liste**: alle Personen mit einer Rolle, außer {rolle.guest}. Je Person gibt es ein Kästchen für **anwesend**, **entschuldigt** und **fehlt**. Neben dem Namen steht die Rolle, wenn sie nicht {rolle.member} ist. **{bereich.points} gebucht** heißt: Diese Person hat für diese Liste schon {bereich.points} bekommen.
 - **zugesagt** bzw. **abgesagt** unter dem Namen: die Rückmeldung der Person zum Termin, mit ihrem Hinweis (nur bei Listen zu Terminen aus dem {bereich.calendar}). Solange man noch zu- und absagen kann, steht dort eine Auswahl, mit der du die Rückmeldung für die Person einträgst.
 - **Absagen übernehmen**: setzt alle, die abgesagt haben und noch kein Häkchen haben, auf **entschuldigt**. Der Knopf erscheint nur, wenn es solche Personen gibt.
-- **Speichern**: speichert deine Änderungen. Ist alles gespeichert, steht dort **Gespeichert**.
+- **Speichern**: speichert deine Änderungen. Ist alles gespeichert, steht dort **Gespeichert**. Ohne Verbindung steht dort **Auf dem Gerät gespeichert** (siehe „Ohne Internet eintragen“ unten).
+- **Noch nicht übertragen**: Hinweis über der Liste, solange offline gespeicherte Änderungen noch nicht beim Server sind. Mit **Jetzt übertragen** versucht die App es sofort.
 - **{bereich.points} für … Anwesende** und **Eintrag für … Fehlende**: nur, wenn du {bereich.points} bzw. {bereich.penalties} vergeben darfst.
 - **Liste löschen**: ganz unten.
 
@@ -62,6 +63,12 @@ Meldet sich jemand z. B. per Telefon ab:
 2. Das Formular für {bereich.penalties} öffnet sich mit allen {rolle.member}, die gefehlt haben. Als Grund steht „Gefehlt:“ und der Titel der Liste.
 3. Prüfe die Auswahl und trage den Eintrag ein wie sonst unter **Verwaltung** → **{bereich.penalties} +**.
 
+### Ohne Internet eintragen
+1. Öffne die Liste, solange du noch Netz hast. Die App merkt sich dann ihren Stand, auch die Übersicht.
+2. Ohne Verbindung setzt du die Häkchen wie gewohnt und tippst auf **Speichern**.
+3. Es erscheint „Keine Verbindung. Auf diesem Gerät gespeichert, die App überträgt es, sobald du wieder online bist.“ Über der Liste steht **Noch nicht übertragen**, in der Übersicht steht das auch bei der Liste.
+4. Hast du wieder Netz, überträgt die App die Änderungen von selbst (beim Start der App, sobald das Handy wieder online ist, und beim Öffnen der Liste). Danach erscheint „Offline gespeicherte Anwesenheit übertragen“.
+
 ### Eine Liste löschen
 1. Tippe ganz unten auf **Liste löschen**.
 2. Bestätige die Frage.
@@ -73,6 +80,10 @@ Meldet sich jemand z. B. per Telefon ab:
 - Löschst du eine Liste, bleiben die schon gebuchten {bereich.points} erhalten.
 - Verschiebst du einen freien Termin in die Zukunft, entferne vorher die Häkchen bei **anwesend** und **fehlt**. Sonst lässt sich die Liste nicht speichern.
 - Unten steht, wer die Liste zuletzt gespeichert hat.
+- Offline gespeichert wird nur auf diesem Gerät und nur für dich. Übertragen werden nur die Personen, die du geändert hast. Hat jemand anderes inzwischen dieselbe Person geändert, gilt, was zuletzt beim Server ankommt.
+- Ohne Verbindung lässt sich keine neue Liste anlegen, auch nicht zu einem Termin ohne Liste. Für Punkte, Strafen und Zu- oder Absagen braucht die App weiterhin eine Verbindung.
+- Lehnt der Server offline gespeicherte Änderungen ab (z. B. weil die Liste inzwischen gelöscht ist), verwirft die App sie und meldet das.
+- Meldest du dich ab, bevor alles übertragen ist, fragt die App nach: Beim Abmelden gehen nicht übertragene Änderungen verloren.
 - Eine Zusage trägt nichts ein: Ob jemand da war, steht erst am Termin fest.
 - Für jemanden zu- oder absagen geht nur bei Personen, die selbst zu- und absagen dürfen, und nur bis zur selben Frist (Beginn bzw. Anmeldeschluss). Danach siehst du die Rückmeldungen nur noch. Ein Hinweis der Person bleibt dabei erhalten.
 - Wird ein Termin aus dem {bereich.calendar} gelöscht, zeigt seine Liste keine Rückmeldungen mehr. Die Einträge der Liste bleiben.
