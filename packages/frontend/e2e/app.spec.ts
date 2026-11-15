@@ -1627,6 +1627,46 @@ test('Ämter: Haken „Ehrung“ an der Amtszeit, einzelnes Jahr ohne Ehrung (Is
   await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
 });
 
+test('Nicht gespeicherte Eingaben: Rückfrage vor dem Verlassen, mit Tab und mit „Zurück“', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Ämter');
+  const field = page.locator('form', { hasText: 'Neues Amt' }).getByLabel('Bezeichnung');
+  await field.fill('Nur getippt');
+  const ask = page.locator('.ask-dialog');
+
+  // Tab unten: Rückfrage, Abbrechen bleibt mit der Eingabe auf der Seite
+  await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
+  await expect(ask).toContainText('noch nicht gespeichert');
+  await askCancel(page);
+  await expect(page).toHaveURL(/#\/verwaltung\/aemter/);
+  await expect(field).toHaveValue('Nur getippt');
+
+  // „Zurück“: ebenso, Bleiben und dann Verlassen
+  await page.goBack();
+  await expect(ask).toContainText('noch nicht gespeichert');
+  await askCancel(page);
+  await expect(page).toHaveURL(/#\/verwaltung\/aemter/);
+  await expect(field).toHaveValue('Nur getippt');
+  await page.goBack();
+  await askOk(page);
+  await expect(page).toHaveURL(/#\/verwaltung\/einrichtungen$/);
+
+  // Nach dem Speichern keine Rückfrage
+  await page.locator('.admin-tiles').getByRole('button', { name: 'Ämter', exact: true }).click();
+  const office = `Ohne Rückfrage ${Date.now() % 1000000}`;
+  await field.fill(office);
+  await page.locator('form', { hasText: 'Neues Amt' }).getByRole('button', { name: 'Anlegen' }).click();
+  await expect(page.locator('.toast')).toHaveText('Amt angelegt');
+  await page.locator('.tabbar').getByRole('button', { name: 'Meins' }).click();
+  await expect(page).toHaveURL(/#\/meins/);
+  await expect(ask).toHaveCount(0);
+  await page.goto('/app/#/verwaltung/aemter');
+  await page.getByRole('button', { name: office, exact: true }).click();
+  await page.getByRole('button', { name: 'Amt löschen' }).click();
+  await askOk(page);
+  await expect(page.locator('.toast')).toHaveText('Amt gelöscht');
+});
+
 test('Ämter: gemeinsame Amtszeiten einer Gruppe mit Gruppenbild, öffentlich als Karte (Issue #282)', async ({ page }) => {
   const n = Date.now() % 1000000;
   const group = `Königshaus ${n}`;
@@ -3913,7 +3953,7 @@ test('Admin wird durch die Einrichtung geführt', async ({ page }) => {
   }
   expect(importStep).toBe(true);
   await page.getByRole('button', { name: 'Einrichtung abschließen' }).click();
-  await expect(page).toHaveURL(/#\/verwaltung$/);
+  await expect(page).toHaveURL(/#\/verwaltung\/einrichtungen$/);
   await expect(hint).toHaveCount(0);
   const nav = page.getByRole('navigation', { name: 'Hauptnavigation' });
   await expect(nav.getByRole('button', { name: 'Galerie' })).toHaveCount(0);
@@ -4626,7 +4666,7 @@ test('Dienstgrade: Liste anlegen, mit Punkteschwelle befördern, Mitglied sieht 
   await expect(page).toHaveURL(/#\/verwaltung\/einrichtungen$/);
   await expect(page.locator('.admin-tiles').getByRole('button', { name: 'Punktekatalog', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '‹ Verwaltung' }).click();
-  await expect(page).toHaveURL(/#\/verwaltung$/);
+  await expect(page).toHaveURL(/#\/verwaltung\/einrichtungen$/);
   const tiles = page.locator('.admin-tiles');
   await expect(tiles.getByRole('button', { name: 'Beförderungen', exact: true })).toBeVisible();
   await expect(tiles.getByRole('button', { name: 'Dienstgrade', exact: true })).toHaveCount(0);
