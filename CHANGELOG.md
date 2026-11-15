@@ -82,6 +82,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Anwesenheit ohne Verbindung**: Wer in einer Anwesenheitsliste unter
+  [Verwaltung → Anwesenheit](app:verwaltung/anwesenheit) ohne Internet auf _Speichern_ tippt, verliert die Häkchen nicht
+  mehr. Die App merkt sie sich auf dem Gerät, auch über einen Neustart, zeigt sie mit dem Hinweis „Noch nicht
+  übertragen“ und überträgt sie von selbst, sobald wieder Netz da ist. Übertragen wird nur, was geändert wurde, Einträge
+  anderer bleiben. Bisher waren solche Eingaben nach dem Schließen der Liste weg.
+
 - **Ämter-Liste**: Unter [Verwaltung → Ämter](app:verwaltung/aemter) steht ein langer, zweizeiliger Name eines Amts jetzt
   linksbündig wie die übrigen statt mittig. Unter „Gemeinsame Amtszeiten“ hat der Knopf „Neue gemeinsame Amtszeit“ wieder
   Abstand zur Karte darüber.

@@ -1,6 +1,7 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
   api,
+  ApiError,
   ATTENDANCE_LABELS,
   can,
   countsText,
@@ -18,6 +19,16 @@ import { navigate } from '../router';
 import { Caps, Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { prefetchOnTap, sources } from '../viewData';
 import { confirmAsk } from '../ask';
+import { applyPending, pendingCount, type PendingSave } from '../attendanceOutbox';
+import {
+  attendanceOutbox,
+  outboxChanged,
+  saveInput,
+  syncAttendance,
+  syncMessage,
+  usePendingAttendance,
+  usePendingAttendanceIds,
+} from '../attendanceSync';
 
 const sec = brand.labels.sections;
 const STATUSES: AttendanceStatus[] = ['present', 'excused', 'absent'];
@@ -46,6 +57,7 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(todayYmd());
   const [busy, setBusy] = useState(false);
+  const pendingIds = usePendingAttendanceIds();
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -141,7 +153,9 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
               {...prefetchOnTap(sources.attendance(l.id))}
             >
               <div className="row-main">
-                <div className="row-title">{l.title}</div>
+                <div className="row-title">
+                  {l.title} {pendingIds.includes(l.id) && <span className="badge badge-level-guest">Noch nicht übertragen</span>}
+                </div>
                 <div className="row-sub">
                   {formatDate(l.date)} · {countsText(l.counts)}
                 </div>
@@ -214,17 +228,29 @@ function EventList({
 function ListView({ id, onToast }: { id: number; onToast: (msg: string) => void }) {
   const s = sources.attendance(id);
   const { data, error, loading, reload, setData } = useAsync(s.load, s.deps, s.key);
+  const pending = usePendingAttendance(id);
+  // Offline gespeicherte Änderungen jetzt übertragen, wenn es geht (attendanceSync.ts).
+  useEffect(() => {
+    void syncAttendance().then((r) => {
+      const msg = syncMessage(r);
+      if (msg) onToast(msg);
+    });
+  }, [id, onToast]);
   if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
-  return <Editor key={data!.updated_at} list={data!} onSaved={setData} onToast={onToast} />;
+  // Mit den offline gespeicherten Änderungen, bis sie übertragen sind.
+  return <Editor key={data!.updated_at} list={applyPending(data!, pending)} pending={pending} onSaved={setData} onToast={onToast} />;
 }
 
 function Editor({
   list,
+  pending,
   onSaved,
   onToast,
 }: {
   list: AttendanceDetail;
+  /** Offline gespeicherte, noch nicht übertragene Änderungen (in `list` schon eingerechnet) */
+  pending: PendingSave | null;
   onSaved: (l: AttendanceDetail) => void;
   onToast: (msg: string) => void;
 }) {
@@ -267,11 +293,28 @@ function Editor({
       return false;
     }
     setBusy(true);
+    const freeInput = free ? { title: title.trim(), date } : null;
     try {
-      onSaved(await api.saveAttendance({ id: list.id, entries: changes, ...(free ? { title: title.trim(), date } : {}) }));
+      // Offline gespeicherte Änderungen gehen mit.
+      const saved = await api.saveAttendance(saveInput(list.id, pending, changes, freeInput));
+      if (pending) {
+        attendanceOutbox.remove(list.id, pending);
+        outboxChanged();
+      }
+      onSaved(saved);
       return true;
     } catch (e) {
-      onToast((e as Error).message);
+      // Keine Verbindung: auf dem Gerät ablegen und später übertragen (attendanceSync.ts).
+      if (
+        e instanceof ApiError &&
+        e.status === 0 &&
+        attendanceOutbox.add(list.id, { entries: changes, ...(freeInput ?? {}), label: freeInput?.title ?? list.title })
+      ) {
+        outboxChanged();
+        onToast('Keine Verbindung. Auf diesem Gerät gespeichert, die App überträgt es, sobald du wieder online bist.');
+      } else {
+        onToast((e as Error).message);
+      }
       return false;
     } finally {
       setBusy(false);
@@ -305,6 +348,8 @@ function Editor({
     setBusy(true);
     try {
       await api.deleteAttendance(list.id);
+      attendanceOutbox.discard(list.id);
+      outboxChanged();
       onToast('Liste gelöscht');
       navigate('verwaltung/anwesenheit');
     } catch (e) {
@@ -351,7 +396,23 @@ function Editor({
           Absagen übernehmen ({declinesOpen.length})
         </button>
       )}
-      {!dirty && <GroupCounts list={list} />}
+      {pending && (
+        <p className="attendance-pending small" role="status">
+          Noch nicht übertragen: offline gespeicherte Änderungen
+          {pendingCount(pending) > 0 && ` bei ${pendingCount(pending)} ${pendingCount(pending) === 1 ? 'Person' : 'Personen'}`}. Die App
+          sendet sie, sobald du wieder online bist.{' '}
+          <button
+            type="button"
+            className="btn btn-link inline-link"
+            onClick={() =>
+              void syncAttendance().then((r) => onToast(syncMessage(r) ?? 'Noch keine Verbindung. Die App versucht es später wieder.'))
+            }
+          >
+            Jetzt übertragen
+          </button>
+        </p>
+      )}
+      {!dirty && !pending && <GroupCounts list={list} />}
 
       <div className="picker">
         <div className="picker-head">
@@ -431,7 +492,7 @@ function Editor({
         disabled={busy || !dirty}
         onClick={() => save().then((ok) => ok && onToast('Anwesenheit gespeichert'))}
       >
-        {busy ? 'Speichert …' : dirty ? 'Speichern' : 'Gespeichert'}
+        {busy ? 'Speichert …' : dirty ? 'Speichern' : pending ? 'Auf dem Gerät gespeichert' : 'Gespeichert'}
       </button>
       {(points || penalties) && (
         <div className="button-row attendance-book">
