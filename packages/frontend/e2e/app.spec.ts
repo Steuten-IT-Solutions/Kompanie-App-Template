@@ -5502,6 +5502,52 @@ test('Anwesenheit: freie Liste, Status, Punkte aus dem Vorschlag, Mitglied sieht
   await expect(page.locator('.my-attendance .row', { hasText: title })).toContainText('anwesend');
 });
 
+test('Anwesenheit offline: auf dem Gerät gespeichert, nach dem Neustart noch da, online von selbst übertragen', async ({ page }) => {
+  const title = `Offline ${Date.now().toString(36)}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Anwesenheit');
+  await page.locator('.free-event').getByLabel('Titel').fill(title);
+  await page.getByRole('button', { name: 'Liste anlegen' }).click();
+  await expect(page.locator('.attendance .field').first().locator('input')).toHaveValue(title);
+  // Erst ab dem nächsten Laden steuert der Service Worker die Seite und speichert die Liste für offline.
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  await expect(page.locator('.attendance .field').first().locator('input')).toHaveValue(title);
+  // Übersicht mit der neuen Liste einmal online laden, damit sie auch offline da ist.
+  await page.locator('.attendance .back').click();
+  await page.locator('.attendance-lists li', { hasText: title }).click();
+  await expect(page.locator('.attendance .field').first().locator('input')).toHaveValue(title);
+
+  await page.context().setOffline(true);
+  try {
+    await page.getByRole('radio', { name: 'Mitglied2: anwesend' }).check();
+    await page.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toContainText('Auf diesem Gerät gespeichert');
+    await expect(page.locator('.attendance-pending')).toContainText('bei 1 Person');
+    await expect(page.getByRole('button', { name: 'Auf dem Gerät gespeichert' })).toBeDisabled();
+    // Neustart der App ohne Netz: Die Auswahl ist noch da (vorher war sie weg).
+    await page.reload();
+    await expect(page.locator('.offline')).toBeVisible();
+    await expect(page.getByRole('radio', { name: 'Mitglied2: anwesend' })).toBeChecked();
+    await expect(page.locator('.attendance-pending')).toBeVisible();
+    await page.locator('.attendance .back').click();
+    await expect(page.locator('.attendance-lists li', { hasText: title })).toContainText('Noch nicht übertragen');
+  } finally {
+    await page.context().setOffline(false);
+  }
+  // Wieder online: Die App überträgt von selbst.
+  await expect(page.locator('.toast')).toHaveText('Offline gespeicherte Anwesenheit übertragen');
+  await expect(page.locator('.attendance-lists li', { hasText: title })).not.toContainText('Noch nicht übertragen');
+  // Gegenprobe: Die Warteschlange ist leer, der Haken kommt also vom Server.
+  await page.locator('.attendance-lists li', { hasText: title }).click();
+  await expect(page.getByRole('radio', { name: 'Mitglied2: anwesend' })).toBeChecked();
+  await expect(page.locator('.attendance-pending')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Gespeichert', exact: true })).toBeDisabled();
+});
+
 test('Dokumente: hochladen, Kategorien eingeklappt, PDF anzeigen, Sortierung gemerkt, offline erneut öffnen', async ({ page }) => {
   const id = Date.now().toString(36);
   const pdf = Buffer.from(
