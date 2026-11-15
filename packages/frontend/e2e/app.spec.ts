@@ -5509,17 +5509,19 @@ test('Anwesenheit offline: auf dem Gerät gespeichert, nach dem Neustart noch da
   await page.locator('.free-event').getByLabel('Titel').fill(title);
   await page.getByRole('button', { name: 'Liste anlegen' }).click();
   await expect(page.locator('.attendance .field').first().locator('input')).toHaveValue(title);
+  const openList = async () => {
+    await adminMenu(page, 'Anwesenheit');
+    await page.locator('.attendance-lists li', { hasText: title }).click();
+    await expect(page.locator('.attendance .field').first().locator('input')).toHaveValue(title);
+  };
   // Erst ab dem nächsten Laden steuert der Service Worker die Seite und speichert die Liste für offline.
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
   });
   await page.reload();
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
-  await expect(page.locator('.attendance .field').first().locator('input')).toHaveValue(title);
-  // Übersicht mit der neuen Liste einmal online laden, damit sie auch offline da ist.
-  await page.locator('.attendance .back').click();
-  await page.locator('.attendance-lists li', { hasText: title }).click();
-  await expect(page.locator('.attendance .field').first().locator('input')).toHaveValue(title);
+  // Übersicht und Liste einmal online laden, damit sie auch offline da sind.
+  await openList();
 
   await page.context().setOffline(true);
   try {
@@ -5531,6 +5533,7 @@ test('Anwesenheit offline: auf dem Gerät gespeichert, nach dem Neustart noch da
     // Neustart der App ohne Netz: Die Auswahl ist noch da (vorher war sie weg).
     await page.reload();
     await expect(page.locator('.offline')).toBeVisible();
+    await openList();
     await expect(page.getByRole('radio', { name: 'Mitglied2: anwesend' })).toBeChecked();
     await expect(page.locator('.attendance-pending')).toBeVisible();
     await page.locator('.attendance .back').click();
