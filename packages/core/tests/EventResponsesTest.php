@@ -266,4 +266,71 @@ final class EventResponsesTest extends TestCase
         $this->clock->at = new \DateTimeImmutable('2027-02-19 12:00:00', new \DateTimeZone('UTC'));
         $this->assertSame(1, $this->app->eventResponses()->cleanup());
     }
+    public function testAttendanceListShowsResponsesAndSuggestsNothingByItself(): void
+    {
+        $id = $this->appEvent();
+        $this->ok('PUT', "/calendar/$id/response", ['status' => 'no', 'note' => 'Urlaub'], $this->anna);
+        $this->ok('PUT', "/calendar/$id/response", ['status' => 'yes'], $this->ben);
+        $list = $this->ok('PUT', '/attendance', ['source' => 'calendar', 'event_key' => $id]);
+        $this->assertTrue($list['responses_open']);
+        $people = array_column($list['people'], null, 'name');
+        $this->assertSame(['no', 'Urlaub', true, null], [$people['Anna']['response'], $people['Anna']['response_note'], $people['Anna']['may_respond'], $people['Anna']['status']], 'nur angezeigt, nicht eingetragen');
+        $this->assertSame('yes', $people['Ben']['response']);
+        $this->assertNull($people['Admin']['response']);
+
+        // Freie Liste: keine Rückmeldungen
+        $free = $this->ok('PUT', '/attendance', ['source' => 'free', 'title' => 'Spontan', 'date' => '2026-11-14']);
+        $this->assertNull($free['responses_open']);
+        $this->assertArrayNotHasKey('response', $free['people'][0]);
+
+        // Termin gelöscht: Liste bleibt, ohne Rückmeldungen
+        $this->ok('DELETE', '/calendar/entries/' . substr($id, 1));
+        $gone = $this->ok('GET', '/attendance/' . $list['id']);
+        $this->assertNull($gone['responses_open']);
+    }
+
+    public function testRespondForOthersWithManageAttendance(): void
+    {
+        $id = $this->appEvent();
+        $this->ok('PUT', "/calendar/$id/response", ['status' => 'yes', 'note' => 'mit Auto'], $this->anna);
+        $this->assertSame(403, $this->call('PUT', "/calendar/$id/responses/{$this->ben}", ['status' => 'no'], $this->anna)->status);
+
+        $this->assertSame(['user_id' => $this->anna, 'status' => 'no', 'note' => 'mit Auto'], $this->ok('PUT', "/calendar/$id/responses/{$this->anna}", ['status' => 'no']), 'Hinweis bleibt');
+        $this->ok('PUT', "/calendar/$id/responses/{$this->ben}", ['status' => 'yes']);
+        $this->assertSame(['no', 1, 1], [$this->responses($id, $this->anna)['mine'], $this->responses($id)['yes'], $this->responses($id)['no']]);
+        $this->assertSame(['user_id' => $this->ben, 'status' => null, 'note' => ''], $this->ok('PUT', "/calendar/$id/responses/{$this->ben}", ['status' => null]));
+        $this->assertNull($this->responses($id, $this->ben)['mine']);
+
+        $this->assertSame(400, $this->call('PUT', "/calendar/$id/responses/{$this->ben}", ['status' => 'maybe'])->status);
+        $guest = $this->users->add('gast', Roles::GUEST);
+        $this->assertSame(400, $this->call('PUT', "/calendar/$id/responses/$guest", ['status' => 'yes'])->status, 'nur wer selbst zusagen darf');
+
+        // Im Änderungsprotokoll, mit der Person als Betroffener
+        $changes = $this->ok('GET', '/admin/changes')['entries'];
+        $entry = array_values(array_filter($changes, fn (array $e): bool => $e['type'] === 'Rückmeldung zu einem Termin' && $e['subject_user_id'] === $this->anna))[0] ?? null;
+        $this->assertNotNull($entry, (string) json_encode($changes));
+        $fields = array_column($entry['changes'], null, 'field');
+        $this->assertSame(['zugesagt', 'abgesagt'], [$fields['Rückmeldung']['old'], $fields['Rückmeldung']['new']]);
+
+        // Gleiche Frist wie beim Zusagen
+        $this->clock->at = new \DateTimeImmutable('2026-11-20 10:00:00', new \DateTimeZone('UTC'));
+        $this->assertSame(409, $this->call('PUT', "/calendar/$id/responses/{$this->ben}", ['status' => 'yes'])->status);
+        $list = $this->ok('PUT', '/attendance', ['source' => 'calendar', 'event_key' => $id]);
+        $this->assertFalse($list['responses_open']);
+    }
+
+    public function testAwaitingCountInConfig(): void
+    {
+        $this->ok('PATCH', '/admin/settings', ['calendar_source' => 'app']);
+        $soon = 'i' . $this->ok('POST', '/calendar/entries', ['title' => 'Bald', 'start_date' => '2026-11-20'])['id'];
+        $this->ok('POST', '/calendar/entries', ['title' => 'Auch bald', 'start_date' => '2026-12-01', 'start_time' => '19:00']);
+        $this->ok('POST', '/calendar/entries', ['title' => 'Später', 'start_date' => '2027-01-20']);
+        $this->assertSame(2, $this->ok('GET', '/config', [], $this->anna)['awaitingResponses'], 'nur Fristen in den nächsten 30 Tagen');
+        $this->ok('PUT', "/calendar/$soon/response", ['status' => 'no'], $this->anna);
+        $this->assertSame(1, $this->ok('GET', '/config', [], $this->anna)['awaitingResponses']);
+
+        $guest = $this->users->add('gast', Roles::GUEST);
+        $this->assertNull($this->ok('GET', '/config', [], $guest)['awaitingResponses'], 'ohne das Recht');
+        $this->assertNull($this->ok('GET', '/config', [], null)['awaitingResponses'], 'ohne Anmeldung');
+    }
 }

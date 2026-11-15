@@ -10,6 +10,7 @@ import {
   type AttendanceEvent,
   type AttendanceInput,
   type AttendanceStatus,
+  type ResponseStatus,
 } from '../api';
 import { formatDate, formatEventWhen, roleCount, todayYmd } from '../format';
 import brand from '../generated/brand';
@@ -20,6 +21,12 @@ import { confirmAsk } from '../ask';
 
 const sec = brand.labels.sections;
 const STATUSES: AttendanceStatus[] = ['present', 'excused', 'absent'];
+const RESPONSE_LABELS: Record<ResponseStatus, string> = { yes: 'zugesagt', no: 'abgesagt' };
+
+/** Wer abgesagt hat und noch keinen Eintrag hat, ist als „entschuldigt“ vorausgewählt (gespeichert erst mit der Liste). */
+function withDeclines(list: AttendanceDetail, saved: Record<number, AttendanceStatus | null>) {
+  return Object.fromEntries(list.people.map((p) => [p.id, saved[p.id] ?? (p.response === 'no' ? 'excused' : null)]));
+}
 const EVENTS_SHOWN = 8;
 
 /** Verwaltung → Anwesenheit: #/verwaltung/anwesenheit[/<id>] */
@@ -222,12 +229,16 @@ function Editor({
   onToast: (msg: string) => void;
 }) {
   const initial = useMemo(() => Object.fromEntries(list.people.map((p) => [p.id, p.status])), [list]);
-  const [statuses, setStatuses] = useState<Record<number, AttendanceStatus | null>>(initial);
+  const [statuses, setStatuses] = useState<Record<number, AttendanceStatus | null>>(() => withDeclines(list, initial));
   const [title, setTitle] = useState(list.title);
   const [date, setDate] = useState(list.date);
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
+  const [responding, setResponding] = useState<number | null>(null);
   const free = list.source === 'free';
+  const declines = list.people.filter((p) => p.response === 'no' && !initial[p.id]);
+  const declinesOpen = declines.filter((p) => !statuses[p.id]);
+  const preselected = declines.some((p) => statuses[p.id] === 'excused');
   const changes = Object.fromEntries(list.people.filter((p) => statuses[p.id] !== initial[p.id]).map((p) => [p.id, statuses[p.id]]));
   const dirty = Object.keys(changes).length > 0 || (free && (title.trim() !== list.title || date !== list.date));
   // Kommender Termin: nur „entschuldigt“ (bei freien Listen nach dem Datum im Feld)
@@ -264,6 +275,24 @@ function Editor({
       return false;
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** Für jemanden zu- oder absagen (z. B. nach einem Anruf); eine Absage wählt „entschuldigt“ vor. */
+  async function respondFor(personId: number, status: ResponseStatus | null) {
+    if (!list.event_key) return;
+    setResponding(personId);
+    try {
+      const r = await api.respondFor(list.event_key, personId, status);
+      onSaved({ ...list, people: list.people.map((p) => (p.id === personId ? { ...p, response: r.status, response_note: r.note } : p)) });
+      if (!initial[personId]) {
+        if (r.status === 'no' && !statuses[personId]) setStatuses({ ...statuses, [personId]: 'excused' });
+        if (r.status !== 'no' && statuses[personId] === 'excused') setStatuses({ ...statuses, [personId]: null });
+      }
+    } catch (e) {
+      onToast((e as Error).message);
+    } finally {
+      setResponding(null);
     }
   }
 
@@ -310,6 +339,18 @@ function Editor({
         {countsText(counts, open)}
       </p>
       {upcoming && <p className="muted small">Der Termin kommt erst noch. Bis dahin kannst du nur „entschuldigt“ eintragen.</p>}
+      {preselected && (
+        <p className="muted small">Wer abgesagt hat, ist als „entschuldigt“ vorausgewählt. Gespeichert ist das erst mit „Speichern“.</p>
+      )}
+      {declinesOpen.length > 0 && (
+        <button
+          type="button"
+          className="btn btn-secondary btn-block attendance-declines"
+          onClick={() => setStatuses({ ...statuses, ...Object.fromEntries(declinesOpen.map((p) => [p.id, 'excused' as const])) })}
+        >
+          Absagen übernehmen ({declinesOpen.length})
+        </button>
+      )}
       {!dirty && <GroupCounts list={list} />}
 
       <div className="picker">
@@ -345,6 +386,24 @@ function Editor({
               <span className="attendance-name">
                 <span>{p.name}</span>
                 {p.booked && <span className="attendance-booked">{sec.points} gebucht</span>}
+                {list.responses_open && p.may_respond ? (
+                  <select
+                    className={`attendance-response attendance-response-${p.response ?? 'none'}`}
+                    value={p.response ?? ''}
+                    disabled={responding === p.id}
+                    aria-label={`Rückmeldung von ${p.name}`}
+                    onChange={(e) => void respondFor(p.id, (e.target.value || null) as ResponseStatus | null)}
+                  >
+                    <option value="">keine Rückmeldung</option>
+                    <option value="yes">{RESPONSE_LABELS.yes}</option>
+                    <option value="no">{RESPONSE_LABELS.no}</option>
+                  </select>
+                ) : (
+                  p.response && (
+                    <span className={`attendance-response attendance-response-${p.response}`}>{RESPONSE_LABELS[p.response]}</span>
+                  )
+                )}
+                {p.response_note && <span className="attendance-response-note">„{p.response_note}“</span>}
               </span>
               {STATUSES.map((st) => (
                 <span key={st} className="attendance-cell">

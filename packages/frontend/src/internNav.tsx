@@ -1,6 +1,8 @@
+import { config } from './api';
 import { AdminIcon } from './adminNav';
 import { targetIcon } from './navigation';
 import { navigate } from './router';
+import { tileCount } from './tileCount';
 import { Caps } from './ui';
 
 /** Bereich eines Untermenüs: eigene Ansicht (#/<id>). */
@@ -12,16 +14,24 @@ export function InternMenu({ tabs, label = 'Intern' }: { tabs: InternTab[]; labe
   return (
     <nav aria-label={label}>
       <ul className="admin-tiles">
-        {tabs.map((t) => (
-          <li key={t.id}>
-            <button type="button" className="card admin-tile" onClick={() => navigate(t.id)}>
-              <AdminIcon id={targetIcon(t.id)} />
-              <span>
-                <Caps text={t.label} />
-              </span>
-            </button>
-          </li>
-        ))}
+        {tabs.map((t) => {
+          const badge = tileCount(t.id, { responses: config?.awaitingResponses });
+          return (
+            <li key={t.id}>
+              <button type="button" className="card admin-tile" title={badge?.title} onClick={() => navigate(t.id)}>
+                <AdminIcon id={targetIcon(t.id)} />
+                <span>
+                  <Caps text={t.label} />
+                </span>
+                {badge && (
+                  <span className="count-badge" aria-hidden="true">
+                    {badge.text}
+                  </span>
+                )}
+              </button>
+            </li>
+          );
+        })}
       </ul>
     </nav>
   );

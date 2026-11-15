@@ -14,6 +14,7 @@ Tippe unten auf **{bereich.events}**. Unter jedem kommenden Termin stehen die Kn
 - **Zähler**: z. B. „5 Zusagen · 2 Absagen“. Er zeigt, wie viele schon geantwortet haben.
 - **Zu- und absagen bis …**: steht da, wenn es für den Termin einen Anmeldeschluss gibt.
 - **Hinweis zu deiner Zusage** bzw. **Absage**: erscheint im aufgeklappten Termin, sobald du geantwortet hast.
+- **Zahl im Kreis** am Knopf **{bereich.events}** unten (bzw. an seiner Kachel): wie viele Termine der nächsten 30 Tage noch auf deine Antwort warten.
 - **Rückmeldungen ansehen**: nur, wenn du Termine des Kalenders pflegen darfst. Es zeigt, wer zugesagt oder abgesagt hat und wer sich noch nicht gemeldet hat, mit den Hinweisen.
 
 ## So gehst du vor
@@ -32,7 +33,9 @@ Tippe unten auf **{bereich.events}**. Unter jedem kommenden Termin stehen die Kn
 
 ## Gut zu wissen
 - Zu- und absagen geht bis zum Beginn des Termins. Bei Terminen ohne Uhrzeit endet das um 0 Uhr des Tages. Hat der Termin einen Anmeldeschluss, geht es nur bis zum Ende dieses Tages. Danach siehst du nur noch deine Antwort.
-- Deinen Namen und deinen Hinweis sehen nur die, die Termine des Kalenders pflegen dürfen. Alle anderen sehen nur die Zahl der Zusagen und Absagen.
+- Deinen Namen und deinen Hinweis sehen die, die Termine des Kalenders pflegen dürfen, und in der Anwesenheitsliste die, die die Anwesenheit erfassen. Alle anderen sehen nur die Zahl der Zusagen und Absagen.
+- Eine Absage trägt dich nicht selbst als entschuldigt ein. In der Anwesenheitsliste ist sie nur vorausgewählt; eingetragen wird sie von denen, die die Anwesenheit erfassen.
+- Wer die Anwesenheit erfasst, kann auch für dich zu- oder absagen, z. B. wenn du anrufst.
 - Wird ein Termin verschoben, bleibt deine Antwort erhalten. Wird er gelöscht und neu angelegt, musst du noch einmal antworten.
 - Etwa drei Monate nach dem Termin löscht die App die Rückmeldungen. Ob du da warst, steht in der Anwesenheit, wenn die {kompanie.name} sie führt.
 

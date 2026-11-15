@@ -216,6 +216,20 @@ final class CalendarService
         return null;
     }
 
+    /**
+     * Termine ohne Abruf: bei der Quelle App die Termine, sonst die letzte gespeicherte Fassung (auch wenn sie nicht mehr
+     * frisch ist); null, wenn es noch keine gibt. Für Zähler, die nicht auf den Kalender warten sollen (z. B. in /config).
+     *
+     * @return array<int, array<string, mixed>>|null
+     */
+    public function cached(): ?array
+    {
+        if ($this->source() === self::SOURCE_APP) {
+            return $this->appEvents();
+        }
+        return $this->copy()['events'] ?? null;
+    }
+
     public function clearCache(): void
     {
         $this->cache->delete(self::CACHE_KEY);

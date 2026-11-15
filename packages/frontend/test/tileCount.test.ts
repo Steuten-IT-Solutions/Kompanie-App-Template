@@ -1,7 +1,7 @@
 // Zahl im Kreis an den Kacheln der Verwaltung (src/tileCount.ts): Beförderungen, Anfragen und Fehlermeldungen.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { tileCount } from '../src/tileCount.ts';
+import { awaitingResponses, tileCount } from '../src/tileCount.ts';
 
 test('keine Zahl ohne offene Einträge oder ohne Recht (null vom Server)', () => {
   for (const id of ['befoerderungen', 'anfragen', 'meldungen']) {
@@ -30,4 +30,22 @@ test('Erklärung in Einzahl und Mehrzahl', () => {
 test('ab 100 steht 99+ im Kreis', () => {
   assert.equal(tileCount('meldungen', { reports: 99 })?.text, '99');
   assert.equal(tileCount('meldungen', { reports: 100 })?.text, '99+');
+});
+
+test('Kalender: Termine ohne eigene Rückmeldung, deren Frist in 30 Tagen endet', () => {
+  const now = Date.parse('2026-11-15T12:00:00+01:00');
+  const ev = (mine: 'yes' | 'no' | null, until: string, more: { open?: boolean; can_respond?: boolean } = {}) => ({
+    responses: { mine, note: '', yes: 0, no: 0, until, open: true, can_respond: true, can_list: false, ...more },
+  });
+  const events = [
+    ev(null, '2026-11-20T19:30:00+01:00'),
+    ev('yes', '2026-11-21T19:30:00+01:00'),
+    ev(null, '2026-11-22T00:00:00+01:00', { open: false }),
+    ev(null, '2026-11-23T00:00:00+01:00', { can_respond: false }),
+    ev(null, '2027-01-10T00:00:00+01:00'),
+    {},
+  ];
+  assert.equal(awaitingResponses(events, now), 1);
+  assert.equal(tileCount('termine', { responses: 1 })?.title, '1 Termin ohne deine Zu- oder Absage');
+  assert.equal(tileCount('termine', { responses: 0 }), null);
 });

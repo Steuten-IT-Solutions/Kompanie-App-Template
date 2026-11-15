@@ -131,6 +131,8 @@ export interface AppConfig {
   registration?: boolean;
   /** Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null */
   pendingRegistrations?: number | null;
+  /** Kommende Termine (Frist endet in 30 Tagen) ohne eigene Zu- oder Absage; nur mit respond_calendar, sonst null */
+  awaitingResponses?: number | null;
   /** Einreichen von Bildern und Videos erlaubt (Einstellungen → Galerie); fehlt bei älteren Servern (dann erlaubt) */
   gallerySubmissions?: boolean;
   /** Rollen der Installation (Einstellungen → Rollen): Bezeichnung und Punktefaktor */
@@ -508,6 +510,13 @@ export function applyNavigation(next: Pick<NavigationAdmin, 'navigation' | 'inte
   config.navigation = next.navigation;
   config.navigation_intern_order = next.intern_order;
   config.admin_order = next.admin_order;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/** Zahl der Termine ohne eigene Rückmeldung nach dem Laden des Kalenders oder einer Antwort: Zahl an der Kachel. */
+export function applyAwaitingResponses(count: number): void {
+  if (!config || config.awaitingResponses == null || config.awaitingResponses === count) return;
+  config.awaitingResponses = count;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -1671,10 +1680,17 @@ export interface AttendancePerson {
   status: AttendanceStatus | null;
   /** Hat für diese Liste schon Punkte */
   booked: boolean;
+  /** Zu- oder Absage zum Termin (nur Listen aus dem Kalender, solange es den Termin gibt) */
+  response?: ResponseStatus | null;
+  response_note?: string;
+  /** Darf bei Terminen zu- und absagen (nur dann lässt sich für die Person etwas eintragen) */
+  may_respond?: boolean;
 }
 
 export interface AttendanceDetail extends AttendanceSummary {
   event_key: string | null;
+  /** null: keine Rückmeldungen (freie Liste, Termin nicht mehr im Kalender); sonst ob man noch zu- und absagen kann */
+  responses_open?: boolean | null;
   updated_by_name: string | null;
   updated_at: string;
   people: AttendancePerson[];
@@ -2311,6 +2327,12 @@ export const api = {
     request<CalendarEvent>('PUT', `/calendar/${encodeURIComponent(id)}/response`, { status, note }),
   withdrawResponse: (id: string) => request<CalendarEvent>('DELETE', `/calendar/${encodeURIComponent(id)}/response`),
   eventResponses: (id: string) => request<EventResponseOverview>('GET', `/calendar/${encodeURIComponent(id)}/responses`),
+  respondFor: (id: string, userId: number, status: ResponseStatus | null) =>
+    request<{ user_id: number; status: ResponseStatus | null; note: string }>(
+      'PUT',
+      `/calendar/${encodeURIComponent(id)}/responses/${userId}`,
+      { status },
+    ),
 
   login: (username: string, password: string, remember: boolean) =>
     request<AppConfig>('POST', '/auth/login', { username, password, remember }),

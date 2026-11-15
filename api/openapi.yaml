@@ -1103,6 +1103,42 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /calendar/{key}/responses/{id}:
+    parameters:
+      - { name: key, in: path, required: true, schema: { type: string }, description: 'Kennung des Termins wie in `GET /calendar` (`id`)' }
+      - { name: id, in: path, required: true, schema: { type: integer }, description: ID der Person }
+    put:
+      tags: [Termine]
+      summary: Für eine andere Person zu- oder absagen
+      description: >-
+        Z. B. nach einem Anruf, aus der Anwesenheitsliste. `status` null entfernt die Rückmeldung; ein vorhandener Hinweis
+        bleibt. Nur für Personen mit `respond_calendar` und bis zur gleichen Frist wie beim Zusagen (sonst 409
+        `responses_closed`). Steht im Änderungsprotokoll.
+      x-capability: manage_attendance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: [string, 'null'], enum: ['yes', 'no', null] }
+      responses:
+        '200':
+          description: Die Rückmeldung der Person
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_id: { type: integer }
+                  status: { type: [string, 'null'], enum: ['yes', 'no', null] }
+                  note: { type: string }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
   /calendar/entries:
     get:
       tags: [Termine]
@@ -9402,6 +9438,11 @@ components:
         registration: { type: boolean, description: 'Zugang beantragen eingeschaltet (Issue #314): Link „Zugang beantragen“ für Gäste' }
         pendingRegistrations:
           { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null' }
+        awaitingResponses:
+          type: [integer, 'null']
+          description: >-
+            Kommende Termine, deren Frist in den nächsten 30 Tagen endet, ohne eigene Zu- oder Absage (Zahl an der Kachel des
+            Kalenders); nur mit respond_calendar und einer gespeicherten Fassung des Kalenders, sonst null
         gallerySubmissions:
           { type: boolean, description: 'Galerie an und Einreichen erlaubt (Einstellung gallery_submissions): sonst kein Knopf zum Einreichen' }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
@@ -11192,6 +11233,9 @@ components:
         - type: object
           properties:
             event_key: { type: [string, 'null'], description: ID des Kalendertermins (nur source calendar) }
+            responses_open:
+              type: [boolean, 'null']
+              description: 'null: keine Rückmeldungen (freie Liste, Termin nicht mehr im Kalender); sonst ob man noch zu- und absagen kann'
             updated_by_name: { type: [string, 'null'] }
             updated_at: { type: string }
             people:
@@ -11210,6 +11254,12 @@ components:
                       - $ref: '#/components/schemas/AttendanceStatus'
                       - type: 'null'
                   booked: { type: boolean, description: Hat für diese Liste schon Punkte (ohne stornierte) }
+                  response:
+                    type: [string, 'null']
+                    enum: ['yes', 'no', null]
+                    description: Zu- oder Absage zum Termin (nur Listen aus dem Kalender, solange es den Termin gibt)
+                  response_note: { type: string, description: Hinweis zur Zu- oder Absage }
+                  may_respond: { type: boolean, description: Darf bei Terminen zu- und absagen (nur dann lässt sich etwas eintragen) }
             counts_by_group:
               type: object
               description: Je Status die Gruppen in der Reihenfolge der Rollen

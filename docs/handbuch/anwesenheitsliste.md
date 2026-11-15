@@ -18,6 +18,8 @@ Tippe unten auf **Verwaltung**, dann auf **{bereich.attendance}**. Tippe dort au
 - **Person suchen …**: zeigt nur Personen, deren Name passt.
 - **Alle anwesend**: setzt alle gezeigten Personen auf anwesend (bei einer Suche nur die gefundenen).
 - **Die Liste**: alle Personen mit einer Rolle, außer {rolle.guest}. Je Person gibt es ein Kästchen für **anwesend**, **entschuldigt** und **fehlt**. Neben dem Namen steht die Rolle, wenn sie nicht {rolle.member} ist. **{bereich.points} gebucht** heißt: Diese Person hat für diese Liste schon {bereich.points} bekommen.
+- **zugesagt** bzw. **abgesagt** unter dem Namen: die Rückmeldung der Person zum Termin, mit ihrem Hinweis (nur bei Listen zu Terminen aus dem {bereich.calendar}). Solange man noch zu- und absagen kann, steht dort eine Auswahl, mit der du die Rückmeldung für die Person einträgst.
+- **Absagen übernehmen**: setzt alle, die abgesagt haben und noch kein Häkchen haben, auf **entschuldigt**. Der Knopf erscheint nur, wenn es solche Personen gibt.
 - **Speichern**: speichert deine Änderungen. Ist alles gespeichert, steht dort **Gespeichert**.
 - **{bereich.points} für … Anwesende** und **Eintrag für … Fehlende**: nur, wenn du {bereich.points} bzw. {bereich.penalties} vergeben darfst.
 - **Liste löschen**: ganz unten.
@@ -35,6 +37,18 @@ Tippe unten auf **Verwaltung**, dann auf **{bereich.attendance}**. Tippe dort au
 2. Über der Liste steht „Der Termin kommt erst noch. Bis dahin kannst du nur „entschuldigt“ eintragen.“ Die Kästchen für **anwesend** und **fehlt** sind gesperrt, **Alle anwesend** und die Knöpfe zum Buchen fehlen.
 3. Setze bei jeder entschuldigten Person das Häkchen bei **entschuldigt** und tippe auf **Speichern**.
 4. Ab dem Tag des Termins trägst du in derselben Liste wie gewohnt die übrigen ein.
+
+### Absagen als entschuldigt übernehmen
+1. Öffne die Liste zu einem Termin aus dem {bereich.calendar}.
+2. Wer abgesagt hat und noch keinen Eintrag hat, ist schon als **entschuldigt** vorausgewählt. Über der Liste steht dann „Wer abgesagt hat, ist als „entschuldigt“ vorausgewählt.“
+3. Prüfe die Auswahl. Hast du einzelne Häkchen entfernt, setzt **Absagen übernehmen** sie wieder alle.
+4. Tippe auf **Speichern**. Erst dann ist es eingetragen.
+
+### Für jemanden zu- oder absagen
+Meldet sich jemand z. B. per Telefon ab:
+1. Öffne die Liste zum Termin.
+2. Wähle unter dem Namen **zugesagt**, **abgesagt** oder **keine Rückmeldung**. Das ist sofort gespeichert und steht im Änderungsprotokoll.
+3. Bei einer Absage ist **entschuldigt** vorausgewählt. Tippe auf **Speichern**, um es einzutragen.
 
 ### {bereich.points} für die Anwesenden buchen
 1. Tippe auf **{bereich.points} für … Anwesende**. Ungespeicherte Änderungen speichert die App vorher.
@@ -59,6 +73,9 @@ Tippe unten auf **Verwaltung**, dann auf **{bereich.attendance}**. Tippe dort au
 - Löschst du eine Liste, bleiben die schon gebuchten {bereich.points} erhalten.
 - Verschiebst du einen freien Termin in die Zukunft, entferne vorher die Häkchen bei **anwesend** und **fehlt**. Sonst lässt sich die Liste nicht speichern.
 - Unten steht, wer die Liste zuletzt gespeichert hat.
+- Eine Zusage trägt nichts ein: Ob jemand da war, steht erst am Termin fest.
+- Für jemanden zu- oder absagen geht nur bei Personen, die selbst zu- und absagen dürfen, und nur bis zur selben Frist (Beginn bzw. Anmeldeschluss). Danach siehst du die Rückmeldungen nur noch. Ein Hinweis der Person bleibt dabei erhalten.
+- Wird ein Termin aus dem {bereich.calendar} gelöscht, zeigt seine Liste keine Rückmeldungen mehr. Die Einträge der Liste bleiben.
 - Was im Zähler als eigene Gruppe erscheint, legt ein {rolle.admin} unter **Einstellungen** → **Rollen** im Abschnitt **{bereich.attendance}: Gruppen im Zähler** fest. Ohne Einstellung zählen alle Rollen, die zur Kompanie gehören, als {rolle.member}, die übrigen (z. B. Anwärter) je für sich.
 - Jede Person sieht ihre eigenen Einträge unter **Meins** → **{bereich.attendance}**.
 
