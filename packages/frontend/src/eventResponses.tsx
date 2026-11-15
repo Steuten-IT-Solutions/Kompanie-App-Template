@@ -1,7 +1,9 @@
 // Zu- und Absagen bei Terminen des internen Kalenders: Knöpfe unter dem Termin, Hinweis und (für alle, die Termine
 // pflegen) die Namen im aufgeklappten Termin. Der Server prüft Recht und Frist (EventResponseService).
 import { useState } from 'react';
-import { api, type CalendarEvent, type EventResponseOverview, type EventResponses, type ResponseStatus } from './api';
+import { api, ApiError, type CalendarEvent, type EventResponseOverview, type EventResponses, type ResponseStatus } from './api';
+import { applyPendingResponse, pendingFor } from './responseOutbox';
+import { responseOutbox, usePendingResponse } from './responseSync';
 import { formatDate } from './format';
 import { ErrorBox, Loading } from './ui';
 
@@ -19,8 +21,41 @@ export function responseCounts(r: EventResponses): string {
  * Zusagen und Absagen direkt unter dem Termin. Ein Tipp auf die gewählte Antwort nimmt sie zurück. Nach Ablauf der Frist
  * nur noch die eigene Antwort und die Zähler.
  */
+/**
+ * Antwort senden; ohne Verbindung vormerken (responseOutbox.ts) und später übertragen. true: gesendet oder vorgemerkt.
+ */
+async function send(
+  ev: CalendarEvent,
+  status: ResponseStatus | null,
+  note: string,
+  onChange: (ev: CalendarEvent) => void,
+  setError: (msg: string | null) => void,
+): Promise<boolean> {
+  const server = ev.responses!;
+  const before = responseOutbox.get(ev.id);
+  try {
+    const next = status === null ? await api.withdrawResponse(ev.id) : await api.respondEvent(ev.id, status, note);
+    // Gesendet: Eine ältere Vormerkung ist damit überholt.
+    if (before) responseOutbox.remove(ev.id, before);
+    onChange(next);
+    return true;
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 0 && responseOutbox.set(ev.id, pendingFor(server, status, note, ev.title, Date.now()))) {
+      return true;
+    }
+    setError((e as Error).message);
+    return false;
+  }
+}
+
+/** Hinweis, solange eine offline vorgemerkte Antwort noch nicht übertragen ist. */
+function PendingHint() {
+  return <p className="event-response-pending small">Noch nicht übertragen – die App sendet es, sobald du wieder online bist.</p>;
+}
+
 export function ResponseBar({ ev, onChange }: { ev: CalendarEvent; onChange: (ev: CalendarEvent) => void }) {
-  const r = ev.responses;
+  const pending = usePendingResponse(ev.id);
+  const r = ev.responses ? applyPendingResponse(ev.responses, pending) : undefined;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   if (!r) return null;
@@ -30,13 +65,8 @@ export function ResponseBar({ ev, onChange }: { ev: CalendarEvent; onChange: (ev
     if (!r) return;
     setBusy(true);
     setError(null);
-    try {
-      onChange(r.mine === status ? await api.withdrawResponse(ev.id) : await api.respondEvent(ev.id, status, r.note));
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    await send(ev, r.mine === status ? null : status, r.note, onChange, setError);
+    setBusy(false);
   }
 
   const choice = (status: ResponseStatus, label: string, chosen: string) => (
@@ -68,6 +98,7 @@ export function ResponseBar({ ev, onChange }: { ev: CalendarEvent; onChange: (ev
       {(counts || (until && r.open)) && (
         <p className="event-response-counts small muted">{[counts, r.open ? until : ''].filter(Boolean).join(' · ')}</p>
       )}
+      {pending && <PendingHint />}
       {error && (
         <p className="form-error small" role="alert">
           {error}
@@ -79,7 +110,8 @@ export function ResponseBar({ ev, onChange }: { ev: CalendarEvent; onChange: (ev
 
 /** Im aufgeklappten Termin: eigener Hinweis (nach der Antwort) und für alle, die Termine pflegen, wer wie geantwortet hat. */
 export function ResponseDetails({ ev, onChange }: { ev: CalendarEvent; onChange: (ev: CalendarEvent) => void }) {
-  const r = ev.responses;
+  const pending = usePendingResponse(ev.id);
+  const r = ev.responses ? applyPendingResponse(ev.responses, pending) : undefined;
   const [note, setNote] = useState(r?.note ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,13 +125,8 @@ export function ResponseDetails({ ev, onChange }: { ev: CalendarEvent; onChange:
     if (!r?.mine) return;
     setBusy(true);
     setError(null);
-    try {
-      onChange(await api.respondEvent(ev.id, r.mine, note));
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    await send(ev, r.mine, note, onChange, setError);
+    setBusy(false);
   }
 
   async function toggleList() {

@@ -4584,6 +4584,34 @@ test('Admin stellt den internen Kalender auf „In der App pflegen“ um, legt e
   await card.getByRole('button', { name: 'Zugesagt' }).click();
   await expect(card.getByRole('button', { name: 'Zusagen' })).toHaveAttribute('aria-pressed', 'false');
   await expect(card.locator('.event-response-counts')).toHaveCount(0);
+  // Ohne Netz: Die Zusage wird vorgemerkt, übersteht einen Neustart und geht online von selbst raus.
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  await expect(card).toBeVisible();
+  await page.context().setOffline(true);
+  try {
+    await card.getByRole('button', { name: 'Zusagen' }).click();
+    await expect(card.getByRole('button', { name: 'Zugesagt' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(card.locator('.event-response-counts')).toHaveText('1 Zusage');
+    await expect(card.locator('.event-response-pending')).toContainText('Noch nicht übertragen');
+    await page.reload();
+    await expect(page.locator('.offline')).toBeVisible();
+    await expect(card.getByRole('button', { name: 'Zugesagt' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(card.locator('.event-response-pending')).toBeVisible();
+  } finally {
+    await page.context().setOffline(false);
+  }
+  await expect(page.locator('.toast')).toHaveText('Offline vorgemerkte Zu- und Absagen übertragen');
+  await expect(card.locator('.event-response-pending')).toHaveCount(0);
+  await expect(card.getByRole('button', { name: 'Zugesagt' })).toHaveAttribute('aria-pressed', 'true');
+  // Gegenprobe vom Server, dann wieder zurücknehmen
+  await page.reload();
+  await expect(card.getByRole('button', { name: 'Zugesagt' })).toHaveAttribute('aria-pressed', 'true');
+  await card.getByRole('button', { name: 'Zugesagt' }).click();
+  await expect(card.locator('.event-response-counts')).toHaveCount(0);
   await page.context().clearCookies();
   await page.goto('/app/');
   await page.reload();

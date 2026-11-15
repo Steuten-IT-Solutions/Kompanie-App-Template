@@ -7515,8 +7515,14 @@ fieldset.block-source legend {
   color: #fff;
 }
 .event-response-counts,
-.event-response-closed {
+.event-response-closed,
+.event-response-pending {
   margin: 6px 0 0;
+}
+/* Offline vorgemerkte Antwort (responseOutbox.ts) */
+.event-response-pending {
+  color: var(--ink-2);
+  font-style: italic;
 }
 .event-response-closed {
   margin-top: 0;

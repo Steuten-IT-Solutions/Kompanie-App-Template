@@ -27,7 +27,8 @@ import Termine, { canManageCalendar } from './views/Termine';
 import { canManageGallery } from './galleryManage';
 import { hasEvents, prefetcher, tabSources, type TabId } from './viewData';
 import { whenIdle } from './prefetch';
-import { attendanceOutbox, clearOfflineChanges, syncAttendance, syncMessage } from './attendanceSync';
+import { clearOfflineChanges } from './attendanceSync';
+import { pendingOfflineCount, syncOffline } from './offlineSync';
 import { confirmAsk } from './ask';
 import { CONNECTION_CHANGED, isStale } from './connection';
 
@@ -337,14 +338,17 @@ async function clearCaches() {
 async function logout(onError: (msg: string) => void) {
   // In der Vorschau: erst beenden, sonst lehnte der Server das Abmelden der Benachrichtigungen ab.
   if (previewRole()) stopPreview();
-  // Offline gespeicherte Anwesenheit (attendanceSync.ts) erst übertragen: Beim Abmelden löscht die App sie vom Gerät.
-  if (attendanceOutbox.ids().length > 0) {
-    await syncAttendance();
+  // Offline gespeicherte Änderungen (offlineSync.ts) erst übertragen: Beim Abmelden löscht die App sie vom Gerät.
+  if (pendingOfflineCount() > 0) {
+    await syncOffline();
     if (
-      attendanceOutbox.ids().length > 0 &&
-      !(await confirmAsk('Offline gespeicherte Anwesenheit ist noch nicht übertragen und geht beim Abmelden verloren. Trotzdem abmelden?', {
-        okLabel: 'Abmelden',
-      }))
+      pendingOfflineCount() > 0 &&
+      !(await confirmAsk(
+        'Offline gespeicherte Änderungen (Anwesenheit, Zu- und Absagen) sind noch nicht übertragen und gehen beim Abmelden verloren. Trotzdem abmelden?',
+        {
+          okLabel: 'Abmelden',
+        },
+      ))
     ) {
       return;
     }
@@ -537,12 +541,11 @@ export default function App({ notice = null }: { notice?: string | null }) {
     return () => clearTimeout(t);
   }, [toast]);
 
-  // Offline gespeicherte Anwesenheit übertragen: beim Start und sobald wieder Netz da ist (attendanceSync.ts).
+  // Offline gespeicherte Änderungen übertragen: beim Start und sobald wieder Netz da ist (offlineSync.ts).
   useEffect(() => {
     const sync = () =>
-      void syncAttendance().then((r) => {
-        const msg = syncMessage(r);
-        if (msg) showToast(msg);
+      void syncOffline().then((messages) => {
+        if (messages.length > 0) showToast(messages.join(' · '));
       });
     sync();
     window.addEventListener('online', sync);
