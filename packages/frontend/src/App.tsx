@@ -29,6 +29,7 @@ import { hasEvents, prefetcher, tabSources, type TabId } from './viewData';
 import { whenIdle } from './prefetch';
 import { attendanceOutbox, clearOfflineChanges, syncAttendance, syncMessage } from './attendanceSync';
 import { confirmAsk } from './ask';
+import { CONNECTION_CHANGED, isStale } from './connection';
 
 // Erst bei Bedarf laden: Der App-Start braucht nur die Ansichten, mit denen Gäste meist beginnen (Termine, News).
 // Der Service Worker speichert alle Teile trotzdem vorab, damit sie auch offline da sind.
@@ -493,6 +494,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
 
   const [toast, setToast] = useState<string | null>(notice);
   const [online, setOnline] = useState(navigator.onLine);
+  const [stale, setStale] = useState(isStale);
   const showToast = useCallback((msg: string) => setToast(msg), []);
   // Bereiche wurden ein- oder ausgeschaltet: Tabs und Ansichten neu bestimmen.
   const [, setConfigVersion] = useState(0);
@@ -550,11 +552,14 @@ export default function App({ notice = null }: { notice?: string | null }) {
   useEffect(() => {
     const on = () => setOnline(true);
     const off = () => setOnline(false);
+    const connection = () => setStale(isStale());
     window.addEventListener('online', on);
     window.addEventListener('offline', off);
+    window.addEventListener(CONNECTION_CHANGED, connection);
     return () => {
       window.removeEventListener('online', on);
       window.removeEventListener('offline', off);
+      window.removeEventListener(CONNECTION_CHANGED, connection);
     };
   }, []);
 
@@ -664,6 +669,11 @@ export default function App({ notice = null }: { notice?: string | null }) {
       )}
       {boardReadable() && tab !== 'brett' && <BoardBanner />}
       {!online && <div className="offline">Offline – angezeigt werden die zuletzt geladenen Daten.</div>}
+      {online && stale && (
+        <div className="offline" role="status">
+          Schlechte Verbindung – angezeigt werden die zuletzt geladenen Daten.
+        </div>
+      )}
       {!['installieren', 'anmelden', 'registrieren', 'einstellungen', 'einrichtung'].includes(tab) && <InstallBanner onToast={showToast} />}
 
       <main className="content">

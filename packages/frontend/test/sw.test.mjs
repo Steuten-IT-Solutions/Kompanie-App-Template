@@ -75,6 +75,7 @@ function load({
   now = () => 0,
   clientIds = [],
   windowId = '',
+  apiTimeout = 6000,
 } = {}) {
   const listeners = {};
   const fetched = [];
@@ -86,6 +87,8 @@ function load({
     `const PRECACHE = ${JSON.stringify(precache)};`,
   );
   assert.notEqual(source, SOURCE, 'Platzhalter in sw.js gefunden');
+  const timed = source.replace('const API_TIMEOUT_MS = 6000;', `const API_TIMEOUT_MS = ${apiTimeout};`);
+  assert.ok(apiTimeout === 6000 || timed !== source, 'API_TIMEOUT_MS in sw.js gefunden');
   const self = {
     location: { href: `${ORIGIN}/app/sw.js?api=${encodeURIComponent(API)}&assets=${encodeURIComponent(ASSETS)}`, origin: ORIGIN },
     registration: { scope: SCOPE },
@@ -124,7 +127,7 @@ function load({
       return make();
     },
   };
-  vm.runInNewContext(source, context);
+  vm.runInNewContext(timed, context);
 
   /** Ereignis mit waitUntil (install, activate); wartet, bis alles erledigt ist. */
   async function lifecycle(type) {
@@ -696,4 +699,43 @@ test('Bilder der Galerie: höchstens PHOTOS_MAX Vorschaubilder, die ältesten fa
   const keys = (await (await sw.storage.open('kompanie-fotos-v1')).keys()).map((r) => r.url);
   assert.equal(keys.length, max);
   assert.ok(!keys.includes(`${SCOPE}foto/1/thumb?v=a`) && !keys.includes(`${SCOPE}foto/2/thumb?v=a`));
+});
+
+test('Schlechtes Netz nach einer eigenen Änderung: nach dem Zeitlimit die gespeicherte Version, gekennzeichnet; die späte Antwort wird gemeldet', async () => {
+  let t = 1000;
+  let late;
+  const net = { [`${API}members`]: json('[1]') };
+  const sw = load({ net, now: () => t, apiTimeout: 20 });
+  await sw.request(`${API}members`, 'cors', STALE_OK);
+  t = 2000;
+  await sw.request(`${API}points`, 'cors', {}, 'POST');
+  // Netz antwortet erst nach dem Zeitlimit.
+  net[`${API}members`] = () => new Promise((resolve) => (late = () => resolve(json('[1,2]')())));
+  t = 3000;
+  const { answer, done } = sw.requestSplit(`${API}members`, 'cors', STALE_OK);
+  const res = await answer;
+  assert.equal(await res.text(), '[1]');
+  assert.equal(res.headers.get('X-Kompanie-Stale'), '1');
+  late();
+  await done;
+  assert.deepEqual(JSON.parse(JSON.stringify(sw.messages)), [{ type: 'kompanie-data', url: `${API}members` }]);
+  // Danach frisch gespeichert: sofort und ohne Kennzeichen
+  const again = await sw.request(`${API}members`, 'cors', STALE_OK);
+  assert.equal(await again.text(), '[1,2]');
+  assert.equal(again.headers.get('X-Kompanie-Stale'), null);
+});
+
+test('Ohne Netz nach einer eigenen Änderung: gespeicherte Version gekennzeichnet; nie die einer anderen Person', async () => {
+  let t = 1000;
+  const net = { [`${API}members`]: json('[1]') };
+  const sw = load({ net, now: () => t, apiTimeout: 20 });
+  await sw.request(`${API}members`, 'cors', STALE_OK);
+  t = 2000;
+  await sw.request(`${API}points`, 'cors', {}, 'POST');
+  delete net[`${API}members`];
+  const res = await sw.request(`${API}members`, 'cors', STALE_OK);
+  assert.equal(await res.text(), '[1]');
+  assert.equal(res.headers.get('X-Kompanie-Stale'), '1');
+  await assert.rejects(sw.request(`${API}members`, 'cors', { ...STALE_OK, 'X-Kompanie-User': '6' }));
+  await assert.rejects(sw.request(`${API}members`, 'cors', { 'X-Kompanie-User': '6' }), 'auch ohne Stale-Ok');
 });
