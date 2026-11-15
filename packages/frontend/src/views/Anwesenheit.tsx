@@ -16,7 +16,7 @@ import {
 import { formatDate, formatEventWhen, roleCount, todayYmd } from '../format';
 import brand from '../generated/brand';
 import { navigate } from '../router';
-import { Caps, Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { Caps, Empty, ErrorBox, Loading, useAsync, useUnsaved } from '../ui';
 import { prefetchOnTap, sources } from '../viewData';
 import { confirmAsk } from '../ask';
 import { applyPending, pendingCount, type PendingSave } from '../attendanceOutbox';
@@ -267,6 +267,13 @@ function Editor({
   const preselected = declines.some((p) => statuses[p.id] === 'excused');
   const changes = Object.fromEntries(list.people.filter((p) => statuses[p.id] !== initial[p.id]).map((p) => [p.id, statuses[p.id]]));
   const dirty = Object.keys(changes).length > 0 || (free && (title.trim() !== list.title || date !== list.date));
+  // Häkchen, die weder gespeichert noch offline vorgemerkt sind: vor dem Verlassen nachfragen (unsaved.ts). Die
+  // vorgewählten Entschuldigungen nach Absagen zählen dabei nicht als Eingabe.
+  const preset = useMemo(() => withDeclines(list, initial), [list, initial]);
+  const touched =
+    list.people.some((p) => (statuses[p.id] ?? null) !== (preset[p.id] ?? null)) ||
+    (free && (title.trim() !== list.title || date !== list.date));
+  useUnsaved(touched);
   // Kommender Termin: nur „entschuldigt“ (bei freien Listen nach dem Datum im Feld)
   const upcoming = free && date !== list.date ? date > todayYmd() : list.upcoming;
 

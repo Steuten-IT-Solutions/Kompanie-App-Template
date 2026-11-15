@@ -38,9 +38,14 @@ export function hasUnsaved(): boolean {
   return forms.size > 0 || flags.size > 0;
 }
 
-/** Eine Änderung kam beim Server an (api.ts): Eingaben in Formularen gelten als gespeichert. */
+/**
+ * Eine Änderung kam beim Server an (api.ts): Eingaben gelten als gespeichert, auch die mit useUnsaved gemeldeten (die
+ * Ansicht meldet sich wieder, sobald sie erneut etwas Ungespeichertes hat). So fragt ein navigate() direkt nach dem
+ * Speichern nicht nach, bevor die Ansicht ihren neuen Stand gezeichnet hat.
+ */
 export function markSaved(): void {
   forms.clear();
+  flags.clear();
 }
 
 /** Alles verwerfen (die Person will die Seite trotzdem verlassen). */
