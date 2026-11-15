@@ -32,6 +32,8 @@ final class Subjects
         'POST /me/push/test', 'POST /push/test',
         // Abstimmen in Umfragen (absichtlich nicht, auch nicht bei offenen Umfragen)
         'PUT /polls/{id}/vote', 'DELETE /polls/{id}/vote',
+        // Eigene Zu- und Absage bei einem Termin (wie Abstimmen; was die Verwaltung für andere einträgt, wird erfasst)
+        'PUT /calendar/{key}/response', 'DELETE /calendar/{key}/response',
         // Teile eines Uploads; erfasst wird der Eintrag, der daraus entsteht (Video, Update, Bild in einem Text)
         'POST /gallery/video-uploads', 'POST /gallery/video-uploads/chunk', 'POST /gallery/video-uploads/cancel', 'POST /attachments', 'POST /rich-images',
         'POST /admin/update/upload', 'POST /admin/update/upload/chunk', 'POST /admin/update/upload/check', 'POST /admin/update/upload/cancel',
@@ -277,7 +279,7 @@ final class Subjects
         $holders = fn (string $where, mixed $id): array => $this->people($this->app->db->select('SELECT user_id, name FROM {office_holders} WHERE ' . $where . ' ORDER BY sort, id', [$id]));
 
         $events = $this->spec('Termin', 'events', 'title', $eventCols);
-        $calendar = $this->spec('Termin im Kalender', 'internal_events', 'title', $eventCols);
+        $calendar = $this->spec('Termin im Kalender', 'internal_events', 'title', $eventCols + ['respond_until' => 'Anmeldeschluss']);
         $news = $this->spec('News', 'app_news', 'title', ['title' => 'Titel', 'blocks' => ['Inhalt', 'blocks'], 'cover' => ['Titelbild', 'secret']]);
         $ranks = $this->spec('Dienstgrad', 'ranks', 'title', ['title' => 'Bezeichnung', 'min_points' => 'Ab Punkten', 'active' => ['Aktiv', 'bool'], 'badge_version' => ['Abzeichen', 'secret']]);
         $titles = $this->spec('Titel', 'titles', 'title', ['title' => 'Bezeichnung', 'active' => ['Aktiv', 'bool']]);

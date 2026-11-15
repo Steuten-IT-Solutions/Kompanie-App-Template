@@ -34,7 +34,8 @@ use KompanieApp\Core\Port\Settings;
  */
 final class CalendarService
 {
-    public const CACHE_KEY = 'calendar_events';
+    /** _v2: seit den Zu- und Absagen haben Termine aus iCal eine stabile Kennung (response_key); ältere Kopien gelten nicht. */
+    public const CACHE_KEY = 'calendar_events_v2';
     public const ERROR_KEY = 'calendar_error';
     public const TASK = 'calendar_refresh';
     /** Vom Admin gewählte Quelle (SOURCES); leer: wie vor der Auswahl (das Eingetragene gilt). */
@@ -301,6 +302,7 @@ final class CalendarService
             'location' => $e['location'],
             'description' => $e['description'],
             'url' => $e['url'],
+            'respond_until' => $e['respond_until'] ?? null,
         ], $this->internal->between($from, $to));
         usort($events, static fn (array $a, array $b): int => strcmp((string) $a['start'], (string) $b['start']));
         return $events;
@@ -586,9 +588,20 @@ final class CalendarService
             }
         }
 
+        // Stabile Kennung für Zu- und Absagen (response_key): Die id hängt am Beginn und ändert sich, wenn jemand den Termin
+        // verschiebt. Einzeltermine zählen über die UID, Termine einer Serie über UID und ursprünglichen Beginn (einzeln
+        // geänderte über RECURRENCE-ID, also wie der Termin der Serie, den sie ersetzen).
+        $uid = (string) ($e['UID']['value'] ?? '');
+        $rid = isset($e['RECURRENCE-ID']) ? $this->icsDate($e['RECURRENCE-ID']) : null;
         $out = [];
         foreach ($starts as $s) {
-            $out[] = $this->icsEvent($e, $s, $duration, $allDay);
+            $key = match (true) {
+                $uid === '' => null,
+                $rid !== null => md5('r|' . $uid . '|' . $rid[0]->getTimestamp()),
+                !empty($e['RRULE']) => md5('r|' . $uid . '|' . $s->getTimestamp()),
+                default => md5('r|' . $uid),
+            };
+            $out[] = $this->icsEvent($e, $s, $duration, $allDay, $key);
         }
         return $out;
     }
@@ -640,7 +653,7 @@ final class CalendarService
     }
 
     /** @return array<string, mixed> */
-    private function icsEvent(array $e, \DateTimeImmutable $start, int $duration, bool $allDay): array
+    private function icsEvent(array $e, \DateTimeImmutable $start, int $duration, bool $allDay, ?string $responseKey = null): array
     {
         $end = $start->modify('+' . $duration . ' seconds');
         if ($allDay) {
@@ -653,8 +666,10 @@ final class CalendarService
             $startStr = $start->setTimezone($tz)->format('c');
             $endStr = $end->setTimezone($tz)->format('c');
         }
+        $id = md5(($e['UID']['value'] ?? '') . $startStr);
         return [
-            'id' => md5(($e['UID']['value'] ?? '') . $startStr),
+            'id' => $id,
+            'response_key' => $responseKey ?? $id,
             'title' => isset($e['SUMMARY']) ? self::icsText($e['SUMMARY']['value']) : '(ohne Titel)',
             'start' => $startStr,
             'end' => $endStr,

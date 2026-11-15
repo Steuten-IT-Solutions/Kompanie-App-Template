@@ -57,6 +57,8 @@ final class RoleService
     public const PERSONAL_SETTING = 'roles_personal_split';
     /** Gesetzt, sobald Rollen mit create_users das Recht manage_former haben (migrateFormerRights). */
     public const FORMER_SETTING = 'roles_former_split';
+    /** Gesetzt, sobald Rollen mit dem internen Kalender das Recht respond_calendar haben (migrateRespondRights). */
+    public const RESPOND_SETTING = 'roles_respond_added';
     /** Rechte aus Roles::ADDED_VIEW, die die Rollen schon bekommen haben (migrateAddedViewRights). */
     public const ADDED_VIEW_SETTING = 'roles_view_added';
     public const LABEL_MAX = 30;
@@ -323,9 +325,11 @@ final class RoleService
     /** Fehlermeldung, wenn die Voraussetzung eines Rechts fehlt. */
     private static function missingRequired(Capability $needed): ApiError
     {
-        return $needed === Capability::Member
-            ? ApiError::invalid('Rechte zum Verwalten und die eigenen Punkte, Strafen, Dienstgrade und Anwesenheit gibt es nur mit „Mitglied der Kompanie“.')
-            : ApiError::invalid('„Persönliche Angaben pflegen“ gibt es nur zusammen mit „Persönliche Angaben sehen“.');
+        return match ($needed) {
+            Capability::Member => ApiError::invalid('Rechte zum Verwalten und die eigenen Punkte, Strafen, Dienstgrade und Anwesenheit gibt es nur mit „Mitglied der Kompanie“.'),
+            Capability::Calendar => ApiError::invalid('Zu- und absagen gibt es nur zusammen mit dem internen Kalender.'),
+            default => ApiError::invalid('„Persönliche Angaben pflegen“ gibt es nur zusammen mit „Persönliche Angaben sehen“.'),
+        };
     }
 
     /**
@@ -669,6 +673,7 @@ final class RoleService
             $this->migrateViewRights();
             $this->migratePersonalRights();
             $this->migrateFormerRights();
+            $this->migrateRespondRights();
             $this->migrateAddedViewRights();
             return;
         }
@@ -685,6 +690,7 @@ final class RoleService
         $this->settings->set(self::CANDIDATE_SETTING, true);
         $this->settings->set(self::VIEW_SETTING, true);
         $this->settings->set(self::PERSONAL_SETTING, true);
+        $this->settings->set(self::RESPOND_SETTING, true);
         $this->settings->set(self::ADDED_VIEW_SETTING, Roles::ADDED_VIEW);
     }
 
@@ -793,6 +799,16 @@ final class RoleService
     }
 
     /**
+     * Einmalig nach dem Update: Zu- und Absagen bei Terminen (respond_calendar) ist neu. Jede Rolle mit dem internen
+     * Kalender außer Gast bekommt es, ebenso jede Person, der der Kalender zusätzlich gegeben ist; so können Mitglieder
+     * und Anwärter gleich zusagen. Gäste bekommen es nur, wenn der Admin es ihnen gibt.
+     */
+    private function migrateRespondRights(): void
+    {
+        $this->migrateFrom(self::RESPOND_SETTING, Capability::Calendar, [Capability::RespondCalendar->value], false);
+    }
+
+    /**
      * Rechte, die von create_users abgetrennt wurden, einmalig (gemerkt unter $setting) jeder Rolle mit create_users geben
      * und den Ausnahmen einzelner Personen folgen lassen: zusätzlich gegeben bzw. entzogen wie create_users.
      *
@@ -800,14 +816,25 @@ final class RoleService
      */
     private function migrateFromCreateUsers(string $setting, array $added): void
     {
+        $this->migrateFrom($setting, Capability::CreateUsers, $added, true);
+    }
+
+    /**
+     * Rechte einmalig (gemerkt unter $setting) jeder Rolle mit $source geben (außer Admin, ohne $guest auch außer Gast) und
+     * den Ausnahmen einzelner Personen folgen lassen: zusätzlich gegeben bzw. entzogen wie $source.
+     *
+     * @param list<string> $added
+     */
+    private function migrateFrom(string $setting, Capability $source, array $added, bool $guest): void
+    {
         if ($this->settings->get($setting)) {
             return;
         }
-        $create = Capability::CreateUsers->value;
+        $create = $source->value;
         $roles = $this->all();
         $changed = false;
         foreach ($roles as $key => $r) {
-            if ($key !== Roles::ADMIN && in_array($create, $r['capabilities'], true)) {
+            if ($key !== Roles::ADMIN && ($guest || $key !== Roles::GUEST) && in_array($create, $r['capabilities'], true)) {
                 $roles[$key]['capabilities'] = self::ordered([...$r['capabilities'], ...$added]);
                 $changed = true;
             }
@@ -817,7 +844,7 @@ final class RoleService
         }
         foreach ($this->loadOverrides() as $id => $o) {
             $u = $this->users->find($id);
-            if ($u === null || !self::overridable($u->role)) {
+            if ($u === null || !self::overridable($u->role) || (!$guest && $u->role === Roles::GUEST)) {
                 continue;
             }
             $grant = in_array($create, $o['grant'], true) ? [...$o['grant'], ...$added] : $o['grant'];

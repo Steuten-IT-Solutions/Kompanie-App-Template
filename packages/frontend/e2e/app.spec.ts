@@ -4521,6 +4521,15 @@ test('Admin stellt den internen Kalender auf „In der App pflegen“ um, legt e
   await page.goto('/app/#/termine');
   await expect(page.locator('.event-title', { hasText: 'E2E Vorstandssitzung' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Internen Kalender verwalten' })).toHaveCount(0);
+  // Zu- und absagen direkt unter dem Termin; ein zweiter Tipp nimmt die Antwort zurück.
+  const card = page.locator('.card.event', { hasText: 'E2E Vorstandssitzung' });
+  await card.getByRole('button', { name: 'Zusagen' }).click();
+  await expect(card.getByRole('button', { name: 'Zugesagt' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(card.locator('.event-response-counts')).toHaveText('1 Zusage');
+  await shot(page, 'termin-zusagen');
+  await card.getByRole('button', { name: 'Zugesagt' }).click();
+  await expect(card.getByRole('button', { name: 'Zusagen' })).toHaveAttribute('aria-pressed', 'false');
+  await expect(card.locator('.event-response-counts')).toHaveCount(0);
   await page.context().clearCookies();
   await page.goto('/app/');
   await page.reload();

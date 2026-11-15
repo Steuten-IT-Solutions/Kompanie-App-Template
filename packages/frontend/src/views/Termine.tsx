@@ -9,6 +9,8 @@ import { mapLinkTarget, mapPlatform, mapSearchUrl } from '../address';
 import { useFocusEntry } from '../focus';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { hasEvents, prefetcher, prefetchOnTap, sources, type EventLike } from '../viewData';
+import { ResponseBar, ResponseDetails } from '../eventResponses';
+import type { CalendarEvent } from '../api';
 
 /** Interne Termine in der App pflegen: Quelle „In der App“ und das Recht dazu. */
 export const canManageCalendar = (): boolean => !!config?.calendarInApp && !!config.features.calendar && can('manage_calendar');
@@ -21,7 +23,9 @@ export default function Termine({ focus }: { focus?: string }) {
 }
 
 function EventList({ focus }: { focus?: string }) {
-  const { data, error, loading, reload } = useAsync(sources.termine.load, sources.termine.deps, sources.termine.key);
+  const { data, error, loading, reload, setData } = useAsync(sources.termine.load, sources.termine.deps, sources.termine.key);
+  // Nach einer Zu- oder Absage: den Termin in der Liste (und im Zwischenspeicher) ersetzen.
+  const replace = (ev: CalendarEvent) => setData((data ?? []).map((e) => (e.id === ev.id ? { ...e, responses: ev.responses } : e)));
   // Geburtstage gleichzeitig laden und erst mit den Terminen zeigen: Sonst taucht die Karte oben nachträglich auf und
   // schiebt die Liste nach unten.
   const showBirthdays = birthdaysVisible();
@@ -127,9 +131,11 @@ function EventList({ focus }: { focus?: string }) {
                       {ev.location && <div className="event-where">{ev.location}</div>}
                     </div>
                   </button>
+                  <ResponseBar ev={ev} onChange={replace} />
                   {isOpen && (
                     <div className="event-body">
                       {ev.description && <p className="event-desc">{ev.description}</p>}
+                      <ResponseDetails ev={ev} onChange={replace} />
                       <div className="event-actions">
                         <button className="btn btn-secondary" onClick={() => downloadIcs(ev)}>
                           In meinen Kalender

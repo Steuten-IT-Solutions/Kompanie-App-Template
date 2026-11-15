@@ -17,6 +17,7 @@ Tippe unten auf **{bereich.events}**. Meist ist das auch die Startseite der App.
 - **Öffentliche Termine verwalten**: nur, wenn du öffentliche Termine pflegen darfst.
 - **Monatsüberschrift**: z. B. „Oktober 2026“; darunter die Termine dieses Monats.
 - **Termin**: links das Datum, rechts Titel, Wochentag und Uhrzeit und, falls angegeben, der Ort. Liegt der Termin nicht im laufenden Jahr, steht auch das Jahr dabei. Steht keine Uhrzeit dabei, dauert der Termin den ganzen Tag.
+- **Zusagen** und **Absagen** unter dem Termin, mit der Zahl der Zusagen und Absagen: siehe [Bei Terminen zu- und absagen](seite:zu-und-absagen).
 
 ## So gehst du vor
 ### Einen Termin ansehen
@@ -36,5 +37,6 @@ Tippe unten auf **{bereich.events}**. Meist ist das auch die Startseite der App.
 - Über neue und geänderte Termine und mit einer Erinnerung am Vortag kann dich die App benachrichtigen, siehe [Benachrichtigungen](seite:benachrichtigungen).
 
 ## Siehe auch
+- [Bei Terminen zu- und absagen](seite:zu-und-absagen)
 - [Benachrichtigungen](seite:benachrichtigungen)
 - [Die App im Überblick](seite:app-ueberblick)

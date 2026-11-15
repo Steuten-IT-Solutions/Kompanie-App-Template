@@ -21,6 +21,7 @@ use KompanieApp\Core\Domain\BugReportService;
 use KompanieApp\Core\Domain\CalendarService;
 use KompanieApp\Core\Domain\DocumentService;
 use KompanieApp\Core\Domain\DriveClient;
+use KompanieApp\Core\Domain\EventResponseService;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Features;
 use KompanieApp\Core\Domain\FileMediaStore;
@@ -383,6 +384,7 @@ final class App
                 if ($error !== null) {
                     $this->telemetry()->record(Code::CalendarFetch, Detail::of($this->calendar()->source(), Detail::fromMessage($error)), $error);
                 }
+                $this->eventResponses()->cleanup();
             } elseif ($task === UpdateService::TASK) {
                 $this->updateUploads()->prune();
                 $last = $this->updates()->status()['last'] ?? null;
@@ -605,7 +607,7 @@ final class App
     /** Termine des internen Kalenders in der App (Quelle „app“), getrennt von den öffentlichen. */
     public function internalEvents(): EventService
     {
-        return $this->service('internal_events', fn () => new EventService(new EventRepository($this->db, EventRepository::INTERNAL), $this->time()));
+        return $this->service('internal_events', fn () => new EventService(new EventRepository($this->db, EventRepository::INTERNAL), $this->time(), true));
     }
 
     public function scores(): ScoreService
@@ -634,6 +636,12 @@ final class App
     public function attendance(): AttendanceService
     {
         return $this->service(AttendanceService::class, fn () => new AttendanceService($this));
+    }
+
+    /** Zu- und Absagen bei Terminen des internen Kalenders. */
+    public function eventResponses(): EventResponseService
+    {
+        return $this->service(EventResponseService::class, fn () => new EventResponseService($this));
     }
 
     public function board(): BoardService

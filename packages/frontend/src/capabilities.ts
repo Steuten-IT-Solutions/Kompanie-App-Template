@@ -62,6 +62,12 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
       { key: 'view_own_attendance', label: `Eigene ${sec.attendance}`, short: `eigene ${sec.attendance}`, features: ['attendance'] },
       { key: 'calendar', label: 'Interner Kalender', short: 'Kalender', features: ['calendar'] },
       {
+        key: 'respond_calendar',
+        label: 'Bei Terminen des internen Kalenders zu- und absagen',
+        short: 'zu- und absagen',
+        features: ['calendar'],
+      },
+      {
         key: 'view_gallery_internal',
         label: `${sec.gallery}: interne Bilder und Videos`,
         short: `interne ${sec.gallery}`,

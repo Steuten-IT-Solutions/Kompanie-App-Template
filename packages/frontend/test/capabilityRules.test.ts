@@ -16,6 +16,13 @@ test('eigene Daten und Verwalten setzen die Mitgliedschaft voraus, Sehen nicht',
   assert.equal(requires('member'), null);
 });
 
+test('zu- und absagen setzt den internen Kalender voraus, nicht die Mitgliedschaft', () => {
+  assert.equal(requires('respond_calendar'), 'calendar');
+  assert.deepEqual(orderedCaps(toggleCap(set(), 'respond_calendar', true)), ['calendar', 'respond_calendar']);
+  assert.deepEqual(orderedCaps(toggleCap(set('calendar', 'respond_calendar', 'view_ranks'), 'calendar', false)), ['view_ranks']);
+  assert.equal(lockedFor('guest', true, 'respond_calendar'), false, 'auch für Gast');
+});
+
 test('Anhaken bringt die Voraussetzung mit, Abhaken nimmt was sie voraussetzt', () => {
   assert.deepEqual(orderedCaps(toggleCap(set(), 'manage_points', true)), ['member', 'manage_points']);
   const before = set('member', 'view_own_points', 'manage_points', 'view_ranks');

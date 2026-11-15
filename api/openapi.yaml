@@ -1006,7 +1006,7 @@ paths:
       summary: Alle Termine des internen Kalenders (Mitglieder und Anwärter)
       description: |
         Aus der gewählten Quelle: in der App gepflegt (`app`, Kennungen mit `i` davor, direkt aus der Datenbank),
-        Google Kalender oder eine iCal-Adresse. Bei Google und iCal hält der Server die letzte gute Fassung bereit (bis `calendar_cache_minutes` frisch) und erneuert sie
+        Google Kalender oder eine iCal-Adresse. Jeder Termin hat `responses` (Zu- und Absagen). Bei Google und iCal hält der Server die letzte gute Fassung bereit (bis `calendar_cache_minutes` frisch) und erneuert sie
         im Hintergrund. Ist sie veraltet und der Kalender gerade nicht erreichbar, kommt die alte Fassung
         mit 200. 502 nur, wenn es noch keine Fassung gibt; ein solcher Fehler wird etwa 60 Sekunden gemerkt.
       x-capability: calendar
@@ -1025,6 +1025,83 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+
+  /calendar/{key}/response:
+    parameters:
+      - { name: key, in: path, required: true, schema: { type: string }, description: 'Kennung des Termins wie in `GET /calendar` (`id`)' }
+    put:
+      tags: [Termine]
+      summary: Bei einem Termin zu- oder absagen (eigene Rückmeldung)
+      description: |
+        Setzt oder ändert die eigene Rückmeldung, mit kurzem Hinweis (höchstens 191 Zeichen). Geht bei jeder Quelle des
+        Kalenders bis zum Beginn des Termins (ganztägig: 0 Uhr), bei Terminen der App bis zum Ende des Anmeldeschlusses
+        (`respond_until`), wenn der früher ist; danach 409 `responses_closed`. Bei iCal gilt die Rückmeldung auch, wenn
+        der Termin verschoben wird (stabile Kennung aus UID und ursprünglichem Beginn). Kommt nicht ins Änderungsprotokoll.
+      x-capability: respond_calendar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: ['yes', 'no'] }
+                note: { type: string, maxLength: 191 }
+      responses:
+        '200':
+          description: Der Termin mit der neuen Rückmeldung
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CalendarEvent' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Termine]
+      summary: Eigene Rückmeldung zurücknehmen
+      description: Wieder „keine Rückmeldung“; gleiche Frist wie beim Zusagen (sonst 409 `responses_closed`).
+      x-capability: respond_calendar
+      responses:
+        '200':
+          description: Der Termin ohne eigene Rückmeldung
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CalendarEvent' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /calendar/{key}/responses:
+    parameters:
+      - { name: key, in: path, required: true, schema: { type: string }, description: 'Kennung des Termins wie in `GET /calendar` (`id`)' }
+    get:
+      tags: [Termine]
+      summary: Wer zu- oder abgesagt hat und wer sich noch nicht gemeldet hat
+      description: Namen und Hinweise; gezählt werden alle, die zusagen dürfen (`respond_calendar`).
+      x-capability: manage_calendar
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [event, 'yes', 'no', none]
+                properties:
+                  event: { $ref: '#/components/schemas/CalendarEvent' }
+                  'yes': { type: array, items: { $ref: '#/components/schemas/EventResponsePerson' } }
+                  'no': { type: array, items: { $ref: '#/components/schemas/EventResponsePerson' } }
+                  none:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
 
   /calendar/entries:
     get:
@@ -9025,6 +9102,7 @@ components:
                     [
                       member,
                       calendar,
+                      respond_calendar,
                       view_intern,
                       view_events,
                       view_news,
@@ -9101,6 +9179,7 @@ components:
                 [
                   member,
                   calendar,
+                  respond_calendar,
                   view_intern,
                   view_events,
                   view_news,
@@ -9182,6 +9261,7 @@ components:
               [
                 member,
                 calendar,
+                respond_calendar,
                 view_intern,
                 manage_points,
                 manage_penalties,
@@ -9498,6 +9578,26 @@ components:
         location: { type: string }
         description: { type: string }
         url: { type: string, description: 'Nur bei Terminen, die in der App gepflegt werden (Quelle app)' }
+        respond_until: { type: [string, 'null'], format: date, description: 'Nur Quelle app: Anmeldeschluss (Zu- und Absagen bis zum Ende dieses Tages)' }
+        responses:
+          type: object
+          description: Zu- und Absagen (nur in `GET /calendar` und den Antworten der Rückmeldung)
+          properties:
+            mine: { type: [string, 'null'], enum: ['yes', 'no', null], description: Eigene Rückmeldung }
+            note: { type: string, description: Eigener Hinweis }
+            'yes': { type: integer, description: 'Zusagen (von allen, die zusagen dürfen)' }
+            'no': { type: integer, description: Absagen }
+            until: { type: string, description: 'ISO 8601: bis dahin änderbar (Beginn bzw. Ende des Anmeldeschlusses)' }
+            open: { type: boolean, description: Noch änderbar }
+            can_respond: { type: boolean, description: 'Hat respond_calendar' }
+            can_list: { type: boolean, description: 'Hat manage_calendar: sieht die Namen (`GET /calendar/{key}/responses`)' }
+
+    EventResponsePerson:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        note: { type: string }
 
     PublicEvent:
       type: object
@@ -9514,6 +9614,7 @@ components:
         end_date: { type: [string, 'null'] }
         end_time: { type: [string, 'null'] }
         url: { type: string }
+        respond_until: { type: [string, 'null'], format: date, description: 'Nur Termine des internen Kalenders (`/calendar/entries`): Anmeldeschluss' }
 
     EventInput:
       type: object
@@ -9527,6 +9628,7 @@ components:
         location: { type: string }
         description: { type: string }
         url: { type: string }
+        respond_until: { type: string, description: 'Nur `/calendar/entries`: Anmeldeschluss YYYY-MM-DD, höchstens der Tag des Beginns, oder leer' }
 
     NewsItem:
       type: object
@@ -9982,6 +10084,7 @@ components:
         [
           member,
           calendar,
+          respond_calendar,
           view_intern,
           manage_points,
           manage_penalties,

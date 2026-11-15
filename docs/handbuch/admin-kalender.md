@@ -61,6 +61,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und unter **Termine u
 - Die iCal-Adresse zeigt die App nach dem Speichern nicht wieder an. Eine neue Adresse ersetzt die bisherige.
 - Hast du den Kalender eingerichtet, bevor es die Auswahl der Quelle gab, gilt bis zum nächsten Speichern das Eingetragene wie bisher: Kalender-IDs vor der iCal-Adresse.
 - Darf die Verbindung mit Google den Kalender nicht lesen, steht das auf dieser Seite und unter [Zustand und Updates](seite:admin-zustand). Dann trennst du unter **Google-Zugang** die Verbindung und verbindest neu, mit dem Häkchen für den Kalender.
+- Bei jedem Termin des internen Kalenders können alle mit dem Recht **Bei Terminen des internen Kalenders zu- und absagen** zu- oder absagen, bei jeder Quelle. {rolle.member} haben das Recht anfangs, {rolle.guest} nicht. Wer wie geantwortet hat, sehen nur Personen mit dem Recht **Kalender pflegen**, auch bei Google Kalender und iCal-Adresse, unter **{bereich.events}** im aufgeklappten Termin.
 - Der {bereich.calendar} erscheint für die anderen erst, wenn der Bereich an und ein Kalender eingerichtet ist (siehe [Bereiche](seite:admin-bereiche)).
 - Mit WordPress gibt es die Felder für Google Kalender und die iCal-Adresse auch im WordPress-Backend auf der Seite der App (dort mit **Speichern und testen**), auch **Aktualisieren alle … Minuten**, dazu ein Feld für einen eigenen Google-API-Schlüssel für öffentliche Kalender. Ist er eingetragen, geht er bei Kalender-IDs vor. Die Quelle wählst du nur hier in der App.
 

@@ -10,7 +10,7 @@ use KompanieApp\Core\Storage\Sql\Connection;
 
 /**
  * Alle eigenen Daten einer Person löschen (Issue #24, Löschung nach DSGVO): Punkte, Strafen, Anwesenheit, Dienstgrad mit
- * Verlauf, Titel, Zusatzrollen (Issue #66), Push-Abos samt Warteschlange, Teilnahme und Antworten bei Umfragen
+ * Verlauf, Titel, Zusatzrollen (Issue #66), Zu- und Absagen bei Terminen, Push-Abos samt Warteschlange, Teilnahme und Antworten bei Umfragen
  * (namentliche über user_id, anonyme über das Pseudonym, wenn das Geheimnis der Umfragen mitkommt), Geburtstag,
  * Eintrittsjahr, Foto, Handynummer, Eintrag als ehemaliges Mitglied, wartende Fehlermeldungen mit ihrem Namen (Issue #64), Einträge der
  * Nutzungsauswertung (Issue #175), Protokollzeilen der E-Mails aus der Verwaltung an sie. Was sie für andere eingetragen
@@ -34,6 +34,8 @@ final class UserData
         'gallery_submissions' => 'user_id',
         'member_roles' => 'user_id',
         'attendance_entries' => 'user_id',
+        // Zu- und Absagen bei Terminen des internen Kalenders
+        'event_responses' => 'user_id',
         'poll_votes' => 'user_id',
         'poll_answers' => 'user_id',
         'birthdays' => 'user_id',
