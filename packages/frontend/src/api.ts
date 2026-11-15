@@ -28,6 +28,7 @@ export type Capability =
   | 'view_own_attendance'
   | 'view_birthdays'
   | 'vote_polls'
+  | 'respond_calendar'
   | 'view_directory'
   | 'view_offices'
   | 'view_former'
@@ -723,6 +724,39 @@ export interface CalendarEvent {
   all_day: boolean;
   location: string;
   description: string;
+  /** Nur Quelle „In der App“: Anmeldeschluss (Datum) */
+  respond_until?: string | null;
+  /** Zu- und Absagen (nur internen Kalender, fehlt bei älteren Servern) */
+  responses?: EventResponses;
+}
+
+export type ResponseStatus = 'yes' | 'no';
+
+/** Zu- und Absagen bei einem Termin des internen Kalenders */
+export interface EventResponses {
+  mine: ResponseStatus | null;
+  note: string;
+  yes: number;
+  no: number;
+  /** ISO 8601: bis dahin änderbar */
+  until: string;
+  open: boolean;
+  can_respond: boolean;
+  /** Sieht die Namen (manage_calendar) */
+  can_list: boolean;
+}
+
+export interface EventResponsePerson {
+  id: number;
+  name: string;
+  note: string;
+}
+
+export interface EventResponseOverview {
+  event: CalendarEvent;
+  yes: EventResponsePerson[];
+  no: EventResponsePerson[];
+  none: { id: number; name: string }[];
 }
 
 export interface CatalogItem {
@@ -740,6 +774,8 @@ export interface PublicEvent extends Omit<CalendarEvent, 'id'> {
   end_date: string | null;
   end_time: string | null;
   url: string;
+  /** Nur Termine des internen Kalenders: Anmeldeschluss */
+  respond_until?: string | null;
 }
 
 export interface EventInput {
@@ -751,6 +787,8 @@ export interface EventInput {
   location: string;
   description: string;
   url: string;
+  /** Nur Termine des internen Kalenders: Anmeldeschluss YYYY-MM-DD oder leer */
+  respond_until?: string;
 }
 
 export interface NewsItem {
@@ -2269,6 +2307,10 @@ export const api = {
   myPoints: () => request<PointEntry[]>('GET', '/me/points'),
   myPenalties: () => request<Penalty[]>('GET', '/me/penalties'),
   calendar: () => request<CalendarEvent[]>('GET', '/calendar'),
+  respondEvent: (id: string, status: ResponseStatus, note: string) =>
+    request<CalendarEvent>('PUT', `/calendar/${encodeURIComponent(id)}/response`, { status, note }),
+  withdrawResponse: (id: string) => request<CalendarEvent>('DELETE', `/calendar/${encodeURIComponent(id)}/response`),
+  eventResponses: (id: string) => request<EventResponseOverview>('GET', `/calendar/${encodeURIComponent(id)}/responses`),
 
   login: (username: string, password: string, remember: boolean) =>
     request<AppConfig>('POST', '/auth/login', { username, password, remember }),

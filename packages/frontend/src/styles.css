@@ -7430,3 +7430,55 @@ fieldset.block-source legend {
   display: block;
   margin: 0 auto;
 }
+
+/* Zu- und Absagen bei Terminen des internen Kalenders (eventResponses.tsx): unter dem Kopf, eingerückt wie der Text */
+.event-responses {
+  padding: 0 14px 12px 82px;
+}
+.event-responses:empty {
+  display: none;
+}
+.event-response-row {
+  display: flex;
+  gap: 8px;
+}
+.event-response {
+  flex: 1 1 0;
+  min-width: 0;
+  background: var(--card);
+  color: var(--ink);
+  border: 1.5px solid var(--line-strong);
+}
+.event-response-yes.chosen {
+  background: #1f6b3a;
+  border-color: #1f6b3a;
+  color: #fff;
+}
+.event-response-no.chosen {
+  background: #a3301a;
+  border-color: #a3301a;
+  color: #fff;
+}
+.event-response-counts,
+.event-response-closed {
+  margin: 6px 0 0;
+}
+.event-response-closed {
+  margin-top: 0;
+  color: var(--ink-2);
+}
+.event-response-note,
+.event-response-list {
+  margin-bottom: 12px;
+}
+.event-response-groups {
+  margin-top: 10px;
+}
+.event-response-group h4 {
+  margin: 10px 0 4px;
+  font-size: 0.92rem;
+}
+.event-response-group ul {
+  margin: 0;
+  padding-left: 18px;
+}

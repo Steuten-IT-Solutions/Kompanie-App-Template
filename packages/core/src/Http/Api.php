@@ -822,6 +822,7 @@ final class Api
         $denyRoles = 'Nur Administratoren dürfen Rollen ändern.';
         $denyRights = 'Dafür fehlen dir die Rechte.';
         $denyPolls = 'An Umfragen darfst du nicht teilnehmen.';
+        $denyRespond = 'Bei Terminen zu- oder absagen darfst du nicht.';
         $denyBirthdays = 'Geburtstage sind nur für Mitglieder.';
         $denyPersonal = 'Persönliche Angaben anderer pflegt nur, wer das Recht dazu hat.';
         // Mitgliederliste: wer Punkte oder Strafen vergibt, Dienstgrade, Titel oder die Anwesenheit pflegt, Mitglieder anlegt oder Rollen vergibt
@@ -924,7 +925,11 @@ final class Api
                 $a->push()->sendTest($a->push()->own(null, $r->input('endpoint'), $r->input('auth')));
                 return ['sent' => true];
             }),
-            new Route('GET', '/calendar', Cap::Calendar, fn () => $a->calendar()->upcoming(), 'calendar', $denyCalendar),
+            // Mit Zu- und Absagen je Termin (responses, EventResponseService); Namen dazu nur mit manage_calendar.
+            new Route('GET', '/calendar', Cap::Calendar, fn () => $a->eventResponses()->annotate($a->authContext->currentUser(), $a->calendar()->upcoming()), 'calendar', $denyCalendar),
+            new Route('PUT', '/calendar/{key}/response', Cap::RespondCalendar, fn (Request $r) => $a->eventResponses()->respond($this->user(), (string) $r->params['key'], $r->input('status'), $r->input('note')), 'calendar', $denyRespond),
+            new Route('DELETE', '/calendar/{key}/response', Cap::RespondCalendar, fn (Request $r) => $a->eventResponses()->withdraw($this->user(), (string) $r->params['key']), 'calendar', $denyRespond),
+            new Route('GET', '/calendar/{key}/responses', Cap::ManageCalendar, fn (Request $r) => $a->eventResponses()->overview($this->user(), (string) $r->params['key']), 'calendar', $denyRights),
             // Interner Kalender in der App (Quelle „app“): Termine pflegen mit manage_calendar, getrennt von den öffentlichen.
             // Benachrichtigungen wie bei jeder Quelle über PushTriggers::checkCalendar, nach dem Speichern sofort angestoßen.
             new Route('GET', '/calendar/entries', Cap::ManageCalendar, fn () => $a->calendar()->requireInApp()->upcoming(), 'calendar', $denyRights),

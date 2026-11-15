@@ -44,6 +44,8 @@ enum Capability: string
     case ViewBirthdays = 'view_birthdays';
     /** An Umfragen teilnehmen (Umfragen sehen und abstimmen). */
     case VotePolls = 'vote_polls';
+    /** Bei Terminen des internen Kalenders zu- und absagen (setzt den internen Kalender voraus, nicht member). */
+    case RespondCalendar = 'respond_calendar';
     /** Intern: Liste der Mitglieder. */
     case ViewDirectory = 'view_directory';
     /** Intern: Ämter. */
@@ -149,12 +151,16 @@ enum Capability: string
      * nur für Mitglieder (sonst sähe die Person ihre Mitglieder nicht bzw. hätte nichts Eigenes). Persönliche Angaben
      * pflegt nur, wer sie sieht (manage_personal → view_personal → member). Die einzige Stelle für diese Regel; die App
      * hat sie in capabilityRules.ts (requires) noch einmal. Bei der Rolle Gast entfällt die Voraussetzung member
-     * (RoleService::validCapabilities).
+     * (RoleService::validCapabilities). Zu- und absagen setzt nur den internen Kalender voraus: So können auch Anwärter
+     * und, wenn der Admin es will, Gäste mit Konto zusagen.
      */
     public function requires(): ?self
     {
         if (in_array($this, self::ownData(), true)) {
             return self::Member;
+        }
+        if ($this === self::RespondCalendar) {
+            return self::Calendar;
         }
         if ($this === self::ManagePersonal) {
             return self::ViewPersonal;

@@ -1929,6 +1929,48 @@ WHERE title IS NULL",
                 'mysql' => ['ALTER TABLE {change_log} ADD COLUMN batch varchar(32) NOT NULL DEFAULT \'\''],
                 'sqlite' => ['ALTER TABLE {change_log} ADD COLUMN batch TEXT NOT NULL DEFAULT \'\''],
             ],
+            // Zu- und Absagen bei Terminen des internen Kalenders (Domain\EventResponseService): eine Rückmeldung je Person und
+            // Termin (event_key = stabile Kennung des Termins in der Quelle), Titel und Datum als Momentaufnahme (Aufräumen,
+            // Auskunft). Termine der App bekommen einen optionalen Anmeldeschluss (Datum, bis zum Ende dieses Tages).
+            61 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {event_responses} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  event_key varchar(64) NOT NULL,
+  user_id bigint(20) unsigned NOT NULL,
+  status varchar(10) NOT NULL,
+  note varchar(191) NOT NULL DEFAULT \'\',
+  event_title varchar(191) NOT NULL DEFAULT \'\',
+  event_date date NOT NULL,
+  updated_by bigint(20) unsigned NOT NULL,
+  created_at datetime NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY event_user (event_key, user_id),
+  KEY user_id (user_id),
+  KEY event_date (event_date)
+) {options}',
+                    'ALTER TABLE {internal_events} ADD COLUMN respond_until date DEFAULT NULL',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {event_responses} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_key TEXT NOT NULL,
+  user_id INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT \'\',
+  event_title TEXT NOT NULL DEFAULT \'\',
+  event_date TEXT NOT NULL,
+  updated_by INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {event_responses}_event_user ON {event_responses} (event_key, user_id)',
+                    'CREATE INDEX IF NOT EXISTS {event_responses}_user_id ON {event_responses} (user_id)',
+                    'CREATE INDEX IF NOT EXISTS {event_responses}_event_date ON {event_responses} (event_date)',
+                    'ALTER TABLE {internal_events} ADD COLUMN respond_until TEXT DEFAULT NULL',
+                ],
+            ],
         ];
     }
 

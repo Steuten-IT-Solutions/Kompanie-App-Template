@@ -28,6 +28,7 @@ function toInput(ev: PublicEvent): EventInput {
     location: ev.location,
     description: ev.description,
     url: ev.url,
+    respond_until: ev.respond_until ?? '',
   };
 }
 
@@ -84,12 +85,14 @@ export default function TermineVerwalten({ onToast, internal = false }: { onToas
     if (!form.title.trim()) return setFormError('Bitte einen Titel angeben.');
     if (!form.start_date) return setFormError('Bitte ein Startdatum angeben.');
     setBusy(true);
+    // Den Anmeldeschluss gibt es nur im internen Kalender.
+    const data: EventInput = internal ? form : { ...form, respond_until: undefined };
     try {
       if (editing === 'new') {
-        await kind.create(form);
+        await kind.create(data);
         onToast('Termin angelegt');
       } else if (typeof editing === 'number') {
-        await kind.update(editing, form);
+        await kind.update(editing, data);
         onToast('Termin gespeichert');
       }
       setEditing(null);
@@ -146,6 +149,15 @@ export default function TermineVerwalten({ onToast, internal = false }: { onToas
             </label>
           </div>
           <p className="muted small">Ohne Uhrzeit gilt der Termin als ganztägig.</p>
+          {internal && (
+            <>
+              <label className="field">
+                <span>Anmeldeschluss (optional)</span>
+                <input type="date" value={form.respond_until ?? ''} max={form.start_date || undefined} onChange={set('respond_until')} />
+              </label>
+              <p className="muted small">Zu- und absagen geht bis zum Ende dieses Tages, ohne Anmeldeschluss bis zum Beginn.</p>
+            </>
+          )}
           <label className="field">
             <span>Ort</span>
             <input type="text" maxLength={191} value={form.location} onChange={set('location')} />

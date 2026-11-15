@@ -118,7 +118,7 @@ final class CapabilityOverridesTest extends TestCase
         $this->assertTrue($this->can($this->m, Capability::ViewRanks));
         // Ohne Mitgliedschaft fallen die eigenen Daten weg, das Übrige zum Sehen bleibt.
         $this->assertSame(200, $this->rights($this->m, [], ['member'])->status);
-        $expected = array_values(array_filter(TestApp::capabilities(['member']), static fn (Capability $c): bool => $c !== Capability::Member && $c->requires() === null));
+        $expected = array_values(array_filter(TestApp::capabilities(['member']), static fn (Capability $c): bool => $c !== Capability::Member && $c->requires() !== Capability::Member));
         $this->assertSame($expected, $this->users->find($this->m)?->capabilities);
         $this->assertSame(400, $this->rights($this->users->add('anw2', TestApp::candidateRole($this->app)), ['view_own_points'])->status, 'eigene Punkte nur mit Mitgliedschaft');
         $this->assertSame(400, $this->rights($this->m, ['manage_points'], ['manage_points'])->status);

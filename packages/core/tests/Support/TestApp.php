@@ -103,6 +103,10 @@ final class TestApp
     public static function caps(array $legacy): array
     {
         $all = [...\KompanieApp\Core\Auth\Roles::expandLegacy($legacy), ...\KompanieApp\Core\Auth\Roles::ADDED_VIEW];
+        // Rollen mit dem internen Kalender bekommen beim Update Zu- und Absagen dazu (RoleService::migrateRespondRights).
+        if (in_array('calendar', $all, true)) {
+            $all[] = 'respond_calendar';
+        }
         return array_values(array_filter(
             array_map(static fn (\KompanieApp\Core\Auth\Capability $c): string => $c->value, \KompanieApp\Core\Auth\Roles::GRANTABLE),
             static fn (string $v): bool => in_array($v, $all, true),

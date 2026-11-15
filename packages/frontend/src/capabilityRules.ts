@@ -34,10 +34,12 @@ const OWN_DATA: Capability[] = ['view_own_points', 'view_own_penalties', 'view_o
 
 /**
  * Recht, das dieses voraussetzt (wie Capability::requires im Kern): eigene Daten und alles zum Verwalten nur mit
- * „Gehört zur Kompanie“ (member); persönliche Angaben pflegt nur, wer sie sieht (manage_personal → view_personal).
+ * „Gehört zur Kompanie“ (member); persönliche Angaben pflegt nur, wer sie sieht (manage_personal → view_personal);
+ * zu- und absagen nur mit dem internen Kalender.
  */
 export function requires(c: Capability): Capability | null {
   if (OWN_DATA.includes(c)) return 'member';
+  if (c === 'respond_calendar') return 'calendar';
   if (c === 'manage_personal') return 'view_personal';
   return isView(c) || c === 'member' ? null : 'member';
 }
@@ -114,6 +116,7 @@ const ORDER: Capability[] = [
   'view_own_rank',
   'view_own_attendance',
   'calendar',
+  'respond_calendar',
   'view_gallery_internal',
   'view_birthdays',
   'vote_polls',

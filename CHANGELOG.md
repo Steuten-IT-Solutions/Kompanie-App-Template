@@ -44,6 +44,15 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Termine mit einem Datum in der Zukunft.
 - **Anwesenheitsliste zählt Offene**: Der Zähler über der Liste nennt zusätzlich, für wie viele Personen noch nichts
   gewählt ist, z. B. „3 anwesend · 1 entschuldigt · 0 fehlt · 5 ohne Auswahl“.
+- **Zu- und Absagen bei Terminen**: Unter [Termine](app:termine) stehen bei jedem Termin des internen Kalenders die
+  Knöpfe _Zusagen_ und _Absagen_, bei jeder Quelle (in der App gepflegt, Google Kalender, iCal-Adresse). Mitglieder
+  können einen kurzen Hinweis dazuschreiben und sich bis zum Beginn umentscheiden; bei Terminen aus der App lässt sich
+  ein früherer _Anmeldeschluss_ eintragen. Alle sehen, wie viele zu- und abgesagt haben; wer wie geantwortet hat (mit
+  Hinweis und wer sich noch nicht gemeldet hat), sehen nur Personen mit dem Recht _Kalender pflegen_. Dafür gibt es das
+  neue Recht _Bei Terminen des internen Kalenders zu- und absagen_ unter
+  [Einstellungen → Rollen](app:einstellungen/rollen): Nach dem Update hat es jede Rolle mit dem internen Kalender außer
+  Gast. Wird ein Termin verschoben, bleiben die Rückmeldungen erhalten; etwa drei Monate nach dem Termin löscht die App
+  sie.
 
 ### Geändert
 

@@ -52,6 +52,7 @@ final class ViewRightsMigrationTest extends TestCase
         ]);
         $settings->delete(RoleService::VIEW_SETTING);
         $settings->delete(RoleService::ADDED_VIEW_SETTING);
+        $settings->delete(RoleService::RESPOND_SETTING);
 
         $app = TestApp::create($db, $users, settings: $settings, features: false);
         $this->assertTrue($settings->get(RoleService::VIEW_SETTING));

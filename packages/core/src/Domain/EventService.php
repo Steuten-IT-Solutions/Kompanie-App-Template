@@ -11,15 +11,19 @@ use KompanieApp\Core\Storage\EventRepository;
  * Termine, die in der App gepflegt werden: die öffentlichen (App::events, Recht manage_events) und, getrennt davon in
  * einer eigenen Tabelle, die des internen Kalenders mit der Quelle „app“ (App::internalEvents, Recht manage_calendar).
  * Datum und Uhrzeit sind getrennt gespeichert, weil viele Termine ganztägig oder mehrtägig sind.
+ *
+ * Termine des internen Kalenders ($deadline) haben zusätzlich einen optionalen Anmeldeschluss (respond_until, Datum):
+ * Zu- und Absagen gehen bis zum Ende dieses Tages, höchstens bis zum Beginn (EventResponseService).
  */
 final class EventService
 {
-    private const FIELDS = ['title', 'start_date', 'start_time', 'end_date', 'end_time', 'location', 'description', 'url'];
+    private const FIELDS = ['title', 'start_date', 'start_time', 'end_date', 'end_time', 'location', 'description', 'url', 'respond_until'];
     public const MAX_DESCRIPTION = 10000;
 
     public function __construct(
         private readonly EventRepository $events,
         private readonly Time $time,
+        private readonly bool $deadline = false,
     ) {
     }
 
@@ -137,7 +141,19 @@ final class EventService
 
         $url = Input::url($get('url'), 'Der Link muss mit http:// oder https:// beginnen.');
 
-        return [
+        $deadline = [];
+        if ($this->deadline) {
+            $until = $get('respond_until');
+            if ($until !== '' && !Input::isDate($until)) {
+                throw ApiError::invalid('Der Anmeldeschluss ist ungültig.');
+            }
+            if ($until !== '' && $until > $startDate) {
+                throw ApiError::invalid('Der Anmeldeschluss liegt nach dem Beginn.');
+            }
+            $deadline = ['respond_until' => $until === '' ? null : $until];
+        }
+
+        return $deadline + [
             'title' => $title,
             'start_date' => $startDate,
             'start_time' => $startTime,
@@ -197,6 +213,6 @@ final class EventService
             'all_day' => $allDay,
             'start' => $start,
             'end' => $end,
-        ];
+        ] + ($this->deadline ? ['respond_until' => ($r['respond_until'] ?? null) ?: null] : []);
     }
 }
