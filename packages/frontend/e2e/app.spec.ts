@@ -991,15 +991,16 @@ test('Fotos: beim Anlegen mitgeben (einzeln und mehrere), in Liste und Details, 
     const held = new Promise<void>((resolve) => (release = resolve));
     return { held, release };
   };
+  // Über den Kontext: Fotos lädt der Service Worker (Bilder-Speicher), seine Anfragen sieht page.route nicht.
   const heldBig = hold();
   const heldOriginal = hold();
   const bigPhoto = /[?&]s=1024(&|$)/;
   const originalPhoto = /[?&]s=4096(&|$)/;
-  await page.route(bigPhoto, async (route) => {
+  await page.context().route(bigPhoto, async (route) => {
     await heldBig.held;
     await route.continue();
   });
-  await page.route(originalPhoto, async (route) => {
+  await page.context().route(originalPhoto, async (route) => {
     await heldOriginal.held;
     await route.continue();
   });
@@ -1013,8 +1014,8 @@ test('Fotos: beim Anlegen mitgeben (einzeln und mehrere), in Liste und Details, 
   await expect(zoom.locator('img')).toHaveAttribute('src', bigPhoto);
   heldOriginal.release();
   await expect(zoom.locator('img')).toHaveAttribute('src', originalPhoto);
-  await page.unroute(bigPhoto);
-  await page.unroute(originalPhoto);
+  await page.context().unroute(bigPhoto);
+  await page.context().unroute(originalPhoto);
   await page.keyboard.press('Escape');
   await expect(zoom).toHaveCount(0);
   await page.getByRole('button', { name: /vergrößern/ }).click();

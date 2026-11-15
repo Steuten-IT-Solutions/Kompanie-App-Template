@@ -67,6 +67,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Nicht gespeicherte Eingaben**: Wer etwas eingegeben, aber noch nicht gespeichert hat, wird jetzt gefragt, bevor
   die Seite verlassen wird (auch mit „Zurück“ und beim Neuladen); **Verlassen** verwirft die Eingaben. Kommt eine
   Änderung ohne Internetverbindung nicht an, sagt die Meldung jetzt ausdrücklich „Keine Verbindung – nicht gespeichert“.
+- **Mehr offline verfügbar**: Die App behält jetzt dreimal so viele zuletzt geladene Seiten für die Nutzung ohne
+  Internet. Mitgliedsfotos, Logos von Sponsoren und Kompanien und Bilder in Texten (z. B. am Schwarzen Brett) sind nach
+  dem ersten Ansehen ebenfalls offline da. Beim Abmelden löscht die App alles wie bisher.
+- **Schlechte Verbindung**: Antwortet das Netz nicht oder nur sehr langsam, zeigt die App nach einigen Sekunden die
+  zuletzt geladenen Daten mit dem Hinweis „Schlechte Verbindung“, statt lange bei „Lädt …“ zu bleiben. Kommt die Antwort
+  doch noch, erscheint der neue Stand von selbst. Gespeicherte Daten einer anderen Person zeigt die App dabei nie.
 - **Block einfügen übersichtlicher**: Beim Bearbeiten von Seiten, News und Nachrichten am Schwarzen Brett öffnet
   **+ Block einfügen** jetzt ein Fenster statt einer langen Auswahlliste. Jede Blockart steht dort als Kachel mit
   Symbol, Name und kurzer Erklärung (am Computer in zwei Spalten); Antippen fügt den Block ein, ✕ oder „Zurück“

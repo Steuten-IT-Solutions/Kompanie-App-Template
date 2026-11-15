@@ -9,6 +9,7 @@ import brand from './generated/brand';
 import { noteError } from './lastError';
 import { rememberRoute } from './share';
 import { markSaved } from './unsaved';
+import { noteResponse } from './connection';
 import type { AdminOrder, NavigationSetting, NavNames, NavStart } from './navigation';
 
 /** Schlüssel einer Rolle: guest, member, admin, früher fest (organizer, manager, candidate) oder vom Admin angelegt (r1, r2, …). */
@@ -2267,6 +2268,8 @@ async function requestFull<T>(
     // Bei Änderungen sagen, dass nichts gespeichert ist (Offline-Prüfung): Die Eingaben stehen noch in der Ansicht.
     throw new ApiError(method === 'GET' ? 'Keine Verbindung. Bitte später erneut versuchen.' : OFFLINE_NOT_SAVED, 0);
   }
+  // Gespeicherte Version statt einer Antwort aus dem Netz (schlechte Verbindung): Hinweis oben (connection.ts).
+  if (method === 'GET') noteResponse(res.headers);
   // Eigene Änderung (auch eine abgelehnte könnte etwas geändert haben): zwischengespeicherte Daten verwerfen.
   // Ausnahmen ohne Änderung an den angezeigten Daten: die Abfrage des Push-Status beim Start und Vorschauen ({preview: true},
   // z. B. die Frist für Ehemalige vor dem Speichern).
