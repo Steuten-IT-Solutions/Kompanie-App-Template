@@ -74,6 +74,7 @@ final class Backup
         // Mailversand (Issue #172): gemerktes Limit des Mailservers und Pause zwischen den Portionen.
         'mail_server_size', 'board_mail_next',
         'push_calendar_seen', 'push_news_seen', 'push_reminder_date', 'push_board_offered', 'push_polls_offered', 'push_birthdays_offered',
+        'push_responses_date', 'push_responses_offered',
         // Protokoll der Benachrichtigungen (PushService::LOG_SETTING): Stand dieser Installation.
         'push_log',
     ];

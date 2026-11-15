@@ -50,7 +50,7 @@ Welche Arten du siehst, hängt davon ab, welche Bereiche die {kompanie.name} nut
 
 Für alle, auch ohne Konto:
 - **{bereich.events}: neue und geänderte**: wenn ein Termin dazukommt oder sich Beginn, Ende oder Ort ändern. Bei einer Änderung steht in der Nachricht nur, was sich geändert hat, z. B. „Uhrzeit: 19:00 Uhr → 20:00 Uhr“. Kommen viele neue Termine auf einmal, gibt es eine Sammelnachricht.
-- **Erinnerung am Vortag**: eine Nachricht mit allen Terminen von morgen, ab der Uhrzeit, die ein {rolle.admin} festlegt (üblich 18 Uhr).
+- **Erinnerung am Vortag**: eine Nachricht mit allen Terminen von morgen, ab der Uhrzeit, die ein {rolle.admin} festlegt (üblich 18 Uhr). Termine, bei denen du abgesagt hast, stehen nicht darin.
 - **{bereich.news}: neue Beiträge**: wenn ein neuer Beitrag erscheint.
 
 Diese Nachrichten bekommst du zu den Terminen, die du unter **{bereich.events}** siehst: ohne Konto zu den öffentlichen Terminen, als {rolle.member} oder mit dem internen Kalender (z. B. Anwärter) zum Kalender der {kompanie.name}, wenn sie ihn nutzt.
@@ -62,6 +62,7 @@ Für {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter):
 - **{bereich.board}: dringende Nachrichten**: sobald jemand eine Nachricht ans {bereich.board} schreibt, interne wie öffentliche (außer er schaltet die Benachrichtigung dabei ab). Nachrichten nur für bestimmte {bereich.companies} oder Personen bekommst du nur, wenn sie für dich bestimmt sind.
 
 Nur für {rolle.member}:
+- **{bereich.events}: Erinnerung an deine Zu- oder Absage**: wenn du bei einem Termin des internen Kalenders noch nicht zu- oder abgesagt hast, zur Uhrzeit der Erinnerung einige Tage vorher (üblich 3), bei einem Anmeldeschluss am Tag davor. Nur, wenn du zu- und absagen darfst und ein {rolle.admin} die Erinnerung eingeschaltet hat.
 - **{bereich.polls}: neue Umfrage und Erinnerung**: bei jeder neuen Umfrage und 24 Stunden vor ihrem Ende, wenn du noch nicht geantwortet hast.
 - **{bereich.birthdays}: am Tag selbst**: am Geburtstag eines anderen Mitglieds, das seinen Geburtstag anderen zeigt, ab der Uhrzeit, die ein {rolle.admin} festlegt (üblich 7 Uhr).
 - **{bereich.penalties}: neue Einträge**: bei einem neuen Eintrag für dich.

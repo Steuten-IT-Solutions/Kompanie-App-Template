@@ -57,6 +57,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   ist dort als _entschuldigt_ vorausgewählt (eingetragen erst mit _Speichern_, auf einmal mit _Absagen übernehmen_).
   Wer die Anwesenheit erfasst, kann dort auch für andere zu- oder absagen, z. B. nach einem Anruf; das steht im
   Änderungsprotokoll.
+  Wer noch nicht geantwortet hat, bekommt eine Benachrichtigung (neue Art _Termine: Erinnerung an deine Zu- oder
+  Absage_), einstellbar unter [Einstellungen → Kalender](app:einstellungen/kalender): an oder aus und wie viele Tage
+  vor dem Termin (anfangs an, 3 Tage; bei einem Anmeldeschluss am Tag davor). Die _Erinnerung am Vortag_ nennt keine
+  Termine mehr, bei denen man abgesagt hat.
 
 ### Geändert
 

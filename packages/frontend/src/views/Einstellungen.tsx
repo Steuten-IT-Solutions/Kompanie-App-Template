@@ -168,7 +168,13 @@ function Verbindung({
   // key: Die Formulare übernehmen ihre Felder einmal; weicht der frische Stand vom gespeicherten ab, neu aufbauen.
   const props = { settings: s, onSaved: setData, onToast };
   if (page === 'google') return <GoogleAccess key={revision} {...props} />;
-  if (page === 'kalender') return <Calendar key={revision} {...props} />;
+  if (page === 'kalender')
+    return (
+      <>
+        <Calendar key={revision} {...props} />
+        <CalendarResponses key={`r${revision}`} {...props} />
+      </>
+    );
   if (page === 'galerie')
     return (
       <>
@@ -1273,6 +1279,56 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
         <p className="small" role="status">
           {result}
         </p>
+      )}
+    </Section>
+  );
+}
+
+/** Erinnerung an die Zu- und Absagen bei Terminen des internen Kalenders: an/aus und Vorlauf in Tagen. */
+function CalendarResponses({ settings, onSaved, onToast }: SectionProps) {
+  const c = settings.calendar;
+  const [on, setOn] = useState(c.response_reminder ?? true);
+  const [days, setDays] = useState(String(c.response_reminder_days ?? 3));
+  const { busy, error, save } = useSave(onSaved, onToast);
+  if (c.response_reminder === undefined) return null;
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    const n = Number(days);
+    if (on === c.response_reminder && n === c.response_reminder_days) return onToast('Nichts geändert.');
+    save({ calendar_response_reminder: on ? '1' : '0', ...(on ? { calendar_response_reminder_days: n } : {}) });
+  }
+
+  return (
+    <Section id="zu-und-absagen" title="Zu- und Absagen" busy={busy} error={error} onSubmit={submit}>
+      <p className="small muted">
+        Bei jedem Termin des internen Kalenders sagen alle mit dem Recht „zu- und absagen“ zu oder ab. Wer sich noch nicht gemeldet hat,
+        bekommt eine Benachrichtigung (nur auf Geräten mit eingeschalteten Benachrichtigungen, keine E-Mail).
+      </p>
+      <label className="toggle feature-toggle">
+        <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} />
+        <span>
+          An Zu- und Absage erinnern
+          <span className="small muted feature-desc">Nur an alle, die bei dem Termin noch nicht zu- oder abgesagt haben.</span>
+        </span>
+      </label>
+      {on && (
+        <label className="field">
+          <span>Erinnerung … Tage vor dem Termin</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={30}
+            step={1}
+            required
+            value={days}
+            onChange={(e) => setDays(e.target.value)}
+          />
+          <span className="small muted">
+            Zur Uhrzeit der Erinnerung unter Benachrichtigungen. Hat ein Termin einen Anmeldeschluss, kommt die Erinnerung am Tag davor.
+          </span>
+        </label>
       )}
     </Section>
   );

@@ -220,6 +220,7 @@ final class PushTriggers
             $count += $this->checkNews();
         }
         $count += $this->sendReminders($now);
+        $count += $this->sendResponseReminders($now);
         $this->push->expireGuests();
         return $count;
     }
@@ -362,7 +363,17 @@ final class PushTriggers
             try {
                 $list = $this->eventsOn($this->app->calendar()->events(), $tomorrow);
                 if ($list !== []) {
-                    $count += $this->push->notifyAll(PushService::TYPE_REMINDER, $this->reminderMessage($list, ''), true);
+                    // Wer abgesagt hat, wird an diesen Termin nicht erinnert: eigene Nachricht ohne ihn bzw. keine.
+                    $declined = $this->app->eventResponses()->declined($list);
+                    $count += $this->push->notifyAll(PushService::TYPE_REMINDER, $this->reminderMessage($list, ''), true, static fn (int $uid): bool => !isset($declined[$uid]));
+                    $own = [];
+                    foreach ($declined as $uid => $ids) {
+                        $rest = array_values(array_filter($list, static fn (array $ev): bool => !isset($ids[(string) $ev['id']])));
+                        if ($rest !== [] && $this->push->usesCalendar($this->app->users->find($uid))) {
+                            $own[] = [$uid, $this->reminderMessage($rest, '')];
+                        }
+                    }
+                    $count += $this->push->notifyUsers(PushService::TYPE_REMINDER, $own);
                 }
             } catch (\RuntimeException) {
                 // Kalender nicht erreichbar: dann eben keine Erinnerung aus dem Kalender.
@@ -375,6 +386,60 @@ final class PushTriggers
             }
         }
         return $count;
+    }
+
+    /**
+     * Erinnerung an die eigene Zu- oder Absage (Einstellungen → Kalender, Standard an): einmal am Tag zur Uhrzeit der
+     * Erinnerung, an alle ohne Rückmeldung zu den Terminen, deren Anmeldeschluss morgen ist bzw. die in den Tagen des
+     * Vorlaufs beginnen (EventResponseService::dueForReminder). Je Person eine Nachricht.
+     */
+    public function sendResponseReminders(?\DateTimeImmutable $now = null): int
+    {
+        if (!$this->app->features()->enabled('calendar') || !$this->app->calendar()->isConfigured() || !$this->app->eventResponses()->reminderSettings()['enabled']) {
+            return 0;
+        }
+        $now ??= $this->app->time()->today()->setTimestamp($this->app->time()->timestamp());
+        $now = $now->setTimezone($this->app->time()->timezone());
+        $hour = (int) $now->format('G');
+        $from = $this->push->reminderHour();
+        $today = $now->format('Y-m-d');
+        if ($hour < $from || $hour >= $from + 4 || $this->app->settings->get(PushService::RESPONSES_DATE_SETTING) === $today) {
+            return 0;
+        }
+        $this->app->settings->set(PushService::RESPONSES_DATE_SETTING, $today);
+        // Bestehende Abos bekommen die neue Art einmalig dazu (wie bei einem neu eingeschalteten Bereich).
+        $this->push->offerTypeToExisting(PushService::TYPE_RESPONSES);
+        try {
+            $due = $this->app->eventResponses()->dueForReminder($this->app->calendar()->events(), $today);
+        } catch (\RuntimeException) {
+            return 0; // Kalender nicht erreichbar: dann eben keine Erinnerung.
+        }
+        if ($due === []) {
+            return 0;
+        }
+        $messages = [];
+        foreach ($this->app->eventResponses()->withoutResponse($due) as $uid => $events) {
+            $messages[] = [$uid, $this->responseMessage($events)];
+        }
+        return $this->push->notifyUsers(PushService::TYPE_RESPONSES, $messages);
+    }
+
+    /**
+     * „Zu- oder absagen: Probe“ mit Datum und Frist; bei mehreren Terminen die Liste.
+     *
+     * @param list<array<string, mixed>> $events
+     * @return array{title: string, body: string, route: string, tag: string}
+     */
+    private function responseMessage(array $events): array
+    {
+        if (count($events) === 1) {
+            $ev = $events[0];
+            $until = $ev['respond_until'] ?? null;
+            $body = $this->when($ev) . (is_string($until) && $until !== '' ? ' – Anmeldeschluss morgen' : '') . '. Du hast noch nicht zu- oder abgesagt.';
+            return PushService::message('Zu- oder absagen: ' . $ev['title'], $body, self::eventRoute((string) $ev['id']), 'rueckmeldung');
+        }
+        $titles = implode(' · ', array_map(static fn (array $ev): string => (string) $ev['title'], $events));
+        return PushService::message(sprintf('Zu- oder absagen: %d Termine', count($events)), $titles . '. Du hast noch nicht zu- oder abgesagt.', 'termine', 'rueckmeldung');
     }
 
     /**

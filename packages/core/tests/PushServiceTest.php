@@ -113,12 +113,12 @@ final class PushServiceTest extends TestCase
         $member = $this->users->find($this->users->add('m', Roles::MEMBER));
         $guest = $this->users->find($this->users->add('g', Roles::GUEST));
         $p = $app->push();
-        $this->assertSame(['board', 'polls', 'birthdays', 'reports', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'], $p->availableTypes($member));
+        $this->assertSame(['board', 'polls', 'birthdays', 'reports', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'responses', 'news'], $p->availableTypes($member));
         $this->assertSame(['board_public', 'events', 'reminder', 'news'], $p->availableTypes(null), 'Gäste ohne Konto: nur Öffentliches');
         $this->assertSame(['board_public', 'reports', 'events', 'reminder', 'news'], $p->availableTypes($guest), 'Konto ohne Mitgliederbereich; Antworten auf Fehlermeldungen für alle Konten');
 
         $app->features()->update(['penalties' => false, 'news' => false, 'events' => false, 'ranks' => false, 'titles' => false, 'board' => false, 'polls' => false, 'birthdays' => false]);
-        $this->assertSame(['reports', 'points', 'events', 'reminder'], $p->availableTypes($member), 'Termine aus dem Kalender');
+        $this->assertSame(['reports', 'points', 'events', 'reminder', 'responses'], $p->availableTypes($member), 'Termine aus dem Kalender');
         $this->assertSame([], $p->availableTypes(null), 'ohne öffentliche Termine und News nichts für Gäste');
         $this->assertSame(0, $p->notifyAll('news', PushService::message('x', 'y', 'news')), 'ausgeschalteter Bereich: kein Versand');
     }
@@ -175,7 +175,7 @@ final class PushServiceTest extends TestCase
         $this->assertSame(1, $p->addNewTypes());
         $sub = $p->repository()->byEndpoint($d['endpoint']);
         $this->assertNotNull($sub);
-        $this->assertSame(['board', 'board_public', 'polls', 'birthdays', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder'], $sub['types'], 'neue Arten der Rolle an, News bleibt aus');
+        $this->assertSame(['board', 'board_public', 'polls', 'birthdays', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'responses'], $sub['types'], 'neue Arten der Rolle an, News bleibt aus');
         $this->assertSame(0, $p->addNewTypes(), 'nur einmal');
 
         // Bereich aus und wieder an: Die Art kennt das Gerät schon, abgeschaltet bleibt abgeschaltet.
@@ -679,6 +679,103 @@ final class PushServiceTest extends TestCase
         $this->assertSame('Morgen: Vereinsabend', $msg['title']);
         $this->assertSame('Vereinsabend (19:00 Uhr)', $msg['body']);
         $this->assertSame('termine/termin/p' . $id, $msg['route'], 'ein Termin: dorthin (Issue #190)');
+    }
+
+    /**
+     * Zu- und Absagen: Quelle „In der App“, Anna und Ben (Mitglieder) je mit einem Gerät; liefert die Geräte und
+     * eine Funktion, die Termine anlegt (Kennung wie im Kalender).
+     *
+     * @return array{0: App, 1: array<string, array>, 2: \Closure(array): string, 3: array<string, int>}
+     */
+    private function responsesSetup(): array
+    {
+        $app = $this->app();
+        $admin = $this->users->add('admin', Roles::ADMIN);
+        $ids = ['anna' => $this->users->add('anna', Roles::MEMBER), 'ben' => $this->users->add('ben', Roles::MEMBER)];
+        $this->users->current = $admin;
+        $app->api()->handle(new Request('PATCH', '/admin/settings', [], ['calendar_source' => 'app']));
+        $devices = [];
+        foreach ($ids as $name => $id) {
+            $devices[$name] = self::device($name);
+            $app->push()->subscribe($this->users->find($id), $devices[$name]['endpoint'], $devices[$name]['keys'], ['responses', 'reminder'], null, '');
+        }
+        $create = function (array $fields) use ($app): string {
+            $res = $app->api()->handle(new Request('POST', '/calendar/entries', [], $fields));
+            $this->assertSame(201, $res->status, (string) json_encode($res->data));
+            return 'i' . $res->data['id'];
+        };
+        return [$app, $devices, $create, $ids];
+    }
+
+    /** @return array<string, list<array<string, mixed>>> Gerät => entschlüsselte Nachrichten */
+    private function messagesTo(App $app, array $devices): array
+    {
+        $app->push()->processQueue();
+        $out = [];
+        foreach ($this->pushes() as $c) {
+            foreach ($devices as $name => $d) {
+                if ($c['url'] === $d['endpoint']) {
+                    $out[$name][] = self::decrypt((string) $c['body'], $d);
+                }
+            }
+        }
+        return $out;
+    }
+
+    private function respondAs(App $app, int $userId, string $eventId, string $status): void
+    {
+        $before = $this->users->current;
+        $this->users->current = $userId;
+        $res = $app->api()->handle(new Request('PUT', "/calendar/$eventId/response", [], ['status' => $status]));
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->users->current = $before;
+    }
+
+    public function testResponseReminderOnlyToThoseWithoutAnswer(): void
+    {
+        [$app, $devices, $create, $ids] = $this->responsesSetup();
+        // Heute 19.10.: Vorlauf 3 Tage → Termine am 22.10.; mit Anmeldeschluss am 20.10. (morgen) unabhängig vom Beginn
+        $work = $create(['title' => 'Arbeitsdienst', 'start_date' => '2026-10-22', 'start_time' => '10:00']);
+        $create(['title' => 'Fest', 'start_date' => '2026-10-28', 'respond_until' => '2026-10-20']);
+        $create(['title' => 'Später', 'start_date' => '2026-10-25']);
+        $create(['title' => 'Schluss vorbei', 'start_date' => '2026-10-22', 'respond_until' => '2026-10-18']);
+        $this->respondAs($app, $ids['anna'], $work, 'yes');
+        $app->push()->repository()->dequeue(array_column($app->push()->repository()->claim('9999-12-31 00:00:00', '9999-12-31 00:00:00', 100), 'id'));
+
+        $tz = new \DateTimeZone('Europe/Berlin');
+        $t = $app->pushTriggers();
+        $this->assertSame(0, $t->sendResponseReminders(new \DateTimeImmutable('2026-10-19 17:59', $tz)), 'vor der Uhrzeit nichts');
+        $this->assertSame(2, $t->sendResponseReminders(new \DateTimeImmutable('2026-10-19 18:05', $tz)));
+        $this->assertSame(0, $t->sendResponseReminders(new \DateTimeImmutable('2026-10-19 19:00', $tz)), 'nur einmal am Tag');
+        $msgs = $this->messagesTo($app, $devices);
+        $this->assertSame('Zu- oder absagen: Fest', $msgs['anna'][0]['title']);
+        $this->assertSame('Mi 28.10.2026 – Anmeldeschluss morgen. Du hast noch nicht zu- oder abgesagt.', $msgs['anna'][0]['body']);
+        $this->assertStringStartsWith('termine/termin/i', $msgs['anna'][0]['route']);
+        $this->assertSame(['Zu- oder absagen: 2 Termine', 'Arbeitsdienst · Fest. Du hast noch nicht zu- oder abgesagt.', 'termine'], [$msgs['ben'][0]['title'], $msgs['ben'][0]['body'], $msgs['ben'][0]['route']]);
+
+        // Ausgeschaltet: keine Erinnerung; Vorlauf einstellbar
+        $res = $app->api()->handle(new Request('PATCH', '/admin/settings', [], ['calendar_response_reminder' => '0']));
+        $this->assertFalse($res->data['calendar']['response_reminder']);
+        $this->assertSame(0, $t->sendResponseReminders(new \DateTimeImmutable('2026-10-21 18:05', $tz)));
+        $res = $app->api()->handle(new Request('PATCH', '/admin/settings', [], ['calendar_response_reminder' => '1', 'calendar_response_reminder_days' => 4]));
+        $this->assertSame([true, 4], [$res->data['calendar']['response_reminder'], $res->data['calendar']['response_reminder_days']]);
+        $this->assertSame(400, $app->api()->handle(new Request('PATCH', '/admin/settings', [], ['calendar_response_reminder_days' => 31]))->status);
+        $this->assertSame(2, $t->sendResponseReminders(new \DateTimeImmutable('2026-10-21 18:05', $tz)), 'Später (25.10.) an beide');
+    }
+
+    public function testDayBeforeReminderSkipsDeclinedEvents(): void
+    {
+        [$app, $devices, $create, $ids] = $this->responsesSetup();
+        $probe = $create(['title' => 'Probe', 'start_date' => '2026-10-20', 'start_time' => '19:00']);
+        $fest = $create(['title' => 'Fest', 'start_date' => '2026-10-20', 'start_time' => '20:00']);
+        $this->respondAs($app, $ids['anna'], $probe, 'no');
+        $this->respondAs($app, $ids['ben'], $probe, 'no');
+        $this->respondAs($app, $ids['ben'], $fest, 'no');
+        $app->push()->repository()->dequeue(array_column($app->push()->repository()->claim('9999-12-31 00:00:00', '9999-12-31 00:00:00', 100), 'id'));
+        $this->assertSame(1, $app->pushTriggers()->sendReminders(new \DateTimeImmutable('2026-10-19 18:05', new \DateTimeZone('Europe/Berlin'))));
+        $msgs = $this->messagesTo($app, $devices);
+        $this->assertSame('Morgen: Fest', $msgs['anna'][0]['title'], 'ohne die abgesagte Probe');
+        $this->assertArrayNotHasKey('ben', $msgs, 'alles abgesagt: keine Erinnerung');
     }
 
     public function testReminderForSeveralEventsOpensTheList(): void
