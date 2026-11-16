@@ -26,6 +26,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Bericht als PDF**: Unter [Verwaltung → Bericht](app:verwaltung/bericht) erstellst du eine PDF-Datei mit den Daten
+  mehrerer Bereiche für einen Zeitraum, z. B. für die Jahreshauptversammlung. Den Zeitraum wählst du mit _Von_ und _Bis_
+  oder der Schnellwahl (dieses Jahr, letztes Jahr, letzte 12 Monate), die Bereiche mit Haken. Enthalten sind die
+  Mitglieder (Stand heute; E-Mail, Telefon, Adresse und Geburtsdatum nur für alle, die persönliche Angaben sehen dürfen),
+  Punkte und Strafen mit Summen je Mitglied und allen Einträgen sowie die Anwesenheit je Mitglied und je Termin. Jede
+  Person sieht nur die Bereiche, die sie auch sonst verwalten darf; ein eigenes Recht gibt es nicht. Die Schrift ist im
+  PDF enthalten, damit auch Buchstaben wie „ł“ oder „č“ stimmen. Wer wann einen Bericht erstellt, steht im
+  Änderungsprotokoll (Zeitraum und Bereiche, ohne Inhalt).
 - **Eigene Leiste für Gäste**: Unter [Einstellungen → Navigation](app:einstellungen/navigation) wählst du oben
   _Für Angemeldete_ oder _Für Gäste_. Mit _Eigene Leiste für Gäste_ bekommen Gäste ihre eigene Reihenfolge, eigene
   Untermenüs und eigene ausgeblendete Bereiche, z. B. die Mitglieder unten in der Leiste statt unter „Intern“. Die Leiste

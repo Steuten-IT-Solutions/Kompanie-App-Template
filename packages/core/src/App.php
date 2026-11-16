@@ -14,6 +14,7 @@ use KompanieApp\Core\Domain\AttendanceService;
 use KompanieApp\Core\Domain\BackupEncryptionService;
 use KompanieApp\Core\Domain\BackupUploadService;
 use KompanieApp\Core\Domain\PersonalDataExport;
+use KompanieApp\Core\Domain\ReportService;
 use KompanieApp\Core\Domain\BirthdayService;
 use KompanieApp\Core\Domain\BoardMailService;
 use KompanieApp\Core\Domain\BoardService;
@@ -878,6 +879,12 @@ final class App
     public function personalData(): PersonalDataExport
     {
         return $this->service(PersonalDataExport::class, fn () => new PersonalDataExport($this));
+    }
+
+    /** Bericht als PDF: Daten mehrerer Bereiche für einen Zeitraum */
+    public function reports(): ReportService
+    {
+        return $this->service(ReportService::class, fn () => new ReportService($this));
     }
 
     /** Sicherungen automatisch in Google Drive */

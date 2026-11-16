@@ -16,6 +16,7 @@ Du siehst nur die Knöpfe, für die du das Recht hast und deren Bereich die Komp
 - **Mitglieder**: die Mitgliederliste mit der Seite jedes Mitglieds. Sie öffnet, wer {bereich.points} oder {bereich.penalties} vergibt, {bereich.ranks}, {bereich.titles} oder {bereich.attendance} pflegt, Mitglieder anlegt oder Rollen vergibt.
 - **Ehemalige**: ausgetretene, verstorbene und sonst ausgeschiedene Mitglieder (wer Ehemalige verwalten darf).
 - **Passive**: die interne Liste der passiven Mitglieder mit ihren Betreuern (wer Passive verwalten darf).
+- **Bericht**: die Daten mehrerer Bereiche für einen Zeitraum als PDF-Datei (wer einen dieser Bereiche verwalten darf).
 - **{bereich.points} +**: {bereich.points} vergeben.
 - **{bereich.penalties} +**: {bereich.penalties} eintragen.
 - **Beförderungen**: anstehende Beförderungen sehen (nur, wenn die Kompanie {bereich.ranks} und {bereich.points} nutzt).

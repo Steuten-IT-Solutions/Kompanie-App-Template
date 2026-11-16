@@ -469,6 +469,44 @@ export interface ChangeLogSettings {
   keep_max: number;
 }
 
+/** Bericht als PDF (Verwaltung → Bericht): ein Abschnitt zur Auswahl; dated false = ohne Zeitbezug (Stand heute) */
+export interface ReportSectionChoice {
+  key: string;
+  title: string;
+  dated: boolean;
+}
+
+export interface ReportColumn {
+  label: string;
+  /** Zahl: rechtsbündig */
+  num: boolean;
+  /** Langer Text (Grund, Adresse): bekommt den übrigen Platz und bricht um */
+  wrap: boolean;
+}
+
+export interface ReportTable {
+  /** Überschrift über der Tabelle; leer: keine */
+  title: string;
+  columns: ReportColumn[];
+  rows: string[][];
+  /** Hinweis statt der Tabelle, wenn sie leer ist */
+  empty: string;
+}
+
+export interface ReportSection extends ReportSectionChoice {
+  /** Breite Tabelle: Seite quer */
+  landscape: boolean;
+  tables: ReportTable[];
+}
+
+export interface Report {
+  from: string;
+  to: string;
+  /** Zeitpunkt des Abrufs in der Zeit der Kompanie (TT.MM.JJJJ, HH:MM) */
+  created: string;
+  sections: ReportSection[];
+}
+
 export interface ChangeLog extends ChangeLogSettings {
   from: string;
   to: string;
@@ -2770,6 +2808,9 @@ export const api = {
       ...(q.userId ? { user_id: String(q.userId) } : {}),
       ...(q.area ? { area: q.area } : {}),
     }),
+  reportSections: () => request<ReportSectionChoice[]>('GET', '/admin/report/sections'),
+  report: (q: { from: string; to: string; sections: string[] }) =>
+    request<Report>('GET', '/admin/report', undefined, { from: q.from, to: q.to, sections: q.sections.join(',') }),
   setChangeLogSettings: (data: Partial<Pick<ChangeLogSettings, 'enabled' | 'keep_days'>>) =>
     request<ChangeLogSettings>('PUT', '/admin/changes/settings', data),
   maintenance: () => request<MaintenanceState>('GET', '/admin/maintenance'),
