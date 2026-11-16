@@ -169,8 +169,11 @@ export interface AppConfig {
   newsInApp?: boolean;
   /** Interner Kalender wird in der App gepflegt (Quelle „In der App“); fehlt bei älteren Servern */
   calendarInApp?: boolean;
-  /** Vorschau „App als Rolle ansehen“ (Issue #63): vom Server bestätigt; role ist der Schlüssel oder @public */
-  preview?: { role: string; label: string } | null;
+  /**
+   * Vorschau „App als Rolle ansehen“ (Issue #63): vom Server bestätigt; role ist der Schlüssel, @public oder
+   * @person:<ID>. Als Person: label ist ihr Name, person ihre ID, roles ihre Rollen (Grundrolle, Zusatzrollen).
+   */
+  preview?: { role: string; label: string; person?: number; roles?: string[] } | null;
   /** Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen; null ohne den Bereich, fehlt bei älteren Servern */
   birthdays?: { upcomingDays: number } | null;
 }

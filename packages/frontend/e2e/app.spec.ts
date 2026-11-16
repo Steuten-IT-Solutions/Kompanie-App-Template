@@ -3520,9 +3520,21 @@ test('Zusatzrollen: Mitglied bekommt „Termine verwalten“ dazu, hat die Recht
   await openKonto(page);
   await expect(page.locator('.account-card').first()).toContainText('Rollen: Mitglied, Termine verwalten');
 
+  // Vorschau als Person (Grundrolle und Zusatzrolle zusammen): Banner mit Namen und Rollen, Beenden führt zurück.
   await login(page, 'admin', ADMIN_PASSWORD);
   await adminMenu(page, 'Mitglieder');
   await page.locator('.row', { hasText: 'Mitglied2' }).click();
+  await memberAccount(page);
+  await page.getByRole('button', { name: /^App als .*Mitglied2.* ansehen$/ }).click();
+  const banner = page.locator('.preview-banner');
+  await expect(banner).toHaveText(/Vorschau als .*Mitglied2.* \(Mitglied, Termine verwalten\) – nur ansehen/);
+  await expect(page.getByRole('button', { name: 'Meins' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Öffentliche Termine verwalten' })).toBeVisible();
+  await expect(page.locator('.tabbar').getByRole('button', { name: MANAGER })).toHaveCount(0);
+  await banner.getByRole('button', { name: 'Beenden' }).click();
+  await expect(banner).toHaveCount(0);
+  await expect(page.locator('.member-account')).toBeVisible();
+
   await memberAccount(page);
   await page.locator('.extra-roles').getByLabel('Termine verwalten').uncheck();
   await expect(page.locator('.toast')).toHaveText('Zusatzrolle entfernt: Termine verwalten');

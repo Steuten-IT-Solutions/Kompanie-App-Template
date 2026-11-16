@@ -141,6 +141,9 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
             <button type="button" className="btn btn-secondary btn-block" onClick={() => startPreview(PUBLIC_PREVIEW)}>
               App ohne Anmeldung ansehen
             </button>
+            <p className="muted small">
+              Die App mit allen Rollen einer bestimmten Person zusammen ansehen: auf ihrer Seite unter „Konto und Rolle“.
+            </p>
           </div>
         </>
       )}
