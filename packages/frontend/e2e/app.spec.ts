@@ -1283,7 +1283,7 @@ test('Eigene Leiste für Gäste: Mitglieder unten statt unter „Intern“, Ange
     await expect(card.getByLabel('Platz von Dokumente')).toHaveValue('main');
     await expect(card.getByLabel('Platz von Punktekatalog')).toHaveValue('hidden');
     expect((await smallestStackGap(card)).gap).toBeGreaterThanOrEqual(12);
-    await card.getByLabel('Für Gäste', { exact: true }).selectOption({ label: 'Mitglieder' });
+    await card.getByRole('combobox', { name: /^Für Gäste/ }).selectOption({ label: 'Mitglieder' });
     await card.getByRole('button', { name: 'Navigation speichern' }).click();
     await expect(page.getByText('Navigation gespeichert')).toBeVisible();
 
@@ -1318,7 +1318,7 @@ test('Navigation (Issue #362): Galerie umbenennen mit eigenem Symbol, Startseite
     // Erst das Symbol: Mit dem neuen Namen heißt auch die Zeile anders („Platz von Fotos“).
     await row.getByLabel('Symbol').selectOption({ label: 'Kamera' });
     await row.getByLabel('Eigener Name (leer = Standard)').fill('Fotos');
-    await card.getByLabel('Für Gäste', { exact: true }).selectOption({ label: 'Fotos' });
+    await card.getByRole('combobox', { name: /^Für Gäste/ }).selectOption({ label: 'Fotos' });
     await card.getByRole('button', { name: 'Navigation speichern' }).click();
     await expect(page.getByText('Navigation gespeichert')).toBeVisible();
     // Unverändert aus der Standardnavigation: Sie bleibt, nur mit dem neuen Namen.
