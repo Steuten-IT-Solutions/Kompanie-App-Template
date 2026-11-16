@@ -1432,6 +1432,15 @@ final class Api
                 $a->passives()->delete($r->id());
                 return ['deleted' => true];
             }, 'passive', $denyRights),
+            // Beitrag: je Passivem und Jahr eine Zahlung (Betrag, Datum, Zahlungsart); Jahresbeitrag und Zahlungsarten einrichten
+            new Route('GET', '/passive-members/settings', Cap::ManagePassive, fn () => $a->passives()->settings(), 'passive', $denyRights),
+            new Route('PATCH', '/passive-members/settings', Cap::ManagePassive, fn (Request $r) => $a->passives()->setSettings((array) $r->body), 'passive', $denyRights),
+            new Route('POST', '/passive-members/{id}/payments', Cap::ManagePassive, fn (Request $r) => Response::created($a->passives()->addPayment($this->user(), $r->id(), (array) $r->body)), 'passive', $denyRights),
+            new Route('PATCH', '/passive-payments/{id}', Cap::ManagePassive, fn (Request $r) => $a->passives()->updatePayment($this->user(), $r->id(), (array) $r->body), 'passive', $denyRights),
+            new Route('DELETE', '/passive-payments/{id}', Cap::ManagePassive, function (Request $r) use ($a) {
+                $a->passives()->deletePayment($r->id());
+                return ['deleted' => true];
+            }, 'passive', $denyRights),
             // Ehemalige Mitglieder: Liste, eintragen (Konto stilllegen, Daten bleiben), ändern, wieder aufnehmen, Import
             new Route('GET', '/members/former', Cap::ManageFormer, function () use ($a) {
                 $photos = $a->memberPhotos()->urls();

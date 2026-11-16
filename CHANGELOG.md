@@ -26,6 +26,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Beitrag der Passiven**: Unter [Verwaltung → Passive](app:verwaltung/passive) trägst du jetzt je Passivem und Jahr
+  ein, dass der Beitrag bezahlt ist, mit Betrag, Datum und Zahlungsart. Oben wählst du das Jahr, siehst, wie viele
+  bezahlt haben, und kannst nur die offenen oder nur die bezahlten zeigen. Einen Jahresbeitrag stellst du als Vorschlag
+  ein, er steht beim Eintragen schon im Feld; die Zahlungsarten zur Auswahl richtest du dort auch ein (vorgegeben
+  Bar, SEPA und PayPal). Eintragen darf, wer Passive verwaltet. Betreuer sehen unter
+  [Meins → Meine Passiven](app:meins/passive), ob der Beitrag für das laufende Jahr bezahlt ist.
 - **Titelbild eines Albums wählen**: Wer die Galerie verwalten darf, öffnet ein Bild in der Großansicht und tippt auf
   _Als Titelbild des Albums verwenden_. Dieses Bild steht dann in der Galerie-Übersicht für das Album, auch bei Alben aus
   Google Drive. Noch einmal getippt, wählt die App das Titelbild wieder selbst. Ist das gewählte Bild nur für Mitglieder,

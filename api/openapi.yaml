@@ -5179,6 +5179,9 @@ paths:
                         name: { type: string }
                   personal: { type: boolean, description: 'Sieht die Person Adresse, Telefon, E-Mail und Geburtsdatum (view_personal)?' }
                   manage_personal: { type: boolean, description: 'Darf die Person sie ändern (manage_personal)?' }
+                  fee_cents: { type: integer, description: 'Jahresbeitrag als Vorschlag beim Eintragen in Cent, 0 = keiner' }
+                  methods: { type: array, items: { type: string }, description: 'Zahlungsarten zur Auswahl' }
+                  year: { type: integer, description: 'Laufendes Jahr (Zeitzone der App)' }
         '403': { $ref: '#/components/responses/Error' }
     post:
       tags: [Verwaltung]
@@ -5241,6 +5244,111 @@ paths:
     delete:
       tags: [Verwaltung]
       summary: Einen Passiven löschen
+      x-capability: manage_passive
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /passive-members/settings:
+    get:
+      tags: [Verwaltung]
+      summary: Einstellungen der Beiträge der Passiven (Jahresbeitrag als Vorschlag, Zahlungsarten)
+      x-capability: manage_passive
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PassiveSettings' }
+        '403': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Verwaltung]
+      summary: Einstellungen der Beiträge ändern
+      description: |
+        Was fehlt, bleibt. `fee_cents`: 0, leer oder null heißt kein Vorschlag, sonst über 0 und höchstens 100000.
+        `methods`: Liste von Bezeichnungen (getrimmt, leere fallen weg), mindestens eine, höchstens 20, je höchstens 40
+        Zeichen, keine doppelt (sonst 400). Frühere Zahlungen behalten ihre Zahlungsart.
+      x-capability: manage_passive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fee_cents: { type: [integer, string, 'null'] }
+                methods: { type: array, items: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PassiveSettings' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /passive-members/{id}/payments:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Verwaltung]
+      summary: Zahlung des Beitrags eines Passiven für ein Jahr eintragen
+      description: |
+        Je Passivem und Jahr höchstens eine Zahlung (sonst 400). Jahr ab 1900, höchstens das nächste; Betrag über 0 und
+        höchstens 100000 Cent; Datum JJJJ-MM-TT, ab 1900, nicht in der Zukunft; Zahlungsart Pflicht (eine der eingerichteten).
+      x-capability: manage_passive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/PassivePaymentInput'
+                - required: [year, amount_cents, paid_on, method]
+      responses:
+        '201':
+          description: Eingetragen
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PassivePayment' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /passive-payments/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    patch:
+      tags: [Verwaltung]
+      summary: Zahlung eines Passiven ändern
+      description: Was fehlt, bleibt. Prüfungen wie beim Eintragen.
+      x-capability: manage_passive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PassivePaymentInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PassivePayment' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Verwaltung]
+      summary: Zahlung eines Passiven löschen
       x-capability: manage_passive
       responses:
         '200':
@@ -10611,6 +10719,32 @@ components:
         phone: { type: string, description: 'Leer, wenn keine hinterlegt ist' }
         email: { type: string, description: 'Leer, wenn keine hinterlegt ist' }
         birth_date: { type: [string, 'null'], format: date }
+        payments:
+          type: array
+          description: Gezahlte Beiträge, neuestes Jahr zuerst (auch für den Betreuer)
+          items: { $ref: '#/components/schemas/PassivePayment' }
+    PassivePayment:
+      type: object
+      required: [id, year, amount_cents, paid_on, method]
+      properties:
+        id: { type: integer }
+        year: { type: integer }
+        amount_cents: { type: integer }
+        paid_on: { type: string, format: date }
+        method: { type: string, description: 'Bezeichnung der Zahlungsart' }
+    PassivePaymentInput:
+      type: object
+      properties:
+        year: { type: integer, description: 'Ab 1900, höchstens das nächste Jahr' }
+        amount_cents: { type: integer, minimum: 1, maximum: 100000 }
+        paid_on: { type: string, format: date, description: 'JJJJ-MM-TT, nicht in der Zukunft' }
+        method: { type: string, description: 'Eine der eingerichteten Zahlungsarten; beim Ändern auch die bisherige' }
+    PassiveSettings:
+      type: object
+      required: [fee_cents, methods]
+      properties:
+        fee_cents: { type: integer, description: '0 = kein Vorschlag' }
+        methods: { type: array, items: { type: string }, description: 'Zahlungsarten zur Auswahl (vorgegeben Bar, SEPA, PayPal)' }
     PassiveInput:
       type: object
       description: Felder zum Anlegen und Ändern; persönliche Angaben (address, phone, email, birth_date) nur mit manage_personal.

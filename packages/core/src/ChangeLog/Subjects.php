@@ -81,6 +81,7 @@ final class Subjects
         '/admin/backup/drive' => ['enabled' => 'Automatisch sichern'],
         '/admin/backup/server' => ['enabled' => 'Automatisch sichern'],
         '/admin/former/retention' => ['years' => 'Frist (Jahre)'],
+        '/passive-members/settings' => ['fee_cents' => 'Jahresbeitrag (Vorschlag, Cent)', 'methods' => 'Zahlungsarten'],
         '/admin/website' => ['home_page_title' => 'Startseite der Webseite', 'entry.state' => 'Einstiegsdatei'],
     ];
 
@@ -232,6 +233,7 @@ final class Subjects
             'PUT /admin/backup/encryption' => $this->event('Einstellungen', 'Verschlüsselung der Sicherung', 'update'),
             'DELETE /admin/backup/encryption' => $this->event('Einstellungen', 'Verschlüsselung der Sicherung', 'delete'),
             'PUT /admin/former/retention' => $this->settings('Aufbewahrungsfrist für Ehemalige', '/admin/former/retention'),
+            'PATCH /passive-members/settings' => $this->settings('Beiträge der Passiven', '/passive-members/settings'),
             'PUT /admin/activity/settings' => $this->value('Nutzung', 'Erfassung je Person', fn (): bool => $this->app->activity()->personal()),
             'PUT /admin/changes/settings' => $this->values('Änderungsprotokoll', fn (): array => [
                 'Änderungen protokollieren' => $this->app->changeLog()->enabled(),
@@ -302,6 +304,9 @@ final class Subjects
             'postal_code' => 'Postleitzahl', 'city' => 'Ort', 'country' => 'Land', 'country_name' => 'Land (Name)', 'phone' => 'Telefon', 'email' => 'E-Mail',
             'birth_date' => 'Geburtsdatum', 'caretaker_id' => ['Betreuer', 'user'],
         ], personal: ['street', 'house_number', 'address_extra', 'postal_code', 'city', 'country', 'country_name', 'phone', 'email', 'birth_date']);
+        $passivePayments = $this->spec('Beitrag eines Passiven', 'passive_payments', fn (array $r): string => trim($this->lookup('passive_members', 'first_name', $r['passive_id']) . ' ' . $this->lookup('passive_members', 'last_name', $r['passive_id'])) . ' ' . $r['year'], [
+            'year' => 'Jahr', 'amount_cents' => ['Betrag', 'cents'], 'paid_on' => 'Bezahlt am', 'method' => 'Zahlungsart',
+        ]);
         $sponsors = $this->spec('Sponsor', 'sponsors', 'name', ['name' => 'Name', 'url' => 'Link', 'logo_version' => ['Logo', 'secret']]);
         $companies = $this->spec('Kompanie', 'companies', 'name', [
             'name' => 'Name', 'short_name' => 'Kurzname', 'founded_year' => 'Gegründet', 'description' => 'Beschreibung', 'website_url' => 'Webseite',
@@ -357,6 +362,7 @@ final class Subjects
             [$pages, 'POST /pages', 'PATCH /pages/{id}', 'DELETE /pages/{id}'],
             [$sponsors, 'POST /sponsors', 'PATCH /sponsors/{id}', 'DELETE /sponsors/{id}'],
             [$passives, 'POST /passive-members', 'PATCH /passive-members/{id}', 'DELETE /passive-members/{id}'],
+            [$passivePayments, 'POST /passive-members/{id}/payments', 'PATCH /passive-payments/{id}', 'DELETE /passive-payments/{id}'],
             [$companies, 'POST /companies', 'PATCH /companies/{id}', 'DELETE /companies/{id}'],
             [$lists, 'POST /lists', 'PUT /lists/{id}', 'DELETE /lists/{id}'],
             [$documents, 'POST /documents', 'PATCH /documents/{id}', 'DELETE /documents/{id}'],

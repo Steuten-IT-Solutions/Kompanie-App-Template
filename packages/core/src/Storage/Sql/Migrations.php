@@ -2049,6 +2049,40 @@ WHERE title IS NULL",
                     'ALTER TABLE {albums} ADD COLUMN cover_photo_id INTEGER DEFAULT NULL',
                 ],
             ],
+            // Beitrag der Passiven: je Passivem und Jahr höchstens eine Zahlung mit Betrag, Datum und Zahlungsart
+            65 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {passive_payments} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  passive_id bigint(20) unsigned NOT NULL,
+  year smallint(5) unsigned NOT NULL,
+  amount_cents int(11) NOT NULL,
+  paid_on date NOT NULL,
+  method varchar(40) NOT NULL DEFAULT \'\',
+  created_by bigint(20) unsigned NOT NULL,
+  created_at datetime NOT NULL,
+  updated_by bigint(20) unsigned NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY passive_year (passive_id, year)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {passive_payments} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  passive_id INTEGER NOT NULL,
+  year INTEGER NOT NULL,
+  amount_cents INTEGER NOT NULL,
+  paid_on TEXT NOT NULL,
+  method TEXT NOT NULL DEFAULT \'\',
+  created_by INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_by INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {passive_payments}_passive_year ON {passive_payments} (passive_id, year)',
+                ],
+            ],
         ];
     }
 
