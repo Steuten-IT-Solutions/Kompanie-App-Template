@@ -16,7 +16,19 @@ import { focusId } from './focus';
 import { AdminBack, adminTabs } from './adminNav';
 import { MenuBack, InternMenu } from './internNav';
 import { targetIcons, targetLabels } from './navLabels';
-import { buildNav, isPageTarget, menuOf, pageTarget, startOf, tabbarClass, viewPath, type NavEntry, type NavTarget } from './navigation';
+import {
+  buildNav,
+  isGuestView,
+  isPageTarget,
+  navigationFor,
+  menuOf,
+  pageTarget,
+  startOf,
+  tabbarClass,
+  viewPath,
+  type NavEntry,
+  type NavTarget,
+} from './navigation';
 import { helpSlug } from './helpSlug';
 import { setReportOrigin } from './lastError';
 import { shareLink, shareUrl } from './share';
@@ -438,7 +450,9 @@ export default function App({ notice = null }: { notice?: string | null }) {
   };
   // Tab-Leiste: eingerichtet (Einstellungen → Navigation, Issue #277) oder die Standardnavigation; nur, was die Person
   // sehen darf. Das Brett zum Lesen (view_board); wer schreibt, hat es außerdem in der Verwaltung.
-  const navEntries = buildNav(config?.navigation, {
+  // Gäste (ohne Anmeldung oder mit der Grundrolle Gast, auch in der Vorschau) haben ggf. eine eigene Leiste und Startseite.
+  const guestView = isGuestView(user);
+  const navEntries = buildNav(navigationFor(config, guestView), {
     // Eigene Seiten (Issue #287): jede, die die Person lesen darf (/config), als eigener Punkt
     visible: (t: NavTarget) =>
       t === 'brett' ? boardVisible() : isPageTarget(t) ? allowed.seiten && pageIds.has(Number(t.slice(7))) : allowed[t],
@@ -461,7 +475,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
   allowed.menue = requested === 'menue' && navEntries.some((e) => e.key === `menue/${path[1]}`);
   // Startseite (Issue #362): eingestellt für Gäste bzw. Angemeldete, wenn sie in der Leiste der Person steht, sonst der
   // erste Punkt. Neue Installation ohne Bereiche: Der Admin landet direkt in der Einrichtung.
-  const startKey = startOf(tabs, user ? config?.navigation_start?.member : config?.navigation_start?.guest);
+  const startKey = startOf(tabs, guestView ? config?.navigation_start?.guest : config?.navigation_start?.member);
   const start: string = startKey ?? (config?.setupPending && allowed.einrichtung ? 'einrichtung' : 'installieren');
   // Tab der Startseite (bei einem Bereich in einem Untermenü das Untermenü): Begrüßung und Hinweise stehen dort.
   const homeTab = tabs.find((t) => t.key === startKey || t.children?.includes(startKey as NavTarget))?.key;

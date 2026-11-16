@@ -19,6 +19,10 @@ use KompanieApp\Core\Port\Settings;
  * {label, icon, items}; hidden sind Bereiche, die nicht in der Navigation stehen. Bereiche, die in keiner der beiden
  * Listen vorkommen (z. B. mit einer neuen Version dazugekommen), hängt die App hinten an die Tab-Leiste an.
  *
+ * Eine zweite Leiste für Gäste (GUEST, gleiche Form): Sie gilt ohne Anmeldung und für Angemeldete mit der Grundrolle Gast
+ * (z. B. ehemalige Mitglieder), auch in der Vorschau. Ohne sie (null) sehen Gäste dieselbe Leiste wie die Angemeldeten.
+ * Beide Leisten sind unabhängig: Jede kann eigen sein oder (bei den Angemeldeten) die Standardnavigation.
+ *
  * Dazu (Issue #362), je in einer eigenen Einstellung, damit sie auch in der Standardnavigation gelten:
  * - eigene Namen und Symbole je Bereich, eigene Seite und „Intern“ (NAMES): Der Name gilt überall, wo die App den Bereich
  *   nennt (sectionOverrides → KompanieConfig::sectionLabel), bei eigenen Seiten nur im Tab (ihr Titel bleibt);
@@ -33,6 +37,8 @@ use KompanieApp\Core\Port\Settings;
 final class NavigationService
 {
     public const SETTING = 'navigation';
+    /** Eigene Leiste für Gäste; fehlt = dieselbe wie für Angemeldete. */
+    public const GUEST = 'navigation_guest';
     public const NAMES = 'navigation_names';
     public const START = 'navigation_start';
     public const LABELS = 'navigation_labels';
@@ -103,7 +109,15 @@ final class NavigationService
         if (in_array($id, $start, true)) {
             $this->saveStart(array_filter($start, static fn (string $t): bool => $t !== $id));
         }
-        $nav = $this->get();
+        foreach ([self::SETTING, self::GUEST] as $key) {
+            $this->removeFrom($key, $id);
+        }
+    }
+
+    /** Eine eigene Seite aus einer der beiden gespeicherten Navigationen nehmen. */
+    private function removeFrom(string $key, string $id): void
+    {
+        $nav = $this->read($key);
         if ($nav === null) {
             return;
         }
@@ -122,7 +136,7 @@ final class NavigationService
         }
         $hidden = array_values(array_filter($nav['hidden'], static fn (string $t): bool => $t !== $id));
         if ($items !== $nav['items'] || $hidden !== $nav['hidden']) {
-            $this->settings->set(self::SETTING, ['items' => $items, 'hidden' => $hidden]);
+            $this->settings->set($key, ['items' => $items, 'hidden' => $hidden]);
         }
     }
 
@@ -133,7 +147,25 @@ final class NavigationService
      */
     public function get(): ?array
     {
-        $raw = $this->settings->get(self::SETTING);
+        return $this->read(self::SETTING);
+    }
+
+    /**
+     * Gespeicherte Leiste für Gäste; null = dieselbe wie für Angemeldete.
+     *
+     * @return array{items: list<string|array{label: string, icon: string, items: list<string>}>, hidden: list<string>}|null
+     */
+    public function guest(): ?array
+    {
+        return $this->read(self::GUEST);
+    }
+
+    /**
+     * @return array{items: list<string|array{label: string, icon: string, items: list<string>}>, hidden: list<string>}|null
+     */
+    private function read(string $key): ?array
+    {
+        $raw = $this->settings->get($key);
         if (!is_array($raw) || !is_array($raw['items'] ?? null)) {
             return null;
         }
@@ -157,12 +189,13 @@ final class NavigationService
     }
 
     /**
-     * @return array{navigation: array<string, mixed>|null, names: array<string, array{label?: string, icon?: string}>|\stdClass, start: array{guest?: string, member?: string}|\stdClass, show_labels: bool, intern_order: list<string>, admin_order: array{start?: list<string>, setup?: list<string>}|\stdClass, targets: list<string>, icons: list<string>, max_menu_items: int, label_max: int}
+     * @return array{navigation: array<string, mixed>|null, guest_navigation: array<string, mixed>|null, names: array<string, array{label?: string, icon?: string}>|\stdClass, start: array{guest?: string, member?: string}|\stdClass, show_labels: bool, intern_order: list<string>, admin_order: array{start?: list<string>, setup?: list<string>}|\stdClass, targets: list<string>, icons: list<string>, max_menu_items: int, label_max: int}
      */
     public function describe(): array
     {
         return [
             'navigation' => $this->get(),
+            'guest_navigation' => $this->guest(),
             // Leer als Objekt ({}), wie in api/openapi.yaml
             'names' => $this->names() === [] ? new \stdClass() : $this->names(),
             'start' => $this->start() === [] ? new \stdClass() : $this->start(),
@@ -288,10 +321,11 @@ final class NavigationService
     }
 
     /**
-     * Speichert Einstellungen → Navigation (Issue #362): die Navigation (null = Standard) und, falls angegeben, eigene
-     * Namen und Symbole, Startseiten und die Namen in der Leiste. Startseiten prüft das gegen die neue Navigation.
+     * Speichert Einstellungen → Navigation (Issue #362): die Navigation (null = Standard) und, falls angegeben, die Leiste
+     * für Gäste (null = wie für Angemeldete), eigene Namen und Symbole, Startseiten und die Namen in der Leiste.
+     * Startseiten prüft das gegen die neuen Leisten. Ist etwas ungültig, bleibt alles, wie es war.
      *
-     * @param array<mixed> $body navigation (Pflicht), names?, start?, show_labels?, intern_order?, admin_order?
+     * @param array<mixed> $body navigation (Pflicht), guest_navigation?, names?, start?, show_labels?, intern_order?, admin_order?
      * @return array<string, mixed> wie describe()
      */
     public function save(array $body): array
@@ -302,7 +336,14 @@ final class NavigationService
         $names = array_key_exists('names', $body) ? $this->validNames($body['names']) : null;
         $internOrder = array_key_exists('intern_order', $body) ? self::validInternOrder($body['intern_order']) : null;
         $adminOrder = array_key_exists('admin_order', $body) ? self::validAdminOrder($body['admin_order']) : null;
-        $this->set($body['navigation']);
+        $navigation = self::validNavigation($body['navigation']);
+        $guest = array_key_exists('guest_navigation', $body) ? self::validNavigation($body['guest_navigation']) : $this->guest();
+        $start = array_key_exists('start', $body) ? self::validStart($body['start'], $navigation, $guest) : null;
+        if (array_key_exists('show_labels', $body) && !is_bool($body['show_labels'])) {
+            throw ApiError::invalid('show_labels muss true oder false sein.');
+        }
+        $this->store(self::SETTING, $navigation);
+        $this->store(self::GUEST, $guest);
         if ($internOrder !== null) {
             $this->saveInternOrder($internOrder);
         }
@@ -312,13 +353,10 @@ final class NavigationService
         if ($names !== null) {
             $this->saveNames($names);
         }
-        if (array_key_exists('start', $body)) {
-            $this->saveStart($this->validStart($body['start']));
+        if ($start !== null) {
+            $this->saveStart($start);
         }
         if (array_key_exists('show_labels', $body)) {
-            if (!is_bool($body['show_labels'])) {
-                throw ApiError::invalid('show_labels muss true oder false sein.');
-            }
             $body['show_labels'] ? $this->settings->delete(self::LABELS) : $this->settings->set(self::LABELS, self::LABELS_OFF);
         }
         return $this->describe();
@@ -425,12 +463,14 @@ final class NavigationService
     }
 
     /**
-     * Startseiten müssen in der (eben gespeicherten) Navigation stehen: nicht ausgeblendet, ein vorhandenes Untermenü,
-     * „Intern“ nur in der Standardnavigation, „Meins“ nur für Angemeldete.
+     * Startseiten müssen in der Leiste ihrer Gruppe stehen (Gäste: ihre eigene, sonst die der Angemeldeten): nicht
+     * ausgeblendet, ein vorhandenes Untermenü, „Intern“ nur in der Standardnavigation, „Meins“ nur für Angemeldete.
      *
+     * @param array<string, mixed>|null $navigation Leiste der Angemeldeten (null = Standard)
+     * @param array<string, mixed>|null $guestNav Leiste der Gäste (null = wie Angemeldete)
      * @return array{guest?: string, member?: string}
      */
-    private function validStart(mixed $start): array
+    private static function validStart(mixed $start, ?array $navigation, ?array $guestNav): array
     {
         if ($start === null) {
             return [];
@@ -438,21 +478,21 @@ final class NavigationService
         if (!is_array($start)) {
             throw ApiError::invalid('Die Startseite muss ein Objekt sein (guest, member).');
         }
-        $nav = $this->get();
-        $menus = $nav === null ? 0 : count(array_filter($nav['items'], 'is_array'));
         $out = [];
         foreach (['guest', 'member'] as $who) {
             $t = $start[$who] ?? null;
             if ($t === null || $t === '') {
                 continue;
             }
+            $nav = $who === 'guest' ? ($guestNav ?? $navigation) : $navigation;
+            $menus = $nav === null ? 0 : count(array_filter($nav['items'], 'is_array'));
             $ok = is_string($t) && self::isStart($t, $who === 'member');
             if ($ok && $t === self::INTERN) {
                 $ok = $nav === null;
             } elseif ($ok && str_starts_with($t, 'menue/')) {
                 $ok = (int) substr($t, 6) <= $menus;
             } elseif ($ok && $nav !== null) {
-                $ok = !in_array($t, $nav['hidden'], true);
+                $ok = !in_array($t, is_array($nav['hidden'] ?? null) ? $nav['hidden'] : [], true);
             }
             if (!$ok) {
                 throw ApiError::invalid('Als Startseite geht nur ein Punkt, der in der Navigation steht.');
@@ -481,9 +521,25 @@ final class NavigationService
      */
     public function set(mixed $navigation): array
     {
+        $this->store(self::SETTING, self::validNavigation($navigation));
+        return $this->describe();
+    }
+
+    /** @param array<string, mixed>|null $navigation geprüft (validNavigation); null löscht die Einstellung */
+    private function store(string $key, ?array $navigation): void
+    {
+        $navigation === null ? $this->settings->delete($key) : $this->settings->set($key, $navigation);
+    }
+
+    /**
+     * Prüft eine Navigation (für Angemeldete oder Gäste); null bleibt null.
+     *
+     * @return array{items: list<string|array{label: string, icon: string, items: list<string>}>, hidden: list<string>}|null
+     */
+    private static function validNavigation(mixed $navigation): ?array
+    {
         if ($navigation === null) {
-            $this->settings->delete(self::SETTING);
-            return $this->describe();
+            return null;
         }
         if (!is_array($navigation) || !is_array($navigation['items'] ?? null) || !array_is_list($navigation['items'])) {
             throw ApiError::invalid('Die Navigation braucht eine Liste der Hauptpunkte.');
@@ -530,7 +586,6 @@ final class NavigationService
         if (!is_array($hidden) || !array_is_list($hidden)) {
             throw ApiError::invalid('Die ausgeblendeten Bereiche müssen eine Liste sein.');
         }
-        $this->settings->set(self::SETTING, ['items' => $items, 'hidden' => array_map($target, $hidden)]);
-        return $this->describe();
+        return ['items' => $items, 'hidden' => array_map($target, $hidden)];
     }
 }

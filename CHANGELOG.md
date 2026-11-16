@@ -26,6 +26,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Eigene Leiste für Gäste**: Unter [Einstellungen → Navigation](app:einstellungen/navigation) wählst du oben
+  _Für Angemeldete_ oder _Für Gäste_. Mit _Eigene Leiste für Gäste_ bekommen Gäste ihre eigene Reihenfolge, eigene
+  Untermenüs und eigene ausgeblendete Bereiche, z. B. die Mitglieder unten in der Leiste statt unter „Intern“. Die Leiste
+  beginnt als Kopie der Leiste für Angemeldete, in der Mitglieder und Dokumente schon unten stehen. Gäste sind alle ohne
+  Anmeldung und Angemeldete mit der Grundrolle Gast (z. B. ehemalige Mitglieder); für sie gilt auch die Startseite der
+  Gäste, ebenso in der Vorschau als Gast. Ohne eigene Leiste sehen Gäste wie bisher dieselbe Leiste wie Angemeldete.
+  Namen und Symbole gelten für beide Leisten. Was jemand sehen darf, regeln weiter die Rechte.
 - **App als Person ansehen**: Neben der Vorschau als Rolle siehst du die App jetzt auch so, wie eine bestimmte Person
   sie sieht, mit allen ihren Rollen zusammen (Grundrolle, Zusatzrollen und einzeln gegebene oder entzogene Rechte). Du
   startest sie auf der Seite der Person in der [Verwaltung → Mitglieder](app:verwaltung/mitglieder) unter _Konto und

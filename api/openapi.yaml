@@ -6344,7 +6344,9 @@ paths:
         Die Zahl der Hauptpunkte ist frei (Issue #362). names, start und show_labels sind optional; fehlen sie, bleiben sie,
         wie sie sind. Die App setzt mit „Standardnavigation wiederherstellen“ alles zurück (navigation null, names {}, start {}, show_labels true,
         intern_order null). Ebenso optional: intern_order (Reihenfolge in „Intern“ der Standardnavigation) und admin_order
-        (Reihenfolge der Kacheln der Verwaltung); null bzw. leer = Standardreihenfolge.
+        (Reihenfolge der Kacheln der Verwaltung); null bzw. leer = Standardreihenfolge. guest_navigation (optional) ist die
+        eigene Leiste für Gäste; null = dieselbe wie für Angemeldete, fehlt = unverändert. Die Startseite der Gäste muss in
+        deren Leiste stehen (ohne eigene: in der für Angemeldete). Ist etwas ungültig, bleibt alles, wie es war.
       x-capability: manage_settings
       requestBody:
         required: true
@@ -6356,6 +6358,11 @@ paths:
               properties:
                 navigation:
                   description: null stellt die Standardnavigation wieder her
+                  oneOf:
+                    - $ref: '#/components/schemas/Navigation'
+                    - type: 'null'
+                guest_navigation:
+                  description: Eigene Leiste für Gäste; null = dieselbe wie für Angemeldete
                   oneOf:
                     - $ref: '#/components/schemas/Navigation'
                     - type: 'null'
@@ -8858,10 +8865,15 @@ components:
           items: { type: string, enum: [katalog, dienstgrade, titel, aemter, kompanien, sponsoren, seiten, webseite] }
     NavigationAdmin:
       type: object
-      required: [navigation, names, start, show_labels, intern_order, admin_order, targets, icons, max_menu_items, label_max]
+      required: [navigation, guest_navigation, names, start, show_labels, intern_order, admin_order, targets, icons, max_menu_items, label_max]
       properties:
         navigation:
           description: Gespeicherte Navigation; null = Standardnavigation
+          oneOf:
+            - $ref: '#/components/schemas/Navigation'
+            - type: 'null'
+        guest_navigation:
+          description: Eigene Leiste für Gäste (ohne Anmeldung und Grundrolle Gast); null = dieselbe wie für Angemeldete
           oneOf:
             - $ref: '#/components/schemas/Navigation'
             - type: 'null'
@@ -9470,7 +9482,12 @@ components:
           }
         maintenance: { $ref: '#/components/schemas/MaintenanceInfo' }
         navigation:
-          description: 'Einrichtbare Navigation (Issue #277, Einstellungen → Navigation), für alle; null = Standardnavigation'
+          description: 'Einrichtbare Navigation (Issue #277, Einstellungen → Navigation), für Angemeldete und ohne eigene Leiste für Gäste auch für sie; null = Standardnavigation'
+          oneOf:
+            - $ref: '#/components/schemas/Navigation'
+            - type: 'null'
+        navigation_guest:
+          description: 'Eigene Leiste für Gäste: ohne Anmeldung und mit der Grundrolle Gast (auch in der Vorschau); null = dieselbe wie navigation'
           oneOf:
             - $ref: '#/components/schemas/Navigation'
             - type: 'null'
