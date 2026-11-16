@@ -1,15 +1,195 @@
 import { useState, type FormEvent } from 'react';
-import { api, type PassiveInput, type PassiveList, type PassiveMember } from '../api';
+import { api, type PassiveInput, type PassiveList, type PassiveMember, type PassivePayment, type PaymentMethod } from '../api';
 import { addressInput, EMPTY_ADDRESS, formatAddress, mapLinkTarget, mapPlatform, mapUrl, type Address } from '../address';
 import { normalizeEmail } from '../email';
 import { normalizePhone } from '../phone';
 import { formatBirthday } from '../birthdays';
-import { todayYmd } from '../format';
+import { formatDate, formatEuro, parseEuroToCents, todayYmd } from '../format';
 import { AddressFields, EmailField, Empty, ErrorBox, Loading, PhoneField, useAsync } from '../ui';
 import { IconButton } from '../icons';
 import { confirmAsk } from '../ask';
 
 const NAME_MAX = 100;
+/** Höchster Betrag einer Zahlung (wie auf dem Server) */
+const MAX_CENTS = 100000;
+
+/** Zahlungsarten mit Bezeichnung (wie auf dem Server) */
+const METHODS: Record<PaymentMethod, string> = { cash: 'Bar', sepa: 'SEPA', paypal: 'PayPal' };
+
+/** Betrag in Cent als Text fürs Eingabefeld, z. B. 2400 → „24,00“ */
+function centsText(cents: number): string {
+  return (cents / 100).toFixed(2).replace('.', ',');
+}
+
+/** Betrag aus dem Feld prüfen: Cent oder Fehlermeldung */
+function parseAmount(text: string): number | string {
+  const cents = parseEuroToCents(text);
+  if (cents === null || cents <= 0) return 'Bitte einen gültigen Betrag angeben, z. B. 24,00.';
+  if (cents > MAX_CENTS) return 'Der Betrag darf höchstens 1.000 € sein.';
+  return cents;
+}
+
+/** Zahlung eines Jahres oder undefined */
+function paymentOf(p: PassiveMember, year: number): PassivePayment | undefined {
+  return p.payments?.find((x) => x.year === year);
+}
+
+/** „Beitrag 2026: 24,00 €, bezahlt am 03.02.2026“ bzw. „Beitrag 2026: offen“ */
+function PaymentLine({ year, payment }: { year: number; payment: PassivePayment | undefined }) {
+  return payment ? (
+    <span>
+      Beitrag {year}: <span className="pos">{formatEuro(payment.amount_cents)}</span>, bezahlt am {formatDate(payment.paid_on)}
+      {METHODS[payment.method] ? ` (${METHODS[payment.method]})` : ''}
+    </span>
+  ) : (
+    <span>
+      Beitrag {year}: <span className="neg">offen</span>
+    </span>
+  );
+}
+
+/** Zahlung eintragen oder ändern: Betrag (Vorschlag: Jahresbeitrag) und Datum (Vorschlag: heute). */
+function PaymentForm({
+  year,
+  payment,
+  feeCents,
+  busy,
+  onSave,
+  onDelete,
+  onCancel,
+}: {
+  year: number;
+  payment: PassivePayment | undefined;
+  feeCents: number;
+  busy: boolean;
+  onSave: (amountCents: number, paidOn: string, method: PaymentMethod) => void;
+  onDelete: () => void;
+  onCancel: () => void;
+}) {
+  const [amount, setAmount] = useState(payment ? centsText(payment.amount_cents) : feeCents > 0 ? centsText(feeCents) : '');
+  const [date, setDate] = useState(payment?.paid_on ?? todayYmd());
+  const [method, setMethod] = useState<PaymentMethod | ''>(payment && METHODS[payment.method] ? payment.method : '');
+  const [error, setError] = useState<string | null>(null);
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    const cents = parseAmount(amount);
+    if (typeof cents === 'string') return setError(cents);
+    if (method === '') return setError('Bitte die Zahlungsart wählen.');
+    setError(null);
+    onSave(cents, date, method);
+  }
+  return (
+    <form className="form passive-payment-form" onSubmit={submit}>
+      <h4>Beitrag {year}</h4>
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="field-row">
+        <label className="field">
+          <span>Betrag in €</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            placeholder="24,00"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+            autoFocus
+          />
+        </label>
+        <label className="field">
+          <span>Bezahlt am</span>
+          <input type="date" min="1900-01-01" max={todayYmd()} value={date} onChange={(e) => setDate(e.target.value)} required />
+        </label>
+      </div>
+      <label className="field">
+        <span>Zahlungsart</span>
+        <select value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod | '')} required>
+          <option value="">bitte wählen</option>
+          {(Object.keys(METHODS) as PaymentMethod[]).map((m) => (
+            <option key={m} value={m}>
+              {METHODS[m]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="button-row">
+        <button className="btn" type="submit" disabled={busy}>
+          {busy ? 'Speichert …' : 'Speichern'}
+        </button>
+        <button className="btn btn-secondary" type="button" onClick={onCancel} disabled={busy}>
+          Abbrechen
+        </button>
+        {payment && (
+          <button className="btn btn-danger" type="button" onClick={onDelete} disabled={busy}>
+            Zahlung löschen
+          </button>
+        )}
+      </div>
+    </form>
+  );
+}
+
+/** Jahresbeitrag als Vorschlag beim Eintragen: anzeigen und ändern. */
+function FeeSetting({ feeCents, busy, onSave }: { feeCents: number; busy: boolean; onSave: (cents: number) => Promise<boolean> }) {
+  const [editing, setEditing] = useState(false);
+  const [amount, setAmount] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    let cents = 0;
+    if (amount.trim() !== '') {
+      const parsed = parseAmount(amount);
+      if (typeof parsed === 'string') return setError(parsed);
+      cents = parsed;
+    }
+    setError(null);
+    if (await onSave(cents)) setEditing(false);
+  }
+  if (!editing) {
+    return (
+      <p className="small passive-fee-setting">
+        Jahresbeitrag (Vorschlag): {feeCents > 0 ? formatEuro(feeCents) : <span className="muted">keiner</span>}{' '}
+        <button
+          type="button"
+          className="link-button"
+          onClick={() => {
+            setAmount(feeCents > 0 ? centsText(feeCents) : '');
+            setError(null);
+            setEditing(true);
+          }}
+        >
+          {feeCents > 0 ? 'Ändern' : 'Festlegen'}
+        </button>
+      </p>
+    );
+  }
+  return (
+    <form className="form card" onSubmit={submit}>
+      <h3>Jahresbeitrag</h3>
+      <p className="small muted">Steht beim Eintragen einer Zahlung schon im Feld und lässt sich dort ändern. Leer heißt kein Vorschlag.</p>
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+      <label className="field">
+        <span>Betrag in €</span>
+        <input type="text" inputMode="decimal" placeholder="24,00" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus />
+      </label>
+      <div className="button-row">
+        <button className="btn" type="submit" disabled={busy}>
+          {busy ? 'Speichert …' : 'Speichern'}
+        </button>
+        <button className="btn btn-secondary" type="button" onClick={() => setEditing(false)} disabled={busy}>
+          Abbrechen
+        </button>
+      </div>
+    </form>
+  );
+}
 
 /** Geburtsdatum JJJJ-MM-TT als TT.MM.JJJJ */
 function birthText(ymd: string): string {
@@ -195,6 +375,9 @@ function PassiveForm({
 export function PassiveAdmin({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload } = useAsync(() => api.passiveMembers(), [], 'passive-members');
   const [editing, setEditing] = useState<number | 'new' | null>(null);
+  const [paying, setPaying] = useState<number | null>(null);
+  const [yearChoice, setYearChoice] = useState<number | null>(null);
+  const [show, setShow] = useState<'all' | 'open' | 'paid'>('all');
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -206,9 +389,12 @@ export function PassiveAdmin({ onToast }: { onToast: (msg: string) => void }) {
       await action();
       onToast(msg);
       setEditing(null);
+      setPaying(null);
       reload();
+      return true;
     } catch (e) {
       setFormError((e as Error).message);
+      return false;
     } finally {
       setBusy(false);
     }
@@ -217,8 +403,18 @@ export function PassiveAdmin({ onToast }: { onToast: (msg: string) => void }) {
   if (loading && !data) return <Loading shape="people" />;
   if (error || !data) return <ErrorBox message={error ?? 'Die Passiven konnten nicht geladen werden.'} onRetry={reload} />;
   const q = query.trim().toLowerCase();
+  const current = data.year ?? Number(todayYmd().slice(0, 4));
+  const year = yearChoice ?? current;
+  const feeCents = data.fee_cents ?? 0;
+  // Wählbar: nächstes Jahr (Vorauszahlung) bis fünf Jahre zurück, dazu jedes Jahr mit einer Zahlung
+  const paidYears = data.passives.flatMap((p) => (p.payments ?? []).map((x) => x.year));
+  const oldest = Math.min(current - 4, ...paidYears);
+  const years = Array.from({ length: current + 1 - oldest + 1 }, (_, i) => current + 1 - i);
+  const paidCount = data.passives.filter((p) => paymentOf(p, year)).length;
   const list = data.passives.filter(
-    (p) => q === '' || `${p.first_name} ${p.last_name} ${p.caretaker?.name ?? ''}`.toLowerCase().includes(q),
+    (p) =>
+      (q === '' || `${p.first_name} ${p.last_name} ${p.caretaker?.name ?? ''}`.toLowerCase().includes(q)) &&
+      (show === 'all' || (show === 'paid') === (paymentOf(p, year) !== undefined)),
   );
   const errorBox = formError && (
     <p className="form-error" role="alert">
@@ -230,7 +426,10 @@ export function PassiveAdmin({ onToast }: { onToast: (msg: string) => void }) {
     <div>
       <p className="small muted member-counts" role="status">
         {data.passives.length === 1 ? '1 Passiver' : `${data.passives.length} Passive`}
+        {data.passives.length > 0 && `, Beitrag ${year}: ${paidCount} bezahlt, ${data.passives.length - paidCount} offen`}
       </p>
+      {editing === null && paying === null && errorBox}
+      <FeeSetting feeCents={feeCents} busy={busy} onSave={(cents) => run(() => api.setPassiveFee(cents), 'Jahresbeitrag gespeichert')} />
       {editing === 'new' ? (
         <>
           {errorBox}
@@ -260,14 +459,42 @@ export function PassiveAdmin({ onToast }: { onToast: (msg: string) => void }) {
         </div>
       )}
       {data.passives.length > 0 && (
-        <input
-          className="search"
-          type="search"
-          placeholder="Passiven suchen …"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          aria-label="Passiven suchen"
-        />
+        <>
+          <div className="field-row passive-filter">
+            <label className="field">
+              <span>Beitrag für</span>
+              <select
+                value={year}
+                onChange={(e) => {
+                  setYearChoice(Number(e.target.value));
+                  setPaying(null);
+                }}
+              >
+                {years.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Zeigen</span>
+              <select value={show} onChange={(e) => setShow(e.target.value as 'all' | 'open' | 'paid')}>
+                <option value="all">alle</option>
+                <option value="open">nur offen</option>
+                <option value="paid">nur bezahlt</option>
+              </select>
+            </label>
+          </div>
+          <input
+            className="search"
+            type="search"
+            placeholder="Passiven suchen …"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Passiven suchen"
+          />
+        </>
       )}
       {data.passives.length === 0 ? (
         <Empty>Noch keine Passiven eingetragen.</Empty>
@@ -298,6 +525,52 @@ export function PassiveAdmin({ onToast }: { onToast: (msg: string) => void }) {
                     {p.last_name}, {p.first_name}
                   </div>
                   <div className="row-sub">{p.caretaker ? `Betreuer: ${p.caretaker.name}` : 'ohne Betreuer'}</div>
+                  {paying === p.id ? (
+                    <>
+                      {errorBox}
+                      <PaymentForm
+                        year={year}
+                        payment={paymentOf(p, year)}
+                        feeCents={feeCents}
+                        busy={busy}
+                        onSave={(amount_cents, paid_on, method) => {
+                          const payment = paymentOf(p, year);
+                          void run(
+                            () =>
+                              payment
+                                ? api.updatePassivePayment(payment.id, { amount_cents, paid_on, method })
+                                : api.addPassivePayment(p.id, { year, amount_cents, paid_on, method }),
+                            'Zahlung gespeichert',
+                          );
+                        }}
+                        onDelete={async () => {
+                          const payment = paymentOf(p, year);
+                          if (payment && (await confirmAsk(`Zahlung ${year} von „${p.name}“ löschen?`)))
+                            void run(() => api.deletePassivePayment(payment.id), 'Zahlung gelöscht');
+                        }}
+                        onCancel={() => {
+                          setPaying(null);
+                          setFormError(null);
+                        }}
+                      />
+                    </>
+                  ) : (
+                    <div className="row-sub passive-payment">
+                      <PaymentLine year={year} payment={paymentOf(p, year)} />{' '}
+                      <button
+                        type="button"
+                        className="link-button"
+                        disabled={busy}
+                        onClick={() => {
+                          setFormError(null);
+                          setEditing(null);
+                          setPaying(p.id);
+                        }}
+                      >
+                        {paymentOf(p, year) ? 'Ändern' : 'Zahlung eintragen'}
+                      </button>
+                    </div>
+                  )}
                   <PassiveDetails p={p} />
                   <div className="row-actions">
                     <IconButton
@@ -330,6 +603,7 @@ export function PassiveAdmin({ onToast }: { onToast: (msg: string) => void }) {
 /** Meins → Meine Passiven: die Passiven, die die Person betreut, mit allen Angaben, nur zum Lesen. */
 export function MyPassives() {
   const { data, error, loading, reload } = useAsync(() => api.myPassives(), [], 'my-passives');
+  const year = Number(todayYmd().slice(0, 4));
   if (loading && !data) return <Loading shape="list" />;
   if (error || !data) return <ErrorBox message={error ?? 'Deine Passiven konnten nicht geladen werden.'} onRetry={reload} />;
   if (data.length === 0) return <Empty>Du betreust gerade keine Passiven.</Empty>;
@@ -346,6 +620,11 @@ export function MyPassives() {
               <div className="row-title">
                 {p.last_name}, {p.first_name}
               </div>
+              {p.payments && (
+                <div className="row-sub">
+                  <PaymentLine year={year} payment={paymentOf(p, year)} />
+                </div>
+              )}
               <PassiveDetails p={p} />
             </div>
           </li>

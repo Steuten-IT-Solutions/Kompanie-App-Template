@@ -24,8 +24,13 @@ use KompanieApp\Core\Storage\PassiveMemberRepository;
  *   (wie bei Mitgliedern).
  * - Ausnahme (bewusst so entschieden): Wer Betreuer ist, sieht unter Meins → Meine Passiven alle Angaben seiner eigenen
  *   Passiven, auch ohne view_personal, aber nur zum Lesen (mine()).
+ * - Beitrag (Entscheidungen vom 16.11.2026): je Passivem und Jahr höchstens eine Zahlung mit Betrag, Datum und Zahlungsart (Bar, SEPA, PayPal). Eintragen,
+ *   ändern und löschen darf, wer Passive verwaltet (manage_passive). Ein Jahresbeitrag lässt sich als Vorschlag
+ *   einstellen (fee()), die App setzt ihn beim Eintragen ins Feld. Der Betreuer sieht die Zahlungen seiner Passiven unter
+ *   Meins, nur zum Lesen.
  *
  * @phpstan-import-type PassiveRow from PassiveMemberRepository
+ * @phpstan-import-type PaymentRow from PassiveMemberRepository
  */
 final class PassiveMemberService
 {
@@ -35,6 +40,13 @@ final class PassiveMemberService
     public const BIRTH_YEAR_MIN = 1900;
     /** Felder mit persönlichen Angaben (anzeigen mit view_personal, ändern mit manage_personal) */
     public const PERSONAL = ['address', 'phone', 'email', 'birth_date'];
+    /** Einstellung: Jahresbeitrag als Vorschlag in Cent (0 = keiner) */
+    public const FEE_SETTING = 'passive_fee';
+    /** Höchster Betrag einer Zahlung und des Vorschlags in Cent (1.000 Euro) */
+    public const MAX_CENTS = 100000;
+    public const YEAR_MIN = 1900;
+    /** Zahlungsarten (Wunsch vom 16.11.2026): Schlüssel => Bezeichnung */
+    public const METHODS = ['cash' => 'Bar', 'sepa' => 'SEPA', 'paypal' => 'PayPal'];
 
     private ?PassiveMemberRepository $repo = null;
 
@@ -50,20 +62,23 @@ final class PassiveMemberService
     /**
      * Alle Passiven für die Verwaltung, nach Nachname, dazu die Mitglieder, die Betreuer sein können.
      *
-     * @return array{passives: list<array<string, mixed>>, caretakers: list<array{id: int, name: string}>, personal: bool, manage_personal: bool}
+     * @return array{passives: list<array<string, mixed>>, caretakers: list<array{id: int, name: string}>, personal: bool, manage_personal: bool, fee_cents: int, year: int}
      */
     public function list(User $viewer): array
     {
         $rows = $this->repository()->all();
         $personal = $viewer->can(Capability::ViewPersonal);
         $names = (new UserNames($this->app->users))->prime(array_column($rows, 'caretaker_id'));
-        $out = array_map(fn (array $r): array => $this->format($r, $personal, $names), $rows);
+        $payments = $this->repository()->payments();
+        $out = array_map(fn (array $r): array => $this->format($r, $personal, $names, $payments[$r['id']] ?? []), $rows);
         usort($out, self::compare(...));
         return [
             'passives' => $out,
             'caretakers' => $this->caretakers(),
             'personal' => $personal,
             'manage_personal' => $viewer->can(Capability::ManagePersonal),
+            'fee_cents' => $this->fee()['fee_cents'],
+            'year' => $this->year(),
         ];
     }
 
@@ -71,7 +86,7 @@ final class PassiveMemberService
     public function get(User $viewer, int $id): array
     {
         $row = $this->find($id);
-        return $this->format($row, $viewer->can(Capability::ViewPersonal), new UserNames($this->app->users));
+        return $this->format($row, $viewer->can(Capability::ViewPersonal), new UserNames($this->app->users), $this->repository()->payments([$id])[$id] ?? []);
     }
 
     /**
@@ -116,7 +131,9 @@ final class PassiveMemberService
     public function mine(User $user): array
     {
         $names = (new UserNames($this->app->users))->prime([$user->id]);
-        $out = array_map(fn (array $r): array => $this->format($r, true, $names), $this->repository()->ofCaretaker($user->id));
+        $rows = $this->repository()->ofCaretaker($user->id);
+        $payments = $this->repository()->payments(array_column($rows, 'id'));
+        $out = array_map(fn (array $r): array => $this->format($r, true, $names, $payments[$r['id']] ?? []), $rows);
         usort($out, self::compare(...));
         return $out;
     }
@@ -146,6 +163,152 @@ final class PassiveMemberService
         return $out;
     }
 
+    /**
+     * Zahlung des Beitrags für ein Jahr eintragen (je Jahr nur eine).
+     *
+     * @param array<string, mixed> $in year, amount_cents, paid_on, method
+     * @return array{id: int, year: int, amount_cents: int, paid_on: string, method: string}
+     */
+    public function addPayment(User $actor, int $passiveId, array $in): array
+    {
+        $this->find($passiveId);
+        $year = $this->paymentYear($in['year'] ?? null);
+        $cents = self::cents($in['amount_cents'] ?? null);
+        $paidOn = $this->paidOn($in['paid_on'] ?? null);
+        $method = self::method($in['method'] ?? null);
+        if ($this->repository()->hasPayment($passiveId, $year)) {
+            throw ApiError::invalid(sprintf('Für %d ist schon eine Zahlung eingetragen.', $year));
+        }
+        $id = $this->repository()->insertPayment($passiveId, $year, $cents, $paidOn, $method, $actor->id, $this->app->time()->nowUtc());
+        return self::payment($this->findPayment($id));
+    }
+
+    /**
+     * Zahlung ändern; was fehlt, bleibt.
+     *
+     * @param array<string, mixed> $in year, amount_cents, paid_on, method
+     * @return array{id: int, year: int, amount_cents: int, paid_on: string, method: string}
+     */
+    public function updatePayment(User $actor, int $id, array $in): array
+    {
+        $row = $this->findPayment($id);
+        $values = [];
+        if (array_key_exists('year', $in)) {
+            $values['year'] = $this->paymentYear($in['year']);
+            if ($this->repository()->hasPayment($row['passive_id'], $values['year'], $id)) {
+                throw ApiError::invalid(sprintf('Für %d ist schon eine Zahlung eingetragen.', $values['year']));
+            }
+        }
+        if (array_key_exists('amount_cents', $in)) {
+            $values['amount_cents'] = self::cents($in['amount_cents']);
+        }
+        if (array_key_exists('paid_on', $in)) {
+            $values['paid_on'] = $this->paidOn($in['paid_on']);
+        }
+        if (array_key_exists('method', $in)) {
+            $values['method'] = self::method($in['method']);
+        }
+        $this->repository()->updatePayment($id, $values, $actor->id, $this->app->time()->nowUtc());
+        return self::payment($this->findPayment($id));
+    }
+
+    public function deletePayment(int $id): void
+    {
+        $this->findPayment($id);
+        $this->repository()->deletePayment($id);
+    }
+
+    /**
+     * Jahresbeitrag als Vorschlag beim Eintragen (0 = keiner).
+     *
+     * @return array{fee_cents: int}
+     */
+    public function fee(): array
+    {
+        // WordPress kann Zahlen als Zeichenkette zurückgeben.
+        $v = $this->app->settings->get(self::FEE_SETTING, 0);
+        return ['fee_cents' => is_numeric($v) ? max(0, min(self::MAX_CENTS, (int) $v)) : 0];
+    }
+
+    /**
+     * @param array<string, mixed> $in fee_cents (0 oder leer = keiner)
+     * @return array{fee_cents: int}
+     */
+    public function setFee(array $in): array
+    {
+        $raw = $in['fee_cents'] ?? null;
+        $cents = $raw === null || $raw === '' || Input::integer($raw) === 0 ? 0 : self::cents($raw);
+        $this->app->settings->set(self::FEE_SETTING, $cents);
+        return $this->fee();
+    }
+
+    /** Laufendes Jahr (Zeitzone der App) */
+    private function year(): int
+    {
+        return (int) $this->app->time()->today()->format('Y');
+    }
+
+    /** Jahr einer Zahlung: ab 1900, höchstens nächstes Jahr (Vorauszahlung). */
+    private function paymentYear(mixed $raw): int
+    {
+        $year = Input::integer($raw);
+        $max = $this->year() + 1;
+        if ($year === null || $year < self::YEAR_MIN || $year > $max) {
+            throw ApiError::invalid(sprintf('Bitte ein Jahr zwischen %d und %d angeben.', self::YEAR_MIN, $max));
+        }
+        return $year;
+    }
+
+    /** Betrag in Cent: mehr als 0, höchstens MAX_CENTS. */
+    private static function cents(mixed $raw): int
+    {
+        $cents = Input::integer($raw);
+        if ($cents === null || $cents <= 0 || $cents > self::MAX_CENTS) {
+            throw ApiError::invalid(sprintf('Bitte einen Betrag über 0 und höchstens %s Euro angeben.', number_format(self::MAX_CENTS / 100, 0, ',', '.')));
+        }
+        return $cents;
+    }
+
+    /** Zahlungsart: einer der Schlüssel aus METHODS (Pflicht). */
+    private static function method(mixed $raw): string
+    {
+        if (!is_string($raw) || !array_key_exists($raw, self::METHODS)) {
+            throw ApiError::invalid('Bitte die Zahlungsart wählen: ' . implode(', ', self::METHODS) . '.');
+        }
+        return $raw;
+    }
+
+    /** Datum der Zahlung JJJJ-MM-TT, ab 1900, nicht in der Zukunft. */
+    private function paidOn(mixed $raw): string
+    {
+        if (!Input::isDate($raw)) {
+            throw ApiError::invalid('Bitte das Datum der Zahlung angeben (JJJJ-MM-TT).');
+        }
+        /** @var string $raw */
+        if ((int) substr($raw, 0, 4) < self::YEAR_MIN) {
+            throw ApiError::invalid(sprintf('Das Datum der Zahlung muss ab %d liegen.', self::YEAR_MIN));
+        }
+        if ($raw > $this->app->time()->today()->format('Y-m-d')) {
+            throw ApiError::invalid('Das Datum der Zahlung darf nicht in der Zukunft liegen.');
+        }
+        return $raw;
+    }
+
+    /** @return PaymentRow */
+    private function findPayment(int $id): array
+    {
+        return $this->repository()->findPayment($id) ?? throw ApiError::notFound('Diese Zahlung gibt es nicht (mehr).');
+    }
+
+    /**
+     * @param PaymentRow $p
+     * @return array{id: int, year: int, amount_cents: int, paid_on: string, method: string}
+     */
+    private static function payment(array $p): array
+    {
+        return ['id' => $p['id'], 'year' => $p['year'], 'amount_cents' => $p['amount_cents'], 'paid_on' => $p['paid_on'], 'method' => $p['method']];
+    }
+
     /** @return PassiveRow */
     private function find(int $id): array
     {
@@ -154,9 +317,10 @@ final class PassiveMemberService
 
     /**
      * @param PassiveRow $r
+     * @param list<PaymentRow> $payments
      * @return array<string, mixed>
      */
-    private function format(array $r, bool $personal, UserNames $names): array
+    private function format(array $r, bool $personal, UserNames $names, array $payments): array
     {
         $out = [
             'id' => $r['id'],
@@ -164,6 +328,8 @@ final class PassiveMemberService
             'last_name' => $r['last_name'],
             'name' => PersonName::join($r['first_name'], $r['last_name']),
             'caretaker' => $r['caretaker_id'] !== null ? ['id' => $r['caretaker_id'], 'name' => $names->name($r['caretaker_id'])] : null,
+            // Beiträge, neuestes Jahr zuerst
+            'payments' => array_map(self::payment(...), $payments),
         ];
         if ($personal) {
             $out += ['address' => $r['address'], 'phone' => $r['phone'], 'email' => $r['email'], 'birth_date' => $r['birth_date']];

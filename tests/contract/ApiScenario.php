@@ -1553,11 +1553,27 @@ final class ApiScenario
         [$s, $p] = $this->req('PATCH', "/passive-members/$id", ['phone' => '']);
         $c->ok($s === 200 && ($p['phone'] ?? 'x') === '' && ($p['email'] ?? '') === 'kptest-passiv@example.org', 'Telefon entfernen, E-Mail bleibt');
         $c->ok($this->req('POST', '/passive-members', ['first_name' => 'Kptest'])[0] === 400, 'Ohne Nachnamen → 400');
+        // Beitrag: eine Zahlung je Jahr, Jahresbeitrag als Vorschlag
+        $year = (int) gmdate('Y');
+        [, $fee] = $this->req('GET', '/passive-members/fee');
+        [$s, $f] = $this->req('PUT', '/passive-members/fee', ['fee_cents' => 2400]);
+        $c->ok($s === 200 && ($f['fee_cents'] ?? 0) === 2400, 'Jahresbeitrag als Vorschlag einstellen');
+        $this->req('PUT', '/passive-members/fee', ['fee_cents' => (int) ($fee['fee_cents'] ?? 0)]);
+        [$s, $pay] = $this->req('POST', "/passive-members/$id/payments", ['year' => $year, 'amount_cents' => 2400, 'paid_on' => gmdate('Y-m') . '-01', 'method' => 'sepa']);
+        $payId = (int) ($pay['id'] ?? 0);
+        $c->ok($s === 201 && ($pay['amount_cents'] ?? 0) === 2400 && ($pay['method'] ?? '') === 'sepa', 'Zahlung für das Jahr eintragen (mit Zahlungsart)');
+        $c->ok($this->req('POST', "/passive-members/$id/payments", ['year' => $year, 'amount_cents' => 100, 'paid_on' => gmdate('Y-m') . '-01', 'method' => 'cash'])[0] === 400, 'Zweite Zahlung im selben Jahr → 400');
+        [$s, $pay] = $this->req('PATCH', "/passive-payments/$payId", ['amount_cents' => 3000]);
+        $c->ok($s === 200 && ($pay['amount_cents'] ?? 0) === 3000, 'Zahlung ändern');
+        [, $one] = $this->req('GET', "/passive-members/$id");
+        $c->ok(array_column((array) ($one['payments'] ?? []), 'year') === [$year], 'Zahlung steht beim Passiven');
 
         $this->d->actAs($m);
         [$s, $mine] = $this->req('GET', '/me/passive-members');
         $c->ok($s === 200 && array_column((array) $mine, 'email') === ['kptest-passiv@example.org'], 'Betreuer sieht seinen Passiven mit allen Angaben');
         $c->ok($this->req('PATCH', "/passive-members/$id", ['email' => 'x@example.org'])[0] === 403, 'Betreuer ändert nichts');
+        $c->ok(array_column((array) ($mine[0]['payments'] ?? []), 'amount_cents') === [3000], 'Betreuer sieht die Zahlung');
+        $c->ok($this->req('PATCH', "/passive-payments/$payId", ['amount_cents' => 1])[0] === 403, 'Betreuer ändert keine Zahlung');
 
         $this->d->actAs($admin);
         [, $roles] = $this->req('GET', '/admin/roles');

@@ -12,6 +12,7 @@ use KompanieApp\Core\Storage\Sql\Connection;
  *
  * @phpstan-type AddressRow array{street: string, house_number: string, extra: string, postal_code: string, city: string, country: string, country_name: string}
  * @phpstan-type PassiveRow array{id: int, first_name: string, last_name: string, address: AddressRow|null, phone: string, email: string, birth_date: string|null, caretaker_id: int|null, updated_at: string}
+ * @phpstan-type PaymentRow array{id: int, passive_id: int, year: int, amount_cents: int, paid_on: string, method: string}
  */
 final class PassiveMemberRepository
 {
@@ -68,9 +69,66 @@ final class PassiveMemberRepository
         }
     }
 
+    /** Löscht den Passiven mit seinen Zahlungen. */
     public function delete(int $id): void
     {
-        $this->db->execute('DELETE FROM {passive_members} WHERE id = ?', [$id]);
+        $this->db->transaction(function () use ($id): void {
+            $this->db->execute('DELETE FROM {passive_payments} WHERE passive_id = ?', [$id]);
+            $this->db->execute('DELETE FROM {passive_members} WHERE id = ?', [$id]);
+        });
+    }
+
+    /**
+     * Zahlungen der Beiträge, je Passivem nach Jahr absteigend.
+     *
+     * @param list<int>|null $passiveIds null = alle
+     * @return array<int, list<PaymentRow>> ID des Passiven => Zahlungen
+     */
+    public function payments(?array $passiveIds = null): array
+    {
+        if ($passiveIds === []) {
+            return [];
+        }
+        $where = $passiveIds === null ? '' : ' WHERE passive_id IN (' . implode(', ', array_fill(0, count($passiveIds), '?')) . ')';
+        $out = [];
+        foreach ($this->db->select('SELECT * FROM {passive_payments}' . $where . ' ORDER BY year DESC, id ASC', $passiveIds ?? []) as $r) {
+            $row = self::paymentRow($r);
+            $out[$row['passive_id']][] = $row;
+        }
+        return $out;
+    }
+
+    /** @return PaymentRow|null */
+    public function findPayment(int $id): ?array
+    {
+        $row = $this->db->selectOne('SELECT * FROM {passive_payments} WHERE id = ?', [$id]);
+        return $row === null ? null : self::paymentRow($row);
+    }
+
+    public function hasPayment(int $passiveId, int $year, ?int $exceptId = null): bool
+    {
+        return (int) $this->db->scalar('SELECT COUNT(*) FROM {passive_payments} WHERE passive_id = ? AND year = ? AND id <> ?', [$passiveId, $year, $exceptId ?? 0]) > 0;
+    }
+
+    public function insertPayment(int $passiveId, int $year, int $cents, string $paidOn, string $method, int $by, string $now): int
+    {
+        return $this->db->insert('passive_payments', [
+            'passive_id' => $passiveId, 'year' => $year, 'amount_cents' => $cents, 'paid_on' => $paidOn, 'method' => $method,
+            'created_by' => $by, 'created_at' => $now, 'updated_by' => $by, 'updated_at' => $now,
+        ]);
+    }
+
+    /** @param array<string, string|int> $values year, amount_cents, paid_on, method */
+    public function updatePayment(int $id, array $values, int $by, string $now): void
+    {
+        if ($values !== []) {
+            $this->db->update('passive_payments', $values + ['updated_by' => $by, 'updated_at' => $now], ['id' => $id]);
+        }
+    }
+
+    public function deletePayment(int $id): void
+    {
+        $this->db->execute('DELETE FROM {passive_payments} WHERE id = ?', [$id]);
     }
 
     /**
@@ -86,6 +144,22 @@ final class PassiveMemberRepository
             $out[$column] = $address[$field] ?? '';
         }
         return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $r
+     * @return PaymentRow
+     */
+    private static function paymentRow(array $r): array
+    {
+        return [
+            'id' => (int) $r['id'],
+            'passive_id' => (int) $r['passive_id'],
+            'year' => (int) $r['year'],
+            'amount_cents' => (int) $r['amount_cents'],
+            'paid_on' => substr((string) $r['paid_on'], 0, 10),
+            'method' => (string) ($r['method'] ?? ''),
+        ];
     }
 
     /**

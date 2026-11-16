@@ -181,10 +181,70 @@ final class PassiveMembersTest extends TestCase
         $this->assertSame(0, $this->call('GET', '/config')->data['caredPassives']);
     }
 
+    public function testPayments(): void
+    {
+        $id = $this->passive('Erika', 'Mustermann', ['caretaker_id' => $this->member]);
+        $this->assertSame(['fee_cents' => 0], $this->call('GET', '/passive-members/fee')->data, 'kein Vorschlag');
+        $this->assertSame(['fee_cents' => 2400], $this->call('PUT', '/passive-members/fee', ['fee_cents' => 2400])->data);
+        $list = $this->call('GET', '/passive-members')->data;
+        $this->assertSame(2400, $list['fee_cents']);
+        $this->assertSame(2026, $list['year']);
+        $this->assertSame([], $list['passives'][0]['payments']);
+
+        $res = $this->call('POST', "/passive-members/$id/payments", ['year' => 2026, 'amount_cents' => 2400, 'paid_on' => '2026-02-03', 'method' => 'sepa']);
+        $this->assertSame(201, $res->status, (string) json_encode($res->data));
+        $pay = $res->data['id'];
+        $this->call('POST', "/passive-members/$id/payments", ['year' => 2025, 'amount_cents' => 2000, 'paid_on' => '2025-03-01', 'method' => 'cash']);
+        $this->assertSame(400, $this->call('POST', "/passive-members/$id/payments", ['year' => 2026, 'amount_cents' => 100, 'paid_on' => '2026-03-01', 'method' => 'cash'])->status, 'je Jahr eine');
+        $this->assertSame([2026, 2025], array_column($this->call('GET', '/passive-members')->data['passives'][0]['payments'], 'year'), 'neuestes zuerst');
+
+        $res = $this->call('PATCH', "/passive-payments/$pay", ['amount_cents' => 3000, 'method' => 'paypal']);
+        $this->assertSame(['id' => $pay, 'year' => 2026, 'amount_cents' => 3000, 'paid_on' => '2026-02-03', 'method' => 'paypal'], $res->data);
+        $this->assertSame(400, $this->call('PATCH', "/passive-payments/$pay", ['method' => 'scheck'])->status, 'unbekannte Zahlungsart');
+        $this->assertSame(400, $this->call('PATCH', "/passive-payments/$pay", ['year' => 2025])->status, 'Jahr schon belegt');
+
+        // Betreuer sieht die Zahlungen, nur lesend
+        $this->users->current = $this->member;
+        $this->assertSame([2026, 2025], array_column($this->call('GET', '/me/passive-members')->data[0]['payments'], 'year'));
+        $this->assertSame(403, $this->call('PATCH', "/passive-payments/$pay", ['amount_cents' => 1])->status);
+        $this->assertSame(403, $this->call('POST', "/passive-members/$id/payments", ['year' => 2024, 'amount_cents' => 100, 'paid_on' => '2024-01-01', 'method' => 'cash'])->status);
+        $this->assertSame(403, $this->call('PUT', '/passive-members/fee', ['fee_cents' => 1])->status);
+
+        // Wer Passive verwaltet, darf eintragen (ohne persönliche Rechte)
+        $this->users->current = $this->withRights('kassierer', ['manage_passive']);
+        $this->assertSame(201, $this->call('POST', "/passive-members/$id/payments", ['year' => 2024, 'amount_cents' => 2000, 'paid_on' => '2024-01-05', 'method' => 'cash'])->status);
+        $this->assertSame(200, $this->call('DELETE', "/passive-payments/$pay")->status);
+        $this->assertSame(404, $this->call('DELETE', "/passive-payments/$pay")->status);
+        $this->assertSame(['fee_cents' => 0], $this->call('PUT', '/passive-members/fee', ['fee_cents' => ''])->data, 'Vorschlag leeren');
+
+        // Passiver gelöscht: Zahlungen auch
+        $this->call('DELETE', "/passive-members/$id");
+        $this->assertSame(0, (int) $this->app->db->scalar('SELECT COUNT(*) FROM {passive_payments}'));
+    }
+
+    public function testPaymentValidation(): void
+    {
+        $id = $this->passive('Erika', 'Mustermann');
+        $ok = ['year' => 2026, 'amount_cents' => 2400, 'paid_on' => '2026-02-03', 'method' => 'cash'];
+        foreach ([
+            'Jahr fehlt' => ['year' => null], 'Jahr zu früh' => ['year' => 1899], 'übernächstes Jahr' => ['year' => 2028],
+            'Betrag 0' => ['amount_cents' => 0], 'Betrag negativ' => ['amount_cents' => -5], 'Betrag zu hoch' => ['amount_cents' => 100001],
+            'Datum fehlt' => ['paid_on' => ''], 'Datum ungültig' => ['paid_on' => '2026-02-30'], 'Datum in der Zukunft' => ['paid_on' => '2026-11-17'],
+            'Zahlungsart fehlt' => ['method' => null], 'Zahlungsart unbekannt' => ['method' => 'scheck'],
+        ] as $why => $bad) {
+            $this->assertSame(400, $this->call('POST', "/passive-members/$id/payments", $bad + $ok)->status, $why);
+        }
+        $this->assertSame(201, $this->call('POST', "/passive-members/$id/payments", ['year' => 2027] + $ok)->status, 'Vorauszahlung fürs nächste Jahr');
+        $this->assertSame(404, $this->call('POST', '/passive-members/99999/payments', $ok)->status);
+        $this->assertSame(400, $this->call('PUT', '/passive-members/fee', ['fee_cents' => 100001])->status);
+        $this->assertSame(400, $this->call('PUT', '/passive-members/fee', ['fee_cents' => -1])->status);
+    }
+
     public function testStandardRoleAndBackup(): void
     {
         $roles = array_column($this->call('GET', '/admin/roles')->data, 'capabilities', 'label');
         $this->assertContains('manage_passive', $roles['Passive verwalten'] ?? [], 'Standardrolle des Bereichs');
         $this->assertContains('passive_members', Backup::CORE_TABLES);
+        $this->assertContains('passive_payments', Backup::CORE_TABLES);
     }
 }
