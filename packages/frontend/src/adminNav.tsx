@@ -23,6 +23,7 @@ const canCompanies = (): boolean => !!config?.features.companies && can('manage_
 const canSponsors = (): boolean => !!config?.features.sponsors && can('manage_sponsors');
 const canPages = (): boolean => !!config?.features.pages && can('manage_pages');
 const canWebsite = (): boolean => !!config?.features.website && can('manage_website');
+const canPassive = (): boolean => !!config?.features.passive && can('manage_passive');
 
 /** Mitgliederliste: für alle, die Punkte oder Strafen vergeben, Dienstgrade, Titel oder Anwesenheit pflegen, Mitglieder
  * anlegen, Ehemalige verwalten, Rollen vergeben oder Kompanien zuordnen. */
@@ -50,6 +51,7 @@ export function adminTabs(): AdminTab[] {
     [
       { id: 'mitglieder', label: 'Mitglieder', on: memberListAllowed() },
       { id: 'ehemalige', label: 'Ehemalige', on: can('manage_former') },
+      { id: 'passive', label: 'Passive', on: canPassive() },
       // Anfragen auf einen Zugang (Issue #314): auch nach dem Ausschalten, solange welche warten; Zahl der offenen im Kreis
       {
         id: 'anfragen',
@@ -94,6 +96,7 @@ export function adminTileCatalog(): Record<string, { label: string; on: boolean 
   return {
     mitglieder: { label: 'Mitglieder', on: true },
     ehemalige: { label: 'Ehemalige', on: true },
+    passive: { label: 'Passive', on: on('passive') },
     anfragen: { label: 'Anfragen', on: !!config?.registration || (config?.pendingRegistrations ?? 0) > 0 },
     meldungen: { label: 'Fehlermeldungen', on: true },
     aenderungen: { label: 'Änderungen', on: true },
@@ -268,6 +271,14 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
       <circle cx="12" cy="8" r="3.5" />
       <path d="M5.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6" />
       <path d="M18 3.5a3 3 0 0 1 0 4" />
+    </>
+  ),
+  // Passive: Person mit Herz (gehört dazu, ohne aktiv mitzumachen)
+  passive: (
+    <>
+      <circle cx="10" cy="8" r="3.5" />
+      <path d="M3.5 20c0-3.6 2.9-6 6.5-6 1.2 0 2.3.3 3.2.8" />
+      <path d="M18 20.5s-3.5-2.1-3.5-4.4a1.8 1.8 0 0 1 3.5-.6 1.8 1.8 0 0 1 3.5.6c0 2.3-3.5 4.4-3.5 4.4z" />
     </>
   ),
   // Anfragen auf einen Zugang: Person mit Plus (wartet auf Aufnahme)

@@ -1986,6 +1986,58 @@ WHERE title IS NULL",
                     'CREATE UNIQUE INDEX IF NOT EXISTS {penalties}_request_user ON {penalties} (request_id, user_id)',
                 ],
             ],
+            // Passive (Bereich passive, Domain\PassiveMemberService): eigene Einträge ohne Konto, damit sie nie einen Zugang
+            // bekommen. Name, Adresse wie in member_contacts, Telefon, E-Mail, Geburtsdatum (JJJJ-MM-TT oder leer) und
+            // optional ein Mitglied als Betreuer (caretaker_id, Konto-ID). Zeiten in UTC.
+            63 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {passive_members} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  first_name varchar(100) NOT NULL,
+  last_name varchar(100) NOT NULL DEFAULT \'\',
+  street varchar(100) NOT NULL DEFAULT \'\',
+  house_number varchar(10) NOT NULL DEFAULT \'\',
+  address_extra varchar(100) NOT NULL DEFAULT \'\',
+  postal_code varchar(12) NOT NULL DEFAULT \'\',
+  city varchar(60) NOT NULL DEFAULT \'\',
+  country varchar(2) NOT NULL DEFAULT \'\',
+  country_name varchar(60) NOT NULL DEFAULT \'\',
+  phone varchar(30) NOT NULL DEFAULT \'\',
+  email varchar(100) NOT NULL DEFAULT \'\',
+  birth_date date DEFAULT NULL,
+  caretaker_id bigint(20) unsigned DEFAULT NULL,
+  created_by bigint(20) unsigned NOT NULL,
+  created_at datetime NOT NULL,
+  updated_by bigint(20) unsigned NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  KEY caretaker_id (caretaker_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {passive_members} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL DEFAULT \'\',
+  street TEXT NOT NULL DEFAULT \'\',
+  house_number TEXT NOT NULL DEFAULT \'\',
+  address_extra TEXT NOT NULL DEFAULT \'\',
+  postal_code TEXT NOT NULL DEFAULT \'\',
+  city TEXT NOT NULL DEFAULT \'\',
+  country TEXT NOT NULL DEFAULT \'\',
+  country_name TEXT NOT NULL DEFAULT \'\',
+  phone TEXT NOT NULL DEFAULT \'\',
+  email TEXT NOT NULL DEFAULT \'\',
+  birth_date TEXT DEFAULT NULL,
+  caretaker_id INTEGER DEFAULT NULL,
+  created_by INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_by INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE INDEX IF NOT EXISTS {passive_members}_caretaker_id ON {passive_members} (caretaker_id)',
+                ],
+            ],
         ];
     }
 

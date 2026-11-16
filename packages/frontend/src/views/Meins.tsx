@@ -5,6 +5,7 @@ import { navigate } from '../router';
 import { DateRow, ErrorBox, lazyView, Loading, StatCard, useAsync } from '../ui';
 import Dienstgrad from './Dienstgrad';
 import MeineAnwesenheit from './MeineAnwesenheit';
+import { MyPassives } from './Passive';
 import Punkte from './Punkte';
 import Strafen from './Strafen';
 import { TitleBadges } from '../TitleBadges';
@@ -46,6 +47,8 @@ export default function Meins({
       ['strafen', sec.penalties, config?.features.penalties && can('view_own_penalties')],
       ['dienstgrad', brand.labels.rank, config?.features.ranks && can('view_own_rank')],
       ['anwesenheit', sec.attendance, config?.features.attendance && can('view_own_attendance')],
+      // Passive, die die Person betreut (Bereich passive): nur, wenn es welche gibt
+      ['passive', 'Meine Passiven', config?.features.passive && (config?.caredPassives ?? 0) > 0],
     ] as const
   )
     .filter(([, , on]) => member && on)
@@ -69,6 +72,8 @@ export default function Meins({
       )}
       {active === 'konto' ? (
         <Konto onToast={onToast} onLogout={onLogout} />
+      ) : active === 'passive' ? (
+        <MyPassives />
       ) : me.loading && !me.data ? (
         <Loading shape={active === 'uebersicht' ? 'overview' : active === 'anwesenheit' ? 'list' : 'stat'} />
       ) : me.error && !me.data ? (

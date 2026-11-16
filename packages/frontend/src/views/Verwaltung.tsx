@@ -75,6 +75,7 @@ import { OfficeAdmin } from './AemterVerwalten';
 import { SponsorAdmin } from './SponsorenVerwalten';
 import { PageAdmin } from './SeitenVerwalten';
 import { WebsiteAdmin } from './WebseiteVerwalten';
+import { PassiveAdmin } from './Passive';
 import { CompanyAdmin, MemberCompanies } from './KompanienVerwalten';
 import { ListAdmin } from './ListenVerwalten';
 import { MailAdmin } from './EmailsVerwalten';
@@ -121,6 +122,7 @@ import { confirmAsk, promptAsk } from '../ask';
 type Sub =
   | 'mitglieder'
   | 'ehemalige'
+  | 'passive'
   | 'anfragen'
   | 'meldungen'
   | 'aenderungen'
@@ -225,6 +227,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <FormerImport onToast={onToast} />
       ) : active === 'ehemalige' ? (
         <FormerList />
+      ) : active === 'passive' ? (
+        <PassiveAdmin onToast={onToast} />
       ) : active === 'anfragen' ? (
         <Anfragen onToast={onToast} />
       ) : active === 'meldungen' ? (

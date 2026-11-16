@@ -54,6 +54,7 @@ use KompanieApp\Core\Domain\InventoryService;
 use KompanieApp\Core\Domain\OfficeService;
 use KompanieApp\Core\Domain\CompanyService;
 use KompanieApp\Core\Domain\SponsorService;
+use KompanieApp\Core\Domain\PassiveMemberService;
 use KompanieApp\Core\Domain\ListService;
 use KompanieApp\Core\Domain\MailGroupService;
 use KompanieApp\Core\Domain\MailingService;
@@ -759,6 +760,12 @@ final class App
     public function sponsors(): SponsorService
     {
         return $this->service(SponsorService::class, fn () => new SponsorService($this));
+    }
+
+    /** Passive (Bereich passive): eigene Einträge ohne Konto, mit Betreuer */
+    public function passives(): PassiveMemberService
+    {
+        return $this->service(PassiveMemberService::class, fn () => new PassiveMemberService($this));
     }
 
     /** Kompanieliste (Issue #280, Bereich companies) */

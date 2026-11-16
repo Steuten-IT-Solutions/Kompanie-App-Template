@@ -296,6 +296,12 @@ final class Subjects
             'kind' => 'Art', 'start_year' => 'Von', 'end_year' => 'Bis', 'note' => 'Notiz', 'honor' => ['Ehrenamt', 'bool'],
         ], extra: fn (array $r): array => ['Inhaber' => $holders('term_id = ?', $r['id'])]);
         $pages = $this->spec('Seite', 'app_pages', 'title', ['title' => 'Titel', 'blocks' => ['Inhalt', 'blocks'], 'audience' => 'Sichtbar für']);
+        // Passive: Adresse, Telefon, E-Mail und Geburtsdatum sind persönliche Angaben (Werte nur mit view_personal)
+        $passives = $this->spec('Passiver', 'passive_members', static fn (array $r): string => trim($r['first_name'] . ' ' . $r['last_name']), [
+            'first_name' => 'Vorname', 'last_name' => 'Nachname', 'street' => 'Straße', 'house_number' => 'Hausnummer', 'address_extra' => 'Adresszusatz',
+            'postal_code' => 'Postleitzahl', 'city' => 'Ort', 'country' => 'Land', 'country_name' => 'Land (Name)', 'phone' => 'Telefon', 'email' => 'E-Mail',
+            'birth_date' => 'Geburtsdatum', 'caretaker_id' => ['Betreuer', 'user'],
+        ], personal: ['street', 'house_number', 'address_extra', 'postal_code', 'city', 'country', 'country_name', 'phone', 'email', 'birth_date']);
         $sponsors = $this->spec('Sponsor', 'sponsors', 'name', ['name' => 'Name', 'url' => 'Link', 'logo_version' => ['Logo', 'secret']]);
         $companies = $this->spec('Kompanie', 'companies', 'name', [
             'name' => 'Name', 'short_name' => 'Kurzname', 'founded_year' => 'Gegründet', 'description' => 'Beschreibung', 'website_url' => 'Webseite',
@@ -350,6 +356,7 @@ final class Subjects
             [$officeTerms, 'POST /offices/{id}/terms', 'PATCH /office-terms/{id}', 'DELETE /office-terms/{id}'],
             [$pages, 'POST /pages', 'PATCH /pages/{id}', 'DELETE /pages/{id}'],
             [$sponsors, 'POST /sponsors', 'PATCH /sponsors/{id}', 'DELETE /sponsors/{id}'],
+            [$passives, 'POST /passive-members', 'PATCH /passive-members/{id}', 'DELETE /passive-members/{id}'],
             [$companies, 'POST /companies', 'PATCH /companies/{id}', 'DELETE /companies/{id}'],
             [$lists, 'POST /lists', 'PUT /lists/{id}', 'DELETE /lists/{id}'],
             [$documents, 'POST /documents', 'PATCH /documents/{id}', 'DELETE /documents/{id}'],
