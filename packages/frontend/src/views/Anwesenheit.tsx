@@ -13,6 +13,7 @@ import {
   type AttendanceStatus,
   type ResponseStatus,
 } from '../api';
+import { showGroupCounts } from '../attendanceGroups';
 import { formatDate, formatEventWhen, roleCount, todayYmd } from '../format';
 import brand from '../generated/brand';
 import { navigate } from '../router';
@@ -419,7 +420,7 @@ function Editor({
           </button>
         </p>
       )}
-      {!dirty && !pending && <GroupCounts list={list} />}
+      {showGroupCounts({ dirty, pending: Boolean(pending), upcoming }) && <GroupCounts list={list} />}
 
       <div className="picker">
         <div className="picker-head">

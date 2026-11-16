@@ -14,7 +14,7 @@ Tippe unten auf **Verwaltung**, dann auf **{bereich.attendance}**. Tippe dort au
 ## Was du hier siehst
 - **‹ {bereich.attendance}**: führt zurück zur Übersicht.
 - **Titel und Datum**: Bei einem Termin aus dem {bereich.calendar} stehen sie fest. Bei einem freien Termin stehen sie in Feldern, die du ändern kannst.
-- **Zähler**: z. B. „3 anwesend · 0 entschuldigt · 1 fehlt · 5 ohne Auswahl“. **Ohne Auswahl** sind die Personen, bei denen noch kein Kästchen angekreuzt ist. Ist alles gespeichert, steht darunter die Aufteilung nach Gruppen, z. B. „anwesend: Mitglieder 3“.
+- **Zähler**: z. B. „3 anwesend · 0 entschuldigt · 1 fehlt · 5 ohne Auswahl“. **Ohne Auswahl** sind die Personen, bei denen noch kein Kästchen angekreuzt ist. Ist alles gespeichert, steht darunter die Aufteilung nach Gruppen, z. B. „anwesend: Mitglieder 3“. Bei kommenden Terminen fehlt diese Zeile.
 - **Person suchen …**: zeigt nur Personen, deren Name passt.
 - **Alle anwesend**: setzt alle gezeigten Personen auf anwesend (bei einer Suche nur die gefundenen).
 - **Die Liste**: alle Personen mit einer Rolle, außer {rolle.guest}. Je Person gibt es ein Kästchen für **anwesend**, **entschuldigt** und **fehlt**. Neben dem Namen steht die Rolle, wenn sie nicht {rolle.member} ist. **{bereich.points} gebucht** heißt: Diese Person hat für diese Liste schon {bereich.points} bekommen.
