@@ -4611,6 +4611,15 @@ test('Admin stellt den internen Kalender auf „In der App pflegen“ um, legt e
   await expect(card.getByRole('button', { name: 'Zugesagt' })).toHaveAttribute('aria-pressed', 'true');
   await expect(card.locator('.event-response-counts')).toHaveText('1 Zusage');
   await shot(page, 'termin-zusagen');
+  // Aufgeklappt: Der Knopf „Hinweis speichern“ klebt nicht am Feld darüber und nimmt die volle Breite.
+  await card.locator('.event-head').click();
+  const noteBox = card.locator('.event-response-note');
+  await noteBox.getByLabel('Hinweis zu deiner Zusage (optional)').fill('komme später');
+  const saveNote = noteBox.getByRole('button', { name: 'Hinweis speichern' });
+  await expect(saveNote).toBeVisible();
+  expect((await smallestStackGap(noteBox)).gap).toBeGreaterThanOrEqual(12);
+  expect((await saveNote.boundingBox())!.width).toBeCloseTo((await noteBox.boundingBox())!.width, 0);
+  await card.locator('.event-head').click();
   await card.getByRole('button', { name: 'Zugesagt' }).click();
   await expect(card.getByRole('button', { name: 'Zusagen' })).toHaveAttribute('aria-pressed', 'false');
   await expect(card.locator('.event-response-counts')).toHaveCount(0);

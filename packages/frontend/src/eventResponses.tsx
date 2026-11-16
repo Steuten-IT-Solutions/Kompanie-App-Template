@@ -153,13 +153,13 @@ export function ResponseDetails({ ev, onChange }: { ev: CalendarEvent; onChange:
   return (
     <>
       {canNote && (
-        <div className="event-response-note">
+        <div className="event-response-note stack">
           <label className="field">
             <span>Hinweis zu deiner {r.mine === 'yes' ? 'Zusage' : 'Absage'} (optional)</span>
             <input type="text" maxLength={191} value={note} placeholder="z. B. komme später" onChange={(e) => setNote(e.target.value)} />
           </label>
           {note.trim() !== r.note && (
-            <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => void saveNote()}>
+            <button type="button" className="btn btn-secondary btn-block" disabled={busy} onClick={() => void saveNote()}>
               {busy ? 'Speichert …' : 'Hinweis speichern'}
             </button>
           )}
@@ -171,8 +171,8 @@ export function ResponseDetails({ ev, onChange }: { ev: CalendarEvent; onChange:
         </div>
       )}
       {r.can_list && (
-        <div className="event-response-list">
-          <button type="button" className="btn btn-secondary" aria-expanded={listOpen} onClick={() => void toggleList()}>
+        <div className="event-response-list stack">
+          <button type="button" className="btn btn-secondary btn-block" aria-expanded={listOpen} onClick={() => void toggleList()}>
             {listOpen ? 'Rückmeldungen ausblenden' : 'Rückmeldungen ansehen'}
           </button>
           {listOpen && (listError ? <ErrorBox message={listError} /> : !list ? <Loading shape="text" /> : <ResponseNames list={list} />)}

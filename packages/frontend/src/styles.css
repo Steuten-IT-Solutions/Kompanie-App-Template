@@ -7507,12 +7507,11 @@ fieldset.block-source legend {
   margin-top: 0;
   color: var(--ink-2);
 }
+/* Hinweis und Rückmeldungen stapeln ihre Teile mit .stack (Abstand zwischen Feld, Knopf und Fehlermeldung); die Knöpfe
+   nehmen wie andere Text-Knöpfe die volle Breite (.btn-block). */
 .event-response-note,
 .event-response-list {
   margin-bottom: 12px;
-}
-.event-response-groups {
-  margin-top: 10px;
 }
 .event-response-group h4 {
   margin: 10px 0 4px;
