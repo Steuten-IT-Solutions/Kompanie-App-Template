@@ -14,7 +14,6 @@ Tippe unten auf **{bereich.events}**. Unter jedem kommenden Termin stehen die Kn
 - **Zähler**: z. B. „5 Zusagen · 2 Absagen“. Er zeigt, wie viele schon geantwortet haben.
 - **Zu- und absagen bis …**: steht da, wenn es für den Termin einen Anmeldeschluss gibt.
 - **Hinweis zu deiner Zusage** bzw. **Absage**: erscheint im aufgeklappten Termin, sobald du geantwortet hast.
-- **Zahl im Kreis** am Knopf **{bereich.events}** unten (bzw. an seiner Kachel): wie viele Termine der nächsten 30 Tage noch auf deine Antwort warten.
 - **Rückmeldungen ansehen**: nur, wenn du Termine des Kalenders pflegen darfst. Es zeigt, wer zugesagt oder abgesagt hat und wer sich noch nicht gemeldet hat, mit den Hinweisen.
 
 ## So gehst du vor

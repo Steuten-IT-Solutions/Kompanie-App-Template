@@ -59,8 +59,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   neue Recht _Bei Terminen des internen Kalenders zu- und absagen_ unter
   [Einstellungen → Rollen](app:einstellungen/rollen): Nach dem Update hat es jede Rolle mit dem internen Kalender außer
   Gast. Wird ein Termin verschoben, bleiben die Rückmeldungen erhalten; etwa drei Monate nach dem Termin löscht die App
-  sie. Eine Zahl im Kreis am Knopf _Termine_ zeigt, wie viele Termine der nächsten 30 Tage noch auf die eigene Antwort
-  warten. In der [Anwesenheit](app:verwaltung/anwesenheit) steht bei jeder Person ihre Rückmeldung; wer abgesagt hat,
+  sie. In der [Anwesenheit](app:verwaltung/anwesenheit) steht bei jeder Person ihre Rückmeldung; wer abgesagt hat,
   ist dort als _entschuldigt_ vorausgewählt (eingetragen erst mit _Speichern_, auf einmal mit _Absagen übernehmen_).
   Wer die Anwesenheit erfasst, kann dort auch für andere zu- oder absagen, z. B. nach einem Anruf; das steht im
   Änderungsprotokoll.

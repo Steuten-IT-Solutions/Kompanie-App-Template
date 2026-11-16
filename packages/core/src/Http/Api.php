@@ -726,7 +726,6 @@ final class Api
             'registration' => $a->registrations()->enabled(),
             'pendingRegistrations' => $user !== null && $this->can(Cap::CreateUsers) ? $a->registrations()->countPending() : null,
             // Zu- und Absagen: kommende Termine ohne eigene Rückmeldung (Zahl an der Kachel des Kalenders), sonst null
-            'awaitingResponses' => $user !== null && ($features['calendar'] ?? false) && $this->can(Cap::RespondCalendar) ? $a->eventResponses()->awaitingCount($user) : null,
             // Einreichen von Bildern und Videos erlaubt (Einstellungen → Galerie): sonst kein Knopf „einreichen“
             'gallerySubmissions' => ($features['gallery'] ?? false) && $a->gallerySubmissions()->enabled(),
             // Impressum und Datenschutzerklärung der Kompanie (Einstellungen → Impressum und Datenschutz): für alle, auch Gäste

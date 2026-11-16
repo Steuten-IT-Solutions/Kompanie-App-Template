@@ -3807,22 +3807,6 @@ select.attendance-response {
   width: 20px;
   height: 20px;
 }
-/* Zahl im Kreis am Tab (Termine ohne eigene Zu- oder Absage): klein oben rechts am Symbol, auch nur mit Symbolen. */
-.tabbar button .count-badge,
-.tabbar.tabbar-icons button .count-badge {
-  display: block;
-  top: 3px;
-  right: auto;
-  left: calc(50% + 6px);
-  min-width: 18px;
-  max-width: none;
-  height: 18px;
-  padding: 0 5px;
-  font-size: 0.66rem;
-  line-height: 18px;
-  overflow: visible;
-  box-shadow: none;
-}
 /* Einstellungen → Navigation: Umbenennen je Bereich */
 .nav-rename {
   margin-top: 6px;
