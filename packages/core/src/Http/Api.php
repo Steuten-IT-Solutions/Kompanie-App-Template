@@ -1427,9 +1427,9 @@ final class Api
                 $a->passives()->delete($r->id());
                 return ['deleted' => true];
             }, 'passive', $denyRights),
-            // Beitrag: je Passivem und Jahr eine Zahlung (Betrag, Datum); Jahresbeitrag als Vorschlag
-            new Route('GET', '/passive-members/fee', Cap::ManagePassive, fn () => $a->passives()->fee(), 'passive', $denyRights),
-            new Route('PUT', '/passive-members/fee', Cap::ManagePassive, fn (Request $r) => $a->passives()->setFee((array) $r->body), 'passive', $denyRights),
+            // Beitrag: je Passivem und Jahr eine Zahlung (Betrag, Datum, Zahlungsart); Jahresbeitrag und Zahlungsarten einrichten
+            new Route('GET', '/passive-members/settings', Cap::ManagePassive, fn () => $a->passives()->settings(), 'passive', $denyRights),
+            new Route('PATCH', '/passive-members/settings', Cap::ManagePassive, fn (Request $r) => $a->passives()->setSettings((array) $r->body), 'passive', $denyRights),
             new Route('POST', '/passive-members/{id}/payments', Cap::ManagePassive, fn (Request $r) => Response::created($a->passives()->addPayment($this->user(), $r->id(), (array) $r->body)), 'passive', $denyRights),
             new Route('PATCH', '/passive-payments/{id}', Cap::ManagePassive, fn (Request $r) => $a->passives()->updatePayment($this->user(), $r->id(), (array) $r->body), 'passive', $denyRights),
             new Route('DELETE', '/passive-payments/{id}', Cap::ManagePassive, function (Request $r) use ($a) {

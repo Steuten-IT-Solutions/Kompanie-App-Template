@@ -1555,14 +1555,14 @@ final class ApiScenario
         $c->ok($this->req('POST', '/passive-members', ['first_name' => 'Kptest'])[0] === 400, 'Ohne Nachnamen → 400');
         // Beitrag: eine Zahlung je Jahr, Jahresbeitrag als Vorschlag
         $year = (int) gmdate('Y');
-        [, $fee] = $this->req('GET', '/passive-members/fee');
-        [$s, $f] = $this->req('PUT', '/passive-members/fee', ['fee_cents' => 2400]);
-        $c->ok($s === 200 && ($f['fee_cents'] ?? 0) === 2400, 'Jahresbeitrag als Vorschlag einstellen');
-        $this->req('PUT', '/passive-members/fee', ['fee_cents' => (int) ($fee['fee_cents'] ?? 0)]);
-        [$s, $pay] = $this->req('POST', "/passive-members/$id/payments", ['year' => $year, 'amount_cents' => 2400, 'paid_on' => gmdate('Y-m') . '-01', 'method' => 'sepa']);
+        [, $settings] = $this->req('GET', '/passive-members/settings');
+        [$s, $f] = $this->req('PATCH', '/passive-members/settings', ['fee_cents' => 2400, 'methods' => ['Bar', 'SEPA', 'Kptest']]);
+        $c->ok($s === 200 && ($f['fee_cents'] ?? 0) === 2400 && ($f['methods'] ?? []) === ['Bar', 'SEPA', 'Kptest'], 'Jahresbeitrag und Zahlungsarten einrichten');
+        $this->req('PATCH', '/passive-members/settings', ['fee_cents' => (int) ($settings['fee_cents'] ?? 0), 'methods' => (array) ($settings['methods'] ?? ['Bar', 'SEPA', 'PayPal'])]);
+        [$s, $pay] = $this->req('POST', "/passive-members/$id/payments", ['year' => $year, 'amount_cents' => 2400, 'paid_on' => gmdate('Y-m') . '-01', 'method' => 'SEPA']);
         $payId = (int) ($pay['id'] ?? 0);
-        $c->ok($s === 201 && ($pay['amount_cents'] ?? 0) === 2400 && ($pay['method'] ?? '') === 'sepa', 'Zahlung für das Jahr eintragen (mit Zahlungsart)');
-        $c->ok($this->req('POST', "/passive-members/$id/payments", ['year' => $year, 'amount_cents' => 100, 'paid_on' => gmdate('Y-m') . '-01', 'method' => 'cash'])[0] === 400, 'Zweite Zahlung im selben Jahr → 400');
+        $c->ok($s === 201 && ($pay['amount_cents'] ?? 0) === 2400 && ($pay['method'] ?? '') === 'SEPA', 'Zahlung für das Jahr eintragen (mit Zahlungsart)');
+        $c->ok($this->req('POST', "/passive-members/$id/payments", ['year' => $year, 'amount_cents' => 100, 'paid_on' => gmdate('Y-m') . '-01', 'method' => 'Bar'])[0] === 400, 'Zweite Zahlung im selben Jahr → 400');
         [$s, $pay] = $this->req('PATCH', "/passive-payments/$payId", ['amount_cents' => 3000]);
         $c->ok($s === 200 && ($pay['amount_cents'] ?? 0) === 3000, 'Zahlung ändern');
         [, $one] = $this->req('GET', "/passive-members/$id");

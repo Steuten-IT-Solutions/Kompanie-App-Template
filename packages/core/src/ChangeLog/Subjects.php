@@ -81,7 +81,7 @@ final class Subjects
         '/admin/backup/drive' => ['enabled' => 'Automatisch sichern'],
         '/admin/backup/server' => ['enabled' => 'Automatisch sichern'],
         '/admin/former/retention' => ['years' => 'Frist (Jahre)'],
-        '/passive-members/fee' => ['fee_cents' => 'Jahresbeitrag (Vorschlag, Cent)'],
+        '/passive-members/settings' => ['fee_cents' => 'Jahresbeitrag (Vorschlag, Cent)', 'methods' => 'Zahlungsarten'],
         '/admin/website' => ['home_page_title' => 'Startseite der Webseite', 'entry.state' => 'Einstiegsdatei'],
     ];
 
@@ -233,7 +233,7 @@ final class Subjects
             'PUT /admin/backup/encryption' => $this->event('Einstellungen', 'Verschlüsselung der Sicherung', 'update'),
             'DELETE /admin/backup/encryption' => $this->event('Einstellungen', 'Verschlüsselung der Sicherung', 'delete'),
             'PUT /admin/former/retention' => $this->settings('Aufbewahrungsfrist für Ehemalige', '/admin/former/retention'),
-            'PUT /passive-members/fee' => $this->settings('Jahresbeitrag der Passiven', '/passive-members/fee'),
+            'PATCH /passive-members/settings' => $this->settings('Beiträge der Passiven', '/passive-members/settings'),
             'PUT /admin/activity/settings' => $this->value('Nutzung', 'Erfassung je Person', fn (): bool => $this->app->activity()->personal()),
             'PUT /admin/changes/settings' => $this->values('Änderungsprotokoll', fn (): array => [
                 'Änderungen protokollieren' => $this->app->changeLog()->enabled(),
@@ -305,7 +305,7 @@ final class Subjects
             'birth_date' => 'Geburtsdatum', 'caretaker_id' => ['Betreuer', 'user'],
         ], personal: ['street', 'house_number', 'address_extra', 'postal_code', 'city', 'country', 'country_name', 'phone', 'email', 'birth_date']);
         $passivePayments = $this->spec('Beitrag eines Passiven', 'passive_payments', fn (array $r): string => trim($this->lookup('passive_members', 'first_name', $r['passive_id']) . ' ' . $this->lookup('passive_members', 'last_name', $r['passive_id'])) . ' ' . $r['year'], [
-            'year' => 'Jahr', 'amount_cents' => ['Betrag', 'cents'], 'paid_on' => 'Bezahlt am', 'method' => ['Zahlungsart', 'payment_method'],
+            'year' => 'Jahr', 'amount_cents' => ['Betrag', 'cents'], 'paid_on' => 'Bezahlt am', 'method' => 'Zahlungsart',
         ]);
         $sponsors = $this->spec('Sponsor', 'sponsors', 'name', ['name' => 'Name', 'url' => 'Link', 'logo_version' => ['Logo', 'secret']]);
         $companies = $this->spec('Kompanie', 'companies', 'name', [
@@ -877,7 +877,6 @@ final class Subjects
             'bool' => (bool) (int) $v,
             'user' => $this->name((int) $v),
             'cents' => self::euro($v),
-            'payment_method' => \KompanieApp\Core\Domain\PassiveMemberService::METHODS[(string) $v] ?? (string) $v,
             'html' => self::plain((string) $v),
             'json' => self::jsonList($v),
             default => is_scalar($v) ? (string) $v : null,

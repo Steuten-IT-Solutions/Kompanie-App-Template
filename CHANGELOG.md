@@ -27,9 +27,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 ### Neu
 
 - **Beitrag der Passiven**: Unter [Verwaltung → Passive](app:verwaltung/passive) trägst du jetzt je Passivem und Jahr
-  ein, dass der Beitrag bezahlt ist, mit Betrag, Datum und Zahlungsart (Bar, SEPA oder PayPal). Oben wählst du das Jahr, siehst, wie viele
+  ein, dass der Beitrag bezahlt ist, mit Betrag, Datum und Zahlungsart. Oben wählst du das Jahr, siehst, wie viele
   bezahlt haben, und kannst nur die offenen oder nur die bezahlten zeigen. Einen Jahresbeitrag stellst du als Vorschlag
-  ein, er steht beim Eintragen schon im Feld. Eintragen darf, wer Passive verwaltet. Betreuer sehen unter
+  ein, er steht beim Eintragen schon im Feld; die Zahlungsarten zur Auswahl richtest du dort auch ein (vorgegeben
+  Bar, SEPA und PayPal). Eintragen darf, wer Passive verwaltet. Betreuer sehen unter
   [Meins → Meine Passiven](app:meins/passive), ob der Beitrag für das laufende Jahr bezahlt ist.
 - **Passive**: Mit dem neuen Bereich _Passive_ (unter [Einstellungen → Bereiche](app:einstellungen/bereiche)) führt ihr
   unter [Verwaltung → Passive](app:verwaltung/passive) eine interne Liste eurer passiven Mitglieder mit Vorname,

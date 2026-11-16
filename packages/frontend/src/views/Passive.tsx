@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { api, type PassiveInput, type PassiveList, type PassiveMember, type PassivePayment, type PaymentMethod } from '../api';
+import { api, type PassiveInput, type PassiveList, type PassiveMember, type PassivePayment } from '../api';
 import { addressInput, EMPTY_ADDRESS, formatAddress, mapLinkTarget, mapPlatform, mapUrl, type Address } from '../address';
 import { normalizeEmail } from '../email';
 import { normalizePhone } from '../phone';
@@ -13,8 +13,9 @@ const NAME_MAX = 100;
 /** Höchster Betrag einer Zahlung (wie auf dem Server) */
 const MAX_CENTS = 100000;
 
-/** Zahlungsarten mit Bezeichnung (wie auf dem Server) */
-const METHODS: Record<PaymentMethod, string> = { cash: 'Bar', sepa: 'SEPA', paypal: 'PayPal' };
+/** Höchstlänge der Bezeichnung einer Zahlungsart (wie auf dem Server) */
+const METHOD_MAX = 40;
+const METHODS_MAX = 20;
 
 /** Betrag in Cent als Text fürs Eingabefeld, z. B. 2400 → „24,00“ */
 function centsText(cents: number): string {
@@ -39,7 +40,7 @@ function PaymentLine({ year, payment }: { year: number; payment: PassivePayment 
   return payment ? (
     <span>
       Beitrag {year}: <span className="pos">{formatEuro(payment.amount_cents)}</span>, bezahlt am {formatDate(payment.paid_on)}
-      {METHODS[payment.method] ? ` (${METHODS[payment.method]})` : ''}
+      {payment.method ? ` (${payment.method})` : ''}
     </span>
   ) : (
     <span>
@@ -53,6 +54,7 @@ function PaymentForm({
   year,
   payment,
   feeCents,
+  methods,
   busy,
   onSave,
   onDelete,
@@ -61,14 +63,17 @@ function PaymentForm({
   year: number;
   payment: PassivePayment | undefined;
   feeCents: number;
+  methods: string[];
   busy: boolean;
-  onSave: (amountCents: number, paidOn: string, method: PaymentMethod) => void;
+  onSave: (amountCents: number, paidOn: string, method: string) => void;
   onDelete: () => void;
   onCancel: () => void;
 }) {
   const [amount, setAmount] = useState(payment ? centsText(payment.amount_cents) : feeCents > 0 ? centsText(feeCents) : '');
   const [date, setDate] = useState(payment?.paid_on ?? todayYmd());
-  const [method, setMethod] = useState<PaymentMethod | ''>(payment && METHODS[payment.method] ? payment.method : '');
+  const [method, setMethod] = useState(payment?.method ?? (methods.length === 1 ? methods[0] : ''));
+  // Eine frühere Zahlungsart, die nicht mehr zur Auswahl steht, bleibt beim Ändern wählbar
+  const options = payment?.method && !methods.includes(payment.method) ? [...methods, payment.method] : methods;
   const [error, setError] = useState<string | null>(null);
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -106,11 +111,11 @@ function PaymentForm({
       </div>
       <label className="field">
         <span>Zahlungsart</span>
-        <select value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod | '')} required>
+        <select value={method} onChange={(e) => setMethod(e.target.value)} required>
           <option value="">bitte wählen</option>
-          {(Object.keys(METHODS) as PaymentMethod[]).map((m) => (
+          {options.map((m) => (
             <option key={m} value={m}>
-              {METHODS[m]}
+              {m}
             </option>
           ))}
         </select>
@@ -132,10 +137,21 @@ function PaymentForm({
   );
 }
 
-/** Jahresbeitrag als Vorschlag beim Eintragen: anzeigen und ändern. */
-function FeeSetting({ feeCents, busy, onSave }: { feeCents: number; busy: boolean; onSave: (cents: number) => Promise<boolean> }) {
+/** Einstellungen der Beiträge: Jahresbeitrag als Vorschlag und Zahlungsarten zur Auswahl, anzeigen und ändern. */
+function PaymentSettings({
+  feeCents,
+  methods,
+  busy,
+  onSave,
+}: {
+  feeCents: number;
+  methods: string[];
+  busy: boolean;
+  onSave: (data: { fee_cents: number; methods: string[] }) => Promise<boolean>;
+}) {
   const [editing, setEditing] = useState(false);
   const [amount, setAmount] = useState('');
+  const [names, setNames] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -145,40 +161,78 @@ function FeeSetting({ feeCents, busy, onSave }: { feeCents: number; busy: boolea
       if (typeof parsed === 'string') return setError(parsed);
       cents = parsed;
     }
+    const list = names.map((n) => n.trim()).filter((n) => n !== '');
+    if (list.length === 0) return setError('Bitte mindestens eine Zahlungsart angeben.');
+    const lower = list.map((n) => n.toLowerCase());
+    const twice = list.find((_, i) => lower.indexOf(lower[i]) !== i);
+    if (twice) return setError(`Die Zahlungsart „${twice}“ steht doppelt in der Liste.`);
     setError(null);
-    if (await onSave(cents)) setEditing(false);
+    if (await onSave({ fee_cents: cents, methods: list })) setEditing(false);
   }
   if (!editing) {
     return (
       <p className="small passive-fee-setting">
-        Jahresbeitrag (Vorschlag): {feeCents > 0 ? formatEuro(feeCents) : <span className="muted">keiner</span>}{' '}
+        Jahresbeitrag (Vorschlag): {feeCents > 0 ? formatEuro(feeCents) : <span className="muted">keiner</span>}
+        <br />
+        Zahlungsarten: {methods.join(', ')}{' '}
         <button
           type="button"
           className="link-button"
           onClick={() => {
             setAmount(feeCents > 0 ? centsText(feeCents) : '');
+            setNames(methods.length > 0 ? methods : ['']);
             setError(null);
             setEditing(true);
           }}
         >
-          {feeCents > 0 ? 'Ändern' : 'Festlegen'}
+          Ändern
         </button>
       </p>
     );
   }
   return (
     <form className="form card" onSubmit={submit}>
-      <h3>Jahresbeitrag</h3>
-      <p className="small muted">Steht beim Eintragen einer Zahlung schon im Feld und lässt sich dort ändern. Leer heißt kein Vorschlag.</p>
+      <h3>Beiträge einrichten</h3>
       {error && (
         <p className="form-error" role="alert">
           {error}
         </p>
       )}
       <label className="field">
-        <span>Betrag in €</span>
+        <span>Jahresbeitrag in € (Vorschlag)</span>
         <input type="text" inputMode="decimal" placeholder="24,00" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus />
       </label>
+      <p className="small muted">Steht beim Eintragen einer Zahlung schon im Feld und lässt sich dort ändern. Leer heißt kein Vorschlag.</p>
+      <div className="field poll-options-edit">
+        <span>Zahlungsarten</span>
+        {names.map((n, i) => (
+          <div className="poll-option-edit" key={i}>
+            <input
+              type="text"
+              aria-label={`Zahlungsart ${i + 1}`}
+              value={n}
+              maxLength={METHOD_MAX}
+              onChange={(e) => setNames(names.map((x, j) => (j === i ? e.target.value : x)))}
+            />
+            {names.length > 1 && (
+              <button
+                type="button"
+                className="btn btn-link"
+                aria-label={`Zahlungsart ${i + 1} entfernen`}
+                onClick={() => setNames(names.filter((_, j) => j !== i))}
+              >
+                ×
+              </button>
+            )}
+          </div>
+        ))}
+        {names.length < METHODS_MAX && (
+          <button type="button" className="btn btn-link poll-add-option" onClick={() => setNames([...names, ''])}>
+            + Zahlungsart
+          </button>
+        )}
+      </div>
+      <p className="small muted">Frühere Zahlungen behalten ihre Zahlungsart, auch wenn du sie hier entfernst.</p>
       <div className="button-row">
         <button className="btn" type="submit" disabled={busy}>
           {busy ? 'Speichert …' : 'Speichern'}
@@ -406,6 +460,7 @@ export function PassiveAdmin({ onToast }: { onToast: (msg: string) => void }) {
   const current = data.year ?? Number(todayYmd().slice(0, 4));
   const year = yearChoice ?? current;
   const feeCents = data.fee_cents ?? 0;
+  const methods = data.methods ?? [];
   // Wählbar: nächstes Jahr (Vorauszahlung) bis fünf Jahre zurück, dazu jedes Jahr mit einer Zahlung
   const paidYears = data.passives.flatMap((p) => (p.payments ?? []).map((x) => x.year));
   const oldest = Math.min(current - 4, ...paidYears);
@@ -429,7 +484,12 @@ export function PassiveAdmin({ onToast }: { onToast: (msg: string) => void }) {
         {data.passives.length > 0 && `, Beitrag ${year}: ${paidCount} bezahlt, ${data.passives.length - paidCount} offen`}
       </p>
       {editing === null && paying === null && errorBox}
-      <FeeSetting feeCents={feeCents} busy={busy} onSave={(cents) => run(() => api.setPassiveFee(cents), 'Jahresbeitrag gespeichert')} />
+      <PaymentSettings
+        feeCents={feeCents}
+        methods={methods}
+        busy={busy}
+        onSave={(settings) => run(() => api.updatePassiveSettings(settings), 'Gespeichert')}
+      />
       {editing === 'new' ? (
         <>
           {errorBox}
@@ -532,6 +592,7 @@ export function PassiveAdmin({ onToast }: { onToast: (msg: string) => void }) {
                         year={year}
                         payment={paymentOf(p, year)}
                         feeCents={feeCents}
+                        methods={methods}
                         busy={busy}
                         onSave={(amount_cents, paid_on, method) => {
                           const payment = paymentOf(p, year);

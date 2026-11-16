@@ -24,9 +24,11 @@ use KompanieApp\Core\Storage\PassiveMemberRepository;
  *   (wie bei Mitgliedern).
  * - Ausnahme (bewusst so entschieden): Wer Betreuer ist, sieht unter Meins → Meine Passiven alle Angaben seiner eigenen
  *   Passiven, auch ohne view_personal, aber nur zum Lesen (mine()).
- * - Beitrag (Entscheidungen vom 16.11.2026): je Passivem und Jahr höchstens eine Zahlung mit Betrag, Datum und Zahlungsart (Bar, SEPA, PayPal). Eintragen,
+ * - Beitrag (Entscheidungen vom 16.11.2026): je Passivem und Jahr höchstens eine Zahlung mit Betrag, Datum und Zahlungsart. Eintragen,
  *   ändern und löschen darf, wer Passive verwaltet (manage_passive). Ein Jahresbeitrag lässt sich als Vorschlag
- *   einstellen (fee()), die App setzt ihn beim Eintragen ins Feld. Der Betreuer sieht die Zahlungen seiner Passiven unter
+ *   einstellen, die App setzt ihn beim Eintragen ins Feld; die Zahlungsarten zur Auswahl richtet man dort auch ein
+ *   (settings()). Gespeichert wird die Bezeichnung der Zahlungsart, frühere Zahlungen behalten sie also, auch wenn sie
+ *   später aus der Auswahl entfernt wird. Der Betreuer sieht die Zahlungen seiner Passiven unter
  *   Meins, nur zum Lesen.
  *
  * @phpstan-import-type PassiveRow from PassiveMemberRepository
@@ -45,8 +47,12 @@ final class PassiveMemberService
     /** Höchster Betrag einer Zahlung und des Vorschlags in Cent (1.000 Euro) */
     public const MAX_CENTS = 100000;
     public const YEAR_MIN = 1900;
-    /** Zahlungsarten (Wunsch vom 16.11.2026): Schlüssel => Bezeichnung */
-    public const METHODS = ['cash' => 'Bar', 'sepa' => 'SEPA', 'paypal' => 'PayPal'];
+    /** Einstellung: Zahlungsarten zur Auswahl (Liste von Bezeichnungen) */
+    public const METHODS_SETTING = 'passive_payment_methods';
+    /** Zahlungsarten, solange keine eingerichtet sind (Wunsch vom 16.11.2026) */
+    public const DEFAULT_METHODS = ['Bar', 'SEPA', 'PayPal'];
+    public const METHOD_MAX = 40;
+    public const METHODS_MAX = 20;
 
     private ?PassiveMemberRepository $repo = null;
 
@@ -62,7 +68,7 @@ final class PassiveMemberService
     /**
      * Alle Passiven für die Verwaltung, nach Nachname, dazu die Mitglieder, die Betreuer sein können.
      *
-     * @return array{passives: list<array<string, mixed>>, caretakers: list<array{id: int, name: string}>, personal: bool, manage_personal: bool, fee_cents: int, year: int}
+     * @return array{passives: list<array<string, mixed>>, caretakers: list<array{id: int, name: string}>, personal: bool, manage_personal: bool, fee_cents: int, methods: list<string>, year: int}
      */
     public function list(User $viewer): array
     {
@@ -77,7 +83,7 @@ final class PassiveMemberService
             'caretakers' => $this->caretakers(),
             'personal' => $personal,
             'manage_personal' => $viewer->can(Capability::ManagePersonal),
-            'fee_cents' => $this->fee()['fee_cents'],
+            ...$this->settings(),
             'year' => $this->year(),
         ];
     }
@@ -175,7 +181,7 @@ final class PassiveMemberService
         $year = $this->paymentYear($in['year'] ?? null);
         $cents = self::cents($in['amount_cents'] ?? null);
         $paidOn = $this->paidOn($in['paid_on'] ?? null);
-        $method = self::method($in['method'] ?? null);
+        $method = $this->method($in['method'] ?? null, null);
         if ($this->repository()->hasPayment($passiveId, $year)) {
             throw ApiError::invalid(sprintf('Für %d ist schon eine Zahlung eingetragen.', $year));
         }
@@ -206,7 +212,7 @@ final class PassiveMemberService
             $values['paid_on'] = $this->paidOn($in['paid_on']);
         }
         if (array_key_exists('method', $in)) {
-            $values['method'] = self::method($in['method']);
+            $values['method'] = $this->method($in['method'], $row['method']);
         }
         $this->repository()->updatePayment($id, $values, $actor->id, $this->app->time()->nowUtc());
         return self::payment($this->findPayment($id));
@@ -219,27 +225,70 @@ final class PassiveMemberService
     }
 
     /**
-     * Jahresbeitrag als Vorschlag beim Eintragen (0 = keiner).
+     * Einstellungen der Beiträge: Jahresbeitrag als Vorschlag beim Eintragen (0 = keiner) und die Zahlungsarten zur
+     * Auswahl.
      *
-     * @return array{fee_cents: int}
+     * @return array{fee_cents: int, methods: list<string>}
      */
-    public function fee(): array
+    public function settings(): array
     {
         // WordPress kann Zahlen als Zeichenkette zurückgeben.
         $v = $this->app->settings->get(self::FEE_SETTING, 0);
-        return ['fee_cents' => is_numeric($v) ? max(0, min(self::MAX_CENTS, (int) $v)) : 0];
+        $m = $this->app->settings->get(self::METHODS_SETTING);
+        $methods = is_array($m) ? array_values(array_filter(array_map(static fn (mixed $x): string => is_string($x) ? $x : '', $m), static fn (string $x): bool => $x !== '')) : [];
+        return [
+            'fee_cents' => is_numeric($v) ? max(0, min(self::MAX_CENTS, (int) $v)) : 0,
+            'methods' => is_array($m) ? $methods : self::DEFAULT_METHODS,
+        ];
     }
 
     /**
-     * @param array<string, mixed> $in fee_cents (0 oder leer = keiner)
-     * @return array{fee_cents: int}
+     * Was fehlt, bleibt.
+     *
+     * @param array<string, mixed> $in fee_cents (0 oder leer = keiner), methods (Liste von Bezeichnungen, mindestens eine)
+     * @return array{fee_cents: int, methods: list<string>}
      */
-    public function setFee(array $in): array
+    public function setSettings(array $in): array
     {
-        $raw = $in['fee_cents'] ?? null;
-        $cents = $raw === null || $raw === '' || Input::integer($raw) === 0 ? 0 : self::cents($raw);
-        $this->app->settings->set(self::FEE_SETTING, $cents);
-        return $this->fee();
+        $methods = null;
+        if (array_key_exists('methods', $in)) {
+            if (!is_array($in['methods'])) {
+                throw ApiError::invalid('Bitte die Zahlungsarten als Liste angeben.');
+            }
+            $methods = [];
+            foreach ($in['methods'] as $raw) {
+                $name = Text::line(is_string($raw) ? $raw : '');
+                if ($name === '') {
+                    continue;
+                }
+                if (mb_strlen($name) > self::METHOD_MAX) {
+                    throw ApiError::invalid(sprintf('Eine Zahlungsart darf höchstens %d Zeichen lang sein.', self::METHOD_MAX));
+                }
+                if (in_array(mb_strtolower($name), array_map('mb_strtolower', $methods), true)) {
+                    throw ApiError::invalid(sprintf('Die Zahlungsart „%s“ steht doppelt in der Liste.', $name));
+                }
+                $methods[] = $name;
+            }
+            if ($methods === []) {
+                throw ApiError::invalid('Bitte mindestens eine Zahlungsart angeben.');
+            }
+            if (count($methods) > self::METHODS_MAX) {
+                throw ApiError::invalid(sprintf('Es gehen höchstens %d Zahlungsarten.', self::METHODS_MAX));
+            }
+        }
+        $cents = null;
+        if (array_key_exists('fee_cents', $in)) {
+            $raw = $in['fee_cents'];
+            $cents = $raw === null || $raw === '' || Input::integer($raw) === 0 ? 0 : self::cents($raw);
+        }
+        // Erst alles prüfen, dann speichern
+        if ($methods !== null) {
+            $this->app->settings->set(self::METHODS_SETTING, $methods);
+        }
+        if ($cents !== null) {
+            $this->app->settings->set(self::FEE_SETTING, $cents);
+        }
+        return $this->settings();
     }
 
     /** Laufendes Jahr (Zeitzone der App) */
@@ -269,13 +318,21 @@ final class PassiveMemberService
         return $cents;
     }
 
-    /** Zahlungsart: einer der Schlüssel aus METHODS (Pflicht). */
-    private static function method(mixed $raw): string
+    /**
+     * Zahlungsart (Pflicht): eine der eingerichteten. Beim Ändern bleibt die bisherige erlaubt, auch wenn sie nicht mehr
+     * zur Auswahl steht.
+     */
+    private function method(mixed $raw, ?string $current): string
     {
-        if (!is_string($raw) || !array_key_exists($raw, self::METHODS)) {
-            throw ApiError::invalid('Bitte die Zahlungsart wählen: ' . implode(', ', self::METHODS) . '.');
+        $name = Text::line(is_string($raw) ? $raw : '');
+        $methods = $this->settings()['methods'];
+        if ($name !== '' && $name === $current) {
+            return $name;
         }
-        return $raw;
+        if ($name === '' || !in_array($name, $methods, true)) {
+            throw ApiError::invalid('Bitte eine der Zahlungsarten wählen: ' . implode(', ', $methods) . '.');
+        }
+        return $name;
     }
 
     /** Datum der Zahlung JJJJ-MM-TT, ab 1900, nicht in der Zukunft. */

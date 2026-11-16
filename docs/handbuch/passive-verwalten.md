@@ -13,7 +13,7 @@ Den Knopf gibt es, sobald unter **Einstellungen → Bereiche** der Bereich **Pas
 
 ## Was du hier siehst
 - **Zähler** oben: wie viele Passive eingetragen sind und wie viele davon den Beitrag für das gewählte Jahr bezahlt haben.
-- **Jahresbeitrag (Vorschlag)**: der Betrag, der beim Eintragen einer Zahlung schon im Feld steht. Mit **Festlegen** bzw. **Ändern** stellst du ihn ein.
+- **Jahresbeitrag (Vorschlag)** und **Zahlungsarten**: der Betrag, der beim Eintragen einer Zahlung schon im Feld steht, und die Zahlungsarten zur Auswahl. Mit **Ändern** richtest du beides ein.
 - **Beitrag für**: das Jahr, dessen Zahlungen die Liste zeigt. Vorgegeben ist das laufende Jahr; wählbar sind auch das nächste Jahr und frühere Jahre.
 - **Zeigen**: alle Passiven, nur die mit offenem Beitrag oder nur die, die bezahlt haben.
 - **+ Passiven anlegen**: öffnet das Formular für einen neuen Eintrag.
@@ -36,14 +36,18 @@ Den Knopf gibt es, sobald unter **Einstellungen → Bereiche** der Bereich **Pas
 ### Eine Zahlung eintragen
 1. Wähle bei **Beitrag für** das Jahr.
 2. Tippe beim Passiven auf **Zahlung eintragen**.
-3. Prüfe den **Betrag in €** (vorgegeben ist der Jahresbeitrag) und das Datum bei **Bezahlt am** (vorgegeben ist heute), und wähle die **Zahlungsart**: Bar, SEPA oder PayPal.
+3. Prüfe den **Betrag in €** (vorgegeben ist der Jahresbeitrag) und das Datum bei **Bezahlt am** (vorgegeben ist heute), und wähle die **Zahlungsart**, z. B. Bar, SEPA oder PayPal.
 4. Tippe auf **Speichern**. Beim Passiven steht jetzt der Betrag mit Datum und Zahlungsart.
 
 Je Passiver gibt es für jedes Jahr nur eine Zahlung. Um eine Zahlung zu ändern oder zu löschen, tippe beim Passiven auf **Ändern** und dann auf **Speichern** bzw. **Zahlung löschen**.
 
-### Den Jahresbeitrag festlegen
-1. Tippe oben bei **Jahresbeitrag (Vorschlag)** auf **Festlegen** bzw. **Ändern**.
-2. Trage den Betrag ein, z. B. 24,00, und tippe auf **Speichern**. Lässt du das Feld leer, gibt es keinen Vorschlag.
+### Jahresbeitrag und Zahlungsarten einrichten
+1. Tippe oben bei **Zahlungsarten** auf **Ändern**.
+2. Trage bei **Jahresbeitrag in €** den Betrag ein, z. B. 24,00. Lässt du das Feld leer, gibt es keinen Vorschlag.
+3. Passe die **Zahlungsarten** an. Vorgegeben sind Bar, SEPA und PayPal. Mit **+ Zahlungsart** kommt eine dazu, mit **×** entfernst du eine. Mindestens eine muss bleiben.
+4. Tippe auf **Speichern**.
+
+Frühere Zahlungen behalten ihre Zahlungsart, auch wenn du sie aus der Auswahl entfernst.
 
 ### Einen Passiven löschen
 1. Tippe beim Eintrag auf **Löschen**.

@@ -762,11 +762,15 @@ export interface PassivePayment {
   amount_cents: number;
   /** JJJJ-MM-TT */
   paid_on: string;
-  method: PaymentMethod;
+  /** Bezeichnung der Zahlungsart (eine der eingerichteten zur Zeit der Zahlung) */
+  method: string;
 }
 
-/** Zahlungsart eines Beitrags */
-export type PaymentMethod = 'cash' | 'sepa' | 'paypal';
+/** Einstellungen der Beiträge: Jahresbeitrag als Vorschlag (0 = keiner) und Zahlungsarten zur Auswahl */
+export interface PassiveSettings {
+  fee_cents: number;
+  methods: string[];
+}
 
 /** Verwaltung → Passive: alle Passiven, Mitglieder zur Wahl als Betreuer und was die Person an Angaben sieht und ändert. */
 export interface PassiveList {
@@ -776,6 +780,8 @@ export interface PassiveList {
   manage_personal: boolean;
   /** Jahresbeitrag als Vorschlag beim Eintragen in Cent (0 = keiner); fehlt bei älteren Servern */
   fee_cents?: number;
+  /** Zahlungsarten zur Auswahl; fehlt bei älteren Servern */
+  methods?: string[];
   /** Laufendes Jahr laut Server; fehlt bei älteren Servern */
   year?: number;
 }
@@ -2505,12 +2511,12 @@ export const api = {
   updatePassive: (id: number, data: PassiveInput) => request<PassiveMember>('PATCH', `/passive-members/${id}`, data),
   deletePassive: (id: number) => request<{ deleted: boolean }>('DELETE', `/passive-members/${id}`),
   myPassives: () => request<PassiveMember[]>('GET', '/me/passive-members'),
-  addPassivePayment: (passiveId: number, data: { year: number; amount_cents: number; paid_on: string; method: PaymentMethod }) =>
+  addPassivePayment: (passiveId: number, data: { year: number; amount_cents: number; paid_on: string; method: string }) =>
     request<PassivePayment>('POST', `/passive-members/${passiveId}/payments`, data),
-  updatePassivePayment: (id: number, data: { year?: number; amount_cents?: number; paid_on?: string; method?: PaymentMethod }) =>
+  updatePassivePayment: (id: number, data: { year?: number; amount_cents?: number; paid_on?: string; method?: string }) =>
     request<PassivePayment>('PATCH', `/passive-payments/${id}`, data),
   deletePassivePayment: (id: number) => request<{ deleted: boolean }>('DELETE', `/passive-payments/${id}`),
-  setPassiveFee: (feeCents: number) => request<{ fee_cents: number }>('PUT', '/passive-members/fee', { fee_cents: feeCents }),
+  updatePassiveSettings: (data: Partial<PassiveSettings>) => request<PassiveSettings>('PATCH', '/passive-members/settings', data),
   markFormer: (id: number, data: FormerInput) => request<FormerInfo & { offices_ended: number }>('PUT', `/members/${id}/former`, data),
   formerOfficesPreview: (id: number, leftOn: string) =>
     request<FormerOfficesPreview>('GET', `/members/${id}/former/offices`, undefined, { left_on: leftOn }),
