@@ -19,7 +19,7 @@ Oben schaltest du zwischen **Rollen** (die Liste) und **Wer sieht was** (die Üb
 - **Bearbeiten** (Stift): öffnet die Rolle zum Ändern.
 - **+ Neue Rolle**: legt eine weitere Rolle an.
 - **App ohne Anmeldung ansehen**: zeigt die App, wie Besucher ohne Konto sie sehen.
-- **{bereich.attendance}: Gruppen im Zähler** (nur wenn {bereich.attendance} an ist): als was jede Rolle in den Anwesenheitslisten zählt.
+- **{bereich.attendance}: Gruppen im Zähler** (nur wenn {bereich.attendance} an ist): als was jede Rolle im Zähler über der Mitgliederliste zählt. Ohne Einstellung zählen alle Rollen, die zur Kompanie gehören, als {rolle.member}, die übrigen (z. B. Anwärter) je für sich.
 - **Wer sieht was**: eine Tabelle mit allen Rechten als Zeilen und allen Rollen als Spalten. So siehst du auf einen Blick, welche Rolle welchen Knopf sieht, und änderst es direkt.
 
 ## So gehst du vor
@@ -48,7 +48,7 @@ Oben schaltest du zwischen **Rollen** (die Liste) und **Wer sieht was** (die Üb
 1. Halte eine Rolle am Griff links fest und ziehe sie nach oben oder unten. Am Computer geht das am Griff auch mit den Pfeiltasten.
 2. Lass los. Die App speichert die neue Reihenfolge sofort.
 
-### Festlegen, wie Rollen in der {bereich.attendance} zählen
+### Festlegen, wie Rollen im Zähler zählen
 1. Wähle unter **{bereich.attendance}: Gruppen im Zähler** je Rolle **Eigene Gruppe** oder **zählt als …** eine andere Rolle.
 2. Tippe auf **Gruppen speichern**.
 

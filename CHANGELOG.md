@@ -48,8 +48,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   stehen ganz oben im Abschnitt „Heute“ statt unter „Vergangene Termine“. So könnt ihr schon vorher eintragen, wer
   entschuldigt ist. Bis zum Tag des Termins lässt sich nur „entschuldigt“ wählen; „anwesend“ und
   „fehlt“, „Alle anwesend“ und das Buchen von Punkten und Strafen gehen erst ab dem Tag selbst. Das gilt auch für freie
-  Termine mit einem Datum in der Zukunft. Die Aufteilung nach Gruppen unter dem Zähler steht erst ab dem Tag des
-  Termins da.
+  Termine mit einem Datum in der Zukunft.
 - **Anwesenheitsliste zählt Offene**: Der Zähler über der Liste nennt zusätzlich, für wie viele Personen noch nichts
   gewählt ist, z. B. „3 anwesend · 1 entschuldigt · 0 fehlt · 5 ohne Auswahl“.
 - **Zu- und Absagen bei Terminen**: Unter [Termine](app:termine) stehen bei jedem Termin des internen Kalenders die
@@ -108,6 +107,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Ämter-Liste**: Unter [Verwaltung → Ämter](app:verwaltung/aemter) steht ein langer, zweizeiliger Name eines Amts jetzt
   linksbündig wie die übrigen statt mittig. Unter „Gemeinsame Amtszeiten“ hat der Knopf „Neue gemeinsame Amtszeit“ wieder
   Abstand zur Karte darüber.
+
+### Entfernt
+
+- **Aufteilung nach Gruppen in der Anwesenheit**: Unter dem Zähler einer Anwesenheitsliste steht nicht mehr zusätzlich die
+  Aufteilung nach Gruppen (z. B. „entschuldigt: Mitglied 1“); sie wiederholte den Zähler. Die Einstellung
+  [„Gruppen im Zähler“](app:einstellungen/rollen) wirkt weiter auf den Zähler über der Mitgliederliste.
 
 ## [0.12.0] – 2026-11-13
 
