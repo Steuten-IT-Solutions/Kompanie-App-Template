@@ -17,6 +17,7 @@ use KompanieApp\Core\Domain\BoardService;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Input;
 use KompanieApp\Core\Domain\PersonName;
+use KompanieApp\Core\Domain\ReportService;
 use KompanieApp\Core\Domain\SignatureService;
 use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Text;
@@ -748,6 +749,8 @@ final class Api
             'maintenance' => self::maintenanceInfo($a->maintenance()->state()),
             // Einrichtbare Navigation (Issue #277): null = Standardnavigation; nur Darstellung, die Rechte prüfen die Routen
             'navigation' => $a->navigation()->get(),
+            // Eigene Leiste für Gäste (ohne Anmeldung oder mit Grundrolle Gast); null = dieselbe wie für Angemeldete
+            'navigation_guest' => $a->navigation()->guest(),
             // Eigene Namen, Symbole und Startseiten (Issue #362); section_labels = die Namen als Abschnitte (brand.labels.sections)
             'navigation_names' => self::jsonObject($a->navigation()->names()),
             'navigation_start' => self::jsonObject($a->navigation()->start()),
@@ -1518,6 +1521,10 @@ final class Api
             new Route('GET', '/admin/activity/entries', Cap::ViewActivity, fn (Request $r) => $a->activity()->entries($r->query['from'] ?? null, $r->query['to'] ?? null, $r->query['user_id'] ?? null), null, $denySettings),
             new Route('PUT', '/admin/activity/settings', Cap::ManageSettings, fn (Request $r) => ['personal' => $a->activity()->setPersonal($r->input('personal'))], null, $denySettings),
             // Änderungsprotokoll (Domain\ChangeLogService): ansehen mit view_changes, ein/aus und Frist mit den Einstellungen
+            // Bericht als PDF (Verwaltung → Bericht): Abschnitte, die die Person wählen kann, und die Daten eines Zeitraums. Jeder
+            // Abschnitt verlangt sein eigenes Recht (ReportService); das PDF baut die App. Der Abruf steht im Änderungsprotokoll.
+            new Route('GET', '/admin/report/sections', ReportService::access(), fn () => $a->reports()->sections($this->user()), null, $denyRights),
+            new Route('GET', '/admin/report', ReportService::access(), fn (Request $r) => $a->reports()->build($this->user(), $r->query['from'] ?? null, $r->query['to'] ?? null, $r->query['sections'] ?? null), null, $denyRights),
             new Route('GET', '/admin/changes', Cap::ViewChanges, fn (Request $r) => $a->changeLog()->entries($this->user(), $r->query['from'] ?? null, $r->query['to'] ?? null, $r->query['user_id'] ?? null, $r->query['subject_id'] ?? null, $r->query['area'] ?? null), null, $denyRights),
             new Route('PUT', '/admin/changes/settings', Cap::ManageSettings, fn (Request $r) => $a->changeLog()->updateSettings($r->body), null, $denySettings),
             new Route('GET', '/admin/maintenance', Cap::ManageSettings, fn () => $a->maintenance()->state() + ['log' => $a->maintenance()->log()], null, $denySettings),

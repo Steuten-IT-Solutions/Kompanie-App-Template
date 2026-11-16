@@ -1190,7 +1190,7 @@ async function resetNavigation(page: Page) {
       method: 'PUT',
       headers: { [cfg.csrf.header]: cfg.csrf.token, 'Content-Type': 'application/json' },
       credentials: 'same-origin',
-      body: JSON.stringify({ navigation: null, names: {}, start: {}, show_labels: true }),
+      body: JSON.stringify({ navigation: null, guest_navigation: null, names: {}, start: {}, show_labels: true }),
     });
   });
 }
@@ -1260,6 +1260,50 @@ test('Navigation einrichten (Issue #277): Untermenü umbenennen, Termine hineins
   }
 });
 
+test('Eigene Leiste für Gäste: Mitglieder unten statt unter „Intern“, Angemeldete behalten ihre Leiste', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  try {
+    await adminMenu(page, 'Einstellungen');
+    await page
+      .locator('.settings-link')
+      .filter({ has: page.getByText('Navigation', { exact: true }) })
+      .click();
+    const card = page.locator('#einstellungen-navigation');
+    // Eigene Navigation für alle: Punktekatalog raus, sonst wie der Standard (Mitglieder unter „Intern“).
+    await card.getByLabel('Platz von Punktekatalog').selectOption({ label: 'Nicht in der Navigation' });
+    await card.getByRole('button', { name: 'Navigation speichern' }).click();
+    await expect(page.getByText('Navigation gespeichert')).toBeVisible();
+
+    await card.getByRole('button', { name: 'Für Gäste', exact: true }).click();
+    await expect(card.getByRole('button', { name: 'Für Gäste', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(card.getByText('Gäste sehen dieselbe Leiste wie Angemeldete', { exact: false })).toBeVisible();
+    await card.getByLabel('Eigene Leiste für Gäste').check();
+    // Der Entwurf beginnt als Kopie, Mitglieder und Dokumente stehen schon unten.
+    await expect(card.getByLabel('Platz von Mitglieder')).toHaveValue('main');
+    await expect(card.getByLabel('Platz von Dokumente')).toHaveValue('main');
+    await expect(card.getByLabel('Platz von Punktekatalog')).toHaveValue('hidden');
+    expect((await smallestStackGap(card)).gap).toBeGreaterThanOrEqual(12);
+    await card.getByRole('combobox', { name: /^Für Gäste/ }).selectOption({ label: 'Mitglieder' });
+    await card.getByRole('button', { name: 'Navigation speichern' }).click();
+    await expect(page.getByText('Navigation gespeichert')).toBeVisible();
+
+    // Admin (angemeldet): weiter „Intern“, Mitglieder nicht unten.
+    const tabbar = page.locator('.tabbar');
+    await expect(tabbar.getByRole('button', { name: 'Intern' })).toBeVisible();
+    await expect(tabbar.getByRole('button', { name: 'Mitglieder' })).toHaveCount(0);
+
+    // Gast ohne Anmeldung: Mitglieder unten und als Startseite.
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await expect(page).toHaveURL(/#\/mitglieder$/);
+    await expect(tabbar.getByRole('button', { name: 'Mitglieder' })).toHaveAttribute('aria-current', 'page');
+    await shot(page, '41-navigation-gaeste');
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD).catch(() => undefined);
+    await resetNavigation(page).catch(() => undefined);
+  }
+});
+
 test('Navigation (Issue #362): Galerie umbenennen mit eigenem Symbol, Startseite für Gäste, nur Symbole', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   try {
@@ -1274,7 +1318,7 @@ test('Navigation (Issue #362): Galerie umbenennen mit eigenem Symbol, Startseite
     // Erst das Symbol: Mit dem neuen Namen heißt auch die Zeile anders („Platz von Fotos“).
     await row.getByLabel('Symbol').selectOption({ label: 'Kamera' });
     await row.getByLabel('Eigener Name (leer = Standard)').fill('Fotos');
-    await card.getByLabel('Ohne Anmeldung').selectOption({ label: 'Fotos' });
+    await card.getByRole('combobox', { name: /^Für Gäste/ }).selectOption({ label: 'Fotos' });
     await card.getByRole('button', { name: 'Navigation speichern' }).click();
     await expect(page.getByText('Navigation gespeichert')).toBeVisible();
     // Unverändert aus der Standardnavigation: Sie bleibt, nur mit dem neuen Namen.
@@ -2195,6 +2239,14 @@ test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)',
   await expect(page.locator('.gallery-upload', { hasText: 'zweites.jpg' })).toContainText('nicht freigegeben: Unscharf');
   await expect(page.locator('.gallery-upload', { hasText: 'foto.jpg' }).filter({ hasText: title })).toContainText('freigegeben');
 
+  // Aus dem Album heraus einreichen: das Album ist schon gewählt, „‹ Zum Album“ führt zurück
+  await page.goto(`/app/#/galerie/${albumId}`);
+  await page.getByRole('button', { name: 'Bilder und Videos in dieses Album einreichen' }).click();
+  await expect(page).toHaveURL(new RegExp(`#/galerie/einreichen/${albumId}$`));
+  await expect(page.locator('form', { hasText: 'Bilder und Videos einreichen' }).getByLabel('Album')).toHaveValue(String(albumId));
+  await page.getByRole('button', { name: '‹ Zum Album' }).click();
+  await expect(page).toHaveURL(new RegExp(`#/galerie/${albumId}$`));
+
   // Ausgeschaltet: kein Knopf mehr, das Formular sagt es; eigene Einreichungen bleiben sichtbar
   await page.goto('/app/#/einstellungen/galerie');
   await page.getByLabel(/Einreichen von Bildern und Videos durch Mitglieder erlauben/).uncheck();
@@ -2203,6 +2255,9 @@ test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)',
   await page.goto('/app/#/galerie');
   await expect(page.getByRole('button', { name: 'Einreichungen prüfen' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Bilder und Videos einreichen' })).toHaveCount(0);
+  await page.goto(`/app/#/galerie/${albumId}`);
+  await expect(page.getByRole('heading', { name: new RegExp(title) })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Bilder und Videos in dieses Album einreichen' })).toHaveCount(0);
   await page.goto('/app/#/galerie/einreichen');
   await expect(page.getByText('Das Einreichen ist zurzeit ausgeschaltet.')).toBeVisible();
   await expect(page.locator('.gallery-upload', { hasText: 'zweites.jpg' })).toContainText('nicht freigegeben: Unscharf');

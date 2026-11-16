@@ -155,6 +155,8 @@ export interface AppConfig {
   maintenance?: MaintenanceInfo;
   /** Einrichtbare Navigation (Issue #277): null bzw. fehlt = Standardnavigation */
   navigation?: NavigationSetting | null;
+  /** Eigene Leiste für Gäste (ohne Anmeldung oder Grundrolle Gast); null bzw. fehlt = dieselbe wie für Angemeldete */
+  navigation_guest?: NavigationSetting | null;
   /** Eigene Namen und Symbole (Issue #362), je Bereich, eigener Seite oder „intern“ (leer kann als [] kommen) */
   navigation_names?: NavNames;
   /** Startseiten (Issue #362) für Gäste und Angemeldete */
@@ -369,6 +371,8 @@ export type BlockInput =
 /** Einstellungen → Navigation (Issue #277): gespeicherte Navigation und was der Server erlaubt. */
 export interface NavigationAdmin {
   navigation: NavigationSetting | null;
+  /** Leiste für Gäste; null = dieselbe wie für Angemeldete; fehlt bei älteren Servern */
+  guest_navigation?: NavigationSetting | null;
   /** Issue #362: eigene Namen und Symbole, Startseiten, Namen in der Leiste */
   names: NavNames;
   start: NavStart;
@@ -465,6 +469,44 @@ export interface ChangeLogSettings {
   keep_max: number;
 }
 
+/** Bericht als PDF (Verwaltung → Bericht): ein Abschnitt zur Auswahl; dated false = ohne Zeitbezug (Stand heute) */
+export interface ReportSectionChoice {
+  key: string;
+  title: string;
+  dated: boolean;
+}
+
+export interface ReportColumn {
+  label: string;
+  /** Zahl: rechtsbündig */
+  num: boolean;
+  /** Langer Text (Grund, Adresse): bekommt den übrigen Platz und bricht um */
+  wrap: boolean;
+}
+
+export interface ReportTable {
+  /** Überschrift über der Tabelle; leer: keine */
+  title: string;
+  columns: ReportColumn[];
+  rows: string[][];
+  /** Hinweis statt der Tabelle, wenn sie leer ist */
+  empty: string;
+}
+
+export interface ReportSection extends ReportSectionChoice {
+  /** Breite Tabelle: Seite quer */
+  landscape: boolean;
+  tables: ReportTable[];
+}
+
+export interface Report {
+  from: string;
+  to: string;
+  /** Zeitpunkt des Abrufs in der Zeit der Kompanie (TT.MM.JJJJ, HH:MM) */
+  created: string;
+  sections: ReportSection[];
+}
+
 export interface ChangeLog extends ChangeLogSettings {
   from: string;
   to: string;
@@ -514,9 +556,10 @@ export function applyBirthdayUpcomingDays(days: number): void {
 }
 
 /** Übernimmt die gespeicherte Navigation in die geladene Konfiguration und baut die Tab-Leiste neu. */
-export function applyNavigation(next: Pick<NavigationAdmin, 'navigation' | 'intern_order' | 'admin_order'>): void {
+export function applyNavigation(next: Pick<NavigationAdmin, 'navigation' | 'guest_navigation' | 'intern_order' | 'admin_order'>): void {
   if (!config) return;
   config.navigation = next.navigation;
+  config.navigation_guest = next.guest_navigation ?? null;
   config.navigation_intern_order = next.intern_order;
   config.admin_order = next.admin_order;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
@@ -2796,12 +2839,16 @@ export const api = {
       ...(q.userId ? { user_id: String(q.userId) } : {}),
       ...(q.area ? { area: q.area } : {}),
     }),
+  reportSections: () => request<ReportSectionChoice[]>('GET', '/admin/report/sections'),
+  report: (q: { from: string; to: string; sections: string[] }) =>
+    request<Report>('GET', '/admin/report', undefined, { from: q.from, to: q.to, sections: q.sections.join(',') }),
   setChangeLogSettings: (data: Partial<Pick<ChangeLogSettings, 'enabled' | 'keep_days'>>) =>
     request<ChangeLogSettings>('PUT', '/admin/changes/settings', data),
   maintenance: () => request<MaintenanceState>('GET', '/admin/maintenance'),
   navigation: () => request<NavigationAdmin>('GET', '/admin/navigation'),
   saveNavigation: (body: {
     navigation: NavigationSetting | null;
+    guest_navigation?: NavigationSetting | null;
     names?: NavNames;
     start?: NavStart;
     show_labels?: boolean;

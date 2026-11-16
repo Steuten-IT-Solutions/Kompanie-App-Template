@@ -25,6 +25,14 @@ const canPages = (): boolean => !!config?.features.pages && can('manage_pages');
 const canWebsite = (): boolean => !!config?.features.website && can('manage_website');
 const canPassive = (): boolean => !!config?.features.passive && can('manage_passive');
 
+/**
+ * Bericht als PDF: wer mindestens einen Bereich des Berichts verwalten darf (wie ReportService im Kern: Mitglieder mit
+ * den Rechten der Mitgliederliste, sonst Punkte, Strafen, Anwesenheit). Welche Bereiche genau, sagt der Server.
+ */
+export function reportAllowed(): boolean {
+  return memberListAllowed() || canPoints() || canPenalties() || canAttendance();
+}
+
 /** Mitgliederliste: für alle, die Punkte oder Strafen vergeben, Dienstgrade, Titel oder Anwesenheit pflegen, Mitglieder
  * anlegen, Ehemalige verwalten, Rollen vergeben oder Kompanien zuordnen. */
 export function memberListAllowed(): boolean {
@@ -62,6 +70,8 @@ export function adminTabs(): AdminTab[] {
       { id: 'meldungen', label: 'Fehlermeldungen', on: can('review_reports') },
       // Änderungsprotokoll: wer wann was angelegt, geändert oder gelöscht hat
       { id: 'aenderungen', label: 'Änderungen', on: can('view_changes') },
+      // Bericht als PDF: Daten mehrerer Bereiche für einen Zeitraum
+      { id: 'bericht', label: 'Bericht', on: reportAllowed() },
       { id: 'punkte', label: `${sec.points} +`, on: points },
       { id: 'strafe', label: `${sec.penalties} +`, on: canPenalties() },
       { id: 'katalog', label: sec.catalog, on: points, group: SETUP },
@@ -100,6 +110,7 @@ export function adminTileCatalog(): Record<string, { label: string; on: boolean 
     anfragen: { label: 'Anfragen', on: !!config?.registration || (config?.pendingRegistrations ?? 0) > 0 },
     meldungen: { label: 'Fehlermeldungen', on: true },
     aenderungen: { label: 'Änderungen', on: true },
+    bericht: { label: 'Bericht', on: true },
     punkte: { label: `${sec.points} +`, on: on('points') },
     strafe: { label: `${sec.penalties} +`, on: on('penalties') },
     befoerderungen: { label: 'Beförderungen', on: on('ranks', 'points') },
@@ -302,6 +313,14 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
       <path d="M3.5 12a8.5 8.5 0 1 0 2.5-6" />
       <path d="M3 3.5V8h4.5" />
       <path d="M12 7.5V12l3 2" />
+    </>
+  ),
+  // Bericht: Blatt mit Eselsohr und Balken (Zahlen eines Zeitraums)
+  bericht: (
+    <>
+      <path d="M6 3h8.5L19 7.5V21H6z" />
+      <path d="M14 3v5h5" />
+      <path d="M9.5 17.5v-3M12.5 17.5v-6M15.5 17.5v-4.5" />
     </>
   ),
   punkte: <path d="M12 3l2.6 5.6 6.1.6-4.6 4.1 1.3 6L12 16.3l-5.4 3 1.3-6-4.6-4.1 6.1-.6z" />,

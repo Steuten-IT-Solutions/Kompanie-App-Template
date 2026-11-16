@@ -129,6 +129,17 @@ export function mergeOrder<T extends string>(full: readonly T[], part: readonly 
   return full.map((t) => (inPart.has(t) ? part[n++] : t));
 }
 
+/** Sieht die Person die Leiste der Gäste? Ohne Anmeldung und mit der Grundrolle Gast (auch in der Vorschau als Gast). */
+export const isGuestView = (user: { level: string } | null | undefined): boolean => !user || user.level === 'guest';
+
+/** Leiste, die gilt: für Gäste ihre eigene, sonst (und ohne eigene) die der Angemeldeten; null = Standardnavigation. */
+export function navigationFor(
+  config: { navigation?: NavigationSetting | null; navigation_guest?: NavigationSetting | null } | null | undefined,
+  guest: boolean,
+): NavigationSetting | null {
+  return (guest ? config?.navigation_guest : null) ?? config?.navigation ?? null;
+}
+
 const isTarget = (id: unknown): id is NavTarget =>
   typeof id === 'string' && ((NAV_TARGETS as readonly string[]).includes(id) || isPageTarget(id));
 
@@ -257,6 +268,20 @@ export function moveTo(draft: NavigationSetting, target: NavTarget, place: NavPl
   };
 }
 
+/**
+ * Erster Entwurf der Leiste für Gäste: eine Kopie der Leiste der Angemeldeten, in der Mitglieder und Dokumente aus
+ * Untermenüs unten in der Leiste stehen (wie in der Standardnavigation für alle ohne das Recht „Intern“). Ein Untermenü,
+ * das dadurch leer wird, fällt weg.
+ */
+export function guestDraftOf(memberDraft: NavigationSetting): NavigationSetting {
+  let next: NavigationSetting = {
+    items: memberDraft.items.map((i) => (typeof i === 'string' ? i : { ...i, items: [...i.items] })),
+    hidden: [...memberDraft.hidden],
+  };
+  for (const t of OWN_TABS) if (typeof placeOf(next, t) === 'number') next = moveTo(next, t, 'main');
+  return { ...next, items: next.items.filter((i) => typeof i === 'string' || i.items.length > 0) };
+}
+
 /** Untermenü entfernen; seine Bereiche kommen zu den ausgeblendeten (der Admin verteilt sie dann neu). */
 export function removeMenu(draft: NavigationSetting, index: number): NavigationSetting {
   let menu = -1;
@@ -338,9 +363,11 @@ export const SETUP = 'einrichtungen';
 export const ADMIN_START = [
   'mitglieder',
   'ehemalige',
+  'passive',
   'anfragen',
   'meldungen',
   'aenderungen',
+  'bericht',
   'punkte',
   'strafe',
   'befoerderungen',

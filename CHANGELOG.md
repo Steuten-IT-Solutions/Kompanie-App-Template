@@ -32,6 +32,25 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   ein, er steht beim Eintragen schon im Feld; die Zahlungsarten zur Auswahl richtest du dort auch ein (vorgegeben
   Bar, SEPA und PayPal). Eintragen darf, wer Passive verwaltet. Betreuer sehen unter
   [Meins → Meine Passiven](app:meins/passive), ob der Beitrag für das laufende Jahr bezahlt ist.
+- **Direkt im Album einreichen**: In einem Album der [Galerie](app:galerie) gibt es oben den Knopf _Bilder und Videos
+  in dieses Album einreichen_. Das Album ist im Formular dann schon gewählt, und _‹ Zum Album_ führt zurück. Der Knopf
+  erscheint wie in der Übersicht nur mit dem Recht zum Einreichen und mit dem Haken _Einreichen von Bildern und Videos durch Mitglieder erlauben_ unter
+  [Einstellungen → Galerie](app:einstellungen/galerie).
+- **Bericht als PDF**: Unter [Verwaltung → Bericht](app:verwaltung/bericht) erstellst du eine PDF-Datei mit den Daten
+  mehrerer Bereiche für einen Zeitraum, z. B. für die Jahreshauptversammlung. Den Zeitraum wählst du mit _Von_ und _Bis_
+  oder der Schnellwahl (dieses Jahr, letztes Jahr, letzte 12 Monate), die Bereiche mit Haken. Enthalten sind die
+  Mitglieder (Stand heute; E-Mail, Telefon, Adresse und Geburtsdatum nur für alle, die persönliche Angaben sehen dürfen),
+  Punkte und Strafen mit Summen je Mitglied und allen Einträgen sowie die Anwesenheit je Mitglied und je Termin. Jede
+  Person sieht nur die Bereiche, die sie auch sonst verwalten darf; ein eigenes Recht gibt es nicht. Die Schrift ist im
+  PDF enthalten, damit auch Buchstaben wie „ł“ oder „č“ stimmen. Wer wann einen Bericht erstellt, steht im
+  Änderungsprotokoll (Zeitraum und Bereiche, ohne Inhalt).
+- **Eigene Leiste für Gäste**: Unter [Einstellungen → Navigation](app:einstellungen/navigation) wählst du oben
+  _Für Angemeldete_ oder _Für Gäste_. Mit _Eigene Leiste für Gäste_ bekommen Gäste ihre eigene Reihenfolge, eigene
+  Untermenüs und eigene ausgeblendete Bereiche, z. B. die Mitglieder unten in der Leiste statt unter „Intern“. Die Leiste
+  beginnt als Kopie der Leiste für Angemeldete, in der Mitglieder und Dokumente schon unten stehen. Gäste sind alle ohne
+  Anmeldung und Angemeldete mit der Grundrolle Gast (z. B. ehemalige Mitglieder); für sie gilt auch die Startseite der
+  Gäste, ebenso in der Vorschau als Gast. Ohne eigene Leiste sehen Gäste wie bisher dieselbe Leiste wie Angemeldete.
+  Namen und Symbole gelten für beide Leisten. Was jemand sehen darf, regeln weiter die Rechte.
 - **Passive**: Mit dem neuen Bereich _Passive_ (unter [Einstellungen → Bereiche](app:einstellungen/bereiche)) führt ihr
   unter [Verwaltung → Passive](app:verwaltung/passive) eine interne Liste eurer passiven Mitglieder mit Vorname,
   Nachname, Adresse, Telefon, E-Mail-Adresse und Geburtsdatum, je optional mit einem Mitglied als Betreuer. Passive sind

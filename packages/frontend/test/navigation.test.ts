@@ -5,7 +5,10 @@ import {
   buildNav,
   draftError,
   draftOf,
+  guestDraftOf,
   internOrderOf,
+  isGuestView,
+  navigationFor,
   isPageTarget,
   mergeOrder,
   menuOf,
@@ -212,4 +215,55 @@ test('Nur „Intern“ umgeordnet: es bleibt bei der Standardnavigation', () => 
   assert.equal(internOrderOf(initial, moved), null, 'anderer Platz: eigene Navigation');
   const renamed = { ...initial, items: [...initial.items.slice(0, -1), { ...menu, label: 'Mehr' }] };
   assert.equal(internOrderOf(initial, renamed), null, 'anderer Name: eigene Navigation');
+});
+
+test('Leiste für Gäste: ohne Anmeldung und mit der Grundrolle Gast, sonst die der Angemeldeten', () => {
+  assert.equal(isGuestView(null), true);
+  assert.equal(isGuestView(undefined), true);
+  assert.equal(isGuestView({ level: 'guest' }), true, 'auch angemeldet, z. B. ehemalige Mitglieder und die Vorschau als Gast');
+  assert.equal(isGuestView({ level: 'member' }), false);
+  assert.equal(isGuestView({ level: 'admin' }), false);
+
+  const member = { items: ['termine', { label: 'Intern', icon: 'ordner', items: ['mitglieder'] }], hidden: [] };
+  const guest = { items: ['mitglieder', 'termine'], hidden: [] };
+  assert.equal(navigationFor({ navigation: member, navigation_guest: guest }, true), guest);
+  assert.equal(navigationFor({ navigation: member, navigation_guest: guest }, false), member);
+  assert.equal(navigationFor({ navigation: member, navigation_guest: null }, true), member, 'ohne eigene: wie Angemeldete');
+  assert.equal(navigationFor({ navigation: null, navigation_guest: guest }, false), null, 'Angemeldete mit Standardnavigation');
+  assert.equal(navigationFor({ navigation: null }, true), null);
+  assert.equal(navigationFor(null, true), null);
+});
+
+test('Erster Entwurf für Gäste: Mitglieder und Dokumente aus Untermenüs nach unten, leere Untermenüs fallen weg', () => {
+  const member = {
+    items: [
+      'termine',
+      { label: 'Intern', icon: 'ordner', items: ['mitglieder', 'dokumente'] },
+      { label: 'Mehr', icon: 'stern', items: ['brett'] },
+    ],
+    hidden: ['punktekatalog'],
+  };
+  assert.deepEqual(guestDraftOf(member), {
+    items: ['termine', { label: 'Mehr', icon: 'stern', items: ['brett'] }, 'mitglieder', 'dokumente'],
+    hidden: ['punktekatalog'],
+  });
+  assert.deepEqual(member.items[1], { label: 'Intern', icon: 'ordner', items: ['mitglieder', 'dokumente'] }, 'Vorlage unverändert');
+  // Ausgeblendetes bleibt ausgeblendet, unten Stehendes bleibt, wo es ist.
+  assert.deepEqual(guestDraftOf({ items: ['mitglieder', 'termine'], hidden: ['dokumente'] }), {
+    items: ['mitglieder', 'termine'],
+    hidden: ['dokumente'],
+  });
+  // Aus der Standardnavigation
+  assert.deepEqual(guestDraftOf(draftOf(null)), {
+    items: [
+      'termine',
+      'news',
+      'galerie',
+      'kompanien',
+      { label: 'Intern', icon: 'ordner', items: ['sponsoren', 'brett', 'dienstgrade', 'punktekatalog'] },
+      'mitglieder',
+      'dokumente',
+    ],
+    hidden: [],
+  });
 });

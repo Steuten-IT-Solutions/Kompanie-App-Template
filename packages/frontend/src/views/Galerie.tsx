@@ -468,10 +468,20 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
     }
   }
 
-  // Auswählen beginnt mit langem Drücken auf ein Bild (useLongPress), ohne eigenen Knopf
-  const tools = manage && album.source === 'app' && !selecting && (
+  // Auswählen beginnt mit langem Drücken auf ein Bild (useLongPress), ohne eigenen Knopf. Einreichen direkt in dieses
+  // Album (vorgewählt), wie oben in der Übersicht nur mit Haken „Einreichen erlauben“; Bearbeiten nur für Alben der App.
+  const submit = can('submit_gallery') && gallerySubmissionsOpen();
+  const edit = manage && album.source === 'app';
+  const tools = (submit || edit) && !selecting && (
     <div className="button-row gallery-actions">
-      <IconButton icon="edit" label="Album bearbeiten" onClick={() => setSheet({ kind: 'edit' })} />
+      {submit && (
+        <IconButton
+          icon="submit"
+          label="Bilder und Videos in dieses Album einreichen"
+          onClick={() => navigate(`galerie/einreichen/${album.id}`)}
+        />
+      )}
+      {edit && <IconButton icon="edit" label="Album bearbeiten" onClick={() => setSheet({ kind: 'edit' })} />}
     </div>
   );
   const selectBar = selecting && (

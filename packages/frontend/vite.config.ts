@@ -43,9 +43,14 @@ function precacheList(): Plugin {
       outDir = config.build.outDir.startsWith('/') ? config.build.outDir : join(config.root, config.build.outDir);
     },
     generateBundle(_options, bundle) {
-      // Die Bild-Dekodierer von pdf.js (selten gebraucht, groß) erst bei Bedarf speichern.
+      // Die Bild-Dekodierer von pdf.js (selten gebraucht, groß) erst bei Bedarf speichern, ebenso die Schrift des
+      // Berichts als PDF (src/reportFont.ts, gut 1 MB, nur für die Verwaltung).
+      const onDemand = (f: string) => {
+        const out = bundle[f];
+        return out.type === 'chunk' && out.moduleIds.some((id) => /\.ttf\?inline$/.test(id));
+      };
       files = Object.keys(bundle)
-        .filter((f) => f.startsWith('assets/') && !f.startsWith(`assets/${PDFJS_DIR}`))
+        .filter((f) => f.startsWith('assets/') && !f.startsWith(`assets/${PDFJS_DIR}`) && !onDemand(f))
         .sort();
     },
     closeBundle() {
