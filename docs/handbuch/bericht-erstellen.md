@@ -2,7 +2,7 @@
 titel: Bericht als PDF
 reihenfolge: 69
 rechte: []
-einrecht: [manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_companies, view_personal, create_users, manage_former, promote_users]
+einrecht: [manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_companies, view_personal, create_users, manage_former, promote_users, manage_passive, manage_events, manage_calendar, manage_offices, manage_inventory]
 ---
 Mit dem Bericht holst du die Daten mehrerer Bereiche für einen Zeitraum in eine PDF-Datei, z. B. für die Jahreshauptversammlung oder wenn ein neuer Vorstand übernimmt.
 
@@ -19,7 +19,14 @@ Tippe unten auf **Verwaltung** und dann auf **Bericht**.
 - **Mitglieder** (Stand heute): Name, Rolle und {bereich.ranks}. Wer persönliche Angaben sehen darf, bekommt dazu E-Mail, Telefon, Adresse und Geburtsdatum; dann steht die Tabelle auf einer Seite im Querformat. Diese Liste hängt nicht vom Zeitraum ab.
 - **{bereich.points}**: die Summe je Mitglied und alle Einträge im Zeitraum mit Datum, Name und Grund. Es zählt, was auch sonst zählt, also mit dem Punktefaktor der Rolle. Stornierte Einträge fehlen.
 - **{bereich.penalties}**: je Mitglied die Summe und was davon noch offen ist, darunter **Gesamt**, und alle Strafen im Zeitraum mit Betrag, Grund und Stand (**offen** oder **bezahlt am …**). Es zählt das Datum der Strafe, nicht das der Zahlung.
+- **Passive** (Stand heute): Name und Betreuer, mit dem Recht für persönliche Angaben auch Adresse, Telefon, E-Mail und Geburtsdatum.
 - **{bereich.attendance}**: je Mitglied, wie oft es anwesend, entschuldigt oder nicht da war, und je Termin die Zahlen.
+- **{bereich.events}**: die öffentlichen Termine, die im Zeitraum liegen oder laufen, mit Datum, Uhrzeit und Ort.
+- **{bereich.calendar}**: die internen Termine, wenn ihr sie in der App pflegt (nicht bei Google Kalender oder einer iCal-Adresse). Sind Zu- und Absagen eingeschaltet, dazu die Zahl der Zu- und Absagen je Termin und je Mitglied.
+- **{bereich.ranks}**: jeder Wechsel im Zeitraum mit Datum, Name, Art (Beförderung, zurückgestuft, erster Dienstgrad), vorher, nachher und Grund.
+- **{bereich.titles}**: die im Zeitraum vergebenen Titel. Ein Titel, der einer Person später wieder abgenommen wurde, fehlt, weil die App ihn dann nicht mehr kennt.
+- **{bereich.offices}**: je Amt die Amtszeiten, die in die Jahre des Zeitraums fallen, mit ihren Inhabern. Ämter zählen nach Jahren, nicht nach Tagen.
+- **{bereich.inventory}**: der Bestand von heute und der Verlauf im Zeitraum (angelegt, geändert, umgelagert, gelöscht) mit Datum, Person und Grund.
 
 Jeder Bereich beginnt auf einer neuen Seite. Der Tabellenkopf steht auf jeder Seite, unten stehen Kompanie, Zeitraum und Seitenzahl. Die Schrift ist im PDF enthalten, daher stimmen auch Buchstaben wie „ł“ oder „č“.
 

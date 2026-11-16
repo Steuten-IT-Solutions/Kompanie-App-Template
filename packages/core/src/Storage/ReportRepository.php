@@ -8,7 +8,8 @@ use KompanieApp\Core\Storage\Sql\Connection;
 
 /**
  * Abfragen für den Bericht (Domain\ReportService): Einträge eines Zeitraums über alle Mitglieder, je Bereich eine
- * Abfrage. Zeiträume als 'Y-m-d' (Datum der Kompanie), beide Grenzen eingeschlossen; stornierte Einträge fehlen.
+ * Abfrage. Zeiträume als 'Y-m-d' (Datum der Kompanie), beide Grenzen eingeschlossen, oder für Zeitpunkte als UTC
+ * 'Y-m-d H:i:s' mit ausgeschlossenem Ende; stornierte Einträge fehlen.
  */
 final class ReportRepository
 {
@@ -98,5 +99,82 @@ final class ReportRepository
             $out[(int) $r['user_id']][(string) $r['status']] = (int) $r['n'];
         }
         return $out;
+    }
+
+    /**
+     * Dienstgrad-Wechsel im Zeitraum, älteste zuerst. Grenzen als UTC-Zeitpunkte 'Y-m-d H:i:s', $to ausgeschlossen.
+     *
+     * @return list<array{user_id: int, from_title: string, to_title: string, kind: string, reason: string, changed_at: string}>
+     */
+    public function rankChanges(string $fromUtc, string $toUtc): array
+    {
+        return array_values(array_map(static fn (array $r): array => [
+            'user_id' => (int) $r['user_id'],
+            'from_title' => (string) $r['from_title'],
+            'to_title' => (string) $r['to_title'],
+            'kind' => (string) $r['kind'],
+            'reason' => (string) $r['reason'],
+            'changed_at' => (string) $r['changed_at'],
+        ], $this->db->select(
+            'SELECT user_id, from_title, to_title, kind, reason, changed_at FROM {rank_history} WHERE changed_at >= ? AND changed_at < ? ORDER BY changed_at, id',
+            [$fromUtc, $toUtc],
+        )));
+    }
+
+    /**
+     * Vergebene Titel im Zeitraum (wer ihn noch trägt), älteste zuerst. Grenzen wie bei rankChanges().
+     *
+     * @return list<array{user_id: int, title: string, assigned_at: string}>
+     */
+    public function titleAssignments(string $fromUtc, string $toUtc): array
+    {
+        return array_values(array_map(static fn (array $r): array => [
+            'user_id' => (int) $r['user_id'],
+            'title' => (string) $r['title'],
+            'assigned_at' => (string) $r['assigned_at'],
+        ], $this->db->select(
+            'SELECT m.user_id, t.title, m.assigned_at FROM {member_titles} m JOIN {titles} t ON t.id = m.title_id'
+            . ' WHERE m.assigned_at >= ? AND m.assigned_at < ? ORDER BY m.assigned_at, t.sort, m.user_id',
+            [$fromUtc, $toUtc],
+        )));
+    }
+
+    /**
+     * Zu- und Absagen für Termine im Zeitraum (Tag des Termins), nach Termin.
+     *
+     * @return list<array{event_key: string, event_title: string, event_date: string, user_id: int, status: string}>
+     */
+    public function responses(string $from, string $to): array
+    {
+        return array_values(array_map(static fn (array $r): array => [
+            'event_key' => (string) $r['event_key'],
+            'event_title' => (string) $r['event_title'],
+            'event_date' => (string) $r['event_date'],
+            'user_id' => (int) $r['user_id'],
+            'status' => (string) $r['status'],
+        ], $this->db->select(
+            'SELECT event_key, event_title, event_date, user_id, status FROM {event_responses} WHERE event_date >= ? AND event_date <= ? ORDER BY event_date, event_title, event_key, id',
+            [$from, $to],
+        )));
+    }
+
+    /**
+     * Verlauf des Inventars im Zeitraum, älteste zuerst. Grenzen wie bei rankChanges().
+     *
+     * @return list<array{action: string, reason: string, title: string, location: string, user_id: int, created_at: string}>
+     */
+    public function inventoryLog(string $fromUtc, string $toUtc): array
+    {
+        return array_values(array_map(static fn (array $r): array => [
+            'action' => (string) $r['action'],
+            'reason' => (string) $r['reason'],
+            'title' => (string) $r['title'],
+            'location' => (string) $r['location'],
+            'user_id' => (int) $r['user_id'],
+            'created_at' => (string) $r['created_at'],
+        ], $this->db->select(
+            'SELECT action, reason, title, location, user_id, created_at FROM {inventory_log} WHERE created_at >= ? AND created_at < ? ORDER BY created_at, id',
+            [$fromUtc, $toUtc],
+        )));
     }
 }
