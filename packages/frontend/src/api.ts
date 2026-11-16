@@ -155,6 +155,8 @@ export interface AppConfig {
   maintenance?: MaintenanceInfo;
   /** Einrichtbare Navigation (Issue #277): null bzw. fehlt = Standardnavigation */
   navigation?: NavigationSetting | null;
+  /** Eigene Leiste für Gäste (ohne Anmeldung oder Grundrolle Gast); null bzw. fehlt = dieselbe wie für Angemeldete */
+  navigation_guest?: NavigationSetting | null;
   /** Eigene Namen und Symbole (Issue #362), je Bereich, eigener Seite oder „intern“ (leer kann als [] kommen) */
   navigation_names?: NavNames;
   /** Startseiten (Issue #362) für Gäste und Angemeldete */
@@ -369,6 +371,8 @@ export type BlockInput =
 /** Einstellungen → Navigation (Issue #277): gespeicherte Navigation und was der Server erlaubt. */
 export interface NavigationAdmin {
   navigation: NavigationSetting | null;
+  /** Leiste für Gäste; null = dieselbe wie für Angemeldete; fehlt bei älteren Servern */
+  guest_navigation?: NavigationSetting | null;
   /** Issue #362: eigene Namen und Symbole, Startseiten, Namen in der Leiste */
   names: NavNames;
   start: NavStart;
@@ -552,9 +556,10 @@ export function applyBirthdayUpcomingDays(days: number): void {
 }
 
 /** Übernimmt die gespeicherte Navigation in die geladene Konfiguration und baut die Tab-Leiste neu. */
-export function applyNavigation(next: Pick<NavigationAdmin, 'navigation' | 'intern_order' | 'admin_order'>): void {
+export function applyNavigation(next: Pick<NavigationAdmin, 'navigation' | 'guest_navigation' | 'intern_order' | 'admin_order'>): void {
   if (!config) return;
   config.navigation = next.navigation;
+  config.navigation_guest = next.guest_navigation ?? null;
   config.navigation_intern_order = next.intern_order;
   config.admin_order = next.admin_order;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
@@ -2812,6 +2817,7 @@ export const api = {
   navigation: () => request<NavigationAdmin>('GET', '/admin/navigation'),
   saveNavigation: (body: {
     navigation: NavigationSetting | null;
+    guest_navigation?: NavigationSetting | null;
     names?: NavNames;
     start?: NavStart;
     show_labels?: boolean;

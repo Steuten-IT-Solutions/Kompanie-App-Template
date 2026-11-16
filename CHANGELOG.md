@@ -34,6 +34,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Person sieht nur die Bereiche, die sie auch sonst verwalten darf; ein eigenes Recht gibt es nicht. Die Schrift ist im
   PDF enthalten, damit auch Buchstaben wie „ł“ oder „č“ stimmen. Wer wann einen Bericht erstellt, steht im
   Änderungsprotokoll (Zeitraum und Bereiche, ohne Inhalt).
+- **Eigene Leiste für Gäste**: Unter [Einstellungen → Navigation](app:einstellungen/navigation) wählst du oben
+  _Für Angemeldete_ oder _Für Gäste_. Mit _Eigene Leiste für Gäste_ bekommen Gäste ihre eigene Reihenfolge, eigene
+  Untermenüs und eigene ausgeblendete Bereiche, z. B. die Mitglieder unten in der Leiste statt unter „Intern“. Die Leiste
+  beginnt als Kopie der Leiste für Angemeldete, in der Mitglieder und Dokumente schon unten stehen. Gäste sind alle ohne
+  Anmeldung und Angemeldete mit der Grundrolle Gast (z. B. ehemalige Mitglieder); für sie gilt auch die Startseite der
+  Gäste, ebenso in der Vorschau als Gast. Ohne eigene Leiste sehen Gäste wie bisher dieselbe Leiste wie Angemeldete.
+  Namen und Symbole gelten für beide Leisten. Was jemand sehen darf, regeln weiter die Rechte.
 - **Passive**: Mit dem neuen Bereich _Passive_ (unter [Einstellungen → Bereiche](app:einstellungen/bereiche)) führt ihr
   unter [Verwaltung → Passive](app:verwaltung/passive) eine interne Liste eurer passiven Mitglieder mit Vorname,
   Nachname, Adresse, Telefon, E-Mail-Adresse und Geburtsdatum, je optional mit einem Mitglied als Betreuer. Passive sind
