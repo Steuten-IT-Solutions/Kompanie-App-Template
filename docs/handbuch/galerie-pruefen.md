@@ -27,7 +27,7 @@ Setze oder entferne unter **Zuletzt freigegeben** den Haken **intern**. Mit Hake
 Tippe unter **Zuletzt freigegeben** auf **Wieder entfernen** (Mülleimer) und bestätige. Das Bild verschwindet aus der {bereich.gallery}.
 
 ## Gut zu wissen
-- Bei neuen Einreichungen bekommst du eine Benachrichtigung, je Person und Schub Bilder nur eine (unter **Meins → Benachrichtigungen** einstellbar).
-- Die einreichende Person erfährt, ob ihr Bild freigegeben oder abgelehnt wurde.
+- Bei neuen Einreichungen bekommst du eine Benachrichtigung, je Person und Schub nur eine (unter **Meins → Benachrichtigungen** einstellbar).
+- Die einreichende Person erfährt, ob ihr Bild oder Video freigegeben oder abgelehnt wurde.
 - Wer selbst einreichen und prüfen darf, kann auch eigene Bilder freigeben.
 - Unbearbeitete Einreichungen löscht die App nie von selbst.

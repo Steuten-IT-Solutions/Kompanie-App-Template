@@ -234,7 +234,7 @@ final class GallerySubmissionService
     public function reject(User $actor, int $id, mixed $reason): array
     {
         $s = $this->pending($id);
-        $reason = $this->validReason($reason, true);
+        $reason = $this->validReason($reason, true, self::isVideo($s) ? 'das Video' : 'das Bild');
         $this->app->gallery()->media()->delete((string) $s['file_key']);
         $this->repo()->update($id, ['status' => Repo::REJECTED, 'reviewed_by' => $actor->id, 'reviewed_at' => $this->app->time()->nowUtc(), 'reason' => $reason, 'thumb' => null, 'file_key' => '']);
         $this->notifySubmitter($s, false, $reason);
@@ -371,11 +371,11 @@ final class GallerySubmissionService
         ]);
     }
 
-    private function validReason(mixed $raw, bool $required): string
+    private function validReason(mixed $raw, bool $required, string $what = 'das Bild'): string
     {
         $reason = Text::line(is_string($raw) ? $raw : '', self::REASON_MAX + 1);
         if ($required && $reason === '') {
-            throw ApiError::invalid('Bitte kurz begründen, warum das Bild nicht freigegeben wird.');
+            throw ApiError::invalid(sprintf('Bitte kurz begründen, warum %s nicht freigegeben wird.', $what));
         }
         if (mb_strlen($reason) > self::REASON_MAX) {
             throw ApiError::invalid(sprintf('Der Grund darf höchstens %d Zeichen lang sein.', self::REASON_MAX));
@@ -424,8 +424,9 @@ final class GallerySubmissionService
         try {
             $this->app->push()->notifyAudience(
                 PushService::TYPE_GALLERY_REVIEW,
-                PushService::message($gallery . ': neue Bilder', sprintf('%s hat Bilder für „%s“ eingereicht.', $user->name, $album), 'galerie/pruefen', 'galerie-pruefen'),
-                // Wer selbst einreicht, braucht keinen Hinweis auf die eigenen Bilder.
+                // Nur die erste Datei eines Schubs löst die Nachricht aus; was danach kommt, ist noch offen.
+                PushService::message($gallery . ': neue Einreichungen', sprintf('%s hat Bilder oder Videos für „%s“ eingereicht.', $user->name, $album), 'galerie/pruefen', 'galerie-pruefen'),
+                // Wer selbst einreicht, braucht keinen Hinweis auf die eigenen Einreichungen.
                 static fn (int $uid): bool => $uid !== $user->id,
             );
         } catch (\Throwable $e) {
@@ -438,14 +439,15 @@ final class GallerySubmissionService
     {
         $gallery = $this->app->config->sectionLabel('gallery', 'Galerie');
         $album = (string) ($s['album_title'] ?? '');
+        $what = self::isVideo($s) ? 'Video' : 'Bild';
         $body = $approved
-            ? sprintf('Dein Bild „%s“ ist jetzt im Album „%s“.', $s['name'], $album)
-            : sprintf('Dein Bild „%s“ wurde nicht freigegeben: %s', $s['name'], $reason);
+            ? sprintf('Dein %s „%s“ ist jetzt im Album „%s“.', $what, $s['name'], $album)
+            : sprintf('Dein %s „%s“ wurde nicht freigegeben: %s', $what, $s['name'], $reason);
         try {
             $this->app->push()->notifyUser(
                 (int) $s['user_id'],
                 PushService::TYPE_GALLERY_SUBMISSIONS,
-                PushService::message($gallery . ($approved ? ': Bild freigegeben' : ': Bild abgelehnt'), $body, 'galerie/einreichen', 'galerie-einreichung-' . $s['id']),
+                PushService::message($gallery . ': ' . $what . ($approved ? ' freigegeben' : ' abgelehnt'), $body, 'galerie/einreichen', 'galerie-einreichung-' . $s['id']),
             );
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Benachrichtigung zu Einreichung ' . $s['id'] . ' nicht eingereiht: ' . $e->getMessage());
