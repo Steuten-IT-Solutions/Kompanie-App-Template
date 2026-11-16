@@ -76,6 +76,7 @@ import { SponsorAdmin } from './SponsorenVerwalten';
 import { PageAdmin } from './SeitenVerwalten';
 import { WebsiteAdmin } from './WebseiteVerwalten';
 import { PassiveAdmin } from './Passive';
+import { Bericht } from './Bericht';
 import { CompanyAdmin, MemberCompanies } from './KompanienVerwalten';
 import { ListAdmin } from './ListenVerwalten';
 import { MailAdmin } from './EmailsVerwalten';
@@ -126,6 +127,7 @@ type Sub =
   | 'anfragen'
   | 'meldungen'
   | 'aenderungen'
+  | 'bericht'
   | 'punkte'
   | 'strafe'
   | 'katalog'
@@ -235,6 +237,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <Meldungen onToast={onToast} />
       ) : active === 'aenderungen' ? (
         <Aenderungen onToast={onToast} />
+      ) : active === 'bericht' ? (
+        <Bericht onToast={onToast} />
       ) : (active === 'punkte' || active === 'strafe') && fromList !== null ? (
         <FromAttendance key={path.join('/')} listId={fromList} kind={active} onToast={onToast} />
       ) : active === 'punkte' ? (

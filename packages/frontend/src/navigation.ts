@@ -338,9 +338,11 @@ export const SETUP = 'einrichtungen';
 export const ADMIN_START = [
   'mitglieder',
   'ehemalige',
+  'passive',
   'anfragen',
   'meldungen',
   'aenderungen',
+  'bericht',
   'punkte',
   'strafe',
   'befoerderungen',

@@ -6384,6 +6384,101 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+  /admin/report/sections:
+    get:
+      tags: [Einstellungen]
+      summary: Bereiche, die die Person in den Bericht als PDF nehmen kann
+      description: |
+        Bericht als PDF (Verwaltung → Bericht). Je Bereich nur, wenn er an ist und die Person sein Recht hat: Mitglieder mit
+        einem Recht der Mitgliederliste, Punkte mit `manage_points`, Strafen mit `manage_penalties`, Anwesenheit mit
+        `manage_attendance`. `dated` false: ohne Zeitbezug (Stand heute). Reihenfolge wie im Bericht.
+      x-capability: 'eines der Rechte der Bereiche (siehe Beschreibung)'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [key, title, dated]
+                  properties:
+                    key: { type: string, enum: [members, points, penalties, attendance] }
+                    title: { type: string, description: Name des Bereichs, wie die Kompanie ihn nennt }
+                    dated: { type: boolean }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /admin/report:
+    get:
+      tags: [Einstellungen]
+      summary: Daten des Berichts als PDF für einen Zeitraum
+      description: |
+        Fertige Tabellen (Texte, wie sie im PDF stehen) je gewähltem Bereich; das PDF baut die App. Jeder Bereich verlangt
+        sein Recht wie in `/admin/report/sections`; einer ohne Recht oder ausgeschaltet ergibt 403 (nichts wird still
+        weggelassen). Persönliche Angaben der Mitglieder (E-Mail, Telefon, Adresse, Geburtsdatum) nur mit `view_personal`.
+        Stornierte Punkte und Strafen fehlen. Der Abruf steht im Änderungsprotokoll (Art „Bericht“, Aktion `event`, Zeitraum
+        und Bereiche, ohne Inhalt). In der Vorschau 403.
+      x-capability: 'eines der Rechte der Bereiche (siehe /admin/report/sections)'
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: string, format: date }, description: Beginn (JJJJ-MM-TT) }
+        - {
+            name: to,
+            in: query,
+            required: true,
+            schema: { type: string, format: date },
+            description: 'Ende einschließlich (JJJJ-MM-TT); höchstens rund zehn Jahre nach dem Beginn',
+          }
+        - {
+            name: sections,
+            in: query,
+            required: true,
+            schema: { type: string },
+            description: 'Bereiche mit Kommas, z. B. members,points; Reihenfolge im Bericht ist fest',
+          }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [from, to, created, sections]
+                properties:
+                  from: { type: string, format: date }
+                  to: { type: string, format: date }
+                  created: { type: string, description: 'Zeitpunkt des Abrufs in der Zeit der Kompanie (TT.MM.JJJJ, HH:MM)' }
+                  sections:
+                    type: array
+                    items:
+                      type: object
+                      required: [key, title, dated, landscape, tables]
+                      properties:
+                        key: { type: string }
+                        title: { type: string }
+                        dated: { type: boolean }
+                        landscape: { type: boolean, description: Breite Tabelle, im PDF quer }
+                        tables:
+                          type: array
+                          items:
+                            type: object
+                            required: [title, columns, rows, empty]
+                            properties:
+                              title: { type: string }
+                              columns:
+                                type: array
+                                items:
+                                  type: object
+                                  required: [label, num, wrap]
+                                  properties:
+                                    label: { type: string }
+                                    num: { type: boolean, description: Zahl (rechtsbündig) }
+                                    wrap: { type: boolean, description: Langer Text, bricht um }
+                              rows: { type: array, items: { type: array, items: { type: string } } }
+                              empty: { type: string, description: Hinweis, wenn die Tabelle leer ist }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /admin/changes:
     get:
       tags: [Einstellungen]

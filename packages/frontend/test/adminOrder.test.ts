@@ -29,7 +29,7 @@ test('Kacheln, die die Einstellung nicht kennt, bleiben hinter ihrem Vorgänger'
   // Gespeichert vor einem Update ohne „ehemalige“, „mail“ nach vorn geholt: „ehemalige“ steht hinter „mitglieder“.
   const saved = ['mail', ...ADMIN_START.filter((id) => id !== 'ehemalige' && id !== 'mail')];
   const start = startOrder({ start: saved });
-  assert.deepEqual(start.slice(0, 4), ['mail', 'mitglieder', 'ehemalige', 'anfragen']);
+  assert.deepEqual(start.slice(0, 4), ['mail', 'mitglieder', 'ehemalige', 'passive']);
   assert.equal(new Set(start).size, ADMIN_START.length, 'jede Kachel genau einmal');
 });
 
