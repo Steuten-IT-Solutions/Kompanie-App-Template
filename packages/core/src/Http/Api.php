@@ -515,6 +515,8 @@ final class Api
             + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::ViewPersonal) ? ['birthday' => $a->birthdays()->of($id)] : [])
             // Eintrittsjahr mit Anzeige, ebenso nur für create_users
             + ($this->user()->can(Cap::CreateUsers) ? ['join_year' => $a->joinYears()->of($id)] : [])
+            // Anwesenheit (gespeicherte Einträge und Summen) mit Bereich und Recht manage_attendance
+            + ($a->features()->enabled('attendance') && $this->user()->can(Cap::ManageAttendance) ? ['attendance' => $a->attendance()->ofMember($id)] : [])
             // Ehemalig: Grund, Eintritt, Ausscheiden (sonst null)
             + ['former' => $a->formerMembers()->of($id)];
     }

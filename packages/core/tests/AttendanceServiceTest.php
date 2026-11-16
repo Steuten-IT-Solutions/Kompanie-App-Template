@@ -186,6 +186,39 @@ final class AttendanceServiceTest extends TestCase
         $this->assertSame(404, $this->call('GET', "/attendance/$id")->status);
     }
 
+    public function testOverviewOnMemberPage(): void
+    {
+        $this->setUpApp();
+        $this->call('PUT', '/attendance', ['source' => 'free', 'title' => 'Übung', 'date' => '2025-09-01', 'entries' => [$this->m => 'absent']]);
+        $this->call('PUT', '/attendance', ['source' => 'free', 'title' => 'Probe', 'date' => '2026-10-19', 'entries' => [$this->m => 'present', $this->cand => 'excused']]);
+        $this->call('PUT', '/attendance', ['source' => 'free', 'title' => 'Heute', 'date' => '2026-10-20', 'entries' => [$this->m => 'excused']]);
+        $fest = $this->call('GET', '/attendance/events')->data[0];
+        $this->assertTrue($fest['upcoming']);
+        $this->createForEvent((string) $fest['key']);
+        // Ein kommender Termin mit Liste, aber ohne gespeicherten Eintrag, zählt nicht; gespeichert zählt er.
+        $att = $this->call('GET', "/members/{$this->m}")->data['attendance'];
+        $this->assertSame('2026-10-20', $att['today']);
+        $this->assertSame(['Heute', 'Probe', 'Übung'], array_column($att['entries'], 'title'));
+        $this->assertSame(['present' => 1, 'excused' => 1, 'absent' => 1], $att['counts']);
+        $this->call('PUT', '/attendance', ['source' => 'calendar', 'event_key' => $fest['key'], 'entries' => [$this->m => 'excused']]);
+        $att = $this->call('GET', "/members/{$this->m}")->data['attendance'];
+        $this->assertSame(['date' => '2026-11-01', 'status' => 'excused'], array_intersect_key($att['entries'][0], ['date' => 1, 'status' => 1]));
+        $this->assertSame(['present' => 1, 'excused' => 2, 'absent' => 1], $att['counts']);
+        $this->assertSame([], $this->call('GET', "/members/{$this->admin}")->data['attendance']['entries']);
+
+        // Nur mit dem Recht manage_attendance …
+        $kassierer = $this->users->add('kassierer', Roles::MEMBER);
+        $this->assertSame(200, $this->call('PUT', "/members/$kassierer/rights", ['grant' => ['manage_points'], 'revoke' => []])->status);
+        $this->users->current = $kassierer;
+        $res = $this->call('GET', "/members/{$this->m}");
+        $this->assertSame(200, $res->status);
+        $this->assertArrayNotHasKey('attendance', $res->data);
+        // … und mit dem Bereich.
+        $this->users->current = $this->admin;
+        $this->app->features()->update(['attendance' => false]);
+        $this->assertArrayNotHasKey('attendance', $this->call('GET', "/members/{$this->m}")->data);
+    }
+
     public function testPointsFromProposalOnlyOnce(): void
     {
         $this->setUpApp();

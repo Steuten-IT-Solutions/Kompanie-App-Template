@@ -274,6 +274,32 @@ final class AttendanceService
     }
 
     /**
+     * Anwesenheit einer Person für ihre Seite in der Verwaltung: gespeicherte Einträge (jüngste zuerst), Summen über alle
+     * und das heutige Datum der Kompanie. Damit trennt die App kommende Termine (nur „entschuldigt“ möglich) von
+     * vergangenen und zählt je Jahr. Nur gespeicherte Einträge zählen; eine Absage, die eine Liste bloß vorschlägt, nicht.
+     *
+     * @return array{today: string, entries: list<array{list_id: int, title: string, date: string, status: string}>, counts: array{present: int, excused: int, absent: int}}
+     */
+    public function ofMember(int $userId): array
+    {
+        $rows = $this->repository()->forUser($userId);
+        $counts = [];
+        foreach ($rows as $r) {
+            $counts[$r['status']] = ($counts[$r['status']] ?? 0) + 1;
+        }
+        return [
+            'today' => $this->today(),
+            'entries' => array_map(static fn (array $r): array => [
+                'list_id' => $r['list_id'],
+                'title' => $r['title'],
+                'date' => $r['event_date'],
+                'status' => $r['status'],
+            ], $rows),
+            'counts' => self::statusCounts($counts),
+        ];
+    }
+
+    /**
      * Punkte aus dem Vorschlag einer Liste: Liste prüfen und nur, wer für sie noch keine Punkte hat.
      *
      * @return array{0: int, 1: list<int>} Liste, verbleibende Benutzer-IDs
