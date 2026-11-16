@@ -22,7 +22,7 @@ Tippe unten auf **{bereich.events}** und dann oben auf **Internen Kalender verwa
 2. Trage **Titel** und **Datum** ein. Beides ist Pflicht.
 3. Dauert der Termin mehrere Tage, trage unter **Bis (optional)** den letzten Tag ein.
 4. Trage bei Bedarf **Beginn (optional)** und **Ende (optional)** ein. Ohne Uhrzeit gilt der Termin als ganztägig. Ein Ende braucht auch einen Beginn.
-5. Willst du Zu- und Absagen früher beenden als zum Beginn, trage einen **Anmeldeschluss (optional)** ein. Zu- und absagen geht dann bis zum Ende dieses Tages. Er darf nicht nach dem Datum des Termins liegen.
+5. Willst du Zu- und Absagen früher beenden als zum Beginn, trage einen **Anmeldeschluss (optional)** ein. Das Feld gibt es nur, wenn Zu- und Absagen eingeschaltet sind. Zu- und absagen geht dann bis zum Ende dieses Tages. Er darf nicht nach dem Datum des Termins liegen.
 6. Ergänze **Ort**, **Beschreibung** und einen **Link (optional)**, wenn du magst. Der Link muss mit http:// oder https:// beginnen.
 7. Tippe auf **Speichern**. Es erscheint „Termin angelegt“.
 

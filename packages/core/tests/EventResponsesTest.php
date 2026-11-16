@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Tests;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\Roles;
+use KompanieApp\Core\Domain\EventResponseService;
 use KompanieApp\Core\Domain\RoleService;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Http\Response;
@@ -43,6 +44,7 @@ final class EventResponsesTest extends TestCase
         $this->anna = $this->users->add('anna', Roles::MEMBER);
         $this->ben = $this->users->add('ben', Roles::MEMBER);
         $this->users->current = $this->admin;
+        $this->app->settings->set(EventResponseService::ENABLED_SETTING, true);
     }
 
     private function call(string $method, string $path, array $body = [], ?int $as = -1): Response
@@ -80,6 +82,37 @@ final class EventResponsesTest extends TestCase
             }
         }
         $this->fail("Termin $id fehlt");
+    }
+
+    /** Schalter in Einstellungen → Kalender, Vorgabe aus: dann keine Rückmeldungen, keine Erinnerung, kein Vorschlag. */
+    public function testOffUntilSwitchedOn(): void
+    {
+        $this->app->settings->delete(EventResponseService::ENABLED_SETTING);
+        $id = $this->appEvent();
+        $settings = $this->ok('GET', '/admin/settings');
+        $this->assertFalse($settings['calendar']['responses'], 'Vorgabe aus');
+        $this->assertFalse($this->ok('GET', '/config')['eventResponses']);
+        $event = array_column($this->ok('GET', '/calendar', [], $this->anna), null, 'id')[$id];
+        $this->assertArrayNotHasKey('responses', $event);
+        $this->assertArrayNotHasKey('response_key', $event);
+        $this->assertSame(403, $this->call('PUT', "/calendar/$id/response", ['status' => 'yes'], $this->anna)->status);
+        $this->assertSame(403, $this->call('DELETE', "/calendar/$id/response", [], $this->anna)->status);
+        $this->assertSame(403, $this->call('GET', "/calendar/$id/responses")->status);
+        $this->assertSame(403, $this->call('PUT', "/calendar/$id/responses/{$this->anna}", ['status' => 'no'])->status);
+        $this->assertSame(400, $this->call('PATCH', '/admin/settings', ['calendar_responses' => 'ja'])->status);
+
+        // Einschalten, absagen, wieder ausschalten: Rückmeldung bleibt gespeichert, die Anwesenheit schlägt nichts vor.
+        $on = $this->ok('PATCH', '/admin/settings', ['calendar_responses' => '1']);
+        $this->assertTrue($on['calendar']['responses']);
+        $this->assertTrue($this->ok('GET', '/config')['eventResponses']);
+        $this->ok('PUT', "/calendar/$id/response", ['status' => 'no'], $this->anna);
+        $this->assertFalse($this->ok('PATCH', '/admin/settings', ['calendar_responses' => '0'])['calendar']['responses']);
+        $list = $this->ok('PUT', '/attendance', ['source' => 'calendar', 'event_key' => $id]);
+        $this->assertNull($list['responses_open']);
+        $this->assertArrayNotHasKey('response', $list['people'][0]);
+        $this->assertSame([], $this->app->eventResponses()->declined($this->app->calendar()->events()), 'Vortags-Erinnerung wie ohne Absagen');
+        $this->ok('PATCH', '/admin/settings', ['calendar_responses' => '1']);
+        $this->assertSame('no', $this->responses($id, $this->anna)['mine'], 'nach erneutem Einschalten wieder da');
     }
 
     public function testRespondChangeAndWithdraw(): void
@@ -220,7 +253,7 @@ final class EventResponsesTest extends TestCase
             return ['status' => 200, 'body' => $body];
         });
         $this->app = TestApp::create(TestApp::connection(), $this->users, http: $http, clock: $this->clock);
-        $this->ok('PATCH', '/admin/settings', ['calendar_source' => 'ics', 'calendar_ics_url' => 'https://example.org/k.ics']);
+        $this->ok('PATCH', '/admin/settings', ['calendar_source' => 'ics', 'calendar_ics_url' => 'https://example.org/k.ics', 'calendar_responses' => '1']);
         $byTitle = function (): array {
             $out = [];
             foreach ($this->ok('GET', '/calendar', [], $this->anna) as $e) {

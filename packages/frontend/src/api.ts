@@ -135,6 +135,8 @@ export interface AppConfig {
   pendingRegistrations?: number | null;
   /** Einreichen von Bildern und Videos erlaubt (Einstellungen → Galerie); fehlt bei älteren Servern (dann erlaubt) */
   gallerySubmissions?: boolean;
+  /** Zu- und Absagen bei Terminen eingeschaltet (Einstellungen → Kalender); fehlt bei älteren Servern (dann an) */
+  eventResponses?: boolean;
   /** Rollen der Installation (Einstellungen → Rollen): Bezeichnung und Punktefaktor */
   roles?: RoleInfo[];
   /** null = Gast ohne Anmeldung. */
@@ -537,6 +539,18 @@ export function applyGallerySubmissions(enabled: boolean): void {
 /** Darf, wer submit_gallery hat, gerade einreichen? Ältere Server kennen den Haken nicht (dann ja). */
 export function gallerySubmissionsOpen(): boolean {
   return config?.gallerySubmissions !== false;
+}
+
+/** Übernimmt den Schalter „Zu- und Absagen“ des Kalenders in die geladene Konfiguration (nach dem Speichern). */
+export function applyEventResponses(enabled: boolean): void {
+  if (!config || config.eventResponses === enabled) return;
+  config.eventResponses = enabled;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
+/** Sind Zu- und Absagen bei Terminen eingeschaltet? Ältere Server kennen den Schalter nicht (dann ja). */
+export function eventResponsesOn(): boolean {
+  return config?.eventResponses !== false;
 }
 
 /** Übernimmt die Einstellung „Zugang beantragen“ in die geladene Konfiguration (nach dem Speichern). */
@@ -3277,6 +3291,8 @@ export interface AdminSettings {
     google_api_key_set: boolean;
     calendar_ids: string;
     cache_minutes: number;
+    /** Zu- und Absagen eingeschaltet (Vorgabe aus); fehlt bei älteren Servern (dann immer an) */
+    responses?: boolean;
     /** Erinnerung an alle ohne Zu- oder Absage (Push); fehlt bei älteren Servern */
     response_reminder?: boolean;
     /** Vorlauf der Erinnerung in Tagen vor Beginn (1 bis 30) */
@@ -3382,6 +3398,7 @@ export interface AdminSettingsInput {
   google_api_key?: string;
   calendar_ids?: string;
   calendar_cache_minutes?: number;
+  calendar_responses?: '0' | '1';
   calendar_response_reminder?: '0' | '1';
   calendar_response_reminder_days?: number;
   drive_service_account?: string;

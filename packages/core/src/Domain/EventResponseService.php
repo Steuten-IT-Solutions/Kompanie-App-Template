@@ -13,6 +13,9 @@ use KompanieApp\Core\Storage\EventResponseRepository;
 /**
  * Zu- und Absagen bei Terminen des internen Kalenders, bei jeder Quelle (App, Google, iCal).
  *
+ * - Erst nach dem Einschalten (Einstellungen → Kalender, ENABLED_SETTING, Vorgabe aus). Ausgeschaltet gibt es keine
+ *   Rückmeldungen am Termin, keine Erinnerung, keinen Vorschlag „entschuldigt“ in der Anwesenheit; schon gespeicherte
+ *   Rückmeldungen bleiben für ein erneutes Einschalten erhalten.
  * - Zusagen oder absagen darf, wer respond_calendar hat (setzt den internen Kalender voraus), mit einem kurzen Hinweis.
  *   Ändern und zurücknehmen bis zum Beginn des Termins; bei Terminen der App bis zum Ende des Anmeldeschlusses
  *   (respond_until), wenn der früher ist. Ganztägige Termine beginnen um 0 Uhr (Zeitzone der Kompanie).
@@ -29,6 +32,8 @@ final class EventResponseService
     public const NO = 'no';
     public const STATUSES = [self::YES, self::NO];
     public const NOTE_MAX = 191;
+    /** Zu- und Absagen eingeschaltet (Einstellungen → Kalender); fehlt der Wert, sind sie aus */
+    public const ENABLED_SETTING = 'event_responses_enabled';
     /** Erinnerung an alle ohne Rückmeldung (Einstellungen → Kalender): an/aus und Vorlauf in Tagen vor Beginn */
     public const REMINDER_SETTING = 'event_response_reminder';
     public const REMINDER_DAYS_SETTING = 'event_response_reminder_days';
@@ -46,15 +51,50 @@ final class EventResponseService
         return $this->repo ??= new EventResponseRepository($this->app->db);
     }
 
+    /** Sind Zu- und Absagen eingeschaltet (Einstellungen → Kalender)? Vorgabe: aus. */
+    public function enabled(): bool
+    {
+        return (bool) $this->app->settings->get(self::ENABLED_SETTING, false);
+    }
+
+    /**
+     * Einstellung prüfen (für SettingsService::update, nur wenn mitgeschickt).
+     *
+     * @return array<string, bool> Einstellung => Wert
+     */
+    public static function validEnabled(mixed $enabled): array
+    {
+        if ($enabled === null) {
+            return [];
+        }
+        if (!in_array($enabled, ['0', '1'], true)) {
+            throw ApiError::invalid('Ungültiger Wert für Zu- und Absagen (0 oder 1).');
+        }
+        return [self::ENABLED_SETTING => $enabled === '1'];
+    }
+
+    private function assertEnabled(): void
+    {
+        if (!$this->enabled()) {
+            throw ApiError::forbidden('Zu- und Absagen bei Terminen sind ausgeschaltet.');
+        }
+    }
+
     /**
      * Termine des Kalenders mit dem Feld responses für $viewer: eigene Rückmeldung, Zähler, Frist, ob noch änderbar. Ohne
-     * Anmeldung (Gast mit dem internen Kalender) nur die Zähler.
+     * Anmeldung (Gast mit dem internen Kalender) nur die Zähler. Ausgeschaltet ohne das Feld responses.
      *
      * @param array<int, array<string, mixed>> $events
      * @return list<array<string, mixed>>
      */
     public function annotate(?User $viewer, array $events): array
     {
+        if (!$this->enabled()) {
+            return array_values(array_map(static function (array $e): array {
+                unset($e['response_key']);
+                return $e;
+            }, $events));
+        }
         $byEvent = $this->repository()->forEvents(array_map(self::key(...), array_values($events)));
         $audience = $this->audience();
         $mayRespond = $viewer !== null && $viewer->id > 0 && $viewer->can(Capability::RespondCalendar);
@@ -100,6 +140,7 @@ final class EventResponseService
         if (!is_string($status) || !in_array($status, self::STATUSES, true)) {
             throw ApiError::invalid('Bitte zusagen oder absagen.');
         }
+        $this->assertEnabled();
         $note = is_string($note) ? Text::line($note) : '';
         if (mb_strlen($note) > self::NOTE_MAX) {
             throw ApiError::invalid('Der Hinweis ist zu lang (höchstens ' . self::NOTE_MAX . ' Zeichen).');
@@ -125,6 +166,7 @@ final class EventResponseService
      */
     public function withdraw(User $user, string $id): array
     {
+        $this->assertEnabled();
         $event = $this->openEvent($id);
         $this->repository()->delete(self::key($event), $user->id);
         return $this->annotate($user, [$event])[0];
@@ -137,6 +179,7 @@ final class EventResponseService
      */
     public function overview(User $viewer, string $id): array
     {
+        $this->assertEnabled();
         $event = $this->event($id);
         $rows = [];
         foreach ($this->repository()->forEvents([self::key($event)])[self::key($event)] ?? [] as $r) {
@@ -165,6 +208,7 @@ final class EventResponseService
         if ($status !== null && (!is_string($status) || !in_array($status, self::STATUSES, true))) {
             throw ApiError::invalid('Bitte zusagen, absagen oder die Rückmeldung entfernen.');
         }
+        $this->assertEnabled();
         if (!isset($this->audience()[$userId])) {
             throw ApiError::invalid('Diese Person kann bei Terminen nicht zu- oder absagen.');
         }
@@ -190,12 +234,15 @@ final class EventResponseService
 
     /**
      * Rückmeldungen zu einem Termin für seine Anwesenheitsliste: ob es den Termin noch gibt, ob die Frist läuft, wer
-     * zu- und absagen darf und wer wie geantwortet hat. Ohne den Termin (gelöscht, Kalender gestört) null.
+     * zu- und absagen darf und wer wie geantwortet hat. Ohne den Termin (gelöscht, Kalender gestört) oder ausgeschaltet null.
      *
      * @return array{open: bool, audience: array<int, true>, rows: array<int, array{status: string, note: string}>}|null
      */
     public function forAttendance(string $id): ?array
     {
+        if (!$this->enabled()) {
+            return null;
+        }
         try {
             $event = $this->event($id);
         } catch (ApiError) {
@@ -288,13 +335,16 @@ final class EventResponseService
     }
 
     /**
-     * Je Person (alle, die zu- und absagen dürfen) die Termine ohne ihre Rückmeldung.
+     * Je Person (alle, die zu- und absagen dürfen) die Termine ohne ihre Rückmeldung; ausgeschaltet niemand.
      *
      * @param list<array<string, mixed>> $events
      * @return array<int, list<array<string, mixed>>> Benutzer-ID => Termine
      */
     public function withoutResponse(array $events): array
     {
+        if (!$this->enabled()) {
+            return [];
+        }
         $rows = $this->repository()->forEvents(array_map(self::key(...), $events));
         $out = [];
         foreach ($this->audience() as $uid => $u) {
@@ -312,13 +362,16 @@ final class EventResponseService
     }
 
     /**
-     * Wer bei welchen dieser Termine abgesagt hat (für die Erinnerung am Vortag).
+     * Wer bei welchen dieser Termine abgesagt hat (für die Erinnerung am Vortag); ausgeschaltet niemand.
      *
      * @param list<array<string, mixed>> $events
      * @return array<int, array<string, true>> Benutzer-ID => Kennungen der Termine (id)
      */
     public function declined(array $events): array
     {
+        if (!$this->enabled()) {
+            return [];
+        }
         $byKey = [];
         foreach ($events as $e) {
             $byKey[self::key($e)][] = (string) $e['id'];

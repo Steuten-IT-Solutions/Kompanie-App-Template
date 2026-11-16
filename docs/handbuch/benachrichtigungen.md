@@ -62,7 +62,7 @@ Für {rolle.member} und Personen mit dem internen Kalender (z. B. Anwärter):
 - **{bereich.board}: dringende Nachrichten**: sobald jemand eine Nachricht ans {bereich.board} schreibt, interne wie öffentliche (außer er schaltet die Benachrichtigung dabei ab). Nachrichten nur für bestimmte {bereich.companies} oder Personen bekommst du nur, wenn sie für dich bestimmt sind.
 
 Nur für {rolle.member}:
-- **{bereich.events}: Erinnerung an deine Zu- oder Absage**: wenn du bei einem Termin des internen Kalenders noch nicht zu- oder abgesagt hast, zur Uhrzeit der Erinnerung einige Tage vorher (üblich 3), bei einem Anmeldeschluss am Tag davor. Nur, wenn du zu- und absagen darfst und ein {rolle.admin} die Erinnerung eingeschaltet hat.
+- **{bereich.events}: Erinnerung an deine Zu- oder Absage**: wenn du bei einem Termin des internen Kalenders noch nicht zu- oder abgesagt hast, zur Uhrzeit der Erinnerung einige Tage vorher (üblich 3), bei einem Anmeldeschluss am Tag davor. Nur, wenn du zu- und absagen darfst und ein {rolle.admin} Zu- und Absagen samt Erinnerung eingeschaltet hat.
 - **{bereich.polls}: neue Umfrage und Erinnerung**: bei jeder neuen Umfrage und 24 Stunden vor ihrem Ende, wenn du noch nicht geantwortet hast.
 - **{bereich.birthdays}: am Tag selbst**: am Geburtstag eines anderen Mitglieds, das seinen Geburtstag anderen zeigt, ab der Uhrzeit, die ein {rolle.admin} festlegt (üblich 7 Uhr).
 - **{bereich.penalties}: neue Einträge**: bei einem neuen Eintrag für dich.

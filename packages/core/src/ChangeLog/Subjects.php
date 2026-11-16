@@ -62,7 +62,7 @@ final class Subjects
             'google.client_id' => 'Google-Client-ID', 'google.connected' => 'Mit Google verbunden', 'google.email' => 'Google-Konto',
             'google.service_account_email' => 'Dienstkonto (Adresse)', 'calendar.choice' => 'Quelle des Kalenders', 'calendar.source' => 'Kalender wirksam aus',
             'calendar.calendar_ids' => 'Kalender-IDs', 'calendar.cache_minutes' => 'Kalender zwischenspeichern (Minuten)',
-            'calendar.response_reminder' => 'An Zu- und Absage erinnern', 'calendar.response_reminder_days' => 'Erinnerung … Tage vorher', 'gallery.root' => 'Galerie-Ordner',
+            'calendar.responses' => 'Zu- und Absagen bei Terminen', 'calendar.response_reminder' => 'An Zu- und Absage erinnern', 'calendar.response_reminder_days' => 'Erinnerung … Tage vorher', 'gallery.root' => 'Galerie-Ordner',
             'gallery.source' => 'Quelle der Galerie', 'gallery.store' => 'Ablage hochgeladener Bilder', 'gallery.downloads' => 'Bilder herunterladen erlaubt', 'gallery.submissions' => 'Einreichen durch Mitglieder erlaubt',
             'news.source' => 'Quelle der News', 'news.url' => 'Adresse der News', 'legal.imprint_url' => 'Impressum', 'legal.privacy_url' => 'Datenschutzerklärung',
         ],

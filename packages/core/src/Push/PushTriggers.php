@@ -389,13 +389,15 @@ final class PushTriggers
     }
 
     /**
-     * Erinnerung an die eigene Zu- oder Absage (Einstellungen → Kalender, Standard an): einmal am Tag zur Uhrzeit der
+     * Erinnerung an die eigene Zu- oder Absage (Einstellungen → Kalender, nur wenn Zu- und Absagen an sind; Erinnerung
+     * dann standardmäßig an): einmal am Tag zur Uhrzeit der
      * Erinnerung, an alle ohne Rückmeldung zu den Terminen, deren Anmeldeschluss morgen ist bzw. die in den Tagen des
      * Vorlaufs beginnen (EventResponseService::dueForReminder). Je Person eine Nachricht.
      */
     public function sendResponseReminders(?\DateTimeImmutable $now = null): int
     {
-        if (!$this->app->features()->enabled('calendar') || !$this->app->calendar()->isConfigured() || !$this->app->eventResponses()->reminderSettings()['enabled']) {
+        if (!$this->app->features()->enabled('calendar') || !$this->app->calendar()->isConfigured()
+            || !$this->app->eventResponses()->enabled() || !$this->app->eventResponses()->reminderSettings()['enabled']) {
             return 0;
         }
         $now ??= $this->app->time()->today()->setTimestamp($this->app->time()->timestamp());

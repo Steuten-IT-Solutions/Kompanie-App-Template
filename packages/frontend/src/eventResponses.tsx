@@ -1,7 +1,15 @@
 // Zu- und Absagen bei Terminen des internen Kalenders: Knöpfe unter dem Termin, Hinweis und (für alle, die Termine
 // pflegen) die Namen im aufgeklappten Termin. Der Server prüft Recht und Frist (EventResponseService).
 import { useState } from 'react';
-import { api, ApiError, type CalendarEvent, type EventResponseOverview, type EventResponses, type ResponseStatus } from './api';
+import {
+  api,
+  ApiError,
+  eventResponsesOn,
+  type CalendarEvent,
+  type EventResponseOverview,
+  type EventResponses,
+  type ResponseStatus,
+} from './api';
 import { applyPendingResponse, pendingFor } from './responseOutbox';
 import { responseOutbox, usePendingResponse } from './responseSync';
 import { formatDate } from './format';
@@ -55,7 +63,8 @@ function PendingHint() {
 
 export function ResponseBar({ ev, onChange }: { ev: CalendarEvent; onChange: (ev: CalendarEvent) => void }) {
   const pending = usePendingResponse(ev.id);
-  const r = ev.responses ? applyPendingResponse(ev.responses, pending) : undefined;
+  // Ausgeschaltet (Einstellungen → Kalender) keine Knöpfe, auch nicht aus offline gespeicherten Terminen
+  const r = ev.responses && eventResponsesOn() ? applyPendingResponse(ev.responses, pending) : undefined;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   if (!r) return null;
@@ -111,7 +120,8 @@ export function ResponseBar({ ev, onChange }: { ev: CalendarEvent; onChange: (ev
 /** Im aufgeklappten Termin: eigener Hinweis (nach der Antwort) und für alle, die Termine pflegen, wer wie geantwortet hat. */
 export function ResponseDetails({ ev, onChange }: { ev: CalendarEvent; onChange: (ev: CalendarEvent) => void }) {
   const pending = usePendingResponse(ev.id);
-  const r = ev.responses ? applyPendingResponse(ev.responses, pending) : undefined;
+  // Ausgeschaltet (Einstellungen → Kalender) keine Knöpfe, auch nicht aus offline gespeicherten Terminen
+  const r = ev.responses && eventResponsesOn() ? applyPendingResponse(ev.responses, pending) : undefined;
   const [note, setNote] = useState(r?.note ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -51,8 +51,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Termine mit einem Datum in der Zukunft.
 - **Anwesenheitsliste zählt Offene**: Der Zähler über der Liste nennt zusätzlich, für wie viele Personen noch nichts
   gewählt ist, z. B. „3 anwesend · 1 entschuldigt · 0 fehlt · 5 ohne Auswahl“.
-- **Zu- und Absagen bei Terminen**: Unter [Termine](app:termine) stehen bei jedem Termin des internen Kalenders die
-  Knöpfe _Zusagen_ und _Absagen_, bei jeder Quelle (in der App gepflegt, Google Kalender, iCal-Adresse). Mitglieder
+- **Zu- und Absagen bei Terminen**: Erst einschalten unter [Einstellungen → Kalender](app:einstellungen/kalender)
+  (Schalter _Zu- und Absagen bei Terminen_, anfangs aus, auch nach dem Update). Dann stehen unter
+  [Termine](app:termine) bei jedem Termin des internen Kalenders die Knöpfe _Zusagen_ und _Absagen_, bei jeder Quelle (in der App gepflegt, Google Kalender, iCal-Adresse). Mitglieder
   können einen kurzen Hinweis dazuschreiben und sich bis zum Beginn umentscheiden; bei Terminen aus der App lässt sich
   ein früherer _Anmeldeschluss_ eintragen. Alle sehen, wie viele zu- und abgesagt haben; wer wie geantwortet hat (mit
   Hinweis und wer sich noch nicht gemeldet hat), sehen nur Personen mit dem Recht _Kalender pflegen_. Dafür gibt es das
@@ -64,9 +65,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Wer die Anwesenheit erfasst, kann dort auch für andere zu- oder absagen, z. B. nach einem Anruf; das steht im
   Änderungsprotokoll.
   Wer noch nicht geantwortet hat, bekommt eine Benachrichtigung (neue Art _Termine: Erinnerung an deine Zu- oder
-  Absage_), einstellbar unter [Einstellungen → Kalender](app:einstellungen/kalender): an oder aus und wie viele Tage
-  vor dem Termin (anfangs an, 3 Tage; bei einem Anmeldeschluss am Tag davor). Die _Erinnerung am Vortag_ nennt keine
-  Termine mehr, bei denen man abgesagt hat.
+  Absage_), einstellbar unter dem Schalter: an oder aus und wie viele Tage vor dem Termin (anfangs an, 3 Tage; bei
+  einem Anmeldeschluss am Tag davor). Die _Erinnerung am Vortag_ nennt keine Termine mehr, bei denen man abgesagt hat.
+  Schaltest du Zu- und Absagen wieder aus, verschwinden Knöpfe, Anmeldeschluss, Erinnerung und der Vorschlag in der
+  Anwesenheit; die bisherigen Rückmeldungen bleiben gespeichert.
 
 ### Geändert
 

@@ -207,7 +207,8 @@ final class PushService
             self::TYPE_TITLES => ['label' => $c->sectionLabel('titles', 'Titel') . ': neu verliehen', 'features' => ['titles'], 'audience' => 'view_own_rank'],
             self::TYPE_EVENTS => ['label' => $c->sectionLabel('events', 'Termine') . ': neue und geänderte', 'features' => ['events', 'calendar'], 'audience' => 'all'],
             self::TYPE_REMINDER => ['label' => 'Erinnerung am Vortag', 'features' => ['events', 'calendar'], 'audience' => 'all'],
-            self::TYPE_RESPONSES => ['label' => $c->sectionLabel('events', 'Termine') . ': Erinnerung an deine Zu- oder Absage', 'features' => ['calendar'], 'audience' => 'respond_calendar'],
+            self::TYPE_RESPONSES => ['label' => $c->sectionLabel('events', 'Termine') . ': Erinnerung an deine Zu- oder Absage', 'features' => [], 'audience' => 'respond_calendar',
+                'active' => $this->app->features()->enabled('calendar') && $this->app->eventResponses()->enabled()],
             self::TYPE_NEWS => ['label' => $c->sectionLabel('news', 'News') . ': neue Beiträge', 'features' => ['news'], 'audience' => 'all'],
         ];
     }

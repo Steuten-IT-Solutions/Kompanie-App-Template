@@ -56,7 +56,8 @@ final class SettingsService
                 'google_api_key_set' => trim((string) $s->get('google_api_key', '')) !== '',
                 'calendar_ids' => (string) $s->get('calendar_ids', ''),
                 'cache_minutes' => max(1, (int) $s->get('calendar_cache_minutes', 15)),
-                // Erinnerung an alle ohne Zu- oder Absage (Push), Vorlauf in Tagen vor Beginn
+                // Zu- und Absagen eingeschaltet (Vorgabe aus); Erinnerung an alle ohne Rückmeldung (Push), Vorlauf in Tagen
+                'responses' => $a->eventResponses()->enabled(),
                 'response_reminder' => $a->eventResponses()->reminderSettings()['enabled'],
                 'response_reminder_days' => $a->eventResponses()->reminderSettings()['days'],
             ],
@@ -162,6 +163,7 @@ final class SettingsService
             }
             $set['calendar_cache_minutes'] = $min;
         }
+        $set += EventResponseService::validEnabled($in['calendar_responses'] ?? null);
         $set += EventResponseService::validReminder($in['calendar_response_reminder'] ?? null, $in['calendar_response_reminder_days'] ?? null);
         $serviceAccount = null;
         if (array_key_exists('drive_service_account', $in) && trim($in['drive_service_account']) !== '') {
