@@ -23,6 +23,7 @@ Du siehst nur, wofür du das Recht hast und was die Kompanie nutzt.
 - Kachel **{bereich.companies}** (mit dem Recht **{bereich.companies} verwalten**): ihre {bereich.companies} (oder „Keine“); ein Tipp öffnet die Auswahl zum Ankreuzen.
 - **Geburtstag**: nur mit dem Recht **Persönliche Angaben sehen**. **Eintritt**: nur für alle, die Mitglieder anlegen dürfen; **Austritt** (und bei Ehemaligen auch ihr Eintritt): für alle, die Ehemalige verwalten dürfen. „Nicht eingetragen“ heißt: Es fehlt noch.
 - **Persönliche Angaben**: E-Mail-Adresse, Handynummer und Adresse der Person, nur mit dem Recht **Persönliche Angaben sehen**. Ein Tipp auf die E-Mail-Adresse oder Handynummer schreibt bzw. ruft an.
+- **{bereich.attendance}** (mit dem Recht **{bereich.attendance}: Listen je Termin führen**): wie oft die Person **anwesend** war, wie oft sie **entschuldigt** und wie oft sie **unentschuldigt** gefehlt hat. Rechts daneben wählst du das Jahr oder **Gesamt**; vorgegeben ist das laufende Jahr. Ein Tipp auf die Zahlen öffnet die Termine dazu.
 - **{bereich.offices}**: die Ämter der Person als Zeitstrahl, nur zum Ansehen.
 - **Konto und Rolle** ganz unten: klappt beim Antippen auf (siehe [Konto und Rolle](seite:rollen-vergeben)).
 
@@ -52,6 +53,13 @@ Das dürfen alle mit dem Recht **Persönliche Angaben pflegen**.
 
 ![Fenster Eintritt](bild:mitglied-uebersicht-eintritt)
 
+### Die {bereich.attendance} einer Person ansehen
+1. Wähle rechts neben **{bereich.attendance}** das Jahr oder **Gesamt**.
+2. Lies die drei Zahlen ab: **anwesend**, **entschuldigt** und **unentschuldigt**.
+3. Tippe auf die Zahlen. Es öffnet sich ein Fenster mit allen Terminen des Zeitraums, die jüngsten zuerst, jeweils mit dem Eintrag.
+
+![Anwesenheit auf der Seite eines Mitglieds](bild:mitglied-uebersicht-anwesenheit)
+
 ### Ein Fenster schließen
 Tippe auf **✕**, neben das Fenster oder auf die Zurück-Taste des Geräts.
 
@@ -63,6 +71,7 @@ Tippe auf **✕**, neben das Fenster oder auf die Zurück-Taste des Geräts.
 - Die E-Mail-Adresse von Admins und von Personen mit mehr Rechten als du ändert nur, wer deren Konto verwalten darf: Über die E-Mail-Adresse lässt sich das Passwort zurücksetzen. Handynummer und Adresse pflegst du mit dem Recht bei allen.
 - Jede Person sieht und ändert ihre eigenen Angaben unter **Meins → Konto**.
 - Der Eintritt geht ab dem Jahr 1800 und nicht in der Zukunft. Ob er auf der Seite der Person unter **{bereich.directory}** steht, wählt nur sie selbst unter **Meins → Konto**; im Fenster siehst du ihre Wahl nur zur Information.
+- Bei der {bereich.attendance} zählt nur, was in einer Anwesenheitsliste gespeichert ist. Hat die Person für einen kommenden Termin abgesagt, schlägt die Liste „entschuldigt“ nur vor; gezählt wird es erst, wenn jemand die Liste speichert. Gespeicherte Entschuldigungen für kommende Termine zählen mit, die Zeile darunter nennt, wie viele es sind. Termine, bei denen für die Person nichts eingetragen ist, zählen nicht.
 - Wie du Geburtstag und Austritt einträgst, steht im Handbuch unter **{bereich.birthdays} pflegen** (mit dem Recht **Persönliche Angaben pflegen**) und **Ehemalige** (für alle, die Ehemalige verwalten dürfen). Was die Kacheln für {bereich.points}, {bereich.penalties}, {begriff.rank} und {bereich.titles} öffnen, erklären die Handbuchseiten zu diesen Bereichen.
 
 ## Siehe auch

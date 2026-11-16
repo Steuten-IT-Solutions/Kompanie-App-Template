@@ -26,6 +26,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Anwesenheit auf der Seite eines Mitglieds**: Unter [Verwaltung → Mitglieder](app:verwaltung/mitglieder) steht bei
+  jeder Person, wie oft sie anwesend war, wie oft sie entschuldigt und wie oft sie unentschuldigt gefehlt hat. Vorgegeben
+  ist das laufende Jahr; du kannst auf frühere Jahre oder „Gesamt“ umschalten, und ein Tipp öffnet die Termine dazu. Es
+  zählt nur, was in einer Anwesenheitsliste gespeichert ist. Das sehen alle mit dem Recht, Anwesenheitslisten zu führen.
 - **App als Person ansehen**: Neben der Vorschau als Rolle siehst du die App jetzt auch so, wie eine bestimmte Person
   sie sieht, mit allen ihren Rollen zusammen (Grundrolle, Zusatzrollen und einzeln gegebene oder entzogene Rechte). Du
   startest sie auf der Seite der Person in der [Verwaltung → Mitglieder](app:verwaltung/mitglieder) unter _Konto und

@@ -1000,6 +1000,8 @@ export interface MemberDetail extends MemberSummary {
   photo_editable?: boolean;
   /** Ehemalig: Grund, Eintritt, Ausscheiden; null, wenn die Person nicht ehemalig ist (fehlt bei älteren Servern) */
   former?: FormerInfo | null;
+  /** Anwesenheit (nur mit Bereich und Recht manage_attendance) */
+  attendance?: MemberAttendance;
 }
 
 /** Grund des Ausscheidens */
@@ -1715,6 +1717,14 @@ export type AttendanceInput = (
 
 export interface MyAttendance {
   entries: { list_id: number; title: string; date: string; status: AttendanceStatus; updated_by_name: string | null }[];
+  counts: AttendanceCounts;
+}
+
+/** Anwesenheit einer Person auf ihrer Seite in der Verwaltung (nur mit Bereich und Recht manage_attendance) */
+export interface MemberAttendance {
+  /** Heute in der Zeitzone der Kompanie (JJJJ-MM-TT); später liegende Einträge sind kommende Termine */
+  today: string;
+  entries: { list_id: number; title: string; date: string; status: AttendanceStatus }[];
   counts: AttendanceCounts;
 }
 
