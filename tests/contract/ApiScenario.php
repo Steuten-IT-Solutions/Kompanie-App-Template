@@ -58,6 +58,7 @@ final class ApiScenario
             $this->mails();
             $this->companies();
             $this->sponsors();
+            $this->passives();
             $this->pages();
             $this->newsInApp();
             $this->activity();
@@ -114,7 +115,7 @@ final class ApiScenario
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Ausgeschalteter Bereich → 403 feature_disabled');
 
         $this->d->actAs($admin);
-        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true, 'directory' => true, 'offices' => true, 'lists' => true, 'mail' => true, 'companies' => true, 'sponsors' => true, 'pages' => true, 'website' => true];
+        $all = ['events' => true, 'calendar' => true, 'news' => true, 'gallery' => true, 'points' => true, 'penalties' => true, 'ranks' => true, 'titles' => true, 'attendance' => true, 'documents' => true, 'board' => true, 'polls' => true, 'birthdays' => true, 'inventory' => true, 'directory' => true, 'offices' => true, 'lists' => true, 'mail' => true, 'companies' => true, 'sponsors' => true, 'pages' => true, 'website' => true, 'passive' => true];
         [$s, $d] = $this->req('PUT', '/admin/features', $all);
         $c->ok($s === 200 && !in_array(false, array_column((array) $d, 'enabled', 'key'), true), 'Alle Bereiche einschalten');
 
@@ -1527,6 +1528,41 @@ final class ApiScenario
         [$s, $d] = $this->req('DELETE', "/sponsors/{$mine[0]}/logo");
         $c->ok($s === 200 && array_key_exists('logo_url', (array) $d) && $d['logo_url'] === null, 'Logo entfernen');
         $c->ok($this->req('DELETE', "/sponsors/{$mine[0]}")[0] === 200 && $this->req('DELETE', "/sponsors/{$mine[1]}")[0] === 200 && $this->req('PATCH', "/sponsors/{$mine[0]}", ['name' => 'x'])[0] === 404, 'Aufräumen: Sponsoren löschen');
+    }
+
+    /** Passive (Bereich passive): eigene Einträge ohne Konto, Rechte für persönliche Angaben, Betreuer liest unter Meins. */
+    private function passives(): void
+    {
+        $c = $this->c;
+        $c->section('Passive');
+        $admin = $this->user('kptest_passive_admin', 'admin');
+        $m = $this->user('kptest_passive_m', 'member');
+        $this->d->actAs($m);
+        $c->ok($this->req('GET', '/passive-members')[0] === 403, 'Ohne manage_passive → 403');
+        $this->d->actAs(null);
+        $c->ok($this->req('GET', '/passive-members')[0] === 401, 'Ohne Anmeldung → 401');
+
+        $this->d->actAs($admin);
+        $address = ['street' => 'Musterstraße', 'house_number' => '1', 'extra' => '', 'postal_code' => '12345', 'city' => 'Musterstadt', 'country' => 'DE', 'country_name' => ''];
+        [$s, $p] = $this->req('POST', '/passive-members', [
+            'first_name' => 'Kptest', 'last_name' => 'Passiv', 'address' => $address, 'phone' => '+49 2151 123456', 'email' => 'kptest-passiv@example.org', 'birth_date' => '1950-03-12', 'caretaker_id' => $m,
+        ]);
+        $id = (int) ($p['id'] ?? 0);
+        $c->ok($s === 201 && ($p['birth_date'] ?? '') === '1950-03-12' && ($p['caretaker']['id'] ?? 0) === $m && ($p['address']['city'] ?? '') === 'Musterstadt', 'Passiven anlegen mit allen Angaben');
+        $c->ok(!in_array('Kptest Passiv', array_column((array) $this->req('GET', '/members', [], ['all' => '1'])[1], 'name'), true), 'Kein Konto: nicht in der Mitgliederliste');
+        [$s, $p] = $this->req('PATCH', "/passive-members/$id", ['phone' => '']);
+        $c->ok($s === 200 && ($p['phone'] ?? 'x') === '' && ($p['email'] ?? '') === 'kptest-passiv@example.org', 'Telefon entfernen, E-Mail bleibt');
+        $c->ok($this->req('POST', '/passive-members', ['first_name' => 'Kptest'])[0] === 400, 'Ohne Nachnamen → 400');
+
+        $this->d->actAs($m);
+        [$s, $mine] = $this->req('GET', '/me/passive-members');
+        $c->ok($s === 200 && array_column((array) $mine, 'email') === ['kptest-passiv@example.org'], 'Betreuer sieht seinen Passiven mit allen Angaben');
+        $c->ok($this->req('PATCH', "/passive-members/$id", ['email' => 'x@example.org'])[0] === 403, 'Betreuer ändert nichts');
+
+        $this->d->actAs($admin);
+        [, $roles] = $this->req('GET', '/admin/roles');
+        $c->ok((array_column((array) $roles, 'capabilities', 'key')['passive'] ?? null) === self::caps(['member', 'manage_passive']), 'Standardrolle „Passive verwalten“');
+        $c->ok($this->req('DELETE', "/passive-members/$id")[0] === 200 && $this->req('GET', "/passive-members/$id")[0] === 404, 'Aufräumen: Passiven löschen');
     }
 
     /** News in der App (Quelle app): schreiben, lesen ohne Anmeldung, ändern mit Stand, löschen; Quelle danach zurück. */

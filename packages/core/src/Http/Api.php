@@ -765,6 +765,8 @@ final class Api
             'backupUrl' => $a->backup !== null && $this->can(Cap::ManageSettings) && !$a->preview()->active() ? $a->env->backupUrl() : null,
             // Vorschau „App als Rolle ansehen“ (Issue #63): {role, label}, null ohne (gültige) Vorschau
             'preview' => $a->preview()->info(),
+            // Passive (Bereich passive): wie viele die Person betreut (Punkt „Meine Passiven“ unter Meins); 0 ohne
+            'caredPassives' => $a->passives()->countMine($user),
             // Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen; null ohne den Bereich
             'birthdays' => ($features['birthdays'] ?? false) ? ['upcomingDays' => $a->birthdays()->upcomingDays()] : null,
         ];
@@ -869,6 +871,9 @@ final class Api
                 + ['ranks' => $a->ranks()->list(false), 'history' => $a->ranks()->history($this->user()->id)], 'ranks', $denyMember),
             new Route('GET', '/me/attendance', Cap::ViewOwnAttendance, fn () => $a->attendance()->mine($this->user()->id), 'attendance', $denyMember),
             new Route('GET', '/me/points', Cap::ViewOwnPoints, fn () => $a->scores()->pointsFor($this->user()->id), 'points', $denyMember),
+            // Meins → Meine Passiven: die Passiven, die die Person betreut, mit allen Angaben (bewusst auch ohne view_personal,
+            // nur lesen; Entscheidung vom 16.11.2026)
+            new Route('GET', '/me/passive-members', Cap::Member, fn () => $a->passives()->mine($this->user()), 'passive', $denyMember),
             new Route('GET', '/me/penalties', Cap::ViewOwnPenalties, fn () => $a->scores()->penaltiesFor($this->user()->id), 'penalties', $denyMember),
             // Geburtstage (Issue #1): eigener mit Jahr und Schaltern
             new Route('GET', '/me/birthday', Cap::Member, fn () => ['birthday' => $a->birthdays()->of($this->user()->id)], 'birthdays', $denyBirthdays),
@@ -1410,6 +1415,16 @@ final class Api
                 }
                 return $out;
             }, null, $denyManage),
+            // Passive (Bereich passive): eigene Einträge ohne Konto. Liste und Pflege mit manage_passive; Adresse, Telefon,
+            // E-Mail und Geburtsdatum nur mit view_personal sehen und mit manage_personal ändern (prüft PassiveMemberService).
+            new Route('GET', '/passive-members', Cap::ManagePassive, fn () => $a->passives()->list($this->user()), 'passive', $denyRights),
+            new Route('POST', '/passive-members', Cap::ManagePassive, fn (Request $r) => Response::created($a->passives()->create($this->user(), (array) $r->body)), 'passive', $denyRights),
+            new Route('GET', '/passive-members/{id}', Cap::ManagePassive, fn (Request $r) => $a->passives()->get($this->user(), $r->id()), 'passive', $denyRights),
+            new Route('PATCH', '/passive-members/{id}', Cap::ManagePassive, fn (Request $r) => $a->passives()->update($this->user(), $r->id(), (array) $r->body), 'passive', $denyRights),
+            new Route('DELETE', '/passive-members/{id}', Cap::ManagePassive, function (Request $r) use ($a) {
+                $a->passives()->delete($r->id());
+                return ['deleted' => true];
+            }, 'passive', $denyRights),
             // Ehemalige Mitglieder: Liste, eintragen (Konto stilllegen, Daten bleiben), ändern, wieder aufnehmen, Import
             new Route('GET', '/members/former', Cap::ManageFormer, function () use ($a) {
                 $photos = $a->memberPhotos()->urls();

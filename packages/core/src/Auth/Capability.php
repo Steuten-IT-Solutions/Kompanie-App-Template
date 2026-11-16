@@ -126,6 +126,12 @@ enum Capability: string
      * Ehemaliger weiterhin nur mit view_personal bzw. manage_personal; die Aufbewahrungsfrist bleibt bei manage_settings.
      */
     case ManageFormer = 'manage_former';
+    /**
+     * Passive verwalten (Bereich passive, Domain\PassiveMemberService): Liste der Passiven in der Verwaltung, anlegen,
+     * Namen und Betreuer ändern, löschen. Adresse, Telefon, E-Mail und Geburtsdatum der Passiven weiterhin nur mit
+     * view_personal bzw. manage_personal. Passive sind keine Konten, darum kein Recht über Konten (accountRights).
+     */
+    case ManagePassive = 'manage_passive';
     /** Rollen vergeben. */
     case PromoteUsers = 'promote_users';
     /**

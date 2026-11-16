@@ -26,6 +26,15 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Passive**: Mit dem neuen Bereich _Passive_ (unter [Einstellungen → Bereiche](app:einstellungen/bereiche)) führt ihr
+  unter [Verwaltung → Passive](app:verwaltung/passive) eine interne Liste eurer passiven Mitglieder mit Vorname,
+  Nachname, Adresse, Telefon, E-Mail-Adresse und Geburtsdatum, je optional mit einem Mitglied als Betreuer. Passive sind
+  keine Konten: Sie bekommen nie einen Zugang zur App, stehen in keiner Mitgliederliste und ihr Geburtstag erscheint nicht
+  bei den Geburtstagen. Die Liste sieht und pflegt, wer das neue Recht _Passive verwalten_ (`manage_passive`) hat; beim
+  Einschalten entsteht die Rolle „Passive verwalten“. Adresse, Telefon, E-Mail und Geburtsdatum sieht davon nur, wer
+  persönliche Angaben sehen darf, und ändert nur, wer sie pflegen darf. Betreuer sehen ihre eigenen Passiven unter
+  [Meins → Meine Passiven](app:meins/passive) mit allen Angaben, nur zum Lesen. Die Passiven sind Teil der
+  Datensicherung.
 - **App als Person ansehen**: Neben der Vorschau als Rolle siehst du die App jetzt auch so, wie eine bestimmte Person
   sie sieht, mit allen ihren Rollen zusammen (Grundrolle, Zusatzrollen und einzeln gegebene oder entzogene Rechte). Du
   startest sie auf der Seite der Person in der [Verwaltung → Mitglieder](app:verwaltung/mitglieder) unter _Konto und

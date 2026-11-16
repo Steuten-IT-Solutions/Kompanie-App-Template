@@ -70,6 +70,7 @@ export function helpSlug(path: string[], ctx: HelpContext): string | null {
           strafen: 'meine-strafen',
           dienstgrad: 'mein-dienstgrad',
           anwesenheit: 'meine-anwesenheit',
+          passive: 'meine-passiven',
           konto: 'anmelden-und-konto',
         }[sub ?? (ctx.can('member') ? 'uebersicht' : 'konto')] ?? 'meins-uebersicht'
       );
@@ -137,6 +138,7 @@ function adminSlug([sub, arg, page]: string[], ctx: HelpContext): string | null 
     sponsoren: 'sponsoren-verwalten',
     seiten: 'seiten-verwalten',
     webseite: 'webseite-verwalten',
+    passive: 'passive-verwalten',
     kompanien: 'kompanien-verwalten',
     neu: 'mitglieder-anlegen',
     'neu-mehrere': 'mitglieder-mehrere-anlegen',
