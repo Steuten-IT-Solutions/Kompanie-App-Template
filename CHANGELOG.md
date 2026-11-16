@@ -30,6 +30,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   _Als Titelbild des Albums verwenden_. Dieses Bild steht dann in der Galerie-Übersicht für das Album, auch bei Alben aus
   Google Drive. Noch einmal getippt, wählt die App das Titelbild wieder selbst. Ist das gewählte Bild nur für Mitglieder,
   sehen Gäste weiter ein öffentliches Bild des Albums; ein internes Bild wird so nie öffentlich.
+- **Direkt im Album einreichen**: In einem Album der [Galerie](app:galerie) gibt es oben den Knopf _Bilder und Videos
+  in dieses Album einreichen_. Das Album ist im Formular dann schon gewählt, und _‹ Zum Album_ führt zurück. Der Knopf
+  erscheint wie in der Übersicht nur mit dem Recht zum Einreichen und mit dem Haken _Einreichen von Bildern und Videos durch Mitglieder erlauben_ unter
+  [Einstellungen → Galerie](app:einstellungen/galerie).
 - **Bericht als PDF**: Unter [Verwaltung → Bericht](app:verwaltung/bericht) erstellst du eine PDF-Datei mit den Daten
   mehrerer Bereiche für einen Zeitraum, z. B. für die Jahreshauptversammlung. Den Zeitraum wählst du mit _Von_ und _Bis_
   oder der Schnellwahl (dieses Jahr, letztes Jahr, letzte 12 Monate), die Bereiche mit Haken. Enthalten sind die

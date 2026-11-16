@@ -9,15 +9,25 @@ import { VIDEO_ACCEPT, countFiles, isVideoFile, submitVideo } from '../videoUplo
 
 /**
  * Bilder und Videos (Issue #350) für die Galerie einreichen (submit_gallery) und Einreichungen prüfen (review_gallery),
- * Issue #286. Unter Galerie → „Bilder und Videos einreichen“ bzw. „Einreichungen prüfen“.
+ * Issue #286. Unter Galerie → „Bilder und Videos einreichen“ bzw. „Einreichungen prüfen“. Aus einem Album heraus
+ * (#/galerie/einreichen/<album>) ist dieses Album schon gewählt, und „‹ Zum Album“ führt dorthin zurück.
  */
-export default function GalerieEinreichungen({ mode, onToast }: { mode: 'einreichen' | 'pruefen'; onToast: (msg: string) => void }) {
+export default function GalerieEinreichungen({
+  mode,
+  albumId,
+  onToast,
+}: {
+  mode: 'einreichen' | 'pruefen';
+  albumId?: number;
+  onToast: (msg: string) => void;
+}) {
+  const fromAlbum = mode === 'einreichen' && albumId !== undefined;
   return (
     <div className="gallery-submissions">
-      <button className="btn btn-link back" onClick={() => navigate('galerie')}>
-        ‹ Alle Alben
+      <button className="btn btn-link back" onClick={() => navigate(fromAlbum ? `galerie/${albumId}` : 'galerie')}>
+        {fromAlbum ? '‹ Zum Album' : '‹ Alle Alben'}
       </button>
-      {mode === 'einreichen' ? <Submit onToast={onToast} /> : <Review onToast={onToast} />}
+      {mode === 'einreichen' ? <Submit albumId={albumId} onToast={onToast} /> : <Review onToast={onToast} />}
     </div>
   );
 }
@@ -28,9 +38,9 @@ const STATUS: Record<GallerySubmission['status'], string> = {
   rejected: 'nicht freigegeben',
 };
 
-function Submit({ onToast }: { onToast: (msg: string) => void }) {
+function Submit({ albumId, onToast }: { albumId?: number; onToast: (msg: string) => void }) {
   const { data, error, loading, reload } = useAsync(api.gallerySubmissions, []);
-  const [album, setAlbum] = useState('');
+  const [chosen, setAlbum] = useState(albumId !== undefined ? String(albumId) : '');
   const [consent, setConsent] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [progress, setProgress] = useState<string | null>(null);
@@ -67,6 +77,8 @@ function Submit({ onToast }: { onToast: (msg: string) => void }) {
   if (loading && !data) return <Loading shape="text" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const albums = data?.albums ?? [];
+  // Ein vorgewähltes Album, in das man nicht (mehr) einreichen kann (z. B. gelöscht), gilt als nicht gewählt.
+  const album = albums.some((a) => String(a.id) === chosen) ? chosen : '';
   const busy = progress !== null;
 
   return (

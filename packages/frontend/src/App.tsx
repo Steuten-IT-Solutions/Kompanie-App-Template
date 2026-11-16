@@ -744,7 +744,11 @@ export default function App({ notice = null }: { notice?: string | null }) {
             {tab === 'news' && <News id={newsId} onToast={showToast} />}
             {tab === 'galerie' &&
               (path[1] === 'einreichen' && can('submit_gallery') ? (
-                <GalerieEinreichungen mode="einreichen" onToast={showToast} />
+                <GalerieEinreichungen
+                  mode="einreichen"
+                  albumId={/^\d+$/.test(path[2] ?? '') ? Number(path[2]) : undefined}
+                  onToast={showToast}
+                />
               ) : path[1] === 'pruefen' && can('review_gallery') ? (
                 <GalerieEinreichungen mode="pruefen" onToast={showToast} />
               ) : path[1] === 'verwalten' && canManageGallery() ? (
