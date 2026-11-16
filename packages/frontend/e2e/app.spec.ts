@@ -2239,6 +2239,14 @@ test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)',
   await expect(page.locator('.gallery-upload', { hasText: 'zweites.jpg' })).toContainText('nicht freigegeben: Unscharf');
   await expect(page.locator('.gallery-upload', { hasText: 'foto.jpg' }).filter({ hasText: title })).toContainText('freigegeben');
 
+  // Aus dem Album heraus einreichen: das Album ist schon gewählt, „‹ Zum Album“ führt zurück
+  await page.goto(`/app/#/galerie/${albumId}`);
+  await page.getByRole('button', { name: 'Bilder und Videos in dieses Album einreichen' }).click();
+  await expect(page).toHaveURL(new RegExp(`#/galerie/einreichen/${albumId}$`));
+  await expect(page.locator('form', { hasText: 'Bilder und Videos einreichen' }).getByLabel('Album')).toHaveValue(String(albumId));
+  await page.getByRole('button', { name: '‹ Zum Album' }).click();
+  await expect(page).toHaveURL(new RegExp(`#/galerie/${albumId}$`));
+
   // Ausgeschaltet: kein Knopf mehr, das Formular sagt es; eigene Einreichungen bleiben sichtbar
   await page.goto('/app/#/einstellungen/galerie');
   await page.getByLabel(/Einreichen von Bildern und Videos durch Mitglieder erlauben/).uncheck();
@@ -2247,6 +2255,9 @@ test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)',
   await page.goto('/app/#/galerie');
   await expect(page.getByRole('button', { name: 'Einreichungen prüfen' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Bilder und Videos einreichen' })).toHaveCount(0);
+  await page.goto(`/app/#/galerie/${albumId}`);
+  await expect(page.getByRole('heading', { name: new RegExp(title) })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Bilder und Videos in dieses Album einreichen' })).toHaveCount(0);
   await page.goto('/app/#/galerie/einreichen');
   await expect(page.getByText('Das Einreichen ist zurzeit ausgeschaltet.')).toBeVisible();
   await expect(page.locator('.gallery-upload', { hasText: 'zweites.jpg' })).toContainText('nicht freigegeben: Unscharf');
