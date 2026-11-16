@@ -9451,11 +9451,6 @@ components:
         registration: { type: boolean, description: 'Zugang beantragen eingeschaltet (Issue #314): Link „Zugang beantragen“ für Gäste' }
         pendingRegistrations:
           { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null' }
-        awaitingResponses:
-          type: [integer, 'null']
-          description: >-
-            Kommende Termine, deren Frist in den nächsten 30 Tagen endet, ohne eigene Zu- oder Absage (Zahl an der Kachel des
-            Kalenders); nur mit respond_calendar und einer gespeicherten Fassung des Kalenders, sonst null
         gallerySubmissions:
           { type: boolean, description: 'Galerie an und Einreichen erlaubt (Einstellung gallery_submissions): sonst kein Knopf zum Einreichen' }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }

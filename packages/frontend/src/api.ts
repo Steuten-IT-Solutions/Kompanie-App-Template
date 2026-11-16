@@ -133,8 +133,6 @@ export interface AppConfig {
   registration?: boolean;
   /** Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null */
   pendingRegistrations?: number | null;
-  /** Kommende Termine (Frist endet in 30 Tagen) ohne eigene Zu- oder Absage; nur mit respond_calendar, sonst null */
-  awaitingResponses?: number | null;
   /** Einreichen von Bildern und Videos erlaubt (Einstellungen → Galerie); fehlt bei älteren Servern (dann erlaubt) */
   gallerySubmissions?: boolean;
   /** Rollen der Installation (Einstellungen → Rollen): Bezeichnung und Punktefaktor */
@@ -512,13 +510,6 @@ export function applyNavigation(next: Pick<NavigationAdmin, 'navigation' | 'inte
   config.navigation = next.navigation;
   config.navigation_intern_order = next.intern_order;
   config.admin_order = next.admin_order;
-  window.dispatchEvent(new Event(CONFIG_CHANGED));
-}
-
-/** Zahl der Termine ohne eigene Rückmeldung nach dem Laden des Kalenders oder einer Antwort: Zahl an der Kachel. */
-export function applyAwaitingResponses(count: number): void {
-  if (!config || config.awaitingResponses == null || config.awaitingResponses === count) return;
-  config.awaitingResponses = count;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 

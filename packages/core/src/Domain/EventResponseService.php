@@ -29,8 +29,6 @@ final class EventResponseService
     public const NO = 'no';
     public const STATUSES = [self::YES, self::NO];
     public const NOTE_MAX = 191;
-    /** Zahl an der Kachel: Termine, deren Frist in so vielen Tagen endet */
-    public const BADGE_DAYS = 30;
     /** Erinnerung an alle ohne Rückmeldung (Einstellungen → Kalender): an/aus und Vorlauf in Tagen vor Beginn */
     public const REMINDER_SETTING = 'event_response_reminder';
     public const REMINDER_DAYS_SETTING = 'event_response_reminder_days';
@@ -214,35 +212,6 @@ final class EventResponseService
             'audience' => array_map(static fn (): bool => true, $this->audience()),
             'rows' => $rows,
         ];
-    }
-
-    /**
-     * Kommende Termine der nächsten BADGE_DAYS Tage, bei denen $user noch zu- oder absagen kann und es noch nicht getan
-     * hat (Zahl an der Kachel des Kalenders). Wartet nicht auf den Kalender: ohne gespeicherte Fassung null.
-     */
-    public function awaitingCount(User $user): ?int
-    {
-        if ($user->id <= 0 || !$user->can(Capability::RespondCalendar)) {
-            return null;
-        }
-        $events = $this->app->calendar()->cached();
-        if ($events === null) {
-            return null;
-        }
-        $now = $this->app->time()->timestamp();
-        $until = $now + self::BADGE_DAYS * 86400;
-        $keys = [];
-        foreach ($events as $e) {
-            $deadline = $this->deadline($e);
-            if ($deadline > $now && $deadline <= $until) {
-                $keys[] = self::key($e);
-            }
-        }
-        if ($keys === []) {
-            return 0;
-        }
-        $answered = array_flip($this->repository()->keysOfUser($user->id, $keys));
-        return count(array_filter(array_unique($keys), static fn (string $k): bool => !isset($answered[$k])));
     }
 
     /** Stabile Kennung, unter der die Rückmeldungen zu diesem Termin gespeichert sind (für das Änderungsprotokoll). */

@@ -318,19 +318,4 @@ final class EventResponsesTest extends TestCase
         $list = $this->ok('PUT', '/attendance', ['source' => 'calendar', 'event_key' => $id]);
         $this->assertFalse($list['responses_open']);
     }
-
-    public function testAwaitingCountInConfig(): void
-    {
-        $this->ok('PATCH', '/admin/settings', ['calendar_source' => 'app']);
-        $soon = 'i' . $this->ok('POST', '/calendar/entries', ['title' => 'Bald', 'start_date' => '2026-11-20'])['id'];
-        $this->ok('POST', '/calendar/entries', ['title' => 'Auch bald', 'start_date' => '2026-12-01', 'start_time' => '19:00']);
-        $this->ok('POST', '/calendar/entries', ['title' => 'Später', 'start_date' => '2027-01-20']);
-        $this->assertSame(2, $this->ok('GET', '/config', [], $this->anna)['awaitingResponses'], 'nur Fristen in den nächsten 30 Tagen');
-        $this->ok('PUT', "/calendar/$soon/response", ['status' => 'no'], $this->anna);
-        $this->assertSame(1, $this->ok('GET', '/config', [], $this->anna)['awaitingResponses']);
-
-        $guest = $this->users->add('gast', Roles::GUEST);
-        $this->assertNull($this->ok('GET', '/config', [], $guest)['awaitingResponses'], 'ohne das Recht');
-        $this->assertNull($this->ok('GET', '/config', [], null)['awaitingResponses'], 'ohne Anmeldung');
-    }
 }

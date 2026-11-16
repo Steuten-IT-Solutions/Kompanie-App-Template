@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { applyAwaitingResponses, can, config } from '../api';
-import { awaitingResponses } from '../tileCount';
+import { can, config } from '../api';
 import GuestPushButton from '../GuestPushButton';
 import { birthdaysVisible, UpcomingBirthdays, UpcomingBirthdaysCard, useUpcomingBirthdays } from '../upcomingBirthdays';
 import { navigate } from '../router';
@@ -27,10 +26,6 @@ function EventList({ focus }: { focus?: string }) {
   const { data, error, loading, reload, setData } = useAsync(sources.termine.load, sources.termine.deps, sources.termine.key);
   // Nach einer Zu- oder Absage: den Termin in der Liste (und im Zwischenspeicher) ersetzen.
   const replace = (ev: CalendarEvent) => setData((data ?? []).map((e) => (e.id === ev.id ? { ...e, responses: ev.responses } : e)));
-  // Zahl an der Kachel des Kalenders mit dem geladenen Stand abgleichen (auch nach jeder eigenen Antwort).
-  useEffect(() => {
-    if (data) applyAwaitingResponses(awaitingResponses(data));
-  }, [data]);
   // Geburtstage gleichzeitig laden und erst mit den Terminen zeigen: Sonst taucht die Karte oben nachträglich auf und
   // schiebt die Liste nach unten.
   const showBirthdays = birthdaysVisible();
