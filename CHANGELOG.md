@@ -26,6 +26,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Direkt im Album einreichen**: In einem Album der [Galerie](app:galerie) gibt es oben den Knopf _Bilder und Videos
+  in dieses Album einreichen_. Das Album ist im Formular dann schon gewählt, und _‹ Zum Album_ führt zurück. Der Knopf
+  erscheint wie in der Übersicht nur mit dem Recht zum Einreichen und mit dem Haken _Einreichen von Bildern und Videos durch Mitglieder erlauben_ unter
+  [Einstellungen → Galerie](app:einstellungen/galerie).
 - **Bericht als PDF**: Unter [Verwaltung → Bericht](app:verwaltung/bericht) erstellst du eine PDF-Datei mit den Daten
   mehrerer Bereiche für einen Zeitraum, z. B. für die Jahreshauptversammlung. Den Zeitraum wählst du mit _Von_ und _Bis_
   oder der Schnellwahl (dieses Jahr, letztes Jahr, letzte 12 Monate), die Bereiche mit Haken. Enthalten sind die
