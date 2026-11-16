@@ -26,6 +26,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **App als Person ansehen**: Neben der Vorschau als Rolle siehst du die App jetzt auch so, wie eine bestimmte Person
+  sie sieht, mit allen ihren Rollen zusammen (Grundrolle, Zusatzrollen und einzeln gegebene oder entzogene Rechte). Du
+  startest sie auf der Seite der Person in der [Verwaltung → Mitglieder](app:verwaltung/mitglieder) unter _Konto und
+  Rolle_ mit _App als … ansehen_; das Banner zeigt ihren Namen und ihre Rollen. Wie die Vorschau als Rolle ist sie nur
+  für Admins, nur zum Ansehen und zeigt bei persönlichen Seiten (z. B. _Meins_) weiter deine eigenen Daten, nicht die
+  der Person.
+
 - **Zu- und Absagen ohne Internet**: Ohne Verbindung merkt sich die App Zusagen, Absagen, Hinweise und das Zurücknehmen
   auf dem Gerät, zeigt sie gleich an (mit „Noch nicht übertragen“) und sendet sie von selbst, sobald wieder Netz da ist.
   Wie bei der Anwesenheit fragt die App beim Abmelden nach, wenn noch etwas nicht übertragen ist.

@@ -180,7 +180,7 @@ final class App
     ) {
         // Vorschau „App als Rolle ansehen“ (Issue #63): Wer die Anfrage stellt und die Adressen geschützter Dateien gehen
         // über die Vorschau – so gilt sie überall gleich, ohne dass Dienste oder Adapter sie kennen müssen.
-        $this->preview = new Preview($authContext, fn (): RoleService => $this->roles());
+        $this->preview = new Preview($authContext, fn (): RoleService => $this->roles(), fn (): UserDirectory => $this->users);
         $this->authContext = $this->preview;
         $this->env = new PreviewEnvironment($env, $this->preview);
         // Eigene Bereichsnamen der Installation (Issue #362) gehen überall vor kompanie.json.

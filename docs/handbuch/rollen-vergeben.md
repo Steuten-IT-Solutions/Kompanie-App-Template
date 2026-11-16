@@ -17,6 +17,7 @@ Du siehst nur die Teile, für die du das Recht hast:
 - **Rechte**: alle Rechte der Person, mit **Rechte speichern** (wer Rollen vergeben darf).
 - **Als {rolle.member} aufnehmen**: nur bei Rollen, die ein {rolle.admin} dafür freigegeben hat, z. B. Anwärter (wer Mitglieder anlegen darf).
 - **Passwort vergessen? Neues Startpasswort erzeugen** (wer Mitglieder anlegen darf). Bei einem Mitglied ohne Zugang steht hier stattdessen **Zugang einrichten**.
+- **App als … ansehen**: zeigt die App mit den Rechten dieser Person, alle ihre Rollen zusammen (nur für {rolle.admin}s, nicht bei {rolle.admin}s und nicht auf deiner eigenen Seite; mehr dazu im Handbuch unter „App als Rolle ansehen“).
 - **Ehemalig** mit **Als ehemalig eintragen …** (wer Ehemalige verwalten darf).
 - **Konto** mit Benutzername, E-Mail und Handynummer, **Angaben ändern**, **Daten exportieren (Auskunft)** und **Konto löschen** (wer Mitglieder anlegen darf). Auf deiner eigenen Seite fehlt **Konto löschen**.
 

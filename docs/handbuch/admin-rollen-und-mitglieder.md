@@ -18,7 +18,7 @@ Oben schaltest du zwischen **Rollen** (die Liste) und **Wer sieht was** (die Üb
 - **Ansehen** (Auge): zeigt die App so, wie diese Rolle sie sieht (siehe [App als Rolle ansehen](seite:admin-vorschau)). Bei {rolle.admin} fehlt der Knopf.
 - **Bearbeiten** (Stift): öffnet die Rolle zum Ändern.
 - **+ Neue Rolle**: legt eine weitere Rolle an.
-- **App ohne Anmeldung ansehen**: zeigt die App, wie Besucher ohne Konto sie sehen.
+- **App ohne Anmeldung ansehen**: zeigt die App, wie Besucher ohne Konto sie sehen. Wie eine bestimmte Person die App mit all ihren Rollen sieht, zeigt **App als … ansehen** auf ihrer Seite unter **Konto und Rolle**.
 - **{bereich.attendance}: Gruppen im Zähler** (nur wenn {bereich.attendance} an ist): als was jede Rolle im Zähler über der Mitgliederliste zählt. Ohne Einstellung zählen alle Rollen, die zur Kompanie gehören, als {rolle.member}, die übrigen (z. B. Anwärter) je für sich.
 - **Wer sieht was**: eine Tabelle mit allen Rechten als Zeilen und allen Rollen als Spalten. So siehst du auf einen Blick, welche Rolle welchen Knopf sieht, und änderst es direkt.
 

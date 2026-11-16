@@ -109,6 +109,7 @@ import { hasOverrides, MemberRightsPanel } from './Rechte';
 import { MemberAvatar, PhotoPicker, preloadAvatar, ZoomableAvatar, type PreparedPhoto } from '../memberPhoto';
 import { FORMER_SORTS, FormerImport, FormerList, FormerPanel, NewFormer, REASON_OPTIONS } from './Ehemalige';
 import { MemberImport } from './MitgliederImport';
+import { startPersonPreview } from '../preview';
 import { Anfragen } from './Anfragen';
 import { Meldungen } from './Meldungen';
 import { Aenderungen } from './Aenderungen';
@@ -1165,6 +1166,12 @@ function MemberDetailView({
             }
           >
             Als {levelLabel('member')} aufnehmen
+          </button>
+        )}
+        {/* Vorschau mit den Rechten dieser Person (alle Rollen zusammen); nur Admins, nicht für Admins selbst. */}
+        {config?.user?.level === 'admin' && !self && m.level !== 'admin' && (
+          <button type="button" className="btn btn-secondary btn-block member-preview-start" onClick={() => startPersonPreview(m.id)}>
+            App als {m.name} ansehen
           </button>
         )}
         {!m.former && <ResetPassword id={m.id} name={m.name} level={m.level} noAccess={!!m.no_access} onToast={onToast} />}

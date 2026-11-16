@@ -303,7 +303,8 @@ function InstallBanner({ onToast }: { onToast: (msg: string) => void }) {
 }
 
 /**
- * Vorschau „App als Rolle ansehen“ (Issue #63): auf jeder Seite oben, mit „Beenden“ (zurück zu Einstellungen → Rollen).
+ * Vorschau „App als Rolle ansehen“ (Issue #63): auf jeder Seite oben, mit „Beenden“ (zurück zu Einstellungen → Rollen,
+ * als Person zu ihrer Seite). Als Person stehen ihre Rollen dahinter.
  * Änderungen lehnt der Server in der Vorschau ab; die Knöpfe bleiben, wie die Rolle sie sieht.
  */
 function PreviewBanner() {
@@ -312,7 +313,8 @@ function PreviewBanner() {
   return (
     <div className="preview-banner" role="status">
       <span>
-        <strong>{p.role === PUBLIC_PREVIEW ? 'Vorschau ohne Anmeldung' : `Vorschau als ${p.label}`}</strong> – nur ansehen
+        <strong>{p.role === PUBLIC_PREVIEW ? 'Vorschau ohne Anmeldung' : `Vorschau als ${p.label}`}</strong>
+        {p.person !== undefined && p.roles && p.roles.length > 0 && ` (${p.roles.join(', ')})`} – nur ansehen
       </span>
       <button className="btn btn-small" onClick={endPreview}>
         Beenden
