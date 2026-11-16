@@ -32,6 +32,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   ein, er steht beim Eintragen schon im Feld; die Zahlungsarten zur Auswahl richtest du dort auch ein (vorgegeben
   Bar, SEPA und PayPal). Eintragen darf, wer Passive verwaltet. Betreuer sehen unter
   [Meins → Meine Passiven](app:meins/passive), ob der Beitrag für das laufende Jahr bezahlt ist.
+- **Titelbild eines Albums wählen**: Wer die Galerie verwalten darf, öffnet ein Bild in der Großansicht und tippt auf
+  _Als Titelbild des Albums verwenden_. Dieses Bild steht dann in der Galerie-Übersicht für das Album, auch bei Alben aus
+  Google Drive. Noch einmal getippt, wählt die App das Titelbild wieder selbst. Ist das gewählte Bild nur für Mitglieder,
+  sehen Gäste weiter ein öffentliches Bild des Albums; ein internes Bild wird so nie öffentlich.
 - **Direkt im Album einreichen**: In einem Album der [Galerie](app:galerie) gibt es oben den Knopf _Bilder und Videos
   in dieses Album einreichen_. Das Album ist im Formular dann schon gewählt, und _‹ Zum Album_ führt zurück. Der Knopf
   erscheint wie in der Übersicht nur mit dem Recht zum Einreichen und mit dem Haken _Einreichen von Bildern und Videos durch Mitglieder erlauben_ unter
@@ -153,6 +157,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Ämter-Liste**: Unter [Verwaltung → Ämter](app:verwaltung/aemter) steht ein langer, zweizeiliger Name eines Amts jetzt
   linksbündig wie die übrigen statt mittig. Unter „Gemeinsame Amtszeiten“ hat der Knopf „Neue gemeinsame Amtszeit“ wieder
   Abstand zur Karte darüber.
+
+- **Benachrichtigung zu eingereichten Videos**: Wird ein eingereichtes Video in der Galerie freigegeben oder abgelehnt,
+  spricht die Benachrichtigung jetzt vom Video („Video freigegeben“, „Dein Video … ist jetzt im Album …“) statt immer vom
+  Bild. Wer prüft, liest bei neuen Einreichungen „Bilder oder Videos“, und die Rückfrage beim Ablehnen ohne Grund nennt
+  ebenfalls Bild oder Video. Auch die Namen der beiden Benachrichtigungen unter
+  [Meins → Benachrichtigungen](app:meins/benachrichtigungen) nennen jetzt Bilder und Videos.
 
 ### Entfernt
 

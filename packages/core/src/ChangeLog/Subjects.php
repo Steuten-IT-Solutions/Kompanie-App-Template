@@ -339,7 +339,7 @@ final class Subjects
             'name' => 'Datei', 'user_id' => ['Von', 'user'], 'album_id' => ['Album', 'lookup:albums.title'], 'status' => 'Status', 'reason' => 'Begründung',
         ], subject: 'user_id');
         $photos = $this->spec('Bild der Galerie', 'photos', 'name', ['name' => 'Datei', 'album_id' => ['Album', 'lookup:albums.title'], 'is_intern' => ['Intern', 'bool']]);
-        $albums = $this->spec('Album', 'albums', 'title', ['title' => 'Titel', 'year' => 'Jahr']);
+        $albums = $this->spec('Album', 'albums', 'title', ['title' => 'Titel', 'year' => 'Jahr', 'cover_photo_id' => ['Titelbild', 'lookup:photos.name']]);
         $mailings = $this->spec('E-Mail', 'mailings', 'subject', ['subject' => 'Betreff', 'body' => ['Text', 'html'], 'selection' => ['Empfänger', 'json']]);
         $reports = $this->spec('Fehlermeldung', 'report_inbox', static function (array $r): string {
             $report = json_decode((string) $r['report'], true);
@@ -396,6 +396,7 @@ final class Subjects
             'POST /lists/{id}/sync-members' => $lists,
             'POST /polls/{id}/close' => $polls,
             'POST /inventory/{id}/move' => $inventory,
+            'PUT /gallery/albums/{id}/cover' => $albums,
             'POST /gallery/review/{id}/approve' => $submissions, 'POST /gallery/review/{id}/reject' => $submissions, 'POST /gallery/review/{id}/remove' => $submissions,
             'POST /reports/review/{id}/close' => $reports, 'POST /reports/review/{id}/forward' => $reports,
         ] as $key => $spec) {

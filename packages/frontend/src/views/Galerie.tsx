@@ -587,6 +587,17 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
                 }
               : undefined
           }
+          coverId={album.cover_id ?? null}
+          onCover={
+            manage
+              ? async (p, cover) => {
+                  await api.setGalleryAlbumCover(album.id, cover ? p.id : null);
+                  dataUpdated();
+                  onToast(cover ? 'Titelbild gewählt' : 'Titelbild wieder automatisch');
+                  reload();
+                }
+              : undefined
+          }
           onMove={manage ? (p) => new Promise<boolean>((done) => setSheet({ kind: 'move', ids: [p.id], top: true, done })) : undefined}
           onDelete={manage ? (p) => deleteItems([p.id]) : undefined}
         />
@@ -758,6 +769,8 @@ function Lightbox({
   onClose,
   downloads = false,
   onIntern,
+  coverId = null,
+  onCover,
   onMove,
   onDelete,
 }: {
@@ -767,6 +780,10 @@ function Lightbox({
   downloads?: boolean;
   /** Umstellen intern/öffentlich für hochgeladene Bilder und Videos (manage_gallery oder review_gallery) */
   onIntern?: (p: GalleryPhoto, intern: boolean) => Promise<void>;
+  /** Gewähltes Titelbild des Albums (null: automatisch) */
+  coverId?: number | null;
+  /** Bild als Titelbild der Übersicht wählen (true) oder zurück auf automatisch (false), auch aus Drive (manage_gallery) */
+  onCover?: (p: GalleryPhoto, cover: boolean) => Promise<void>;
   /** Hochgeladenes Bild oder Video verschieben bzw. löschen (manage_gallery); true, wenn es geschehen ist (dann schließt die Großansicht) */
   onMove?: (p: GalleryPhoto) => Promise<boolean>;
   onDelete?: (p: GalleryPhoto) => Promise<boolean>;
@@ -1026,6 +1043,27 @@ function Lightbox({
       <div className="lb-count">
         {i + 1} / {photos.length}
         {p.intern && ' · intern'}
+        {coverId === p.id && ' · Titelbild'}
+        {onCover && !isVideo(p) && (
+          <IconButton
+            icon="cover"
+            label={coverId === p.id ? 'Titelbild wieder automatisch wählen' : 'Als Titelbild des Albums verwenden'}
+            variant="lb"
+            className={coverId === p.id ? 'lb-intern lb-active' : 'lb-intern'}
+            disabled={switching}
+            onClick={async () => {
+              setSwitching(true);
+              setSaveError(null);
+              try {
+                await onCover(p, coverId !== p.id);
+              } catch (e) {
+                setSaveError((e as Error).message);
+              } finally {
+                setSwitching(false);
+              }
+            }}
+          />
+        )}
         {onIntern && p.upload && (
           <IconButton
             icon={p.intern ? 'public' : 'intern'}

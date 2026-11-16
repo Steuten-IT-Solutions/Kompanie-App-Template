@@ -138,7 +138,7 @@ final class GallerySubmissionTest extends TestCase
             $this->assertStringNotContainsString('GPSLatitude', (string) file_get_contents($this->dir . '/private/einreichungen/' . $f));
         }
         $this->assertCount(1, $this->queued($this->rev), 'ein Schub, eine Benachrichtigung');
-        $this->assertStringContainsString('Einreicher hat Bilder für „Sommerfest“ eingereicht.', json_decode($this->queued($this->rev)[0], true)['body']);
+        $this->assertStringContainsString('Einreicher hat Bilder oder Videos für „Sommerfest“ eingereicht.', json_decode($this->queued($this->rev)[0], true)['body']);
 
         // Zurückziehen: nur eigene, nur offene
         $this->users->current = $this->rev;
@@ -166,6 +166,9 @@ final class GallerySubmissionTest extends TestCase
         $msgs = $this->queued($this->sub);
         $this->assertCount(2, $msgs);
         $this->assertStringContainsString('Unscharf', implode(' ', $msgs));
+        $first = json_decode($msgs[0], true);
+        $this->assertSame(['Galerie: Bild freigegeben', 'Dein Bild „Erstes.jpg“ ist jetzt im Album „Sommerfest“.'], [$first['title'], $first['body']]);
+        $this->assertSame('Galerie: Bild abgelehnt', json_decode($msgs[1], true)['title']);
 
         // Eigene Liste mit Status und Grund
         $this->users->current = $this->sub;

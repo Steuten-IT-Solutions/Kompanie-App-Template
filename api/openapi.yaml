@@ -1746,6 +1746,43 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /gallery/albums/{id}/cover:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Galerie]
+      summary: Titelbild eines Albums für die Übersicht wählen
+      description: |
+        Ein Bild (kein Video) dieses Albums, auch in Alben aus Google Drive; `photo_id: null` stellt auf die automatische
+        Wahl zurück (öffentlich vor intern, Bilder vor Videos, dann nach Aufnahmezeit). Ist das gewählte Bild intern, zeigt
+        die Übersicht es nur Mitgliedern (view_gallery_internal); Gäste sehen weiter das automatisch gewählte öffentliche.
+        Liegt das Bild nicht mehr im Album (verschoben, gelöscht), gilt wieder die automatische Wahl.
+      x-capability: 'manage_settings oder manage_gallery'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [photo_id]
+              properties:
+                photo_id: { type: [integer, 'null'], description: 'Bild des Albums; null: automatisch' }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, cover_id]
+                properties:
+                  id: { type: integer }
+                  cover_id: { type: [integer, 'null'] }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /gallery/photos/move:
     post:
       tags: [Galerie]
@@ -6925,9 +6962,12 @@ paths:
                     description: 'Kommagetrennte Kalender-IDs; gelesen mit API-Schlüssel (öffentliche Kalender) oder über den Google-Zugang',
                   }
                 calendar_cache_minutes: { type: integer, minimum: 1, maximum: 1440 }
-                calendar_responses: { type: string, enum: ['0', '1'], description: 'Zu- und Absagen bei Terminen einschalten (Vorgabe aus)' }
-                calendar_response_reminder: { type: string, enum: ['0', '1'], description: An Zu- und Absage erinnern (Push an alle ohne Rückmeldung) }
-                calendar_response_reminder_days: { type: integer, minimum: 1, maximum: 30, description: Erinnerung so viele Tage vor Beginn }
+                calendar_responses:
+                  { type: string, enum: ['0', '1'], description: 'Zu- und Absagen bei Terminen einschalten (Vorgabe aus)' }
+                calendar_response_reminder:
+                  { type: string, enum: ['0', '1'], description: An Zu- und Absage erinnern (Push an alle ohne Rückmeldung) }
+                calendar_response_reminder_days:
+                  { type: integer, minimum: 1, maximum: 30, description: Erinnerung so viele Tage vor Beginn }
                 drive_service_account: { type: string, description: JSON-Schlüssel des Dienstkontos }
                 drive_oauth:
                   {
@@ -9192,7 +9232,8 @@ components:
           items: { type: string, enum: [katalog, dienstgrade, titel, aemter, kompanien, sponsoren, seiten, webseite] }
     NavigationAdmin:
       type: object
-      required: [navigation, guest_navigation, names, start, show_labels, intern_order, admin_order, targets, icons, max_menu_items, label_max]
+      required:
+        [navigation, guest_navigation, names, start, show_labels, intern_order, admin_order, targets, icons, max_menu_items, label_max]
       properties:
         navigation:
           description: Gespeicherte Navigation; null = Standardnavigation
@@ -9801,10 +9842,21 @@ components:
         pendingRegistrations:
           { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null' }
         gallerySubmissions:
-          { type: boolean, description: 'Galerie an und Einreichen erlaubt (Einstellung gallery_submissions): sonst kein Knopf zum Einreichen' }
+          {
+            type: boolean,
+            description: 'Galerie an und Einreichen erlaubt (Einstellung gallery_submissions): sonst kein Knopf zum Einreichen',
+          }
         eventResponses:
-          { type: boolean, description: 'Interner Kalender an und Zu- und Absagen eingeschaltet (Einstellung calendar_responses): sonst keine Knöpfe und kein Anmeldeschluss' }
-        caredPassives: { type: integer, minimum: 0, description: 'Wie viele Passive die angemeldete Person betreut (Meins → Meine Passiven); 0 ohne Anmeldung oder ohne den Bereich passive' }
+          {
+            type: boolean,
+            description: 'Interner Kalender an und Zu- und Absagen eingeschaltet (Einstellung calendar_responses): sonst keine Knöpfe und kein Anmeldeschluss',
+          }
+        caredPassives:
+          {
+            type: integer,
+            minimum: 0,
+            description: 'Wie viele Passive die angemeldete Person betreut (Meins → Meine Passiven); 0 ohne Anmeldung oder ohne den Bereich passive',
+          }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
         backupUrl:
           {
@@ -9990,7 +10042,12 @@ components:
         location: { type: string }
         description: { type: string }
         url: { type: string, description: 'Nur bei Terminen, die in der App gepflegt werden (Quelle app)' }
-        respond_until: { type: [string, 'null'], format: date, description: 'Nur Quelle app: Anmeldeschluss (Zu- und Absagen bis zum Ende dieses Tages)' }
+        respond_until:
+          {
+            type: [string, 'null'],
+            format: date,
+            description: 'Nur Quelle app: Anmeldeschluss (Zu- und Absagen bis zum Ende dieses Tages)',
+          }
         responses:
           type: object
           description: Zu- und Absagen (nur in `GET /calendar` und den Antworten der Rückmeldung); fehlt, solange Zu- und Absagen ausgeschaltet sind
@@ -10026,7 +10083,8 @@ components:
         end_date: { type: [string, 'null'] }
         end_time: { type: [string, 'null'] }
         url: { type: string }
-        respond_until: { type: [string, 'null'], format: date, description: 'Nur Termine des internen Kalenders (`/calendar/entries`): Anmeldeschluss' }
+        respond_until:
+          { type: [string, 'null'], format: date, description: 'Nur Termine des internen Kalenders (`/calendar/entries`): Anmeldeschluss' }
 
     EventInput:
       type: object
@@ -10040,7 +10098,8 @@ components:
         location: { type: string }
         description: { type: string }
         url: { type: string }
-        respond_until: { type: string, description: 'Nur `/calendar/entries`: Anmeldeschluss YYYY-MM-DD, höchstens der Tag des Beginns, oder leer' }
+        respond_until:
+          { type: string, description: 'Nur `/calendar/entries`: Anmeldeschluss YYYY-MM-DD, höchstens der Tag des Beginns, oder leer' }
 
     NewsItem:
       type: object
@@ -10145,6 +10204,11 @@ components:
           description: |
             Knöpfe zum Herunterladen zeigen (Einstellung `gallery_downloads`): je Bild in der Großansicht und das Album als ZIP.
             Die App lädt dafür bei Bildern `original` (sonst `large`), bei Videos `video` in Ausschnitten mit Range, und packt das ZIP selbst.
+        cover_id:
+          type: [integer, 'null']
+          description: |
+            In der App gewähltes Titelbild (PUT /gallery/albums/{id}/cover), wenn es in diesem Album für den Betrachter zu sehen
+            ist; null: Die Übersicht wählt automatisch. Ein internes Titelbild bekommen Gäste nie (dann null).
         photos:
           type: array
           items: { $ref: '#/components/schemas/GalleryPhoto' }
@@ -10323,7 +10387,10 @@ components:
                 - $ref: '#/components/schemas/MemberRights'
                 - type: 'null'
             photo_editable:
-              { type: boolean, description: 'Ob der Betrachter das Foto ändern darf (create_users, bei Ehemaligen auch manage_former, und dieses Konto verwalten)' }
+              {
+                type: boolean,
+                description: 'Ob der Betrachter das Foto ändern darf (create_users, bei Ehemaligen auch manage_former, und dieses Konto verwalten)',
+              }
             former:
               description: Ehemalig (Grund, Eintritt, Ausscheiden); null, wenn die Person nicht ehemalig ist
               oneOf:
@@ -10691,7 +10758,8 @@ components:
             - $ref: '#/components/schemas/Address'
         phone: { type: string, description: 'Ziffern, Leerzeichen und + ( ) / -; leer entfernt sie' }
         email: { type: string, format: email, description: 'Leer entfernt sie' }
-        birth_date: { type: [string, 'null'], format: date, description: 'JJJJ-MM-TT, ab 1900, nicht in der Zukunft; null oder leer entfernt es' }
+        birth_date:
+          { type: [string, 'null'], format: date, description: 'JJJJ-MM-TT, ab 1900, nicht in der Zukunft; null oder leer entfernt es' }
     PersonalInfo:
       type: object
       required: [email, phone, address]

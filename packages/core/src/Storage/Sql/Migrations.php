@@ -2038,8 +2038,19 @@ WHERE title IS NULL",
                     'CREATE INDEX IF NOT EXISTS {passive_members}_caretaker_id ON {passive_members} (caretaker_id)',
                 ],
             ],
-            // Beitrag der Passiven: je Passivem und Jahr höchstens eine Zahlung mit Betrag und Datum
+            // Titelbild eines Albums in der Galerie-Übersicht, in der App gewählt (manage_gallery). NULL: automatisch wie
+            // bisher. Ein gewähltes Bild, das nicht mehr im Album liegt oder für den Betrachter nicht sichtbar ist (intern),
+            // zählt nicht: Dann gilt die automatische Wahl (GalleryRepository::albumSummaries).
             64 => [
+                'mysql' => [
+                    'ALTER TABLE {albums} ADD COLUMN cover_photo_id bigint(20) unsigned DEFAULT NULL',
+                ],
+                'sqlite' => [
+                    'ALTER TABLE {albums} ADD COLUMN cover_photo_id INTEGER DEFAULT NULL',
+                ],
+            ],
+            // Beitrag der Passiven: je Passivem und Jahr höchstens eine Zahlung mit Betrag, Datum und Zahlungsart
+            65 => [
                 'mysql' => [
                     'CREATE TABLE IF NOT EXISTS {passive_payments} (
   id bigint(20) unsigned NOT NULL AUTO_INCREMENT,

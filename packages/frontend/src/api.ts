@@ -997,6 +997,8 @@ export interface GalleryAlbum {
   source?: 'app' | 'drive';
   /** Knöpfe zum Herunterladen zeigen (je Bild in der Großansicht, das Album als ZIP); fehlt bei älteren Servern */
   downloads?: boolean;
+  /** In der App gewähltes Titelbild der Übersicht, wenn hier zu sehen; null: automatisch; fehlt bei älteren Servern */
+  cover_id?: number | null;
   photos: GalleryPhoto[];
 }
 
@@ -2895,6 +2897,9 @@ export const api = {
   /** Hochgeladenes Bild oder Video nachträglich intern oder öffentlich stellen (manage_gallery oder review_gallery) */
   setGalleryPhotoIntern: (id: number, intern: boolean) =>
     request<{ id: number; intern: boolean }>('PATCH', `/gallery/photos/${id}`, { intern }),
+  /** Titelbild eines Albums für die Übersicht wählen; null: automatisch (manage_gallery) */
+  setGalleryAlbumCover: (albumId: number, photoId: number | null) =>
+    request<{ id: number; cover_id: number | null }>('PUT', `/gallery/albums/${albumId}/cover`, { photo_id: photoId }),
   /** Alben als Ziel zum Verschieben (manage_gallery) */
   galleryMoveTargets: () =>
     request<{ albums: { id: number; title: string; year: string; source: 'app' | 'drive' }[] }>('GET', '/gallery/albums'),
