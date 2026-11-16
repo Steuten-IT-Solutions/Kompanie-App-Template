@@ -9980,6 +9980,26 @@ components:
               oneOf:
                 - $ref: '#/components/schemas/FormerInfo'
                 - type: 'null'
+            attendance:
+              description: |
+                Anwesenheit der Person (nur mit Bereich Anwesenheit und Recht manage_attendance): gespeicherte Einträge,
+                jüngste Termine zuerst, und Summen über alle. Eine Absage, die eine Liste nur vorschlägt, fehlt, bis die
+                Liste gespeichert ist. Einträge nach `today` sind kommende Termine (dort nur `excused` möglich).
+              type: object
+              required: [today, entries, counts]
+              properties:
+                today: { type: string, format: date, description: Heute in der Zeitzone der Kompanie }
+                entries:
+                  type: array
+                  items:
+                    type: object
+                    required: [list_id, title, date, status]
+                    properties:
+                      list_id: { type: integer }
+                      title: { type: string }
+                      date: { type: string, format: date }
+                      status: { $ref: '#/components/schemas/AttendanceStatus' }
+                counts: { $ref: '#/components/schemas/AttendanceCounts' }
 
     FormerReason:
       type: string
