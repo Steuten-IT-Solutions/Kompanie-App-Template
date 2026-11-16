@@ -17,6 +17,7 @@ Tippe unten auf **{bereich.gallery}** und dann auf ein Album.
 - **Titel und Jahr** des Albums.
 - **Vorschaubilder**: alle Bilder und Videos des Albums, die du sehen darfst. Bilder und Videos nur für {rolle.member} tragen ein Schloss 🔒.
 - **Videos** erkennst du am ▶ in der Mitte, unten links steht ihre Länge, z. B. „1:02“.
+- **Bilder und Videos in dieses Album einreichen** (Pfeil nach oben) unter dem Titel: nur, wenn du Bilder einreichen darfst und das Einreichen eingeschaltet ist. Das Album ist im Formular dann schon gewählt.
 - **Knopf mit Pfeil nach unten** rechts neben dem Titel: lädt das ganze Album als ZIP herunter; nur, wenn die {kompanie.name} das Herunterladen erlaubt.
 
 ## So gehst du vor
