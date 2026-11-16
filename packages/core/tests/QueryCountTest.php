@@ -38,8 +38,8 @@ final class QueryCountTest extends TestCase
         foreach (self::LISTS as $label) {
             $this->assertSame($small[$label]['total'], $large[$label]['total'], "$label: gleich viele Abfragen mit 10 und 40 Mitgliedern");
             // Die Seite einer Person lädt für view_personal zusätzlich E-Mail (Benutzerverzeichnis) und Kontaktangaben, für
-            // create_users, ob sie einen Zugang hat.
-            $max = $label === 'GET /members/{m}' ? 19 : 16;
+            // create_users, ob sie einen Zugang hat, für manage_attendance ihre Anwesenheit (eine Abfrage).
+            $max = $label === 'GET /members/{m}' ? 20 : 16;
             $this->assertLessThanOrEqual($max, $large[$label]['total'], "$label: feste, kleine Zahl von Abfragen");
         }
     }

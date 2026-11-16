@@ -170,6 +170,12 @@ final class UserData
             $ok = false;
         }
         try {
+            // Betreuer von Passiven: Die Passiven bleiben, nur ohne Betreuer.
+            $db->execute('UPDATE {passive_members} SET caretaker_id = NULL WHERE caretaker_id = ?', [$userId]);
+        } catch (\RuntimeException) {
+            $ok = false;
+        }
+        try {
             // Bilder der Signatur und nie gespeicherte Entwürfe; Bilder in Nachrichten gehören der Nachricht.
             $db->execute("DELETE FROM {rich_images} WHERE owner_type IN ('signature', 'draft') AND owner_id = ?", [$userId]);
         } catch (\RuntimeException) {

@@ -64,6 +64,7 @@ export type Capability =
   | 'manage_personal'
   | 'create_users'
   | 'manage_former'
+  | 'manage_passive'
   | 'promote_users'
   | 'review_reports'
   | 'view_activity'
@@ -91,7 +92,8 @@ export type Feature =
   | 'sponsors'
   | 'companies'
   | 'pages'
-  | 'website';
+  | 'website'
+  | 'passive';
 
 export interface AppUser {
   id: number;
@@ -137,6 +139,8 @@ export interface AppConfig {
   gallerySubmissions?: boolean;
   /** Zu- und Absagen bei Terminen eingeschaltet (Einstellungen → Kalender); fehlt bei älteren Servern (dann an) */
   eventResponses?: boolean;
+  /** Wie viele Passive die Person betreut (Meins → Meine Passiven); 0 ohne den Bereich, fehlt bei älteren Servern */
+  caredPassives?: number;
   /** Rollen der Installation (Einstellungen → Rollen): Bezeichnung und Punktefaktor */
   roles?: RoleInfo[];
   /** null = Gast ohne Anmeldung. */
@@ -737,6 +741,42 @@ export interface PersonalInfo {
   address?: Address | null;
 }
 
+/**
+ * Ein Passiver (Bereich passive): eigener Eintrag ohne Konto. Adresse, Telefon, E-Mail und Geburtsdatum nur mit
+ * view_personal (in der Verwaltung) bzw. für den eigenen Betreuer (Meins → Meine Passiven); sonst fehlen sie.
+ */
+export interface PassiveMember {
+  id: number;
+  first_name: string;
+  last_name: string;
+  name: string;
+  caretaker: { id: number; name: string } | null;
+  address?: Address | null;
+  phone?: string;
+  email?: string;
+  /** JJJJ-MM-TT oder null */
+  birth_date?: string | null;
+}
+
+/** Verwaltung → Passive: alle Passiven, Mitglieder zur Wahl als Betreuer und was die Person an Angaben sieht und ändert. */
+export interface PassiveList {
+  passives: PassiveMember[];
+  caretakers: { id: number; name: string }[];
+  personal: boolean;
+  manage_personal: boolean;
+}
+
+/** Anlegen und Ändern; persönliche Angaben nur mit manage_personal mitschicken. */
+export interface PassiveInput {
+  first_name?: string;
+  last_name?: string;
+  caretaker_id?: number | null;
+  address?: Address | null;
+  phone?: string;
+  email?: string;
+  birth_date?: string | null;
+}
+
 /** Eigene Kontaktangaben (Meins → Konto) */
 export type OwnAccount = PersonalInfo;
 
@@ -1005,6 +1045,8 @@ export interface MemberDetail extends MemberSummary {
   photo_editable?: boolean;
   /** Ehemalig: Grund, Eintritt, Ausscheiden; null, wenn die Person nicht ehemalig ist (fehlt bei älteren Servern) */
   former?: FormerInfo | null;
+  /** Anwesenheit (nur mit Bereich und Recht manage_attendance) */
+  attendance?: MemberAttendance;
 }
 
 /** Grund des Ausscheidens */
@@ -1723,6 +1765,14 @@ export interface MyAttendance {
   counts: AttendanceCounts;
 }
 
+/** Anwesenheit einer Person auf ihrer Seite in der Verwaltung (nur mit Bereich und Recht manage_attendance) */
+export interface MemberAttendance {
+  /** Heute in der Zeitzone der Kompanie (JJJJ-MM-TT); später liegende Einträge sind kommende Termine */
+  today: string;
+  entries: { list_id: number; title: string; date: string; status: AttendanceStatus }[];
+  counts: AttendanceCounts;
+}
+
 export interface AttendanceGroup {
   key: Level;
   label: string;
@@ -2436,6 +2486,11 @@ export const api = {
   ) => request<AccountProfile>('PATCH', `/members/${id}/account`, data),
   deleteAccount: (id: number) => request<{ deleted: boolean }>('DELETE', `/members/${id}`),
   formerMembers: () => request<FormerMember[]>('GET', '/members/former'),
+  passiveMembers: () => request<PassiveList>('GET', '/passive-members'),
+  createPassive: (data: PassiveInput) => request<PassiveMember>('POST', '/passive-members', data),
+  updatePassive: (id: number, data: PassiveInput) => request<PassiveMember>('PATCH', `/passive-members/${id}`, data),
+  deletePassive: (id: number) => request<{ deleted: boolean }>('DELETE', `/passive-members/${id}`),
+  myPassives: () => request<PassiveMember[]>('GET', '/me/passive-members'),
   markFormer: (id: number, data: FormerInput) => request<FormerInfo & { offices_ended: number }>('PUT', `/members/${id}/former`, data),
   formerOfficesPreview: (id: number, leftOn: string) =>
     request<FormerOfficesPreview>('GET', `/members/${id}/former/offices`, undefined, { left_on: leftOn }),

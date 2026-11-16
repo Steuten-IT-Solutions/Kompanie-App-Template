@@ -2,7 +2,7 @@
 titel: Verwaltung
 reihenfolge: 50
 rechte: []
-einrecht: [manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_offices, manage_lists, send_mail, view_personal, manage_personal, create_users, manage_former, promote_users, post_board, manage_polls, manage_inventory, manage_settings]
+einrecht: [manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_offices, manage_lists, send_mail, view_personal, manage_personal, create_users, manage_former, manage_passive, promote_users, post_board, manage_polls, manage_inventory, manage_settings]
 ---
 Die Verwaltung ist dein Einstieg in alle Aufgaben, die du in der Kompanie übernimmst: Mitglieder pflegen, {bereich.points} vergeben, {bereich.offices} eintragen und mehr. Jede Aufgabe hat hier einen eigenen Knopf.
 
@@ -15,6 +15,7 @@ Tippe unten in der Leiste auf **Verwaltung**. Den Bereich gibt es nur, wenn du m
 Du siehst nur die Knöpfe, für die du das Recht hast und deren Bereich die Kompanie nutzt. Möglich sind:
 - **Mitglieder**: die Mitgliederliste mit der Seite jedes Mitglieds. Sie öffnet, wer {bereich.points} oder {bereich.penalties} vergibt, {bereich.ranks}, {bereich.titles} oder {bereich.attendance} pflegt, Mitglieder anlegt oder Rollen vergibt.
 - **Ehemalige**: ausgetretene, verstorbene und sonst ausgeschiedene Mitglieder (wer Ehemalige verwalten darf).
+- **Passive**: die interne Liste der passiven Mitglieder mit ihren Betreuern (wer Passive verwalten darf).
 - **{bereich.points} +**: {bereich.points} vergeben.
 - **{bereich.penalties} +**: {bereich.penalties} eintragen.
 - **Beförderungen**: anstehende Beförderungen sehen (nur, wenn die Kompanie {bereich.ranks} und {bereich.points} nutzt).

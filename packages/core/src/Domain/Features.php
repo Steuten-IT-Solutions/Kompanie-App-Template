@@ -70,6 +70,8 @@ final class Features
         // Webseite (Issue #273): eine eigene Seite als Startseite unter der Adresse des Webspace, ohne App und Anmeldung;
         // nur in der eigenständigen Version (HOSTED).
         'website' => ['label' => 'Webseite', 'description' => 'Eine Webseite für Besucher unter eurer Adresse, gebaut aus euren Seiten, die für alle sichtbar sind; ohne Anmeldung und ohne Cookies.', 'requires' => ['pages'], 'setup' => null, 'role' => ['member', 'manage_website']],
+        // Passive: interne Liste passiver Mitglieder ohne Konto, mit Betreuer (Domain\PassiveMemberService).
+        'passive' => ['label' => 'Passive', 'description' => 'Interne Liste eurer passiven Mitglieder mit Adresse, Telefon, E-Mail und Geburtsdatum, je mit einem Mitglied als Betreuer; Passive bekommen keinen Zugang zur App.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_passive']],
     ];
 
     /**
@@ -266,7 +268,7 @@ final class Features
         foreach (self::keys() as $key) {
             // Dienstgrade, Titel, Anwesenheit, Dokumente, das Schwarze Brett, Umfragen, Geburtstage, Inventar, die
             // Mitgliederliste, Ämter, Listen, E-Mails und Sponsoren gab es in den alten Versionen nicht: nie aus kompanie.json einschalten.
-            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices', 'lists', 'mail', 'sponsors', 'companies', 'pages', 'website'], true) && $this->app->config->legacyFeature($key);
+            $state[$key] = $existingInstallation && !in_array($key, ['ranks', 'titles', 'attendance', 'documents', 'board', 'polls', 'birthdays', 'inventory', 'directory', 'offices', 'lists', 'mail', 'sponsors', 'companies', 'pages', 'website', 'passive'], true) && $this->app->config->legacyFeature($key);
         }
         $this->save($state);
     }

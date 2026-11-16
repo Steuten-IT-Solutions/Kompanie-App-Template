@@ -232,6 +232,13 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         short: 'Ehemalige verwalten',
       },
       {
+        key: 'manage_passive',
+        label:
+          'Passive verwalten: Liste der Passiven, anlegen, Namen und Betreuer ändern, löschen (Adresse, Telefon, E-Mail und Geburtsdatum nur mit den Rechten für persönliche Angaben)',
+        short: 'Passive verwalten',
+        features: ['passive'],
+      },
+      {
         key: 'promote_users',
         label:
           'Rollen vergeben (nur Rollen mit eigenen Rechten, ohne die Rechte Mitglieder anlegen, Ehemalige verwalten und Rollen vergeben)',

@@ -75,6 +75,7 @@ import { OfficeAdmin } from './AemterVerwalten';
 import { SponsorAdmin } from './SponsorenVerwalten';
 import { PageAdmin } from './SeitenVerwalten';
 import { WebsiteAdmin } from './WebseiteVerwalten';
+import { PassiveAdmin } from './Passive';
 import { CompanyAdmin, MemberCompanies } from './KompanienVerwalten';
 import { ListAdmin } from './ListenVerwalten';
 import { MailAdmin } from './EmailsVerwalten';
@@ -110,6 +111,7 @@ import { MemberAvatar, PhotoPicker, preloadAvatar, ZoomableAvatar, type Prepared
 import { FORMER_SORTS, FormerImport, FormerList, FormerPanel, NewFormer, REASON_OPTIONS } from './Ehemalige';
 import { MemberImport } from './MitgliederImport';
 import { startPersonPreview } from '../preview';
+import { MemberAttendance } from '../memberAttendance';
 import { Anfragen } from './Anfragen';
 import { Meldungen } from './Meldungen';
 import { Aenderungen } from './Aenderungen';
@@ -120,6 +122,7 @@ import { confirmAsk, promptAsk } from '../ask';
 type Sub =
   | 'mitglieder'
   | 'ehemalige'
+  | 'passive'
   | 'anfragen'
   | 'meldungen'
   | 'aenderungen'
@@ -224,6 +227,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <FormerImport onToast={onToast} />
       ) : active === 'ehemalige' ? (
         <FormerList />
+      ) : active === 'passive' ? (
+        <PassiveAdmin onToast={onToast} />
       ) : active === 'anfragen' ? (
         <Anfragen onToast={onToast} />
       ) : active === 'meldungen' ? (
@@ -772,14 +777,24 @@ function MemberPeek({
 }
 
 /** Fenster auf der Seite eines Mitglieds; stehen in der Adresse (verwaltung/mitglied/<id>/<fenster>), damit „Zurück“ sie schließt. */
-type MemberSheet = 'punkte' | 'strafen' | 'dienstgrad' | 'titel' | 'kompanien' | 'geburtstag' | 'eintritt' | 'austritt';
-const MEMBER_SHEETS: MemberSheet[] = ['punkte', 'strafen', 'dienstgrad', 'titel', 'kompanien', 'geburtstag', 'eintritt', 'austritt'];
+type MemberSheet = 'punkte' | 'strafen' | 'dienstgrad' | 'titel' | 'kompanien' | 'geburtstag' | 'eintritt' | 'austritt' | 'anwesenheit';
+const MEMBER_SHEETS: MemberSheet[] = [
+  'punkte',
+  'strafen',
+  'dienstgrad',
+  'titel',
+  'kompanien',
+  'geburtstag',
+  'eintritt',
+  'austritt',
+  'anwesenheit',
+];
 /** Fenster in der App geöffnet (eigener Verlaufseintrag): Schließen geht dann zurück, sonst (Link) ersetzt es die Adresse. */
 let sheetOpenedHere = false;
 
 /**
  * Mitglied in der Verwaltung, alles auf einer Seite: Name, Dienstgradabzeichen und Foto, Rolle, Kacheln für Punkte,
- * Offen und Titel, Eintritt und Austritt, Ämter, persönliche Angaben mit dem Geburtstag (ohne view_personal steht er bei
+ * Offen und Titel, Eintritt und Austritt, Anwesenheit, Ämter, persönliche Angaben mit dem Geburtstag (ohne view_personal steht er bei
  * Eintritt und Austritt), ganz unten „Konto und Rolle“ zum Aufklappen. Bearbeitet
  * wird durch Antippen: Es öffnet sich ein Fenster (verwaltung/mitglied/<id>/<fenster>; ältere Links auf die früheren
  * Unterseiten öffnen so das passende Fenster). Ehemalige haben dieselbe Seite unter verwaltung/ehemalige/<id>; steht
@@ -989,6 +1004,8 @@ function MemberDetailView({
   // Als ehemalig eintragen bzw. die Angaben ändern; m.former fehlt bei älteren Servern (dann nicht).
   const formerEditable = can('manage_former') && !self && m.former !== undefined && (m.former !== null || m.level !== 'guest');
   const avatar = !!m.photo_url || !!m.photo_editable;
+  // Anwesenheit (manage_attendance): Gäste stehen in keiner Liste, bei ihnen nur mit älteren Einträgen.
+  const attendanceOn = !!m.attendance && (m.level !== 'guest' || m.attendance.entries.length > 0);
   const rankBadge = m.rank_title ? (
     <>
       <RankBadge url={m.rank_badge_url} title={m.rank_title} size="large" />
@@ -1111,6 +1128,16 @@ function MemberDetailView({
             </DateRow>
           )}
         </ul>
+      )}
+
+      {attendanceOn && m.attendance && (
+        <MemberAttendance
+          key={m.id}
+          data={m.attendance}
+          open={sheet === 'anwesenheit'}
+          onOpen={() => openSheet('anwesenheit')}
+          onClose={closeSheet}
+        />
       )}
 
       {officesOn && (

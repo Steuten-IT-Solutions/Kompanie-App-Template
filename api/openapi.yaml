@@ -229,6 +229,25 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /me/passive-members:
+    get:
+      tags: [Eigene Daten]
+      summary: Meine Passiven (die Passiven, die die Person betreut)
+      description: |
+        Mit allen Angaben (Adresse, Telefon, E-Mail, Geburtsdatum), auch ohne `view_personal`: bewusste Ausnahme für den
+        eigenen Betreuer, nur zum Lesen. Nach Nachname. Bereich `passive` aus → 403 `feature_disabled`.
+      x-capability: member
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PassiveMember' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
   /me/birthday:
     get:
       tags: [Geburtstage]
@@ -5094,6 +5113,111 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /passive-members:
+    get:
+      tags: [Verwaltung]
+      summary: Passive (eigene Einträge ohne Konto)
+      description: |
+        Nach Nachname, dazu die Mitglieder, die Betreuer sein können. Adresse, Telefon, E-Mail und Geburtsdatum nur mit
+        `view_personal` (sonst fehlen sie). Bereich `passive` aus → 403 `feature_disabled`.
+      x-capability: manage_passive
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [passives, caretakers, personal, manage_personal]
+                properties:
+                  passives: { type: array, items: { $ref: '#/components/schemas/PassiveMember' } }
+                  caretakers:
+                    type: array
+                    description: Mitglieder (Recht member), nach Namen
+                    items:
+                      type: object
+                      required: [id, name]
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+                  personal: { type: boolean, description: 'Sieht die Person Adresse, Telefon, E-Mail und Geburtsdatum (view_personal)?' }
+                  manage_personal: { type: boolean, description: 'Darf die Person sie ändern (manage_personal)?' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Verwaltung]
+      summary: Einen Passiven anlegen
+      description: |
+        Vor- und Nachname sind Pflicht. Adresse, Telefon, E-Mail und Geburtsdatum nur mit `manage_personal` (sonst 403).
+        Betreuer nur ein Mitglied (sonst 400). Es entsteht kein Konto.
+      x-capability: manage_passive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/PassiveInput'
+                - required: [first_name, last_name]
+      responses:
+        '201':
+          description: Angelegt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PassiveMember' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /passive-members/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Verwaltung]
+      summary: Ein Passiver
+      x-capability: manage_passive
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PassiveMember' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Verwaltung]
+      summary: Angaben eines Passiven ändern
+      description: Was fehlt, bleibt. Adresse, Telefon, E-Mail und Geburtsdatum nur mit `manage_personal` (sonst 403).
+      x-capability: manage_passive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PassiveInput' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PassiveMember' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Verwaltung]
+      summary: Einen Passiven löschen
+      x-capability: manage_passive
+      responses:
+        '200':
+          description: Gelöscht
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted: { type: boolean }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /members/former:
     get:
       tags: [Verwaltung]
@@ -9217,6 +9341,7 @@ components:
                       manage_personal,
                       create_users,
                       manage_former,
+                      manage_passive,
                       promote_users,
                       review_reports,
                       view_activity,
@@ -9294,6 +9419,7 @@ components:
                   manage_personal,
                   create_users,
                   manage_former,
+                  manage_passive,
                   promote_users,
                   review_reports,
                 ],
@@ -9357,6 +9483,7 @@ components:
                 manage_personal,
                 create_users,
                 manage_former,
+                manage_passive,
                 promote_users,
                 review_reports,
                 view_activity,
@@ -9474,6 +9601,7 @@ components:
           { type: boolean, description: 'Galerie an und Einreichen erlaubt (Einstellung gallery_submissions): sonst kein Knopf zum Einreichen' }
         eventResponses:
           { type: boolean, description: 'Interner Kalender an und Zu- und Absagen eingeschaltet (Einstellung calendar_responses): sonst keine Knöpfe und kein Anmeldeschluss' }
+        caredPassives: { type: integer, minimum: 0, description: 'Wie viele Passive die angemeldete Person betreut (Meins → Meine Passiven); 0 ohne Anmeldung oder ohne den Bereich passive' }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
         backupUrl:
           {
@@ -9583,6 +9711,7 @@ components:
             sponsors: { type: boolean }
             pages: { type: boolean }
             website: { type: boolean, description: 'Webseite (Issue #273); nur in der eigenständigen Version, sonst immer false' }
+            passive: { type: boolean, description: 'Passive: interne Liste passiver Mitglieder ohne Konto' }
         user:
           oneOf:
             - $ref: '#/components/schemas/AppUser'
@@ -9997,6 +10126,26 @@ components:
               oneOf:
                 - $ref: '#/components/schemas/FormerInfo'
                 - type: 'null'
+            attendance:
+              description: |
+                Anwesenheit der Person (nur mit Bereich Anwesenheit und Recht manage_attendance): gespeicherte Einträge,
+                jüngste Termine zuerst, und Summen über alle. Eine Absage, die eine Liste nur vorschlägt, fehlt, bis die
+                Liste gespeichert ist. Einträge nach `today` sind kommende Termine (dort nur `excused` möglich).
+              type: object
+              required: [today, entries, counts]
+              properties:
+                today: { type: string, format: date, description: Heute in der Zeitzone der Kompanie }
+                entries:
+                  type: array
+                  items:
+                    type: object
+                    required: [list_id, title, date, status]
+                    properties:
+                      list_id: { type: integer }
+                      title: { type: string }
+                      date: { type: string, format: date }
+                      status: { $ref: '#/components/schemas/AttendanceStatus' }
+                counts: { $ref: '#/components/schemas/AttendanceCounts' }
 
     FormerReason:
       type: string
@@ -10192,6 +10341,7 @@ components:
           manage_personal,
           create_users,
           manage_former,
+          manage_passive,
           promote_users,
           review_reports,
         ]
@@ -10272,6 +10422,47 @@ components:
             country: { type: string }
             country_name: { type: string }
 
+    PassiveMember:
+      type: object
+      description: |
+        Ein Passiver (Bereich passive): eigener Eintrag ohne Konto. `address`, `phone`, `email` und `birth_date` nur mit
+        `view_personal` bzw. für den eigenen Betreuer (`GET /me/passive-members`), sonst fehlen sie.
+      required: [id, first_name, last_name, name, caretaker]
+      properties:
+        id: { type: integer }
+        first_name: { type: string }
+        last_name: { type: string }
+        name: { type: string, description: 'Vorname Nachname' }
+        caretaker:
+          description: Mitglied als Betreuer, null ohne
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [id, name]
+              properties:
+                id: { type: integer }
+                name: { type: string }
+        address:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/Address'
+        phone: { type: string, description: 'Leer, wenn keine hinterlegt ist' }
+        email: { type: string, description: 'Leer, wenn keine hinterlegt ist' }
+        birth_date: { type: [string, 'null'], format: date }
+    PassiveInput:
+      type: object
+      description: Felder zum Anlegen und Ändern; persönliche Angaben (address, phone, email, birth_date) nur mit manage_personal.
+      properties:
+        first_name: { type: string, maxLength: 100 }
+        last_name: { type: string, maxLength: 100 }
+        caretaker_id: { type: [integer, 'null'], description: 'Konto-ID eines Mitglieds; null oder leer für keinen' }
+        address:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/Address'
+        phone: { type: string, description: 'Ziffern, Leerzeichen und + ( ) / -; leer entfernt sie' }
+        email: { type: string, format: email, description: 'Leer entfernt sie' }
+        birth_date: { type: [string, 'null'], format: date, description: 'JJJJ-MM-TT, ab 1900, nicht in der Zukunft; null oder leer entfernt es' }
     PersonalInfo:
       type: object
       required: [email, phone, address]
