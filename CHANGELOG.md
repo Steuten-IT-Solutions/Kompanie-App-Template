@@ -152,6 +152,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   linksbündig wie die übrigen statt mittig. Unter „Gemeinsame Amtszeiten“ hat der Knopf „Neue gemeinsame Amtszeit“ wieder
   Abstand zur Karte darüber.
 
+- **Benachrichtigung zu eingereichten Videos**: Wird ein eingereichtes Video in der Galerie freigegeben oder abgelehnt,
+  spricht die Benachrichtigung jetzt vom Video („Video freigegeben“, „Dein Video … ist jetzt im Album …“) statt immer vom
+  Bild. Wer prüft, liest bei neuen Einreichungen „Bilder oder Videos“, und die Rückfrage beim Ablehnen ohne Grund nennt
+  ebenfalls Bild oder Video. Auch die Namen der beiden Benachrichtigungen unter
+  [Meins → Benachrichtigungen](app:meins/benachrichtigungen) nennen jetzt Bilder und Videos.
+
 ### Entfernt
 
 - **Aufteilung nach Gruppen in der Anwesenheit**: Unter dem Zähler einer Anwesenheitsliste steht nicht mehr zusätzlich die
