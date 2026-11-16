@@ -2,7 +2,7 @@
 titel: Bericht als PDF
 reihenfolge: 69
 rechte: []
-einrecht: [manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_companies, view_personal, create_users, manage_former, promote_users, manage_passive, manage_events, manage_calendar, manage_offices, manage_inventory]
+einrecht: [manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_companies, view_personal, create_users, manage_former, promote_users, manage_passive, manage_offices, manage_inventory]
 ---
 Mit dem Bericht holst du die Daten mehrerer Bereiche für einen Zeitraum in eine PDF-Datei, z. B. für die Jahreshauptversammlung oder wenn ein neuer Vorstand übernimmt.
 
@@ -38,5 +38,6 @@ Jeder Bereich beginnt auf einer neuen Seite. Der Tabellenkopf steht auf jeder Se
 ## Gut zu wissen
 - Der Bericht kann persönliche Daten enthalten. Gib ihn nur an Personen weiter, die sie sehen dürfen, und lösche ihn, wenn du ihn nicht mehr brauchst.
 - Wer wann einen Bericht erstellt hat, steht unter **Verwaltung → Änderungen** (für alle, die Änderungen sehen dürfen), mit Zeitraum und Bereichen, aber ohne Inhalt. Ist das Änderungsprotokoll ausgeschaltet, wird es nicht festgehalten.
+- {bereich.events} und {bereich.calendar} stehen im Bericht, wenn du sie pflegen darfst und die Verwaltung ohnehin siehst. Wer nur Termine pflegt, bekommt dafür keine eigene Verwaltung.
 - Der Zeitraum darf höchstens zehn Jahre lang sein.
 - In der Vorschau **App als Person ansehen** gibt es keinen Bericht.
