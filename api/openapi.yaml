@@ -1037,6 +1037,8 @@ paths:
         Kalenders bis zum Beginn des Termins (ganztägig: 0 Uhr), bei Terminen der App bis zum Ende des Anmeldeschlusses
         (`respond_until`), wenn der früher ist; danach 409 `responses_closed`. Bei iCal gilt die Rückmeldung auch, wenn
         der Termin verschoben wird (stabile Kennung aus UID und ursprünglichem Beginn). Kommt nicht ins Änderungsprotokoll.
+        Sind Zu- und Absagen ausgeschaltet (Einstellungen → Kalender, `calendar_responses`), 403 – wie bei allen
+        Rückmeldungen (`/calendar/{key}/response`, `/calendar/{key}/responses`, `/calendar/{key}/responses/{id}`).
       x-capability: respond_calendar
       requestBody:
         required: true
@@ -6587,6 +6589,7 @@ paths:
                     description: 'Kommagetrennte Kalender-IDs; gelesen mit API-Schlüssel (öffentliche Kalender) oder über den Google-Zugang',
                   }
                 calendar_cache_minutes: { type: integer, minimum: 1, maximum: 1440 }
+                calendar_responses: { type: string, enum: ['0', '1'], description: 'Zu- und Absagen bei Terminen einschalten (Vorgabe aus)' }
                 calendar_response_reminder: { type: string, enum: ['0', '1'], description: An Zu- und Absage erinnern (Push an alle ohne Rückmeldung) }
                 calendar_response_reminder_days: { type: integer, minimum: 1, maximum: 30, description: Erinnerung so viele Tage vor Beginn }
                 drive_service_account: { type: string, description: JSON-Schlüssel des Dienstkontos }
@@ -9055,6 +9058,7 @@ components:
             google_api_key_set: { type: boolean }
             calendar_ids: { type: string }
             cache_minutes: { type: integer }
+            responses: { type: boolean, description: 'Zu- und Absagen bei Terminen eingeschaltet (calendar_responses, Vorgabe aus)' }
             response_reminder: { type: boolean, description: An Zu- und Absage erinnern (Standard an) }
             response_reminder_days: { type: integer, minimum: 1, maximum: 30, description: Vorlauf in Tagen vor Beginn (Standard 3) }
         gallery:
@@ -9453,6 +9457,8 @@ components:
           { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null' }
         gallerySubmissions:
           { type: boolean, description: 'Galerie an und Einreichen erlaubt (Einstellung gallery_submissions): sonst kein Knopf zum Einreichen' }
+        eventResponses:
+          { type: boolean, description: 'Interner Kalender an und Zu- und Absagen eingeschaltet (Einstellung calendar_responses): sonst keine Knöpfe und kein Anmeldeschluss' }
         setupPending: { type: boolean, description: 'Nur für Admins true: Einrichtungsassistent noch nicht abgeschlossen' }
         backupUrl:
           {
@@ -9630,7 +9636,7 @@ components:
         respond_until: { type: [string, 'null'], format: date, description: 'Nur Quelle app: Anmeldeschluss (Zu- und Absagen bis zum Ende dieses Tages)' }
         responses:
           type: object
-          description: Zu- und Absagen (nur in `GET /calendar` und den Antworten der Rückmeldung)
+          description: Zu- und Absagen (nur in `GET /calendar` und den Antworten der Rückmeldung); fehlt, solange Zu- und Absagen ausgeschaltet sind
           properties:
             mine: { type: [string, 'null'], enum: ['yes', 'no', null], description: Eigene Rückmeldung }
             note: { type: string, description: Eigener Hinweis }

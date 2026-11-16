@@ -18,7 +18,7 @@ Tippe unten auf **Verwaltung**, dann auf **{bereich.attendance}**. Tippe dort au
 - **Person suchen …**: zeigt nur Personen, deren Name passt.
 - **Alle anwesend**: setzt alle gezeigten Personen auf anwesend (bei einer Suche nur die gefundenen).
 - **Die Liste**: alle Personen mit einer Rolle, außer {rolle.guest}. Je Person gibt es ein Kästchen für **anwesend**, **entschuldigt** und **fehlt**. Neben dem Namen steht die Rolle, wenn sie nicht {rolle.member} ist. **{bereich.points} gebucht** heißt: Diese Person hat für diese Liste schon {bereich.points} bekommen.
-- **zugesagt** bzw. **abgesagt** unter dem Namen: die Rückmeldung der Person zum Termin, mit ihrem Hinweis (nur bei Listen zu Terminen aus dem {bereich.calendar}). Solange man noch zu- und absagen kann, steht dort eine Auswahl, mit der du die Rückmeldung für die Person einträgst.
+- **zugesagt** bzw. **abgesagt** unter dem Namen: die Rückmeldung der Person zum Termin, mit ihrem Hinweis (nur bei Listen zu Terminen aus dem {bereich.calendar} und wenn Zu- und Absagen eingeschaltet sind). Solange man noch zu- und absagen kann, steht dort eine Auswahl, mit der du die Rückmeldung für die Person einträgst.
 - **Absagen übernehmen**: setzt alle, die abgesagt haben und noch kein Häkchen haben, auf **entschuldigt**. Der Knopf erscheint nur, wenn es solche Personen gibt.
 - **Speichern**: speichert deine Änderungen. Ist alles gespeichert, steht dort **Gespeichert**. Ohne Verbindung steht dort **Auf dem Gerät gespeichert** (siehe „Ohne Internet eintragen“ unten).
 - **Noch nicht übertragen**: Hinweis über der Liste, solange offline gespeicherte Änderungen noch nicht beim Server sind. Mit **Jetzt übertragen** versucht die App es sofort.

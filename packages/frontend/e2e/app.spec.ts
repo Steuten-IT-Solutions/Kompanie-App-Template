@@ -3031,20 +3031,7 @@ test.describe('Android', () => {
         return (await res.json()).subscription;
       }, device);
     await expect.poll(status).toEqual({
-      types: [
-        'board',
-        'polls',
-        'birthdays',
-        'reports',
-        'penalties',
-        'points',
-        'ranks',
-        'titles',
-        'events',
-        'reminder',
-        'responses',
-        'news',
-      ],
+      types: ['board', 'polls', 'birthdays', 'reports', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'],
       details: true,
     });
 
@@ -4590,6 +4577,14 @@ test('Admin stellt den internen Kalender auf „In der App pflegen“ um, legt e
   await expect(section().getByText('✓ Die Termine werden in der App gepflegt.')).toBeVisible();
   await expect(section().getByLabel('Aktualisieren alle … Minuten')).toHaveCount(0);
   await shot(page, 'kalender-quelle');
+  // Zu- und Absagen sind erst nach dem Einschalten da; die Erinnerung steht darunter.
+  const responses = page.locator('#einstellungen-zu-und-absagen');
+  await expect(responses.getByRole('checkbox', { name: /An Zu- und Absage erinnern/ })).toHaveCount(0);
+  await responses.getByRole('checkbox', { name: /Zu- und Absagen bei Terminen/ }).check();
+  await expect(responses.getByRole('checkbox', { name: /An Zu- und Absage erinnern/ })).toBeChecked();
+  await responses.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  await page.locator('.toast').waitFor({ state: 'detached' });
 
   await page.goto('/app/#/termine');
   await page.getByRole('button', { name: 'Internen Kalender verwalten' }).click();

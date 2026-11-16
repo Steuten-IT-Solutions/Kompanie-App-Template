@@ -4,7 +4,7 @@ reihenfolge: 31
 rechte: [respond_calendar]
 bereiche: [calendar]
 ---
-Bei jedem Termin des internen Kalenders sagst du direkt in der Terminliste zu oder ab. So weiß die {kompanie.name} vorher, wer kommt. Bis zum Beginn kannst du dich umentscheiden.
+Bei jedem Termin des internen Kalenders sagst du direkt in der Terminliste zu oder ab. So weiß die {kompanie.name} vorher, wer kommt. Bis zum Beginn kannst du dich umentscheiden. Die Knöpfe gibt es nur, wenn ein {rolle.admin} Zu- und Absagen eingeschaltet hat.
 
 ## So öffnest du die Seite
 Tippe unten auf **{bereich.events}**. Unter jedem kommenden Termin stehen die Knöpfe **Zusagen** und **Absagen**.

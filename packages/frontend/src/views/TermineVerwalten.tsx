@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { api, type EventInput, type PublicEvent } from '../api';
+import { api, eventResponsesOn, type EventInput, type PublicEvent } from '../api';
 import { formatEventWhen } from '../format';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
@@ -149,7 +149,7 @@ export default function TermineVerwalten({ onToast, internal = false }: { onToas
             </label>
           </div>
           <p className="muted small">Ohne Uhrzeit gilt der Termin als ganztägig.</p>
-          {internal && (
+          {internal && eventResponsesOn() && (
             <>
               <label className="field">
                 <span>Anmeldeschluss (optional)</span>

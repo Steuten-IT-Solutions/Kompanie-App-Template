@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Tests;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Roles;
+use KompanieApp\Core\Domain\EventResponseService;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Port\NewsSource;
@@ -113,6 +114,8 @@ final class PushServiceTest extends TestCase
         $member = $this->users->find($this->users->add('m', Roles::MEMBER));
         $guest = $this->users->find($this->users->add('g', Roles::GUEST));
         $p = $app->push();
+        $this->assertSame(['board', 'polls', 'birthdays', 'reports', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'news'], $p->availableTypes($member), 'Zu- und Absagen erst nach dem Einschalten');
+        $app->settings->set(EventResponseService::ENABLED_SETTING, true);
         $this->assertSame(['board', 'polls', 'birthdays', 'reports', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'responses', 'news'], $p->availableTypes($member));
         $this->assertSame(['board_public', 'events', 'reminder', 'news'], $p->availableTypes(null), 'Gäste ohne Konto: nur Öffentliches');
         $this->assertSame(['board_public', 'reports', 'events', 'reminder', 'news'], $p->availableTypes($guest), 'Konto ohne Mitgliederbereich; Antworten auf Fehlermeldungen für alle Konten');
@@ -175,7 +178,7 @@ final class PushServiceTest extends TestCase
         $this->assertSame(1, $p->addNewTypes());
         $sub = $p->repository()->byEndpoint($d['endpoint']);
         $this->assertNotNull($sub);
-        $this->assertSame(['board', 'board_public', 'polls', 'birthdays', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder', 'responses'], $sub['types'], 'neue Arten der Rolle an, News bleibt aus');
+        $this->assertSame(['board', 'board_public', 'polls', 'birthdays', 'penalties', 'points', 'ranks', 'titles', 'events', 'reminder'], $sub['types'], 'neue Arten der Rolle an, News bleibt aus');
         $this->assertSame(0, $p->addNewTypes(), 'nur einmal');
 
         // Bereich aus und wieder an: Die Art kennt das Gerät schon, abgeschaltet bleibt abgeschaltet.
@@ -693,7 +696,7 @@ final class PushServiceTest extends TestCase
         $admin = $this->users->add('admin', Roles::ADMIN);
         $ids = ['anna' => $this->users->add('anna', Roles::MEMBER), 'ben' => $this->users->add('ben', Roles::MEMBER)];
         $this->users->current = $admin;
-        $app->api()->handle(new Request('PATCH', '/admin/settings', [], ['calendar_source' => 'app']));
+        $app->api()->handle(new Request('PATCH', '/admin/settings', [], ['calendar_source' => 'app', 'calendar_responses' => '1']));
         $devices = [];
         foreach ($ids as $name => $id) {
             $devices[$name] = self::device($name);
