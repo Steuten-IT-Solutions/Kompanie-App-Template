@@ -748,6 +748,8 @@ final class Api
             'maintenance' => self::maintenanceInfo($a->maintenance()->state()),
             // Einrichtbare Navigation (Issue #277): null = Standardnavigation; nur Darstellung, die Rechte prüfen die Routen
             'navigation' => $a->navigation()->get(),
+            // Eigene Leiste für Gäste (ohne Anmeldung oder mit Grundrolle Gast); null = dieselbe wie für Angemeldete
+            'navigation_guest' => $a->navigation()->guest(),
             // Eigene Namen, Symbole und Startseiten (Issue #362); section_labels = die Namen als Abschnitte (brand.labels.sections)
             'navigation_names' => self::jsonObject($a->navigation()->names()),
             'navigation_start' => self::jsonObject($a->navigation()->start()),

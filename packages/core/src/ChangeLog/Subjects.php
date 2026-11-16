@@ -74,7 +74,7 @@ final class Subjects
         '/admin/push' => ['reminderHour' => 'Erinnerung um (Uhr)', 'birthdays.enabled' => 'Geburtstage melden', 'birthdays.hour' => 'Geburtstage um (Uhr)'],
         '/admin/birthdays' => ['upcoming_days' => 'Tage im Voraus'],
         '/admin/navigation' => [
-            'navigation' => 'Menü', 'names' => 'Namen der Bereiche', 'start' => 'Startseite', 'show_labels' => 'Beschriftungen zeigen',
+            'navigation' => 'Menü', 'guest_navigation' => 'Menü für Gäste', 'names' => 'Namen der Bereiche', 'start' => 'Startseite', 'show_labels' => 'Beschriftungen zeigen',
             'intern_order' => 'Reihenfolge Intern', 'admin_order' => 'Reihenfolge Verwaltung',
         ],
         '/admin/maintenance' => ['on' => 'Wartungsmodus an', 'reason' => 'Grund'],
