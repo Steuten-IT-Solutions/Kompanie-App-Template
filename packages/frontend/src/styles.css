@@ -7434,6 +7434,11 @@ fieldset.block-source legend {
 .lb-count .icon-btn-lb-danger {
   background: rgb(190 40 40 / 75%);
 }
+/* Gewähltes Titelbild: Knopf hervorgehoben (nochmal tippen: wieder automatisch) */
+.lb-count .icon-btn-lb.lb-active {
+  background: var(--accent-light);
+  color: #000;
+}
 .gallery-actions,
 .gallery-select-bar .button-row {
   display: flex;

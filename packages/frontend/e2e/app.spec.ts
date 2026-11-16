@@ -2166,6 +2166,63 @@ test('Galerie verwalten: Bilder auswählen, verschieben und löschen, Alben ins 
   }
 });
 
+test('Galerie verwalten: Titelbild eines Albums in der Großansicht wählen und zurück auf automatisch', async ({ page }) => {
+  const title = `Titelbild ${Date.now() % 1000000}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json()) as { id?: number; photos?: { thumb: string }[] } };
+      },
+      [path, method, body] as const,
+    );
+  const albumId = (await api('admin/gallery/albums', 'POST', { title, year: 2026 })).data.id!;
+  for (const name of ['a-eins.png', 'b-zwei.png']) {
+    expect(
+      (await api(`admin/gallery/albums/${albumId}/photos`, 'POST', { file: { name, data: PNG.buffer.toString('base64') } })).status,
+    ).toBe(201);
+  }
+  try {
+    // Titelbild der Übersicht im Vergleich zu den Bildern des Albums (beide zur selben Zeit abgefragt: Adressen ändern
+    // sich, sobald ein Bild aufbereitet ist): 0 = erstes, 1 = zweites
+    const coverIndex = async () => {
+      const overview = (await api('gallery', 'GET')).data as unknown as { years: { albums: { id: number; cover: string }[] }[] };
+      const cover = overview.years.flatMap((y) => y.albums).find((a) => a.id === albumId)?.cover;
+      return (await api(`gallery/${albumId}`, 'GET')).data.photos!.findIndex((p) => p.thumb === cover);
+    };
+    await expect.poll(coverIndex).toBe(0);
+    await page.goto('/app/#/galerie');
+    await expect(page.locator('.album-card', { hasText: title }).locator('.album-cover img')).toBeVisible();
+
+    await page.goto(`/app/#/galerie/${albumId}`);
+    await page.getByRole('button', { name: 'Bild 2 öffnen' }).click();
+    const coverButton = page.locator('.lb-count').getByRole('button', { name: 'Als Titelbild des Albums verwenden' });
+    await expect(coverButton).toHaveAttribute('title', 'Als Titelbild des Albums verwenden');
+    await coverButton.click();
+    await expect(page.locator('.toast')).toHaveText('Titelbild gewählt');
+    await expect(page.locator('.lb-count')).toContainText('Titelbild');
+    await expect(page.locator('.lb-count').getByRole('button', { name: 'Titelbild wieder automatisch wählen' })).toBeVisible();
+    await expect.poll(coverIndex).toBe(1);
+
+    // Noch einmal getippt: wieder automatisch
+    await page.goto(`/app/#/galerie/${albumId}`);
+    await page.getByRole('button', { name: 'Bild 2 öffnen' }).click();
+    await page.locator('.lb-count').getByRole('button', { name: 'Titelbild wieder automatisch wählen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Titelbild wieder automatisch');
+    await expect(page.locator('.lb-count').getByRole('button', { name: 'Als Titelbild des Albums verwenden' })).toBeVisible();
+    await expect.poll(coverIndex).toBe(0);
+  } finally {
+    expect((await api(`admin/gallery/albums/${albumId}`, 'DELETE')).status).toBe(200);
+  }
+});
+
 test('Galerie: Bilder einreichen, prüfen, freigeben und ablehnen (Issue #286)', async ({ page }) => {
   const n = Date.now() % 1000000;
   const title = `Einreichung ${n}`;

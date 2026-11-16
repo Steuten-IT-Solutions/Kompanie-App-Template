@@ -1009,6 +1009,8 @@ final class Api
                 static fn (array $al): array => ['id' => $al['id'], 'title' => $al['title'], 'year' => $al['year'], 'source' => $al['source']],
                 $a->galleryUploads()->albums(),
             )], 'gallery'),
+            // Titelbild eines Albums für die Übersicht wählen (null: automatisch)
+            new Route('PUT', '/gallery/albums/{id}/cover', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => $a->galleryUploads()->setCover($r->id(), $r->input('photo_id')), 'gallery'),
             new Route('POST', '/gallery/photos/move', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => $a->galleryUploads()->movePhotos($r->input('ids'), $r->input('album_id')), 'gallery'),
             new Route('POST', '/gallery/photos/delete', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => $a->galleryUploads()->deletePhotos($r->input('ids'), $this->user()), 'gallery'),
             new Route('GET', '/gallery/review', Cap::ReviewGallery, fn () => $a->gallerySubmissions()->review(), 'gallery'),

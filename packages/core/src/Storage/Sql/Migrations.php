@@ -2038,6 +2038,17 @@ WHERE title IS NULL",
                     'CREATE INDEX IF NOT EXISTS {passive_members}_caretaker_id ON {passive_members} (caretaker_id)',
                 ],
             ],
+            // Titelbild eines Albums in der Galerie-Übersicht, in der App gewählt (manage_gallery). NULL: automatisch wie
+            // bisher. Ein gewähltes Bild, das nicht mehr im Album liegt oder für den Betrachter nicht sichtbar ist (intern),
+            // zählt nicht: Dann gilt die automatische Wahl (GalleryRepository::albumSummaries).
+            64 => [
+                'mysql' => [
+                    'ALTER TABLE {albums} ADD COLUMN cover_photo_id bigint(20) unsigned DEFAULT NULL',
+                ],
+                'sqlite' => [
+                    'ALTER TABLE {albums} ADD COLUMN cover_photo_id INTEGER DEFAULT NULL',
+                ],
+            ],
         ];
     }
 

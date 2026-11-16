@@ -26,6 +26,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Titelbild eines Albums wählen**: Wer die Galerie verwalten darf, öffnet ein Bild in der Großansicht und tippt auf
+  _Als Titelbild des Albums verwenden_. Dieses Bild steht dann in der Galerie-Übersicht für das Album, auch bei Alben aus
+  Google Drive. Noch einmal getippt, wählt die App das Titelbild wieder selbst. Ist das gewählte Bild nur für Mitglieder,
+  sehen Gäste weiter ein öffentliches Bild des Albums; ein internes Bild wird so nie öffentlich.
 - **Direkt im Album einreichen**: In einem Album der [Galerie](app:galerie) gibt es oben den Knopf _Bilder und Videos
   in dieses Album einreichen_. Das Album ist im Formular dann schon gewählt, und _‹ Zum Album_ führt zurück. Der Knopf
   erscheint wie in der Übersicht nur mit dem Recht zum Einreichen und mit dem Haken _Einreichen von Bildern und Videos durch Mitglieder erlauben_ unter

@@ -260,7 +260,9 @@ final class GalleryRepository
 
     /**
      * Alben mit Anzahl sichtbarer Bilder und Videos (video_cnt) und Titelbild, in einer Abfrage (keine je Album).
-     * Titelbild: öffentlich vor intern, Bilder vor Videos, fertige zuerst, dann nach Aufnahmezeit und Name.
+     * Titelbild: das in der App gewählte (albums.cover_photo_id), wenn es ein Bild dieses Albums ist und der Betrachter
+     * es sehen darf (ein internes nie für Gäste); sonst automatisch: öffentlich vor intern, Bilder vor Videos, fertige
+     * zuerst, dann nach Aufnahmezeit und Name.
      * Ohne Fensterfunktionen (ältere MySQL-Versionen): Die ID kommt aus einer Unterabfrage je
      * Zeile, die Spalten des Titelbilds aus einem Join darauf.
      *
@@ -276,15 +278,18 @@ final class GalleryRepository
              FROM (
                 SELECT a.id, a.year, a.title, a.sort_date, a.source, COUNT(p.id) AS cnt, SUM(p.is_intern) AS intern_cnt,
                     SUM(CASE WHEN p.media = 'video' THEN 1 ELSE 0 END) AS video_cnt,
-                    (SELECT c.id FROM {photos} c WHERE c.album_id = a.id AND c.status <> ?$coverVis
-                     ORDER BY c.is_intern ASC, (c.media = 'image') DESC, (c.status = 'ready') DESC, c.taken_at ASC, c.name ASC LIMIT 1) AS cover_id
+                    COALESCE(
+                        (SELECT c.id FROM {photos} c WHERE c.id = a.cover_photo_id AND c.album_id = a.id AND c.media = 'image' AND c.status <> ?$coverVis),
+                        (SELECT c.id FROM {photos} c WHERE c.album_id = a.id AND c.status <> ?$coverVis
+                         ORDER BY c.is_intern ASC, (c.media = 'image') DESC, (c.status = 'ready') DESC, c.taken_at ASC, c.name ASC LIMIT 1)
+                    ) AS cover_id
                 FROM {albums} a JOIN {photos} p ON p.album_id = a.id
                 WHERE p.status <> ?$vis
-                GROUP BY a.id, a.year, a.title, a.sort_date, a.source
+                GROUP BY a.id, a.year, a.title, a.sort_date, a.source, a.cover_photo_id
              ) s
              LEFT JOIN {photos} ph ON ph.id = s.cover_id
              ORDER BY s.year DESC, s.sort_date DESC",
-            [self::FAILED, self::FAILED],
+            [self::FAILED, self::FAILED, self::FAILED],
         );
     }
 

@@ -288,6 +288,33 @@ final class GalleryUploadService
         return ['id' => $id, 'intern' => $intern];
     }
 
+    /**
+     * Titelbild eines Albums in der Galerie-Übersicht wählen (auch Alben aus Drive) oder mit null zurück zur automatischen
+     * Wahl. Nur Bilder dieses Albums, keine Videos. Ist das gewählte Bild intern, sehen Gäste weiter ein öffentliches
+     * (GalleryRepository::albumSummaries).
+     *
+     * @return array{id: int, cover_id: int|null}
+     */
+    public function setCover(int $albumId, mixed $photoId): array
+    {
+        $repo = $this->repo();
+        $repo->album($albumId) ?? throw ApiError::notFound('Album nicht gefunden.');
+        if ($photoId !== null && !is_int($photoId)) {
+            throw ApiError::invalid('Bitte ein Bild angeben (photo_id) oder null für die automatische Wahl.');
+        }
+        if ($photoId !== null) {
+            $photo = $repo->photo($photoId);
+            if ($photo === null || (int) $photo['album_id'] !== $albumId || $photo['status'] === GalleryRepository::FAILED) {
+                throw ApiError::notFound('Bild nicht in diesem Album gefunden.');
+            }
+            if (($photo['media'] ?? 'image') === 'video') {
+                throw ApiError::invalid('Als Titelbild geht nur ein Bild, kein Video.');
+            }
+        }
+        $repo->updateAlbum($albumId, ['cover_photo_id' => $photoId]);
+        return ['id' => $albumId, 'cover_id' => $photoId];
+    }
+
     /** Ein hochgeladenes Bild löschen (Bilder aus Drive kämen beim nächsten Abgleich wieder). */
     public function deletePhoto(int $id, ?User $actor = null): void
     {
