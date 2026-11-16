@@ -26,6 +26,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Titelbild eines Albums wählen**: Wer die Galerie verwalten darf, öffnet ein Bild in der Großansicht und tippt auf
+  _Als Titelbild des Albums verwenden_. Dieses Bild steht dann in der Galerie-Übersicht für das Album, auch bei Alben aus
+  Google Drive. Noch einmal getippt, wählt die App das Titelbild wieder selbst. Ist das gewählte Bild nur für Mitglieder,
+  sehen Gäste weiter ein öffentliches Bild des Albums; ein internes Bild wird so nie öffentlich.
 - **Bericht als PDF**: Unter [Verwaltung → Bericht](app:verwaltung/bericht) erstellst du eine PDF-Datei mit den Daten
   mehrerer Bereiche für einen Zeitraum, z. B. für die Jahreshauptversammlung. Den Zeitraum wählst du mit _Von_ und _Bis_
   oder der Schnellwahl (dieses Jahr, letztes Jahr, letzte 12 Monate), die Bereiche mit Haken. Enthalten sind die

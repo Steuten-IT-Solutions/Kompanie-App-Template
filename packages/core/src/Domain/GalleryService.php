@@ -1326,6 +1326,8 @@ final class GalleryService
             'source' => (string) $album['source'] === 'app' ? 'app' : 'drive',
             // Knöpfe zum Herunterladen zeigen (Einstellungen → Galerie)
             'downloads' => $this->downloadsEnabled(),
+            // In der App gewähltes Titelbild, wenn es hier zu sehen ist; null: automatisch (albumSummaries)
+            'cover_id' => self::chosenCover($album, $photos),
             'photos' => array_map(fn (array $ph): array => self::isVideoRow($ph) ? [
                 'id' => (int) $ph['id'],
                 'type' => 'video',
@@ -1360,6 +1362,23 @@ final class GalleryService
                 'ready' => $ph['status'] === GalleryRepository::READY,
             ], $photos),
         ];
+    }
+
+    /**
+     * Gewähltes Titelbild des Albums, wenn es unter den sichtbaren Bildern ist (kein Video); sonst null.
+     *
+     * @param array<string, mixed> $album
+     * @param array<int, array<string, mixed>> $photos sichtbare Bilder und Videos des Albums
+     */
+    private static function chosenCover(array $album, array $photos): ?int
+    {
+        $id = (int) ($album['cover_photo_id'] ?? 0);
+        foreach ($photos as $ph) {
+            if ($id > 0 && (int) $ph['id'] === $id && !self::isVideoRow($ph)) {
+                return $id;
+            }
+        }
+        return null;
     }
 
     /** Alles aus Drive entfernen (Index und Dateien), z. B. beim Wechsel des Ordners; hochgeladene Bilder bleiben. */
