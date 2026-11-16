@@ -13,7 +13,7 @@ import {
   type AttendanceStatus,
   type ResponseStatus,
 } from '../api';
-import { formatDate, formatEventWhen, roleCount, todayYmd } from '../format';
+import { formatDate, formatEventWhen, todayYmd } from '../format';
 import brand from '../generated/brand';
 import { navigate } from '../router';
 import { Caps, Empty, ErrorBox, Loading, useAsync, useUnsaved } from '../ui';
@@ -419,7 +419,6 @@ function Editor({
           </button>
         </p>
       )}
-      {!dirty && !pending && <GroupCounts list={list} />}
 
       <div className="picker">
         <div className="picker-head">
@@ -524,20 +523,5 @@ function Editor({
         </button>
       </p>
     </div>
-  );
-}
-
-/** Aufteilung der gespeicherten Zähler nach Gruppen (Einstellungen → Rollen → Anwesenheit). */
-function GroupCounts({ list }: { list: AttendanceDetail }) {
-  const rows = STATUSES.filter((s) => list.counts_by_group[s].length > 0);
-  if (rows.length === 0) return null;
-  return (
-    <ul className="attendance-groups small muted">
-      {rows.map((s) => (
-        <li key={s}>
-          <strong>{ATTENDANCE_LABELS[s]}:</strong> {list.counts_by_group[s].map((g) => roleCount(g.label, g.count)).join(' · ')}
-        </li>
-      ))}
-    </ul>
   );
 }

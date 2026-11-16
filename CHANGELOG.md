@@ -107,6 +107,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   linksbündig wie die übrigen statt mittig. Unter „Gemeinsame Amtszeiten“ hat der Knopf „Neue gemeinsame Amtszeit“ wieder
   Abstand zur Karte darüber.
 
+### Entfernt
+
+- **Aufteilung nach Gruppen in der Anwesenheit**: Unter dem Zähler einer Anwesenheitsliste steht nicht mehr zusätzlich die
+  Aufteilung nach Gruppen (z. B. „entschuldigt: Mitglied 1“); sie wiederholte den Zähler. Die Einstellung
+  [„Gruppen im Zähler“](app:einstellungen/rollen) wirkt weiter auf den Zähler über der Mitgliederliste.
+
 ## [0.12.0] – 2026-11-13
 
 ### Neu
