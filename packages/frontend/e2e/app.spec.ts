@@ -1286,8 +1286,11 @@ test('Eigene Leiste für Gäste: Mitglieder unten statt unter „Intern“, Ange
     await expect(card.getByText('Nicht zur Auswahl, weil Gäste sie nicht sehen dürfen', { exact: false })).toContainText('Dokumente');
     expect((await smallestStackGap(card)).gap).toBeGreaterThanOrEqual(12);
     await card.getByRole('combobox', { name: /^Für Gäste/ }).selectOption({ label: 'Mitglieder' });
+    // Auf die Antwort warten: Der Hinweis „Navigation gespeichert“ vom ersten Speichern steht noch da. Ohne das konnte die
+    // Seite für Gäste schon die neue Leiste, aber noch nicht die Startseite haben (der Server speichert nacheinander).
+    const saved = page.waitForResponse((r) => r.request().method() === 'PUT' && decodeURIComponent(r.url()).includes('/navigation'));
     await card.getByRole('button', { name: 'Navigation speichern' }).click();
-    await expect(page.getByText('Navigation gespeichert')).toBeVisible();
+    expect((await saved).ok()).toBe(true);
 
     // Admin (angemeldet): weiter „Intern“, Mitglieder nicht unten.
     const tabbar = page.locator('.tabbar');
