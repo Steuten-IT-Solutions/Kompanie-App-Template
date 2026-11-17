@@ -239,6 +239,7 @@ final class Subjects
                 'Änderungen protokollieren' => $this->app->changeLog()->enabled(),
                 'Frist (Tage)' => $this->app->changeLog()->keepDays(),
             ]),
+            'PUT /admin/event-kinds' => $this->values('Terminarten', fn (): array => ['Terminarten' => $this->app->eventKinds()->options()]),
             'PUT /attendance/groups' => $this->values('Gruppen der Anwesenheit', function (): array {
                 $groups = $this->app->attendance()->groups();
                 $labels = array_column($groups, 'label', 'key');
@@ -323,7 +324,7 @@ final class Subjects
             'title' => 'Titel', 'description' => 'Beschreibung', 'type' => 'Art', 'anonymous' => ['Anonym', 'bool'], 'results' => 'Ergebnisse sichtbar', 'ends_at' => 'Ende', 'closed_at' => 'Beendet',
         ], extra: fn (array $r): array => ['Antworten' => $this->column('SELECT title FROM {poll_options} WHERE poll_id = ? ORDER BY sort, id', $r['id'])]);
         $inventory = $this->spec('Inventar', 'inventory_items', 'title', ['title' => 'Bezeichnung', 'category' => 'Kategorie', 'quantity' => 'Menge', 'unit' => 'Einheit', 'location' => 'Lagerort', 'note' => 'Notiz']);
-        $attendance = $this->spec('Anwesenheitsliste', 'attendance_lists', 'title', ['title' => 'Titel', 'event_date' => 'Datum'], extra: function (array $r): array {
+        $attendance = $this->spec('Anwesenheitsliste', 'attendance_lists', 'title', ['title' => 'Titel', 'event_date' => 'Datum', 'kind' => 'Terminart'], extra: function (array $r): array {
             $entries = $this->app->db->select('SELECT user_id, status FROM {attendance_entries} WHERE list_id = ? ORDER BY user_id', [$r['id']]);
             $names = $this->people($entries);
             return ['Einträge' => array_map(static fn (array $e, string $name): string => $name . ': ' . (self::ATTENDANCE[$e['status']] ?? $e['status']), $entries, $names)];
@@ -432,6 +433,12 @@ final class Subjects
             $key = $this->app->eventResponses()->keyOf((string) ($r->params['key'] ?? ''));
             $id = $key === null ? null : $this->app->db->scalar('SELECT id FROM {event_responses} WHERE event_key = ? AND user_id = ?', [$key, $r->id()]);
             return is_scalar($id) ? [(string) $id] : [];
+        }, true);
+        // Terminart eines Termins im Kalender (EventKindService)
+        $kinds = $this->spec('Terminart eines Termins', 'event_kinds', 'event_title', ['event_title' => 'Termin', 'event_date' => 'Datum', 'kind' => 'Terminart']);
+        $map['PUT /calendar/{key}/kind'] = $this->table($kinds, function (Request $r): array {
+            $id = $this->app->eventKinds()->rowIdOf((string) ($r->params['key'] ?? ''));
+            return $id === null ? [] : [(string) $id];
         }, true);
         // Ämter: Namen mit Mitgliedern verbinden, Import aus einer CSV-Datei (ohne apply nur die Vorschau, ändert nichts)
         $map['POST /offices/link'] = $this->table($this->spec('Amtsinhaber', 'office_holders', 'name', ['name' => 'Name', 'user_id' => ['Mitglied', 'user']]), function (Request $r): array {

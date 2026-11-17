@@ -6,6 +6,7 @@ import {
   can,
   countsText,
   config,
+  eventKinds,
   type AttendanceCounts,
   type AttendanceDetail,
   type AttendanceEvent,
@@ -157,7 +158,8 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
                   {l.title} {pendingIds.includes(l.id) && <span className="badge badge-level-guest">Noch nicht übertragen</span>}
                 </div>
                 <div className="row-sub">
-                  {formatDate(l.date)} · {countsText(l.counts)}
+                  {formatDate(l.date)}
+                  {l.kind && ` · ${l.kind}`} · {countsText(l.counts)}
                 </div>
               </div>
               <span className="chevron" aria-hidden="true">
@@ -206,7 +208,10 @@ function EventList({
               <div className="row-title">
                 {ev.title} {ev.list_id && <span className="badge badge-level-guest">Liste vorhanden</span>}
               </div>
-              <div className="row-sub">{formatEventWhen(ev)}</div>
+              <div className="row-sub">
+                {formatEventWhen(ev)}
+                {ev.kind && ` · ${ev.kind}`}
+              </div>
             </div>
             <span className="chevron" aria-hidden="true">
               ›
@@ -239,19 +244,31 @@ function ListView({ id, onToast }: { id: number; onToast: (msg: string) => void 
   if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   // Mit den offline gespeicherten Änderungen, bis sie übertragen sind.
-  return <Editor key={data!.updated_at} list={applyPending(data!, pending)} pending={pending} onSaved={setData} onToast={onToast} />;
+  return (
+    <Editor
+      key={data!.updated_at}
+      list={applyPending(data!, pending)}
+      pending={pending}
+      onSaved={setData}
+      // Nur die Art übernehmen: Ein neuer Stand würde die noch nicht gespeicherten Häkchen verwerfen.
+      onKind={(kind) => setData({ ...data!, kind })}
+      onToast={onToast}
+    />
+  );
 }
 
 function Editor({
   list,
   pending,
   onSaved,
+  onKind,
   onToast,
 }: {
   list: AttendanceDetail;
   /** Offline gespeicherte, noch nicht übertragene Änderungen (in `list` schon eingerechnet) */
   pending: PendingSave | null;
   onSaved: (l: AttendanceDetail) => void;
+  onKind: (kind: string | null) => void;
   onToast: (msg: string) => void;
 }) {
   const initial = useMemo(() => Object.fromEntries(list.people.map((p) => [p.id, p.status])), [list]);
@@ -387,6 +404,7 @@ function Editor({
           <p className="muted small">{formatDate(list.date)}</p>
         </>
       )}
+      <KindSelect list={list} onKind={onKind} onToast={onToast} />
       <p className="attendance-counts" role="status">
         {countsText(counts, open)}
       </p>
@@ -523,5 +541,49 @@ function Editor({
         </button>
       </p>
     </div>
+  );
+}
+
+/** Terminart der Liste (z. B. Versammlung); speichert sofort, unabhängig von den Häkchen. */
+function KindSelect({
+  list,
+  onKind,
+  onToast,
+}: {
+  list: AttendanceDetail;
+  onKind: (kind: string | null) => void;
+  onToast: (msg: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const kinds = eventKinds();
+  const current = list.kind ?? null;
+  if (list.kind === undefined || (kinds.length === 0 && !current)) return null;
+  const options = current && !kinds.includes(current) ? [...kinds, current] : kinds;
+
+  async function choose(kind: string) {
+    setBusy(true);
+    try {
+      const saved = await api.saveAttendance({ id: list.id, kind });
+      onKind(saved.kind ?? null);
+      onToast('Terminart gespeichert');
+    } catch (e) {
+      onToast((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <label className="field attendance-kind">
+      <span>Terminart</span>
+      <select value={current ?? ''} disabled={busy} onChange={(e) => void choose(e.target.value)}>
+        <option value="">keine</option>
+        {options.map((k) => (
+          <option key={k} value={k}>
+            {k}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

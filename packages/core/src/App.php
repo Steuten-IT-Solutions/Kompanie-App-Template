@@ -22,6 +22,7 @@ use KompanieApp\Core\Domain\BugReportService;
 use KompanieApp\Core\Domain\CalendarService;
 use KompanieApp\Core\Domain\DocumentService;
 use KompanieApp\Core\Domain\DriveClient;
+use KompanieApp\Core\Domain\EventKindService;
 use KompanieApp\Core\Domain\EventResponseService;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Features;
@@ -644,6 +645,11 @@ final class App
     public function eventResponses(): EventResponseService
     {
         return $this->service(EventResponseService::class, fn () => new EventResponseService($this));
+    }
+
+    public function eventKinds(): EventKindService
+    {
+        return $this->service(EventKindService::class, fn () => new EventKindService($this));
     }
 
     public function board(): BoardService

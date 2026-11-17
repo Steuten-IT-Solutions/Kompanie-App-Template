@@ -26,6 +26,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Terminarten**: Unter [Einstellungen → Kalender](app:einstellungen/kalender) richtest du Terminarten ein, z. B.
+  Versammlung oder Arbeitsdienst. Wer Termine pflegen darf, wählt die Art im aufgeklappten Termin unter
+  [Termine](app:termine), bei jeder Quelle des Kalenders, auch bei Google Kalender und iCal. Die App speichert die Art
+  selbst und ändert nichts in Google. Steht der Name einer Art im Titel, schlägt die App sie vor. Anwesenheitslisten
+  übernehmen die Art ihres Termins und zeigen sie an; ändern lässt sie sich auch an der Liste.
 - **Beitrag der Passiven**: Unter [Verwaltung → Passive](app:verwaltung/passive) trägst du jetzt je Passivem und Jahr
   ein, dass der Beitrag bezahlt ist, mit Betrag, Datum und Zahlungsart. Oben wählst du das Jahr, siehst, wie viele
   bezahlt haben, und kannst nur die offenen oder nur die bezahlten zeigen. Einen Jahresbeitrag stellst du als Vorschlag

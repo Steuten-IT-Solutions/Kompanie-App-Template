@@ -2083,6 +2083,37 @@ WHERE title IS NULL",
                     'CREATE UNIQUE INDEX IF NOT EXISTS {passive_payments}_passive_year ON {passive_payments} (passive_id, year)',
                 ],
             ],
+            // Terminarten (z. B. Versammlung): je Termin des internen Kalenders, bei jeder Quelle in der App gespeichert
+            // (event_key wie bei den Zu- und Absagen), dazu als Momentaufnahme an jeder Anwesenheitsliste.
+            66 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {event_kinds} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  event_key varchar(64) NOT NULL,
+  kind varchar(40) NOT NULL,
+  event_title varchar(191) NOT NULL DEFAULT \'\',
+  event_date date NOT NULL,
+  updated_by bigint(20) unsigned NOT NULL,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY event_key (event_key)
+) {options}',
+                    'ALTER TABLE {attendance_lists} ADD COLUMN kind varchar(40) NOT NULL DEFAULT \'\'',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {event_kinds} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_key TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  event_title TEXT NOT NULL DEFAULT \'\',
+  event_date TEXT NOT NULL,
+  updated_by INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {event_kinds}_event_key ON {event_kinds} (event_key)',
+                    'ALTER TABLE {attendance_lists} ADD COLUMN kind TEXT NOT NULL DEFAULT \'\'',
+                ],
+            ],
         ];
     }
 
