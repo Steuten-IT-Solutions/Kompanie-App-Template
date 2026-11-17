@@ -26,6 +26,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Neustart nach einem Update anbieten**: Holt jemand die App aus dem Hintergrund, sucht sie nach einer neuen Version
+  (höchstens alle 15 Minuten, bei offener App einmal pro Stunde). Ist eine da, lädt die App sie im Hintergrund und
+  zeigt oben _Die App wurde aktualisiert_ mit dem Knopf _Neu starten_. So sieht man Neuerungen sofort, statt erst beim
+  nächsten Öffnen. Neu geladen wird nur auf Knopfdruck; nicht gespeicherte Eingaben fragt die App vorher ab.
 - **Galerie in Google Drive ablegen**: Nutzt die Galerie Google Drive, landen eingereichte und in der App hochgeladene
   Bilder und Videos jetzt in Drive statt auf dem Server. Offene Einreichungen liegen im Ordner „Einreichungen …“ in der
   Ablage des verbundenen Google-Kontos, außerhalb des Galerie-Ordners. Bei der Freigabe verschiebt die App sie in den

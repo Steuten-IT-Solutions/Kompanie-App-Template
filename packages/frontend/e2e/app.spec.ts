@@ -4306,6 +4306,65 @@ test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nich
   await expect(page.getByRole('heading', { name: /^Version / })).toHaveCount(0);
 });
 
+test('Neue Version: Hinweis „Neu starten“, neu geladen erst auf Knopfdruck und mit Rückfrage bei offenen Eingaben', async ({ page }) => {
+  // Neuer Build auf dem Server: Den Abruf von sw.js selbst kann Playwright nicht abfangen. Stattdessen hängt die Seite
+  // eine Build-Nummer an die Adresse des Service Workers; eine neue Adresse installiert ihn neu wie ein neuer Build.
+  await page.addInitScript(() => {
+    const register = ServiceWorkerContainer.prototype.register;
+    ServiceWorkerContainer.prototype.register = function (url, options) {
+      const u = new URL(String(url), location.href);
+      u.searchParams.set('e2e-build', localStorage.getItem('e2e-build') ?? '0');
+      return register.call(this, u.href, options);
+    };
+  });
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  const hint = page.locator('.update-hint');
+  // Der erste Service Worker ist keine neue Version.
+  await expect(hint).toHaveCount(0);
+
+  let build = 0;
+  const newBuild = async () => {
+    // Die neue Version übernimmt erst, wenn die alte nichts mehr zu tun hat (z. B. Daten im Hintergrund nachladen).
+    await page.waitForLoadState('networkidle');
+    build++;
+    await page.evaluate(async (n) => {
+      localStorage.setItem('e2e-build', String(n));
+      const reg = await navigator.serviceWorker.getRegistration();
+      await navigator.serviceWorker.register(reg!.active!.scriptURL, { scope: reg!.scope });
+    }, build);
+    await expect(hint).toContainText('Die App wurde aktualisiert', { timeout: 15_000 });
+  };
+  await newBuild();
+
+  // Nichts lädt von selbst neu: Die Eingabe bleibt, „Neu starten“ fragt vorher.
+  await adminMenu(page, 'Ämter');
+  const field = page.locator('form', { hasText: 'Neues Amt' }).getByLabel('Bezeichnung');
+  await field.fill('Nur getippt');
+  await page.evaluate(() => ((window as unknown as { vorNeustart: boolean }).vorNeustart = true));
+  await hint.getByRole('button', { name: 'Neu starten' }).click();
+  await expect(page.locator('.ask-dialog')).toContainText('noch nicht gespeichert');
+  await askCancel(page);
+  await expect(field).toHaveValue('Nur getippt');
+  await expect(hint).toBeVisible();
+  await hint.getByRole('button', { name: 'Neu starten' }).click();
+  await askOk(page);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { vorNeustart?: boolean }).vorNeustart ?? false)).toBe(false);
+  await expect(page).toHaveURL(/#\/verwaltung\/aemter/);
+  await expect(field).toHaveValue('');
+  // Neu gestartet läuft die neue Version: kein Hinweis mehr.
+  await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? '')).toContain('e2e-build=1');
+  await expect(hint).toHaveCount(0);
+
+  // „Später“ blendet den Hinweis aus; eine noch neuere Version zeigt ihn wieder.
+  await newBuild();
+  await hint.getByRole('button', { name: 'Später' }).click();
+  await expect(hint).toHaveCount(0);
+  await newBuild();
+});
+
 test('Offline: App und zuletzt geladene Termine kommen aus dem Speicher', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/');
