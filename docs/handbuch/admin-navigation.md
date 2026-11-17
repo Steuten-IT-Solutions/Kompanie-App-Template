@@ -20,6 +20,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Navigation*
 - **Verwaltung**: die Knöpfe der **Startseite der Verwaltung** und unter **Einrichtungen** in ihrer Reihenfolge, für alle gleich. Es stehen nur Knöpfe von Bereichen darin, die ihr nutzt. **Siehst du selbst nicht** heißt: Dir fehlt das Recht dafür, andere sehen den Knopf aber.
 - **Nicht in der Navigation**: Bereiche, die in der Leiste nicht erscheinen. Ein Bereich, der mit einem Update neu dazukommt, steht hier mit dem Hinweis **Neu** und erscheint hinten in der Leiste, bis du ihm einen Platz gibst.
 - Bei jedem Bereich wählst du seinen **Platz**: unten in der Leiste, in einem Untermenü oder nicht in der Navigation.
+- Zur Auswahl stehen nur Bereiche, die eingeschaltet sind (unter [Bereiche](seite:admin-bereiche)); in der Leiste **Für Gäste** außerdem nur Bereiche und eigene Seiten, die Gäste sehen dürfen. Was deshalb fehlt, steht unter der Liste. Ein schon eingeordneter Bereich behält dabei seinen Platz und steht wieder in der Liste, sobald du ihn einschaltest bzw. die Rolle {rolle.guest} das Recht dafür bekommt.
 - Mit dem Bereich {bereich.pages} steht jede eigene Seite als eigener Punkt in der Liste (mit dem Hinweis **Eigene Seite**). Eine neue Seite erscheint wie ein neuer Bereich hinten in der Leiste, bis du ihr einen Platz gibst; eine gelöschte verschwindet von selbst.
 
 Die Navigation ändert nur, wo etwas steht, nicht wer es sehen darf. Jede Person sieht nur die Bereiche, die ihre Rolle sehen darf (siehe [Rollen](seite:admin-rollen-und-mitglieder)). Ein Untermenü ohne sichtbaren Bereich erscheint für diese Person nicht. Ein ausgeschalteter Bereich erscheint für niemanden.
@@ -39,7 +40,7 @@ Gäste sind alle, die die App ohne Anmeldung öffnen, und Angemeldete mit der Gr
 3. Ordne die Punkte, lege Untermenüs an oder blende Bereiche aus, wie oben beschrieben.
 4. Tippe auf **Navigation speichern**.
 
-Beide Leisten sind unabhängig: Die Angemeldeten können dabei auch bei der Standardnavigation bleiben. Eigene Namen und Symbole gelten für beide Leisten. Die Startseite **Für Gäste** wählst du aus dem, was in der Leiste der Gäste steht. Schaltest du **Eigene Leiste für Gäste** wieder aus und speicherst, sehen Gäste wieder dieselbe Leiste wie die Angemeldeten. In der [Vorschau](seite:admin-rollen-und-mitglieder) siehst du die Leiste der Gäste ohne Anmeldung, als Rolle {rolle.guest} und als Person mit dieser Grundrolle.
+Beide Leisten sind unabhängig: Die Angemeldeten können dabei auch bei der Standardnavigation bleiben. Eigene Namen und Symbole gelten für beide Leisten. Die Startseite **Für Gäste** wählst du aus dem, was in der Leiste der Gäste steht und was Gäste sehen dürfen. Schaltest du **Eigene Leiste für Gäste** wieder aus und speicherst, sehen Gäste wieder dieselbe Leiste wie die Angemeldeten. In der [Vorschau](seite:admin-rollen-und-mitglieder) siehst du die Leiste der Gäste ohne Anmeldung, als Rolle {rolle.guest} und als Person mit dieser Grundrolle.
 
 ### Die Knöpfe der Verwaltung ordnen
 1. Ziehe unter **Verwaltung** einen Knopf am Griff an seine neue Stelle, in der Liste **Startseite der Verwaltung** oder **Einrichtungen**. Ein Knopf bleibt dabei in seiner Liste.

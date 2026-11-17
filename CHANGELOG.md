@@ -161,6 +161,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Navigation nur mit verfügbaren Punkten**: Unter [Einstellungen → Navigation](app:einstellungen/navigation) stehen
+  nur noch Bereiche zur Auswahl, die eingeschaltet sind. In der Leiste _Für Gäste_ stehen außerdem nur Bereiche und
+  eigene Seiten, die Gäste sehen dürfen (Rechte der Rolle Gast, bei eigenen Seiten deren Zielgruppe). Darunter steht,
+  welche Punkte deshalb fehlen. Schon gespeicherte Punkte gehen dabei nicht verloren: Sie behalten ihren Platz und
+  erscheinen wieder, sobald der Bereich an ist bzw. Gäste ihn sehen dürfen. Auch bei der Startseite stehen nur Punkte zur
+  Wahl, die Gäste bzw. Angemeldete sehen können.
 - **Nicht gespeicherte Eingaben**: Wer etwas eingegeben, aber noch nicht gespeichert hat, wird jetzt gefragt, bevor
   die Seite verlassen wird (auch mit „Zurück“ und beim Neuladen); **Verlassen** verwirft die Eingaben. Kommt eine
   Änderung ohne Internetverbindung nicht an, sagt die Meldung jetzt ausdrücklich „Keine Verbindung – nicht gespeichert“.
