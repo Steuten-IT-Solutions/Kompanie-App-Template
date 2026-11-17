@@ -38,7 +38,7 @@ final class Features
         // Standardrolle „Kalender verwalten“ gibt es nur mit der Quelle „In der App“ (roleOf).
         'calendar' => ['label' => 'Kalender', 'description' => 'Interne Termine für angemeldete Mitglieder, getrennt von den öffentlichen: direkt in der App gepflegt, aus Google Kalender oder einer iCal-Adresse.', 'requires' => [], 'setup' => 'kalender', 'role' => null],
         // News: aus den Beiträgen einer Webseite, einem Feed oder in der App geschrieben (NewsService). Die Standardrolle
-        // „News verwalten“ gibt es nur mit der Quelle „In der App“ (roleOf); sonst gibt es in der App nichts zu pflegen.
+        // „News verwalten“ gibt es nur mit der Quelle „In der App“ oder den Beiträgen der WordPress-Seite (roleOf); sonst gibt es nichts zu pflegen.
         'news' => ['label' => 'News', 'description' => 'Neuigkeiten der Kompanie: aus den Beiträgen der Webseite, einem Feed oder direkt in der App geschrieben.', 'requires' => [], 'setup' => 'news', 'role' => null],
         'gallery' => ['label' => 'Galerie', 'description' => 'Fotoalben aus Google Drive oder nur in der App, mit internen Bildern nur für Mitglieder; auf Wunsch reichen Mitglieder Bilder zur Freigabe ein.', 'requires' => [], 'setup' => 'galerie', 'role' => ['member', 'view_submissions', 'review_gallery', 'manage_gallery']],
         'points' => ['label' => 'Punkte', 'description' => 'Punkte für Mitglieder, mit Katalog und Verlauf.', 'requires' => [], 'setup' => null, 'role' => ['member', 'view_points', 'manage_points']],
@@ -233,15 +233,16 @@ final class Features
 
     /** Name der Standardrolle eines Bereichs, z. B. „Punkte verwalten“ (mit der Bezeichnung aus kompanie.json). */
     /**
-     * Rechte der Standardrolle eines Bereichs (DEFINITIONS role); bei den News und beim Kalender nur mit der Quelle
-     * „In der App“.
+     * Rechte der Standardrolle eines Bereichs (DEFINITIONS role); bei den News nur mit einer Quelle, die man pflegt
+     * (NewsService::managedType), beim Kalender nur mit der Quelle „In der App“.
      *
      * @return string[]|null
      */
     public function roleOf(string $feature): ?array
     {
         if ($feature === 'news') {
-            return $this->app->newsService()->inApp() ? NewsService::ROLE : null;
+            $news = $this->app->newsService();
+            return $news->managedType($news->sourceType()) ? NewsService::ROLE : null;
         }
         if ($feature === 'calendar') {
             return $this->app->calendar()->inApp() ? CalendarService::ROLE : null;

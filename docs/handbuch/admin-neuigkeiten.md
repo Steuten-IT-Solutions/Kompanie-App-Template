@@ -22,6 +22,11 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Neuigkeiten
 2. Unter **{bereich.news}** steht jetzt für alle mit dem Recht **{bereich.news} schreiben** der Knopf **Neuer Beitrag**. Als {rolle.admin} hast du das Recht immer.
 3. Die App legt dazu die Rolle „{bereich.news} verwalten“ an. Gib sie unter **Mitglieder** allen, die Beiträge schreiben sollen (siehe [Rollen](seite:admin-rollen-und-mitglieder)).
 
+### Mit WordPress: Beiträge der Webseite aus der App schreiben
+1. Lass bei **Quelle** **Beiträge dieser WordPress-Seite** gewählt.
+2. Unter **{bereich.news}** steht für alle mit dem Recht **{bereich.news} schreiben** der Knopf **Neuer Beitrag**, im geöffneten Beitrag **In WordPress bearbeiten**. Beide öffnen den Editor von WordPress.
+3. Die App legt dazu die Rolle „{bereich.news} verwalten“ an. Wer sie hat, darf im Editor von WordPress alle Beiträge schreiben, ändern, veröffentlichen und löschen und Bilder hochladen, aber keine Seiten bearbeiten. Eine Rolle in WordPress (Autor, Redakteur) brauchst du dafür nicht.
+
 ### Die Webseite der Kompanie verbinden (ohne WordPress)
 1. Wähle bei **Quelle** **Andere WordPress-Webseite**, wenn eure Webseite mit WordPress läuft. Sonst wähle **RSS- oder Atom-Feed**.
 2. Trage die **Adresse der Webseite** ein (z. B. `https://www.beispiel.de`) bzw. die **Adresse des Feeds** (z. B. `https://www.beispiel.de/feed`).
@@ -37,7 +42,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Neuigkeiten
 - Die {bereich.news} erscheinen für die anderen erst, wenn der Bereich an und eine Quelle eingerichtet ist (siehe [Bereiche](seite:admin-bereiche)).
 - Es gilt immer genau eine Quelle; Beiträge aus der App und von der Webseite werden nicht gemischt. Wechselst du die Quelle, bleiben die Beiträge der App gespeichert, ebenso die Adresse der Webseite oder des Feeds. Wechselst du zurück, sind sie wieder da.
 - Nach einem Wechsel meldet die App die Beiträge der neuen Quelle nicht als neu; Benachrichtigungen gibt es erst für die danach erscheinenden Beiträge.
-- Mit WordPress und **Beiträge dieser WordPress-Seite** kommen die {bereich.news} aus den veröffentlichten Beiträgen eurer Seite; einzustellen gibt es dafür nichts.
+- Mit WordPress und **Beiträge dieser WordPress-Seite** kommen die {bereich.news} aus den veröffentlichten Beiträgen eurer Seite; einzustellen gibt es dafür nichts. Entwürfe und kennwortgeschützte Beiträge zeigt die App nicht.
 
 > **Für Fortgeschrittene:** Ein RSS- oder Atom-Feed ist eine Adresse, unter der eine Webseite ihre neuesten Beiträge in maschinenlesbarer Form anbietet. Viele Webseiten haben einen, oft unter `/feed` oder `/rss`.
 
