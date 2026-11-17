@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, applyOpenReports, type ReportStatus, type ReviewReport } from '../api';
+import { api, applyOpenReports, can, type ReportStatus, type ReviewReport } from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
 
 /** Zeitpunkt einer Meldung (Unix-Zeit) in Ortszeit */
@@ -33,7 +33,7 @@ export function Meldungen({ onToast }: { onToast: (msg: string) => void }) {
   return (
     <div className="reports-review">
       <h2 className="section-title">Fehlermeldungen</h2>
-      {!list.forward && (
+      {can('review_reports') && !list.forward && (
         <p className="muted small">
           In dieser App ist kein Empfänger für Fehlermeldungen eingerichtet. Ihr könnt Meldungen lesen und schließen, aber nicht an die
           Betreuer der App weiterleiten.
@@ -177,7 +177,9 @@ function ReportCard({
           {error}
         </p>
       )}
+      {/* Nur sehen (view_reports): ohne Schließen und Weiterleiten */}
       {isOpen &&
+        can('review_reports') &&
         (closing ? (
           <div className="row-actions">
             <button type="button" className="btn" disabled={busy} onClick={close}>

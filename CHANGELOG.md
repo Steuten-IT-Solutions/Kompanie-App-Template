@@ -46,7 +46,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Rechte zum Sehen und zum Ändern getrennt**: Unter [Einstellungen → Rollen](app:einstellungen/rollen) gibt es
   jetzt eigene Rechte, um Punkte, Strafen, Dienstgrade mit Beförderungen, Titel und die Anwesenheit der Mitglieder nur
   zu sehen, z. B. „Punkte aller Mitglieder sehen“ neben „Punkte vergeben“. Ebenso gibt es eigene Rechte, um das
-  Inventar, die Listen, den Verlauf der E-Mails, die Zu- und Absagen bei Terminen und die Passiven nur zu sehen. Wer nur sehen darf,
+  Inventar, die Listen, den Verlauf der E-Mails, die Zu- und Absagen bei Terminen, die Passiven, die Einreichungen der Galerie und die Fehlermeldungen nur zu sehen. Wer nur sehen darf,
   sieht die Mitgliederliste bzw. den Bereich und die Angaben, aber keine Knöpfe zum Ändern. Ändern gibt es nur zusammen mit Sehen. Rollen und Personen, die ein
   Recht zum Ändern hatten, haben nach dem Update auch das Recht zum Sehen; es ändert sich also für niemanden etwas,
   bis du es umstellst.

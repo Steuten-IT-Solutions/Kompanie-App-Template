@@ -188,10 +188,16 @@ function Overview({ onToast }: { onToast: Toast }) {
   // Einreichungen (Issue #286), nur mit Haken „Einreichen erlauben“ (Einstellungen → Galerie); Verwalten (manage_gallery)
   const submit = can('submit_gallery') && gallerySubmissionsOpen();
   const actions =
-    submit || can('review_gallery') || manage ? (
+    submit || can('view_submissions') || manage ? (
       <div className="button-row gallery-actions">
         {submit && <IconButton icon="submit" label="Bilder und Videos einreichen" onClick={() => navigate('galerie/einreichen')} />}
-        {can('review_gallery') && <IconButton icon="review" label="Einreichungen prüfen" onClick={() => navigate('galerie/pruefen')} />}
+        {can('view_submissions') && (
+          <IconButton
+            icon="review"
+            label={can('review_gallery') ? 'Einreichungen prüfen' : 'Einreichungen ansehen'}
+            onClick={() => navigate('galerie/pruefen')}
+          />
+        )}
         {manage && <IconButton icon="albumAdd" label="Alben anlegen und hochladen" onClick={() => navigate('galerie/verwalten')} />}
       </div>
     ) : null;

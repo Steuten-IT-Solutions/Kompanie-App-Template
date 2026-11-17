@@ -41,7 +41,7 @@ final class VideoUploadTest extends TestCase
         $this->sub = $this->users->add('einreicher', Roles::MEMBER);
         $this->rev = $this->users->add('pruefer', Roles::MEMBER);
         $this->app->roles()->setOverrides($this->users->find($this->admin), $this->sub, ['submit_gallery'], []);
-        $this->app->roles()->setOverrides($this->users->find($this->admin), $this->rev, ['review_gallery'], []);
+        $this->app->roles()->setOverrides($this->users->find($this->admin), $this->rev, ['view_submissions', 'review_gallery'], []);
         $this->users->current = $this->admin;
         $this->ok('PATCH', '/admin/settings', ['gallery_source' => 'server', 'gallery_submissions' => '1']);
         $this->album = (int) $this->ok('POST', '/admin/gallery/albums', ['title' => 'Sommerfest', 'year' => 2026])['id'];

@@ -48,6 +48,8 @@ export const READ_OF: Partial<Record<Capability, Capability>> = {
   manage_lists: 'view_lists',
   send_mail: 'view_mail',
   manage_passive: 'view_passive',
+  review_gallery: 'view_submissions',
+  review_reports: 'view_reports',
 };
 
 /**
@@ -160,6 +162,7 @@ const ORDER: Capability[] = [
   'manage_sponsors',
   'manage_companies',
   'submit_gallery',
+  'view_submissions',
   'review_gallery',
   'manage_gallery',
   'manage_pages',
@@ -184,6 +187,7 @@ const ORDER: Capability[] = [
   'view_passive',
   'manage_passive',
   'promote_users',
+  'view_reports',
   'review_reports',
   'view_changes',
 ];

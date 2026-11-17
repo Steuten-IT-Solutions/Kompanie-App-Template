@@ -74,7 +74,7 @@ export function adminTabs(): AdminTab[] {
         on: can('create_users') && (!!config?.registration || (config?.pendingRegistrations ?? 0) > 0),
       },
       // Fehlermeldungen aus der App: Zahl der offenen im Kreis
-      { id: 'meldungen', label: 'Fehlermeldungen', on: can('review_reports') },
+      { id: 'meldungen', label: 'Fehlermeldungen', on: can('view_reports') },
       // Änderungsprotokoll: wer wann was angelegt, geändert oder gelöscht hat
       { id: 'aenderungen', label: 'Änderungen', on: can('view_changes') },
       // Bericht als PDF: Daten mehrerer Bereiche für einen Zeitraum

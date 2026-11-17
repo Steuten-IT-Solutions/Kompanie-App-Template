@@ -735,9 +735,9 @@ final class Api
             ],
             'features' => $features,
             // Fehlermeldungen (Issue #64): gehen zuerst an die Admins, darum immer möglich (Knopf „Fehler melden“);
-            // openReports: offene Meldungen für alle mit review_reports (Zähler in der Verwaltung), sonst null
+            // openReports: offene Meldungen für alle mit view_reports (Zähler in der Verwaltung), sonst null
             'reports' => true,
-            'openReports' => $user !== null && $this->can(Cap::ReviewReports) ? $a->bugReports()->openCount() : null,
+            'openReports' => $user !== null && $this->can(Cap::ViewReports) ? $a->bugReports()->openCount() : null,
             // Zugang beantragen (Issue #314): Link „Zugang beantragen“ für Gäste; pendingRegistrations: offene Anfragen
             // für alle, die freigeben (Zähler in der Verwaltung), sonst null
             'registration' => $a->registrations()->enabled(),
@@ -929,8 +929,8 @@ final class Api
             new Route('POST', '/reports', $P, fn (Request $r) => Response::created($a->bugReports()->submit($a->authContext->currentUser(), $r->body, $r->client))),
             // Eigene Meldungen mit Stand; Eingang der Admins: schließen mit Begründung oder an die Betreuer weiterleiten
             new Route('GET', '/reports/mine', $L, fn () => $a->bugReports()->mine($this->user())),
-            new Route('GET', '/reports/review', Cap::ReviewReports, fn () => $a->bugReports()->review()),
-            new Route('GET', '/reports/review/{id}/screenshot', Cap::ReviewReports, fn (Request $r) => $a->bugReports()->screenshotOf($r->id())),
+            new Route('GET', '/reports/review', Cap::ViewReports, fn () => $a->bugReports()->review()),
+            new Route('GET', '/reports/review/{id}/screenshot', Cap::ViewReports, fn (Request $r) => $a->bugReports()->screenshotOf($r->id())),
             new Route('POST', '/reports/review/{id}/close', Cap::ReviewReports, fn (Request $r) => $a->bugReports()->close($this->user(), $r->id(), $r->input('reason'))),
             new Route('POST', '/reports/review/{id}/forward', Cap::ReviewReports, fn (Request $r) => $a->bugReports()->forward($this->user(), $r->id())),
             // Selbstregistrierung (Issue #314): Zugang beantragen (auch ohne Anmeldung; Zeitfalle, Honeypot und Begrenzung
@@ -1009,7 +1009,7 @@ final class Api
             new Route('GET', '/gallery', [Cap::ViewGallery, Cap::ViewGalleryInternal], fn () => ['years' => $a->gallery()->overview($this->can(Cap::ViewGalleryInternal))], 'gallery', $denyView),
             new Route('GET', '/gallery/{id}', [Cap::ViewGallery, Cap::ViewGalleryInternal], fn (Request $r) => $a->gallery()->album($r->id(), $this->can(Cap::ViewGalleryInternal))
                 ?? throw ApiError::notFound('Album nicht gefunden.'), 'gallery', $denyView),
-            // Einreichungen (Issue #286): einreichen und eigene sehen mit submit_gallery, prüfen mit review_gallery
+            // Einreichungen (Issue #286): einreichen und eigene sehen mit submit_gallery, sehen mit view_submissions, prüfen mit review_gallery
             new Route('GET', '/gallery/submissions', Cap::SubmitGallery, fn () => $a->gallerySubmissions()->own($this->user()), 'gallery'),
             new Route('POST', '/gallery/submissions', Cap::SubmitGallery, fn (Request $r) => Response::created($a->gallerySubmissions()->submit($this->user(), $r->input('album_id'), $r->input('file'), $r->input('consent'))), 'gallery'),
             new Route('DELETE', '/gallery/submissions/{id}', Cap::SubmitGallery, function (Request $r) use ($a) {
@@ -1037,7 +1037,7 @@ final class Api
             new Route('PUT', '/gallery/albums/{id}/cover', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => $a->galleryUploads()->setCover($r->id(), $r->input('photo_id')), 'gallery'),
             new Route('POST', '/gallery/photos/move', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => $a->galleryUploads()->movePhotos($r->input('ids'), $r->input('album_id')), 'gallery'),
             new Route('POST', '/gallery/photos/delete', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => $a->galleryUploads()->deletePhotos($r->input('ids'), $this->user()), 'gallery'),
-            new Route('GET', '/gallery/review', Cap::ReviewGallery, fn () => $a->gallerySubmissions()->review(), 'gallery'),
+            new Route('GET', '/gallery/review', Cap::ViewSubmissions, fn () => $a->gallerySubmissions()->review(), 'gallery'),
             new Route('POST', '/gallery/review/{id}/approve', Cap::ReviewGallery, fn (Request $r) => $a->gallerySubmissions()->approve($this->user(), $r->id(), Input::bool($r->input('intern'))), 'gallery'),
             new Route('POST', '/gallery/review/{id}/reject', Cap::ReviewGallery, fn (Request $r) => $a->gallerySubmissions()->reject($this->user(), $r->id(), $r->input('reason')), 'gallery'),
             new Route('POST', '/gallery/review/{id}/remove', Cap::ReviewGallery, function (Request $r) use ($a) {

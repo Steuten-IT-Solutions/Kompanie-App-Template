@@ -184,7 +184,7 @@ final class GalleryUploadTest extends TestCase
         $reviewer = $this->users->add('pruefer', Roles::MEMBER);
         $this->users->current = $this->m;
         $this->assertSame(403, $this->call('PATCH', "/gallery/photos/{$photoId}", ['intern' => false])->status, 'ohne Recht');
-        $this->app->roles()->setOverrides($this->users->find($this->admin), $reviewer, ['review_gallery'], []);
+        $this->app->roles()->setOverrides($this->users->find($this->admin), $reviewer, ['view_submissions', 'review_gallery'], []);
         $this->users->current = $reviewer;
         $this->assertSame(['id' => $photoId, 'intern' => false], $this->ok('PATCH', "/gallery/photos/{$photoId}", ['intern' => false]));
         $gallery->processPending(30);
@@ -233,7 +233,7 @@ final class GalleryUploadTest extends TestCase
         $this->assertSame(403, $this->call('POST', '/gallery/photos/move', ['ids' => [$ids['Offen.jpg']], 'album_id' => $to])->status);
         $this->assertSame(403, $this->call('POST', '/gallery/photos/delete', ['ids' => [$ids['Drei.jpg']]])->status);
         $reviewer = $this->users->add('pruefer', Roles::MEMBER);
-        $this->app->roles()->setOverrides($this->users->find($this->admin), $reviewer, ['review_gallery'], []);
+        $this->app->roles()->setOverrides($this->users->find($this->admin), $reviewer, ['view_submissions', 'review_gallery'], []);
         $this->users->current = $reviewer;
         $this->assertSame(403, $this->call('POST', '/gallery/photos/move', ['ids' => [$ids['Offen.jpg']], 'album_id' => $to])->status, 'Prüfen reicht nicht');
         $this->assertSame(403, $this->call('POST', '/gallery/photos/delete', ['ids' => [$ids['Drei.jpg']]])->status, 'Prüfen reicht nicht');

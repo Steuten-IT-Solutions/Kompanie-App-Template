@@ -165,6 +165,12 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         features: ['gallery'],
       },
       {
+        key: 'view_submissions',
+        label: `${sec.gallery}: eingereichte Bilder und Videos ansehen, auch vor der Freigabe`,
+        short: 'Einreichungen sehen',
+        features: ['gallery'],
+      },
+      {
         key: 'review_gallery',
         label: `${sec.gallery}: Einreichungen freigeben oder ablehnen, freigegebene wieder entfernen`,
         short: 'Einreichungen prüfen',
@@ -305,8 +311,13 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         short: 'Rollen vergeben',
       },
       {
+        key: 'view_reports',
+        label: 'Fehlermeldungen der Mitglieder mit Bildschirmfoto sehen',
+        short: 'Fehlermeldungen sehen',
+      },
+      {
         key: 'review_reports',
-        label: 'Fehlermeldungen der Mitglieder sehen, mit Begründung schließen oder an die Betreuer der App weiterleiten',
+        label: 'Fehlermeldungen der Mitglieder mit Begründung schließen oder an die Betreuer der App weiterleiten',
         short: 'Fehlermeldungen bearbeiten',
       },
       {

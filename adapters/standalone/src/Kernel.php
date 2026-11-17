@@ -36,7 +36,7 @@ use KompanieApp\Core\Storage\Sql\PdoConnection;
  *   /manifest.webmanifest    Manifest         (index.php?r=/manifest.webmanifest)
  *   /foto/<id>/<größe>       Galeriebild      (index.php?r=/foto/…)
  *   /foto/<id>/video         Galerievideo in Ausschnitten (Range), aus Drive oder der eigenen Ablage
- *   /foto/<id>/einreichung   Video einer offenen Einreichung zum Prüfen (review_gallery, Issue #350)
+ *   /foto/<id>/einreichung   Video einer offenen Einreichung zum Prüfen (view_submissions, Issue #350)
  *   /dokument/<id>?v=…       Dokument         (index.php?r=/dokument/…&v=…)
  *   /abzeichen/<id>?v=…&s=…  Abzeichen        (index.php?r=/abzeichen/…&v=…&s=…)
  *   /mitgliedsfoto/<id>?v=…&s=… Foto eines Mitglieds (index.php?r=/mitgliedsfoto/…&v=…&s=…)
@@ -626,7 +626,7 @@ final class Kernel
         @ini_set('zlib.output_compression', '0');
         $access = static function () use ($app, $submission): array {
             $user = $app->authContext->currentUser();
-            $cap = $submission ? \KompanieApp\Core\Auth\Capability::ReviewGallery : \KompanieApp\Core\Auth\Capability::ViewGalleryInternal;
+            $cap = $submission ? \KompanieApp\Core\Auth\Capability::ViewSubmissions : \KompanieApp\Core\Auth\Capability::ViewGalleryInternal;
             return [$app->can($cap), $user !== null];
         };
         $deliver = $submission ? $app->gallerySubmissions()->deliverVideo(...) : $app->gallery()->deliverVideo(...);
