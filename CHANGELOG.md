@@ -64,7 +64,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   mehrerer Bereiche für einen Zeitraum, z. B. für die Jahreshauptversammlung. Den Zeitraum wählst du mit _Von_ und _Bis_
   oder der Schnellwahl (dieses Jahr, letztes Jahr, letzte 12 Monate), die Bereiche mit Haken. Enthalten sind die
   Mitglieder (Stand heute; E-Mail, Telefon, Adresse und Geburtsdatum nur für alle, die persönliche Angaben sehen dürfen),
-  Punkte und Strafen mit Summen je Mitglied und allen Einträgen sowie die Anwesenheit je Mitglied und je Termin. Jede
+  die Passiven (Stand heute, Kontaktdaten ebenso nur mit diesem Recht), Punkte und Strafen mit Summen je Mitglied und
+  allen Einträgen, die Anwesenheit je Mitglied und je Termin, die öffentlichen Termine, der interne Kalender mit den Zu-
+  und Absagen je Termin und je Mitglied, Wechsel der Dienstgrade, vergebene Titel, die Amtszeiten der Ämter sowie der
+  Bestand und Verlauf des Inventars. Jede
   Person sieht nur die Bereiche, die sie auch sonst verwalten darf; ein eigenes Recht gibt es nicht. Die Schrift ist im
   PDF enthalten, damit auch Buchstaben wie „ł“ oder „č“ stimmen. Wer wann einen Bericht erstellt, steht im
   Änderungsprotokoll (Zeitraum und Bereiche, ohne Inhalt).

@@ -31,10 +31,13 @@ const canPassive = (): boolean => !!config?.features.passive && can('manage_pass
 
 /**
  * Bericht als PDF: wer mindestens einen Bereich des Berichts verwalten darf (wie ReportService im Kern: Mitglieder mit
- * den Rechten der Mitgliederliste, sonst Punkte, Strafen, Anwesenheit). Welche Bereiche genau, sagt der Server.
+ * den Rechten der Mitgliederliste, dazu Passive, Ämter, Inventar). Termine und Kalender allein öffnen keine Verwaltung
+ * (wer nur sie pflegt, hat dort sonst nichts); wer die Verwaltung hat, bekommt sie im Bericht dazu. Welche Bereiche
+ * genau, sagt der Server.
  */
 export function reportAllowed(): boolean {
-  return memberListAllowed() || seePoints() || seePenalties() || seeAttendance();
+  const f = config?.features;
+  return memberListAllowed() || canPassive() || canOffices() || (!!f?.inventory && can('manage_inventory'));
 }
 
 /** Mitgliederliste: für alle, die Punkte, Strafen, Dienstgrade, Titel oder Anwesenheit der Mitglieder sehen, Mitglieder

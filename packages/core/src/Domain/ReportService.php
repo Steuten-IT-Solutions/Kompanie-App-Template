@@ -46,9 +46,23 @@ final class ReportService
             Capability::ViewPoints, Capability::ViewPenalties, Capability::ViewPromotions, Capability::ViewTitles, Capability::ViewAttendance,
             Capability::ManageCompanies, Capability::ViewPersonal, Capability::CreateUsers, Capability::ManageFormer, Capability::PromoteUsers,
         ], 'dated' => false, 'label' => 'Mitglieder'],
+        'passive' => ['feature' => 'passive', 'caps' => [Capability::ManagePassive], 'dated' => false, 'label' => 'Passive'],
         'points' => ['feature' => 'points', 'caps' => [Capability::ViewPoints], 'dated' => true, 'label' => 'Punkte'],
         'penalties' => ['feature' => 'penalties', 'caps' => [Capability::ViewPenalties], 'dated' => true, 'label' => 'Strafen'],
         'attendance' => ['feature' => 'attendance', 'caps' => [Capability::ViewAttendance], 'dated' => true, 'label' => 'Anwesenheit'],
+        'events' => ['feature' => 'events', 'caps' => [Capability::ManageEvents], 'dated' => true, 'label' => 'Termine'],
+        'calendar' => ['feature' => 'calendar', 'caps' => [Capability::ManageCalendar], 'dated' => true, 'label' => 'Kalender'],
+        'ranks' => ['feature' => 'ranks', 'caps' => [Capability::ViewPromotions], 'dated' => true, 'label' => 'Dienstgrade'],
+        'titles' => ['feature' => 'titles', 'caps' => [Capability::ViewTitles], 'dated' => true, 'label' => 'Titel'],
+        'offices' => ['feature' => 'offices', 'caps' => [Capability::ManageOffices], 'dated' => true, 'label' => 'Ämter'],
+        'inventory' => ['feature' => 'inventory', 'caps' => [Capability::ManageInventory], 'dated' => true, 'label' => 'Inventar'],
+    ];
+
+    private const RANK_KINDS = [RankService::KIND_PROMOTION => 'Beförderung', RankService::KIND_DEMOTION => 'Zurückgestuft', RankService::KIND_INITIAL => 'Erster Dienstgrad'];
+
+    private const INVENTORY_ACTIONS = [
+        InventoryService::ACTION_CREATE => 'Angelegt', InventoryService::ACTION_UPDATE => 'Geändert',
+        InventoryService::ACTION_MOVE => 'Umgelagert', InventoryService::ACTION_DELETE => 'Gelöscht',
     ];
 
     private const STATUS_LABELS = [AttendanceService::PRESENT => 'Anwesend', AttendanceService::EXCUSED => 'Entschuldigt', AttendanceService::ABSENT => 'Fehlt'];
@@ -116,6 +130,13 @@ final class ReportService
                 'points' => $this->points($fromDay, $toDay),
                 'penalties' => $this->penalties($fromDay, $toDay),
                 'attendance' => $this->attendance($fromDay, $toDay),
+                'passive' => $this->passive($viewer),
+                'events' => $this->events($fromDay, $toDay),
+                'calendar' => $this->calendar($fromDay, $toDay),
+                'ranks' => $this->ranks($fromDay, $toDay),
+                'titles' => $this->titles($fromDay, $toDay),
+                'offices' => $this->offices($fromDay, $toDay),
+                'inventory' => $this->inventory($fromDay, $toDay),
                 default => throw new \LogicException('Abschnitt ohne Inhalt: ' . $key),
             };
         }
@@ -139,6 +160,10 @@ final class ReportService
     {
         $def = self::SECTIONS[$key] ?? null;
         if ($def === null || ($def['feature'] !== null && !$this->app->features()->enabled($def['feature']))) {
+            return false;
+        }
+        // Kalender: Termine nur, wenn sie in der App gepflegt werden; sonst bleiben nur die Zu- und Absagen
+        if ($key === 'calendar' && !$this->app->calendar()->inApp() && !$this->app->eventResponses()->enabled()) {
             return false;
         }
         foreach ($def['caps'] as $cap) {
@@ -341,6 +366,188 @@ final class ReportService
         ]);
     }
 
+    /**
+     * Passive (Stand heute): Name und Betreuer; Adresse, Telefon, E-Mail und Geburtsdatum nur mit view_personal.
+     *
+     * @return Section
+     */
+    private function passive(User $viewer): array
+    {
+        $rows = $this->app->passives()->repository()->all();
+        $personal = $viewer->can(Capability::ViewPersonal);
+        $names = (new UserNames($this->app->users))->prime(array_values(array_filter(array_column($rows, 'caretaker_id'), 'is_int')));
+        usort($rows, static fn (array $a, array $b): int => strcasecmp($a['last_name'], $b['last_name']) ?: strcasecmp($a['first_name'], $b['first_name']) ?: $a['id'] <=> $b['id']);
+        $columns = [self::col('Name'), self::col('Betreuer')];
+        if ($personal) {
+            array_push($columns, self::col('Adresse', wrap: true), self::col('Telefon'), self::col('E-Mail', wrap: true), self::col('Geburtsdatum'));
+        }
+        $out = [];
+        foreach ($rows as $r) {
+            $row = [PersonName::join($r['first_name'], $r['last_name']), $r['caretaker_id'] !== null ? (string) $names->name($r['caretaker_id']) : ''];
+            if ($personal) {
+                array_push($row, $r['address'] !== null ? Address::oneLine($r['address']) : '', $r['phone'], $r['email'], $r['birth_date'] !== null ? self::day($r['birth_date']) : '');
+            }
+            $out[] = $row;
+        }
+        $title = $this->title('passive');
+        return self::section('passive', $title, false, [self::table('', $columns, $out, 'Keine ' . $title . '.')], landscape: $personal);
+    }
+
+    /**
+     * Öffentliche Termine, die im Zeitraum liegen oder laufen.
+     *
+     * @return Section
+     */
+    private function events(string $from, string $to): array
+    {
+        $title = $this->title('events');
+        return self::section('events', $title, true, [self::eventTable('', $this->app->events()->between($from, $to))]);
+    }
+
+    /**
+     * Interner Kalender: die in der App gepflegten Termine (nur mit dieser Quelle) und, wenn eingeschaltet, die Zu- und
+     * Absagen je Termin und je Mitglied (nach dem Tag des Termins, gleich aus welcher Quelle).
+     *
+     * @return Section
+     */
+    private function calendar(string $from, string $to): array
+    {
+        $tables = [];
+        if ($this->app->calendar()->inApp()) {
+            $tables[] = self::eventTable('Termine', $this->app->internalEvents()->between($from, $to));
+        }
+        if ($this->app->eventResponses()->enabled()) {
+            $rows = $this->repository()->responses($from, $to);
+            $names = (new UserNames($this->app->users))->prime(array_column($rows, 'user_id'));
+            $events = [];
+            $people = [];
+            foreach ($rows as $r) {
+                $yes = $r['status'] === EventResponseService::YES;
+                $events[$r['event_key']] ??= ['date' => self::day($r['event_date']), 'title' => $r['event_title'], 'yes' => 0, 'no' => 0];
+                $events[$r['event_key']][$yes ? 'yes' : 'no']++;
+                $people[$r['user_id']] ??= ['name' => (string) $names->name($r['user_id']), 'yes' => 0, 'no' => 0];
+                $people[$r['user_id']][$yes ? 'yes' : 'no']++;
+            }
+            $counts = [self::col('Zusagen', num: true), self::col('Absagen', num: true)];
+            $tables[] = self::table('Zu- und Absagen je Termin', [self::col('Datum'), self::col('Termin', wrap: true), ...$counts], array_values(array_map(
+                static fn (array $e): array => [$e['date'], $e['title'], (string) $e['yes'], (string) $e['no']],
+                $events,
+            )), 'Im Zeitraum gibt es keine Zu- oder Absagen.');
+            $tables[] = self::table('Zu- und Absagen je Mitglied', [self::col('Name'), ...$counts], self::byName($people, static fn (array $p): array => [
+                $p['name'], (string) $p['yes'], (string) $p['no'],
+            ]), 'Im Zeitraum gibt es keine Zu- oder Absagen.');
+        }
+        return self::section('calendar', $this->title('calendar'), true, $tables);
+    }
+
+    /**
+     * Dienstgrad-Wechsel im Zeitraum (Beförderungen, Rückstufungen, erste Dienstgrade).
+     *
+     * @return Section
+     */
+    private function ranks(string $from, string $to): array
+    {
+        [$start, $end] = $this->utcBounds($from, $to);
+        $rows = $this->repository()->rankChanges($start, $end);
+        $names = (new UserNames($this->app->users))->prime(array_column($rows, 'user_id'));
+        $out = array_map(fn (array $r): array => [
+            $this->utcDay($r['changed_at']), (string) $names->name($r['user_id']), self::RANK_KINDS[$r['kind']] ?? $r['kind'], $r['from_title'], $r['to_title'], $r['reason'],
+        ], $rows);
+        return self::section('ranks', $this->title('ranks'), true, [self::table('Wechsel im Zeitraum', [
+            self::col('Datum'), self::col('Name'), self::col('Art'), self::col('Vorher'), self::col('Nachher'), self::col('Grund', wrap: true),
+        ], $out, 'Im Zeitraum gab es keine Wechsel.')]);
+    }
+
+    /**
+     * Im Zeitraum vergebene Titel, die die Person noch trägt (abgenommene Titel stehen nicht mehr in der Datenbank).
+     *
+     * @return Section
+     */
+    private function titles(string $from, string $to): array
+    {
+        [$start, $end] = $this->utcBounds($from, $to);
+        $rows = $this->repository()->titleAssignments($start, $end);
+        $names = (new UserNames($this->app->users))->prime(array_column($rows, 'user_id'));
+        $title = $this->title('titles');
+        $out = array_map(fn (array $r): array => [$this->utcDay($r['assigned_at']), (string) $names->name($r['user_id']), $r['title']], $rows);
+        return self::section('titles', $title, true, [self::table('Vergeben im Zeitraum', [self::col('Datum'), self::col('Name'), self::col($title)], $out, 'Im Zeitraum wurden keine ' . $title . ' vergeben.')]);
+    }
+
+    /**
+     * Ämter: Amtszeiten, die die Jahre des Zeitraums berühren, je Amt (laufende Amtszeiten ohne Ende zählen bis heute).
+     *
+     * @return Section
+     */
+    private function offices(string $from, string $to): array
+    {
+        $repo = $this->app->offices()->repository();
+        $fromYear = (int) substr($from, 0, 4);
+        $toYear = (int) substr($to, 0, 4);
+        $holders = $repo->holders();
+        $ids = [];
+        foreach ($holders as $list) {
+            foreach ($list as $h) {
+                foreach ([$h, ...$h['companions']] as $p) {
+                    if ($p['user_id'] !== null) {
+                        $ids[] = $p['user_id'];
+                    }
+                }
+            }
+        }
+        $names = (new UserNames($this->app->users))->prime($ids);
+        $name = static fn (array $p): string => $p['user_id'] !== null ? (string) ($names->name($p['user_id']) ?? $p['name']) : $p['name'];
+        $terms = [];
+        foreach ($repo->terms() as $t) {
+            $last = $t['kind'] === OfficeService::KIND_POINT ? $t['start_year'] : ($t['end_year'] ?? PHP_INT_MAX);
+            if ($t['start_year'] <= $toYear && $last >= $fromYear) {
+                $terms[$t['office_id']][] = $t;
+            }
+        }
+        $out = [];
+        foreach ($repo->offices() as $o) {
+            $list = $terms[$o['id']] ?? [];
+            usort($list, static fn (array $a, array $b): int => [$a['start_year'], $a['id']] <=> [$b['start_year'], $b['id']]);
+            foreach ($list as $t) {
+                $people = array_map(static fn (array $h): string => $name($h) . ($h['companions'] !== [] ? ' (mit ' . implode(', ', array_map($name, $h['companions'])) . ')' : ''), $holders[$t['id']] ?? []);
+                $years = match (true) {
+                    $t['kind'] === OfficeService::KIND_POINT || $t['end_year'] === $t['start_year'] => (string) $t['start_year'],
+                    $t['end_year'] === null => 'seit ' . $t['start_year'],
+                    default => $t['start_year'] . '–' . $t['end_year'],
+                };
+                $out[] = [$o['title'], $years, implode(', ', $people), $t['note']];
+            }
+        }
+        return self::section('offices', $this->title('offices'), true, [self::table(
+            $fromYear === $toYear ? 'Amtszeiten im Jahr ' . $fromYear : 'Amtszeiten in den Jahren ' . $fromYear . ' bis ' . $toYear,
+            [self::col('Amt', wrap: true), self::col('Jahre'), self::col('Inhaber', wrap: true), self::col('Hinweis', wrap: true)],
+            $out,
+            'In diesen Jahren gibt es keine Amtszeiten.',
+        )]);
+    }
+
+    /**
+     * Inventar: der Bestand heute und der Verlauf im Zeitraum (wer was angelegt, geändert, umgelagert oder gelöscht hat).
+     *
+     * @return Section
+     */
+    private function inventory(string $from, string $to): array
+    {
+        $items = $this->app->inventory()->repository()->active();
+        $stock = array_map(static fn (array $i): array => [
+            $i['title'], $i['category'], self::number(InventoryService::number($i['quantity'])) . ($i['unit'] !== '' ? ' ' . $i['unit'] : ''), $i['location'],
+        ], $items);
+        [$start, $end] = $this->utcBounds($from, $to);
+        $log = $this->repository()->inventoryLog($start, $end);
+        $names = (new UserNames($this->app->users))->prime(array_column($log, 'user_id'));
+        $entries = array_map(fn (array $r): array => [
+            $this->utcDay($r['created_at']), $r['title'], self::INVENTORY_ACTIONS[$r['action']] ?? $r['action'], $r['location'], (string) $names->name($r['user_id']), $r['reason'],
+        ], $log);
+        return self::section('inventory', $this->title('inventory'), true, [
+            self::table('Bestand (Stand heute)', [self::col('Bezeichnung', wrap: true), self::col('Kategorie'), self::col('Menge', num: true), self::col('Ort', wrap: true)], $stock, 'Das Inventar ist leer.'),
+            self::table('Verlauf im Zeitraum', [self::col('Datum'), self::col('Bezeichnung', wrap: true), self::col('Aktion'), self::col('Ort'), self::col('Von'), self::col('Grund', wrap: true)], $entries, 'Im Zeitraum gab es keine Änderungen.'),
+        ]);
+    }
+
     /* ---------------------------------------------------------------- */
     /* Hilfen                                                            */
     /* ---------------------------------------------------------------- */
@@ -382,6 +589,45 @@ final class ReportService
     {
         uasort($people, static fn (array $a, array $b): int => strcasecmp($a['name'], $b['name']));
         return array_values(array_map($row, $people));
+    }
+
+    /**
+     * Termine als Tabelle (Datum, Zeit, Termin, Ort) aus EventService::between().
+     *
+     * @param array<int, array<string, mixed>> $events
+     * @return Table
+     */
+    private static function eventTable(string $title, array $events): array
+    {
+        $rows = [];
+        foreach ($events as $e) {
+            $start = (string) $e['start_date'];
+            $endDay = is_string($e['end_date'] ?? null) && $e['end_date'] !== $start ? $e['end_date'] : null;
+            $startTime = is_string($e['start_time'] ?? null) ? $e['start_time'] : null;
+            $endTime = is_string($e['end_time'] ?? null) ? $e['end_time'] : null;
+            $rows[] = [
+                self::day($start) . ($endDay !== null ? ' – ' . self::day($endDay) : ''),
+                $startTime === null ? 'ganztägig' : $startTime . ($endTime !== null ? '–' . $endTime : '') . ' Uhr',
+                (string) $e['title'],
+                (string) $e['location'],
+            ];
+        }
+        return self::table($title, [self::col('Datum'), self::col('Zeit'), self::col('Termin', wrap: true), self::col('Ort', wrap: true)], $rows, 'Im Zeitraum gibt es keine Termine.');
+    }
+
+    /**
+     * Zeitraum (Tage der Kompanie, beide eingeschlossen) als UTC-Zeitpunkte für Spalten mit Zeitstempel, Ende ausgeschlossen.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function utcBounds(string $from, string $to): array
+    {
+        $tz = $this->app->time()->timezone();
+        $utc = new \DateTimeZone('UTC');
+        return [
+            (new \DateTimeImmutable($from, $tz))->setTimezone($utc)->format('Y-m-d H:i:s'),
+            (new \DateTimeImmutable($to, $tz))->modify('+1 day')->setTimezone($utc)->format('Y-m-d H:i:s'),
+        ];
     }
 
     /** 'Y-m-d' als TT.MM.JJJJ */
