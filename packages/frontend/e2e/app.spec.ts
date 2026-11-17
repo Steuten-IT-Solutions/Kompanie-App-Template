@@ -1295,7 +1295,9 @@ test('Eigene Leiste für Gäste: Mitglieder unten statt unter „Intern“, Ange
     // Gast ohne Anmeldung: Mitglieder unten und als Startseite.
     await page.context().clearCookies();
     await page.goto('/app/');
-    await expect(tabbar.getByRole('button', { name: 'Mitglieder' })).toHaveAttribute('aria-current', 'page');
+    // Der Service Worker kann zuerst die gespeicherte Seite des Admins zeigen; die Seite des Gasts holt er im Hintergrund
+    // und lädt dann neu (refreshPage/pageChange in public/sw.js). Bei WordPress dauert das in der CI manchmal über 5 s.
+    await expect(tabbar.getByRole('button', { name: 'Mitglieder' })).toHaveAttribute('aria-current', 'page', { timeout: 20_000 });
     // Ohne Adresse leitet die App nur um, wenn die Startseite nicht schon der erste Punkt der Leiste ist (startRedirect in
     // App.tsx); sonst bleibt die Adresse ohne #/….
     const first = (
