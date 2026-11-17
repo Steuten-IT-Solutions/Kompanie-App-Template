@@ -115,8 +115,7 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
                       {r.users === 1 ? '1 Person' : `${r.users} Personen`}
                       {(r.extra_users ?? 0) > 0 && ` (davon ${r.extra_users} als Zusatzrolle)`}
                       {!r.system && r.new_accounts && ' · für neue Konten'}
-                      {r.promotable && ` · aufnehmen als ${levelLabel('member')}`}
-                      {r.admission_extra && ' · Anwärter-Rolle (bei Aufnahme entfernen)'}
+                      {(r.promotable || r.admission_extra) && ' · Anwärter-Rolle'}
                       {' · '}
                       {summary(r)}
                     </div>
@@ -252,9 +251,9 @@ function RoleForm({
   );
   const [factor, setFactor] = useState((role?.points_factor ?? 1).toLocaleString('de-DE'));
   const [newAccounts, setNewAccounts] = useState(role?.new_accounts ?? false);
-  const [promotable, setPromotable] = useState(role?.promotable ?? false);
-  // Aufnahme: Anwärter-Rolle als Zusatzrolle und Voraussetzung (Teilnahmen an einer Terminart, Mindestdauer)
-  const [admissionExtra, setAdmissionExtra] = useState(role?.admission_extra ?? false);
+  // Anwärter-Rolle (Aufnahmen): als Grundrolle oder Zusatzrolle; ein Haken. Ohne „Gehört zur Kompanie“ zusätzlich
+  // promotable (Grundrolle → Mitglied wie bisher), sonst nur admission_extra. Dazu die Voraussetzung.
+  const [promotable, setPromotable] = useState((role?.promotable ?? false) || (role?.admission_extra ?? false));
   const [admissionKind, setAdmissionKind] = useState(role?.admission_kind ?? '');
   const [admissionCount, setAdmissionCount] = useState(String(role?.admission_count ?? 0));
   const [admissionMonths, setAdmissionMonths] = useState(String(role?.admission_months ?? 0));
@@ -273,7 +272,7 @@ function RoleForm({
   // Voraussetzung nur an Anwärter-Rollen: Grundrolle mit „aufnehmen“ oder Zusatzrolle, die bei der Aufnahme wegfällt.
   // Ältere Server kennen die Felder nicht (dann fehlen sie in der Antwort).
   const admissionKnown = !role || role.admission_count !== undefined;
-  const candidate = !fixed && admissionKnown && ((promotable && !withMember) || admissionExtra);
+  const candidate = !fixed && admissionKnown && promotable;
   const kinds = [...eventKinds(), ...(admissionKind && !eventKinds().includes(admissionKind) ? [admissionKind] : [])];
 
   async function run(action: () => Promise<RoleAdmin[]>, msg: string) {
@@ -294,11 +293,12 @@ function RoleForm({
       label,
       ...(admin ? {} : { capabilities: ordered }),
       ...(fixed ? {} : { new_accounts: newAccounts, promotable: promotable && !withMember }),
+      // Mit „Gehört zur Kompanie“ trägt admission_extra die Anwärter-Rolle allein (als Grund- und Zusatzrolle).
       ...(fixed || !admissionKnown
         ? {}
         : candidate
           ? {
-              admission_extra: admissionExtra,
+              admission_extra: true,
               admission_kind: admissionKind,
               admission_count: admissionKind ? admissionCount : 0,
               admission_months: admissionMonths,
@@ -359,24 +359,25 @@ function RoleForm({
             <input type="checkbox" checked={newAccounts} onChange={(e) => setNewAccounts(e.target.checked)} />
             <span>Beim Anlegen neuer Konten wählbar (auch für alle, die nur Mitglieder anlegen dürfen)</span>
           </label>
-          <label className="toggle feature-toggle">
-            <input
-              type="checkbox"
-              checked={promotable && !withMember}
-              disabled={withMember}
-              onChange={(e) => setPromotable(e.target.checked)}
-            />
-            <span>
-              Wer Mitglieder anlegen darf, nimmt Personen mit dieser Rolle als {levelLabel('member')} auf (z. B. Anwärter)
-              {withMember && '; nur ohne „Gehört zur Kompanie“'}
-            </span>
-          </label>
-          {admissionKnown && (
+          {admissionKnown ? (
             <label className="toggle feature-toggle">
-              <input type="checkbox" checked={admissionExtra} onChange={(e) => setAdmissionExtra(e.target.checked)} />
+              <input type="checkbox" checked={promotable} onChange={(e) => setPromotable(e.target.checked)} />
               <span>
-                Anwärter-Rolle als Zusatzrolle: Wer Mitglieder anlegen darf, nimmt Personen mit dieser Zusatzrolle als{' '}
-                {levelLabel('member')} auf; dabei wird sie entfernt
+                Anwärter-Rolle: Wer Mitglieder anlegen darf, nimmt Personen mit dieser Rolle unter Verwaltung → Aufnahmen als{' '}
+                {levelLabel('member')} auf. Als Rolle wird sie dabei zu {levelLabel('member')}, als Zusatzrolle wird sie entfernt.
+              </span>
+            </label>
+          ) : (
+            <label className="toggle feature-toggle">
+              <input
+                type="checkbox"
+                checked={promotable && !withMember}
+                disabled={withMember}
+                onChange={(e) => setPromotable(e.target.checked)}
+              />
+              <span>
+                Wer Mitglieder anlegen darf, nimmt Personen mit dieser Rolle als {levelLabel('member')} auf (z. B. Anwärter)
+                {withMember && '; nur ohne „Gehört zur Kompanie“'}
               </span>
             </label>
           )}

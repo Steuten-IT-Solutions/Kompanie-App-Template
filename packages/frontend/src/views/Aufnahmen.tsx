@@ -1,9 +1,9 @@
 import { Fragment, useEffect, useState, type FormEvent } from 'react';
-import { api, applyAdmissionsDue, config, levelLabel, type Admission } from '../api';
+import { api, applyAdmissionsDue, can, config, levelLabel, type Admission } from '../api';
 import { confirmAsk } from '../ask';
 import { formatDate } from '../format';
 import { navigate } from '../router';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -45,7 +45,7 @@ export function Admissions() {
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const list = data ?? [];
-  if (list.length === 0) return <Empty>Keine Anwärter.</Empty>;
+  if (list.length === 0) return <NoCandidates />;
   return (
     <ul className="card-list admissions">
       {list.map((a, i) => {
@@ -75,6 +75,30 @@ export function Admissions() {
         );
       })}
     </ul>
+  );
+}
+
+/**
+ * Noch niemand: Gibt es keine Anwärter-Rolle, erscheint hier auch niemand. Darum steht hier, wie man sie einrichtet
+ * (Einstellungen → Rollen, nur Admins).
+ */
+function NoCandidates() {
+  const admin = can('manage_settings');
+  return (
+    <div className="card stack">
+      <p>Keine Anwärter.</p>
+      <p className="muted">
+        Hier erscheint, wer eine Anwärter-Rolle hat, als Rolle oder als Zusatzrolle. Dafür setzt ein Admin unter Einstellungen → Rollen an
+        der Rolle den Haken „Anwärter-Rolle“ und legt dort auch die Voraussetzung fest, z. B. 6 Teilnahmen an Terminen einer Terminart.
+      </p>
+      {admin && (
+        <div className="button-row">
+          <button className="btn" type="button" onClick={() => navigate('einstellungen/rollen')}>
+            Zu den Rollen
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

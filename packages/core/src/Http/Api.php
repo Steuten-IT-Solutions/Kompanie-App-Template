@@ -751,8 +751,9 @@ final class Api
             // Terminarten ohne Schild neben dem Titel des Termins (Einstellungen → Kalender, Vorgabe: keine)
             'eventKindsHidden' => ($features['calendar'] ?? false) || ($features['attendance'] ?? false) ? $a->eventKinds()->hiddenTags() : [],
             // admissionsDue: Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“), für create_users
-            // mit Anwesenheit und einer Anwärter-Rolle; sonst null (keine Kachel)
-            'admissionsDue' => $user !== null && $this->can(Cap::CreateUsers) && $a->admissions()->enabled() ? $a->admissions()->dueCount() : null,
+            // mit dem Bereich Anwesenheit (auch ohne Anwärter-Rolle: die Seite erklärt dann, wie man sie einrichtet); sonst null
+            // (keine Kachel)
+            'admissionsDue' => $user !== null && $this->can(Cap::CreateUsers) && ($features['attendance'] ?? false) ? $a->admissions()->dueCount() : null,
             // Impressum und Datenschutzerklärung der Kompanie (Einstellungen → Impressum und Datenschutz): für alle, auch Gäste
             'legal' => self::legalLinks($a->settingsService()->legal()),
             // Handbuch auf GitHub Pages der Kompanie: neben updates.json (Issue #12)
@@ -1609,7 +1610,7 @@ final class Api
                 return $this->roles();
             }, null, $denySettings),
             new Route('PATCH', '/admin/roles/{key}', Cap::ManageSettings, function (Request $r) use ($a) {
-                // Aufnahme (Anwärter-Rolle als Zusatzrolle, Voraussetzung): erst alles prüfen, dann speichern.
+                // Aufnahme (Anwärter-Rolle, Voraussetzung): erst alles prüfen, dann speichern.
                 $key = (string) $r->params['key'];
                 $admission = $a->admissions()->prepareRole($key, $r->body);
                 $a->roles()->update($key, array_diff_key($r->body, array_flip(AdmissionService::ROLE_FIELDS)));

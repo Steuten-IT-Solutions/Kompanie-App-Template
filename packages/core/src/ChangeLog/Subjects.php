@@ -695,7 +695,7 @@ final class Subjects
     private static function admissionFields(array $a): array
     {
         return [
-            'Anwärter-Rolle (bei Aufnahme entfernen)' => $a['admission_extra'],
+            'Anwärter-Rolle' => $a['admission_extra'],
             'Aufnahme: Terminart' => $a['admission_kind'],
             'Aufnahme: Teilnahmen' => $a['admission_count'],
             'Aufnahme: Monate als Anwärter' => $a['admission_months'],

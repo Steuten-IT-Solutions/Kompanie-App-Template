@@ -35,9 +35,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   bleibt sie gespeichert und zählt weiter.
 - **Aufnahmen**: Unter [Verwaltung → Aufnahmen](app:verwaltung/aufnahmen) siehst du wie bei den Beförderungen, welche
   Anwärter die Voraussetzung für die Aufnahme als Mitglied erfüllen; die Zahl im Kreis am Knopf zeigt, wie viele es
-  sind. Die Voraussetzung legst du je Anwärter-Rolle unter [Einstellungen → Rollen](app:einstellungen/rollen) fest:
-  Teilnahmen an Terminen einer Terminart (z. B. 6 Versammlungen) und eine Mindestdauer als Anwärter. Eine Anwärter-Rolle
-  kann auch eine Zusatzrolle zu Mitglied sein; beim Aufnehmen wird sie dann entfernt. Auf der Seite eines Anwärters
+  sind. Unter [Einstellungen → Rollen](app:einstellungen/rollen) setzt du an einer Rolle den Haken „Anwärter-Rolle“
+  und legst die Voraussetzung fest: Teilnahmen an Terminen einer Terminart (z. B. 6 Versammlungen) und eine
+  Mindestdauer als Anwärter. Die Anwärter-Rolle kann die Rolle der Person sein (beim Aufnehmen wird sie zu Mitglied)
+  oder eine Zusatzrolle zu Mitglied (beim Aufnehmen wird sie entfernt). Der Knopf ist da, sobald die Anwesenheit an ist. Auf der Seite eines Anwärters
   stehen „Anwärter seit“ (bei bisherigen Anwärtern nachtragen) und der Stand; aufnehmen geht dort jederzeit, ohne
   erfüllte Voraussetzung mit Hinweis. Ohne Eintritt trägt die App den Tag der Aufnahme ein. Nach dem Speichern einer
   Anwesenheitsliste zeigt die App, wer neu die Voraussetzung erfüllt. Sehen und aufnehmen darf, wer Mitglieder anlegen

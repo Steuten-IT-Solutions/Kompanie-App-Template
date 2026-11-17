@@ -13,7 +13,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Rollen**.
 ## Was du hier siehst
 Oben schaltest du zwischen **Rollen** (die Liste) und **Wer sieht was** (die Übersicht) um.
 
-- **Liste der Rollen**: je Rolle der Name, wie viele Personen sie haben (davon als Zusatzrolle) und ihre Rechte. Bei eigenen Rollen steht außerdem **für neue Konten**, **aufnehmen als {rolle.member}** oder **Anwärter-Rolle (bei Aufnahme entfernen)**, wenn das eingestellt ist. Weicht der {bereich.points}faktor von 1 ab, steht er als Abzeichen neben dem Namen, z. B. „×0,5“.
+- **Liste der Rollen**: je Rolle der Name, wie viele Personen sie haben (davon als Zusatzrolle) und ihre Rechte. Bei eigenen Rollen steht außerdem **für neue Konten** oder **Anwärter-Rolle**, wenn das eingestellt ist. Weicht der {bereich.points}faktor von 1 ab, steht er als Abzeichen neben dem Namen, z. B. „×0,5“.
 - **Griff** links neben jeder Rolle: zum Ändern der Reihenfolge.
 - **Ansehen** (Auge): zeigt die App so, wie diese Rolle sie sieht (siehe [App als Rolle ansehen](seite:admin-vorschau)). Bei {rolle.admin} fehlt der Knopf.
 - **Bearbeiten** (Stift): öffnet die Rolle zum Ändern.
@@ -27,8 +27,7 @@ Oben schaltest du zwischen **Rollen** (die Liste) und **Wer sieht was** (die Üb
 1. Tippe auf **+ Neue Rolle**.
 2. Trage den **Name der Rolle** ein (höchstens 30 Zeichen).
 3. Setze unter **Rechte** die Häkchen für alles, was die Rolle sieht und darf. Eine neue Rolle sieht zuerst, was {rolle.member} sieht. Die Rechte stehen in Gruppen; tippe auf den Namen einer Gruppe, um sie auf- oder zuzuklappen. Der Haken vor der Gruppe setzt oder entfernt alle Rechte der Gruppe auf einmal.
-4. Stelle bei Bedarf unter **Konten** ein, ob die Rolle **Beim Anlegen neuer Konten wählbar** ist (dann auch für alle, die nur Mitglieder anlegen dürfen; wer Rollen vergeben darf, wählt beim Anlegen ohnehin jede Rolle, die er vergeben darf) und ob, wer Mitglieder anlegen darf, Personen mit dieser Rolle als {rolle.member} aufnimmt.
-   Ist die Rolle eine Anwärter-Rolle, die Personen zusätzlich zu ihrer Rolle {rolle.member} haben, hake **Anwärter-Rolle als Zusatzrolle** an: Beim Aufnehmen wird dann diese Zusatzrolle entfernt.
+4. Stelle bei Bedarf unter **Konten** ein, ob die Rolle **Beim Anlegen neuer Konten wählbar** ist (dann auch für alle, die nur Mitglieder anlegen dürfen; wer Rollen vergeben darf, wählt beim Anlegen ohnehin jede Rolle, die er vergeben darf) und ob sie eine **Anwärter-Rolle** ist. Dann nimmt, wer Mitglieder anlegen darf, Personen mit dieser Rolle unter *Verwaltung → Aufnahmen* als {rolle.member} auf. Das geht mit der Rolle als Rolle der Person (sie wird beim Aufnehmen zu {rolle.member}) und als Zusatzrolle zu {rolle.member} (sie wird beim Aufnehmen entfernt).
    Bei einer Anwärter-Rolle legst du darunter die **Voraussetzung für die Aufnahme** fest: wie viele Teilnahmen („anwesend“) an Terminen welcher Art und wie viele Monate als Anwärter. Beides ist freiwillig; die Terminarten legst du unter *Einstellungen → Kalender* an. Wer die Voraussetzung erfüllt, steht unter *Verwaltung → Aufnahmen* oben.
 5. Nutzt ihr {bereich.points} und gehört die Rolle zur Kompanie, trage den **{bereich.points}faktor** ein (z. B. 0,5 für die Hälfte).
 6. Tippe auf **Anlegen**.
