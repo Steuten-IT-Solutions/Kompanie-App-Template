@@ -51,9 +51,8 @@ export function memberListAllowed(): boolean {
     seeAttendance() ||
     canCompanies() ||
     can('view_personal') ||
-    can('create_users') ||
-    can('manage_former') ||
-    can('promote_users')
+    can('view_accounts') ||
+    can('manage_former')
   );
 }
 
@@ -71,7 +70,7 @@ export function adminTabs(): AdminTab[] {
       {
         id: 'anfragen',
         label: 'Anfragen',
-        on: can('create_users') && (!!config?.registration || (config?.pendingRegistrations ?? 0) > 0),
+        on: can('view_accounts') && (!!config?.registration || (config?.pendingRegistrations ?? 0) > 0),
       },
       // Fehlermeldungen aus der App: Zahl der offenen im Kreis
       { id: 'meldungen', label: 'Fehlermeldungen', on: can('view_reports') },
@@ -85,7 +84,7 @@ export function adminTabs(): AdminTab[] {
       { id: 'dienstgrade', label: sec.ranks, on: canRanks(), group: SETUP },
       { id: 'befoerderungen', label: 'Beförderungen', on: seeRanks() && !!config?.features.points },
       // Aufnahmen: Anwärter, die die Voraussetzung erfüllen (Zahl im Kreis); der Server schickt die Zahl nur, wenn es passt
-      { id: 'aufnahmen', label: 'Aufnahmen', on: can('create_users') && config?.admissionsDue != null },
+      { id: 'aufnahmen', label: 'Aufnahmen', on: can('view_accounts') && config?.admissionsDue != null },
       { id: 'titel', label: sec.titles, on: seeTitles(), group: SETUP },
       { id: 'aemter', label: sec.offices, on: canOffices(), group: SETUP },
       { id: 'kompanien', label: sec.companies, on: canCompanies(), group: SETUP },

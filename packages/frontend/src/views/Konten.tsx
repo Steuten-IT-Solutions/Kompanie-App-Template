@@ -421,6 +421,7 @@ export function AccountPanel({
   level,
   former = false,
   self = false,
+  readOnly = false,
   onChanged,
   onToast,
 }: {
@@ -430,6 +431,8 @@ export function AccountPanel({
   former?: boolean;
   /** das eigene Konto */
   self?: boolean;
+  /** nur sehen (view_accounts ohne create_users): ohne Ändern und Löschen */
+  readOnly?: boolean;
   onChanged: () => void;
   onToast: (msg: string) => void;
 }) {
@@ -556,16 +559,18 @@ export function AccountPanel({
             )}
           </p>
           <div className="button-row">
-            <button
-              className="btn btn-secondary"
-              disabled={busy}
-              onClick={() => {
-                setFormError(null); // z. B. vom Export
-                setEditing(p);
-              }}
-            >
-              Angaben ändern
-            </button>
+            {!readOnly && (
+              <button
+                className="btn btn-secondary"
+                disabled={busy}
+                onClick={() => {
+                  setFormError(null); // z. B. vom Export
+                  setEditing(p);
+                }}
+              >
+                Angaben ändern
+              </button>
+            )}
             {p.can_export && (
               <button
                 className="btn btn-link"
@@ -582,7 +587,7 @@ export function AccountPanel({
                 Daten exportieren (Auskunft)
               </button>
             )}
-            {level !== 'admin' && !self && (
+            {!readOnly && level !== 'admin' && !self && (
               <button className="btn btn-danger" disabled={busy || confirming} onClick={() => setConfirming(true)}>
                 {wordpress ? 'Aus der App entfernen' : 'Konto löschen'}
               </button>

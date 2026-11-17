@@ -95,7 +95,7 @@ final class RolesTest extends TestCase
     {
         $users = new FakeUsers();
         $app = TestApp::create(TestApp::connection(), $users);
-        $app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'promote_users', 'create_users', 'view_points', 'manage_points'])]);
+        $app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'view_accounts', 'promote_users', 'create_users', 'view_points', 'manage_points'])]);
         $schrift = $users->add('schrift', 'r1');
         $kasse = $users->add('kasse', 'penalties');
         $m = $users->add('m', Roles::MEMBER);
@@ -232,7 +232,7 @@ final class RolesTest extends TestCase
 
         // Wer nur Mitglieder anlegen darf: freigegebene Rollen mit höchstens Mitgliederbereich bzw. Kalender, sonst nur
         // Rollen mit Rechten, die er weitergeben darf.
-        $clerk = $users->add('schrift', $app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'create_users'])])['key']);
+        $clerk = $users->add('schrift', $app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'view_accounts', 'create_users'])])['key']);
         $users->current = $clerk;
         $res = $call('POST', '/users', ['name' => 'Fritz', 'level' => $friend]);
         $this->assertSame([201, $friend], [$res->status, $res->data['level'] ?? null], (string) json_encode($res->data));

@@ -121,7 +121,7 @@ final class MemberService
     {
         $totals = $this->scores->totalsByUser();
         [$points, $penalties] = self::visibleParts($viewer);
-        $noAccess = $viewer === null || $viewer->can(Capability::CreateUsers) ? $this->noAccessIds() : null;
+        $noAccess = $viewer === null || $viewer->can(Capability::ViewAccounts) ? $this->noAccessIds() : null;
         $out = [];
         // Anwärter haben immer eine Rolle in der App: list(false) enthält sie schon (bei WordPress nicht alle Konten laden).
         $users = $this->users->list($includeGuests);
@@ -222,16 +222,16 @@ final class MemberService
             'first_name' => $u->firstName,
             'last_name' => $u->lastName,
             'level' => $u->role,
-            // Zusatzrollen nur für die, die Rollen vergeben (Issue #349); die Grundrolle braucht die App auch sonst.
-            'extra_roles' => $viewer === null || $viewer->can(Capability::PromoteUsers) ? ($this->roles?->extraRolesOf($u) ?? []) : [],
+            // Zusatzrollen nur für die, die Konten sehen (Issue #349, view_accounts); die Grundrolle braucht die App auch sonst.
+            'extra_roles' => $viewer === null || $viewer->can(Capability::ViewAccounts) ? ($this->roles?->extraRolesOf($u) ?? []) : [],
             'member' => $u->isMember(),
             'points' => $points ? $this->scores->pointsTotal($u->id) : null,
             'open_cents' => $penalties ? $this->scores->openCents($u->id) : null,
             'point_list' => $points ? $this->scores->pointsFor($u->id) : [],
             'penalties' => $penalties ? $this->scores->penaltiesFor($u->id) : [],
-            // Ausnahmen bei den Rechten: nur für die, die sie ändern dürfen.
+            // Ausnahmen bei den Rechten: nur für die, die Konten sehen (ändern nur mit promote_users).
             'rights' => $viewer !== null ? $this->roles?->overridesView($viewer, $u) : null,
-        ] + ($viewer === null || $viewer->can(Capability::CreateUsers) ? ['no_access' => $this->hasNoAccess($u->id)] : []);
+        ] + ($viewer === null || $viewer->can(Capability::ViewAccounts) ? ['no_access' => $this->hasNoAccess($u->id)] : []);
     }
 
     /** Interner Kalender ohne Mitgliederbereich: Anwärter oder eine eigene Rolle nur mit dem Kalender. */

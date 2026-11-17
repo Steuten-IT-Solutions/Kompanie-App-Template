@@ -148,6 +148,7 @@ final class Roles
         // Mitglieder und Rollen
         Capability::ViewPersonal,
         Capability::ManagePersonal,
+        Capability::ViewAccounts,
         Capability::CreateUsers,
         Capability::ManageFormer,
         Capability::ViewPassive,

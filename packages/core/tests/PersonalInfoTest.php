@@ -138,7 +138,7 @@ final class PersonalInfoTest extends TestCase
         $this->app->db->insert('birthdays', ['user_id' => $this->m, 'month' => 2, 'day' => 3, 'year' => 1980, 'visible' => 1, 'show_age' => 0, 'updated_by' => $this->m, 'updated_at' => '2026-01-01 00:00:00']);
 
         // Nur Mitglieder anlegen: Name, Benutzername, E-Mail; nichts Persönliches darüber hinaus.
-        $this->users->current = $this->withRights('anleger', ['create_users']);
+        $this->users->current = $this->withRights('anleger', ['view_accounts', 'create_users']);
         $detail = $this->call('GET', "/members/{$this->m}")->data;
         $this->assertArrayNotHasKey('personal', $detail);
         $this->assertArrayNotHasKey('birthday', $detail);
@@ -178,7 +178,7 @@ final class PersonalInfoTest extends TestCase
 
     public function testCreateWithAllPersonalData(): void
     {
-        $this->users->current = $this->withRights('anleger', ['create_users']);
+        $this->users->current = $this->withRights('anleger', ['view_accounts', 'create_users']);
         $res = $this->call('POST', '/users', ['first_name' => 'Erika', 'phone' => '+49 171 1234567', 'address' => self::ADDRESS]);
         $this->assertSame(201, $res->status, (string) json_encode($res->data));
         $this->users->current = $this->admin;
@@ -274,7 +274,7 @@ final class PersonalInfoTest extends TestCase
         $this->assertNotContains('manage_former', $app->roles()->all()['r2']['capabilities']);
 
         // Nur einmal: Nimmt der Admin es danach weg, kommt es nicht wieder.
-        $app->roles()->update('r1', ['capabilities' => ['member', 'create_users']]);
+        $app->roles()->update('r1', ['capabilities' => ['member', 'view_accounts', 'create_users']]);
         TestApp::create($db, $users, settings: $settings, features: false);
         $this->assertFalse($has($a));
     }

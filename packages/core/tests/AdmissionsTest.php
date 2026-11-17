@@ -34,7 +34,7 @@ final class AdmissionsTest extends TestCase
         $this->app = TestApp::create(TestApp::connection(), $this->users, clock: $this->clock);
         $this->admin = $this->users->add('admin', Roles::ADMIN);
         $this->users->current = $this->admin;
-        $this->clerk = $this->users->add('schrift', $this->app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'create_users', 'view_attendance', 'manage_attendance'])])['key']);
+        $this->clerk = $this->users->add('schrift', $this->app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'view_accounts', 'create_users', 'view_attendance', 'manage_attendance'])])['key']);
         $this->ok('PUT', '/admin/event-kinds', ['kinds' => ['Versammlung', 'Arbeitsdienst']]);
     }
 

@@ -72,6 +72,7 @@ export type Capability =
   | 'manage_news'
   | 'view_personal'
   | 'manage_personal'
+  | 'view_accounts'
   | 'create_users'
   | 'manage_former'
   | 'view_passive'

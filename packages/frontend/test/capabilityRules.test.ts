@@ -9,7 +9,7 @@ const set = (...caps: Capability[]) => new Set<Capability>(caps);
 test('eigene Daten und Verwalten setzen die Mitgliedschaft voraus, Sehen nicht', () => {
   assert.equal(requires('view_own_points'), 'member');
   assert.equal(requires('manage_events'), 'member');
-  assert.equal(requires('create_users'), 'member');
+  assert.equal(requires('view_accounts'), 'member');
   assert.equal(requires('manage_former'), 'member');
   assert.equal(requires('view_ranks'), null);
   assert.equal(requires('calendar'), null);
@@ -46,6 +46,8 @@ test('Schreiben setzt das passende Lesen voraus, Lesen die Mitgliedschaft (wie C
     ['manage_ranks', 'view_promotions'],
     ['manage_titles', 'view_titles'],
     ['manage_attendance', 'view_attendance'],
+    ['create_users', 'view_accounts'],
+    ['promote_users', 'view_accounts'],
   ];
   for (const [write, read] of pairs) {
     assert.equal(requires(write), read, write);
