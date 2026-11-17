@@ -17,7 +17,7 @@ Tippe unten auf **Verwaltung** und dann auf den Knopf **{bereich.attendance}**.
 - **Vergangene Termine**: die Termine aus dem {bereich.calendar} der letzten 90 Tage bis gestern, die jüngsten oben. Mit **Ältere Termine anzeigen** siehst du mehr als die ersten acht. Gibt es keine, steht dort „In den letzten 90 Tagen stand nichts an.“
 - **Liste vorhanden** bei einem Termin heißt: Es gibt schon eine Liste dazu.
 - **Freier Termin**: für alles, was nicht im {bereich.calendar} steht, z. B. einen spontanen Arbeitsdienst.
-- **Letzte Listen**: die bisherigen Listen mit Datum und Zählern, z. B. „3 anwesend · 0 entschuldigt · 1 fehlt“.
+- **Letzte Listen**: die bisherigen Listen mit Datum, Terminart (falls gesetzt) und Zählern, z. B. „3 anwesend · 0 entschuldigt · 1 fehlt“. Auch bei den Terminen aus dem {bereich.calendar} steht die Terminart hinter der Uhrzeit.
 
 ## So gehst du vor
 ### Eine Liste zu einem Termin aus dem {bereich.calendar} anlegen

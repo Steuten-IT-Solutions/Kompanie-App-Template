@@ -732,6 +732,8 @@ final class Api
             'gallerySubmissions' => ($features['gallery'] ?? false) && $a->gallerySubmissions()->enabled(),
             // Zu- und Absagen bei Terminen eingeschaltet (Einstellungen → Kalender, Vorgabe aus)
             'eventResponses' => ($features['calendar'] ?? false) && $a->eventResponses()->enabled(),
+            // Terminarten (Einstellungen → Kalender), z. B. Versammlung: zur Auswahl am Termin und an Anwesenheitslisten
+            'eventKinds' => ($features['calendar'] ?? false) || ($features['attendance'] ?? false) ? $a->eventKinds()->options() : [],
             // Impressum und Datenschutzerklärung der Kompanie (Einstellungen → Impressum und Datenschutz): für alle, auch Gäste
             'legal' => self::legalLinks($a->settingsService()->legal()),
             // Handbuch auf GitHub Pages der Kompanie: neben updates.json (Issue #12)
@@ -938,7 +940,9 @@ final class Api
                 return ['sent' => true];
             }),
             // Mit Zu- und Absagen je Termin (responses, EventResponseService); Namen dazu nur mit manage_calendar.
-            new Route('GET', '/calendar', Cap::Calendar, fn () => $a->eventResponses()->annotate($a->authContext->currentUser(), $a->calendar()->upcoming()), 'calendar', $denyCalendar),
+            // Terminart (kind) vor den Rückmeldungen: annotate() der Rückmeldungen entfernt die stabile Kennung.
+            new Route('GET', '/calendar', Cap::Calendar, fn () => $a->eventResponses()->annotate($a->authContext->currentUser(), $a->eventKinds()->annotate($a->authContext->currentUser(), $a->calendar()->upcoming())), 'calendar', $denyCalendar),
+            new Route('PUT', '/calendar/{key}/kind', Cap::ManageCalendar, fn (Request $r) => $a->eventKinds()->set($this->user(), (string) $r->params['key'], $r->input('kind')), 'calendar', $denyRights),
             new Route('PUT', '/calendar/{key}/response', Cap::RespondCalendar, fn (Request $r) => $a->eventResponses()->respond($this->user(), (string) $r->params['key'], $r->input('status'), $r->input('note')), 'calendar', $denyRespond),
             new Route('DELETE', '/calendar/{key}/response', Cap::RespondCalendar, fn (Request $r) => $a->eventResponses()->withdraw($this->user(), (string) $r->params['key']), 'calendar', $denyRespond),
             new Route('PUT', '/calendar/{key}/responses/{id}', Cap::ManageAttendance, fn (Request $r) => $a->eventResponses()->respondFor($this->user(), (string) $r->params['key'], $r->id(), $r->input('status')), 'calendar', $denyRights),
@@ -1353,6 +1357,7 @@ final class Api
                 return $created ? Response::created($list) : $list;
             }, 'attendance', $denyRights),
             new Route('GET', '/attendance/events', Cap::ManageAttendance, fn () => $a->attendance()->events(), 'attendance', $denyRights),
+            new Route('PUT', '/admin/event-kinds', Cap::ManageSettings, fn (Request $r) => ['kinds' => $a->eventKinds()->setOptions($r->input('kinds'))], null, $denySettings),
             new Route('GET', '/attendance/groups', Cap::ManageSettings, fn () => $a->attendance()->groups(), 'attendance', $denySettings),
             new Route('PUT', '/attendance/groups', Cap::ManageSettings, fn (Request $r) => $a->attendance()->setGroups($r->input('groups')), 'attendance', $denySettings),
             new Route('GET', '/attendance/{id}', Cap::ManageAttendance, fn (Request $r) => $a->attendance()->detail($r->id()), 'attendance', $denyRights),

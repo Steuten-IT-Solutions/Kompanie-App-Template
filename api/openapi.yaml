@@ -3506,6 +3506,68 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /calendar/{key}/kind:
+    parameters:
+      - { name: key, in: path, required: true, schema: { type: string }, description: 'Kennung des Termins wie in `GET /calendar` (`id`)' }
+    put:
+      tags: [Termine]
+      summary: Terminart eines Termins setzen (z. B. Versammlung)
+      description: |
+        Bei jeder Quelle des Kalenders (App, Google, iCal); die App speichert die Art selbst, nichts geht an Google. Erlaubt
+        sind die Terminarten aus den Einstellungen und die bisherige Art des Termins; `null` oder leer entfernt sie. Eine
+        Anwesenheitsliste zu dem Termin übernimmt die neue Art. Geht auch bei vergangenen Terminen, solange der Kalender
+        sie liefert (sonst 404).
+      x-capability: manage_calendar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kind: { type: [string, 'null'], maxLength: 40 }
+      responses:
+        '200':
+          description: Die gespeicherte Art
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  kind: { type: [string, 'null'] }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /admin/event-kinds:
+    put:
+      tags: [Einstellungen]
+      summary: Terminarten festlegen (Einstellungen → Kalender)
+      description: |
+        Liste von Bezeichnungen (höchstens 30, je höchstens 40 Zeichen, keine doppelten), leer erlaubt. Gespeichert wird
+        an Terminen und Listen die Bezeichnung: Entfernte Arten bleiben dort stehen. Die Liste steht in `GET /config`
+        (`eventKinds`).
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kinds]
+              properties:
+                kinds: { type: array, items: { type: string, maxLength: 40 } }
+      responses:
+        '200':
+          description: Die gespeicherte Liste
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kinds: { type: array, items: { type: string } }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /attendance:
     get:
       tags: [Verwaltung]
@@ -3529,7 +3591,9 @@ paths:
         `date`. Titel und Datum sind eine Momentaufnahme. `entries` setzt den Status je Person (null entfernt ihn);
         nur Personen mit einer Rolle (keine Gäste). Liegt das Datum nach heute (Zeitzone der Kompanie), ist nur
         `excused` erlaubt; das gilt auch für schon gespeicherte Einträge, wenn das Datum einer freien Liste in die Zukunft
-        rückt (sonst 400, ohne dass eine Liste entsteht).
+        rückt (sonst 400, ohne dass eine Liste entsteht). `kind` setzt die Terminart der Liste (eine der eingerichteten
+        oder die bisherige, leer für keine); ohne Angabe übernimmt eine neue Liste die Art des Termins im Kalender, sonst
+        den Vorschlag aus dem Titel (Name einer Terminart als eigenes Wort).
       x-capability: manage_attendance
       requestBody:
         required: true
@@ -3543,6 +3607,7 @@ paths:
                 event_key: { type: string }
                 title: { type: string, maxLength: 191 }
                 date: { type: string, format: date }
+                kind: { type: [string, 'null'], maxLength: 40, description: Terminart (leer = keine) }
                 entries:
                   type: object
                   description: Benutzer-ID → Status
@@ -3587,6 +3652,7 @@ paths:
                     start: { type: string }
                     end: { type: string }
                     all_day: { type: boolean }
+                    kind: { type: [string, 'null'], description: Terminart des Termins }
                     upcoming: { type: boolean, description: Datum nach heute (Zeitzone der Kompanie) }
                     today: { type: boolean, description: Datum ist heute (Zeitzone der Kompanie) }
                     list_id: { type: [integer, 'null'], description: Schon angelegte Liste }
@@ -9851,6 +9917,10 @@ components:
             type: boolean,
             description: 'Interner Kalender an und Zu- und Absagen eingeschaltet (Einstellung calendar_responses): sonst keine Knöpfe und kein Anmeldeschluss',
           }
+        eventKinds:
+          type: array
+          items: { type: string }
+          description: 'Terminarten (Einstellungen → Kalender, `PUT /admin/event-kinds`) zur Auswahl am Termin und an Anwesenheitslisten; leer ohne Kalender und Anwesenheit'
         caredPassives:
           {
             type: integer,
@@ -10060,6 +10130,10 @@ components:
             open: { type: boolean, description: Noch änderbar }
             can_respond: { type: boolean, description: 'Hat respond_calendar' }
             can_list: { type: boolean, description: 'Hat manage_calendar: sieht die Namen (`GET /calendar/{key}/responses`)' }
+        kind: { type: [string, 'null'], description: 'Terminart (nur in `GET /calendar`), z. B. Versammlung' }
+        kind_suggestion:
+          type: [string, 'null']
+          description: 'Nur mit manage_calendar und ohne gesetzte Art: Vorschlag aus dem Titel (zählt erst gespeichert)'
 
     EventResponsePerson:
       type: object
@@ -11749,6 +11823,7 @@ components:
         source: { type: string, enum: [calendar, free] }
         title: { type: string, description: Momentaufnahme beim Anlegen }
         date: { type: string, format: date }
+        kind: { type: [string, 'null'], description: Terminart der Liste }
         upcoming:
           type: boolean
           description: Datum nach heute (Zeitzone der Kompanie); dann ist nur der Status excused erlaubt.
