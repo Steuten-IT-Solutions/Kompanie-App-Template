@@ -140,10 +140,17 @@ export interface AppConfig {
   registration?: boolean;
   /** Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null */
   pendingRegistrations?: number | null;
+  /**
+   * Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“); nur für create_users mit dem Bereich
+   * Anwesenheit und einer Anwärter-Rolle, sonst null (keine Kachel). Fehlt bei älteren Servern.
+   */
+  admissionsDue?: number | null;
   /** Einreichen von Bildern und Videos erlaubt (Einstellungen → Galerie); fehlt bei älteren Servern (dann erlaubt) */
   gallerySubmissions?: boolean;
   /** Zu- und Absagen bei Terminen eingeschaltet (Einstellungen → Kalender); fehlt bei älteren Servern (dann an) */
   eventResponses?: boolean;
+  /** Terminarten (Einstellungen → Kalender), z. B. Versammlung; fehlt bei älteren Servern */
+  eventKinds?: string[];
   /** Wie viele Passive die Person betreut (Meins → Meine Passiven); 0 ohne den Bereich, fehlt bei älteren Servern */
   caredPassives?: number;
   /** Rollen der Installation (Einstellungen → Rollen): Bezeichnung und Punktefaktor */
@@ -577,6 +584,13 @@ export function applyPendingRegistrations(count: number): void {
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
+/** Zahl der Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“). */
+export function applyAdmissionsDue(count: number): void {
+  if (!config || config.admissionsDue == null || config.admissionsDue === count) return;
+  config.admissionsDue = count;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
 /** Zahl der offenen Fehlermeldungen nach dem Schließen oder Weiterleiten: Zähler in der Verwaltung. */
 export function applyOpenReports(count: number): void {
   if (!config || config.openReports == null || config.openReports === count) return;
@@ -606,6 +620,18 @@ export function applyEventResponses(enabled: boolean): void {
 /** Sind Zu- und Absagen bei Terminen eingeschaltet? Ältere Server kennen den Schalter nicht (dann ja). */
 export function eventResponsesOn(): boolean {
   return config?.eventResponses !== false;
+}
+
+/** Eingerichtete Terminarten (Einstellungen → Kalender); leer bei älteren Servern. */
+export function eventKinds(): string[] {
+  return config?.eventKinds ?? [];
+}
+
+/** Übernimmt die Terminarten in die geladene Konfiguration (nach dem Speichern). */
+export function applyEventKinds(kinds: string[]): void {
+  if (!config) return;
+  config.eventKinds = kinds;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
 /** Übernimmt die Einstellung „Zugang beantragen“ in die geladene Konfiguration (nach dem Speichern). */
@@ -645,6 +671,13 @@ export interface RoleAdmin extends RoleInfo {
   extra_users?: number;
   system: boolean;
   deletable: boolean;
+  /** Anwärter-Rolle als Zusatzrolle: wird bei der Aufnahme als Mitglied entfernt; fehlen bei älteren Servern */
+  admission_extra?: boolean;
+  /** Voraussetzung für die Aufnahme: Teilnahmen an Terminen dieser Art (null: keine) … */
+  admission_kind?: string | null;
+  admission_count?: number;
+  /** … und Mindestdauer als Anwärter in Monaten (0: keine) */
+  admission_months?: number;
 }
 
 export type RoleInput = {
@@ -653,7 +686,36 @@ export type RoleInput = {
   points_factor?: number | string;
   new_accounts?: boolean;
   promotable?: boolean;
+  admission_extra?: boolean;
+  admission_kind?: string | null;
+  admission_count?: number | string;
+  admission_months?: number | string;
 };
+
+/** Stand eines Anwärters für die Aufnahme als Mitglied (GET /admissions, Mitgliedsseite). */
+export interface Admission {
+  id: number;
+  name: string;
+  /** Bezeichnung und Schlüssel der Anwärter-Rolle */
+  role: string;
+  role_key: Level;
+  /** base: Grundrolle wird Mitglied; extra: die Zusatzrolle wird entfernt */
+  way: 'base' | 'extra';
+  /** Anwärter seit (JJJJ-MM-TT); null, wenn unbekannt */
+  since: string | null;
+  kind: string | null;
+  /** Nötige Teilnahmen (0: keine) und Mindestdauer in Monaten (0: keine) */
+  count: number;
+  months: number;
+  attended: number;
+  missing: number;
+  /** Tag, ab dem die Mindestdauer erfüllt ist */
+  months_on: string | null;
+  /** Tag, an dem alles erfüllt war */
+  fulfilled_on: string | null;
+  /** fulfilled: erfüllt; open: noch nicht; none: Rolle ohne Voraussetzung */
+  status: 'fulfilled' | 'open' | 'none';
+}
 
 export const roleInfo = (level: Level): RoleInfo | undefined => config?.roles?.find((r) => r.key === level);
 
@@ -860,6 +922,10 @@ export interface CalendarEvent {
   respond_until?: string | null;
   /** Zu- und Absagen (nur internen Kalender, fehlt bei älteren Servern) */
   responses?: EventResponses;
+  /** Terminart, z. B. Versammlung (nur GET /calendar; fehlt bei älteren Servern) */
+  kind?: string | null;
+  /** Nur mit manage_calendar und ohne gesetzte Art: Vorschlag aus dem Titel */
+  kind_suggestion?: string | null;
 }
 
 export type ResponseStatus = 'yes' | 'no';
@@ -1117,6 +1183,8 @@ export interface MemberDetail extends MemberSummary {
   former?: FormerInfo | null;
   /** Anwesenheit (nur mit Bereich und Recht manage_attendance) */
   attendance?: MemberAttendance;
+  /** Stand als Anwärter (nur für create_users; null, wenn die Person kein Anwärter ist; fehlt bei älteren Servern) */
+  admission?: Admission | null;
 }
 
 /** Grund des Ausscheidens */
@@ -1776,6 +1844,8 @@ export interface AttendanceSummary {
   source: 'calendar' | 'free';
   title: string;
   date: string;
+  /** Terminart der Liste (fehlt bei älteren Servern) */
+  kind?: string | null;
   /** Termin nach heute: nur „entschuldigt“ möglich */
   upcoming: boolean;
   counts: AttendanceCounts;
@@ -1789,6 +1859,8 @@ export interface AttendanceEvent {
   start: string;
   end: string;
   all_day: boolean;
+  /** Terminart des Termins (fehlt bei älteren Servern) */
+  kind?: string | null;
   /** Termin nach heute */
   upcoming: boolean;
   /** Termin heute (Zeitzone der Kompanie) */
@@ -1822,10 +1894,12 @@ export interface AttendanceDetail extends AttendanceSummary {
   updated_at: string;
   people: AttendancePerson[];
   counts_by_group: Record<AttendanceStatus, { group: Level; label: string; count: number }[]>;
+  /** Nach dem Speichern: wer jetzt neu die Voraussetzung für die Aufnahme erfüllt (nur für create_users) */
+  admissions_new?: { user_id: number; name: string }[];
 }
 
 export type AttendanceInput = (
-  | { id: number; title?: string; date?: string }
+  | { id: number; title?: string; date?: string; kind?: string }
   | { source: 'calendar'; event_key: string }
   | { source: 'free'; title: string; date: string }
 ) & { entries?: Record<number, AttendanceStatus | null> };
@@ -2470,6 +2544,8 @@ export const api = {
     request<CalendarEvent>('PUT', `/calendar/${encodeURIComponent(id)}/response`, { status, note }),
   withdrawResponse: (id: string) => request<CalendarEvent>('DELETE', `/calendar/${encodeURIComponent(id)}/response`),
   eventResponses: (id: string) => request<EventResponseOverview>('GET', `/calendar/${encodeURIComponent(id)}/responses`),
+  setEventKind: (id: string, kind: string | null) =>
+    request<{ id: string; kind: string | null }>('PUT', `/calendar/${encodeURIComponent(id)}/kind`, { kind }),
   respondFor: (id: string, userId: number, status: ResponseStatus | null) =>
     request<{ user_id: number; status: ResponseStatus | null; note: string }>(
       'PUT',
@@ -2523,6 +2599,13 @@ export const api = {
     }),
   /** Zum Mitglied machen (wer Mitglieder anlegen darf; nur aus Rollen, die das erlauben, z. B. Anwärter). */
   promote: (id: number) => request<{ id: number; level: Level }>('POST', `/members/${id}/promote`),
+  /** Anwärter mit Stand der Voraussetzung (create_users). */
+  admissions: () => request<Admission[]>('GET', '/admissions'),
+  /** Als Mitglied aufnehmen: Grundrolle → Mitglied bzw. Anwärter-Zusatzrolle entfernen; Eintritt = heute, wenn leer. */
+  admit: (id: number) =>
+    request<{ id: number; level: Level; extra_roles: Level[]; join_date: string | null }>('POST', `/members/${id}/admit`),
+  /** „Anwärter seit“ ändern (TT.MM.JJJJ, leer = unbekannt). */
+  setCandidateSince: (id: number, since: string) => request<Admission>('PUT', `/members/${id}/candidate-since`, { since }),
   setRole: (id: number, level: Level) =>
     request<{ id: number; level: Level; extra_roles: Level[] }>('PATCH', `/members/${id}/role`, { level }),
   setExtraRoles: (id: number, extra_roles: Level[]) =>
@@ -2714,6 +2797,7 @@ export const api = {
   attendanceEvents: () => request<AttendanceEvent[]>('GET', '/attendance/events'),
   attendance: (id: number) => request<AttendanceDetail>('GET', `/attendance/${id}`),
   saveAttendance: (data: AttendanceInput) => request<AttendanceDetail>('PUT', '/attendance', data),
+  setEventKinds: (kinds: string[]) => request<{ kinds: string[] }>('PUT', '/admin/event-kinds', { kinds }),
   deleteAttendance: (id: number) => request<{ deleted: boolean }>('DELETE', `/attendance/${id}`),
   myAttendance: () => request<MyAttendance>('GET', '/me/attendance'),
   attendanceGroups: () => request<AttendanceGroup[]>('GET', '/attendance/groups'),

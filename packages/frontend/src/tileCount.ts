@@ -1,5 +1,5 @@
 /**
- * Zahl im Kreis an einer Kachel: wie viel dort gerade ansteht (Beförderungen, Anfragen auf einen Zugang,
+ * Zahl im Kreis an einer Kachel: wie viel dort gerade ansteht (Beförderungen, Aufnahmen, Anfragen auf einen Zugang,
  * Fehlermeldungen in der Verwaltung).
  * Die Zahlen liefert der Server nur an Berechtigte (sonst null, siehe /config und /admin/promotions).
  */
@@ -10,6 +10,8 @@ export type TileCounts = {
   registrations?: number | null;
   /** offene Fehlermeldungen */
   reports?: number | null;
+  /** Anwärter, die die Voraussetzung für die Aufnahme erfüllen */
+  admissions?: number | null;
 };
 
 export type TileCount = { count: number; text: string; title: string };
@@ -23,6 +25,8 @@ export function tileCount(id: string, counts: TileCounts): TileCount | null {
   switch (id) {
     case 'befoerderungen':
       return make(counts.promotions, (n) => `${plural(n, 'Mitglied', 'Mitglieder')} zur Beförderung bereit`);
+    case 'aufnahmen':
+      return make(counts.admissions, (n) => `${plural(n, 'Anwärter erfüllt', 'Anwärter erfüllen')} die Voraussetzung für die Aufnahme`);
     case 'anfragen':
       return make(counts.registrations, (n) => `${plural(n, 'offene Anfrage', 'offene Anfragen')} auf einen Zugang`);
     case 'meldungen':

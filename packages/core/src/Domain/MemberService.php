@@ -44,6 +44,8 @@ final class MemberService
         private readonly ?MemberContactRepository $contacts = null,
         private readonly ?Time $time = null,
         private readonly ?UserSettings $settings = null,
+        /** @var (\Closure(int, string, string): void)|null Grundrolle gesetzt (ID, vorher, nachher; AdmissionService „Anwärter seit“) */
+        private readonly ?\Closure $baseRoleSet = null,
     ) {
     }
 
@@ -71,6 +73,13 @@ final class MemberService
     private function formerRole(User $user): ?string
     {
         return $this->formerRole !== null ? ($this->formerRole)($user) : null;
+    }
+
+    private function baseRoleSet(int $id, string $old, string $new): void
+    {
+        if ($this->baseRoleSet !== null) {
+            ($this->baseRoleSet)($id, $old, $new);
+        }
     }
 
     private function denyFormer(User $user): void
@@ -295,6 +304,7 @@ final class MemberService
             } catch (\DomainException $e) {
                 throw ApiError::invalid($e->getMessage());
             }
+            $this->baseRoleSet($id, $target->role, $new);
         }
         if ($this->roles !== null && $nextExtra !== $extra) {
             $this->roles->setExtraRoles($id, $nextExtra);
@@ -555,6 +565,7 @@ final class MemberService
         } catch (\DomainException $e) {
             throw ApiError::invalid($e->getMessage());
         }
+        $this->baseRoleSet($id, '', $level);
         $out = ['id' => $id, 'name' => $name, 'first_name' => $first, 'last_name' => $last, 'username' => $login, 'email' => $email, 'level' => $level];
         $extra = $p['extra_roles'] ?? [];
         if ($extra !== [] && $this->roles !== null) {
@@ -599,6 +610,7 @@ final class MemberService
         } catch (\DomainException $e) {
             throw ApiError::invalid($e->getMessage());
         }
+        $this->baseRoleSet($id, '', $p['level']);
         return ['id' => $id, 'name' => $p['name'], 'first_name' => $p['first_name'], 'last_name' => $p['last_name'], 'username' => $p['login'], 'email' => $p['email'], 'level' => $p['level']];
     }
 

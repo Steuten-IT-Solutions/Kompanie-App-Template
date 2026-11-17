@@ -81,6 +81,8 @@ export function adminTabs(): AdminTab[] {
       { id: 'katalog', label: sec.catalog, on: points, group: SETUP },
       { id: 'dienstgrade', label: sec.ranks, on: canRanks(), group: SETUP },
       { id: 'befoerderungen', label: 'Beförderungen', on: seeRanks() && !!config?.features.points },
+      // Aufnahmen: Anwärter, die die Voraussetzung erfüllen (Zahl im Kreis); der Server schickt die Zahl nur, wenn es passt
+      { id: 'aufnahmen', label: 'Aufnahmen', on: can('create_users') && config?.admissionsDue != null },
       { id: 'titel', label: sec.titles, on: seeTitles(), group: SETUP },
       { id: 'aemter', label: sec.offices, on: canOffices(), group: SETUP },
       { id: 'kompanien', label: sec.companies, on: canCompanies(), group: SETUP },
@@ -118,6 +120,7 @@ export function adminTileCatalog(): Record<string, { label: string; on: boolean 
     punkte: { label: `${sec.points} +`, on: on('points') },
     strafe: { label: `${sec.penalties} +`, on: on('penalties') },
     befoerderungen: { label: 'Beförderungen', on: on('ranks', 'points') },
+    aufnahmen: { label: 'Aufnahmen', on: on('attendance') },
     anwesenheit: { label: sec.attendance, on: on('attendance') },
     brett: { label: sec.board, on: on('board') },
     umfragen: { label: sec.polls, on: on('polls') },
@@ -343,6 +346,12 @@ const ADMIN_ICONS: Record<string, ReactNode> = {
       <path d="M12 16.5v-9M8 11l4-4 4 4" />
     </>
   ),
+  aufnahmen: (
+    <>
+      <circle cx="10" cy="8" r="4" />
+      <path d="M3 20c0-3.9 3.1-7 7-7 1.4 0 2.7.4 3.8 1.1M15 18l2 2 4-4.5" />
+    </>
+  ),
   titel: (
     <>
       <circle cx="12" cy="15" r="5" />
@@ -420,7 +429,12 @@ export function AdminIcon({ id }: { id: string }) {
 export function AdminMenu({ group }: { group?: string }) {
   const due = usePromotionsDue();
   useAdminCounts(!group);
-  const counts = { promotions: due, registrations: config?.pendingRegistrations, reports: config?.openReports };
+  const counts = {
+    promotions: due,
+    registrations: config?.pendingRegistrations,
+    reports: config?.openReports,
+    admissions: config?.admissionsDue,
+  };
   // Daten der Bereiche hinter den Knöpfen im Leerlauf vorab laden (auch die unter „Einrichtungen“), beim Antippen sofort.
   usePrefetchMenu(
     'verwaltung',

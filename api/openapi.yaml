@@ -3506,6 +3506,68 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /calendar/{key}/kind:
+    parameters:
+      - { name: key, in: path, required: true, schema: { type: string }, description: 'Kennung des Termins wie in `GET /calendar` (`id`)' }
+    put:
+      tags: [Termine]
+      summary: Terminart eines Termins setzen (z. B. Versammlung)
+      description: |
+        Bei jeder Quelle des Kalenders (App, Google, iCal); die App speichert die Art selbst, nichts geht an Google. Erlaubt
+        sind die Terminarten aus den Einstellungen und die bisherige Art des Termins; `null` oder leer entfernt sie. Eine
+        Anwesenheitsliste zu dem Termin übernimmt die neue Art. Geht auch bei vergangenen Terminen, solange der Kalender
+        sie liefert (sonst 404).
+      x-capability: manage_calendar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kind: { type: [string, 'null'], maxLength: 40 }
+      responses:
+        '200':
+          description: Die gespeicherte Art
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  kind: { type: [string, 'null'] }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /admin/event-kinds:
+    put:
+      tags: [Einstellungen]
+      summary: Terminarten festlegen (Einstellungen → Kalender)
+      description: |
+        Liste von Bezeichnungen (höchstens 30, je höchstens 40 Zeichen, keine doppelten), leer erlaubt. Gespeichert wird
+        an Terminen und Listen die Bezeichnung: Entfernte Arten bleiben dort stehen. Die Liste steht in `GET /config`
+        (`eventKinds`).
+      x-capability: manage_settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kinds]
+              properties:
+                kinds: { type: array, items: { type: string, maxLength: 40 } }
+      responses:
+        '200':
+          description: Die gespeicherte Liste
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kinds: { type: array, items: { type: string } }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /attendance:
     get:
       tags: [Verwaltung]
@@ -3529,7 +3591,9 @@ paths:
         `date`. Titel und Datum sind eine Momentaufnahme. `entries` setzt den Status je Person (null entfernt ihn);
         nur Personen mit einer Rolle (keine Gäste). Liegt das Datum nach heute (Zeitzone der Kompanie), ist nur
         `excused` erlaubt; das gilt auch für schon gespeicherte Einträge, wenn das Datum einer freien Liste in die Zukunft
-        rückt (sonst 400, ohne dass eine Liste entsteht).
+        rückt (sonst 400, ohne dass eine Liste entsteht). `kind` setzt die Terminart der Liste (eine der eingerichteten
+        oder die bisherige, leer für keine); ohne Angabe übernimmt eine neue Liste die Art des Termins im Kalender, sonst
+        den Vorschlag aus dem Titel (Name einer Terminart als eigenes Wort).
       x-capability: manage_attendance
       requestBody:
         required: true
@@ -3543,6 +3607,7 @@ paths:
                 event_key: { type: string }
                 title: { type: string, maxLength: 191 }
                 date: { type: string, format: date }
+                kind: { type: [string, 'null'], maxLength: 40, description: Terminart (leer = keine) }
                 entries:
                   type: object
                   description: Benutzer-ID → Status
@@ -3587,6 +3652,7 @@ paths:
                     start: { type: string }
                     end: { type: string }
                     all_day: { type: boolean }
+                    kind: { type: [string, 'null'], description: Terminart des Termins }
                     upcoming: { type: boolean, description: Datum nach heute (Zeitzone der Kompanie) }
                     today: { type: boolean, description: Datum ist heute (Zeitzone der Kompanie) }
                     list_id: { type: [integer, 'null'], description: Schon angelegte Liste }
@@ -5121,6 +5187,75 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+
+  /members/{id}/admit:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Verwaltung]
+      summary: Anwärter als Mitglied aufnehmen
+      description: |
+        Grundrolle mit `promotable` → `member` (wie `/members/{id}/promote`), sonst die Zusatzrolle mit `admission_extra`
+        entfernen. Die Voraussetzung sperrt nicht. Ohne Eintritt wird er auf heute gesetzt (`join_date`, sonst null);
+        „Anwärter seit“ fällt weg. Nicht für sich selbst und nicht für Ehemalige (400).
+      x-capability: create_users
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  level: { $ref: '#/components/schemas/Level' }
+                  extra_roles: { $ref: '#/components/schemas/ExtraRoles' }
+                  join_date: { type: [string, 'null'] }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /members/{id}/candidate-since:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Verwaltung]
+      summary: „Anwärter seit“ ändern
+      description: TT.MM.JJJJ oder JJJJ-MM-TT, nicht in der Zukunft; leer = unbekannt. Nur bei Anwärtern (sonst 400).
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                since: { type: string }
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Admission' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admissions:
+    get:
+      tags: [Verwaltung]
+      summary: Aufnahmen – Anwärter mit Stand der Voraussetzung (nur zusammen mit dem Bereich Anwesenheit)
+      description: |
+        Alle Anwärter (Grundrolle mit `promotable` oder Zusatzrolle mit `admission_extra`, ohne Ehemalige): zuerst wer die
+        Voraussetzung erfüllt (nach `fulfilled_on`), dann `open`, dann `none`. Es zählen alle Teilnahmen der Terminart bis heute.
+      x-capability: create_users
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Admission' } }
+        '403': { $ref: '#/components/responses/Error' }
 
   /members/{id}/data:
     get:
@@ -9607,6 +9742,10 @@ components:
                 description: 'guest, member und admin: nicht löschbar; bei guest und member nur die Rechte zum Sehen änderbar, bei admin keine',
               }
             deletable: { type: boolean, description: 'false für guest, member und admin' }
+            admission_extra: { type: boolean, description: Anwärter-Rolle als Zusatzrolle (bei Aufnahme entfernen) }
+            admission_kind: { type: [string, 'null'] }
+            admission_count: { type: integer }
+            admission_months: { type: integer }
 
     RoleInput:
       type: object
@@ -9682,6 +9821,31 @@ components:
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
         new_accounts: { type: boolean, description: 'Nur eigene Rollen: beim Anlegen von Konten wählbar' }
         promotable: { type: boolean, description: 'Nur eigene Rollen ohne member: als Mitglied aufnehmen mit create_users' }
+        admission_extra: { type: boolean, description: 'Nur eigene Rollen: Anwärter-Rolle als Zusatzrolle, wird bei der Aufnahme entfernt' }
+        admission_kind:
+          { type: [string, 'null'], description: 'Voraussetzung für die Aufnahme: Terminart (eine aus /config eventKinds; leer oder null für keine)' }
+        admission_count: { type: [integer, string], description: 'Mindestens so viele Teilnahmen (present) an Listen dieser Art, 0–100; > 0 nur mit admission_kind' }
+        admission_months: { type: [integer, string], description: 'Mindestens so viele Monate seit „Anwärter seit“, 0–120' }
+
+    Admission:
+      type: object
+      description: Stand eines Anwärters für die Aufnahme als Mitglied (Domain\AdmissionService)
+      required: [id, name, role, role_key, way, since, kind, count, months, attended, missing, months_on, fulfilled_on, status]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        role: { type: string, description: Bezeichnung der Anwärter-Rolle }
+        role_key: { $ref: '#/components/schemas/Level' }
+        way: { type: string, enum: [base, extra], description: 'base: Grundrolle wird member; extra: diese Zusatzrolle wird entfernt' }
+        since: { type: [string, 'null'], description: 'Anwärter seit (JJJJ-MM-TT); null, wenn unbekannt' }
+        kind: { type: [string, 'null'], description: Terminart der Voraussetzung }
+        count: { type: integer, description: Nötige Teilnahmen (0 keine) }
+        months: { type: integer, description: Mindestdauer in Monaten (0 keine) }
+        attended: { type: integer, description: 'Teilnahmen (present) an Listen der Art bis heute, auch vor since' }
+        missing: { type: integer }
+        months_on: { type: [string, 'null'], description: Tag, ab dem die Mindestdauer erfüllt ist }
+        fulfilled_on: { type: [string, 'null'], description: Tag, an dem alles erfüllt war }
+        status: { type: string, enum: [fulfilled, open, none], description: 'none: Rolle ohne Voraussetzung' }
 
     AppUser:
       type: object
@@ -9856,6 +10020,9 @@ components:
         registration: { type: boolean, description: 'Zugang beantragen eingeschaltet (Issue #314): Link „Zugang beantragen“ für Gäste' }
         pendingRegistrations:
           { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null' }
+        admissionsDue:
+          type: [integer, 'null']
+          description: 'Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“); nur für create_users mit Bereich Anwesenheit und einer Anwärter-Rolle, sonst null'
         gallerySubmissions:
           {
             type: boolean,
@@ -9866,6 +10033,10 @@ components:
             type: boolean,
             description: 'Interner Kalender an und Zu- und Absagen eingeschaltet (Einstellung calendar_responses): sonst keine Knöpfe und kein Anmeldeschluss',
           }
+        eventKinds:
+          type: array
+          items: { type: string }
+          description: 'Terminarten (Einstellungen → Kalender, `PUT /admin/event-kinds`) zur Auswahl am Termin und an Anwesenheitslisten; leer ohne Kalender und Anwesenheit'
         caredPassives:
           {
             type: integer,
@@ -10075,6 +10246,10 @@ components:
             open: { type: boolean, description: Noch änderbar }
             can_respond: { type: boolean, description: 'Hat respond_calendar' }
             can_list: { type: boolean, description: 'Hat manage_calendar: sieht die Namen (`GET /calendar/{key}/responses`)' }
+        kind: { type: [string, 'null'], description: 'Terminart (nur in `GET /calendar`), z. B. Versammlung' }
+        kind_suggestion:
+          type: [string, 'null']
+          description: 'Nur mit manage_calendar und ohne gesetzte Art: Vorschlag aus dem Titel (zählt erst gespeichert)'
 
     EventResponsePerson:
       type: object
@@ -10410,6 +10585,11 @@ components:
               description: Ehemalig (Grund, Eintritt, Ausscheiden); null, wenn die Person nicht ehemalig ist
               oneOf:
                 - $ref: '#/components/schemas/FormerInfo'
+                - type: 'null'
+            admission:
+              description: Stand als Anwärter (nur für create_users); null, wenn die Person kein Anwärter ist
+              oneOf:
+                - $ref: '#/components/schemas/Admission'
                 - type: 'null'
             attendance:
               description: |
@@ -11769,6 +11949,7 @@ components:
         source: { type: string, enum: [calendar, free] }
         title: { type: string, description: Momentaufnahme beim Anlegen }
         date: { type: string, format: date }
+        kind: { type: [string, 'null'], description: Terminart der Liste }
         upcoming:
           type: boolean
           description: Datum nach heute (Zeitzone der Kompanie); dann ist nur der Status excused erlaubt.
@@ -11785,6 +11966,14 @@ components:
               description: 'null: keine Rückmeldungen (freie Liste, Termin nicht mehr im Kalender); sonst ob man noch zu- und absagen kann'
             updated_by_name: { type: [string, 'null'] }
             updated_at: { type: string }
+            admissions_new:
+              type: array
+              description: 'Nur in der Antwort von PUT /attendance für create_users: wer dadurch neu die Voraussetzung für die Aufnahme erfüllt'
+              items:
+                type: object
+                properties:
+                  user_id: { type: integer }
+                  name: { type: string }
             people:
               type: array
               description: Alle mit einer Rolle (ohne Gäste), nach Namen

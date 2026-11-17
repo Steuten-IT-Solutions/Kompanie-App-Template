@@ -36,6 +36,8 @@ final class UserData
         'attendance_entries' => 'user_id',
         // Zu- und Absagen bei Terminen des internen Kalenders
         'event_responses' => 'user_id',
+        // „Anwärter seit“ je Anwärter-Rolle (Aufnahmen)
+        'candidate_since' => 'user_id',
         'poll_votes' => 'user_id',
         'poll_answers' => 'user_id',
         'birthdays' => 'user_id',

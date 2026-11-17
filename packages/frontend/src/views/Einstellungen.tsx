@@ -5,8 +5,10 @@ import {
   can,
   config,
   applyBirthdayUpcomingDays,
+  applyEventKinds,
   applyEventResponses,
   applyFeatures,
+  eventKinds,
   applyGallerySubmissions,
   applyRegistration,
   registrationRoles,
@@ -174,6 +176,7 @@ function Verbindung({
       <>
         <Calendar key={revision} {...props} />
         <CalendarResponses key={`r${revision}`} {...props} />
+        {config?.eventKinds !== undefined && <EventKinds onToast={onToast} />}
       </>
     );
   if (page === 'galerie')
@@ -1359,6 +1362,80 @@ function CalendarResponses({ settings, onSaved, onToast }: SectionProps) {
           </span>
         </label>
       )}
+    </Section>
+  );
+}
+
+const KIND_MAX = 40;
+const KINDS_MAX = 30;
+
+/**
+ * Terminarten (z. B. Versammlung): zur Auswahl am Termin und an Anwesenheitslisten, etwa als Voraussetzung für die
+ * Aufnahme. Gespeichert wird die Bezeichnung; entfernte Arten bleiben an Terminen und Listen stehen.
+ */
+function EventKinds({ onToast }: { onToast: (msg: string) => void }) {
+  const saved = eventKinds();
+  const [names, setNames] = useState<string[]>(saved.length > 0 ? saved : ['']);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    const list = names.map((n) => n.trim()).filter((n) => n !== '');
+    const lower = list.map((n) => n.toLowerCase());
+    const twice = list.find((_, i) => lower.indexOf(lower[i]) !== i);
+    if (twice) return setError(`Die Terminart „${twice}“ steht doppelt in der Liste.`);
+    if (list.join('\n') === saved.join('\n')) return onToast('Nichts geändert.');
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api.setEventKinds(list);
+      applyEventKinds(r.kinds);
+      setNames(r.kinds.length > 0 ? r.kinds : ['']);
+      onToast('Gespeichert');
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Section id="terminarten" title="Terminarten" busy={busy} error={error} onSubmit={submit}>
+      <p className="small muted">
+        Zum Beispiel Versammlung oder Arbeitsdienst. Wer Termine pflegt, wählt die Art beim Termin, auch bei Terminen aus Google oder iCal.
+        Anwesenheitslisten übernehmen sie. Steht der Name einer Art im Titel, schlägt die App sie vor.
+      </p>
+      <div className="field poll-options-edit">
+        <span>Terminarten</span>
+        {names.map((n, i) => (
+          <div className="poll-option-edit" key={i}>
+            <input
+              type="text"
+              aria-label={`Terminart ${i + 1}`}
+              value={n}
+              maxLength={KIND_MAX}
+              onChange={(e) => setNames(names.map((x, j) => (j === i ? e.target.value : x)))}
+            />
+            {(names.length > 1 || n !== '') && (
+              <button
+                type="button"
+                className="btn btn-link"
+                aria-label={`Terminart ${i + 1} entfernen`}
+                onClick={() => setNames(names.length > 1 ? names.filter((_, j) => j !== i) : [''])}
+              >
+                ×
+              </button>
+            )}
+          </div>
+        ))}
+        {names.length < KINDS_MAX && (
+          <button type="button" className="btn btn-link poll-add-option" onClick={() => setNames([...names, ''])}>
+            + Terminart
+          </button>
+        )}
+      </div>
+      <p className="small muted">Termine und Listen behalten ihre Art, auch wenn du sie hier entfernst.</p>
     </Section>
   );
 }

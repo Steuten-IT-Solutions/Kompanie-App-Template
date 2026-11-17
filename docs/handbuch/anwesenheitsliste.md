@@ -15,6 +15,7 @@ Tippe unten auf **Verwaltung**, dann auf **{bereich.attendance}**. Tippe dort au
 ## Was du hier siehst
 - **‹ {bereich.attendance}**: führt zurück zur Übersicht.
 - **Titel und Datum**: Bei einem Termin aus dem {bereich.calendar} stehen sie fest. Bei einem freien Termin stehen sie in Feldern, die du ändern kannst.
+- **Terminart**: eine Auswahl, z. B. **Versammlung** oder **keine** (nur, wenn ein {rolle.admin} Terminarten eingerichtet hat). Eine neue Liste übernimmt die Art ihres Termins im {bereich.calendar}; hat der keine, schlägt die App eine aus dem Titel vor. Eine andere Wahl ist sofort gespeichert, ohne deine Häkchen zu speichern.
 - **Zähler**: z. B. „3 anwesend · 0 entschuldigt · 1 fehlt · 5 ohne Auswahl“. **Ohne Auswahl** sind die Personen, bei denen noch kein Kästchen angekreuzt ist.
 - **Person suchen …**: zeigt nur Personen, deren Name passt.
 - **Alle anwesend**: setzt alle gezeigten Personen auf anwesend (bei einer Suche nur die gefundenen).
@@ -76,6 +77,7 @@ Meldet sich jemand z. B. per Telefon ab:
 
 ## Gut zu wissen
 - In der Liste stehen auch Personen, deren Rolle nicht zur Kompanie gehört (z. B. Anwärter). {bereich.points} und {bereich.penalties} bekommen aber nur Personen, die zur Kompanie gehören.
+- Darfst du auch Mitglieder anlegen, zeigt die App nach dem Speichern oben, wer dadurch neu die Voraussetzung für die Aufnahme als {rolle.member} erfüllt (siehe *Verwaltung → Aufnahmen*).
 - Wer für diese Liste schon {bereich.points} hat, bekommt sie kein zweites Mal. Haben alle Anwesenden schon welche, steht dort „{bereich.points} für alle Anwesenden bereits gebucht.“
 - Bei {bereich.penalties} merkt sich die Liste nicht, wer schon einen Eintrag hat. Lege ihn also nicht zweimal an.
 - Löschst du eine Liste, bleiben die schon gebuchten {bereich.points} erhalten.

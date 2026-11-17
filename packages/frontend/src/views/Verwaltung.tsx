@@ -119,6 +119,7 @@ import { Aenderungen } from './Aenderungen';
 import { newlyDue } from '../promotionCheck';
 import { promotionsAllowed, refreshPromotions, setReached, useReached } from '../promotionsDue';
 import { confirmAsk, promptAsk } from '../ask';
+import { AdmissionNotice, Admissions, MemberAdmission } from './Aufnahmen';
 
 type Sub =
   | 'mitglieder'
@@ -133,6 +134,7 @@ type Sub =
   | 'katalog'
   | 'dienstgrade'
   | 'befoerderungen'
+  | 'aufnahmen'
   | 'titel'
   | 'aemter'
   | 'kompanien'
@@ -214,6 +216,7 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
     <div>
       {(showBack || setup) && <AdminBack from={active ?? undefined} />}
       <ReachedNotice />
+      <AdmissionNotice />
       {setup ? (
         <AdminMenu group="einrichtungen" />
       ) : sub === 'mitglied' && arg ? (
@@ -256,6 +259,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <RankList onToast={onToast} />
       ) : active === 'befoerderungen' ? (
         <Promotions />
+      ) : active === 'aufnahmen' ? (
+        <Admissions />
       ) : active === 'titel' ? (
         <TitleList onToast={onToast} />
       ) : active === 'aemter' ? (
@@ -1190,18 +1195,24 @@ function MemberDetailView({
             onToast={onToast}
           />
         )}
-        {roleInfo(m.level)?.promotable && can('create_users') && (
-          <button
-            className="btn btn-block promote-candidate"
-            disabled={busy}
-            onClick={async () =>
-              (await confirmAsk(`${m.name} als ${levelLabel('member')} aufnehmen?`)) &&
-              run(() => api.promote(m.id), `${m.name} ist jetzt ${levelLabel('member')}`)
-            }
-          >
-            Als {levelLabel('member')} aufnehmen
-          </button>
-        )}
+        {/* Aufnahme mit „Anwärter seit“ und Stand der Voraussetzung; ältere Server ohne admission: nur der Knopf */}
+        {m.admission !== undefined
+          ? m.admission && (
+              <MemberAdmission key={JSON.stringify(m.admission)} admission={m.admission} onChanged={reload} onToast={onToast} />
+            )
+          : roleInfo(m.level)?.promotable &&
+            can('create_users') && (
+              <button
+                className="btn btn-block promote-candidate"
+                disabled={busy}
+                onClick={async () =>
+                  (await confirmAsk(`${m.name} als ${levelLabel('member')} aufnehmen?`)) &&
+                  run(() => api.promote(m.id), `${m.name} ist jetzt ${levelLabel('member')}`)
+                }
+              >
+                Als {levelLabel('member')} aufnehmen
+              </button>
+            )}
         {/* Vorschau mit den Rechten dieser Person (alle Rollen zusammen); nur Admins, nicht für Admins selbst. */}
         {config?.user?.level === 'admin' && !self && m.level !== 'admin' && (
           <button type="button" className="btn btn-secondary btn-block member-preview-start" onClick={() => startPersonPreview(m.id)}>

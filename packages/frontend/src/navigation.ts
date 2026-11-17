@@ -371,6 +371,7 @@ export const ADMIN_START = [
   'punkte',
   'strafe',
   'befoerderungen',
+  'aufnahmen',
   'anwesenheit',
   'brett',
   'umfragen',

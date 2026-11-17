@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
-import { api, applyOpenReports, applyPendingRegistrations, can, config, inBackground } from './api';
+import { api, applyAdmissionsDue, applyOpenReports, applyPendingRegistrations, can, config, inBackground } from './api';
 
 /**
- * Zahlen offener Anfragen und Fehlermeldungen für die Kacheln der Verwaltung. Sie kommen mit der Konfiguration der
+ * Zahlen offener Anfragen, Fehlermeldungen und fälliger Aufnahmen für die Kacheln der Verwaltung. Sie kommen mit der Konfiguration der
  * Seite, die der Service Worker zuerst aus seinem Speicher zeigt; beim Öffnen der Verwaltung darum still neu holen
  * (höchstens alle 30 Sekunden). Der Server liefert sie nur an Berechtigte (create_users bzw. review_reports).
  */
@@ -18,6 +18,7 @@ export function refreshAdminCounts(now = Date.now()): void {
     .then((next) => {
       if (typeof next.pendingRegistrations === 'number') applyPendingRegistrations(next.pendingRegistrations);
       if (typeof next.openReports === 'number') applyOpenReports(next.openReports);
+      if (typeof next.admissionsDue === 'number') applyAdmissionsDue(next.admissionsDue);
     })
     .catch(() => {
       // offline oder Fehler: die bisherigen Zahlen bleiben stehen

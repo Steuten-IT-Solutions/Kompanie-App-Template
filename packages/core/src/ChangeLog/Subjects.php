@@ -170,6 +170,8 @@ final class Subjects
             'PATCH /members/{id}/role' => $member,
             'PUT /members/{id}/rights' => $member,
             'POST /members/{id}/promote' => $member,
+            'POST /members/{id}/admit' => $member,
+            'PUT /members/{id}/candidate-since' => $member,
             'DELETE /members/{id}' => $member,
             'PUT /members/{id}/photo' => $member,
             'DELETE /members/{id}/photo' => $member,
@@ -239,6 +241,7 @@ final class Subjects
                 'Änderungen protokollieren' => $this->app->changeLog()->enabled(),
                 'Frist (Tage)' => $this->app->changeLog()->keepDays(),
             ]),
+            'PUT /admin/event-kinds' => $this->values('Terminarten', fn (): array => ['Terminarten' => $this->app->eventKinds()->options()]),
             'PUT /attendance/groups' => $this->values('Gruppen der Anwesenheit', function (): array {
                 $groups = $this->app->attendance()->groups();
                 $labels = array_column($groups, 'label', 'key');
@@ -323,7 +326,7 @@ final class Subjects
             'title' => 'Titel', 'description' => 'Beschreibung', 'type' => 'Art', 'anonymous' => ['Anonym', 'bool'], 'results' => 'Ergebnisse sichtbar', 'ends_at' => 'Ende', 'closed_at' => 'Beendet',
         ], extra: fn (array $r): array => ['Antworten' => $this->column('SELECT title FROM {poll_options} WHERE poll_id = ? ORDER BY sort, id', $r['id'])]);
         $inventory = $this->spec('Inventar', 'inventory_items', 'title', ['title' => 'Bezeichnung', 'category' => 'Kategorie', 'quantity' => 'Menge', 'unit' => 'Einheit', 'location' => 'Lagerort', 'note' => 'Notiz']);
-        $attendance = $this->spec('Anwesenheitsliste', 'attendance_lists', 'title', ['title' => 'Titel', 'event_date' => 'Datum'], extra: function (array $r): array {
+        $attendance = $this->spec('Anwesenheitsliste', 'attendance_lists', 'title', ['title' => 'Titel', 'event_date' => 'Datum', 'kind' => 'Terminart'], extra: function (array $r): array {
             $entries = $this->app->db->select('SELECT user_id, status FROM {attendance_entries} WHERE list_id = ? ORDER BY user_id', [$r['id']]);
             $names = $this->people($entries);
             return ['Einträge' => array_map(static fn (array $e, string $name): string => $name . ': ' . (self::ATTENDANCE[$e['status']] ?? $e['status']), $entries, $names)];
@@ -432,6 +435,12 @@ final class Subjects
             $key = $this->app->eventResponses()->keyOf((string) ($r->params['key'] ?? ''));
             $id = $key === null ? null : $this->app->db->scalar('SELECT id FROM {event_responses} WHERE event_key = ? AND user_id = ?', [$key, $r->id()]);
             return is_scalar($id) ? [(string) $id] : [];
+        }, true);
+        // Terminart eines Termins im Kalender (EventKindService)
+        $kinds = $this->spec('Terminart eines Termins', 'event_kinds', 'event_title', ['event_title' => 'Termin', 'event_date' => 'Datum', 'kind' => 'Terminart']);
+        $map['PUT /calendar/{key}/kind'] = $this->table($kinds, function (Request $r): array {
+            $id = $this->app->eventKinds()->rowIdOf((string) ($r->params['key'] ?? ''));
+            return $id === null ? [] : [(string) $id];
         }, true);
         // Ämter: Namen mit Mitgliedern verbinden, Import aus einer CSV-Datei (ohne apply nur die Vorschau, ändert nichts)
         $map['POST /offices/link'] = $this->table($this->spec('Amtsinhaber', 'office_holders', 'name', ['name' => 'Name', 'user_id' => ['Mitglied', 'user']]), function (Request $r): array {
@@ -641,6 +650,8 @@ final class Subjects
         $fields['Geburtsdatum'] = $birthday === null ? null : sprintf('%02d.%02d.%s', $birthday['day'], $birthday['month'], $birthday['year'] ?? '');
         $join = $this->app->joinYears()->repository()->find($id);
         $fields['Eintritt'] = $join === null ? null : ($join['joined_on'] !== '' ? $join['joined_on'] : (string) $join['year']);
+        $admission = $this->app->admissions()->statusOf($id);
+        $fields['Anwärter seit'] = $admission['since'] ?? null;
         $former = $this->app->formerMembers()->repository()->find($id);
         $fields['Ehemalig seit'] = $former['left_on'] ?? null;
         $fields['Grund des Ausscheidens'] = $former['reason'] ?? null;
@@ -669,9 +680,23 @@ final class Subjects
                 'Faktor für Punkte' => $r['points_factor'],
                 'Für neue Konten' => $r['new_accounts'],
                 'Beförderbar' => $r['promotable'],
-            ]);
+            ] + self::admissionFields($this->app->admissions()->describeRole($key)));
         };
         return new Subject($load, Subject::fromPath('key'), fn (): array => array_map('strval', array_keys($this->app->roles()->all())));
+    }
+
+    /**
+     * @param array{admission_extra: bool, admission_kind: string|null, admission_count: int, admission_months: int} $a
+     * @return array<string, mixed>
+     */
+    private static function admissionFields(array $a): array
+    {
+        return [
+            'Anwärter-Rolle (bei Aufnahme entfernen)' => $a['admission_extra'],
+            'Aufnahme: Terminart' => $a['admission_kind'],
+            'Aufnahme: Teilnahmen' => $a['admission_count'],
+            'Aufnahme: Monate als Anwärter' => $a['admission_months'],
+        ];
     }
 
     /** @param bool $all neue Gruppen über den Vergleich aller Schlüssel erkennen */

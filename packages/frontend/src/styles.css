@@ -964,6 +964,19 @@ p.small + p.small:not(.muted) {
   gap: 8px;
   flex-wrap: wrap;
 }
+/* Terminart am Termin (z. B. Versammlung) und ihre Auswahl für alle, die Termine pflegen */
+.event-kind {
+  background: var(--line);
+  color: var(--ink-2);
+  margin-left: 6px;
+  vertical-align: 2px;
+}
+.event-kind-picker {
+  margin: 0 0 12px;
+}
+.event-kind-picker .field {
+  margin-bottom: 4px;
+}
 
 /* ------------------------------------------------------------------ */
 /* Spieß & Formulare                                                   */

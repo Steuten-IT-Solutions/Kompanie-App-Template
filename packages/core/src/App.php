@@ -22,6 +22,8 @@ use KompanieApp\Core\Domain\BugReportService;
 use KompanieApp\Core\Domain\CalendarService;
 use KompanieApp\Core\Domain\DocumentService;
 use KompanieApp\Core\Domain\DriveClient;
+use KompanieApp\Core\Domain\AdmissionService;
+use KompanieApp\Core\Domain\EventKindService;
 use KompanieApp\Core\Domain\EventResponseService;
 use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Features;
@@ -646,6 +648,17 @@ final class App
         return $this->service(EventResponseService::class, fn () => new EventResponseService($this));
     }
 
+    public function eventKinds(): EventKindService
+    {
+        return $this->service(EventKindService::class, fn () => new EventKindService($this));
+    }
+
+    /** Aufnahmen: Anwärter, die die Voraussetzung für die Aufnahme als Mitglied erfüllen */
+    public function admissions(): AdmissionService
+    {
+        return $this->service(AdmissionService::class, fn () => new AdmissionService($this));
+    }
+
     public function board(): BoardService
     {
         return $this->service(BoardService::class, fn () => new BoardService($this));
@@ -792,6 +805,7 @@ final class App
             $this->memberContacts(),
             $this->time(),
             new UserSettings($this->db),
+            fn (int $id, string $old, string $new) => $this->admissions()->baseRoleSet($id, $old, $new),
         ));
     }
 
