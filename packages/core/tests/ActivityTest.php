@@ -232,7 +232,7 @@ final class ActivityTest extends TestCase
         // Auch eine Rolle mit allen vergebbaren Rechten sieht die Auswertung nicht; view_activity ist nicht vergebbar.
         $this->as($this->admin);
         $this->assertSame(400, $this->call('POST', '/admin/roles', ['label' => 'Vorstand', 'capabilities' => ['member', 'view_activity']])->status);
-        $role = $this->call('POST', '/admin/roles', ['label' => 'Vorstand', 'capabilities' => ['member', 'manage_points', 'manage_settings']]);
+        $role = $this->call('POST', '/admin/roles', ['label' => 'Vorstand', 'capabilities' => ['member', 'view_points', 'manage_points', 'manage_settings']]);
         $this->assertSame(400, $role->status, 'manage_settings ist ebenso wenig vergebbar');
         $res = $this->call('POST', '/admin/roles', ['label' => 'Vorstand', 'capabilities' => array_map(static fn (Capability $c): string => $c->value, \KompanieApp\Core\Auth\Roles::GRANTABLE)]);
         $this->assertSame(201, $res->status, (string) json_encode($res->data));

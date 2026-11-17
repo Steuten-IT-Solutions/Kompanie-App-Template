@@ -42,6 +42,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   erfüllte Voraussetzung mit Hinweis. Ohne Eintritt trägt die App den Tag der Aufnahme ein. Nach dem Speichern einer
   Anwesenheitsliste zeigt die App, wer neu die Voraussetzung erfüllt. Sehen und aufnehmen darf, wer Mitglieder anlegen
   darf.
+- **Rechte zum Sehen und zum Ändern getrennt**: Unter [Einstellungen → Rollen](app:einstellungen/rollen) gibt es
+  jetzt eigene Rechte, um Punkte, Strafen, Dienstgrade mit Beförderungen, Titel und die Anwesenheit der Mitglieder nur
+  zu sehen, z. B. „Punkte aller Mitglieder sehen“ neben „Punkte vergeben“. Wer nur sehen darf, sieht die Mitgliederliste
+  und die Angaben, aber keine Knöpfe zum Ändern. Ändern gibt es nur zusammen mit Sehen. Rollen und Personen, die ein
+  Recht zum Ändern hatten, haben nach dem Update auch das Recht zum Sehen; es ändert sich also für niemanden etwas,
+  bis du es umstellst.
 - **Beitrag der Passiven**: Unter [Verwaltung → Passive](app:verwaltung/passive) trägst du jetzt je Passivem und Jahr
   ein, dass der Beitrag bezahlt ist, mit Betrag, Datum und Zahlungsart. Oben wählst du das Jahr, siehst, wie viele
   bezahlt haben, und kannst nur die offenen oder nur die bezahlten zeigen. Einen Jahresbeitrag stellst du als Vorschlag
@@ -166,6 +172,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   _Mitglieder anlegen_ und _Rollen vergeben_ geben Nicht-Admins dieses Recht nicht weiter.
 
 ### Behoben
+
+- **Erinnerung an Zu- und Absagen ausschalten**: Unter [Einstellungen → Kalender](app:einstellungen/kalender) bleibt
+  die Erinnerung an Zu- und Absagen jetzt ausgeschaltet, wenn du den Haken entfernst und speicherst. In der
+  WordPress-Version war der Haken nach dem Neuladen wieder gesetzt, weil WordPress beim ersten Ausschalten nichts
+  gespeichert hat.
 
 - **Anwesenheit ohne Verbindung**: Wer in einer Anwesenheitsliste unter
   [Verwaltung → Anwesenheit](app:verwaltung/anwesenheit) ohne Internet auf _Speichern_ tippt, verliert die Häkchen nicht

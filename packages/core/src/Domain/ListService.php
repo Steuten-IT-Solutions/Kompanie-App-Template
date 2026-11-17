@@ -292,14 +292,14 @@ final class ListService
             // Rollen stehen nur in der Mitgliederliste der Verwaltung.
             'role' => (bool) array_filter(Capability::memberList(), static fn (Capability $c): bool => $viewer->can($c)),
             // Dienstgrad und Titel: in der Mitgliederliste für alle oder für die, die sie pflegen.
-            'rank' => $f->enabled('ranks') && ($directory || $viewer->can(Capability::ManageRanks)),
-            'titles' => $f->enabled('titles') && ($directory || $viewer->can(Capability::ManageTitles)),
+            'rank' => $f->enabled('ranks') && ($directory || $viewer->can(Capability::ViewPromotions)),
+            'titles' => $f->enabled('titles') && ($directory || $viewer->can(Capability::ViewTitles)),
             // Geburtstage sehen nur Mitglieder, und nur die, die die Person freigegeben hat (Issue #1).
             'birthday' => $f->enabled('birthdays') && BirthdayService::canSee($viewer),
             // Persönliche Angaben anderer nur mit view_personal (wie auf der Seite der Person in der Verwaltung).
             ...array_fill_keys(self::PERSONAL_FIELDS, $viewer->can(Capability::ViewPersonal)),
-            'points' => $f->enabled('points') && $viewer->can(Capability::ManagePoints),
-            'penalties' => $f->enabled('penalties') && $viewer->can(Capability::ManagePenalties),
+            'points' => $f->enabled('points') && $viewer->can(Capability::ViewPoints),
+            'penalties' => $f->enabled('penalties') && $viewer->can(Capability::ViewPenalties),
         ];
     }
 

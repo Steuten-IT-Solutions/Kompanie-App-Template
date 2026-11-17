@@ -186,7 +186,7 @@ final class BirthdayServiceTest extends TestCase
         $this->assertNull($this->call('GET', "/members/{$this->m3}")->data['birthday']);
 
         // Wer Mitgliedsdetails nur wegen anderer Rechte sieht (hier Punkte), bekommt kein Geburtsdatum
-        $pointsRole = $this->app->roles()->create(['label' => 'Punktewart', 'capabilities' => TestApp::caps(['member', 'manage_points'])]);
+        $pointsRole = $this->app->roles()->create(['label' => 'Punktewart', 'capabilities' => TestApp::caps(['member', 'view_points', 'manage_points'])]);
         $pointsManager = $this->users->add('punktewart', $pointsRole['key']);
         $res = $this->as($pointsManager)->call('GET', "/members/{$this->m}");
         $this->assertSame(200, $res->status);

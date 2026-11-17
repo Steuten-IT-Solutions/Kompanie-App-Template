@@ -412,6 +412,8 @@ function section(p: Promotion): number {
 }
 
 /** Mitgliedsdetails: Dienstgrad, mit Punkten der Stand zur Schwelle, befördern oder degradieren, Verlauf. */
+const noRanks = (): Promise<Rank[]> => Promise.resolve([]);
+
 export function MemberRank({
   id,
   member,
@@ -420,6 +422,7 @@ export function MemberRank({
   onChanged,
   onToast,
   focus = false,
+  readOnly = false,
 }: {
   id: number;
   /** Wer kein Mitglied mehr ist (z. B. Gast), kann den Dienstgrad nur verlieren. */
@@ -430,9 +433,12 @@ export function MemberRank({
   onToast: (msg: string) => void;
   /** Aus „Beförderungen“ geöffnet: zum Abschnitt springen und den nächsten Dienstgrad vorschlagen. */
   focus?: boolean;
+  /** Nur sehen (view_promotions ohne manage_ranks): Stand und Verlauf, ohne Befördern. */
+  readOnly?: boolean;
 }) {
-  // Alle, auch inaktive: Position und Schwelle des aktuellen Dienstgrads zählen auch, wenn er deaktiviert ist.
-  const ranks = useAsync(sources.ranksAll.load, sources.ranksAll.deps, sources.ranksAll.key);
+  // Alle, auch inaktive: Position und Schwelle des aktuellen Dienstgrads zählen auch, wenn er deaktiviert ist. Nur zum
+  // Ändern nötig; wer nur sieht, lädt sie nicht.
+  const ranks = useAsync(readOnly ? noRanks : sources.ranksAll.load, sources.ranksAll.deps, readOnly ? undefined : sources.ranksAll.key);
   const [target, setTarget] = useState('');
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -494,38 +500,40 @@ export function MemberRank({
         )}
       </p>
       {ranks.error && <ErrorBox message={ranks.error} onRetry={ranks.reload} />}
-      <form className="form rank-change" onSubmit={submit}>
-        <label className="field">
-          <span>Neuer {rank}</span>
-          <select value={target} onChange={(e) => setTarget(e.target.value)} required>
-            <option value="" disabled>
-              Bitte wählen …
-            </option>
-            {options.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.title}
-                {points && r.min_points !== null ? ` (ab ${r.min_points.toLocaleString('de-DE')})` : ''}
+      {!readOnly && (
+        <form className="form rank-change" onSubmit={submit}>
+          <label className="field">
+            <span>Neuer {rank}</span>
+            <select value={target} onChange={(e) => setTarget(e.target.value)} required>
+              <option value="" disabled>
+                Bitte wählen …
               </option>
-            ))}
-            {status.rank && <option value="none">Kein {rank}</option>}
-          </select>
-        </label>
-        <label className="field">
-          <span>Begründung (optional)</span>
-          <input type="text" maxLength={255} value={reason} onChange={(e) => setReason(e.target.value)} />
-        </label>
-        {formError && (
-          <p className="form-error" role="alert">
-            {formError}
-          </p>
-        )}
-        <button className="btn btn-block" type="submit" disabled={busy || target === ''}>
-          {rank} ändern
-        </button>
-        {points && ranks.data && options.length === 0 && !status.rank && (
-          <p className="muted small">Zurzeit ist keine Änderung möglich: Befördern erst ab der Schwelle.</p>
-        )}
-      </form>
+              {options.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.title}
+                  {points && r.min_points !== null ? ` (ab ${r.min_points.toLocaleString('de-DE')})` : ''}
+                </option>
+              ))}
+              {status.rank && <option value="none">Kein {rank}</option>}
+            </select>
+          </label>
+          <label className="field">
+            <span>Begründung (optional)</span>
+            <input type="text" maxLength={255} value={reason} onChange={(e) => setReason(e.target.value)} />
+          </label>
+          {formError && (
+            <p className="form-error" role="alert">
+              {formError}
+            </p>
+          )}
+          <button className="btn btn-block" type="submit" disabled={busy || target === ''}>
+            {rank} ändern
+          </button>
+          {points && ranks.data && options.length === 0 && !status.rank && (
+            <p className="muted small">Zurzeit ist keine Änderung möglich: Befördern erst ab der Schwelle.</p>
+          )}
+        </form>
+      )}
       <RankHistory entries={history} />
     </section>
   );

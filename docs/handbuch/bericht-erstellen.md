@@ -2,7 +2,7 @@
 titel: Bericht als PDF
 reihenfolge: 69
 rechte: []
-einrecht: [manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_companies, view_personal, create_users, manage_former, promote_users, manage_passive, manage_offices, manage_inventory]
+einrecht: [view_points, view_penalties, view_promotions, view_titles, view_attendance, manage_companies, view_personal, create_users, manage_former, promote_users, manage_passive, manage_offices, manage_inventory]
 ---
 Mit dem Bericht holst du die Daten mehrerer Bereiche für einen Zeitraum in eine PDF-Datei, z. B. für die Jahreshauptversammlung oder wenn ein neuer Vorstand übernimmt.
 
@@ -11,7 +11,7 @@ Tippe unten auf **Verwaltung** und dann auf **Bericht**.
 
 ## Was du hier siehst
 - **Zeitraum**: **Von** und **Bis**, dazu die Schnellwahl **Dieses Jahr** (vom 1. Januar bis heute), **Letztes Jahr** und **Letzte 12 Monate**.
-- **Bereiche**: ein Haken je Bereich. Du siehst nur die Bereiche, die die Kompanie nutzt und die du verwalten darfst. Am Anfang sind alle angehakt.
+- **Bereiche**: ein Haken je Bereich. Du siehst nur die Bereiche, die die Kompanie nutzt und die du sehen darfst. Am Anfang sind alle angehakt.
 - **PDF** (Pfeil nach unten mit „PDF“): erstellt die Datei und lädt sie herunter.
 
 ## Was im Bericht steht

@@ -33,14 +33,28 @@ export const isView = (c: Capability): boolean => VIEW.includes(c);
 const OWN_DATA: Capability[] = ['view_own_points', 'view_own_penalties', 'view_own_rank', 'view_own_attendance'];
 
 /**
+ * Schreibrecht → Leserecht, das es voraussetzt (wie Capability::READ_OF im Kern): Rechte in Lesen und Schreiben
+ * aufgeteilt; das Leserecht setzt seinerseits „Gehört zur Kompanie“ voraus.
+ */
+export const READ_OF: Partial<Record<Capability, Capability>> = {
+  manage_personal: 'view_personal',
+  manage_points: 'view_points',
+  manage_penalties: 'view_penalties',
+  manage_ranks: 'view_promotions',
+  manage_titles: 'view_titles',
+  manage_attendance: 'view_attendance',
+};
+
+/**
  * Recht, das dieses voraussetzt (wie Capability::requires im Kern): eigene Daten und alles zum Verwalten nur mit
- * „Gehört zur Kompanie“ (member); persönliche Angaben pflegt nur, wer sie sieht (manage_personal → view_personal);
- * zu- und absagen nur mit dem internen Kalender.
+ * „Gehört zur Kompanie“ (member); Schreiben nur mit dem passenden Lesen (READ_OF, z. B. manage_personal →
+ * view_personal); zu- und absagen nur mit dem internen Kalender.
  */
 export function requires(c: Capability): Capability | null {
   if (OWN_DATA.includes(c)) return 'member';
   if (c === 'respond_calendar') return 'calendar';
-  if (c === 'manage_personal') return 'view_personal';
+  const read = READ_OF[c];
+  if (read) return read;
   return isView(c) || c === 'member' ? null : 'member';
 }
 
@@ -142,10 +156,15 @@ const ORDER: Capability[] = [
   'manage_gallery',
   'manage_pages',
   'manage_website',
+  'view_points',
   'manage_points',
+  'view_penalties',
   'manage_penalties',
+  'view_promotions',
   'manage_ranks',
+  'view_titles',
   'manage_titles',
+  'view_attendance',
   'manage_attendance',
   'manage_offices',
   'manage_inventory',

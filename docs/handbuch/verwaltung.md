@@ -2,7 +2,7 @@
 titel: Verwaltung
 reihenfolge: 50
 rechte: []
-einrecht: [manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, manage_offices, manage_lists, send_mail, view_personal, manage_personal, create_users, manage_former, manage_passive, promote_users, post_board, manage_polls, manage_inventory, manage_settings]
+einrecht: [view_points, manage_points, view_penalties, manage_penalties, view_promotions, manage_ranks, view_titles, manage_titles, view_attendance, manage_attendance, manage_offices, manage_lists, send_mail, view_personal, manage_personal, create_users, manage_former, manage_passive, promote_users, post_board, manage_polls, manage_inventory, manage_settings]
 ---
 Die Verwaltung ist dein Einstieg in alle Aufgaben, die du in der Kompanie übernimmst: Mitglieder pflegen, {bereich.points} vergeben, {bereich.offices} eintragen und mehr. Jede Aufgabe hat hier einen eigenen Knopf.
 
@@ -13,21 +13,21 @@ Tippe unten in der Leiste auf **Verwaltung**. Den Bereich gibt es nur, wenn du m
 
 ## Was du hier siehst
 Du siehst nur die Knöpfe, für die du das Recht hast und deren Bereich die Kompanie nutzt. Möglich sind:
-- **Mitglieder**: die Mitgliederliste mit der Seite jedes Mitglieds. Sie öffnet, wer {bereich.points} oder {bereich.penalties} vergibt, {bereich.ranks}, {bereich.titles} oder {bereich.attendance} pflegt, Mitglieder anlegt oder Rollen vergibt.
+- **Mitglieder**: die Mitgliederliste mit der Seite jedes Mitglieds. Sie öffnet, wer {bereich.points}, {bereich.penalties}, {bereich.ranks}, {bereich.titles} oder die {bereich.attendance} der Mitglieder sehen darf, Mitglieder anlegt oder Rollen vergibt.
 - **Ehemalige**: ausgetretene, verstorbene und sonst ausgeschiedene Mitglieder (wer Ehemalige verwalten darf).
 - **Passive**: die interne Liste der passiven Mitglieder mit ihren Betreuern (wer Passive verwalten darf).
-- **Bericht**: die Daten mehrerer Bereiche für einen Zeitraum als PDF-Datei (wer einen dieser Bereiche verwalten darf).
+- **Bericht**: die Daten mehrerer Bereiche für einen Zeitraum als PDF-Datei (wer einen dieser Bereiche sehen darf).
 - **{bereich.points} +**: {bereich.points} vergeben.
 - **{bereich.penalties} +**: {bereich.penalties} eintragen.
 - **Beförderungen**: anstehende Beförderungen sehen (nur, wenn die Kompanie {bereich.ranks} und {bereich.points} nutzt).
-- **{bereich.attendance}**: Anwesenheitslisten je Termin.
+- **{bereich.attendance}**: Anwesenheitslisten je Termin (wer sie nur sehen darf, sieht die vorhandenen Listen).
 - **{bereich.board}**, **{bereich.polls}** und **{bereich.inventory}**: führen zu den eigenen Seiten dieser Bereiche.
 - **{bereich.lists}**: Listen zum Drucken.
 - **{bereich.mail}**: E-Mails an Rollen, Mitglieder und beliebige Adressen schreiben.
 - **Einrichtungen**: was ihr einmal anlegt und selten ändert. Dahinter liegen die Knöpfe
   - **{bereich.catalog}**: Vorlagen zum Vergeben von {bereich.points} pflegen,
   - **{bereich.ranks}**: {bereich.ranks} und ihre Schwellen pflegen,
-  - **{bereich.titles}**: {bereich.titles} anlegen,
+  - **{bereich.titles}**: {bereich.titles} anlegen (wer sie nur sehen darf, sieht die Liste),
   - **{bereich.offices}**: wer welches Amt wann hatte,
   - **{bereich.companies}**: eure {bereich.companies} mit Logo, Beschreibung und Mitgliedern,
   - **{bereich.sponsors}**: eure {bereich.sponsors} mit Logo und Link,

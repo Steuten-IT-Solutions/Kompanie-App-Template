@@ -51,12 +51,12 @@ $legacyCaps = static fn (array $l): array => array_values(array_filter(
 $c->ok($caps($member) === $legacyCaps(['member']), 'Mitglied: Mitgliedschaft und Rechte zum Sehen');
 $c->ok($caps($organizer) === $legacyCaps(['member', 'manage_events']), 'Termine verwalten: Termine und Mitglied, keine Punkte/Strafen');
 $c->ok($app->users->find($organizer)?->role === 'events' && get_user_meta($organizer, KompanieApp\WordPress\WpUsers::metaKey(), true) === 'events', 'Rolle steht in der Benutzer-Option der Website');
-$c->ok($caps($manager) === $legacyCaps(['member', 'manage_points']), 'Punkte verwalten: Punkte und Mitglied');
+$c->ok($caps($manager) === $legacyCaps(['member', 'view_points', 'manage_points']), 'Punkte verwalten: Punkte und Mitglied');
 $c->ok(in_array(Roles::ROLE_MEMBER, get_userdata($member)->roles, true), 'Mitglied behält die frühere WP-Rolle (Zurückrollen)');
 $c->ok(count($caps($admin)) === count(KompanieApp\Core\Auth\Capability::cases()) && $app->users->find($admin)?->role === 'admin', 'Administrator: alle App-Rechte');
 
 // Eigene Rolle aus der App wirkt auch in WordPress.
-$app->roles()->create(['label' => 'Kpwp Kasse', 'capabilities' => $legacyCaps(['member', 'manage_penalties'])]);
+$app->roles()->create(['label' => 'Kpwp Kasse', 'capabilities' => $legacyCaps(['member', 'view_penalties', 'manage_penalties'])]);
 $kasseKey = (string) array_search('Kpwp Kasse', array_column($app->roles()->all(), 'label', 'key'), true);
 $app->users->setRole($member, $kasseKey);
 clean_user_cache($member);
@@ -454,6 +454,14 @@ Plugin::upgrade();
 $c->ok($wpSettings->get('kp_alt') === 'aus der Vorversion', 'Einstellung ohne Autoload aus einer Vorversion nach dem Update lesbar');
 $c->ok(get_option(KompanieApp\WordPress\WpSettings::PREFIX . 'roles_version') === $rolesVersion, 'Update-Schritt einmal je Version');
 delete_option(KompanieApp\WordPress\WpSettings::PREFIX . 'kp_alt');
+// false bei einer noch nicht gespeicherten Einstellung (update_option() allein speicherte nichts, die Vorgabe „an“ blieb).
+delete_option(KompanieApp\WordPress\WpSettings::PREFIX . 'kp_schalter');
+$wpSettings->set('kp_schalter', false);
+wp_cache_delete('alloptions', 'options');
+$c->ok((bool) (new KompanieApp\WordPress\WpSettings())->get('kp_schalter', true) === false, 'Schalter mit Vorgabe an lässt sich beim ersten Mal ausschalten (false gespeichert)');
+$wpSettings->set('kp_schalter', true);
+$c->ok((bool) $wpSettings->get('kp_schalter', false) === true, 'Und wieder einschalten');
+delete_option(KompanieApp\WordPress\WpSettings::PREFIX . 'kp_schalter');
 
 $c->section('Aufgaben');
 $task = [\KompanieApp\Core\Domain\GalleryService::TASK];
@@ -638,6 +646,15 @@ $c->ok(str_contains($page, 'Alternative: Dienstkonto') && strpos($page, 'id="dri
 $d->actAs($admin);
 [$s, $set] = $d->request('GET', '/admin/settings');
 $c->ok($s === 200 && ($set['google']['redirect_uri'] ?? '') === $redirect, 'Weiterleitungs-URI: wp-admin/admin-post.php');
+// Erinnerung an Zu- und Absagen ausschalten (Vorgabe an): bleibt nach dem Neuladen aus.
+delete_option(KompanieApp\WordPress\WpSettings::PREFIX . KompanieApp\Core\Domain\EventResponseService::REMINDER_SETTING);
+$responsesBefore = $app->settings->get(KompanieApp\Core\Domain\EventResponseService::ENABLED_SETTING);
+[$s, $set] = $d->request('PATCH', '/admin/settings', ['calendar_responses' => '1', 'calendar_response_reminder' => '0']);
+wp_cache_delete('alloptions', 'options');
+$c->ok($s === 200 && $set['calendar']['response_reminder'] === false && $d->request('GET', '/admin/settings')[1]['calendar']['response_reminder'] === false && get_option(KompanieApp\WordPress\WpSettings::PREFIX . KompanieApp\Core\Domain\EventResponseService::REMINDER_SETTING, null) !== null, 'Erinnerung an Zu- und Absagen bleibt ausgeschaltet');
+[$s, $set] = $d->request('PATCH', '/admin/settings', ['calendar_response_reminder' => '1']);
+$c->ok($s === 200 && $set['calendar']['response_reminder'] === true, 'Erinnerung wieder einschalten');
+$responsesBefore === null ? $app->settings->delete(KompanieApp\Core\Domain\EventResponseService::ENABLED_SETTING) : $app->settings->set(KompanieApp\Core\Domain\EventResponseService::ENABLED_SETTING, $responsesBefore);
 [$s, $start] = $d->request('POST', '/admin/google/connect', ['client_id' => '1-wp.apps.googleusercontent.com', 'client_secret' => 'GOCSPX-wp']);
 parse_str((string) parse_url((string) ($start['url'] ?? ''), PHP_URL_QUERY), $q);
 $c->ok($s === 200 && ($q['redirect_uri'] ?? '') === $redirect && str_starts_with((string) ($q['state'] ?? ''), 'kompanie_app_app_'), 'REST: Admin beginnt die Verbindung (Rückkehr in die App)');
