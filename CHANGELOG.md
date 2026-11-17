@@ -37,7 +37,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   warten, steht unter [Einstellungen → Galerie](app:einstellungen/galerie). Mit Drive als Ablage gibt es in der
   [Galerie](app:galerie) für Bilder und Alben aus Drive dieselben Knöpfe wie für hochgeladene: Verschieben, Nur für
   Mitglieder bzw. Öffentlich (über den Ordner „intern“), Löschen (in den Papierkorb von Drive), Alben anlegen (als Ordner
-  im Jahresordner), umbenennen, in ein anderes Jahr setzen und löschen.
+  im Jahresordner), umbenennen, in ein anderes Jahr setzen und löschen. Alben, die bisher nur in der App lagen, bekommen
+  einmalig einen Ordner im Jahresordner von Drive, ihre Bilder ziehen im Hintergrund dorthin um.
 - **Terminarten**: Unter [Einstellungen → Kalender](app:einstellungen/kalender) richtest du Terminarten ein, z. B.
   Versammlung oder Arbeitsdienst. Wer Termine pflegen darf, wählt die Art im aufgeklappten Termin unter
   [Termine](app:termine), bei jeder Quelle des Kalenders, auch bei Google Kalender und iCal. Die App speichert die Art

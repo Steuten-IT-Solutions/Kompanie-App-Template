@@ -115,14 +115,17 @@ final class GalleryUploadService
                 throw ApiError::invalid('Das Album ließ sich in Google Drive nicht anlegen: ' . $e->getMessage());
             }
         }
-        $id = $this->repo()->insertAlbum([
-            'drive_id' => $folder ?? self::ALBUM_PREFIX . bin2hex(random_bytes(12)),
-            'year' => $year,
-            'title' => $title,
-            'sort_date' => $now,
-            'synced_at' => $now,
-            'source' => $folder !== null ? 'drive' : 'app',
-        ]);
+        $data = ['year' => $year, 'title' => $title, 'sort_date' => $now, 'synced_at' => $now, 'source' => $folder !== null ? 'drive' : 'app'];
+        $repo = $this->repo();
+        $id = $repo->transaction(static function () use ($repo, $folder, $data): int {
+            // Hat ein gleichzeitiger Abgleich den neuen Ordner schon als Album angelegt: dieses übernehmen.
+            $twin = $folder !== null ? $repo->albumByDriveId($folder) : null;
+            if ($twin !== null) {
+                $repo->updateAlbum((int) $twin['id'], $data);
+                return (int) $twin['id'];
+            }
+            return $repo->insertAlbum(['drive_id' => $folder ?? self::ALBUM_PREFIX . bin2hex(random_bytes(12))] + $data);
+        });
         return $this->album($id);
     }
 
