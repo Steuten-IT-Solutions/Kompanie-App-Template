@@ -374,8 +374,9 @@ final class CompanyService
         }
         $year = Input::integer($raw);
         $max = (int) $this->app->time()->format($this->app->time()->timestamp(), 'Y');
-        if ($year === null || $year < OfficeService::YEAR_MIN || $year > $max) {
-            throw ApiError::invalid(sprintf('Bitte ein Gründungsjahr zwischen %d und %d angeben oder das Feld leer lassen.', OfficeService::YEAR_MIN, $max));
+        // Keine Untergrenze außer > 0: Manche Kompanien sind älter als jede feste Grenze.
+        if ($year === null || $year < 1 || $year > $max) {
+            throw ApiError::invalid(sprintf('Bitte ein Gründungsjahr bis %d angeben oder das Feld leer lassen.', $max));
         }
         return $year;
     }

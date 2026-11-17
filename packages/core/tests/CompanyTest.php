@@ -83,7 +83,9 @@ final class CompanyTest extends TestCase
             'Name fehlt' => ['short_name' => 'X'],
             'Name zu lang' => ['name' => str_repeat('x', CompanyService::NAME_MAX + 1)],
             'Kurzname zu lang' => ['name' => 'A', 'short_name' => str_repeat('x', CompanyService::SHORT_MAX + 1)],
-            'Jahr zu früh' => ['name' => 'A', 'founded_year' => 1799],
+            'Jahr null' => ['name' => 'A', 'founded_year' => 0],
+            'Jahr negativ' => ['name' => 'A', 'founded_year' => -5],
+            'Jahr keine ganze Zahl' => ['name' => 'A', 'founded_year' => 1850.5],
             'Jahr in der Zukunft' => ['name' => 'A', 'founded_year' => 9999],
             'nur http' => ['name' => 'A', 'website_url' => 'http://example.org/'],
             'App nur https' => ['name' => 'A', 'app_url' => 'javascript:alert(1)'],
@@ -94,6 +96,13 @@ final class CompanyTest extends TestCase
             $this->assertSame(400, $this->call('POST', '/companies', $body)->status, $case);
         }
         $this->assertSame([], $this->call('GET', '/companies')->data);
+    }
+
+    public function testFoundedYearWithoutLowerLimit(): void
+    {
+        $id = $this->company(['name' => 'Alte Kompanie', 'founded_year' => 1430]);
+        $this->assertSame(1430, $this->call('GET', '/companies')->data[0]['founded_year'], 'älter als 1800');
+        $this->assertSame(1, $this->call('PATCH', "/companies/$id", ['founded_year' => '1'])->data['founded_year'], 'kleinstes Jahr');
     }
 
     public function testLinksWithoutScheme(): void
