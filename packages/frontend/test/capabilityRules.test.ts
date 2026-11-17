@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Capability } from '../src/api.ts';
-import { groupState, lockedFor, orderedCaps, requires, toggleCap, toggleForRole, toggleMany } from '../src/capabilityRules.ts';
+import { groupState, lockedFor, orderedCaps, requires, rightsRows, toggleCap, toggleForRole, toggleMany } from '../src/capabilityRules.ts';
 
 const set = (...caps: Capability[]) => new Set<Capability>(caps);
 
@@ -119,4 +119,28 @@ test('Kompanien und Sponsoren: Rechte zum Sehen, auch für Gast, und beim Speich
     'view_sponsors',
     'member',
   ]);
+});
+
+test('Rechtebaum: Leserecht mit Bereich und folgendem Schreibrecht in einer Zeile, sonst einzeln', () => {
+  const rows = rightsRows<{ key: Capability; area?: string }>([
+    { key: 'view_points', area: 'Punkte' },
+    { key: 'manage_points' },
+    { key: 'view_accounts', area: 'Konten' },
+    { key: 'create_users' },
+    { key: 'manage_former' },
+    { key: 'promote_users' },
+    { key: 'view_lists', area: 'Listen' },
+    { key: 'manage_events' },
+  ]);
+  assert.deepEqual(
+    rows.map((r) => (r.kind === 'pair' ? `${r.area}: ${r.read.key}/${r.write.key}` : r.item.key)),
+    [
+      'Punkte: view_points/manage_points',
+      'Konten: view_accounts/create_users',
+      'manage_former',
+      'promote_users',
+      'view_lists',
+      'manage_events',
+    ],
+  );
 });

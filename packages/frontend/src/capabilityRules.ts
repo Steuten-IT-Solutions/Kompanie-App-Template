@@ -205,3 +205,28 @@ const ORDER: Capability[] = [
 
 /** Rechte in der Reihenfolge der Gruppen (wie der Kern sie speichert). */
 export const orderedCaps = (set: ReadonlySet<Capability>): Capability[] => ORDER.filter((c) => set.has(c));
+
+/** Eine Zeile im Rechtebaum: ein einzelnes Recht oder ein Bereich mit Leserecht und Schreibrecht. */
+export type RightsRow<T extends { key: Capability; area?: string }> =
+  | { kind: 'single'; item: T }
+  | { kind: 'pair'; area: string; read: T; write: T };
+
+/**
+ * Zeilen einer Gruppe im Rechtebaum (rightsTree.tsx): Ein Leserecht mit Bereichsnamen (area), dem sein Schreibrecht folgt
+ * (READ_OF), wird eine Zeile mit den Haken „Lesen“ und „Schreiben“ (Entscheidung vom 17.11.2026); alle anderen Rechte
+ * bleiben einzeln.
+ */
+export function rightsRows<T extends { key: Capability; area?: string }>(items: T[]): RightsRow<T>[] {
+  const rows: RightsRow<T>[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const next = items[i + 1];
+    if (item.area && next && READ_OF[next.key] === item.key) {
+      rows.push({ kind: 'pair', area: item.area, read: item, write: next });
+      i++;
+    } else {
+      rows.push({ kind: 'single', item });
+    }
+  }
+  return rows;
+}
