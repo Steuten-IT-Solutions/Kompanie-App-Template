@@ -4,6 +4,8 @@
  * prüfen wie immer. „Verwaltung“ und „Meins“ hängt App.tsx fest hinten an.
  */
 
+import type { Capability, Feature } from './api';
+
 /** Bereiche, die in der Navigation stehen können (wie NavigationService::TARGETS im Kern), in der Standardreihenfolge. */
 export const NAV_TARGETS = [
   'termine',
@@ -123,10 +125,51 @@ export function orderBy<T extends string>(list: readonly T[], wanted: readonly s
  * Teilliste neu geordnet in die ganze Liste zurückschreiben: Die Einträge von part belegen nacheinander die Plätze, an
  * denen sie in full standen; alle anderen bleiben, wo sie sind. So ordnet man nur die sichtbaren Einträge.
  */
-export function mergeOrder<T extends string>(full: readonly T[], part: readonly T[]): T[] {
+export function mergeOrder<T>(full: readonly T[], part: readonly T[]): T[] {
   const inPart = new Set(part);
   let n = 0;
   return full.map((t) => (inPart.has(t) ? part[n++] : t));
+}
+
+/**
+ * Darf jemand mit diesen Rechten (has) den Bereich in der Navigation sehen, bei diesen eingeschalteten Bereichen (on)?
+ * Die eine Regel für die Tab-Leiste (App.tsx) und für Einstellungen → Navigation (mit allen Rechten: ist der Bereich an;
+ * mit den Rechten der Rolle Gast: sehen ihn Gäste). Die Server prüfen wie immer selbst.
+ */
+export function targetAllowed(t: FixedTarget, has: (cap: Capability) => boolean, on: (feature: Feature) => boolean): boolean {
+  switch (t) {
+    // Termine: öffentliche Liste, interner Kalender oder (nur sie) die Geburtstage
+    case 'termine':
+      return (on('events') && has('view_events')) || (on('calendar') && has('calendar')) || (on('birthdays') && has('view_birthdays'));
+    case 'news':
+      return on('news') && has('view_news');
+    case 'galerie':
+      return on('gallery') && (has('view_gallery') || has('view_gallery_internal'));
+    case 'kompanien':
+      return on('companies') && (has('view_companies') || has('manage_companies'));
+    case 'sponsoren':
+      return on('sponsors') && (has('view_sponsors') || has('manage_sponsors'));
+    // Mitgliederliste, Ehemalige und Ämter unter einem Punkt
+    case 'mitglieder':
+      return (on('directory') && (has('view_directory') || has('view_former'))) || (on('offices') && has('view_offices'));
+    case 'dokumente':
+      return on('documents') && (has('view_documents') || has('view_restricted_documents'));
+    // In der Navigation nur mit allen internen Nachrichten (wie boardVisible)
+    case 'brett':
+      return on('board') && has('view_board');
+    case 'dienstgrade':
+      return on('ranks') && has('view_ranks');
+    case 'punktekatalog':
+      return on('points') && has('view_catalog');
+  }
+}
+
+/**
+ * Sehen Gäste eine eigene Seite (wie PageService::canRead im Kern)? Öffentliche alle; die für Mitglieder nur Angemeldete
+ * mit view_board oder manage_pages, also mit der Grundrolle Gast nur, wenn die Rolle Gast eines davon hat.
+ */
+export function pageAllowedForGuests(audience: string | undefined, has: (cap: Capability) => boolean): boolean {
+  return audience === 'public' || has('view_board') || has('manage_pages');
 }
 
 /** Sieht die Person die Leiste der Gäste? Ohne Anmeldung und mit der Grundrolle Gast (auch in der Vorschau als Gast). */

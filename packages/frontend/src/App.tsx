@@ -6,9 +6,8 @@ import { detectPlatform, isStandalone, promptInstall, useCanPrompt } from './ins
 import BoardBanner from './BoardBanner';
 import { caps } from './sharpS';
 import PushHint from './PushHint';
-import { boardReadable, boardVisible, canManagePolls, canPostBoard, pollsVisible } from './board';
+import { boardReadable, canManagePolls, canPostBoard, pollsVisible } from './board';
 import { ErrorBoundary, lazyView, Loading } from './ui';
-import { birthdaysVisible } from './upcomingBirthdays';
 import { forgetPushOnLogout } from './push';
 import { endPreview, previewRole, PUBLIC_PREVIEW, stopPreview } from './preview';
 import { navigate, redirect, useRoute, viewKey } from './router';
@@ -18,6 +17,8 @@ import { MenuBack, InternMenu } from './internNav';
 import { targetIcons, targetLabels } from './navLabels';
 import {
   buildNav,
+  targetAllowed,
+  type FixedTarget,
   isGuestView,
   isPageTarget,
   navigationFor,
@@ -36,7 +37,7 @@ import { toggleTheme, useTheme } from './theme';
 import News from './views/News';
 import Termine, { canManageCalendar } from './views/Termine';
 import { canManageGallery } from './galleryManage';
-import { hasEvents, prefetcher, tabSources, type TabId } from './viewData';
+import { prefetcher, tabSources, type TabId } from './viewData';
 import { whenIdle } from './prefetch';
 import { clearOfflineChanges } from './attendanceSync';
 import { pendingOfflineCount, syncOffline } from './offlineSync';
@@ -399,32 +400,27 @@ export default function App({ notice = null }: { notice?: string | null }) {
   const rawPath = useRoute();
   const path = ALIASES[rawPath[0]] ?? rawPath;
   const user = config?.user ?? null;
-  // Jeder Knopf mit eigenem Recht (wie die Routen im Kern); ohne Anmeldung die Rechte von Gast (can).
-  const docsAllowed = !!features?.documents && (can('view_documents') || can('view_restricted_documents'));
-  // Mitgliederliste, Ehemalige und Ämter (Issue #112) unter einem Knopf.
-  const membersAllowed = !!(
-    (features?.directory && (can('view_directory') || can('view_former'))) ||
-    (features?.offices && can('view_offices'))
-  );
-  // Dienstgrade und Punktekatalog zum Nachschlagen.
-  const ranksAllowed = !!features?.ranks && can('view_ranks');
-  const catalogAllowed = !!features?.points && can('view_catalog');
+  // Jeder Knopf mit eigenem Recht (wie die Routen im Kern); ohne Anmeldung die Rechte von Gast (can). Die Bereiche der
+  // Navigation nach einer Regel (targetAllowed), die auch Einstellungen → Navigation nutzt.
+  const shown = (t: FixedTarget): boolean => targetAllowed(t, can, (f) => !!features?.[f]);
   const pageIds = new Set((config?.pages ?? []).map((p) => p.id));
   const allowed: Record<View, boolean> = {
     // Geburtstage (Issue #1) stehen bei den Terminen: für alle, die sie sehen, auch wenn es sonst keine Termine gibt.
-    termine: hasEvents() || birthdaysVisible(),
-    news: !!features?.news && can('view_news'),
-    galerie: !!features?.gallery && (can('view_gallery') || can('view_gallery_internal')),
+    termine: shown('termine'),
+    news: shown('news'),
+    galerie: shown('galerie'),
     // Kompanien (Issue #280): mit view_companies sehen, mit manage_companies (Verwaltung) ohnehin
-    kompanien: !!features?.companies && (can('view_companies') || can('manage_companies')),
+    kompanien: shown('kompanien'),
     // Sponsoren (Issue #279): mit view_sponsors sehen, mit manage_sponsors (Verwaltung) ohnehin
-    sponsoren: !!features?.sponsors && (can('view_sponsors') || can('manage_sponsors')),
+    sponsoren: shown('sponsoren'),
     // Eigene Seiten (Issue #287): #/seiten/<id>, wenn es eine gibt, die die Person lesen darf; wer sie pflegt, ohnehin
     seiten: !!features?.pages && ((config?.pages?.length ?? 0) > 0 || can('manage_pages')),
-    dokumente: docsAllowed,
-    mitglieder: membersAllowed,
-    dienstgrade: ranksAllowed,
-    punktekatalog: catalogAllowed,
+    dokumente: shown('dokumente'),
+    // Mitgliederliste, Ehemalige und Ämter (Issue #112) unter einem Knopf
+    mitglieder: shown('mitglieder'),
+    // Dienstgrade und Punktekatalog zum Nachschlagen
+    dienstgrade: shown('dienstgrade'),
+    punktekatalog: shown('punktekatalog'),
     // Intern bzw. ein Untermenü: unten aus der Navigation bestimmt
     intern: false,
     menue: false,
@@ -455,7 +451,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
   const navEntries = buildNav(navigationFor(config, guestView), {
     // Eigene Seiten (Issue #287): jede, die die Person lesen darf (/config), als eigener Punkt
     visible: (t: NavTarget) =>
-      t === 'brett' ? boardVisible() : isPageTarget(t) ? allowed.seiten && pageIds.has(Number(t.slice(7))) : allowed[t],
+      t === 'brett' ? shown('brett') : isPageTarget(t) ? allowed.seiten && pageIds.has(Number(t.slice(7))) : allowed[t],
     intern: can('view_intern'),
     label: (t: NavTarget) => targetLabels()[t] ?? t,
     pages: (config?.pages ?? []).map((p) => pageTarget(p.id)),

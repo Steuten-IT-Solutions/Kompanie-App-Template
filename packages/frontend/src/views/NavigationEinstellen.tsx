@@ -1,12 +1,13 @@
 import { useState, type ReactNode } from 'react';
 import { defaultSections } from '../generated/brand';
 import { adminTabs, adminTileCatalog } from '../adminNav';
-import { api, applyNavigation, config, levelLabel, type Feature, type NavigationAdmin, type PageSummary } from '../api';
+import { api, applyNavigation, config, levelLabel, type Capability, type Feature, type NavigationAdmin, type PageSummary } from '../api';
 import { useDragSort } from '../dragSort';
 import {
   draftError,
   draftOf,
   guestDraftOf,
+  INTERN_TARGETS,
   internOrderOf,
   isPageTarget,
   mergeOrder,
@@ -17,10 +18,12 @@ import {
   moveTo,
   NAV_ICONS,
   NAV_TARGETS,
+  pageAllowedForGuests,
   pageTarget,
   placeOf,
   removeMenu,
   startChoices,
+  targetAllowed,
   targetIcon,
   unplaced,
   type FixedTarget,
@@ -34,20 +37,6 @@ import {
 } from '../navigation';
 import { ErrorBox, Loading, useAsync } from '../ui';
 import { confirmAsk } from '../ask';
-
-/** Bereiche der App, ohne die ein Punkt der Navigation für niemanden erscheint. */
-const FEATURES: Record<FixedTarget, Feature[]> = {
-  termine: ['events', 'calendar', 'birthdays'],
-  news: ['news'],
-  galerie: ['gallery'],
-  kompanien: ['companies'],
-  sponsoren: ['sponsors'],
-  mitglieder: ['directory', 'offices'],
-  dokumente: ['documents'],
-  brett: ['board'],
-  dienstgrade: ['ranks'],
-  punktekatalog: ['points'],
-};
 
 const ICON_LABELS: Record<string, string> = {
   ordner: 'Ordner',
@@ -98,7 +87,13 @@ function defaultLabel(t: string, pages: PageSummary[]): string {
   return fixed[t] ?? pages.find((p) => pageTarget(p.id) === t)?.title ?? t;
 }
 
-const isOn = (t: NavTarget): boolean => (isPageTarget(t) ? !!config?.features.pages : FEATURES[t].some((f) => !!config?.features[f]));
+const featureOn = (f: Feature): boolean => !!config?.features[f];
+
+/** Ist der Bereich an (sieht ihn mit den nötigen Rechten überhaupt jemand)? Sonst steht er für niemanden in der Leiste. */
+const isOn = (t: NavTarget): boolean => (isPageTarget(t) ? featureOn('pages') : targetAllowed(t, () => true, featureOn));
+
+/** Rechte der Rolle Gast; sie gelten auch ohne Anmeldung. */
+const guestCan = (cap: Capability): boolean => (config?.guestCapabilities ?? []).includes(cap);
 
 type Labels = Record<string, string | undefined>;
 
@@ -172,6 +167,14 @@ function Editor({
     savedGuest !== null ? draftOf(savedGuest) : guestDraftOf(initial),
   );
   const editingGuest = who === 'guest';
+  // Sehen Gäste den Punkt (Bereich an, Recht der Rolle Gast, bei eigenen Seiten deren Zielgruppe)?
+  const audience = new Map<string, string>(pages.map((p) => [pageTarget(p.id), p.audience]));
+  const forGuests = (t: NavTarget): boolean =>
+    isPageTarget(t) ? featureOn('pages') && pageAllowedForGuests(audience.get(t), guestCan) : targetAllowed(t, guestCan, featureOn);
+  // Zur Auswahl steht nur, was in der gerade bearbeiteten Leiste erscheinen kann. Der Rest behält im Entwurf seinen Platz
+  // (auch gespeicherte Punkte), erscheint aber nicht: Wird der Bereich eingeschaltet bzw. bekommt Gast das Recht, steht er
+  // wieder hier.
+  const avail = (t: string): t is NavTarget => known(t) && (editingGuest ? forGuests(t) : isOn(t));
   // Entwurf, den die Liste gerade zeigt und ändert
   const cur = editingGuest ? guestDraft : draft;
   const [busy, setBusy] = useState(false);
@@ -188,11 +191,16 @@ function Editor({
   const problem =
     draftError(draft, data.label_max) ?? (guestProblem ? `Leiste für Gäste: ${guestProblem}` : null) ?? namesError(names, data.label_max);
   const menus = cur.items.filter((i): i is NavMenuSetting => typeof i !== 'string');
-  const newOnes = unplaced(cur, pageTargets);
+  const newOnes = unplaced(cur, pageTargets).filter(avail);
+  // Hauptpunkte in der Liste: Bereiche, die erscheinen können, und alle Untermenüs (ein leeres meldet draftError)
+  const shownItems = cur.items.filter((i) => typeof i !== 'string' || avail(i));
+  const shownCount = shownItems.filter((i) => typeof i === 'string' || i.items.length === 0 || i.items.some(avail)).length;
+  // Nicht aufgeführt, weil sie in dieser Leiste nicht erscheinen können
+  const unavailable = [...NAV_TARGETS, ...pageTargets].filter((t) => !avail(t));
   // Punkte unten: Angemeldete haben dazu Verwaltung und Meins, Gäste ohne Anmeldung keins von beiden.
-  const mainCount = editingGuest ? cur.items.length + newOnes.length : (keepDefault ? 5 : draft.items.length + newOnes.length) + 2;
+  const mainCount = editingGuest ? shownCount + newOnes.length : (keepDefault ? 5 : shownCount + newOnes.length) + 2;
   const duplicates = duplicateNames(
-    Object.fromEntries(Object.entries(labels).filter(([k]) => k !== 'intern' && known(k) && isOn(k) && !cur.hidden.includes(k))),
+    Object.fromEntries(Object.entries(labels).filter(([k]) => k !== 'intern' && avail(k) && !cur.hidden.includes(k))),
     keepDefault && !editingGuest ? [labels.intern ?? ''] : menus.map((m) => m.label.trim()),
   );
 
@@ -254,11 +262,20 @@ function Editor({
     // Gäste: ihre eigene Leiste, sonst die der Angemeldeten
     const own = who === 'guest' && guestOwn;
     const nav = own ? guestDraft : draft;
-    const choices = startChoices(own ? guestDraft : keepDefault ? null : draft, who === 'member', pageTargets).filter(
-      (t) => !known(t) || (isOn(t) && !nav.hidden.includes(t)),
-    );
+    const navMenus = nav.items.filter((i): i is NavMenuSetting => typeof i !== 'string');
+    // Nur, was diese Personen sehen können: Gäste mit den Rechten der Rolle Gast, Angemeldete alles, was an ist.
+    const ok = (t: string): boolean => known(t) && (who === 'guest' ? forGuests(t) : isOn(t));
+    const standard = !own && keepDefault;
+    const choices = startChoices(own ? guestDraft : keepDefault ? null : draft, who === 'member', pageTargets).filter((t) => {
+      if (known(t)) return ok(t) && !nav.hidden.includes(t);
+      const menu = /^menue\/(\d+)$/.exec(t);
+      if (menu) return navMenus[Number(menu[1]) - 1]?.items.some(ok) ?? false;
+      // „Intern“ der Standardnavigation: nur mit dem Recht „Intern“ (Gäste: das der Rolle Gast) und etwas darin
+      if (t === 'intern') return standard && (who === 'member' || guestCan('view_intern')) && INTERN_TARGETS.some(ok);
+      return true;
+    });
     const menuLabel = (n: number): string => {
-      const m = nav.items.filter((i): i is NavMenuSetting => typeof i !== 'string')[n - 1];
+      const m = navMenus[n - 1];
       return `Untermenü „${m?.label.trim() || `Menü ${n}`}“`;
     };
     return (
@@ -356,7 +373,6 @@ function Editor({
     <div className="row-main">
       <span className="row-title">{labels[t]}</span>
       {isPageTarget(t) && <span className="row-sub row-kind">Eigene Seite</span>}
-      {!isOn(t) && <div className="row-sub">Der Bereich ist ausgeschaltet und erscheint erst, wenn er an ist.</div>}
       {placeSelect(t)}
       {renameFields(t, targetIcon(t))}
     </div>
@@ -427,8 +443,8 @@ function Editor({
             </p>
           )}
           <MainList
-            draft={cur}
-            onMove={(items) => change({ ...cur, items })}
+            items={shownItems}
+            onMove={(items) => change({ ...cur, items: mergeOrder(cur.items, items) })}
             disabled={busy}
             labels={labels}
             render={(item, index) => {
@@ -456,13 +472,23 @@ function Editor({
                     </select>
                   </label>
                   <SubList
-                    items={item.items.filter(known)}
+                    items={item.items.filter(avail)}
                     disabled={busy}
-                    onMove={(next) => updateMenu(index, { items: next })}
+                    onMove={(next) => updateMenu(index, { items: mergeOrder(item.items, next) })}
                     render={targetRow}
                     labels={labels}
                   />
-                  {item.items.length === 0 && <p className="small muted">Noch leer: Wähle bei einem Bereich „Im Untermenü …“.</p>}
+                  {item.items.length === 0 ? (
+                    <p className="small muted">Noch leer: Wähle bei einem Bereich „Im Untermenü …“.</p>
+                  ) : (
+                    !item.items.some(avail) && (
+                      <p className="small muted">
+                        {editingGuest
+                          ? 'Darin ist zurzeit nichts, was Gäste sehen dürfen: Das Untermenü erscheint nicht.'
+                          : 'Die Bereiche darin sind ausgeschaltet: Das Untermenü erscheint nicht.'}
+                      </p>
+                    )
+                  )}
                   <button
                     type="button"
                     className="btn btn-small btn-secondary"
@@ -479,11 +505,11 @@ function Editor({
             Untermenü hinzufügen
           </button>
 
-          {(cur.hidden.length > 0 || newOnes.length > 0) && (
+          {(cur.hidden.some(avail) || newOnes.length > 0) && (
             <>
               <h4>Nicht in der Navigation</h4>
               <ul className="card-list">
-                {cur.hidden.filter(known).map((t) => (
+                {cur.hidden.filter(avail).map((t) => (
                   <li key={t} className="card row">
                     {targetRow(t)}
                   </li>
@@ -499,6 +525,13 @@ function Editor({
                 ))}
               </ul>
             </>
+          )}
+          {unavailable.length > 0 && (
+            <p className="small muted" role="note">
+              {editingGuest
+                ? `Nicht zur Auswahl, weil Gäste sie nicht sehen dürfen oder der Bereich aus ist: ${unavailable.map((t) => labels[t]).join(', ')}. Was Gäste sehen, stellst du bei der Rolle ${GUEST_LABEL()} unter Einstellungen → Rollen ein.`
+                : `Nicht zur Auswahl, weil der Bereich aus ist: ${unavailable.map((t) => labels[t]).join(', ')}. Schaltest du einen ein, steht er wieder hier.`}
+            </p>
           )}
         </>
       )}
@@ -644,28 +677,29 @@ function duplicateNames(labels: Labels, menuLabels: string[]): string[] {
 
 /** Hauptpunkte: per Ziehen am Griff ordnen. */
 function MainList({
-  draft,
+  items,
   onMove,
   disabled,
   render,
   labels,
 }: {
-  draft: NavigationSetting;
+  /** Die gezeigten Hauptpunkte (ohne die, die in dieser Leiste nicht erscheinen können) */
+  items: Item[];
   labels: Labels;
   onMove: (items: Item[]) => void;
   disabled: boolean;
   /** index: Nummer des Untermenüs (ab 0), bei Bereichen -1 */
   render: (item: Item, index: number) => ReactNode;
 }) {
-  const sort = useDragSort(draft.items, onMove, disabled);
+  const sort = useDragSort(items, onMove, disabled);
   let menu = -1;
   return (
     <ul className="card-list">
-      {draft.items.map((item, i) => {
+      {items.map((item, i) => {
         if (typeof item !== 'string') menu++;
         return (
           <li key={typeof item === 'string' ? item : `menu-${i}`} {...sort.itemProps(i, 'card row')}>
-            {draft.items.length > 1 && sort.handle(i, typeof item === 'string' ? (labels[item] ?? item) : item.label)}
+            {items.length > 1 && sort.handle(i, typeof item === 'string' ? (labels[item] ?? item) : item.label)}
             {render(item, typeof item === 'string' ? -1 : menu)}
           </li>
         );
