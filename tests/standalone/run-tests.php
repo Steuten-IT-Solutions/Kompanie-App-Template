@@ -707,6 +707,9 @@ try {
     $c->ok($set['news'] === ['source' => 'rss', 'url' => 'https://example.org/feed', 'sources' => ['none', 'wordpress', 'rss', 'app']], 'Quelle der Neuigkeiten einstellbar');
     $c->ok(json_decode((string) $kernel->db()->scalar("SELECT value FROM {settings} WHERE name = 'calendar_ics_url'")) === 'https://calendar.example.org/geheim/basic.ics', 'webcal:// wird als https:// gespeichert');
     $c->ok($d->request('PATCH', '/admin/settings', ['news_source' => 'none', 'calendar_ics_url' => ''])[1]['calendar']['source'] === 'none', 'Einstellungen lassen sich wieder leeren');
+    [$s, $set] = $d->request('PATCH', '/admin/settings', ['calendar_responses' => '1', 'calendar_response_reminder' => '0']);
+    $c->ok($s === 200 && $set['calendar']['response_reminder'] === false && json_decode((string) $kernel->db()->scalar("SELECT value FROM {settings} WHERE name = 'event_response_reminder'")) === false, 'Erinnerung an Zu- und Absagen bleibt ausgeschaltet (gespeichert)');
+    $c->ok($d->request('PATCH', '/admin/settings', ['calendar_responses' => '0', 'calendar_response_reminder' => '1'])[0] === 200, 'Erinnerung wieder an, Zu- und Absagen wieder aus');
     $c->ok($d->request('POST', '/admin/gallery/sync')[0] === 503, 'Abgleich ohne Galerie → 503 not_configured');
     // Kalender-IDs ohne API-Schlüssel: gelesen über den Google-Zugang der Galerie, wenn er den Kalender lesen darf.
     $store = $kernel->app()->settings;

@@ -165,6 +165,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Erinnerung an Zu- und Absagen ausschalten**: Unter [Einstellungen → Kalender](app:einstellungen/kalender) bleibt
+  die Erinnerung an Zu- und Absagen jetzt ausgeschaltet, wenn du den Haken entfernst und speicherst. In der
+  WordPress-Version war der Haken nach dem Neuladen wieder gesetzt, weil WordPress beim ersten Ausschalten nichts
+  gespeichert hat.
+
 - **Anwesenheit ohne Verbindung**: Wer in einer Anwesenheitsliste unter
   [Verwaltung → Anwesenheit](app:verwaltung/anwesenheit) ohne Internet auf _Speichern_ tippt, verliert die Häkchen nicht
   mehr. Die App merkt sie sich auf dem Gerät, auch über einen Neustart, zeigt sie mit dem Hinweis „Noch nicht
