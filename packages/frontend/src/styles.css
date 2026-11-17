@@ -7636,6 +7636,7 @@ fieldset.block-source legend {
 /* Karte eines Passiven (Verwaltung → Passive bzw. Meins → Meine Passiven): Beiträge und Angaben als eigene Karten */
 .passive-card .card {
   margin-top: var(--space-3);
+  padding: 14px 16px;
 }
 .passive-card h3 {
   margin: 0 0 8px;
@@ -7651,6 +7652,10 @@ fieldset.block-source legend {
 .passive-payment-other {
   margin-top: var(--space-3);
   align-items: end;
+}
+/* Aufgeklappter Filter der Passiven: Abstand zur Liste darunter (wie die Suche darüber) */
+.passive-filters {
+  margin-bottom: 14px;
 }
 .passive-card-actions {
   justify-content: center;
