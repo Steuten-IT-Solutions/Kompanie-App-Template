@@ -10007,7 +10007,7 @@ components:
           { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null' }
         admissionsDue:
           type: [integer, 'null']
-          description: 'Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“); nur für create_users mit Bereich Anwesenheit und einer Anwärter-Rolle, sonst null'
+          description: 'Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“); nur für create_users mit Bereich Anwesenheit (auch ohne Anwärter-Rolle, dann 0), sonst null'
         gallerySubmissions:
           {
             type: boolean,

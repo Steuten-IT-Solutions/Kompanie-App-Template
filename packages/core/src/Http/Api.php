@@ -749,8 +749,9 @@ final class Api
             // Terminarten (Einstellungen → Kalender), z. B. Versammlung: zur Auswahl am Termin und an Anwesenheitslisten
             'eventKinds' => ($features['calendar'] ?? false) || ($features['attendance'] ?? false) ? $a->eventKinds()->options() : [],
             // admissionsDue: Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“), für create_users
-            // mit Anwesenheit und einer Anwärter-Rolle; sonst null (keine Kachel)
-            'admissionsDue' => $user !== null && $this->can(Cap::CreateUsers) && $a->admissions()->enabled() ? $a->admissions()->dueCount() : null,
+            // mit dem Bereich Anwesenheit (auch ohne Anwärter-Rolle: die Seite erklärt dann, wie man sie einrichtet); sonst null
+            // (keine Kachel)
+            'admissionsDue' => $user !== null && $this->can(Cap::CreateUsers) && ($features['attendance'] ?? false) ? $a->admissions()->dueCount() : null,
             // Impressum und Datenschutzerklärung der Kompanie (Einstellungen → Impressum und Datenschutz): für alle, auch Gäste
             'legal' => self::legalLinks($a->settingsService()->legal()),
             // Handbuch auf GitHub Pages der Kompanie: neben updates.json (Issue #12)

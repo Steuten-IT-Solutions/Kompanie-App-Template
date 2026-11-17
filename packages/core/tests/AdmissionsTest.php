@@ -144,7 +144,7 @@ final class AdmissionsTest extends TestCase
         $old = $this->users->add('alt', Roles::MEMBER);
         $this->ok('PATCH', "/members/$old/role", ['extra_roles' => [$key]]);
         $this->assertSame([], $this->ok('GET', '/admissions', [], $this->clerk), 'noch keine Anwärter-Rolle');
-        $this->assertNull($this->ok('GET', '/config', [], $this->clerk)['admissionsDue']);
+        $this->assertSame(0, $this->ok('GET', '/config', [], $this->clerk)['admissionsDue'], 'Kachel auch ohne Anwärter-Rolle (Seite erklärt die Einrichtung)');
 
         $this->clock->at = new \DateTimeImmutable('2026-11-14 12:00:00', new \DateTimeZone('UTC'));
         $this->ok('PATCH', "/admin/roles/$key", ['admission_extra' => true, 'admission_kind' => 'Versammlung', 'admission_count' => 1]);
