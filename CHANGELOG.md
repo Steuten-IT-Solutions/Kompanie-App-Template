@@ -26,6 +26,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Kompanie beim Zugang beantragen**: Ist der Bereich [Kompanien](app:kompanien) an, wählt die Person beim
+  [Zugang beantragen](app:registrieren) freiwillig ihre Kompanie (nur aktive, auch mehrere). Unter
+  [Verwaltung → Anfragen](app:verwaltung/anfragen) steht die Wahl auf der Karte, und die Freigabe ordnet die Person
+  der Kompanie zu, sofern sie eine Rolle mit dem Recht „Mitglied“ bekommt. Ändern lässt sich die Kompanie beim
+  Freigeben mit dem Recht „Kompanien verwalten“.
+
 - **Galerie in Google Drive ablegen**: Nutzt die Galerie Google Drive, landen eingereichte und in der App hochgeladene
   Bilder und Videos jetzt in Drive statt auf dem Server. Offene Einreichungen liegen im Ordner „Einreichungen …“ in der
   Ablage des verbundenen Google-Kontos, außerhalb des Galerie-Ordners. Bei der Freigabe verschiebt die App sie in den

@@ -3257,12 +3257,14 @@ export const api = {
     request<RegistrationStatus>('POST', '/registration/status', { username, password }),
   registrations: () => request<RegistrationList>('GET', '/registrations'),
   /** Freigeben: neues Konto, oder mit user_id das Mitglied ohne Zugang mit der Anfrage verbinden */
-  approveRegistration: (id: number, data: { level?: Level; username?: string; user_id?: number }) =>
-    request<{ member: { id: number; name: string; username: string; level: Level }; mailed: boolean; linked?: boolean }>(
-      'POST',
-      `/registrations/${id}/approve`,
-      data,
-    ),
+  approveRegistration: (id: number, data: { level?: Level; username?: string; user_id?: number; company_ids?: number[] }) =>
+    request<{
+      member: { id: number; name: string; username: string; level: Level };
+      mailed: boolean;
+      linked?: boolean;
+      /** Kompanien der Person nach der Freigabe; nur mit dem Bereich Kompanien */
+      companies?: { id: number; name: string }[];
+    }>('POST', `/registrations/${id}/approve`, data),
   rejectRegistration: (id: number, reason: string) =>
     request<{ rejected: boolean; mailed: boolean }>('POST', `/registrations/${id}/reject`, { reason }),
   registrationSettings: () => request<RegistrationSettings>('GET', '/admin/registration'),
@@ -3332,6 +3334,8 @@ export interface RegistrationForm {
   /** Mailversand eingerichtet: Bestätigung der Adresse und Ergebnis per Mail */
   email_confirmation: boolean;
   privacy_url: string | null;
+  /** Aktive Kompanien zum Auswählen (Bereich Kompanien); leer oder fehlt: keine Auswahl */
+  companies?: { id: number; name: string }[];
 }
 
 export interface RegistrationInput {
@@ -3343,6 +3347,8 @@ export interface RegistrationInput {
   username: string;
   password: string;
   message?: string;
+  /** Gewählte Kompanien (freiwillig, nur mit dem Bereich Kompanien) */
+  company_ids?: number[];
   /** Verstecktes Feld gegen Programme (bleibt leer) */
   website?: string;
 }
@@ -3367,6 +3373,8 @@ export interface RegistrationRequest {
   expires_at: string;
   /** Mitglieder ohne Zugang, die passen könnten (beste zuerst); fehlt bei älteren Servern */
   matches?: RegistrationMatch[];
+  /** Kompanien, die die Person gewählt hat; nur mit dem Bereich Kompanien */
+  companies?: { id: number; name: string }[];
 }
 
 /** Vorschlag zum Verbinden: gleiche E-Mail-Adresse, gleicher Name oder ähnlicher Name (gleicher Nachname, Vorname beginnt gleich) */
@@ -3382,6 +3390,8 @@ export interface RegistrationList {
   email_confirmation: boolean;
   /** Alle Mitglieder ohne Zugang zum Auswählen; fehlt bei älteren Servern */
   no_access_members?: { id: number; name: string }[];
+  /** Alle Kompanien zum Ändern beim Freigeben; nur mit dem Bereich Kompanien */
+  companies?: { id: number; name: string; active: boolean }[];
 }
 
 export interface RegistrationSettings {

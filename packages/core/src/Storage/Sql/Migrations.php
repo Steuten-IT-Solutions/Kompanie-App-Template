@@ -2168,6 +2168,12 @@ WHERE title IS NULL",
                 'mysql' => ['ALTER TABLE {gallery_submissions} ADD COLUMN drive_file_id varchar(100) NOT NULL DEFAULT \'\''],
                 'sqlite' => ['ALTER TABLE {gallery_submissions} ADD COLUMN drive_file_id TEXT NOT NULL DEFAULT \'\''],
             ],
+            // Zugang beantragen mit Bereich Kompanien (RegistrationService): Kompanien, die die Person im Antrag gewählt hat,
+            // als IDs mit Komma (leer: keine). Die Freigabe übernimmt sie als Zuordnung.
+            71 => [
+                'mysql' => ['ALTER TABLE {registration_requests} ADD COLUMN company_ids varchar(255) NOT NULL DEFAULT \'\''],
+                'sqlite' => ['ALTER TABLE {registration_requests} ADD COLUMN company_ids TEXT NOT NULL DEFAULT \'\''],
+            ],
         ];
     }
 
