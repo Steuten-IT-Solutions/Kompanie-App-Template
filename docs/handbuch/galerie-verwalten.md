@@ -5,7 +5,7 @@ rechte: [manage_gallery]
 bereiche: [gallery]
 ---
 
-Wer die {bereich.gallery} verwaltet, legt Alben an, lädt Bilder und Videos hoch, verschiebt und löscht sie und stellt sie intern oder öffentlich, direkt in der {bereich.gallery}. Das geht mit allem, was in der App angelegt bzw. hochgeladen wurde. Alben und Bilder aus Google Drive änderst du in Drive. Das Titelbild eines Albums wählst du bei allen Alben in der App, auch bei denen aus Drive.
+Wer die {bereich.gallery} verwaltet, legt Alben an, lädt Bilder und Videos hoch, verschiebt und löscht sie und stellt sie intern oder öffentlich, direkt in der {bereich.gallery}. Das geht mit allem, was in der App angelegt bzw. hochgeladen wurde. Ist Google Drive der Ablageort der {bereich.gallery}, geht es genauso mit Alben und Bildern aus Drive: Die App ändert sie dann in Drive. Sonst änderst du sie in Drive. Das Titelbild eines Albums wählst du bei allen Alben in der App, auch bei denen aus Drive.
 
 ## So öffnest du die Seite
 
@@ -14,8 +14,8 @@ Tippe unten auf **{bereich.gallery}**. Die Knöpfe der {bereich.gallery} sind ru
 ## Was du hier siehst
 
 - **Alben anlegen und hochladen**: alle Alben mit der Zahl der Bilder aus Drive und der hochgeladenen, darunter **Neues Album in der App**. Tippst du ein Album an, klappt es auf: Dort lädst du Bilder und Videos hoch und siehst die hochgeladenen.
-- **Alben auswählen**: Drücke lange auf ein Album aus der App. Es ist dann gewählt; tippe weitere an. Gewählte tragen einen farbigen Rahmen. Alben aus Google Drive lassen sich nicht wählen. Oben stehen dann **Jahr ändern** (Kalender) und **Löschen** (Mülleimer).
-- **Bilder und Videos auswählen**: Drücke in einem Album lange auf ein hochgeladenes Bild oder Video. Es ist dann gewählt; tippe weitere an. Gewählte tragen einen Haken ✓. Oben stehen **Alle wählen** (Doppelhaken), **Verschieben** (Ordner mit Pfeil), **Nur für Mitglieder** (Schloss), **Öffentlich** (Weltkugel) und **Löschen** (Mülleimer).
+- **Alben auswählen**: Drücke lange auf ein Album aus der App. Es ist dann gewählt; tippe weitere an. Gewählte tragen einen farbigen Rahmen. Alben aus Google Drive lassen sich nur wählen, wenn Google Drive der Ablageort ist. Oben stehen dann **Jahr ändern** (Kalender) und **Löschen** (Mülleimer).
+- **Bilder und Videos auswählen**: Drücke in einem Album lange auf ein hochgeladenes Bild oder Video (mit Google Drive als Ablageort auf jedes). Es ist dann gewählt; tippe weitere an. Gewählte tragen einen Haken ✓. Oben stehen **Alle wählen** (Doppelhaken), **Verschieben** (Ordner mit Pfeil), **Nur für Mitglieder** (Schloss), **Öffentlich** (Weltkugel) und **Löschen** (Mülleimer).
 - **Auswählen beenden**: Tippe die gewählten wieder an. Ist nichts mehr gewählt, endet das Auswählen von selbst. Auch **Zurück** (Taste oder Geste des Handys) und am Computer die Escape-Taste beenden es, ebenso jede erledigte Aktion. Ist dabei ein Fenster offen (z. B. **Verschieben**), schließt **Zurück** zuerst nur das Fenster; die Auswahl bleibt.
 - In der **Großansicht** eines Bilds steht unten **Als Titelbild des Albums verwenden** (Bild mit Bergen). Bei einem hochgeladenen Bild folgen **Nur für Mitglieder** (Schloss) bzw. **Öffentlich zeigen** (Weltkugel), **Verschieben** und **Löschen**.
 
@@ -63,7 +63,8 @@ Tippe im Album auf **Album bearbeiten** und dann auf **Album löschen**, oder w�
 
 ## Gut zu wissen
 
-- Gelöschte Bilder, Videos und Alben lassen sich nicht wiederherstellen. Wer ein Bild vorher angesehen oder gespeichert hat, behält diese Kopie.
+- Mit Google Drive als Ablageort sind Alben Ordner im Galerie-Ordner: Ein neues Album ist ein neuer Ordner im Ordner seines Jahres (gibt es den nicht, legt die App ihn an), Umbenennen benennt den Ordner um, ein anderes Jahr verschiebt ihn. **Nur für Mitglieder** verschiebt ein Bild in den Ordner **intern** des Albums, **Öffentlich** wieder heraus. **Löschen** legt Bilder, Videos und Alben in den Papierkorb von Google Drive; dort lassen sie sich 30 Tage lang wiederherstellen und erscheinen nach dem nächsten Abgleich wieder. Alben, die früher nur in der App angelegt wurden, bekommen nach dem Umstieg im Hintergrund einen Ordner in Drive; bis dahin lassen sich Bilder aus Drive nicht dorthin verschieben.
+- Sonst lassen sich gelöschte Bilder, Videos und Alben nicht wiederherstellen. Wer ein Bild vorher angesehen oder gespeichert hat, behält in jedem Fall diese Kopie.
 - Beim Verschieben bekommt ein öffentliches Bild eine neue Adresse; ein alter Link auf das Bild führt dann ins Leere. Links auf das Album bleiben gleich.
 - Kam ein Bild aus einer Einreichung, zählt die Einreichung nach dem Verschieben zum neuen Album; nach dem Löschen gilt sie als wieder entfernt.
 - Ist das gewählte Titelbild **nur für Mitglieder**, sehen nur {rolle.member} es in der Übersicht. Alle anderen sehen weiter ein öffentliches Bild des Albums als Titelbild; ein internes Bild wird so nie öffentlich.

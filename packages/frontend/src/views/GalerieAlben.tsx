@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, type GalleryAdminAlbum } from '../api';
+import { albumEditable, api, type GalleryAdminAlbum } from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
 import { confirmAsk } from '../ask';
 import { InternToggle } from '../galleryIntern';
@@ -8,7 +8,7 @@ import { VIDEO_ACCEPT, countFiles, isVideoFile, uploadAlbumVideo } from '../vide
 /**
  * Alben der App und hochgeladene Bilder (Issue #285), unter Einstellungen → Galerie: Album anlegen (nur in der App),
  * Bilder und Videos (Issue #350) in jedes Album hochladen, auch in eines aus Google Drive, hochgeladene löschen. Alben
- * aus Drive ändert man in Drive.
+ * aus Drive ändert man hier nur mit Drive als Ablage (editable), sonst in Drive.
  */
 export default function GalleryAlbums({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload } = useAsync(api.galleryAlbums, []);
@@ -241,7 +241,7 @@ function AlbumUploads({
           ))}
         </ul>
       )}
-      {album.source === 'app' && (
+      {albumEditable(album) && (
         <form
           className="form gallery-album-edit"
           onSubmit={async (e) => {

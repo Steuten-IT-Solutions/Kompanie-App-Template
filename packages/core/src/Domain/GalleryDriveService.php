@@ -22,7 +22,8 @@ use KompanieApp\Core\Storage\GallerySubmissionRepository;
  *   Papierkorb von Drive.
  * - Hochgeladene Bilder in Alben aus Drive ziehen nach dem Aufbereiten in den Ordner des Albums um und gelten danach als
  *   Bilder aus Drive (photos.source = drive). Die aufbereiteten Größen bleiben, nichts wird neu berechnet.
- * - Alben der App (ohne Ordner in Drive) bleiben vorerst auf dem Server.
+ * - Alben der App, die vor dem Umstieg nur auf dem Server lagen (albums.source = app), bekommen einmalig einen Ordner
+ *   im Jahresordner und gelten danach als Alben aus Drive; ihre Bilder ziehen wie oben nach Drive um.
  */
 final class GalleryDriveService
 {
@@ -60,7 +61,7 @@ final class GalleryDriveService
             'active' => $this->active(),
             // Drive als Quelle, aber eine ältere Verbindung (nur lesen) oder ein Dienstkonto
             'needs_reconnect' => $gallery->driveConfigured() && !$this->app->drive()->writeAccess(),
-            'waiting' => $gallery->driveConfigured() ? count($this->waitingSubmissions()) + count($this->waitingPhotos()) : 0,
+            'waiting' => $gallery->driveConfigured() ? count($this->waitingSubmissions()) + count($this->waitingPhotos()) + $this->waitingAlbumPhotos() : 0,
             'error' => $state['error'],
         ];
     }
@@ -82,6 +83,13 @@ final class GalleryDriveService
         $done = 0;
         $state = ['last_try' => $this->app->time()->timestamp(), 'error' => ''];
         try {
+            // Zuerst die Alben der App zu Ordnern in Drive machen: Danach warten ihre Bilder wie alle anderen.
+            foreach ($this->waitingAlbums() as $album) {
+                if (hrtime(true) / 1e9 >= $deadline) {
+                    return $done;
+                }
+                $this->moveAlbum($album);
+            }
             foreach ($this->waitingSubmissions() as $s) {
                 if (hrtime(true) / 1e9 >= $deadline || !$this->pushSubmission($s, $deadline)) {
                     return $done;
@@ -106,7 +114,58 @@ final class GalleryDriveService
     /** Wartet noch etwas auf Drive? (Dann läuft die Aufgabe bald wieder.) */
     public function hasWaiting(): bool
     {
-        return $this->active() && ($this->waitingSubmissions() !== [] || $this->waitingPhotos() !== []);
+        return $this->active() && ($this->waitingAlbums() !== [] || $this->waitingSubmissions() !== [] || $this->waitingPhotos() !== []);
+    }
+
+    /**
+     * Alben der App, die noch keinen Ordner in Drive haben.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function waitingAlbums(): array
+    {
+        return array_values($this->app->db->select("SELECT * FROM {albums} WHERE source = 'app' ORDER BY id ASC"));
+    }
+
+    /** Bilder in Alben der App (für den Zähler in den Einstellungen; sie warten, bis ihr Album einen Ordner hat). */
+    private function waitingAlbumPhotos(): int
+    {
+        $row = $this->app->db->selectOne(
+            "SELECT COUNT(*) AS n FROM {photos} p JOIN {albums} a ON a.id = p.album_id WHERE p.source = 'upload' AND a.source = 'app'",
+        );
+        return (int) ($row['n'] ?? 0);
+    }
+
+    /**
+     * Album der App bekommt einen Ordner im Jahresordner und gilt ab jetzt als Album aus Drive.
+     *
+     * @param array<string, mixed> $album
+     */
+    private function moveAlbum(array $album): void
+    {
+        $year = trim((string) $album['year']);
+        if ($year === '') {
+            $year = substr((string) $album['sort_date'], 0, 4);
+        }
+        $folder = $this->createAlbumFolder((string) $album['title'], $year);
+        $this->takeOverFolder((int) $album['id'], $folder, $year);
+    }
+
+    /**
+     * Ein Album gilt ab jetzt als Album aus Drive (Ordner $folder). Hat ein gleichzeitiger Abgleich den neuen Ordner
+     * schon als eigenes Album angelegt, verschwindet dieses doppelte (seine Bilder kommen ins Album).
+     */
+    public function takeOverFolder(int $albumId, string $folder, ?string $year = null): void
+    {
+        $repo = new GalleryRepository($this->app->db);
+        $repo->transaction(function () use ($repo, $albumId, $folder, $year): void {
+            $twin = $repo->albumByDriveId($folder);
+            if ($twin !== null && (int) $twin['id'] !== $albumId) {
+                $this->app->db->execute('UPDATE {photos} SET album_id = ? WHERE album_id = ?', [$albumId, (int) $twin['id']]);
+                $repo->deleteAlbum((int) $twin['id']);
+            }
+            $repo->updateAlbum($albumId, ['drive_id' => $folder, 'source' => 'drive'] + ($year !== null ? ['year' => $year] : []));
+        });
     }
 
     /**
@@ -289,6 +348,65 @@ final class GalleryDriveService
         $photoId = $uploads->insertDrivePhoto((int) $album['id'], $fileId, (string) $s['file_key'], $stored, $intern);
         $this->app->gallery()->notePushed($photoId);
         return $photoId;
+    }
+
+    /**
+     * Ordner eines Jahres im Galerie-Ordner (Name = Jahr, wie der Abgleich ihn liest); mit $create angelegt, wenn es
+     * keinen gibt.
+     */
+    public function yearFolder(string $year, bool $create = true): ?string
+    {
+        $drive = $this->app->drive();
+        $root = $this->app->gallery()->root();
+        foreach ($drive->listChildren($root) as $f) {
+            if (DriveClient::isFolder($f) && trim((string) $f['name']) === $year) {
+                return (string) $f['id'];
+            }
+        }
+        return $create ? $drive->createFolder($year, $root) : null;
+    }
+
+    /** Neues Album als Ordner im Jahresordner; Rückgabe: ID des Ordners. */
+    public function createAlbumFolder(string $title, string $year): string
+    {
+        return $this->app->drive()->createFolder($title, (string) $this->yearFolder($year));
+    }
+
+    /**
+     * Ordner eines Albums umbenennen bzw. in einen anderen Jahresordner verschieben.
+     *
+     * @param array<string, mixed> $album Zeile vor der Änderung
+     */
+    public function updateAlbumFolder(array $album, ?string $title, ?string $year): void
+    {
+        $drive = $this->app->drive();
+        $folder = (string) $album['drive_id'];
+        if ($year !== null && $year !== (string) $album['year']) {
+            $from = $this->yearFolder((string) $album['year'], false)
+                ?? throw new \RuntimeException(sprintf('Der Ordner „%s“ des Albums ist im Galerie-Ordner nicht zu finden.', (string) $album['year']));
+            $drive->moveFile($folder, $from, (string) $this->yearFolder($year), $title);
+            return;
+        }
+        if ($title !== null && $title !== (string) $album['title']) {
+            $drive->renameFile($folder, $title);
+        }
+    }
+
+    /**
+     * Datei eines Bilds aus Drive in einen anderen Ordner: anderes Album und/oder zwischen Album und „intern“.
+     *
+     * @param array<string, mixed> $photo
+     * @param array<string, mixed> $from Album, in dem es liegt
+     * @param array<string, mixed> $to Ziel-Album (Album aus Drive)
+     */
+    public function movePhotoFile(array $photo, array $from, array $to, bool $intern): void
+    {
+        $source = (int) $photo['is_intern'] === 1 ? $this->internFolder((string) $from['drive_id']) : (string) $from['drive_id'];
+        $target = $intern ? $this->internFolder((string) $to['drive_id']) : (string) $to['drive_id'];
+        if ($source !== $target) {
+            $this->app->drive()->moveFile((string) $photo['drive_file_id'], $source, $target);
+        }
+        $this->app->gallery()->notePushed((int) $photo['id']);
     }
 
     /** Datei in den Papierkorb von Drive; Fehler stehen nur im Protokoll (die Zeile in der App ist dann schon weg). */

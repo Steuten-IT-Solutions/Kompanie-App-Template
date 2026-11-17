@@ -10,7 +10,7 @@ import {
   type TouchList,
   type ReactNode,
 } from 'react';
-import { api, can, gallerySubmissionsOpen, type GalleryAlbum, type GalleryPhoto } from '../api';
+import { albumEditable, api, can, gallerySubmissionsOpen, photoEditable, type GalleryAlbum, type GalleryPhoto } from '../api';
 import { downloadablePhotos } from '../downloadFiles';
 import { downloadAlbum, downloadMedia } from '../galleryDownload';
 import { afterBackSync, useBackClose } from '../backClose';
@@ -248,8 +248,8 @@ function Overview({ onToast }: { onToast: Toast }) {
                 <button
                   className={selected.has(a.id) ? 'album-card selected' : 'album-card'}
                   aria-pressed={selecting ? selected.has(a.id) : undefined}
-                  disabled={selecting && a.source !== 'app'}
-                  title={selecting && a.source !== 'app' ? 'Aus Google Drive: in Drive ändern' : undefined}
+                  disabled={selecting && !albumEditable(a)}
+                  title={selecting && !albumEditable(a) ? 'Aus Google Drive: in Drive ändern' : undefined}
                   onClick={() => {
                     if (selecting) {
                       setSelected((old) => toggle(old, a.id));
@@ -259,7 +259,7 @@ function Overview({ onToast }: { onToast: Toast }) {
                     navigate(`galerie/${a.id}`);
                   }}
                   {...(selecting ? {} : prefetchAlbumOnTap(a.id))}
-                  {...withPrefetch(press(a.id, a.source === 'app'), selecting ? undefined : prefetchAlbumOnTap(a.id).onPointerDown)}
+                  {...withPrefetch(press(a.id, albumEditable(a)), selecting ? undefined : prefetchAlbumOnTap(a.id).onPointerDown)}
                 >
                   {a.cover ? (
                     <span className="album-cover">
@@ -414,7 +414,7 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
   const photos = album.photos.map((p) =>
     p.ready || !p.thumb ? p : { ...p, thumb: retryUrl(p.thumb, retry), large: p.large && retryUrl(p.large, retry) },
   );
-  const uploads = photos.filter((p) => p.upload);
+  const uploads = photos.filter(photoEditable);
   const chosen = uploads.filter((p) => selected.has(p.id));
 
   /** Auswählen beenden (sein Eintrag im Verlauf verschwindet von selbst, backClose.ts). */
@@ -477,7 +477,7 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
   // Auswählen beginnt mit langem Drücken auf ein Bild (useLongPress), ohne eigenen Knopf. Einreichen direkt in dieses
   // Album (vorgewählt), wie oben in der Übersicht nur mit Haken „Einreichen erlauben“; Bearbeiten nur für Alben der App.
   const submit = can('submit_gallery') && gallerySubmissionsOpen();
-  const edit = manage && album.source === 'app';
+  const edit = manage && albumEditable(album);
   const tools = (submit || edit) && !selecting && (
     <div className="button-row gallery-actions">
       {submit && (
@@ -544,8 +544,8 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
               }}
               className={`${isVideo(p) ? 'photo photo-video' : 'photo'}${selected.has(p.id) ? ' selected' : ''}`}
               onClick={() => (selecting ? setSelected((old) => toggle(old, p.id)) : setOpen(i))}
-              {...press(p.id, !!p.upload)}
-              disabled={selecting && !p.upload}
+              {...press(p.id, photoEditable(p))}
+              disabled={selecting && !photoEditable(p)}
               aria-pressed={selecting ? selected.has(p.id) : undefined}
               data-intern={p.intern ? '' : undefined}
               aria-label={
@@ -568,7 +568,7 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
                   🔒
                 </span>
               )}
-              {selecting && p.upload && (
+              {selecting && photoEditable(p) && (
                 <span className="photo-check" aria-hidden="true">
                   {selected.has(p.id) ? '✓' : ''}
                 </span>
@@ -1070,7 +1070,7 @@ function Lightbox({
             }}
           />
         )}
-        {onIntern && p.upload && (
+        {onIntern && photoEditable(p) && (
           <IconButton
             icon={p.intern ? 'public' : 'intern'}
             label={p.intern ? 'Öffentlich zeigen' : 'Nur für Mitglieder'}
@@ -1090,7 +1090,7 @@ function Lightbox({
             }}
           />
         )}
-        {onMove && p.upload && (
+        {onMove && photoEditable(p) && (
           <IconButton
             icon="move"
             label="Verschieben"
@@ -1102,7 +1102,7 @@ function Lightbox({
             }}
           />
         )}
-        {onDelete && p.upload && (
+        {onDelete && photoEditable(p) && (
           <IconButton
             icon="delete"
             label="Löschen"

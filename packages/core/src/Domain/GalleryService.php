@@ -317,7 +317,9 @@ final class GalleryService
                         $unique[(string) $image[0]['id']] ??= $image;
                     }
                     $images = array_values($unique);
-                    if ($images === []) {
+                    // Leere Ordner nur mit Drive als Ablage (dort legt die App neue Alben an, die erst danach Bilder bekommen);
+                    // die Galerie zeigt leere Alben ohnehin nicht.
+                    if ($images === [] && $this->store() !== 'drive') {
                         continue;
                     }
                     $albumRow = $albumRows[(string) $album['id']] ?? null;
@@ -1328,6 +1330,8 @@ final class GalleryService
                 'title' => (string) $r['title'],
                 // Album der App (in der App änderbar) oder aus Drive
                 'source' => (string) ($r['source'] ?? '') === 'app' ? 'app' : 'drive',
+                // In der App änderbar: Alben der App, mit Drive als Ablage auch die aus Drive
+                'editable' => (string) ($r['source'] ?? '') === 'app' || $this->store() === 'drive',
                 // Bilder und Videos zusammen; davon Videos
                 'count' => (int) $r['cnt'],
                 'video_count' => (int) $r['video_cnt'],
@@ -1363,11 +1367,13 @@ final class GalleryService
         if ($photos === []) {
             return null;
         }
+        $editable = $this->store() === 'drive';
         return [
             'id' => (int) $album['id'],
             'title' => (string) $album['title'],
             'year' => (string) $album['year'],
             'source' => (string) $album['source'] === 'app' ? 'app' : 'drive',
+            'editable' => (string) $album['source'] === 'app' || $this->store() === 'drive',
             // Knöpfe zum Herunterladen zeigen (Einstellungen → Galerie)
             'downloads' => $this->downloadsEnabled(),
             // In der App gewähltes Titelbild, wenn es hier zu sehen ist; null: automatisch (albumSummaries)
@@ -1387,6 +1393,8 @@ final class GalleryService
                 'intern' => (bool) (int) $ph['is_intern'],
                 // in der App hochgeladen: intern/öffentlich in der App umstellbar (aus Drive nur über den Ordner)
                 'upload' => self::isUpload($ph),
+                // in der App verschieben, intern stellen und löschen (mit Drive als Ablage auch Bilder aus Drive)
+                'editable' => $editable || self::isUpload($ph),
                 'name' => (string) $ph['name'],
                 'ready' => $ph['status'] === GalleryRepository::READY,
             ] : [
@@ -1401,6 +1409,8 @@ final class GalleryService
                 'intern' => (bool) (int) $ph['is_intern'],
                 // in der App hochgeladen: intern/öffentlich in der App umstellbar (aus Drive nur über den Ordner)
                 'upload' => self::isUpload($ph),
+                // in der App verschieben, intern stellen und löschen (mit Drive als Ablage auch Bilder aus Drive)
+                'editable' => $editable || self::isUpload($ph),
                 'name' => (string) $ph['name'],
                 // noch nicht aufbereitet: Die Adressen erzeugen das Bild oder liefern vorerst einen Platzhalter (202)
                 'ready' => $ph['status'] === GalleryRepository::READY,
