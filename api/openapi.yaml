@@ -1688,8 +1688,9 @@ paths:
       tags: [Galerie]
       summary: Hochgeladenes Bild oder Video intern oder öffentlich stellen
       description: |
-        Nur Bilder und Videos, die in der App hochgeladen oder über Einreichungen freigegeben wurden (`upload: true`);
-        Bilder aus Google Drive stellt der Ordner „intern“ in Drive um (400). Bei einem Wechsel löscht der Server die
+        Nur Bilder und Videos, die in der App hochgeladen oder über Einreichungen freigegeben wurden (`upload: true`),
+        mit Google Drive als Ablage (`gallery.store = drive`) auch Bilder aus Drive (`editable: true`): Die Datei zieht
+        dann in den Ordner „intern“ des Albums bzw. heraus. Sonst stellt der Ordner „intern“ in Drive um (400). Bei einem Wechsel löscht der Server die
         aufbereiteten Größen (öffentliche lagen als statische Dateien vor), vergibt neue Adressen und bereitet im
         Hintergrund neu auf; die alten öffentlichen Adressen liefern danach nichts mehr. Das Original bleibt.
       x-capability: 'manage_settings, manage_gallery oder review_gallery'
@@ -9590,6 +9591,7 @@ components:
         title: { type: string }
         year: { type: string }
         source: { type: string, enum: [app, drive], description: 'app: nur in der App; drive: aus Google Drive' }
+        editable: { type: boolean, description: 'In der App änderbar: Alben der App, mit Google Drive als Ablage auch aus Drive' }
         uploads: { type: integer, description: Anzahl hochgeladener Bilder }
         drive_photos: { type: integer, description: Anzahl Bilder aus Drive }
     GalleryAdminAlbumDetail:
@@ -10466,6 +10468,7 @@ components:
         id: { type: integer }
         title: { type: string }
         source: { type: string, enum: [app, drive], description: 'Album der App (in der App änderbar) oder aus Google Drive' }
+        editable: { type: boolean, description: 'In der App änderbar: Alben der App, mit Google Drive als Ablage auch aus Drive' }
         count: { type: integer, description: Bilder und Videos zusammen }
         video_count: { type: integer, description: davon Videos }
         intern_count: { type: integer }
@@ -10525,6 +10528,7 @@ components:
             type: boolean,
             description: 'In der App hochgeladen (auch über Einreichungen): intern/öffentlich mit PATCH /gallery/photos/{id} umstellbar',
           }
+        editable: { type: boolean, description: 'In der App verschieben, intern stellen und löschen (upload oder Google Drive als Ablage)' }
         name: { type: string }
         ready:
           type: boolean
@@ -10537,6 +10541,7 @@ components:
         title: { type: string }
         year: { type: string }
         source: { type: string, enum: [app, drive], description: 'Album der App (in der App änderbar) oder aus Google Drive' }
+        editable: { type: boolean, description: 'In der App änderbar: Alben der App, mit Google Drive als Ablage auch aus Drive' }
         downloads:
           type: boolean
           description: |

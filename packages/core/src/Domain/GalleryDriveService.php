@@ -291,6 +291,65 @@ final class GalleryDriveService
         return $photoId;
     }
 
+    /**
+     * Ordner eines Jahres im Galerie-Ordner (Name = Jahr, wie der Abgleich ihn liest); mit $create angelegt, wenn es
+     * keinen gibt.
+     */
+    public function yearFolder(string $year, bool $create = true): ?string
+    {
+        $drive = $this->app->drive();
+        $root = $this->app->gallery()->root();
+        foreach ($drive->listChildren($root) as $f) {
+            if (DriveClient::isFolder($f) && trim((string) $f['name']) === $year) {
+                return (string) $f['id'];
+            }
+        }
+        return $create ? $drive->createFolder($year, $root) : null;
+    }
+
+    /** Neues Album als Ordner im Jahresordner; Rückgabe: ID des Ordners. */
+    public function createAlbumFolder(string $title, string $year): string
+    {
+        return $this->app->drive()->createFolder($title, (string) $this->yearFolder($year));
+    }
+
+    /**
+     * Ordner eines Albums umbenennen bzw. in einen anderen Jahresordner verschieben.
+     *
+     * @param array<string, mixed> $album Zeile vor der Änderung
+     */
+    public function updateAlbumFolder(array $album, ?string $title, ?string $year): void
+    {
+        $drive = $this->app->drive();
+        $folder = (string) $album['drive_id'];
+        if ($year !== null && $year !== (string) $album['year']) {
+            $from = $this->yearFolder((string) $album['year'], false)
+                ?? throw new \RuntimeException(sprintf('Der Ordner „%s“ des Albums ist im Galerie-Ordner nicht zu finden.', (string) $album['year']));
+            $drive->moveFile($folder, $from, (string) $this->yearFolder($year), $title);
+            return;
+        }
+        if ($title !== null && $title !== (string) $album['title']) {
+            $drive->renameFile($folder, $title);
+        }
+    }
+
+    /**
+     * Datei eines Bilds aus Drive in einen anderen Ordner: anderes Album und/oder zwischen Album und „intern“.
+     *
+     * @param array<string, mixed> $photo
+     * @param array<string, mixed> $from Album, in dem es liegt
+     * @param array<string, mixed> $to Ziel-Album (Album aus Drive)
+     */
+    public function movePhotoFile(array $photo, array $from, array $to, bool $intern): void
+    {
+        $source = (int) $photo['is_intern'] === 1 ? $this->internFolder((string) $from['drive_id']) : (string) $from['drive_id'];
+        $target = $intern ? $this->internFolder((string) $to['drive_id']) : (string) $to['drive_id'];
+        if ($source !== $target) {
+            $this->app->drive()->moveFile((string) $photo['drive_file_id'], $source, $target);
+        }
+        $this->app->gallery()->notePushed((int) $photo['id']);
+    }
+
     /** Datei in den Papierkorb von Drive; Fehler stehen nur im Protokoll (die Zeile in der App ist dann schon weg). */
     public function trash(string $fileId): void
     {

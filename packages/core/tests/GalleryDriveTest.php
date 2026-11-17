@@ -277,7 +277,8 @@ final class GalleryDriveTest extends TestCase
 
     public function testSubmissionIntoAppAlbumComesBackToServer(): void
     {
-        $app = (int) $this->ok('POST', '/admin/gallery/albums', ['title' => 'Nur App', 'year' => 2026])['id'];
+        // Album, das vor der Ablage in Drive nur in der App angelegt wurde
+        $app = $this->app->db->insert('albums', ['drive_id' => 'app:alt', 'year' => '2026', 'title' => 'Nur App', 'sort_date' => '2026-01-01 00:00:00', 'synced_at' => '2026-01-01 00:00:00', 'source' => 'app']);
         $s = $this->submit('App.jpg', $app);
         $this->app->galleryDrive()->runTask();
         $fileId = (string) $this->app->db->scalar('SELECT drive_file_id FROM {gallery_submissions} WHERE id = ?', [$s['id']]);
@@ -287,5 +288,90 @@ final class GalleryDriveTest extends TestCase
         $this->assertCount(1, $this->onServer());
         $this->assertContains($fileId, $this->drive->trashed);
         $this->assertSame(0, $this->app->galleryDrive()->runTask(), 'Alben der App bleiben auf dem Server');
+    }
+
+    private function photoId(string $driveId): int
+    {
+        return (int) $this->app->db->scalar('SELECT id FROM {photos} WHERE drive_file_id = ?', [$driveId]);
+    }
+
+    public function testDrivePhotosHaveTheSameControlsAsUploads(): void
+    {
+        $this->app->gallery()->processPending(60);
+        $album = $this->app->gallery()->album($this->album, true);
+        $this->assertTrue($album['editable']);
+        $this->assertSame([true], array_values(array_unique(array_column($album['photos'], 'editable'))));
+
+        // Intern stellen: in den Ordner „Intern“ des Albums und zurück
+        $img1 = $this->photoId('IMG1');
+        $this->ok('PATCH', "/gallery/photos/$img1", ['intern' => true]);
+        $this->assertContains('a.jpg', $this->names('I1'));
+        $this->assertNotContains('a.jpg', $this->names('A1'));
+        $img3 = $this->photoId('IMG3');
+        $this->ok('PATCH', "/gallery/photos/$img3", ['intern' => false]);
+        $this->assertContains('c.jpg', $this->names('A1'));
+        $this->app->gallery()->sync();
+        $this->assertSame([1, 0], [(int) $this->app->db->scalar('SELECT is_intern FROM {photos} WHERE id = ?', [$img1]), (int) $this->app->db->scalar('SELECT is_intern FROM {photos} WHERE id = ?', [$img3])]);
+
+        // Verschieben in ein anderes Album aus Drive (intern bleibt intern)
+        $a3 = $this->albumId('A3');
+        $this->ok('POST', '/gallery/photos/move', ['ids' => [$img1, $this->photoId('IMG2')], 'album_id' => $a3]);
+        $this->assertSame(['e.png', 'intern', 'b.jpg'], $this->names('A3'), 'Ordner intern für a.jpg angelegt');
+        $this->assertSame(['a.jpg'], $this->names((string) $this->drive->tree['A3'][1]['id']));
+        $this->app->gallery()->sync();
+        $this->assertSame($a3, (int) $this->app->db->scalar('SELECT album_id FROM {photos} WHERE id = ?', [$img1]));
+        $this->assertSame(1, (int) $this->app->db->scalar('SELECT is_intern FROM {photos} WHERE id = ?', [$img1]));
+
+        // Löschen: Papierkorb von Drive, der Abgleich bringt es nicht zurück
+        $img5 = $this->photoId('IMG5');
+        $this->ok('POST', '/gallery/photos/delete', ['ids' => [$img5]]);
+        $this->assertContains('IMG5', $this->drive->trashed);
+        $this->app->gallery()->sync();
+        $this->assertSame(0, $this->photoId('IMG5'));
+    }
+
+    public function testAlbumsAreFoldersInDrive(): void
+    {
+        // Neues Album: Ordner im Jahresordner, auch leer nach dem Abgleich da
+        $new = $this->ok('POST', '/admin/gallery/albums', ['title' => 'Kirmes', 'year' => 2026]);
+        $this->assertSame(['drive', true], [$new['source'], $new['editable']]);
+        $this->assertContains('Kirmes', $this->names('Y2026'));
+        $this->app->gallery()->sync();
+        $this->assertNotNull($this->app->db->selectOne('SELECT id FROM {albums} WHERE id = ?', [$new['id']]), 'leeres Album bleibt');
+
+        // Neues Jahr: Ordner angelegt
+        $old = $this->ok('POST', '/admin/gallery/albums', ['title' => 'Alt', 'year' => 2019]);
+        $this->assertContains('2019', $this->names('ROOT'));
+
+        // Umbenennen und ins andere Jahr
+        $this->ok('PATCH', "/admin/gallery/albums/{$new['id']}", ['title' => 'Kirmes 2025']);
+        $this->assertContains('Kirmes 2025', $this->names('Y2026'));
+        $this->ok('PATCH', "/admin/gallery/albums/{$new['id']}", ['year' => 2025]);
+        $this->assertContains('Kirmes 2025', $this->names('Y2025'));
+        $this->assertNotContains('Kirmes 2025', $this->names('Y2026'));
+        $this->app->gallery()->sync();
+        $this->assertSame(['2025', 'Kirmes 2025'], array_values((array) $this->app->db->selectOne('SELECT year, title FROM {albums} WHERE id = ?', [$new['id']])));
+
+        // Album aus Drive mit Bildern löschen: Ordner in den Papierkorb
+        $a2 = $this->albumId('A2');
+        $this->ok('DELETE', "/admin/gallery/albums/$a2");
+        $this->assertContains('A2', $this->drive->trashed);
+        $this->app->gallery()->sync();
+        $this->assertSame(0, $this->albumId('A2'));
+        $this->assertSame(0, $this->photoId('IMG4'));
+        $this->ok('DELETE', "/admin/gallery/albums/{$old['id']}");
+    }
+
+    public function testDrivePhotosStayReadOnlyWithoutWriteAccess(): void
+    {
+        $this->connect(DriveClient::SCOPE . ' ' . DriveClient::CALENDAR_SCOPE);
+        $this->app->gallery()->processPending(60);
+        $album = $this->app->gallery()->album($this->album, true);
+        $this->assertFalse($album['editable']);
+        $this->assertSame(400, $this->call('PATCH', '/gallery/photos/' . $this->photoId('IMG1'), ['intern' => true])->status);
+        $this->assertSame(400, $this->call('POST', '/gallery/photos/delete', ['ids' => [$this->photoId('IMG1')]])->status);
+        $this->assertSame(400, $this->call('PATCH', "/admin/gallery/albums/{$this->album}", ['title' => 'Neu'])->status);
+        $this->assertSame('app', $this->ok('POST', '/admin/gallery/albums', ['title' => 'Nur App', 'year' => 2026])['source']);
+        $this->assertSame([], $this->drive->writes);
     }
 }

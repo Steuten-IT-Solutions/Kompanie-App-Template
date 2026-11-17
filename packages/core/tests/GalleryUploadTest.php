@@ -124,7 +124,7 @@ final class GalleryUploadTest extends TestCase
         $this->assertSame(200, $this->app->gallery()->photoForDelivery($photoId, GalleryService::ORIGINAL, false, false)['status'], 'Original aus der Ablage');
 
         $albums = $this->ok('GET', '/admin/gallery/albums')['albums'];
-        $this->assertSame([['id' => $id, 'title' => 'Schützenfest', 'year' => '2026', 'source' => 'app', 'uploads' => 2, 'drive_photos' => 0]], $albums);
+        $this->assertSame([['id' => $id, 'title' => 'Schützenfest', 'year' => '2026', 'source' => 'app', 'editable' => true, 'uploads' => 2, 'drive_photos' => 0]], $albums);
         $this->assertSame('Sommer', $this->ok('PATCH', "/admin/gallery/albums/{$id}", ['title' => 'Sommer'])['title']);
         $this->assertGreaterThan(0, $this->ok('GET', '/admin/settings')['gallery']['media_bytes']);
         $this->assertStringContainsString('Hochgeladene Bilder belegen', json_encode($this->ok('GET', '/admin/status'), JSON_UNESCAPED_UNICODE));

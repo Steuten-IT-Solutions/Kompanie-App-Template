@@ -1146,11 +1146,22 @@ export interface NewsInput {
   updated_at?: string | null;
 }
 
+/** In der App änderbar? Ältere Server liefern kein editable: dann nur Alben der App bzw. hochgeladene Bilder. */
+export function albumEditable(a: { source?: 'app' | 'drive'; editable?: boolean }): boolean {
+  return a.editable ?? a.source === 'app';
+}
+
+export function photoEditable(p: { upload?: boolean; editable?: boolean }): boolean {
+  return p.editable ?? !!p.upload;
+}
+
 export interface GalleryAlbumSummary {
   id: number;
   title: string;
   /** Album der App (in der App änderbar) oder aus Google Drive; fehlt bei älteren Servern */
   source?: 'app' | 'drive';
+  /** in der App änderbar (Alben der App, mit Drive als Ablage auch aus Drive); fehlt bei älteren Servern */
+  editable?: boolean;
   /** Bilder und Videos zusammen */
   count: number;
   /** davon Videos; fehlt bei älteren Servern */
@@ -1182,6 +1193,8 @@ export interface GalleryPhoto {
   intern: boolean;
   /** in der App hochgeladen: intern/öffentlich lässt sich in der App umstellen (aus Drive nur über den Ordner); fehlt bei älteren Servern */
   upload?: boolean;
+  /** in der App verschieben, intern stellen und löschen (mit Drive als Ablage auch Bilder aus Drive); fehlt bei älteren Servern */
+  editable?: boolean;
   name: string;
   /** false: noch nicht aufbereitet; die Adressen erzeugen das Bild oder liefern vorerst einen Platzhalter */
   ready: boolean;
@@ -1193,6 +1206,8 @@ export interface GalleryAlbum {
   year: string;
   /** Album der App (in der App änderbar) oder aus Google Drive; fehlt bei älteren Servern */
   source?: 'app' | 'drive';
+  /** in der App änderbar; fehlt bei älteren Servern */
+  editable?: boolean;
   /** Knöpfe zum Herunterladen zeigen (je Bild in der Großansicht, das Album als ZIP); fehlt bei älteren Servern */
   downloads?: boolean;
   /** In der App gewähltes Titelbild der Übersicht, wenn hier zu sehen; null: automatisch; fehlt bei älteren Servern */
@@ -3733,6 +3748,8 @@ export interface GalleryAdminAlbum {
   title: string;
   year: string;
   source: 'drive' | 'app';
+  /** in der App änderbar; fehlt bei älteren Servern */
+  editable?: boolean;
   uploads: number;
   drive_photos: number;
 }
@@ -3742,6 +3759,8 @@ export interface GalleryAdminAlbumDetail {
   title: string;
   year: string;
   source: 'drive' | 'app';
+  /** in der App änderbar; fehlt bei älteren Servern */
+  editable?: boolean;
   /** thumb '' bei einem Video ohne Standbild */
   uploads: { id: number; type: 'image' | 'video'; name: string; intern: boolean; thumb: string; status: string; error: string }[];
 }

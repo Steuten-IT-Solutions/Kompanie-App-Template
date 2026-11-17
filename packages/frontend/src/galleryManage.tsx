@@ -8,7 +8,7 @@ import { useBackClose } from './backClose';
 /**
  * Galerie direkt in der Galerie verwalten (Recht manage_gallery, Admins sowieso): hochgeladene Bilder und Videos
  * verschieben, löschen und intern oder öffentlich stellen, Alben der App umbenennen, ins andere Jahr setzen und
- * löschen, auch mehrere auf einmal. Bilder und Alben aus Google Drive ändert man in Drive.
+ * löschen, auch mehrere auf einmal. Bilder und Alben aus Google Drive nur mit Drive als Ablage (editable), sonst in Drive.
  */
 export function canManageGallery(): boolean {
   return can('manage_gallery') || can('manage_settings');

@@ -23,6 +23,9 @@ use KompanieApp\Core\Storage\GallerySubmissionRepository;
  *   Bilder aus Drive (thumb, large, Original).
  * - Videos (MP4, WebM, Issue #350) kommen in Stücken über VideoUploadService und bleiben unverändert.
  * - Der Abgleich mit Drive ändert und löscht keine hochgeladenen Bilder und keine Alben, in denen welche liegen.
+ * - Mit Google Drive als Ablage (GalleryDriveService::active) gilt dasselbe für Bilder und Alben aus Drive: Die App
+ *   ändert sie dort (Ordner anlegen, umbenennen, ins Jahr verschieben, Bilder verschieben, intern über den Ordner
+ *   „intern“, Löschen in den Papierkorb von Drive). Neue Alben bekommen dann einen Ordner in Drive.
  */
 final class GalleryUploadService
 {
@@ -54,11 +57,12 @@ final class GalleryUploadService
     /** @return list<array<string, mixed>> */
     public function albums(): array
     {
-        return array_map(static fn (array $a): array => [
+        return array_map(fn (array $a): array => [
             'id' => (int) $a['id'],
             'title' => (string) $a['title'],
             'year' => (string) $a['year'],
             'source' => (string) $a['source'] === 'app' ? 'app' : 'drive',
+            'editable' => (string) $a['source'] === 'app' || $this->app->galleryDrive()->active(),
             'uploads' => (int) $a['upload_cnt'],
             'drive_photos' => (int) $a['drive_cnt'],
         ], $this->repo()->adminAlbums());
@@ -74,6 +78,7 @@ final class GalleryUploadService
             'title' => (string) $album['title'],
             'year' => (string) $album['year'],
             'source' => (string) $album['source'] === 'app' ? 'app' : 'drive',
+            'editable' => (string) $album['source'] === 'app' || $this->app->galleryDrive()->active(),
             'uploads' => array_map(static fn (array $p): array => [
                 'id' => (int) $p['id'],
                 'type' => (string) $p['media'] === 'video' ? 'video' : 'image',
@@ -87,6 +92,12 @@ final class GalleryUploadService
         ];
     }
 
+    /** Lässt sich das Bild in der App ändern? Hochgeladene immer, aus Drive mit Drive als Ablage. */
+    public function editable(array $photo): bool
+    {
+        return GalleryService::isUpload($photo) || $this->app->galleryDrive()->active();
+    }
+
     /** @return array<string, mixed> */
     public function createAlbum(mixed $in): array
     {
@@ -94,13 +105,23 @@ final class GalleryUploadService
         $title = $this->validTitle($in['title'] ?? null);
         $year = $this->validYear($in['year'] ?? null);
         $now = $this->app->time()->nowUtc();
+        $drive = $this->app->galleryDrive();
+        $folder = null;
+        if ($drive->active()) {
+            // Mit Drive als Ablage: Ordner im Jahresordner, das Album gilt als Album aus Drive
+            try {
+                $folder = $drive->createAlbumFolder($title, $year);
+            } catch (\RuntimeException $e) {
+                throw ApiError::invalid('Das Album ließ sich in Google Drive nicht anlegen: ' . $e->getMessage());
+            }
+        }
         $id = $this->repo()->insertAlbum([
-            'drive_id' => self::ALBUM_PREFIX . bin2hex(random_bytes(12)),
+            'drive_id' => $folder ?? self::ALBUM_PREFIX . bin2hex(random_bytes(12)),
             'year' => $year,
             'title' => $title,
             'sort_date' => $now,
             'synced_at' => $now,
-            'source' => 'app',
+            'source' => $folder !== null ? 'drive' : 'app',
         ]);
         return $this->album($id);
     }
@@ -117,19 +138,40 @@ final class GalleryUploadService
         if (array_key_exists('year', $in)) {
             $data['year'] = $this->validYear($in['year']);
         }
+        if ($data !== [] && (string) $album['source'] === 'drive') {
+            try {
+                $this->app->galleryDrive()->updateAlbumFolder($album, $data['title'] ?? null, $data['year'] ?? null);
+            } catch (\RuntimeException $e) {
+                throw ApiError::invalid('Das Album ließ sich in Google Drive nicht ändern: ' . $e->getMessage());
+            }
+        }
         if ($data !== []) {
             $this->repo()->updateAlbum((int) $album['id'], $data);
         }
         return $this->album($id);
     }
 
-    /** Album der App mit allen Bildern darin löschen. */
+    /** Album mit allen Bildern darin löschen; ein Album aus Drive kommt samt Ordner in den Papierkorb von Drive. */
     public function deleteAlbum(int $id): void
     {
-        $this->appAlbum($id);
+        $album = $this->appAlbum($id);
         $repo = $this->repo();
+        if ((string) $album['source'] === 'drive') {
+            try {
+                $this->app->drive()->trashFile((string) $album['drive_id']);
+            } catch (\RuntimeException $e) {
+                throw ApiError::invalid('Das Album ließ sich in Google Drive nicht löschen: ' . $e->getMessage());
+            }
+        }
+        $gallery = $this->app->gallery();
         foreach ($repo->photosOfAlbum($id) as $photo) {
-            $this->removePhoto($photo);
+            if (GalleryService::isUpload($photo)) {
+                $this->removePhoto($photo);
+                continue;
+            }
+            // Die Datei liegt im Ordner, der schon im Papierkorb ist
+            $gallery->deleteFiles($photo);
+            $repo->deletePhoto((int) $photo['id']);
         }
         $this->app->gallerySubmissions()->albumDeleted($id);
         $repo->deleteAlbum($id);
@@ -305,8 +347,17 @@ final class GalleryUploadService
         }
         $repo = $this->repo();
         $photo = $repo->photo($id) ?? throw ApiError::notFound('Bild nicht gefunden.');
-        if (!GalleryService::isUpload($photo)) {
+        if (!$this->editable($photo)) {
             throw ApiError::invalid('Bilder aus Google Drive stellst du in Drive um: in den Ordner „intern“ des Albums verschieben oder heraus.');
+        }
+        if ((bool) (int) $photo['is_intern'] !== $intern && !GalleryService::isUpload($photo)) {
+            // Aus Drive: in den Ordner „intern“ des Albums oder heraus
+            $album = $repo->album((int) $photo['album_id']) ?? throw ApiError::notFound('Album nicht gefunden.');
+            try {
+                $this->app->galleryDrive()->movePhotoFile($photo, $album, $album, $intern);
+            } catch (\RuntimeException $e) {
+                throw ApiError::invalid('Das ließ sich in Google Drive nicht umstellen: ' . $e->getMessage());
+            }
         }
         if ((bool) (int) $photo['is_intern'] !== $intern) {
             $this->app->gallery()->deleteFiles($photo);
@@ -349,11 +400,11 @@ final class GalleryUploadService
         return ['id' => $albumId, 'cover_id' => $photoId];
     }
 
-    /** Ein hochgeladenes Bild löschen (Bilder aus Drive kämen beim nächsten Abgleich wieder). */
+    /** Ein Bild löschen: hochgeladen vom Server, aus Drive (mit Drive als Ablage) in den Papierkorb von Drive. */
     public function deletePhoto(int $id, ?User $actor = null): void
     {
         $photo = $this->repo()->photo($id);
-        if ($photo === null || !GalleryService::isUpload($photo)) {
+        if ($photo === null || !$this->editable($photo)) {
             throw ApiError::notFound('Hochgeladenes Bild nicht gefunden.');
         }
         $this->removePhoto($photo);
@@ -377,8 +428,13 @@ final class GalleryUploadService
             throw ApiError::invalid('Bitte das Album angeben, in das verschoben werden soll.');
         }
         $repo = $this->repo();
-        $repo->album($target) ?? throw ApiError::notFound('Album nicht gefunden.');
+        $targetAlbum = $repo->album($target) ?? throw ApiError::notFound('Album nicht gefunden.');
         $photos = $this->uploadedPhotos($ids);
+        foreach ($photos as $photo) {
+            if (!GalleryService::isUpload($photo) && (string) $targetAlbum['source'] !== 'drive' && (int) $photo['album_id'] !== $target) {
+                throw ApiError::invalid(sprintf('„%s“ liegt in Google Drive und kann nur in ein Album mit Ordner in Drive.', (string) $photo['name']));
+            }
+        }
         $gallery = $this->app->gallery();
         $submissions = new GallerySubmissionRepository($this->app->db);
         $moved = 0;
@@ -388,10 +444,20 @@ final class GalleryUploadService
                 continue;
             }
             $data = ['album_id' => $target];
-            try {
-                $data['drive_file_id'] = GalleryService::UPLOAD_PREFIX . $gallery->media()->move(GalleryService::uploadKey($photo), $target);
-            } catch (\RuntimeException | \InvalidArgumentException) {
-                // Original fehlt oder lässt sich nicht umbenennen: Es bleibt unter seinem Schlüssel, das Bild zieht trotzdem um.
+            if (!GalleryService::isUpload($photo)) {
+                // Aus Drive: Datei in den Ordner des neuen Albums (bzw. dessen „intern“)
+                $from = $repo->album((int) $photo['album_id']) ?? throw ApiError::notFound('Album nicht gefunden.');
+                try {
+                    $this->app->galleryDrive()->movePhotoFile($photo, $from, $targetAlbum, (int) $photo['is_intern'] === 1);
+                } catch (\RuntimeException $e) {
+                    throw ApiError::invalid(sprintf('„%s“ ließ sich in Google Drive nicht verschieben: %s', (string) $photo['name'], $e->getMessage()));
+                }
+            } else {
+                try {
+                    $data['drive_file_id'] = GalleryService::UPLOAD_PREFIX . $gallery->media()->move(GalleryService::uploadKey($photo), $target);
+                } catch (\RuntimeException | \InvalidArgumentException) {
+                    // Original fehlt oder lässt sich nicht umbenennen: Es bleibt unter seinem Schlüssel, das Bild zieht trotzdem um.
+                }
             }
             if (!$gallery->moveFiles($photo, $target)) {
                 $gallery->deleteFiles($photo);
@@ -450,7 +516,7 @@ final class GalleryUploadService
             if ($photo === null) {
                 throw ApiError::notFound('Bild oder Video nicht gefunden.');
             }
-            if (!GalleryService::isUpload($photo)) {
+            if (!$this->editable($photo)) {
                 throw ApiError::invalid(sprintf('„%s“ kommt aus Google Drive. Das verschiebst oder löschst du in Drive.', (string) $photo['name']));
             }
             $photos[$id] = $photo;
@@ -480,7 +546,7 @@ final class GalleryUploadService
     private function appAlbum(int $id): array
     {
         $album = $this->repo()->album($id) ?? throw ApiError::notFound('Album nicht gefunden.');
-        if ((string) $album['source'] !== 'app') {
+        if ((string) $album['source'] !== 'app' && !$this->app->galleryDrive()->active()) {
             throw ApiError::invalid('Alben aus Google Drive änderst du in Drive.');
         }
         return $album;

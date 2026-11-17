@@ -34,7 +34,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Albums, auch solche, die schon auf dem Server liegen. Dafür braucht die App vollen Zugriff auf Google Drive: Trenne
   unter [Einstellungen → Google-Zugang](app:einstellungen/google) die Verbindung und verbinde neu, dabei das Häkchen
   für Google Drive setzen. Bis dahin bleibt alles wie bisher auf dem Server. Wo die Dateien landen und ob noch welche
-  warten, steht unter [Einstellungen → Galerie](app:einstellungen/galerie).
+  warten, steht unter [Einstellungen → Galerie](app:einstellungen/galerie). Mit Drive als Ablage gibt es in der
+  [Galerie](app:galerie) für Bilder und Alben aus Drive dieselben Knöpfe wie für hochgeladene: Verschieben, Nur für
+  Mitglieder bzw. Öffentlich (über den Ordner „intern“), Löschen (in den Papierkorb von Drive), Alben anlegen (als Ordner
+  im Jahresordner), umbenennen, in ein anderes Jahr setzen und löschen.
 - **Terminarten**: Unter [Einstellungen → Kalender](app:einstellungen/kalender) richtest du Terminarten ein, z. B.
   Versammlung oder Arbeitsdienst. Wer Termine pflegen darf, wählt die Art im aufgeklappten Termin unter
   [Termine](app:termine), bei jeder Quelle des Kalenders, auch bei Google Kalender und iCal. Die App speichert die Art
