@@ -26,6 +26,15 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Galerie in Google Drive ablegen**: Nutzt die Galerie Google Drive, landen eingereichte und in der App hochgeladene
+  Bilder und Videos jetzt in Drive statt auf dem Server. Offene Einreichungen liegen im Ordner „Einreichungen …“ in der
+  Ablage des verbundenen Google-Kontos, außerhalb des Galerie-Ordners. Bei der Freigabe verschiebt die App sie in den
+  Ordner des Albums (nur für Mitglieder: in dessen Ordner „intern“), beim Ablehnen oder Zurückziehen in den Papierkorb
+  von Drive. Hochgeladene Bilder in Alben aus Drive ziehen nach dem Aufbereiten im Hintergrund in den Ordner des
+  Albums, auch solche, die schon auf dem Server liegen. Dafür braucht die App vollen Zugriff auf Google Drive: Trenne
+  unter [Einstellungen → Google-Zugang](app:einstellungen/google) die Verbindung und verbinde neu, dabei das Häkchen
+  für Google Drive setzen. Bis dahin bleibt alles wie bisher auf dem Server. Wo die Dateien landen und ob noch welche
+  warten, steht unter [Einstellungen → Galerie](app:einstellungen/galerie).
 - **Terminarten**: Unter [Einstellungen → Kalender](app:einstellungen/kalender) richtest du Terminarten ein, z. B.
   Versammlung oder Arbeitsdienst. Wer Termine pflegen darf, wählt die Art im aufgeklappten Termin unter
   [Termine](app:termine), bei jeder Quelle des Kalenders, auch bei Google Kalender und iCal. Die App speichert die Art

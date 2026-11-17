@@ -2162,6 +2162,12 @@ WHERE title IS NULL",
                     'ALTER TABLE {passive_members} ADD COLUMN birthday_reminded TEXT NOT NULL DEFAULT \'\'',
                 ],
             ],
+            // Einreichungen der Galerie in Google Drive (GalleryDriveService): ID der Datei im Ordner „Einreichungen“, solange
+            // sie offen ist (leer: Datei liegt im MediaStore unter file_key). file_key bleibt, seine Endung zeigt Video oder Bild.
+            70 => [
+                'mysql' => ['ALTER TABLE {gallery_submissions} ADD COLUMN drive_file_id varchar(100) NOT NULL DEFAULT \'\''],
+                'sqlite' => ['ALTER TABLE {gallery_submissions} ADD COLUMN drive_file_id TEXT NOT NULL DEFAULT \'\''],
+            ],
         ];
     }
 

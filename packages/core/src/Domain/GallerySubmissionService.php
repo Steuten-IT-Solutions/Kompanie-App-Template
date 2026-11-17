@@ -25,6 +25,9 @@ use KompanieApp\Core\Storage\GallerySubmissionRepository as Repo;
  * - Videos (MP4, WebM bis 1 GB, Issue #350) kommen in Stücken über VideoUploadService, unverändert; die Vorschau
  *   ist das Standbild aus dem Browser. Prüfende sehen das Video vor der Freigabe (deliverVideo).
  * - Freigegebene lassen sich wieder entfernen (das Bild verschwindet, die Einreichung gilt als abgelehnt).
+ * - Mit Google Drive als Ablage (GalleryDriveService) bringt die Aufgabe der Galerie offene Einreichungen in einen
+ *   privaten Ordner in Drive (drive_file_id); Freigeben verschiebt sie von dort ins Album, Ablehnen und Zurückziehen
+ *   legen sie in den Papierkorb von Drive.
  * - Konto gelöscht (UserData::purge): alle Zeilen der Person verschwinden, freigegebene Bilder bleiben ohne Verknüpfung.
  *   Die Dateien offener Einreichungen löscht userDeleted(); was ohne App gelöscht wurde (WordPress-Netzwerk), räumt
  *   pruneOrphans() in der Aufgabe der Galerie auf.
@@ -187,6 +190,10 @@ final class GallerySubmissionService
             $this->app->gallery()->media()->delete($stored['key']);
             throw $e;
         }
+        if ($this->app->galleryDrive()->active()) {
+            // Mit Drive als Ablage: im Hintergrund in den Ordner „Einreichungen“
+            $this->app->scheduler->runSoon(GalleryDriveService::TASK);
+        }
         $since = gmdate('Y-m-d H:i:s', $this->app->time()->timestamp() - self::NOTIFY_GAP);
         if (!$repo->submittedSince($user->id, $since, $sid)) {
             $this->notifyReviewers($user, (string) $album['title'], $sid);
@@ -204,7 +211,7 @@ final class GallerySubmissionService
         if ((string) $s['status'] !== Repo::PENDING) {
             throw ApiError::invalid('Nur offene Einreichungen lassen sich zurückziehen.');
         }
-        $this->app->gallery()->media()->delete((string) $s['file_key']);
+        $this->deleteFile($s);
         $this->repo()->delete($id);
     }
 
@@ -212,6 +219,14 @@ final class GallerySubmissionService
     public function approve(User $actor, int $id, bool $intern): array
     {
         $s = $this->pending($id);
+        if ((string) ($s['drive_file_id'] ?? '') !== '') {
+            try {
+                $photoId = $this->app->galleryDrive()->approve($s, $this->album((int) $s['album_id']), $intern);
+            } catch (\RuntimeException $e) {
+                throw ApiError::invalid('Die Einreichung ließ sich in Google Drive nicht ins Album verschieben: ' . $e->getMessage());
+            }
+            return $this->approved($actor, $s, $id, $photoId);
+        }
         $media = $this->app->gallery()->media();
         if ($media->path((string) $s['file_key']) === null) {
             throw ApiError::invalid('Die Datei der Einreichung fehlt. Bitte ablehnen.');
@@ -225,9 +240,32 @@ final class GallerySubmissionService
             'bytes' => (int) $s['bytes'],
             'duration_ms' => (int) ($s['duration_ms'] ?? 0),
         ], $intern);
-        $this->repo()->update($id, ['status' => Repo::APPROVED, 'reviewed_by' => $actor->id, 'reviewed_at' => $this->app->time()->nowUtc(), 'photo_id' => $photoId, 'reason' => '']);
+        return $this->approved($actor, $s, $id, $photoId);
+    }
+
+    /**
+     * @param array<string, mixed> $s
+     * @return array<string, mixed>
+     */
+    private function approved(User $actor, array $s, int $id, int $photoId): array
+    {
+        $this->repo()->update($id, ['status' => Repo::APPROVED, 'reviewed_by' => $actor->id, 'reviewed_at' => $this->app->time()->nowUtc(), 'photo_id' => $photoId, 'reason' => '', 'drive_file_id' => '']);
         $this->notifySubmitter($s, true, '');
         return $this->out($this->repo()->find($id) ?? [], true);
+    }
+
+    /**
+     * Datei einer offenen Einreichung löschen: auf dem Server oder (in Drive) in den Papierkorb von Drive.
+     *
+     * @param array<string, mixed> $s
+     */
+    private function deleteFile(array $s): void
+    {
+        if ((string) ($s['drive_file_id'] ?? '') !== '') {
+            $this->app->galleryDrive()->trash((string) $s['drive_file_id']);
+            return;
+        }
+        $this->app->gallery()->media()->delete((string) $s['file_key']);
     }
 
     /** Ablehnen: Die Datei verschwindet sofort, der Grund bleibt für die einreichende Person sichtbar. */
@@ -235,8 +273,8 @@ final class GallerySubmissionService
     {
         $s = $this->pending($id);
         $reason = $this->validReason($reason, true, self::isVideo($s) ? 'das Video' : 'das Bild');
-        $this->app->gallery()->media()->delete((string) $s['file_key']);
-        $this->repo()->update($id, ['status' => Repo::REJECTED, 'reviewed_by' => $actor->id, 'reviewed_at' => $this->app->time()->nowUtc(), 'reason' => $reason, 'thumb' => null, 'file_key' => '']);
+        $this->deleteFile($s);
+        $this->repo()->update($id, ['status' => Repo::REJECTED, 'reviewed_by' => $actor->id, 'reviewed_at' => $this->app->time()->nowUtc(), 'reason' => $reason, 'thumb' => null, 'file_key' => '', 'drive_file_id' => '']);
         $this->notifySubmitter($s, false, $reason);
         return $this->out($this->repo()->find($id) ?? [], true);
     }
@@ -273,7 +311,7 @@ final class GallerySubmissionService
         $repo = $this->repo();
         foreach ($repo->ofAlbum($albumId) as $s) {
             if ((string) $s['status'] === Repo::PENDING) {
-                $this->app->gallery()->media()->delete((string) $s['file_key']);
+                $this->deleteFile($s);
             }
             $repo->delete((int) $s['id']);
         }
@@ -283,7 +321,7 @@ final class GallerySubmissionService
     public function userDeleted(int $userId): void
     {
         foreach ($this->repo()->pendingOfUser($userId) as $s) {
-            $this->app->gallery()->media()->delete((string) $s['file_key']);
+            $this->deleteFile($s);
         }
     }
 
@@ -339,11 +377,15 @@ final class GallerySubmissionService
             return ['status' => 404];
         }
         $key = (string) $s['file_key'];
+        $mime = VideoUploadService::TYPES[strtolower(pathinfo($key, PATHINFO_EXTENSION))];
+        if ((string) ($s['drive_file_id'] ?? '') !== '') {
+            // Schon im Ordner „Einreichungen“ in Drive: von dort durchreichen
+            return $this->app->gallery()->deliverDriveRange((string) $s['drive_file_id'], (int) $s['bytes'], $mime, '"s' . md5($key) . '"', true, $range, $begin, $write);
+        }
         $file = $this->app->gallery()->media()->path($key);
         if ($file === null) {
             return ['status' => 404];
         }
-        $mime = VideoUploadService::TYPES[strtolower(pathinfo($key, PATHINFO_EXTENSION))];
         return $this->app->gallery()->deliverFile($file, $mime, '"s' . md5($key) . '"', true, $range, $begin, $write);
     }
 

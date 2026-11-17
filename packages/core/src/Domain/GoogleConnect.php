@@ -95,8 +95,11 @@ final class GoogleConnect
         }
         $email = $drive->oauthEmail();
         $message = 'Mit Google verbunden' . ($email !== '' ? ' (' . $email . ')' : '') . '.';
+        $message .= $drive->writeAccess()
+            ? ' Die Verbindung darf Google Drive lesen und darin Dateien ablegen.'
+            : ' Die Verbindung darf Google Drive nur lesen.';
         $message .= $drive->calendarAccess()
-            ? ' Die Verbindung darf Google Drive und Google Kalender lesen.'
+            ? ' Den Google Kalender darf sie lesen.'
             : ' Den Kalender darf die Verbindung nicht lesen (Häkchen nicht gesetzt). Für einen privaten Kalender trenne sie und verbinde neu, dabei beide Häkchen setzen.';
         return $this->result(true, $message, $return);
     }

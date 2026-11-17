@@ -54,9 +54,19 @@ final class GalleryService
     public const SOURCE_DRIVE = 'drive';
     public const SOURCE_SERVER = 'server';
     public const SOURCES = [self::SOURCE_DRIVE, self::SOURCE_SERVER];
-    /** Ablageort hochgeladener Bilder; vorerst nur der eigene Server (MediaStore), weitere später. */
+    /**
+     * Ablageort hochgeladener Bilder und Einreichungen: der eigene Server (MediaStore) oder, mit Drive als Quelle und
+     * vollem Drive-Zugriff, Google Drive (GalleryDriveService). Ergibt sich daraus, store(); die Einstellung bleibt für
+     * ältere Fassungen der App.
+     */
     public const STORE_SETTING = 'gallery_store';
-    public const STORES = ['server'];
+    public const STORES = ['server', 'drive'];
+    /**
+     * Gerade nach Drive gebrachte Bilder: ID => Zeit. Ein Abgleich, der Drive vorher gelesen hat, löscht sie nicht als
+     * „nicht mehr in Drive“ (PUSHED_TTL Sekunden).
+     */
+    public const PUSHED_SETTING = 'gallery_drive_pushed';
+    private const PUSHED_TTL = 7200;
     /** Knöpfe zum Herunterladen (je Bild in der Großansicht und je Album als ZIP) für alle, die die Galerie sehen. */
     public const DOWNLOADS_SETTING = 'gallery_downloads';
     /** Präfix von photos.drive_file_id bei hochgeladenen Bildern (die Spalte ist NOT NULL UNIQUE). */
@@ -138,7 +148,27 @@ final class GalleryService
 
     public function store(): string
     {
-        return self::STORES[0];
+        return $this->driveConfigured() && $this->source->writeAccess() ? 'drive' : 'server';
+    }
+
+    /** Ein Bild wurde gerade nach Drive gebracht (siehe PUSHED_SETTING). */
+    public function notePushed(int $photoId): void
+    {
+        $now = $this->time->timestamp();
+        $pushed = array_filter($this->pushed(), static fn (int $t): bool => $t > $now - self::PUSHED_TTL);
+        $pushed[$photoId] = $now;
+        $this->settings->set(self::PUSHED_SETTING, $pushed);
+    }
+
+    /** @return array<int, int> */
+    private function pushed(): array
+    {
+        $raw = $this->settings->get(self::PUSHED_SETTING);
+        $out = [];
+        foreach (is_array($raw) ? $raw : [] as $id => $t) {
+            $out[(int) $id] = (int) $t;
+        }
+        return $out;
     }
 
     /** Zeigt die Galerie Knöpfe zum Herunterladen? Vorgabe: nein. */
@@ -326,8 +356,10 @@ final class GalleryService
             throw $this->fail($e->getMessage());
         }
 
-        // Aufräumen nur, wenn es etwas zu tun gibt: Ein Abgleich ohne Änderungen braucht keine Transaktion.
-        $gone = $this->repo->photosExcept($seenPhotos);
+        // Aufräumen nur, wenn es etwas zu tun gibt: Ein Abgleich ohne Änderungen braucht keine Transaktion. Gerade nach
+        // Drive gebrachte Bilder hat dieser Abgleich vielleicht noch nicht gesehen: die bleiben.
+        $recent = array_filter($this->pushed(), fn (int $t): bool => $t > $this->time->timestamp() - self::PUSHED_TTL);
+        $gone = array_values(array_filter($this->repo->photosExcept($seenPhotos), static fn (array $p): bool => !isset($recent[(int) $p['id']])));
         $staleAlbums = array_values(array_diff(array_map(static fn (array $a): int => (int) $a['id'], $albumRows), $seenAlbums));
         if ($gone !== [] || $staleAlbums !== [] || $this->repo->countRetryable(self::MAX_ATTEMPTS) > 0) {
             $this->repo->transaction(function () use ($gone, $staleAlbums): void {
@@ -945,7 +977,19 @@ final class GalleryService
             }
             return $this->deliverFile($file, (string) $photo['mime'], '"v' . md5((string) $photo['md5']) . '"', $intern, $range, $begin, $write);
         }
-        $total = (int) $photo['bytes'];
+        return $this->deliverDriveRange((string) $photo['drive_file_id'], (int) $photo['bytes'], (string) $photo['mime'], '"v' . md5((string) $photo['md5']) . '"', $intern, $range, $begin, $write);
+    }
+
+    /**
+     * Ausschnitt eines Videos aus Drive durchreichen (deliverVideo, auch offene Einreichungen in Drive). Antwort wie dort;
+     * die Rechte prüft der Aufrufer.
+     *
+     * @param (\Closure(array{status: int, contentRange: string, length: int, mime: string, etag: string, intern: bool}): void)|null $begin
+     * @param (\Closure(string): bool)|null $write
+     * @return array{status: int, body?: string, sent?: bool, length?: int, contentRange?: string, mime?: string, etag?: string, intern?: bool, retryAfter?: int}
+     */
+    public function deliverDriveRange(string $fileId, int $total, string $mime, string $etag, bool $intern, ?string $range, ?\Closure $begin = null, ?\Closure $write = null): array
+    {
         $span = self::byteRange($range, $total);
         if ($span === null) {
             return ['status' => 416, 'contentRange' => 'bytes */' . $total];
@@ -959,13 +1003,13 @@ final class GalleryService
         $streaming = $begin !== null && $write !== null;
         $head = null;
         $body = '';
-        $onStart = static function (int $from, int $to, int $size) use (&$head, $photo, $intern, $begin, $streaming): void {
+        $onStart = static function (int $from, int $to, int $size) use (&$head, $mime, $etag, $intern, $begin, $streaming): void {
             $head = [
                 'status' => 206,
                 'contentRange' => 'bytes ' . $from . '-' . $to . '/' . $size,
                 'length' => $to - $from + 1,
-                'mime' => (string) $photo['mime'],
-                'etag' => '"v' . md5((string) $photo['md5']) . '"',
+                'mime' => $mime,
+                'etag' => $etag,
                 'intern' => $intern,
             ];
             if ($streaming) {
@@ -977,7 +1021,7 @@ final class GalleryService
             return true;
         };
         try {
-            $this->source->streamRange((string) $photo['drive_file_id'], $start, $end, $onStart, $onData);
+            $this->source->streamRange($fileId, $start, $end, $onStart, $onData);
         } catch (\RuntimeException) {
             if ($head === null) {
                 return ['status' => 502];

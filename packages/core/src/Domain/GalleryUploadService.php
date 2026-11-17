@@ -257,6 +257,40 @@ final class GalleryUploadService
     }
 
     /**
+     * Eine Datei, die schon im Ordner eines Albums in Drive liegt (freigegebene Einreichung, GalleryDriveService), als
+     * Bild aus Drive aufnehmen, ohne auf den nächsten Abgleich zu warten. Der Abgleich findet sie danach unter derselben
+     * Drive-ID; die Prüfsumme ist die der hochgeladenen Datei (gleich der von Drive).
+     *
+     * @param string $typeKey Schlüssel der Einreichung (die Endung zeigt Video oder Bild)
+     * @param array{name: string, width: int, height: int, md5: string, bytes: int, duration_ms?: int} $stored
+     * @return int ID des Bilds
+     */
+    public function insertDrivePhoto(int $albumId, string $driveFileId, string $typeKey, array $stored, bool $intern): int
+    {
+        $mime = VideoUploadService::TYPES[strtolower(pathinfo($typeKey, PATHINFO_EXTENSION))] ?? null;
+        $id = $this->repo()->insertPhoto([
+            'album_id' => $albumId,
+            'drive_file_id' => $driveFileId,
+            'name' => $stored['name'],
+            'is_intern' => $intern ? 1 : 0,
+            'width' => $stored['width'],
+            'height' => $stored['height'],
+            'taken_at' => null,
+            'md5' => $stored['md5'],
+            'file_key' => bin2hex(random_bytes(16)),
+            'status' => GalleryRepository::PENDING,
+            'error' => '',
+            'media' => $mime !== null ? 'video' : 'image',
+            'mime' => $mime ?? 'image/jpeg',
+            'bytes' => $stored['bytes'],
+            'duration_ms' => $mime !== null ? max(0, (int) ($stored['duration_ms'] ?? 0)) : 0,
+            'source' => 'drive',
+        ]);
+        $this->app->scheduler->runSoon(GalleryService::PROCESS_TASK);
+        return $id;
+    }
+
+    /**
      * Ein hochgeladenes Bild oder Video nachträglich intern (nur für Mitglieder) oder öffentlich stellen. Die
      * aufbereiteten Größen liegen bei öffentlichen Bildern im öffentlichen Verzeichnis: Sie werden gelöscht und mit
      * neuem file_key im Hintergrund neu erzeugt, damit alte öffentliche Adressen sofort nichts mehr liefern. Das
@@ -424,13 +458,20 @@ final class GalleryUploadService
         return array_values($photos);
     }
 
-    /** @param array<string, mixed> $photo */
+    /**
+     * Bild samt Dateien löschen; ein Bild aus Drive (z. B. eine freigegebene Einreichung, die schon nach Drive
+     * umgezogen ist) kommt dort in den Papierkorb, sonst brächte der nächste Abgleich es zurück.
+     *
+     * @param array<string, mixed> $photo
+     */
     public function removePhoto(array $photo): void
     {
         $gallery = $this->app->gallery();
         $gallery->deleteFiles($photo);
         if (GalleryService::isUpload($photo)) {
             $gallery->media()->delete(GalleryService::uploadKey($photo));
+        } elseif ($this->app->drive()->writeAccess()) {
+            $this->app->drive()->trashFile((string) $photo['drive_file_id']);
         }
         $this->repo()->deletePhoto((int) $photo['id']);
     }

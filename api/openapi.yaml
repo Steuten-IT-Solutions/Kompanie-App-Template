@@ -5323,7 +5323,8 @@ paths:
                   fee_cents: { type: integer, description: 'Jahresbeitrag als Vorschlag beim Eintragen in Cent, 0 = keiner' }
                   methods: { type: array, items: { type: string }, description: 'Zahlungsarten zur Auswahl' }
                   year: { type: integer, description: 'Laufendes Jahr (Zeitzone der App)' }
-                  birthday_ages: { type: array, items: { type: integer }, description: 'Alter, an deren Geburtstag erinnert wird (leer = aus)' }
+                  birthday_ages:
+                    { type: array, items: { type: integer }, description: 'Alter, an deren Geburtstag erinnert wird (leer = aus)' }
                   birthday_days: { type: integer, description: 'So viele Tage vorher kommt die Erinnerung (0 = am Tag selbst)' }
                   birthdays:
                     type: array
@@ -6759,7 +6760,11 @@ paths:
                   type: object
                   required: [key, title, dated]
                   properties:
-                    key: { type: string, enum: [members, passive, points, penalties, attendance, events, calendar, ranks, titles, offices, inventory] }
+                    key:
+                      {
+                        type: string,
+                        enum: [members, passive, points, penalties, attendance, events, calendar, ranks, titles, offices, inventory],
+                      }
                     title: { type: string, description: Name des Bereichs, wie die Kompanie ihn nennt }
                     dated: { type: boolean }
         '401': { $ref: '#/components/responses/Error' }
@@ -7285,7 +7290,8 @@ paths:
       description: |
         Speichert den eigenen OAuth-Client der Installation (Client-ID und Client-Secret aus der Google Cloud Console,
         Typ „Webanwendung“) und liefert die Adresse der Anmeldung bei Google. Die App leitet den Browser dorthin.
-        Angefragt werden `drive.readonly` und `calendar.readonly` mit `access_type=offline`, `prompt=consent` und
+        Angefragt werden `drive` (voller Zugriff: die Galerie legt Einreichungen und hochgeladene Bilder in Drive ab;
+        ältere Verbindungen haben `drive.readonly` und `drive.file`) und `calendar.readonly` mit `access_type=offline`, `prompt=consent` und
         `include_granted_scopes=true`. Das `state` gilt 15 Minuten, einmal, nur für diesen Admin in dieser Sitzung.
 
         Google leitet danach an die Weiterleitungs-URI der Installation zurück (`google.redirect_uri` in
@@ -8779,7 +8785,8 @@ components:
         updated_at: { type: string, format: date-time, description: 'Wechselt, wenn sich Titel, Inhalt oder Anhänge ändern' }
         expires_at: { type: string, format: date-time, description: 'Sichtbar bis (UTC); standardmäßig 24 Stunden nach created_at' }
         audience: { $ref: '#/components/schemas/BoardAudience' }
-        audience_ids: { type: array, items: { type: integer }, description: 'Nur mit view_board_history, bei company und person: die Auswahl' }
+        audience_ids:
+          { type: array, items: { type: integer }, description: 'Nur mit view_board_history, bei company und person: die Auswahl' }
         audience_names:
           type: array
           items: { type: string }
@@ -9622,6 +9629,8 @@ components:
             connected: { type: boolean, description: OAuth-Verbindung besteht (geht dem Dienstkonto vor) }
             email: { type: string, description: 'Google-Konto der Verbindung, leer wenn unbekannt' }
             calendar_access: { type: boolean, description: wie gallery.calendar_access }
+            write_access:
+              { type: boolean, description: 'Voller Drive-Zugriff (OAuth mit drive); ältere Verbindungen und das Dienstkonto nur lesen' }
             service_account_email: { type: string }
             last_result:
               type: [object, 'null']
@@ -9661,8 +9670,20 @@ components:
             configured: { type: boolean, description: 'Quelle server immer, Quelle drive mit Zugang und Ordner' }
             root: { type: string }
             source: { type: string, enum: [drive, server] }
-            store: { type: string, enum: [server] }
+            store:
+              type: string
+              enum: [server, drive]
+              description: 'Ablageort hochgeladener Bilder und Einreichungen: drive mit Drive als Quelle und write_access, sonst server'
             media_bytes: { type: integer, description: Belegter Platz der hochgeladenen Bilder in Bytes }
+            drive:
+              type: object
+              description: Ablage in Google Drive (GalleryDriveService)
+              required: [active, needs_reconnect, waiting, error]
+              properties:
+                active: { type: boolean, description: 'Neue Dateien landen in Drive' }
+                needs_reconnect: { type: boolean, description: 'Drive ist die Quelle, die Verbindung darf aber nur lesen' }
+                waiting: { type: integer, description: 'Dateien, die noch auf dem Server auf Drive warten' }
+                error: { type: string, description: 'Letzter Fehler beim Übertragen, leer ohne' }
             downloads: { type: boolean, description: 'Knöpfe zum Herunterladen in der Galerie (Einstellung gallery_downloads)' }
             submissions: { type: boolean, description: 'Einreichen durch Mitglieder erlaubt (Einstellung gallery_submissions)' }
             service_account_email: { type: string, description: wie google.service_account_email (für ältere Fassungen der App) }
@@ -9921,10 +9942,21 @@ components:
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
         new_accounts: { type: boolean, description: 'Nur eigene Rollen: beim Anlegen von Konten wählbar' }
         promotable: { type: boolean, description: 'Nur eigene Rollen ohne member: als Mitglied aufnehmen mit create_users' }
-        admission_extra: { type: boolean, description: 'Nur eigene Rollen: Anwärter-Rolle als Grund- oder Zusatzrolle; bei der Aufnahme wird die Grundrolle zu member, die Zusatzrolle entfernt' }
+        admission_extra:
+          {
+            type: boolean,
+            description: 'Nur eigene Rollen: Anwärter-Rolle als Grund- oder Zusatzrolle; bei der Aufnahme wird die Grundrolle zu member, die Zusatzrolle entfernt',
+          }
         admission_kind:
-          { type: [string, 'null'], description: 'Voraussetzung für die Aufnahme: Terminart (eine aus /config eventKinds; leer oder null für keine)' }
-        admission_count: { type: [integer, string], description: 'Mindestens so viele Teilnahmen (present) an Listen dieser Art, 0–100; > 0 nur mit admission_kind' }
+          {
+            type: [string, 'null'],
+            description: 'Voraussetzung für die Aufnahme: Terminart (eine aus /config eventKinds; leer oder null für keine)',
+          }
+        admission_count:
+          {
+            type: [integer, string],
+            description: 'Mindestens so viele Teilnahmen (present) an Listen dieser Art, 0–100; > 0 nur mit admission_kind',
+          }
         admission_months: { type: [integer, string], description: 'Mindestens so viele Monate seit „Anwärter seit“, 0–120' }
 
     Admission:
@@ -11056,7 +11088,24 @@ components:
           items: { $ref: '#/components/schemas/PassivePayment' }
     PassiveImportResult:
       type: object
-      required: [headers, header_line, columns, method_columns, ignored, personal, year, paid_on, methods, rows, new, payments, existing, errors, applied]
+      required:
+        [
+          headers,
+          header_line,
+          columns,
+          method_columns,
+          ignored,
+          personal,
+          year,
+          paid_on,
+          methods,
+          rows,
+          new,
+          payments,
+          existing,
+          errors,
+          applied,
+        ]
       properties:
         headers: { type: array, items: { type: string }, description: 'Zellen der Kopfzeile' }
         header_line: { type: integer, description: 'Nummer der Kopfzeile ab 1' }
@@ -11148,7 +11197,12 @@ components:
       properties:
         fee_cents: { type: integer, description: '0 = kein Vorschlag' }
         methods: { type: array, items: { type: string }, description: 'Zahlungsarten zur Auswahl (vorgegeben Bar, SEPA, PayPal)' }
-        birthday_ages: { type: array, items: { type: integer }, description: 'Alter, an deren Geburtstag erinnert wird, aufsteigend; leer (Vorgabe) = keine Erinnerung' }
+        birthday_ages:
+          {
+            type: array,
+            items: { type: integer },
+            description: 'Alter, an deren Geburtstag erinnert wird, aufsteigend; leer (Vorgabe) = keine Erinnerung',
+          }
         birthday_days: { type: integer, minimum: 0, maximum: 30, description: 'Tage vorher (Vorgabe 7, 0 = am Tag selbst)' }
     PassiveInput:
       type: object

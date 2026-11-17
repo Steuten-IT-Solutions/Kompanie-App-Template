@@ -839,10 +839,10 @@ final class Subjects
     {
         return [
             '/admin/settings' => [
-                'google.redirect_uri', 'google.client_secret_set', 'google.last_result', 'google.calendar_access',
+                'google.redirect_uri', 'google.client_secret_set', 'google.last_result', 'google.calendar_access', 'google.write_access',
                 'calendar.connection_needs_calendar_access', 'calendar.ics_url_set', 'calendar.google_api_key_set', 'gallery.configured',
                 'gallery.media_bytes', 'gallery.service_account_email', 'gallery.oauth_connected', 'gallery.oauth_email', 'gallery.calendar_access',
-                'gallery.status.', 'news.sources',
+                'gallery.status.', 'gallery.drive.', 'news.sources',
             ],
             '/admin/mail' => ['from_name_default', 'password_set', 'configured', 'unavailable', 'server_max_size', 'pending'],
             '/admin/registration' => ['pending', 'link'],

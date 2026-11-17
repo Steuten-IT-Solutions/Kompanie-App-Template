@@ -958,6 +958,8 @@ export function GoogleAccess({ settings, onSaved, onToast }: SectionProps) {
             {g.calendar_access
               ? 'Es darf auch den Kalender lesen.'
               : 'Den Kalender darf es noch nicht lesen. Für einen privaten Kalender: Verbindung trennen und neu verbinden, dabei beide Häkchen setzen.'}
+            {g.write_access === false &&
+              ' Google Drive darf es nur lesen. Damit Einreichungen und hochgeladene Bilder der Galerie in Drive landen: Verbindung trennen und neu verbinden, dabei das Häkchen für Google Drive setzen.'}
           </p>
           <div className="button-row">
             <button type="button" className="btn btn-link" onClick={disconnect}>
@@ -1463,6 +1465,49 @@ function EventKinds({ onToast }: { onToast: (msg: string) => void }) {
   );
 }
 
+/** Wo hochgeladene Bilder und Einreichungen landen: eigener Server oder Google Drive (Drive als Quelle, voller Zugriff). */
+function GalleryStore({ g }: { g: AdminSettings['gallery'] }) {
+  const d = g.drive;
+  const onServer = formatBytes(g.media_bytes ?? 0);
+  if (g.store === 'drive' && d) {
+    return (
+      <div className="small">
+        <p>
+          <strong>Ablageort:</strong> Google Drive. Hochgeladene Bilder und Videos kommen in den Ordner ihres Albums. Offene Einreichungen
+          liegen im Ordner „Einreichungen“ in der Ablage des verbundenen Google-Kontos und kommen bei der Freigabe ins Album.
+        </p>
+        {d.waiting > 0 && (
+          <p className="muted">
+            {d.waiting === 1 ? '1 Datei wartet' : `${d.waiting} Dateien warten`} noch auf dem Server und{' '}
+            {d.waiting === 1 ? 'kommt' : 'kommen'} im Hintergrund nach Drive (belegt {onServer}). Alben, die nur in der App angelegt sind,
+            bleiben vorerst auf dem Server.
+          </p>
+        )}
+        {d.error && (
+          <p className="form-error" role="alert">
+            Letzter Versuch, Dateien nach Drive zu bringen: {d.error}
+          </p>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="small">
+      <p>
+        <strong>Ablageort:</strong> eigener Server. Hochgeladene Bilder belegen {onServer}. Die App setzt keine Grenze; behalte den
+        Speicherplatz deines Webspace im Blick. Sie sind in der Sicherung enthalten.
+      </p>
+      {d?.needs_reconnect && (
+        <p>
+          Damit hochgeladene Bilder und Einreichungen in Google Drive landen, braucht die App vollen Zugriff auf Drive: unter <GoogleLink />{' '}
+          die Verbindung trennen und neu mit Google verbinden, dabei das Häkchen für Google Drive setzen. Mit einem Dienstkonto geht das
+          nicht, es hat in Drive keinen eigenen Speicherplatz.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function Gallery({ settings, onSaved, onToast }: SectionProps) {
   const g = settings.gallery;
   const [root, setRoot] = useState(g.root);
@@ -1523,7 +1568,6 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
             ? { gallery_root: root.trim() }
             : {
                 gallery_source: source,
-                gallery_store: 'server',
                 ...(source === 'drive' ? { gallery_root: root.trim() } : {}),
                 ...(g.downloads !== undefined ? { gallery_downloads: downloads ? '1' : '0' } : {}),
                 ...(g.submissions !== undefined ? { gallery_submissions: submissions ? '1' : '0' } : {}),
@@ -1540,16 +1584,7 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
               <option value="server">Eigener Server (nur Alben der App)</option>
             </select>
           </label>
-          <label className="field">
-            <span>Ablageort für hochgeladene Bilder</span>
-            <select value="server" disabled>
-              <option value="server">Eigener Server</option>
-            </select>
-          </label>
-          <p className="muted small">
-            Hochgeladene Bilder belegen {formatBytes(g.media_bytes ?? 0)}. Die App setzt keine Grenze; behalte den Speicherplatz deines
-            Webspace im Blick. Sie sind in der Sicherung enthalten.
-          </p>
+          <GalleryStore g={g} />
         </>
       )}
       {source === 'drive' && (
