@@ -31,6 +31,15 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   [Termine](app:termine), bei jeder Quelle des Kalenders, auch bei Google Kalender und iCal. Die App speichert die Art
   selbst und ändert nichts in Google. Steht der Name einer Art im Titel, schlägt die App sie vor. Anwesenheitslisten
   übernehmen die Art ihres Termins und zeigen sie an; ändern lässt sie sich auch an der Liste.
+- **Aufnahmen**: Unter [Verwaltung → Aufnahmen](app:verwaltung/aufnahmen) siehst du wie bei den Beförderungen, welche
+  Anwärter die Voraussetzung für die Aufnahme als Mitglied erfüllen; die Zahl im Kreis am Knopf zeigt, wie viele es
+  sind. Die Voraussetzung legst du je Anwärter-Rolle unter [Einstellungen → Rollen](app:einstellungen/rollen) fest:
+  Teilnahmen an Terminen einer Terminart (z. B. 6 Versammlungen) und eine Mindestdauer als Anwärter. Eine Anwärter-Rolle
+  kann auch eine Zusatzrolle zu Mitglied sein; beim Aufnehmen wird sie dann entfernt. Auf der Seite eines Anwärters
+  stehen „Anwärter seit“ (bei bisherigen Anwärtern nachtragen) und der Stand; aufnehmen geht dort jederzeit, ohne
+  erfüllte Voraussetzung mit Hinweis. Ohne Eintritt trägt die App den Tag der Aufnahme ein. Nach dem Speichern einer
+  Anwesenheitsliste zeigt die App, wer neu die Voraussetzung erfüllt. Sehen und aufnehmen darf, wer Mitglieder anlegen
+  darf.
 - **Beitrag der Passiven**: Unter [Verwaltung → Passive](app:verwaltung/passive) trägst du jetzt je Passivem und Jahr
   ein, dass der Beitrag bezahlt ist, mit Betrag, Datum und Zahlungsart. Oben wählst du das Jahr, siehst, wie viele
   bezahlt haben, und kannst nur die offenen oder nur die bezahlten zeigen. Einen Jahresbeitrag stellst du als Vorschlag

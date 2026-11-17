@@ -170,6 +170,8 @@ final class Subjects
             'PATCH /members/{id}/role' => $member,
             'PUT /members/{id}/rights' => $member,
             'POST /members/{id}/promote' => $member,
+            'POST /members/{id}/admit' => $member,
+            'PUT /members/{id}/candidate-since' => $member,
             'DELETE /members/{id}' => $member,
             'PUT /members/{id}/photo' => $member,
             'DELETE /members/{id}/photo' => $member,
@@ -648,6 +650,8 @@ final class Subjects
         $fields['Geburtsdatum'] = $birthday === null ? null : sprintf('%02d.%02d.%s', $birthday['day'], $birthday['month'], $birthday['year'] ?? '');
         $join = $this->app->joinYears()->repository()->find($id);
         $fields['Eintritt'] = $join === null ? null : ($join['joined_on'] !== '' ? $join['joined_on'] : (string) $join['year']);
+        $admission = $this->app->admissions()->statusOf($id);
+        $fields['Anwärter seit'] = $admission['since'] ?? null;
         $former = $this->app->formerMembers()->repository()->find($id);
         $fields['Ehemalig seit'] = $former['left_on'] ?? null;
         $fields['Grund des Ausscheidens'] = $former['reason'] ?? null;
@@ -676,9 +680,23 @@ final class Subjects
                 'Faktor für Punkte' => $r['points_factor'],
                 'Für neue Konten' => $r['new_accounts'],
                 'Beförderbar' => $r['promotable'],
-            ]);
+            ] + self::admissionFields($this->app->admissions()->describeRole($key)));
         };
         return new Subject($load, Subject::fromPath('key'), fn (): array => array_map('strval', array_keys($this->app->roles()->all())));
+    }
+
+    /**
+     * @param array{admission_extra: bool, admission_kind: string|null, admission_count: int, admission_months: int} $a
+     * @return array<string, mixed>
+     */
+    private static function admissionFields(array $a): array
+    {
+        return [
+            'Anwärter-Rolle (bei Aufnahme entfernen)' => $a['admission_extra'],
+            'Aufnahme: Terminart' => $a['admission_kind'],
+            'Aufnahme: Teilnahmen' => $a['admission_count'],
+            'Aufnahme: Monate als Anwärter' => $a['admission_months'],
+        ];
     }
 
     /** @param bool $all neue Gruppen über den Vergleich aller Schlüssel erkennen */

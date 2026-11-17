@@ -37,6 +37,25 @@ final class MemberRoleRepository
     }
 
     /**
+     * Seit wann jemand eine Zusatzrolle hat (UTC), in einer Abfrage; ohne Tabelle leer.
+     *
+     * @return array<int, array<string, string>> Benutzer-ID => Rolle => assigned_at
+     */
+    public function assignedAt(): array
+    {
+        try {
+            $rows = $this->db->select('SELECT user_id, role, assigned_at FROM {member_roles}');
+        } catch (\RuntimeException) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $r) {
+            $out[(int) $r['user_id']][(string) $r['role']] = (string) $r['assigned_at'];
+        }
+        return $out;
+    }
+
+    /**
      * Zusatzrollen einer Person ersetzen, in einer Transaktion. Bestehende Zuordnungen behalten ihr Datum.
      *
      * @param list<string> $current bisher (aus all())

@@ -76,6 +76,7 @@ Meldet sich jemand z. B. per Telefon ab:
 
 ## Gut zu wissen
 - In der Liste stehen auch Personen, deren Rolle nicht zur Kompanie gehört (z. B. Anwärter). {bereich.points} und {bereich.penalties} bekommen aber nur Personen, die zur Kompanie gehören.
+- Darfst du auch Mitglieder anlegen, zeigt die App nach dem Speichern oben, wer dadurch neu die Voraussetzung für die Aufnahme als {rolle.member} erfüllt (siehe *Verwaltung → Aufnahmen*).
 - Wer für diese Liste schon {bereich.points} hat, bekommt sie kein zweites Mal. Haben alle Anwesenden schon welche, steht dort „{bereich.points} für alle Anwesenden bereits gebucht.“
 - Bei {bereich.penalties} merkt sich die Liste nicht, wer schon einen Eintrag hat. Lege ihn also nicht zweimal an.
 - Löschst du eine Liste, bleiben die schon gebuchten {bereich.points} erhalten.

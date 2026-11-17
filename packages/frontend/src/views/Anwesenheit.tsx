@@ -20,6 +20,7 @@ import { navigate } from '../router';
 import { Caps, Empty, ErrorBox, Loading, useAsync, useUnsaved } from '../ui';
 import { prefetchOnTap, sources } from '../viewData';
 import { confirmAsk } from '../ask';
+import { noteAdmissions } from './Aufnahmen';
 import { applyPending, pendingCount, type PendingSave } from '../attendanceOutbox';
 import {
   attendanceOutbox,
@@ -321,6 +322,7 @@ function Editor({
     try {
       // Offline gespeicherte Änderungen gehen mit.
       const saved = await api.saveAttendance(saveInput(list.id, pending, changes, freeInput));
+      noteAdmissions(saved.admissions_new);
       if (pending) {
         attendanceOutbox.remove(list.id, pending);
         outboxChanged();

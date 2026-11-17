@@ -133,6 +133,7 @@ function adminSlug([sub, arg, page]: string[], ctx: HelpContext): string | null 
     strafe: 'strafen-verwalten',
     dienstgrade: 'dienstgrade-verwalten',
     befoerderungen: 'befoerderungen',
+    aufnahmen: 'aufnahmen',
     titel: 'titel-verwalten',
     aemter: 'aemter-verwalten',
     sponsoren: 'sponsoren-verwalten',

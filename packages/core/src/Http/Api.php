@@ -12,6 +12,7 @@ use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\ChangeLog\Item;
 use KompanieApp\Core\ChangeLog\Subject;
 use KompanieApp\Core\ChangeLog\Subjects;
+use KompanieApp\Core\Domain\AdmissionService;
 use KompanieApp\Core\Domain\AttachmentService;
 use KompanieApp\Core\Domain\BoardService;
 use KompanieApp\Core\Domain\EventService;
@@ -493,6 +494,17 @@ final class Api
             + ($status !== null ? ['rank' => $status, 'rank_history' => $this->app->ranks()->history($userId)] : []);
     }
 
+    /**
+     * Rollen für Einstellungen → Rollen, je Rolle mit den Angaben zur Aufnahme (AdmissionService::describeRole).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function roles(): array
+    {
+        $admissions = $this->app->admissions();
+        return array_values(array_map(static fn (array $r): array => $r + $admissions->describeRole((string) $r['key']), $this->app->roles()->describe()));
+    }
+
     /** Höchstzahl Personen je GET /members/details. */
     public const MEMBER_DETAILS_MAX = 25;
 
@@ -516,6 +528,8 @@ final class Api
             + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::ViewPersonal) ? ['birthday' => $a->birthdays()->of($id)] : [])
             // Eintrittsjahr mit Anzeige, ebenso nur für create_users
             + ($this->user()->can(Cap::CreateUsers) ? ['join_year' => $a->joinYears()->of($id)] : [])
+            // Aufnahme als Mitglied: Anwärter-Rolle, „Anwärter seit“ und Stand der Voraussetzung (null, wenn kein Anwärter)
+            + ($this->user()->can(Cap::CreateUsers) ? ['admission' => $a->admissions()->statusOf($id)] : [])
             // Anwesenheit (gespeicherte Einträge und Summen) mit Bereich und Recht manage_attendance
             + ($a->features()->enabled('attendance') && $this->user()->can(Cap::ManageAttendance) ? ['attendance' => $a->attendance()->ofMember($id)] : [])
             // Ehemalig: Grund, Eintritt, Ausscheiden (sonst null)
@@ -734,6 +748,9 @@ final class Api
             'eventResponses' => ($features['calendar'] ?? false) && $a->eventResponses()->enabled(),
             // Terminarten (Einstellungen → Kalender), z. B. Versammlung: zur Auswahl am Termin und an Anwesenheitslisten
             'eventKinds' => ($features['calendar'] ?? false) || ($features['attendance'] ?? false) ? $a->eventKinds()->options() : [],
+            // admissionsDue: Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“), für create_users
+            // mit Anwesenheit und einer Anwärter-Rolle; sonst null (keine Kachel)
+            'admissionsDue' => $user !== null && $this->can(Cap::CreateUsers) && $a->admissions()->enabled() ? $a->admissions()->dueCount() : null,
             // Impressum und Datenschutzerklärung der Kompanie (Einstellungen → Impressum und Datenschutz): für alle, auch Gäste
             'legal' => self::legalLinks($a->settingsService()->legal()),
             // Handbuch auf GitHub Pages der Kompanie: neben updates.json (Issue #12)
@@ -1353,7 +1370,14 @@ final class Api
             // Anwesenheit (Issue #21): Listen je Termin; Gruppen für den Zähler stellen Admins bei den Rollen ein
             new Route('GET', '/attendance', Cap::ManageAttendance, fn () => $a->attendance()->lists(), 'attendance', $denyRights),
             new Route('PUT', '/attendance', Cap::ManageAttendance, function (Request $r) use ($a) {
+                // Wer danach neu die Voraussetzung für die Aufnahme erfüllt (Hinweis nach dem Speichern, nur für create_users)
+                $admissions = $this->user()->can(Cap::CreateUsers) && $a->admissions()->enabled() ? $a->admissions() : null;
+                $before = $admissions?->fulfilledIds();
                 [$list, $created] = $a->attendance()->save($this->user(), $r->body);
+                if ($admissions !== null && $before !== null) {
+                    $new = array_diff_key($admissions->fulfilledIds(), $before);
+                    $list['admissions_new'] = array_map(static fn (int $id, string $name): array => ['user_id' => $id, 'name' => $name], array_keys($new), array_values($new));
+                }
                 return $created ? Response::created($list) : $list;
             }, 'attendance', $denyRights),
             new Route('GET', '/attendance/events', Cap::ManageAttendance, fn () => $a->attendance()->events(), 'attendance', $denyRights),
@@ -1479,6 +1503,11 @@ final class Api
             // Rechte einzelner Personen zusätzlich zu ihren Rollen geben oder entziehen
             new Route('PUT', '/members/{id}/rights', Cap::PromoteUsers, fn (Request $r) => $a->roles()->setOverrides($this->user(), $r->id(), $r->input('grant'), $r->input('revoke')), null, $denyRoles),
             new Route('POST', '/members/{id}/promote', Cap::CreateUsers, fn (Request $r) => $a->members()->promote($this->user(), $r->id()), null, $denyUsers),
+            // Aufnahmen: Anwärter mit Stand der Voraussetzung; aufnehmen (Grundrolle → Mitglied bzw. Anwärter-Zusatzrolle
+            // entfernen, Eintritt setzen, wenn leer) und „Anwärter seit“ ändern
+            new Route('GET', '/admissions', Cap::CreateUsers, fn () => $a->admissions()->list(), 'attendance', $denyUsers),
+            new Route('POST', '/members/{id}/admit', Cap::CreateUsers, fn (Request $r) => $a->admissions()->admit($this->user(), $r->id()), null, $denyUsers),
+            new Route('PUT', '/members/{id}/candidate-since', Cap::CreateUsers, fn (Request $r) => $a->admissions()->setSince($this->user(), $r->id(), $r->input('since')), null, $denyUsers),
             // Konten verwalten (Issue #24): Angaben ändern, löschen mit allen eigenen Daten
             new Route('GET', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->profile($r->id(), $this->user()), null, $denyUsers),
             new Route('PATCH', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->updateProfile($this->user(), $r->id(), $r->body), null, $denyUsers),
@@ -1566,24 +1595,29 @@ final class Api
             new Route('POST', '/admin/mail/check', Cap::ManageSettings, fn () => $a->mail()->check() + ['settings' => $a->mail()->describe()], null, $denySettings),
             new Route('POST', '/admin/mail/test', Cap::ManageSettings, fn (Request $r) => $a->mail()->sendTest($this->user(), $r->input('to')), null, $denySettings),
             // Rollen (Issue #28): nur Admins (manage_settings lässt sich keiner anderen Rolle geben)
-            new Route('GET', '/admin/roles', Cap::ManageSettings, fn () => $a->roles()->describe(), null, $denySettings),
+            new Route('GET', '/admin/roles', Cap::ManageSettings, fn () => $this->roles(), null, $denySettings),
             new Route('POST', '/admin/roles', Cap::ManageSettings, function (Request $r) use ($a) {
-                $a->roles()->create($r->body);
-                return Response::created($a->roles()->describe());
+                $admission = $a->admissions()->prepareRole(null, $r->body);
+                $admission($a->roles()->create($r->body)['key']);
+                return Response::created($this->roles());
             }, null, $denySettings),
             // Reihenfolge der eigenen Rollen (Einstellungen → Rollen, per Ziehen)
             new Route('PUT', '/admin/roles/order', Cap::ManageSettings, function (Request $r) use ($a) {
                 $a->roles()->reorder($r->input('keys'));
-                return $a->roles()->describe();
+                return $this->roles();
             }, null, $denySettings),
             new Route('PATCH', '/admin/roles/{key}', Cap::ManageSettings, function (Request $r) use ($a) {
-                $a->roles()->update((string) $r->params['key'], $r->body);
-                return $a->roles()->describe();
+                // Aufnahme (Anwärter-Rolle als Zusatzrolle, Voraussetzung): erst alles prüfen, dann speichern.
+                $key = (string) $r->params['key'];
+                $admission = $a->admissions()->prepareRole($key, $r->body);
+                $a->roles()->update($key, array_diff_key($r->body, array_flip(AdmissionService::ROLE_FIELDS)));
+                $admission($key);
+                return $this->roles();
             }, null, $denySettings),
             new Route('DELETE', '/admin/roles/{key}', Cap::ManageSettings, function (Request $r) use ($a) {
                 $replacement = $r->query['replacement'] ?? null;
                 $a->roles()->delete((string) $r->params['key'], is_string($replacement) ? $replacement : null);
-                return $a->roles()->describe();
+                return $this->roles();
             }, null, $denySettings),
             new Route('GET', '/admin/features', Cap::ManageSettings, fn () => $a->features()->describe(), null, $denySettings),
             new Route('PUT', '/admin/features', Cap::ManageSettings, function (Request $r) use ($a) {
