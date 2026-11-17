@@ -1455,6 +1455,16 @@ final class Api
             // E-Mail und Geburtsdatum nur mit view_personal sehen und mit manage_personal ändern (prüft PassiveMemberService).
             new Route('GET', '/passive-members', Cap::ManagePassive, fn () => $a->passives()->list($this->user()), 'passive', $denyRights),
             new Route('POST', '/passive-members', Cap::ManagePassive, fn (Request $r) => Response::created($a->passives()->create($this->user(), (array) $r->body)), 'passive', $denyRights),
+            // Import aus einer Tabelle (CSV oder in der App gelesenes Excel): ohne apply nur die Vorschau
+            new Route('POST', '/passive-members/import', Cap::ManagePassive, fn (Request $r) => $a->passiveImport()->import(
+                $this->user(),
+                $r->input('csv'),
+                Input::bool($r->input('apply')),
+                $r->input('columns'),
+                $r->input('year'),
+                $r->input('paid_on'),
+                Input::bool($r->input('skip_errors')),
+            ), 'passive', $denyRights),
             new Route('GET', '/passive-members/{id}', Cap::ManagePassive, fn (Request $r) => $a->passives()->get($this->user(), $r->id()), 'passive', $denyRights),
             new Route('PATCH', '/passive-members/{id}', Cap::ManagePassive, fn (Request $r) => $a->passives()->update($this->user(), $r->id(), (array) $r->body), 'passive', $denyRights),
             new Route('DELETE', '/passive-members/{id}', Cap::ManagePassive, function (Request $r) use ($a) {

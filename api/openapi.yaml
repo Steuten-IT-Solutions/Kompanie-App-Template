@@ -5342,6 +5342,53 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /passive-members/import:
+    post:
+      tags: [Verwaltung]
+      summary: Passive aus einer Tabelle übernehmen, mit dem Beitrag eines Jahres; ohne apply nur die Vorschau
+      description: |
+        CSV mit Semikolon, Tabulator (die App liest Excel-Dateien selbst und schickt sie so) oder Komma, UTF-8 oder
+        Windows-1252, höchstens 500 KB und 1.000 Zeilen. Kopfzeile ist die erste der ersten 20 Zeilen mit „Vorname“ oder
+        „Nachname“ (sonst die erste). Ohne `columns` werden die Spalten an ihren Namen erkannt (vorname, nachname,
+        straße/strasse (auch mit Hausnummer), hausnummer, adresszusatz, plz, ort/wohnort, land, telefon/telefon-nr./handy,
+        e-mail, geburtsdatum/geb-datum, eintritt, bemerkung, betreuer, betrag, zahlungsart, bezahlt am); die Antwort nennt
+        die Zuordnung (`columns`), die die App ändern und mitschicken kann. Adresse, Telefon, E-Mail und Geburtsdatum nur mit
+        `manage_personal` (sonst übergangen, `ignored`); ungültige Angaben bleiben leer, mit Hinweis (`warnings`).
+        Betreuer als „Vorname Nachname“, „Nachname, Vorname“ oder „V. Nachname“; passt keins oder mehr als ein Mitglied,
+        bleibt er leer (Hinweis). Beitrag für `year` (Vorgabe das laufende Jahr): Spalten betrag + zahlungsart oder, ohne
+        betrag, Spalten, die wie eine eingerichtete Zahlungsart heißen (auch abgekürzt) und den Betrag enthalten
+        (`method_columns`); ohne Betrag gilt der Jahresbeitrag. Datum aus „bezahlt am“ (TT.MM.JJJJ, TT.MM. oder JJJJ-MM-TT
+        am Anfang der Zelle), sonst `paid_on` (Vorgabe heute). Zellen ohne Buchstaben und Ziffern gelten als leer. Gleicher
+        Vor- und Nachname wie ein vorhandener Passiver → übersprungen (`existing`); doppelt in der Tabelle → Fehler.
+        Mit `apply` alles in einer Transaktion; hat eine Zeile einen Fehler → 400 (nichts angelegt), außer mit
+        `skip_errors` (dann ohne diese Zeilen).
+      x-capability: manage_passive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [csv]
+              properties:
+                csv: { type: string }
+                apply: { type: boolean, default: false }
+                columns:
+                  type: [object, 'null']
+                  description: 'Feld => Nummer der Spalte ab 0 (null = keine); ohne: erkannt'
+                  additionalProperties: { type: [integer, 'null'] }
+                year: { type: integer, description: 'Jahr des Beitrags; Vorgabe das laufende' }
+                paid_on: { type: string, format: date, description: 'Datum für Zahlungen ohne Datum; Vorgabe heute' }
+                skip_errors: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Vorschau bzw. Ergebnis
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PassiveImportResult' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
   /passive-members/{id}:
     parameters:
       - { name: id, in: path, required: true, schema: { type: integer } }
@@ -10919,10 +10966,84 @@ components:
         phone: { type: string, description: 'Leer, wenn keine hinterlegt ist' }
         email: { type: string, description: 'Leer, wenn keine hinterlegt ist' }
         birth_date: { type: [string, 'null'], format: date }
+        joined: { type: string, description: 'Eintritt als freier Text (z. B. „2023“ oder „vor 2014“), leer ohne' }
+        note: { type: string, description: 'Bemerkung, leer ohne' }
         payments:
           type: array
           description: Gezahlte Beiträge, neuestes Jahr zuerst (auch für den Betreuer)
           items: { $ref: '#/components/schemas/PassivePayment' }
+    PassiveImportResult:
+      type: object
+      required: [headers, header_line, columns, method_columns, ignored, personal, year, paid_on, methods, rows, new, payments, existing, errors, applied]
+      properties:
+        headers: { type: array, items: { type: string }, description: 'Zellen der Kopfzeile' }
+        header_line: { type: integer, description: 'Nummer der Kopfzeile ab 1' }
+        columns: { type: object, additionalProperties: { type: integer }, description: 'Feld => Nummer der Spalte ab 0' }
+        method_columns:
+          type: array
+          items:
+            type: object
+            required: [column, method]
+            properties:
+              column: { type: integer }
+              method: { type: string }
+        ignored:
+          type: array
+          items:
+            type: object
+            required: [column, reason]
+            properties:
+              column: { type: string }
+              reason: { type: string }
+        personal: { type: boolean, description: 'Ob persönliche Angaben übernommen werden (manage_personal)' }
+        year: { type: integer }
+        paid_on: { type: string, format: date }
+        methods: { type: array, items: { type: string } }
+        rows:
+          type: array
+          items:
+            type: object
+            required: [line, name, first_name, last_name]
+            properties:
+              line: { type: integer }
+              name: { type: string }
+              first_name: { type: string }
+              last_name: { type: string }
+              existing: { type: boolean }
+              error: { type: string }
+              warnings: { type: array, items: { type: string } }
+              caretaker:
+                oneOf:
+                  - type: 'null'
+                  - type: object
+                    required: [id, name]
+                    properties:
+                      id: { type: integer }
+                      name: { type: string }
+              joined: { type: string }
+              note: { type: string }
+              address:
+                oneOf:
+                  - type: 'null'
+                  - $ref: '#/components/schemas/Address'
+              phone: { type: string }
+              email: { type: string }
+              birth_date: { type: [string, 'null'], format: date }
+              payment:
+                oneOf:
+                  - type: 'null'
+                  - type: object
+                    required: [year, amount_cents, paid_on, method]
+                    properties:
+                      year: { type: integer }
+                      amount_cents: { type: integer }
+                      paid_on: { type: string, format: date }
+                      method: { type: string }
+        new: { type: integer, description: 'Neue Passive (nach apply: angelegt)' }
+        payments: { type: integer, description: 'Davon mit Zahlung' }
+        existing: { type: integer }
+        errors: { type: integer }
+        applied: { type: boolean }
     PassivePayment:
       type: object
       required: [id, year, amount_cents, paid_on, method]
@@ -10958,6 +11079,8 @@ components:
             - $ref: '#/components/schemas/Address'
         phone: { type: string, description: 'Ziffern, Leerzeichen und + ( ) / -; leer entfernt sie' }
         email: { type: string, format: email, description: 'Leer entfernt sie' }
+        joined: { type: string, maxLength: 40, description: 'Eintritt als freier Text; leer entfernt ihn' }
+        note: { type: string, maxLength: 500, description: 'Bemerkung; leer entfernt sie' }
         birth_date:
           { type: [string, 'null'], format: date, description: 'JJJJ-MM-TT, ab 1900, nicht in der Zukunft; null oder leer entfernt es' }
     PersonalInfo:

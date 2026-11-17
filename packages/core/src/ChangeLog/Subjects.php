@@ -305,7 +305,7 @@ final class Subjects
         $passives = $this->spec('Passiver', 'passive_members', static fn (array $r): string => trim($r['first_name'] . ' ' . $r['last_name']), [
             'first_name' => 'Vorname', 'last_name' => 'Nachname', 'street' => 'Straße', 'house_number' => 'Hausnummer', 'address_extra' => 'Adresszusatz',
             'postal_code' => 'Postleitzahl', 'city' => 'Ort', 'country' => 'Land', 'country_name' => 'Land (Name)', 'phone' => 'Telefon', 'email' => 'E-Mail',
-            'birth_date' => 'Geburtsdatum', 'caretaker_id' => ['Betreuer', 'user'],
+            'birth_date' => 'Geburtsdatum', 'caretaker_id' => ['Betreuer', 'user'], 'joined' => 'Eintritt', 'note' => 'Bemerkung',
         ], personal: ['street', 'house_number', 'address_extra', 'postal_code', 'city', 'country', 'country_name', 'phone', 'email', 'birth_date']);
         $passivePayments = $this->spec('Beitrag eines Passiven', 'passive_payments', fn (array $r): string => trim($this->lookup('passive_members', 'first_name', $r['passive_id']) . ' ' . $this->lookup('passive_members', 'last_name', $r['passive_id'])) . ' ' . $r['year'], [
             'year' => 'Jahr', 'amount_cents' => ['Betrag', 'cents'], 'paid_on' => 'Bezahlt am', 'method' => 'Zahlungsart',
@@ -450,6 +450,8 @@ final class Subjects
         // Der Import legt auch Gruppen und Ämter an, die es noch nicht gibt
         $none = static fn (): array => [];
         $map['POST /offices/import'] = $this->combine(['g' => $this->table($officeGroups, $none, true), 'o' => $this->table($offices, $none, true), 't' => $this->table($officeTerms, $none, true)]);
+        // Passive: Import (ohne apply nur die Vorschau, ändert nichts) legt Passive und ihre Zahlungen an
+        $map['POST /passive-members/import'] = $this->combine(['p' => $this->table($passives, $none, true), 'z' => $this->table($passivePayments, $none, true)]);
         // Mailgruppen
         $map['POST /mails/groups'] = $this->mailGroup(true);
         $map['PATCH /mails/groups/{key}'] = $this->mailGroup();

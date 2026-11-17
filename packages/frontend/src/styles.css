@@ -7596,3 +7596,12 @@ fieldset.block-source legend {
   margin: 0;
   padding-left: 18px;
 }
+
+/* Passive: Bemerkung mit Zeilenumbrüchen; Hinweise in der Vorschau des Imports */
+.passive-note {
+  white-space: pre-line;
+}
+.passive-import-warning {
+  margin: 0.15rem 0 0;
+  color: var(--muted);
+}

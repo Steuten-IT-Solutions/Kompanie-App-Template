@@ -8,10 +8,11 @@ use KompanieApp\Core\Storage\Sql\Connection;
 
 /**
  * Passive (Bereich passive, Domain\PassiveMemberService): eigene Einträge ohne Konto. Name, Postanschrift (wie
- * MemberContactRepository), Telefon, E-Mail, Geburtsdatum und optional ein Mitglied als Betreuer.
+ * MemberContactRepository), Telefon, E-Mail, Geburtsdatum, Eintritt (freier Text), Bemerkung und optional ein Mitglied als
+ * Betreuer.
  *
  * @phpstan-type AddressRow array{street: string, house_number: string, extra: string, postal_code: string, city: string, country: string, country_name: string}
- * @phpstan-type PassiveRow array{id: int, first_name: string, last_name: string, address: AddressRow|null, phone: string, email: string, birth_date: string|null, caretaker_id: int|null, updated_at: string}
+ * @phpstan-type PassiveRow array{id: int, first_name: string, last_name: string, address: AddressRow|null, phone: string, email: string, birth_date: string|null, caretaker_id: int|null, joined: string, note: string, updated_at: string}
  * @phpstan-type PaymentRow array{id: int, passive_id: int, year: int, amount_cents: int, paid_on: string, method: string}
  */
 final class PassiveMemberRepository
@@ -53,6 +54,30 @@ final class PassiveMemberRepository
     {
         $row = $this->db->selectOne('SELECT * FROM {passive_members} WHERE id = ?', [$id]);
         return $row === null ? null : self::row($row);
+    }
+
+    /**
+     * Zahlungen mehrerer Passiver auf einmal eintragen (Import), zusammen mit dem Anlegen in einer Transaktion.
+     *
+     * @param list<array{values: array<string, string|int|null>, payment: array{year: int, amount_cents: int, paid_on: string, method: string}|null}> $entries
+     * @return list<int> IDs der neuen Passiven
+     */
+    public function insertMany(array $entries, int $by, string $now): array
+    {
+        $ids = $this->db->transaction(function () use ($entries, $by, $now): array {
+            $ids = [];
+            foreach ($entries as $e) {
+                $id = $this->insert($e['values'], $by, $now);
+                if ($e['payment'] !== null) {
+                    $p = $e['payment'];
+                    $this->insertPayment($id, $p['year'], $p['amount_cents'], $p['paid_on'], $p['method'], $by, $now);
+                }
+                $ids[] = $id;
+            }
+            return $ids;
+        });
+        /** @var list<int> $ids */
+        return $ids;
     }
 
     /** @param array<string, string|int|null> $values Spalte => Wert (columns()) */
@@ -184,6 +209,8 @@ final class PassiveMemberRepository
             // MySQL liefert JJJJ-MM-TT, SQLite den gespeicherten Text
             'birth_date' => $birth === null || $birth === '' ? null : substr((string) $birth, 0, 10),
             'caretaker_id' => $caretaker === null || $caretaker === '' ? null : (int) $caretaker,
+            'joined' => (string) ($r['joined'] ?? ''),
+            'note' => (string) ($r['note'] ?? ''),
             'updated_at' => (string) $r['updated_at'],
         ];
     }
