@@ -58,6 +58,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   ein, er steht beim Eintragen schon im Feld; die Zahlungsarten zur Auswahl richtest du dort auch ein (vorgegeben
   Bar, SEPA und PayPal). Eintragen darf, wer Passive verwaltet. Betreuer sehen unter
   [Meins → Meine Passiven](app:meins/passive), ob der Beitrag für das laufende Jahr bezahlt ist.
+- **Geburtstage der Passiven**: Unter [Verwaltung → Passive](app:verwaltung/passive) richtest du bei _Erinnerung an
+  Geburtstage_ ein, bei welchen Altern erinnert wird (z. B. 50, 60, 70, 75, 80) und wie viele Tage vorher (Vorgabe 7).
+  Anfangs ist keine Altersliste eingetragen, die Erinnerung also aus. Erinnert werden alle, die Passive verwalten und
+  persönliche Angaben sehen dürfen: per Benachrichtigung (einmal je Geburtstag) und oben in der Liste unter
+  _Anstehende Geburtstage_.
 - **Titelbild eines Albums wählen**: Wer die Galerie verwalten darf, öffnet ein Bild in der Großansicht und tippt auf
   _Als Titelbild des Albums verwenden_. Dieses Bild steht dann in der Galerie-Übersicht für das Album, auch bei Alben aus
   Google Drive. Noch einmal getippt, wählt die App das Titelbild wieder selbst. Ist das gewählte Bild nur für Mitglieder,

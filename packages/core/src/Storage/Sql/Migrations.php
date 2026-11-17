@@ -2152,6 +2152,16 @@ WHERE title IS NULL",
                     'ALTER TABLE {passive_members} ADD COLUMN note TEXT NOT NULL DEFAULT \'\'',
                 ],
             ],
+            // Geburtstage der Passiven (PassiveMemberService::remindBirthdays): Tag des Geburtstags, an den zuletzt erinnert
+            // wurde (JJJJ-MM-TT, leer = noch nie), damit jede Erinnerung nur einmal kommt.
+            69 => [
+                'mysql' => [
+                    'ALTER TABLE {passive_members} ADD COLUMN birthday_reminded varchar(10) NOT NULL DEFAULT \'\'',
+                ],
+                'sqlite' => [
+                    'ALTER TABLE {passive_members} ADD COLUMN birthday_reminded TEXT NOT NULL DEFAULT \'\'',
+                ],
+            ],
         ];
     }
 

@@ -96,6 +96,8 @@ final class PushService
     public const TYPE_BOARD_PUBLIC = 'board_public';
     public const TYPE_POLLS = 'polls';
     public const TYPE_BIRTHDAYS = 'birthdays';
+    /** Geburtstage der Passiven (PassiveMemberService::remindBirthdays): an die Verwalter mit view_personal. */
+    public const TYPE_PASSIVE_BIRTHDAYS = 'passive_birthdays';
     /** Galerie (Issue #286): neue Einreichungen an alle mit review_gallery, das Ergebnis an die einreichende Person. */
     public const TYPE_GALLERY_REVIEW = 'gallery_review';
     public const TYPE_GALLERY_SUBMISSIONS = 'gallery_submissions';
@@ -196,6 +198,8 @@ final class PushService
             self::TYPE_BOARD_PUBLIC => ['label' => $c->sectionLabel('board', 'Schwarzes Brett') . ': öffentliche Nachrichten', 'features' => ['board'], 'audience' => 'all'],
             self::TYPE_POLLS => ['label' => $c->sectionLabel('polls', 'Umfragen') . ': neue Umfrage und Erinnerung', 'features' => ['polls'], 'audience' => 'vote_polls'],
             self::TYPE_BIRTHDAYS => ['label' => $c->sectionLabel('birthdays', 'Geburtstage') . ': am Tag selbst', 'features' => ['birthdays'], 'audience' => 'view_birthdays'],
+            self::TYPE_PASSIVE_BIRTHDAYS => ['label' => 'Passive: Geburtstage der eingestellten Alter', 'features' => [], 'audience' => 'manage_passive',
+                'active' => $this->app->features()->enabled('passive') && $this->app->passives()->birthdayAges() !== []],
             self::TYPE_GALLERY_REVIEW => ['label' => $c->sectionLabel('gallery', 'Galerie') . ': neue Bilder und Videos zum Prüfen', 'features' => ['gallery'], 'audience' => 'review_gallery'],
             self::TYPE_GALLERY_SUBMISSIONS => ['label' => $c->sectionLabel('gallery', 'Galerie') . ': deine Bilder und Videos freigegeben oder abgelehnt', 'features' => ['gallery'], 'audience' => 'submit_gallery'],
             self::TYPE_REGISTRATIONS => ['label' => 'Zugang beantragt: neue Anfragen', 'features' => [], 'audience' => 'create_users', 'active' => $this->app->registrations()->enabled()],
