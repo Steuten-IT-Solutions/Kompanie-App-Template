@@ -239,7 +239,7 @@ final class MemberService
      */
     private static function visibleParts(?User $viewer): array
     {
-        return $viewer === null ? [true, true] : [$viewer->can(Capability::ManagePoints), $viewer->can(Capability::ManagePenalties)];
+        return $viewer === null ? [true, true] : [$viewer->can(Capability::ViewPoints), $viewer->can(Capability::ViewPenalties)];
     }
 
     /**

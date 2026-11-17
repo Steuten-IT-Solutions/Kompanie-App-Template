@@ -1,7 +1,7 @@
 ---
 titel: "{begriff.rank} eines Mitglieds"
 reihenfolge: 56
-rechte: [manage_ranks]
+rechte: [view_promotions]
 bereiche: [ranks]
 ---
 In diesem Fenster beförderst oder degradierst du ein Mitglied und siehst, wie sich sein {begriff.rank} bisher geändert hat.
@@ -39,7 +39,7 @@ Aus der Übersicht **Beförderungen** öffnet ein Tipp auf einen Namen dieses Fe
 - Den Stand an {bereich.points} siehst du hier auch, wenn du selbst keine {bereich.points} vergeben darfst.
 - Wer Benachrichtigungen eingeschaltet hat, bekommt eine Nachricht, wenn sich sein {begriff.rank} ändert.
 - Wer zusätzlich Mitglieder anlegt, kann den {begriff.rank} gleich beim Anlegen eintragen. Im Verlauf steht das als „Ersteinstufung“.
+- **Nur sehen:** Mit dem Recht **Beförderungen sehen** ohne **{bereich.ranks} pflegen, befördern und degradieren** zeigt das Fenster nur den {begriff.rank} und den Verlauf, ohne das Formular zum Ändern.
 
 ## Siehe auch
-- [{bereich.ranks} verwalten](seite:dienstgrade-verwalten)
 - [Benachrichtigungen](seite:benachrichtigungen)

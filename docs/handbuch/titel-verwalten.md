@@ -1,7 +1,8 @@
 ---
 titel: "{bereich.titles} verwalten"
 reihenfolge: 57
-rechte: [manage_titles]
+rechte: []
+einrecht: [view_titles, manage_titles]
 bereiche: [titles]
 ---
 Hier legst du die {bereich.titles} an, die Mitglieder tragen können, z. B. Ehrenmitglied oder Schützenkönig, und bestimmst ihre Reihenfolge. Wer welchen Titel hat, änderst du auf der Seite des Mitglieds.
@@ -40,6 +41,7 @@ Am Computer geht es auch mit der Tastatur: Griff mit der Tab-Taste auswählen, d
 - {bereich.titles} sind unabhängig von {bereich.ranks} und {bereich.points}. Ein Mitglied kann mehrere haben.
 - Die Bezeichnung hat höchstens 60 Zeichen, und jede gibt es nur einmal.
 - Ein Titel kann mit einem Amt verknüpft sein (Bereich {bereich.offices}). Dann bekommt ihn, wer das Amt gerade hat, und verliert ihn, wenn die Amtszeit endet. Die Verknüpfung stellst du beim Amt ein. In der Liste steht bei solchen Titeln **Wird über das Amt „…“ vergeben**; darfst du {bereich.offices} verwalten, führt ein Tipp auf den Namen des Amts dorthin. Umbenennen geht trotzdem; löschst du den Titel, fällt die Verknüpfung weg.
+- **Nur sehen:** Mit dem Recht **{bereich.titles} sehen** ohne **{bereich.titles} pflegen und vergeben** siehst du die Liste mit der Zahl der Vergaben, aber ohne **Umbenennen**, **Deaktivieren**, **Löschen**, Griff und **Neuer Titel**.
 
 ## Siehe auch
 - [{bereich.titles} eines Mitglieds](seite:mitglied-titel)

@@ -13,8 +13,8 @@ let pending: Promise<Promotion[] | null> | null = null;
 let pendingAt = -1;
 const listeners = new Set<(n: number | null) => void>();
 
-/** Beförderungsübersicht sichtbar: Dienstgrade verwalten, mit den Bereichen Dienstgrade und Punkte. */
-export const promotionsAllowed = (): boolean => !!config?.features.ranks && !!config?.features.points && can('manage_ranks');
+/** Beförderungsübersicht sichtbar: Beförderungen sehen (view_promotions), mit den Bereichen Dienstgrade und Punkte. */
+export const promotionsAllowed = (): boolean => !!config?.features.ranks && !!config?.features.points && can('view_promotions');
 
 /** Zahl aus einer frisch geladenen Beförderungsliste übernehmen. */
 export function notePromotions(list: Promotion[], since = dataCache.generation()) {

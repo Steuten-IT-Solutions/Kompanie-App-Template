@@ -1,7 +1,8 @@
 ---
 titel: "Anwesenheitsliste „…“"
 reihenfolge: 60
-rechte: [manage_attendance]
+rechte: []
+einrecht: [view_attendance, manage_attendance]
 bereiche: [attendance]
 ---
 In einer Anwesenheitsliste trägst du für einen Termin ein, wer **anwesend** war, wer **entschuldigt** war und wer **fehlt**. Darfst du auch {bereich.points} oder {bereich.penalties} vergeben, buchst du sie von hier aus für alle Anwesenden bzw. Fehlenden.
@@ -88,6 +89,7 @@ Meldet sich jemand z. B. per Telefon ab:
 - Für jemanden zu- oder absagen geht nur bei Personen, die selbst zu- und absagen dürfen, und nur bis zur selben Frist (Beginn bzw. Anmeldeschluss). Danach siehst du die Rückmeldungen nur noch. Ein Hinweis der Person bleibt dabei erhalten.
 - Wird ein Termin aus dem {bereich.calendar} gelöscht, zeigt seine Liste keine Rückmeldungen mehr. Die Einträge der Liste bleiben.
 - Jede Person sieht ihre eigenen Einträge unter **Meins** → **{bereich.attendance}**.
+- **Nur sehen:** Mit dem Recht **{bereich.attendance} sehen** ohne **Listen je Termin führen** siehst du unter **{bereich.attendance}** nur die vorhandenen Listen. Eine Liste zeigt dann je Person, ob sie anwesend, entschuldigt oder nicht da war; ändern, anlegen und löschen kannst du nichts.
 
 ## Siehe auch
 - [{bereich.attendance} erfassen](seite:anwesenheit-erfassen)

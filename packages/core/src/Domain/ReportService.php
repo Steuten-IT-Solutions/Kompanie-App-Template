@@ -43,12 +43,12 @@ final class ReportService
      */
     private const SECTIONS = [
         'members' => ['feature' => null, 'caps' => [
-            Capability::ManagePoints, Capability::ManagePenalties, Capability::ManageRanks, Capability::ManageTitles, Capability::ManageAttendance,
+            Capability::ViewPoints, Capability::ViewPenalties, Capability::ViewPromotions, Capability::ViewTitles, Capability::ViewAttendance,
             Capability::ManageCompanies, Capability::ViewPersonal, Capability::CreateUsers, Capability::ManageFormer, Capability::PromoteUsers,
         ], 'dated' => false, 'label' => 'Mitglieder'],
-        'points' => ['feature' => 'points', 'caps' => [Capability::ManagePoints], 'dated' => true, 'label' => 'Punkte'],
-        'penalties' => ['feature' => 'penalties', 'caps' => [Capability::ManagePenalties], 'dated' => true, 'label' => 'Strafen'],
-        'attendance' => ['feature' => 'attendance', 'caps' => [Capability::ManageAttendance], 'dated' => true, 'label' => 'Anwesenheit'],
+        'points' => ['feature' => 'points', 'caps' => [Capability::ViewPoints], 'dated' => true, 'label' => 'Punkte'],
+        'penalties' => ['feature' => 'penalties', 'caps' => [Capability::ViewPenalties], 'dated' => true, 'label' => 'Strafen'],
+        'attendance' => ['feature' => 'attendance', 'caps' => [Capability::ViewAttendance], 'dated' => true, 'label' => 'Anwesenheit'],
     ];
 
     private const STATUS_LABELS = [AttendanceService::PRESENT => 'Anwesend', AttendanceService::EXCUSED => 'Entschuldigt', AttendanceService::ABSENT => 'Fehlt'];

@@ -208,7 +208,7 @@ final class AttendanceServiceTest extends TestCase
 
         // Nur mit dem Recht manage_attendance …
         $kassierer = $this->users->add('kassierer', Roles::MEMBER);
-        $this->assertSame(200, $this->call('PUT', "/members/$kassierer/rights", ['grant' => ['manage_points'], 'revoke' => []])->status);
+        $this->assertSame(200, $this->call('PUT', "/members/$kassierer/rights", ['grant' => ['view_points', 'manage_points'], 'revoke' => []])->status);
         $this->users->current = $kassierer;
         $res = $this->call('GET', "/members/{$this->m}");
         $this->assertSame(200, $res->status);

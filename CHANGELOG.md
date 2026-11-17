@@ -26,6 +26,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Rechte zum Sehen und zum Ändern getrennt**: Unter [Einstellungen → Rollen](app:einstellungen/rollen) gibt es
+  jetzt eigene Rechte, um Punkte, Strafen, Dienstgrade mit Beförderungen, Titel und die Anwesenheit der Mitglieder nur
+  zu sehen, z. B. „Punkte aller Mitglieder sehen“ neben „Punkte vergeben“. Wer nur sehen darf, sieht die Mitgliederliste
+  und die Angaben, aber keine Knöpfe zum Ändern. Ändern gibt es nur zusammen mit Sehen. Rollen und Personen, die ein
+  Recht zum Ändern hatten, haben nach dem Update auch das Recht zum Sehen; es ändert sich also für niemanden etwas,
+  bis du es umstellst.
 - **Beitrag der Passiven**: Unter [Verwaltung → Passive](app:verwaltung/passive) trägst du jetzt je Passivem und Jahr
   ein, dass der Beitrag bezahlt ist, mit Betrag, Datum und Zahlungsart. Oben wählst du das Jahr, siehst, wie viele
   bezahlt haben, und kannst nur die offenen oder nur die bezahlten zeigen. Einen Jahresbeitrag stellst du als Vorschlag

@@ -1,7 +1,7 @@
 ---
 titel: Beförderungen
 reihenfolge: 55
-rechte: [manage_ranks]
+rechte: [view_promotions]
 bereiche: [ranks, points]
 ---
 Die Beförderungsübersicht zeigt, wer genug {bereich.points} für den nächsten {begriff.rank} hat, wem noch wie viele fehlen und wer unter die Schwelle seines {begriff.rank}s gefallen ist. Von hier aus beförderst du mit zwei Tipps.
@@ -33,7 +33,7 @@ Tippe unten auf **Verwaltung** und dann auf den Knopf **Beförderungen**. Mit **
 - Es stehen nur Mitglieder darin. Wer schon den höchsten {begriff.rank} hat, steht nur darin, wenn er unter seiner Schwelle liegt.
 - Befördert wird nie automatisch. Die Liste zeigt nur, wer so weit ist.
 - Als nächsten {begriff.rank} nimmt die Übersicht den nächsthöheren mit Schwelle; {bereich.ranks} ohne Schwelle dazwischen überspringt sie.
+- **Nur sehen:** Mit dem Recht **Beförderungen sehen** ohne **{bereich.ranks} pflegen, befördern und degradieren** siehst du die Übersicht und auf der Seite des Mitglieds seinen {begriff.rank} mit Verlauf, befördern kannst du nicht.
 
 ## Siehe auch
 - [{begriff.rank} eines Mitglieds](seite:mitglied-dienstgrad)
-- [{bereich.ranks} verwalten](seite:dienstgrade-verwalten)

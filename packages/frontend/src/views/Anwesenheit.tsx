@@ -58,6 +58,8 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
   const [date, setDate] = useState(todayYmd());
   const [busy, setBusy] = useState(false);
   const pendingIds = usePendingAttendanceIds();
+  // Nur sehen (view_attendance ohne manage_attendance): die vorhandenen Listen, ohne neue anzulegen.
+  const editable = can('manage_attendance');
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -82,7 +84,8 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <div className="attendance">
-      {config?.features.calendar &&
+      {editable &&
+        config?.features.calendar &&
         (typeof events === 'string' ? (
           <>
             <h3 className="section-title">Termin aus dem Kalender</h3>
@@ -122,23 +125,31 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
           </>
         ))}
 
-      <form className="form card free-event" onSubmit={createFree}>
-        <h3>Freier Termin</h3>
-        <p className="muted small">Für Anlässe, die nicht im Kalender stehen, z. B. einen spontanen Arbeitsdienst.</p>
-        <div className="field-row">
-          <label className="field">
-            <span>Titel</span>
-            <input type="text" maxLength={191} placeholder="z. B. Arbeitsdienst" value={title} onChange={(e) => setTitle(e.target.value)} />
-          </label>
-          <label className="field">
-            <span>Datum</span>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
-          </label>
-        </div>
-        <button className="btn btn-block" type="submit" disabled={busy}>
-          {busy ? 'Legt an …' : 'Liste anlegen'}
-        </button>
-      </form>
+      {editable && (
+        <form className="form card free-event" onSubmit={createFree}>
+          <h3>Freier Termin</h3>
+          <p className="muted small">Für Anlässe, die nicht im Kalender stehen, z. B. einen spontanen Arbeitsdienst.</p>
+          <div className="field-row">
+            <label className="field">
+              <span>Titel</span>
+              <input
+                type="text"
+                maxLength={191}
+                placeholder="z. B. Arbeitsdienst"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+            </label>
+            <label className="field">
+              <span>Datum</span>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+            </label>
+          </div>
+          <button className="btn btn-block" type="submit" disabled={busy}>
+            {busy ? 'Legt an …' : 'Liste anlegen'}
+          </button>
+        </form>
+      )}
 
       <h3 className="section-title">Letzte Listen</h3>
       {lists.length === 0 ? (
@@ -238,8 +249,45 @@ function ListView({ id, onToast }: { id: number; onToast: (msg: string) => void 
   }, [id, onToast]);
   if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
+  if (!can('manage_attendance')) return <ReadOnlyList list={data!} />;
   // Mit den offline gespeicherten Änderungen, bis sie übertragen sind.
   return <Editor key={data!.updated_at} list={applyPending(data!, pending)} pending={pending} onSaved={setData} onToast={onToast} />;
+}
+
+/** Eine Liste nur ansehen (view_attendance ohne manage_attendance): wer anwesend, entschuldigt oder nicht da war. */
+function ReadOnlyList({ list }: { list: AttendanceDetail }) {
+  const counts: AttendanceCounts = { present: 0, excused: 0, absent: 0 };
+  let open = 0;
+  for (const p of list.people) {
+    if (p.status) counts[p.status]++;
+    else open++;
+  }
+  return (
+    <div className="attendance">
+      <button className="btn btn-link back" onClick={() => navigate('verwaltung/anwesenheit')}>
+        ‹ {sec.attendance}
+      </button>
+      <h2 className="member-name">{list.title}</h2>
+      <p className="muted small">{formatDate(list.date)}</p>
+      <p className="attendance-counts" role="status">
+        {countsText(counts, open)}
+      </p>
+      <ul className="card-list attendance-readonly">
+        {list.people.map((p) => (
+          <li key={p.id} className="card row">
+            <div className="row-main">
+              <div className="row-title">{p.name}</div>
+              {p.response && <div className="row-sub">{RESPONSE_LABELS[p.response]}</div>}
+            </div>
+            <span className={`badge ${p.status ? `attendance-col-${p.status}` : 'badge-level-guest'}`}>
+              {p.status ? ATTENDANCE_LABELS[p.status] : 'offen'}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {list.updated_by_name && <p className="muted small">Zuletzt gespeichert von {list.updated_by_name}.</p>}
+    </div>
+  );
 }
 
 function Editor({

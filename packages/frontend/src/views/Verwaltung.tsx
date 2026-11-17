@@ -149,6 +149,9 @@ const sec = brand.labels.sections;
 const canPoints = (): boolean => !!config?.features.points && can('manage_points');
 const canPenalties = (): boolean => !!config?.features.penalties && can('manage_penalties');
 const canRanks = (): boolean => !!config?.features.ranks && can('manage_ranks');
+// Leserechte (Rechte in Lesen und Schreiben aufgeteilt): Punkte und Strafen der Mitglieder sehen, ohne zu buchen
+const seePoints = (): boolean => !!config?.features.points && can('view_points');
+const seePenalties = (): boolean => !!config?.features.penalties && can('view_penalties');
 
 /** Hinweis nach dem Vergeben von Punkten: Diese Mitglieder haben neu die Schwelle für eine Beförderung erreicht. */
 function ReachedNotice() {
@@ -312,7 +315,7 @@ let savedMembers: MembersState | null = null;
  */
 const memberSorts = (): MemberSort[] =>
   (Object.keys(MEMBER_SORT_LABELS) as MemberSort[]).filter(
-    (s) => s !== 'left' && (s !== 'points' || canPoints()) && (s !== 'joined' || can('create_users')),
+    (s) => s !== 'left' && (s !== 'points' || seePoints()) && (s !== 'joined' || can('create_users')),
   );
 
 /** Rolle als Titel in der Liste, solange die Person noch als Mitglied aufzunehmen ist (Häkchen an der Rolle, z. B. Anwärter). */
@@ -514,8 +517,8 @@ function Members() {
                 {/* Eintritt und Punkte nur, wenn danach sortiert ist, damit die Reihenfolge nachvollziehbar ist. */}
                 {order.sort === 'joined' && m.joined_on && `Eintritt ${formatYearOrDate(m.joined_on)}`}
                 {order.sort === 'joined' && m.joined_on && (m.open_cents ?? 0) > 0 && ' · '}
-                {order.sort === 'points' && canPoints() && `${(m.points ?? 0).toLocaleString('de-DE')} ${sec.points}`}
-                {order.sort === 'points' && canPoints() && (m.open_cents ?? 0) > 0 && ' · '}
+                {order.sort === 'points' && seePoints() && `${(m.points ?? 0).toLocaleString('de-DE')} ${sec.points}`}
+                {order.sort === 'points' && seePoints() && (m.open_cents ?? 0) > 0 && ' · '}
                 {(m.open_cents ?? 0) > 0 && <span className="neg">{formatEuro(m.open_cents ?? 0)} offen</span>}
               </div>
             </div>
@@ -630,12 +633,12 @@ function MemberPreviewHead({ p, onOpen }: { p: MemberPreview; onOpen?: (sheet: '
       {(role || can('promote_users')) && (
         <p className="muted small member-level">{role || <span className="skeleton-text" style={{ width: '16ch' }} />}</p>
       )}
-      {(canPoints() || canPenalties()) && (
+      {(seePoints() || seePenalties()) && (
         <div className="stats member-stats">
-          {canPoints() && (
+          {seePoints() && (
             <StatCard label={sec.points} value={(p.points ?? 0).toLocaleString('de-DE')} tone="good" onClick={open('punkte')} />
           )}
-          {canPenalties() && (
+          {seePenalties() && (
             <StatCard
               label="Offen"
               value={formatEuro(p.open_cents ?? 0)}
@@ -749,10 +752,10 @@ function MemberPeek({
             </div>
           )}
           {roleLine(m) && <p className="muted small member-level">{roleLine(m)}</p>}
-          {(canPoints() || canPenalties()) && (
+          {(seePoints() || seePenalties()) && (
             <div className="stats member-stats">
-              {canPoints() && <StatCard label={sec.points} value={(m.points ?? 0).toLocaleString('de-DE')} tone="good" onClick={none} />}
-              {canPenalties() && (
+              {seePoints() && <StatCard label={sec.points} value={(m.points ?? 0).toLocaleString('de-DE')} tone="good" onClick={none} />}
+              {seePenalties() && (
                 <StatCard
                   label="Offen"
                   value={formatEuro(m.open_cents ?? 0)}
@@ -1063,12 +1066,12 @@ function MemberDetailView({
       )}
       {roleLine(m) && <p className="muted small member-level">{roleLine(m)}</p>}
 
-      {(canPoints() || canPenalties()) && (
+      {(seePoints() || seePenalties()) && (
         <div className="stats member-stats">
-          {canPoints() && (
+          {seePoints() && (
             <StatCard label={sec.points} value={(m.points ?? 0).toLocaleString('de-DE')} tone="good" onClick={() => openSheet('punkte')} />
           )}
-          {canPenalties() && (
+          {seePenalties() && (
             <StatCard
               label="Offen"
               value={formatEuro(m.open_cents ?? 0)}
@@ -1214,19 +1217,19 @@ function MemberDetailView({
         )}
       </FoldSection>
 
-      {sheet === 'punkte' && canPoints() && (
+      {sheet === 'punkte' && seePoints() && (
         <Sheet title={sec.points} onClose={closeSheet} routed>
-          {m.member && <GivePoints preselect={[m.id]} fixed onToast={onToast} onDone={reload} />}
+          {m.member && canPoints() && <GivePoints preselect={[m.id]} fixed onToast={onToast} onDone={reload} />}
           <h3 className="section-title">Einträge</h3>
-          <PointEntries entries={m.point_list} busy={busy} run={run} />
+          <PointEntries entries={m.point_list} busy={busy} run={run} editable={canPoints()} />
         </Sheet>
       )}
 
-      {sheet === 'strafen' && canPenalties() && (
+      {sheet === 'strafen' && seePenalties() && (
         <Sheet title={sec.penalties} onClose={closeSheet} routed>
-          {m.member && <GivePenalty preselect={[m.id]} fixed onToast={onToast} onDone={reload} />}
+          {m.member && canPenalties() && <GivePenalty preselect={[m.id]} fixed onToast={onToast} onDone={reload} />}
           <h3 className="section-title">Einträge</h3>
-          <PenaltyEntries entries={m.penalties} busy={busy} run={run} />
+          <PenaltyEntries entries={m.penalties} busy={busy} run={run} editable={canPenalties()} />
         </Sheet>
       )}
 
@@ -1240,6 +1243,7 @@ function MemberDetailView({
             onChanged={reload}
             onToast={onToast}
             focus={rankFocus}
+            readOnly={!canRanks()}
           />
         </Sheet>
       )}
@@ -1253,6 +1257,7 @@ function MemberDetailView({
             titles={m.titles}
             onChanged={reload}
             onToast={onToast}
+            readOnly={!can('manage_titles')}
           />
         </Sheet>
       )}
@@ -1293,7 +1298,8 @@ function MemberDetailView({
 type Run = (action: () => Promise<unknown>, msg: string) => Promise<void>;
 
 /** Punkte einer Person mit „Stornieren“. */
-function PointEntries({ entries, busy, run }: { entries: PointEntry[]; busy: boolean; run: Run }) {
+/** Punkte einer Person; „Stornieren“ nur mit dem Schreibrecht (editable). */
+function PointEntries({ entries, busy, run, editable }: { entries: PointEntry[]; busy: boolean; run: Run; editable: boolean }) {
   if (entries.length === 0) return <Empty>Keine Einträge.</Empty>;
   return (
     <ul className="card-list">
@@ -1305,18 +1311,20 @@ function PointEntries({ entries, busy, run }: { entries: PointEntry[]; busy: boo
               {formatDate(p.date)}
               {p.created_by_name && ` · von ${p.created_by_name}`}
             </div>
-            <div className="row-actions">
-              <button
-                className="btn btn-small btn-danger"
-                disabled={busy}
-                onClick={async () =>
-                  (await confirmAsk(`Eintrag „${p.reason}“ (${formatPoints(p.points)}) wirklich stornieren?`)) &&
-                  run(() => api.deletePoints(p.id), 'Storniert')
-                }
-              >
-                Stornieren
-              </button>
-            </div>
+            {editable && (
+              <div className="row-actions">
+                <button
+                  className="btn btn-small btn-danger"
+                  disabled={busy}
+                  onClick={async () =>
+                    (await confirmAsk(`Eintrag „${p.reason}“ (${formatPoints(p.points)}) wirklich stornieren?`)) &&
+                    run(() => api.deletePoints(p.id), 'Storniert')
+                  }
+                >
+                  Stornieren
+                </button>
+              </div>
+            )}
           </div>
           <div className={`row-value ${p.points < 0 ? 'neg' : 'pos'}`}>{formatPoints(p.points)}</div>
         </li>
@@ -1326,7 +1334,7 @@ function PointEntries({ entries, busy, run }: { entries: PointEntry[]; busy: boo
 }
 
 /** Strafen einer Person mit „Bezahlt“ bzw. „Doch offen“ und „Stornieren“. */
-function PenaltyEntries({ entries, busy, run }: { entries: Penalty[]; busy: boolean; run: Run }) {
+function PenaltyEntries({ entries, busy, run, editable }: { entries: Penalty[]; busy: boolean; run: Run; editable: boolean }) {
   if (entries.length === 0) return <Empty>Keine Einträge.</Empty>;
   return (
     <ul className="card-list">
@@ -1335,35 +1343,37 @@ function PenaltyEntries({ entries, busy, run }: { entries: Penalty[]; busy: bool
           key={p.id}
           p={p}
           actions={
-            <>
-              {p.status === 'open' ? (
+            editable && (
+              <>
+                {p.status === 'open' ? (
+                  <button
+                    className="btn btn-small"
+                    disabled={busy}
+                    onClick={() => run(() => api.setPenaltyStatus(p.id, 'paid'), 'Als bezahlt markiert')}
+                  >
+                    Bezahlt
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-small btn-secondary"
+                    disabled={busy}
+                    onClick={() => run(() => api.setPenaltyStatus(p.id, 'open'), 'Wieder auf offen gesetzt')}
+                  >
+                    Doch offen
+                  </button>
+                )}
                 <button
-                  className="btn btn-small"
+                  className="btn btn-small btn-danger"
                   disabled={busy}
-                  onClick={() => run(() => api.setPenaltyStatus(p.id, 'paid'), 'Als bezahlt markiert')}
+                  onClick={async () =>
+                    (await confirmAsk(`Eintrag „${p.reason}“ (${formatEuro(p.amount_cents)}) wirklich stornieren?`)) &&
+                    run(() => api.deletePenalty(p.id), 'Storniert')
+                  }
                 >
-                  Bezahlt
+                  Stornieren
                 </button>
-              ) : (
-                <button
-                  className="btn btn-small btn-secondary"
-                  disabled={busy}
-                  onClick={() => run(() => api.setPenaltyStatus(p.id, 'open'), 'Wieder auf offen gesetzt')}
-                >
-                  Doch offen
-                </button>
-              )}
-              <button
-                className="btn btn-small btn-danger"
-                disabled={busy}
-                onClick={async () =>
-                  (await confirmAsk(`Eintrag „${p.reason}“ (${formatEuro(p.amount_cents)}) wirklich stornieren?`)) &&
-                  run(() => api.deletePenalty(p.id), 'Storniert')
-                }
-              >
-                Stornieren
-              </button>
-            </>
+              </>
+            )
           }
         />
       ))}

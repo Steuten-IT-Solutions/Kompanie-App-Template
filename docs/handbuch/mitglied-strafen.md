@@ -1,7 +1,7 @@
 ---
 titel: "{bereich.penalties} eines Mitglieds"
 reihenfolge: 53
-rechte: [manage_penalties]
+rechte: [view_penalties]
 bereiche: [penalties]
 ---
 Auf der Seite eines Mitglieds öffnest du ein Fenster mit seinen {bereich.penalties}. Dort markierst du Einträge als bezahlt, stornierst falsche und trägst neue nur für diese Person ein.
@@ -37,6 +37,4 @@ Mit **✕** oder der Zurück-Taste schließt du es wieder.
 - Ein stornierter Eintrag zählt nicht mehr und verschwindet aus den Listen, auch beim Mitglied.
 - Die Kachel **Offen** zeigt, wie viel noch offen ist.
 - Bei ehemaligen Mitgliedern (Liste **Ehemalige** der Verwaltung, nur für alle, die Mitglieder anlegen dürfen) und bei Personen, die kein Mitglied mehr sind, fehlt das Formular. Offene Beträge kannst du dort weiter als bezahlt markieren oder stornieren.
-
-## Siehe auch
-- [{bereich.penalties} eintragen](seite:strafen-verwalten)
+- **Nur sehen:** Mit dem Recht **{bereich.penalties} aller Mitglieder sehen** ohne **{bereich.penalties} vergeben** zeigt das Fenster nur die Einträge, ohne Formular und ohne **Bezahlt** oder **Stornieren**.

@@ -24,10 +24,10 @@ test('zu- und absagen setzt den internen Kalender voraus, nicht die Mitgliedscha
 });
 
 test('Anhaken bringt die Voraussetzung mit, Abhaken nimmt was sie voraussetzt', () => {
-  assert.deepEqual(orderedCaps(toggleCap(set(), 'manage_points', true)), ['member', 'manage_points']);
-  const before = set('member', 'view_own_points', 'manage_points', 'view_ranks');
+  assert.deepEqual(orderedCaps(toggleCap(set(), 'manage_events', true)), ['member', 'manage_events']);
+  const before = set('member', 'view_own_points', 'manage_events', 'view_ranks');
   assert.deepEqual(orderedCaps(toggleCap(before, 'member', false)), ['view_ranks'], 'Sehen bleibt');
-  assert.deepEqual(orderedCaps(before), ['member', 'view_own_points', 'view_ranks', 'manage_points'], 'unverändert');
+  assert.deepEqual(orderedCaps(before), ['member', 'view_own_points', 'view_ranks', 'manage_events'], 'unverändert');
 });
 
 test('persönliche Angaben: pflegen setzt sehen voraus, über mehrere Stufen', () => {
@@ -37,6 +37,30 @@ test('persönliche Angaben: pflegen setzt sehen voraus, über mehrere Stufen', (
   const all = set('member', 'view_personal', 'manage_personal', 'view_ranks');
   assert.deepEqual(orderedCaps(toggleCap(all, 'view_personal', false)), ['member', 'view_ranks']);
   assert.deepEqual(orderedCaps(toggleCap(all, 'member', false)), ['view_ranks'], 'ohne Mitgliedschaft fällt beides weg');
+});
+
+test('Schreiben setzt das passende Lesen voraus, Lesen die Mitgliedschaft (wie Capability::READ_OF)', () => {
+  const pairs: [Capability, Capability][] = [
+    ['manage_points', 'view_points'],
+    ['manage_penalties', 'view_penalties'],
+    ['manage_ranks', 'view_promotions'],
+    ['manage_titles', 'view_titles'],
+    ['manage_attendance', 'view_attendance'],
+  ];
+  for (const [write, read] of pairs) {
+    assert.equal(requires(write), read, write);
+    assert.equal(requires(read), 'member', read);
+  }
+  assert.deepEqual(orderedCaps(toggleCap(set(), 'manage_points', true)), ['member', 'view_points', 'manage_points']);
+  assert.deepEqual(
+    orderedCaps(toggleCap(set('member', 'view_points', 'manage_points'), 'view_points', false)),
+    ['member'],
+    'ohne Lesen kein Schreiben',
+  );
+  assert.deepEqual(orderedCaps(toggleCap(set('member', 'view_points', 'manage_points'), 'manage_points', false)), [
+    'member',
+    'view_points',
+  ]);
 });
 
 test('Haken einer Gruppe: alle, einige, keine', () => {

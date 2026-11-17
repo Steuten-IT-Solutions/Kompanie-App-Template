@@ -60,15 +60,25 @@ enum Capability: string
     case ViewRanks = 'view_ranks';
     /** Intern: Punktekatalog. */
     case ViewCatalog = 'view_catalog';
-    /** Punkte vergeben und stornieren, Punktekatalog pflegen (Bereich Punkte). */
+    /** Punkte aller Mitglieder sehen: in der Mitgliederliste, auf der Seite des Mitglieds, im Bericht und in Listen. */
+    case ViewPoints = 'view_points';
+    /** Punkte vergeben und stornieren, Punktekatalog pflegen (Bereich Punkte; setzt view_points voraus). */
     case ManagePoints = 'manage_points';
-    /** Strafen vergeben, als bezahlt markieren, stornieren (Bereich Strafen). */
+    /** Strafen aller Mitglieder sehen, auch die offenen, in der Mitgliederliste, im Bericht und in Listen. */
+    case ViewPenalties = 'view_penalties';
+    /** Strafen vergeben, als bezahlt markieren, stornieren (Bereich Strafen; setzt view_penalties voraus). */
     case ManagePenalties = 'manage_penalties';
-    /** Dienstgradliste pflegen, befördern und degradieren (Bereich Dienstgrade, Issue #9). */
+    /** Dienstgrade der Mitglieder mit Verlauf und die anstehenden Beförderungen sehen (ohne zu befördern). */
+    case ViewPromotions = 'view_promotions';
+    /** Dienstgradliste pflegen, befördern und degradieren (Bereich Dienstgrade, Issue #9; setzt view_promotions voraus). */
     case ManageRanks = 'manage_ranks';
-    /** Titelliste pflegen und Titel zuweisen (Bereich Titel, Issue #22). */
+    /** Titelliste sehen und welche Titel die Mitglieder haben (in der Verwaltung). */
+    case ViewTitles = 'view_titles';
+    /** Titelliste pflegen und Titel zuweisen (Bereich Titel, Issue #22; setzt view_titles voraus). */
     case ManageTitles = 'manage_titles';
-    /** Anwesenheitslisten je Termin führen (Bereich Anwesenheit, Issue #21). */
+    /** Anwesenheitslisten je Termin und die Anwesenheit der Mitglieder sehen (ohne sie zu ändern). */
+    case ViewAttendance = 'view_attendance';
+    /** Anwesenheitslisten je Termin führen (Bereich Anwesenheit, Issue #21; setzt view_attendance voraus). */
     case ManageAttendance = 'manage_attendance';
     /** Öffentliche Termine pflegen (Bereich Termine). */
     case ManageEvents = 'manage_events';
@@ -158,7 +168,8 @@ enum Capability: string
      * pflegt nur, wer sie sieht (manage_personal → view_personal → member). Die einzige Stelle für diese Regel; die App
      * hat sie in capabilityRules.ts (requires) noch einmal. Bei der Rolle Gast entfällt die Voraussetzung member
      * (RoleService::validCapabilities). Zu- und absagen setzt nur den internen Kalender voraus: So können auch Anwärter
-     * und, wenn der Admin es will, Gäste mit Konto zusagen.
+     * und, wenn der Admin es will, Gäste mit Konto zusagen. Schreiben setzt das passende Lesen voraus (READ_OF,
+     * Entscheidung vom 17.11.2026), das Lesen wiederum member.
      */
     public function requires(): ?self
     {
@@ -168,11 +179,26 @@ enum Capability: string
         if ($this === self::RespondCalendar) {
             return self::Calendar;
         }
-        if ($this === self::ManagePersonal) {
-            return self::ViewPersonal;
+        $read = self::READ_OF[$this->value] ?? null;
+        if ($read !== null) {
+            return self::from($read);
         }
         return $this->isView() || $this === self::Member ? null : self::Member;
     }
+
+    /**
+     * Schreibrecht => Leserecht, das es voraussetzt (Rechte in Lesen und Schreiben aufgeteilt, Entscheidung vom
+     * 17.11.2026). Wer das Schreibrecht vor der Aufteilung hatte, bekommt das Leserecht beim Update einmal dazu
+     * (RoleService::migrateReadRights); ein neues Paar kommt hier hinten dazu.
+     */
+    public const READ_OF = [
+        'manage_personal' => 'view_personal',
+        'manage_points' => 'view_points',
+        'manage_penalties' => 'view_penalties',
+        'manage_ranks' => 'view_promotions',
+        'manage_titles' => 'view_titles',
+        'manage_attendance' => 'view_attendance',
+    ];
 
     /**
      * Rechte zum Sehen (Tabs, Knöpfe unter „Intern“, eigene Daten); Gast gilt dabei auch ohne Anmeldung.
@@ -199,8 +225,8 @@ enum Capability: string
     }
 
     /**
-     * Wer die Mitgliederliste der Verwaltung sieht: wer Punkte oder Strafen vergibt, Dienstgrade, Titel oder die
-     * Anwesenheit pflegt, Mitglieder Kompanien zuordnet (Issue #280), persönliche Angaben sieht, Mitglieder anlegt,
+     * Wer die Mitgliederliste der Verwaltung sieht: wer Punkte, Strafen, Dienstgrade, Titel oder die Anwesenheit der
+     * Mitglieder sieht (das Schreibrecht setzt jeweils das Leserecht voraus), Mitglieder Kompanien zuordnet (Issue #280), persönliche Angaben sieht, Mitglieder anlegt,
      * Ehemalige verwaltet (Mitglieder als ehemalig eintragen geht auf ihrer Seite) oder Rollen vergibt (wie
      * memberListAllowed() in adminNav.tsx). Punkte und Strafen der Mitglieder zeigt sie nur mit dem jeweiligen Recht
      * (MemberService::visibleParts).
@@ -209,7 +235,7 @@ enum Capability: string
      */
     public static function memberList(): array
     {
-        return [self::ManagePoints, self::ManagePenalties, self::ManageRanks, self::ManageTitles, self::ManageAttendance, self::ManageCompanies, self::ViewPersonal, self::CreateUsers, self::ManageFormer, self::PromoteUsers];
+        return [self::ViewPoints, self::ViewPenalties, self::ViewPromotions, self::ViewTitles, self::ViewAttendance, self::ManageCompanies, self::ViewPersonal, self::CreateUsers, self::ManageFormer, self::PromoteUsers];
     }
 
     /**
