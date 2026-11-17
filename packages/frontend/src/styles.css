@@ -4571,6 +4571,10 @@ fieldset.board-targets legend {
 .poll-add-option {
   align-self: flex-start;
 }
+/* Terminart in Einstellungen → Kalender: Name und darunter der Haken „Als Schild am Termin zeigen“ */
+.event-kind-edit .toggle {
+  margin: 0 2px 10px;
+}
 @media (min-width: 900px) {
   .poll-page,
   .poll-admin,

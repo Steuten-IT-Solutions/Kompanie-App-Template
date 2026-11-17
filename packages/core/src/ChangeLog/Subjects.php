@@ -241,7 +241,10 @@ final class Subjects
                 'Änderungen protokollieren' => $this->app->changeLog()->enabled(),
                 'Frist (Tage)' => $this->app->changeLog()->keepDays(),
             ]),
-            'PUT /admin/event-kinds' => $this->values('Terminarten', fn (): array => ['Terminarten' => $this->app->eventKinds()->options()]),
+            'PUT /admin/event-kinds' => $this->values('Terminarten', fn (): array => [
+                'Terminarten' => $this->app->eventKinds()->options(),
+                'Ohne Schild am Termin' => $this->app->eventKinds()->hiddenTags(),
+            ]),
             'PUT /attendance/groups' => $this->values('Gruppen der Anwesenheit', function (): array {
                 $groups = $this->app->attendance()->groups();
                 $labels = array_column($groups, 'label', 'key');
