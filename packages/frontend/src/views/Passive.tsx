@@ -737,7 +737,9 @@ function CardBody({ p, caretaker, payments }: { p: PassiveMember; caretaker: boo
 
 /**
  * Karte eines Passiven (wie die Seite eines Mitglieds): oben zurück zur Liste und blättern (auch per Wischen, im Kreis),
- * darunter alle Angaben. In der Verwaltung mit Bearbeiten, Löschen und Zahlungen (manage_passive).
+ * darunter alle Angaben. In der Verwaltung mit Bearbeiten, Löschen und Zahlungen (manage_passive). Die Aufrufer bauen sie
+ * je Passivem neu auf (key): Sonst steht die Spur nach dem Gleiten zum Nachbarn noch verschoben und zeigt kurz dessen
+ * Nachbarn, bis sie zurückspringt (unter Meins bleibt die Ansicht beim Wechsel sonst stehen).
  */
 function PassiveCard({
   base,
@@ -876,6 +878,7 @@ export function PassiveDetail({ id, onToast }: { id: number; onToast: (msg: stri
   );
   return (
     <PassiveCard
+      key={id}
       base="verwaltung/passive"
       id={id}
       passives={data.passives}
@@ -1173,6 +1176,7 @@ export function MyPassives({ focus }: { focus?: string }) {
   if (focus && /^\d+$/.test(focus)) {
     return (
       <PassiveCard
+        key={focus}
         base="meins/passive"
         id={Number(focus)}
         passives={data}
