@@ -30,7 +30,9 @@ declare(strict_types=1);
 
 require __DIR__ . '/markdown.php';
 
-const CAPABILITIES = ['member', 'calendar', 'respond_calendar', 'view_intern', 'view_events', 'view_news', 'view_gallery', 'view_companies', 'view_sponsors', 'view_gallery_internal', 'view_own_points', 'view_own_penalties', 'view_own_rank', 'view_own_attendance', 'view_birthdays', 'vote_polls', 'view_directory', 'view_offices', 'view_former', 'view_documents', 'view_board', 'view_ranks', 'view_catalog', 'manage_points', 'manage_penalties', 'manage_ranks', 'manage_titles', 'manage_attendance', 'manage_events', 'manage_calendar', 'manage_documents', 'post_board', 'manage_polls', 'manage_inventory', 'manage_offices', 'manage_lists', 'send_mail', 'manage_sponsors', 'manage_companies', 'submit_gallery', 'review_gallery', 'manage_gallery', 'manage_pages', 'manage_website', 'manage_news', 'view_personal', 'manage_personal', 'create_users', 'manage_former', 'manage_passive', 'promote_users', 'review_reports', 'view_activity', 'view_changes', 'manage_settings'];
+const CAPABILITIES = ['member', 'calendar', 'respond_calendar', 'view_intern', 'view_events', 'view_news', 'view_gallery', 'view_companies', 'view_sponsors', 'view_gallery_internal', 'view_own_points', 'view_own_penalties', 'view_own_rank', 'view_own_attendance', 'view_birthdays', 'vote_polls', 'view_directory', 'view_offices', 'view_former', 'view_documents', 'view_board', 'view_ranks', 'view_catalog', 'view_points', 'manage_points', 'view_penalties', 'manage_penalties', 'view_promotions', 'manage_ranks', 'view_titles', 'manage_titles', 'view_attendance', 'manage_attendance', 'manage_events', 'manage_calendar', 'manage_documents', 'post_board', 'manage_polls', 'manage_inventory', 'manage_offices', 'manage_lists', 'send_mail', 'manage_sponsors', 'manage_companies', 'submit_gallery', 'review_gallery', 'manage_gallery', 'manage_pages', 'manage_website', 'manage_news', 'view_personal', 'manage_personal', 'create_users', 'manage_former', 'manage_passive', 'promote_users', 'review_reports', 'view_activity', 'view_changes', 'manage_settings'];
+/** Schreibrecht => Leserecht, das es voraussetzt (wie Capability::READ_OF im Kern): Wer schreibt, sieht auch. */
+const READ_OF = ['manage_personal' => 'view_personal', 'manage_points' => 'view_points', 'manage_penalties' => 'view_penalties', 'manage_ranks' => 'view_promotions', 'manage_titles' => 'view_titles', 'manage_attendance' => 'view_attendance'];
 /** Wie Roles::PUBLIC_DEFAULTS mit ADDED_VIEW, CANDIDATE_DEFAULTS und MEMBER_DEFAULTS im Kern (Gast, Anwärter, Mitglied anfangs). */
 const PUBLIC_DEFAULTS = ['view_events', 'view_news', 'view_gallery', 'view_directory', 'view_offices', 'view_former', 'view_companies', 'view_sponsors'];
 const CANDIDATE_DEFAULTS = ['calendar', 'respond_calendar', 'view_board'];
@@ -171,6 +173,11 @@ function reachable(array $from, array $to): bool
 {
     $admin = in_array('manage_settings', $from['rechte'], true);
     $held = $admin ? CAPABILITIES : $from['rechte'];
+    foreach ($held as $c) {
+        if (isset(READ_OF[$c])) {
+            $held[] = READ_OF[$c];
+        }
+    }
     // Wer die Seite sieht, wie anfangs eingerichtet (Roles im Kern; jede Rolle lässt sich enger stellen, für Verweise
     // zählt der Anfang): Das Öffentliche sieht jeder, Anwärter dazu Kalender und Brett, wer mehr braucht, ist Mitglied.
     if (array_diff($held, [...PUBLIC_DEFAULTS, ...CANDIDATE_DEFAULTS]) !== []) {

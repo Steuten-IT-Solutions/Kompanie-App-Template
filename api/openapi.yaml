@@ -2148,8 +2148,8 @@ paths:
       description: |
         Nur Mitglieder (ohne Gäste und Anwärter). Erreichte Schwellen zuerst (älteste oben), dann nach fehlenden Punkten;
         ohne nächsten Dienstgrad mit Schwelle am Ende. Enthält die Punktestände, auch wenn der Abrufende selbst kein
-        manage_points hat (die Übersicht braucht sie).
-      x-capability: manage_ranks
+        view_points hat (die Übersicht braucht sie).
+      x-capability: view_promotions
       responses:
         '200':
           description: OK
@@ -2212,8 +2212,8 @@ paths:
         Die Werte der Datenspalten werden beim Lesen ermittelt und nur geliefert, soweit die anfragende Person sie in der
         App ohnehin sehen darf (`available`): Rolle nur mit Zugang zur Mitgliederliste der Verwaltung, Dienstgrad und
         Titel mit öffentlicher Mitgliederliste (Bereich directory) oder dem Recht, sie zu pflegen, Geburtstag (Tag und
-        Monat) nur für Mitglieder und nur, wenn die Person ihn freigegeben hat, Punkte nur mit `manage_points`, offene
-        Strafen nur mit `manage_penalties`; jeweils nur bei eingeschaltetem Bereich.
+        Monat) nur für Mitglieder und nur, wenn die Person ihn freigegeben hat, Punkte nur mit `view_points`, offene
+        Strafen nur mit `view_penalties`; jeweils nur bei eingeschaltetem Bereich.
       x-capability: manage_lists
       responses:
         '200':
@@ -3572,7 +3572,7 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Die letzten 50 Anwesenheitslisten (Issue #21)
-      x-capability: manage_attendance
+      x-capability: view_attendance
       responses:
         '200':
           description: OK
@@ -3635,7 +3635,7 @@ paths:
       tags: [Verwaltung]
       summary: Termine aus dem internen Kalender der letzten 90 Tage und alle kommenden (späteste zuerst)
       description: Ohne Bereich Kalender bzw. ohne eingerichteten Kalender eine leere Liste.
-      x-capability: manage_attendance
+      x-capability: view_attendance
       responses:
         '200':
           description: OK
@@ -3697,7 +3697,7 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Liste mit allen Personen, Status, gebuchten Punkten und Zählern
-      x-capability: manage_attendance
+      x-capability: view_attendance
       responses:
         '200':
           description: OK
@@ -4257,7 +4257,7 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Titelliste (Ehrentitel und Ämter, Issue #22)
-      x-capability: manage_titles
+      x-capability: view_titles
       responses:
         '200':
           description: OK
@@ -5007,8 +5007,8 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Mitglieder mit Summen
-      description: Wer Dienstgrade bzw. Titel verwaltet, sieht zusätzlich frühere Mitglieder, die noch einen Dienstgrad bzw. Titel haben.
-      x-capability: 'manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, create_users, manage_former oder promote_users (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, sonst null)'
+      description: Wer Dienstgrade bzw. Titel sieht (view_promotions bzw. view_titles), sieht zusätzlich frühere Mitglieder, die noch einen Dienstgrad bzw. Titel haben.
+      x-capability: 'view_points, view_penalties, view_promotions, view_titles, view_attendance, manage_companies, view_personal, create_users, manage_former oder promote_users (Punkte bzw. offene Beträge nur mit view_points bzw. view_penalties, sonst null)'
       parameters:
         - name: all
           in: query
@@ -5059,7 +5059,7 @@ paths:
       tags: [Verwaltung]
       summary: Mitglied mit Punkten und Strafen
       description: Mit Bereich Geburtstage und Recht `create_users` auch `birthday` (mit Jahr und den Schaltern der Person, null ohne Eintrag).
-      x-capability: 'manage_points, manage_penalties, manage_ranks, manage_titles, manage_attendance, create_users, manage_former oder promote_users (Punkte bzw. Strafen nur mit dem jeweiligen Recht)'
+      x-capability: 'view_points, view_penalties, view_promotions, view_titles, view_attendance, manage_companies, view_personal, create_users, manage_former oder promote_users (Punkte bzw. Strafen nur mit view_points bzw. view_penalties)'
       responses:
         '200':
           description: OK
@@ -5270,7 +5270,7 @@ paths:
         Wie `GET /me/data`, aber ohne Antworten in anonymen Umfragen und die Nutzungsauswertung nur mit `view_activity`.
         Grenzen wie beim Löschen (Konten von Admins nur für Admins); zusätzlich alle Rechte der enthaltenen Bereiche
         (sonst 403), damit niemand über die Auskunft sieht, was ihm in der App verborgen ist: `manage_former`, `view_personal`,
-        `manage_points`, `manage_penalties`, `manage_ranks`, `manage_titles`, `manage_attendance`, `manage_polls`,
+        `view_points`, `view_penalties`, `view_promotions`, `view_titles`, `view_attendance`, `manage_polls`,
         `send_mail`, `manage_lists`, `post_board`, `view_offices`.
       x-capability: create_users und die Rechte aller enthaltenen Bereiche (in der Regel Admins)
       parameters:
@@ -5502,7 +5502,7 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Ehemalige Mitglieder (ausgetreten, verstorben, sonst ausgeschieden)
-      description: Nach Namen. `points` bzw. `open_cents` nur mit manage_points bzw. manage_penalties (sonst null).
+      description: Nach Namen. `points` bzw. `open_cents` nur mit view_points bzw. view_penalties (sonst null).
       x-capability: manage_former
       responses:
         '200':
@@ -6372,7 +6372,7 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Alle offenen Strafen, neueste zuerst, mit dem Namen der Person
-      x-capability: manage_penalties
+      x-capability: view_penalties
       responses:
         '200':
           description: OK
@@ -6670,8 +6670,8 @@ paths:
       summary: Bereiche, die die Person in den Bericht als PDF nehmen kann
       description: |
         Bericht als PDF (Verwaltung → Bericht). Je Bereich nur, wenn er an ist und die Person sein Recht hat: Mitglieder mit
-        einem Recht der Mitgliederliste, Punkte mit `manage_points`, Strafen mit `manage_penalties`, Anwesenheit mit
-        `manage_attendance`. `dated` false: ohne Zeitbezug (Stand heute). Reihenfolge wie im Bericht.
+        einem Recht der Mitgliederliste, Punkte mit `view_points`, Strafen mit `view_penalties`, Anwesenheit mit
+        `view_attendance`. `dated` false: ohne Zeitbezug (Stand heute). Reihenfolge wie im Bericht.
       x-capability: 'eines der Rechte der Bereiche (siehe Beschreibung)'
       responses:
         '200':
@@ -9694,10 +9694,15 @@ components:
                       view_board,
                       view_ranks,
                       view_catalog,
+                      view_points,
                       manage_points,
+                      view_penalties,
                       manage_penalties,
+                      view_promotions,
                       manage_ranks,
+                      view_titles,
                       manage_titles,
+                      view_attendance,
                       manage_attendance,
                       manage_events,
                       manage_calendar,
@@ -9776,10 +9781,15 @@ components:
                   view_board,
                   view_ranks,
                   view_catalog,
+                  view_points,
                   manage_points,
+                  view_penalties,
                   manage_penalties,
+                  view_promotions,
                   manage_ranks,
+                  view_titles,
                   manage_titles,
+                  view_attendance,
                   manage_attendance,
                   manage_events,
                   manage_calendar,
@@ -9865,10 +9875,15 @@ components:
                 calendar,
                 respond_calendar,
                 view_intern,
+                view_points,
                 manage_points,
+                view_penalties,
                 manage_penalties,
+                view_promotions,
                 manage_ranks,
+                view_titles,
                 manage_titles,
+                view_attendance,
                 manage_attendance,
                 manage_events,
                 manage_calendar,
@@ -10407,8 +10422,8 @@ components:
             type: [string, 'null'],
             description: 'Gruppe im Zähler über der Liste, wie in der Anwesenheit (Einstellung attendance_groups); null bei Gästen',
           }
-        points: { type: [number, 'null'], description: 'Summe mit Punktefaktor, höchstens zwei Nachkommastellen; null ohne manage_points' }
-        open_cents: { type: [integer, 'null'], description: 'null ohne manage_penalties' }
+        points: { type: [number, 'null'], description: 'Summe mit Punktefaktor, höchstens zwei Nachkommastellen; null ohne view_points' }
+        open_cents: { type: [integer, 'null'], description: 'null ohne view_penalties' }
         rank_title:
           {
             type: [string, 'null'],
@@ -10417,7 +10432,7 @@ components:
         rank_badge_url: { $ref: '#/components/schemas/BadgeUrl' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
         titles:
-          description: Titel in der Reihenfolge der Titelliste (nur mit Bereich Titel und Recht manage_titles)
+          description: Titel in der Reihenfolge der Titelliste (nur mit Bereich Titel und Recht view_titles)
           type: array
           items: { $ref: '#/components/schemas/TitleRef' }
         joined_on:
@@ -10528,12 +10543,12 @@ components:
             penalties:
               type: array
               items: { $ref: '#/components/schemas/Penalty' }
-            rank: { $ref: '#/components/schemas/RankStatus', description: 'Stand mit Fortschritt (nur mit Recht manage_ranks)' }
+            rank: { $ref: '#/components/schemas/RankStatus', description: 'Stand mit Fortschritt (nur mit Recht view_promotions)' }
             rank_history:
               type: array
               items: { $ref: '#/components/schemas/RankHistoryEntry' }
             titles:
-              description: Titel (nur mit Bereich Titel und Recht manage_titles)
+              description: Titel (nur mit Bereich Titel und Recht view_titles)
               type: array
               items: { $ref: '#/components/schemas/TitleRef' }
             companies:
@@ -10578,7 +10593,7 @@ components:
                 - type: 'null'
             attendance:
               description: |
-                Anwesenheit der Person (nur mit Bereich Anwesenheit und Recht manage_attendance): gespeicherte Einträge,
+                Anwesenheit der Person (nur mit Bereich Anwesenheit und Recht view_attendance): gespeicherte Einträge,
                 jüngste Termine zuerst, und Summen über alle. Eine Absage, die eine Liste nur vorschlägt, fehlt, bis die
                 Liste gespeichert ist. Einträge nach `today` sind kommende Termine (dort nur `excused` möglich).
               type: object
@@ -10765,10 +10780,15 @@ components:
           calendar,
           respond_calendar,
           view_intern,
+          view_points,
           manage_points,
+          view_penalties,
           manage_penalties,
+          view_promotions,
           manage_ranks,
+          view_titles,
           manage_titles,
+          view_attendance,
           manage_attendance,
           manage_events,
           manage_calendar,
@@ -11002,7 +11022,7 @@ components:
       description: |
         Foto des Mitglieds oder null: `<App>/mitgliedsfoto/<id>?v=<Fassung>&s=128`. Die App ersetzt `s` bei Bedarf
         durch 480, 1024 oder 4096 (Originalauflösung, für die Großansicht nachgeladen; 404, wenn es sie nicht gibt). Ausgeliefert als image/jpeg an die Person selbst und an alle, die die Mitglieder in der Verwaltung
-        sehen (manage_points, manage_penalties, manage_ranks, manage_titles, create_users, manage_former oder promote_users); mit dem
+        sehen (view_points, view_penalties, view_promotions, view_titles, view_attendance, manage_companies, view_personal, create_users, manage_former oder promote_users); mit dem
         Bereich directory an alle, auch ohne Anmeldung, wenn das Foto zu einem Mitglied oder Anwärter gehört (Issue #112,
         dann `Cache-Control: public`); sonst 401/403, im Wartungsmodus 503. Sonst `Cache-Control: private`, bei passender
         Fassung einen Tag; immer `X-Robots-Tag: noindex`. Die Adresse wechselt mit jedem Foto.

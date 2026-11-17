@@ -224,7 +224,7 @@ final class PersonalInfoTest extends TestCase
             ['key' => 'guest', 'label' => 'Gast', 'capabilities' => []],
             ['key' => 'member', 'label' => 'Mitglied', 'capabilities' => ['member']],
             ['key' => 'r1', 'label' => 'Schriftführer', 'capabilities' => ['member', 'create_users']],
-            ['key' => 'r2', 'label' => 'Kasse', 'capabilities' => ['member', 'manage_penalties']],
+            ['key' => 'r2', 'label' => 'Kasse', 'capabilities' => ['member', 'view_penalties', 'manage_penalties']],
             ['key' => 'admin', 'label' => 'Admin', 'capabilities' => []],
         ]);
         $settings->set(RoleService::OVERRIDES_SETTING, [
@@ -256,7 +256,7 @@ final class PersonalInfoTest extends TestCase
             ['key' => 'guest', 'label' => 'Gast', 'capabilities' => []],
             ['key' => 'member', 'label' => 'Mitglied', 'capabilities' => ['member']],
             ['key' => 'r1', 'label' => 'Schriftführer', 'capabilities' => ['member', 'create_users']],
-            ['key' => 'r2', 'label' => 'Kasse', 'capabilities' => ['member', 'manage_penalties']],
+            ['key' => 'r2', 'label' => 'Kasse', 'capabilities' => ['member', 'view_penalties', 'manage_penalties']],
             ['key' => 'admin', 'label' => 'Admin', 'capabilities' => []],
         ]);
         $settings->set(RoleService::OVERRIDES_SETTING, [

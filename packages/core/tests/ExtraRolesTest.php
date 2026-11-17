@@ -53,7 +53,7 @@ final class ExtraRolesTest extends TestCase
         $res = $this->setRoles($m, ['penalties', 'events']);
         $this->assertSame(200, $res->status, json_encode($res->data) ?: '');
         $this->assertSame(['id' => $m, 'level' => Roles::MEMBER, 'extra_roles' => ['events', 'penalties']], $res->data, 'Reihenfolge der Rollen, level bleibt die Grundrolle');
-        $this->assertEqualsCanonicalizing(TestApp::caps(['member', 'manage_penalties', 'manage_events']), $this->caps($m));
+        $this->assertEqualsCanonicalizing(TestApp::caps(['member', 'view_penalties', 'manage_penalties', 'manage_events']), $this->caps($m));
 
         $list = array_column($this->call('GET', '/members')->data, null, 'id');
         $this->assertSame(['events', 'penalties'], $list[$m]['extra_roles']);
@@ -158,7 +158,7 @@ final class ExtraRolesTest extends TestCase
 
     public function testNonAdminsAssignOnlyRolesTheyCouldGiveAsBaseRole(): void
     {
-        $this->app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'promote_users', 'manage_points', 'manage_events'])]);
+        $this->app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'promote_users', 'view_points', 'manage_points', 'manage_events'])]);
         $schrift = $this->users->add('schrift', 'r1');
         $m = $this->users->add('m', Roles::MEMBER);
         $kasse = $this->users->add('kasse', Roles::MEMBER);

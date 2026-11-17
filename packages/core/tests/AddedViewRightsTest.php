@@ -62,13 +62,14 @@ final class AddedViewRightsTest extends TestCase
         $settings->set(RoleService::SETTING, $stored);
         $settings->set(RoleService::OVERRIDES_SETTING, [['user' => $a, 'grant' => ['manage_events'], 'revoke' => ['view_documents']]]);
         $settings->delete(RoleService::ADDED_VIEW_SETTING);
+        $settings->delete(RoleService::READ_SPLIT_SETTING);
 
         $app = TestApp::create($db, $users, settings: $settings, features: false);
         $this->assertSame(Roles::ADDED_VIEW, $settings->get(RoleService::ADDED_VIEW_SETTING));
         $roles = $app->roles()->all();
         $this->assertSame(['view_news', ...Roles::ADDED_VIEW], $roles[Roles::GUEST]['capabilities']);
         $this->assertSame(['view_news', ...Roles::ADDED_VIEW, 'member', 'view_documents'], $roles[Roles::MEMBER]['capabilities']);
-        $this->assertSame([...Roles::ADDED_VIEW, 'member', 'manage_points'], $roles['r1']['capabilities'], 'auch eigene Rollen');
+        $this->assertSame([...Roles::ADDED_VIEW, 'member', 'view_points', 'manage_points'], $roles['r1']['capabilities'], 'auch eigene Rollen');
         $this->assertSame(['grant' => ['manage_events'], 'revoke' => ['view_documents']], $app->roles()->overridesOf($a), 'Ausnahmen bleiben');
         $has = static fn (int $id): array => array_map(static fn (Capability $c): string => $c->value, $users->find($id)?->capabilities ?? []);
         $this->assertSame([], array_values(array_diff(Roles::ADDED_VIEW, $has($b))));

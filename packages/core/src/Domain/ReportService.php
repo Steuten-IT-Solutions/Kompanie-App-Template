@@ -43,17 +43,17 @@ final class ReportService
      */
     private const SECTIONS = [
         'members' => ['feature' => null, 'caps' => [
-            Capability::ManagePoints, Capability::ManagePenalties, Capability::ManageRanks, Capability::ManageTitles, Capability::ManageAttendance,
+            Capability::ViewPoints, Capability::ViewPenalties, Capability::ViewPromotions, Capability::ViewTitles, Capability::ViewAttendance,
             Capability::ManageCompanies, Capability::ViewPersonal, Capability::CreateUsers, Capability::ManageFormer, Capability::PromoteUsers,
         ], 'dated' => false, 'label' => 'Mitglieder'],
         'passive' => ['feature' => 'passive', 'caps' => [Capability::ManagePassive], 'dated' => false, 'label' => 'Passive'],
-        'points' => ['feature' => 'points', 'caps' => [Capability::ManagePoints], 'dated' => true, 'label' => 'Punkte'],
-        'penalties' => ['feature' => 'penalties', 'caps' => [Capability::ManagePenalties], 'dated' => true, 'label' => 'Strafen'],
-        'attendance' => ['feature' => 'attendance', 'caps' => [Capability::ManageAttendance], 'dated' => true, 'label' => 'Anwesenheit'],
+        'points' => ['feature' => 'points', 'caps' => [Capability::ViewPoints], 'dated' => true, 'label' => 'Punkte'],
+        'penalties' => ['feature' => 'penalties', 'caps' => [Capability::ViewPenalties], 'dated' => true, 'label' => 'Strafen'],
+        'attendance' => ['feature' => 'attendance', 'caps' => [Capability::ViewAttendance], 'dated' => true, 'label' => 'Anwesenheit'],
         'events' => ['feature' => 'events', 'caps' => [Capability::ManageEvents], 'dated' => true, 'label' => 'Termine'],
         'calendar' => ['feature' => 'calendar', 'caps' => [Capability::ManageCalendar], 'dated' => true, 'label' => 'Kalender'],
-        'ranks' => ['feature' => 'ranks', 'caps' => [Capability::ManageRanks], 'dated' => true, 'label' => 'Dienstgrade'],
-        'titles' => ['feature' => 'titles', 'caps' => [Capability::ManageTitles], 'dated' => true, 'label' => 'Titel'],
+        'ranks' => ['feature' => 'ranks', 'caps' => [Capability::ViewPromotions], 'dated' => true, 'label' => 'Dienstgrade'],
+        'titles' => ['feature' => 'titles', 'caps' => [Capability::ViewTitles], 'dated' => true, 'label' => 'Titel'],
         'offices' => ['feature' => 'offices', 'caps' => [Capability::ManageOffices], 'dated' => true, 'label' => 'Ämter'],
         'inventory' => ['feature' => 'inventory', 'caps' => [Capability::ManageInventory], 'dated' => true, 'label' => 'Inventar'],
     ];

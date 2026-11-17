@@ -530,8 +530,8 @@ final class Api
             + ($this->user()->can(Cap::CreateUsers) ? ['join_year' => $a->joinYears()->of($id)] : [])
             // Aufnahme als Mitglied: Anwärter-Rolle, „Anwärter seit“ und Stand der Voraussetzung (null, wenn kein Anwärter)
             + ($this->user()->can(Cap::CreateUsers) ? ['admission' => $a->admissions()->statusOf($id)] : [])
-            // Anwesenheit (gespeicherte Einträge und Summen) mit Bereich und Recht manage_attendance
-            + ($a->features()->enabled('attendance') && $this->user()->can(Cap::ManageAttendance) ? ['attendance' => $a->attendance()->ofMember($id)] : [])
+            // Anwesenheit (gespeicherte Einträge und Summen) mit Bereich und Recht view_attendance
+            + ($a->features()->enabled('attendance') && $this->user()->can(Cap::ViewAttendance) ? ['attendance' => $a->attendance()->ofMember($id)] : [])
             // Ehemalig: Grund, Eintritt, Ausscheiden (sonst null)
             + ['former' => $a->formerMembers()->of($id)];
     }
@@ -622,10 +622,10 @@ final class Api
         }, $list);
     }
 
-    /** Stand, Verlauf und frühere Mitglieder mit Dienstgrad in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
+    /** Stand, Verlauf und frühere Mitglieder mit Dienstgrad in Mitgliederliste und -details: Bereich an und Recht, sie zu sehen. */
     private function showRanks(): bool
     {
-        return $this->app->features()->enabled('ranks') && $this->can(Cap::ManageRanks);
+        return $this->app->features()->enabled('ranks') && $this->can(Cap::ViewPromotions);
     }
 
     /** Auskunft als Datei (meine-daten-… bzw. daten-<id>-…), nie zwischengespeichert. */
@@ -644,10 +644,10 @@ final class Api
         return $this->app->features()->enabled('companies') && $this->can(Cap::ManageCompanies);
     }
 
-    /** Titel in Mitgliederliste und -details: Bereich an und Recht, sie zu verwalten. */
+    /** Titel in Mitgliederliste und -details: Bereich an und Recht, sie zu sehen. */
     private function showTitles(): bool
     {
-        return $this->app->features()->enabled('titles') && $this->can(Cap::ManageTitles);
+        return $this->app->features()->enabled('titles') && $this->can(Cap::ViewTitles);
     }
 
     private function authorize(Route $route): void
@@ -1080,10 +1080,10 @@ final class Api
             new Route('POST', '/ranks/{id}/badge', Cap::ManageRanks, fn (Request $r) => $a->ranks()->uploadBadge($r->id(), $r->input('file'), $r->input('png')), 'ranks', $denyRights),
             new Route('DELETE', '/ranks/{id}/badge', Cap::ManageRanks, fn (Request $r) => $a->ranks()->removeBadge($r->id()), 'ranks', $denyRights),
             new Route('PUT', '/members/{id}/rank', Cap::ManageRanks, fn (Request $r) => $a->ranks()->change($this->user(), $r->id(), $r->input('rank_id'), $r->input('reason')), 'ranks', $denyRights),
-            new Route('GET', '/promotions', Cap::ManageRanks, fn () => $a->ranks()->promotions(), 'ranks', $denyRights),
+            new Route('GET', '/promotions', Cap::ViewPromotions, fn () => $a->ranks()->promotions(), 'ranks', $denyRights),
 
             // Titel (Issue #22): Pflege der Liste und Zuweisung
-            new Route('GET', '/titles', Cap::ManageTitles, fn () => $a->titles()->list(), 'titles', $denyRights),
+            new Route('GET', '/titles', Cap::ViewTitles, fn () => $a->titles()->list(), 'titles', $denyRights),
             new Route('POST', '/titles', Cap::ManageTitles, fn (Request $r) => Response::created($a->titles()->create($r->body)), 'titles', $denyRights),
             new Route('PUT', '/titles/order', Cap::ManageTitles, fn (Request $r) => $a->titles()->reorder($r->input('ids')), 'titles', $denyRights),
             new Route('PATCH', '/titles/{id}', Cap::ManageTitles, fn (Request $r) => $a->titles()->update($r->id(), $r->body), 'titles', $denyRights),
@@ -1369,7 +1369,7 @@ final class Api
             new Route('POST', '/inventory/{id}/move', Cap::ManageInventory, fn (Request $r) => $a->inventory()->move($this->user(), $r->id(), $r->body), 'inventory', $denyRights),
 
             // Anwesenheit (Issue #21): Listen je Termin; Gruppen für den Zähler stellen Admins bei den Rollen ein
-            new Route('GET', '/attendance', Cap::ManageAttendance, fn () => $a->attendance()->lists(), 'attendance', $denyRights),
+            new Route('GET', '/attendance', Cap::ViewAttendance, fn () => $a->attendance()->lists(), 'attendance', $denyRights),
             new Route('PUT', '/attendance', Cap::ManageAttendance, function (Request $r) use ($a) {
                 // Wer danach neu die Voraussetzung für die Aufnahme erfüllt (Hinweis nach dem Speichern, nur für create_users)
                 $admissions = $this->user()->can(Cap::CreateUsers) && $a->admissions()->enabled() ? $a->admissions() : null;
@@ -1381,11 +1381,11 @@ final class Api
                 }
                 return $created ? Response::created($list) : $list;
             }, 'attendance', $denyRights),
-            new Route('GET', '/attendance/events', Cap::ManageAttendance, fn () => $a->attendance()->events(), 'attendance', $denyRights),
+            new Route('GET', '/attendance/events', Cap::ViewAttendance, fn () => $a->attendance()->events(), 'attendance', $denyRights),
             new Route('PUT', '/admin/event-kinds', Cap::ManageSettings, fn (Request $r) => ['kinds' => $a->eventKinds()->setOptions($r->input('kinds'))], null, $denySettings),
             new Route('GET', '/attendance/groups', Cap::ManageSettings, fn () => $a->attendance()->groups(), 'attendance', $denySettings),
             new Route('PUT', '/attendance/groups', Cap::ManageSettings, fn (Request $r) => $a->attendance()->setGroups($r->input('groups')), 'attendance', $denySettings),
-            new Route('GET', '/attendance/{id}', Cap::ManageAttendance, fn (Request $r) => $a->attendance()->detail($r->id()), 'attendance', $denyRights),
+            new Route('GET', '/attendance/{id}', Cap::ViewAttendance, fn (Request $r) => $a->attendance()->detail($r->id()), 'attendance', $denyRights),
             new Route('DELETE', '/attendance/{id}', Cap::ManageAttendance, function (Request $r) use ($a) {
                 $a->attendance()->delete($r->id());
                 return ['deleted' => true];
@@ -1856,7 +1856,7 @@ final class Api
                 return Response::created($rows);
             }, 'penalties', $denyManage),
             // Alle offenen Strafen (Verwaltung → Strafen: Karte „Offen gesamt“), mit Namen
-            new Route('GET', '/penalties/open', Cap::ManagePenalties, fn () => $a->scores()->openPenalties(), 'penalties', $denyManage),
+            new Route('GET', '/penalties/open', Cap::ViewPenalties, fn () => $a->scores()->openPenalties(), 'penalties', $denyManage),
             new Route('PATCH', '/penalties/{id}', Cap::ManagePenalties, fn (Request $r) => $a->scores()->setPenaltyStatus($r->id(), $r->input('status'), $this->user()->id), 'penalties', $denyManage),
             new Route('DELETE', '/penalties/{id}', Cap::ManagePenalties, function (Request $r) use ($a) {
                 $a->scores()->cancelPenalty($r->id(), $this->user()->id);

@@ -138,7 +138,7 @@ final class ReportTest extends TestCase
         $this->assertContains('anna@example.org', $anna);
         $this->assertContains('+49 2151 1', $anna);
 
-        $this->users->current = $this->withRights('punktwart', ['manage_points']);
+        $this->users->current = $this->withRights('punktwart', ['view_points', 'manage_points']);
         $sections = array_column($this->get('/admin/report/sections')->data, 'key');
         $this->assertSame(['members', 'points'], $sections, 'nur, was die Person verwalten darf');
         $plain = self::section($this->get('/admin/report', ['from' => '2026-01-01', 'to' => '2026-12-31', 'sections' => 'members'])->data, 'members');
@@ -224,7 +224,7 @@ final class ReportTest extends TestCase
 
     public function testRightsFeaturesAndInput(): void
     {
-        $this->users->current = $this->withRights('punktwart', ['manage_points']);
+        $this->users->current = $this->withRights('punktwart', ['view_points', 'manage_points']);
         $res = $this->get('/admin/report', ['from' => '2026-01-01', 'to' => '2026-12-31', 'sections' => 'points,penalties']);
         $this->assertSame(403, $res->status, 'ein Abschnitt ohne Recht: kein Bericht, statt ihn still wegzulassen');
 
@@ -249,7 +249,7 @@ final class ReportTest extends TestCase
 
     public function testNoReportInPreview(): void
     {
-        $role = $this->app->roles()->create(['label' => 'Punktwart', 'capabilities' => [...Roles::TEMPLATES[Roles::MEMBER], 'manage_points']])['key'];
+        $role = $this->app->roles()->create(['label' => 'Punktwart', 'capabilities' => [...Roles::TEMPLATES[Roles::MEMBER], 'view_points', 'manage_points']])['key'];
         $this->assertSame(['members', 'points'], array_column($this->get('/admin/report/sections', [], $role)->data, 'key'), 'Auswahl wie für die Rolle');
         $res = $this->get('/admin/report', ['from' => '2026-01-01', 'to' => '2026-12-31', 'sections' => 'points'], $role);
         $this->assertSame(403, $res->status);

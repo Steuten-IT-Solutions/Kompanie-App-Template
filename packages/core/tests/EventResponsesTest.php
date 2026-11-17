@@ -223,7 +223,7 @@ final class EventResponsesTest extends TestCase
             ['key' => 'guest', 'label' => 'Gast', 'capabilities' => ['view_events', 'calendar']],
             ['key' => 'member', 'label' => 'Mitglied', 'capabilities' => ['member', 'calendar', 'view_board']],
             ['key' => 'r1', 'label' => 'Anwärter', 'capabilities' => ['calendar']],
-            ['key' => 'r2', 'label' => 'Kasse', 'capabilities' => ['member', 'manage_points']],
+            ['key' => 'r2', 'label' => 'Kasse', 'capabilities' => ['member', 'view_points', 'manage_points']],
             ['key' => 'admin', 'label' => 'Admin', 'capabilities' => []],
         ]);
         $settings->delete(RoleService::RESPOND_SETTING);
