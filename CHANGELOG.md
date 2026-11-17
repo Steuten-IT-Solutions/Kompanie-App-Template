@@ -30,20 +30,26 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Versammlung oder Arbeitsdienst. Wer Termine pflegen darf, wählt die Art im aufgeklappten Termin unter
   [Termine](app:termine), bei jeder Quelle des Kalenders, auch bei Google Kalender und iCal. Die App speichert die Art
   selbst und ändert nichts in Google. Steht der Name einer Art im Titel, schlägt die App sie vor. Anwesenheitslisten
-  übernehmen die Art ihres Termins und zeigen sie an; ändern lässt sie sich auch an der Liste.
+  übernehmen die Art ihres Termins und zeigen sie an; ändern lässt sie sich auch an der Liste. Je Art legst du mit
+  dem Haken „Als Schild am Termin zeigen“ fest, ob sie neben dem Titel des Termins steht (anfangs an); ohne Schild
+  bleibt sie gespeichert und zählt weiter.
 - **Aufnahmen**: Unter [Verwaltung → Aufnahmen](app:verwaltung/aufnahmen) siehst du wie bei den Beförderungen, welche
   Anwärter die Voraussetzung für die Aufnahme als Mitglied erfüllen; die Zahl im Kreis am Knopf zeigt, wie viele es
-  sind. Die Voraussetzung legst du je Anwärter-Rolle unter [Einstellungen → Rollen](app:einstellungen/rollen) fest:
-  Teilnahmen an Terminen einer Terminart (z. B. 6 Versammlungen) und eine Mindestdauer als Anwärter. Eine Anwärter-Rolle
-  kann auch eine Zusatzrolle zu Mitglied sein; beim Aufnehmen wird sie dann entfernt. Auf der Seite eines Anwärters
+  sind. Unter [Einstellungen → Rollen](app:einstellungen/rollen) setzt du an einer Rolle den Haken „Anwärter-Rolle“
+  und legst die Voraussetzung fest: Teilnahmen an Terminen einer Terminart (z. B. 6 Versammlungen) und eine
+  Mindestdauer als Anwärter. Die Anwärter-Rolle kann die Rolle der Person sein (beim Aufnehmen wird sie zu Mitglied)
+  oder eine Zusatzrolle zu Mitglied (beim Aufnehmen wird sie entfernt). Der Knopf ist da, sobald die Anwesenheit an ist. Auf der Seite eines Anwärters
   stehen „Anwärter seit“ (bei bisherigen Anwärtern nachtragen) und der Stand; aufnehmen geht dort jederzeit, ohne
   erfüllte Voraussetzung mit Hinweis. Ohne Eintritt trägt die App den Tag der Aufnahme ein. Nach dem Speichern einer
   Anwesenheitsliste zeigt die App, wer neu die Voraussetzung erfüllt. Sehen und aufnehmen darf, wer Mitglieder anlegen
   darf.
 - **Rechte zum Sehen und zum Ändern getrennt**: Unter [Einstellungen → Rollen](app:einstellungen/rollen) gibt es
   jetzt eigene Rechte, um Punkte, Strafen, Dienstgrade mit Beförderungen, Titel und die Anwesenheit der Mitglieder nur
-  zu sehen, z. B. „Punkte aller Mitglieder sehen“ neben „Punkte vergeben“. Wer nur sehen darf, sieht die Mitgliederliste
-  und die Angaben, aber keine Knöpfe zum Ändern. Ändern gibt es nur zusammen mit Sehen. Rollen und Personen, die ein
+  zu sehen, z. B. „Punkte aller Mitglieder sehen“ neben „Punkte vergeben“. Ebenso gibt es eigene Rechte, um das
+  Inventar, die Listen, den Verlauf der E-Mails, die Zu- und Absagen bei Terminen, die Passiven, die Einreichungen der Galerie und die Fehlermeldungen nur zu sehen. Mit „Konten sehen“ siehst du Konto,
+  Rolle, Zusatzrollen und Rechte einer Person, den Eintritt, Anfragen auf einen Zugang und Aufnahmen; dieses Recht
+  geben wie „Mitglieder anlegen“ nur Admins weiter. Wer nur sehen darf,
+  sieht die Mitgliederliste bzw. den Bereich und die Angaben, aber keine Knöpfe zum Ändern. Ändern gibt es nur zusammen mit Sehen. Rollen und Personen, die ein
   Recht zum Ändern hatten, haben nach dem Update auch das Recht zum Sehen; es ändert sich also für niemanden etwas,
   bis du es umstellst.
 - **Beitrag der Passiven**: Unter [Verwaltung → Passive](app:verwaltung/passive) trägst du jetzt je Passivem und Jahr
@@ -80,7 +86,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Namen und Symbole gelten für beide Leisten. Was jemand sehen darf, regeln weiter die Rechte.
 - **Passive**: Mit dem neuen Bereich _Passive_ (unter [Einstellungen → Bereiche](app:einstellungen/bereiche)) führt ihr
   unter [Verwaltung → Passive](app:verwaltung/passive) eine interne Liste eurer passiven Mitglieder mit Vorname,
-  Nachname, Adresse, Telefon, E-Mail-Adresse und Geburtsdatum, je optional mit einem Mitglied als Betreuer. Passive sind
+  Nachname, Adresse, Telefon, E-Mail-Adresse, Geburtsdatum, Eintritt und Bemerkung, je optional mit einem Mitglied als
+  Betreuer. Eine bisher geführte Liste übernimmst du dort mit „Tabelle importieren“ aus Excel (.xlsx) oder CSV: Die App
+  findet die Kopfzeile auch unter einem Titel, erkennt die Spalten an ihren Namen (änderbar), ordnet Betreuer wie
+  „A. Beispiel“ einem Mitglied zu, übernimmt auf Wunsch den Beitrag eines Jahres (auch aus Spalten je Zahlungsart),
+  zeigt vorher eine Vorschau und überspringt, wer schon eingetragen ist. Passive sind
   keine Konten: Sie bekommen nie einen Zugang zur App, stehen in keiner Mitgliederliste und ihr Geburtstag erscheint nicht
   bei den Geburtstagen. Die Liste sieht und pflegt, wer das neue Recht _Passive verwalten_ (`manage_passive`) hat; beim
   Einschalten entsteht die Rolle „Passive verwalten“. Adresse, Telefon, E-Mail und Geburtsdatum sieht davon nur, wer
@@ -176,6 +186,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   _Mitglieder anlegen_ und _Rollen vergeben_ geben Nicht-Admins dieses Recht nicht weiter.
 
 ### Behoben
+
+- **Erinnerung an Zu- und Absagen ausschalten**: Unter [Einstellungen → Kalender](app:einstellungen/kalender) bleibt
+  die Erinnerung an Zu- und Absagen jetzt ausgeschaltet, wenn du den Haken entfernst und speicherst. In der
+  WordPress-Version war der Haken nach dem Neuladen wieder gesetzt, weil WordPress beim ersten Ausschalten nichts
+  gespeichert hat.
 
 - **Anwesenheit ohne Verbindung**: Wer in einer Anwesenheitsliste unter
   [Verwaltung → Anwesenheit](app:verwaltung/anwesenheit) ohne Internet auf _Speichern_ tippt, verliert die Häkchen nicht

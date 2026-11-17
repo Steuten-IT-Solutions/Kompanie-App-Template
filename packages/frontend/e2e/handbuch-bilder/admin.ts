@@ -40,7 +40,7 @@ const gruppe: Gruppe = async (f) => {
   }
   await form.getByLabel(/^Interner Kalender/).check();
   await form.getByLabel(/^Beim Anlegen neuer Konten wählbar/).check();
-  await form.getByLabel(/^Wer Mitglieder anlegen darf/).check();
+  await form.getByLabel(/^Anwärter-Rolle/).check();
   await ausschnitt('admin-rollen-und-mitglieder-neu', 'form.role-form');
   await form.getByRole('button', { name: 'Abbrechen' }).click();
   await ausschnitt('admin-vorschau-starten', '.role-preview');

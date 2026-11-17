@@ -141,7 +141,7 @@ final class FormerMembersTest extends TestCase
     {
         $this->app->features()->update(['birthdays' => true]);
         $roles = $this->app->roles();
-        $creator = $this->users->add('anleger', $roles->create(['label' => 'Anleger', 'capabilities' => TestApp::caps(['member', 'create_users'])])['key']);
+        $creator = $this->users->add('anleger', $roles->create(['label' => 'Anleger', 'capabilities' => TestApp::caps(['member', 'view_accounts', 'create_users'])])['key']);
         $keeper = $this->users->add('chronist', $roles->create(['label' => 'Chronist', 'capabilities' => TestApp::caps(['member', 'manage_former'])])['key']);
 
         $this->users->current = $creator;

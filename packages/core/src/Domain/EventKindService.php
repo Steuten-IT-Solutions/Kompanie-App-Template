@@ -20,6 +20,8 @@ use KompanieApp\Core\Storage\EventKindRepository;
  *   wer Termine pflegen darf (manage_calendar); sehen jeder, der den Termin sieht.
  * - Ohne gesetzte Art schlägt die App eine vor, wenn ihr Name als eigenes Wort im Titel steht (suggest; „Versammlung März“
  *   → Versammlung). Zählt erst, wenn sie gespeichert ist.
+ * - Je Art legt der Admin fest, ob sie als Schild (Tag) neben dem Titel des Termins steht (HIDDEN_TAGS_SETTING: Arten
+ *   ohne Schild, Vorgabe leer = alle mit Schild). Das betrifft nur die Anzeige; die Art bleibt gespeichert und zählt.
  * - Jede Anwesenheitsliste hat die Art als eigene Momentaufnahme (AttendanceService): Beim Anlegen übernimmt sie die des
  *   Termins (sonst den Vorschlag aus dem Titel), ändern lässt sie sich an der Liste. Wer die Art eines Termins ändert,
  *   ändert sie auch an dessen Liste. So zählt eine Teilnahme auch, wenn der Termin aus dem Kalender verschwunden ist.
@@ -27,6 +29,7 @@ use KompanieApp\Core\Storage\EventKindRepository;
 final class EventKindService
 {
     public const OPTIONS_SETTING = 'event_kind_options';
+    public const HIDDEN_TAGS_SETTING = 'event_kind_hidden_tags';
     public const NAME_MAX = 40;
     public const OPTIONS_MAX = 30;
 
@@ -79,7 +82,51 @@ final class EventKindService
             throw ApiError::invalid(sprintf('Es gehen höchstens %d Terminarten.', self::OPTIONS_MAX));
         }
         $this->app->settings->set(self::OPTIONS_SETTING, $out);
+        // Arten ohne Schild: nur die, die es noch gibt (eine entfernte und neu angelegte Art hat wieder ein Schild)
+        $this->app->settings->set(self::HIDDEN_TAGS_SETTING, array_values(array_intersect($this->hiddenTags(), $out)));
         return $out;
+    }
+
+    /** @return list<string> Arten, die nicht als Schild neben dem Titel des Termins stehen (Vorgabe: keine) */
+    public function hiddenTags(): array
+    {
+        $raw = $this->app->settings->get(self::HIDDEN_TAGS_SETTING);
+        if (!is_array($raw)) {
+            return [];
+        }
+        $options = $this->options();
+        return array_values(array_filter($options, static fn (string $kind): bool => in_array($kind, $raw, true)));
+    }
+
+    /**
+     * Festlegen, welche Arten kein Schild am Termin haben: Liste von Bezeichnungen aus options(), andere werden ignoriert.
+     *
+     * @return list<string>
+     */
+    public function setHiddenTags(mixed $in): array
+    {
+        if (!is_array($in)) {
+            throw ApiError::invalid('Bitte eine Liste von Terminarten ohne Schild schicken.');
+        }
+        $names = array_map(static fn (mixed $x): string => is_string($x) ? Text::line($x, self::NAME_MAX + 1) : '', $in);
+        $hidden = array_values(array_filter($this->options(), static fn (string $kind): bool => in_array($kind, $names, true)));
+        $this->app->settings->set(self::HIDDEN_TAGS_SETTING, $hidden);
+        return $hidden;
+    }
+
+    /**
+     * PUT /admin/event-kinds: Liste der Arten und (wenn geschickt) die Arten ohne Schild. Ohne hidden bleiben die bisherigen
+     * Arten ohne Schild so (ältere Oberflächen).
+     *
+     * @return array{kinds: list<string>, hidden: list<string>}
+     */
+    public function save(mixed $kinds, mixed $hidden): array
+    {
+        if ($hidden !== null && !is_array($hidden)) {
+            throw ApiError::invalid('Bitte eine Liste von Terminarten ohne Schild schicken.');
+        }
+        $list = $this->setOptions($kinds);
+        return ['kinds' => $list, 'hidden' => $hidden === null ? $this->hiddenTags() : $this->setHiddenTags($hidden)];
     }
 
     /**

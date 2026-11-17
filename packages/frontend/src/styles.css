@@ -4571,6 +4571,10 @@ fieldset.board-targets legend {
 .poll-add-option {
   align-self: flex-start;
 }
+/* Terminart in Einstellungen → Kalender: Name und darunter der Haken „Als Schild am Termin zeigen“ */
+.event-kind-edit .toggle {
+  margin: 0 2px 10px;
+}
 @media (min-width: 900px) {
   .poll-page,
   .poll-admin,
@@ -7595,4 +7599,13 @@ fieldset.block-source legend {
 .event-response-group ul {
   margin: 0;
   padding-left: 18px;
+}
+
+/* Passive: Bemerkung mit Zeilenumbrüchen; Hinweise in der Vorschau des Imports */
+.passive-note {
+  white-space: pre-line;
+}
+.passive-import-warning {
+  margin: 0.15rem 0 0;
+  color: var(--muted);
 }

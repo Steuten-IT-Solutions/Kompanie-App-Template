@@ -14,7 +14,7 @@ Tippe unten auf **{bereich.events}**. Unter jedem kommenden Termin stehen die Kn
 - **Zähler**: z. B. „5 Zusagen · 2 Absagen“. Er zeigt, wie viele schon geantwortet haben.
 - **Zu- und absagen bis …**: steht da, wenn es für den Termin einen Anmeldeschluss gibt.
 - **Hinweis zu deiner Zusage** bzw. **Absage**: erscheint im aufgeklappten Termin, sobald du geantwortet hast.
-- **Rückmeldungen ansehen**: nur, wenn du Termine des Kalenders pflegen darfst. Es zeigt, wer zugesagt oder abgesagt hat und wer sich noch nicht gemeldet hat, mit den Hinweisen.
+- **Rückmeldungen ansehen**: nur mit dem Recht **Zu- und Absagen sehen** (wer Termine des Kalenders pflegen darf, hat es immer). Es zeigt, wer zugesagt oder abgesagt hat und wer sich noch nicht gemeldet hat, mit den Hinweisen.
 
 ## So gehst du vor
 ### Zusagen oder absagen
@@ -34,7 +34,7 @@ Tippe unten auf **{bereich.events}**. Unter jedem kommenden Termin stehen die Kn
 - Ohne Internetverbindung merkt sich die App deine Antwort (auch einen Hinweis oder das Zurücknehmen) auf dem Gerät und zeigt sie gleich an, darunter **Noch nicht übertragen – die App sendet es, sobald du wieder online bist.** Sobald wieder Netz da ist, schickt sie die Antwort von selbst und meldet das. Ist der Anmeldeschluss inzwischen vorbei, nimmt der Server sie nicht mehr an; auch das meldet die App. Beim Abmelden fragt die App nach, wenn noch etwas nicht übertragen ist.
 - Hast du noch nicht geantwortet, erinnert dich die App einige Tage vor dem Termin (bei einem Anmeldeschluss am Tag davor), wenn du Benachrichtigungen eingeschaltet hast und ein {rolle.admin} die Erinnerung nicht abgeschaltet hat. Hast du abgesagt, kommt zu diesem Termin auch keine Erinnerung am Vortag.
 - Zu- und absagen geht bis zum Beginn des Termins. Bei Terminen ohne Uhrzeit endet das um 0 Uhr des Tages. Hat der Termin einen Anmeldeschluss, geht es nur bis zum Ende dieses Tages. Danach siehst du nur noch deine Antwort.
-- Deinen Namen und deinen Hinweis sehen die, die Termine des Kalenders pflegen dürfen, und in der Anwesenheitsliste die, die die Anwesenheit erfassen. Alle anderen sehen nur die Zahl der Zusagen und Absagen.
+- Deinen Namen und deinen Hinweis sehen die mit dem Recht **Zu- und Absagen sehen** (auch alle, die Termine des Kalenders pflegen), und in der Anwesenheitsliste die, die die Anwesenheit erfassen. Alle anderen sehen nur die Zahl der Zusagen und Absagen.
 - Eine Absage trägt dich nicht selbst als entschuldigt ein. In der Anwesenheitsliste ist sie nur vorausgewählt; eingetragen wird sie von denen, die die Anwesenheit erfassen.
 - Wer die Anwesenheit erfasst, kann auch für dich zu- oder absagen, z. B. wenn du anrufst.
 - Wird ein Termin verschoben, bleibt deine Antwort erhalten. Wird er gelöscht und neu angelegt, musst du noch einmal antworten.

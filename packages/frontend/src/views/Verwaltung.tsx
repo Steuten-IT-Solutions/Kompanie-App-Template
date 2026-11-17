@@ -76,6 +76,7 @@ import { SponsorAdmin } from './SponsorenVerwalten';
 import { PageAdmin } from './SeitenVerwalten';
 import { WebsiteAdmin } from './WebseiteVerwalten';
 import { PassiveAdmin } from './Passive';
+import { PassiveImport } from './PassiveImport';
 import { Bericht } from './Bericht';
 import { CompanyAdmin, MemberCompanies } from './KompanienVerwalten';
 import { ListAdmin } from './ListenVerwalten';
@@ -235,6 +236,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <FormerImport onToast={onToast} />
       ) : active === 'ehemalige' ? (
         <FormerList />
+      ) : active === 'passive' && arg === 'import' && can('manage_passive') ? (
+        <PassiveImport onToast={onToast} />
       ) : active === 'passive' ? (
         <PassiveAdmin onToast={onToast} />
       ) : active === 'anfragen' ? (
@@ -315,12 +318,12 @@ type MembersState = {
 let savedMembers: MembersState | null = null;
 
 /**
- * Sortierungen der Mitgliederliste: nach Punkten nur, wer sie sieht, nach Eintritt nur, wer die Jahre pflegt
- * (create_users); nach Austritt nur bei den Ehemaligen.
+ * Sortierungen der Mitgliederliste: nach Punkten nur, wer sie sieht, nach Eintritt nur, wer die Jahre sieht
+ * (view_accounts); nach Austritt nur bei den Ehemaligen.
  */
 const memberSorts = (): MemberSort[] =>
   (Object.keys(MEMBER_SORT_LABELS) as MemberSort[]).filter(
-    (s) => s !== 'left' && (s !== 'points' || seePoints()) && (s !== 'joined' || can('create_users')),
+    (s) => s !== 'left' && (s !== 'points' || seePoints()) && (s !== 'joined' || can('view_accounts')),
   );
 
 /** Rolle als Titel in der Liste, solange die Person noch als Mitglied aufzunehmen ist (Häkchen an der Rolle, z. B. Anwärter). */
@@ -330,7 +333,8 @@ const admitRole = (level: Level) => {
 };
 
 function Members() {
-  const canPromote = can('promote_users');
+  // Rollen sehen und danach filtern (auch Gäste): wer Konten sieht
+  const canPromote = can('view_accounts');
   // Nur einmal übernehmen: Wer die Liste danach neu öffnet, fängt wieder oben an.
   const [restore] = useState(() => {
     const s = savedMembers;
@@ -573,11 +577,11 @@ function rankEditable(m: MemberDetail): boolean {
 }
 
 /**
- * Zeile unter Abzeichen und Foto: Rolle(n) bzw. ehemalig. Die Rolle nur für die, die Rollen vergeben (Issue #349);
+ * Zeile unter Abzeichen und Foto: Rolle(n) bzw. ehemalig. Die Rolle nur für die, die Konten sehen (Issue #349, view_accounts);
  * sonst bleiben „Ehemalig“ und „Ohne Zugang“.
  */
 function roleLine(m: MemberDetail): string {
-  if (!can('promote_users')) return [m.former ? 'Ehemalig' : '', m.no_access ? 'Ohne Zugang' : ''].filter(Boolean).join(' · ');
+  if (!can('view_accounts')) return [m.former ? 'Ehemalig' : '', m.no_access ? 'Ohne Zugang' : ''].filter(Boolean).join(' · ');
   const role = m.former
     ? `Ehemalig (zuvor ${levelLabel(m.former.previous_level)})`
     : (m.extra_roles ?? []).length > 0
@@ -602,7 +606,7 @@ function previewFromLists(id: number, former: boolean): MemberPreview | null {
 
 /** Rollenzeile aus der Liste (ohne den Hinweis auf Ausnahmen bei den Rechten, den kennt erst die Seite). */
 function previewRoleLine(p: MemberPreview): string {
-  if (!can('promote_users')) return p.previous_level ? 'Ehemalig' : '';
+  if (!can('view_accounts')) return p.previous_level ? 'Ehemalig' : '';
   if (p.previous_level) return `Ehemalig (zuvor ${levelLabel(p.previous_level)})`;
   if (!p.level) return '';
   return p.extra_roles.length > 0
@@ -635,7 +639,7 @@ function MemberPreviewHead({ p, onOpen }: { p: MemberPreview; onOpen?: (sheet: '
           !p.rank_title && <span className="skeleton-box" style={{ width: 96, height: 96, borderRadius: '50%' }} />
         )}
       </div>
-      {(role || can('promote_users')) && (
+      {(role || can('view_accounts')) && (
         <p className="muted small member-level">{role || <span className="skeleton-text" style={{ width: '16ch' }} />}</p>
       )}
       {(seePoints() || seePenalties()) && (
@@ -1123,7 +1127,7 @@ function MemberDetailView({
             </DateRow>
           )}
           {joinOn && (
-            <DateRow label="Eintritt" onOpen={() => openSheet('eintritt')}>
+            <DateRow label="Eintritt" onOpen={can('create_users') ? () => openSheet('eintritt') : undefined}>
               {m.join_year ? joinText(m.join_year) : null}
             </DateRow>
           )}
@@ -1223,8 +1227,16 @@ function MemberDetailView({
         {/* Gäste gehören nicht zur Kompanie. */}
         {formerEditable && formerPanel(false)}
         {/* Das eigene Konto ohne Löschen; E-Mail auch unter Meins → Konto. */}
-        {can('create_users') && (
-          <AccountPanel id={m.id} level={m.level} former={!!m.former} self={self} onChanged={reload} onToast={onToast} />
+        {can('view_accounts') && (
+          <AccountPanel
+            id={m.id}
+            level={m.level}
+            former={!!m.former}
+            self={self}
+            readOnly={!can('create_users')}
+            onChanged={reload}
+            onToast={onToast}
+          />
         )}
       </FoldSection>
 
@@ -1291,7 +1303,7 @@ function MemberDetailView({
         </Sheet>
       )}
 
-      {sheet === 'eintritt' && joinOn && m.join_year !== undefined && (
+      {sheet === 'eintritt' && joinOn && can('create_users') && m.join_year !== undefined && (
         <Sheet title="Eintritt" onClose={closeSheet} routed>
           <MemberJoinYear key={JSON.stringify(m.join_year)} id={m.id} joinYear={m.join_year} onChanged={reload} onToast={onToast} />
         </Sheet>
@@ -1429,9 +1441,9 @@ function RoleControl({
       {extra.length > 0 && <p className="muted small member-level">Zusatzrollen: {extra.map(levelLabel).join(', ')}</p>}
     </>
   );
-  // Ohne das Recht steht die Rolle nirgends auf der Seite (Issue #349).
-  if (!can('promote_users')) return null;
-  if ((level === 'admin' && !adminsHere) || id === config?.user?.id) {
+  // Ohne das Recht steht die Rolle nirgends auf der Seite (Issue #349); wer Konten nur sieht, sieht sie ohne Ändern.
+  if (!can('view_accounts')) return null;
+  if (!can('promote_users') || (level === 'admin' && !adminsHere) || id === config?.user?.id) {
     return readOnly;
   }
   async function save(action: () => Promise<unknown>, msg: string) {

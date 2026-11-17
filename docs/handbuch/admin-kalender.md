@@ -20,7 +20,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und unter **Termine u
 - **Kalender testen** und **Entfernen**: erscheinen bei Google Kalender und iCal-Adresse, sobald der Kalender eingerichtet ist.
 - **Speichern**: übernimmt die Eingaben.
 - **Zu- und Absagen**: ein eigener Abschnitt darunter mit eigenem **Speichern**. **Zu- und Absagen bei Terminen** (anfangs aus) schaltet die Knöpfe **Zusagen** und **Absagen** bei den Terminen ein. Erst dann erscheinen die Einstellungen der Erinnerung: **An Zu- und Absage erinnern** (anfangs an) schickt allen, die bei einem Termin noch nicht geantwortet haben, eine Benachrichtigung. **Erinnerung … Tage vor dem Termin** legt fest, wie lange vorher (1 bis 30, anfangs 3).
-- **Terminarten**: ein eigener Abschnitt mit eigenem **Speichern**, z. B. **Versammlung** oder **Arbeitsdienst** (anfangs leer). Mit **+ Terminart** kommt eine Zeile dazu, **×** entfernt eine.
+- **Terminarten**: ein eigener Abschnitt mit eigenem **Speichern**, z. B. **Versammlung** oder **Arbeitsdienst** (anfangs leer). Mit **+ Terminart** kommt eine Zeile dazu, **×** entfernt eine. Unter jeder Art steht der Haken **Als Schild am Termin zeigen** (anfangs an).
 
 ## So gehst du vor
 ### Termine direkt in der App pflegen (ohne Google)
@@ -62,8 +62,9 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und unter **Termine u
 
 ### Terminarten einrichten
 1. Trage im Abschnitt **Terminarten** je Zeile eine Art ein, z. B. **Versammlung**. Mit **+ Terminart** kommt eine weitere Zeile dazu (höchstens 30, je höchstens 40 Zeichen).
-2. Tippe in diesem Abschnitt auf **Speichern**.
-3. Ab jetzt wählen alle mit dem Recht **Kalender pflegen** die Art im aufgeklappten Termin unter **{bereich.events}**, und in der Anwesenheit steht sie an jeder Liste.
+2. Soll eine Art nicht als Schild neben dem Titel des Termins stehen, nimm darunter den Haken **Als Schild am Termin zeigen** heraus.
+3. Tippe in diesem Abschnitt auf **Speichern**.
+4. Ab jetzt wählen alle mit dem Recht **Kalender pflegen** die Art im aufgeklappten Termin unter **{bereich.events}**, und in der Anwesenheit steht sie an jeder Liste.
 
 ### Prüfen, ob der Kalender ankommt
 1. Tippe auf **Kalender testen**.
@@ -83,7 +84,8 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und unter **Termine u
 - Ist der Haken gesetzt, können bei jedem Termin des internen Kalenders alle mit dem Recht **Bei Terminen des internen Kalenders zu- und absagen** zu- oder absagen, bei jeder Quelle. {rolle.member} haben das Recht anfangs, {rolle.guest} nicht. Wer wie geantwortet hat, sehen nur Personen mit dem Recht **Kalender pflegen**, auch bei Google Kalender und iCal-Adresse, unter **{bereich.events}** im aufgeklappten Termin.
 - Die Erinnerung an Zu- und Absagen kommt einmal am Tag zur Uhrzeit der Erinnerung (unter **Benachrichtigungen**, üblich 18 Uhr), nur auf Geräten mit eingeschalteten Benachrichtigungen und nie per E-Mail. Hat ein Termin aus der App einen Anmeldeschluss, kommt sie am Tag vor dem Anmeldeschluss statt die eingestellten Tage vor Beginn. Wer abgesagt hat, bekommt auch die Erinnerung am Vortag zu diesem Termin nicht.
 - Terminarten gelten bei jeder Quelle, auch bei Google Kalender und iCal-Adresse. Die App speichert die Art selbst und ändert nichts im Google Kalender. Steht der Name einer Art als eigenes Wort im Titel eines Termins, schlägt die App sie vor. Eine neue Anwesenheitsliste übernimmt die Art ihres Termins, sonst diesen Vorschlag.
-- Entfernst du eine Terminart aus der Liste, behalten Termine und Anwesenheitslisten sie.
+- Ohne Schild bleibt die Art am Termin gespeichert und zählt weiter, z. B. für die Aufnahme von Anwärtern. Wer Termine pflegt, sieht sie im aufgeklappten Termin, und in der Anwesenheit steht sie wie bisher an der Liste.
+- Entfernst du eine Terminart aus der Liste, behalten Termine und Anwesenheitslisten sie. Legst du sie später neu an, steht sie wieder als Schild am Termin.
 - Der {bereich.calendar} erscheint für die anderen erst, wenn der Bereich an und ein Kalender eingerichtet ist (siehe [Bereiche](seite:admin-bereiche)).
 - Mit WordPress gibt es die Felder für Google Kalender und die iCal-Adresse auch im WordPress-Backend auf der Seite der App (dort mit **Speichern und testen**), auch **Aktualisieren alle … Minuten**, dazu ein Feld für einen eigenen Google-API-Schlüssel für öffentliche Kalender. Ist er eingetragen, geht er bei Kalender-IDs vor. Die Quelle wählst du nur hier in der App.
 

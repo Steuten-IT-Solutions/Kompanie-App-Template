@@ -97,6 +97,12 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
     items: [
       { key: 'manage_events', label: `Öffentliche ${sec.events} pflegen`, short: `${sec.events} pflegen`, features: ['events'] },
       {
+        key: 'view_responses',
+        label: 'Zu- und Absagen sehen: wer bei einem internen Termin zu- oder abgesagt hat, mit Hinweis',
+        short: 'Zu- und Absagen sehen',
+        features: ['calendar'],
+      },
+      {
         key: 'manage_calendar',
         label: 'Internen Kalender pflegen: Termine in der App anlegen, ändern und löschen (nur mit der Quelle „In der App“)',
         short: 'Kalender pflegen',
@@ -121,10 +127,22 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         short: `${sec.polls} verwalten`,
         features: ['polls'],
       },
-      { key: 'manage_lists', label: `${sec.lists}: zum Drucken und als CSV anlegen und bearbeiten`, short: sec.lists, features: ['lists'] },
+      { key: 'view_lists', label: `${sec.lists} sehen, drucken und als CSV laden`, short: `${sec.lists} sehen`, features: ['lists'] },
+      {
+        key: 'manage_lists',
+        label: `${sec.lists}: zum Drucken und als CSV anlegen, bearbeiten und löschen`,
+        short: sec.lists,
+        features: ['lists'],
+      },
+      {
+        key: 'view_mail',
+        label: `${sec.mail}: Verlauf der versendeten E-Mails mit Versandprotokoll sehen`,
+        short: `${sec.mail} sehen`,
+        features: ['mail'],
+      },
       {
         key: 'send_mail',
-        label: `${sec.mail}: an Rollen, Mitglieder und beliebige Adressen schreiben und versenden, Verlauf`,
+        label: `${sec.mail}: an Rollen, Mitglieder und beliebige Adressen schreiben und versenden`,
         short: sec.mail,
         features: ['mail'],
       },
@@ -144,6 +162,12 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         key: 'submit_gallery',
         label: `${sec.gallery}: Bilder und Videos einreichen, eigene Einreichungen sehen und zurückziehen`,
         short: 'Bilder und Videos einreichen',
+        features: ['gallery'],
+      },
+      {
+        key: 'view_submissions',
+        label: `${sec.gallery}: eingereichte Bilder und Videos ansehen, auch vor der Freigabe`,
+        short: 'Einreichungen sehen',
         features: ['gallery'],
       },
       {
@@ -228,8 +252,14 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         features: ['offices'],
       },
       {
+        key: 'view_inventory',
+        label: `${sec.inventory} mit Lagerorten und Verlauf sehen`,
+        short: `${sec.inventory} sehen`,
+        features: ['inventory'],
+      },
+      {
         key: 'manage_inventory',
-        label: `${sec.inventory}: sehen und pflegen, umlagern, Verlauf`,
+        label: `${sec.inventory}: anlegen, ändern, umlagern und löschen`,
         short: sec.inventory,
         features: ['inventory'],
       },
@@ -250,6 +280,12 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         short: 'Persönliches pflegen',
       },
       {
+        key: 'view_accounts',
+        label:
+          'Konten sehen: wer ohne Zugang ist, Benutzername und E-Mail-Adresse, Eintritt, Rollen und einzelne Rechte, Anfragen auf einen Zugang und Aufnahmen (ohne zu ändern; nur Admins vergeben es)',
+        short: 'Konten sehen',
+      },
+      {
         key: 'create_users',
         label:
           'Mitglieder anlegen (auch mit ihren persönlichen Angaben) und Startpasswörter erzeugen (nicht für Personen mit mehr Rechten)',
@@ -262,21 +298,32 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         short: 'Ehemalige verwalten',
       },
       {
-        key: 'manage_passive',
+        key: 'view_passive',
         label:
-          'Passive verwalten: Liste der Passiven, anlegen, Namen und Betreuer ändern, löschen (Adresse, Telefon, E-Mail und Geburtsdatum nur mit den Rechten für persönliche Angaben)',
+          'Passive sehen: Liste der Passiven mit Betreuer und Beiträgen (Adresse, Telefon, E-Mail und Geburtsdatum nur mit den Rechten für persönliche Angaben)',
+        short: 'Passive sehen',
+        features: ['passive'],
+      },
+      {
+        key: 'manage_passive',
+        label: 'Passive verwalten: anlegen, Namen und Betreuer ändern, Beiträge eintragen, löschen',
         short: 'Passive verwalten',
         features: ['passive'],
       },
       {
         key: 'promote_users',
         label:
-          'Rollen vergeben (nur Rollen mit eigenen Rechten, ohne die Rechte Mitglieder anlegen, Ehemalige verwalten und Rollen vergeben)',
+          'Rollen vergeben (nur Rollen mit eigenen Rechten, ohne die Rechte Konten sehen, Mitglieder anlegen, Ehemalige verwalten und Rollen vergeben)',
         short: 'Rollen vergeben',
       },
       {
+        key: 'view_reports',
+        label: 'Fehlermeldungen der Mitglieder mit Bildschirmfoto sehen',
+        short: 'Fehlermeldungen sehen',
+      },
+      {
         key: 'review_reports',
-        label: 'Fehlermeldungen der Mitglieder sehen, mit Begründung schließen oder an die Betreuer der App weiterleiten',
+        label: 'Fehlermeldungen der Mitglieder mit Begründung schließen oder an die Betreuer der App weiterleiten',
         short: 'Fehlermeldungen bearbeiten',
       },
       {

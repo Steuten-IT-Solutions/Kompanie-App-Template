@@ -115,10 +115,10 @@ final class PersonalDataExportTest extends TestCase
         $this->assertSame([null], array_map(static fn (array $r) => $r['report'] ?? null, $res->data['data']['bug_reports']), 'Fehlermeldung nur, dass es sie gibt');
 
         // Wer Konten anlegt, aber kein Admin ist: keine Admins; ohne create_users gar nicht; ohne Anmeldung 401.
-        $res = $this->call('POST', '/admin/roles', ['label' => 'Nur Konten', 'capabilities' => TestApp::caps(['member', 'create_users'])]);
+        $res = $this->call('POST', '/admin/roles', ['label' => 'Nur Konten', 'capabilities' => TestApp::caps(['member', 'view_accounts', 'create_users'])]);
         $this->assertLessThan(300, $res->status, (string) json_encode($res->data));
         $accountsOnly = $this->users->add('konten', (string) array_column($this->call('GET', '/admin/roles')->data, 'key', 'label')['Nur Konten']);
-        $res = $this->call('POST', '/admin/roles', ['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'create_users', 'view_personal'])]);
+        $res = $this->call('POST', '/admin/roles', ['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'view_accounts', 'create_users', 'view_personal'])]);
         $this->assertLessThan(300, $res->status, (string) json_encode($res->data));
         $secretary = $this->users->add('schrift', (string) array_column($this->call('GET', '/admin/roles')->data, 'key', 'label')['Schriftführer']);
         $all = array_map(static fn ($c) => $c->value, \KompanieApp\Core\Domain\PersonalDataExport::OTHERS_REQUIRE);
@@ -159,11 +159,11 @@ final class PersonalDataExportTest extends TestCase
     {
         $area = [
             'points' => 'view_points', 'penalties' => 'view_penalties', 'rank_history' => 'view_promotions', 'member_ranks' => 'view_promotions',
-            'member_titles' => 'view_titles', 'member_companies' => 'view_personal', 'gallery_submissions' => 'view_personal', 'member_roles' => 'create_users', 'attendance_entries' => 'view_attendance', 'event_responses' => 'manage_calendar', 'candidate_since' => 'create_users',
+            'member_titles' => 'view_titles', 'member_companies' => 'view_personal', 'gallery_submissions' => 'view_personal', 'member_roles' => 'view_accounts', 'attendance_entries' => 'view_attendance', 'event_responses' => 'view_responses', 'candidate_since' => 'view_accounts',
             'poll_votes' => 'manage_polls', 'poll_answers' => 'manage_polls', 'birthdays' => 'view_personal', 'join_years' => 'view_personal',
             'member_photos' => 'view_personal', 'former_members' => 'manage_former', 'member_contacts' => 'view_personal',
             'bug_reports' => 'view_personal', 'report_inbox' => 'view_personal', 'user_signatures' => 'view_personal', 'user_settings' => 'view_personal',
-            'board_mails' => 'send_mail', 'mailing_recipients' => 'send_mail', 'activity' => 'view_activity', 'activity_last' => 'view_activity',
+            'board_mails' => 'view_mail', 'mailing_recipients' => 'view_mail', 'activity' => 'view_activity', 'activity_last' => 'view_activity',
         ];
         $required = [...array_map(static fn ($c) => $c->value, \KompanieApp\Core\Domain\PersonalDataExport::OTHERS_REQUIRE), 'view_activity'];
         foreach (array_keys(UserData::tables()) as $table) {

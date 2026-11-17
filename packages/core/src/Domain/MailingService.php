@@ -225,10 +225,10 @@ final class MailingService
         ];
     }
 
-    /** Bild einer Mail ansehen (RichImageService::canView): wer Mails versendet und den Verlauf sieht. */
+    /** Bild einer Mail ansehen (RichImageService::canView): wer den Verlauf der Mails sieht (view_mail). */
     public function canSeeImage(User $viewer, int $mailingId): bool
     {
-        return $this->app->features()->enabled(self::FEATURE) && $viewer->can(Capability::SendMail) && $this->find($mailingId) !== null;
+        return $this->app->features()->enabled(self::FEATURE) && $viewer->can(Capability::ViewMail) && $this->find($mailingId) !== null;
     }
 
     /**

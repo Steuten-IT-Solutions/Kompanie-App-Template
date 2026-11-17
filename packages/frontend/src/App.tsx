@@ -433,8 +433,8 @@ export default function App({ notice = null }: { notice?: string | null }) {
     brett: boardReadable(),
     // Umfragen (Issue #4): mit vote_polls antworten, manage_polls verwaltet; laufende stehen am Brett.
     umfragen: pollsVisible() || canManagePolls(),
-    // Inventar (Issue #6): nur mit manage_inventory, Einstieg über das Menü der Verwaltung.
-    inventar: !!features?.inventory && can('manage_inventory'),
+    // Inventar (Issue #6): sehen mit view_inventory, ändern mit manage_inventory, Einstieg über das Menü der Verwaltung.
+    inventar: !!features?.inventory && can('view_inventory'),
     benachrichtigungen: true,
     installieren: true,
     anmelden: !user && config?.auth.mode === 'form',
@@ -745,7 +745,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
                   albumId={/^\d+$/.test(path[2] ?? '') ? Number(path[2]) : undefined}
                   onToast={showToast}
                 />
-              ) : path[1] === 'pruefen' && can('review_gallery') ? (
+              ) : path[1] === 'pruefen' && can('view_submissions') ? (
                 <GalerieEinreichungen mode="pruefen" onToast={showToast} />
               ) : path[1] === 'verwalten' && canManageGallery() ? (
                 <div>

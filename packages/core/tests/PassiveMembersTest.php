@@ -117,11 +117,11 @@ final class PassiveMembersTest extends TestCase
         $id = $this->passive('Erika', 'Mustermann', ['email' => 'erika@example.org', 'birth_date' => '1950-03-12']);
 
         $this->users->current = $this->member;
-        $this->assertSame(403, $this->call('GET', '/passive-members')->status, 'ohne manage_passive');
+        $this->assertSame(403, $this->call('GET', '/passive-members')->status, 'ohne view_passive');
         $this->assertSame(403, $this->call('POST', '/passive-members', ['first_name' => 'A', 'last_name' => 'B'])->status);
 
         // Nur manage_passive: Namen und Betreuer, aber keine persönlichen Angaben
-        $this->users->current = $this->withRights('kassierer', ['manage_passive']);
+        $this->users->current = $this->withRights('kassierer', ['view_passive', 'manage_passive']);
         $list = $this->call('GET', '/passive-members')->data;
         $this->assertFalse($list['personal']);
         $this->assertArrayNotHasKey('email', $list['passives'][0]);
@@ -132,7 +132,7 @@ final class PassiveMembersTest extends TestCase
         $this->assertSame(201, $this->call('POST', '/passive-members', ['first_name' => 'A', 'last_name' => 'B'])->status);
 
         // Mit view_personal sehen, aber nicht ändern
-        $this->users->current = $this->withRights('schriftfuehrer', ['manage_passive', 'view_personal']);
+        $this->users->current = $this->withRights('schriftfuehrer', ['view_passive', 'manage_passive', 'view_personal']);
         $list = $this->call('GET', '/passive-members')->data;
         $this->assertTrue($list['personal']);
         $this->assertFalse($list['manage_personal']);
@@ -140,7 +140,7 @@ final class PassiveMembersTest extends TestCase
         $this->assertSame(403, $this->call('PATCH', "/passive-members/$id", ['birth_date' => '1951-01-01'])->status);
 
         // Mit manage_personal auch ändern
-        $this->users->current = $this->withRights('pfleger', ['manage_passive', 'view_personal', 'manage_personal']);
+        $this->users->current = $this->withRights('pfleger', ['view_passive', 'manage_passive', 'view_personal', 'manage_personal']);
         $this->assertSame('1951-01-01', $this->call('PATCH', "/passive-members/$id", ['birth_date' => '1951-01-01'])->data['birth_date']);
     }
 
@@ -212,7 +212,7 @@ final class PassiveMembersTest extends TestCase
         $this->assertSame(403, $this->call('PATCH', '/passive-members/settings', ['fee_cents' => 1])->status);
 
         // Wer Passive verwaltet, darf eintragen (ohne persönliche Rechte)
-        $this->users->current = $this->withRights('kassierer', ['manage_passive']);
+        $this->users->current = $this->withRights('kassierer', ['view_passive', 'manage_passive']);
         $this->assertSame(201, $this->call('POST', "/passive-members/$id/payments", ['year' => 2024, 'amount_cents' => 2000, 'paid_on' => '2024-01-05', 'method' => 'Bar'])->status);
         $this->assertSame(200, $this->call('DELETE', "/passive-payments/$pay")->status);
         $this->assertSame(404, $this->call('DELETE', "/passive-payments/$pay")->status);
@@ -268,5 +268,19 @@ final class PassiveMembersTest extends TestCase
         $this->assertContains('manage_passive', $roles['Passive verwalten'] ?? [], 'Standardrolle des Bereichs');
         $this->assertContains('passive_members', Backup::CORE_TABLES);
         $this->assertContains('passive_payments', Backup::CORE_TABLES);
+    }
+
+    public function testJoinedAndNote(): void
+    {
+        $id = $this->passive('Erika', 'Muster', ['joined' => 'vor 2014', 'note' => "Zeile 1\nZeile 2"]);
+        $got = $this->call('GET', "/passive-members/$id")->data;
+        $this->assertSame('vor 2014', $got['joined']);
+        $this->assertSame("Zeile 1\nZeile 2", $got['note']);
+        $res = $this->call('PATCH', "/passive-members/$id", ['joined' => 2023, 'note' => '']);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame('2023', $res->data['joined']);
+        $this->assertSame('', $res->data['note']);
+        $this->assertSame(400, $this->call('PATCH', "/passive-members/$id", ['joined' => str_repeat('x', 41)])->status);
+        $this->assertSame(400, $this->call('PATCH', "/passive-members/$id", ['note' => str_repeat('x', 501)])->status);
     }
 }

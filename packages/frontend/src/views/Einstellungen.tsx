@@ -9,6 +9,7 @@ import {
   applyEventResponses,
   applyFeatures,
   eventKinds,
+  eventKindsHidden,
   applyGallerySubmissions,
   applyRegistration,
   registrationRoles,
@@ -1371,27 +1372,35 @@ const KINDS_MAX = 30;
 
 /**
  * Terminarten (z. B. Versammlung): zur Auswahl am Termin und an Anwesenheitslisten, etwa als Voraussetzung für die
- * Aufnahme. Gespeichert wird die Bezeichnung; entfernte Arten bleiben an Terminen und Listen stehen.
+ * Aufnahme. Gespeichert wird die Bezeichnung; entfernte Arten bleiben an Terminen und Listen stehen. Je Art ein Haken, ob
+ * sie als Schild neben dem Titel des Termins steht (Vorgabe: ja).
  */
 function EventKinds({ onToast }: { onToast: (msg: string) => void }) {
   const saved = eventKinds();
-  const [names, setNames] = useState<string[]>(saved.length > 0 ? saved : ['']);
+  const savedHidden = eventKindsHidden();
+  const toRows = (kinds: string[], hidden: string[]) =>
+    kinds.length > 0 ? kinds.map((name) => ({ name, tag: !hidden.includes(name) })) : [{ name: '', tag: true }];
+  const [rows, setRows] = useState(() => toRows(saved, savedHidden));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const update = (i: number, change: Partial<{ name: string; tag: boolean }>) =>
+    setRows(rows.map((x, j) => (j === i ? { ...x, ...change } : x)));
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const list = names.map((n) => n.trim()).filter((n) => n !== '');
+    const filled = rows.map((r) => ({ ...r, name: r.name.trim() })).filter((r) => r.name !== '');
+    const list = filled.map((r) => r.name);
+    const hidden = filled.filter((r) => !r.tag).map((r) => r.name);
     const lower = list.map((n) => n.toLowerCase());
     const twice = list.find((_, i) => lower.indexOf(lower[i]) !== i);
     if (twice) return setError(`Die Terminart „${twice}“ steht doppelt in der Liste.`);
-    if (list.join('\n') === saved.join('\n')) return onToast('Nichts geändert.');
+    if (list.join('\n') === saved.join('\n') && hidden.join('\n') === savedHidden.join('\n')) return onToast('Nichts geändert.');
     setBusy(true);
     setError(null);
     try {
-      const r = await api.setEventKinds(list);
-      applyEventKinds(r.kinds);
-      setNames(r.kinds.length > 0 ? r.kinds : ['']);
+      const r = await api.setEventKinds(list, hidden);
+      applyEventKinds(r.kinds, r.hidden ?? hidden);
+      setRows(toRows(r.kinds, r.hidden ?? hidden));
       onToast('Gespeichert');
     } catch (err) {
       setError((err as Error).message);
@@ -1408,34 +1417,48 @@ function EventKinds({ onToast }: { onToast: (msg: string) => void }) {
       </p>
       <div className="field poll-options-edit">
         <span>Terminarten</span>
-        {names.map((n, i) => (
-          <div className="poll-option-edit" key={i}>
-            <input
-              type="text"
-              aria-label={`Terminart ${i + 1}`}
-              value={n}
-              maxLength={KIND_MAX}
-              onChange={(e) => setNames(names.map((x, j) => (j === i ? e.target.value : x)))}
-            />
-            {(names.length > 1 || n !== '') && (
-              <button
-                type="button"
-                className="btn btn-link"
-                aria-label={`Terminart ${i + 1} entfernen`}
-                onClick={() => setNames(names.length > 1 ? names.filter((_, j) => j !== i) : [''])}
-              >
-                ×
-              </button>
-            )}
+        {rows.map((r, i) => (
+          <div className="event-kind-edit" key={i}>
+            <div className="poll-option-edit">
+              <input
+                type="text"
+                aria-label={`Terminart ${i + 1}`}
+                value={r.name}
+                maxLength={KIND_MAX}
+                onChange={(e) => update(i, { name: e.target.value })}
+              />
+              {(rows.length > 1 || r.name !== '') && (
+                <button
+                  type="button"
+                  className="btn btn-link"
+                  aria-label={`Terminart ${i + 1} entfernen`}
+                  onClick={() => setRows(rows.length > 1 ? rows.filter((_, j) => j !== i) : [{ name: '', tag: true }])}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            <label className="toggle">
+              <input
+                type="checkbox"
+                aria-label={`Terminart ${i + 1} als Schild am Termin zeigen`}
+                checked={r.tag}
+                onChange={(e) => update(i, { tag: e.target.checked })}
+              />
+              <span>Als Schild am Termin zeigen</span>
+            </label>
           </div>
         ))}
-        {names.length < KINDS_MAX && (
-          <button type="button" className="btn btn-link poll-add-option" onClick={() => setNames([...names, ''])}>
+        {rows.length < KINDS_MAX && (
+          <button type="button" className="btn btn-link poll-add-option" onClick={() => setRows([...rows, { name: '', tag: true }])}>
             + Terminart
           </button>
         )}
       </div>
-      <p className="small muted">Termine und Listen behalten ihre Art, auch wenn du sie hier entfernst.</p>
+      <p className="small muted">
+        Ohne Schild bleibt die Art am Termin gespeichert und zählt weiter, etwa für die Aufnahme; sie steht dann nur nicht neben dem Titel.
+        Termine und Listen behalten ihre Art, auch wenn du sie hier entfernst.
+      </p>
     </Section>
   );
 }

@@ -403,7 +403,7 @@ final class GallerySubmissionService
             'type' => self::isVideo($s) ? 'video' : 'image',
         ];
         if ($forReview && self::isVideo($s) && (string) ($s['status'] ?? '') === Repo::PENDING) {
-            // Zum Ansehen vor der Freigabe (nur mit review_gallery, siehe deliverVideo)
+            // Zum Ansehen vor der Freigabe (nur mit view_submissions, siehe deliverVideo)
             $out['video'] = $this->app->env->photoUrl((int) $s['id'], self::VIDEO_SIZE);
         }
         if ($forReview) {

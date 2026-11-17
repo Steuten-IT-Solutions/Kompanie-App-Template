@@ -49,17 +49,22 @@ export type Capability =
   | 'view_attendance'
   | 'manage_attendance'
   | 'manage_events'
+  | 'view_responses'
   | 'manage_calendar'
   | 'manage_documents'
   | 'post_board'
   | 'manage_polls'
+  | 'view_inventory'
   | 'manage_inventory'
   | 'manage_offices'
+  | 'view_lists'
   | 'manage_lists'
+  | 'view_mail'
   | 'send_mail'
   | 'manage_sponsors'
   | 'manage_companies'
   | 'submit_gallery'
+  | 'view_submissions'
   | 'review_gallery'
   | 'manage_gallery'
   | 'manage_pages'
@@ -67,10 +72,13 @@ export type Capability =
   | 'manage_news'
   | 'view_personal'
   | 'manage_personal'
+  | 'view_accounts'
   | 'create_users'
   | 'manage_former'
+  | 'view_passive'
   | 'manage_passive'
   | 'promote_users'
+  | 'view_reports'
   | 'review_reports'
   | 'view_activity'
   | 'view_changes'
@@ -134,7 +142,7 @@ export interface AppConfig {
   legal?: { imprint: string | null; privacy: string | null };
   /** „Fehler melden“ möglich (Issue #64); Meldungen gehen zuerst an die Admins */
   reports?: boolean;
-  /** Offene Fehlermeldungen; nur für Angemeldete mit review_reports, sonst null */
+  /** Offene Fehlermeldungen; nur für Angemeldete mit view_reports, sonst null */
   openReports?: number | null;
   /** Zugang beantragen (Issue #314) eingeschaltet: Link „Zugang beantragen“ für Gäste; fehlt bei älteren Servern */
   registration?: boolean;
@@ -151,6 +159,8 @@ export interface AppConfig {
   eventResponses?: boolean;
   /** Terminarten (Einstellungen → Kalender), z. B. Versammlung; fehlt bei älteren Servern */
   eventKinds?: string[];
+  /** Terminarten ohne Schild neben dem Titel des Termins (Einstellungen → Kalender); fehlt bei älteren Servern */
+  eventKindsHidden?: string[];
   /** Wie viele Passive die Person betreut (Meins → Meine Passiven); 0 ohne den Bereich, fehlt bei älteren Servern */
   caredPassives?: number;
   /** Rollen der Installation (Einstellungen → Rollen): Bezeichnung und Punktefaktor */
@@ -627,10 +637,21 @@ export function eventKinds(): string[] {
   return config?.eventKinds ?? [];
 }
 
-/** Übernimmt die Terminarten in die geladene Konfiguration (nach dem Speichern). */
-export function applyEventKinds(kinds: string[]): void {
+/** Terminarten, die nicht als Schild neben dem Titel des Termins stehen; leer bei älteren Servern (dann alle). */
+export function eventKindsHidden(): string[] {
+  return config?.eventKindsHidden ?? [];
+}
+
+/** Steht diese Art als Schild neben dem Titel des Termins? */
+export function eventKindTag(kind: string | null | undefined): boolean {
+  return !!kind && !eventKindsHidden().includes(kind);
+}
+
+/** Übernimmt die Terminarten (und die ohne Schild) in die geladene Konfiguration (nach dem Speichern). */
+export function applyEventKinds(kinds: string[], hidden?: string[]): void {
   if (!config) return;
   config.eventKinds = kinds;
+  if (hidden !== undefined) config.eventKindsHidden = hidden;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -671,7 +692,7 @@ export interface RoleAdmin extends RoleInfo {
   extra_users?: number;
   system: boolean;
   deletable: boolean;
-  /** Anwärter-Rolle als Zusatzrolle: wird bei der Aufnahme als Mitglied entfernt; fehlen bei älteren Servern */
+  /** Anwärter-Rolle (als Grund- oder Zusatzrolle, Aufnahmen); fehlen bei älteren Servern */
   admission_extra?: boolean;
   /** Voraussetzung für die Aufnahme: Teilnahmen an Terminen dieser Art (null: keine) … */
   admission_kind?: string | null;
@@ -861,6 +882,10 @@ export interface PassiveMember {
   email?: string;
   /** JJJJ-MM-TT oder null */
   birth_date?: string | null;
+  /** Eintritt als freier Text (z. B. „2023“ oder „vor 2014“); fehlt bei älteren Servern */
+  joined?: string;
+  /** Bemerkung; fehlt bei älteren Servern */
+  note?: string;
   /** Gezahlte Beiträge, neuestes Jahr zuerst; fehlt bei älteren Servern */
   payments?: PassivePayment[];
 }
@@ -905,6 +930,82 @@ export interface PassiveInput {
   phone?: string;
   email?: string;
   birth_date?: string | null;
+  joined?: string;
+  note?: string;
+}
+
+/** Felder, denen der Import der Passiven Spalten zuordnet */
+export type PassiveImportField =
+  | 'first_name'
+  | 'last_name'
+  | 'street'
+  | 'house_number'
+  | 'extra'
+  | 'postal_code'
+  | 'city'
+  | 'country'
+  | 'phone'
+  | 'email'
+  | 'birth_date'
+  | 'joined'
+  | 'note'
+  | 'caretaker'
+  | 'amount'
+  | 'method'
+  | 'paid_on';
+
+/** Eine Zeile der Vorschau beim Import der Passiven */
+export interface PassiveImportRow {
+  line: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  existing?: boolean;
+  error?: string;
+  warnings?: string[];
+  caretaker?: { id: number; name: string } | null;
+  joined?: string;
+  note?: string;
+  address?: Address | null;
+  phone?: string;
+  email?: string;
+  birth_date?: string | null;
+  payment?: { year: number; amount_cents: number; paid_on: string; method: string } | null;
+}
+
+/** Ergebnis des Imports der Passiven (Vorschau oder übernommen) */
+export interface PassiveImportResult {
+  /** Zellen der Kopfzeile */
+  headers: string[];
+  /** Nummer der Kopfzeile in der Tabelle (ab 1) */
+  header_line: number;
+  /** Zuordnung: Feld => Nummer der Spalte (ab 0) */
+  columns: Partial<Record<PassiveImportField, number>>;
+  /** Spalten, die wie eine Zahlungsart heißen und den Betrag enthalten */
+  method_columns: { column: number; method: string }[];
+  ignored: { column: string; reason: string }[];
+  /** Ob Adresse, Telefon, E-Mail und Geburtsdatum übernommen werden (manage_personal) */
+  personal: boolean;
+  year: number;
+  /** Datum für Zahlungen ohne Datum (JJJJ-MM-TT) */
+  paid_on: string;
+  methods: string[];
+  rows: PassiveImportRow[];
+  new: number;
+  payments: number;
+  existing: number;
+  errors: number;
+  applied: boolean;
+}
+
+/** Was an den Import der Passiven geht */
+export interface PassiveImportInput {
+  csv: string;
+  apply: boolean;
+  columns?: Partial<Record<PassiveImportField, number | null>> | null;
+  year?: number;
+  paid_on?: string;
+  skip_errors?: boolean;
 }
 
 /** Eigene Kontaktangaben (Meins → Konto) */
@@ -940,7 +1041,7 @@ export interface EventResponses {
   until: string;
   open: boolean;
   can_respond: boolean;
-  /** Sieht die Namen (manage_calendar) */
+  /** Sieht die Namen (view_responses) */
   can_list: boolean;
 }
 
@@ -2650,6 +2751,7 @@ export const api = {
     request<PassivePayment>('PATCH', `/passive-payments/${id}`, data),
   deletePassivePayment: (id: number) => request<{ deleted: boolean }>('DELETE', `/passive-payments/${id}`),
   updatePassiveSettings: (data: Partial<PassiveSettings>) => request<PassiveSettings>('PATCH', '/passive-members/settings', data),
+  importPassives: (data: PassiveImportInput) => request<PassiveImportResult>('POST', '/passive-members/import', data),
   markFormer: (id: number, data: FormerInput) => request<FormerInfo & { offices_ended: number }>('PUT', `/members/${id}/former`, data),
   formerOfficesPreview: (id: number, leftOn: string) =>
     request<FormerOfficesPreview>('GET', `/members/${id}/former/offices`, undefined, { left_on: leftOn }),
@@ -2797,7 +2899,8 @@ export const api = {
   attendanceEvents: () => request<AttendanceEvent[]>('GET', '/attendance/events'),
   attendance: (id: number) => request<AttendanceDetail>('GET', `/attendance/${id}`),
   saveAttendance: (data: AttendanceInput) => request<AttendanceDetail>('PUT', '/attendance', data),
-  setEventKinds: (kinds: string[]) => request<{ kinds: string[] }>('PUT', '/admin/event-kinds', { kinds }),
+  setEventKinds: (kinds: string[], hidden: string[]) =>
+    request<{ kinds: string[]; hidden?: string[] }>('PUT', '/admin/event-kinds', { kinds, hidden }),
   deleteAttendance: (id: number) => request<{ deleted: boolean }>('DELETE', `/attendance/${id}`),
   myAttendance: () => request<MyAttendance>('GET', '/me/attendance'),
   attendanceGroups: () => request<AttendanceGroup[]>('GET', '/attendance/groups'),
@@ -2875,7 +2978,7 @@ export const api = {
   /** Einen freien Namen in allen Amtszeiten mit dem Konto verknüpfen */
   linkOfficeName: (name: string, user_id: number) => request<{ linked: number }>('POST', '/offices/link', { name, user_id }),
 
-  // Listen (Issue #121): nur mit manage_lists
+  // Listen (Issue #121): ansehen mit view_lists, ändern mit manage_lists
   lists: () => request<PrintListSummary[]>('GET', '/lists'),
   list: (id: number) => request<PrintList>('GET', `/lists/${id}`),
   createList: (data: PrintListInput) => request<PrintList>('POST', '/lists', data),

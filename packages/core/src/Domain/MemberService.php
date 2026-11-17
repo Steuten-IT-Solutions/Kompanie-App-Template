@@ -121,7 +121,7 @@ final class MemberService
     {
         $totals = $this->scores->totalsByUser();
         [$points, $penalties] = self::visibleParts($viewer);
-        $noAccess = $viewer === null || $viewer->can(Capability::CreateUsers) ? $this->noAccessIds() : null;
+        $noAccess = $viewer === null || $viewer->can(Capability::ViewAccounts) ? $this->noAccessIds() : null;
         $out = [];
         // Anwärter haben immer eine Rolle in der App: list(false) enthält sie schon (bei WordPress nicht alle Konten laden).
         $users = $this->users->list($includeGuests);
@@ -222,16 +222,16 @@ final class MemberService
             'first_name' => $u->firstName,
             'last_name' => $u->lastName,
             'level' => $u->role,
-            // Zusatzrollen nur für die, die Rollen vergeben (Issue #349); die Grundrolle braucht die App auch sonst.
-            'extra_roles' => $viewer === null || $viewer->can(Capability::PromoteUsers) ? ($this->roles?->extraRolesOf($u) ?? []) : [],
+            // Zusatzrollen nur für die, die Konten sehen (Issue #349, view_accounts); die Grundrolle braucht die App auch sonst.
+            'extra_roles' => $viewer === null || $viewer->can(Capability::ViewAccounts) ? ($this->roles?->extraRolesOf($u) ?? []) : [],
             'member' => $u->isMember(),
             'points' => $points ? $this->scores->pointsTotal($u->id) : null,
             'open_cents' => $penalties ? $this->scores->openCents($u->id) : null,
             'point_list' => $points ? $this->scores->pointsFor($u->id) : [],
             'penalties' => $penalties ? $this->scores->penaltiesFor($u->id) : [],
-            // Ausnahmen bei den Rechten: nur für die, die sie ändern dürfen.
+            // Ausnahmen bei den Rechten: nur für die, die Konten sehen (ändern nur mit promote_users).
             'rights' => $viewer !== null ? $this->roles?->overridesView($viewer, $u) : null,
-        ] + ($viewer === null || $viewer->can(Capability::CreateUsers) ? ['no_access' => $this->hasNoAccess($u->id)] : []);
+        ] + ($viewer === null || $viewer->can(Capability::ViewAccounts) ? ['no_access' => $this->hasNoAccess($u->id)] : []);
     }
 
     /** Interner Kalender ohne Mitgliederbereich: Anwärter oder eine eigene Rolle nur mit dem Kalender. */
@@ -364,9 +364,10 @@ final class MemberService
      * Zum Mitglied machen (Issue #23, z. B. Anwärter): wer Konten anlegen darf, aber nur aus einer Rolle, die der Admin
      * dafür freigegeben hat (RoleService::promotable). Andere Rollenwechsel bleiben bei „Rollen vergeben“.
      *
+     * @param bool $candidate Aufnahme aus einer Anwärter-Rolle (geprüft hat AdmissionService)
      * @return array{id: int, level: string}
      */
-    public function promote(User $actor, int $id): array
+    public function promote(User $actor, int $id, bool $candidate = false): array
     {
         $target = $this->users->find($id);
         if (!$target) {
@@ -376,7 +377,8 @@ final class MemberService
             throw ApiError::invalid('Die eigene Rolle kann man nicht selbst ändern.');
         }
         $this->denyFormer($target);
-        if (!($this->roles?->promotable($target->role) ?? false)) {
+        // $candidate: Aufnahme aus einer Anwärter-Rolle (AdmissionService::admit, auch mit „Gehört zur Kompanie“)
+        if (!$candidate && !($this->roles?->promotable($target->role) ?? false)) {
             throw ApiError::invalid(sprintf('Aus der Rolle „%s“ lässt sich niemand so zum Mitglied machen.', $this->roles?->label($target->role) ?? $target->role));
         }
         try {

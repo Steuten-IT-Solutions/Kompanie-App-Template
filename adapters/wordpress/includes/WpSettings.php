@@ -43,8 +43,17 @@ final class WpSettings implements Settings
 
     public function set(string $key, mixed $value): void
     {
+        $name = self::PREFIX . $key;
         // Kleine Einstellungen, die bei jedem Aufruf gebraucht werden: mit Autoload.
-        update_option(self::PREFIX . $key, $value, !in_array($key, self::NO_AUTOLOAD, true));
+        $autoload = !in_array($key, self::NO_AUTOLOAD, true);
+        // update_option() speichert false nicht, solange es die Einstellung noch nicht gibt: get_option() liefert dann
+        // ebenfalls false, und WordPress hält das für „unverändert“. Ein Schalter mit Vorgabe „an“ ließe sich so beim
+        // ersten Mal nicht ausschalten. Deshalb neu anlegen (gespeichert als leerer Text, gelesen als falsch).
+        if ($value === false && get_option($name, null) === null) {
+            add_option($name, $value, '', $autoload);
+            return;
+        }
+        update_option($name, $value, $autoload);
     }
 
     public function delete(string $key): void

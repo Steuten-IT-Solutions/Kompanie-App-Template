@@ -1112,7 +1112,7 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
     await chooseRights(rollen, CANDIDATE_RIGHTS);
     await expect(rollen.getByLabel(/^Gehört zur Kompanie/)).not.toBeChecked();
     await rollen.getByLabel(/^Beim Anlegen neuer Konten wählbar/).check();
-    await rollen.getByLabel(/^Wer Mitglieder anlegen darf, nimmt/).check();
+    await rollen.getByLabel(/^Anwärter-Rolle/).check();
     await rollen.getByRole('button', { name: 'Anlegen' }).click();
     await expect(page.locator('.toast')).toHaveText('Rolle angelegt');
   }
@@ -1297,8 +1297,13 @@ test('Eigene Leiste für Gäste: Mitglieder unten statt unter „Intern“, Ange
     // Gast ohne Anmeldung: Mitglieder unten und als Startseite.
     await page.context().clearCookies();
     await page.goto('/app/');
-    await expect(page).toHaveURL(/#\/mitglieder$/);
     await expect(tabbar.getByRole('button', { name: 'Mitglieder' })).toHaveAttribute('aria-current', 'page');
+    // Ohne Adresse leitet die App nur um, wenn die Startseite nicht schon der erste Punkt der Leiste ist (startRedirect in
+    // App.tsx); sonst bleibt die Adresse ohne #/….
+    const first = (
+      (await tabbar.getByRole('button').first().getAttribute('aria-label')) ?? (await tabbar.getByRole('button').first().innerText())
+    ).trim();
+    await expect(page).toHaveURL(first === 'Mitglieder' ? /\/app\/$/ : /#\/mitglieder$/);
     await shot(page, '41-navigation-gaeste');
   } finally {
     await login(page, 'admin', ADMIN_PASSWORD).catch(() => undefined);
@@ -7212,4 +7217,45 @@ test('Nutzung: Admin sieht aktive Konten, Nutzung je Bereich und den Verlauf ein
   await schalter.click();
   await expect(schalter).toBeChecked();
   await expect(members).toBeVisible();
+});
+
+test('Passive: Liste aus einer Tabelle importieren, mit Kopfzeile unter dem Titel und Beitrag je Zahlungsart', async ({ page }) => {
+  const id = Date.now().toString(36);
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/einstellungen/bereiche');
+  const bereiche = page.locator('.settings-section', { hasText: 'Bereiche' }).first();
+  const passive = bereiche.getByRole('checkbox', { name: /^Passive/ });
+  if (!(await passive.isChecked())) {
+    await passive.click();
+    await expect(passive).toBeChecked();
+  }
+  await page.goto('/app/#/verwaltung/passive');
+  await page.getByRole('button', { name: 'Tabelle importieren' }).click();
+  await expect(page.getByRole('heading', { name: 'Passive importieren' })).toBeVisible();
+  // Erfundene Daten: Titel über der Kopfzeile, Betrag in der Spalte der Zahlungsart, Datum am Anfang der Spalte „Info“
+  const csv = [
+    ';Stand: 01.11.2026',
+    '',
+    `Nachname;Vorname;Strasse;PLZ;Wohnort;Bar;PayPal;Info;Eintritt;Bemerkung`,
+    `${id};Erika;Musterstr. 3;12345;Musterstadt;25;;;2023;Will keine Post`,
+    `${id};Otto;;;;;25;12.03. per PayPal;vor 2014;`,
+    ';Summe;;;;25;25;;;',
+  ].join('\n');
+  await page
+    .getByLabel('Datei wählen (Excel .xlsx oder CSV)')
+    .setInputFiles({ name: 'passive.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await page.getByRole('button', { name: 'Vorschau' }).click();
+  await expect(page.getByRole('status')).toContainText('Neu: 2 Passive · davon mit Beitrag');
+  await page.locator('.passive-import-columns').getByLabel('Bezahlt am').selectOption({ label: 'Info' });
+  await page.getByRole('button', { name: 'Vorschau' }).click();
+  await expect(page.locator('.office-import-rows')).toContainText('PayPal, 12.03.2026');
+  await expect(page.getByRole('button', { name: 'Übernehmen' })).toBeDisabled();
+  await page.getByRole('checkbox', { name: 'Zeilen mit Fehler überspringen' }).check();
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/passive-import.png`, fullPage: true });
+  await page.getByRole('button', { name: 'Übernehmen' }).click();
+  await expect(page.locator('.toast')).toContainText('2 Passive angelegt, 2 Zahlungen');
+  const erika = page.locator('.passive-list .card', { hasText: `${id}, Erika` });
+  await expect(erika).toContainText('Will keine Post');
+  await expect(erika).toContainText('2023');
+  await expect(page.locator('.passive-list .card', { hasText: `${id}, Otto` })).toContainText('vor 2014');
 });

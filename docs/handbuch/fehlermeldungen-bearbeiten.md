@@ -1,7 +1,8 @@
 ---
 titel: Fehlermeldungen bearbeiten
 reihenfolge: 69
-rechte: [review_reports]
+rechte: []
+einrecht: [view_reports, review_reports]
 ---
 
 Meldet jemand über **Fehler melden** ein Problem, landet die Meldung zuerst hier. Oft könnt ihr selbst helfen, z. B. wenn jemand ein Recht nicht hat oder eine Einstellung fehlt. Dann schließt du die Meldung mit einer Begründung. Ist es ein Fehler der App, leitest du die Meldung an die Betreuer der App (Steuten IT Solutions) weiter. Erst dann geht sie dorthin.
@@ -38,6 +39,7 @@ War die Person angemeldet, sieht sie die Begründung unter **?** → **Fehler me
 Der Name der Person geht nur mit, wenn sie beim Melden **Meinen Namen beim Weiterleiten an die Betreuer mitschicken** gewählt hat. War sie angemeldet, sieht sie, dass die Meldung weitergeleitet ist.
 
 ## Gut zu wissen
+- **Nur sehen:** Mit dem Recht **Fehlermeldungen sehen** ohne **Fehlermeldungen bearbeiten** liest du die Meldungen und siehst das Bildschirmfoto, aber ohne **Schließen …** und **An die Betreuer weiterleiten**.
 
 - Fehlermeldungen bearbeiten dürfen {rolle.admin}s und alle, deren Rolle das Recht **Fehlermeldungen bearbeiten** hat.
 - Ein Bildschirmfoto wird beim Schließen oder Weiterleiten aus der Liste gelöscht.

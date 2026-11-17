@@ -1,9 +1,9 @@
 import { Fragment, useEffect, useState, type FormEvent } from 'react';
-import { api, applyAdmissionsDue, config, levelLabel, type Admission } from '../api';
+import { api, applyAdmissionsDue, can, config, levelLabel, type Admission } from '../api';
 import { confirmAsk } from '../ask';
 import { formatDate } from '../format';
 import { navigate } from '../router';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -33,7 +33,7 @@ const SECTION: Record<Admission['status'], number> = { fulfilled: 0, open: 1, no
 const HEADINGS = ['Voraussetzung erfüllt', 'Noch nicht erfüllt', 'Ohne Voraussetzung'];
 
 /**
- * Verwaltung → Aufnahmen (create_users): alle Anwärter, zuerst wer die Voraussetzung erfüllt (ältestes Datum zuerst),
+ * Verwaltung → Aufnahmen (view_accounts; aufnehmen mit create_users): alle Anwärter, zuerst wer die Voraussetzung erfüllt (ältestes Datum zuerst),
  * dann wer noch nicht, dann Rollen ohne Voraussetzung. Tippen öffnet die Seite der Person mit „Als Mitglied aufnehmen“.
  */
 export function Admissions() {
@@ -45,7 +45,7 @@ export function Admissions() {
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const list = data ?? [];
-  if (list.length === 0) return <Empty>Keine Anwärter.</Empty>;
+  if (list.length === 0) return <NoCandidates />;
   return (
     <ul className="card-list admissions">
       {list.map((a, i) => {
@@ -79,7 +79,31 @@ export function Admissions() {
 }
 
 /**
- * Auf der Seite eines Anwärters (unter „Konto und Rolle“, create_users): Anwärter-Rolle, „Anwärter seit“ (ändern), Stand
+ * Noch niemand: Gibt es keine Anwärter-Rolle, erscheint hier auch niemand. Darum steht hier, wie man sie einrichtet
+ * (Einstellungen → Rollen, nur Admins).
+ */
+function NoCandidates() {
+  const admin = can('manage_settings');
+  return (
+    <div className="card stack">
+      <p>Keine Anwärter.</p>
+      <p className="muted">
+        Hier erscheint, wer eine Anwärter-Rolle hat, als Rolle oder als Zusatzrolle. Dafür setzt ein Admin unter Einstellungen → Rollen an
+        der Rolle den Haken „Anwärter-Rolle“ und legt dort auch die Voraussetzung fest, z. B. 6 Teilnahmen an Terminen einer Terminart.
+      </p>
+      {admin && (
+        <div className="button-row">
+          <button className="btn" type="button" onClick={() => navigate('einstellungen/rollen')}>
+            Zu den Rollen
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Auf der Seite eines Anwärters (unter „Konto und Rolle“, view_accounts; ändern und aufnehmen mit create_users): Anwärter-Rolle, „Anwärter seit“ (ändern), Stand
  * der Voraussetzung und „Als Mitglied aufnehmen“. Die Voraussetzung sperrt nicht; die Rückfrage weist darauf hin.
  */
 export function MemberAdmission({
@@ -96,6 +120,8 @@ export function MemberAdmission({
   const [formError, setFormError] = useState<string | null>(null);
   const rule = admissionRule(a);
   const member = levelLabel('member');
+  // Nur sehen (Konten sehen ohne Mitglieder anlegen): Stand ohne Datum ändern und Aufnehmen.
+  const editable = can('create_users');
 
   async function run(action: () => Promise<unknown>, msg: string) {
     setBusy(true);
@@ -138,25 +164,30 @@ export function MemberAdmission({
           {admissionState(a)}
           {a.kind && a.count > 0 ? ` (${a.attended} von ${a.count})` : ''}
         </p>
-        <form className="stack" onSubmit={saveSince}>
-          <label className="field">
-            <span>Anwärter seit</span>
-            <input type="date" value={since} onChange={(e) => setSince(e.target.value)} disabled={busy} />
-          </label>
-          <div className="button-row">
-            <button className="btn btn-secondary" type="submit" disabled={busy || since === (a.since ?? '')}>
-              Datum speichern
-            </button>
-          </div>
-        </form>
+        {!editable && a.since && <p className="muted">Anwärter seit {formatDate(a.since)}</p>}
+        {editable && (
+          <form className="stack" onSubmit={saveSince}>
+            <label className="field">
+              <span>Anwärter seit</span>
+              <input type="date" value={since} onChange={(e) => setSince(e.target.value)} disabled={busy} />
+            </label>
+            <div className="button-row">
+              <button className="btn btn-secondary" type="submit" disabled={busy || since === (a.since ?? '')}>
+                Datum speichern
+              </button>
+            </div>
+          </form>
+        )}
         {formError && (
           <p className="form-error" role="alert">
             {formError}
           </p>
         )}
-        <button className="btn btn-block promote-candidate" type="button" disabled={busy} onClick={() => void admit()}>
-          Als {member} aufnehmen
-        </button>
+        {editable && (
+          <button className="btn btn-block promote-candidate" type="button" disabled={busy} onClick={() => void admit()}>
+            Als {member} aufnehmen
+          </button>
+        )}
       </div>
     </section>
   );

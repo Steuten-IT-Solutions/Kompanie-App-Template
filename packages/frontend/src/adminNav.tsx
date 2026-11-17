@@ -21,13 +21,14 @@ const seeRanks = (): boolean => !!config?.features.ranks && can('view_promotions
 const seeTitles = (): boolean => !!config?.features.titles && can('view_titles');
 const seeAttendance = (): boolean => !!config?.features.attendance && can('view_attendance');
 const canOffices = (): boolean => !!config?.features.offices && can('manage_offices');
-const canLists = (): boolean => !!config?.features.lists && can('manage_lists');
-const canMail = (): boolean => !!config?.features.mail && can('send_mail');
+const seeLists = (): boolean => !!config?.features.lists && can('view_lists');
+const seeMail = (): boolean => !!config?.features.mail && can('view_mail');
+const seeInventory = (): boolean => !!config?.features.inventory && can('view_inventory');
 const canCompanies = (): boolean => !!config?.features.companies && can('manage_companies');
 const canSponsors = (): boolean => !!config?.features.sponsors && can('manage_sponsors');
 const canPages = (): boolean => !!config?.features.pages && can('manage_pages');
 const canWebsite = (): boolean => !!config?.features.website && can('manage_website');
-const canPassive = (): boolean => !!config?.features.passive && can('manage_passive');
+const canPassive = (): boolean => !!config?.features.passive && can('view_passive');
 
 /**
  * Bericht als PDF: wer mindestens einen Bereich des Berichts verwalten darf (wie ReportService im Kern: Mitglieder mit
@@ -36,8 +37,7 @@ const canPassive = (): boolean => !!config?.features.passive && can('manage_pass
  * genau, sagt der Server.
  */
 export function reportAllowed(): boolean {
-  const f = config?.features;
-  return memberListAllowed() || canPassive() || canOffices() || (!!f?.inventory && can('manage_inventory'));
+  return memberListAllowed() || canPassive() || canOffices() || seeInventory();
 }
 
 /** Mitgliederliste: für alle, die Punkte, Strafen, Dienstgrade, Titel oder Anwesenheit der Mitglieder sehen, Mitglieder
@@ -51,9 +51,8 @@ export function memberListAllowed(): boolean {
     seeAttendance() ||
     canCompanies() ||
     can('view_personal') ||
-    can('create_users') ||
-    can('manage_former') ||
-    can('promote_users')
+    can('view_accounts') ||
+    can('manage_former')
   );
 }
 
@@ -71,10 +70,10 @@ export function adminTabs(): AdminTab[] {
       {
         id: 'anfragen',
         label: 'Anfragen',
-        on: can('create_users') && (!!config?.registration || (config?.pendingRegistrations ?? 0) > 0),
+        on: can('view_accounts') && (!!config?.registration || (config?.pendingRegistrations ?? 0) > 0),
       },
       // Fehlermeldungen aus der App: Zahl der offenen im Kreis
-      { id: 'meldungen', label: 'Fehlermeldungen', on: can('review_reports') },
+      { id: 'meldungen', label: 'Fehlermeldungen', on: can('view_reports') },
       // Änderungsprotokoll: wer wann was angelegt, geändert oder gelöscht hat
       { id: 'aenderungen', label: 'Änderungen', on: can('view_changes') },
       // Bericht als PDF: Daten mehrerer Bereiche für einen Zeitraum
@@ -85,7 +84,7 @@ export function adminTabs(): AdminTab[] {
       { id: 'dienstgrade', label: sec.ranks, on: canRanks(), group: SETUP },
       { id: 'befoerderungen', label: 'Beförderungen', on: seeRanks() && !!config?.features.points },
       // Aufnahmen: Anwärter, die die Voraussetzung erfüllen (Zahl im Kreis); der Server schickt die Zahl nur, wenn es passt
-      { id: 'aufnahmen', label: 'Aufnahmen', on: can('create_users') && config?.admissionsDue != null },
+      { id: 'aufnahmen', label: 'Aufnahmen', on: can('view_accounts') && config?.admissionsDue != null },
       { id: 'titel', label: sec.titles, on: seeTitles(), group: SETUP },
       { id: 'aemter', label: sec.offices, on: canOffices(), group: SETUP },
       { id: 'kompanien', label: sec.companies, on: canCompanies(), group: SETUP },
@@ -95,9 +94,9 @@ export function adminTabs(): AdminTab[] {
       { id: 'anwesenheit', label: sec.attendance, on: seeAttendance() },
       { id: 'brett', label: sec.board, on: canPostBoard(), route: 'brett' },
       { id: 'umfragen', label: sec.polls, on: canManagePolls(), route: 'umfragen/verwalten' },
-      { id: 'inventar', label: sec.inventory, on: !!config?.features.inventory && can('manage_inventory'), route: 'inventar' },
-      { id: 'listen', label: sec.lists, on: canLists() },
-      { id: 'mail', label: sec.mail, on: canMail() },
+      { id: 'inventar', label: sec.inventory, on: seeInventory(), route: 'inventar' },
+      { id: 'listen', label: sec.lists, on: seeLists() },
+      { id: 'mail', label: sec.mail, on: seeMail() },
       { id: 'einstellungen', label: 'Einstellungen', on: can('manage_settings'), route: 'einstellungen' },
     ] as AdminTab[]
   ).filter((t) => t.on);

@@ -2,7 +2,7 @@
 titel: Konto und Rolle
 reihenfolge: 53
 rechte: []
-einrecht: [view_points, manage_points, view_penalties, manage_penalties, view_promotions, manage_ranks, view_titles, manage_titles, view_attendance, manage_attendance, view_personal, manage_personal, create_users, manage_former, promote_users]
+einrecht: [view_points, manage_points, view_penalties, manage_penalties, view_promotions, manage_ranks, view_titles, manage_titles, view_attendance, manage_attendance, view_personal, manage_personal, view_accounts, create_users, manage_former, promote_users]
 ---
 Unter **Konto und Rolle** auf der Seite eines Mitglieds legst du fest, welche Rolle und welche Rechte die Person hat, erzeugst ein neues Startpasswort, trägst sie als ehemalig ein oder änderst und löschst ihr Konto. Wer nur {bereich.points}, {bereich.penalties} oder Ähnliches pflegt, sieht hier nur die Rolle.
 
@@ -13,13 +13,13 @@ Tippe unten auf **Verwaltung**, dann auf **Mitglieder**, und tippe auf die Perso
 
 ## Was du hier siehst
 Du siehst nur die Teile, für die du das Recht hast:
-- **Grundrolle** und **Zusatzrollen**: für alle, die Rollen vergeben dürfen. Sonst steht hier nur die Rolle zum Lesen.
-- **Rechte**: alle Rechte der Person, mit **Rechte speichern** (wer Rollen vergeben darf).
-- **Aufnahme** mit **Als {rolle.member} aufnehmen**: nur bei Anwärtern, also Personen mit einer Rolle, die ein {rolle.admin} dafür eingerichtet hat (wer Mitglieder anlegen darf). Dazu stehen dort **Anwärter seit** und ob die Voraussetzung für die Aufnahme erfüllt ist. Bei einer Anwärter-Rolle als Zusatzrolle entfernt das Aufnehmen diese Zusatzrolle. Ist noch kein Eintritt eingetragen, setzt die App ihn auf den Tag der Aufnahme.
+- **Grundrolle** und **Zusatzrollen**: für alle, die Rollen vergeben dürfen. Wer Konten nur sieht, liest hier Rolle und Zusatzrollen.
+- **Rechte**: alle Rechte der Person, mit **Rechte speichern** (wer Rollen vergeben darf; wer Konten nur sieht, sieht die Haken ohne Ändern).
+- **Aufnahme** mit **Als {rolle.member} aufnehmen**: nur bei Anwärtern, also Personen mit einer Rolle, die ein {rolle.admin} dafür eingerichtet hat (wer Mitglieder anlegen darf). Dazu stehen dort **Anwärter seit** und ob die Voraussetzung für die Aufnahme erfüllt ist. Ist die Anwärter-Rolle die Rolle der Person, wird sie beim Aufnehmen zu {rolle.member}; ist sie eine Zusatzrolle, entfernt das Aufnehmen sie. Ist noch kein Eintritt eingetragen, setzt die App ihn auf den Tag der Aufnahme.
 - **Passwort vergessen? Neues Startpasswort erzeugen** (wer Mitglieder anlegen darf). Bei einem Mitglied ohne Zugang steht hier stattdessen **Zugang einrichten**.
 - **App als … ansehen**: zeigt die App mit den Rechten dieser Person, alle ihre Rollen zusammen (nur für {rolle.admin}s, nicht bei {rolle.admin}s und nicht auf deiner eigenen Seite; mehr dazu im Handbuch unter „App als Rolle ansehen“).
 - **Ehemalig** mit **Als ehemalig eintragen …** (wer Ehemalige verwalten darf).
-- **Konto** mit Benutzername, E-Mail und Handynummer, **Angaben ändern**, **Daten exportieren (Auskunft)** und **Konto löschen** (wer Mitglieder anlegen darf). Auf deiner eigenen Seite fehlt **Konto löschen**.
+- **Konto** mit Benutzername, E-Mail und Handynummer, **Angaben ändern**, **Daten exportieren (Auskunft)** und **Konto löschen** (wer Mitglieder anlegen darf; wer Konten nur sieht, sieht Benutzername und E-Mail ohne Ändern und Löschen). Auf deiner eigenen Seite fehlt **Konto löschen**.
 
 ## So gehst du vor
 ### Die Rolle ändern
@@ -55,13 +55,14 @@ Du siehst nur die Teile, für die du das Recht hast:
 ## Gut zu wissen
 - Die Person hat die Rechte aller ihrer Rollen zusammen; bei {bereich.points} zählt der kleinste Punktefaktor ihrer Rollen. Zusatzrollen gibt es nur zu einer Grundrolle, die zur Kompanie gehört; {rolle.guest}, {rolle.member} und {rolle.admin} sind nur Grundrolle.
 - Die eigene Rolle und die eigenen Rechte ändert niemand selbst. Der letzte {rolle.admin} kann nicht herabgestuft werden.
-- Wer kein {rolle.admin} ist, vergibt und entfernt nur Rollen und Rechte, die er selbst hat – nie {rolle.admin} und nie „Mitglieder anlegen“, „Ehemalige verwalten“ oder „Rollen vergeben“ – und ändert nur Personen, die keines dieser drei Rechte und keine weiteren Rechte als er selbst haben.
+- Wer kein {rolle.admin} ist, vergibt und entfernt nur Rollen und Rechte, die er selbst hat – nie {rolle.admin} und nie „Konten sehen“, „Mitglieder anlegen“, „Ehemalige verwalten“ oder „Rollen vergeben“ – und ändert nur Personen, die keines dieser vier Rechte und keine weiteren Rechte als er selbst haben.
 - Ausnahmen bei den Rechten bleiben, wenn sich die Rollen ändern; was die Rollen dann ohnehin regeln, fällt weg. {rolle.admin}s haben immer alle Rechte, {rolle.guest}s die ihrer Rolle: Für sie gibt es keine Ausnahmen. Einstellungen, Updates und Datensicherung bleiben {rolle.admin}s vorbehalten.
 - Nach einem neuen Startpasswort gilt das alte nicht mehr, und die Person ist auf allen Geräten abgemeldet. Ein neuer Benutzername meldet sie ebenfalls überall ab.
 - **Daten exportieren (Auskunft)** (nur für alle, die jeden darin enthaltenen Bereich auch in der App sehen dürfen: persönliche Angaben, {bereich.points}, {bereich.penalties}, {bereich.ranks}, {bereich.titles}, {bereich.attendance}, {bereich.polls}, E-Mails, {bereich.lists}, {bereich.board} und {bereich.offices}; in der Regel {rolle.admin}s) lädt alle gespeicherten Daten der Person als Datei herunter, z. B. wenn jemand nach der DSGVO (Art. 15) Auskunft verlangt. Antworten in anonymen Umfragen sind nicht dabei (sie bleiben anonym); die bekommt die Person nur selbst unter **Konto → Meine Daten**.
 - **Konto löschen** entfernt alle eigenen Daten der Person: {bereich.points}, {bereich.penalties}, Anwesenheit, {begriff.rank}, {bereich.titles}, Geburtstag, Eintritt, Foto, Antworten bei Umfragen und Benachrichtigungen. Was sie für andere eingetragen hat, bleibt; dort steht dann „gelöschtes Konto“. Das eigene Konto und Konten von {rolle.admin}s lassen sich hier nicht löschen. Wer nur ausgetreten oder verstorben ist, trägst du besser als ehemalig ein: Dann bleiben alle Daten erhalten.
-- Wer kein {rolle.admin} ist, setzt Passwörter nur bei Personen zurück (und ändert bzw. löscht nur deren Konten und Fotos), die keine weiteren Rechte als er selbst haben und weder Mitglieder anlegen, Ehemalige verwalten noch Rollen vergeben dürfen.
+- Wer kein {rolle.admin} ist, setzt Passwörter nur bei Personen zurück (und ändert bzw. löscht nur deren Konten und Fotos), die keine weiteren Rechte als er selbst haben und weder Konten sehen, Mitglieder anlegen, Ehemalige verwalten noch Rollen vergeben dürfen.
 - Bei einer ehemaligen Person lassen sich Rolle, Rechte und Passwort erst nach **Wieder aufnehmen** ändern.
+- **Nur sehen:** Mit dem Recht **Konten sehen** ohne **Mitglieder anlegen** und **Rollen vergeben** siehst du Rolle, Zusatzrollen, Rechte, Aufnahme und Konto der Person, ändern kannst du nichts. Die Seite zeigt das nur bei Personen, die du auch ändern dürftest.
 
 > **Für Fortgeschrittene:** In der WordPress-Version wird die Rolle {rolle.admin} im WordPress-Backend vergeben und entzogen, nicht in der App. Der Knopf zum Löschen heißt dort **Aus der App entfernen**: Der Benutzer der Webseite bleibt bestehen, hat aber keine Rolle in der App mehr. Name und E-Mail-Adresse löscht ein Administrator der Webseite im WordPress-Backend unter **Benutzer** (Beiträge dabei einer anderen Person zuordnen). Den Benutzernamen von Benutzern der Webseite (z. B. Redakteure) ändert nur, wer sie in WordPress bearbeiten darf.
 

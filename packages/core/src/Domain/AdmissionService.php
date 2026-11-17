@@ -12,10 +12,11 @@ use KompanieApp\Core\Storage\CandidateSinceRepository;
 /**
  * Aufnahmen: Wer als Anwärter die Voraussetzung erfüllt, als Mitglied aufgenommen zu werden (wie die Beförderungen).
  *
- * - Anwärter ist, wer eine Grundrolle mit „Als Mitglied aufnehmen“ hat (RoleService::promotable, ohne Mitgliederbereich)
- *   oder eine Zusatzrolle, an der der Admin „Anwärter-Rolle: bei Aufnahme entfernen“ angehakt hat (extra). Aufnehmen
- *   heißt dann: Grundrolle → Mitglied (MemberService::promote) bzw. diese Zusatzrolle entfernen. Beides darf, wer
- *   Mitglieder anlegen darf (create_users). Ist der Eintritt leer, wird er auf den Aufnahmetag gesetzt.
+ * - Anwärter ist, wer eine Anwärter-Rolle als Grundrolle oder Zusatzrolle hat: eine Rolle mit „Als Mitglied aufnehmen“
+ *   (RoleService::promotable, ohne Mitgliederbereich) oder eine eigene Rolle, an der der Admin „Anwärter-Rolle“
+ *   angehakt hat (extra, auch mit Mitgliederbereich). Aufnehmen heißt dann: Grundrolle → Mitglied
+ *   (MemberService::promote) bzw. diese Zusatzrolle entfernen. Beides darf, wer Mitglieder anlegen darf (create_users).
+ *   Ist der Eintritt leer, wird er auf den Aufnahmetag gesetzt.
  * - Voraussetzung je Anwärter-Rolle (Einstellungen → Rollen, gespeichert in RULES_SETTING): mindestens count Teilnahmen
  *   („anwesend“) an Anwesenheitslisten der Terminart kind und/oder mindestens months Monate seit „Anwärter seit“. Ohne
  *   beides steht die Person unter „ohne Voraussetzung“. Es zählen alle Teilnahmen, auch vor „Anwärter seit“.
@@ -78,7 +79,7 @@ final class AdmissionService
     }
 
     /**
-     * Für Einstellungen → Rollen (GET /admin/roles): Anwärter-Rolle als Zusatzrolle und Voraussetzung.
+     * Für Einstellungen → Rollen (GET /admin/roles): Anwärter-Rolle (Grund- oder Zusatzrolle) und Voraussetzung.
      *
      * @return array{admission_extra: bool, admission_kind: string|null, admission_count: int, admission_months: int}
      */
@@ -115,7 +116,7 @@ final class AdmissionService
         if (array_key_exists('admission_extra', $in)) {
             $extra = Input::bool($in['admission_extra']);
             if ($extra && !$own) {
-                throw ApiError::invalid('Als Anwärter-Rolle zum Entfernen taugt nur eine eigene Rolle.');
+                throw ApiError::invalid('Anwärter-Rolle kann nur eine eigene Rolle sein.');
             }
             if ($extra && !$r['extra']) {
                 // Ab jetzt zählt die Zuordnung als „Anwärter seit“ (frühere sind unbekannt und werden nachgetragen).
@@ -155,12 +156,11 @@ final class AdmissionService
     {
         $roles = $this->app->roles();
         $found = null;
-        if ($roles->promotable($u->role)) {
+        if ($roles->promotable($u->role) || $this->flagged($u->role)) {
             $found = ['key' => $u->role, 'way' => 'base'];
         } else {
-            $rules = $this->rules();
             foreach ($roles->extraRoles($u->id, $u->role) as $key) {
-                if (($rules[$key]['extra'] ?? false) === true) {
+                if ($this->flagged($key)) {
                     $found = ['key' => $key, 'way' => 'extra'];
                     break;
                 }
@@ -170,12 +170,17 @@ final class AdmissionService
         return $found !== null && $this->app->formerMembers()->previousRole($u) === null ? $found : null;
     }
 
+    /** Eigene Rolle mit dem Haken „Anwärter-Rolle“ (als Grund- oder Zusatzrolle). */
+    private function flagged(string $key): bool
+    {
+        return ($this->rules()[$key]['extra'] ?? false) === true && RoleService::canBeExtra($key);
+    }
+
     /** Gibt es Anwärter-Rollen (Grund- oder Zusatzrolle)? Sonst keine Kachel. */
     public function hasCandidateRoles(): bool
     {
-        $rules = $this->rules();
         foreach ($this->app->roles()->all() as $key => $r) {
-            if ($r['promotable'] || (($rules[$key]['extra'] ?? false) === true && RoleService::canBeExtra($key))) {
+            if ($r['promotable'] || $this->flagged($key)) {
                 return true;
             }
         }
@@ -244,7 +249,7 @@ final class AdmissionService
         $candidate = $this->candidateRole($target) ?? throw ApiError::invalid('Diese Person ist kein Anwärter (mehr).');
         $roles = $this->app->roles();
         if ($candidate['way'] === 'base') {
-            $this->app->members()->promote($actor, $id);
+            $this->app->members()->promote($actor, $id, true);
         } else {
             $roles->setExtraRoles($id, array_values(array_diff($roles->extraRoles($id, $target->role), [$candidate['key']])));
             $roles->roleChanged($id, $target->role);
@@ -297,7 +302,7 @@ final class AdmissionService
      */
     public function baseRoleSet(int $id, string $old, string $new): void
     {
-        if ($old === $new || !$this->app->roles()->promotable($new)) {
+        if ($old === $new || !($this->app->roles()->promotable($new) || $this->flagged($new))) {
             return;
         }
         try {

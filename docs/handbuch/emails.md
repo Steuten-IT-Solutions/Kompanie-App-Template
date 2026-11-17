@@ -1,7 +1,8 @@
 ---
 titel: "{bereich.mail}"
 reihenfolge: 62
-rechte: [send_mail]
+rechte: []
+einrecht: [view_mail, send_mail]
 bereiche: [mail]
 ---
 Hier schreibst du E-Mails aus der App, z. B. eine Einladung zur Versammlung an alle {rolle.member} oder eine Nachricht an den Vorstand und eine Adresse außerhalb der {kompanie.name}. Empfänger wählst du wie in einem Mailprogramm in **An**, **Cc** und **Bcc**: Mailgruppen wie **Alle Mitglieder**, ganze Rollen, einzelne Mitglieder oder beliebige Mailadressen. Den Text gestaltest du genauso wie am {bereich.board}, auf Wunsch mit deiner Signatur und mit Dateien im Anhang. Darunter siehst du, welche E-Mails verschickt wurden und ob sie angekommen sind.
@@ -50,6 +51,7 @@ Mit **Bearbeiten** änderst du eine Gruppe, mit **Löschen** (Mülleimer) entfer
 Hast du noch keine Signatur, tippe beim Schreiben auf **Noch keine Signatur – jetzt einrichten**. Die App öffnet die Signatur in deinem Konto (**Meins → Konto**). Was du schon geschrieben hast, bleibt erhalten: Nach dem Speichern der Signatur führt **‹ Zurück zur E-Mail** wieder hierher.
 
 ## Gut zu wissen
+- **Nur sehen:** Mit dem Recht **{bereich.mail}: Verlauf der versendeten E-Mails mit Versandprotokoll sehen** ohne das Recht zum Schreiben siehst du nur **Versendete E-Mails** und öffnest sie mit Empfängern, Anhängen und **Versand je Empfänger**. Das Formular zum Schreiben und **Mailgruppen verwalten** fehlen dann.
 - Absender ist die Adresse der {kompanie.name}, die ein {rolle.admin} unter **Einstellungen → E-Mail** eingetragen hat. Antworten gehen an diese Adresse.
 - Wer in **An** und **Cc** steht, sieht alle anderen Empfänger aus An und Cc, wie in einem Mailprogramm. Wer in **Bcc** steht, ist für niemanden sichtbar. Schreibst du an eine große Gruppe, nimm deshalb lieber **Bcc**.
 - Eine Rolle umfasst alle, die sie als Rolle oder Zusatzrolle haben. Die Rolle {rolle.member} erreicht deshalb keine {rolle.admin}s oder Spieße, die eine eigene Rolle haben; für eine Mail an alle nimm die Gruppe **Alle Mitglieder**.
@@ -58,5 +60,5 @@ Hast du noch keine Signatur, tippe beim Schreiben auf **Noch keine Signatur – 
 - Du bekommst die E-Mail selbst nur, wenn du dich (oder eine deiner Rollen oder eine Gruppe, zu der du gehörst) auswählst.
 - Die App verschickt die E-Mails einzeln und nach und nach, so wie es unter **Einstellungen → E-Mail** eingestellt ist. Klappt es bei einer Adresse vorübergehend nicht, versucht sie es später noch einmal.
 - Ist die E-Mail mit ihren Bildern und Anhängen größer, als der Mailserver annimmt, sagt die App das vor dem Senden. Verkleinere dann Bilder oder Anhänge. Viele Mailserver nehmen nur 10 bis 25 MB je Mail an.
-- Versendete E-Mails bleiben ein Jahr im Verlauf; danach löscht die App sie samt Protokoll und Anhängen. Den Verlauf sehen alle, die E-Mails versenden dürfen.
+- Versendete E-Mails bleiben ein Jahr im Verlauf; danach löscht die App sie samt Protokoll und Anhängen. Den Verlauf sehen alle, die E-Mails versenden oder den Verlauf sehen dürfen.
 

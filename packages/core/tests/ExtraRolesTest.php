@@ -158,7 +158,7 @@ final class ExtraRolesTest extends TestCase
 
     public function testNonAdminsAssignOnlyRolesTheyCouldGiveAsBaseRole(): void
     {
-        $this->app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'promote_users', 'view_points', 'manage_points', 'manage_events'])]);
+        $this->app->roles()->create(['label' => 'Schriftführer', 'capabilities' => TestApp::caps(['member', 'view_accounts', 'promote_users', 'view_points', 'manage_points', 'manage_events'])]);
         $schrift = $this->users->add('schrift', 'r1');
         $m = $this->users->add('m', Roles::MEMBER);
         $kasse = $this->users->add('kasse', Roles::MEMBER);

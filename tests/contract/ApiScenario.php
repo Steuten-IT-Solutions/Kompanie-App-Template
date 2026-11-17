@@ -488,7 +488,7 @@ final class ApiScenario
 
         // Wer Konten anlegen darf, ohne Admin zu sein: Passwörter nur von Mitgliedern mit eigenen Rechten.
         $this->d->actAs($admin);
-        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Kontenpflege', 'capabilities' => self::caps(['member', 'create_users'])]);
+        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Kontenpflege', 'capabilities' => self::caps(['member', 'view_accounts', 'create_users'])]);
         $pflege = (string) (array_column((array) $d, 'key', 'label')['Kptest Kontenpflege'] ?? '');
         $holder = $this->user('kptest_rollen_pflege', $pflege);
         $guest = $this->user('kptest_rollen_gast', 'guest');
@@ -713,7 +713,7 @@ final class ApiScenario
 
         // Wer Konten anlegt, legt Anwärter an und nimmt sie auf – nur von Anwärter zu Mitglied.
         $this->d->actAs($admin);
-        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Aufnahme', 'capabilities' => self::caps(['member', 'create_users'])]);
+        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Aufnahme', 'capabilities' => self::caps(['member', 'view_accounts', 'create_users'])]);
         $aufnahme = (string) (array_column((array) $d, 'key', 'label')['Kptest Aufnahme'] ?? '');
         $c->ok($this->req('POST', '/admin/roles', ['label' => 'Kptest Nur Kalender', 'capabilities' => ['calendar']])[0] === 201, 'Eigene Rolle nur mit dem Kalender');
         $c->ok($this->req('POST', '/admin/roles', ['label' => 'Kptest Ungültig', 'capabilities' => ['calendar', 'view_points', 'manage_points']])[0] === 400, 'Verwalten ohne Mitgliederbereich → 400');
@@ -1220,7 +1220,7 @@ final class ApiScenario
         $c->ok($s === 200 && ($listed($d)['joined_on'] ?? null) === '2004-03-12', 'Mitgliederliste der Verwaltung mit Eintritt (unabhängig von der Anzeige)');
         $this->d->actAs($this->user('kptest_liste_punkte', 'points'));
         [$s, $d] = $this->req('GET', '/members');
-        $c->ok($s === 200 && $listed($d) !== [] && !array_key_exists('joined_on', $listed($d)), 'Ohne create_users kein Eintrittsjahr in der Liste');
+        $c->ok($s === 200 && $listed($d) !== [] && !array_key_exists('joined_on', $listed($d)), 'Ohne view_accounts kein Eintrittsjahr in der Liste');
         $this->d->actAs($cand);
         $c->ok($this->req('PUT', "/members/$m/join-year", ['year' => 2000])[0] === 403, 'Ohne create_users kein fremdes Eintrittsjahr → 403');
         $c->ok($this->req('PUT', '/me/join-year', ['year' => 2000])[0] === 403, 'Anwärter: kein eigenes Eintrittsjahr → 403');
@@ -1384,7 +1384,7 @@ final class ApiScenario
         [$s, $d] = $this->req('PUT', "/lists/$id", ['title' => 'Kptest', 'columns' => $columns, 'rows' => [], 'updated_at' => '2000-01-01T00:00:00+00:00']);
         $c->ok($s === 409 && ($d['code'] ?? '') === 'conflict', 'Veralteter Stand → 409 conflict, nichts überschrieben');
         [, $roles] = $this->req('GET', '/admin/roles');
-        $c->ok(($roles = array_column((array) $roles, 'capabilities', 'key'))['lists'] === self::caps(['member', 'manage_lists']), 'Standardrolle „Listen verwalten“');
+        $c->ok(($roles = array_column((array) $roles, 'capabilities', 'key'))['lists'] === self::caps(['member', 'view_lists', 'manage_lists']), 'Standardrolle „Listen verwalten“');
         $this->req('PATCH', "/members/$m/role", ['extra_roles' => ['lists']]);
         $this->d->actAs($m);
         [$s, $d] = $this->req('GET', "/lists/$id");
@@ -1431,7 +1431,7 @@ final class ApiScenario
         }
         $c->ok($this->req('GET', '/mails')[0] === 200 && $this->req('GET', '/mails/999999999')[0] === 404, 'Verlauf; unbekannte Mail → 404');
         [, $roles] = $this->req('GET', '/admin/roles');
-        $c->ok((array_column((array) $roles, 'capabilities', 'key')['mail'] ?? null) === self::caps(['member', 'send_mail']), 'Standardrolle „E-Mails verwalten“');
+        $c->ok((array_column((array) $roles, 'capabilities', 'key')['mail'] ?? null) === self::caps(['member', 'view_mail', 'send_mail']), 'Standardrolle „E-Mails verwalten“');
         $this->req('PUT', '/admin/features', ['mail' => false]);
         [$s, $d] = $this->req('GET', '/mails/options');
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
@@ -1577,7 +1577,7 @@ final class ApiScenario
 
         $this->d->actAs($admin);
         [, $roles] = $this->req('GET', '/admin/roles');
-        $c->ok((array_column((array) $roles, 'capabilities', 'key')['passive'] ?? null) === self::caps(['member', 'manage_passive']), 'Standardrolle „Passive verwalten“');
+        $c->ok((array_column((array) $roles, 'capabilities', 'key')['passive'] ?? null) === self::caps(['member', 'view_passive', 'manage_passive']), 'Standardrolle „Passive verwalten“');
         $c->ok($this->req('DELETE', "/passive-members/$id")[0] === 200 && $this->req('GET', "/passive-members/$id")[0] === 404, 'Aufräumen: Passiven löschen');
     }
 

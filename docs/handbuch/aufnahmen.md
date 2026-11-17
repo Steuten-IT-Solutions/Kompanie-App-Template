@@ -1,7 +1,8 @@
 ---
 titel: Aufnahmen
 reihenfolge: 55
-rechte: [create_users]
+rechte: []
+einrecht: [view_accounts, create_users]
 bereiche: [attendance]
 ---
 Die Übersicht **Aufnahmen** zeigt alle Anwärter und wer von ihnen die Voraussetzung erfüllt, als {rolle.member} aufgenommen zu werden, zum Beispiel sechs Teilnahmen an Versammlungen. Aufgenommen wird nie automatisch: Die Liste ist ein Vorschlag, aufnehmen tust du auf der Seite der Person.
@@ -9,7 +10,7 @@ Die Übersicht **Aufnahmen** zeigt alle Anwärter und wer von ihnen die Vorausse
 ## So öffnest du die Seite
 Tippe unten auf **Verwaltung** und dann auf den Knopf **Aufnahmen**. Mit **‹ Verwaltung** kommst du zurück. Die kleine Zahl im roten Kreis an der Ecke des Knopfs zeigt, wie viele Anwärter die Voraussetzung gerade erfüllen; ist es niemand, fehlt sie.
 
-Den Knopf gibt es, wenn {bereich.attendance} an ist und ein {rolle.admin} unter *Einstellungen → Rollen* eine Anwärter-Rolle eingerichtet hat.
+Den Knopf gibt es, wenn {bereich.attendance} an ist. Damit dort jemand erscheint, richtet ein {rolle.admin} unter *Einstellungen → Rollen* eine Anwärter-Rolle ein: an der Rolle den Haken **Anwärter-Rolle**. Die Rolle kann die Rolle der Person sein oder eine Zusatzrolle. Solange es keine gibt, steht auf der Seite, wie das geht.
 
 ## Was du hier siehst
 - **Voraussetzung erfüllt**: wer alles erfüllt, mit dem Tag, seit dem. Wer am längsten wartet, steht oben.
@@ -33,6 +34,7 @@ Ist die Anwärter-Rolle die Grundrolle der Person, wird sie {rolle.member}. Ist 
 - **Anwärter seit** setzt die App selbst, wenn jemand in der App die Anwärter-Rolle bekommt (beim Anlegen, beim Ändern der Rolle oder bei der Freigabe einer Anfrage). Bei Personen, die schon vorher Anwärter waren, fehlt das Datum; die Mindestdauer gilt dann erst, wenn du es nachträgst.
 - Nach dem Speichern einer Anwesenheitsliste zeigt die App oben in der Verwaltung, wer dadurch neu die Voraussetzung erfüllt.
 - Die Voraussetzung legt ein {rolle.admin} je Anwärter-Rolle unter *Einstellungen → Rollen* fest.
+- **Nur sehen:** Mit dem Recht **Konten sehen** ohne **Mitglieder anlegen** siehst du die Übersicht und auf der Seite der Person den Stand, aber ohne **Datum speichern** und **Als {rolle.member} aufnehmen**.
 
 ## Siehe auch
 - [Konto und Rolle](seite:rollen-vergeben)
