@@ -70,6 +70,12 @@ final class PollService
         return $user !== null && $user->can(Capability::ManagePolls);
     }
 
+    /** Ergebnisse immer sehen (view_poll_results; manage_polls setzt das voraus). */
+    public static function seesAllResults(?User $user): bool
+    {
+        return $user !== null && $user->can(Capability::ViewPollResults);
+    }
+
     /* ---------------------------------------------------------------- */
     /* Pseudonym                                                        */
     /* ---------------------------------------------------------------- */
@@ -395,7 +401,7 @@ final class PollService
             }
         }
         $names = (new UserNames($this->app->users))->prime($people);
-        $manager = self::canManage($user);
+        $manager = self::seesAllResults($user);
         $out = [];
         foreach ($polls as $p) {
             $id = $p['id'];

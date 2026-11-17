@@ -48,7 +48,7 @@ final class PersonalDataExport
      */
     public const OTHERS_REQUIRE = [
         Capability::ViewAccounts, Capability::ManageFormer, Capability::ViewPersonal, Capability::ViewPoints, Capability::ViewPenalties,
-        Capability::ViewPromotions, Capability::ViewTitles, Capability::ViewAttendance, Capability::ManagePolls, Capability::ViewMail,
+        Capability::ViewPromotions, Capability::ViewTitles, Capability::ViewAttendance, Capability::ViewPollResults, Capability::ViewMail,
         Capability::ViewLists, Capability::PostBoard, Capability::ViewOffices, Capability::ViewResponses,
     ];
 

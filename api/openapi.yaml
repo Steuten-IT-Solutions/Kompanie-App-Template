@@ -2334,8 +2334,8 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Sichtbare Dokumente (nach Titel) und alle Kategorien (Issue #2)
-      description: Dokumente mit Sichtbarkeit `managers` nur für wer `manage_documents` hat; für sie auch `max_bytes`.
-      x-capability: 'view_documents oder manage_documents'
+      description: Dokumente mit Sichtbarkeit `managers` nur für alle mit `view_restricted_documents` (`manage_documents` setzt es voraus); mit `manage_documents` auch `max_bytes`.
+      x-capability: 'view_documents oder view_restricted_documents'
       responses:
         '200':
           description: OK
@@ -3148,12 +3148,12 @@ paths:
       tags: [Umfragen]
       summary: Alle Umfragen (laufende und beendete), neueste zuerst (Issue #4)
       description: |
-        Für Mitglieder (Recht `member`; Anwärter nicht) und alle mit `manage_polls`. Je Umfrage `has_voted`, die eigene
+        Für Mitglieder (Recht `member`; Anwärter nicht) und alle mit `view_poll_results`. Je Umfrage `has_voted`, die eigene
         Antwort (`my_answer`) und die Ergebnisse (`results_data`), soweit sie für dieses Konto sichtbar sind:
         `after_vote` – wer geantwortet hat, nach dem Ende alle Mitglieder; `after_end` – alle Mitglieder nach dem Ende;
-        `managers` – nur `manage_polls`. Wer `manage_polls` hat, sieht die Ergebnisse immer. Namen je Möglichkeit bzw. je
+        `managers` – nur `view_poll_results`. Wer `view_poll_results` hat (`manage_polls` setzt es voraus), sieht die Ergebnisse immer. Namen je Möglichkeit bzw. je
         Freitext nur bei namentlichen Umfragen; bei anonymen nie Namen oder Benutzer-IDs (Freitexte alphabetisch).
-      x-capability: 'vote_polls oder manage_polls'
+      x-capability: 'vote_polls oder view_poll_results'
       responses:
         '200':
           description: OK
@@ -3192,7 +3192,7 @@ paths:
     get:
       tags: [Umfragen]
       summary: Eine Umfrage (wie in der Liste)
-      x-capability: 'vote_polls oder manage_polls'
+      x-capability: 'vote_polls oder view_poll_results'
       responses:
         '200':
           description: OK
@@ -5276,7 +5276,7 @@ paths:
         Wie `GET /me/data`, aber ohne Antworten in anonymen Umfragen und die Nutzungsauswertung nur mit `view_activity`.
         Grenzen wie beim Löschen (Konten von Admins nur für Admins); zusätzlich alle Rechte der enthaltenen Bereiche
         (sonst 403), damit niemand über die Auskunft sieht, was ihm in der App verborgen ist: `manage_former`, `view_personal`,
-        `view_points`, `view_penalties`, `view_promotions`, `view_titles`, `view_attendance`, `manage_polls`,
+        `view_points`, `view_penalties`, `view_promotions`, `view_titles`, `view_attendance`, `view_poll_results`,
         `view_mail`, `view_lists`, `post_board`, `view_offices`, `view_responses`.
       x-capability: view_accounts und die Rechte aller enthaltenen Bereiche (in der Regel Admins)
       parameters:
@@ -5323,6 +5323,22 @@ paths:
                   fee_cents: { type: integer, description: 'Jahresbeitrag als Vorschlag beim Eintragen in Cent, 0 = keiner' }
                   methods: { type: array, items: { type: string }, description: 'Zahlungsarten zur Auswahl' }
                   year: { type: integer, description: 'Laufendes Jahr (Zeitzone der App)' }
+                  birthday_ages: { type: array, items: { type: integer }, description: 'Alter, an deren Geburtstag erinnert wird (leer = aus)' }
+                  birthday_days: { type: integer, description: 'So viele Tage vorher kommt die Erinnerung (0 = am Tag selbst)' }
+                  birthdays:
+                    type: array
+                    description: |
+                      Anstehende Geburtstage der eingestellten Alter, heute bis in `birthday_days` Tagen, nach Datum. Nur mit
+                      `view_personal`, sonst leer. Der 29.02. gilt in Jahren ohne Schalttag am 28.02.
+                    items:
+                      type: object
+                      required: [id, name, date, age, days]
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+                        date: { type: string, format: date, description: 'Tag des Geburtstags' }
+                        age: { type: integer, description: 'Alter, das die Person an diesem Tag erreicht' }
+                        days: { type: integer, description: 'Tage bis dahin, 0 = heute' }
         '403': { $ref: '#/components/responses/Error' }
     post:
       tags: [Verwaltung]
@@ -5449,7 +5465,7 @@ paths:
   /passive-members/settings:
     get:
       tags: [Verwaltung]
-      summary: Einstellungen der Beiträge der Passiven (Jahresbeitrag als Vorschlag, Zahlungsarten)
+      summary: Einstellungen der Passiven (Jahresbeitrag als Vorschlag, Zahlungsarten, Erinnerung an Geburtstage)
       x-capability: view_passive
       responses:
         '200':
@@ -5460,11 +5476,14 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
     patch:
       tags: [Verwaltung]
-      summary: Einstellungen der Beiträge ändern
+      summary: Einstellungen der Passiven ändern
       description: |
         Was fehlt, bleibt. `fee_cents`: 0, leer oder null heißt kein Vorschlag, sonst über 0 und höchstens 100000.
         `methods`: Liste von Bezeichnungen (getrimmt, leere fallen weg), mindestens eine, höchstens 20, je höchstens 40
         Zeichen, keine doppelt (sonst 400). Frühere Zahlungen behalten ihre Zahlungsart.
+        `birthday_ages`: Liste von Altern 1–120 (leere fallen weg, doppelte zählen einmal), höchstens 30; leer schaltet die
+        Erinnerung an Geburtstage aus. `birthday_days`: 0–30 Tage vorher. Erinnert werden per Push (Art
+        `passive_birthdays`) alle mit `manage_passive` und `view_personal`, je Geburtstag einmal.
       x-capability: manage_passive
       requestBody:
         required: true
@@ -5475,6 +5494,8 @@ paths:
               properties:
                 fee_cents: { type: [integer, string, 'null'] }
                 methods: { type: array, items: { type: string } }
+                birthday_ages: { type: array, items: { type: [integer, string] } }
+                birthday_days: { type: [integer, string] }
       responses:
         '200':
           description: OK
@@ -9083,6 +9104,7 @@ components:
           board_public,
           polls,
           birthdays,
+          passive_birthdays,
           gallery_review,
           gallery_submissions,
           registrations,
@@ -9097,7 +9119,7 @@ components:
           responses,
           news,
         ]
-      description: '`board` (Schwarzes Brett, Issue #5) nur für Mitglieder und Anwärter (view_board); dringend (Urgency high), TTL höchstens bis zum Ablauf der Nachricht. `board_public`: öffentliche Nachrichten am Brett für alle anderen (Gäste ohne Konto, Konten ohne view_board), sonst wie `board`. `polls` (Umfragen, Issue #4) nur für Mitglieder: neue Umfrage und Erinnerung 24 Stunden vor dem Ende an alle ohne Antwort. `birthdays` (Geburtstage, Issue #1) nur für Mitglieder: am Tag selbst ab 7 Uhr (Zeitzone der Kompanie), nicht an das Geburtstagskind, nur für sichtbare Geburtstage; TTL bis Mitternacht. `responses` (Zu- und Absagen) nur mit respond_calendar: einmal am Tag zur Uhrzeit der Erinnerung an alle ohne Rückmeldung zu Terminen, die in den eingestellten Tagen beginnen bzw. deren Anmeldeschluss morgen ist. `reminder` (Erinnerung am Vortag) nennt keine Termine, bei denen die Person abgesagt hat.'
+      description: '`board` (Schwarzes Brett, Issue #5) nur für Mitglieder und Anwärter (view_board); dringend (Urgency high), TTL höchstens bis zum Ablauf der Nachricht. `board_public`: öffentliche Nachrichten am Brett für alle anderen (Gäste ohne Konto, Konten ohne view_board), sonst wie `board`. `polls` (Umfragen, Issue #4) nur für Mitglieder: neue Umfrage und Erinnerung 24 Stunden vor dem Ende an alle ohne Antwort. `birthdays` (Geburtstage, Issue #1) nur für Mitglieder: am Tag selbst ab 7 Uhr (Zeitzone der Kompanie), nicht an das Geburtstagskind, nur für sichtbare Geburtstage; TTL bis Mitternacht. `passive_birthdays` (Geburtstage der Passiven) nur mit manage_passive und view_personal und nur mit eingestellten Altern: einmal je Geburtstag die eingestellten Tage vorher ab derselben Stunde. `responses` (Zu- und Absagen) nur mit respond_calendar: einmal am Tag zur Uhrzeit der Erinnerung an alle ohne Rückmeldung zu Terminen, die in den eingestellten Tagen beginnen bzw. deren Anmeldeschluss morgen ist. `reminder` (Erinnerung am Vortag) nennt keine Termine, bei denen die Person abgesagt hat.'
     PushSubscribe:
       type: object
       required: [endpoint, keys]
@@ -9761,8 +9783,10 @@ components:
                       manage_events,
                       view_responses,
                       manage_calendar,
+                      view_restricted_documents,
                       manage_documents,
                       post_board,
+                      view_poll_results,
                       manage_polls,
                       view_inventory,
                       manage_inventory,
@@ -9856,8 +9880,10 @@ components:
                   manage_events,
                   view_responses,
                   manage_calendar,
+                  view_restricted_documents,
                   manage_documents,
                   post_board,
+                  view_poll_results,
                   manage_polls,
                   view_inventory,
                   manage_inventory,
@@ -9958,8 +9984,10 @@ components:
                 manage_events,
                 view_responses,
                 manage_calendar,
+                view_restricted_documents,
                 manage_documents,
                 post_board,
+                view_poll_results,
                 manage_polls,
                 view_inventory,
                 manage_inventory,
@@ -10876,8 +10904,10 @@ components:
           manage_events,
           view_responses,
           manage_calendar,
+          view_restricted_documents,
           manage_documents,
           post_board,
+          view_poll_results,
           manage_polls,
           view_inventory,
           manage_inventory,
@@ -11106,10 +11136,12 @@ components:
         method: { type: string, description: 'Eine der eingerichteten Zahlungsarten; beim Ändern auch die bisherige' }
     PassiveSettings:
       type: object
-      required: [fee_cents, methods]
+      required: [fee_cents, methods, birthday_ages, birthday_days]
       properties:
         fee_cents: { type: integer, description: '0 = kein Vorschlag' }
         methods: { type: array, items: { type: string }, description: 'Zahlungsarten zur Auswahl (vorgegeben Bar, SEPA, PayPal)' }
+        birthday_ages: { type: array, items: { type: integer }, description: 'Alter, an deren Geburtstag erinnert wird, aufsteigend; leer (Vorgabe) = keine Erinnerung' }
+        birthday_days: { type: integer, minimum: 0, maximum: 30, description: 'Tage vorher (Vorgabe 7, 0 = am Tag selbst)' }
     PassiveInput:
       type: object
       description: Felder zum Anlegen und Ändern; persönliche Angaben (address, phone, email, birth_date) nur mit manage_personal.
@@ -12007,7 +12039,7 @@ components:
             document_id: { type: integer, description: 'Dokument aus dem Bereich Dokumente (muss beim Speichern existieren)' }
             document:
               readOnly: true
-              description: 'Nur in Antworten. Der Block fehlt ganz, wenn Dokumente ausgeschaltet sind oder die Person das Dokument dort nicht sehen darf (view_documents, bei visibility managers manage_documents; ohne Anmeldung mit den Rechten von Gast); mit manage_pages kommt er dann mit document null. Die Datei prüft die Rechte beim Abruf erneut.'
+              description: 'Nur in Antworten. Der Block fehlt ganz, wenn Dokumente ausgeschaltet sind oder die Person das Dokument dort nicht sehen darf (view_documents, bei visibility managers view_restricted_documents; ohne Anmeldung mit den Rechten von Gast); mit manage_pages kommt er dann mit document null. Die Datei prüft die Rechte beim Abruf erneut.'
               oneOf:
                 - type: 'null'
                 - type: object
@@ -12076,7 +12108,7 @@ components:
         title: { type: string, maxLength: 191 }
         category_id: { type: [integer, 'null'] }
         date: { type: string, format: date, description: Stand }
-        visibility: { type: string, enum: [members, managers], description: 'managers: nur wer manage_documents hat' }
+        visibility: { type: string, enum: [members, managers], description: 'managers: nur wer view_restricted_documents hat' }
         ext: { type: string }
         kind: { type: string, enum: [pdf, image, file], description: 'pdf und image zeigt die App an, file nur herunterladen' }
         mime: { type: string }

@@ -432,7 +432,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
     // interne mit view_board; mit post_board schreiben. In der Navigation nur mit view_board (unten).
     brett: boardReadable(),
     // Umfragen (Issue #4): mit vote_polls antworten, manage_polls verwaltet; laufende stehen am Brett.
-    umfragen: pollsVisible() || canManagePolls(),
+    umfragen: pollsVisible() || canManagePolls() || (!!features?.polls && can('view_poll_results')),
     // Inventar (Issue #6): sehen mit view_inventory, ändern mit manage_inventory, Einstieg über das Menü der Verwaltung.
     inventar: !!features?.inventory && can('view_inventory'),
     benachrichtigungen: true,

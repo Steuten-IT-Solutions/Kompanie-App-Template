@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Push;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Domain\BoardService;
+use KompanieApp\Core\Domain\PassiveMemberService;
 use KompanieApp\Core\Domain\RankService;
 
 /**
@@ -153,6 +154,29 @@ final class PushTriggers
             static fn (int $uid): bool => $uid !== $userId,
             'high',
             $midnight - $this->app->time()->timestamp(),
+        );
+    }
+
+    /**
+     * Geburtstag eines Passiven (PassiveMemberService::remindBirthdays): an alle, die Passive verwalten und Geburtsdaten
+     * sehen dürfen; zustellbar bis zum Ende des Geburtstags (Zeitzone der Kompanie).
+     */
+    public function passiveBirthday(int $passiveId, string $name, string $date, int $age, int $days): int
+    {
+        $when = match ($days) {
+            0 => 'heute',
+            1 => 'morgen',
+            default => 'am ' . substr($date, 8, 2) . '.' . substr($date, 5, 2) . '.',
+        };
+        $body = sprintf('%s wird %s %d Jahre alt.', $name, $when, $age);
+        $end = (new \DateTimeImmutable($date, $this->app->time()->timezone()))->modify('+1 day')->getTimestamp();
+        return $this->push->notifyAudience(
+            PushService::TYPE_PASSIVE_BIRTHDAYS,
+            PushService::message('Geburtstag eines Passiven', $body, 'verwaltung/passive', 'passiv-geburtstag-' . $passiveId),
+            fn (int $uid): bool => PassiveMemberService::remindsBirthdays($this->app->users->find($uid)),
+            PushService::URGENCY,
+            $end - $this->app->time()->timestamp(),
+            PushService::MAX_TTL,
         );
     }
 

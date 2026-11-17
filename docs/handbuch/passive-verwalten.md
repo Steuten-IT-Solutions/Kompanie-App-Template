@@ -5,7 +5,7 @@ rechte: []
 einrecht: [view_passive, manage_passive]
 bereiche: [passive]
 ---
-Hier führst du die interne Liste eurer passiven Mitglieder: Name, Vorname, Adresse, Telefon, E-Mail-Adresse, Geburtsdatum, Eintritt und eine Bemerkung, dazu je ein Mitglied als Betreuer. Eine bisher in Excel geführte Liste übernimmst du mit **Tabelle importieren**. Außerdem trägst du ein, wer den Beitrag für ein Jahr bezahlt hat. Passive sind keine Konten. Sie bekommen nie einen Zugang zur App, stehen in keiner Mitgliederliste und haben keine {bereich.points}, {bereich.penalties} oder {bereich.attendance}.
+Hier führst du die interne Liste eurer passiven Mitglieder: Name, Vorname, Adresse, Telefon, E-Mail-Adresse, Geburtsdatum, Eintritt und eine Bemerkung, dazu je ein Mitglied als Betreuer. Eine bisher in Excel geführte Liste übernimmst du mit **Tabelle importieren**. Außerdem trägst du ein, wer den Beitrag für ein Jahr bezahlt hat, und lässt dich an besondere Geburtstage erinnern. Passive sind keine Konten. Sie bekommen nie einen Zugang zur App, stehen in keiner Mitgliederliste und haben keine {bereich.points}, {bereich.penalties} oder {bereich.attendance}.
 
 ## So öffnest du die Seite
 Tippe unten auf **Verwaltung** und dann auf den Knopf **Passive**.
@@ -14,7 +14,9 @@ Den Knopf gibt es, sobald unter **Einstellungen → Bereiche** der Bereich **Pas
 
 ## Was du hier siehst
 - **Zähler** oben: wie viele Passive eingetragen sind und wie viele davon den Beitrag für das gewählte Jahr bezahlt haben.
+- **Anstehende Geburtstage**: Passive, die in den nächsten Tagen eines der eingestellten Alter erreichen, mit Datum und Alter. Die Karte erscheint nur, wenn Alter eingestellt sind, ein solcher Geburtstag ansteht und du persönliche Angaben sehen darfst.
 - **Jahresbeitrag (Vorschlag)** und **Zahlungsarten**: der Betrag, der beim Eintragen einer Zahlung schon im Feld steht, und die Zahlungsarten zur Auswahl. Mit **Ändern** richtest du beides ein.
+- **Erinnerung an Geburtstage**: bei welchen Altern und wie viele Tage vorher erinnert wird, oder **aus**. Mit **Einrichten** bzw. **Ändern** stellst du das ein.
 - **Beitrag für**: das Jahr, dessen Zahlungen die Liste zeigt. Vorgegeben ist das laufende Jahr; wählbar sind auch das nächste Jahr und frühere Jahre.
 - **Zeigen**: alle Passiven, nur die mit offenem Beitrag oder nur die, die bezahlt haben.
 - **+ Passiven anlegen**: öffnet das Formular für einen neuen Eintrag.
@@ -72,15 +74,25 @@ Je Passiver gibt es für jedes Jahr nur eine Zahlung. Um eine Zahlung zu ändern
 
 Frühere Zahlungen behalten ihre Zahlungsart, auch wenn du sie aus der Auswahl entfernst.
 
+### Die Erinnerung an Geburtstage einrichten
+1. Tippe oben bei **Erinnerung an Geburtstage** auf **Einrichten** (oder **Ändern**).
+2. Trage bei **Bei diesen Altern erinnern** die Alter ein, mit Komma getrennt, z. B. 50, 60, 70, 75, 80. Erinnert wird nur, wenn ein Passiver genau eines dieser Alter erreicht.
+3. Trage bei **Tage vorher** ein, wie viele Tage vor dem Geburtstag die Erinnerung kommen soll (0 bis 30, vorgegeben 7). 0 heißt am Tag selbst.
+4. Tippe auf **Speichern**.
+
+Anfangs sind keine Alter eingetragen, die Erinnerung ist also aus. Leerst du das Feld wieder, schaltest du sie aus.
+
 ### Einen Passiven löschen
 1. Tippe beim Eintrag auf **Löschen**.
 2. Bestätige die Frage. Der Eintrag ist dann mit allen Angaben und Zahlungen gelöscht.
 
 ## Gut zu wissen
-- **Nur sehen:** Mit dem Recht **Passive sehen** ohne **Passive verwalten** siehst du die Liste mit Betreuer, Beitrag und Zahlungen. **+ Passiven anlegen**, **Tabelle importieren**, **Zahlung eintragen**, **Ändern**, **Bearbeiten**, **Löschen** und die Einstellung zu Beitrag und Zahlungsarten fehlen dann.
+- **Nur sehen:** Mit dem Recht **Passive sehen** ohne **Passive verwalten** siehst du die Liste mit Betreuer, Beitrag und Zahlungen. **+ Passiven anlegen**, **Tabelle importieren**, **Zahlung eintragen**, **Ändern**, **Bearbeiten**, **Löschen** und die Einstellungen zu Beitrag, Zahlungsarten und Erinnerung an Geburtstage fehlen dann.
 - Adresse, Telefon, E-Mail-Adresse und Geburtsdatum sind persönliche Angaben. Sie sieht nur, wer das Recht **Persönliche Angaben sehen** hat, und ändert nur, wer **Persönliche Angaben pflegen** hat. Ohne diese Rechte siehst und pflegst du nur die Namen, den Betreuer, den Eintritt und die Bemerkung, und beim Import übergeht die App die Spalten mit persönlichen Angaben.
 - Der Betreuer sieht seine eigenen Passiven unter **Meins → Meine Passiven** mit allen Angaben, auch ohne die Rechte für persönliche Angaben. Ändern kann er dort nichts.
 - Zahlungen trägt ein, wer **Passive verwalten** darf, auch ohne die Rechte für persönliche Angaben. Der Betreuer sieht unter **Meins → Meine Passiven**, ob der Beitrag für das laufende Jahr bezahlt ist.
 - Betreuer kann nur ein Mitglied sein. Wird das Konto des Betreuers gelöscht, bleibt der Passive ohne Betreuer eingetragen.
 - Der Geburtstag eines Passiven erscheint nicht bei den {bereich.birthdays} der Mitglieder.
+- An Geburtstage erinnert werden alle, die **Passive verwalten** und **Persönliche Angaben sehen** dürfen, nicht der Betreuer. Sie bekommen eine Benachrichtigung aufs Gerät, die eingestellten Tage vorher, je Geburtstag einmal, ab derselben Uhrzeit wie die Benachrichtigung zu Geburtstagen der Mitglieder (vorgegeben 7 Uhr). Dafür muss unter **Meins → Konto → Benachrichtigungen einstellen** die Art **Passive: Geburtstage der eingestellten Alter** an sein. Wer schon Benachrichtigungen bekommt, hat sie nach dem Einrichten automatisch an.
+- Wird ein Geburtstag erst eingetragen, wenn er schon in weniger Tagen ist, kommt die Erinnerung noch beim nächsten Lauf. Am 29. Februar Geborene werden in Jahren ohne Schalttag am 28. Februar erinnert.
 - Anlegen (auch per Import), Ändern und Löschen stehen im Änderungsprotokoll. Die Werte persönlicher Angaben sieht dort nur, wer sie auch hier sehen darf.

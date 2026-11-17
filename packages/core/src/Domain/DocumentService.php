@@ -67,8 +67,9 @@ final class DocumentService
 
     public static function canSee(?User $user, string $visibility): bool
     {
-        $manager = $user !== null && $user->can(Capability::ManageDocuments);
-        return $user !== null && ($manager || $user->can(Capability::ViewDocuments)) && ($visibility !== self::VISIBLE_MANAGERS || $manager);
+        // Eingeschränkte sieht, wer sie sehen darf (view_restricted_documents; manage_documents setzt das voraus).
+        $all = $user !== null && $user->can(Capability::ViewRestrictedDocuments);
+        return $user !== null && ($all || $user->can(Capability::ViewDocuments)) && ($visibility !== self::VISIBLE_MANAGERS || $all);
     }
 
     /**
@@ -119,7 +120,7 @@ final class DocumentService
         }
         // Ohne Anmeldung mit den Rechten von Gast (App::anonymous).
         $viewer = $user ?? $this->app->anonymous();
-        if (!$viewer->can(Capability::ViewDocuments) && !$viewer->can(Capability::ManageDocuments)) {
+        if (!$viewer->can(Capability::ViewDocuments) && !$viewer->can(Capability::ViewRestrictedDocuments)) {
             return ['status' => $user === null ? 401 : 403];
         }
         $user = $viewer;

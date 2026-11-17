@@ -153,7 +153,7 @@ export function targetAllowed(t: FixedTarget, has: (cap: Capability) => boolean,
     case 'mitglieder':
       return (on('directory') && (has('view_directory') || has('view_former'))) || (on('offices') && has('view_offices'));
     case 'dokumente':
-      return on('documents') && (has('view_documents') || has('manage_documents'));
+      return on('documents') && (has('view_documents') || has('view_restricted_documents'));
     // In der Navigation nur mit allen internen Nachrichten (wie boardVisible)
     case 'brett':
       return on('board') && has('view_board');

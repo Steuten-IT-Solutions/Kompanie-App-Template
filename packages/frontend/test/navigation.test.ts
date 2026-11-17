@@ -292,7 +292,7 @@ test('targetAllowed: Bereich an und Recht, wie die Tab-Leiste und Einstellungen 
     NAV_TARGETS.filter((t) => targetAllowed(t, gast, allOn)),
     ['termine', 'news', 'galerie', 'mitglieder'],
   );
-  assert.equal(targetAllowed('dokumente', caps('manage_documents'), allOn), true);
+  assert.equal(targetAllowed('dokumente', caps('view_restricted_documents'), allOn), true);
   assert.equal(targetAllowed('brett', caps('post_board'), allOn), false);
   assert.equal(targetAllowed('galerie', caps('view_gallery_internal'), allOn), true);
   assert.equal(targetAllowed('termine', caps('calendar'), on('events')), false);

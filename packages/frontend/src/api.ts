@@ -51,8 +51,10 @@ export type Capability =
   | 'manage_events'
   | 'view_responses'
   | 'manage_calendar'
+  | 'view_restricted_documents'
   | 'manage_documents'
   | 'post_board'
+  | 'view_poll_results'
   | 'manage_polls'
   | 'view_inventory'
   | 'manage_inventory'
@@ -905,6 +907,22 @@ export interface PassivePayment {
 export interface PassiveSettings {
   fee_cents: number;
   methods: string[];
+  /** Alter, an deren Geburtstag erinnert wird (aufsteigend, leer = keine Erinnerung); fehlt bei älteren Servern */
+  birthday_ages?: number[];
+  /** So viele Tage vorher kommt die Erinnerung (0 = am Tag selbst); fehlt bei älteren Servern */
+  birthday_days?: number;
+}
+
+/** Anstehender Geburtstag eines Passiven mit einem der eingestellten Alter */
+export interface PassiveBirthday {
+  id: number;
+  name: string;
+  /** Tag des Geburtstags, JJJJ-MM-TT */
+  date: string;
+  /** Alter, das die Person an diesem Tag erreicht */
+  age: number;
+  /** Tage bis dahin (0 = heute) */
+  days: number;
 }
 
 /** Verwaltung → Passive: alle Passiven, Mitglieder zur Wahl als Betreuer und was die Person an Angaben sieht und ändert. */
@@ -919,6 +937,12 @@ export interface PassiveList {
   methods?: string[];
   /** Laufendes Jahr laut Server; fehlt bei älteren Servern */
   year?: number;
+  /** Alter für die Erinnerung an Geburtstage (leer = aus); fehlt bei älteren Servern */
+  birthday_ages?: number[];
+  /** Tage vorher (0–30); fehlt bei älteren Servern */
+  birthday_days?: number;
+  /** Anstehende Geburtstage der eingestellten Alter, nur mit view_personal (sonst leer); fehlt bei älteren Servern */
+  birthdays?: PassiveBirthday[];
 }
 
 /** Anlegen und Ändern; persönliche Angaben nur mit manage_personal mitschicken. */
@@ -3370,6 +3394,7 @@ export type PushType =
   | 'board_public'
   | 'polls'
   | 'birthdays'
+  | 'passive_birthdays'
   | 'gallery_review'
   | 'gallery_submissions'
   | 'registrations'

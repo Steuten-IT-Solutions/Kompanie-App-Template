@@ -48,7 +48,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   zu sehen, z. B. „Punkte aller Mitglieder sehen“ neben „Punkte vergeben“. Ebenso gibt es eigene Rechte, um das
   Inventar, die Listen, den Verlauf der E-Mails, die Zu- und Absagen bei Terminen, die Passiven, die Einreichungen der Galerie und die Fehlermeldungen nur zu sehen. Mit „Konten sehen“ siehst du Konto,
   Rolle, Zusatzrollen und Rechte einer Person, den Eintritt, Anfragen auf einen Zugang und Aufnahmen; dieses Recht
-  geben wie „Mitglieder anlegen“ nur Admins weiter. Wer nur sehen darf,
+  geben wie „Mitglieder anlegen“ nur Admins weiter. Eigene Rechte gibt es auch für eingeschränkte Dokumente und für
+  alle Ergebnisse der Umfragen, auch laufender. Wer nur sehen darf,
   sieht die Mitgliederliste bzw. den Bereich und die Angaben, aber keine Knöpfe zum Ändern. Ändern gibt es nur zusammen mit Sehen. Rollen und Personen, die ein
   Recht zum Ändern hatten, haben nach dem Update auch das Recht zum Sehen; es ändert sich also für niemanden etwas,
   bis du es umstellst.
@@ -58,6 +59,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   ein, er steht beim Eintragen schon im Feld; die Zahlungsarten zur Auswahl richtest du dort auch ein (vorgegeben
   Bar, SEPA und PayPal). Eintragen darf, wer Passive verwaltet. Betreuer sehen unter
   [Meins → Meine Passiven](app:meins/passive), ob der Beitrag für das laufende Jahr bezahlt ist.
+- **Geburtstage der Passiven**: Unter [Verwaltung → Passive](app:verwaltung/passive) richtest du bei _Erinnerung an
+  Geburtstage_ ein, bei welchen Altern erinnert wird (z. B. 50, 60, 70, 75, 80) und wie viele Tage vorher (Vorgabe 7).
+  Anfangs ist keine Altersliste eingetragen, die Erinnerung also aus. Erinnert werden alle, die Passive verwalten und
+  persönliche Angaben sehen dürfen: per Benachrichtigung (einmal je Geburtstag) und oben in der Liste unter
+  _Anstehende Geburtstage_.
 - **Titelbild eines Albums wählen**: Wer die Galerie verwalten darf, öffnet ein Bild in der Großansicht und tippt auf
   _Als Titelbild des Albums verwenden_. Dieses Bild steht dann in der Galerie-Übersicht für das Album, auch bei Alben aus
   Google Drive. Noch einmal getippt, wählt die App das Titelbild wieder selbst. Ist das gewählte Bild nur für Mitglieder,
