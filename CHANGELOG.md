@@ -66,7 +66,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   bis du es umstellst.
 - **Beitrag der Passiven**: Unter [Verwaltung → Passive](app:verwaltung/passive) trägst du jetzt je Passivem und Jahr
   ein, dass der Beitrag bezahlt ist, mit Betrag, Datum und Zahlungsart. Oben wählst du das Jahr, siehst, wie viele
-  bezahlt haben, und kannst nur die offenen oder nur die bezahlten zeigen. Einen Jahresbeitrag stellst du als Vorschlag
+  bezahlt haben, und kannst nur die offenen oder nur die bezahlten zeigen. Vor dem Eintrittsjahr (Feld _Eintritt_,
+  z. B. 2027) gilt der Beitrag nicht als offen, sondern als „noch nicht dabei“. Einen Jahresbeitrag stellst du als Vorschlag
   ein, er steht beim Eintragen schon im Feld; die Zahlungsarten zur Auswahl richtest du dort auch ein (vorgegeben
   Bar, SEPA und PayPal). Eintragen darf, wer Passive verwaltet. Betreuer sehen unter
   [Meins → Meine Passiven](app:meins/passive), ob der Beitrag für das laufende Jahr bezahlt ist.
@@ -107,7 +108,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Betreuer. Eine bisher geführte Liste übernimmst du dort mit „Tabelle importieren“ aus Excel (.xlsx) oder CSV: Die App
   findet die Kopfzeile auch unter einem Titel, erkennt die Spalten an ihren Namen (änderbar), ordnet Betreuer wie
   „A. Beispiel“ einem Mitglied zu, übernimmt auf Wunsch den Beitrag eines Jahres (auch aus Spalten je Zahlungsart),
-  zeigt vorher eine Vorschau und überspringt, wer schon eingetragen ist. Passive sind
+  zeigt vorher eine Vorschau und überspringt, wer schon eingetragen ist. Die Liste zeigt nur die Namen; Antippen öffnet
+  wie bei den Mitgliedern die Karte des Passiven mit allen Angaben und Beiträgen, dort bearbeitest und löschst du ihn
+  und blätterst (auch per Wischen) zum nächsten. Passive sind
   keine Konten: Sie bekommen nie einen Zugang zur App, stehen in keiner Mitgliederliste und ihr Geburtstag erscheint nicht
   bei den Geburtstagen. Die Liste sieht und pflegt, wer das neue Recht _Passive verwalten_ (`manage_passive`) hat; beim
   Einschalten entsteht die Rolle „Passive verwalten“. Adresse, Telefon, E-Mail und Geburtsdatum sieht davon nur, wer

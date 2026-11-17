@@ -7632,3 +7632,26 @@ fieldset.block-source legend {
   margin: 0.15rem 0 0;
   color: var(--muted);
 }
+
+/* Karte eines Passiven (Verwaltung → Passive bzw. Meins → Meine Passiven): Beiträge und Angaben als eigene Karten */
+.passive-card .card {
+  margin-top: var(--space-3);
+}
+.passive-card h3 {
+  margin: 0 0 8px;
+}
+.passive-payment-years {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.passive-payment-years > li + li {
+  margin-top: 6px;
+}
+.passive-payment-other {
+  margin-top: var(--space-3);
+  align-items: end;
+}
+.passive-card-actions {
+  justify-content: center;
+}

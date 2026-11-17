@@ -1,4 +1,4 @@
-import { can, config, isMember, roleLabels, type Me } from '../api';
+import { api, can, config, isMember, roleLabels, type Me } from '../api';
 import brand from '../generated/brand';
 import { formatEuro } from '../format';
 import { navigate } from '../router';
@@ -40,6 +40,10 @@ export default function Meins({
 }) {
   const member = isMember();
   const me = useAsync(() => (member ? sources.me.load() : Promise.resolve(null)), [], sources.me.key);
+  // Meine Passiven: Die Zahl aus der Konfiguration stammt vom Laden der Seite und kann veraltet sein (gespeicherte
+  // App-Seite, gerade erst als Betreuer eingetragen). Deshalb mit dem Bereich auch die eigene Liste fragen.
+  const passiveOn = member && !!config?.features.passive;
+  const cared = useAsync(() => (passiveOn ? api.myPassives() : Promise.resolve([])), [], passiveOn ? 'my-passives' : undefined);
   const dataParts = (
     [
       ['uebersicht', 'Übersicht', true],
@@ -48,7 +52,7 @@ export default function Meins({
       ['dienstgrad', brand.labels.rank, config?.features.ranks && can('view_own_rank')],
       ['anwesenheit', sec.attendance, config?.features.attendance && can('view_own_attendance')],
       // Passive, die die Person betreut (Bereich passive): nur, wenn es welche gibt
-      ['passive', 'Meine Passiven', config?.features.passive && (config?.caredPassives ?? 0) > 0],
+      ['passive', 'Meine Passiven', passiveOn && ((config?.caredPassives ?? 0) > 0 || (cared.data?.length ?? 0) > 0)],
     ] as const
   )
     .filter(([, , on]) => member && on)
@@ -73,7 +77,7 @@ export default function Meins({
       {active === 'konto' ? (
         <Konto onToast={onToast} onLogout={onLogout} />
       ) : active === 'passive' ? (
-        <MyPassives />
+        <MyPassives focus={focus} />
       ) : me.loading && !me.data ? (
         <Loading shape={active === 'uebersicht' ? 'overview' : active === 'anwesenheit' ? 'list' : 'stat'} />
       ) : me.error && !me.data ? (

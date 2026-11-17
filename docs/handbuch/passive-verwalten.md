@@ -13,17 +13,22 @@ Tippe unten auf **Verwaltung** und dann auf den Knopf **Passive**.
 Den Knopf gibt es, sobald unter **Einstellungen → Bereiche** der Bereich **Passive** an ist, und nur für alle mit dem Recht **Passive verwalten**. Beim Einschalten des Bereichs legt die App die Rolle **Passive verwalten** an, die du als Zusatzrolle vergeben kannst.
 
 ## Was du hier siehst
-- **Zähler** oben: wie viele Passive eingetragen sind und wie viele davon den Beitrag für das gewählte Jahr bezahlt haben.
+- **Zähler** oben: wie viele Passive eingetragen sind, wie viele davon den Beitrag für das gewählte Jahr bezahlt haben, wie viele noch offen sind und wie viele in dem Jahr noch nicht dabei sind (Eintritt erst später).
 - **Anstehende Geburtstage**: Passive, die in den nächsten Tagen eines der eingestellten Alter erreichen, mit Datum und Alter. Die Karte erscheint nur, wenn Alter eingestellt sind, ein solcher Geburtstag ansteht und du persönliche Angaben sehen darfst.
 - **Jahresbeitrag (Vorschlag)** und **Zahlungsarten**: der Betrag, der beim Eintragen einer Zahlung schon im Feld steht, und die Zahlungsarten zur Auswahl. Mit **Ändern** richtest du beides ein.
 - **Erinnerung an Geburtstage**: bei welchen Altern und wie viele Tage vorher erinnert wird, oder **aus**. Mit **Einrichten** bzw. **Ändern** stellst du das ein.
-- **Beitrag für**: das Jahr, dessen Zahlungen die Liste zeigt. Vorgegeben ist das laufende Jahr; wählbar sind auch das nächste Jahr und frühere Jahre.
-- **Zeigen**: alle Passiven, nur die mit offenem Beitrag oder nur die, die bezahlt haben.
+- **Filter nach Beitrag** (zum Aufklappen): Bei **Beitrag für** wählst du das Jahr, für das Zähler und Filter gelten. Vorgegeben ist das laufende Jahr; wählbar sind auch das nächste Jahr und frühere Jahre. Bei **Zeigen** wählst du alle Passiven, nur die mit offenem Beitrag oder nur die, die bezahlt haben. Ist ein Filter gesetzt, steht am Knopf **aktiv**.
 - **+ Passiven anlegen**: öffnet das Formular für einen neuen Eintrag.
 - **Tabelle importieren**: übernimmt viele Passive auf einmal aus einer Excel-Datei oder CSV, auf Wunsch mit dem Beitrag eines Jahres.
 - **Suche**: findet Passive nach Vor- und Nachnamen und nach dem Namen des Betreuers.
-- **Liste**: je Passiver der Name (Nachname, Vorname), der Betreuer, der Beitrag für das gewählte Jahr (Betrag, Datum und Zahlungsart oder **offen**) Eintritt und Bemerkung (wenn eingetragen) und, wenn du persönliche Angaben sehen darfst, Adresse, Telefon, E-Mail-Adresse und Geburtsdatum. Antippen der Adresse öffnet den Ort in der Karten-App, Antippen der Nummer ruft an.
-- Bei jedem Eintrag die Knöpfe **Bearbeiten** (Stift) und **Löschen** (Papierkorb).
+- **Liste**: je Passiver nur der Name (Nachname, Vorname). Antippen öffnet die Karte des Passiven.
+
+Auf der **Karte** eines Passiven siehst du:
+- oben **‹ Alle Passiven** zurück zur Liste, daneben die Pfeile zum vorherigen und nächsten Passiven der Liste (so, wie sie gerade gefiltert ist). Du kannst auch nach links oder rechts wischen.
+- den Namen und den Betreuer.
+- **Beiträge**: das laufende Jahr und jedes Jahr mit einer Zahlung, jeweils mit Betrag, Datum und Zahlungsart oder **offen**. Vor dem Eintrittsjahr steht **noch nicht dabei**, ein künftiges Jahr ohne Zahlung ist **noch nicht fällig**.
+- **Angaben**: Eintritt und Bemerkung (wenn eingetragen) und, wenn du persönliche Angaben sehen darfst, Adresse, Telefon, E-Mail-Adresse und Geburtsdatum. Antippen der Adresse öffnet den Ort in der Karten-App, Antippen der Nummer ruft an.
+- unten die Knöpfe **Bearbeiten** (Stift) und **Löschen** (Papierkorb).
 
 ## So gehst du vor
 ### Einen Passiven anlegen
@@ -55,16 +60,16 @@ So liest die App die Spalten:
 Wer schon als Passiver eingetragen ist (gleicher Vor- und Nachname), wird übersprungen. Du kannst dieselbe Tabelle also ein zweites Mal importieren, ohne dass jemand doppelt angelegt wird. Steht ein Name zweimal in der Tabelle, ist das ein Fehler.
 
 ### Angaben ändern
-1. Tippe beim Eintrag auf **Bearbeiten**.
+1. Tippe in der Liste auf den Passiven und auf seiner Karte auf **Bearbeiten**.
 2. Ändere, was nötig ist, und tippe auf **Speichern**. Mit **Abbrechen** bleibt alles, wie es war.
 
 ### Eine Zahlung eintragen
-1. Wähle bei **Beitrag für** das Jahr.
-2. Tippe beim Passiven auf **Zahlung eintragen**.
+1. Tippe in der Liste auf den Passiven.
+2. Tippe auf der Karte unter **Beiträge** beim Jahr auf **Zahlung eintragen**. Für ein anderes Jahr wähle es bei **Zahlung für ein anderes Jahr** und tippe auf **Eintragen**.
 3. Prüfe den **Betrag in €** (vorgegeben ist der Jahresbeitrag) und das Datum bei **Bezahlt am** (vorgegeben ist heute), und wähle die **Zahlungsart**, z. B. Bar, SEPA oder PayPal.
-4. Tippe auf **Speichern**. Beim Passiven steht jetzt der Betrag mit Datum und Zahlungsart.
+4. Tippe auf **Speichern**. Beim Jahr steht jetzt der Betrag mit Datum und Zahlungsart.
 
-Je Passiver gibt es für jedes Jahr nur eine Zahlung. Um eine Zahlung zu ändern oder zu löschen, tippe beim Passiven auf **Ändern** und dann auf **Speichern** bzw. **Zahlung löschen**.
+Je Passiver gibt es für jedes Jahr nur eine Zahlung. Um eine Zahlung zu ändern oder zu löschen, tippe auf der Karte beim Jahr auf **Ändern** und dann auf **Speichern** bzw. **Zahlung löschen**.
 
 ### Jahresbeitrag und Zahlungsarten einrichten
 1. Tippe oben bei **Zahlungsarten** auf **Ändern**.
@@ -83,7 +88,7 @@ Frühere Zahlungen behalten ihre Zahlungsart, auch wenn du sie aus der Auswahl e
 Anfangs sind keine Alter eingetragen, die Erinnerung ist also aus. Leerst du das Feld wieder, schaltest du sie aus.
 
 ### Einen Passiven löschen
-1. Tippe beim Eintrag auf **Löschen**.
+1. Tippe in der Liste auf den Passiven und auf seiner Karte auf **Löschen**.
 2. Bestätige die Frage. Der Eintrag ist dann mit allen Angaben und Zahlungen gelöscht.
 
 ## Gut zu wissen
@@ -91,6 +96,7 @@ Anfangs sind keine Alter eingetragen, die Erinnerung ist also aus. Leerst du das
 - Adresse, Telefon, E-Mail-Adresse und Geburtsdatum sind persönliche Angaben. Sie sieht nur, wer das Recht **Persönliche Angaben sehen** hat, und ändert nur, wer **Persönliche Angaben pflegen** hat. Ohne diese Rechte siehst und pflegst du nur die Namen, den Betreuer, den Eintritt und die Bemerkung, und beim Import übergeht die App die Spalten mit persönlichen Angaben.
 - Der Betreuer sieht seine eigenen Passiven unter **Meins → Meine Passiven** mit allen Angaben, auch ohne die Rechte für persönliche Angaben. Ändern kann er dort nichts.
 - Zahlungen trägt ein, wer **Passive verwalten** darf, auch ohne die Rechte für persönliche Angaben. Der Betreuer sieht unter **Meins → Meine Passiven**, ob der Beitrag für das laufende Jahr bezahlt ist.
+- **Eintritt in der Zukunft:** Steht beim Eintritt ein Jahr, z. B. 2027 oder 01.03.2027, ist der Beitrag erst ab diesem Jahr fällig. Davor zählt der Passive weder als offen noch erscheint er bei **nur offen**. Bei einem Eintritt wie „vor 2014“ oder ohne Jahr gilt der Beitrag in jedem Jahr.
 - Betreuer kann nur ein Mitglied sein. Wird das Konto des Betreuers gelöscht, bleibt der Passive ohne Betreuer eingetragen.
 - Der Geburtstag eines Passiven erscheint nicht bei den {bereich.birthdays} der Mitglieder.
 - An Geburtstage erinnert werden alle, die **Passive verwalten** und **Persönliche Angaben sehen** dürfen, nicht der Betreuer. Sie bekommen eine Benachrichtigung aufs Gerät, die eingestellten Tage vorher, je Geburtstag einmal, ab derselben Uhrzeit wie die Benachrichtigung zu Geburtstagen der Mitglieder (vorgegeben 7 Uhr). Dafür muss unter **Meins → Konto → Benachrichtigungen einstellen** die Art **Passive: Geburtstage der eingestellten Alter** an sein. Wer schon Benachrichtigungen bekommt, hat sie nach dem Einrichten automatisch an.
