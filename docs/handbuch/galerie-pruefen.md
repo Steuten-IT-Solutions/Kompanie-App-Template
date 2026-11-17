@@ -1,13 +1,14 @@
 ---
 titel: Eingereichte Bilder und Videos prüfen
 reihenfolge: 39
-rechte: [review_gallery]
+rechte: []
+einrecht: [view_submissions, review_gallery]
 bereiche: [gallery]
 ---
 Hier siehst du die Bilder und Videos, die Mitglieder für die {bereich.gallery} eingereicht haben, und entscheidest, ob sie hineinkommen.
 
 ## So öffnest du die Seite
-Tippe unten auf **{bereich.gallery}** und oben auf **Einreichungen prüfen** (Klemmbrett mit Haken). Mit **‹ Alle Alben** kommst du zurück.
+Tippe unten auf **{bereich.gallery}** und oben auf **Einreichungen prüfen** (Klemmbrett mit Haken; darfst du nur sehen, heißt der Knopf **Einreichungen ansehen**). Mit **‹ Alle Alben** kommst du zurück.
 
 ## Was du hier siehst
 - **Offene Einreichungen**, die ältesten zuerst: das Bild oder Video, sein Name, das Album und wer es eingereicht hat. Ein Video spielst du hier mit ▶ ab, bevor du entscheidest.
@@ -27,6 +28,7 @@ Setze oder entferne unter **Zuletzt freigegeben** den Haken **intern**. Mit Hake
 Tippe unter **Zuletzt freigegeben** auf **Wieder entfernen** (Mülleimer) und bestätige. Das Bild verschwindet aus der {bereich.gallery}.
 
 ## Gut zu wissen
+- **Nur sehen:** Mit dem Recht **Einreichungen sehen** ohne **Einreichungen prüfen** heißt die Seite **Einreichungen**. Du siehst die offenen und die zuletzt freigegebenen Bilder und Videos, aber ohne **Öffentlich freigeben**, **Nur für Mitglieder freigeben**, **Ablehnen**, den Schalter für intern und **Wieder entfernen**.
 - Bei neuen Einreichungen bekommst du eine Benachrichtigung, je Person und Schub nur eine (unter **Meins → Benachrichtigungen** einstellbar).
 - Die einreichende Person erfährt, ob ihr Bild oder Video freigegeben oder abgelehnt wurde.
 - Wer selbst einreichen und prüfen darf, kann auch eigene Bilder freigeben.

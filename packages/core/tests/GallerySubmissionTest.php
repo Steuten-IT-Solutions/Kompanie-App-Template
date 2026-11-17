@@ -43,7 +43,7 @@ final class GallerySubmissionTest extends TestCase
         $this->sub = $this->users->add('einreicher', Roles::MEMBER);
         $this->rev = $this->users->add('pruefer', Roles::MEMBER);
         $this->grant($this->sub, ['submit_gallery']);
-        $this->grant($this->rev, ['review_gallery']);
+        $this->grant($this->rev, ['view_submissions', 'review_gallery']);
         $this->users->current = $this->admin;
         $this->ok('PATCH', '/admin/settings', ['gallery_source' => 'server', 'gallery_submissions' => '1']);
         $this->album = (int) $this->ok('POST', '/admin/gallery/albums', ['title' => 'Sommerfest', 'year' => 2026])['id'];
@@ -115,7 +115,7 @@ final class GallerySubmissionTest extends TestCase
         $this->users->current = $this->rev;
         $this->assertSame(403, $this->call('POST', '/gallery/submissions', ['album_id' => $this->album])->status, 'nur mit submit_gallery');
         $this->users->current = $this->sub;
-        $this->assertSame(403, $this->call('GET', '/gallery/review')->status, 'nur mit review_gallery');
+        $this->assertSame(403, $this->call('GET', '/gallery/review')->status, 'nur mit view_submissions');
         $own = $this->ok('GET', '/gallery/submissions');
         $this->assertSame([['id' => $this->album, 'title' => 'Sommerfest', 'year' => '2026']], $own['albums']);
 
@@ -189,7 +189,7 @@ final class GallerySubmissionTest extends TestCase
     public function testOwnApprovalNeedsBothRightsAndAdminDeleteMarksRemoved(): void
     {
         $both = $this->users->add('beides', Roles::MEMBER);
-        $this->grant($both, ['submit_gallery', 'review_gallery']);
+        $this->grant($both, ['submit_gallery', 'view_submissions', 'review_gallery']);
         $s = $this->submit('Selbst.jpg', $both);
         $this->users->current = $both;
         $this->ok('POST', "/gallery/review/{$s['id']}/approve", ['intern' => false]);
@@ -243,7 +243,7 @@ final class GallerySubmissionTest extends TestCase
     {
         $this->app->settings->set(GallerySubmissionService::SETUP_SETTING, false);
         $this->app->gallerySubmissions()->initialize(true);
-        $this->assertSame(TestApp::caps(['member', 'review_gallery', 'manage_gallery']), $this->app->roles()->find('gallery')['capabilities'] ?? null);
+        $this->assertSame(TestApp::caps(['member', 'view_submissions', 'review_gallery', 'manage_gallery']), $this->app->roles()->find('gallery')['capabilities'] ?? null);
         $this->assertSame('Galerie verwalten', $this->app->roles()->find('gallery')['label'] ?? null);
         $this->assertTrue($this->app->settings->get(GallerySubmissionService::SETUP_SETTING));
     }

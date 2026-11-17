@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, type GallerySubmission } from '../api';
+import { api, can, type GallerySubmission } from '../api';
 import { navigate } from '../router';
 import { Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
 import { confirmAsk, promptAsk } from '../ask';
@@ -175,6 +175,8 @@ function Submit({ albumId, onToast }: { albumId?: number; onToast: (msg: string)
 }
 
 function Review({ onToast }: { onToast: (msg: string) => void }) {
+  // Nur sehen (view_submissions): Einreichungen ansehen; freigeben, ablehnen, umstellen und entfernen mit review_gallery
+  const editable = can('review_gallery');
   const { data, error, loading, reload } = useAsync(api.galleryReview, []);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -202,7 +204,7 @@ function Review({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <>
-      <h2>Einreichungen prüfen</h2>
+      <h2>{editable ? 'Einreichungen prüfen' : 'Einreichungen'}</h2>
       {actionError && (
         <p className="form-error small" role="alert">
           {actionError}
@@ -223,36 +225,38 @@ function Review({ onToast }: { onToast: (msg: string) => void }) {
               <p className="small">
                 <strong>{s.name}</strong> für {s.album}, von {s.user_name}
               </p>
-              <div className="button-row">
-                <button
-                  type="button"
-                  className="btn btn-small btn-primary"
-                  disabled={busy}
-                  onClick={() => void run(() => api.approveGallerySubmission(s.id, false), 'Freigegeben')}
-                >
-                  Öffentlich freigeben
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-small btn-secondary"
-                  disabled={busy}
-                  onClick={() => void run(() => api.approveGallerySubmission(s.id, true), 'Intern freigegeben')}
-                >
-                  Nur für Mitglieder freigeben
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-small btn-danger"
-                  disabled={busy}
-                  onClick={async () => {
-                    const reason = await promptAsk(`Warum kommt „${s.name}“ nicht in die Galerie?`);
-                    if (reason === null) return;
-                    void run(() => api.rejectGallerySubmission(s.id, reason), 'Abgelehnt');
-                  }}
-                >
-                  Ablehnen
-                </button>
-              </div>
+              {editable && (
+                <div className="button-row">
+                  <button
+                    type="button"
+                    className="btn btn-small btn-primary"
+                    disabled={busy}
+                    onClick={() => void run(() => api.approveGallerySubmission(s.id, false), 'Freigegeben')}
+                  >
+                    Öffentlich freigeben
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-small btn-secondary"
+                    disabled={busy}
+                    onClick={() => void run(() => api.approveGallerySubmission(s.id, true), 'Intern freigegeben')}
+                  >
+                    Nur für Mitglieder freigeben
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-small btn-danger"
+                    disabled={busy}
+                    onClick={async () => {
+                      const reason = await promptAsk(`Warum kommt „${s.name}“ nicht in die Galerie?`);
+                      if (reason === null) return;
+                      void run(() => api.rejectGallerySubmission(s.id, reason), 'Abgelehnt');
+                    }}
+                  >
+                    Ablehnen
+                  </button>
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -267,29 +271,31 @@ function Review({ onToast }: { onToast: (msg: string) => void }) {
                 <span className="small">
                   {s.name} · {s.album} · von {s.user_name}
                 </span>
-                <div className="gallery-approved-actions">
-                  {s.photo_id !== null && typeof s.intern === 'boolean' && (
-                    <InternToggle
-                      checked={s.intern}
-                      name={s.name}
+                {editable && (
+                  <div className="gallery-approved-actions">
+                    {s.photo_id !== null && typeof s.intern === 'boolean' && (
+                      <InternToggle
+                        checked={s.intern}
+                        name={s.name}
+                        disabled={busy}
+                        onChange={(next) =>
+                          run(() => api.setGalleryPhotoIntern(s.photo_id!, next), next ? 'Jetzt nur für Mitglieder' : 'Jetzt öffentlich')
+                        }
+                      />
+                    )}
+                    <IconButton
+                      icon="delete"
+                      label="Wieder entfernen"
+                      variant="danger"
                       disabled={busy}
-                      onChange={(next) =>
-                        run(() => api.setGalleryPhotoIntern(s.photo_id!, next), next ? 'Jetzt nur für Mitglieder' : 'Jetzt öffentlich')
-                      }
+                      onClick={async () => {
+                        if (!(await confirmAsk(`${s.type === 'video' ? 'Video' : 'Bild'} „${s.name}“ wieder aus der Galerie entfernen?`)))
+                          return;
+                        void run(() => api.removeGallerySubmission(s.id), 'Entfernt');
+                      }}
                     />
-                  )}
-                  <IconButton
-                    icon="delete"
-                    label="Wieder entfernen"
-                    variant="danger"
-                    disabled={busy}
-                    onClick={async () => {
-                      if (!(await confirmAsk(`${s.type === 'video' ? 'Video' : 'Bild'} „${s.name}“ wieder aus der Galerie entfernen?`)))
-                        return;
-                      void run(() => api.removeGallerySubmission(s.id), 'Entfernt');
-                    }}
-                  />
-                </div>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

@@ -17,7 +17,7 @@ use KompanieApp\Core\Http\ManifestIcons;
  * /app/sw.js                 → Service Worker (Bereich /app/)
  * /app/foto/<id>/<größe>     → Galeriebild (interne nur für Mitglieder)
  * /app/foto/<id>/video       → Galerievideo in Ausschnitten aus Drive oder der eigenen Ablage (Range; interne nur für Mitglieder)
- * /app/foto/<id>/einreichung → Video einer offenen Einreichung zum Prüfen (review_gallery, Issue #350)
+ * /app/foto/<id>/einreichung → Video einer offenen Einreichung zum Prüfen (view_submissions, Issue #350)
  * /app/dokument/<id>?v=…     → Dokument (nur für Mitglieder, die es sehen dürfen)
  * /app/abzeichen/<id>?v=…&s=… → Abzeichen eines Dienstgrads (angemeldet mit Mitgliederbereich oder Kalender)
  * /app/mitgliedsfoto/<id>?v=…&s=… → Foto eines Mitglieds (die Person selbst und wer Mitglieder verwaltet)
@@ -337,7 +337,7 @@ final class AppPage
         $range = isset($_SERVER['HTTP_RANGE']) && is_string($_SERVER['HTTP_RANGE']) ? wp_unslash($_SERVER['HTTP_RANGE']) : null;
         $access = static function () use ($app, $submission): array {
             $user = $app->authContext->currentUser();
-            $cap = $submission ? \KompanieApp\Core\Auth\Capability::ReviewGallery : \KompanieApp\Core\Auth\Capability::ViewGalleryInternal;
+            $cap = $submission ? \KompanieApp\Core\Auth\Capability::ViewSubmissions : \KompanieApp\Core\Auth\Capability::ViewGalleryInternal;
             return [$app->can($cap), $user !== null];
         };
         if ($submission) {

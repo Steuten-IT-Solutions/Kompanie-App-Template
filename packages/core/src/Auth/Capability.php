@@ -115,7 +115,9 @@ enum Capability: string
     case ManageCompanies = 'manage_companies';
     /** Bilder für die Galerie einreichen, eigene Einreichungen sehen und zurückziehen (Issue #286). */
     case SubmitGallery = 'submit_gallery';
-    /** Einreichungen sehen, freigeben (öffentlich oder intern), ablehnen und freigegebene wieder entfernen (Issue #286). */
+    /** Eingereichte Bilder und Videos zur Prüfung sehen, auch Videos vor der Freigabe (ohne freizugeben). */
+    case ViewSubmissions = 'view_submissions';
+    /** Einreichungen freigeben (öffentlich oder intern), ablehnen und freigegebene wieder entfernen (Issue #286; setzt view_submissions voraus). */
     case ReviewGallery = 'review_gallery';
     /**
      * Galerie verwalten: Alben der App anlegen, umbenennen, ins andere Jahr setzen und löschen, Bilder und Videos
@@ -155,9 +157,11 @@ enum Capability: string
     case ManagePassive = 'manage_passive';
     /** Rollen vergeben. */
     case PromoteUsers = 'promote_users';
+    /** Fehlermeldungen der App mit Bildschirmfoto sehen (ohne sie zu schließen oder weiterzuleiten). */
+    case ViewReports = 'view_reports';
     /**
      * Fehlermeldungen der App sehen (mit Namen angemeldeter Personen und Bildschirmfoto), mit Begründung schließen oder
-     * an die Betreuer der App weiterleiten (BugReportService).
+     * an die Betreuer der App weiterleiten (BugReportService; setzt view_reports voraus).
      */
     case ReviewReports = 'review_reports';
     /**
@@ -214,6 +218,8 @@ enum Capability: string
         'manage_lists' => 'view_lists',
         'send_mail' => 'view_mail',
         'manage_passive' => 'view_passive',
+        'review_gallery' => 'view_submissions',
+        'review_reports' => 'view_reports',
     ];
 
     /**

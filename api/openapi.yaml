@@ -612,7 +612,7 @@ paths:
     get:
       tags: [Fehlermeldungen]
       summary: Eingang der Fehlermeldungen (offene zuerst, dann die erledigten der letzten 30 Tage)
-      x-capability: review_reports
+      x-capability: view_reports
       responses:
         '200':
           description: OK
@@ -634,7 +634,7 @@ paths:
     get:
       tags: [Fehlermeldungen]
       summary: Bildschirmfoto einer offenen Meldung
-      x-capability: review_reports
+      x-capability: view_reports
       responses:
         '200':
           description: OK
@@ -1527,7 +1527,7 @@ paths:
     get:
       tags: [Galerie]
       summary: Offene Einreichungen (älteste zuerst) und die zuletzt freigegebenen
-      x-capability: review_gallery
+      x-capability: view_submissions
       responses:
         '200':
           description: OK
@@ -9434,7 +9434,7 @@ components:
 
     ReviewReport:
       type: object
-      description: Fehlermeldung im Eingang der Admins (review_reports)
+      description: Fehlermeldung im Eingang der Admins (view_reports)
       required:
         [
           id,
@@ -9497,7 +9497,7 @@ components:
         video:
           {
             type: string,
-            description: 'Nur beim Prüfen offener Videos: Adresse zum Abspielen vor der Freigabe (<App>/foto/<id der Einreichung>/einreichung, Range, nur mit review_gallery)',
+            description: 'Nur beim Prüfen offener Videos: Adresse zum Abspielen vor der Freigabe (<App>/foto/<id der Einreichung>/einreichung, Range, nur mit view_submissions)',
           }
     GalleryAlbumInput:
       type: object
@@ -9725,6 +9725,7 @@ components:
                       manage_sponsors,
                       manage_companies,
                       submit_gallery,
+                      view_submissions,
                       review_gallery,
                       manage_gallery,
                       manage_pages,
@@ -9737,6 +9738,7 @@ components:
                       view_passive,
                       manage_passive,
                       promote_users,
+                      view_reports,
                       review_reports,
                       view_activity,
                       view_changes,
@@ -9817,6 +9819,7 @@ components:
                   manage_sponsors,
                   manage_companies,
                   submit_gallery,
+                  view_submissions,
                   review_gallery,
                   manage_gallery,
                   manage_pages,
@@ -9829,6 +9832,7 @@ components:
                   view_passive,
                   manage_passive,
                   promote_users,
+                  view_reports,
                   review_reports,
                 ],
             }
@@ -9916,6 +9920,7 @@ components:
                 manage_sponsors,
                 manage_companies,
                 submit_gallery,
+                view_submissions,
                 review_gallery,
                 manage_gallery,
                 manage_pages,
@@ -9928,6 +9933,7 @@ components:
                 view_passive,
                 manage_passive,
                 promote_users,
+                view_reports,
                 review_reports,
                 view_activity,
                 view_changes,
@@ -10036,7 +10042,7 @@ components:
             imprint: { type: [string, 'null'] }
             privacy: { type: [string, 'null'] }
         reports: { type: boolean, description: 'Fehler melden möglich (Knopf „Fehler melden“); Meldungen gehen zuerst an die Admins' }
-        openReports: { type: [integer, 'null'], description: 'Offene Fehlermeldungen; nur für Angemeldete mit review_reports, sonst null' }
+        openReports: { type: [integer, 'null'], description: 'Offene Fehlermeldungen; nur für Angemeldete mit view_reports, sonst null' }
         registration: { type: boolean, description: 'Zugang beantragen eingeschaltet (Issue #314): Link „Zugang beantragen“ für Gäste' }
         pendingRegistrations:
           { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null' }
@@ -10830,6 +10836,7 @@ components:
           manage_sponsors,
           manage_companies,
           submit_gallery,
+          view_submissions,
           review_gallery,
           manage_gallery,
           manage_pages,
@@ -10842,6 +10849,7 @@ components:
           view_passive,
           manage_passive,
           promote_users,
+          view_reports,
           review_reports,
         ]
 

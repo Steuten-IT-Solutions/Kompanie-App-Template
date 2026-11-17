@@ -126,6 +126,7 @@ final class Roles
         Capability::ManageSponsors,
         Capability::ManageCompanies,
         Capability::SubmitGallery,
+        Capability::ViewSubmissions,
         Capability::ReviewGallery,
         Capability::ManageGallery,
         Capability::ManagePages,
@@ -152,6 +153,7 @@ final class Roles
         Capability::ViewPassive,
         Capability::ManagePassive,
         Capability::PromoteUsers,
+        Capability::ViewReports,
         Capability::ReviewReports,
         Capability::ViewChanges,
     ];

@@ -749,7 +749,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
                   albumId={/^\d+$/.test(path[2] ?? '') ? Number(path[2]) : undefined}
                   onToast={showToast}
                 />
-              ) : path[1] === 'pruefen' && can('review_gallery') ? (
+              ) : path[1] === 'pruefen' && can('view_submissions') ? (
                 <GalerieEinreichungen mode="pruefen" onToast={showToast} />
               ) : path[1] === 'verwalten' && canManageGallery() ? (
                 <div>

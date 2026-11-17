@@ -64,6 +64,7 @@ export type Capability =
   | 'manage_sponsors'
   | 'manage_companies'
   | 'submit_gallery'
+  | 'view_submissions'
   | 'review_gallery'
   | 'manage_gallery'
   | 'manage_pages'
@@ -76,6 +77,7 @@ export type Capability =
   | 'view_passive'
   | 'manage_passive'
   | 'promote_users'
+  | 'view_reports'
   | 'review_reports'
   | 'view_activity'
   | 'view_changes'
@@ -139,7 +141,7 @@ export interface AppConfig {
   legal?: { imprint: string | null; privacy: string | null };
   /** „Fehler melden“ möglich (Issue #64); Meldungen gehen zuerst an die Admins */
   reports?: boolean;
-  /** Offene Fehlermeldungen; nur für Angemeldete mit review_reports, sonst null */
+  /** Offene Fehlermeldungen; nur für Angemeldete mit view_reports, sonst null */
   openReports?: number | null;
   /** Zugang beantragen (Issue #314) eingeschaltet: Link „Zugang beantragen“ für Gäste; fehlt bei älteren Servern */
   registration?: boolean;
