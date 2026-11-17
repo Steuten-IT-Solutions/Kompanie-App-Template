@@ -551,6 +551,11 @@ final class WpUsers implements UserDirectory, AuthContext
                 $caps[] = $cap;
             }
         }
+        // Konten anlegen und Rollen vergeben setzen Konten sehen voraus (Capability::READ_OF): Wem WordPress eines davon gibt,
+        // der sieht die Konten auch.
+        if (array_intersect([Capability::CreateUsers, Capability::PromoteUsers], $caps) !== [] && !in_array(Capability::ViewAccounts, $caps, true)) {
+            $caps[] = Capability::ViewAccounts;
+        }
         // Ehemalige verwaltete früher, wer Mitglieder anlegt: Wem WordPress das gibt, der behält auch das (wie die Migration
         // RoleService::migrateFormerRights für die Rollen der App).
         if (is_array($wp) && ($wp['create_users'] ?? null) === Capability::CreateUsers && user_can($u, 'create_users') && !in_array(Capability::ManageFormer, $caps, true)) {
