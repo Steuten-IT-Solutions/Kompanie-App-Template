@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { config, type Capability } from './api';
-import { CAPABILITY_GROUPS, groupState, shown, type CapabilityGroup, type GroupState } from './capabilities';
+import { CAPABILITY_GROUPS, groupState, rightsRows, shown, type CapabilityGroup, type GroupState } from './capabilities';
 
 /** Gruppen mit den Rechten, die zu eingeschalteten Bereichen gehören; leere Gruppen fallen weg. */
 export function visibleGroups(): CapabilityGroup[] {
@@ -112,20 +112,51 @@ export function RightsTree({
             </div>
             <div id={bodyId} className="rights-group-body" hidden={!expanded}>
               {g.hint && <p className="small muted rights-group-hint">{g.hint}</p>}
-              {g.items.map((i) => (
-                <label key={i.key} className="toggle feature-toggle">
-                  <input
-                    type="checkbox"
-                    checked={isOn(i.key)}
-                    disabled={isDisabled(i.key)}
-                    onChange={(e) => onToggle([i.key], e.target.checked)}
-                  />
-                  <span>
-                    {i.label}
-                    {badge?.(i.key)}
-                  </span>
-                </label>
-              ))}
+              {rightsRows(g.items).map((row) =>
+                row.kind === 'single' ? (
+                  <label key={row.item.key} className="toggle feature-toggle">
+                    <input
+                      type="checkbox"
+                      checked={isOn(row.item.key)}
+                      disabled={isDisabled(row.item.key)}
+                      onChange={(e) => onToggle([row.item.key], e.target.checked)}
+                    />
+                    <span>
+                      {row.item.label}
+                      {badge?.(row.item.key)}
+                    </span>
+                  </label>
+                ) : (
+                  <div key={row.read.key} className="rights-pair" role="group" aria-label={row.area}>
+                    <span className="rights-pair-label">{row.area}</span>
+                    <div className="rights-pair-boxes">
+                      {(
+                        [
+                          [row.read, 'Lesen'],
+                          [row.write, 'Schreiben'],
+                        ] as const
+                      ).map(([item, word]) => (
+                        <label key={item.key} className="toggle rights-pair-box">
+                          <input
+                            type="checkbox"
+                            aria-label={`${item.label} (${word})`}
+                            checked={isOn(item.key)}
+                            disabled={isDisabled(item.key)}
+                            onChange={(e) => onToggle([item.key], e.target.checked)}
+                          />
+                          <span>
+                            {word}
+                            {badge?.(item.key)}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    <p className="small muted rights-pair-desc">
+                      Lesen: {row.read.label}. Schreiben: {row.write.label}.
+                    </p>
+                  </div>
+                ),
+              )}
             </div>
           </div>
         );

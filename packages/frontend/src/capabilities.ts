@@ -13,6 +13,11 @@ export interface CapabilityItem {
   short: string;
   /** Nur sichtbar, wenn einer dieser Bereiche an ist (sonst immer) */
   features?: Feature[];
+  /**
+   * Bei einem Leserecht, dem in der Liste sein Schreibrecht folgt (READ_OF): Name des Bereichs für die gemeinsame Zeile
+   * mit den Haken „Lesen“ und „Schreiben“ (Entscheidung vom 17.11.2026).
+   */
+  area?: string;
 }
 
 export interface CapabilityGroup {
@@ -100,6 +105,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         key: 'view_responses',
         label: 'Zu- und Absagen sehen: wer bei einem internen Termin zu- oder abgesagt hat, mit Hinweis',
         short: 'Zu- und Absagen sehen',
+        area: 'Zu- und Absagen, interner Kalender',
         features: ['calendar'],
       },
       {
@@ -118,6 +124,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         key: 'view_restricted_documents',
         label: `Eingeschränkte ${sec.documents} sehen, die nur für die Pflege bestimmt sind`,
         short: `Eingeschränkte ${sec.documents} sehen`,
+        area: `Eingeschränkte ${sec.documents}`,
         features: ['documents'],
       },
       {
@@ -130,6 +137,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         key: 'view_board_history',
         label: `${sec.board}: alle Nachrichten sehen, auch für andere, mit Verlauf und Mailversand`,
         short: `${sec.board}-Verlauf sehen`,
+        area: `${sec.board}: alle Nachrichten`,
         features: ['board'],
       },
       { key: 'post_board', label: `${sec.board}: dringende Nachrichten schreiben`, short: `${sec.board} schreiben`, features: ['board'] },
@@ -137,6 +145,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         key: 'view_poll_results',
         label: `${sec.polls}: alle Ergebnisse sehen, auch laufender und verborgener`,
         short: `${sec.polls}-Ergebnisse sehen`,
+        area: `${sec.polls}: alle Ergebnisse`,
         features: ['polls'],
       },
       {
@@ -145,7 +154,13 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         short: `${sec.polls} verwalten`,
         features: ['polls'],
       },
-      { key: 'view_lists', label: `${sec.lists} sehen, drucken und als CSV laden`, short: `${sec.lists} sehen`, features: ['lists'] },
+      {
+        key: 'view_lists',
+        label: `${sec.lists} sehen, drucken und als CSV laden`,
+        short: `${sec.lists} sehen`,
+        features: ['lists'],
+        area: sec.lists,
+      },
       {
         key: 'manage_lists',
         label: `${sec.lists}: zum Drucken und als CSV anlegen, bearbeiten und löschen`,
@@ -156,6 +171,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         key: 'view_mail',
         label: `${sec.mail}: Verlauf der versendeten E-Mails mit Versandprotokoll sehen`,
         short: `${sec.mail} sehen`,
+        area: sec.mail,
         features: ['mail'],
       },
       {
@@ -174,6 +190,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         key: 'view_company_members',
         label: `${sec.companies}: sehen, welchen ${sec.companies} die Mitglieder zugeordnet sind`,
         short: `Zuordnung zu ${sec.companies} sehen`,
+        area: `Zuordnung zu ${sec.companies}`,
         features: ['companies'],
       },
       {
@@ -192,6 +209,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         key: 'view_submissions',
         label: `${sec.gallery}: eingereichte Bilder und Videos ansehen, auch vor der Freigabe`,
         short: 'Einreichungen sehen',
+        area: `Einreichungen der ${sec.gallery}`,
         features: ['gallery'],
       },
       {
@@ -228,6 +246,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         key: 'view_points',
         label: `${sec.points} aller Mitglieder sehen`,
         short: `${sec.points} sehen`,
+        area: sec.points,
         features: ['points'],
       },
       { key: 'manage_points', label: `${sec.points} vergeben, Katalog pflegen`, short: `${sec.points} vergeben`, features: ['points'] },
@@ -235,6 +254,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         key: 'view_penalties',
         label: `${sec.penalties} aller Mitglieder sehen, auch die offenen`,
         short: `${sec.penalties} sehen`,
+        area: sec.penalties,
         features: ['penalties'],
       },
       {
@@ -247,6 +267,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         key: 'view_promotions',
         label: `${brand.labels.rank} der Mitglieder mit Verlauf und anstehende Beförderungen sehen`,
         short: 'Beförderungen sehen',
+        area: `${sec.ranks} und Beförderungen`,
         features: ['ranks'],
       },
       {
@@ -259,6 +280,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         key: 'view_titles',
         label: `${sec.titles} sehen und wer welchen hat`,
         short: `${sec.titles} sehen`,
+        area: sec.titles,
         features: ['titles'],
       },
       { key: 'manage_titles', label: `${sec.titles} pflegen und vergeben`, short: `${sec.titles} pflegen`, features: ['titles'] },
@@ -266,6 +288,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         key: 'view_attendance',
         label: `${sec.attendance}: Listen je Termin und die ${sec.attendance} der Mitglieder sehen`,
         short: `${sec.attendance} sehen`,
+        area: sec.attendance,
         features: ['attendance'],
       },
       { key: 'manage_attendance', label: `${sec.attendance}: Listen je Termin führen`, short: sec.attendance, features: ['attendance'] },
@@ -279,6 +302,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         key: 'view_inventory',
         label: `${sec.inventory} mit Lagerorten und Verlauf sehen`,
         short: `${sec.inventory} sehen`,
+        area: sec.inventory,
         features: ['inventory'],
       },
       {
@@ -297,6 +321,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         key: 'view_personal',
         label: 'Persönliche Angaben sehen: Adresse, Handynummer, E-Mail-Adresse und Geburtsdatum der Mitglieder',
         short: 'Persönliches sehen',
+        area: 'Persönliche Angaben',
       },
       {
         key: 'manage_personal',
@@ -308,6 +333,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         label:
           'Konten sehen: wer ohne Zugang ist, Benutzername und E-Mail-Adresse, Eintritt, Rollen und einzelne Rechte, Anfragen auf einen Zugang und Aufnahmen (ohne zu ändern; nur Admins vergeben es)',
         short: 'Konten sehen',
+        area: 'Konten und Mitglieder anlegen',
       },
       {
         key: 'create_users',
@@ -326,6 +352,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         label:
           'Passive sehen: Liste der Passiven mit Betreuer und Beiträgen (Adresse, Telefon, E-Mail und Geburtsdatum nur mit den Rechten für persönliche Angaben)',
         short: 'Passive sehen',
+        area: 'Passive',
         features: ['passive'],
       },
       {
@@ -344,6 +371,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         key: 'view_reports',
         label: 'Fehlermeldungen der Mitglieder mit Bildschirmfoto sehen',
         short: 'Fehlermeldungen sehen',
+        area: 'Fehlermeldungen',
       },
       {
         key: 'review_reports',

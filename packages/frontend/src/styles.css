@@ -2853,6 +2853,29 @@ fieldset.rights-tree legend {
 .rights-group-hint {
   margin: 0 0 10px;
 }
+/* Ein Bereich mit Leserecht und Schreibrecht in einer Zeile (rightsTree.tsx): Name, daneben bzw. darunter die zwei Haken */
+.rights-pair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+  padding: 6px 0;
+}
+.rights-pair-label {
+  flex: 1 1 12rem;
+  color: var(--ink);
+}
+.rights-pair-boxes {
+  display: flex;
+  gap: 16px;
+}
+.rights-pair-box input {
+  flex: none;
+}
+.rights-pair-desc {
+  flex: 1 1 100%;
+  margin: 0;
+}
 /* Übersicht „Wer sieht was“ (RechteMatrix.tsx): waagerecht scrollbar, erste Spalte bleibt stehen */
 .rights-matrix-scroll {
   overflow-x: auto;

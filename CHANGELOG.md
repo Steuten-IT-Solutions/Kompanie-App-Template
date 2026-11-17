@@ -50,7 +50,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Rolle, Zusatzrollen und Rechte einer Person, den Eintritt, Anfragen auf einen Zugang und Aufnahmen; dieses Recht
   geben wie „Mitglieder anlegen“ nur Admins weiter. Eigene Rechte gibt es auch für eingeschränkte Dokumente, für
   alle Ergebnisse der Umfragen, auch laufender, für alle Nachrichten am Schwarzen Brett mit ihrem Verlauf und für die
-  Zuordnung der Mitglieder zu Kompanien. Wer nur sehen darf,
+  Zuordnung der Mitglieder zu Kompanien. Im Formular einer Rolle und bei den Rechten einer Person stehen solche Bereiche in
+  einer Zeile mit den Haken „Lesen“ und „Schreiben“. Wer nur sehen darf,
   sieht die Mitgliederliste bzw. den Bereich und die Angaben, aber keine Knöpfe zum Ändern. Ändern gibt es nur zusammen mit Sehen. Rollen und Personen, die ein
   Recht zum Ändern hatten, haben nach dem Update auch das Recht zum Sehen; es ändert sich also für niemanden etwas,
   bis du es umstellst.
