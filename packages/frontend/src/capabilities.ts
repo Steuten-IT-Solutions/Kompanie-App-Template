@@ -116,7 +116,7 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
       },
       {
         key: 'manage_news',
-        label: `${sec.news}: Beiträge in der App schreiben, bearbeiten und löschen (nur mit der Quelle „In der App“)`,
+        label: `${sec.news}: Beiträge schreiben, bearbeiten und löschen, in der App (Quelle „In der App“) oder im Editor von WordPress (Quelle „Beiträge dieser WordPress-Seite“)`,
         short: `${sec.news} schreiben`,
         features: ['news'],
       },

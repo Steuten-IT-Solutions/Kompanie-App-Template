@@ -783,6 +783,8 @@ final class Api
             'section_labels' => self::jsonObject($a->navigation()->sectionOverrides($a->features()->enabled('directory'), $a->features()->enabled('offices'))),
             // News in der App geschrieben (Quelle „app“): Wer manage_news hat, sieht dort Knöpfe zum Schreiben und Ändern
             'newsInApp' => ($features['news'] ?? false) && $a->newsService()->inApp(),
+            // Beiträge der WordPress-Seite im Editor von WordPress schreiben (Quelle site, manage_news): Adresse für „Neuer Beitrag“
+            'newsEditorUrl' => ($features['news'] ?? false) ? $a->newsService()->editorUrl($user) : null,
             // Interner Kalender in der App gepflegt (Quelle „app“): Wer manage_calendar hat, sieht bei den Terminen den Knopf dafür
             'calendarInApp' => ($features['calendar'] ?? false) && $a->calendar()->inApp(),
             // Eigene Seiten (Issue #287), die die Person lesen darf: für die Kacheln unter „Seiten“ (ohne Text)

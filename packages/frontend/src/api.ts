@@ -199,6 +199,11 @@ export interface AppConfig {
   pages?: { id: number; title: string }[];
   /** News werden in der App geschrieben (Quelle „In der App“); fehlt bei älteren Servern */
   newsInApp?: boolean;
+  /**
+   * Beiträge der WordPress-Seite im Editor von WordPress schreiben (Quelle „Beiträge dieser WordPress-Seite“, Recht
+   * manage_news): Adresse für „Neuer Beitrag“; null oder fehlt ohne das Recht, mit anderen Quellen und bei älteren Servern
+   */
+  newsEditorUrl?: string | null;
   /** Interner Kalender wird in der App gepflegt (Quelle „In der App“); fehlt bei älteren Servern */
   calendarInApp?: boolean;
   /**
@@ -1134,6 +1139,8 @@ export interface NewsItem {
   /** Nur für die Pflege der News in der App (manage_news): Stand für das Speichern (409 conflict) */
   updated_at?: string | null;
   updated_by_name?: string | null;
+  /** Beiträge der WordPress-Seite, nur mit manage_news: Adresse im Editor von WordPress; fehlt sonst */
+  edit_url?: string | null;
 }
 
 /** Beitrag der News in der App: Titel und formatierter Text (RichText mit Bildern). */
