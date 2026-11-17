@@ -76,6 +76,7 @@ import { SponsorAdmin } from './SponsorenVerwalten';
 import { PageAdmin } from './SeitenVerwalten';
 import { WebsiteAdmin } from './WebseiteVerwalten';
 import { PassiveAdmin } from './Passive';
+import { PassiveImport } from './PassiveImport';
 import { Bericht } from './Bericht';
 import { CompanyAdmin, MemberCompanies } from './KompanienVerwalten';
 import { ListAdmin } from './ListenVerwalten';
@@ -235,6 +236,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <FormerImport onToast={onToast} />
       ) : active === 'ehemalige' ? (
         <FormerList />
+      ) : active === 'passive' && arg === 'import' && can('manage_passive') ? (
+        <PassiveImport onToast={onToast} />
       ) : active === 'passive' ? (
         <PassiveAdmin onToast={onToast} />
       ) : active === 'anfragen' ? (

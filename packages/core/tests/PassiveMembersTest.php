@@ -269,4 +269,18 @@ final class PassiveMembersTest extends TestCase
         $this->assertContains('passive_members', Backup::CORE_TABLES);
         $this->assertContains('passive_payments', Backup::CORE_TABLES);
     }
+
+    public function testJoinedAndNote(): void
+    {
+        $id = $this->passive('Erika', 'Muster', ['joined' => 'vor 2014', 'note' => "Zeile 1\nZeile 2"]);
+        $got = $this->call('GET', "/passive-members/$id")->data;
+        $this->assertSame('vor 2014', $got['joined']);
+        $this->assertSame("Zeile 1\nZeile 2", $got['note']);
+        $res = $this->call('PATCH', "/passive-members/$id", ['joined' => 2023, 'note' => '']);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame('2023', $res->data['joined']);
+        $this->assertSame('', $res->data['note']);
+        $this->assertSame(400, $this->call('PATCH', "/passive-members/$id", ['joined' => str_repeat('x', 41)])->status);
+        $this->assertSame(400, $this->call('PATCH', "/passive-members/$id", ['note' => str_repeat('x', 501)])->status);
+    }
 }

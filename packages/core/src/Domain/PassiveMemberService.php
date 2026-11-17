@@ -17,8 +17,10 @@ use KompanieApp\Core\Storage\PassiveMemberRepository;
  * - Passive sind eigene Einträge, keine Konten: Sie bekommen nie einen Zugang zur App (auch nicht über „Passwort
  *   vergessen“ in WordPress), stehen in keiner Mitgliederliste, haben keine Punkte, Strafen oder Anwesenheit, und ihr
  *   Geburtstag erscheint nicht bei den Geburtstagen der Mitglieder.
- * - Angaben: Vor- und Nachname (Pflicht), Adresse (Domain\Address), Telefon, E-Mail-Adresse, Geburtsdatum (JJJJ-MM-TT)
- *   und optional ein Mitglied als Betreuer.
+ * - Angaben: Vor- und Nachname (Pflicht), Adresse (Domain\Address), Telefon, E-Mail-Adresse, Geburtsdatum (JJJJ-MM-TT),
+ *   Eintritt (freier Text, z. B. „2023“ oder „vor 2014“), Bemerkung und optional ein Mitglied als Betreuer. Eintritt und
+ *   Bemerkung sind keine persönlichen Angaben: Sie pflegt, wer Passive verwaltet (Annahme vom 17.11.2026).
+ * - Import aus einer Tabelle: Domain\PassiveImportService.
  * - Liste sehen: wer „Passive sehen“ (view_passive) hat; anlegen, Namen und Betreuer ändern, löschen: wer „Passive verwalten“ (manage_passive) hat. Adresse,
  *   Telefon, E-Mail und Geburtsdatum sieht davon nur, wer view_personal hat, und ändert nur, wer manage_personal hat
  *   (wie bei Mitgliedern).
@@ -40,6 +42,8 @@ final class PassiveMemberService
     public const NAME_MAX = 100;
     public const EMAIL_MAX = 100;
     public const BIRTH_YEAR_MIN = 1900;
+    public const JOINED_MAX = 40;
+    public const NOTE_MAX = 500;
     /** Felder mit persönlichen Angaben (anzeigen mit view_personal, ändern mit manage_personal) */
     public const PERSONAL = ['address', 'phone', 'email', 'birth_date'];
     /** Einstellung: Jahresbeitrag als Vorschlag in Cent (0 = keiner) */
@@ -98,14 +102,41 @@ final class PassiveMemberService
     /**
      * Neuer Passiver. Persönliche Angaben nur mit manage_personal.
      *
-     * @param array<string, mixed> $in first_name, last_name, caretaker_id, address, phone, email, birth_date
+     * @param array<string, mixed> $in first_name, last_name, caretaker_id, address, phone, email, birth_date, joined, note
      * @return array<string, mixed>
      */
     public function create(User $actor, array $in): array
     {
-        $values = $this->names($in, null) + $this->caretakerValue($in, true) + $this->personalValues($actor, $in);
+        $values = $this->prepare($actor, $in);
         $id = $this->repository()->insert($values, $actor->id, $this->app->time()->nowUtc());
         return $this->get($actor, $id);
+    }
+
+    /**
+     * Angaben eines neuen Passiven prüfen (wie create(), ohne zu speichern); Spalte => Wert für das Repository.
+     *
+     * @param array<string, mixed> $in
+     * @return array<string, string|int|null>
+     */
+    public function prepare(User $actor, array $in): array
+    {
+        return $this->names($in, null) + $this->caretakerValue($in, true) + self::extraValues($in) + $this->personalValues($actor, $in);
+    }
+
+    /**
+     * Zahlung prüfen (wie addPayment(), ohne zu speichern).
+     *
+     * @param array<string, mixed> $in year, amount_cents, paid_on, method
+     * @return array{year: int, amount_cents: int, paid_on: string, method: string}
+     */
+    public function checkPayment(array $in): array
+    {
+        return [
+            'year' => $this->paymentYear($in['year'] ?? null),
+            'amount_cents' => self::cents($in['amount_cents'] ?? null),
+            'paid_on' => $this->paidOn($in['paid_on'] ?? null),
+            'method' => $this->method($in['method'] ?? null, null),
+        ];
     }
 
     /**
@@ -117,7 +148,7 @@ final class PassiveMemberService
     public function update(User $actor, int $id, array $in): array
     {
         $row = $this->find($id);
-        $values = $this->names($in, $row) + $this->caretakerValue($in, false) + $this->personalValues($actor, $in);
+        $values = $this->names($in, $row) + $this->caretakerValue($in, false) + self::extraValues($in) + $this->personalValues($actor, $in);
         $this->repository()->update($id, $values, $actor->id, $this->app->time()->nowUtc());
         return $this->get($actor, $id);
     }
@@ -385,6 +416,8 @@ final class PassiveMemberService
             'last_name' => $r['last_name'],
             'name' => PersonName::join($r['first_name'], $r['last_name']),
             'caretaker' => $r['caretaker_id'] !== null ? ['id' => $r['caretaker_id'], 'name' => $names->name($r['caretaker_id'])] : null,
+            'joined' => $r['joined'],
+            'note' => $r['note'],
             // Beiträge, neuestes Jahr zuerst
             'payments' => array_map(self::payment(...), $payments),
         ];
@@ -424,6 +457,44 @@ final class PassiveMemberService
             throw ApiError::invalid(sprintf('Vor- und Nachname dürfen je höchstens %d Zeichen lang sein.', self::NAME_MAX));
         }
         return ['first_name' => $first, 'last_name' => $last];
+    }
+
+    /**
+     * Eintritt und Bemerkung (nur die mitgeschickten); leer heißt keine Angabe.
+     *
+     * @param array<string, mixed> $in
+     * @return array<string, string>
+     */
+    private static function extraValues(array $in): array
+    {
+        $out = [];
+        if (array_key_exists('joined', $in)) {
+            $out['joined'] = self::joined($in['joined']);
+        }
+        if (array_key_exists('note', $in)) {
+            $out['note'] = self::note($in['note']);
+        }
+        return $out;
+    }
+
+    /** Eintritt: freier Text (Jahr, Datum oder z. B. „vor 2014“), höchstens JOINED_MAX Zeichen. */
+    public static function joined(mixed $raw): string
+    {
+        $text = Text::line(is_string($raw) || is_int($raw) ? (string) $raw : '');
+        if (mb_strlen($text) > self::JOINED_MAX) {
+            throw ApiError::invalid(sprintf('Der Eintritt darf höchstens %d Zeichen lang sein.', self::JOINED_MAX));
+        }
+        return $text;
+    }
+
+    /** Bemerkung: auch mehrzeilig, höchstens NOTE_MAX Zeichen. */
+    public static function note(mixed $raw): string
+    {
+        $text = Text::multiline(is_string($raw) ? $raw : '');
+        if (mb_strlen($text) > self::NOTE_MAX) {
+            throw ApiError::invalid(sprintf('Die Bemerkung darf höchstens %d Zeichen lang sein.', self::NOTE_MAX));
+        }
+        return $text;
     }
 
     /**

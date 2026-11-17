@@ -84,7 +84,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Namen und Symbole gelten für beide Leisten. Was jemand sehen darf, regeln weiter die Rechte.
 - **Passive**: Mit dem neuen Bereich _Passive_ (unter [Einstellungen → Bereiche](app:einstellungen/bereiche)) führt ihr
   unter [Verwaltung → Passive](app:verwaltung/passive) eine interne Liste eurer passiven Mitglieder mit Vorname,
-  Nachname, Adresse, Telefon, E-Mail-Adresse und Geburtsdatum, je optional mit einem Mitglied als Betreuer. Passive sind
+  Nachname, Adresse, Telefon, E-Mail-Adresse, Geburtsdatum, Eintritt und Bemerkung, je optional mit einem Mitglied als
+  Betreuer. Eine bisher geführte Liste übernimmst du dort mit „Tabelle importieren“ aus Excel (.xlsx) oder CSV: Die App
+  findet die Kopfzeile auch unter einem Titel, erkennt die Spalten an ihren Namen (änderbar), ordnet Betreuer wie
+  „A. Beispiel“ einem Mitglied zu, übernimmt auf Wunsch den Beitrag eines Jahres (auch aus Spalten je Zahlungsart),
+  zeigt vorher eine Vorschau und überspringt, wer schon eingetragen ist. Passive sind
   keine Konten: Sie bekommen nie einen Zugang zur App, stehen in keiner Mitgliederliste und ihr Geburtstag erscheint nicht
   bei den Geburtstagen. Die Liste sieht und pflegt, wer das neue Recht _Passive verwalten_ (`manage_passive`) hat; beim
   Einschalten entsteht die Rolle „Passive verwalten“. Adresse, Telefon, E-Mail und Geburtsdatum sieht davon nur, wer

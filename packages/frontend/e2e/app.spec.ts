@@ -7211,3 +7211,44 @@ test('Nutzung: Admin sieht aktive Konten, Nutzung je Bereich und den Verlauf ein
   await expect(schalter).toBeChecked();
   await expect(members).toBeVisible();
 });
+
+test('Passive: Liste aus einer Tabelle importieren, mit Kopfzeile unter dem Titel und Beitrag je Zahlungsart', async ({ page }) => {
+  const id = Date.now().toString(36);
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/einstellungen/bereiche');
+  const bereiche = page.locator('.settings-section', { hasText: 'Bereiche' }).first();
+  const passive = bereiche.getByRole('checkbox', { name: /^Passive/ });
+  if (!(await passive.isChecked())) {
+    await passive.click();
+    await expect(passive).toBeChecked();
+  }
+  await page.goto('/app/#/verwaltung/passive');
+  await page.getByRole('button', { name: 'Tabelle importieren' }).click();
+  await expect(page.getByRole('heading', { name: 'Passive importieren' })).toBeVisible();
+  // Erfundene Daten: Titel über der Kopfzeile, Betrag in der Spalte der Zahlungsart, Datum am Anfang der Spalte „Info“
+  const csv = [
+    ';Stand: 01.11.2026',
+    '',
+    `Nachname;Vorname;Strasse;PLZ;Wohnort;Bar;PayPal;Info;Eintritt;Bemerkung`,
+    `${id};Erika;Musterstr. 3;12345;Musterstadt;25;;;2023;Will keine Post`,
+    `${id};Otto;;;;;25;12.03. per PayPal;vor 2014;`,
+    ';Summe;;;;25;25;;;',
+  ].join('\n');
+  await page
+    .getByLabel('Datei wählen (Excel .xlsx oder CSV)')
+    .setInputFiles({ name: 'passive.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await page.getByRole('button', { name: 'Vorschau' }).click();
+  await expect(page.getByRole('status')).toContainText('Neu: 2 Passive · davon mit Beitrag');
+  await page.locator('.passive-import-columns').getByLabel('Bezahlt am').selectOption({ label: 'Info' });
+  await page.getByRole('button', { name: 'Vorschau' }).click();
+  await expect(page.locator('.office-import-rows')).toContainText('PayPal, 12.03.2026');
+  await expect(page.getByRole('button', { name: 'Übernehmen' })).toBeDisabled();
+  await page.getByRole('checkbox', { name: 'Zeilen mit Fehler überspringen' }).check();
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/passive-import.png`, fullPage: true });
+  await page.getByRole('button', { name: 'Übernehmen' }).click();
+  await expect(page.locator('.toast')).toContainText('2 Passive angelegt, 2 Zahlungen');
+  const erika = page.locator('.passive-list .card', { hasText: `${id}, Erika` });
+  await expect(erika).toContainText('Will keine Post');
+  await expect(erika).toContainText('2023');
+  await expect(page.locator('.passive-list .card', { hasText: `${id}, Otto` })).toContainText('vor 2014');
+});
