@@ -1126,25 +1126,27 @@ export function PassiveAdmin({ onToast }: { onToast: (msg: string) => void }) {
               ›
             </span>
           </button>
-          <div id="passive-filters" className="member-filters field-row passive-filter" hidden={!state.filtersOpen}>
-            <label className="field">
-              <span>Beitrag für</span>
-              <select value={year} onChange={(e) => update({ year: Number(e.target.value) })}>
-                {years.map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>Zeigen</span>
-              <select value={state.show} onChange={(e) => update({ show: e.target.value as 'all' | 'open' | 'paid' })}>
-                <option value="all">alle</option>
-                <option value="open">nur offen</option>
-                <option value="paid">nur bezahlt</option>
-              </select>
-            </label>
+          <div id="passive-filters" className="member-filters passive-filters" hidden={!state.filtersOpen}>
+            <div className="field-row passive-filter">
+              <label className="field">
+                <span>Beitrag für</span>
+                <select value={year} onChange={(e) => update({ year: Number(e.target.value) })}>
+                  {years.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Zeigen</span>
+                <select value={state.show} onChange={(e) => update({ show: e.target.value as 'all' | 'open' | 'paid' })}>
+                  <option value="all">alle</option>
+                  <option value="open">nur offen</option>
+                  <option value="paid">nur bezahlt</option>
+                </select>
+              </label>
+            </div>
           </div>
         </>
       )}
