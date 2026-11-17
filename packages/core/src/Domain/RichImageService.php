@@ -217,7 +217,7 @@ final class RichImageService
 
     /**
      * Darf $viewer das Bild sehen? Entwürfe und Signaturen nur ihr Konto, Bilder am Brett wie die Nachricht (öffentliche
-     * auch ohne Anmeldung, BoardService::canSeeImage), Bilder in E-Mails alle mit send_mail (MailingService::canSeeImage), Bilder einer
+     * auch ohne Anmeldung, BoardService::canSeeImage), Bilder in E-Mails alle mit view_mail (MailingService::canSeeImage), Bilder einer
      * Kompanie wie die Liste, Gruppenbilder und Fotos freier Namen der Ämter wie die Ämter (alle auch ohne Anmeldung, s. isPublic).
      *
      * @param array{owner_type: string, owner_id: int, user_id: int, uid?: string} $img

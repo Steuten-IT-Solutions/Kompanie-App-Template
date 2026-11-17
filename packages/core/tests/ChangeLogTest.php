@@ -278,7 +278,7 @@ final class ChangeLogTest extends TestCase
 
     public function testRolesAreLogged(): void
     {
-        $res = $this->call('POST', '/admin/roles', ['label' => 'Schriftführer', 'capabilities' => ['member', 'send_mail']]);
+        $res = $this->call('POST', '/admin/roles', ['label' => 'Schriftführer', 'capabilities' => ['member', 'view_mail', 'send_mail']]);
         $this->assertSame(201, $res->status, (string) json_encode($res->data));
         $key = array_search('Schriftführer', array_column($this->app->roles()->all(), 'label', 'key'), true);
         $this->assertSame(200, $this->call('PATCH', "/admin/roles/{$key}", ['label' => 'Schriftführerin'])->status);

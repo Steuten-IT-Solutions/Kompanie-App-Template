@@ -97,6 +97,12 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
     items: [
       { key: 'manage_events', label: `Öffentliche ${sec.events} pflegen`, short: `${sec.events} pflegen`, features: ['events'] },
       {
+        key: 'view_responses',
+        label: 'Zu- und Absagen sehen: wer bei einem internen Termin zu- oder abgesagt hat, mit Hinweis',
+        short: 'Zu- und Absagen sehen',
+        features: ['calendar'],
+      },
+      {
         key: 'manage_calendar',
         label: 'Internen Kalender pflegen: Termine in der App anlegen, ändern und löschen (nur mit der Quelle „In der App“)',
         short: 'Kalender pflegen',
@@ -121,10 +127,22 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         short: `${sec.polls} verwalten`,
         features: ['polls'],
       },
-      { key: 'manage_lists', label: `${sec.lists}: zum Drucken und als CSV anlegen und bearbeiten`, short: sec.lists, features: ['lists'] },
+      { key: 'view_lists', label: `${sec.lists} sehen, drucken und als CSV laden`, short: `${sec.lists} sehen`, features: ['lists'] },
+      {
+        key: 'manage_lists',
+        label: `${sec.lists}: zum Drucken und als CSV anlegen, bearbeiten und löschen`,
+        short: sec.lists,
+        features: ['lists'],
+      },
+      {
+        key: 'view_mail',
+        label: `${sec.mail}: Verlauf der versendeten E-Mails mit Versandprotokoll sehen`,
+        short: `${sec.mail} sehen`,
+        features: ['mail'],
+      },
       {
         key: 'send_mail',
-        label: `${sec.mail}: an Rollen, Mitglieder und beliebige Adressen schreiben und versenden, Verlauf`,
+        label: `${sec.mail}: an Rollen, Mitglieder und beliebige Adressen schreiben und versenden`,
         short: sec.mail,
         features: ['mail'],
       },
@@ -228,8 +246,14 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         features: ['offices'],
       },
       {
+        key: 'view_inventory',
+        label: `${sec.inventory} mit Lagerorten und Verlauf sehen`,
+        short: `${sec.inventory} sehen`,
+        features: ['inventory'],
+      },
+      {
         key: 'manage_inventory',
-        label: `${sec.inventory}: sehen und pflegen, umlagern, Verlauf`,
+        label: `${sec.inventory}: anlegen, ändern, umlagern und löschen`,
         short: sec.inventory,
         features: ['inventory'],
       },
@@ -262,9 +286,15 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         short: 'Ehemalige verwalten',
       },
       {
-        key: 'manage_passive',
+        key: 'view_passive',
         label:
-          'Passive verwalten: Liste der Passiven, anlegen, Namen und Betreuer ändern, löschen (Adresse, Telefon, E-Mail und Geburtsdatum nur mit den Rechten für persönliche Angaben)',
+          'Passive sehen: Liste der Passiven mit Betreuer und Beiträgen (Adresse, Telefon, E-Mail und Geburtsdatum nur mit den Rechten für persönliche Angaben)',
+        short: 'Passive sehen',
+        features: ['passive'],
+      },
+      {
+        key: 'manage_passive',
+        label: 'Passive verwalten: anlegen, Namen und Betreuer ändern, Beiträge eintragen, löschen',
         short: 'Passive verwalten',
         features: ['passive'],
       },

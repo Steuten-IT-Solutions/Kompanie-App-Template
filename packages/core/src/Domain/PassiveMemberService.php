@@ -19,7 +19,7 @@ use KompanieApp\Core\Storage\PassiveMemberRepository;
  *   Geburtstag erscheint nicht bei den Geburtstagen der Mitglieder.
  * - Angaben: Vor- und Nachname (Pflicht), Adresse (Domain\Address), Telefon, E-Mail-Adresse, Geburtsdatum (JJJJ-MM-TT)
  *   und optional ein Mitglied als Betreuer.
- * - Liste sehen, anlegen, Namen und Betreuer ändern, löschen: wer „Passive verwalten“ (manage_passive) hat. Adresse,
+ * - Liste sehen: wer „Passive sehen“ (view_passive) hat; anlegen, Namen und Betreuer ändern, löschen: wer „Passive verwalten“ (manage_passive) hat. Adresse,
  *   Telefon, E-Mail und Geburtsdatum sieht davon nur, wer view_personal hat, und ändert nur, wer manage_personal hat
  *   (wie bei Mitgliedern).
  * - Ausnahme (bewusst so entschieden): Wer Betreuer ist, sieht unter Meins → Meine Passiven alle Angaben seiner eigenen

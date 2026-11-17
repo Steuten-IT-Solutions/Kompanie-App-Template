@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { api, type InventoryInput, type InventoryItem, type InventoryLogEntry } from '../api';
+import { api, can, type InventoryInput, type InventoryItem, type InventoryLogEntry } from '../api';
 import brand from '../generated/brand';
 import { formatShortTime } from '../format';
 import { navigate } from '../router';
@@ -9,7 +9,8 @@ import { promptAsk } from '../ask';
 import { IconButton } from '../icons';
 
 // Inventar (Issue #6): Liste nach Material gruppiert (Summe über alle Orte, je Einheit), aufklappbar zu den Einträgen je
-// Ort; anlegen, ändern, −/+, umlagern, löschen; Verlauf je Eintrag und gesamt. Nur mit manage_inventory.
+// Ort; anlegen, ändern, −/+, umlagern, löschen; Verlauf je Eintrag und gesamt. Sehen mit view_inventory, alles zum
+// Ändern nur mit manage_inventory.
 
 const sec = brand.labels.sections;
 
@@ -80,6 +81,7 @@ function InventoryList({ onToast }: { onToast: (msg: string) => void }) {
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
   const [open, setOpen] = useState<Set<string>>(new Set());
+  const editable = can('manage_inventory');
 
   const items = list.data ?? [];
   const groups = useMemo(() => groupInventory(items), [items]);
@@ -120,9 +122,11 @@ function InventoryList({ onToast }: { onToast: (msg: string) => void }) {
       </datalist>
 
       <div className="button-row">
-        <button className="btn inventory-add" onClick={() => setCreating((c) => !c)} aria-expanded={creating}>
-          + Eintrag anlegen
-        </button>
+        {editable && (
+          <button className="btn inventory-add" onClick={() => setCreating((c) => !c)} aria-expanded={creating}>
+            + Eintrag anlegen
+          </button>
+        )}
         <button className="btn btn-secondary inventory-history-all" onClick={() => navigate('inventar/verlauf')}>
           Gesamter Verlauf
         </button>
@@ -197,6 +201,7 @@ function InventoryList({ onToast }: { onToast: (msg: string) => void }) {
 type Mode = 'view' | 'edit' | 'move';
 
 function Entry({ item, onToast, onChanged }: { item: InventoryItem; onToast: (msg: string) => void; onChanged: () => void }) {
+  const editable = can('manage_inventory');
   const [mode, setMode] = useState<Mode>('view');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -232,34 +237,40 @@ function Entry({ item, onToast, onChanged }: { item: InventoryItem; onToast: (ms
           )}
         </div>
         <div className="inventory-qty">
-          <button
-            className="btn btn-secondary btn-small inventory-minus"
-            aria-label={`${item.title} in ${item.location}: eins weniger`}
-            disabled={busy || item.quantity < 1}
-            onClick={() => run(() => api.updateInventory(item.id, { adjust: -1 }), 'Menge geändert')}
-          >
-            −
-          </button>
+          {editable && (
+            <button
+              className="btn btn-secondary btn-small inventory-minus"
+              aria-label={`${item.title} in ${item.location}: eins weniger`}
+              disabled={busy || item.quantity < 1}
+              onClick={() => run(() => api.updateInventory(item.id, { adjust: -1 }), 'Menge geändert')}
+            >
+              −
+            </button>
+          )}
           <span className="inventory-qty-value">{formatQuantity(item.quantity, item.unit)}</span>
-          <button
-            className="btn btn-secondary btn-small inventory-plus"
-            aria-label={`${item.title} in ${item.location}: eins mehr`}
-            disabled={busy}
-            onClick={() => run(() => api.updateInventory(item.id, { adjust: 1 }), 'Menge geändert')}
-          >
-            +
-          </button>
+          {editable && (
+            <button
+              className="btn btn-secondary btn-small inventory-plus"
+              aria-label={`${item.title} in ${item.location}: eins mehr`}
+              disabled={busy}
+              onClick={() => run(() => api.updateInventory(item.id, { adjust: 1 }), 'Menge geändert')}
+            >
+              +
+            </button>
+          )}
         </div>
       </div>
       {error && <p className="form-error small">{error}</p>}
       {mode === 'view' && (
         <div className="row-actions inventory-actions">
-          <button className="btn btn-secondary btn-small" disabled={busy} onClick={() => setMode('move')}>
-            Umlagern
-          </button>
-          <IconButton icon="edit" label="Bearbeiten" disabled={busy} onClick={() => setMode('edit')} />
+          {editable && (
+            <button className="btn btn-secondary btn-small" disabled={busy} onClick={() => setMode('move')}>
+              Umlagern
+            </button>
+          )}
+          {editable && <IconButton icon="edit" label="Bearbeiten" disabled={busy} onClick={() => setMode('edit')} />}
           <IconButton icon="history" label="Verlauf" onClick={() => navigate(`inventar/verlauf/${item.id}`)} />
-          <IconButton icon="delete" label="Löschen" variant="danger" disabled={busy} onClick={remove} />
+          {editable && <IconButton icon="delete" label="Löschen" variant="danger" disabled={busy} onClick={remove} />}
         </div>
       )}
       {mode === 'edit' && (

@@ -1,7 +1,8 @@
 ---
 titel: "{bereich.inventory}"
 reihenfolge: 66
-rechte: [manage_inventory]
+rechte: []
+einrecht: [view_inventory, manage_inventory]
 bereiche: [inventory]
 ---
 Im {bereich.inventory} hältst du fest, was die Kompanie besitzt, wie viel davon da ist und wo es liegt. Hier legst du Material an, änderst Mengen und lagerst es an einen anderen Ort um.
@@ -54,6 +55,7 @@ Für größere Änderungen tippst du auf **Bearbeiten**, trägst die neue **Meng
 3. Bestätige mit **OK**.
 
 ## Gut zu wissen
+- **Nur sehen:** Mit dem Recht **{bereich.inventory} mit Lagerorten und Verlauf sehen** ohne das Recht zum Ändern siehst du die Liste, die Orte und den Verlauf. **+ Eintrag anlegen**, **−**, **+**, **Umlagern**, **Bearbeiten** und **Löschen** fehlen dann.
 - Ein Eintrag hat genau einen Ort. Liegt dasselbe Material an zwei Orten, sind das zwei Einträge.
 - Die Menge ist 0 oder mehr, mit höchstens drei Nachkommastellen. Unter 0 geht es nicht; ist weniger als 1 da, ist **−** gesperrt.
 - Beim Umlagern: Gibt es am Zielort schon dasselbe Material mit derselben Einheit, kommt die Menge dort dazu. Sonst entsteht am Zielort ein neuer Eintrag.
@@ -61,7 +63,7 @@ Für größere Änderungen tippst du auf **Bearbeiten**, trägst die neue **Meng
 - Mehr umlagern, als da ist, geht nicht. Der Zielort muss ein anderer sein. Die App meldet das, und nichts ändert sich.
 - Änderst du unter **Bearbeiten** den Ort, berichtigst du nur die Angabe. Mit gleichem Material am neuen Ort wird dabei nichts zusammengelegt; dafür nimmst du **Umlagern**.
 - Jede Änderung steht im Verlauf, auch bei gelöschten Einträgen.
-- Das {bereich.inventory} sehen nur Personen, die es pflegen dürfen. Andere {rolle.member} sehen es nicht.
+- Das {bereich.inventory} sehen nur Personen mit einem der beiden Rechte zum {bereich.inventory}. Andere {rolle.member} sehen es nicht.
 
 ## Siehe auch
 - [Verlauf im {bereich.inventory}](seite:inventar-verlauf)

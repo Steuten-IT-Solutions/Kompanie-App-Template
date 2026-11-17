@@ -1,7 +1,8 @@
 ---
 titel: Liste bearbeiten
 reihenfolge: 62
-rechte: [manage_lists]
+rechte: []
+einrecht: [view_lists, manage_lists]
 bereiche: [lists]
 ---
 Hier stellst du eine Liste zusammen: Titel, Spalten und Zeilen. Unten siehst du sie so, wie sie gedruckt wird, und druckst sie oder lädst sie als Datei für Excel herunter.
@@ -65,6 +66,7 @@ Zahlen sortiert die App nach ihrem Wert, Geburtstage nach dem Tag im Jahr (Janua
 ![Die Ausgabe mit Druckknöpfen und Vorschau](bild:liste-bearbeiten-ausgabe)
 
 ## Gut zu wissen
+- **Nur sehen:** Ohne das Recht zum Anlegen und Bearbeiten siehst du oben nur den Titel und darunter **Ausgabe** mit Vorschau, PDF, CSV und Drucken. Titel, Spalten und Zeilen änderst du dann nicht.
 - **Mitglieder aktualisieren** legt für jedes {rolle.member} eine Zeile an, das noch keine hat, und ebenso für die Rollen, die du unter **In die Liste kommen** angehakt hast. Es löscht die Zeilen von Konten, die es nicht mehr gibt oder die nicht mehr dazugehören. {rolle.guest} und Ehemalige kommen nie in die Liste, Rollen ohne Mitgliederbereich (z. B. Anwärter) nur, wenn du sie anhakst. Neue Mitglieder ordnet die App nach dem Nachnamen zwischen die vorhandenen ein.
 - Eigene Zeilen bleiben beim Aktualisieren stehen. Entfernst du die Zeile eines Mitglieds, legt das nächste **Mitglieder aktualisieren** sie wieder an.
 - Wird ein Konto gelöscht, bleibt seine Zeile ohne Namen stehen, bis du die Liste aktualisierst. Die App weist darauf hin.
