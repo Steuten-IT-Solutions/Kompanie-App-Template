@@ -593,6 +593,16 @@ final class RoleService
     }
 
     /**
+     * Seit wann jemand eine Zusatzrolle hat (UTC, Domain\AdmissionService „Anwärter seit“).
+     *
+     * @return array<int, array<string, string>> Benutzer-ID => Rolle => assigned_at
+     */
+    public function extraAssignedAt(): array
+    {
+        return $this->memberRoles?->assignedAt() ?? [];
+    }
+
+    /**
      * Gespeicherte Zusatzrollen aller Personen (eine Abfrage, danach aus dem Zwischenspeicher dieser Anfrage).
      *
      * @return array<int, list<string>>

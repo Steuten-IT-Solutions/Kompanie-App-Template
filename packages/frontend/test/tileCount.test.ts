@@ -1,4 +1,4 @@
-// Zahl im Kreis an den Kacheln der Verwaltung (src/tileCount.ts): Beförderungen, Anfragen und Fehlermeldungen.
+// Zahl im Kreis an den Kacheln der Verwaltung (src/tileCount.ts): Beförderungen, Aufnahmen, Anfragen und Fehlermeldungen.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { tileCount } from '../src/tileCount.ts';
@@ -30,4 +30,11 @@ test('Erklärung in Einzahl und Mehrzahl', () => {
 test('ab 100 steht 99+ im Kreis', () => {
   assert.equal(tileCount('meldungen', { reports: 99 })?.text, '99');
   assert.equal(tileCount('meldungen', { reports: 100 })?.text, '99+');
+});
+
+test('Aufnahmen: Anwärter, die die Voraussetzung erfüllen', () => {
+  assert.equal(tileCount('aufnahmen', { admissions: null }), null);
+  assert.equal(tileCount('aufnahmen', { admissions: 0 }), null);
+  assert.equal(tileCount('aufnahmen', { admissions: 1 })?.title, '1 Anwärter erfüllt die Voraussetzung für die Aufnahme');
+  assert.equal(tileCount('aufnahmen', { admissions: 3 })?.title, '3 Anwärter erfüllen die Voraussetzung für die Aufnahme');
 });

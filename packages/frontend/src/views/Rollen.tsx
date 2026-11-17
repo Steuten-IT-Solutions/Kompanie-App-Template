@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { api, applyRoles, config, levelLabel, type Capability, type Level, type RoleAdmin } from '../api';
+import { api, applyRoles, config, eventKinds, levelLabel, type Capability, type Level, type RoleAdmin } from '../api';
 import { CAPABILITIES, isView, lockedFor, orderedCaps, toggleForRole } from '../capabilities';
 import { RightsTree } from '../rightsTree';
 import RechteMatrix from './RechteMatrix';
@@ -116,6 +116,7 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
                       {(r.extra_users ?? 0) > 0 && ` (davon ${r.extra_users} als Zusatzrolle)`}
                       {!r.system && r.new_accounts && ' · für neue Konten'}
                       {r.promotable && ` · aufnehmen als ${levelLabel('member')}`}
+                      {r.admission_extra && ' · Anwärter-Rolle (bei Aufnahme entfernen)'}
                       {' · '}
                       {summary(r)}
                     </div>
@@ -252,6 +253,11 @@ function RoleForm({
   const [factor, setFactor] = useState((role?.points_factor ?? 1).toLocaleString('de-DE'));
   const [newAccounts, setNewAccounts] = useState(role?.new_accounts ?? false);
   const [promotable, setPromotable] = useState(role?.promotable ?? false);
+  // Aufnahme: Anwärter-Rolle als Zusatzrolle und Voraussetzung (Teilnahmen an einer Terminart, Mindestdauer)
+  const [admissionExtra, setAdmissionExtra] = useState(role?.admission_extra ?? false);
+  const [admissionKind, setAdmissionKind] = useState(role?.admission_kind ?? '');
+  const [admissionCount, setAdmissionCount] = useState(String(role?.admission_count ?? 0));
+  const [admissionMonths, setAdmissionMonths] = useState(String(role?.admission_months ?? 0));
   const [replacement, setReplacement] = useState<Level>('member');
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -264,6 +270,11 @@ function RoleForm({
   const withFactor = !!config?.features.points && (fixed ? key === 'member' || admin : capabilities.has('member'));
   const withMember = capabilities.has('member');
   const ordered = orderedCaps(capabilities);
+  // Voraussetzung nur an Anwärter-Rollen: Grundrolle mit „aufnehmen“ oder Zusatzrolle, die bei der Aufnahme wegfällt.
+  // Ältere Server kennen die Felder nicht (dann fehlen sie in der Antwort).
+  const admissionKnown = !role || role.admission_count !== undefined;
+  const candidate = !fixed && admissionKnown && ((promotable && !withMember) || admissionExtra);
+  const kinds = [...eventKinds(), ...(admissionKind && !eventKinds().includes(admissionKind) ? [admissionKind] : [])];
 
   async function run(action: () => Promise<RoleAdmin[]>, msg: string) {
     setBusy(true);
@@ -283,6 +294,16 @@ function RoleForm({
       label,
       ...(admin ? {} : { capabilities: ordered }),
       ...(fixed ? {} : { new_accounts: newAccounts, promotable: promotable && !withMember }),
+      ...(fixed || !admissionKnown
+        ? {}
+        : candidate
+          ? {
+              admission_extra: admissionExtra,
+              admission_kind: admissionKind,
+              admission_count: admissionKind ? admissionCount : 0,
+              admission_months: admissionMonths,
+            }
+          : { admission_extra: false }),
       ...(withFactor ? { points_factor: factor } : {}),
     };
     void run(() => (role ? api.updateRole(role.key, data) : api.createRole(data)), role ? 'Rolle gespeichert' : 'Rolle angelegt');
@@ -349,6 +370,42 @@ function RoleForm({
               Wer Mitglieder anlegen darf, nimmt Personen mit dieser Rolle als {levelLabel('member')} auf (z. B. Anwärter)
               {withMember && '; nur ohne „Gehört zur Kompanie“'}
             </span>
+          </label>
+          {admissionKnown && (
+            <label className="toggle feature-toggle">
+              <input type="checkbox" checked={admissionExtra} onChange={(e) => setAdmissionExtra(e.target.checked)} />
+              <span>
+                Anwärter-Rolle als Zusatzrolle: Wer Mitglieder anlegen darf, nimmt Personen mit dieser Zusatzrolle als{' '}
+                {levelLabel('member')} auf; dabei wird sie entfernt
+              </span>
+            </label>
+          )}
+        </fieldset>
+      )}
+      {candidate && (
+        <fieldset className="feature-list role-admission">
+          <legend className="field-label">Voraussetzung für die Aufnahme (Vorschlag unter Verwaltung → Aufnahmen)</legend>
+          <label className="field">
+            <span>Teilnahmen an Terminen der Art</span>
+            <select value={admissionKind} onChange={(e) => setAdmissionKind(e.target.value)}>
+              <option value="">keine</option>
+              {kinds.map((k) => (
+                <option key={k} value={k}>
+                  {k}
+                </option>
+              ))}
+            </select>
+          </label>
+          {kinds.length === 0 && <p className="small muted">Terminarten legst du unter Einstellungen → Kalender an.</p>}
+          {admissionKind && (
+            <label className="field">
+              <span>Mindestens so viele Teilnahmen („anwesend“)</span>
+              <input type="number" min={0} max={100} value={admissionCount} onChange={(e) => setAdmissionCount(e.target.value)} />
+            </label>
+          )}
+          <label className="field">
+            <span>Mindestens so viele Monate als Anwärter (0: keine)</span>
+            <input type="number" min={0} max={120} value={admissionMonths} onChange={(e) => setAdmissionMonths(e.target.value)} />
           </label>
         </fieldset>
       )}

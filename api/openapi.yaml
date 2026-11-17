@@ -5188,6 +5188,75 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /members/{id}/admit:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Verwaltung]
+      summary: Anwärter als Mitglied aufnehmen
+      description: |
+        Grundrolle mit `promotable` → `member` (wie `/members/{id}/promote`), sonst die Zusatzrolle mit `admission_extra`
+        entfernen. Die Voraussetzung sperrt nicht. Ohne Eintritt wird er auf heute gesetzt (`join_date`, sonst null);
+        „Anwärter seit“ fällt weg. Nicht für sich selbst und nicht für Ehemalige (400).
+      x-capability: create_users
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  level: { $ref: '#/components/schemas/Level' }
+                  extra_roles: { $ref: '#/components/schemas/ExtraRoles' }
+                  join_date: { type: [string, 'null'] }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /members/{id}/candidate-since:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Verwaltung]
+      summary: „Anwärter seit“ ändern
+      description: TT.MM.JJJJ oder JJJJ-MM-TT, nicht in der Zukunft; leer = unbekannt. Nur bei Anwärtern (sonst 400).
+      x-capability: create_users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                since: { type: string }
+      responses:
+        '200':
+          description: Neuer Stand
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Admission' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admissions:
+    get:
+      tags: [Verwaltung]
+      summary: Aufnahmen – Anwärter mit Stand der Voraussetzung (nur zusammen mit dem Bereich Anwesenheit)
+      description: |
+        Alle Anwärter (Grundrolle mit `promotable` oder Zusatzrolle mit `admission_extra`, ohne Ehemalige): zuerst wer die
+        Voraussetzung erfüllt (nach `fulfilled_on`), dann `open`, dann `none`. Es zählen alle Teilnahmen der Terminart bis heute.
+      x-capability: create_users
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Admission' } }
+        '403': { $ref: '#/components/responses/Error' }
+
   /members/{id}/data:
     get:
       tags: [Verwaltung]
@@ -9668,6 +9737,10 @@ components:
                 description: 'guest, member und admin: nicht löschbar; bei guest und member nur die Rechte zum Sehen änderbar, bei admin keine',
               }
             deletable: { type: boolean, description: 'false für guest, member und admin' }
+            admission_extra: { type: boolean, description: Anwärter-Rolle als Zusatzrolle (bei Aufnahme entfernen) }
+            admission_kind: { type: [string, 'null'] }
+            admission_count: { type: integer }
+            admission_months: { type: integer }
 
     RoleInput:
       type: object
@@ -9738,6 +9811,31 @@ components:
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
         new_accounts: { type: boolean, description: 'Nur eigene Rollen: beim Anlegen von Konten wählbar' }
         promotable: { type: boolean, description: 'Nur eigene Rollen ohne member: als Mitglied aufnehmen mit create_users' }
+        admission_extra: { type: boolean, description: 'Nur eigene Rollen: Anwärter-Rolle als Zusatzrolle, wird bei der Aufnahme entfernt' }
+        admission_kind:
+          { type: [string, 'null'], description: 'Voraussetzung für die Aufnahme: Terminart (eine aus /config eventKinds; leer oder null für keine)' }
+        admission_count: { type: [integer, string], description: 'Mindestens so viele Teilnahmen (present) an Listen dieser Art, 0–100; > 0 nur mit admission_kind' }
+        admission_months: { type: [integer, string], description: 'Mindestens so viele Monate seit „Anwärter seit“, 0–120' }
+
+    Admission:
+      type: object
+      description: Stand eines Anwärters für die Aufnahme als Mitglied (Domain\AdmissionService)
+      required: [id, name, role, role_key, way, since, kind, count, months, attended, missing, months_on, fulfilled_on, status]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        role: { type: string, description: Bezeichnung der Anwärter-Rolle }
+        role_key: { $ref: '#/components/schemas/Level' }
+        way: { type: string, enum: [base, extra], description: 'base: Grundrolle wird member; extra: diese Zusatzrolle wird entfernt' }
+        since: { type: [string, 'null'], description: 'Anwärter seit (JJJJ-MM-TT); null, wenn unbekannt' }
+        kind: { type: [string, 'null'], description: Terminart der Voraussetzung }
+        count: { type: integer, description: Nötige Teilnahmen (0 keine) }
+        months: { type: integer, description: Mindestdauer in Monaten (0 keine) }
+        attended: { type: integer, description: 'Teilnahmen (present) an Listen der Art bis heute, auch vor since' }
+        missing: { type: integer }
+        months_on: { type: [string, 'null'], description: Tag, ab dem die Mindestdauer erfüllt ist }
+        fulfilled_on: { type: [string, 'null'], description: Tag, an dem alles erfüllt war }
+        status: { type: string, enum: [fulfilled, open, none], description: 'none: Rolle ohne Voraussetzung' }
 
     AppUser:
       type: object
@@ -9907,6 +10005,9 @@ components:
         registration: { type: boolean, description: 'Zugang beantragen eingeschaltet (Issue #314): Link „Zugang beantragen“ für Gäste' }
         pendingRegistrations:
           { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null' }
+        admissionsDue:
+          type: [integer, 'null']
+          description: 'Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“); nur für create_users mit Bereich Anwesenheit und einer Anwärter-Rolle, sonst null'
         gallerySubmissions:
           {
             type: boolean,
@@ -10469,6 +10570,11 @@ components:
               description: Ehemalig (Grund, Eintritt, Ausscheiden); null, wenn die Person nicht ehemalig ist
               oneOf:
                 - $ref: '#/components/schemas/FormerInfo'
+                - type: 'null'
+            admission:
+              description: Stand als Anwärter (nur für create_users); null, wenn die Person kein Anwärter ist
+              oneOf:
+                - $ref: '#/components/schemas/Admission'
                 - type: 'null'
             attendance:
               description: |
@@ -11840,6 +11946,14 @@ components:
               description: 'null: keine Rückmeldungen (freie Liste, Termin nicht mehr im Kalender); sonst ob man noch zu- und absagen kann'
             updated_by_name: { type: [string, 'null'] }
             updated_at: { type: string }
+            admissions_new:
+              type: array
+              description: 'Nur in der Antwort von PUT /attendance für create_users: wer dadurch neu die Voraussetzung für die Aufnahme erfüllt'
+              items:
+                type: object
+                properties:
+                  user_id: { type: integer }
+                  name: { type: string }
             people:
               type: array
               description: Alle mit einer Rolle (ohne Gäste), nach Namen

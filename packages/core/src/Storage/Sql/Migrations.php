@@ -2114,6 +2114,33 @@ WHERE title IS NULL",
                     'ALTER TABLE {attendance_lists} ADD COLUMN kind TEXT NOT NULL DEFAULT \'\'',
                 ],
             ],
+            // Aufnahmen (Domain\AdmissionService): „Anwärter seit“ je Person und Anwärter-Rolle; since leer = unbekannt
+            // (nachtragen).
+            67 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {candidate_since} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  user_id bigint(20) unsigned NOT NULL,
+  role_key varchar(64) NOT NULL,
+  since varchar(10) NOT NULL DEFAULT \'\',
+  updated_by bigint(20) unsigned NOT NULL DEFAULT 0,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY user_role (user_id, role_key)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {candidate_since} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  role_key TEXT NOT NULL,
+  since TEXT NOT NULL DEFAULT \'\',
+  updated_by INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {candidate_since}_user_role ON {candidate_since} (user_id, role_key)',
+                ],
+            ],
         ];
     }
 

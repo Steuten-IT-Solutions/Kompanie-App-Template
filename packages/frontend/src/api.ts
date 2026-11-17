@@ -135,6 +135,11 @@ export interface AppConfig {
   registration?: boolean;
   /** Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null */
   pendingRegistrations?: number | null;
+  /**
+   * Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“); nur für create_users mit dem Bereich
+   * Anwesenheit und einer Anwärter-Rolle, sonst null (keine Kachel). Fehlt bei älteren Servern.
+   */
+  admissionsDue?: number | null;
   /** Einreichen von Bildern und Videos erlaubt (Einstellungen → Galerie); fehlt bei älteren Servern (dann erlaubt) */
   gallerySubmissions?: boolean;
   /** Zu- und Absagen bei Terminen eingeschaltet (Einstellungen → Kalender); fehlt bei älteren Servern (dann an) */
@@ -574,6 +579,13 @@ export function applyPendingRegistrations(count: number): void {
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
+/** Zahl der Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“). */
+export function applyAdmissionsDue(count: number): void {
+  if (!config || config.admissionsDue == null || config.admissionsDue === count) return;
+  config.admissionsDue = count;
+  window.dispatchEvent(new Event(CONFIG_CHANGED));
+}
+
 /** Zahl der offenen Fehlermeldungen nach dem Schließen oder Weiterleiten: Zähler in der Verwaltung. */
 export function applyOpenReports(count: number): void {
   if (!config || config.openReports == null || config.openReports === count) return;
@@ -654,6 +666,13 @@ export interface RoleAdmin extends RoleInfo {
   extra_users?: number;
   system: boolean;
   deletable: boolean;
+  /** Anwärter-Rolle als Zusatzrolle: wird bei der Aufnahme als Mitglied entfernt; fehlen bei älteren Servern */
+  admission_extra?: boolean;
+  /** Voraussetzung für die Aufnahme: Teilnahmen an Terminen dieser Art (null: keine) … */
+  admission_kind?: string | null;
+  admission_count?: number;
+  /** … und Mindestdauer als Anwärter in Monaten (0: keine) */
+  admission_months?: number;
 }
 
 export type RoleInput = {
@@ -662,7 +681,36 @@ export type RoleInput = {
   points_factor?: number | string;
   new_accounts?: boolean;
   promotable?: boolean;
+  admission_extra?: boolean;
+  admission_kind?: string | null;
+  admission_count?: number | string;
+  admission_months?: number | string;
 };
+
+/** Stand eines Anwärters für die Aufnahme als Mitglied (GET /admissions, Mitgliedsseite). */
+export interface Admission {
+  id: number;
+  name: string;
+  /** Bezeichnung und Schlüssel der Anwärter-Rolle */
+  role: string;
+  role_key: Level;
+  /** base: Grundrolle wird Mitglied; extra: die Zusatzrolle wird entfernt */
+  way: 'base' | 'extra';
+  /** Anwärter seit (JJJJ-MM-TT); null, wenn unbekannt */
+  since: string | null;
+  kind: string | null;
+  /** Nötige Teilnahmen (0: keine) und Mindestdauer in Monaten (0: keine) */
+  count: number;
+  months: number;
+  attended: number;
+  missing: number;
+  /** Tag, ab dem die Mindestdauer erfüllt ist */
+  months_on: string | null;
+  /** Tag, an dem alles erfüllt war */
+  fulfilled_on: string | null;
+  /** fulfilled: erfüllt; open: noch nicht; none: Rolle ohne Voraussetzung */
+  status: 'fulfilled' | 'open' | 'none';
+}
 
 export const roleInfo = (level: Level): RoleInfo | undefined => config?.roles?.find((r) => r.key === level);
 
@@ -1130,6 +1178,8 @@ export interface MemberDetail extends MemberSummary {
   former?: FormerInfo | null;
   /** Anwesenheit (nur mit Bereich und Recht manage_attendance) */
   attendance?: MemberAttendance;
+  /** Stand als Anwärter (nur für create_users; null, wenn die Person kein Anwärter ist; fehlt bei älteren Servern) */
+  admission?: Admission | null;
 }
 
 /** Grund des Ausscheidens */
@@ -1839,6 +1889,8 @@ export interface AttendanceDetail extends AttendanceSummary {
   updated_at: string;
   people: AttendancePerson[];
   counts_by_group: Record<AttendanceStatus, { group: Level; label: string; count: number }[]>;
+  /** Nach dem Speichern: wer jetzt neu die Voraussetzung für die Aufnahme erfüllt (nur für create_users) */
+  admissions_new?: { user_id: number; name: string }[];
 }
 
 export type AttendanceInput = (
@@ -2542,6 +2594,13 @@ export const api = {
     }),
   /** Zum Mitglied machen (wer Mitglieder anlegen darf; nur aus Rollen, die das erlauben, z. B. Anwärter). */
   promote: (id: number) => request<{ id: number; level: Level }>('POST', `/members/${id}/promote`),
+  /** Anwärter mit Stand der Voraussetzung (create_users). */
+  admissions: () => request<Admission[]>('GET', '/admissions'),
+  /** Als Mitglied aufnehmen: Grundrolle → Mitglied bzw. Anwärter-Zusatzrolle entfernen; Eintritt = heute, wenn leer. */
+  admit: (id: number) =>
+    request<{ id: number; level: Level; extra_roles: Level[]; join_date: string | null }>('POST', `/members/${id}/admit`),
+  /** „Anwärter seit“ ändern (TT.MM.JJJJ, leer = unbekannt). */
+  setCandidateSince: (id: number, since: string) => request<Admission>('PUT', `/members/${id}/candidate-since`, { since }),
   setRole: (id: number, level: Level) =>
     request<{ id: number; level: Level; extra_roles: Level[] }>('PATCH', `/members/${id}/role`, { level }),
   setExtraRoles: (id: number, extra_roles: Level[]) =>
