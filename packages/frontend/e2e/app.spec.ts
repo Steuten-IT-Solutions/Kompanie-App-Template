@@ -1112,7 +1112,7 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
     await chooseRights(rollen, CANDIDATE_RIGHTS);
     await expect(rollen.getByLabel(/^Gehört zur Kompanie/)).not.toBeChecked();
     await rollen.getByLabel(/^Beim Anlegen neuer Konten wählbar/).check();
-    await rollen.getByLabel(/^Wer Mitglieder anlegen darf, nimmt/).check();
+    await rollen.getByLabel(/^Anwärter-Rolle/).check();
     await rollen.getByRole('button', { name: 'Anlegen' }).click();
     await expect(page.locator('.toast')).toHaveText('Rolle angelegt');
   }
