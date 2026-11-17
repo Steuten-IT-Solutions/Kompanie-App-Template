@@ -7247,13 +7247,14 @@ test('Passive: Liste aus einer Tabelle importieren, mit Kopfzeile unter dem Tite
     `Nachname;Vorname;Strasse;PLZ;Wohnort;Bar;PayPal;Info;Eintritt;Bemerkung`,
     `${id};Erika;Musterstr. 3;12345;Musterstadt;25;;;2023;Will keine Post`,
     `${id};Otto;;;;;25;12.03. per PayPal;vor 2014;`,
+    `${id};Fritz;;;;;;;2099;Kommt erst noch`,
     ';Summe;;;;25;25;;;',
   ].join('\n');
   await page
     .getByLabel('Datei wählen (Excel .xlsx oder CSV)')
     .setInputFiles({ name: 'passive.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
   await page.getByRole('button', { name: 'Vorschau' }).click();
-  await expect(page.getByRole('status')).toContainText('Neu: 2 Passive · davon mit Beitrag');
+  await expect(page.getByRole('status')).toContainText('Neu: 3 Passive · davon mit Beitrag');
   await page.locator('.passive-import-columns').getByLabel('Bezahlt am').selectOption({ label: 'Info' });
   await page.getByRole('button', { name: 'Vorschau' }).click();
   await expect(page.locator('.office-import-rows')).toContainText('PayPal, 12.03.2026');
@@ -7261,9 +7262,28 @@ test('Passive: Liste aus einer Tabelle importieren, mit Kopfzeile unter dem Tite
   await page.getByRole('checkbox', { name: 'Zeilen mit Fehler überspringen' }).check();
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/passive-import.png`, fullPage: true });
   await page.getByRole('button', { name: 'Übernehmen' }).click();
-  await expect(page.locator('.toast')).toContainText('2 Passive angelegt, 2 Zahlungen');
+  await expect(page.locator('.toast')).toContainText('3 Passive angelegt, 2 Zahlungen');
+  // Die Liste zeigt nur die Namen; Antippen öffnet die Karte mit allen Angaben
+  await expect(page.locator('.member-counts')).toContainText('noch nicht dabei');
+  await page.getByLabel('Passiven suchen').fill(id);
   const erika = page.locator('.passive-list .card', { hasText: `${id}, Erika` });
-  await expect(erika).toContainText('Will keine Post');
-  await expect(erika).toContainText('2023');
-  await expect(page.locator('.passive-list .card', { hasText: `${id}, Otto` })).toContainText('vor 2014');
+  await expect(erika).not.toContainText('Will keine Post');
+  await erika.click();
+  const card = page.locator('.passive-card');
+  await expect(card.getByRole('heading', { name: `Erika ${id}` })).toBeVisible();
+  await expect(card).toContainText('Will keine Post');
+  await expect(card).toContainText('2023');
+  await expect(card.locator('.passive-payments')).toContainText('25,00');
+  // Blättern zum nächsten der Liste (Fritz), dessen Eintritt in der Zukunft liegt: Beitrag nicht offen
+  await card.getByRole('button', { name: 'Nächster Passiver' }).click();
+  await expect(card.getByRole('heading', { name: `Fritz ${id}` })).toBeVisible();
+  await expect(card.locator('.passive-payments')).toContainText('noch nicht dabei');
+  await expect(card.locator('.passive-payments')).not.toContainText('offen');
+  await card.getByRole('button', { name: '‹ Alle Passiven' }).click();
+  await page.getByRole('button', { name: 'Filter nach Beitrag' }).click();
+  await page.getByLabel('Zeigen').selectOption('open');
+  await expect(page.locator('.passive-list .card', { hasText: `${id}, Fritz` })).toHaveCount(0);
+  await page.getByLabel('Zeigen').selectOption('all');
+  await page.locator('.passive-list .card', { hasText: `${id}, Otto` }).click();
+  await expect(page.locator('.passive-card')).toContainText('vor 2014');
 });

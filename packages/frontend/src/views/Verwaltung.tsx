@@ -75,7 +75,7 @@ import { OfficeAdmin } from './AemterVerwalten';
 import { SponsorAdmin } from './SponsorenVerwalten';
 import { PageAdmin } from './SeitenVerwalten';
 import { WebsiteAdmin } from './WebseiteVerwalten';
-import { PassiveAdmin } from './Passive';
+import { PassiveAdmin, PassiveDetail } from './Passive';
 import { PassiveImport } from './PassiveImport';
 import { Bericht } from './Bericht';
 import { CompanyAdmin, MemberCompanies } from './KompanienVerwalten';
@@ -238,6 +238,8 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <FormerList />
       ) : active === 'passive' && arg === 'import' && can('manage_passive') ? (
         <PassiveImport onToast={onToast} />
+      ) : active === 'passive' && arg && /^\d+$/.test(arg) ? (
+        <PassiveDetail key="passive-card" id={Number(arg)} onToast={onToast} />
       ) : active === 'passive' ? (
         <PassiveAdmin onToast={onToast} />
       ) : active === 'anfragen' ? (
