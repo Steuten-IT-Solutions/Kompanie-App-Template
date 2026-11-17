@@ -106,8 +106,8 @@ final class ReadRightsTest extends TestCase
         $this->assertSame(201, $list->status, (string) json_encode($list->data));
         $listId = (int) $list->data['id'];
 
-        $this->users->current = $this->withRights('leser2', ['view_inventory', 'view_lists', 'view_mail', 'view_responses', 'view_passive']);
-        foreach (['/inventory', '/inventory/locations', '/inventory/log', '/inventory/' . $item->data['id'] . '/log', '/lists', '/lists/' . $listId, '/mails', '/passive-members', '/passive-members/settings'] as $path) {
+        $this->users->current = $this->withRights('leser2', ['view_inventory', 'view_lists', 'view_mail', 'view_responses', 'view_passive', 'view_reports', 'view_submissions']);
+        foreach (['/inventory', '/inventory/locations', '/inventory/log', '/inventory/' . $item->data['id'] . '/log', '/lists', '/lists/' . $listId, '/mails', '/passive-members', '/passive-members/settings', '/reports/review', '/gallery/review'] as $path) {
             $this->assertSame(200, $this->call('GET', $path)->status, "GET $path mit Leserecht");
         }
         // Das Recht reicht; hier fehlt nur der Schalter für Zu- und Absagen.
@@ -118,11 +118,43 @@ final class ReadRightsTest extends TestCase
         $this->assertSame(403, $this->call('DELETE', '/lists/' . $listId)->status);
         $this->assertSame(403, $this->call('GET', '/mails/options')->status, 'Schreiben bleibt bei send_mail');
         $this->assertSame(403, $this->call('POST', '/mails', ['subject' => 'x', 'text' => 'x'])->status);
+        $this->assertSame(403, $this->call('POST', '/reports/review/1/close', ['reason' => 'erledigt'])->status, 'Schließen bleibt bei review_reports');
+        $this->assertSame(403, $this->call('POST', '/gallery/review/1/reject', ['reason' => 'nein'])->status, 'Ablehnen bleibt bei review_gallery');
         $this->assertSame(403, $this->call('POST', '/passive-members', ['first_name' => 'Paul', 'last_name' => 'Passiv'])->status);
 
         $this->users->current = $this->withRights('ohne2', []);
-        foreach (['/inventory', '/lists', '/mails', '/calendar/x/responses', '/passive-members'] as $path) {
+        foreach (['/inventory', '/lists', '/mails', '/calendar/x/responses', '/passive-members', '/reports/review', '/gallery/review'] as $path) {
             $this->assertSame(403, $this->call('GET', $path)->status, "GET $path ohne Leserecht");
+        }
+    }
+
+    public function testAccountReadRightShowsWithoutChanging(): void
+    {
+        $this->assertSame(Capability::ViewAccounts, Capability::CreateUsers->requires());
+        $this->assertSame(Capability::ViewAccounts, Capability::PromoteUsers->requires());
+        $this->assertContains(Capability::ViewAccounts, Capability::accountRights(), 'nur Admins geben es weiter');
+        $this->assertSame(400, $this->call('POST', '/admin/roles', ['label' => 'Anleger', 'capabilities' => TestApp::caps(['member', 'create_users'])])->status, 'Anlegen ohne Konten sehen');
+
+        $this->users->current = $this->withRights('kontenleser', ['view_accounts']);
+        $this->assertSame(200, $this->call('GET', '/members')->status, 'Mitgliederliste mit Konten sehen');
+        $detail = $this->call('GET', '/members/' . $this->anna);
+        $this->assertSame(200, $detail->status);
+        $this->assertArrayHasKey('join_year', $detail->data);
+        $this->assertArrayHasKey('no_access', $detail->data);
+        $this->assertSame([], $detail->data['rights']['editable'] ?? null, 'Rechte sichtbar, nichts änderbar');
+        foreach (['/members/' . $this->anna . '/account', '/registrations', '/admissions'] as $path) {
+            $this->assertSame(200, $this->call('GET', $path)->status, "GET $path mit view_accounts");
+        }
+        $this->assertSame(403, $this->call('PATCH', '/members/' . $this->anna . '/account', ['first_name' => 'X'])->status);
+        $this->assertSame(403, $this->call('POST', '/users', ['first_name' => 'Neu', 'last_name' => 'Person', 'level' => 'member'])->status);
+        $this->assertSame(403, $this->call('PATCH', '/members/' . $this->anna . '/role', ['level' => 'guest'])->status);
+        $this->assertSame(403, $this->call('PUT', '/members/' . $this->anna . '/rights', ['grant' => [], 'revoke' => []])->status);
+        $this->assertSame(403, $this->call('PUT', '/members/' . $this->anna . '/join-year', ['date' => '2001'])->status);
+        $this->assertSame(403, $this->call('POST', '/members/' . $this->anna . '/password')->status);
+
+        $this->users->current = $this->withRights('ohne3', []);
+        foreach (['/members/' . $this->anna . '/account', '/registrations', '/admissions'] as $path) {
+            $this->assertSame(403, $this->call('GET', $path)->status, "GET $path ohne view_accounts");
         }
     }
 

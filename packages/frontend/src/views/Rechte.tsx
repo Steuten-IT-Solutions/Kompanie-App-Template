@@ -48,6 +48,8 @@ export function MemberRightsPanel({
     grant.some((c) => !rights.grant.includes(c)) ||
     revoke.some((c) => !rights.revoke.includes(c));
   const overridden = new Set([...rights.grant, ...rights.revoke]);
+  // Nur sehen (Konten sehen ohne Rollen vergeben): nichts änderbar, kein Speichern.
+  const readOnly = rights.editable.length === 0;
 
   async function save(g: Capability[], r: Capability[], msg: string) {
     setBusy(true);
@@ -68,8 +70,10 @@ export function MemberRightsPanel({
       <h3 className="section-title">Rechte</h3>
       <div className="card">
         <p className="small muted">
-          {plural ? `Grundlage sind die Rollen „${roles}“.` : `Grundlage ist die Rolle „${roles}“.`} Hier kannst du {name} einzelne Rechte
-          zusätzlich geben oder entziehen. Die Ausnahmen bleiben auch bei einem Rollenwechsel bestehen.
+          {plural ? `Grundlage sind die Rollen „${roles}“.` : `Grundlage ist die Rolle „${roles}“.`}{' '}
+          {readOnly
+            ? `Markiert ist, was ${name} zusätzlich bekommen hat oder was entzogen ist.`
+            : `Hier kannst du ${name} einzelne Rechte zusätzlich geben oder entziehen. Die Ausnahmen bleiben auch bei einem Rollenwechsel bestehen.`}
         </p>
         <RightsTree
           legend={`Rechte von ${name}`}
@@ -82,24 +86,26 @@ export function MemberRightsPanel({
           }
           initiallyOpen={(g) => g.items.some((i) => overridden.has(i.key))}
         />
-        <div className="button-row">
-          <button className="btn" disabled={busy || !dirty} onClick={() => save(grant, revoke, 'Rechte gespeichert')}>
-            Rechte speichern
-          </button>
-          {hasOverrides(rights) && (
-            <button
-              className="btn btn-secondary"
-              disabled={busy}
-              onClick={async () =>
-                (await confirmAsk(
-                  `Alle Ausnahmen von ${name} entfernen? Dann gelten nur die Rechte ${plural ? 'der Rollen' : 'der Rolle'}.`,
-                )) && save([], [], 'Rechte wie die Rolle')
-              }
-            >
-              Wie die Rolle
+        {!readOnly && (
+          <div className="button-row">
+            <button className="btn" disabled={busy || !dirty} onClick={() => save(grant, revoke, 'Rechte gespeichert')}>
+              Rechte speichern
             </button>
-          )}
-        </div>
+            {hasOverrides(rights) && (
+              <button
+                className="btn btn-secondary"
+                disabled={busy}
+                onClick={async () =>
+                  (await confirmAsk(
+                    `Alle Ausnahmen von ${name} entfernen? Dann gelten nur die Rechte ${plural ? 'der Rollen' : 'der Rolle'}.`,
+                  )) && save([], [], 'Rechte wie die Rolle')
+                }
+              >
+                Wie die Rolle
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );

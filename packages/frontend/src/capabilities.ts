@@ -165,6 +165,12 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         features: ['gallery'],
       },
       {
+        key: 'view_submissions',
+        label: `${sec.gallery}: eingereichte Bilder und Videos ansehen, auch vor der Freigabe`,
+        short: 'Einreichungen sehen',
+        features: ['gallery'],
+      },
+      {
         key: 'review_gallery',
         label: `${sec.gallery}: Einreichungen freigeben oder ablehnen, freigegebene wieder entfernen`,
         short: 'Einreichungen prüfen',
@@ -274,6 +280,12 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         short: 'Persönliches pflegen',
       },
       {
+        key: 'view_accounts',
+        label:
+          'Konten sehen: wer ohne Zugang ist, Benutzername und E-Mail-Adresse, Eintritt, Rollen und einzelne Rechte, Anfragen auf einen Zugang und Aufnahmen (ohne zu ändern; nur Admins vergeben es)',
+        short: 'Konten sehen',
+      },
+      {
         key: 'create_users',
         label:
           'Mitglieder anlegen (auch mit ihren persönlichen Angaben) und Startpasswörter erzeugen (nicht für Personen mit mehr Rechten)',
@@ -301,12 +313,17 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
       {
         key: 'promote_users',
         label:
-          'Rollen vergeben (nur Rollen mit eigenen Rechten, ohne die Rechte Mitglieder anlegen, Ehemalige verwalten und Rollen vergeben)',
+          'Rollen vergeben (nur Rollen mit eigenen Rechten, ohne die Rechte Konten sehen, Mitglieder anlegen, Ehemalige verwalten und Rollen vergeben)',
         short: 'Rollen vergeben',
       },
       {
+        key: 'view_reports',
+        label: 'Fehlermeldungen der Mitglieder mit Bildschirmfoto sehen',
+        short: 'Fehlermeldungen sehen',
+      },
+      {
         key: 'review_reports',
-        label: 'Fehlermeldungen der Mitglieder sehen, mit Begründung schließen oder an die Betreuer der App weiterleiten',
+        label: 'Fehlermeldungen der Mitglieder mit Begründung schließen oder an die Betreuer der App weiterleiten',
         short: 'Fehlermeldungen bearbeiten',
       },
       {

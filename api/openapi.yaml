@@ -612,7 +612,7 @@ paths:
     get:
       tags: [Fehlermeldungen]
       summary: Eingang der Fehlermeldungen (offene zuerst, dann die erledigten der letzten 30 Tage)
-      x-capability: review_reports
+      x-capability: view_reports
       responses:
         '200':
           description: OK
@@ -634,7 +634,7 @@ paths:
     get:
       tags: [Fehlermeldungen]
       summary: Bildschirmfoto einer offenen Meldung
-      x-capability: review_reports
+      x-capability: view_reports
       responses:
         '200':
           description: OK
@@ -1527,7 +1527,7 @@ paths:
     get:
       tags: [Galerie]
       summary: Offene Einreichungen (älteste zuerst) und die zuletzt freigegebenen
-      x-capability: review_gallery
+      x-capability: view_submissions
       responses:
         '200':
           description: OK
@@ -5253,7 +5253,8 @@ paths:
       description: |
         Alle Anwärter (Grundrolle mit `promotable` oder `admission_extra`, Zusatzrolle mit `admission_extra`, ohne Ehemalige): zuerst wer die
         Voraussetzung erfüllt (nach `fulfilled_on`), dann `open`, dann `none`. Es zählen alle Teilnahmen der Terminart bis heute.
-      x-capability: create_users
+        Aufnehmen (`POST /members/{id}/admit`) nur mit `create_users`.
+      x-capability: view_accounts
       responses:
         '200':
           description: OK
@@ -5277,7 +5278,7 @@ paths:
         (sonst 403), damit niemand über die Auskunft sieht, was ihm in der App verborgen ist: `manage_former`, `view_personal`,
         `view_points`, `view_penalties`, `view_promotions`, `view_titles`, `view_attendance`, `manage_polls`,
         `view_mail`, `view_lists`, `post_board`, `view_offices`, `view_responses`.
-      x-capability: create_users und die Rechte aller enthaltenen Bereiche (in der Regel Admins)
+      x-capability: view_accounts und die Rechte aller enthaltenen Bereiche (in der Regel Admins)
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }
       responses:
@@ -5360,6 +5361,53 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PassiveMember' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /passive-members/import:
+    post:
+      tags: [Verwaltung]
+      summary: Passive aus einer Tabelle übernehmen, mit dem Beitrag eines Jahres; ohne apply nur die Vorschau
+      description: |
+        CSV mit Semikolon, Tabulator (die App liest Excel-Dateien selbst und schickt sie so) oder Komma, UTF-8 oder
+        Windows-1252, höchstens 500 KB und 1.000 Zeilen. Kopfzeile ist die erste der ersten 20 Zeilen mit „Vorname“ oder
+        „Nachname“ (sonst die erste). Ohne `columns` werden die Spalten an ihren Namen erkannt (vorname, nachname,
+        straße/strasse (auch mit Hausnummer), hausnummer, adresszusatz, plz, ort/wohnort, land, telefon/telefon-nr./handy,
+        e-mail, geburtsdatum/geb-datum, eintritt, bemerkung, betreuer, betrag, zahlungsart, bezahlt am); die Antwort nennt
+        die Zuordnung (`columns`), die die App ändern und mitschicken kann. Adresse, Telefon, E-Mail und Geburtsdatum nur mit
+        `manage_personal` (sonst übergangen, `ignored`); ungültige Angaben bleiben leer, mit Hinweis (`warnings`).
+        Betreuer als „Vorname Nachname“, „Nachname, Vorname“ oder „V. Nachname“; passt keins oder mehr als ein Mitglied,
+        bleibt er leer (Hinweis). Beitrag für `year` (Vorgabe das laufende Jahr): Spalten betrag + zahlungsart oder, ohne
+        betrag, Spalten, die wie eine eingerichtete Zahlungsart heißen (auch abgekürzt) und den Betrag enthalten
+        (`method_columns`); ohne Betrag gilt der Jahresbeitrag. Datum aus „bezahlt am“ (TT.MM.JJJJ, TT.MM. oder JJJJ-MM-TT
+        am Anfang der Zelle), sonst `paid_on` (Vorgabe heute). Zellen ohne Buchstaben und Ziffern gelten als leer. Gleicher
+        Vor- und Nachname wie ein vorhandener Passiver → übersprungen (`existing`); doppelt in der Tabelle → Fehler.
+        Mit `apply` alles in einer Transaktion; hat eine Zeile einen Fehler → 400 (nichts angelegt), außer mit
+        `skip_errors` (dann ohne diese Zeilen).
+      x-capability: manage_passive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [csv]
+              properties:
+                csv: { type: string }
+                apply: { type: boolean, default: false }
+                columns:
+                  type: [object, 'null']
+                  description: 'Feld => Nummer der Spalte ab 0 (null = keine); ohne: erkannt'
+                  additionalProperties: { type: [integer, 'null'] }
+                year: { type: integer, description: 'Jahr des Beitrags; Vorgabe das laufende' }
+                paid_on: { type: string, format: date, description: 'Datum für Zahlungen ohne Datum; Vorgabe heute' }
+                skip_errors: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Vorschau bzw. Ergebnis
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PassiveImportResult' }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
@@ -5790,8 +5838,9 @@ paths:
       summary: Angaben eines Kontos zum Bearbeiten (Issue #24)
       description: |
         Mit denselben Grenzen wie beim Passwort-Zurücksetzen (Admins nur für Admins usw.). `phone` nur für das eigene
-        Konto und mit `view_personal`, sonst leer; Adresse und Geburtsdatum stehen in `GET /members/{id}`.
-      x-capability: create_users
+        Konto und mit `view_personal`, sonst leer; Adresse und Geburtsdatum stehen in `GET /members/{id}`. Ändern
+        (`PATCH`) nur mit `create_users`.
+      x-capability: view_accounts
       responses:
         '200': { $ref: '#/components/responses/AccountProfile' }
         '403': { $ref: '#/components/responses/Error' }
@@ -6102,7 +6151,7 @@ paths:
   /registrations:
     get:
       tags: [Zugang beantragen]
-      summary: Anfragen, die auf Freigabe warten (create_users)
+      summary: Anfragen, die auf Freigabe warten (view_accounts; freigeben und ablehnen mit create_users)
       responses:
         '200':
           description: Älteste zuerst
@@ -9456,7 +9505,7 @@ components:
 
     ReviewReport:
       type: object
-      description: Fehlermeldung im Eingang der Admins (review_reports)
+      description: Fehlermeldung im Eingang der Admins (view_reports)
       required:
         [
           id,
@@ -9519,7 +9568,7 @@ components:
         video:
           {
             type: string,
-            description: 'Nur beim Prüfen offener Videos: Adresse zum Abspielen vor der Freigabe (<App>/foto/<id der Einreichung>/einreichung, Range, nur mit review_gallery)',
+            description: 'Nur beim Prüfen offener Videos: Adresse zum Abspielen vor der Freigabe (<App>/foto/<id der Einreichung>/einreichung, Range, nur mit view_submissions)',
           }
     GalleryAlbumInput:
       type: object
@@ -9747,6 +9796,7 @@ components:
                       manage_sponsors,
                       manage_companies,
                       submit_gallery,
+                      view_submissions,
                       review_gallery,
                       manage_gallery,
                       manage_pages,
@@ -9754,11 +9804,13 @@ components:
                       manage_news,
                       view_personal,
                       manage_personal,
+                      view_accounts,
                       create_users,
                       manage_former,
                       view_passive,
                       manage_passive,
                       promote_users,
+                      view_reports,
                       review_reports,
                       view_activity,
                       view_changes,
@@ -9839,6 +9891,7 @@ components:
                   manage_sponsors,
                   manage_companies,
                   submit_gallery,
+                  view_submissions,
                   review_gallery,
                   manage_gallery,
                   manage_pages,
@@ -9846,11 +9899,13 @@ components:
                   manage_news,
                   view_personal,
                   manage_personal,
+                  view_accounts,
                   create_users,
                   manage_former,
                   view_passive,
                   manage_passive,
                   promote_users,
+                  view_reports,
                   review_reports,
                 ],
             }
@@ -9938,6 +9993,7 @@ components:
                 manage_sponsors,
                 manage_companies,
                 submit_gallery,
+                view_submissions,
                 review_gallery,
                 manage_gallery,
                 manage_pages,
@@ -9945,11 +10001,13 @@ components:
                 manage_news,
                 view_personal,
                 manage_personal,
+                view_accounts,
                 create_users,
                 manage_former,
                 view_passive,
                 manage_passive,
                 promote_users,
+                view_reports,
                 review_reports,
                 view_activity,
                 view_changes,
@@ -10058,13 +10116,13 @@ components:
             imprint: { type: [string, 'null'] }
             privacy: { type: [string, 'null'] }
         reports: { type: boolean, description: 'Fehler melden möglich (Knopf „Fehler melden“); Meldungen gehen zuerst an die Admins' }
-        openReports: { type: [integer, 'null'], description: 'Offene Fehlermeldungen; nur für Angemeldete mit review_reports, sonst null' }
+        openReports: { type: [integer, 'null'], description: 'Offene Fehlermeldungen; nur für Angemeldete mit view_reports, sonst null' }
         registration: { type: boolean, description: 'Zugang beantragen eingeschaltet (Issue #314): Link „Zugang beantragen“ für Gäste' }
         pendingRegistrations:
-          { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null' }
+          { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit view_accounts, sonst null' }
         admissionsDue:
           type: [integer, 'null']
-          description: 'Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“); nur für create_users mit Bereich Anwesenheit (auch ohne Anwärter-Rolle, dann 0), sonst null'
+          description: 'Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“); nur für view_accounts mit Bereich Anwesenheit (auch ohne Anwärter-Rolle, dann 0), sonst null'
         gallerySubmissions:
           {
             type: boolean,
@@ -10482,10 +10540,10 @@ components:
           type: array
           items: { $ref: '#/components/schemas/TitleRef' }
         joined_on:
-          description: Eintritt als JJJJ-MM-TT oder nur das Jahr JJJJ (unabhängig von der Anzeige auf der eigenen Seite), leer ohne Eintrag; nur mit Recht create_users
+          description: Eintritt als JJJJ-MM-TT oder nur das Jahr JJJJ (unabhängig von der Anzeige auf der eigenen Seite), leer ohne Eintrag; nur mit Recht view_accounts
           type: string
         no_access:
-          description: 'Mitglied ohne Zugang (meldet sich noch nicht an, z. B. für Chroniken angelegt); nur mit Recht create_users, auch in GET /members/{id}'
+          description: 'Mitglied ohne Zugang (meldet sich noch nicht an, z. B. für Chroniken angelegt); nur mit Recht view_accounts, auch in GET /members/{id}'
           type: boolean
 
     DirectoryEntry:
@@ -10611,14 +10669,15 @@ components:
               allOf:
                 - $ref: '#/components/schemas/PersonalInfo'
             join_year:
-              description: Eintrittsjahr mit Anzeige (nur mit Recht create_users; null ohne Eintrag)
+              description: Eintrittsjahr mit Anzeige (nur mit Recht view_accounts, ändern mit create_users; null ohne Eintrag)
               oneOf:
                 - $ref: '#/components/schemas/JoinYear'
                 - type: 'null'
             rights:
               description: |
                 Ausnahmen bei den Rechten (`PUT /members/{id}/rights`); null für Admins, Gäste, sich selbst und wenn der
-                Betrachter sie nicht ändern darf.
+                Betrachter sie nicht sehen darf (view_accounts, Grenzen wie beim Ändern). Ohne promote_users ist
+                `editable` leer.
               oneOf:
                 - $ref: '#/components/schemas/MemberRights'
                 - type: 'null'
@@ -10633,7 +10692,7 @@ components:
                 - $ref: '#/components/schemas/FormerInfo'
                 - type: 'null'
             admission:
-              description: Stand als Anwärter (nur für create_users); null, wenn die Person kein Anwärter ist
+              description: Stand als Anwärter (nur für view_accounts); null, wenn die Person kein Anwärter ist
               oneOf:
                 - $ref: '#/components/schemas/Admission'
                 - type: 'null'
@@ -10852,6 +10911,7 @@ components:
           manage_sponsors,
           manage_companies,
           submit_gallery,
+          view_submissions,
           review_gallery,
           manage_gallery,
           manage_pages,
@@ -10859,11 +10919,13 @@ components:
           manage_news,
           view_personal,
           manage_personal,
+          view_accounts,
           create_users,
           manage_former,
           view_passive,
           manage_passive,
           promote_users,
+          view_reports,
           review_reports,
         ]
 
@@ -10884,7 +10946,7 @@ components:
           type: array
           items: { $ref: '#/components/schemas/GrantableCapability' }
         editable:
-          description: Rechte, die der Betrachter hier ändern darf
+          description: Rechte, die der Betrachter hier ändern darf (leer ohne promote_users, mit view_accounts nur zum Sehen)
           type: array
           items: { $ref: '#/components/schemas/GrantableCapability' }
 
@@ -10970,10 +11032,84 @@ components:
         phone: { type: string, description: 'Leer, wenn keine hinterlegt ist' }
         email: { type: string, description: 'Leer, wenn keine hinterlegt ist' }
         birth_date: { type: [string, 'null'], format: date }
+        joined: { type: string, description: 'Eintritt als freier Text (z. B. „2023“ oder „vor 2014“), leer ohne' }
+        note: { type: string, description: 'Bemerkung, leer ohne' }
         payments:
           type: array
           description: Gezahlte Beiträge, neuestes Jahr zuerst (auch für den Betreuer)
           items: { $ref: '#/components/schemas/PassivePayment' }
+    PassiveImportResult:
+      type: object
+      required: [headers, header_line, columns, method_columns, ignored, personal, year, paid_on, methods, rows, new, payments, existing, errors, applied]
+      properties:
+        headers: { type: array, items: { type: string }, description: 'Zellen der Kopfzeile' }
+        header_line: { type: integer, description: 'Nummer der Kopfzeile ab 1' }
+        columns: { type: object, additionalProperties: { type: integer }, description: 'Feld => Nummer der Spalte ab 0' }
+        method_columns:
+          type: array
+          items:
+            type: object
+            required: [column, method]
+            properties:
+              column: { type: integer }
+              method: { type: string }
+        ignored:
+          type: array
+          items:
+            type: object
+            required: [column, reason]
+            properties:
+              column: { type: string }
+              reason: { type: string }
+        personal: { type: boolean, description: 'Ob persönliche Angaben übernommen werden (manage_personal)' }
+        year: { type: integer }
+        paid_on: { type: string, format: date }
+        methods: { type: array, items: { type: string } }
+        rows:
+          type: array
+          items:
+            type: object
+            required: [line, name, first_name, last_name]
+            properties:
+              line: { type: integer }
+              name: { type: string }
+              first_name: { type: string }
+              last_name: { type: string }
+              existing: { type: boolean }
+              error: { type: string }
+              warnings: { type: array, items: { type: string } }
+              caretaker:
+                oneOf:
+                  - type: 'null'
+                  - type: object
+                    required: [id, name]
+                    properties:
+                      id: { type: integer }
+                      name: { type: string }
+              joined: { type: string }
+              note: { type: string }
+              address:
+                oneOf:
+                  - type: 'null'
+                  - $ref: '#/components/schemas/Address'
+              phone: { type: string }
+              email: { type: string }
+              birth_date: { type: [string, 'null'], format: date }
+              payment:
+                oneOf:
+                  - type: 'null'
+                  - type: object
+                    required: [year, amount_cents, paid_on, method]
+                    properties:
+                      year: { type: integer }
+                      amount_cents: { type: integer }
+                      paid_on: { type: string, format: date }
+                      method: { type: string }
+        new: { type: integer, description: 'Neue Passive (nach apply: angelegt)' }
+        payments: { type: integer, description: 'Davon mit Zahlung' }
+        existing: { type: integer }
+        errors: { type: integer }
+        applied: { type: boolean }
     PassivePayment:
       type: object
       required: [id, year, amount_cents, paid_on, method]
@@ -11011,6 +11147,8 @@ components:
             - $ref: '#/components/schemas/Address'
         phone: { type: string, description: 'Ziffern, Leerzeichen und + ( ) / -; leer entfernt sie' }
         email: { type: string, format: email, description: 'Leer entfernt sie' }
+        joined: { type: string, maxLength: 40, description: 'Eintritt als freier Text; leer entfernt ihn' }
+        note: { type: string, maxLength: 500, description: 'Bemerkung; leer entfernt sie' }
         birth_date:
           { type: [string, 'null'], format: date, description: 'JJJJ-MM-TT, ab 1900, nicht in der Zukunft; null oder leer entfernt es' }
     PersonalInfo:

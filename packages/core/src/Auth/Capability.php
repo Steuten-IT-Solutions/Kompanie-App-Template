@@ -115,7 +115,9 @@ enum Capability: string
     case ManageCompanies = 'manage_companies';
     /** Bilder für die Galerie einreichen, eigene Einreichungen sehen und zurückziehen (Issue #286). */
     case SubmitGallery = 'submit_gallery';
-    /** Einreichungen sehen, freigeben (öffentlich oder intern), ablehnen und freigegebene wieder entfernen (Issue #286). */
+    /** Eingereichte Bilder und Videos zur Prüfung sehen, auch Videos vor der Freigabe (ohne freizugeben). */
+    case ViewSubmissions = 'view_submissions';
+    /** Einreichungen freigeben (öffentlich oder intern), ablehnen und freigegebene wieder entfernen (Issue #286; setzt view_submissions voraus). */
     case ReviewGallery = 'review_gallery';
     /**
      * Galerie verwalten: Alben der App anlegen, umbenennen, ins andere Jahr setzen und löschen, Bilder und Videos
@@ -136,7 +138,13 @@ enum Capability: string
     case ViewPersonal = 'view_personal';
     /** Persönliche Angaben anderer ändern (setzt view_personal voraus). */
     case ManagePersonal = 'manage_personal';
-    /** Mitglieder anlegen (auch mit ihren persönlichen Angaben), Startpasswörter erzeugen. */
+    /**
+     * Konten sehen (ohne zu ändern): wer ohne Zugang ist, Benutzername und E-Mail-Adresse des Kontos, Eintritt, Rollen,
+     * Zusatzrollen und Ausnahmen bei den Rechten anderer, Anfragen auf einen Zugang und Aufnahmen. Ein Recht über Konten
+     * (accountRights): Nur Admins geben es weiter (Entscheidung vom 17.11.2026).
+     */
+    case ViewAccounts = 'view_accounts';
+    /** Mitglieder anlegen (auch mit ihren persönlichen Angaben), Startpasswörter erzeugen (setzt view_accounts voraus). */
     case CreateUsers = 'create_users';
     /**
      * Ehemalige verwalten: Liste der Ehemaligen in der Verwaltung, Ehemalige anlegen und importieren, Mitglieder als
@@ -153,11 +161,13 @@ enum Capability: string
      * view_passive voraus.
      */
     case ManagePassive = 'manage_passive';
-    /** Rollen vergeben. */
+    /** Rollen vergeben (setzt view_accounts voraus). */
     case PromoteUsers = 'promote_users';
+    /** Fehlermeldungen der App mit Bildschirmfoto sehen (ohne sie zu schließen oder weiterzuleiten). */
+    case ViewReports = 'view_reports';
     /**
      * Fehlermeldungen der App sehen (mit Namen angemeldeter Personen und Bildschirmfoto), mit Begründung schließen oder
-     * an die Betreuer der App weiterleiten (BugReportService).
+     * an die Betreuer der App weiterleiten (BugReportService; setzt view_reports voraus).
      */
     case ReviewReports = 'review_reports';
     /**
@@ -214,6 +224,10 @@ enum Capability: string
         'manage_lists' => 'view_lists',
         'send_mail' => 'view_mail',
         'manage_passive' => 'view_passive',
+        'review_gallery' => 'view_submissions',
+        'review_reports' => 'view_reports',
+        'create_users' => 'view_accounts',
+        'promote_users' => 'view_accounts',
     ];
 
     /**
@@ -242,20 +256,20 @@ enum Capability: string
 
     /**
      * Wer die Mitgliederliste der Verwaltung sieht: wer Punkte, Strafen, Dienstgrade, Titel oder die Anwesenheit der
-     * Mitglieder sieht (das Schreibrecht setzt jeweils das Leserecht voraus), Mitglieder Kompanien zuordnet (Issue #280), persönliche Angaben sieht, Mitglieder anlegt,
-     * Ehemalige verwaltet (Mitglieder als ehemalig eintragen geht auf ihrer Seite) oder Rollen vergibt (wie
-     * memberListAllowed() in adminNav.tsx). Punkte und Strafen der Mitglieder zeigt sie nur mit dem jeweiligen Recht
+     * Mitglieder sieht (das Schreibrecht setzt jeweils das Leserecht voraus), Mitglieder Kompanien zuordnet (Issue #280), persönliche Angaben sieht, Konten
+     * sieht (Mitglieder anlegen und Rollen vergeben setzen das voraus), Ehemalige verwaltet (Mitglieder als ehemalig
+     * eintragen geht auf ihrer Seite); wie memberListAllowed() in adminNav.tsx. Punkte und Strafen der Mitglieder zeigt sie nur mit dem jeweiligen Recht
      * (MemberService::visibleParts).
      *
      * @return list<self>
      */
     public static function memberList(): array
     {
-        return [self::ViewPoints, self::ViewPenalties, self::ViewPromotions, self::ViewTitles, self::ViewAttendance, self::ManageCompanies, self::ViewPersonal, self::CreateUsers, self::ManageFormer, self::PromoteUsers];
+        return [self::ViewPoints, self::ViewPenalties, self::ViewPromotions, self::ViewTitles, self::ViewAttendance, self::ManageCompanies, self::ViewPersonal, self::ViewAccounts, self::ManageFormer];
     }
 
     /**
-     * Rechte über Konten anderer: Konten anlegen und Passwörter setzen, Mitglieder als ehemalig eintragen (das Konto
+     * Rechte über Konten anderer: Konten sehen, Konten anlegen und Passwörter setzen, Mitglieder als ehemalig eintragen (das Konto
      * stilllegen) und wieder aufnehmen, Rollen vergeben. Wer nicht Admin ist, vergibt sie nicht weiter (weder mit einer
      * Rolle noch einzeln) und verwaltet keine Personen, die eines davon haben (RoleService::canHandle); so kann niemand
      * sich gegenseitig stilllegen oder sich über eine andere Person mehr Rechte verschaffen.
@@ -264,6 +278,6 @@ enum Capability: string
      */
     public static function accountRights(): array
     {
-        return [self::CreateUsers, self::ManageFormer, self::PromoteUsers];
+        return [self::ViewAccounts, self::CreateUsers, self::ManageFormer, self::PromoteUsers];
     }
 }

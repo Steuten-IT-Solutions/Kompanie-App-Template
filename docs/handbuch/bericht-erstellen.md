@@ -2,7 +2,7 @@
 titel: Bericht als PDF
 reihenfolge: 69
 rechte: []
-einrecht: [view_points, view_penalties, view_promotions, view_titles, view_attendance, manage_companies, view_personal, create_users, manage_former, promote_users, view_passive, manage_offices, view_inventory]
+einrecht: [view_points, view_penalties, view_promotions, view_titles, view_attendance, manage_companies, view_personal, view_accounts, create_users, manage_former, promote_users, view_passive, manage_offices, view_inventory]
 ---
 Mit dem Bericht holst du die Daten mehrerer Bereiche für einen Zeitraum in eine PDF-Datei, z. B. für die Jahreshauptversammlung oder wenn ein neuer Vorstand übernimmt.
 

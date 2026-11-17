@@ -69,7 +69,7 @@ $app->roles()->delete($kasseKey, null);
 $c->section('Anwärter');
 $candKey = (string) (array_search('Kpwp Anwärter', array_column($app->roles()->all(), 'label', 'key'), true)
     ?: $app->roles()->create(['label' => 'Kpwp Anwärter', 'capabilities' => $legacyCaps(['calendar']), 'new_accounts' => true, 'promotable' => true])['key']);
-$app->roles()->create(['label' => 'Kpwp Aufnahme', 'capabilities' => $legacyCaps(['member', 'create_users'])]);
+$app->roles()->create(['label' => 'Kpwp Aufnahme', 'capabilities' => $legacyCaps(['member', 'view_accounts', 'create_users'])]);
 $aufnahmeKey = (string) array_search('Kpwp Aufnahme', array_column($app->roles()->all(), 'label', 'key'), true);
 $holder = $d->createUser('kpwp_aufnahme', $aufnahmeKey);
 $existingCand = get_user_by('login', 'kpwp.anwaerter');
@@ -136,7 +136,7 @@ remove_role('kpwp_vorstand');
 
 // Wer in der App Konten anlegen darf, setzt keine Passwörter von Benutzerverwaltern der Webseite zurück.
 add_role('kpwp_userpflege', 'Benutzerpflege', ['read' => true, 'list_users' => true, 'edit_users' => true]);
-$pflegeRole = $app->roles()->create(['label' => 'Kpwp Kontenpflege', 'capabilities' => $legacyCaps(['member', 'create_users'])]);
+$pflegeRole = $app->roles()->create(['label' => 'Kpwp Kontenpflege', 'capabilities' => $legacyCaps(['member', 'view_accounts', 'create_users'])]);
 $pflegeKey = $pflegeRole['key'];
 $pfleger = $d->createUser('kpwp_pfleger', 'member');
 $app->users->setRole($pfleger, $pflegeKey);
@@ -197,7 +197,7 @@ wp_delete_user($manual);
 wp_set_current_user($pfleger);
 // Konto der Webseite (z. B. Kunde, Forum), das erst über die App zum Mitglied gemacht wird: nicht übernehmbar.
 wp_set_current_user(0);
-$app->roles()->update($pflegeKey, ['capabilities' => $legacyCaps(['member', 'create_users', 'promote_users'])]);
+$app->roles()->update($pflegeKey, ['capabilities' => $legacyCaps(['member', 'view_accounts', 'create_users', 'promote_users'])]);
 $fremd = wp_insert_user(['user_login' => 'kpwp_fremd', 'user_pass' => wp_generate_password(), 'role' => 'subscriber']);
 wp_set_current_user($pfleger);
 $app->users->setRole($fremd, 'member');
@@ -275,7 +275,7 @@ $d->request('PATCH', "/members/$rid/account", ['username' => 'kpwp.dritter']);
 clean_user_cache($rid);
 $c->ok(get_userdata($rid)->user_login === 'kpwp.dritter' && get_userdata($rid)->user_nicename === 'kpwp-eigen', 'Eigener Name in Adressen bleibt');
 // Benutzer der Webseite (z. B. Redakteur): nur mit dem Recht aus WordPress, nicht über „Mitglieder anlegen“ der App.
-$umbenenner = $app->roles()->create(['label' => 'Kpwp Umbenenner', 'capabilities' => $legacyCaps(['member', 'create_users'])]);
+$umbenenner = $app->roles()->create(['label' => 'Kpwp Umbenenner', 'capabilities' => $legacyCaps(['member', 'view_accounts', 'create_users'])]);
 $kontenpfleger = $d->createUser('kpwp_kontenpfleger', 'member');
 $app->users->setRole($kontenpfleger, $umbenenner['key']);
 $redakteur = wp_insert_user(['user_login' => 'kpwp_red', 'user_pass' => wp_generate_password(), 'role' => 'editor']);

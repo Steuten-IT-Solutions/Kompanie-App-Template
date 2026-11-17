@@ -488,7 +488,7 @@ final class ApiScenario
 
         // Wer Konten anlegen darf, ohne Admin zu sein: Passwörter nur von Mitgliedern mit eigenen Rechten.
         $this->d->actAs($admin);
-        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Kontenpflege', 'capabilities' => self::caps(['member', 'create_users'])]);
+        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Kontenpflege', 'capabilities' => self::caps(['member', 'view_accounts', 'create_users'])]);
         $pflege = (string) (array_column((array) $d, 'key', 'label')['Kptest Kontenpflege'] ?? '');
         $holder = $this->user('kptest_rollen_pflege', $pflege);
         $guest = $this->user('kptest_rollen_gast', 'guest');
@@ -713,7 +713,7 @@ final class ApiScenario
 
         // Wer Konten anlegt, legt Anwärter an und nimmt sie auf – nur von Anwärter zu Mitglied.
         $this->d->actAs($admin);
-        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Aufnahme', 'capabilities' => self::caps(['member', 'create_users'])]);
+        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Aufnahme', 'capabilities' => self::caps(['member', 'view_accounts', 'create_users'])]);
         $aufnahme = (string) (array_column((array) $d, 'key', 'label')['Kptest Aufnahme'] ?? '');
         $c->ok($this->req('POST', '/admin/roles', ['label' => 'Kptest Nur Kalender', 'capabilities' => ['calendar']])[0] === 201, 'Eigene Rolle nur mit dem Kalender');
         $c->ok($this->req('POST', '/admin/roles', ['label' => 'Kptest Ungültig', 'capabilities' => ['calendar', 'view_points', 'manage_points']])[0] === 400, 'Verwalten ohne Mitgliederbereich → 400');
@@ -1220,7 +1220,7 @@ final class ApiScenario
         $c->ok($s === 200 && ($listed($d)['joined_on'] ?? null) === '2004-03-12', 'Mitgliederliste der Verwaltung mit Eintritt (unabhängig von der Anzeige)');
         $this->d->actAs($this->user('kptest_liste_punkte', 'points'));
         [$s, $d] = $this->req('GET', '/members');
-        $c->ok($s === 200 && $listed($d) !== [] && !array_key_exists('joined_on', $listed($d)), 'Ohne create_users kein Eintrittsjahr in der Liste');
+        $c->ok($s === 200 && $listed($d) !== [] && !array_key_exists('joined_on', $listed($d)), 'Ohne view_accounts kein Eintrittsjahr in der Liste');
         $this->d->actAs($cand);
         $c->ok($this->req('PUT', "/members/$m/join-year", ['year' => 2000])[0] === 403, 'Ohne create_users kein fremdes Eintrittsjahr → 403');
         $c->ok($this->req('PUT', '/me/join-year', ['year' => 2000])[0] === 403, 'Anwärter: kein eigenes Eintrittsjahr → 403');

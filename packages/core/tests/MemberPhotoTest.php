@@ -122,7 +122,7 @@ final class MemberPhotoTest extends TestCase
     public function testOnlyAccountManagersChangePhotos(): void
     {
         $manager = $this->users->add('verwalter', $this->roleWith('Kassierer', ['member', 'view_points', 'manage_points', 'view_penalties', 'manage_penalties']));
-        $creator = $this->users->add('anleger', $this->roleWith('Anleger', ['member', 'create_users']));
+        $creator = $this->users->add('anleger', $this->roleWith('Anleger', ['member', 'view_accounts', 'create_users']));
         $photo = ['file' => self::file('a.jpg', self::image(10, 10))];
 
         // Wer nur Punkte und Strafen verwaltet, sieht Fotos, ändert sie aber nicht (auch nicht das eigene).

@@ -2141,9 +2141,20 @@ WHERE title IS NULL",
                     'CREATE UNIQUE INDEX IF NOT EXISTS {candidate_since}_user_role ON {candidate_since} (user_id, role_key)',
                 ],
             ],
+            // Passive: Eintritt (Jahr, Datum oder freier Text wie „vor 2014“) und eine Bemerkung (Wunsch vom 17.11.2026, für
+            // den Import einer bestehenden Liste)
+            68 => [
+                'mysql' => [
+                    'ALTER TABLE {passive_members} ADD COLUMN joined varchar(40) NOT NULL DEFAULT \'\', ADD COLUMN note varchar(500) NOT NULL DEFAULT \'\'',
+                ],
+                'sqlite' => [
+                    'ALTER TABLE {passive_members} ADD COLUMN joined TEXT NOT NULL DEFAULT \'\'',
+                    'ALTER TABLE {passive_members} ADD COLUMN note TEXT NOT NULL DEFAULT \'\'',
+                ],
+            ],
             // Geburtstage der Passiven (PassiveMemberService::remindBirthdays): Tag des Geburtstags, an den zuletzt erinnert
             // wurde (JJJJ-MM-TT, leer = noch nie), damit jede Erinnerung nur einmal kommt.
-            68 => [
+            69 => [
                 'mysql' => [
                     'ALTER TABLE {passive_members} ADD COLUMN birthday_reminded varchar(10) NOT NULL DEFAULT \'\'',
                 ],

@@ -64,6 +64,7 @@ export type Capability =
   | 'manage_sponsors'
   | 'manage_companies'
   | 'submit_gallery'
+  | 'view_submissions'
   | 'review_gallery'
   | 'manage_gallery'
   | 'manage_pages'
@@ -71,11 +72,13 @@ export type Capability =
   | 'manage_news'
   | 'view_personal'
   | 'manage_personal'
+  | 'view_accounts'
   | 'create_users'
   | 'manage_former'
   | 'view_passive'
   | 'manage_passive'
   | 'promote_users'
+  | 'view_reports'
   | 'review_reports'
   | 'view_activity'
   | 'view_changes'
@@ -139,7 +142,7 @@ export interface AppConfig {
   legal?: { imprint: string | null; privacy: string | null };
   /** „Fehler melden“ möglich (Issue #64); Meldungen gehen zuerst an die Admins */
   reports?: boolean;
-  /** Offene Fehlermeldungen; nur für Angemeldete mit review_reports, sonst null */
+  /** Offene Fehlermeldungen; nur für Angemeldete mit view_reports, sonst null */
   openReports?: number | null;
   /** Zugang beantragen (Issue #314) eingeschaltet: Link „Zugang beantragen“ für Gäste; fehlt bei älteren Servern */
   registration?: boolean;
@@ -879,6 +882,10 @@ export interface PassiveMember {
   email?: string;
   /** JJJJ-MM-TT oder null */
   birth_date?: string | null;
+  /** Eintritt als freier Text (z. B. „2023“ oder „vor 2014“); fehlt bei älteren Servern */
+  joined?: string;
+  /** Bemerkung; fehlt bei älteren Servern */
+  note?: string;
   /** Gezahlte Beiträge, neuestes Jahr zuerst; fehlt bei älteren Servern */
   payments?: PassivePayment[];
 }
@@ -945,6 +952,82 @@ export interface PassiveInput {
   phone?: string;
   email?: string;
   birth_date?: string | null;
+  joined?: string;
+  note?: string;
+}
+
+/** Felder, denen der Import der Passiven Spalten zuordnet */
+export type PassiveImportField =
+  | 'first_name'
+  | 'last_name'
+  | 'street'
+  | 'house_number'
+  | 'extra'
+  | 'postal_code'
+  | 'city'
+  | 'country'
+  | 'phone'
+  | 'email'
+  | 'birth_date'
+  | 'joined'
+  | 'note'
+  | 'caretaker'
+  | 'amount'
+  | 'method'
+  | 'paid_on';
+
+/** Eine Zeile der Vorschau beim Import der Passiven */
+export interface PassiveImportRow {
+  line: number;
+  name: string;
+  first_name: string;
+  last_name: string;
+  existing?: boolean;
+  error?: string;
+  warnings?: string[];
+  caretaker?: { id: number; name: string } | null;
+  joined?: string;
+  note?: string;
+  address?: Address | null;
+  phone?: string;
+  email?: string;
+  birth_date?: string | null;
+  payment?: { year: number; amount_cents: number; paid_on: string; method: string } | null;
+}
+
+/** Ergebnis des Imports der Passiven (Vorschau oder übernommen) */
+export interface PassiveImportResult {
+  /** Zellen der Kopfzeile */
+  headers: string[];
+  /** Nummer der Kopfzeile in der Tabelle (ab 1) */
+  header_line: number;
+  /** Zuordnung: Feld => Nummer der Spalte (ab 0) */
+  columns: Partial<Record<PassiveImportField, number>>;
+  /** Spalten, die wie eine Zahlungsart heißen und den Betrag enthalten */
+  method_columns: { column: number; method: string }[];
+  ignored: { column: string; reason: string }[];
+  /** Ob Adresse, Telefon, E-Mail und Geburtsdatum übernommen werden (manage_personal) */
+  personal: boolean;
+  year: number;
+  /** Datum für Zahlungen ohne Datum (JJJJ-MM-TT) */
+  paid_on: string;
+  methods: string[];
+  rows: PassiveImportRow[];
+  new: number;
+  payments: number;
+  existing: number;
+  errors: number;
+  applied: boolean;
+}
+
+/** Was an den Import der Passiven geht */
+export interface PassiveImportInput {
+  csv: string;
+  apply: boolean;
+  columns?: Partial<Record<PassiveImportField, number | null>> | null;
+  year?: number;
+  paid_on?: string;
+  skip_errors?: boolean;
 }
 
 /** Eigene Kontaktangaben (Meins → Konto) */
@@ -2690,6 +2773,7 @@ export const api = {
     request<PassivePayment>('PATCH', `/passive-payments/${id}`, data),
   deletePassivePayment: (id: number) => request<{ deleted: boolean }>('DELETE', `/passive-payments/${id}`),
   updatePassiveSettings: (data: Partial<PassiveSettings>) => request<PassiveSettings>('PATCH', '/passive-members/settings', data),
+  importPassives: (data: PassiveImportInput) => request<PassiveImportResult>('POST', '/passive-members/import', data),
   markFormer: (id: number, data: FormerInput) => request<FormerInfo & { offices_ended: number }>('PUT', `/members/${id}/former`, data),
   formerOfficesPreview: (id: number, leftOn: string) =>
     request<FormerOfficesPreview>('GET', `/members/${id}/former/offices`, undefined, { left_on: leftOn }),

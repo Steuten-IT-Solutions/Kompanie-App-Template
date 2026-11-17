@@ -526,10 +526,10 @@ final class Api
             // view_personal: Wer etwa nur Punkte verwaltet oder Konten anlegt, sieht kein Geburtsdatum, auch kein verborgenes
             + ($this->user()->can(Cap::ViewPersonal) ? ['personal' => $a->members()->personal($id)] : [])
             + ($a->features()->enabled('birthdays') && $this->user()->can(Cap::ViewPersonal) ? ['birthday' => $a->birthdays()->of($id)] : [])
-            // Eintrittsjahr mit Anzeige, ebenso nur für create_users
-            + ($this->user()->can(Cap::CreateUsers) ? ['join_year' => $a->joinYears()->of($id)] : [])
+            // Eintrittsjahr mit Anzeige, nur wer Konten sieht (view_accounts); ändern mit create_users
+            + ($this->user()->can(Cap::ViewAccounts) ? ['join_year' => $a->joinYears()->of($id)] : [])
             // Aufnahme als Mitglied: Anwärter-Rolle, „Anwärter seit“ und Stand der Voraussetzung (null, wenn kein Anwärter)
-            + ($this->user()->can(Cap::CreateUsers) ? ['admission' => $a->admissions()->statusOf($id)] : [])
+            + ($this->user()->can(Cap::ViewAccounts) ? ['admission' => $a->admissions()->statusOf($id)] : [])
             // Anwesenheit (gespeicherte Einträge und Summen) mit Bereich und Recht view_attendance
             + ($a->features()->enabled('attendance') && $this->user()->can(Cap::ViewAttendance) ? ['attendance' => $a->attendance()->ofMember($id)] : [])
             // Ehemalig: Grund, Eintritt, Ausscheiden (sonst null)
@@ -735,13 +735,13 @@ final class Api
             ],
             'features' => $features,
             // Fehlermeldungen (Issue #64): gehen zuerst an die Admins, darum immer möglich (Knopf „Fehler melden“);
-            // openReports: offene Meldungen für alle mit review_reports (Zähler in der Verwaltung), sonst null
+            // openReports: offene Meldungen für alle mit view_reports (Zähler in der Verwaltung), sonst null
             'reports' => true,
-            'openReports' => $user !== null && $this->can(Cap::ReviewReports) ? $a->bugReports()->openCount() : null,
+            'openReports' => $user !== null && $this->can(Cap::ViewReports) ? $a->bugReports()->openCount() : null,
             // Zugang beantragen (Issue #314): Link „Zugang beantragen“ für Gäste; pendingRegistrations: offene Anfragen
             // für alle, die freigeben (Zähler in der Verwaltung), sonst null
             'registration' => $a->registrations()->enabled(),
-            'pendingRegistrations' => $user !== null && $this->can(Cap::CreateUsers) ? $a->registrations()->countPending() : null,
+            'pendingRegistrations' => $user !== null && $this->can(Cap::ViewAccounts) ? $a->registrations()->countPending() : null,
             // Einreichen von Bildern und Videos erlaubt (Einstellungen → Galerie): sonst kein Knopf „einreichen“
             'gallerySubmissions' => ($features['gallery'] ?? false) && $a->gallerySubmissions()->enabled(),
             // Zu- und Absagen bei Terminen eingeschaltet (Einstellungen → Kalender, Vorgabe aus)
@@ -753,7 +753,7 @@ final class Api
             // admissionsDue: Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“), für create_users
             // mit dem Bereich Anwesenheit (auch ohne Anwärter-Rolle: die Seite erklärt dann, wie man sie einrichtet); sonst null
             // (keine Kachel)
-            'admissionsDue' => $user !== null && $this->can(Cap::CreateUsers) && ($features['attendance'] ?? false) ? $a->admissions()->dueCount() : null,
+            'admissionsDue' => $user !== null && $this->can(Cap::ViewAccounts) && ($features['attendance'] ?? false) ? $a->admissions()->dueCount() : null,
             // Impressum und Datenschutzerklärung der Kompanie (Einstellungen → Impressum und Datenschutz): für alle, auch Gäste
             'legal' => self::legalLinks($a->settingsService()->legal()),
             // Handbuch auf GitHub Pages der Kompanie: neben updates.json (Issue #12)
@@ -929,8 +929,8 @@ final class Api
             new Route('POST', '/reports', $P, fn (Request $r) => Response::created($a->bugReports()->submit($a->authContext->currentUser(), $r->body, $r->client))),
             // Eigene Meldungen mit Stand; Eingang der Admins: schließen mit Begründung oder an die Betreuer weiterleiten
             new Route('GET', '/reports/mine', $L, fn () => $a->bugReports()->mine($this->user())),
-            new Route('GET', '/reports/review', Cap::ReviewReports, fn () => $a->bugReports()->review()),
-            new Route('GET', '/reports/review/{id}/screenshot', Cap::ReviewReports, fn (Request $r) => $a->bugReports()->screenshotOf($r->id())),
+            new Route('GET', '/reports/review', Cap::ViewReports, fn () => $a->bugReports()->review()),
+            new Route('GET', '/reports/review/{id}/screenshot', Cap::ViewReports, fn (Request $r) => $a->bugReports()->screenshotOf($r->id())),
             new Route('POST', '/reports/review/{id}/close', Cap::ReviewReports, fn (Request $r) => $a->bugReports()->close($this->user(), $r->id(), $r->input('reason'))),
             new Route('POST', '/reports/review/{id}/forward', Cap::ReviewReports, fn (Request $r) => $a->bugReports()->forward($this->user(), $r->id())),
             // Selbstregistrierung (Issue #314): Zugang beantragen (auch ohne Anmeldung; Zeitfalle, Honeypot und Begrenzung
@@ -1009,7 +1009,7 @@ final class Api
             new Route('GET', '/gallery', [Cap::ViewGallery, Cap::ViewGalleryInternal], fn () => ['years' => $a->gallery()->overview($this->can(Cap::ViewGalleryInternal))], 'gallery', $denyView),
             new Route('GET', '/gallery/{id}', [Cap::ViewGallery, Cap::ViewGalleryInternal], fn (Request $r) => $a->gallery()->album($r->id(), $this->can(Cap::ViewGalleryInternal))
                 ?? throw ApiError::notFound('Album nicht gefunden.'), 'gallery', $denyView),
-            // Einreichungen (Issue #286): einreichen und eigene sehen mit submit_gallery, prüfen mit review_gallery
+            // Einreichungen (Issue #286): einreichen und eigene sehen mit submit_gallery, sehen mit view_submissions, prüfen mit review_gallery
             new Route('GET', '/gallery/submissions', Cap::SubmitGallery, fn () => $a->gallerySubmissions()->own($this->user()), 'gallery'),
             new Route('POST', '/gallery/submissions', Cap::SubmitGallery, fn (Request $r) => Response::created($a->gallerySubmissions()->submit($this->user(), $r->input('album_id'), $r->input('file'), $r->input('consent'))), 'gallery'),
             new Route('DELETE', '/gallery/submissions/{id}', Cap::SubmitGallery, function (Request $r) use ($a) {
@@ -1037,7 +1037,7 @@ final class Api
             new Route('PUT', '/gallery/albums/{id}/cover', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => $a->galleryUploads()->setCover($r->id(), $r->input('photo_id')), 'gallery'),
             new Route('POST', '/gallery/photos/move', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => $a->galleryUploads()->movePhotos($r->input('ids'), $r->input('album_id')), 'gallery'),
             new Route('POST', '/gallery/photos/delete', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => $a->galleryUploads()->deletePhotos($r->input('ids'), $this->user()), 'gallery'),
-            new Route('GET', '/gallery/review', Cap::ReviewGallery, fn () => $a->gallerySubmissions()->review(), 'gallery'),
+            new Route('GET', '/gallery/review', Cap::ViewSubmissions, fn () => $a->gallerySubmissions()->review(), 'gallery'),
             new Route('POST', '/gallery/review/{id}/approve', Cap::ReviewGallery, fn (Request $r) => $a->gallerySubmissions()->approve($this->user(), $r->id(), Input::bool($r->input('intern'))), 'gallery'),
             new Route('POST', '/gallery/review/{id}/reject', Cap::ReviewGallery, fn (Request $r) => $a->gallerySubmissions()->reject($this->user(), $r->id(), $r->input('reason')), 'gallery'),
             new Route('POST', '/gallery/review/{id}/remove', Cap::ReviewGallery, function (Request $r) use ($a) {
@@ -1409,7 +1409,7 @@ final class Api
                 );
                 // Ehemalige stehen in ihrer eigenen Liste (GET /members/former), auch wenn sie noch Dienstgrad oder Titel haben.
                 $holders = array_values(array_diff($holders, $a->formerMembers()->ids()));
-                $list = $a->members()->list($r->queryFlag('all') && $this->can(Cap::PromoteUsers), $this->user(), $r->queryFlag('candidates'), $holders);
+                $list = $a->members()->list($r->queryFlag('all') && $this->can(Cap::ViewAccounts), $this->user(), $r->queryFlag('candidates'), $holders);
                 // Gruppe für den Zähler über der Liste, wie in der Anwesenheit (Einstellungen → Rollen); Gäste ohne.
                 $groups = $a->attendance()->groupMap();
                 $list = array_map(static fn (array $m): array => $m + ['group' => $groups[$m['level']] ?? null], $list);
@@ -1427,8 +1427,8 @@ final class Api
                     $titles = $a->titles()->byUser();
                     $list = array_map(static fn (array $m): array => $m + ['titles' => $titles[$m['id']] ?? []], $list);
                 }
-                // Eintritt (zum Sortieren), wie in den Mitgliedsdetails nur für create_users
-                if ($this->user()->can(Cap::CreateUsers)) {
+                // Eintritt (zum Sortieren), wie in den Mitgliedsdetails nur für view_accounts
+                if ($this->user()->can(Cap::ViewAccounts)) {
                     $joined = $a->joinYears()->repository()->all();
                     $list = array_map(static fn (array $m): array => $m + ['joined_on' => isset($joined[$m['id']]) ? (string) $joined[$m['id']] : ''], $list);
                 }
@@ -1458,6 +1458,16 @@ final class Api
             // E-Mail und Geburtsdatum nur mit view_personal sehen und mit manage_personal ändern (prüft PassiveMemberService).
             new Route('GET', '/passive-members', Cap::ViewPassive, fn () => $a->passives()->list($this->user()), 'passive', $denyRights),
             new Route('POST', '/passive-members', Cap::ManagePassive, fn (Request $r) => Response::created($a->passives()->create($this->user(), (array) $r->body)), 'passive', $denyRights),
+            // Import aus einer Tabelle (CSV oder in der App gelesenes Excel): ohne apply nur die Vorschau
+            new Route('POST', '/passive-members/import', Cap::ManagePassive, fn (Request $r) => $a->passiveImport()->import(
+                $this->user(),
+                $r->input('csv'),
+                Input::bool($r->input('apply')),
+                $r->input('columns'),
+                $r->input('year'),
+                $r->input('paid_on'),
+                Input::bool($r->input('skip_errors')),
+            ), 'passive', $denyRights),
             new Route('GET', '/passive-members/{id}', Cap::ViewPassive, fn (Request $r) => $a->passives()->get($this->user(), $r->id()), 'passive', $denyRights),
             new Route('PATCH', '/passive-members/{id}', Cap::ManagePassive, fn (Request $r) => $a->passives()->update($this->user(), $r->id(), (array) $r->body), 'passive', $denyRights),
             new Route('DELETE', '/passive-members/{id}', Cap::ManagePassive, function (Request $r) use ($a) {
@@ -1508,14 +1518,14 @@ final class Api
             new Route('POST', '/members/{id}/promote', Cap::CreateUsers, fn (Request $r) => $a->members()->promote($this->user(), $r->id()), null, $denyUsers),
             // Aufnahmen: Anwärter mit Stand der Voraussetzung; aufnehmen (Grundrolle → Mitglied bzw. Anwärter-Zusatzrolle
             // entfernen, Eintritt setzen, wenn leer) und „Anwärter seit“ ändern
-            new Route('GET', '/admissions', Cap::CreateUsers, fn () => $a->admissions()->list(), 'attendance', $denyUsers),
+            new Route('GET', '/admissions', Cap::ViewAccounts, fn () => $a->admissions()->list(), 'attendance', $denyUsers),
             new Route('POST', '/members/{id}/admit', Cap::CreateUsers, fn (Request $r) => $a->admissions()->admit($this->user(), $r->id()), null, $denyUsers),
             new Route('PUT', '/members/{id}/candidate-since', Cap::CreateUsers, fn (Request $r) => $a->admissions()->setSince($this->user(), $r->id(), $r->input('since')), null, $denyUsers),
             // Konten verwalten (Issue #24): Angaben ändern, löschen mit allen eigenen Daten
-            new Route('GET', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->profile($r->id(), $this->user()), null, $denyUsers),
+            new Route('GET', '/members/{id}/account', Cap::ViewAccounts, fn (Request $r) => $a->members()->profile($r->id(), $this->user()), null, $denyUsers),
             new Route('PATCH', '/members/{id}/account', Cap::CreateUsers, fn (Request $r) => $a->members()->updateProfile($this->user(), $r->id(), $r->body), null, $denyUsers),
             // Auskunft nach Art. 15 DSGVO (Domain\PersonalDataExport): alle Daten der Person als JSON-Datei
-            new Route('GET', '/members/{id}/data', Cap::CreateUsers, fn (Request $r) => $this->personalData($r->id()), null, $denyUsers),
+            new Route('GET', '/members/{id}/data', Cap::ViewAccounts, fn (Request $r) => $this->personalData($r->id()), null, $denyUsers),
             // Persönliche Angaben anderer: E-Mail, Handynummer, Adresse (Geburtstag unter /members/{id}/birthday)
             new Route('PUT', '/members/{id}/personal', Cap::ManagePersonal, fn (Request $r) => $a->members()->updatePersonal($this->user(), $r->id(), $r->body), null, $denyPersonal),
             new Route('DELETE', '/members/{id}', Cap::CreateUsers, function (Request $r) use ($a) {
@@ -1548,7 +1558,7 @@ final class Api
                 return Response::created($created);
             }, null, $denyUsers),
             // Anfragen auf einen Zugang (Issue #314): freigeben legt das Konto an, mit denselben Grenzen wie POST /users
-            new Route('GET', '/registrations', Cap::CreateUsers, fn () => $a->registrations()->pending(), null, $denyUsers),
+            new Route('GET', '/registrations', Cap::ViewAccounts, fn () => $a->registrations()->pending(), null, $denyUsers),
             new Route('POST', '/registrations/{id}/approve', Cap::CreateUsers, fn (Request $r) => $a->registrations()->approve($this->user(), $r->id(), $r->body), null, $denyUsers),
             new Route('POST', '/registrations/{id}/reject', Cap::CreateUsers, fn (Request $r) => $a->registrations()->reject($r->id(), $r->input('reason')), null, $denyUsers),
             // Mehrere auf einmal (Issue #24): erst alle prüfen; bei einem Fehler wird keiner angelegt.

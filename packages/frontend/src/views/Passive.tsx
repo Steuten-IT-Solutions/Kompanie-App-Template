@@ -9,8 +9,12 @@ import { AddressFields, EmailField, Empty, ErrorBox, Loading, PhoneField, useAsy
 import { IconButton } from '../icons';
 import { confirmAsk } from '../ask';
 import { parseAges } from '../passiveAges';
+import { navigate } from '../router';
 
 const NAME_MAX = 100;
+/** Höchstlängen von Eintritt und Bemerkung (wie auf dem Server) */
+const JOINED_MAX = 40;
+const NOTE_MAX = 500;
 /** Höchster Betrag einer Zahlung (wie auf dem Server) */
 const MAX_CENTS = 100000;
 
@@ -379,7 +383,25 @@ function birthText(ymd: string): string {
  * Server geschickt hat (persönliche Angaben nur mit view_personal bzw. für den eigenen Betreuer).
  */
 function PassiveDetails({ p }: { p: PassiveMember }) {
-  if (p.email === undefined && p.phone === undefined && p.address === undefined && p.birth_date === undefined) return null;
+  const extra = (
+    <>
+      {p.joined && (
+        <>
+          <dt>Eintritt</dt>
+          <dd>{p.joined}</dd>
+        </>
+      )}
+      {p.note && (
+        <>
+          <dt>Bemerkung</dt>
+          <dd className="passive-note">{p.note}</dd>
+        </>
+      )}
+    </>
+  );
+  if (p.email === undefined && p.phone === undefined && p.address === undefined && p.birth_date === undefined) {
+    return p.joined || p.note ? <dl className="contact-list passive-details">{extra}</dl> : null;
+  }
   const lines = formatAddress(p.address ?? null);
   const map = mapUrl(p.address ?? null, mapPlatform());
   const none = <span className="muted">nicht hinterlegt</span>;
@@ -403,6 +425,7 @@ function PassiveDetails({ p }: { p: PassiveMember }) {
       <dd>{p.email ? <a href={`mailto:${p.email}`}>{p.email}</a> : none}</dd>
       <dt>Geburtsdatum</dt>
       <dd>{p.birth_date ? birthText(p.birth_date) : none}</dd>
+      {extra}
     </dl>
   );
 }
@@ -415,6 +438,8 @@ interface Draft {
   phone: string;
   email: string;
   birth_date: string;
+  joined: string;
+  note: string;
 }
 
 function draftOf(p: PassiveMember | null): Draft {
@@ -426,6 +451,8 @@ function draftOf(p: PassiveMember | null): Draft {
     phone: p?.phone ?? '',
     email: p?.email ?? '',
     birth_date: p?.birth_date ?? '',
+    joined: p?.joined ?? '',
+    note: p?.note ?? '',
   };
 }
 
@@ -435,6 +462,8 @@ function inputOf(d: Draft, before: Draft | null, personal: boolean): PassiveInpu
     first_name: d.first_name.trim(),
     last_name: d.last_name.trim(),
     caretaker_id: d.caretaker_id === '' ? null : Number(d.caretaker_id),
+    joined: d.joined.trim(),
+    note: d.note.trim(),
   };
   if (!personal) return out;
   const address = addressInput(d.address);
@@ -512,6 +541,21 @@ function PassiveForm({
             </option>
           ))}
         </select>
+      </label>
+      <label className="field">
+        <span>Eintritt (optional)</span>
+        <input
+          type="text"
+          autoComplete="off"
+          maxLength={JOINED_MAX}
+          placeholder="z. B. 2023 oder vor 2014"
+          value={d.joined}
+          onChange={(e) => set({ joined: e.target.value })}
+        />
+      </label>
+      <label className="field">
+        <span>Bemerkung (optional)</span>
+        <textarea maxLength={NOTE_MAX} value={d.note} onChange={(e) => set({ note: e.target.value })} />
       </label>
       {list.manage_personal ? (
         <>
@@ -651,6 +695,9 @@ export function PassiveAdmin({ onToast }: { onToast: (msg: string) => void }) {
             }}
           >
             + Passiven anlegen
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate('verwaltung/passive/import')}>
+            Tabelle importieren
           </button>
         </div>
       )}
