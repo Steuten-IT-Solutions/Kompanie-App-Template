@@ -158,11 +158,15 @@ final class PassiveImportTest extends TestCase
         $this->assertSame(['year' => 2026, 'amount_cents' => 2500, 'paid_on' => '2026-11-17', 'method' => 'Bar'], $d['rows'][2]['payment'], 'Jahresbeitrag als Betrag');
 
         // Ohne manage_personal werden persönliche Spalten übergangen; ohne manage_passive kein Import
-        $key = $this->app->roles()->create(['label' => 'Kasse', 'capabilities' => [...Roles::TEMPLATES[Roles::MEMBER], 'manage_passive']])['key'];
+        $key = $this->app->roles()->create(['label' => 'Kasse', 'capabilities' => [...Roles::TEMPLATES[Roles::MEMBER], 'view_passive', 'manage_passive']])['key'];
         $this->users->current = $this->users->add('kasse', $key);
         $d = $this->call('POST', '/passive-members/import', ['csv' => "Vorname;Nachname;Telefon\nErika;Muster;01234 5678"])->data;
         $this->assertSame('Telefon', $d['ignored'][0]['column']);
         $this->assertArrayNotHasKey('phone', $d['rows'][0]);
+        // Nur sehen reicht nicht
+        $viewer = $this->app->roles()->create(['label' => 'Lesen', 'capabilities' => [...Roles::TEMPLATES[Roles::MEMBER], 'view_passive']])['key'];
+        $this->users->current = $this->users->add('lesen', $viewer);
+        $this->assertSame(403, $this->call('POST', '/passive-members/import', ['csv' => "Vorname;Nachname\nA;B"])->status);
         $this->users->current = $this->caretaker;
         $this->assertSame(403, $this->call('POST', '/passive-members/import', ['csv' => "Vorname;Nachname\nA;B"])->status);
     }

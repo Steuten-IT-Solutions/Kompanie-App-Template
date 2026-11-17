@@ -236,7 +236,7 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <FormerImport onToast={onToast} />
       ) : active === 'ehemalige' ? (
         <FormerList />
-      ) : active === 'passive' && arg === 'import' ? (
+      ) : active === 'passive' && arg === 'import' && can('manage_passive') ? (
         <PassiveImport onToast={onToast} />
       ) : active === 'passive' ? (
         <PassiveAdmin onToast={onToast} />

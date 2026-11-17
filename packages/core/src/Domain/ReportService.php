@@ -46,7 +46,7 @@ final class ReportService
             Capability::ViewPoints, Capability::ViewPenalties, Capability::ViewPromotions, Capability::ViewTitles, Capability::ViewAttendance,
             Capability::ManageCompanies, Capability::ViewPersonal, Capability::CreateUsers, Capability::ManageFormer, Capability::PromoteUsers,
         ], 'dated' => false, 'label' => 'Mitglieder'],
-        'passive' => ['feature' => 'passive', 'caps' => [Capability::ManagePassive], 'dated' => false, 'label' => 'Passive'],
+        'passive' => ['feature' => 'passive', 'caps' => [Capability::ViewPassive], 'dated' => false, 'label' => 'Passive'],
         'points' => ['feature' => 'points', 'caps' => [Capability::ViewPoints], 'dated' => true, 'label' => 'Punkte'],
         'penalties' => ['feature' => 'penalties', 'caps' => [Capability::ViewPenalties], 'dated' => true, 'label' => 'Strafen'],
         'attendance' => ['feature' => 'attendance', 'caps' => [Capability::ViewAttendance], 'dated' => true, 'label' => 'Anwesenheit'],
@@ -55,7 +55,7 @@ final class ReportService
         'ranks' => ['feature' => 'ranks', 'caps' => [Capability::ViewPromotions], 'dated' => true, 'label' => 'Dienstgrade'],
         'titles' => ['feature' => 'titles', 'caps' => [Capability::ViewTitles], 'dated' => true, 'label' => 'Titel'],
         'offices' => ['feature' => 'offices', 'caps' => [Capability::ManageOffices], 'dated' => true, 'label' => 'Ämter'],
-        'inventory' => ['feature' => 'inventory', 'caps' => [Capability::ManageInventory], 'dated' => true, 'label' => 'Inventar'],
+        'inventory' => ['feature' => 'inventory', 'caps' => [Capability::ViewInventory], 'dated' => true, 'label' => 'Inventar'],
     ];
 
     private const RANK_KINDS = [RankService::KIND_PROMOTION => 'Beförderung', RankService::KIND_DEMOTION => 'Zurückgestuft', RankService::KIND_INITIAL => 'Erster Dienstgrad'];

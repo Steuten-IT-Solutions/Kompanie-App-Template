@@ -12,7 +12,7 @@ Tippe unten auf **{bereich.events}** und dann auf einen Termin, damit er aufklap
 ## Was du hier siehst
 - **Terminart**: eine Auswahl im aufgeklappten Termin mit allen Terminarten, die ein {rolle.admin} unter **Einstellungen** → **Kalender** eingerichtet hat, und **keine**. Sie erscheint nur, wenn es mindestens eine Terminart gibt.
 - **Vorschlag aus dem Titel: …** mit **Übernehmen**: Steht der Name einer Terminart als eigenes Wort im Titel (z. B. „Versammlung März“), schlägt die App sie vor. Der Vorschlag zählt erst, wenn du ihn übernimmst.
-- Die gewählte Art steht für alle, die den Termin sehen, als kleines Schild neben dem Titel.
+- Die gewählte Art steht für alle, die den Termin sehen, als kleines Schild neben dem Titel. Ein {rolle.admin} kann das je Art unter **Einstellungen** → **Kalender** abschalten (Haken **Als Schild am Termin zeigen**); die Art bleibt dann trotzdem gespeichert.
 
 ## So gehst du vor
 ### Eine Terminart wählen

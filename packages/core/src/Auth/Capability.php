@@ -82,7 +82,9 @@ enum Capability: string
     case ManageAttendance = 'manage_attendance';
     /** Öffentliche Termine pflegen (Bereich Termine). */
     case ManageEvents = 'manage_events';
-    /** Termine des internen Kalenders in der App pflegen (Bereich Kalender mit der Quelle „In der App“). */
+    /** Bei internen Terminen sehen, wer zu- oder abgesagt hat, mit Hinweis (ohne Termine zu pflegen). */
+    case ViewResponses = 'view_responses';
+    /** Termine des internen Kalenders in der App pflegen (Bereich Kalender mit der Quelle „In der App“; setzt view_responses voraus). */
     case ManageCalendar = 'manage_calendar';
     /**
      * Dokumente pflegen und alle Dokumente sehen, auch die mit eingeschränkter Sichtbarkeit.
@@ -93,13 +95,19 @@ enum Capability: string
     case PostBoard = 'post_board';
     /** Umfragen anlegen, ändern, beenden und löschen, Ergebnisse immer sehen (Bereich Umfragen, Issue #4). */
     case ManagePolls = 'manage_polls';
-    /** Inventar pflegen: Einträge anlegen, ändern, umlagern, löschen, Verlauf sehen (Bereich Inventar, Issue #6). */
+    /** Inventar mit Lagerorten und Verlauf sehen (ohne zu ändern). */
+    case ViewInventory = 'view_inventory';
+    /** Inventar pflegen: Einträge anlegen, ändern, umlagern, löschen, Verlauf sehen (Bereich Inventar, Issue #6; setzt view_inventory voraus). */
     case ManageInventory = 'manage_inventory';
     /** Ämter, ihre Gruppen und Amtszeiten pflegen, auch frühere (Bereich Ämter, Issue #112). */
     case ManageOffices = 'manage_offices';
-    /** Listen zum Drucken und als CSV anlegen, bearbeiten und löschen (Bereich Listen, Issue #121). */
+    /** Listen ansehen, drucken und als CSV laden (ohne sie zu ändern). */
+    case ViewLists = 'view_lists';
+    /** Listen zum Drucken und als CSV anlegen, bearbeiten und löschen (Bereich Listen, Issue #121; setzt view_lists voraus). */
     case ManageLists = 'manage_lists';
-    /** E-Mails aus der Verwaltung schreiben und versenden, Verlauf mit Versandprotokoll sehen (Bereich E-Mails). */
+    /** Verlauf der E-Mails aus der Verwaltung mit Versandprotokoll sehen (ohne zu schreiben). */
+    case ViewMail = 'view_mail';
+    /** E-Mails aus der Verwaltung schreiben und versenden, Verlauf mit Versandprotokoll sehen (Bereich E-Mails; setzt view_mail voraus). */
     case SendMail = 'send_mail';
     /** Sponsoren pflegen: anlegen, ändern, Logo hochladen, sortieren, löschen (Bereich Sponsoren, Issue #279). */
     case ManageSponsors = 'manage_sponsors';
@@ -136,10 +144,13 @@ enum Capability: string
      * Ehemaliger weiterhin nur mit view_personal bzw. manage_personal; die Aufbewahrungsfrist bleibt bei manage_settings.
      */
     case ManageFormer = 'manage_former';
+    /** Liste der Passiven mit Betreuer und Beiträgen sehen (ohne zu ändern; persönliche Angaben nur mit view_personal). */
+    case ViewPassive = 'view_passive';
     /**
      * Passive verwalten (Bereich passive, Domain\PassiveMemberService): Liste der Passiven in der Verwaltung, anlegen,
      * Namen und Betreuer ändern, löschen. Adresse, Telefon, E-Mail und Geburtsdatum der Passiven weiterhin nur mit
-     * view_personal bzw. manage_personal. Passive sind keine Konten, darum kein Recht über Konten (accountRights).
+     * view_personal bzw. manage_personal. Passive sind keine Konten, darum kein Recht über Konten (accountRights). Setzt
+     * view_passive voraus.
      */
     case ManagePassive = 'manage_passive';
     /** Rollen vergeben. */
@@ -198,6 +209,11 @@ enum Capability: string
         'manage_ranks' => 'view_promotions',
         'manage_titles' => 'view_titles',
         'manage_attendance' => 'view_attendance',
+        'manage_calendar' => 'view_responses',
+        'manage_inventory' => 'view_inventory',
+        'manage_lists' => 'view_lists',
+        'send_mail' => 'view_mail',
+        'manage_passive' => 'view_passive',
     ];
 
     /**

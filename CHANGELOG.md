@@ -30,7 +30,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Versammlung oder Arbeitsdienst. Wer Termine pflegen darf, wählt die Art im aufgeklappten Termin unter
   [Termine](app:termine), bei jeder Quelle des Kalenders, auch bei Google Kalender und iCal. Die App speichert die Art
   selbst und ändert nichts in Google. Steht der Name einer Art im Titel, schlägt die App sie vor. Anwesenheitslisten
-  übernehmen die Art ihres Termins und zeigen sie an; ändern lässt sie sich auch an der Liste.
+  übernehmen die Art ihres Termins und zeigen sie an; ändern lässt sie sich auch an der Liste. Je Art legst du mit
+  dem Haken „Als Schild am Termin zeigen“ fest, ob sie neben dem Titel des Termins steht (anfangs an); ohne Schild
+  bleibt sie gespeichert und zählt weiter.
 - **Aufnahmen**: Unter [Verwaltung → Aufnahmen](app:verwaltung/aufnahmen) siehst du wie bei den Beförderungen, welche
   Anwärter die Voraussetzung für die Aufnahme als Mitglied erfüllen; die Zahl im Kreis am Knopf zeigt, wie viele es
   sind. Die Voraussetzung legst du je Anwärter-Rolle unter [Einstellungen → Rollen](app:einstellungen/rollen) fest:
@@ -42,8 +44,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   darf.
 - **Rechte zum Sehen und zum Ändern getrennt**: Unter [Einstellungen → Rollen](app:einstellungen/rollen) gibt es
   jetzt eigene Rechte, um Punkte, Strafen, Dienstgrade mit Beförderungen, Titel und die Anwesenheit der Mitglieder nur
-  zu sehen, z. B. „Punkte aller Mitglieder sehen“ neben „Punkte vergeben“. Wer nur sehen darf, sieht die Mitgliederliste
-  und die Angaben, aber keine Knöpfe zum Ändern. Ändern gibt es nur zusammen mit Sehen. Rollen und Personen, die ein
+  zu sehen, z. B. „Punkte aller Mitglieder sehen“ neben „Punkte vergeben“. Ebenso gibt es eigene Rechte, um das
+  Inventar, die Listen, den Verlauf der E-Mails, die Zu- und Absagen bei Terminen und die Passiven nur zu sehen. Wer nur sehen darf,
+  sieht die Mitgliederliste bzw. den Bereich und die Angaben, aber keine Knöpfe zum Ändern. Ändern gibt es nur zusammen mit Sehen. Rollen und Personen, die ein
   Recht zum Ändern hatten, haben nach dem Update auch das Recht zum Sehen; es ändert sich also für niemanden etwas,
   bis du es umstellst.
 - **Beitrag der Passiven**: Unter [Verwaltung → Passive](app:verwaltung/passive) trägst du jetzt je Passivem und Jahr

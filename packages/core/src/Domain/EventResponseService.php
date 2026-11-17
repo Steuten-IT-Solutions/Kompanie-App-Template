@@ -20,7 +20,7 @@ use KompanieApp\Core\Storage\EventResponseRepository;
  *   Ändern und zurücknehmen bis zum Beginn des Termins; bei Terminen der App bis zum Ende des Anmeldeschlusses
  *   (respond_until), wenn der früher ist. Ganztägige Termine beginnen um 0 Uhr (Zeitzone der Kompanie).
  * - Jeder mit dem internen Kalender sieht bei jedem Termin die eigene Rückmeldung und wie viele zu- und abgesagt haben.
- *   Namen und Hinweise sieht nur, wer Termine pflegen darf (manage_calendar; Admins haben alle Rechte).
+ *   Namen und Hinweise sieht nur, wer Zu- und Absagen sehen darf (view_responses; Admins haben alle Rechte).
  * - Gezählt werden alle, die zusagen dürfen; die Rückmeldungen anderer (z. B. von Personen, denen das Recht inzwischen
  *   fehlt) bleiben gespeichert, zählen aber nicht.
  * - Gespeichert wird je Person und stabiler Kennung des Termins (response_key, sonst id), mit Titel und Datum als
@@ -98,7 +98,7 @@ final class EventResponseService
         $byEvent = $this->repository()->forEvents(array_map(self::key(...), array_values($events)));
         $audience = $this->audience();
         $mayRespond = $viewer !== null && $viewer->id > 0 && $viewer->can(Capability::RespondCalendar);
-        $mayList = $viewer !== null && $viewer->can(Capability::ManageCalendar);
+        $mayList = $viewer !== null && $viewer->can(Capability::ViewResponses);
         $now = $this->app->time()->timestamp();
         $out = [];
         foreach ($events as $e) {

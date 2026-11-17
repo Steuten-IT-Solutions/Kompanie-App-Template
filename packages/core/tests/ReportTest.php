@@ -204,7 +204,7 @@ final class ReportTest extends TestCase
         $this->assertSame([], self::section($old, 'inventory')['tables'][1]['rows']);
 
         // Passive ohne view_personal: ohne Kontaktdaten
-        $this->users->current = $this->withRights('passivwart', ['manage_passive']);
+        $this->users->current = $this->withRights('passivwart', ['view_passive', 'manage_passive']);
         $plain = self::section($this->get('/admin/report', ['from' => '2026-01-01', 'to' => '2026-12-31', 'sections' => 'passive'])->data, 'passive');
         $this->assertStringNotContainsString('paul@example.org', (string) json_encode($plain));
         $this->assertFalse($plain['landscape']);
