@@ -10222,6 +10222,9 @@ components:
         newsInApp:
           type: boolean
           description: 'News werden in der App geschrieben (Quelle app, Bereich news an); wer manage_news hat, sieht die Knöpfe dazu'
+        newsEditorUrl:
+          type: [string, 'null']
+          description: 'WordPress, Quelle site, mit manage_news: Adresse des Editors von WordPress für einen neuen Beitrag (Knopf „Neuer Beitrag“); null ohne das Recht oder mit anderen Quellen. Das Recht gibt in WordPress die Rechte für alle Beiträge (keine Seiten).'
         calendarInApp:
           type: boolean
           description: 'Der interne Kalender wird in der App gepflegt (Quelle app, Bereich calendar an); wer manage_calendar hat, sieht den Knopf dazu'
@@ -10461,6 +10464,7 @@ components:
         cover_uid: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app: Kennung des Titelbilds, für PATCH' }
         updated_at: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app, mit manage_news: Stand für PATCH' }
         updated_by_name: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app, mit manage_news' }
+        edit_url: { type: [string, 'null'], description: 'Nur Einzelansicht, WordPress mit Quelle site, mit manage_news: Adresse des Beitrags im Editor von WordPress' }
 
     GalleryAlbumSummary:
       type: object

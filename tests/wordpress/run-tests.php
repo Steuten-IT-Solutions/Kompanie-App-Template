@@ -310,6 +310,45 @@ foreach ([$pub, $draft, $pw] as $pid) {
     wp_delete_post($pid, true);
 }
 
+$c->section('News im Editor von WordPress schreiben');
+$newsWasOn = $app->features()->enabled('news');
+$app->features()->update(['news' => true]);
+$app->settings->delete(KompanieApp\Core\Domain\NewsService::SOURCE_SETTING);
+KompanieApp\WordPress\WpNewsSource::forget();
+$roles = $app->roles()->all();
+$c->ok(isset($roles['news']) && in_array('manage_news', $roles['news']['capabilities'], true), 'Standardrolle „News verwalten“ auch mit den Beiträgen der Seite');
+$autor = $d->createUser('kpwp_newsautor', 'news');
+$leser = $d->createUser('kpwp_newsleser', 'member');
+KompanieApp\WordPress\WpNewsSource::forget();
+$fremd = wp_insert_post(['post_title' => 'Kpwp Fremder Beitrag', 'post_content' => 'x', 'post_status' => 'publish', 'post_author' => $admin]);
+$seite = wp_insert_post(['post_title' => 'Kpwp Seite', 'post_type' => 'page', 'post_status' => 'publish', 'post_author' => $admin]);
+$c->ok(user_can($autor, 'edit_posts') && user_can($autor, 'publish_posts') && user_can($autor, 'upload_files') && user_can($autor, 'edit_post', $fremd) && user_can($autor, 'delete_post', $fremd), 'News schreiben gibt in WordPress die Rechte für alle Beiträge');
+$c->ok(!user_can($autor, 'edit_pages') && !user_can($autor, 'edit_post', $seite) && !user_can($autor, 'unfiltered_html') && !user_can($autor, 'manage_options'), 'Keine Seiten, kein ungefiltertes HTML, keine Einstellungen');
+$c->ok(!user_can($leser, 'edit_posts') && !user_can($leser, 'upload_files'), 'Mitglied ohne das Recht bekommt nichts');
+$d->actAs($autor);
+[, $cfg] = $d->request('GET', '/config');
+$c->ok(($cfg['newsEditorUrl'] ?? '') === admin_url('post-new.php') && ($cfg['newsInApp'] ?? null) === false, '/config newsEditorUrl für News schreiben');
+[$s, $item] = $d->request('GET', '/news/' . $fremd);
+$c->ok($s === 200 && ($item['edit_url'] ?? '') === admin_url('post.php?post=' . $fremd . '&action=edit'), 'Beitrag mit edit_url');
+$d->actAs($leser);
+[, $cfg] = $d->request('GET', '/config');
+[, $item] = $d->request('GET', '/news/' . $fremd);
+$c->ok(($cfg['newsEditorUrl'] ?? null) === null && !isset($item['edit_url']), 'Ohne das Recht keine Adressen');
+$d->actAs(null);
+$app->settings->set(KompanieApp\Core\Domain\NewsService::SOURCE_SETTING, 'app');
+KompanieApp\WordPress\WpNewsSource::forget();
+$c->ok(!user_can($autor, 'edit_posts'), 'Mit der Quelle „In der App“ keine Rechte in WordPress');
+$app->settings->delete(KompanieApp\Core\Domain\NewsService::SOURCE_SETTING);
+KompanieApp\WordPress\WpNewsSource::forget();
+foreach ([$autor, $leser] as $uid) {
+    $d->deleteUser($uid);
+}
+wp_delete_post($fremd, true);
+wp_delete_post($seite, true);
+if (!$newsWasOn) {
+    $app->features()->update(['news' => false]);
+}
+
 $c->section('Shortcodes');
 $d->actAs($admin);
 $tomorrow = wp_date('Y-m-d', time() + DAY_IN_SECONDS);

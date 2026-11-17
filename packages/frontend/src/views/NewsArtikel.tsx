@@ -6,7 +6,7 @@ import BlocksView from '../blocks/BlocksView';
 import RichTextView from '../richtext/RichTextView';
 import { navigate } from '../router';
 import { ErrorBox, lazyView, Loading, useAsync } from '../ui';
-import { canWriteNews } from './News';
+import { canWriteNews, openNewsEditor } from './News';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
 
@@ -109,6 +109,11 @@ export default function NewsArtikel({ id, onToast }: { id: string; onToast: (msg
         <a className="btn btn-secondary btn-block" href={n.link} target="_blank" rel="noreferrer">
           Auf der Webseite öffnen
         </a>
+      )}
+      {!inApp && n.edit_url && (
+        <div className="icon-row news-article-actions">
+          <IconButton icon="edit" label="In WordPress bearbeiten" onClick={() => openNewsEditor(n.edit_url!, reload)} />
+        </div>
       )}
       {inApp && canWriteNews() && (
         <>

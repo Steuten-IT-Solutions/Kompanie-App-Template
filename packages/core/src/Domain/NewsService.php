@@ -10,6 +10,7 @@ use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\Blocks\Blocks;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Infra\RemoteNewsSource;
+use KompanieApp\Core\Port\NewsEditor;
 use KompanieApp\Core\Port\NewsSource;
 use KompanieApp\Core\Push\PushService;
 
@@ -27,6 +28,10 @@ use KompanieApp\Core\Push\PushService;
  * - Lesen wie bisher mit view_news (auch ohne Anmeldung, wenn Gast das Recht hat). Schreiben, ändern und löschen mit
  *   manage_news, nur mit der Quelle „app“. Die Standardrolle „News verwalten“ entsteht beim Wechsel auf „app“
  *   (Features::roleOf) und verschwindet beim Wechsel weg, wenn niemand sie hat.
+ * - Beiträge der eigenen WordPress-Seite („site“) schreibt man im Editor von WordPress: Die Quelle des Adapters ist dann
+ *   ein Port\NewsEditor, die App öffnet seine Adressen (newUrl, editUrl). Wer das darf, sagt canEditSite (manage_news);
+ *   der Adapter gibt diesen Konten in WordPress die Rechte für Beiträge (alle Beiträge, keine Seiten). Auch mit dieser
+ *   Quelle gibt es die Standardrolle „News verwalten“ (managedType).
  * - Benachrichtigungen wie bei jeder Quelle über PushTriggers::checkNews (nach dem Schreiben sofort angestoßen).
  */
 final class NewsService
@@ -39,6 +44,8 @@ final class NewsService
     public const BODY_MAX = 200000;
     /** Rechte der Standardrolle „News verwalten“ (nur mit der Quelle app). */
     public const ROLE = ['member', 'manage_news'];
+    /** Gesetzt, sobald die Standardrolle auch für die Quelle site angelegt wurde (initialize). */
+    public const SITE_ROLE_SETTING = 'news_site_role_done';
 
     private ?AppNewsSource $appSource = null;
 
@@ -83,6 +90,47 @@ final class NewsService
         return $this->source()->available();
     }
 
+    /** Lassen sich die Beiträge der Quelle des Adapters in seinem Editor schreiben (WordPress, Quelle site)? */
+    public function editsSite(): bool
+    {
+        return !$this->inApp() && $this->app->news instanceof NewsEditor;
+    }
+
+    /** Gibt es mit der Quelle $type etwas zu pflegen (Standardrolle „News verwalten“)? */
+    public function managedType(string $type): bool
+    {
+        return $type === self::SOURCE_APP || ($type === self::SOURCE_SITE && $this->app->news instanceof NewsEditor);
+    }
+
+    /** Darf $user die Beiträge der WordPress-Seite in deren Editor schreiben, ändern und löschen? */
+    public function canEditSite(?User $user): bool
+    {
+        return $user !== null && $user->id > 0 && $this->editsSite() && $user->can(Capability::ManageNews)
+            && $this->app->features()->enabled('news');
+    }
+
+    /** Adresse zum Schreiben eines neuen Beitrags im Editor der Webseite; null, wenn $viewer das nicht darf. */
+    public function editorUrl(?User $viewer): ?string
+    {
+        return $this->canEditSite($viewer) && $this->app->news instanceof NewsEditor ? $this->app->news->newUrl() : null;
+    }
+
+    /**
+     * Einmalig nach dem Update: Wer die News schon aus den Beiträgen der WordPress-Seite bezieht, bekommt die
+     * Standardrolle „News verwalten“, die es bisher nur mit der Quelle „app“ gab.
+     */
+    public function initialize(): void
+    {
+        if ($this->app->settings->get(self::SITE_ROLE_SETTING, false) === true) {
+            return;
+        }
+        $features = $this->app->features();
+        if ($this->editsSite() && $features->enabled('news')) {
+            $this->app->roles()->featureChanged('news', true, $features->roleLabel('news'), self::ROLE);
+        }
+        $this->app->settings->set(self::SITE_ROLE_SETTING, true);
+    }
+
     public function canManage(?User $viewer): bool
     {
         return $viewer !== null && $viewer->id > 0 && $this->inApp() && $viewer->can(Capability::ManageNews)
@@ -119,6 +167,9 @@ final class NewsService
         }
         if ($this->canManage($viewer)) {
             $item += $this->appSource()->meta((int) $key);
+        }
+        if ($this->canEditSite($viewer) && $this->app->news instanceof NewsEditor) {
+            $item['edit_url'] = $this->app->news->editUrl($key);
         }
         return $item;
     }
@@ -228,8 +279,8 @@ final class NewsService
             return;
         }
         $features = $this->app->features();
-        if ($features->enabled('news') && ($now === self::SOURCE_APP || $before === self::SOURCE_APP)) {
-            $this->app->roles()->featureChanged('news', $now === self::SOURCE_APP, $features->roleLabel('news'), self::ROLE);
+        if ($features->enabled('news') && $this->managedType($now) !== $this->managedType($before)) {
+            $this->app->roles()->featureChanged('news', $this->managedType($now), $features->roleLabel('news'), self::ROLE);
         }
         $this->app->settings->delete(PushService::NEWS_SETTING);
         if ($now === self::SOURCE_APP) {

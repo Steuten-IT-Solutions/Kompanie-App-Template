@@ -15,7 +15,7 @@ Tippe unten auf **{bereich.news}**.
 - **Beitrag**: Bild (falls vorhanden), Datum, Titel und eine kurze Vorschau des Textes.
 - **Ältere Beiträge** (unten): lädt weitere, ältere Beiträge nach. Der Knopf fehlt, wenn alle Beiträge zu sehen sind.
 - **Bei neuen Beiträgen benachrichtigen** (unten, nur ohne Anmeldung): führt zu den Benachrichtigungen.
-- **Neuer Beitrag** (oben): nur, wenn die {bereich.news} in der App geschrieben werden und du das Recht dazu hast (Hilfeseite „{bereich.news} schreiben“).
+- **Neuer Beitrag** (oben): nur, wenn du das Recht dazu hast und die {bereich.news} in der App geschrieben werden oder, mit WordPress, aus den Beiträgen der Webseite kommen (Hilfeseite „{bereich.news} schreiben“).
 
 ## So gehst du vor
 ### Einen Beitrag lesen
