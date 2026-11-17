@@ -6684,7 +6684,7 @@ paths:
                   type: object
                   required: [key, title, dated]
                   properties:
-                    key: { type: string, enum: [members, points, penalties, attendance] }
+                    key: { type: string, enum: [members, passive, points, penalties, attendance, events, calendar, ranks, titles, offices, inventory] }
                     title: { type: string, description: Name des Bereichs, wie die Kompanie ihn nennt }
                     dated: { type: boolean }
         '401': { $ref: '#/components/responses/Error' }
