@@ -48,7 +48,7 @@ export const typeLabel = (doc: DocumentInfo) => TYPE_LABELS[doc.ext] ?? doc.ext.
 
 export const VISIBILITY_LABELS: Record<DocVisibility, string> = {
   members: 'Alle Mitglieder',
-  managers: `Nur wer ${brand.labels.sections.documents} pflegt`,
+  managers: `Nur wer eingeschränkte ${brand.labels.sections.documents} sehen darf`,
 };
 
 /** Gewählte Sortierung, auf dem Gerät gemerkt (für Mitgliederansicht und „Dokumente verwalten“ gemeinsam). */

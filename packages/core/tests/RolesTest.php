@@ -64,7 +64,7 @@ final class RolesTest extends TestCase
         $roles = $app->roles()->all();
         $this->assertSame([Roles::GUEST, Roles::MEMBER, Roles::ORGANIZER, Roles::MANAGER, Roles::ADMIN], array_keys($roles));
         $this->assertSame('Spieß', $roles[Roles::MANAGER]['label']);
-        $this->assertSame(TestApp::capabilities(['member', 'manage_events', 'manage_documents', 'view_points', 'manage_points', 'view_penalties', 'manage_penalties']), $app->roles()->capabilities(Roles::MANAGER));
+        $this->assertSame(TestApp::capabilities(['member', 'manage_events', 'view_restricted_documents', 'manage_documents', 'view_points', 'manage_points', 'view_penalties', 'manage_penalties']), $app->roles()->capabilities(Roles::MANAGER));
         // Bestehende Installationen bekommen beim Einschalten neue Standardrollen, behalten aber ihre.
         $app->features()->update(['points' => true]);
         $this->assertArrayHasKey('points', $app->roles()->all());

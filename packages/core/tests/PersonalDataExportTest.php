@@ -160,7 +160,7 @@ final class PersonalDataExportTest extends TestCase
         $area = [
             'points' => 'view_points', 'penalties' => 'view_penalties', 'rank_history' => 'view_promotions', 'member_ranks' => 'view_promotions',
             'member_titles' => 'view_titles', 'member_companies' => 'view_personal', 'gallery_submissions' => 'view_personal', 'member_roles' => 'view_accounts', 'attendance_entries' => 'view_attendance', 'event_responses' => 'view_responses', 'candidate_since' => 'view_accounts',
-            'poll_votes' => 'manage_polls', 'poll_answers' => 'manage_polls', 'birthdays' => 'view_personal', 'join_years' => 'view_personal',
+            'poll_votes' => 'view_poll_results', 'poll_answers' => 'view_poll_results', 'birthdays' => 'view_personal', 'join_years' => 'view_personal',
             'member_photos' => 'view_personal', 'former_members' => 'manage_former', 'member_contacts' => 'view_personal',
             'bug_reports' => 'view_personal', 'report_inbox' => 'view_personal', 'user_signatures' => 'view_personal', 'user_settings' => 'view_personal',
             'board_mails' => 'view_mail', 'mailing_recipients' => 'view_mail', 'activity' => 'view_activity', 'activity_last' => 'view_activity',

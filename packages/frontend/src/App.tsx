@@ -400,7 +400,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
   const path = ALIASES[rawPath[0]] ?? rawPath;
   const user = config?.user ?? null;
   // Jeder Knopf mit eigenem Recht (wie die Routen im Kern); ohne Anmeldung die Rechte von Gast (can).
-  const docsAllowed = !!features?.documents && (can('view_documents') || can('manage_documents'));
+  const docsAllowed = !!features?.documents && (can('view_documents') || can('view_restricted_documents'));
   // Mitgliederliste, Ehemalige und Ämter (Issue #112) unter einem Knopf.
   const membersAllowed = !!(
     (features?.directory && (can('view_directory') || can('view_former'))) ||
@@ -436,7 +436,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
     // interne mit view_board; mit post_board schreiben. In der Navigation nur mit view_board (unten).
     brett: boardReadable(),
     // Umfragen (Issue #4): mit vote_polls antworten, manage_polls verwaltet; laufende stehen am Brett.
-    umfragen: pollsVisible() || canManagePolls(),
+    umfragen: pollsVisible() || canManagePolls() || (!!features?.polls && can('view_poll_results')),
     // Inventar (Issue #6): sehen mit view_inventory, ändern mit manage_inventory, Einstieg über das Menü der Verwaltung.
     inventar: !!features?.inventory && can('view_inventory'),
     benachrichtigungen: true,

@@ -158,6 +158,26 @@ final class ReadRightsTest extends TestCase
         }
     }
 
+    public function testRestrictedDocumentsAndPollResultsWithoutManaging(): void
+    {
+        $pdf = base64_encode("%PDF-1.4\n%\xe2\xe3\xcf\xd3\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n");
+        $doc = $this->call('POST', '/documents', ['title' => 'Kassenbericht', 'date' => '2026-10-01', 'visibility' => 'managers', 'file' => ['name' => 'kasse.pdf', 'data' => $pdf]]);
+        $this->assertSame(201, $doc->status, (string) json_encode($doc->data));
+        $poll = $this->call('POST', '/polls', ['title' => 'Grillfest?', 'type' => 'single', 'options' => ['Ja', 'Nein'], 'results' => 'managers']);
+        $this->assertSame(201, $poll->status, (string) json_encode($poll->data));
+        $titles = fn (): array => array_column($this->call('GET', '/documents')->data['documents'] ?? [], 'title');
+
+        $this->users->current = $this->withRights('leser4', ['view_restricted_documents', 'view_poll_results']);
+        $this->assertContains('Kassenbericht', $titles(), 'eingeschränktes Dokument sichtbar');
+        $this->assertTrue($this->call('GET', '/polls/' . $poll->data['id'])->data['results_visible'] ?? null, 'Ergebnisse laufender Umfrage');
+        $this->assertSame(403, $this->call('POST', '/polls', ['title' => 'x', 'type' => 'text'])->status);
+        $this->assertSame(403, $this->call('DELETE', '/documents/' . $doc->data['id'])->status);
+
+        $this->users->current = $this->anna;
+        $this->assertNotContains('Kassenbericht', $titles());
+        $this->assertFalse($this->call('GET', '/polls/' . $poll->data['id'])->data['results_visible'] ?? null);
+    }
+
     public function testUpdateGivesReadRightsOnceToEveryoneWithTheWriteRight(): void
     {
         $db = TestApp::connection();

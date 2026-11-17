@@ -158,16 +158,16 @@ final class CapabilityOverridesTest extends TestCase
 
     public function testOverridesSurviveRoleChangesWithoutWhatTheRoleCovers(): void
     {
-        $this->assertSame(200, $this->rights($this->m, ['manage_events', 'manage_polls'])->status);
+        $this->assertSame(200, $this->rights($this->m, ['manage_events', 'view_poll_results', 'manage_polls'])->status);
         // Termine verwalten (Standardrolle des Bereichs) hat manage_events selbst: Diese Ausnahme fällt weg.
         $this->assertSame(200, $this->call('PATCH', "/members/{$this->m}/role", ['level' => 'events'])->status);
-        $this->assertSame(['manage_polls'], $this->call('GET', "/members/{$this->m}")->data['rights']['grant']);
+        $this->assertSame(['view_poll_results', 'manage_polls'], $this->call('GET', "/members/{$this->m}")->data['rights']['grant']);
         $this->assertTrue($this->can($this->m, Capability::ManagePolls));
 
         // Entzogen: nur, solange die Rolle das Recht hat; sonst käme es bei einer späteren Rolle unbemerkt zurück.
-        $this->assertSame(200, $this->rights($this->m, ['manage_polls'], ['manage_events'])->status);
+        $this->assertSame(200, $this->rights($this->m, ['view_poll_results', 'manage_polls'], ['manage_events'])->status);
         $this->assertSame(200, $this->call('PATCH', "/members/{$this->m}/role", ['level' => Roles::MEMBER])->status);
-        $this->assertSame(['grant' => ['manage_polls'], 'revoke' => []], array_intersect_key($this->call('GET', "/members/{$this->m}")->data['rights'], ['grant' => 1, 'revoke' => 1]));
+        $this->assertSame(['grant' => ['view_poll_results', 'manage_polls'], 'revoke' => []], array_intersect_key($this->call('GET', "/members/{$this->m}")->data['rights'], ['grant' => 1, 'revoke' => 1]));
         $this->assertSame(200, $this->call('PATCH', "/members/{$this->m}/role", ['level' => 'events'])->status);
         $this->assertTrue($this->can($this->m, Capability::ManageEvents));
 
@@ -225,14 +225,14 @@ final class CapabilityOverridesTest extends TestCase
 
     public function testStoredForNextRequest(): void
     {
-        $this->assertSame(200, $this->rights($this->m, ['manage_documents'])->status);
+        $this->assertSame(200, $this->rights($this->m, ['view_restricted_documents', 'manage_documents'])->status);
         $users = new FakeUsers();
         $next = TestApp::create(TestApp::connection(), $users, settings: new MemorySettings([
             RoleService::SETTING => $this->app->settings->get(RoleService::SETTING),
             RoleService::OVERRIDES_SETTING => $this->app->settings->get(RoleService::OVERRIDES_SETTING),
             RoleService::VIEW_SETTING => true,
         ]));
-        $this->assertSame([...TestApp::capabilities(['member']), Capability::ManageDocuments], $next->roles()->capabilitiesFor($this->m, Roles::MEMBER));
+        $this->assertSame([...TestApp::capabilities(['member']), Capability::ViewRestrictedDocuments, Capability::ManageDocuments], $next->roles()->capabilitiesFor($this->m, Roles::MEMBER));
         $this->assertSame(TestApp::capabilities(['member']), $next->roles()->capabilitiesFor($this->admin, Roles::MEMBER), 'andere Person');
     }
 }

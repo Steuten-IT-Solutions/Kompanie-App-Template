@@ -2334,8 +2334,8 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Sichtbare Dokumente (nach Titel) und alle Kategorien (Issue #2)
-      description: Dokumente mit Sichtbarkeit `managers` nur für wer `manage_documents` hat; für sie auch `max_bytes`.
-      x-capability: 'view_documents oder manage_documents'
+      description: Dokumente mit Sichtbarkeit `managers` nur für alle mit `view_restricted_documents` (`manage_documents` setzt es voraus); mit `manage_documents` auch `max_bytes`.
+      x-capability: 'view_documents oder view_restricted_documents'
       responses:
         '200':
           description: OK
@@ -3148,12 +3148,12 @@ paths:
       tags: [Umfragen]
       summary: Alle Umfragen (laufende und beendete), neueste zuerst (Issue #4)
       description: |
-        Für Mitglieder (Recht `member`; Anwärter nicht) und alle mit `manage_polls`. Je Umfrage `has_voted`, die eigene
+        Für Mitglieder (Recht `member`; Anwärter nicht) und alle mit `view_poll_results`. Je Umfrage `has_voted`, die eigene
         Antwort (`my_answer`) und die Ergebnisse (`results_data`), soweit sie für dieses Konto sichtbar sind:
         `after_vote` – wer geantwortet hat, nach dem Ende alle Mitglieder; `after_end` – alle Mitglieder nach dem Ende;
-        `managers` – nur `manage_polls`. Wer `manage_polls` hat, sieht die Ergebnisse immer. Namen je Möglichkeit bzw. je
+        `managers` – nur `view_poll_results`. Wer `view_poll_results` hat (`manage_polls` setzt es voraus), sieht die Ergebnisse immer. Namen je Möglichkeit bzw. je
         Freitext nur bei namentlichen Umfragen; bei anonymen nie Namen oder Benutzer-IDs (Freitexte alphabetisch).
-      x-capability: 'vote_polls oder manage_polls'
+      x-capability: 'vote_polls oder view_poll_results'
       responses:
         '200':
           description: OK
@@ -3192,7 +3192,7 @@ paths:
     get:
       tags: [Umfragen]
       summary: Eine Umfrage (wie in der Liste)
-      x-capability: 'vote_polls oder manage_polls'
+      x-capability: 'vote_polls oder view_poll_results'
       responses:
         '200':
           description: OK
@@ -5276,7 +5276,7 @@ paths:
         Wie `GET /me/data`, aber ohne Antworten in anonymen Umfragen und die Nutzungsauswertung nur mit `view_activity`.
         Grenzen wie beim Löschen (Konten von Admins nur für Admins); zusätzlich alle Rechte der enthaltenen Bereiche
         (sonst 403), damit niemand über die Auskunft sieht, was ihm in der App verborgen ist: `manage_former`, `view_personal`,
-        `view_points`, `view_penalties`, `view_promotions`, `view_titles`, `view_attendance`, `manage_polls`,
+        `view_points`, `view_penalties`, `view_promotions`, `view_titles`, `view_attendance`, `view_poll_results`,
         `view_mail`, `view_lists`, `post_board`, `view_offices`, `view_responses`.
       x-capability: view_accounts und die Rechte aller enthaltenen Bereiche (in der Regel Admins)
       parameters:
@@ -9783,8 +9783,10 @@ components:
                       manage_events,
                       view_responses,
                       manage_calendar,
+                      view_restricted_documents,
                       manage_documents,
                       post_board,
+                      view_poll_results,
                       manage_polls,
                       view_inventory,
                       manage_inventory,
@@ -9878,8 +9880,10 @@ components:
                   manage_events,
                   view_responses,
                   manage_calendar,
+                  view_restricted_documents,
                   manage_documents,
                   post_board,
+                  view_poll_results,
                   manage_polls,
                   view_inventory,
                   manage_inventory,
@@ -9980,8 +9984,10 @@ components:
                 manage_events,
                 view_responses,
                 manage_calendar,
+                view_restricted_documents,
                 manage_documents,
                 post_board,
+                view_poll_results,
                 manage_polls,
                 view_inventory,
                 manage_inventory,
@@ -10898,8 +10904,10 @@ components:
           manage_events,
           view_responses,
           manage_calendar,
+          view_restricted_documents,
           manage_documents,
           post_board,
+          view_poll_results,
           manage_polls,
           view_inventory,
           manage_inventory,
@@ -12031,7 +12039,7 @@ components:
             document_id: { type: integer, description: 'Dokument aus dem Bereich Dokumente (muss beim Speichern existieren)' }
             document:
               readOnly: true
-              description: 'Nur in Antworten. Der Block fehlt ganz, wenn Dokumente ausgeschaltet sind oder die Person das Dokument dort nicht sehen darf (view_documents, bei visibility managers manage_documents; ohne Anmeldung mit den Rechten von Gast); mit manage_pages kommt er dann mit document null. Die Datei prüft die Rechte beim Abruf erneut.'
+              description: 'Nur in Antworten. Der Block fehlt ganz, wenn Dokumente ausgeschaltet sind oder die Person das Dokument dort nicht sehen darf (view_documents, bei visibility managers view_restricted_documents; ohne Anmeldung mit den Rechten von Gast); mit manage_pages kommt er dann mit document null. Die Datei prüft die Rechte beim Abruf erneut.'
               oneOf:
                 - type: 'null'
                 - type: object
@@ -12100,7 +12108,7 @@ components:
         title: { type: string, maxLength: 191 }
         category_id: { type: [integer, 'null'] }
         date: { type: string, format: date, description: Stand }
-        visibility: { type: string, enum: [members, managers], description: 'managers: nur wer manage_documents hat' }
+        visibility: { type: string, enum: [members, managers], description: 'managers: nur wer view_restricted_documents hat' }
         ext: { type: string }
         kind: { type: string, enum: [pdf, image, file], description: 'pdf und image zeigt die App an, file nur herunterladen' }
         mime: { type: string }

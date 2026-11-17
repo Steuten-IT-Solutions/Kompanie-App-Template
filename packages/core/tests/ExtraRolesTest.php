@@ -178,7 +178,7 @@ final class ExtraRolesTest extends TestCase
     public function testDeletingARoleReplacesOrDropsItAsExtraRole(): void
     {
         $r1 = $this->app->roles()->create(['label' => 'Fahnenträger', 'capabilities' => TestApp::caps(['member', 'manage_events'])])['key'];
-        $r2 = $this->app->roles()->create(['label' => 'Ersatz', 'capabilities' => TestApp::caps(['member', 'manage_documents'])])['key'];
+        $r2 = $this->app->roles()->create(['label' => 'Ersatz', 'capabilities' => TestApp::caps(['member', 'view_restricted_documents', 'manage_documents'])])['key'];
         $a = $this->users->add('a', Roles::MEMBER);
         $b = $this->users->add('b', $r2);
         $this->setRoles($a, [$r1]);
