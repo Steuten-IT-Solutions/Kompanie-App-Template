@@ -152,18 +152,24 @@ final class RoleService
 
     /**
      * Für die Seite eines Mitglieds: Rechte ihrer Rollen, Ausnahmen und welche Rechte $actor ändern darf.
-     * null, wenn es für die Person keine Ausnahmen gibt (Admin, Gast) oder $actor sie nicht ändern darf.
+     * null, wenn es für die Person keine Ausnahmen gibt (Admin, Gast) oder $actor sie nicht sehen darf (view_accounts,
+     * Grenzen wie canHandleUser); ohne promote_users ist nichts änderbar.
      *
      * @return array{role: string[], grant: string[], revoke: string[], editable: string[]}|null
      */
     public function overridesView(User $actor, User $target): ?array
     {
-        if (!$actor->can(Capability::PromoteUsers) || $actor->id === $target->id || !self::overridable($target->role)
+        if (!$actor->can(Capability::ViewAccounts) || $actor->id === $target->id || !self::overridable($target->role)
             || !$this->canHandleUser($actor, $target)) {
             return null;
         }
         $base = $this->grantedFor($target->id, $target->role);
-        return $this->view($actor, $base, self::normalized($base, $this->loadOverrides()[$target->id] ?? self::NO_OVERRIDES));
+        $view = $this->view($actor, $base, self::normalized($base, $this->loadOverrides()[$target->id] ?? self::NO_OVERRIDES));
+        // Nur sehen (view_accounts ohne promote_users): nichts änderbar.
+        if (!$actor->can(Capability::PromoteUsers)) {
+            $view['editable'] = [];
+        }
+        return $view;
     }
 
     /**

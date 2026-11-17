@@ -128,6 +128,36 @@ final class ReadRightsTest extends TestCase
         }
     }
 
+    public function testAccountReadRightShowsWithoutChanging(): void
+    {
+        $this->assertSame(Capability::ViewAccounts, Capability::CreateUsers->requires());
+        $this->assertSame(Capability::ViewAccounts, Capability::PromoteUsers->requires());
+        $this->assertContains(Capability::ViewAccounts, Capability::accountRights(), 'nur Admins geben es weiter');
+        $this->assertSame(400, $this->call('POST', '/admin/roles', ['label' => 'Anleger', 'capabilities' => TestApp::caps(['member', 'create_users'])])->status, 'Anlegen ohne Konten sehen');
+
+        $this->users->current = $this->withRights('kontenleser', ['view_accounts']);
+        $this->assertSame(200, $this->call('GET', '/members')->status, 'Mitgliederliste mit Konten sehen');
+        $detail = $this->call('GET', '/members/' . $this->anna);
+        $this->assertSame(200, $detail->status);
+        $this->assertArrayHasKey('join_year', $detail->data);
+        $this->assertArrayHasKey('no_access', $detail->data);
+        $this->assertSame([], $detail->data['rights']['editable'] ?? null, 'Rechte sichtbar, nichts änderbar');
+        foreach (['/members/' . $this->anna . '/account', '/registrations', '/admissions'] as $path) {
+            $this->assertSame(200, $this->call('GET', $path)->status, "GET $path mit view_accounts");
+        }
+        $this->assertSame(403, $this->call('PATCH', '/members/' . $this->anna . '/account', ['first_name' => 'X'])->status);
+        $this->assertSame(403, $this->call('POST', '/users', ['first_name' => 'Neu', 'last_name' => 'Person', 'level' => 'member'])->status);
+        $this->assertSame(403, $this->call('PATCH', '/members/' . $this->anna . '/role', ['level' => 'guest'])->status);
+        $this->assertSame(403, $this->call('PUT', '/members/' . $this->anna . '/rights', ['grant' => [], 'revoke' => []])->status);
+        $this->assertSame(403, $this->call('PUT', '/members/' . $this->anna . '/join-year', ['date' => '2001'])->status);
+        $this->assertSame(403, $this->call('POST', '/members/' . $this->anna . '/password')->status);
+
+        $this->users->current = $this->withRights('ohne3', []);
+        foreach (['/members/' . $this->anna . '/account', '/registrations', '/admissions'] as $path) {
+            $this->assertSame(403, $this->call('GET', $path)->status, "GET $path ohne view_accounts");
+        }
+    }
+
     public function testUpdateGivesReadRightsOnceToEveryoneWithTheWriteRight(): void
     {
         $db = TestApp::connection();

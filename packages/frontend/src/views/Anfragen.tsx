@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   api,
   applyPendingRegistrations,
+  can,
   config,
   newAccountRoles,
   type Level,
@@ -15,7 +16,8 @@ import { confirmAsk } from '../ask';
 
 /**
  * Verwaltung → Anfragen (Issue #314): Anfragen auf einen Zugang freigeben (Konto mit gewählter Rolle und dem Passwort aus
- * der Anfrage) oder ablehnen. Für alle mit „Mitglieder anlegen“; Rollen nur, die man vergeben darf (prüft der Server).
+ * der Anfrage) oder ablehnen. Sehen mit „Konten sehen“, freigeben und ablehnen mit „Mitglieder anlegen“; Rollen nur, die
+ * man vergeben darf (prüft der Server).
  * Passt die Anfrage zu einem Mitglied ohne Zugang (z. B. für Chroniken angelegt), lässt sie sich damit verbinden statt ein
  * zweites Konto anzulegen; Vorschläge macht der Server, wählen lässt sich jedes Mitglied ohne Zugang.
  */
@@ -24,6 +26,7 @@ export function Anfragen({ onToast }: { onToast: (msg: string) => void }) {
   if (loading && !data) return <Loading shape="people" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const list = data!;
+  const editable = can('create_users');
   const done = (id: number, msg: string) => {
     const requests = list.requests.filter((r) => r.id !== id);
     setData({ ...list, requests });
@@ -47,6 +50,7 @@ export function Anfragen({ onToast }: { onToast: (msg: string) => void }) {
                 defaultRole={list.default_role}
                 withMail={list.email_confirmation}
                 noAccess={list.no_access_members ?? []}
+                editable={editable}
                 onDone={done}
               />
             </li>
@@ -74,12 +78,15 @@ function RequestCard({
   defaultRole,
   withMail,
   noAccess,
+  editable,
   onDone,
 }: {
   request: RegistrationRequest;
   defaultRole: Level;
   withMail: boolean;
   noAccess: { id: number; name: string }[];
+  /** freigeben und ablehnen (create_users); sonst nur sehen */
+  editable: boolean;
   onDone: (id: number, msg: string) => void;
 }) {
   const matches = r.matches ?? [];
@@ -129,8 +136,8 @@ function RequestCard({
       return `Anfrage abgelehnt${res.mailed ? ', die Person ist per Mail informiert' : ''}`;
     });
 
-  return (
-    <div className="card registration-request">
+  const head = (
+    <>
       <div className="row-title">{r.name}</div>
       <div className="row-sub">
         {r.email}
@@ -138,6 +145,22 @@ function RequestCard({
         {formatDate(r.created_at.slice(0, 10))}
       </div>
       {r.message && <p className="registration-message">{r.message}</p>}
+    </>
+  );
+  if (!editable) {
+    return (
+      <div className="card registration-request">
+        {head}
+        {matches.length > 0 && (
+          <p className="muted small">Könnte passen zu: {matches.map((m) => `${m.name} (${MATCH_LABELS[m.match]})`).join(', ')}</p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="card registration-request">
+      {head}
       {(matches.length > 0 || noAccess.length > 0) && (
         <fieldset className="fieldset registration-link">
           <legend>Mitglied ohne Zugang verbinden?</legend>

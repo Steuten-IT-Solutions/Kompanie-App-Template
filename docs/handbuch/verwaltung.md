@@ -2,7 +2,7 @@
 titel: Verwaltung
 reihenfolge: 50
 rechte: []
-einrecht: [view_points, manage_points, view_penalties, manage_penalties, view_promotions, manage_ranks, view_titles, manage_titles, view_attendance, manage_attendance, manage_offices, view_lists, manage_lists, view_mail, send_mail, view_personal, manage_personal, create_users, manage_former, view_passive, manage_passive, promote_users, post_board, manage_polls, view_inventory, manage_inventory, manage_settings]
+einrecht: [view_points, manage_points, view_penalties, manage_penalties, view_promotions, manage_ranks, view_titles, manage_titles, view_attendance, manage_attendance, manage_offices, view_lists, manage_lists, view_mail, send_mail, view_personal, manage_personal, view_accounts, create_users, manage_former, view_passive, manage_passive, promote_users, post_board, manage_polls, view_inventory, manage_inventory, manage_settings]
 ---
 Die Verwaltung ist dein Einstieg in alle Aufgaben, die du in der Kompanie übernimmst: Mitglieder pflegen, {bereich.points} vergeben, {bereich.offices} eintragen und mehr. Jede Aufgabe hat hier einen eigenen Knopf.
 

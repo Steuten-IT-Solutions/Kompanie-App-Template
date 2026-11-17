@@ -5253,7 +5253,8 @@ paths:
       description: |
         Alle Anwärter (Grundrolle mit `promotable` oder `admission_extra`, Zusatzrolle mit `admission_extra`, ohne Ehemalige): zuerst wer die
         Voraussetzung erfüllt (nach `fulfilled_on`), dann `open`, dann `none`. Es zählen alle Teilnahmen der Terminart bis heute.
-      x-capability: create_users
+        Aufnehmen (`POST /members/{id}/admit`) nur mit `create_users`.
+      x-capability: view_accounts
       responses:
         '200':
           description: OK
@@ -5277,7 +5278,7 @@ paths:
         (sonst 403), damit niemand über die Auskunft sieht, was ihm in der App verborgen ist: `manage_former`, `view_personal`,
         `view_points`, `view_penalties`, `view_promotions`, `view_titles`, `view_attendance`, `manage_polls`,
         `view_mail`, `view_lists`, `post_board`, `view_offices`, `view_responses`.
-      x-capability: create_users und die Rechte aller enthaltenen Bereiche (in der Regel Admins)
+      x-capability: view_accounts und die Rechte aller enthaltenen Bereiche (in der Regel Admins)
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }
       responses:
@@ -5816,8 +5817,9 @@ paths:
       summary: Angaben eines Kontos zum Bearbeiten (Issue #24)
       description: |
         Mit denselben Grenzen wie beim Passwort-Zurücksetzen (Admins nur für Admins usw.). `phone` nur für das eigene
-        Konto und mit `view_personal`, sonst leer; Adresse und Geburtsdatum stehen in `GET /members/{id}`.
-      x-capability: create_users
+        Konto und mit `view_personal`, sonst leer; Adresse und Geburtsdatum stehen in `GET /members/{id}`. Ändern
+        (`PATCH`) nur mit `create_users`.
+      x-capability: view_accounts
       responses:
         '200': { $ref: '#/components/responses/AccountProfile' }
         '403': { $ref: '#/components/responses/Error' }
@@ -6128,7 +6130,7 @@ paths:
   /registrations:
     get:
       tags: [Zugang beantragen]
-      summary: Anfragen, die auf Freigabe warten (create_users)
+      summary: Anfragen, die auf Freigabe warten (view_accounts; freigeben und ablehnen mit create_users)
       responses:
         '200':
           description: Älteste zuerst
@@ -9780,6 +9782,7 @@ components:
                       manage_news,
                       view_personal,
                       manage_personal,
+                      view_accounts,
                       create_users,
                       manage_former,
                       view_passive,
@@ -9874,6 +9877,7 @@ components:
                   manage_news,
                   view_personal,
                   manage_personal,
+                  view_accounts,
                   create_users,
                   manage_former,
                   view_passive,
@@ -9975,6 +9979,7 @@ components:
                 manage_news,
                 view_personal,
                 manage_personal,
+                view_accounts,
                 create_users,
                 manage_former,
                 view_passive,
@@ -10092,10 +10097,10 @@ components:
         openReports: { type: [integer, 'null'], description: 'Offene Fehlermeldungen; nur für Angemeldete mit view_reports, sonst null' }
         registration: { type: boolean, description: 'Zugang beantragen eingeschaltet (Issue #314): Link „Zugang beantragen“ für Gäste' }
         pendingRegistrations:
-          { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null' }
+          { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit view_accounts, sonst null' }
         admissionsDue:
           type: [integer, 'null']
-          description: 'Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“); nur für create_users mit Bereich Anwesenheit (auch ohne Anwärter-Rolle, dann 0), sonst null'
+          description: 'Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“); nur für view_accounts mit Bereich Anwesenheit (auch ohne Anwärter-Rolle, dann 0), sonst null'
         gallerySubmissions:
           {
             type: boolean,
@@ -10513,10 +10518,10 @@ components:
           type: array
           items: { $ref: '#/components/schemas/TitleRef' }
         joined_on:
-          description: Eintritt als JJJJ-MM-TT oder nur das Jahr JJJJ (unabhängig von der Anzeige auf der eigenen Seite), leer ohne Eintrag; nur mit Recht create_users
+          description: Eintritt als JJJJ-MM-TT oder nur das Jahr JJJJ (unabhängig von der Anzeige auf der eigenen Seite), leer ohne Eintrag; nur mit Recht view_accounts
           type: string
         no_access:
-          description: 'Mitglied ohne Zugang (meldet sich noch nicht an, z. B. für Chroniken angelegt); nur mit Recht create_users, auch in GET /members/{id}'
+          description: 'Mitglied ohne Zugang (meldet sich noch nicht an, z. B. für Chroniken angelegt); nur mit Recht view_accounts, auch in GET /members/{id}'
           type: boolean
 
     DirectoryEntry:
@@ -10642,14 +10647,15 @@ components:
               allOf:
                 - $ref: '#/components/schemas/PersonalInfo'
             join_year:
-              description: Eintrittsjahr mit Anzeige (nur mit Recht create_users; null ohne Eintrag)
+              description: Eintrittsjahr mit Anzeige (nur mit Recht view_accounts, ändern mit create_users; null ohne Eintrag)
               oneOf:
                 - $ref: '#/components/schemas/JoinYear'
                 - type: 'null'
             rights:
               description: |
                 Ausnahmen bei den Rechten (`PUT /members/{id}/rights`); null für Admins, Gäste, sich selbst und wenn der
-                Betrachter sie nicht ändern darf.
+                Betrachter sie nicht sehen darf (view_accounts, Grenzen wie beim Ändern). Ohne promote_users ist
+                `editable` leer.
               oneOf:
                 - $ref: '#/components/schemas/MemberRights'
                 - type: 'null'
@@ -10664,7 +10670,7 @@ components:
                 - $ref: '#/components/schemas/FormerInfo'
                 - type: 'null'
             admission:
-              description: Stand als Anwärter (nur für create_users); null, wenn die Person kein Anwärter ist
+              description: Stand als Anwärter (nur für view_accounts); null, wenn die Person kein Anwärter ist
               oneOf:
                 - $ref: '#/components/schemas/Admission'
                 - type: 'null'
@@ -10891,6 +10897,7 @@ components:
           manage_news,
           view_personal,
           manage_personal,
+          view_accounts,
           create_users,
           manage_former,
           view_passive,
@@ -10917,7 +10924,7 @@ components:
           type: array
           items: { $ref: '#/components/schemas/GrantableCapability' }
         editable:
-          description: Rechte, die der Betrachter hier ändern darf
+          description: Rechte, die der Betrachter hier ändern darf (leer ohne promote_users, mit view_accounts nur zum Sehen)
           type: array
           items: { $ref: '#/components/schemas/GrantableCapability' }
 

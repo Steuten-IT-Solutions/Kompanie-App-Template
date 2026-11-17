@@ -4,14 +4,14 @@ import { api, applyAdmissionsDue, applyOpenReports, applyPendingRegistrations, c
 /**
  * Zahlen offener Anfragen, Fehlermeldungen und fälliger Aufnahmen für die Kacheln der Verwaltung. Sie kommen mit der Konfiguration der
  * Seite, die der Service Worker zuerst aus seinem Speicher zeigt; beim Öffnen der Verwaltung darum still neu holen
- * (höchstens alle 30 Sekunden). Der Server liefert sie nur an Berechtigte (create_users bzw. view_reports).
+ * (höchstens alle 30 Sekunden). Der Server liefert sie nur an Berechtigte (view_accounts bzw. view_reports).
  */
 const MIN_GAP_MS = 30_000;
 let lastAt = 0;
 
 export function refreshAdminCounts(now = Date.now()): void {
   if (!config?.user) return;
-  if (!can('create_users') && !can('view_reports')) return;
+  if (!can('view_accounts') && !can('view_reports')) return;
   if (now - lastAt < MIN_GAP_MS) return;
   lastAt = now;
   inBackground(() => api.config())
