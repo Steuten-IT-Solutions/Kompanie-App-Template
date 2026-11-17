@@ -364,9 +364,10 @@ final class MemberService
      * Zum Mitglied machen (Issue #23, z. B. Anwärter): wer Konten anlegen darf, aber nur aus einer Rolle, die der Admin
      * dafür freigegeben hat (RoleService::promotable). Andere Rollenwechsel bleiben bei „Rollen vergeben“.
      *
+     * @param bool $candidate Aufnahme aus einer Anwärter-Rolle (geprüft hat AdmissionService)
      * @return array{id: int, level: string}
      */
-    public function promote(User $actor, int $id): array
+    public function promote(User $actor, int $id, bool $candidate = false): array
     {
         $target = $this->users->find($id);
         if (!$target) {
@@ -376,7 +377,8 @@ final class MemberService
             throw ApiError::invalid('Die eigene Rolle kann man nicht selbst ändern.');
         }
         $this->denyFormer($target);
-        if (!($this->roles?->promotable($target->role) ?? false)) {
+        // $candidate: Aufnahme aus einer Anwärter-Rolle (AdmissionService::admit, auch mit „Gehört zur Kompanie“)
+        if (!$candidate && !($this->roles?->promotable($target->role) ?? false)) {
             throw ApiError::invalid(sprintf('Aus der Rolle „%s“ lässt sich niemand so zum Mitglied machen.', $this->roles?->label($target->role) ?? $target->role));
         }
         try {

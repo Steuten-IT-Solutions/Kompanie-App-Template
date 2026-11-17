@@ -103,7 +103,7 @@ final class PassiveBirthdaysTest extends TestCase
         $this->assertSame(['Clara Fünfzig', 'Anna Achtzig', 'Dieter Später'], array_column($this->call('GET', '/passive-members')->data['birthdays'], 'name'));
 
         // Ohne view_personal: kein Hinweis (Geburtsdaten sind persönliche Angaben)
-        $this->users->current = $this->withRights('kassierer', ['manage_passive']);
+        $this->users->current = $this->withRights('kassierer', ['view_passive', 'manage_passive']);
         $this->assertSame([], $this->call('GET', '/passive-members')->data['birthdays']);
         $this->assertSame(200, $this->call('PATCH', '/passive-members/settings', ['birthday_days' => 7])->status, 'Einstellung mit manage_passive');
     }
@@ -154,10 +154,12 @@ final class PassiveBirthdaysTest extends TestCase
         if (!$this->app->push()->supported()) {
             $this->markTestSkipped('ohne Push-Unterstützung');
         }
-        $manager = $this->withRights('verwalter', ['manage_passive', 'view_personal']);
-        $cashier = $this->withRights('kassierer', ['manage_passive']);
+        $manager = $this->withRights('verwalter', ['view_passive', 'manage_passive', 'view_personal']);
+        $cashier = $this->withRights('kassierer', ['view_passive', 'manage_passive']);
+        $reader = $this->withRights('leser', ['view_passive', 'view_personal']);
         $this->subscribe($manager, 'verwalter');
         $this->subscribe($cashier, 'kassierer');
+        $this->subscribe($reader, 'leser');
         $this->subscribe($this->member, 'mitglied');
         $this->subscribe($this->admin, 'admin');
         $this->passive('Anna', 'Achtzig', '1946-11-23'); // in 7 Tagen 80
@@ -181,7 +183,7 @@ final class PassiveBirthdaysTest extends TestCase
         $this->at('2026-11-16 07:10:00');
         $this->app->runTask(PassiveMemberService::TASK);
         $q = $this->queued();
-        $this->assertSame(['verwalter', 'admin', 'verwalter', 'admin'], array_column($q, 'device'), 'nur Verwalter mit view_personal');
+        $this->assertSame(['verwalter', 'admin', 'verwalter', 'admin'], array_column($q, 'device'), 'nur Verwalter (manage_passive) mit view_personal');
         $this->assertSame(['Geburtstag eines Passiven', 'Bernd Morgen wird morgen 70 Jahre alt.', 'verwaltung/passive'], [$q[0]['title'], $q[0]['body'], $q[0]['route']]);
         $this->assertSame('Anna Achtzig wird am 23.11. 80 Jahre alt.', $q[2]['body']);
 

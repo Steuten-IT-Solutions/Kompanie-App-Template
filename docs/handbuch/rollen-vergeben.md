@@ -15,7 +15,7 @@ Tippe unten auf **Verwaltung**, dann auf **Mitglieder**, und tippe auf die Perso
 Du siehst nur die Teile, für die du das Recht hast:
 - **Grundrolle** und **Zusatzrollen**: für alle, die Rollen vergeben dürfen. Sonst steht hier nur die Rolle zum Lesen.
 - **Rechte**: alle Rechte der Person, mit **Rechte speichern** (wer Rollen vergeben darf).
-- **Aufnahme** mit **Als {rolle.member} aufnehmen**: nur bei Anwärtern, also Personen mit einer Rolle, die ein {rolle.admin} dafür eingerichtet hat (wer Mitglieder anlegen darf). Dazu stehen dort **Anwärter seit** und ob die Voraussetzung für die Aufnahme erfüllt ist. Bei einer Anwärter-Rolle als Zusatzrolle entfernt das Aufnehmen diese Zusatzrolle. Ist noch kein Eintritt eingetragen, setzt die App ihn auf den Tag der Aufnahme.
+- **Aufnahme** mit **Als {rolle.member} aufnehmen**: nur bei Anwärtern, also Personen mit einer Rolle, die ein {rolle.admin} dafür eingerichtet hat (wer Mitglieder anlegen darf). Dazu stehen dort **Anwärter seit** und ob die Voraussetzung für die Aufnahme erfüllt ist. Ist die Anwärter-Rolle die Rolle der Person, wird sie beim Aufnehmen zu {rolle.member}; ist sie eine Zusatzrolle, entfernt das Aufnehmen sie. Ist noch kein Eintritt eingetragen, setzt die App ihn auf den Tag der Aufnahme.
 - **Passwort vergessen? Neues Startpasswort erzeugen** (wer Mitglieder anlegen darf). Bei einem Mitglied ohne Zugang steht hier stattdessen **Zugang einrichten**.
 - **App als … ansehen**: zeigt die App mit den Rechten dieser Person, alle ihre Rollen zusammen (nur für {rolle.admin}s, nicht bei {rolle.admin}s und nicht auf deiner eigenen Seite; mehr dazu im Handbuch unter „App als Rolle ansehen“).
 - **Ehemalig** mit **Als ehemalig eintragen …** (wer Ehemalige verwalten darf).

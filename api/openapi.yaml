@@ -1103,7 +1103,7 @@ paths:
       tags: [Termine]
       summary: Wer zu- oder abgesagt hat und wer sich noch nicht gemeldet hat
       description: Namen und Hinweise; gezählt werden alle, die zusagen dürfen (`respond_calendar`).
-      x-capability: manage_calendar
+      x-capability: view_responses
       responses:
         '200':
           description: OK
@@ -2170,8 +2170,8 @@ paths:
     get:
       tags: [Listen]
       summary: Alle gespeicherten Listen (Issue #121), zuletzt geänderte zuerst
-      description: Nur mit `manage_lists` (Standardrolle „Listen verwalten“, Admins). Bereich aus → 403 `feature_disabled`.
-      x-capability: manage_lists
+      description: Ansehen mit `view_lists`, ändern mit `manage_lists` (Standardrolle „Listen verwalten“, Admins). Bereich aus → 403 `feature_disabled`.
+      x-capability: view_lists
       responses:
         '200':
           description: OK
@@ -2214,7 +2214,7 @@ paths:
         Titel mit öffentlicher Mitgliederliste (Bereich directory) oder dem Recht, sie zu pflegen, Geburtstag (Tag und
         Monat) nur für Mitglieder und nur, wenn die Person ihn freigegeben hat, Punkte nur mit `view_points`, offene
         Strafen nur mit `view_penalties`; jeweils nur bei eingeschaltetem Bereich.
-      x-capability: manage_lists
+      x-capability: view_lists
       responses:
         '200':
           description: OK
@@ -2777,7 +2777,7 @@ paths:
       tags: [E-Mails]
       summary: Formular „E-Mail schreiben“ – eingerichtet, Absender, wählbare Rollen und Mitglieder
       description: |
-        Nur mit `send_mail` (Standardrolle „E-Mails verwalten“, Admins). Bereich `mail` aus → 403 `feature_disabled`.
+        Verlauf mit `view_mail`, schreiben mit `send_mail` (Standardrolle „E-Mails verwalten“, Admins). Bereich `mail` aus → 403 `feature_disabled`.
         Rollen ohne Gäste mit der Zahl der Personen und davon mit Mailadresse; Konten ohne Gäste mit ihren Rollen (Grund-
         und Zusatzrollen) und ob eine Adresse hinterlegt ist. Die Adressen selbst werden nicht ausgeliefert.
       x-capability: send_mail
@@ -2854,7 +2854,7 @@ paths:
       tags: [E-Mails]
       summary: Verlauf der versendeten E-Mails, neueste zuerst
       description: Aufbewahrt werden die Mails ein Jahr (`keep_days`); danach löscht die Aufgabe `mailing_cleanup` sie samt Protokoll und Bildern.
-      x-capability: send_mail
+      x-capability: view_mail
       responses:
         '200':
           description: OK
@@ -2990,7 +2990,7 @@ paths:
     get:
       tags: [E-Mails]
       summary: Eine versendete E-Mail mit Inhalt, Auswahl der Empfänger und Protokoll je Empfänger
-      x-capability: send_mail
+      x-capability: view_mail
       responses:
         '200':
           description: OK
@@ -3307,10 +3307,10 @@ paths:
       tags: [Inventar]
       summary: Alle Einträge des Inventars, nach Bezeichnung und Ort (Issue #6)
       description: |
-        Nur mit `manage_inventory` (Standardrolle „Inventar verwalten“, Admins); Mitglieder ohne das Recht → 403. Ein Ort je
+        Ansehen mit `view_inventory`, ändern mit `manage_inventory` (Standardrolle „Inventar verwalten“, Admins); Mitglieder ohne das Recht → 403. Ein Ort je
         Eintrag; dasselbe Material an zwei Orten sind zwei Einträge. Gelöschte Einträge fehlen. Die App gruppiert nach
         Bezeichnung (ohne Unterschied in Groß- und Kleinschreibung) und summiert je Einheit.
-      x-capability: manage_inventory
+      x-capability: view_inventory
       responses:
         '200':
           description: OK
@@ -3349,7 +3349,7 @@ paths:
       tags: [Inventar]
       summary: Bekannte Orte als Vorschläge
       description: Die Orte der vorhandenen Einträge, alphabetisch, ohne Dubletten in anderer Groß- und Kleinschreibung.
-      x-capability: manage_inventory
+      x-capability: view_inventory
       responses:
         '200':
           description: OK
@@ -3366,7 +3366,7 @@ paths:
       tags: [Inventar]
       summary: Verlauf aller Einträge, neueste zuerst
       description: Auch von gelöschten Einträgen. Mit `before` (ID eines Verlaufseintrags) die nächste Seite.
-      x-capability: manage_inventory
+      x-capability: view_inventory
       parameters:
         - $ref: '#/components/parameters/InventoryLogLimit'
         - $ref: '#/components/parameters/InventoryLogBefore'
@@ -3441,7 +3441,7 @@ paths:
     get:
       tags: [Inventar]
       summary: Verlauf eines Eintrags, neueste zuerst (auch nach dem Löschen)
-      x-capability: manage_inventory
+      x-capability: view_inventory
       parameters:
         - $ref: '#/components/parameters/InventoryLogLimit'
         - $ref: '#/components/parameters/InventoryLogBefore'
@@ -5200,8 +5200,8 @@ paths:
       tags: [Verwaltung]
       summary: Anwärter als Mitglied aufnehmen
       description: |
-        Grundrolle mit `promotable` → `member` (wie `/members/{id}/promote`), sonst die Zusatzrolle mit `admission_extra`
-        entfernen. Die Voraussetzung sperrt nicht. Ohne Eintritt wird er auf heute gesetzt (`join_date`, sonst null);
+        Grundrolle mit `promotable` oder `admission_extra` → `member` (wie `/members/{id}/promote`), sonst die Zusatzrolle mit
+        `admission_extra` entfernen. Die Voraussetzung sperrt nicht. Ohne Eintritt wird er auf heute gesetzt (`join_date`, sonst null);
         „Anwärter seit“ fällt weg. Nicht für sich selbst und nicht für Ehemalige (400).
       x-capability: create_users
       responses:
@@ -5251,7 +5251,7 @@ paths:
       tags: [Verwaltung]
       summary: Aufnahmen – Anwärter mit Stand der Voraussetzung (nur zusammen mit dem Bereich Anwesenheit)
       description: |
-        Alle Anwärter (Grundrolle mit `promotable` oder Zusatzrolle mit `admission_extra`, ohne Ehemalige): zuerst wer die
+        Alle Anwärter (Grundrolle mit `promotable` oder `admission_extra`, Zusatzrolle mit `admission_extra`, ohne Ehemalige): zuerst wer die
         Voraussetzung erfüllt (nach `fulfilled_on`), dann `open`, dann `none`. Es zählen alle Teilnahmen der Terminart bis heute.
       x-capability: create_users
       responses:
@@ -5276,7 +5276,7 @@ paths:
         Grenzen wie beim Löschen (Konten von Admins nur für Admins); zusätzlich alle Rechte der enthaltenen Bereiche
         (sonst 403), damit niemand über die Auskunft sieht, was ihm in der App verborgen ist: `manage_former`, `view_personal`,
         `view_points`, `view_penalties`, `view_promotions`, `view_titles`, `view_attendance`, `manage_polls`,
-        `send_mail`, `manage_lists`, `post_board`, `view_offices`.
+        `view_mail`, `view_lists`, `post_board`, `view_offices`, `view_responses`.
       x-capability: create_users und die Rechte aller enthaltenen Bereiche (in der Regel Admins)
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }
@@ -5297,7 +5297,7 @@ paths:
       description: |
         Nach Nachname, dazu die Mitglieder, die Betreuer sein können. Adresse, Telefon, E-Mail und Geburtsdatum nur mit
         `view_personal` (sonst fehlen sie). Bereich `passive` aus → 403 `feature_disabled`.
-      x-capability: manage_passive
+      x-capability: view_passive
       responses:
         '200':
           description: OK
@@ -5369,7 +5369,7 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Ein Passiver
-      x-capability: manage_passive
+      x-capability: view_passive
       responses:
         '200':
           description: OK
@@ -5418,7 +5418,7 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Einstellungen der Passiven (Jahresbeitrag als Vorschlag, Zahlungsarten, Erinnerung an Geburtstage)
-      x-capability: manage_passive
+      x-capability: view_passive
       responses:
         '200':
           description: OK
@@ -6697,7 +6697,7 @@ paths:
       description: |
         Bericht als PDF (Verwaltung → Bericht). Je Bereich nur, wenn er an ist und die Person sein Recht hat: Mitglieder mit
         einem Recht der Mitgliederliste, Punkte mit `view_points`, Strafen mit `view_penalties`, Anwesenheit mit
-        `view_attendance`. `dated` false: ohne Zeitbezug (Stand heute). Reihenfolge wie im Bericht.
+        `view_attendance`, Inventar mit `view_inventory`. `dated` false: ohne Zeitbezug (Stand heute). Reihenfolge wie im Bericht.
       x-capability: 'eines der Rechte der Bereiche (siehe Beschreibung)'
       responses:
         '200':
@@ -9732,13 +9732,17 @@ components:
                       view_attendance,
                       manage_attendance,
                       manage_events,
+                      view_responses,
                       manage_calendar,
                       manage_documents,
                       post_board,
                       manage_polls,
+                      view_inventory,
                       manage_inventory,
                       manage_offices,
+                      view_lists,
                       manage_lists,
+                      view_mail,
                       send_mail,
                       manage_sponsors,
                       manage_companies,
@@ -9752,6 +9756,7 @@ components:
                       manage_personal,
                       create_users,
                       manage_former,
+                      view_passive,
                       manage_passive,
                       promote_users,
                       review_reports,
@@ -9769,7 +9774,7 @@ components:
                 description: 'guest, member und admin: nicht löschbar; bei guest und member nur die Rechte zum Sehen änderbar, bei admin keine',
               }
             deletable: { type: boolean, description: 'false für guest, member und admin' }
-            admission_extra: { type: boolean, description: Anwärter-Rolle als Zusatzrolle (bei Aufnahme entfernen) }
+            admission_extra: { type: boolean, description: 'Anwärter-Rolle (als Grund- oder Zusatzrolle, auch mit Mitgliederbereich)' }
             admission_kind: { type: [string, 'null'] }
             admission_count: { type: integer }
             admission_months: { type: integer }
@@ -9819,13 +9824,17 @@ components:
                   view_attendance,
                   manage_attendance,
                   manage_events,
+                  view_responses,
                   manage_calendar,
                   manage_documents,
                   post_board,
                   manage_polls,
+                  view_inventory,
                   manage_inventory,
                   manage_offices,
+                  view_lists,
                   manage_lists,
+                  view_mail,
                   send_mail,
                   manage_sponsors,
                   manage_companies,
@@ -9839,6 +9848,7 @@ components:
                   manage_personal,
                   create_users,
                   manage_former,
+                  view_passive,
                   manage_passive,
                   promote_users,
                   review_reports,
@@ -9848,7 +9858,7 @@ components:
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
         new_accounts: { type: boolean, description: 'Nur eigene Rollen: beim Anlegen von Konten wählbar' }
         promotable: { type: boolean, description: 'Nur eigene Rollen ohne member: als Mitglied aufnehmen mit create_users' }
-        admission_extra: { type: boolean, description: 'Nur eigene Rollen: Anwärter-Rolle als Zusatzrolle, wird bei der Aufnahme entfernt' }
+        admission_extra: { type: boolean, description: 'Nur eigene Rollen: Anwärter-Rolle als Grund- oder Zusatzrolle; bei der Aufnahme wird die Grundrolle zu member, die Zusatzrolle entfernt' }
         admission_kind:
           { type: [string, 'null'], description: 'Voraussetzung für die Aufnahme: Terminart (eine aus /config eventKinds; leer oder null für keine)' }
         admission_count: { type: [integer, string], description: 'Mindestens so viele Teilnahmen (present) an Listen dieser Art, 0–100; > 0 nur mit admission_kind' }
@@ -9913,13 +9923,17 @@ components:
                 view_attendance,
                 manage_attendance,
                 manage_events,
+                view_responses,
                 manage_calendar,
                 manage_documents,
                 post_board,
                 manage_polls,
+                view_inventory,
                 manage_inventory,
                 manage_offices,
+                view_lists,
                 manage_lists,
+                view_mail,
                 send_mail,
                 manage_sponsors,
                 manage_companies,
@@ -9933,6 +9947,7 @@ components:
                 manage_personal,
                 create_users,
                 manage_former,
+                view_passive,
                 manage_passive,
                 promote_users,
                 review_reports,
@@ -10049,7 +10064,7 @@ components:
           { type: [integer, 'null'], description: 'Offene Anfragen auf einen Zugang; nur für Angemeldete mit create_users, sonst null' }
         admissionsDue:
           type: [integer, 'null']
-          description: 'Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“); nur für create_users mit Bereich Anwesenheit und einer Anwärter-Rolle, sonst null'
+          description: 'Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“); nur für create_users mit Bereich Anwesenheit (auch ohne Anwärter-Rolle, dann 0), sonst null'
         gallerySubmissions:
           {
             type: boolean,
@@ -10276,7 +10291,7 @@ components:
             until: { type: string, description: 'ISO 8601: bis dahin änderbar (Beginn bzw. Ende des Anmeldeschlusses)' }
             open: { type: boolean, description: Noch änderbar }
             can_respond: { type: boolean, description: 'Hat respond_calendar' }
-            can_list: { type: boolean, description: 'Hat manage_calendar: sieht die Namen (`GET /calendar/{key}/responses`)' }
+            can_list: { type: boolean, description: 'Hat view_responses: sieht die Namen (`GET /calendar/{key}/responses`)' }
         kind: { type: [string, 'null'], description: 'Terminart (nur in `GET /calendar`), z. B. Versammlung' }
         kind_suggestion:
           type: [string, 'null']
@@ -10822,13 +10837,17 @@ components:
           view_attendance,
           manage_attendance,
           manage_events,
+          view_responses,
           manage_calendar,
           manage_documents,
           post_board,
           manage_polls,
+          view_inventory,
           manage_inventory,
           manage_offices,
+          view_lists,
           manage_lists,
+          view_mail,
           send_mail,
           manage_sponsors,
           manage_companies,
@@ -10842,6 +10861,7 @@ components:
           manage_personal,
           create_users,
           manage_former,
+          view_passive,
           manage_passive,
           promote_users,
           review_reports,

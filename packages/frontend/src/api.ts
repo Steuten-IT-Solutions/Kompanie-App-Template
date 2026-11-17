@@ -49,13 +49,17 @@ export type Capability =
   | 'view_attendance'
   | 'manage_attendance'
   | 'manage_events'
+  | 'view_responses'
   | 'manage_calendar'
   | 'manage_documents'
   | 'post_board'
   | 'manage_polls'
+  | 'view_inventory'
   | 'manage_inventory'
   | 'manage_offices'
+  | 'view_lists'
   | 'manage_lists'
+  | 'view_mail'
   | 'send_mail'
   | 'manage_sponsors'
   | 'manage_companies'
@@ -69,6 +73,7 @@ export type Capability =
   | 'manage_personal'
   | 'create_users'
   | 'manage_former'
+  | 'view_passive'
   | 'manage_passive'
   | 'promote_users'
   | 'review_reports'
@@ -684,7 +689,7 @@ export interface RoleAdmin extends RoleInfo {
   extra_users?: number;
   system: boolean;
   deletable: boolean;
-  /** Anwärter-Rolle als Zusatzrolle: wird bei der Aufnahme als Mitglied entfernt; fehlen bei älteren Servern */
+  /** Anwärter-Rolle (als Grund- oder Zusatzrolle, Aufnahmen); fehlen bei älteren Servern */
   admission_extra?: boolean;
   /** Voraussetzung für die Aufnahme: Teilnahmen an Terminen dieser Art (null: keine) … */
   admission_kind?: string | null;
@@ -975,7 +980,7 @@ export interface EventResponses {
   until: string;
   open: boolean;
   can_respond: boolean;
-  /** Sieht die Namen (manage_calendar) */
+  /** Sieht die Namen (view_responses) */
   can_list: boolean;
 }
 
@@ -2911,7 +2916,7 @@ export const api = {
   /** Einen freien Namen in allen Amtszeiten mit dem Konto verknüpfen */
   linkOfficeName: (name: string, user_id: number) => request<{ linked: number }>('POST', '/offices/link', { name, user_id }),
 
-  // Listen (Issue #121): nur mit manage_lists
+  // Listen (Issue #121): ansehen mit view_lists, ändern mit manage_lists
   lists: () => request<PrintListSummary[]>('GET', '/lists'),
   list: (id: number) => request<PrintList>('GET', `/lists/${id}`),
   createList: (data: PrintListInput) => request<PrintList>('POST', '/lists', data),

@@ -1384,7 +1384,7 @@ final class ApiScenario
         [$s, $d] = $this->req('PUT', "/lists/$id", ['title' => 'Kptest', 'columns' => $columns, 'rows' => [], 'updated_at' => '2000-01-01T00:00:00+00:00']);
         $c->ok($s === 409 && ($d['code'] ?? '') === 'conflict', 'Veralteter Stand → 409 conflict, nichts überschrieben');
         [, $roles] = $this->req('GET', '/admin/roles');
-        $c->ok(($roles = array_column((array) $roles, 'capabilities', 'key'))['lists'] === self::caps(['member', 'manage_lists']), 'Standardrolle „Listen verwalten“');
+        $c->ok(($roles = array_column((array) $roles, 'capabilities', 'key'))['lists'] === self::caps(['member', 'view_lists', 'manage_lists']), 'Standardrolle „Listen verwalten“');
         $this->req('PATCH', "/members/$m/role", ['extra_roles' => ['lists']]);
         $this->d->actAs($m);
         [$s, $d] = $this->req('GET', "/lists/$id");
@@ -1431,7 +1431,7 @@ final class ApiScenario
         }
         $c->ok($this->req('GET', '/mails')[0] === 200 && $this->req('GET', '/mails/999999999')[0] === 404, 'Verlauf; unbekannte Mail → 404');
         [, $roles] = $this->req('GET', '/admin/roles');
-        $c->ok((array_column((array) $roles, 'capabilities', 'key')['mail'] ?? null) === self::caps(['member', 'send_mail']), 'Standardrolle „E-Mails verwalten“');
+        $c->ok((array_column((array) $roles, 'capabilities', 'key')['mail'] ?? null) === self::caps(['member', 'view_mail', 'send_mail']), 'Standardrolle „E-Mails verwalten“');
         $this->req('PUT', '/admin/features', ['mail' => false]);
         [$s, $d] = $this->req('GET', '/mails/options');
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');
@@ -1577,7 +1577,7 @@ final class ApiScenario
 
         $this->d->actAs($admin);
         [, $roles] = $this->req('GET', '/admin/roles');
-        $c->ok((array_column((array) $roles, 'capabilities', 'key')['passive'] ?? null) === self::caps(['member', 'manage_passive']), 'Standardrolle „Passive verwalten“');
+        $c->ok((array_column((array) $roles, 'capabilities', 'key')['passive'] ?? null) === self::caps(['member', 'view_passive', 'manage_passive']), 'Standardrolle „Passive verwalten“');
         $c->ok($this->req('DELETE', "/passive-members/$id")[0] === 200 && $this->req('GET', "/passive-members/$id")[0] === 404, 'Aufräumen: Passiven löschen');
     }
 
