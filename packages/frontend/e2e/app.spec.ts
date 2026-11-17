@@ -1294,7 +1294,12 @@ test('Eigene Leiste für Gäste: Mitglieder unten statt unter „Intern“, Ange
     await expect(tabbar.getByRole('button', { name: 'Intern' })).toBeVisible();
     await expect(tabbar.getByRole('button', { name: 'Mitglieder' })).toHaveCount(0);
 
-    // Gast ohne Anmeldung: Mitglieder unten und als Startseite.
+    // Gast ohne Anmeldung: Mitglieder unten und als Startseite. Ohne Abmelden über die App weiß der Service Worker nichts
+    // vom Wechsel und zeigte zuerst die gespeicherte Seite des Admins; sie neu zu laden, verhindert evtl. die Grenze von
+    // drei Neuladungen je Minute (pageReload.ts). Wie auf einem neuen Gerät: ohne gespeicherte Seiten.
+    await page.evaluate(async () => {
+      for (const key of await caches.keys()) await caches.delete(key);
+    });
     await page.context().clearCookies();
     await page.goto('/app/');
     await expect(tabbar.getByRole('button', { name: 'Mitglieder' })).toHaveAttribute('aria-current', 'page');
