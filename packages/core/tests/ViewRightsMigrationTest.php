@@ -63,7 +63,7 @@ final class ViewRightsMigrationTest extends TestCase
 
         $this->assertEqualsCanonicalizing($public, $caps($a), 'Mitgliederbereich entzogen: nur das Öffentliche');
         $this->assertEqualsCanonicalizing([...Roles::MEMBER_DEFAULTS, ...Roles::ADDED_VIEW, 'manage_events'], $caps($b));
-        $this->assertEqualsCanonicalizing([...Roles::MEMBER_DEFAULTS, ...Roles::ADDED_VIEW, 'manage_documents'], $caps($c));
+        $this->assertEqualsCanonicalizing([...Roles::MEMBER_DEFAULTS, ...Roles::ADDED_VIEW, 'view_restricted_documents', 'manage_documents'], $caps($c));
         $this->assertEqualsCanonicalizing([...Roles::MEMBER_DEFAULTS, ...Roles::ADDED_VIEW], $caps($d), 'Zusatzrolle, ihr Recht entzogen');
         $this->assertEqualsCanonicalizing([...Roles::CANDIDATE_DEFAULTS, 'view_intern'], $caps($e));
         $this->assertEqualsCanonicalizing($public, $caps($f), 'Kalender entzogen: auch das Brett nicht mehr');
@@ -75,7 +75,7 @@ final class ViewRightsMigrationTest extends TestCase
         $app->roles()->update(Roles::MEMBER, ['capabilities' => array_values(array_diff(TestApp::caps(['member']), ['view_catalog']))]);
         $again = TestApp::create($db, $users, settings: $settings, features: false);
         $this->assertNotContains('view_catalog', $again->roles()->find(Roles::MEMBER)['capabilities'] ?? []);
-        $this->assertEqualsCanonicalizing([...Roles::MEMBER_DEFAULTS, ...Roles::ADDED_VIEW, 'manage_documents'], [...$caps($c), 'view_catalog'], 'Ausnahmen bleiben');
+        $this->assertEqualsCanonicalizing([...Roles::MEMBER_DEFAULTS, ...Roles::ADDED_VIEW, 'view_restricted_documents', 'manage_documents'], [...$caps($c), 'view_catalog'], 'Ausnahmen bleiben');
     }
 
     public function testNewInstallationNeedsNoMigration(): void

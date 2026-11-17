@@ -1191,7 +1191,7 @@ final class Api
             new Route('POST', '/lists/{id}/sync-members', Cap::ManageLists, fn (Request $r) => $a->lists()->syncMembers($this->user(), $r->id(), Input::bool($r->input('apply'))), 'lists', $denyRights),
 
             // Dokumente (Issue #2): sichtbare für Mitglieder, Pflege mit manage_documents; Dateien Base64 im JSON
-            new Route('GET', '/documents', [Cap::ViewDocuments, Cap::ManageDocuments], fn () => $a->documents()->list($a->viewer()), 'documents', $denyView),
+            new Route('GET', '/documents', [Cap::ViewDocuments, Cap::ViewRestrictedDocuments], fn () => $a->documents()->list($a->viewer()), 'documents', $denyView),
             new Route('POST', '/documents', Cap::ManageDocuments, fn (Request $r) => Response::created($a->documents()->create($r->body, $this->user()->id)), 'documents', $denyRights),
             new Route('PATCH', '/documents/{id}', Cap::ManageDocuments, fn (Request $r) => $a->documents()->update($r->id(), $r->body), 'documents', $denyRights),
             new Route('POST', '/documents/{id}/file', Cap::ManageDocuments, fn (Request $r) => $a->documents()->replaceFile($r->id(), $r->input('file'), $this->user()->id), 'documents', $denyRights),
@@ -1315,14 +1315,14 @@ final class Api
 
             // Umfragen (Issue #4): Mitglieder lesen und antworten (nur solange die Umfrage läuft), manage_polls verwaltet;
             // nur beim Anlegen eine Benachrichtigung. Antworten anonymer Umfragen nie mit Namen oder IDs (PollService).
-            new Route('GET', '/polls', [Cap::VotePolls, Cap::ManagePolls], fn () => $a->polls()->list($this->user()), 'polls', $denyPolls),
+            new Route('GET', '/polls', [Cap::VotePolls, Cap::ViewPollResults], fn () => $a->polls()->list($this->user()), 'polls', $denyPolls),
             new Route('POST', '/polls', Cap::ManagePolls, function (Request $r) use ($a) {
                 $poll = $a->polls()->create($this->user(), $r->body);
                 $creator = $this->user()->id;
                 $this->notify(static fn () => $a->pushTriggers()->pollCreated(['id' => (int) $poll['id'], 'title' => (string) $poll['title'], 'ends_at' => is_string($poll['ends_at']) ? $poll['ends_at'] : null], $creator));
                 return Response::created($poll);
             }, 'polls', $denyRights),
-            new Route('GET', '/polls/{id}', [Cap::VotePolls, Cap::ManagePolls], fn (Request $r) => $a->polls()->get($this->user(), $r->id()), 'polls', $denyPolls),
+            new Route('GET', '/polls/{id}', [Cap::VotePolls, Cap::ViewPollResults], fn (Request $r) => $a->polls()->get($this->user(), $r->id()), 'polls', $denyPolls),
             new Route('PATCH', '/polls/{id}', Cap::ManagePolls, fn (Request $r) => $a->polls()->update($this->user(), $r->id(), $r->body), 'polls', $denyRights),
             new Route('POST', '/polls/{id}/close', Cap::ManagePolls, fn (Request $r) => $a->polls()->close($this->user(), $r->id()), 'polls', $denyRights),
             new Route('DELETE', '/polls/{id}', Cap::ManagePolls, function (Request $r) use ($a) {

@@ -22,7 +22,7 @@ Tippe unten auf **Verwaltung** und dann auf **{bereich.polls}**. Auch am {bereic
 2. Wähle bei **Art**: **Eine Antwort**, **Mehrere Antworten möglich** oder **Freitext**.
 3. Bei **Eine Antwort** und **Mehrere Antworten möglich**: Trage unter **Antwortmöglichkeiten** mindestens zwei verschiedene ein. Mit **+ Möglichkeit** kommt eine weitere dazu, **×** entfernt eine.
 4. Wähle unter **Antworten**: **Namentlich** oder **Anonym**.
-5. Wähle bei **Wer sieht die Ergebnisse?**: **Alle, sobald sie geantwortet haben**, **Alle nach dem Ende** oder **Nur die Verwalter der Umfragen**.
+5. Wähle bei **Wer sieht die Ergebnisse?**: **Alle, sobald sie geantwortet haben**, **Alle nach dem Ende** oder **Nur wer alle Ergebnisse sehen darf**.
 6. Trage bei Bedarf ein **Ende (optional)** mit Datum und Uhrzeit ein. Ohne Ende läuft die Umfrage, bis jemand sie beendet.
 7. Tippe auf **Veröffentlichen** und bestätige die Nachfrage.
 
@@ -50,7 +50,7 @@ Die Umfrage steht danach sofort am {bereich.board} und im Banner der {rolle.memb
 - 24 Stunden vor dem Ende erinnert die App einmal alle, die noch nicht geantwortet haben. Endet die Umfrage schon innerhalb von 24 Stunden nach dem Veröffentlichen, entfällt die Erinnerung. Verschiebst du das Ende auf später als 24 Stunden, gibt es wieder eine Erinnerung.
 - Ändern verschickt keine neue Benachrichtigung. Wer die Umfrage auf seinem Gerät ausgeblendet hatte, sieht sie danach wieder im Banner.
 - Bei **Anonym** sieht niemand, wer was geantwortet hat, auch du nicht. Bei **Namentlich** stehen die Namen bei den Ergebnissen.
-- Wer {bereich.polls} verwalten darf, sieht die Ergebnisse immer, auch bei **Nur die Verwalter der Umfragen** und schon während die Umfrage läuft.
+- Wer {bereich.polls} verwalten darf oder das Recht **{bereich.polls}: alle Ergebnisse sehen** hat, sieht die Ergebnisse immer, auch bei **Nur wer alle Ergebnisse sehen darf** und schon während die Umfrage läuft.
 - Ändern, beenden und löschen darf jede und jeder mit diesem Recht, nicht nur, wer die Umfrage angelegt hat.
 - Grenzen: Beschreibung höchstens 1000 Zeichen, 2 bis 20 Antwortmöglichkeiten mit je höchstens 100 Zeichen, keine doppelt. Das Ende muss in der Zukunft liegen.
 - An {bereich.polls} nehmen nur {rolle.member} teil, nicht z. B. Anwärter.

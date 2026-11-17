@@ -62,7 +62,7 @@ final class PollBlock implements BlockType
      */
     private function poll(array $data, ?User $viewer): ?array
     {
-        if (!$this->app->features()->enabled('polls') || !(PollService::isParticipant($viewer) || PollService::canManage($viewer))) {
+        if (!$this->app->features()->enabled('polls') || !(PollService::isParticipant($viewer) || PollService::seesAllResults($viewer))) {
             return null;
         }
         /** @var User $viewer */

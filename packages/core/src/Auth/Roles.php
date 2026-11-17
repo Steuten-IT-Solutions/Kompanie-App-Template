@@ -72,8 +72,8 @@ final class Roles
      * @var array<string, string[]>
      */
     public const LEGACY = [
-        self::ORGANIZER => [...self::MEMBER_DEFAULTS, ...self::ADDED_VIEW, 'manage_events', 'manage_documents'],
-        self::MANAGER => [...self::MEMBER_DEFAULTS, ...self::ADDED_VIEW, 'manage_events', 'manage_documents', 'view_points', 'manage_points', 'view_penalties', 'manage_penalties'],
+        self::ORGANIZER => [...self::MEMBER_DEFAULTS, ...self::ADDED_VIEW, 'manage_events', 'view_restricted_documents', 'manage_documents'],
+        self::MANAGER => [...self::MEMBER_DEFAULTS, ...self::ADDED_VIEW, 'manage_events', 'view_restricted_documents', 'manage_documents', 'view_points', 'manage_points', 'view_penalties', 'manage_penalties'],
     ];
 
     /** Frühere feste Rolle „Anwärter“: interner Kalender und das Brett (wie damals mit dem Kalender), dazu das Öffentliche. */
@@ -116,8 +116,10 @@ final class Roles
         Capability::ViewResponses,
         Capability::ManageCalendar,
         Capability::ManageNews,
+        Capability::ViewRestrictedDocuments,
         Capability::ManageDocuments,
         Capability::PostBoard,
+        Capability::ViewPollResults,
         Capability::ManagePolls,
         Capability::ViewLists,
         Capability::ManageLists,

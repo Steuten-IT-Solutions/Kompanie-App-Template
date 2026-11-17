@@ -26,7 +26,7 @@ const TYPE_LABELS: Record<PollType, string> = { single: 'Eine Antwort', multiple
 const RESULT_LABELS: Record<PollResults, string> = {
   after_vote: 'Alle, sobald sie geantwortet haben',
   after_end: 'Alle nach dem Ende',
-  managers: 'Nur die Verwalter der Umfragen',
+  managers: 'Nur wer alle Ergebnisse sehen darf',
 };
 
 /** Wann die Ergebnisse sichtbar werden – vor dem Antworten deutlich gezeigt. */
@@ -37,7 +37,7 @@ function resultsHint(poll: Poll): string {
     case 'after_end':
       return 'Die Ergebnisse sehen alle Mitglieder erst nach dem Ende der Umfrage.';
     default:
-      return 'Die Ergebnisse sehen nur die Verwalter der Umfragen.';
+      return 'Die Ergebnisse sehen nur, wer alle Ergebnisse sehen darf.';
   }
 }
 
@@ -55,7 +55,7 @@ function PrivacyNote({ poll }: { poll: Poll }) {
         {poll.anonymous
           ? 'Deine Antwort wird niemandem angezeigt. Gezählt wird sie nur in den Ergebnissen, ohne Namen.'
           : poll.results === 'managers'
-            ? 'Die Verwalter der Umfragen sehen, wer was geantwortet hat.'
+            ? 'Wer alle Ergebnisse sehen darf, sieht, wer was geantwortet hat.'
             : 'Wer die Ergebnisse sieht, sieht auch, wer was geantwortet hat.'}
       </p>
       <p className="small">{resultsHint(poll)}</p>

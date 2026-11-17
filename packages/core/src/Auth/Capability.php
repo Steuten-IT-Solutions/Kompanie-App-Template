@@ -86,14 +86,15 @@ enum Capability: string
     case ViewResponses = 'view_responses';
     /** Termine des internen Kalenders in der App pflegen (Bereich Kalender mit der Quelle „In der App“; setzt view_responses voraus). */
     case ManageCalendar = 'manage_calendar';
-    /**
-     * Dokumente pflegen und alle Dokumente sehen, auch die mit eingeschränkter Sichtbarkeit.
-     * Die Dokumente selbst kommen mit Issue #2.
-     */
+    /** Auch Dokumente sehen, die nur für die Pflege bestimmt sind (eingeschränkte Sichtbarkeit), ohne sie zu pflegen. */
+    case ViewRestrictedDocuments = 'view_restricted_documents';
+    /** Dokumente hochladen, ändern und löschen (Bereich Dokumente, Issue #2; setzt view_restricted_documents voraus). */
     case ManageDocuments = 'manage_documents';
     /** Dringende Nachrichten ans Schwarze Brett schreiben, ändern und vorzeitig löschen (Bereich Schwarzes Brett, Issue #5). */
     case PostBoard = 'post_board';
-    /** Umfragen anlegen, ändern, beenden und löschen, Ergebnisse immer sehen (Bereich Umfragen, Issue #4). */
+    /** Ergebnisse aller Umfragen immer sehen, auch laufender und solcher, deren Ergebnisse sonst verborgen sind (ohne sie zu verwalten). */
+    case ViewPollResults = 'view_poll_results';
+    /** Umfragen anlegen, ändern, beenden und löschen (Bereich Umfragen, Issue #4; setzt view_poll_results voraus). */
     case ManagePolls = 'manage_polls';
     /** Inventar mit Lagerorten und Verlauf sehen (ohne zu ändern). */
     case ViewInventory = 'view_inventory';
@@ -228,6 +229,8 @@ enum Capability: string
         'review_reports' => 'view_reports',
         'create_users' => 'view_accounts',
         'promote_users' => 'view_accounts',
+        'manage_documents' => 'view_restricted_documents',
+        'manage_polls' => 'view_poll_results',
     ];
 
     /**

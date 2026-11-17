@@ -16,7 +16,7 @@ Tippe unten auf **Intern** und dann auf **{bereich.documents}**; mit **‹ Inter
 - **Kategorien**: je eine Zeile mit dem Namen und in Klammern der Zahl der {bereich.documents}, z. B. „Protokolle (2)“. Was keiner Kategorie angehört, steht zuletzt unter **Weitere {bereich.documents}**. Gibt es gar keine Kategorien, stehen alle {bereich.documents} in einer Liste.
 - **Dokument**: Titel, **Stand** (das Datum des Dokuments), die Art der Datei (z. B. PDF, Bild, Word) und ihre Größe.
 - **Auch offline verfügbar**: steht bei {bereich.documents}, die schon auf deinem Gerät gespeichert sind.
-- **Eingeschränkt**: steht bei {bereich.documents}, die nur sieht, wer {bereich.documents} pflegt. Andere {rolle.member} sehen sie gar nicht.
+- **Eingeschränkt**: steht bei {bereich.documents}, die nur sieht, wer {bereich.documents} pflegt oder das Recht **Eingeschränkte {bereich.documents} sehen** hat. Andere {rolle.member} sehen sie gar nicht.
 - **{bereich.documents} verwalten**: nur, wenn du {bereich.documents} pflegen darfst. Dort lädst du {bereich.documents} hoch und änderst sie.
 
 ## So gehst du vor
