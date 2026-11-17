@@ -73,6 +73,7 @@ export type Capability =
   | 'manage_personal'
   | 'create_users'
   | 'manage_former'
+  | 'view_passive'
   | 'manage_passive'
   | 'promote_users'
   | 'review_reports'

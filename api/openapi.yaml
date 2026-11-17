@@ -5292,7 +5292,7 @@ paths:
       description: |
         Nach Nachname, dazu die Mitglieder, die Betreuer sein können. Adresse, Telefon, E-Mail und Geburtsdatum nur mit
         `view_personal` (sonst fehlen sie). Bereich `passive` aus → 403 `feature_disabled`.
-      x-capability: manage_passive
+      x-capability: view_passive
       responses:
         '200':
           description: OK
@@ -5348,7 +5348,7 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Ein Passiver
-      x-capability: manage_passive
+      x-capability: view_passive
       responses:
         '200':
           description: OK
@@ -5397,7 +5397,7 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Einstellungen der Beiträge der Passiven (Jahresbeitrag als Vorschlag, Zahlungsarten)
-      x-capability: manage_passive
+      x-capability: view_passive
       responses:
         '200':
           description: OK
@@ -9729,6 +9729,7 @@ components:
                       manage_personal,
                       create_users,
                       manage_former,
+                      view_passive,
                       manage_passive,
                       promote_users,
                       review_reports,
@@ -9820,6 +9821,7 @@ components:
                   manage_personal,
                   create_users,
                   manage_former,
+                  view_passive,
                   manage_passive,
                   promote_users,
                   review_reports,
@@ -9918,6 +9920,7 @@ components:
                 manage_personal,
                 create_users,
                 manage_former,
+                view_passive,
                 manage_passive,
                 promote_users,
                 review_reports,
@@ -10827,6 +10830,7 @@ components:
           manage_personal,
           create_users,
           manage_former,
+          view_passive,
           manage_passive,
           promote_users,
           review_reports,

@@ -1577,7 +1577,7 @@ final class ApiScenario
 
         $this->d->actAs($admin);
         [, $roles] = $this->req('GET', '/admin/roles');
-        $c->ok((array_column((array) $roles, 'capabilities', 'key')['passive'] ?? null) === self::caps(['member', 'manage_passive']), 'Standardrolle „Passive verwalten“');
+        $c->ok((array_column((array) $roles, 'capabilities', 'key')['passive'] ?? null) === self::caps(['member', 'view_passive', 'manage_passive']), 'Standardrolle „Passive verwalten“');
         $c->ok($this->req('DELETE', "/passive-members/$id")[0] === 200 && $this->req('GET', "/passive-members/$id")[0] === 404, 'Aufräumen: Passiven löschen');
     }
 

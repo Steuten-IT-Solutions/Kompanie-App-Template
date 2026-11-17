@@ -1,7 +1,8 @@
 ---
 titel: Passive verwalten
 reihenfolge: 75
-rechte: [manage_passive]
+rechte: []
+einrecht: [view_passive, manage_passive]
 bereiche: [passive]
 ---
 Hier führst du die interne Liste eurer passiven Mitglieder: Name, Vorname, Adresse, Telefon, E-Mail-Adresse und Geburtsdatum, dazu je ein Mitglied als Betreuer. Außerdem trägst du ein, wer den Beitrag für ein Jahr bezahlt hat. Passive sind keine Konten. Sie bekommen nie einen Zugang zur App, stehen in keiner Mitgliederliste und haben keine {bereich.points}, {bereich.penalties} oder {bereich.attendance}.
@@ -54,6 +55,7 @@ Frühere Zahlungen behalten ihre Zahlungsart, auch wenn du sie aus der Auswahl e
 2. Bestätige die Frage. Der Eintrag ist dann mit allen Angaben und Zahlungen gelöscht.
 
 ## Gut zu wissen
+- **Nur sehen:** Mit dem Recht **Passive sehen** ohne **Passive verwalten** siehst du die Liste mit Betreuer, Beitrag und Zahlungen. **+ Passiven anlegen**, **Zahlung eintragen**, **Ändern**, **Bearbeiten**, **Löschen** und die Einstellung zu Beitrag und Zahlungsarten fehlen dann.
 - Adresse, Telefon, E-Mail-Adresse und Geburtsdatum sind persönliche Angaben. Sie sieht nur, wer das Recht **Persönliche Angaben sehen** hat, und ändert nur, wer **Persönliche Angaben pflegen** hat. Ohne diese Rechte siehst und pflegst du nur die Namen und den Betreuer.
 - Der Betreuer sieht seine eigenen Passiven unter **Meins → Meine Passiven** mit allen Angaben, auch ohne die Rechte für persönliche Angaben. Ändern kann er dort nichts.
 - Zahlungen trägt ein, wer **Passive verwalten** darf, auch ohne die Rechte für persönliche Angaben. Der Betreuer sieht unter **Meins → Meine Passiven**, ob der Beitrag für das laufende Jahr bezahlt ist.

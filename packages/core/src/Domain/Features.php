@@ -71,7 +71,7 @@ final class Features
         // nur in der eigenständigen Version (HOSTED).
         'website' => ['label' => 'Webseite', 'description' => 'Eine Webseite für Besucher unter eurer Adresse, gebaut aus euren Seiten, die für alle sichtbar sind; ohne Anmeldung und ohne Cookies.', 'requires' => ['pages'], 'setup' => null, 'role' => ['member', 'manage_website']],
         // Passive: interne Liste passiver Mitglieder ohne Konto, mit Betreuer (Domain\PassiveMemberService).
-        'passive' => ['label' => 'Passive', 'description' => 'Interne Liste eurer passiven Mitglieder mit Adresse, Telefon, E-Mail und Geburtsdatum, je mit einem Mitglied als Betreuer; Passive bekommen keinen Zugang zur App.', 'requires' => [], 'setup' => null, 'role' => ['member', 'manage_passive']],
+        'passive' => ['label' => 'Passive', 'description' => 'Interne Liste eurer passiven Mitglieder mit Adresse, Telefon, E-Mail und Geburtsdatum, je mit einem Mitglied als Betreuer; Passive bekommen keinen Zugang zur App.', 'requires' => [], 'setup' => null, 'role' => ['member', 'view_passive', 'manage_passive']],
     ];
 
     /**

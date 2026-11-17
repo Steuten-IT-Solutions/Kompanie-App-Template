@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { api, type PassiveInput, type PassiveList, type PassiveMember, type PassivePayment } from '../api';
+import { api, can, type PassiveInput, type PassiveList, type PassiveMember, type PassivePayment } from '../api';
 import { addressInput, EMPTY_ADDRESS, formatAddress, mapLinkTarget, mapPlatform, mapUrl, type Address } from '../address';
 import { normalizeEmail } from '../email';
 import { normalizePhone } from '../phone';
@@ -427,6 +427,8 @@ function PassiveForm({
  * sehen und mit manage_personal ändern (der Server prüft beides).
  */
 export function PassiveAdmin({ onToast }: { onToast: (msg: string) => void }) {
+  // Nur sehen (view_passive): Liste, Beiträge und Angaben; anlegen, ändern, Zahlungen und löschen mit manage_passive
+  const editable = can('manage_passive');
   const { data, error, loading, reload } = useAsync(() => api.passiveMembers(), [], 'passive-members');
   const [editing, setEditing] = useState<number | 'new' | null>(null);
   const [paying, setPaying] = useState<number | null>(null);
@@ -484,13 +486,15 @@ export function PassiveAdmin({ onToast }: { onToast: (msg: string) => void }) {
         {data.passives.length > 0 && `, Beitrag ${year}: ${paidCount} bezahlt, ${data.passives.length - paidCount} offen`}
       </p>
       {editing === null && paying === null && errorBox}
-      <PaymentSettings
-        feeCents={feeCents}
-        methods={methods}
-        busy={busy}
-        onSave={(settings) => run(() => api.updatePassiveSettings(settings), 'Gespeichert')}
-      />
-      {editing === 'new' ? (
+      {editable && (
+        <PaymentSettings
+          feeCents={feeCents}
+          methods={methods}
+          busy={busy}
+          onSave={(settings) => run(() => api.updatePassiveSettings(settings), 'Gespeichert')}
+        />
+      )}
+      {!editable ? null : editing === 'new' ? (
         <>
           {errorBox}
           <PassiveForm
@@ -618,39 +622,43 @@ export function PassiveAdmin({ onToast }: { onToast: (msg: string) => void }) {
                   ) : (
                     <div className="row-sub passive-payment">
                       <PaymentLine year={year} payment={paymentOf(p, year)} />{' '}
-                      <button
-                        type="button"
-                        className="link-button"
-                        disabled={busy}
-                        onClick={() => {
-                          setFormError(null);
-                          setEditing(null);
-                          setPaying(p.id);
-                        }}
-                      >
-                        {paymentOf(p, year) ? 'Ändern' : 'Zahlung eintragen'}
-                      </button>
+                      {editable && (
+                        <button
+                          type="button"
+                          className="link-button"
+                          disabled={busy}
+                          onClick={() => {
+                            setFormError(null);
+                            setEditing(null);
+                            setPaying(p.id);
+                          }}
+                        >
+                          {paymentOf(p, year) ? 'Ändern' : 'Zahlung eintragen'}
+                        </button>
+                      )}
                     </div>
                   )}
                   <PassiveDetails p={p} />
-                  <div className="row-actions">
-                    <IconButton
-                      icon="edit"
-                      label="Bearbeiten"
-                      disabled={busy}
-                      onClick={() => {
-                        setFormError(null);
-                        setEditing(p.id);
-                      }}
-                    />
-                    <IconButton
-                      icon="delete"
-                      label="Löschen"
-                      variant="danger"
-                      disabled={busy}
-                      onClick={async () => (await confirmAsk(`„${p.name}“ löschen?`)) && run(() => api.deletePassive(p.id), 'Gelöscht')}
-                    />
-                  </div>
+                  {editable && (
+                    <div className="row-actions">
+                      <IconButton
+                        icon="edit"
+                        label="Bearbeiten"
+                        disabled={busy}
+                        onClick={() => {
+                          setFormError(null);
+                          setEditing(p.id);
+                        }}
+                      />
+                      <IconButton
+                        icon="delete"
+                        label="Löschen"
+                        variant="danger"
+                        disabled={busy}
+                        onClick={async () => (await confirmAsk(`„${p.name}“ löschen?`)) && run(() => api.deletePassive(p.id), 'Gelöscht')}
+                      />
+                    </div>
+                  )}
                 </div>
               </li>
             ),

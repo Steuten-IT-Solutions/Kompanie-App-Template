@@ -286,9 +286,15 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         short: 'Ehemalige verwalten',
       },
       {
-        key: 'manage_passive',
+        key: 'view_passive',
         label:
-          'Passive verwalten: Liste der Passiven, anlegen, Namen und Betreuer ändern, löschen (Adresse, Telefon, E-Mail und Geburtsdatum nur mit den Rechten für persönliche Angaben)',
+          'Passive sehen: Liste der Passiven mit Betreuer und Beiträgen (Adresse, Telefon, E-Mail und Geburtsdatum nur mit den Rechten für persönliche Angaben)',
+        short: 'Passive sehen',
+        features: ['passive'],
+      },
+      {
+        key: 'manage_passive',
+        label: 'Passive verwalten: anlegen, Namen und Betreuer ändern, Beiträge eintragen, löschen',
         short: 'Passive verwalten',
         features: ['passive'],
       },

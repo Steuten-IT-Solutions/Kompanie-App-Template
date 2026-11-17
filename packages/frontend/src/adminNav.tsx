@@ -28,7 +28,7 @@ const canCompanies = (): boolean => !!config?.features.companies && can('manage_
 const canSponsors = (): boolean => !!config?.features.sponsors && can('manage_sponsors');
 const canPages = (): boolean => !!config?.features.pages && can('manage_pages');
 const canWebsite = (): boolean => !!config?.features.website && can('manage_website');
-const canPassive = (): boolean => !!config?.features.passive && can('manage_passive');
+const canPassive = (): boolean => !!config?.features.passive && can('view_passive');
 
 /**
  * Bericht als PDF: wer mindestens einen Bereich des Berichts verwalten darf (wie ReportService im Kern: Mitglieder mit

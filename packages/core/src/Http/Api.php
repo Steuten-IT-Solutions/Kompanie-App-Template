@@ -1451,18 +1451,18 @@ final class Api
                 }
                 return $out;
             }, null, $denyManage),
-            // Passive (Bereich passive): eigene Einträge ohne Konto. Liste und Pflege mit manage_passive; Adresse, Telefon,
+            // Passive (Bereich passive): eigene Einträge ohne Konto. Liste mit view_passive, Pflege mit manage_passive; Adresse, Telefon,
             // E-Mail und Geburtsdatum nur mit view_personal sehen und mit manage_personal ändern (prüft PassiveMemberService).
-            new Route('GET', '/passive-members', Cap::ManagePassive, fn () => $a->passives()->list($this->user()), 'passive', $denyRights),
+            new Route('GET', '/passive-members', Cap::ViewPassive, fn () => $a->passives()->list($this->user()), 'passive', $denyRights),
             new Route('POST', '/passive-members', Cap::ManagePassive, fn (Request $r) => Response::created($a->passives()->create($this->user(), (array) $r->body)), 'passive', $denyRights),
-            new Route('GET', '/passive-members/{id}', Cap::ManagePassive, fn (Request $r) => $a->passives()->get($this->user(), $r->id()), 'passive', $denyRights),
+            new Route('GET', '/passive-members/{id}', Cap::ViewPassive, fn (Request $r) => $a->passives()->get($this->user(), $r->id()), 'passive', $denyRights),
             new Route('PATCH', '/passive-members/{id}', Cap::ManagePassive, fn (Request $r) => $a->passives()->update($this->user(), $r->id(), (array) $r->body), 'passive', $denyRights),
             new Route('DELETE', '/passive-members/{id}', Cap::ManagePassive, function (Request $r) use ($a) {
                 $a->passives()->delete($r->id());
                 return ['deleted' => true];
             }, 'passive', $denyRights),
             // Beitrag: je Passivem und Jahr eine Zahlung (Betrag, Datum, Zahlungsart); Jahresbeitrag und Zahlungsarten einrichten
-            new Route('GET', '/passive-members/settings', Cap::ManagePassive, fn () => $a->passives()->settings(), 'passive', $denyRights),
+            new Route('GET', '/passive-members/settings', Cap::ViewPassive, fn () => $a->passives()->settings(), 'passive', $denyRights),
             new Route('PATCH', '/passive-members/settings', Cap::ManagePassive, fn (Request $r) => $a->passives()->setSettings((array) $r->body), 'passive', $denyRights),
             new Route('POST', '/passive-members/{id}/payments', Cap::ManagePassive, fn (Request $r) => Response::created($a->passives()->addPayment($this->user(), $r->id(), (array) $r->body)), 'passive', $denyRights),
             new Route('PATCH', '/passive-payments/{id}', Cap::ManagePassive, fn (Request $r) => $a->passives()->updatePayment($this->user(), $r->id(), (array) $r->body), 'passive', $denyRights),
