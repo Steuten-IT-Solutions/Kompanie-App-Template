@@ -2524,17 +2524,17 @@ paths:
       summary: Gültige Einträge am Schwarzen Brett, neueste zuerst (Issue #5, #172)
       description: |
         Öffentlich: Nachrichten mit `audience: public` sehen alle, auch ohne Anmeldung; interne (`audience: members`) nur
-        Konten mit `view_board` (Mitglieder und Anwärter) sowie alle mit `post_board`. Nachrichten mit `audience: company`
+        Konten mit `view_board` (Mitglieder und Anwärter) sowie alle mit `view_board_history`. Nachrichten mit `audience: company`
         sehen nur Konten mit `view_board`, die einer der Kompanien aus `audience_ids` zugeordnet sind, mit `audience:
-        person` nur die ausgewählten Konten (sofern `view_board`); alle mit `post_board` sehen jede. Ohne `view_board` enthält die Liste
+        person` nur die ausgewählten Konten (sofern `view_board`); alle mit `view_board_history` (`post_board` setzt es voraus) sehen jede. Ohne `view_board` enthält die Liste
         daher nur öffentliche Nachrichten (vor dieser Version: 401 ohne Anmeldung, 403 ohne Recht). Nur Einträge, deren
         `expires_at` noch nicht erreicht ist und die nicht gelöscht wurden. Abgelaufene und gelöschte Nachrichten bleiben
-        30 Tage im Verlauf (`GET /board/history`, nur `post_board`); danach löscht die Hintergrundaufgabe `board_cleanup`
+        30 Tage im Verlauf (`GET /board/history`, nur `view_board_history`); danach löscht die Hintergrundaufgabe `board_cleanup`
         sie endgültig. Die App blendet Einträge anhand von `expires_at` auch selbst aus (offline aus dem Speicher).
         Erst die Nachrichten (`kind: message`), neueste zuerst; danach für Mitglieder (Recht `member`) mit eingeschaltetem
         Bereich Umfragen jede laufende Umfrage (`kind: poll`, Issue #4) mit `has_voted`. Später können weitere Arten
-        dazukommen – Clients überspringen unbekannte. Mit `post_board` zusätzlich `last_edit` und `mail`.
-      x-capability: 'öffentlich (interne Nachrichten: view_board oder post_board)'
+        dazukommen – Clients überspringen unbekannte. Mit `view_board_history` zusätzlich `last_edit` und `mail`.
+      x-capability: 'öffentlich (interne Nachrichten: view_board oder view_board_history)'
       security: []
       responses:
         '200':
@@ -2657,7 +2657,7 @@ paths:
     get:
       tags: [Schwarzes Brett]
       summary: Abgelaufene und gelöschte Nachrichten der letzten 30 Tage (Verlauf, Issue #172)
-      x-capability: post_board
+      x-capability: view_board_history
       responses:
         '200':
           description: OK, zuletzt beendete zuerst
@@ -2680,7 +2680,7 @@ paths:
       description: |
         Jede Erstellung, Titel-, Inhalts- und Enddatumsänderung, jeder Mailversand und das vorzeitige Löschen mit Konto
         und Zeitpunkt, mit vorherigem und neuem Stand; dazu das Protokoll des Mailversands je Empfänger.
-      x-capability: post_board
+      x-capability: view_board_history
       responses:
         '200':
           description: OK
@@ -3726,8 +3726,8 @@ paths:
       summary: Kompanien in ihrer Reihenfolge (Issue #280)
       description: |
         Bereich `companies` aus → 403 `feature_disabled`. Ohne Anmeldung die Rechte der Rolle guest. `members` und
-        `member_count` nur mit Bereich Mitgliederliste und Recht view_directory, `member_ids` nur mit manage_companies.
-      x-capability: 'view_companies oder manage_companies'
+        `member_count` nur mit Bereich Mitgliederliste und Recht view_directory, `member_ids` nur mit view_company_members (`manage_companies` setzt es voraus).
+      x-capability: 'view_companies oder view_company_members'
       responses:
         '200':
           description: OK
@@ -5013,7 +5013,7 @@ paths:
       tags: [Verwaltung]
       summary: Mitglieder mit Summen
       description: Wer Dienstgrade bzw. Titel sieht (view_promotions bzw. view_titles), sieht zusätzlich frühere Mitglieder, die noch einen Dienstgrad bzw. Titel haben.
-      x-capability: 'view_points, view_penalties, view_promotions, view_titles, view_attendance, manage_companies, view_personal, create_users, manage_former oder promote_users (Punkte bzw. offene Beträge nur mit view_points bzw. view_penalties, sonst null)'
+      x-capability: 'view_points, view_penalties, view_promotions, view_titles, view_attendance, view_company_members, view_personal, view_accounts, manage_former (Punkte bzw. offene Beträge nur mit view_points bzw. view_penalties, sonst null)'
       parameters:
         - name: all
           in: query
@@ -5064,7 +5064,7 @@ paths:
       tags: [Verwaltung]
       summary: Mitglied mit Punkten und Strafen
       description: Mit Bereich Geburtstage und Recht `create_users` auch `birthday` (mit Jahr und den Schaltern der Person, null ohne Eintrag).
-      x-capability: 'view_points, view_penalties, view_promotions, view_titles, view_attendance, manage_companies, view_personal, create_users, manage_former oder promote_users (Punkte bzw. Strafen nur mit view_points bzw. view_penalties)'
+      x-capability: 'view_points, view_penalties, view_promotions, view_titles, view_attendance, view_company_members, view_personal, view_accounts, manage_former (Punkte bzw. Strafen nur mit view_points bzw. view_penalties)'
       responses:
         '200':
           description: OK
@@ -5277,7 +5277,7 @@ paths:
         Grenzen wie beim Löschen (Konten von Admins nur für Admins); zusätzlich alle Rechte der enthaltenen Bereiche
         (sonst 403), damit niemand über die Auskunft sieht, was ihm in der App verborgen ist: `manage_former`, `view_personal`,
         `view_points`, `view_penalties`, `view_promotions`, `view_titles`, `view_attendance`, `view_poll_results`,
-        `view_mail`, `view_lists`, `post_board`, `view_offices`, `view_responses`.
+        `view_mail`, `view_lists`, `view_board_history`, `view_offices`, `view_responses`.
       x-capability: view_accounts und die Rechte aller enthaltenen Bereiche (in der Regel Admins)
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }
@@ -8753,7 +8753,7 @@ components:
       description: |
         Sichtbarkeit: members (intern, wer das Brett liest: view_board), public (alle, auch ohne Anmeldung), company (wer
         das Brett liest und einer der Kompanien aus audience_ids angehört) oder person (nur die Konten aus audience_ids).
-        Alle mit post_board sehen jede Nachricht. Andere Werte → 400. Ältere Clients zeigen company und person wie intern
+        Alle mit view_board_history sehen jede Nachricht. Andere Werte → 400. Ältere Clients zeigen company und person wie intern
         an (der Server liefert sie trotzdem nur an die Berechtigten).
     BoardItem:
       type: object
@@ -8771,7 +8771,7 @@ components:
           {
             type: array,
             items: { $ref: '#/components/schemas/Block' },
-            description: 'Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur mit view_board bzw. post_board). Ältere Nachrichten: ein Textblock aus text.',
+            description: 'Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur mit view_board bzw. view_board_history). Ältere Nachrichten: ein Textblock aus text.',
           }
         excerpt: { type: string, description: 'Reiner Textauszug aller sichtbaren Blöcke' }
         author_name: { type: [string, 'null'], description: '„gelöschtes Konto“, wenn das Konto des Verfassers gelöscht wurde' }
@@ -8779,11 +8779,11 @@ components:
         updated_at: { type: string, format: date-time, description: 'Wechselt, wenn sich Titel, Inhalt oder Anhänge ändern' }
         expires_at: { type: string, format: date-time, description: 'Sichtbar bis (UTC); standardmäßig 24 Stunden nach created_at' }
         audience: { $ref: '#/components/schemas/BoardAudience' }
-        audience_ids: { type: array, items: { type: integer }, description: 'Nur mit post_board, bei company und person: die Auswahl' }
+        audience_ids: { type: array, items: { type: integer }, description: 'Nur mit view_board_history, bei company und person: die Auswahl' }
         audience_names:
           type: array
           items: { type: string }
-          description: 'Bei company: Namen der Kompanien (für alle, die die Nachricht lesen); bei person: Namen der Personen (nur mit post_board)'
+          description: 'Bei company: Namen der Kompanien (für alle, die die Nachricht lesen); bei person: Namen der Personen (nur mit view_board_history)'
         attachments:
           {
             type: array,
@@ -8791,7 +8791,7 @@ components:
             description: 'Dateianhänge; sehen alle, die die Nachricht sehen (bei öffentlichen auch ohne Anmeldung)',
           }
         last_edit:
-          description: 'Nur mit post_board: wer zuletzt Titel, Inhalt, Enddatum oder Sichtbarkeit geändert hat (null: unverändert)'
+          description: 'Nur mit view_board_history: wer zuletzt Titel, Inhalt, Enddatum oder Sichtbarkeit geändert hat (null: unverändert)'
           oneOf:
             - type: 'null'
             - type: object
@@ -8799,7 +8799,7 @@ components:
                 name: { type: [string, 'null'] }
                 at: { type: string, format: date-time }
         mail:
-          description: 'Nur mit post_board: Stand des Mailversands (null: ohne Mail)'
+          description: 'Nur mit view_board_history: Stand des Mailversands (null: ohne Mail)'
           oneOf: [{ $ref: '#/components/schemas/BoardMailSummary' }, { type: 'null' }]
     BoardMailSummary:
       type: object
@@ -9785,6 +9785,7 @@ components:
                       manage_calendar,
                       view_restricted_documents,
                       manage_documents,
+                      view_board_history,
                       post_board,
                       view_poll_results,
                       manage_polls,
@@ -9796,6 +9797,7 @@ components:
                       view_mail,
                       send_mail,
                       manage_sponsors,
+                      view_company_members,
                       manage_companies,
                       submit_gallery,
                       view_submissions,
@@ -9882,6 +9884,7 @@ components:
                   manage_calendar,
                   view_restricted_documents,
                   manage_documents,
+                  view_board_history,
                   post_board,
                   view_poll_results,
                   manage_polls,
@@ -9893,6 +9896,7 @@ components:
                   view_mail,
                   send_mail,
                   manage_sponsors,
+                  view_company_members,
                   manage_companies,
                   submit_gallery,
                   view_submissions,
@@ -9986,6 +9990,7 @@ components:
                 manage_calendar,
                 view_restricted_documents,
                 manage_documents,
+                view_board_history,
                 post_board,
                 view_poll_results,
                 manage_polls,
@@ -9997,6 +10002,7 @@ components:
                 view_mail,
                 send_mail,
                 manage_sponsors,
+                view_company_members,
                 manage_companies,
                 submit_gallery,
                 view_submissions,
@@ -10662,7 +10668,7 @@ components:
               type: array
               items: { $ref: '#/components/schemas/TitleRef' }
             companies:
-              description: Kompanien (nur mit Bereich Kompanien und Recht manage_companies)
+              description: Kompanien (nur mit Bereich Kompanien und Recht view_company_members)
               type: array
               items: { $ref: '#/components/schemas/CompanyRef' }
             birthday:
@@ -10906,6 +10912,7 @@ components:
           manage_calendar,
           view_restricted_documents,
           manage_documents,
+          view_board_history,
           post_board,
           view_poll_results,
           manage_polls,
@@ -10917,6 +10924,7 @@ components:
           view_mail,
           send_mail,
           manage_sponsors,
+          view_company_members,
           manage_companies,
           submit_gallery,
           view_submissions,
@@ -11221,7 +11229,7 @@ components:
       description: |
         Foto des Mitglieds oder null: `<App>/mitgliedsfoto/<id>?v=<Fassung>&s=128`. Die App ersetzt `s` bei Bedarf
         durch 480, 1024 oder 4096 (Originalauflösung, für die Großansicht nachgeladen; 404, wenn es sie nicht gibt). Ausgeliefert als image/jpeg an die Person selbst und an alle, die die Mitglieder in der Verwaltung
-        sehen (view_points, view_penalties, view_promotions, view_titles, view_attendance, manage_companies, view_personal, create_users, manage_former oder promote_users); mit dem
+        sehen (view_points, view_penalties, view_promotions, view_titles, view_attendance, view_company_members, view_personal, view_accounts, manage_former); mit dem
         Bereich directory an alle, auch ohne Anmeldung, wenn das Foto zu einem Mitglied oder Anwärter gehört (Issue #112,
         dann `Cache-Control: public`); sonst 401/403, im Wartungsmodus 503. Sonst `Cache-Control: private`, bei passender
         Fassung einen Tag; immer `X-Robots-Tag: noindex`. Die Adresse wechselt mit jedem Foto.
@@ -11632,7 +11640,7 @@ components:
               type: array
               items: { $ref: '#/components/schemas/DirectoryEntry' }
             member_count: { type: integer, description: Nur zusammen mit members }
-            member_ids: { type: array, items: { type: integer }, description: 'Nur mit manage_companies: alle Zugeordneten' }
+            member_ids: { type: array, items: { type: integer }, description: 'Nur mit view_company_members: alle Zugeordneten' }
 
     CompanyInput:
       type: object

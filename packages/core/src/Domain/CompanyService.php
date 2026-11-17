@@ -47,15 +47,15 @@ final class CompanyService
 
     /**
      * Alle Kompanien in ihrer Reihenfolge, für $viewer (null: ohne Anmeldung). Mitglieder (members, member_count) nur
-     * mit dem Bereich directory und view_directory; wer Kompanien verwaltet, bekommt dazu die IDs aller
-     * Zugeordneten.
+     * mit dem Bereich directory und view_directory; wer die Zuordnung sieht (view_company_members), bekommt dazu die IDs
+     * aller Zugeordneten.
      *
      * @return list<array<string, mixed>>
      */
     public function list(?User $viewer): array
     {
         $who = $viewer ?? $this->app->anonymous();
-        $manager = $viewer !== null && $viewer->can(Capability::ManageCompanies);
+        $manager = $viewer !== null && $viewer->can(Capability::ViewCompanyMembers);
         // Mitgliederliste: zentral der Bereich directory, wer sie sieht, das Recht view_directory (wie GET /directory).
         $directory = $this->app->features()->enabled('directory') && $who->can(Capability::ViewDirectory);
         $assignments = $this->repository()->assignments();

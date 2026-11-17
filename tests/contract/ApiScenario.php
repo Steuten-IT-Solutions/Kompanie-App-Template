@@ -1479,7 +1479,7 @@ final class ApiScenario
         $dir = array_column((array) $this->req('GET', '/directory')[1], null, 'id');
         $c->ok(array_column((array) ($dir[$m]['companies'] ?? []), 'id') === [$mine[1], $mine[0]], 'Kompanien in der Mitgliederliste');
         [, $roles] = $this->req('GET', '/admin/roles');
-        $c->ok((array_column((array) $roles, 'capabilities', 'key')['companies'] ?? null) === self::caps(['member', 'manage_companies']), 'Standardrolle „Kompanien verwalten“');
+        $c->ok((array_column((array) $roles, 'capabilities', 'key')['companies'] ?? null) === self::caps(['member', 'view_company_members', 'manage_companies']), 'Standardrolle „Kompanien verwalten“');
         $this->req('PUT', '/admin/features', ['companies' => false]);
         [$s, $d] = $this->req('GET', '/companies');
         $c->ok($s === 403 && ($d['code'] ?? '') === 'feature_disabled', 'Bereich aus → 403 feature_disabled');

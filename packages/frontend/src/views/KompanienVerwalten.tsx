@@ -407,12 +407,15 @@ export function MemberCompanies({
   companies,
   onChanged,
   onToast,
+  readOnly = false,
 }: {
   id: number;
   member: boolean;
   companies: CompanyRef[];
   onChanged: () => void;
   onToast: (msg: string) => void;
+  /** Nur sehen (view_company_members ohne manage_companies): die zugeordneten Kompanien ohne Auswahl. */
+  readOnly?: boolean;
 }) {
   const all = useAsync(sources.companies.load, sources.companies.deps, sources.companies.key);
   const current = companies.map((c) => c.id);
@@ -435,6 +438,26 @@ export function MemberCompanies({
     } finally {
       setBusy(false);
     }
+  }
+
+  if (readOnly) {
+    return (
+      <section className="member-companies">
+        {companies.length === 0 ? (
+          <Empty>Keine {sec.companies}.</Empty>
+        ) : (
+          <ul className="card-list">
+            {companies.map((c) => (
+              <li key={c.id} className="card row">
+                <div className="row-main">
+                  <div className="row-title">{c.name}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    );
   }
 
   return (

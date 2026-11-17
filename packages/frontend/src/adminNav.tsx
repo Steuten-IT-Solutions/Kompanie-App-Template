@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { flatOrder, setupOrder, SETUP, sortByIds, startOrder } from './navigation';
 import { can, config, type Feature } from './api';
-import { canManagePolls, canPostBoard } from './board';
+import { boardSeesAll, canManagePolls } from './board';
 import brand from './generated/brand';
 import { navigate } from './router';
 import { Caps } from './ui';
@@ -41,7 +41,7 @@ export function reportAllowed(): boolean {
 }
 
 /** Mitgliederliste: für alle, die Punkte, Strafen, Dienstgrade, Titel oder Anwesenheit der Mitglieder sehen, Mitglieder
- * anlegen, Ehemalige verwalten, Rollen vergeben oder Kompanien zuordnen (wie Capability::memberList im Kern). */
+ * anlegen, Ehemalige verwalten, Rollen vergeben oder die Kompanien der Mitglieder sehen (wie Capability::memberList im Kern). */
 export function memberListAllowed(): boolean {
   return (
     seePoints() ||
@@ -49,7 +49,7 @@ export function memberListAllowed(): boolean {
     seeRanks() ||
     seeTitles() ||
     seeAttendance() ||
-    canCompanies() ||
+    (!!config?.features.companies && can('view_company_members')) ||
     can('view_personal') ||
     can('view_accounts') ||
     can('manage_former')
@@ -92,7 +92,7 @@ export function adminTabs(): AdminTab[] {
       { id: 'seiten', label: sec.pages, on: canPages(), group: SETUP },
       { id: 'webseite', label: 'Webseite', on: canWebsite(), group: SETUP },
       { id: 'anwesenheit', label: sec.attendance, on: seeAttendance() },
-      { id: 'brett', label: sec.board, on: canPostBoard(), route: 'brett' },
+      { id: 'brett', label: sec.board, on: boardSeesAll(), route: 'brett' },
       { id: 'umfragen', label: sec.polls, on: canManagePolls(), route: 'umfragen/verwalten' },
       { id: 'inventar', label: sec.inventory, on: seeInventory(), route: 'inventar' },
       { id: 'listen', label: sec.lists, on: seeLists() },

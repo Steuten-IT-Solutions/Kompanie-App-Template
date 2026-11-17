@@ -126,6 +126,12 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         short: `${sec.documents} pflegen`,
         features: ['documents'],
       },
+      {
+        key: 'view_board_history',
+        label: `${sec.board}: alle Nachrichten sehen, auch für andere, mit Verlauf und Mailversand`,
+        short: `${sec.board}-Verlauf sehen`,
+        features: ['board'],
+      },
       { key: 'post_board', label: `${sec.board}: dringende Nachrichten schreiben`, short: `${sec.board} schreiben`, features: ['board'] },
       {
         key: 'view_poll_results',
@@ -163,6 +169,12 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         label: `${sec.sponsors}: anlegen, Logos hochladen und sortieren`,
         short: `${sec.sponsors} pflegen`,
         features: ['sponsors'],
+      },
+      {
+        key: 'view_company_members',
+        label: `${sec.companies}: sehen, welchen ${sec.companies} die Mitglieder zugeordnet sind`,
+        short: `Zuordnung zu ${sec.companies} sehen`,
+        features: ['companies'],
       },
       {
         key: 'manage_companies',

@@ -2,7 +2,7 @@
 titel: Seite eines Mitglieds
 reihenfolge: 52
 rechte: []
-einrecht: [view_points, manage_points, view_penalties, manage_penalties, view_promotions, manage_ranks, view_titles, manage_titles, view_attendance, manage_attendance, view_personal, manage_personal, view_accounts, create_users, manage_former, promote_users]
+einrecht: [view_points, manage_points, view_penalties, manage_penalties, view_promotions, manage_ranks, view_titles, manage_titles, view_attendance, manage_attendance, view_company_members, manage_companies, view_personal, manage_personal, view_accounts, create_users, manage_former, promote_users]
 ---
 Auf der Seite eines Mitglieds steht alles, was du als Verwaltung über diese Person pflegst. Zum Ändern tippst du einfach auf die jeweilige Angabe; dann öffnet sich ein Fenster.
 
@@ -20,7 +20,7 @@ Du siehst nur, wofür du das Recht hast und was die Kompanie nutzt.
 - **Rolle**: die Rolle der Person (bei Zusatzrollen „Rollen: …“), nur wenn du **Konten sehen** darfst. Hat sie Ausnahmen bei den Rechten, steht „mit Ausnahmen bei den Rechten“ dabei. Ohne dieses Recht steht dort nur „Ehemalig“ oder „Ohne Zugang“, wenn das zutrifft.
 - Kacheln **{bereich.points}** und **Offen**: Stand der {bereich.points} und offene {bereich.penalties}. Ein Tipp öffnet die Einträge der Person. Die Kacheln siehst du mit dem Recht, {bereich.points} bzw. {bereich.penalties} aller Mitglieder zu sehen.
 - Kachel **{bereich.titles}**: ihre {bereich.titles} (oder „Keine“); ein Tipp öffnet die Auswahl (mit dem Recht **{bereich.titles} sehen** nur die Liste).
-- Kachel **{bereich.companies}** (mit dem Recht **{bereich.companies} verwalten**): ihre {bereich.companies} (oder „Keine“); ein Tipp öffnet die Auswahl zum Ankreuzen.
+- Kachel **{bereich.companies}** (mit dem Recht **Zuordnung zu {bereich.companies} sehen**): ihre {bereich.companies} (oder „Keine“). Ein Tipp öffnet mit **{bereich.companies} pflegen** die Auswahl zum Ankreuzen, sonst nur die Liste.
 - **Geburtstag**: nur mit dem Recht **Persönliche Angaben sehen**. **Eintritt**: für alle, die Konten sehen, ändern nur, wer Mitglieder anlegen darf; **Austritt** (und bei Ehemaligen auch ihr Eintritt): für alle, die Ehemalige verwalten dürfen. „Nicht eingetragen“ heißt: Es fehlt noch.
 - **Persönliche Angaben**: E-Mail-Adresse, Handynummer und Adresse der Person, nur mit dem Recht **Persönliche Angaben sehen**. Ein Tipp auf die E-Mail-Adresse oder Handynummer schreibt bzw. ruft an.
 - **{bereich.attendance}** (mit dem Recht **{bereich.attendance} sehen**): wie oft die Person **anwesend** war, wie oft sie **entschuldigt** und wie oft sie **unentschuldigt** gefehlt hat. Rechts daneben wählst du das Jahr oder **Gesamt**; vorgegeben ist das laufende Jahr. Ein Tipp auf die Zahlen öffnet die Termine dazu.

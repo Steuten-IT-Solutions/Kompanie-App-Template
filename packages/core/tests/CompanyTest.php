@@ -111,14 +111,14 @@ final class CompanyTest extends TestCase
         $id = $this->company(['name' => 'Erste']);
         $this->users->current = $this->member;
         $this->assertSame(200, $this->call('GET', '/companies')->status);
-        $this->assertArrayNotHasKey('member_ids', $this->call('GET', '/companies')->data[0], 'nur für die Pflege');
+        $this->assertArrayNotHasKey('member_ids', $this->call('GET', '/companies')->data[0], 'nur mit view_company_members');
         $this->assertSame(403, $this->call('POST', '/companies', ['name' => 'X'])->status);
         $this->assertSame(403, $this->call('PUT', "/members/{$this->member}/companies", ['company_ids' => [$id]])->status);
         $this->users->current = null;
         $this->assertSame(['Erste'], array_column($this->call('GET', '/companies')->data, 'name'), 'ohne Anmeldung');
         $this->assertSame(401, $this->call('POST', '/companies', ['name' => 'X'])->status);
 
-        $this->assertSame(TestApp::caps(['member', 'manage_companies']), $this->app->roles()->find('companies')['capabilities'] ?? null);
+        $this->assertSame(TestApp::caps(['member', 'view_company_members', 'manage_companies']), $this->app->roles()->find('companies')['capabilities'] ?? null);
         $this->assertSame('Kompanien verwalten', $this->app->roles()->find('companies')['label'] ?? null);
         $pfleger = $this->users->add('pfleger', 'companies');
         $this->users->current = $pfleger;
