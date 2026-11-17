@@ -11647,7 +11647,7 @@ components:
       properties:
         name: { type: string, maxLength: 100, description: 'Mehrfache Leerzeichen werden zu einem' }
         short_name: { type: string, maxLength: 30 }
-        founded_year: { type: [integer, 'null'], description: 'Von 1800 bis zum laufenden Jahr' }
+        founded_year: { type: [integer, 'null'], minimum: 1, description: 'Ganze Zahl ab 1 bis zum laufenden Jahr' }
         description: { type: string, maxLength: 20000, description: 'HTML wie bei News, wird bereinigt; Bilder werden entfernt' }
         website_url:
           {

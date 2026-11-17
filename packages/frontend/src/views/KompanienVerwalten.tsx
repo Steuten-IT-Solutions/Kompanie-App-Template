@@ -13,12 +13,12 @@ const RichTextEditor = lazyView(() => import('../richtext/RichTextEditor'));
 
 const sec = brand.labels.sections;
 
-/** Grenzen wie auf dem Server (CompanyService, LogoImage, OfficeService::YEAR_MIN). */
+/** Grenzen wie auf dem Server (CompanyService, LogoImage). Das Gründungsjahr hat keine Untergrenze außer > 0. */
 const LOGO_ACCEPT = '.png,.jpg,.jpeg,.webp,.svg';
 const LOGO_MAX_BYTES = 2 * 1024 * 1024;
 const NAME_MAX = 100;
 const SHORT_MAX = 30;
-const YEAR_MIN = 1800;
+const YEAR_MIN = 1;
 
 type Draft = {
   name: string;

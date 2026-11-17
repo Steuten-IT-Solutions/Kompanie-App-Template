@@ -195,6 +195,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Gründungsjahr einer Kompanie**: Unter [Verwaltung → Kompanien](app:verwaltung/kompanien) darf das Gründungsjahr
+  jetzt auch vor 1800 liegen. Es muss nur eine ganze Zahl sein und darf nicht in der Zukunft liegen.
 - **Erinnerung an Zu- und Absagen ausschalten**: Unter [Einstellungen → Kalender](app:einstellungen/kalender) bleibt
   die Erinnerung an Zu- und Absagen jetzt ausgeschaltet, wenn du den Haken entfernst und speicherst. In der
   WordPress-Version war der Haken nach dem Neuladen wieder gesetzt, weil WordPress beim ersten Ausschalten nichts
