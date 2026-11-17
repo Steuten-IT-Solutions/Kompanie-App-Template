@@ -51,6 +51,11 @@ final class GalleryPortsTest extends TestCase
                 return true;
             }
 
+            public function writeAccess(): bool
+            {
+                return false;
+            }
+
             public function listChildren(string $folderId): array
             {
                 return $this->tree[$folderId] ?? [];

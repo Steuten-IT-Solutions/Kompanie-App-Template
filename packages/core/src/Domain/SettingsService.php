@@ -43,6 +43,8 @@ final class SettingsService
                 'connected' => $drive->oauth() !== null,
                 'email' => $drive->oauthEmail(),
                 'calendar_access' => $drive->calendarAccess(),
+                // Voller Drive-Zugriff (Galerie schreiben); ältere Verbindungen nur lesen
+                'write_access' => $drive->writeAccess(),
                 'service_account_email' => $drive->clientEmail(),
                 'last_result' => $a->googleConnect()->lastResult(),
             ],
@@ -68,6 +70,8 @@ final class SettingsService
                 'source' => $a->gallery()->sourceType(),
                 'store' => $a->gallery()->store(),
                 'media_bytes' => $a->gallery()->mediaBytes(),
+                // Ablage in Google Drive: aktiv, neu verbinden nötig, Dateien, die noch auf dem Server warten, letzter Fehler
+                'drive' => $a->galleryDrive()->status(),
                 'downloads' => $a->gallery()->downloadsEnabled(),
                 // Einreichen von Bildern und Videos durch Mitglieder erlaubt (Haken, Vorgabe bei Neuinstallation: aus)
                 'submissions' => $a->gallerySubmissions()->enabled(),

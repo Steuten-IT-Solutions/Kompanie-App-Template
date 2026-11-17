@@ -16,6 +16,9 @@ interface GallerySource
     /** Zugang eingerichtet (Anmeldung bzw. Schlüssel vorhanden)? */
     public function hasCredentials(): bool;
 
+    /** Darf die App in der Quelle schreiben (Dateien ablegen, verschieben, in den Papierkorb legen)? */
+    public function writeAccess(): bool;
+
     /** @return array<int, array<string, mixed>> alle Einträge eines Ordners */
     public function listChildren(string $folderId): array;
 

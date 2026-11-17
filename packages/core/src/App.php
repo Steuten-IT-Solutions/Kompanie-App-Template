@@ -29,6 +29,7 @@ use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Domain\Features;
 use KompanieApp\Core\Domain\FileMediaStore;
 use KompanieApp\Core\Domain\FormerMemberService;
+use KompanieApp\Core\Domain\GalleryDriveService;
 use KompanieApp\Core\Domain\GalleryService;
 use KompanieApp\Core\Domain\GallerySubmissionService;
 use KompanieApp\Core\Domain\NewsService;
@@ -118,6 +119,7 @@ final class App
     public const TASKS = [
         GalleryService::TASK => 3600,
         GalleryService::PROCESS_TASK => 3600,
+        GalleryDriveService::TASK => 3600,
         CalendarService::TASK => 3600,
         UpdateService::TASK => UpdateService::INTERVAL,
         StatusReporter::TASK => StatusReporter::INTERVAL,
@@ -294,6 +296,8 @@ final class App
         $wanted = [
             GalleryService::TASK => $gallery,
             GalleryService::PROCESS_TASK => $gallery,
+            // Einreichungen und hochgeladene Bilder nach Google Drive: stündlich als Rückfall, nach dem Hochladen vorgezogen.
+            GalleryDriveService::TASK => $gallery && $this->gallery()->driveConfigured(),
             // Termine der App liest der Kalender direkt aus der Datenbank: nichts zu erneuern.
             CalendarService::TASK => $this->features()->enabled('calendar') && $this->calendar()->isConfigured() && !$this->calendar()->inApp(),
             UpdateService::TASK => $this->updates()->configured(),
@@ -387,6 +391,15 @@ final class App
                 $this->gallery()->runProcessTask(25);
                 $this->gallerySubmissions()->pruneOrphans();
                 $this->videoUploads()->prune();
+                // Fertig aufbereitete Uploads in Alben aus Drive dorthin bringen (eigene Aufgabe mit eigenem Zeitbudget)
+                if ($this->galleryDrive()->hasWaiting()) {
+                    $this->scheduler->runSoon(GalleryDriveService::TASK);
+                }
+            } elseif ($task === GalleryDriveService::TASK && $this->features()->enabled('gallery')) {
+                $this->galleryDrive()->runTask();
+                if ($this->galleryDrive()->hasWaiting()) {
+                    $this->scheduler->runSoon(GalleryDriveService::TASK);
+                }
             } elseif ($task === CalendarService::TASK && $this->features()->enabled('calendar')) {
                 $error = $this->calendar()->refreshIfStale();
                 if ($error !== null) {
@@ -995,6 +1008,12 @@ final class App
     public function videoUploads(): VideoUploadService
     {
         return $this->service(VideoUploadService::class, fn () => new VideoUploadService($this));
+    }
+
+    /** Einreichungen und hochgeladene Bilder in Google Drive ablegen (mit vollem Drive-Zugriff) */
+    public function galleryDrive(): GalleryDriveService
+    {
+        return $this->service(GalleryDriveService::class, fn () => new GalleryDriveService($this));
     }
 
     public function gallerySubmissions(): GallerySubmissionService

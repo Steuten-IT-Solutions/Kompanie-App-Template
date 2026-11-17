@@ -3633,6 +3633,8 @@ export interface AdminSettings {
     connected: boolean;
     email: string;
     calendar_access: boolean;
+    /** Voller Drive-Zugriff (Galerie schreiben); ältere Verbindungen nur lesen. Fehlt bei älteren Servern */
+    write_access?: boolean;
     service_account_email: string;
     /** Ergebnis der letzten Rückkehr von Google (Unix-Zeit in at) */
     last_result: { ok: boolean; message: string; at: number } | null;
@@ -3663,10 +3665,15 @@ export interface AdminSettings {
     root: string;
     /** Quelle (Issue #285): Google Drive (dazu Alben der App) oder nur der eigene Server; fehlt bei älteren Servern */
     source?: GallerySourceType;
-    /** Ablageort hochgeladener Bilder (vorerst nur der eigene Server) */
-    store?: 'server';
+    /** Ablageort hochgeladener Bilder und Einreichungen: eigener Server oder (Drive als Quelle, voller Zugriff) Google Drive */
+    store?: 'server' | 'drive';
     /** Belegter Platz der hochgeladenen Bilder in Bytes */
     media_bytes?: number;
+    /**
+     * Ablage in Google Drive: aktiv; Drive als Quelle, aber die Verbindung darf nur lesen (neu verbinden); Dateien, die
+     * noch auf dem Server auf Drive warten; letzter Fehler. Fehlt bei älteren Servern
+     */
+    drive?: { active: boolean; needs_reconnect: boolean; waiting: number; error: string };
     /** Knöpfe zum Herunterladen in der Galerie; fehlt bei älteren Servern */
     downloads?: boolean;
     /** Einreichen von Bildern und Videos durch Mitglieder erlaubt; fehlt bei älteren Servern */

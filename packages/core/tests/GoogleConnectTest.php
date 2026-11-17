@@ -69,8 +69,8 @@ final class GoogleConnectTest extends TestCase
         $this->assertSame(self::CLIENT, $q['client_id']);
         $this->assertSame(self::REDIRECT, $q['redirect_uri']);
         $this->assertSame('code', $q['response_type']);
-        // Mit drive.file für die Sicherungen in Google Drive (BackupUploadService).
-        $this->assertSame(DriveClient::SCOPE . ' ' . DriveClient::CALENDAR_SCOPE . ' ' . DriveClient::BACKUP_SCOPE, $q['scope']);
+        // Voller Drive-Zugriff: Galerie in Drive ablegen und Sicherungen (schließt drive.readonly und drive.file ein).
+        $this->assertSame(DriveClient::WRITE_SCOPE . ' ' . DriveClient::CALENDAR_SCOPE, $q['scope']);
         $this->assertSame('offline', $q['access_type']);
         $this->assertSame('consent', $q['prompt']);
         $this->assertSame('true', $q['include_granted_scopes']);

@@ -87,7 +87,9 @@ final class GalleryUploadTest extends TestCase
         $this->assertSame('server', $settings['gallery']['store']);
         $this->assertTrue($settings['gallery']['configured'], 'eigener Server: ohne Drive nutzbar');
         $this->assertSame(400, $this->call('PATCH', '/admin/settings', ['gallery_source' => 'ftp'])->status);
-        $this->assertSame(400, $this->call('PATCH', '/admin/settings', ['gallery_store' => 'drive'])->status, 'Drive als Ablageort noch nicht');
+        $this->assertSame(400, $this->call('PATCH', '/admin/settings', ['gallery_store' => 'ftp'])->status);
+        // Der Ablageort ergibt sich aus Quelle und Google-Zugang (GalleryDriveTest); ohne Drive bleibt es der Server.
+        $this->assertSame('server', $this->ok('PATCH', '/admin/settings', ['gallery_store' => 'drive'])['gallery']['store']);
 
         $album = $this->ok('POST', '/admin/gallery/albums', ['title' => 'Schützenfest', 'year' => 2026]);
         $this->assertSame('app', $album['source']);

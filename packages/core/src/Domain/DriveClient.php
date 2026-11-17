@@ -13,8 +13,11 @@ use KompanieApp\Core\Port\StreamingHttpClient;
 use KompanieApp\Core\Port\Settings;
 
 /**
- * Lesender Zugriff auf Google Drive und, über denselben Zugang, auf den Google Kalender. Schreibend nur für die
- * Datensicherung (BackupUploadService): mit drive.file sieht und ändert die App nur Dateien, die sie selbst angelegt hat.
+ * Zugriff auf Google Drive und, über denselben Zugang, lesend auf den Google Kalender. Schreibend für die Datensicherung
+ * (BackupUploadService) und, mit vollem Drive-Zugriff (WRITE_SCOPE, nur über „Mit Google verbinden“), für die Galerie
+ * (GalleryDriveService: Einreichungen und hochgeladene Bilder in Drive ablegen). Ältere Verbindungen haben nur
+ * drive.readonly und drive.file (die App sieht und ändert damit nur Dateien, die sie selbst angelegt hat); mit ihnen
+ * bleibt die Galerie lesend, bis jemand neu verbindet.
  *
  * Zwei Wege, in dieser Reihenfolge:
  *  1. „Mit Google verbinden“ (OAuth mit dem eigenen OAuth-Client der Installation): Ein Admin trägt Client-ID und
@@ -53,7 +56,13 @@ final class DriveClient implements GallerySource
     public const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
     public const REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
     public const ABOUT_URL = 'https://www.googleapis.com/drive/v3/about';
+    /** Drive lesen; ältere Verbindungen und das Dienstkonto. Neue Verbindungen fragen WRITE_SCOPE an (schließt Lesen ein). */
     public const SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+    /**
+     * Voller Zugriff auf Google Drive (Lesen und Schreiben), seit dem 17.11.2026 beim „Mit Google verbinden“: Die Galerie
+     * legt Einreichungen und hochgeladene Bilder in Drive ab. Bei Google dieselbe Stufe wie drive.readonly (eingeschränkt).
+     */
+    public const WRITE_SCOPE = 'https://www.googleapis.com/auth/drive';
     /** Lesezugriff auf den Google Kalender (für CalendarService, über denselben Zugang). */
     public const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
     /** Eigene Dateien anlegen und ändern (nur von der App angelegte), für die Datensicherung; nur über „Mit Google verbinden“. */
@@ -94,12 +103,19 @@ final class DriveClient implements GallerySource
     }
 
     /**
-     * Berechtigungen beim „Mit Google verbinden“: zusätzlich eigene Dateien für die Datensicherung (ein Dienstkonto hat
-     * in Google Drive keinen eigenen Speicherplatz und bekommt sie deshalb nicht).
+     * Berechtigungen beim „Mit Google verbinden“: voller Drive-Zugriff (Galerie schreiben, schließt Lesen und die eigenen
+     * Dateien der Datensicherung ein) und der Kalender. Ein Dienstkonto hat in Google Drive keinen eigenen Speicherplatz
+     * und bleibt deshalb lesend (scopes()).
      */
     public static function oauthScopes(): string
     {
-        return self::scopes() . ' ' . self::BACKUP_SCOPE;
+        return self::WRITE_SCOPE . ' ' . self::CALENDAR_SCOPE;
+    }
+
+    /** Enthält die Liste erlaubter Berechtigungen (durch Leerzeichen getrennt, wie Google sie liefert) eine davon? */
+    private static function grants(string $scope, string ...$wanted): bool
+    {
+        return array_intersect($wanted, preg_split('/\s+/', trim($scope)) ?: []) !== [];
     }
 
     /** @return array{client_id: string, client_secret: string, refresh_token: string, email: string, scope: string}|null */
@@ -143,11 +159,24 @@ final class DriveClient implements GallerySource
         return $this->serviceAccount() !== null;
     }
 
-    /** Darf die App Sicherungen in Google Drive ablegen? Nur mit einer OAuth-Verbindung, bei der Google drive.file erlaubt hat. */
+    /**
+     * Darf die App Sicherungen in Google Drive ablegen? Nur mit einer OAuth-Verbindung, bei der Google drive.file oder
+     * vollen Drive-Zugriff erlaubt hat.
+     */
     public function backupAccess(): bool
     {
         $oauth = $this->oauth();
-        return $oauth !== null && in_array(self::BACKUP_SCOPE, preg_split('/\s+/', trim($oauth['scope'])) ?: [], true);
+        return $oauth !== null && self::grants($oauth['scope'], self::BACKUP_SCOPE, self::WRITE_SCOPE);
+    }
+
+    /**
+     * Darf die App in Ordnern schreiben, die sie nicht selbst angelegt hat (Galerie-Ordner)? Nur mit einer
+     * OAuth-Verbindung, bei der Google vollen Drive-Zugriff erlaubt hat; ältere Verbindungen müssen neu verbinden.
+     */
+    public function writeAccess(): bool
+    {
+        $oauth = $this->oauth();
+        return $oauth !== null && self::grants($oauth['scope'], self::WRITE_SCOPE);
     }
 
     /** Ist ein Google-Zugang hinterlegt (OAuth-Verbindung oder Dienstkonto)? */
@@ -363,7 +392,7 @@ final class DriveClient implements GallerySource
         }
         // Bei Google lassen sich einzelne Berechtigungen abwählen; gemerkt wird, was erlaubt wurde.
         $scope = is_string($body['scope'] ?? null) ? trim($body['scope']) : self::scopes();
-        if (!in_array(self::SCOPE, preg_split('/\s+/', $scope) ?: [], true)) {
+        if (!self::grants($scope, self::SCOPE, self::WRITE_SCOPE)) {
             throw new \RuntimeException('Der Zugriff auf Google Drive wurde nicht erlaubt. Bitte beim Verbinden das Häkchen für Google Drive setzen.');
         }
         $this->storeOAuth(['refresh_token' => $body['refresh_token'], 'email' => '', 'scope' => $scope] + $o);
@@ -570,13 +599,14 @@ final class DriveClient implements GallerySource
         return ($body['trashed'] ?? false) !== true;
     }
 
-    /** Legt einen Ordner in „Meine Ablage“ an und gibt seine ID zurück. */
-    public function createFolder(string $name): string
+    /** Legt einen Ordner in „Meine Ablage“ (oder in $parent) an und gibt seine ID zurück. */
+    public function createFolder(string $name, ?string $parent = null): string
     {
-        $res = $this->http->request('POST', self::FILES_URL . '?fields=id', [
+        $meta = ['name' => $name, 'mimeType' => self::FOLDER_MIME] + ($parent !== null ? ['parents' => [$parent]] : []);
+        $res = $this->http->request('POST', self::FILES_URL . '?fields=id&supportsAllDrives=true', [
             'Authorization' => 'Bearer ' . $this->accessToken(),
             'Content-Type' => 'application/json; charset=UTF-8',
-        ], (string) json_encode(['name' => $name, 'mimeType' => self::FOLDER_MIME], JSON_UNESCAPED_UNICODE), 20);
+        ], (string) json_encode($meta, JSON_UNESCAPED_UNICODE), 20);
         $body = json_decode($res['body'], true);
         if ($res['status'] !== 200 || !is_string($body['id'] ?? null)) {
             throw new \RuntimeException('Google Drive: Der Ordner ließ sich nicht anlegen: ' . self::errorMessage($body, $res['status']));
@@ -712,6 +742,123 @@ final class DriveClient implements GallerySource
         if (!in_array($res['status'], [200, 204, 404], true)) {
             throw new \RuntimeException('Google Drive: ' . self::errorMessage(json_decode($res['body'], true), $res['status']));
         }
+    }
+
+    /**
+     * Verschiebt eine Datei oder einen Ordner von $from nach $to (Eltern tauschen); mit $name auch umbenennen. Braucht
+     * writeAccess().
+     *
+     * @throws \RuntimeException mit verständlicher Meldung
+     */
+    public function moveFile(string $fileId, string $from, string $to, ?string $name = null): void
+    {
+        $query = ['supportsAllDrives' => 'true', 'fields' => 'id'];
+        if ($from !== $to) {
+            $query += ['addParents' => $to, 'removeParents' => $from];
+        }
+        $this->patch($fileId, $query, $name !== null ? ['name' => $name] : [], 'Die Datei ließ sich in Google Drive nicht verschieben');
+    }
+
+    /** Benennt eine Datei oder einen Ordner um. */
+    public function renameFile(string $fileId, string $name): void
+    {
+        $this->patch($fileId, ['supportsAllDrives' => 'true', 'fields' => 'id'], ['name' => $name], 'Die Datei ließ sich in Google Drive nicht umbenennen');
+    }
+
+    /** Legt eine Datei oder einen Ordner in den Papierkorb (30 Tage wiederherstellbar). Fehlt sie schon, ist das kein Fehler. */
+    public function trashFile(string $fileId): void
+    {
+        try {
+            $this->patch($fileId, ['supportsAllDrives' => 'true', 'fields' => 'id'], ['trashed' => true], 'Die Datei ließ sich in Google Drive nicht in den Papierkorb legen', true);
+        } catch (\OutOfBoundsException) {
+            // schon weg
+        }
+    }
+
+    /**
+     * @param array<string, string> $query
+     * @param array<string, mixed> $meta
+     * @throws \RuntimeException mit verständlicher Meldung; \OutOfBoundsException bei 404, wenn $notFoundOk
+     */
+    private function patch(string $fileId, array $query, array $meta, string $what, bool $notFoundOk = false): void
+    {
+        $res = $this->http->request('PATCH', self::FILES_URL . '/' . rawurlencode($fileId) . '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986), [
+            'Authorization' => 'Bearer ' . $this->accessToken(),
+            'Content-Type' => 'application/json; charset=UTF-8',
+        ], (string) json_encode($meta === [] ? new \stdClass() : $meta, JSON_UNESCAPED_UNICODE), 20);
+        if ($res['status'] === 404 && $notFoundOk) {
+            throw new \OutOfBoundsException('nicht gefunden');
+        }
+        if ($res['status'] !== 200) {
+            throw new \RuntimeException('Google Drive: ' . $what . ': ' . self::errorMessage(json_decode($res['body'], true), $res['status']));
+        }
+    }
+
+    /** Beginnt ein fortsetzbares Hochladen in Ordner $folderId; Rückgabe: Adresse der Sitzung (bei Google etwa eine Woche gültig). */
+    public function beginUpload(string $folderId, string $name, string $mime, int $length): string
+    {
+        return $this->startUpload($folderId, $name, $mime, $length);
+    }
+
+    /**
+     * Setzt ein fortsetzbares Hochladen fort, ab dem Stand, den Google bestätigt hat, in Stücken von $chunk Bytes, bis
+     * die Datei ganz oben ist oder $deadline (hrtime in Sekunden) erreicht ist. So geht auch ein großes Video über
+     * mehrere kurze Läufe einer Aufgabe nach Drive.
+     *
+     * @return array{id: string|null, offset: int} id der fertigen Datei, sonst null und die bestätigten Bytes
+     * @throws \OutOfBoundsException wenn die Sitzung bei Google abgelaufen ist (neu beginnen)
+     * @throws \RuntimeException mit verständlicher Meldung
+     */
+    public function continueUpload(string $location, string $path, string $mime, float $deadline, int $chunk = self::UPLOAD_CHUNK): array
+    {
+        $size = @filesize($path);
+        if ($size === false) {
+            throw new \RuntimeException('Google Drive: Die Datei zum Hochladen ließ sich nicht lesen.');
+        }
+        // Wie weit ist Google? (308 mit Range „bytes=0-<letztes>“, ohne Range noch nichts; 200/201: schon fertig)
+        $res = $this->http->request('PUT', $location, ['Content-Range' => 'bytes */' . $size], '', 30);
+        if (in_array($res['status'], [200, 201], true)) {
+            return ['id' => self::uploadedId($res), 'offset' => $size];
+        }
+        if (in_array($res['status'], [404, 410], true)) {
+            throw new \OutOfBoundsException('Die Sitzung zum Hochladen ist abgelaufen.');
+        }
+        if ($res['status'] !== 308) {
+            throw new \RuntimeException('Google Drive: Das Hochladen ließ sich nicht fortsetzen: ' . self::errorMessage(json_decode($res['body'], true), $res['status']));
+        }
+        $offset = preg_match('/bytes=0-(\d+)/', (string) ($res['headers']['range'] ?? ''), $m) ? (int) $m[1] + 1 : 0;
+        $in = @fopen($path, 'rb');
+        if ($in === false) {
+            throw new \RuntimeException('Google Drive: Die Datei zum Hochladen ließ sich nicht lesen.');
+        }
+        try {
+            while ($offset < $size) {
+                if (hrtime(true) / 1e9 >= $deadline) {
+                    return ['id' => null, 'offset' => $offset];
+                }
+                fseek($in, $offset);
+                $part = (string) fread($in, $chunk);
+                $end = $offset + strlen($part) - 1;
+                $res = $this->http->request('PUT', $location, [
+                    'Content-Type' => $mime,
+                    'Content-Range' => sprintf('bytes %d-%d/%d', $offset, $end, $size),
+                ], $part, 300);
+                if (in_array($res['status'], [200, 201], true)) {
+                    return ['id' => self::uploadedId($res), 'offset' => $size];
+                }
+                if (in_array($res['status'], [404, 410], true)) {
+                    throw new \OutOfBoundsException('Die Sitzung zum Hochladen ist abgelaufen.');
+                }
+                if ($res['status'] !== 308) {
+                    throw new \RuntimeException('Google Drive: Das Hochladen ist fehlgeschlagen: ' . self::errorMessage(json_decode($res['body'], true), $res['status']));
+                }
+                // Google bestätigt, was angekommen ist (nicht unbedingt das ganze Stück)
+                $offset = preg_match('/bytes=0-(\d+)/', (string) ($res['headers']['range'] ?? ''), $m) ? (int) $m[1] + 1 : $end + 1;
+            }
+        } finally {
+            fclose($in);
+        }
+        throw new \RuntimeException('Google Drive: Das Hochladen ist fehlgeschlagen (unvollständig).');
     }
 
     /** Lädt eine Datei in eine temporäre Datei; der Aufrufer löscht sie. */
