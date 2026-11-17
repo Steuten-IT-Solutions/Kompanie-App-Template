@@ -191,6 +191,27 @@ final class AdmissionsTest extends TestCase
         $this->assertSame([], $this->app->admissions()->repository()->all());
     }
 
+    public function testFlaggedBaseRoleWithMemberAreaIsCandidate(): void
+    {
+        // Anwärter-Rolle mit „Gehört zur Kompanie“ (kein promotable möglich) als Rolle der Person
+        $key = $this->app->roles()->create(['label' => 'Anwärter', 'capabilities' => TestApp::caps(['member'])])['key'];
+        $this->assertFalse($this->app->roles()->promotable($key));
+        $this->ok('PATCH', "/admin/roles/$key", ['admission_extra' => true, 'admission_kind' => 'Versammlung', 'admission_count' => 1]);
+        $karl = (int) $this->ok('POST', '/users', ['name' => 'Karl Neu', 'level' => $key])['id'];
+        $e = $this->entry($karl);
+        $this->assertSame(['base', '2026-11-14', 'open'], [$e['way'], $e['since'], $e['status']], 'Anwärter seit beim Anlegen');
+
+        $this->list('2026-11-13', 'Versammlung', [$karl]);
+        $this->assertSame('fulfilled', $this->entry($karl)['status']);
+        $res = $this->ok('POST', "/members/$karl/admit", [], $this->clerk);
+        $this->assertSame(Roles::MEMBER, $res['level']);
+        $this->assertSame([], $this->ok('GET', '/admissions', [], $this->clerk));
+        // Der Knopf „zum Mitglied machen“ bleibt auf freigegebene Rollen beschränkt
+        $other = $this->users->add('otto', $key);
+        $this->ok('PATCH', "/admin/roles/$key", ['admission_extra' => false]);
+        $this->assertSame(400, $this->call('POST', "/members/$other/promote", [], $this->clerk)->status);
+    }
+
     public function testAddMonthsKeepsEndOfMonth(): void
     {
         $this->assertSame('2027-02-28', AdmissionService::addMonths('2027-01-31', 1));

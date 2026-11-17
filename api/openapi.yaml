@@ -5195,8 +5195,8 @@ paths:
       tags: [Verwaltung]
       summary: Anwärter als Mitglied aufnehmen
       description: |
-        Grundrolle mit `promotable` → `member` (wie `/members/{id}/promote`), sonst die Zusatzrolle mit `admission_extra`
-        entfernen. Die Voraussetzung sperrt nicht. Ohne Eintritt wird er auf heute gesetzt (`join_date`, sonst null);
+        Grundrolle mit `promotable` oder `admission_extra` → `member` (wie `/members/{id}/promote`), sonst die Zusatzrolle mit
+        `admission_extra` entfernen. Die Voraussetzung sperrt nicht. Ohne Eintritt wird er auf heute gesetzt (`join_date`, sonst null);
         „Anwärter seit“ fällt weg. Nicht für sich selbst und nicht für Ehemalige (400).
       x-capability: create_users
       responses:
@@ -5246,7 +5246,7 @@ paths:
       tags: [Verwaltung]
       summary: Aufnahmen – Anwärter mit Stand der Voraussetzung (nur zusammen mit dem Bereich Anwesenheit)
       description: |
-        Alle Anwärter (Grundrolle mit `promotable` oder Zusatzrolle mit `admission_extra`, ohne Ehemalige): zuerst wer die
+        Alle Anwärter (Grundrolle mit `promotable` oder `admission_extra`, Zusatzrolle mit `admission_extra`, ohne Ehemalige): zuerst wer die
         Voraussetzung erfüllt (nach `fulfilled_on`), dann `open`, dann `none`. Es zählen alle Teilnahmen der Terminart bis heute.
       x-capability: create_users
       responses:
@@ -9742,7 +9742,7 @@ components:
                 description: 'guest, member und admin: nicht löschbar; bei guest und member nur die Rechte zum Sehen änderbar, bei admin keine',
               }
             deletable: { type: boolean, description: 'false für guest, member und admin' }
-            admission_extra: { type: boolean, description: Anwärter-Rolle als Zusatzrolle (bei Aufnahme entfernen) }
+            admission_extra: { type: boolean, description: 'Anwärter-Rolle (als Grund- oder Zusatzrolle, auch mit Mitgliederbereich)' }
             admission_kind: { type: [string, 'null'] }
             admission_count: { type: integer }
             admission_months: { type: integer }
@@ -9821,7 +9821,7 @@ components:
         points_factor: { type: [number, string], description: 'Zwischen 0 und 10, z. B. 0.5 oder "0,5"' }
         new_accounts: { type: boolean, description: 'Nur eigene Rollen: beim Anlegen von Konten wählbar' }
         promotable: { type: boolean, description: 'Nur eigene Rollen ohne member: als Mitglied aufnehmen mit create_users' }
-        admission_extra: { type: boolean, description: 'Nur eigene Rollen: Anwärter-Rolle als Zusatzrolle, wird bei der Aufnahme entfernt' }
+        admission_extra: { type: boolean, description: 'Nur eigene Rollen: Anwärter-Rolle als Grund- oder Zusatzrolle; bei der Aufnahme wird die Grundrolle zu member, die Zusatzrolle entfernt' }
         admission_kind:
           { type: [string, 'null'], description: 'Voraussetzung für die Aufnahme: Terminart (eine aus /config eventKinds; leer oder null für keine)' }
         admission_count: { type: [integer, string], description: 'Mindestens so viele Teilnahmen (present) an Listen dieser Art, 0–100; > 0 nur mit admission_kind' }

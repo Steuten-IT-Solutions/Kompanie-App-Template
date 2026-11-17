@@ -1608,7 +1608,7 @@ final class Api
                 return $this->roles();
             }, null, $denySettings),
             new Route('PATCH', '/admin/roles/{key}', Cap::ManageSettings, function (Request $r) use ($a) {
-                // Aufnahme (Anwärter-Rolle als Zusatzrolle, Voraussetzung): erst alles prüfen, dann speichern.
+                // Aufnahme (Anwärter-Rolle, Voraussetzung): erst alles prüfen, dann speichern.
                 $key = (string) $r->params['key'];
                 $admission = $a->admissions()->prepareRole($key, $r->body);
                 $a->roles()->update($key, array_diff_key($r->body, array_flip(AdmissionService::ROLE_FIELDS)));

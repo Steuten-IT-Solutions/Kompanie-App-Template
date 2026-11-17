@@ -9,7 +9,7 @@ Die Übersicht **Aufnahmen** zeigt alle Anwärter und wer von ihnen die Vorausse
 ## So öffnest du die Seite
 Tippe unten auf **Verwaltung** und dann auf den Knopf **Aufnahmen**. Mit **‹ Verwaltung** kommst du zurück. Die kleine Zahl im roten Kreis an der Ecke des Knopfs zeigt, wie viele Anwärter die Voraussetzung gerade erfüllen; ist es niemand, fehlt sie.
 
-Den Knopf gibt es, wenn {bereich.attendance} an ist. Damit dort jemand erscheint, richtet ein {rolle.admin} unter *Einstellungen → Rollen* eine Anwärter-Rolle ein: eine Rolle mit dem Haken zum Aufnehmen als {rolle.member} oder eine Zusatzrolle mit **Anwärter-Rolle als Zusatzrolle**. Solange es keine gibt, steht auf der Seite, wie das geht.
+Den Knopf gibt es, wenn {bereich.attendance} an ist. Damit dort jemand erscheint, richtet ein {rolle.admin} unter *Einstellungen → Rollen* eine Anwärter-Rolle ein: an der Rolle den Haken **Anwärter-Rolle**. Die Rolle kann die Rolle der Person sein oder eine Zusatzrolle. Solange es keine gibt, steht auf der Seite, wie das geht.
 
 ## Was du hier siehst
 - **Voraussetzung erfüllt**: wer alles erfüllt, mit dem Tag, seit dem. Wer am längsten wartet, steht oben.

@@ -88,9 +88,8 @@ function NoCandidates() {
     <div className="card stack">
       <p>Keine Anwärter.</p>
       <p className="muted">
-        Hier erscheint, wer eine Anwärter-Rolle hat: eine Rolle mit „Wer Mitglieder anlegen darf, nimmt Personen mit dieser Rolle als{' '}
-        {levelLabel('member')} auf“ oder eine Zusatzrolle mit „Anwärter-Rolle als Zusatzrolle“. Dort legt ein Admin auch die Voraussetzung
-        fest, z. B. 6 Teilnahmen an Terminen einer Terminart.
+        Hier erscheint, wer eine Anwärter-Rolle hat, als Rolle oder als Zusatzrolle. Dafür setzt ein Admin unter Einstellungen → Rollen an
+        der Rolle den Haken „Anwärter-Rolle“ und legt dort auch die Voraussetzung fest, z. B. 6 Teilnahmen an Terminen einer Terminart.
       </p>
       {admin && (
         <div className="button-row">

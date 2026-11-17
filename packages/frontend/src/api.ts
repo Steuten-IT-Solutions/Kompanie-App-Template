@@ -671,7 +671,7 @@ export interface RoleAdmin extends RoleInfo {
   extra_users?: number;
   system: boolean;
   deletable: boolean;
-  /** Anwärter-Rolle als Zusatzrolle: wird bei der Aufnahme als Mitglied entfernt; fehlen bei älteren Servern */
+  /** Anwärter-Rolle (als Grund- oder Zusatzrolle, Aufnahmen); fehlen bei älteren Servern */
   admission_extra?: boolean;
   /** Voraussetzung für die Aufnahme: Teilnahmen an Terminen dieser Art (null: keine) … */
   admission_kind?: string | null;
