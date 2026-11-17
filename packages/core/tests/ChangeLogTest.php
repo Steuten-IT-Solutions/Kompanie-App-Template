@@ -92,7 +92,7 @@ final class ChangeLogTest extends TestCase
 
     public function testRoleRightsAndOwnAccount(): void
     {
-        $role = $this->app->roles()->create(['label' => 'Kassierer', 'capabilities' => [...Roles::TEMPLATES[Roles::MEMBER], 'manage_penalties']]);
+        $role = $this->app->roles()->create(['label' => 'Kassierer', 'capabilities' => [...Roles::TEMPLATES[Roles::MEMBER], 'view_penalties', 'manage_penalties']]);
         $this->assertSame(200, $this->call('PATCH', "/members/{$this->member}/role", ['level' => $role['key']])->status);
         $this->assertSame(200, $this->call('PUT', "/members/{$this->member}/rights", ['grant' => ['view_personal'], 'revoke' => []])->status);
         [$rights, $level] = $this->entries();

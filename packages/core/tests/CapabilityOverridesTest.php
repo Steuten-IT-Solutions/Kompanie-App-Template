@@ -61,10 +61,10 @@ final class CapabilityOverridesTest extends TestCase
 
     public function testGrantAndRevokeApplyImmediately(): void
     {
-        $res = $this->rights($this->m, ['manage_points']);
+        $res = $this->rights($this->m, ['view_points', 'manage_points']);
         $this->assertSame(200, $res->status, (string) json_encode($res->data));
         $this->assertSame(TestApp::caps(['member']), $res->data['role']);
-        $this->assertSame(['manage_points'], $res->data['grant']);
+        $this->assertSame(['view_points', 'manage_points'], $res->data['grant']);
         $this->assertSame([], $res->data['revoke']);
         $this->assertTrue($this->can($this->m, Capability::ManagePoints));
         $this->assertFalse($this->can($this->m, Capability::ManagePenalties));
@@ -74,9 +74,9 @@ final class CapabilityOverridesTest extends TestCase
         $this->assertSame(201, $this->call('POST', '/points', ['user_ids' => [$this->admin], 'points' => 2, 'reason' => 'Aufbau'])->status);
         $this->users->current = $this->admin;
 
-        $kasse = $this->role('Kasse', TestApp::caps(['member', 'manage_points', 'manage_penalties']));
+        $kasse = $this->role('Kasse', TestApp::caps(['member', 'view_points', 'manage_points', 'view_penalties', 'manage_penalties']));
         $k = $this->users->add('kasse', $kasse);
-        $this->assertSame(200, $this->rights($k, [], ['manage_penalties'])->status);
+        $this->assertSame(200, $this->rights($k, [], ['view_penalties', 'manage_penalties'])->status);
         $this->assertTrue($this->can($k, Capability::ManagePoints));
         $this->assertFalse($this->can($k, Capability::ManagePenalties));
         $this->users->current = $k;
@@ -85,19 +85,19 @@ final class CapabilityOverridesTest extends TestCase
 
         // Auf der Seite des Mitglieds, nur für die, die sie ändern dürfen.
         $detail = $this->call('GET', "/members/$k")->data;
-        $this->assertSame(['grant' => [], 'revoke' => ['manage_penalties']], ['grant' => $detail['rights']['grant'], 'revoke' => $detail['rights']['revoke']]);
+        $this->assertSame(['grant' => [], 'revoke' => ['view_penalties', 'manage_penalties']], ['grant' => $detail['rights']['grant'], 'revoke' => $detail['rights']['revoke']]);
         $this->assertContains('create_users', $detail['rights']['editable']);
         $this->assertNull($this->call('GET', "/members/{$this->admin}")->data['rights'], 'Admins haben keine Ausnahmen');
 
         // Zurücksetzen.
         $this->assertSame(200, $this->rights($k, [])->status);
         $this->assertTrue($this->can($k, Capability::ManagePenalties));
-        $this->assertSame([['user' => $this->m, 'grant' => ['manage_points'], 'revoke' => []]], $this->app->settings->get(RoleService::OVERRIDES_SETTING));
+        $this->assertSame([['user' => $this->m, 'grant' => ['view_points', 'manage_points'], 'revoke' => []]], $this->app->settings->get(RoleService::OVERRIDES_SETTING));
     }
 
     public function testRedundantEntriesAreDropped(): void
     {
-        $res = $this->rights($this->m, ['member', 'calendar', 'manage_events'], ['manage_points']);
+        $res = $this->rights($this->m, ['member', 'calendar', 'manage_events'], ['view_points', 'manage_points']);
         $this->assertSame(200, $res->status, (string) json_encode($res->data));
         $this->assertSame(['manage_events'], $res->data['grant'], 'Mitgliederbereich und Kalender hat die Rolle schon');
         $this->assertSame([], $res->data['revoke'], 'Punkte hat die Rolle nicht');
@@ -107,10 +107,10 @@ final class CapabilityOverridesTest extends TestCase
     {
         $candidate = $this->users->add('anwaerter', TestApp::candidateRole($this->app));
         $guest = $this->users->add('gast', Roles::GUEST);
-        $this->assertSame(400, $this->rights($candidate, ['manage_points'])->status, 'Verwalten braucht den Mitgliederbereich');
+        $this->assertSame(400, $this->rights($candidate, ['view_points', 'manage_points'])->status, 'Verwalten braucht den Mitgliederbereich');
         $this->assertSame(200, $this->rights($candidate, ['view_intern'])->status, '„Intern“ auch ohne Mitgliederbereich');
         $this->assertEqualsCanonicalizing([Capability::ViewIntern, ...TestApp::capabilities(['calendar'])], $this->users->find($candidate)?->capabilities);
-        $this->assertSame(200, $this->rights($candidate, ['member', 'manage_points'])->status);
+        $this->assertSame(200, $this->rights($candidate, ['member', 'view_points', 'manage_points'])->status);
         $this->assertTrue($this->can($candidate, Capability::ManagePoints));
         // Jedes Recht einzeln: Kalender und „Intern“ lassen sich Mitgliedern entziehen.
         $this->assertSame(200, $this->rights($this->m, [], ['calendar', 'view_intern'])->status);
@@ -121,11 +121,11 @@ final class CapabilityOverridesTest extends TestCase
         $expected = array_values(array_filter(TestApp::capabilities(['member']), static fn (Capability $c): bool => $c !== Capability::Member && $c->requires() !== Capability::Member));
         $this->assertSame($expected, $this->users->find($this->m)?->capabilities);
         $this->assertSame(400, $this->rights($this->users->add('anw2', TestApp::candidateRole($this->app)), ['view_own_points'])->status, 'eigene Punkte nur mit Mitgliedschaft');
-        $this->assertSame(400, $this->rights($this->m, ['manage_points'], ['manage_points'])->status);
+        $this->assertSame(400, $this->rights($this->m, ['view_points', 'manage_points'], ['view_points', 'manage_points'])->status);
         $this->assertSame(400, $this->rights($this->m, ['manage_settings'])->status, 'Einstellungen nur für Admins');
         $this->assertSame(400, $this->rights($this->m, ['gibtsnicht'])->status);
         $this->assertSame(400, $this->call('PUT', "/members/{$this->m}/rights", ['grant' => 'manage_points'])->status);
-        $this->assertSame(400, $this->rights($this->admin, ['manage_points'])->status, 'Admin: ohnehin alles; zugleich man selbst');
+        $this->assertSame(400, $this->rights($this->admin, ['view_points', 'manage_points'])->status, 'Admin: ohnehin alles; zugleich man selbst');
         $this->assertSame(400, $this->rights($guest, ['member'])->status, 'Gäste: erst eine Rolle geben');
         $this->assertSame(404, $this->rights(999, ['member'])->status);
 
@@ -135,21 +135,21 @@ final class CapabilityOverridesTest extends TestCase
 
     public function testDelegatedPromoterOnlyChangesOwnRights(): void
     {
-        $chef = $this->users->add('chef', $this->role('Chef', TestApp::caps(['member', 'promote_users', 'manage_points', 'manage_former'])));
+        $chef = $this->users->add('chef', $this->role('Chef', TestApp::caps(['member', 'promote_users', 'view_points', 'manage_points', 'manage_former'])));
         $this->users->current = $chef;
 
-        $res = $this->rights($this->m, ['manage_points']);
+        $res = $this->rights($this->m, ['view_points', 'manage_points']);
         $this->assertSame(200, $res->status, (string) json_encode($res->data));
-        $this->assertSame(TestApp::caps(['member', 'manage_points']), $res->data['editable']);
-        $this->assertSame(403, $this->rights($this->m, ['manage_points', 'manage_events'])->status, 'hat er selbst nicht');
-        $this->assertSame(403, $this->rights($this->m, ['manage_points', 'create_users'])->status, 'bleibt den Admins vorbehalten');
-        $this->assertSame(403, $this->rights($this->m, ['manage_points', 'manage_former'])->status, 'auch Ehemalige verwalten');
+        $this->assertSame(TestApp::caps(['member', 'view_points', 'manage_points']), $res->data['editable']);
+        $this->assertSame(403, $this->rights($this->m, ['view_points', 'manage_points', 'manage_events'])->status, 'hat er selbst nicht');
+        $this->assertSame(403, $this->rights($this->m, ['view_points', 'manage_points', 'create_users'])->status, 'bleibt den Admins vorbehalten');
+        $this->assertSame(403, $this->rights($this->m, ['view_points', 'manage_points', 'manage_former'])->status, 'auch Ehemalige verwalten');
         $this->assertSame(400, $this->rights($chef, [])->status, 'nicht die eigenen');
         $this->assertNull($this->call('GET', "/members/$chef")->data['rights']);
 
         // Hat ein Admin der Person ein Recht gegeben, das der Chef nicht hat, verwaltet er sie nicht mehr.
         $this->users->current = $this->admin;
-        $this->assertSame(200, $this->rights($this->m, ['manage_points', 'manage_events'])->status);
+        $this->assertSame(200, $this->rights($this->m, ['view_points', 'manage_points', 'manage_events'])->status);
         $this->users->current = $chef;
         $this->assertSame(403, $this->rights($this->m, [])->status);
         $this->assertNull($this->call('GET', "/members/{$this->m}")->data['rights']);
@@ -186,13 +186,13 @@ final class CapabilityOverridesTest extends TestCase
     public function testExtraRolesAreTheBase(): void
     {
         // Zusatzrolle „Strafen verwalten“: Ihr Recht lässt sich entziehen, und ein zusätzliches, das sie hat, fällt weg.
-        $this->assertSame(200, $this->rights($this->m, ['manage_penalties', 'manage_events'])->status);
+        $this->assertSame(200, $this->rights($this->m, ['view_penalties', 'manage_penalties', 'manage_events'])->status);
         $this->assertSame(200, $this->call('PATCH', "/members/{$this->m}/role", ['extra_roles' => ['penalties']])->status);
         $rights = $this->call('GET', "/members/{$this->m}")->data['rights'];
-        $this->assertSame([...TestApp::caps(['member']), 'manage_penalties'], $rights['role'], 'Rechte aller Rollen');
+        $this->assertSame([...TestApp::caps(['member']), 'view_penalties', 'manage_penalties'], $rights['role'], 'Rechte aller Rollen');
         $this->assertSame(['manage_events'], $rights['grant']);
 
-        $this->assertSame(200, $this->rights($this->m, ['manage_events'], ['manage_penalties'])->status);
+        $this->assertSame(200, $this->rights($this->m, ['manage_events'], ['view_penalties', 'manage_penalties'])->status);
         $this->assertFalse($this->can($this->m, Capability::ManagePenalties));
         $this->assertTrue($this->can($this->m, Capability::ManageEvents));
 
@@ -201,9 +201,9 @@ final class CapabilityOverridesTest extends TestCase
         $this->assertSame([], $this->call('GET', "/members/{$this->m}")->data['rights']['revoke']);
 
         // Rolle gelöscht, die nur Zusatzrolle war: Ersatz gilt als Grundlage.
-        $kasse = $this->role('Kasse', TestApp::caps(['member', 'manage_points', 'manage_penalties']));
+        $kasse = $this->role('Kasse', TestApp::caps(['member', 'view_points', 'manage_points', 'view_penalties', 'manage_penalties']));
         $this->assertSame(200, $this->call('PATCH', "/members/{$this->m}/role", ['extra_roles' => [$kasse]])->status);
-        $this->assertSame(200, $this->rights($this->m, ['manage_events'], ['manage_points'])->status);
+        $this->assertSame(200, $this->rights($this->m, ['manage_events'], ['view_points', 'manage_points'])->status);
         $this->assertSame(200, $this->call('DELETE', "/admin/roles/$kasse", [], ['replacement' => 'penalties'])->status);
         $rights = $this->call('GET', "/members/{$this->m}")->data['rights'];
         $this->assertSame(['grant' => ['manage_events'], 'revoke' => []], ['grant' => $rights['grant'], 'revoke' => $rights['revoke']]);
@@ -212,9 +212,9 @@ final class CapabilityOverridesTest extends TestCase
 
     public function testDeletedRoleAndDeletedAccount(): void
     {
-        $kasse = $this->role('Kasse', TestApp::caps(['member', 'manage_points', 'manage_penalties']));
+        $kasse = $this->role('Kasse', TestApp::caps(['member', 'view_points', 'manage_points', 'view_penalties', 'manage_penalties']));
         $k = $this->users->add('kasse', $kasse);
-        $this->assertSame(200, $this->rights($k, ['manage_events'], ['manage_penalties'])->status);
+        $this->assertSame(200, $this->rights($k, ['manage_events'], ['view_penalties', 'manage_penalties'])->status);
         $this->assertSame(200, $this->call('DELETE', "/admin/roles/$kasse", [], ['replacement' => 'points'])->status);
         $this->assertSame('points', $this->users->find($k)?->role);
         $this->assertSame([['user' => $k, 'grant' => ['manage_events'], 'revoke' => []]], $this->app->settings->get(RoleService::OVERRIDES_SETTING));

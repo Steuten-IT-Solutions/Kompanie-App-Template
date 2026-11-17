@@ -91,16 +91,16 @@ final class FormerMembersTest extends TestCase
 
     public function testReactivateRestoresRoles(): void
     {
-        $this->call('POST', '/admin/roles', ['label' => 'Kasse', 'capabilities' => TestApp::caps(['member', 'manage_penalties'])]);
+        $this->call('POST', '/admin/roles', ['label' => 'Kasse', 'capabilities' => TestApp::caps(['member', 'view_penalties', 'manage_penalties'])]);
         $this->call('PATCH', "/members/{$this->m}/role", ['extra_roles' => ['r1', 'events']]);
-        $this->call('PUT', "/members/{$this->m}/rights", ['grant' => ['manage_points'], 'revoke' => []]);
+        $this->call('PUT', "/members/{$this->m}/rights", ['grant' => ['view_points', 'manage_points'], 'revoke' => []]);
         $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/former", ['reason' => 'other'])->status);
         $this->assertSame([], $this->app->roles()->extraRolesOf($this->users->find($this->m)), 'Gäste haben keine Zusatzrollen');
 
         $res = $this->call('DELETE', "/members/{$this->m}/former");
         $this->assertSame(200, $res->status, (string) json_encode($res->data));
         $this->assertSame(['id' => $this->m, 'level' => Roles::MEMBER, 'extra_roles' => ['events', 'r1']], $res->data);
-        $this->assertSame(['manage_points'], $this->app->roles()->overridesOf($this->m)['grant'], 'Ausnahmen wieder da');
+        $this->assertSame(['view_points', 'manage_points'], $this->app->roles()->overridesOf($this->m)['grant'], 'Ausnahmen wieder da');
         $this->assertContains($this->m, $this->memberIds());
         $this->assertSame([], $this->call('GET', '/members/former')->data);
         $this->assertNull($this->call('GET', "/members/{$this->m}")->data['former']);

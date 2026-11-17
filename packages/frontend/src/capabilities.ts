@@ -176,7 +176,19 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
     key: 'company',
     label: 'Kompanie verwalten',
     items: [
+      {
+        key: 'view_points',
+        label: `${sec.points} aller Mitglieder sehen`,
+        short: `${sec.points} sehen`,
+        features: ['points'],
+      },
       { key: 'manage_points', label: `${sec.points} vergeben, Katalog pflegen`, short: `${sec.points} vergeben`, features: ['points'] },
+      {
+        key: 'view_penalties',
+        label: `${sec.penalties} aller Mitglieder sehen, auch die offenen`,
+        short: `${sec.penalties} sehen`,
+        features: ['penalties'],
+      },
       {
         key: 'manage_penalties',
         label: `${sec.penalties} vergeben und als bezahlt markieren`,
@@ -184,12 +196,30 @@ export const CAPABILITY_GROUPS: CapabilityGroup[] = [
         features: ['penalties'],
       },
       {
+        key: 'view_promotions',
+        label: `${brand.labels.rank} der Mitglieder mit Verlauf und anstehende Beförderungen sehen`,
+        short: 'Beförderungen sehen',
+        features: ['ranks'],
+      },
+      {
         key: 'manage_ranks',
         label: `${sec.ranks} pflegen, befördern und degradieren`,
         short: `${sec.ranks} pflegen`,
         features: ['ranks'],
       },
+      {
+        key: 'view_titles',
+        label: `${sec.titles} sehen und wer welchen hat`,
+        short: `${sec.titles} sehen`,
+        features: ['titles'],
+      },
       { key: 'manage_titles', label: `${sec.titles} pflegen und vergeben`, short: `${sec.titles} pflegen`, features: ['titles'] },
+      {
+        key: 'view_attendance',
+        label: `${sec.attendance}: Listen je Termin und die ${sec.attendance} der Mitglieder sehen`,
+        short: `${sec.attendance} sehen`,
+        features: ['attendance'],
+      },
       { key: 'manage_attendance', label: `${sec.attendance}: Listen je Termin führen`, short: sec.attendance, features: ['attendance'] },
       {
         key: 'manage_offices',

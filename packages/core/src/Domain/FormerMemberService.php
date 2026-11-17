@@ -108,8 +108,8 @@ final class FormerMemberService
                 continue; // Konto gelöscht bzw. anderswo wieder mit einer Rolle versehen
             }
             $out[] = self::out($user, $row) + [
-                'points' => $viewer->can(Capability::ManagePoints) ? ($totals[$id]['points'] ?? 0) : null,
-                'open_cents' => $viewer->can(Capability::ManagePenalties) ? ($totals[$id]['open_cents'] ?? 0) : null,
+                'points' => $viewer->can(Capability::ViewPoints) ? ($totals[$id]['points'] ?? 0) : null,
+                'open_cents' => $viewer->can(Capability::ViewPenalties) ? ($totals[$id]['open_cents'] ?? 0) : null,
             ];
         }
         usort($out, static fn (array $a, array $b): int => strcasecmp($a['name'], $b['name']));

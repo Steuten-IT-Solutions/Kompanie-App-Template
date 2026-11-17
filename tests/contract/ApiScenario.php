@@ -121,12 +121,12 @@ final class ApiScenario
 
         // Standardrollen der Bereiche (Issue #28): Termine, Punkte und Strafen bringen je eine mit.
         $roles = array_column((array) $this->req('GET', '/admin/roles')[1], 'capabilities', 'key');
-        $c->ok(($roles['events'] ?? null) === self::caps(['member', 'manage_events']) && ($roles['points'] ?? null) === self::caps(['member', 'manage_points']) && ($roles['penalties'] ?? null) === self::caps(['member', 'manage_penalties']), 'Standardrollen der eingeschalteten Bereiche');
+        $c->ok(($roles['events'] ?? null) === self::caps(['member', 'manage_events']) && ($roles['points'] ?? null) === self::caps(['member', 'view_points', 'manage_points']) && ($roles['penalties'] ?? null) === self::caps(['member', 'view_penalties', 'manage_penalties']), 'Standardrollen der eingeschalteten Bereiche');
         // Für die folgenden Abschnitte: eine Leitung wie früher (Punkte, Strafen, Termine).
         // Bei wiederholten Läufen auf derselben Installation gibt es sie schon (Namen sind eindeutig).
         $this->leitung = (string) (array_column((array) $this->req('GET', '/admin/roles')[1], 'key', 'label')['Kptest Leitung'] ?? '');
         if ($this->leitung === '') {
-            [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Leitung', 'capabilities' => self::caps(['member', 'manage_points', 'manage_penalties', 'manage_events'])]);
+            [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Leitung', 'capabilities' => self::caps(['member', 'view_points', 'manage_points', 'view_penalties', 'manage_penalties', 'manage_events'])]);
             $this->leitung = (string) (array_column((array) $d, 'key', 'label')['Kptest Leitung'] ?? '');
         }
         $c->ok($this->leitung !== '', 'Rolle „Kptest Leitung“ vorhanden');
@@ -368,7 +368,7 @@ final class ApiScenario
         $this->d->actAs($this->m1);
         $c->ok($this->req('GET', '/catalog')[0] === 403 && $this->req('GET', '/ranks')[0] === 200, 'Mitglied: Katalog 403, Dienstgrade weiter 200');
         $this->d->actAs($admin);
-        $c->ok($this->req('PATCH', '/admin/roles/member', ['capabilities' => [...$memberCaps, 'manage_points']])[0] === 200, 'Mitglied: auch Rechte zum Verwalten');
+        $c->ok($this->req('PATCH', '/admin/roles/member', ['capabilities' => [...$memberCaps, 'view_points', 'manage_points']])[0] === 200, 'Mitglied: auch Rechte zum Verwalten');
         $c->ok($this->req('PATCH', '/admin/roles/member', ['capabilities' => $memberCaps])[0] === 200, 'Mitglied wieder wie vorher');
         $c->ok($this->req('PATCH', '/admin/roles/member', ['capabilities' => array_values(array_diff($memberCaps, ['member']))])[0] === 400, 'Mitglied ohne Mitgliedschaft → 400');
         $c->ok($this->req('PATCH', '/admin/roles/guest', ['capabilities' => [...$guestCaps, 'member']])[0] === 400, 'Gast mit Mitgliedschaft → 400');
@@ -564,7 +564,7 @@ final class ApiScenario
         $admin = $this->user('kptest_vorschau_admin', 'admin');
         $m = $this->user('kptest_vorschau_m', 'member');
         $this->d->actAs($admin);
-        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Vorschau Kasse', 'capabilities' => self::caps(['member', 'manage_points'])]);
+        [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Vorschau Kasse', 'capabilities' => self::caps(['member', 'view_points', 'manage_points'])]);
         $cash = (string) (array_column((array) $d, 'key', 'label')['Kptest Vorschau Kasse'] ?? '');
         $this->req('PATCH', "/members/$m/role", ['extra_roles' => ['penalties']]);
         $pdf = base64_encode("%PDF-1.4\n%%EOF\n");
@@ -652,13 +652,13 @@ final class ApiScenario
         };
 
         $this->d->actAs($m);
-        $c->ok($this->req('PUT', "/members/$m/rights", ['grant' => ['manage_points']])[0] === 403, 'Ohne „Rollen vergeben“ → 403');
+        $c->ok($this->req('PUT', "/members/$m/rights", ['grant' => ['view_points', 'manage_points']])[0] === 403, 'Ohne „Rollen vergeben“ → 403');
         $this->d->actAs($admin);
-        [$s, $d] = $this->req('PUT', "/members/$m/rights", ['grant' => ['manage_points'], 'revoke' => []]);
-        $c->ok($s === 200 && ($d['grant'] ?? null) === ['manage_points'], 'Recht zusätzlich gegeben');
+        [$s, $d] = $this->req('PUT', "/members/$m/rights", ['grant' => ['view_points', 'manage_points'], 'revoke' => []]);
+        $c->ok($s === 200 && ($d['grant'] ?? null) === ['view_points', 'manage_points'], 'Recht zusätzlich gegeben');
         $c->ok(in_array('manage_points', $caps(), true), 'Gilt sofort für die Person');
         $this->d->actAs($admin);
-        $c->ok(($this->req('GET', "/members/$m")[1]['rights']['grant'] ?? null) === ['manage_points'], 'Steht bei der Person');
+        $c->ok(($this->req('GET', "/members/$m")[1]['rights']['grant'] ?? null) === ['view_points', 'manage_points'], 'Steht bei der Person');
 
         $this->d->actAs($admin);
         [$s] = $this->req('PUT', "/members/$m/rights", ['grant' => [], 'revoke' => ['member']]);
@@ -669,12 +669,12 @@ final class ApiScenario
         [, $d] = $this->req('PATCH', "/members/$m/role", ['level' => 'member']);
         $c->ok($s === 200 && ($d['level'] ?? '') === 'member' && in_array('member', $caps(), true), 'Als Gast verfallen die Ausnahmen');
         $this->d->actAs($admin);
-        $c->ok($this->req('PUT', "/members/$admin/rights", ['grant' => ['manage_points']])[0] === 400, 'Nicht für Admins → 400');
+        $c->ok($this->req('PUT', "/members/$admin/rights", ['grant' => ['view_points', 'manage_points']])[0] === 400, 'Nicht für Admins → 400');
 
         // Zusatzrollen (Issue #66): Grundlage sind alle Rollen der Person.
         $this->req('PATCH', "/members/$m/role", ['extra_roles' => ['penalties']]);
-        [$s, $d] = $this->req('PUT', "/members/$m/rights", ['revoke' => ['manage_penalties']]);
-        $c->ok($s === 200 && ($d['revoke'] ?? null) === ['manage_penalties'] && !in_array('manage_penalties', $caps(), true), 'Recht aus einer Zusatzrolle entzogen');
+        [$s, $d] = $this->req('PUT', "/members/$m/rights", ['revoke' => ['view_penalties', 'manage_penalties']]);
+        $c->ok($s === 200 && ($d['revoke'] ?? null) === ['view_penalties', 'manage_penalties'] && !in_array('manage_penalties', $caps(), true), 'Recht aus einer Zusatzrolle entzogen');
         $this->d->actAs($admin);
         $this->req('PATCH', "/members/$m/role", ['extra_roles' => []]);
         $c->ok(($this->req('GET', "/members/$m")[1]['rights']['revoke'] ?? null) === [], 'Zusatzrolle weg: Ausnahme fällt weg');
@@ -716,7 +716,7 @@ final class ApiScenario
         [, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Aufnahme', 'capabilities' => self::caps(['member', 'create_users'])]);
         $aufnahme = (string) (array_column((array) $d, 'key', 'label')['Kptest Aufnahme'] ?? '');
         $c->ok($this->req('POST', '/admin/roles', ['label' => 'Kptest Nur Kalender', 'capabilities' => ['calendar']])[0] === 201, 'Eigene Rolle nur mit dem Kalender');
-        $c->ok($this->req('POST', '/admin/roles', ['label' => 'Kptest Ungültig', 'capabilities' => ['calendar', 'manage_points']])[0] === 400, 'Verwalten ohne Mitgliederbereich → 400');
+        $c->ok($this->req('POST', '/admin/roles', ['label' => 'Kptest Ungültig', 'capabilities' => ['calendar', 'view_points', 'manage_points']])[0] === 400, 'Verwalten ohne Mitgliederbereich → 400');
         // „Intern“ (Navigation): wie der Kalender auch ohne Mitgliedschaft; jedes Recht gilt einzeln.
         [$s, $d] = $this->req('POST', '/admin/roles', ['label' => 'Kptest Intern', 'capabilities' => ['calendar', 'view_intern']]);
         $intern = array_column((array) $d, null, 'label')['Kptest Intern'] ?? [];

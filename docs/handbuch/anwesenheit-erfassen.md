@@ -1,7 +1,8 @@
 ---
 titel: "{bereich.attendance} erfassen"
 reihenfolge: 59
-rechte: [manage_attendance]
+rechte: []
+einrecht: [view_attendance, manage_attendance]
 bereiche: [attendance]
 ---
 Hier legst du je Termin eine Anwesenheitsliste an und findest die bisherigen Listen wieder. In der Liste trägst du dann ein, wer anwesend, entschuldigt oder nicht da war. Für kommende Termine kannst du schon vorher eintragen, wer entschuldigt ist.
@@ -43,6 +44,7 @@ Wie du in der Liste einträgst, steht unter [Anwesenheitsliste](seite:anwesenhei
 - Zu jedem Termin aus dem {bereich.calendar} gibt es höchstens eine Liste. Freie Termine kannst du beliebig viele anlegen.
 - Unter **Letzte Listen** stehen die 50 neuesten Listen.
 - Alle, die die {bereich.attendance} pflegen dürfen, sehen und bearbeiten dieselben Listen.
+- **Nur sehen:** Mit dem Recht **{bereich.attendance} sehen** ohne **Listen je Termin führen** fehlen die Termine aus dem {bereich.calendar} und **Freier Termin**; du siehst nur **Letzte Listen** und öffnest sie zum Ansehen.
 
 ## Siehe auch
 - [Anwesenheitsliste](seite:anwesenheitsliste)

@@ -121,7 +121,7 @@ final class MemberPhotoTest extends TestCase
 
     public function testOnlyAccountManagersChangePhotos(): void
     {
-        $manager = $this->users->add('verwalter', $this->roleWith('Kassierer', ['member', 'manage_points', 'manage_penalties']));
+        $manager = $this->users->add('verwalter', $this->roleWith('Kassierer', ['member', 'view_points', 'manage_points', 'view_penalties', 'manage_penalties']));
         $creator = $this->users->add('anleger', $this->roleWith('Anleger', ['member', 'create_users']));
         $photo = ['file' => self::file('a.jpg', self::image(10, 10))];
 
@@ -170,7 +170,7 @@ final class MemberPhotoTest extends TestCase
         $info = $this->app->memberPhotos()->repository()->find($this->m);
         $this->assertNotNull($info);
         $other = $this->users->add('anderes', Roles::MEMBER);
-        $manager = $this->users->add('verwalter', $this->roleWith('Kassierer', ['member', 'manage_points', 'manage_penalties']));
+        $manager = $this->users->add('verwalter', $this->roleWith('Kassierer', ['member', 'view_points', 'manage_points', 'view_penalties', 'manage_penalties']));
         $photos = $this->app->memberPhotos();
         $deliver = fn (?int $viewer, mixed $v = null, mixed $s = '480'): array => $photos->forDelivery($viewer === null ? null : $this->users->find($viewer), $this->m, $v ?? $info['version'], $s);
 

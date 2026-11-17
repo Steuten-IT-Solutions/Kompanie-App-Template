@@ -37,6 +37,8 @@ function OfficeHint({ office }: { office: { id: number; title: string } }) {
  */
 export function TitleList({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(sources.titles.load, sources.titles.deps, sources.titles.key);
+  // Nur sehen (view_titles ohne manage_titles): Liste ohne Anlegen, Umbenennen, Sortieren und Löschen.
+  const editable = can('manage_titles');
   const [title, setTitle] = useState('');
   const [editing, setEditing] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -79,7 +81,7 @@ export function TitleList({ onToast }: { onToast: (msg: string) => void }) {
     );
   }
 
-  const sort = useDragSort(data ?? [], reorder, editing !== null);
+  const sort = useDragSort(data ?? [], reorder, editing !== null || !editable);
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -122,7 +124,7 @@ export function TitleList({ onToast }: { onToast: (msg: string) => void }) {
               </li>
             ) : (
               <li key={t.id} {...sort.itemProps(i, `card row ${t.active ? '' : 'inactive'}`)}>
-                {list.length > 1 && sort.handle(i, t.title)}
+                {editable && list.length > 1 && sort.handle(i, t.title)}
                 <div className="row-main">
                   <div className="row-title">
                     {t.title}
@@ -137,36 +139,38 @@ export function TitleList({ onToast }: { onToast: (msg: string) => void }) {
                       </>
                     )}
                   </div>
-                  <div className="row-actions">
-                    <button
-                      className="btn btn-small btn-secondary"
-                      disabled={busy}
-                      onClick={() => {
-                        setEditTitle(t.title);
-                        setEditing(t.id);
-                      }}
-                    >
-                      Umbenennen
-                    </button>
-                    {(t.assigned > 0 || !t.active) && (
+                  {editable && (
+                    <div className="row-actions">
                       <button
                         className="btn btn-small btn-secondary"
                         disabled={busy}
-                        onClick={() => run(() => api.updateTitle(t.id, { active: !t.active }), t.active ? 'Deaktiviert' : 'Aktiviert')}
+                        onClick={() => {
+                          setEditTitle(t.title);
+                          setEditing(t.id);
+                        }}
                       >
-                        {t.active ? 'Deaktivieren' : 'Aktivieren'}
+                        Umbenennen
                       </button>
-                    )}
-                    {t.assigned === 0 && (
-                      <IconButton
-                        icon="delete"
-                        label="Löschen"
-                        variant="danger"
-                        disabled={busy}
-                        onClick={async () => (await confirmAsk(`„${t.title}“ löschen?`)) && run(() => api.deleteTitle(t.id), 'Gelöscht')}
-                      />
-                    )}
-                  </div>
+                      {(t.assigned > 0 || !t.active) && (
+                        <button
+                          className="btn btn-small btn-secondary"
+                          disabled={busy}
+                          onClick={() => run(() => api.updateTitle(t.id, { active: !t.active }), t.active ? 'Deaktiviert' : 'Aktiviert')}
+                        >
+                          {t.active ? 'Deaktivieren' : 'Aktivieren'}
+                        </button>
+                      )}
+                      {t.assigned === 0 && (
+                        <IconButton
+                          icon="delete"
+                          label="Löschen"
+                          variant="danger"
+                          disabled={busy}
+                          onClick={async () => (await confirmAsk(`„${t.title}“ löschen?`)) && run(() => api.deleteTitle(t.id), 'Gelöscht')}
+                        />
+                      )}
+                    </div>
+                  )}
                 </div>
               </li>
             ),
@@ -174,16 +178,18 @@ export function TitleList({ onToast }: { onToast: (msg: string) => void }) {
         </ul>
       )}
 
-      <form className="form card" onSubmit={add}>
-        <h3>Neuer Titel</h3>
-        <label className="field">
-          <span>Bezeichnung</span>
-          <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required />
-        </label>
-        <button className="btn btn-block" type="submit" disabled={busy}>
-          Anlegen
-        </button>
-      </form>
+      {editable && (
+        <form className="form card" onSubmit={add}>
+          <h3>Neuer Titel</h3>
+          <label className="field">
+            <span>Bezeichnung</span>
+            <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required />
+          </label>
+          <button className="btn btn-block" type="submit" disabled={busy}>
+            Anlegen
+          </button>
+        </form>
+      )}
     </div>
   );
 }
@@ -198,12 +204,15 @@ export function MemberTitles({
   titles,
   onChanged,
   onToast,
+  readOnly = false,
 }: {
   id: number;
   member: boolean;
   titles: TitleRef[];
   onChanged: () => void;
   onToast: (msg: string) => void;
+  /** Nur sehen (view_titles ohne manage_titles): die Titel der Person als Liste. */
+  readOnly?: boolean;
 }) {
   const all = useAsync(sources.titles.load, sources.titles.deps, sources.titles.key);
   const current = titles.map((t) => t.id);
@@ -226,6 +235,27 @@ export function MemberTitles({
     } finally {
       setBusy(false);
     }
+  }
+
+  if (readOnly) {
+    return (
+      <section className="member-titles">
+        <h3 className="section-title">{sec.titles}</h3>
+        {titles.length === 0 ? (
+          <Empty>Keine {sec.titles}.</Empty>
+        ) : (
+          <ul className="card-list">
+            {titles.map((t) => (
+              <li key={t.id} className="card row">
+                <div className="row-main">
+                  <div className="row-title">{t.title}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    );
   }
 
   return (

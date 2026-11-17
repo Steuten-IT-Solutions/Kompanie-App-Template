@@ -62,7 +62,17 @@ Jedes Recht gilt für sich; keines schließt ein anderes ein. Die Rechte stehen 
 - **Inhalte verwalten** und **Kompanie verwalten**: je Bereich mit eigenen Aufgaben ein Recht, zum Beispiel **{bereich.points} vergeben, Katalog pflegen** oder **Öffentliche {bereich.events} pflegen**.
 - **Mitglieder und Rollen**: **Persönliche Angaben sehen** (Adresse, Handynummer, E-Mail-Adresse und Geburtsdatum der Mitglieder auf ihrer Seite in der Verwaltung), **Persönliche Angaben pflegen** (diese Angaben ändern), **Mitglieder anlegen und Startpasswörter erzeugen**, **Ehemalige verwalten** (Liste der Ehemaligen, Ehemalige anlegen und importieren, Mitglieder als ehemalig eintragen und wieder aufnehmen) und **Rollen vergeben**.
 
-Die eigenen Daten in **Meins** und alle Rechte zum Verwalten gibt es nur zusammen mit **Gehört zur Kompanie**: Hakst du eines davon an, hakt die App **Gehört zur Kompanie** mit an. Nimmst du es weg, entfallen sie. Ebenso gibt es **Persönliche Angaben pflegen** nur zusammen mit **Persönliche Angaben sehen**. Die übrigen Rechte zum Sehen gehen auch ohne, z. B. für Anwärter.
+Die eigenen Daten in **Meins** und alle Rechte zum Verwalten gibt es nur zusammen mit **Gehört zur Kompanie**: Hakst du eines davon an, hakt die App **Gehört zur Kompanie** mit an. Nimmst du es weg, entfallen sie. Die übrigen Rechte zum Sehen gehen auch ohne, z. B. für Anwärter.
+
+Viele Bereiche haben ein Recht zum Sehen und eines zum Ändern, z. B. **{bereich.points} aller Mitglieder sehen** und **{bereich.points} vergeben**. Wer nur sehen darf, sieht dieselben Angaben, aber ohne Knöpfe und Formulare zum Ändern. Das Recht zum Ändern gibt es nur zusammen mit dem zum Sehen: Hakst du es an, hakt die App das Sehen mit an; nimmst du das Sehen weg, entfällt auch das Ändern. So ist es bei:
+- **Persönliche Angaben sehen** und **Persönliche Angaben pflegen**
+- **{bereich.points} aller Mitglieder sehen** und **{bereich.points} vergeben, Katalog pflegen**
+- **{bereich.penalties} aller Mitglieder sehen** und **{bereich.penalties} vergeben und als bezahlt markieren**
+- **Beförderungen sehen** ({begriff.rank} der Mitglieder mit Verlauf und die Beförderungsübersicht) und **{bereich.ranks} pflegen, befördern und degradieren**
+- **{bereich.titles} sehen** und **{bereich.titles} pflegen und vergeben**
+- **{bereich.attendance} sehen** und **{bereich.attendance}: Listen je Termin führen**
+
+Jedes dieser Rechte zum Sehen öffnet auch die Mitgliederliste der Verwaltung.
 
 Einstellungen, Updates und Datensicherung bleiben immer den {rolle.admin}s vorbehalten; dieses Recht kannst du keiner anderen Rolle geben.
 
@@ -72,6 +82,7 @@ Einstellungen, Updates und Datensicherung bleiben immer den {rolle.admin}s vorbe
 - **Persönliche Angaben:** Seine eigenen Angaben sieht und ändert jede Person unter **Meins → Konto**. Wer Mitglieder anlegen darf, trägt sie beim Anlegen mit ein, sieht sie danach aber nur mit **Persönliche Angaben sehen**. Rollen, die vor diesem Recht **Mitglieder anlegen** hatten, haben nach dem Update beide Rechte für persönliche Angaben; nimm sie dort weg, wenn die Rolle sie nicht braucht.
 - **Ehemalige:** Die Kachel **Ehemalige** und alles dazu gibt es mit dem Recht **Ehemalige verwalten**. Rollen, die vorher **Mitglieder anlegen** hatten, haben nach dem Update auch dieses Recht. Soll z. B. die Rolle, die {bereich.points} vergibt, auch Ehemalige pflegen, hake es dort an. Wie lange die Daten Ehemaliger aufbewahrt werden, stellen nur {rolle.admin}s ein. Das Recht **Ehemalige** unter **Intern** erlaubt nur das Ansehen in der Mitgliederliste.
 - **Zu- und absagen:** Das Recht **Bei Terminen des internen Kalenders zu- und absagen** gibt es nur zusammen mit **Interner Kalender**, nicht aber nur mit **Gehört zur Kompanie**, damit auch Anwärter zusagen können. Nach dem Update hat es jede Rolle mit dem internen Kalender außer {rolle.guest}.
+- **Sehen und Ändern getrennt:** Rollen und Personen, die vor dieser Trennung ein Recht zum Ändern hatten, haben nach dem Update auch das passende Recht zum Sehen. Soll jemand z. B. die {bereich.points} nur sehen, nimm **{bereich.points} vergeben** weg.
 - **Nach dem Update:** Jede Rolle sieht zuerst genau das, was sie vorher sah. Danach kannst du jedes Recht einzeln wegnehmen oder dazugeben.
 - **Rollen der Bereiche:** Schaltest du einen Bereich mit eigenen Aufgaben ein, kommt eine Rolle dazu, die wie der Bereich mit „verwalten“ dahinter heißt, z. B. „{bereich.points} verwalten“. Sie sieht, was {rolle.member} anfangs sieht, und hat das Recht des Bereichs (siehe [Bereiche](seite:admin-bereiche)).
 - **Grundrolle und Zusatzrollen:** Jede Person hat genau eine Grundrolle und dazu auf Wunsch Zusatzrollen; sie hat die Rechte aller ihrer Rollen zusammen. Zusatzrollen können nur eigene Rollen und Rollen der Bereiche sein. Sie gibt es nur zu einer Grundrolle, die zur Kompanie gehört.

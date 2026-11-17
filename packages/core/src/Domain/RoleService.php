@@ -61,6 +61,8 @@ final class RoleService
     public const RESPOND_SETTING = 'roles_respond_added';
     /** Rechte aus Roles::ADDED_VIEW, die die Rollen schon bekommen haben (migrateAddedViewRights). */
     public const ADDED_VIEW_SETTING = 'roles_view_added';
+    /** Schreibrechte aus Capability::READ_OF, deren Leserecht die Rollen schon bekommen haben (migrateReadRights). */
+    public const READ_SPLIT_SETTING = 'roles_read_split';
     public const LABEL_MAX = 30;
     public const MAX_ROLES = 30;
     public const FACTOR_MAX = 10.0;
@@ -328,7 +330,8 @@ final class RoleService
         return match ($needed) {
             Capability::Member => ApiError::invalid('Rechte zum Verwalten und die eigenen Punkte, Strafen, Dienstgrade und Anwesenheit gibt es nur mit „Mitglied der Kompanie“.'),
             Capability::Calendar => ApiError::invalid('Zu- und absagen gibt es nur zusammen mit dem internen Kalender.'),
-            default => ApiError::invalid('„Persönliche Angaben pflegen“ gibt es nur zusammen mit „Persönliche Angaben sehen“.'),
+            Capability::ViewPersonal => ApiError::invalid('„Persönliche Angaben pflegen“ gibt es nur zusammen mit „Persönliche Angaben sehen“.'),
+            default => ApiError::invalid('Ein Recht zum Ändern gibt es nur zusammen mit dem passenden Recht zum Sehen.'),
         };
     }
 
@@ -685,6 +688,7 @@ final class RoleService
             $this->migrateFormerRights();
             $this->migrateRespondRights();
             $this->migrateAddedViewRights();
+            $this->migrateReadRights();
             return;
         }
         $roles = $this->templates();
@@ -702,6 +706,7 @@ final class RoleService
         $this->settings->set(self::PERSONAL_SETTING, true);
         $this->settings->set(self::RESPOND_SETTING, true);
         $this->settings->set(self::ADDED_VIEW_SETTING, Roles::ADDED_VIEW);
+        $this->settings->set(self::READ_SPLIT_SETTING, array_keys(Capability::READ_OF));
     }
 
     /**
@@ -840,6 +845,39 @@ final class RoleService
         if ($this->settings->get($setting)) {
             return;
         }
+        $this->grantAlong($source, $added, $guest);
+        $this->settings->set($setting, true);
+    }
+
+    /**
+     * Einmalig je Paar nach dem Update (Rechte in Lesen und Schreiben aufgeteilt, 17.11.2026): Wer ein Schreibrecht aus
+     * Capability::READ_OF hat, sah bisher auch, was es zeigt. Jede Rolle mit dem Schreibrecht (auch Gast) bekommt das
+     * Leserecht, ebenso jede Person, der das Schreibrecht zusätzlich gegeben ist; wem es entzogen ist, dem wird auch das
+     * Leserecht entzogen. Danach sieht und ändert jede Person dasselbe wie vorher. Welche Paare schon verteilt sind, steht
+     * in READ_SPLIT_SETTING: Ein später ergänztes Paar wird so ebenfalls genau einmal verteilt.
+     */
+    private function migrateReadRights(): void
+    {
+        $done = $this->settings->get(self::READ_SPLIT_SETTING);
+        $done = is_array($done) ? array_values(array_filter($done, 'is_string')) : [];
+        $todo = array_diff(array_keys(Capability::READ_OF), $done);
+        if ($todo === []) {
+            return;
+        }
+        foreach ($todo as $write) {
+            $this->grantAlong(Capability::from($write), [Capability::READ_OF[$write]], true);
+        }
+        $this->settings->set(self::READ_SPLIT_SETTING, [...$done, ...array_values($todo)]);
+    }
+
+    /**
+     * $added jeder Rolle mit $source geben (außer Admin, ohne $guest auch außer Gast) und den Ausnahmen einzelner Personen
+     * folgen lassen: zusätzlich gegeben bzw. entzogen wie $source.
+     *
+     * @param list<string> $added
+     */
+    private function grantAlong(Capability $source, array $added, bool $guest): void
+    {
         $create = $source->value;
         $roles = $this->all();
         $changed = false;
@@ -863,7 +901,6 @@ final class RoleService
                 $this->storeOverrides($id, self::normalized($this->grantedFor($id, $u->role), ['grant' => self::ordered($grant), 'revoke' => self::ordered($revoke)]));
             }
         }
-        $this->settings->set($setting, true);
     }
 
     /**

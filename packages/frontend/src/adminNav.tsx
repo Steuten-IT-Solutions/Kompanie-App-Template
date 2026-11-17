@@ -14,8 +14,12 @@ const sec = brand.labels.sections;
 const canPoints = (): boolean => !!config?.features.points && can('manage_points');
 const canPenalties = (): boolean => !!config?.features.penalties && can('manage_penalties');
 const canRanks = (): boolean => !!config?.features.ranks && can('manage_ranks');
-const canTitles = (): boolean => !!config?.features.titles && can('manage_titles');
-const canAttendance = (): boolean => !!config?.features.attendance && can('manage_attendance');
+// Leserechte (Rechte in Lesen und Schreiben aufgeteilt): Mitgliederliste, Bericht und die Seiten zum Ansehen
+const seePoints = (): boolean => !!config?.features.points && can('view_points');
+const seePenalties = (): boolean => !!config?.features.penalties && can('view_penalties');
+const seeRanks = (): boolean => !!config?.features.ranks && can('view_promotions');
+const seeTitles = (): boolean => !!config?.features.titles && can('view_titles');
+const seeAttendance = (): boolean => !!config?.features.attendance && can('view_attendance');
 const canOffices = (): boolean => !!config?.features.offices && can('manage_offices');
 const canLists = (): boolean => !!config?.features.lists && can('manage_lists');
 const canMail = (): boolean => !!config?.features.mail && can('send_mail');
@@ -36,15 +40,15 @@ export function reportAllowed(): boolean {
   return memberListAllowed() || canPassive() || canOffices() || (!!f?.inventory && can('manage_inventory'));
 }
 
-/** Mitgliederliste: für alle, die Punkte oder Strafen vergeben, Dienstgrade, Titel oder Anwesenheit pflegen, Mitglieder
- * anlegen, Ehemalige verwalten, Rollen vergeben oder Kompanien zuordnen. */
+/** Mitgliederliste: für alle, die Punkte, Strafen, Dienstgrade, Titel oder Anwesenheit der Mitglieder sehen, Mitglieder
+ * anlegen, Ehemalige verwalten, Rollen vergeben oder Kompanien zuordnen (wie Capability::memberList im Kern). */
 export function memberListAllowed(): boolean {
   return (
-    canPoints() ||
-    canPenalties() ||
-    canRanks() ||
-    canTitles() ||
-    canAttendance() ||
+    seePoints() ||
+    seePenalties() ||
+    seeRanks() ||
+    seeTitles() ||
+    seeAttendance() ||
     canCompanies() ||
     can('view_personal') ||
     can('create_users') ||
@@ -79,16 +83,16 @@ export function adminTabs(): AdminTab[] {
       { id: 'strafe', label: `${sec.penalties} +`, on: canPenalties() },
       { id: 'katalog', label: sec.catalog, on: points, group: SETUP },
       { id: 'dienstgrade', label: sec.ranks, on: canRanks(), group: SETUP },
-      { id: 'befoerderungen', label: 'Beförderungen', on: canRanks() && !!config?.features.points },
+      { id: 'befoerderungen', label: 'Beförderungen', on: seeRanks() && !!config?.features.points },
       // Aufnahmen: Anwärter, die die Voraussetzung erfüllen (Zahl im Kreis); der Server schickt die Zahl nur, wenn es passt
       { id: 'aufnahmen', label: 'Aufnahmen', on: can('create_users') && config?.admissionsDue != null },
-      { id: 'titel', label: sec.titles, on: canTitles(), group: SETUP },
+      { id: 'titel', label: sec.titles, on: seeTitles(), group: SETUP },
       { id: 'aemter', label: sec.offices, on: canOffices(), group: SETUP },
       { id: 'kompanien', label: sec.companies, on: canCompanies(), group: SETUP },
       { id: 'sponsoren', label: sec.sponsors, on: canSponsors(), group: SETUP },
       { id: 'seiten', label: sec.pages, on: canPages(), group: SETUP },
       { id: 'webseite', label: 'Webseite', on: canWebsite(), group: SETUP },
-      { id: 'anwesenheit', label: sec.attendance, on: canAttendance() },
+      { id: 'anwesenheit', label: sec.attendance, on: seeAttendance() },
       { id: 'brett', label: sec.board, on: canPostBoard(), route: 'brett' },
       { id: 'umfragen', label: sec.polls, on: canManagePolls(), route: 'umfragen/verwalten' },
       { id: 'inventar', label: sec.inventory, on: !!config?.features.inventory && can('manage_inventory'), route: 'inventar' },

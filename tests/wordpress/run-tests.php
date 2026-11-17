@@ -51,12 +51,12 @@ $legacyCaps = static fn (array $l): array => array_values(array_filter(
 $c->ok($caps($member) === $legacyCaps(['member']), 'Mitglied: Mitgliedschaft und Rechte zum Sehen');
 $c->ok($caps($organizer) === $legacyCaps(['member', 'manage_events']), 'Termine verwalten: Termine und Mitglied, keine Punkte/Strafen');
 $c->ok($app->users->find($organizer)?->role === 'events' && get_user_meta($organizer, KompanieApp\WordPress\WpUsers::metaKey(), true) === 'events', 'Rolle steht in der Benutzer-Option der Website');
-$c->ok($caps($manager) === $legacyCaps(['member', 'manage_points']), 'Punkte verwalten: Punkte und Mitglied');
+$c->ok($caps($manager) === $legacyCaps(['member', 'view_points', 'manage_points']), 'Punkte verwalten: Punkte und Mitglied');
 $c->ok(in_array(Roles::ROLE_MEMBER, get_userdata($member)->roles, true), 'Mitglied behält die frühere WP-Rolle (Zurückrollen)');
 $c->ok(count($caps($admin)) === count(KompanieApp\Core\Auth\Capability::cases()) && $app->users->find($admin)?->role === 'admin', 'Administrator: alle App-Rechte');
 
 // Eigene Rolle aus der App wirkt auch in WordPress.
-$app->roles()->create(['label' => 'Kpwp Kasse', 'capabilities' => $legacyCaps(['member', 'manage_penalties'])]);
+$app->roles()->create(['label' => 'Kpwp Kasse', 'capabilities' => $legacyCaps(['member', 'view_penalties', 'manage_penalties'])]);
 $kasseKey = (string) array_search('Kpwp Kasse', array_column($app->roles()->all(), 'label', 'key'), true);
 $app->users->setRole($member, $kasseKey);
 clean_user_cache($member);
