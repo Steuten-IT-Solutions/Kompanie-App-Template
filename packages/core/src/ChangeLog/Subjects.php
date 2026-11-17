@@ -81,7 +81,7 @@ final class Subjects
         '/admin/backup/drive' => ['enabled' => 'Automatisch sichern'],
         '/admin/backup/server' => ['enabled' => 'Automatisch sichern'],
         '/admin/former/retention' => ['years' => 'Frist (Jahre)'],
-        '/passive-members/settings' => ['fee_cents' => 'Jahresbeitrag (Vorschlag, Cent)', 'methods' => 'Zahlungsarten'],
+        '/passive-members/settings' => ['fee_cents' => 'Jahresbeitrag (Vorschlag, Cent)', 'methods' => 'Zahlungsarten', 'birthday_ages' => 'Geburtstage: Alter', 'birthday_days' => 'Geburtstage: Tage vorher'],
         '/admin/website' => ['home_page_title' => 'Startseite der Webseite', 'entry.state' => 'Einstiegsdatei'],
     ];
 
@@ -235,7 +235,7 @@ final class Subjects
             'PUT /admin/backup/encryption' => $this->event('Einstellungen', 'Verschlüsselung der Sicherung', 'update'),
             'DELETE /admin/backup/encryption' => $this->event('Einstellungen', 'Verschlüsselung der Sicherung', 'delete'),
             'PUT /admin/former/retention' => $this->settings('Aufbewahrungsfrist für Ehemalige', '/admin/former/retention'),
-            'PATCH /passive-members/settings' => $this->settings('Beiträge der Passiven', '/passive-members/settings'),
+            'PATCH /passive-members/settings' => $this->settings('Einstellungen der Passiven', '/passive-members/settings'),
             'PUT /admin/activity/settings' => $this->value('Nutzung', 'Erfassung je Person', fn (): bool => $this->app->activity()->personal()),
             'PUT /admin/changes/settings' => $this->values('Änderungsprotokoll', fn (): array => [
                 'Änderungen protokollieren' => $this->app->changeLog()->enabled(),

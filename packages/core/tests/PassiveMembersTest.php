@@ -184,8 +184,8 @@ final class PassiveMembersTest extends TestCase
     public function testPayments(): void
     {
         $id = $this->passive('Erika', 'Mustermann', ['caretaker_id' => $this->member]);
-        $this->assertSame(['fee_cents' => 0, 'methods' => ['Bar', 'SEPA', 'PayPal']], $this->call('GET', '/passive-members/settings')->data, 'kein Vorschlag, Zahlungsarten vorgegeben');
-        $this->assertSame(['fee_cents' => 2400, 'methods' => ['Bar', 'SEPA', 'PayPal']], $this->call('PATCH', '/passive-members/settings', ['fee_cents' => 2400])->data);
+        $this->assertSame(['fee_cents' => 0, 'methods' => ['Bar', 'SEPA', 'PayPal'], 'birthday_ages' => [], 'birthday_days' => 7], $this->call('GET', '/passive-members/settings')->data, 'kein Vorschlag, Zahlungsarten vorgegeben');
+        $this->assertSame(['fee_cents' => 2400, 'methods' => ['Bar', 'SEPA', 'PayPal'], 'birthday_ages' => [], 'birthday_days' => 7], $this->call('PATCH', '/passive-members/settings', ['fee_cents' => 2400])->data);
         $list = $this->call('GET', '/passive-members')->data;
         $this->assertSame(2400, $list['fee_cents']);
         $this->assertSame(['Bar', 'SEPA', 'PayPal'], $list['methods']);

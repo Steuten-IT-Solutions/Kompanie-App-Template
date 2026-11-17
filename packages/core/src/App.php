@@ -127,6 +127,7 @@ final class App
         MailingService::CLEANUP_TASK => 86400,
         PollService::TASK => 3600,
         BirthdayService::TASK => 3600,
+        PassiveMemberService::TASK => 3600,
         BugReportService::TASK => BugReportService::INTERVAL,
         BackupUploadService::TASK => BackupUploadService::INTERVAL,
         ServerBackupService::TASK => ServerBackupService::INTERVAL,
@@ -311,6 +312,8 @@ final class App
             PollService::TASK => $this->features()->enabled('polls'),
             // Geburtstage: stündlich, benachrichtigt aber erst ab der eingestellten Stunde (Standard 7 Uhr) Ortszeit und je Geburtstag einmal am Tag.
             BirthdayService::TASK => $this->features()->enabled('birthdays'),
+            // Geburtstage der Passiven: stündlich, erinnert ab derselben Stunde, nur mit eingestellten Altern.
+            PassiveMemberService::TASK => $this->features()->enabled(PassiveMemberService::FEATURE) && $this->passives()->birthdayAges() !== [],
             // Fehlermeldungen (Issue #64): stündlich als Rückfall, nach dem Weiterleiten vorgezogen; räumt auch ohne
             // Empfänger den Eingang auf (erledigte Meldungen nach 30 Tagen).
             BugReportService::TASK => true,
@@ -417,6 +420,8 @@ final class App
                 $this->polls()->remind();
             } elseif ($task === BirthdayService::TASK && $this->features()->enabled('birthdays')) {
                 $this->birthdays()->notifyToday();
+            } elseif ($task === PassiveMemberService::TASK) {
+                $this->passives()->remindBirthdays();
             } elseif ($task === BugReportService::TASK) {
                 $this->bugReports()->runTask();
             } elseif ($task === BackupUploadService::TASK) {

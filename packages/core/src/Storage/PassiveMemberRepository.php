@@ -11,7 +11,7 @@ use KompanieApp\Core\Storage\Sql\Connection;
  * MemberContactRepository), Telefon, E-Mail, Geburtsdatum und optional ein Mitglied als Betreuer.
  *
  * @phpstan-type AddressRow array{street: string, house_number: string, extra: string, postal_code: string, city: string, country: string, country_name: string}
- * @phpstan-type PassiveRow array{id: int, first_name: string, last_name: string, address: AddressRow|null, phone: string, email: string, birth_date: string|null, caretaker_id: int|null, updated_at: string}
+ * @phpstan-type PassiveRow array{id: int, first_name: string, last_name: string, address: AddressRow|null, phone: string, email: string, birth_date: string|null, caretaker_id: int|null, birthday_reminded: string, updated_at: string}
  * @phpstan-type PaymentRow array{id: int, passive_id: int, year: int, amount_cents: int, paid_on: string, method: string}
  */
 final class PassiveMemberRepository
@@ -67,6 +67,15 @@ final class PassiveMemberRepository
         if ($values !== []) {
             $this->db->update('passive_members', $values + ['updated_by' => $by, 'updated_at' => $now], ['id' => $id]);
         }
+    }
+
+    /**
+     * Erinnerung an den Geburtstag an diesem Tag (JJJJ-MM-TT) beanspruchen: nur der erste Lauf bekommt true, damit
+     * wiederholte oder gleichzeitige Läufe nicht doppelt erinnern.
+     */
+    public function claimBirthday(int $id, string $date): bool
+    {
+        return $this->db->execute('UPDATE {passive_members} SET birthday_reminded = ? WHERE id = ? AND birthday_reminded <> ?', [$date, $id, $date]) > 0;
     }
 
     /** Löscht den Passiven mit seinen Zahlungen. */
@@ -184,6 +193,7 @@ final class PassiveMemberRepository
             // MySQL liefert JJJJ-MM-TT, SQLite den gespeicherten Text
             'birth_date' => $birth === null || $birth === '' ? null : substr((string) $birth, 0, 10),
             'caretaker_id' => $caretaker === null || $caretaker === '' ? null : (int) $caretaker,
+            'birthday_reminded' => (string) ($r['birthday_reminded'] ?? ''),
             'updated_at' => (string) $r['updated_at'],
         ];
     }

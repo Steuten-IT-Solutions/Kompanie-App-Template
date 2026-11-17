@@ -1,13 +1,14 @@
 import { useState, type FormEvent } from 'react';
-import { api, type PassiveInput, type PassiveList, type PassiveMember, type PassivePayment } from '../api';
+import { api, type PassiveBirthday, type PassiveInput, type PassiveList, type PassiveMember, type PassivePayment } from '../api';
 import { addressInput, EMPTY_ADDRESS, formatAddress, mapLinkTarget, mapPlatform, mapUrl, type Address } from '../address';
 import { normalizeEmail } from '../email';
 import { normalizePhone } from '../phone';
 import { formatBirthday } from '../birthdays';
-import { formatDate, formatEuro, parseEuroToCents, todayYmd } from '../format';
+import { formatDate, formatEuro, formatWeekdayDateYear, parseEuroToCents, parseLocalDate, shortMonth, todayYmd } from '../format';
 import { AddressFields, EmailField, Empty, ErrorBox, Loading, PhoneField, useAsync } from '../ui';
 import { IconButton } from '../icons';
 import { confirmAsk } from '../ask';
+import { parseAges } from '../passiveAges';
 
 const NAME_MAX = 100;
 /** Höchster Betrag einer Zahlung (wie auf dem Server) */
@@ -242,6 +243,128 @@ function PaymentSettings({
         </button>
       </div>
     </form>
+  );
+}
+
+/** Höchste Tage vorher (wie auf dem Server) */
+const BIRTHDAY_DAYS_MAX = 30;
+
+/** Einstellung der Erinnerung an Geburtstage: Alter (leer = aus) und Tage vorher, anzeigen und ändern. */
+function BirthdaySettings({
+  ages,
+  days,
+  busy,
+  onSave,
+}: {
+  ages: number[];
+  days: number;
+  busy: boolean;
+  onSave: (data: { birthday_ages: number[]; birthday_days: number }) => Promise<boolean>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [agesText, setAgesText] = useState('');
+  const [daysInput, setDaysInput] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    const list = parseAges(agesText);
+    if (typeof list === 'string') return setError(list);
+    const n = Number(daysInput);
+    if (!/^\d+$/.test(daysInput.trim()) || n > BIRTHDAY_DAYS_MAX) return setError(`Bitte 0 bis ${BIRTHDAY_DAYS_MAX} Tage vorher angeben.`);
+    setError(null);
+    if (await onSave({ birthday_ages: list, birthday_days: n })) setEditing(false);
+  }
+  if (!editing) {
+    return (
+      <p className="small passive-birthday-setting">
+        Erinnerung an Geburtstage:{' '}
+        {ages.length > 0 ? (
+          `mit ${ages.join(', ')} Jahren, ${days === 0 ? 'am Tag selbst' : days === 1 ? '1 Tag vorher' : `${days} Tage vorher`}`
+        ) : (
+          <span className="muted">aus</span>
+        )}{' '}
+        <button
+          type="button"
+          className="link-button"
+          onClick={() => {
+            setAgesText(ages.join(', '));
+            setDaysInput(String(days));
+            setError(null);
+            setEditing(true);
+          }}
+        >
+          {ages.length > 0 ? 'Ändern' : 'Einrichten'}
+        </button>
+      </p>
+    );
+  }
+  return (
+    <form className="form card" onSubmit={submit}>
+      <h3>Erinnerung an Geburtstage</h3>
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+      <label className="field">
+        <span>Bei diesen Altern erinnern</span>
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="z. B. 50, 60, 70, 75, 80"
+          value={agesText}
+          onChange={(e) => setAgesText(e.target.value)}
+          autoFocus
+        />
+      </label>
+      <p className="small muted">Mehrere Alter mit Komma trennen. Leer heißt keine Erinnerung.</p>
+      <label className="field">
+        <span>Tage vorher</span>
+        <input type="number" min={0} max={BIRTHDAY_DAYS_MAX} value={daysInput} onChange={(e) => setDaysInput(e.target.value)} required />
+      </label>
+      <p className="small muted">
+        0 heißt am Tag selbst. Erinnert werden alle, die Passive verwalten und persönliche Angaben sehen dürfen, per Benachrichtigung und
+        oben in dieser Liste.
+      </p>
+      <div className="button-row">
+        <button className="btn" type="submit" disabled={busy}>
+          {busy ? 'Speichert …' : 'Speichern'}
+        </button>
+        <button className="btn btn-secondary" type="button" onClick={() => setEditing(false)} disabled={busy}>
+          Abbrechen
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** Hinweis: anstehende Geburtstage der eingestellten Alter (wie „Anstehende Geburtstage“ bei den Terminen) */
+function UpcomingBirthdays({ birthdays }: { birthdays: PassiveBirthday[] }) {
+  if (birthdays.length === 0) return null;
+  return (
+    <section className="card birthdays-upcoming passive-birthdays" aria-label="Anstehende Geburtstage">
+      <h2 className="birthdays-title">Anstehende Geburtstage</h2>
+      <ul className="card-list birthday-list">
+        {birthdays.map((b) => {
+          const date = parseLocalDate(b.date);
+          return (
+            <li key={b.id} className={`card birthday-item ${b.days === 0 ? 'birthday-today' : ''}`}>
+              <div className="date-badge" aria-hidden="true">
+                <span className="day">{date.getDate()}</span>
+                <span className="mon">{shortMonth(date)}</span>
+              </div>
+              <div className="birthday-main">
+                <div className="birthday-name">{b.name}</div>
+                <div className="birthday-when">
+                  {b.days === 1 ? 'Morgen' : formatWeekdayDateYear(date)} · wird {b.age}
+                </div>
+              </div>
+              {b.days === 0 && <span className="badge birthday-badge">Heute</span>}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -484,12 +607,21 @@ export function PassiveAdmin({ onToast }: { onToast: (msg: string) => void }) {
         {data.passives.length > 0 && `, Beitrag ${year}: ${paidCount} bezahlt, ${data.passives.length - paidCount} offen`}
       </p>
       {editing === null && paying === null && errorBox}
+      <UpcomingBirthdays birthdays={data.birthdays ?? []} />
       <PaymentSettings
         feeCents={feeCents}
         methods={methods}
         busy={busy}
         onSave={(settings) => run(() => api.updatePassiveSettings(settings), 'Gespeichert')}
       />
+      {data.birthday_ages !== undefined && (
+        <BirthdaySettings
+          ages={data.birthday_ages}
+          days={data.birthday_days ?? 7}
+          busy={busy}
+          onSave={(settings) => run(() => api.updatePassiveSettings(settings), 'Gespeichert')}
+        />
+      )}
       {editing === 'new' ? (
         <>
           {errorBox}

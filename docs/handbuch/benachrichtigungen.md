@@ -65,6 +65,7 @@ Nur für {rolle.member}:
 - **{bereich.events}: Erinnerung an deine Zu- oder Absage**: wenn du bei einem Termin des internen Kalenders noch nicht zu- oder abgesagt hast, zur Uhrzeit der Erinnerung einige Tage vorher (üblich 3), bei einem Anmeldeschluss am Tag davor. Nur, wenn du zu- und absagen darfst und ein {rolle.admin} Zu- und Absagen samt Erinnerung eingeschaltet hat.
 - **{bereich.polls}: neue Umfrage und Erinnerung**: bei jeder neuen Umfrage und 24 Stunden vor ihrem Ende, wenn du noch nicht geantwortet hast.
 - **{bereich.birthdays}: am Tag selbst**: am Geburtstag eines anderen Mitglieds, das seinen Geburtstag anderen zeigt, ab der Uhrzeit, die ein {rolle.admin} festlegt (üblich 7 Uhr).
+- **Passive: Geburtstage der eingestellten Alter**: wenn ein Passiver bald eines der Alter erreicht, die unter **Verwaltung → Passive** eingestellt sind, die dort eingestellten Tage vorher (üblich 7), ab derselben Uhrzeit wie die Geburtstage. Nur, wenn du Passive verwalten und persönliche Angaben sehen darfst.
 - **{bereich.penalties}: neue Einträge**: bei einem neuen Eintrag für dich.
 - **{bereich.points}: neue Einträge**: wenn du {bereich.points} bekommst oder sie dir abgezogen werden, mit Wert und Grund.
 - **{begriff.rank}: Beförderung oder Änderung**: wenn sich dein {begriff.rank} ändert.

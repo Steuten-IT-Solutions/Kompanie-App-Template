@@ -2141,6 +2141,16 @@ WHERE title IS NULL",
                     'CREATE UNIQUE INDEX IF NOT EXISTS {candidate_since}_user_role ON {candidate_since} (user_id, role_key)',
                 ],
             ],
+            // Geburtstage der Passiven (PassiveMemberService::remindBirthdays): Tag des Geburtstags, an den zuletzt erinnert
+            // wurde (JJJJ-MM-TT, leer = noch nie), damit jede Erinnerung nur einmal kommt.
+            68 => [
+                'mysql' => [
+                    'ALTER TABLE {passive_members} ADD COLUMN birthday_reminded varchar(10) NOT NULL DEFAULT \'\'',
+                ],
+                'sqlite' => [
+                    'ALTER TABLE {passive_members} ADD COLUMN birthday_reminded TEXT NOT NULL DEFAULT \'\'',
+                ],
+            ],
         ];
     }
 
