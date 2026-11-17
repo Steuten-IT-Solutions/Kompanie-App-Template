@@ -1295,8 +1295,13 @@ test('Eigene Leiste für Gäste: Mitglieder unten statt unter „Intern“, Ange
     // Gast ohne Anmeldung: Mitglieder unten und als Startseite.
     await page.context().clearCookies();
     await page.goto('/app/');
-    await expect(page).toHaveURL(/#\/mitglieder$/);
     await expect(tabbar.getByRole('button', { name: 'Mitglieder' })).toHaveAttribute('aria-current', 'page');
+    // Ohne Adresse leitet die App nur um, wenn die Startseite nicht schon der erste Punkt der Leiste ist (startRedirect in
+    // App.tsx); sonst bleibt die Adresse ohne #/….
+    const first = (
+      (await tabbar.getByRole('button').first().getAttribute('aria-label')) ?? (await tabbar.getByRole('button').first().innerText())
+    ).trim();
+    await expect(page).toHaveURL(first === 'Mitglieder' ? /\/app\/$/ : /#\/mitglieder$/);
     await shot(page, '41-navigation-gaeste');
   } finally {
     await login(page, 'admin', ADMIN_PASSWORD).catch(() => undefined);
