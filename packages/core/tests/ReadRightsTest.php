@@ -178,6 +178,47 @@ final class ReadRightsTest extends TestCase
         $this->assertFalse($this->call('GET', '/polls/' . $poll->data['id'])->data['results_visible'] ?? null);
     }
 
+    public function testBoardHistoryWithoutPosting(): void
+    {
+        $msg = $this->call('POST', '/board', ['title' => 'Nur für Anna', 'text' => '<p>Hallo</p>', 'audience' => 'person', 'audience_ids' => [$this->anna], 'push' => false, 'mail' => false]);
+        $this->assertSame(201, $msg->status, (string) json_encode($msg->data));
+        $this->assertSame(200, $this->call('DELETE', '/board/' . $msg->data['id'])->status);
+        $live = $this->call('POST', '/board', ['title' => 'Nur für Anna 2', 'text' => '<p>Hallo</p>', 'audience' => 'person', 'audience_ids' => [$this->anna], 'push' => false, 'mail' => false]);
+        $this->assertSame(201, $live->status, (string) json_encode($live->data));
+
+        $this->users->current = $this->withRights('leser5', ['view_board_history']);
+        $items = array_column($this->call('GET', '/board')->data['items'] ?? [], null, 'id');
+        $this->assertArrayHasKey($live->data['id'], $items, 'Nachricht für eine andere Person sichtbar');
+        $this->assertArrayHasKey('last_edit', $items[$live->data['id']]);
+        $history = $this->call('GET', '/board/history');
+        $this->assertSame(200, $history->status);
+        $this->assertContains('Nur für Anna', array_column($history->data['items'] ?? [], 'title'), 'gelöschte Nachricht im Verlauf');
+        $this->assertSame(200, $this->call('GET', '/board/' . $msg->data['id'] . '/history')->status);
+        $this->assertSame(403, $this->call('POST', '/board', ['title' => 'x', 'text' => 'x'])->status);
+        $this->assertSame(403, $this->call('DELETE', '/board/' . $live->data['id'])->status);
+
+        $this->users->current = $this->withRights('leser6', []);
+        $this->assertArrayNotHasKey($live->data['id'], array_column($this->call('GET', '/board')->data['items'] ?? [], null, 'id'));
+        $this->assertSame(403, $this->call('GET', '/board/history')->status);
+    }
+
+    public function testCompanyMembersWithoutAssigning(): void
+    {
+        $company = $this->call('POST', '/companies', ['name' => 'Jägerkompanie']);
+        $this->assertSame(201, $company->status, (string) json_encode($company->data));
+        $this->assertSame(200, $this->call('PUT', '/members/' . $this->anna . '/companies', ['company_ids' => [$company->data['id']]])->status);
+
+        $this->users->current = $this->withRights('leser7', ['view_company_members']);
+        $member = $this->call('GET', '/members/' . $this->anna);
+        $this->assertSame(200, $member->status, (string) json_encode($member->data));
+        $this->assertSame(['Jägerkompanie'], array_column($member->data['companies'] ?? [], 'name'));
+        $this->assertSame([$this->anna], $this->call('GET', '/companies')->data[0]['member_ids'] ?? null);
+        $this->assertSame(403, $this->call('PUT', '/members/' . $this->anna . '/companies', ['company_ids' => []])->status);
+
+        $this->users->current = $this->withRights('leser8', []);
+        $this->assertArrayNotHasKey('companies', $this->call('GET', '/members/' . $this->anna)->data);
+    }
+
     public function testUpdateGivesReadRightsOnceToEveryoneWithTheWriteRight(): void
     {
         $db = TestApp::connection();

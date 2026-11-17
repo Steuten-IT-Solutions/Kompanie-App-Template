@@ -44,7 +44,7 @@ final class ReportService
     private const SECTIONS = [
         'members' => ['feature' => null, 'caps' => [
             Capability::ViewPoints, Capability::ViewPenalties, Capability::ViewPromotions, Capability::ViewTitles, Capability::ViewAttendance,
-            Capability::ManageCompanies, Capability::ViewPersonal, Capability::ViewAccounts, Capability::ManageFormer,
+            Capability::ViewCompanyMembers, Capability::ViewPersonal, Capability::ViewAccounts, Capability::ManageFormer,
         ], 'dated' => false, 'label' => 'Mitglieder'],
         'passive' => ['feature' => 'passive', 'caps' => [Capability::ViewPassive], 'dated' => false, 'label' => 'Passive'],
         'points' => ['feature' => 'points', 'caps' => [Capability::ViewPoints], 'dated' => true, 'label' => 'Punkte'],

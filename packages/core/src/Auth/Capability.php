@@ -90,7 +90,13 @@ enum Capability: string
     case ViewRestrictedDocuments = 'view_restricted_documents';
     /** Dokumente hochladen, ändern und löschen (Bereich Dokumente, Issue #2; setzt view_restricted_documents voraus). */
     case ManageDocuments = 'manage_documents';
-    /** Dringende Nachrichten ans Schwarze Brett schreiben, ändern und vorzeitig löschen (Bereich Schwarzes Brett, Issue #5). */
+    /**
+     * Schwarzes Brett: alle gültigen Nachrichten sehen, auch die für andere Kompanien oder Personen, mit wer zuletzt
+     * geändert hat und dem Stand des Mailversands, dazu den Verlauf abgelaufener und gelöschter Nachrichten (ohne zu
+     * schreiben).
+     */
+    case ViewBoardHistory = 'view_board_history';
+    /** Dringende Nachrichten ans Schwarze Brett schreiben, ändern und vorzeitig löschen (Bereich Schwarzes Brett, Issue #5; setzt view_board_history voraus). */
     case PostBoard = 'post_board';
     /** Ergebnisse aller Umfragen immer sehen, auch laufender und solcher, deren Ergebnisse sonst verborgen sind (ohne sie zu verwalten). */
     case ViewPollResults = 'view_poll_results';
@@ -112,7 +118,9 @@ enum Capability: string
     case SendMail = 'send_mail';
     /** Sponsoren pflegen: anlegen, ändern, Logo hochladen, sortieren, löschen (Bereich Sponsoren, Issue #279). */
     case ManageSponsors = 'manage_sponsors';
-    /** Kompanieliste pflegen und Mitglieder zuordnen (Bereich Kompanien, Issue #280). */
+    /** In der Verwaltung sehen, welchen Kompanien die Mitglieder zugeordnet sind (ohne zuzuordnen). */
+    case ViewCompanyMembers = 'view_company_members';
+    /** Kompanieliste pflegen und Mitglieder zuordnen (Bereich Kompanien, Issue #280; setzt view_company_members voraus). */
     case ManageCompanies = 'manage_companies';
     /** Bilder für die Galerie einreichen, eigene Einreichungen sehen und zurückziehen (Issue #286). */
     case SubmitGallery = 'submit_gallery';
@@ -231,6 +239,8 @@ enum Capability: string
         'promote_users' => 'view_accounts',
         'manage_documents' => 'view_restricted_documents',
         'manage_polls' => 'view_poll_results',
+        'post_board' => 'view_board_history',
+        'manage_companies' => 'view_company_members',
     ];
 
     /**
@@ -268,7 +278,7 @@ enum Capability: string
      */
     public static function memberList(): array
     {
-        return [self::ViewPoints, self::ViewPenalties, self::ViewPromotions, self::ViewTitles, self::ViewAttendance, self::ManageCompanies, self::ViewPersonal, self::ViewAccounts, self::ManageFormer];
+        return [self::ViewPoints, self::ViewPenalties, self::ViewPromotions, self::ViewTitles, self::ViewAttendance, self::ViewCompanyMembers, self::ViewPersonal, self::ViewAccounts, self::ManageFormer];
     }
 
     /**

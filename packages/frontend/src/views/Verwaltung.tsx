@@ -1008,7 +1008,7 @@ function MemberDetailView({
   const self = m.id === config?.user?.id;
   const rankOn = rankEditable(m);
   const titlesOn = !!m.titles && (m.member || m.titles.length > 0);
-  // Kompanien (Issue #280): kommen nur mit Bereich und manage_companies mit.
+  // Kompanien (Issue #280): kommen nur mit Bereich und view_company_members mit; ändern mit manage_companies.
   const companiesOn = !!m.companies && (m.member || m.companies.length > 0);
   // Ämter (Issue #112): Konten in Amtszeiten sieht, wer Ämter pflegt, sonst nur bei öffentlicher Mitgliederliste.
   const officesOn = !!config?.features.offices && (!!config.features.directory || can('manage_offices'));
@@ -1294,6 +1294,7 @@ function MemberDetailView({
             companies={m.companies}
             onChanged={reload}
             onToast={onToast}
+            readOnly={!can('manage_companies')}
           />
         </Sheet>
       )}

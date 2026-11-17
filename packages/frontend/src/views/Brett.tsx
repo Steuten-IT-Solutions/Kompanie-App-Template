@@ -17,7 +17,7 @@ import { AttachmentList, AttachmentsField } from '../attachments';
 import { blocksInput, draftsFrom, hasContent, newBlock, type BlockDraft } from '../blocks/blockDrafts';
 import BlocksEditor from '../blocks/BlocksEditor';
 import BlocksView from '../blocks/BlocksView';
-import { boardLoaded, boardVisible, canManagePolls, canPostBoard, pollsVisible, refreshBoard, useBoard } from '../board';
+import { boardLoaded, boardSeesAll, boardVisible, canManagePolls, canPostBoard, pollsVisible, refreshBoard, useBoard } from '../board';
 import { ComposeEditor } from '../composeEditor';
 import { BoardMeta, pollEndText } from '../BoardBanner';
 import brand from '../generated/brand';
@@ -447,7 +447,7 @@ const ACTIONS: Record<BoardRevision['action'], string> = {
   mailed: 'per E-Mail versendet',
 };
 
-/** Verlauf einer Nachricht (nur post_board): wer wann was geändert hat, bei Inhalten vorher/nachher. */
+/** Verlauf einer Nachricht (nur view_board_history): wer wann was geändert hat, bei Inhalten vorher/nachher. */
 function History({ id }: { id: number }) {
   const [data, setData] = useState<BoardHistory | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -527,6 +527,7 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canPost = canPostBoard();
+  const seeAll = boardSeesAll();
 
   async function run(action: () => Promise<unknown>, message: string) {
     setBusy(true);
@@ -579,11 +580,11 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
 
   return (
     <article className={`card board-card ${focused ? 'focused' : ''}`} data-focus-id={item.id}>
-      <BoardMeta item={item} /> {(canPost || boardVisible()) && <AudienceBadge item={item} />}
+      <BoardMeta item={item} /> {(seeAll || boardVisible()) && <AudienceBadge item={item} />}
       {edit === null ? (
         <>
           <h3 className="board-title">{item.title}</h3>
-          <MessageContent item={item} manager={canPost} />
+          <MessageContent item={item} manager={seeAll} />
           <AttachmentList items={item.attachments} />
         </>
       ) : (
@@ -621,40 +622,45 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
         </div>
       )}
       <p className="muted small board-until">Sichtbar bis {formatUntil(item.expires_at)}</p>
-      {canPost && item.last_edit && (
+      {seeAll && item.last_edit && (
         <p className="muted small board-last-edit">
           Zuletzt geändert von {item.last_edit.name ?? 'Unbekannt'} · {formatShortTime(item.last_edit.at)}
         </p>
       )}
-      {canPost && item.mail && <p className="muted small board-mail-status">{mailText(item.mail)}</p>}
+      {seeAll && item.mail && <p className="muted small board-mail-status">{mailText(item.mail)}</p>}
       {error && <p className="form-error small">{error}</p>}
-      {canPost &&
+      {seeAll &&
         (edit === null ? (
           <div className="icon-row board-item-actions">
-            <IconButton
-              icon="edit"
-              label="Bearbeiten"
-              disabled={busy}
-              onClick={() =>
-                setEdit({
-                  title: item.title,
-                  blocks: draftsFrom(item.blocks, item.text),
-                  expires: toLocalInput(item.expires_at),
-                  audience: item.audience ?? 'members',
-                  audience_ids: item.audience_ids ?? [],
-                  attachments: item.attachments ?? [],
-                })
-              }
-            />
-            <IconButton
-              icon="delete"
-              label="Löschen"
-              variant="danger"
-              disabled={busy}
-              onClick={async () =>
-                (await confirmAsk(`Nachricht „${item.title}“ jetzt löschen?`)) && run(() => api.deleteBoard(item.id), 'Nachricht gelöscht')
-              }
-            />
+            {canPost && (
+              <>
+                <IconButton
+                  icon="edit"
+                  label="Bearbeiten"
+                  disabled={busy}
+                  onClick={() =>
+                    setEdit({
+                      title: item.title,
+                      blocks: draftsFrom(item.blocks, item.text),
+                      expires: toLocalInput(item.expires_at),
+                      audience: item.audience ?? 'members',
+                      audience_ids: item.audience_ids ?? [],
+                      attachments: item.attachments ?? [],
+                    })
+                  }
+                />
+                <IconButton
+                  icon="delete"
+                  label="Löschen"
+                  variant="danger"
+                  disabled={busy}
+                  onClick={async () =>
+                    (await confirmAsk(`Nachricht „${item.title}“ jetzt löschen?`)) &&
+                    run(() => api.deleteBoard(item.id), 'Nachricht gelöscht')
+                  }
+                />
+              </>
+            )}
             <IconButton
               icon="history"
               label={history ? 'Verlauf ausblenden' : 'Verlauf'}
@@ -675,12 +681,12 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
             </div>
           </>
         ))}
-      {canPost && history && edit === null && <History id={item.id} />}
+      {seeAll && history && edit === null && <History id={item.id} />}
     </article>
   );
 }
 
-/** Bereich „Verlauf“ (nur post_board): abgelaufene und gelöschte Nachrichten der letzten 30 Tage samt Verlauf. */
+/** Bereich „Verlauf“ (nur view_board_history): abgelaufene und gelöschte Nachrichten der letzten 30 Tage samt Verlauf. */
 function Ended() {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<{ items: BoardEnded[]; keep_days: number } | null>(null);
@@ -751,8 +757,8 @@ function PollEntry({ poll }: { poll: BoardPoll }) {
 }
 
 /**
- * Seite #/brett: alle gültigen Nachrichten (auch ausgeblendete) mit Titel und formatiertem Inhalt; mit post_board
- * schreiben, ändern, löschen, Verlauf. Darunter für Mitglieder alle laufenden Umfragen mit Status und der Weg zu den
+ * Seite #/brett: alle gültigen Nachrichten (auch ausgeblendete) mit Titel und formatiertem Inhalt; mit view_board_history
+ * auch die für andere und den Verlauf, mit post_board schreiben, ändern, löschen. Darunter für Mitglieder alle laufenden Umfragen mit Status und der Weg zu den
  * beendeten (Issue #4).
  */
 /** `focus`: Kennung einer Nachricht aus der Adresse brett/<id> (Ziel einer Benachrichtigung, Issue #190). */
@@ -782,7 +788,7 @@ export default function Brett({ focus, onToast }: { focus?: string; onToast: (ms
       ) : !boardLoaded() && error ? (
         <ErrorBox message={error} onRetry={load} />
       ) : messages.length === 0 ? (
-        <Empty>Zurzeit gibt es keine {boardVisible() || canPostBoard() ? '' : 'öffentlichen '}Nachrichten.</Empty>
+        <Empty>Zurzeit gibt es keine {boardVisible() || boardSeesAll() ? '' : 'öffentlichen '}Nachrichten.</Empty>
       ) : (
         <>
           <h2 className="board-page-title">Aktuelle Nachrichten</h2>
@@ -794,7 +800,7 @@ export default function Brett({ focus, onToast }: { focus?: string; onToast: (ms
       {!config?.user && (config?.auth.mode === 'form' || !!config?.auth.loginUrl) && (
         <p className="muted small board-login-hint">Interne Nachrichten siehst du nach der Anmeldung.</p>
       )}
-      {canPostBoard() && <Ended />}
+      {boardSeesAll() && <Ended />}
       {(pollsVisible() || canManagePolls()) && boardLoaded() && (
         <section className="board-polls stack">
           <h2 className="board-page-title">Laufende {brand.labels.sections.polls}</h2>

@@ -103,7 +103,7 @@ final class BoardService
      */
     public function canRead(?User $viewer, array $message): bool
     {
-        if ($message['audience'] === self::AUDIENCE_PUBLIC || ($viewer !== null && $viewer->can(Capability::PostBoard))) {
+        if ($message['audience'] === self::AUDIENCE_PUBLIC || self::seesAll($viewer)) {
             return true;
         }
         if (!self::isRecipient($viewer)) {
@@ -115,6 +115,15 @@ final class BoardService
             self::AUDIENCE_COMPANY => array_intersect($message['audience_ids'], $this->companiesOf[$viewer->id] ??= $this->app->companies()->repository()->companyIdsOf($viewer->id)) !== [],
             default => true,
         };
+    }
+
+    /**
+     * Alle Nachrichten sehen, mit letzter Änderung, Stand des Mailversands und Verlauf (view_board_history; post_board
+     * setzt es voraus, Capability::READ_OF).
+     */
+    public static function seesAll(?User $viewer): bool
+    {
+        return $viewer !== null && $viewer->can(Capability::ViewBoardHistory);
     }
 
     /**
@@ -167,22 +176,22 @@ final class BoardService
 
     /**
      * Gültige Nachrichten, die $viewer lesen darf (canRead; ohne Anmeldung nur öffentliche), neueste zuerst; danach für Mitglieder die laufenden Umfragen (Issue #4, kind „poll“, mit
-     * has_voted), sofern der Bereich Umfragen an ist. Mit post_board zusätzlich, wer zuletzt geändert hat, und der Stand
-     * des Mailversands.
+     * has_voted), sofern der Bereich Umfragen an ist. Mit view_board_history zusätzlich, wer zuletzt geändert hat, und der
+     * Stand des Mailversands.
      *
      * @return array{items: list<array<string, mixed>>}
      */
     public function list(?User $viewer = null): array
     {
         $active = array_values(array_filter($this->repository()->active($this->app->time()->nowUtc()), fn (array $m): bool => $this->canRead($viewer, $m)));
-        $editor = $viewer !== null && $viewer->can(Capability::PostBoard);
+        $all = self::seesAll($viewer);
         $ids = array_column($active, 'id');
-        $edits = $editor ? $this->repository()->lastEdits($ids) : [];
-        $mails = $editor ? $this->app->boardMail()->summaries($ids) : [];
+        $edits = $all ? $this->repository()->lastEdits($ids) : [];
+        $mails = $all ? $this->app->boardMail()->summaries($ids) : [];
         $names = (new UserNames($this->app->users))->prime([...array_column($active, 'author_id'), ...array_column($edits, 'user_id')]);
         $files = $this->app->attachments()->many(AttachmentService::OWNER_BOARD, $ids);
         $targets = $this->targetNames($active, $names);
-        $messages = array_map(fn (array $m): array => $this->format($m, $names, $editor, $edits[$m['id']] ?? null, $mails[$m['id']] ?? null, $files[$m['id']] ?? [], $targets, $viewer), $active);
+        $messages = array_map(fn (array $m): array => $this->format($m, $names, $all, $edits[$m['id']] ?? null, $mails[$m['id']] ?? null, $files[$m['id']] ?? [], $targets, $viewer), $active);
         return ['items' => [...$messages, ...$this->app->polls()->boardItems($viewer)]];
     }
 
@@ -343,7 +352,7 @@ final class BoardService
     }
 
     /**
-     * Verlauf einer Nachricht (auch abgelaufen oder gelöscht, solange aufbewahrt). Nur für post_board (Route).
+     * Verlauf einer Nachricht (auch abgelaufen oder gelöscht, solange aufbewahrt). Nur für view_board_history (Route).
      *
      * @return array{message: array<string, mixed>, revisions: list<array<string, mixed>>, mail: array<string, mixed>|null}
      */
@@ -376,7 +385,7 @@ final class BoardService
 
     /**
      * Abgelaufene und gelöschte Nachrichten der letzten HISTORY_KEEP_DAYS Tage (Bereich „Verlauf“ auf der Seite des
-     * Bretts), zuletzt beendete zuerst. Nur für post_board (Route).
+     * Bretts), zuletzt beendete zuerst. Nur für view_board_history (Route).
      *
      * @return array{items: list<array<string, mixed>>, keep_days: int}
      */
@@ -392,14 +401,14 @@ final class BoardService
 
     /**
      * Bild oder Anhang einer Nachricht ansehen (RichImageService::canView, AttachmentService::canView): solange sie gilt
-     * wie die Nachricht selbst (öffentliche auch ohne Anmeldung, $viewer null), danach (im Verlauf) nur mit post_board.
+     * wie die Nachricht selbst (öffentliche auch ohne Anmeldung, $viewer null), danach (im Verlauf) nur mit view_board_history.
      */
     public function canSeeImage(?User $viewer, int $messageId, ?string $uid = null): bool
     {
         if (!$this->app->features()->enabled('board')) {
             return false;
         }
-        if ($viewer !== null && $viewer->can(Capability::PostBoard)) {
+        if (self::seesAll($viewer)) {
             return $this->repository()->find($messageId) !== null;
         }
         $message = $this->repository()->findActive($messageId, $this->app->time()->nowUtc());
@@ -463,12 +472,12 @@ final class BoardService
     /** @return BoardItem */
     public function one(int $id, ?User $viewer = null): array
     {
-        $editor = $viewer !== null && $viewer->can(Capability::PostBoard);
-        $edit = $editor ? ($this->repository()->lastEdits([$id])[$id] ?? null) : null;
-        $mail = $editor ? ($this->app->boardMail()->summaries([$id])[$id] ?? null) : null;
+        $all = self::seesAll($viewer);
+        $edit = $all ? ($this->repository()->lastEdits([$id])[$id] ?? null) : null;
+        $mail = $all ? ($this->app->boardMail()->summaries([$id])[$id] ?? null) : null;
         $message = $this->active($id);
         $names = new UserNames($this->app->users);
-        return $this->format($message, $names, $editor, $edit, $mail, $this->app->attachments()->of(AttachmentService::OWNER_BOARD, $id), $this->targetNames([$message], $names), $viewer);
+        return $this->format($message, $names, $all, $edit, $mail, $this->app->attachments()->of(AttachmentService::OWNER_BOARD, $id), $this->targetNames([$message], $names), $viewer);
     }
 
     /**
@@ -479,9 +488,9 @@ final class BoardService
      * @param array{companies: array<int, string>} $targets Namen der Kompanien (targetNames)
      * @return BoardItem
      */
-    private function format(array $m, UserNames $names, bool $editor = false, ?array $edit = null, ?array $mail = null, array $files = [], array $targets = ['companies' => []], ?User $viewer = null): array
+    private function format(array $m, UserNames $names, bool $all = false, ?array $edit = null, ?array $mail = null, array $files = [], array $targets = ['companies' => []], ?User $viewer = null): array
     {
-        $member = $editor || self::isRecipient($viewer);
+        $member = $all || self::isRecipient($viewer);
         $blocks = Blocks::decode($m['blocks'], $m['body']);
         $out = [
             'kind' => self::KIND_MESSAGE,
@@ -489,7 +498,7 @@ final class BoardService
             'title' => $m['title'],
             // text: Textblöcke für alle (ältere App); blocks: alle Blöcke, die $viewer sieht
             'text' => $this->app->richImages()->render($m['body']),
-            'blocks' => $this->app->blocks()->forViewer($blocks, $viewer, $member, $editor),
+            'blocks' => $this->app->blocks()->forViewer($blocks, $viewer, $member, $all),
             'excerpt' => $this->app->blocks()->plain($blocks, $member, $viewer),
             'author_name' => $names->name($m['author_id']),
             'created_at' => Time::utcToIso($m['created_at']),
@@ -498,15 +507,15 @@ final class BoardService
             'audience' => $m['audience'],
             'attachments' => array_map(fn (array $f): array => $this->app->attachments()->format($f), $files),
         ];
-        // Für wen: Kompanien sehen alle, die die Nachricht lesen; ausgewählte Personen nur post_board (Empfänger sehen nur,
+        // Für wen: Kompanien sehen alle, die die Nachricht lesen; ausgewählte Personen nur view_board_history (Empfänger sehen nur,
         // dass sie für sie bestimmt ist).
-        if ($m['audience'] === self::AUDIENCE_COMPANY || ($editor && $m['audience'] === self::AUDIENCE_PERSON)) {
+        if ($m['audience'] === self::AUDIENCE_COMPANY || ($all && $m['audience'] === self::AUDIENCE_PERSON)) {
             $out['audience_names'] = $this->namesOf($m, $names, $targets);
         }
-        if ($editor && in_array($m['audience'], self::TARGETED, true)) {
+        if ($all && in_array($m['audience'], self::TARGETED, true)) {
             $out['audience_ids'] = $m['audience_ids'];
         }
-        if ($editor) {
+        if ($all) {
             $out['last_edit'] = $edit === null ? null : ['name' => $names->name($edit['user_id']), 'at' => Time::utcToIso($edit['created_at'])];
             $out['mail'] = $mail;
         }
@@ -539,7 +548,7 @@ final class BoardService
             'audience' => $m['audience'],
             'attachments' => array_map(fn (array $f): array => $this->app->attachments()->format($f), $files),
         ];
-        // Nur für post_board (Verlauf)
+        // Nur für view_board_history (Verlauf)
         if (in_array($m['audience'], self::TARGETED, true)) {
             $out['audience_ids'] = $m['audience_ids'];
             $out['audience_names'] = $this->namesOf($m, $names, $targets);

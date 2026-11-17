@@ -42,6 +42,7 @@ Tippe auf **Löschen** und bestätige. Logo und alle Zuordnungen der Mitglieder 
 
 ## Gut zu wissen
 - Neue Zuordnungen gibt es nur für {rolle.member}.
+- **Nur sehen:** Mit dem Recht **Zuordnung zu {bereich.companies} sehen** ohne **{bereich.companies} pflegen** siehst du auf der Seite eines Mitglieds, welchen {bereich.companies} es angehört, auch wenn der Bereich **{bereich.directory}** aus ist. Zuordnen kannst du damit nicht, und diese Seite fehlt dir.
 - Logos: PNG, JPG, WebP oder SVG, höchstens 2 MB. Bilder werden auf höchstens 512 Pixel an der längeren Kante verkleinert. Ein durchsichtiger Hintergrund bleibt erhalten; das Logo steht dann direkt auf der Karte, im hellen wie im dunklen Design. Am besten wirkt ein Logo mit durchsichtigem Hintergrund, das auf hellem und dunklem Grund gut zu erkennen ist.
 - In die **Beschreibung** kannst du Text von eurer Webseite kopieren. Farben, die auf dem Hintergrund schlecht lesbar wären (z. B. dunkle Schrift im dunklen Design), zeigt die App in ihrer normalen Schriftfarbe; sehr große Zeilenabstände setzt sie beim Anzeigen auf normal. Gespeichert bleibt der Text so, wie du ihn eingegeben hast.
 - Bei **Webseite** und **App der Kompanie** reicht die Adresse ohne `https://`, z. B. `beispiel.de/app`; die App ergänzt `https://` beim Verlassen des Felds. Unsichere Adressen mit `http://` nimmt sie nicht an. Was an einer Adresse nicht stimmt, steht direkt unter dem Feld. Das Gründungsjahr liegt zwischen 1800 und dem laufenden Jahr.

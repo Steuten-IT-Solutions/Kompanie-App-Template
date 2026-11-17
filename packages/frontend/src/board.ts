@@ -31,6 +31,11 @@ export function boardReadable(): boolean {
   return !!config?.features.board;
 }
 
+/** Alle Nachrichten sehen, auch für andere, mit letzter Änderung, Mailversand und Verlauf (post_board setzt es voraus). */
+export function boardSeesAll(): boolean {
+  return !!config?.features.board && can('view_board_history');
+}
+
 /** Schreiben, ändern und löschen. */
 export function canPostBoard(): boolean {
   return !!config?.features.board && can('post_board');

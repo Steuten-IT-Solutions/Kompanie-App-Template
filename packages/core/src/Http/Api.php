@@ -638,10 +638,10 @@ final class Api
         return Response::attachment($data, $name);
     }
 
-    /** Kompanien in den Mitgliedsdetails der Verwaltung: Bereich an und Recht, sie zu verwalten (Issue #280). */
+    /** Kompanien in den Mitgliedsdetails der Verwaltung: Bereich an und Recht, die Zuordnung zu sehen (Issue #280). */
     private function showCompanies(): bool
     {
-        return $this->app->features()->enabled('companies') && $this->can(Cap::ManageCompanies);
+        return $this->app->features()->enabled('companies') && $this->can(Cap::ViewCompanyMembers);
     }
 
     /** Titel in Mitgliederliste und -details: Bereich an und Recht, sie zu sehen. */
@@ -1164,7 +1164,7 @@ final class Api
 
             // Kompanien (Issue #280): öffentlich mit view_companies (anfangs auch Gast), Pflege und Zuordnung mit
             // manage_companies; Mitglieder einer Kompanie nur, soweit die Mitgliederliste sichtbar ist
-            new Route('GET', '/companies', [Cap::ViewCompanies, Cap::ManageCompanies], fn () => $this->companies(), 'companies', $denyView),
+            new Route('GET', '/companies', [Cap::ViewCompanies, Cap::ViewCompanyMembers, Cap::ManageCompanies], fn () => $this->companies(), 'companies', $denyView),
             new Route('POST', '/companies', Cap::ManageCompanies, fn (Request $r) => Response::created($a->companies()->create($r->body, $this->user())), 'companies', $denyRights),
             new Route('PUT', '/companies/order', Cap::ManageCompanies, fn (Request $r) => $a->companies()->reorder($r->input('ids'), $this->user()), 'companies', $denyRights),
             new Route('PATCH', '/companies/{id}', Cap::ManageCompanies, fn (Request $r) => $a->companies()->update($r->id(), $r->body, $this->user()), 'companies', $denyRights),
@@ -1208,7 +1208,8 @@ final class Api
             }, 'documents', $denyRights),
 
             // Schwarzes Brett (Issue #5): öffentliche Nachrichten lesen alle (auch ohne Anmeldung), interne view_board,
-            // die für Kompanien oder Personen nur diese (BoardService::canRead); post_board schreibt, ändert und löscht (und liest daher auch); nur beim Schreiben
+            // die für Kompanien oder Personen nur diese (BoardService::canRead), alle und den Verlauf view_board_history; post_board
+            // schreibt, ändert und löscht; nur beim Schreiben
             // eine Benachrichtigung
             new Route('GET', '/board', $P, fn () => $a->board()->list($a->viewer()), 'board'),
             new Route('POST', '/board', Cap::PostBoard, function (Request $r) use ($a) {
@@ -1254,8 +1255,8 @@ final class Api
                 return $a->boardMail()->info($a->board()->readerIds(['audience' => $audience, 'audience_ids' => $ids]), $this->user()->id);
             }, 'board', $denyRights),
             // Verlauf (Issue #172): abgelaufene und gelöschte Nachrichten der letzten 30 Tage, Verlauf einer Nachricht
-            new Route('GET', '/board/history', Cap::PostBoard, fn () => $a->board()->ended($this->user()), 'board', $denyRights),
-            new Route('GET', '/board/{id}/history', Cap::PostBoard, fn (Request $r) => $a->board()->history($r->id(), $this->user()), 'board', $denyRights),
+            new Route('GET', '/board/history', Cap::ViewBoardHistory, fn () => $a->board()->ended($this->user()), 'board', $denyRights),
+            new Route('GET', '/board/{id}/history', Cap::ViewBoardHistory, fn (Request $r) => $a->board()->history($r->id(), $this->user()), 'board', $denyRights),
             new Route('PATCH', '/board/{id}', Cap::PostBoard, fn (Request $r) => $a->board()->update($this->user(), $r->id(), $r->body), 'board', $denyRights),
             new Route('DELETE', '/board/{id}', Cap::PostBoard, function (Request $r) use ($a) {
                 $a->board()->delete($this->user(), $r->id());

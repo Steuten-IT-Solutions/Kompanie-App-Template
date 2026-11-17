@@ -2,7 +2,7 @@
 titel: Konto und Rolle
 reihenfolge: 53
 rechte: []
-einrecht: [view_points, manage_points, view_penalties, manage_penalties, view_promotions, manage_ranks, view_titles, manage_titles, view_attendance, manage_attendance, view_personal, manage_personal, view_accounts, create_users, manage_former, promote_users]
+einrecht: [view_points, manage_points, view_penalties, manage_penalties, view_promotions, manage_ranks, view_titles, manage_titles, view_attendance, manage_attendance, view_company_members, manage_companies, view_personal, manage_personal, view_accounts, create_users, manage_former, promote_users]
 ---
 Unter **Konto und Rolle** auf der Seite eines Mitglieds legst du fest, welche Rolle und welche Rechte die Person hat, erzeugst ein neues Startpasswort, trägst sie als ehemalig ein oder änderst und löschst ihr Konto. Wer nur {bereich.points}, {bereich.penalties} oder Ähnliches pflegt, sieht hier nur die Rolle.
 
