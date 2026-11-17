@@ -44,6 +44,7 @@ function RegistrationForm() {
   const [password, setPassword] = useState('');
   const [password2, setPassword2] = useState('');
   const [message, setMessage] = useState('');
+  const [companyIds, setCompanyIds] = useState<number[]>([]);
   const [consent, setConsent] = useState(false);
   const [website, setWebsite] = useState('');
   const [busy, setBusy] = useState(false);
@@ -63,6 +64,7 @@ function RegistrationForm() {
     return <ErrorBox message={form.error ?? 'Das Formular konnte nicht geladen werden.'} onRetry={form.reload} />;
   const f = form.data;
   const shownUsername = usernameEdited ? username : loginSuggestion(first, last);
+  const companies = f.companies ?? [];
 
   if (done) {
     return (
@@ -115,6 +117,7 @@ function RegistrationForm() {
         username: shownUsername.trim(),
         password,
         message: message.trim(),
+        ...(companies.length > 0 ? { company_ids: companyIds.filter((id) => companies.some((c) => c.id === id)) } : {}),
         website,
       });
       setDone(res.status);
@@ -188,6 +191,22 @@ function RegistrationForm() {
         <span>Passwort wiederholen</span>
         <input type="password" autoComplete="new-password" value={password2} onChange={(e) => setPassword2(e.target.value)} required />
       </label>
+      {companies.length > 0 && (
+        <fieldset className="fieldset registration-companies">
+          <legend>Deine Kompanie (freiwillig)</legend>
+          <p className="muted small">Gehörst du schon zu einer Kompanie? Dann wähle sie hier, das hilft bei der Freigabe.</p>
+          {companies.map((c) => (
+            <label key={c.id} className="toggle">
+              <input
+                type="checkbox"
+                checked={companyIds.includes(c.id)}
+                onChange={(e) => setCompanyIds((ids) => (e.target.checked ? [...ids, c.id] : ids.filter((x) => x !== c.id)))}
+              />
+              {c.name}
+            </label>
+          ))}
+        </fieldset>
+      )}
       <label className="field">
         <span>Nachricht an die Admins (freiwillig)</span>
         <textarea rows={3} maxLength={MESSAGE_MAX} value={message} onChange={(e) => setMessage(e.target.value)} />

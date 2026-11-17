@@ -26,6 +26,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Kompanie beim Zugang beantragen**: Ist der Bereich [Kompanien](app:kompanien) an, wählt die Person beim
+  [Zugang beantragen](app:registrieren) freiwillig ihre Kompanie (nur aktive, auch mehrere). Unter
+  [Verwaltung → Anfragen](app:verwaltung/anfragen) steht die Wahl auf der Karte, und die Freigabe ordnet die Person
+  der Kompanie zu, sofern sie eine Rolle mit dem Recht „Mitglied“ bekommt. Ändern lässt sich die Kompanie beim
+  Freigeben mit dem Recht „Kompanien verwalten“.
 - **News aus der App in WordPress schreiben**: Läuft die App als WordPress-Plugin und kommen die [News](app:news) aus
   den Beiträgen der Webseite, gibt es dort für alle mit dem Recht _News schreiben_ den Knopf _Neuer Beitrag_ und im
   geöffneten Beitrag _In WordPress bearbeiten_. Beide öffnen den Editor von WordPress mit allen seinen Möglichkeiten;

@@ -20,6 +20,8 @@ import { confirmAsk } from '../ask';
  * man vergeben darf (prüft der Server).
  * Passt die Anfrage zu einem Mitglied ohne Zugang (z. B. für Chroniken angelegt), lässt sie sich damit verbinden statt ein
  * zweites Konto anzulegen; Vorschläge macht der Server, wählen lässt sich jedes Mitglied ohne Zugang.
+ * Mit dem Bereich Kompanien steht die Kompanie dabei, die die Person gewählt hat; die Freigabe ordnet sie ihr zu. Ändern
+ * lässt sich die Wahl dabei nur mit „Kompanien verwalten“.
  */
 export function Anfragen({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.registrations(), [], 'registrations');
@@ -50,6 +52,7 @@ export function Anfragen({ onToast }: { onToast: (msg: string) => void }) {
                 defaultRole={list.default_role}
                 withMail={list.email_confirmation}
                 noAccess={list.no_access_members ?? []}
+                companies={list.companies}
                 editable={editable}
                 onDone={done}
               />
@@ -78,6 +81,7 @@ function RequestCard({
   defaultRole,
   withMail,
   noAccess,
+  companies,
   editable,
   onDone,
 }: {
@@ -85,6 +89,8 @@ function RequestCard({
   defaultRole: Level;
   withMail: boolean;
   noAccess: { id: number; name: string }[];
+  /** alle Kompanien (Bereich Kompanien an), sonst undefined */
+  companies?: { id: number; name: string; active: boolean }[];
   /** freigeben und ablehnen (create_users); sonst nur sehen */
   editable: boolean;
   onDone: (id: number, msg: string) => void;
@@ -100,6 +106,11 @@ function RequestCard({
   const roles = newAccountRoles().filter((x) => x.key !== 'admin');
   const [level, setLevel] = useState<Level>(roles.some((x) => x.key === defaultRole) ? defaultRole : 'member');
   const [username, setUsername] = useState(r.username);
+  const chosen = (r.companies ?? []).map((c) => c.id);
+  const [companyIds, setCompanyIds] = useState<number[]>(chosen);
+  // Ändern nur mit „Kompanien verwalten“ (prüft der Server); zur Wahl stehen die aktiven und die gewählten.
+  const companyChoices = companies && can('manage_companies') ? companies.filter((c) => c.active || chosen.includes(c.id)) : null;
+  const companiesChanged = companyIds.length !== chosen.length || companyIds.some((id) => !chosen.includes(id));
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -125,9 +136,13 @@ function RequestCard({
       return;
     }
     return run(async () => {
-      const changed = username.trim() !== r.username ? { username: username.trim() } : {};
+      const changed = {
+        ...(username.trim() !== r.username ? { username: username.trim() } : {}),
+        ...(companyChoices && companiesChanged ? { company_ids: companyIds } : {}),
+      };
       const res = await api.approveRegistration(r.id, linkTo ? { user_id: Number(linkTo), ...changed } : { level, ...changed });
-      return `${res.member.name} ist freigegeben${res.linked ? ' und verbunden' : ''}${res.mailed ? ', per Mail informiert' : ''}`;
+      const assigned = res.companies && res.companies.length > 0 ? `, ${res.companies.map((c) => c.name).join(', ')} zugeordnet` : '';
+      return `${res.member.name} ist freigegeben${res.linked ? ' und verbunden' : ''}${assigned}${res.mailed ? ', per Mail informiert' : ''}`;
     });
   };
   const reject = () =>
@@ -144,6 +159,11 @@ function RequestCard({
         {withMail ? (r.email_confirmed ? ' · Adresse bestätigt' : ' · Adresse nicht bestätigt') : ' · Adresse nicht geprüft'} · angefragt am{' '}
         {formatDate(r.created_at.slice(0, 10))}
       </div>
+      {companies && (
+        <div className="row-sub">
+          Kompanie: {r.companies && r.companies.length > 0 ? r.companies.map((c) => c.name).join(', ') : 'keine angegeben'}
+        </div>
+      )}
       {r.message && <p className="registration-message">{r.message}</p>}
     </>
   );
@@ -189,6 +209,28 @@ function RequestCard({
             </label>
           )}
         </fieldset>
+      )}
+      {companyChoices && companyChoices.length > 0 && (
+        <fieldset className="fieldset registration-companies">
+          <legend>Kompanie zuordnen</legend>
+          {companyChoices.map((c) => (
+            <label key={c.id} className="toggle">
+              <input
+                type="checkbox"
+                checked={companyIds.includes(c.id)}
+                onChange={(e) => setCompanyIds((ids) => (e.target.checked ? [...ids, c.id] : ids.filter((x) => x !== c.id)))}
+              />
+              {c.name}
+              {!c.active && <span className="muted small"> (ehemalig)</span>}
+            </label>
+          ))}
+          <p className="muted small">
+            {linkTo ? 'Zusätzlich zu den Kompanien des Mitglieds. ' : ''}Zugeordnet werden nur Personen mit einer Rolle für Mitglieder.
+          </p>
+        </fieldset>
+      )}
+      {!companyChoices && chosen.length > 0 && (
+        <p className="muted small">Beim Freigeben wird die Person der gewählten Kompanie zugeordnet.</p>
       )}
       {r.email_taken && (
         <p className="form-error small">Zu dieser E-Mail-Adresse gibt es inzwischen ein Konto. Freigeben geht deshalb nicht.</p>
