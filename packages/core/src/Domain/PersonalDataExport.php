@@ -48,8 +48,8 @@ final class PersonalDataExport
      */
     public const OTHERS_REQUIRE = [
         Capability::CreateUsers, Capability::ManageFormer, Capability::ViewPersonal, Capability::ViewPoints, Capability::ViewPenalties,
-        Capability::ViewPromotions, Capability::ViewTitles, Capability::ViewAttendance, Capability::ManagePolls, Capability::SendMail,
-        Capability::ManageLists, Capability::PostBoard, Capability::ViewOffices, Capability::ManageCalendar,
+        Capability::ViewPromotions, Capability::ViewTitles, Capability::ViewAttendance, Capability::ManagePolls, Capability::ViewMail,
+        Capability::ViewLists, Capability::PostBoard, Capability::ViewOffices, Capability::ViewResponses,
     ];
 
     public function __construct(private readonly App $app)

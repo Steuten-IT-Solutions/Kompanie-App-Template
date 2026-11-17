@@ -98,6 +98,33 @@ final class ReadRightsTest extends TestCase
         $this->assertSame(403, $this->call('GET', '/attendance')->status);
     }
 
+    public function testContentReadRightsShowWithoutChanging(): void
+    {
+        $item = $this->call('POST', '/inventory', ['title' => 'Bierbank', 'quantity' => 10, 'location' => 'Lager']);
+        $this->assertSame(201, $item->status, (string) json_encode($item->data));
+        $list = $this->call('POST', '/lists', ['title' => 'Ausflug']);
+        $this->assertSame(201, $list->status, (string) json_encode($list->data));
+        $listId = (int) $list->data['id'];
+
+        $this->users->current = $this->withRights('leser2', ['view_inventory', 'view_lists', 'view_mail', 'view_responses']);
+        foreach (['/inventory', '/inventory/locations', '/inventory/log', '/inventory/' . $item->data['id'] . '/log', '/lists', '/lists/' . $listId, '/mails'] as $path) {
+            $this->assertSame(200, $this->call('GET', $path)->status, "GET $path mit Leserecht");
+        }
+        // Das Recht reicht; hier fehlt nur der Schalter für Zu- und Absagen.
+        $this->assertStringContainsString('ausgeschaltet', (string) ($this->call('GET', '/calendar/x/responses')->data['message'] ?? ''), 'Zu- und Absagen mit view_responses');
+        $this->assertSame(403, $this->call('POST', '/inventory', ['title' => 'Tisch', 'quantity' => 1, 'location' => 'Lager'])->status);
+        $this->assertSame(403, $this->call('PATCH', '/inventory/' . $item->data['id'], ['quantity' => 2])->status);
+        $this->assertSame(403, $this->call('POST', '/lists', ['title' => 'x'])->status);
+        $this->assertSame(403, $this->call('DELETE', '/lists/' . $listId)->status);
+        $this->assertSame(403, $this->call('GET', '/mails/options')->status, 'Schreiben bleibt bei send_mail');
+        $this->assertSame(403, $this->call('POST', '/mails', ['subject' => 'x', 'text' => 'x'])->status);
+
+        $this->users->current = $this->withRights('ohne2', []);
+        foreach (['/inventory', '/lists', '/mails', '/calendar/x/responses'] as $path) {
+            $this->assertSame(403, $this->call('GET', $path)->status, "GET $path ohne Leserecht");
+        }
+    }
+
     public function testUpdateGivesReadRightsOnceToEveryoneWithTheWriteRight(): void
     {
         $db = TestApp::connection();

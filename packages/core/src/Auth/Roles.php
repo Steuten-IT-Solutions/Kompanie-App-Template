@@ -113,12 +113,15 @@ final class Roles
         Capability::ViewCatalog,
         // Inhalte verwalten
         Capability::ManageEvents,
+        Capability::ViewResponses,
         Capability::ManageCalendar,
         Capability::ManageNews,
         Capability::ManageDocuments,
         Capability::PostBoard,
         Capability::ManagePolls,
+        Capability::ViewLists,
         Capability::ManageLists,
+        Capability::ViewMail,
         Capability::SendMail,
         Capability::ManageSponsors,
         Capability::ManageCompanies,
@@ -139,6 +142,7 @@ final class Roles
         Capability::ViewAttendance,
         Capability::ManageAttendance,
         Capability::ManageOffices,
+        Capability::ViewInventory,
         Capability::ManageInventory,
         // Mitglieder und Rollen
         Capability::ViewPersonal,

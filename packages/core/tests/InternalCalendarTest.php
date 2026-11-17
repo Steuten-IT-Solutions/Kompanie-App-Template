@@ -147,12 +147,12 @@ final class InternalCalendarTest extends TestCase
     {
         $this->useApp();
         $role = $this->app->roles()->find('calendar');
-        $this->assertSame(TestApp::caps(['member', 'manage_calendar']), $role['capabilities'] ?? null);
+        $this->assertSame(TestApp::caps(['member', 'view_responses', 'manage_calendar']), $role['capabilities'] ?? null);
         $this->assertSame('Kalender verwalten', $role['label'] ?? null);
         $this->ok('PATCH', '/admin/settings', ['calendar_source' => 'ics']);
         $this->assertNull($this->app->roles()->find('calendar'), 'niemand hat sie: weg');
         $this->assertContains(Capability::ManageCalendar, Roles::GRANTABLE);
-        $this->assertSame(Capability::Member, Capability::ManageCalendar->requires());
+        $this->assertSame(Capability::ViewResponses, Capability::ManageCalendar->requires());
     }
 
     public function testPushForNewAndChangedEntries(): void

@@ -55,7 +55,7 @@ final class ReportService
         'ranks' => ['feature' => 'ranks', 'caps' => [Capability::ViewPromotions], 'dated' => true, 'label' => 'Dienstgrade'],
         'titles' => ['feature' => 'titles', 'caps' => [Capability::ViewTitles], 'dated' => true, 'label' => 'Titel'],
         'offices' => ['feature' => 'offices', 'caps' => [Capability::ManageOffices], 'dated' => true, 'label' => 'Ämter'],
-        'inventory' => ['feature' => 'inventory', 'caps' => [Capability::ManageInventory], 'dated' => true, 'label' => 'Inventar'],
+        'inventory' => ['feature' => 'inventory', 'caps' => [Capability::ViewInventory], 'dated' => true, 'label' => 'Inventar'],
     ];
 
     private const RANK_KINDS = [RankService::KIND_PROMOTION => 'Beförderung', RankService::KIND_DEMOTION => 'Zurückgestuft', RankService::KIND_INITIAL => 'Erster Dienstgrad'];

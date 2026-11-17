@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { api, type ListColumn, type ListField, type ListRow, type ListSyncResult, type PrintList, type PrintListInput } from '../api';
+import { api, can, type ListColumn, type ListField, type ListRow, type ListSyncResult, type PrintList, type PrintListInput } from '../api';
 import { useDragSort } from '../dragSort';
 import { formatDate, formatEuro, todayYmd } from '../format';
 import brand from '../generated/brand';
@@ -112,6 +112,8 @@ export function ListAdmin({ path, onToast }: { path: string[]; onToast: Toast })
 }
 
 function ListOverview({ onToast }: { onToast: Toast }) {
+  // Nur sehen (view_lists): öffnen, drucken und als CSV laden; anlegen, kopieren und löschen mit manage_lists
+  const editable = can('manage_lists');
   const { data, error, loading, reload } = useAsync(sources.lists.load, sources.lists.deps, sources.lists.key);
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
@@ -171,20 +173,24 @@ function ListOverview({ onToast }: { onToast: Toast }) {
                   <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => navigate(`verwaltung/listen/${l.id}`)}>
                     Öffnen
                   </button>
-                  <button
-                    className="btn btn-small btn-secondary"
-                    disabled={busy}
-                    onClick={() => run(() => api.copyList(l.id), 'Liste kopiert')}
-                  >
-                    Kopieren
-                  </button>
-                  <IconButton
-                    icon="delete"
-                    label="Löschen"
-                    variant="danger"
-                    disabled={busy}
-                    onClick={async () => (await confirmAsk(`Liste „${l.title}“ löschen?`)) && run(() => api.deleteList(l.id), 'Gelöscht')}
-                  />
+                  {editable && (
+                    <button
+                      className="btn btn-small btn-secondary"
+                      disabled={busy}
+                      onClick={() => run(() => api.copyList(l.id), 'Liste kopiert')}
+                    >
+                      Kopieren
+                    </button>
+                  )}
+                  {editable && (
+                    <IconButton
+                      icon="delete"
+                      label="Löschen"
+                      variant="danger"
+                      disabled={busy}
+                      onClick={async () => (await confirmAsk(`Liste „${l.title}“ löschen?`)) && run(() => api.deleteList(l.id), 'Gelöscht')}
+                    />
+                  )}
                 </div>
               </div>
             </li>
@@ -192,23 +198,25 @@ function ListOverview({ onToast }: { onToast: Toast }) {
         </ul>
       )}
 
-      <form className="form card" onSubmit={add}>
-        <h3>Neue Liste</h3>
-        <label className="field">
-          <span>Titel</span>
-          <input
-            type="text"
-            maxLength={120}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="z. B. Ausflug – Anmeldung"
-            required
-          />
-        </label>
-        <button className="btn btn-block" type="submit" disabled={busy}>
-          Anlegen
-        </button>
-      </form>
+      {editable && (
+        <form className="form card" onSubmit={add}>
+          <h3>Neue Liste</h3>
+          <label className="field">
+            <span>Titel</span>
+            <input
+              type="text"
+              maxLength={120}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="z. B. Ausflug – Anmeldung"
+              required
+            />
+          </label>
+          <button className="btn btn-block" type="submit" disabled={busy}>
+            Anlegen
+          </button>
+        </form>
+      )}
     </div>
   );
 }
@@ -254,6 +262,8 @@ const toInput = (d: Draft): PrintListInput => ({
 });
 
 function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: PrintList) => void; onToast: Toast }) {
+  // Nur sehen (view_lists): Vorschau, PDF, CSV und Drucken, ohne die Felder zum Bearbeiten
+  const editable = can('manage_lists');
   const [draft, setDraft] = useState<Draft>(() => toDraft(list));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -342,54 +352,59 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
         ‹ Alle {sec.lists}
       </button>
 
-      <section className="card form">
-        <h3>Liste</h3>
-        <label className="field">
-          <span>Titel</span>
-          <input type="text" maxLength={120} value={draft.title} onChange={(e) => update({ title: e.target.value })} required />
-        </label>
-        <label className="field">
-          <span>Untertitel / Hinweis (optional)</span>
-          <input type="text" maxLength={200} value={draft.subtitle} onChange={(e) => update({ subtitle: e.target.value })} />
-        </label>
-        <div className="field-row">
+      {!editable && <h2>{draft.title}</h2>}
+      {editable && (
+        <section className="card form">
+          <h3>Liste</h3>
           <label className="field">
-            <span>Datum (optional)</span>
-            <input type="date" value={draft.date} onChange={(e) => update({ date: e.target.value })} />
+            <span>Titel</span>
+            <input type="text" maxLength={120} value={draft.title} onChange={(e) => update({ title: e.target.value })} required />
           </label>
           <label className="field">
-            <span>Druck</span>
-            <select value={draft.orientation} onChange={(e) => update({ orientation: e.target.value as Draft['orientation'] })}>
-              <option value="portrait">Hochformat</option>
-              <option value="landscape">Querformat</option>
-            </select>
+            <span>Untertitel / Hinweis (optional)</span>
+            <input type="text" maxLength={200} value={draft.subtitle} onChange={(e) => update({ subtitle: e.target.value })} />
           </label>
-        </div>
-      </section>
+          <div className="field-row">
+            <label className="field">
+              <span>Datum (optional)</span>
+              <input type="date" value={draft.date} onChange={(e) => update({ date: e.target.value })} />
+            </label>
+            <label className="field">
+              <span>Druck</span>
+              <select value={draft.orientation} onChange={(e) => update({ orientation: e.target.value as Draft['orientation'] })}>
+                <option value="portrait">Hochformat</option>
+                <option value="landscape">Querformat</option>
+              </select>
+            </label>
+          </div>
+        </section>
+      )}
 
-      <ColumnEditor columns={draft.columns} fields={list.fields} onChange={(columns) => update({ columns })} />
+      {editable && <ColumnEditor columns={draft.columns} fields={list.fields} onChange={(columns) => update({ columns })} />}
 
-      <RowEditor
-        rows={draft.rows}
-        columns={draft.columns}
-        groups={draft.groups}
-        groupOptions={list.group_options}
-        onGroups={(groups) => update({ groups })}
-        deleted={deleted}
-        busy={busy}
-        sync={sync}
-        onChange={(rows) => update({ rows })}
-        onSync={startSync}
-        onApplySync={applySync}
-        onCancelSync={() => setSync(null)}
-      />
+      {editable && (
+        <RowEditor
+          rows={draft.rows}
+          columns={draft.columns}
+          groups={draft.groups}
+          groupOptions={list.group_options}
+          onGroups={(groups) => update({ groups })}
+          deleted={deleted}
+          busy={busy}
+          sync={sync}
+          onChange={(rows) => update({ rows })}
+          onSync={startSync}
+          onApplySync={applySync}
+          onCancelSync={() => setSync(null)}
+        />
+      )}
 
       {error && (
         <p className="form-error" role="alert">
           {error}
         </p>
       )}
-      {dirty && (
+      {editable && dirty && (
         <div className="list-save no-print">
           <button className="btn" disabled={busy || draft.title.trim() === ''} onClick={save}>
             Speichern

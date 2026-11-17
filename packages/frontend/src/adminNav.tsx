@@ -21,8 +21,9 @@ const seeRanks = (): boolean => !!config?.features.ranks && can('view_promotions
 const seeTitles = (): boolean => !!config?.features.titles && can('view_titles');
 const seeAttendance = (): boolean => !!config?.features.attendance && can('view_attendance');
 const canOffices = (): boolean => !!config?.features.offices && can('manage_offices');
-const canLists = (): boolean => !!config?.features.lists && can('manage_lists');
-const canMail = (): boolean => !!config?.features.mail && can('send_mail');
+const seeLists = (): boolean => !!config?.features.lists && can('view_lists');
+const seeMail = (): boolean => !!config?.features.mail && can('view_mail');
+const seeInventory = (): boolean => !!config?.features.inventory && can('view_inventory');
 const canCompanies = (): boolean => !!config?.features.companies && can('manage_companies');
 const canSponsors = (): boolean => !!config?.features.sponsors && can('manage_sponsors');
 const canPages = (): boolean => !!config?.features.pages && can('manage_pages');
@@ -36,8 +37,7 @@ const canPassive = (): boolean => !!config?.features.passive && can('manage_pass
  * genau, sagt der Server.
  */
 export function reportAllowed(): boolean {
-  const f = config?.features;
-  return memberListAllowed() || canPassive() || canOffices() || (!!f?.inventory && can('manage_inventory'));
+  return memberListAllowed() || canPassive() || canOffices() || seeInventory();
 }
 
 /** Mitgliederliste: für alle, die Punkte, Strafen, Dienstgrade, Titel oder Anwesenheit der Mitglieder sehen, Mitglieder
@@ -95,9 +95,9 @@ export function adminTabs(): AdminTab[] {
       { id: 'anwesenheit', label: sec.attendance, on: seeAttendance() },
       { id: 'brett', label: sec.board, on: canPostBoard(), route: 'brett' },
       { id: 'umfragen', label: sec.polls, on: canManagePolls(), route: 'umfragen/verwalten' },
-      { id: 'inventar', label: sec.inventory, on: !!config?.features.inventory && can('manage_inventory'), route: 'inventar' },
-      { id: 'listen', label: sec.lists, on: canLists() },
-      { id: 'mail', label: sec.mail, on: canMail() },
+      { id: 'inventar', label: sec.inventory, on: seeInventory(), route: 'inventar' },
+      { id: 'listen', label: sec.lists, on: seeLists() },
+      { id: 'mail', label: sec.mail, on: seeMail() },
       { id: 'einstellungen', label: 'Einstellungen', on: can('manage_settings'), route: 'einstellungen' },
     ] as AdminTab[]
   ).filter((t) => t.on);

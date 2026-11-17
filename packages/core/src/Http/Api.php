@@ -956,14 +956,14 @@ final class Api
                 $a->push()->sendTest($a->push()->own(null, $r->input('endpoint'), $r->input('auth')));
                 return ['sent' => true];
             }),
-            // Mit Zu- und Absagen je Termin (responses, EventResponseService); Namen dazu nur mit manage_calendar.
+            // Mit Zu- und Absagen je Termin (responses, EventResponseService); Namen dazu nur mit view_responses.
             // Terminart (kind) vor den Rückmeldungen: annotate() der Rückmeldungen entfernt die stabile Kennung.
             new Route('GET', '/calendar', Cap::Calendar, fn () => $a->eventResponses()->annotate($a->authContext->currentUser(), $a->eventKinds()->annotate($a->authContext->currentUser(), $a->calendar()->upcoming())), 'calendar', $denyCalendar),
             new Route('PUT', '/calendar/{key}/kind', Cap::ManageCalendar, fn (Request $r) => $a->eventKinds()->set($this->user(), (string) $r->params['key'], $r->input('kind')), 'calendar', $denyRights),
             new Route('PUT', '/calendar/{key}/response', Cap::RespondCalendar, fn (Request $r) => $a->eventResponses()->respond($this->user(), (string) $r->params['key'], $r->input('status'), $r->input('note')), 'calendar', $denyRespond),
             new Route('DELETE', '/calendar/{key}/response', Cap::RespondCalendar, fn (Request $r) => $a->eventResponses()->withdraw($this->user(), (string) $r->params['key']), 'calendar', $denyRespond),
             new Route('PUT', '/calendar/{key}/responses/{id}', Cap::ManageAttendance, fn (Request $r) => $a->eventResponses()->respondFor($this->user(), (string) $r->params['key'], $r->id(), $r->input('status')), 'calendar', $denyRights),
-            new Route('GET', '/calendar/{key}/responses', Cap::ManageCalendar, fn (Request $r) => $a->eventResponses()->overview($this->user(), (string) $r->params['key']), 'calendar', $denyRights),
+            new Route('GET', '/calendar/{key}/responses', Cap::ViewResponses, fn (Request $r) => $a->eventResponses()->overview($this->user(), (string) $r->params['key']), 'calendar', $denyRights),
             // Interner Kalender in der App (Quelle „app“): Termine pflegen mit manage_calendar, getrennt von den öffentlichen.
             // Benachrichtigungen wie bei jeder Quelle über PushTriggers::checkCalendar, nach dem Speichern sofort angestoßen.
             new Route('GET', '/calendar/entries', Cap::ManageCalendar, fn () => $a->calendar()->requireInApp()->upcoming(), 'calendar', $denyRights),
@@ -1175,9 +1175,9 @@ final class Api
             new Route('PUT', '/members/{id}/companies', Cap::ManageCompanies, fn (Request $r) => ['companies' => $a->companies()->assignToUser($r->id(), $r->input('company_ids'))], 'companies', $denyRights),
 
             // Listen (Issue #121): nur mit manage_lists; Werte der Mitglieder nur, soweit die Person sie ohnehin sieht
-            new Route('GET', '/lists', Cap::ManageLists, fn () => $a->lists()->overview(), 'lists', $denyRights),
+            new Route('GET', '/lists', Cap::ViewLists, fn () => $a->lists()->overview(), 'lists', $denyRights),
             new Route('POST', '/lists', Cap::ManageLists, fn (Request $r) => Response::created($a->lists()->create($this->user(), $r->body)), 'lists', $denyRights),
-            new Route('GET', '/lists/{id}', Cap::ManageLists, fn (Request $r) => $a->lists()->detail($this->user(), $r->id()), 'lists', $denyRights),
+            new Route('GET', '/lists/{id}', Cap::ViewLists, fn (Request $r) => $a->lists()->detail($this->user(), $r->id()), 'lists', $denyRights),
             new Route('PUT', '/lists/{id}', Cap::ManageLists, fn (Request $r) => $a->lists()->save($this->user(), $r->id(), $r->body), 'lists', $denyRights),
             new Route('DELETE', '/lists/{id}', Cap::ManageLists, function (Request $r) use ($a) {
                 $a->lists()->delete($r->id());
@@ -1263,9 +1263,9 @@ final class Api
             // freie Adressen je An, Cc und Bcc), Vorschau der Empfänger, senden (Versand im Hintergrund), Verlauf mit Protokoll
             new Route('GET', '/mails/options', Cap::SendMail, fn () => $a->mailings()->options(), 'mail', $denyRights),
             new Route('POST', '/mails/preview', Cap::SendMail, fn (Request $r) => $a->mailings()->preview($r->body), 'mail', $denyRights),
-            new Route('GET', '/mails', Cap::SendMail, fn () => $a->mailings()->list(), 'mail', $denyRights),
+            new Route('GET', '/mails', Cap::ViewMail, fn () => $a->mailings()->list(), 'mail', $denyRights),
             new Route('POST', '/mails', Cap::SendMail, fn (Request $r) => Response::created($a->mailings()->send($this->user(), $r->body)), 'mail', $denyRights),
-            new Route('GET', '/mails/{id}', Cap::SendMail, fn (Request $r) => $a->mailings()->detail($r->id()), 'mail', $denyRights),
+            new Route('GET', '/mails/{id}', Cap::ViewMail, fn (Request $r) => $a->mailings()->detail($r->id()), 'mail', $denyRights),
             // Mailgruppen (Standardgruppen nur umbenennen, eigene aus Rollen, Konten und Adressen): Antwort ist die neue Liste
             new Route('GET', '/mails/groups', Cap::SendMail, fn () => $a->mailings()->groups(), 'mail', $denyRights),
             new Route('POST', '/mails/groups', Cap::SendMail, function (Request $r) use ($a) {
@@ -1355,16 +1355,16 @@ final class Api
 
             // Inventar (Issue #6): nur mit manage_inventory (Mitglieder ohne das Recht sehen es nicht); optional reason bei
             // allen Änderungen. Genau ein Verlaufseintrag je Änderung und betroffenem Eintrag (InventoryService).
-            new Route('GET', '/inventory', Cap::ManageInventory, fn () => $a->inventory()->list(), 'inventory', $denyRights),
-            new Route('GET', '/inventory/locations', Cap::ManageInventory, fn () => $a->inventory()->locations(), 'inventory', $denyRights),
-            new Route('GET', '/inventory/log', Cap::ManageInventory, fn (Request $r) => $a->inventory()->log($r->query['limit'] ?? null, $r->query['before'] ?? null), 'inventory', $denyRights),
+            new Route('GET', '/inventory', Cap::ViewInventory, fn () => $a->inventory()->list(), 'inventory', $denyRights),
+            new Route('GET', '/inventory/locations', Cap::ViewInventory, fn () => $a->inventory()->locations(), 'inventory', $denyRights),
+            new Route('GET', '/inventory/log', Cap::ViewInventory, fn (Request $r) => $a->inventory()->log($r->query['limit'] ?? null, $r->query['before'] ?? null), 'inventory', $denyRights),
             new Route('POST', '/inventory', Cap::ManageInventory, fn (Request $r) => Response::created($a->inventory()->create($this->user(), $r->body)), 'inventory', $denyRights),
             new Route('PATCH', '/inventory/{id}', Cap::ManageInventory, fn (Request $r) => $a->inventory()->update($this->user(), $r->id(), $r->body), 'inventory', $denyRights),
             new Route('DELETE', '/inventory/{id}', Cap::ManageInventory, function (Request $r) use ($a) {
                 $a->inventory()->delete($this->user(), $r->id(), $r->body['reason'] ?? $r->query['reason'] ?? null);
                 return ['deleted' => true];
             }, 'inventory', $denyRights),
-            new Route('GET', '/inventory/{id}/log', Cap::ManageInventory, fn (Request $r) => $a->inventory()->itemLog($r->id(), $r->query['limit'] ?? null, $r->query['before'] ?? null), 'inventory', $denyRights),
+            new Route('GET', '/inventory/{id}/log', Cap::ViewInventory, fn (Request $r) => $a->inventory()->itemLog($r->id(), $r->query['limit'] ?? null, $r->query['before'] ?? null), 'inventory', $denyRights),
             new Route('POST', '/inventory/{id}/move', Cap::ManageInventory, fn (Request $r) => $a->inventory()->move($this->user(), $r->id(), $r->body), 'inventory', $denyRights),
 
             // Anwesenheit (Issue #21): Listen je Termin; Gruppen für den Zähler stellen Admins bei den Rollen ein

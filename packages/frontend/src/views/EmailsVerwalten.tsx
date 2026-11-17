@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import {
   api,
+  can,
   type BoardMailSummary,
   type MailDetail,
   type MailField,
@@ -720,15 +721,17 @@ function Groups({ onToast }: { onToast: (msg: string) => void }) {
  * E-Mail, verwaltung/mail/gruppen die Mailgruppen.
  */
 export function MailAdmin({ path, onToast }: { path: string[]; onToast: (msg: string) => void }) {
+  // Nur sehen (view_mail): Verlauf mit Versandprotokoll; schreiben und Mailgruppen mit send_mail
+  const send = can('send_mail');
   const detail = path[0] && /^\d+$/.test(path[0]) ? Number(path[0]) : null;
-  const groups = path[0] === 'gruppen';
+  const groups = send && path[0] === 'gruppen';
   const [options, setOptions] = useState<MailOptions | null>(null);
   const [history, setHistory] = useState<{ items: MailListItem[]; keep_days: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = () => {
     setError(null);
-    Promise.all([api.mailOptions(), api.mails()]).then(
+    Promise.all([send ? api.mailOptions() : Promise.resolve(null), api.mails()]).then(
       ([o, h]) => {
         setOptions(o);
         setHistory(h);
@@ -743,19 +746,22 @@ export function MailAdmin({ path, onToast }: { path: string[]; onToast: (msg: st
   if (detail !== null) return <Detail id={detail} />;
   if (groups) return <Groups onToast={onToast} />;
   if (error) return <ErrorBox message={error} onRetry={load} />;
-  if (!options || !history) return <Loading />;
+  if ((send && !options) || !history) return <Loading />;
   return (
     <div className="mail-page">
-      {options.available ? (
-        <Compose options={options} onSent={() => api.mails().then(setHistory, () => undefined)} onToast={onToast} />
-      ) : (
-        <div className="card mail-unavailable">
-          <p>{options.reason ?? 'Der Mailversand ist noch nicht eingerichtet.'}</p>
-        </div>
+      {options &&
+        (options.available ? (
+          <Compose options={options} onSent={() => api.mails().then(setHistory, () => undefined)} onToast={onToast} />
+        ) : (
+          <div className="card mail-unavailable">
+            <p>{options.reason ?? 'Der Mailversand ist noch nicht eingerichtet.'}</p>
+          </div>
+        ))}
+      {options && (
+        <button type="button" className="btn btn-link mail-groups-link" onClick={() => navigate('verwaltung/mail/gruppen')}>
+          Mailgruppen verwalten ({options.groups.length})
+        </button>
       )}
-      <button type="button" className="btn btn-link mail-groups-link" onClick={() => navigate('verwaltung/mail/gruppen')}>
-        Mailgruppen verwalten ({options.groups.length})
-      </button>
       <History items={history.items} keepDays={history.keep_days} />
     </div>
   );

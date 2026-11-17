@@ -43,7 +43,7 @@ final class CalendarService
     public const SOURCE_APP = 'app';
     public const SOURCES = [self::SOURCE_APP, 'google', 'ics'];
     /** Rechte der Standardrolle „Kalender verwalten“ (nur mit der Quelle app, Features::roleOf). */
-    public const ROLE = ['member', 'manage_calendar'];
+    public const ROLE = ['member', 'view_responses', 'manage_calendar'];
     /** Vor der Kennung eines Termins der App (die öffentlichen Termine haben „p“ in der Terminliste). */
     public const APP_ID_PREFIX = 'i';
     /** So lange bleibt die letzte gute Fassung als Rückfall erhalten. */
