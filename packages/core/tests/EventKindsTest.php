@@ -74,13 +74,34 @@ final class EventKindsTest extends TestCase
     public function testOptionsAreValidatedAndInConfig(): void
     {
         $this->assertSame([], $this->ok('GET', '/config')['eventKinds']);
-        $this->assertSame(['kinds' => ['Versammlung', 'Arbeitsdienst']], $this->ok('PUT', '/admin/event-kinds', ['kinds' => [' Versammlung ', '', 'Arbeitsdienst']]));
+        $this->assertSame(['Versammlung', 'Arbeitsdienst'], $this->ok('PUT', '/admin/event-kinds', ['kinds' => [' Versammlung ', '', 'Arbeitsdienst']])['kinds']);
         $this->assertSame(['Versammlung', 'Arbeitsdienst'], $this->ok('GET', '/config', [], $this->anna)['eventKinds']);
         $this->assertSame(400, $this->call('PUT', '/admin/event-kinds', ['kinds' => ['Versammlung', 'versammlung']])->status);
         $this->assertSame(400, $this->call('PUT', '/admin/event-kinds', ['kinds' => [str_repeat('x', 41)]])->status);
         $this->assertSame(400, $this->call('PUT', '/admin/event-kinds', ['kinds' => 'Versammlung'])->status);
         $this->assertSame(403, $this->call('PUT', '/admin/event-kinds', ['kinds' => []], $this->anna)->status);
         $this->assertSame(['Versammlung', 'Arbeitsdienst'], $this->app->eventKinds()->options(), 'Fehler ändern nichts');
+    }
+
+    public function testHiddenTagsAreSavedPerKindAndInConfig(): void
+    {
+        $this->assertSame([], $this->ok('GET', '/config')['eventKindsHidden'], 'Vorgabe: alle Arten mit Schild');
+        $this->assertSame(
+            ['kinds' => ['Versammlung', 'Arbeitsdienst'], 'hidden' => []],
+            $this->ok('PUT', '/admin/event-kinds', ['kinds' => ['Versammlung', 'Arbeitsdienst']]),
+        );
+        $this->assertSame(
+            ['kinds' => ['Versammlung', 'Arbeitsdienst'], 'hidden' => ['Arbeitsdienst']],
+            $this->ok('PUT', '/admin/event-kinds', ['kinds' => ['Versammlung', 'Arbeitsdienst'], 'hidden' => ['Arbeitsdienst', 'Gibt es nicht']]),
+        );
+        $this->assertSame(['Arbeitsdienst'], $this->ok('GET', '/config', [], $this->anna)['eventKindsHidden']);
+        // Ohne hidden (ältere Oberfläche) bleibt es, wie es war
+        $this->assertSame(['Arbeitsdienst'], $this->ok('PUT', '/admin/event-kinds', ['kinds' => ['Arbeitsdienst', 'Schießen']])['hidden']);
+        $this->assertSame(400, $this->call('PUT', '/admin/event-kinds', ['kinds' => ['Versammlung'], 'hidden' => 'Arbeitsdienst'])->status);
+        $this->assertSame(['Arbeitsdienst', 'Schießen'], $this->app->eventKinds()->options(), 'Fehler ändern nichts');
+        // Eine entfernte Art verliert die Einstellung; neu angelegt hat sie wieder ein Schild
+        $this->assertSame([], $this->ok('PUT', '/admin/event-kinds', ['kinds' => ['Schießen']])['hidden']);
+        $this->assertSame([], $this->ok('PUT', '/admin/event-kinds', ['kinds' => ['Schießen', 'Arbeitsdienst']])['hidden']);
     }
 
     public function testSuggestionMatchesWholeWordsAndPrefersLongest(): void

@@ -748,6 +748,8 @@ final class Api
             'eventResponses' => ($features['calendar'] ?? false) && $a->eventResponses()->enabled(),
             // Terminarten (Einstellungen → Kalender), z. B. Versammlung: zur Auswahl am Termin und an Anwesenheitslisten
             'eventKinds' => ($features['calendar'] ?? false) || ($features['attendance'] ?? false) ? $a->eventKinds()->options() : [],
+            // Terminarten ohne Schild neben dem Titel des Termins (Einstellungen → Kalender, Vorgabe: keine)
+            'eventKindsHidden' => ($features['calendar'] ?? false) || ($features['attendance'] ?? false) ? $a->eventKinds()->hiddenTags() : [],
             // admissionsDue: Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“), für create_users
             // mit Anwesenheit und einer Anwärter-Rolle; sonst null (keine Kachel)
             'admissionsDue' => $user !== null && $this->can(Cap::CreateUsers) && $a->admissions()->enabled() ? $a->admissions()->dueCount() : null,
@@ -1381,7 +1383,7 @@ final class Api
                 return $created ? Response::created($list) : $list;
             }, 'attendance', $denyRights),
             new Route('GET', '/attendance/events', Cap::ViewAttendance, fn () => $a->attendance()->events(), 'attendance', $denyRights),
-            new Route('PUT', '/admin/event-kinds', Cap::ManageSettings, fn (Request $r) => ['kinds' => $a->eventKinds()->setOptions($r->input('kinds'))], null, $denySettings),
+            new Route('PUT', '/admin/event-kinds', Cap::ManageSettings, fn (Request $r) => $a->eventKinds()->save($r->input('kinds'), $r->input('hidden')), null, $denySettings),
             new Route('GET', '/attendance/groups', Cap::ManageSettings, fn () => $a->attendance()->groups(), 'attendance', $denySettings),
             new Route('PUT', '/attendance/groups', Cap::ManageSettings, fn (Request $r) => $a->attendance()->setGroups($r->input('groups')), 'attendance', $denySettings),
             new Route('GET', '/attendance/{id}', Cap::ViewAttendance, fn (Request $r) => $a->attendance()->detail($r->id()), 'attendance', $denyRights),

@@ -3546,7 +3546,9 @@ paths:
       description: |
         Liste von Bezeichnungen (höchstens 30, je höchstens 40 Zeichen, keine doppelten), leer erlaubt. Gespeichert wird
         an Terminen und Listen die Bezeichnung: Entfernte Arten bleiben dort stehen. Die Liste steht in `GET /config`
-        (`eventKinds`).
+        (`eventKinds`). `hidden`: Arten, die nicht als Schild neben dem Titel des Termins stehen (nur Anzeige; die Art bleibt
+        gespeichert und zählt). Namen, die nicht in `kinds` stehen, werden ignoriert; ohne `hidden` bleibt die bisherige
+        Auswahl (ohne entfernte Arten). Steht in `GET /config` (`eventKindsHidden`).
       x-capability: manage_settings
       requestBody:
         required: true
@@ -3557,6 +3559,7 @@ paths:
               required: [kinds]
               properties:
                 kinds: { type: array, items: { type: string, maxLength: 40 } }
+                hidden: { type: array, items: { type: string }, description: 'Arten ohne Schild am Termin (Vorgabe: keine)' }
       responses:
         '200':
           description: Die gespeicherte Liste
@@ -3564,8 +3567,10 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [kinds, hidden]
                 properties:
                   kinds: { type: array, items: { type: string } }
+                  hidden: { type: array, items: { type: string } }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
   /attendance:
@@ -10037,6 +10042,10 @@ components:
           type: array
           items: { type: string }
           description: 'Terminarten (Einstellungen → Kalender, `PUT /admin/event-kinds`) zur Auswahl am Termin und an Anwesenheitslisten; leer ohne Kalender und Anwesenheit'
+        eventKindsHidden:
+          type: array
+          items: { type: string }
+          description: 'Terminarten ohne Schild neben dem Titel des Termins (Einstellungen → Kalender, `hidden` in `PUT /admin/event-kinds`); leer = alle mit Schild'
         caredPassives:
           {
             type: integer,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { api, can, config, eventKinds } from '../api';
+import { api, can, config, eventKindTag, eventKinds } from '../api';
 import GuestPushButton from '../GuestPushButton';
 import { birthdaysVisible, UpcomingBirthdays, UpcomingBirthdaysCard, useUpcomingBirthdays } from '../upcomingBirthdays';
 import { navigate } from '../router';
@@ -133,7 +133,7 @@ function EventList({ focus }: { focus?: string }) {
                     </div>
                     <div className="event-main">
                       <div className="event-title">
-                        {ev.title} {ev.kind && <span className="badge event-kind">{ev.kind}</span>}
+                        {ev.title} {eventKindTag(ev.kind) && <span className="badge event-kind">{ev.kind}</span>}
                       </div>
                       <div className="event-when">{formatEventWhen(ev)}</div>
                       {ev.location && <div className="event-where">{ev.location}</div>}

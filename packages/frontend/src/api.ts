@@ -151,6 +151,8 @@ export interface AppConfig {
   eventResponses?: boolean;
   /** Terminarten (Einstellungen → Kalender), z. B. Versammlung; fehlt bei älteren Servern */
   eventKinds?: string[];
+  /** Terminarten ohne Schild neben dem Titel des Termins (Einstellungen → Kalender); fehlt bei älteren Servern */
+  eventKindsHidden?: string[];
   /** Wie viele Passive die Person betreut (Meins → Meine Passiven); 0 ohne den Bereich, fehlt bei älteren Servern */
   caredPassives?: number;
   /** Rollen der Installation (Einstellungen → Rollen): Bezeichnung und Punktefaktor */
@@ -627,10 +629,21 @@ export function eventKinds(): string[] {
   return config?.eventKinds ?? [];
 }
 
-/** Übernimmt die Terminarten in die geladene Konfiguration (nach dem Speichern). */
-export function applyEventKinds(kinds: string[]): void {
+/** Terminarten, die nicht als Schild neben dem Titel des Termins stehen; leer bei älteren Servern (dann alle). */
+export function eventKindsHidden(): string[] {
+  return config?.eventKindsHidden ?? [];
+}
+
+/** Steht diese Art als Schild neben dem Titel des Termins? */
+export function eventKindTag(kind: string | null | undefined): boolean {
+  return !!kind && !eventKindsHidden().includes(kind);
+}
+
+/** Übernimmt die Terminarten (und die ohne Schild) in die geladene Konfiguration (nach dem Speichern). */
+export function applyEventKinds(kinds: string[], hidden?: string[]): void {
   if (!config) return;
   config.eventKinds = kinds;
+  if (hidden !== undefined) config.eventKindsHidden = hidden;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -2797,7 +2810,8 @@ export const api = {
   attendanceEvents: () => request<AttendanceEvent[]>('GET', '/attendance/events'),
   attendance: (id: number) => request<AttendanceDetail>('GET', `/attendance/${id}`),
   saveAttendance: (data: AttendanceInput) => request<AttendanceDetail>('PUT', '/attendance', data),
-  setEventKinds: (kinds: string[]) => request<{ kinds: string[] }>('PUT', '/admin/event-kinds', { kinds }),
+  setEventKinds: (kinds: string[], hidden: string[]) =>
+    request<{ kinds: string[]; hidden?: string[] }>('PUT', '/admin/event-kinds', { kinds, hidden }),
   deleteAttendance: (id: number) => request<{ deleted: boolean }>('DELETE', `/attendance/${id}`),
   myAttendance: () => request<MyAttendance>('GET', '/me/attendance'),
   attendanceGroups: () => request<AttendanceGroup[]>('GET', '/attendance/groups'),
