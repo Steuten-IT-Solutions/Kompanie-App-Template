@@ -14,9 +14,9 @@ Den Knopf gibt es, wenn {bereich.attendance} an ist. Damit dort jemand erscheint
 
 ## Was du hier siehst
 - **Voraussetzung erfüllt**: wer alles erfüllt, mit dem Tag, seit dem. Wer am längsten wartet, steht oben.
-- **Noch nicht erfüllt**: wer noch etwas braucht, z. B. „noch 2 Teilnahmen an „Versammlung““ oder „Mindestdauer ab …“.
+- **Noch nicht erfüllt**: wer noch etwas braucht, z. B. „noch 2 Teilnahmen an „Versammlung““ oder „Mindestdauer ab …“. Bei einer Voraussetzung mit **Eine reicht** steht „oder“ zwischen den Möglichkeiten.
 - **Ohne Voraussetzung**: Anwärter, deren Rolle keine Voraussetzung hat.
-- Bei jedem Namen: die Anwärter-Rolle, **Anwärter seit** (wenn bekannt) und wie viele Teilnahmen schon zählen.
+- Bei jedem Namen: die Anwärter-Rolle, **Anwärter seit** (wenn bekannt) und was noch fehlt. Auf der Seite der Person steht unter **Aufnahme** jede Bedingung einzeln mit ✓ (erfüllt) oder ○ (offen) und dem Stand, z. B. „4 von 6 Teilnahmen an „Versammlung““; Gruppen sind eingerückt.
 
 ## So gehst du vor
 ### Jemanden als {rolle.member} aufnehmen
@@ -33,7 +33,8 @@ Ist die Anwärter-Rolle die Grundrolle der Person, wird sie {rolle.member}. Ist 
 - Es zählen alle Anwesenheitslisten mit der passenden Terminart, in denen die Person **anwesend** ist, auch aus der Zeit vor **Anwärter seit**. **Entschuldigt** zählt nicht. Die Terminarten einer Liste kommen vom Termin im Kalender oder werden an der Liste gewählt. Hat eine Liste mehrere Arten, zählt sie für jede.
 - **Anwärter seit** setzt die App selbst, wenn jemand in der App die Anwärter-Rolle bekommt (beim Anlegen, beim Ändern der Rolle oder bei der Freigabe einer Anfrage). Bei Personen, die schon vorher Anwärter waren, fehlt das Datum; die Mindestdauer gilt dann erst, wenn du es nachträgst.
 - Nach dem Speichern einer Anwesenheitsliste zeigt die App oben in der Verwaltung, wer dadurch neu die Voraussetzung erfüllt.
-- Die Voraussetzung legt ein {rolle.admin} je Anwärter-Rolle unter *Einstellungen → Rollen* fest.
+- Die Voraussetzung legt ein {rolle.admin} je Anwärter-Rolle unter *Einstellungen → Rollen* fest. Bedingungen lassen sich mit **Alle müssen erfüllt sein** (UND) und **Eine reicht** (ODER) verknüpfen, auch in Gruppen. Bei **Eine reicht** gilt als „erfüllt seit“ der Tag, an dem die erste Möglichkeit erfüllt war, bei **Alle müssen erfüllt sein** der Tag der letzten.
+- Anwärter sehen ihren eigenen Stand: unter *Meins* (mit Mitgliederbereich) oder unter *Konto*, mit derselben Liste, aber ohne Knöpfe. Den Stand anderer sehen sie nicht.
 - **Nur sehen:** Mit dem Recht **Konten sehen** ohne **Mitglieder anlegen** siehst du die Übersicht und auf der Seite der Person den Stand, aber ohne **Datum speichern** und **Als {rolle.member} aufnehmen**.
 
 ## Siehe auch

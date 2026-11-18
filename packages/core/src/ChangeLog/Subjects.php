@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\ChangeLog;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Domain\AdmissionRule;
 use KompanieApp\Core\Domain\Blocks\Blocks;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Storage\EventKindRepository;
@@ -692,16 +693,15 @@ final class Subjects
     }
 
     /**
-     * @param array{admission_extra: bool, admission_kind: string|null, admission_count: int, admission_months: int} $a
+     * @param array{admission_extra: bool, admission_rule: array<string, mixed>} $a
      * @return array<string, mixed>
      */
     private static function admissionFields(array $a): array
     {
+        $rule = AdmissionRule::describe($a['admission_rule']);
         return [
             'Anwärter-Rolle' => $a['admission_extra'],
-            'Aufnahme: Terminart' => $a['admission_kind'],
-            'Aufnahme: Teilnahmen' => $a['admission_count'],
-            'Aufnahme: Monate als Anwärter' => $a['admission_months'],
+            'Aufnahme: Voraussetzung' => $rule !== '' ? $rule : null,
         ];
     }
 

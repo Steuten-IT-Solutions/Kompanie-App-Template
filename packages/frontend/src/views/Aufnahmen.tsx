@@ -4,12 +4,15 @@ import { confirmAsk } from '../ask';
 import { formatDate } from '../format';
 import { navigate } from '../router';
 import { ErrorBox, Loading, useAsync } from '../ui';
+import { describeRule, missingText } from '../admissionRule';
+import { RuleResult } from '../admissionRuleView';
 import { sources } from '../viewData';
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /** Was die Voraussetzung verlangt, z. B. „6 Teilnahmen an „Versammlung“ und 12 Monate als Anwärter“; null ohne. */
-export function admissionRule(a: Pick<Admission, 'kind' | 'count' | 'months'>): string | null {
+export function admissionRule(a: Pick<Admission, 'kind' | 'count' | 'months' | 'result'>): string | null {
+  if (a.result) return describeRule(a.result) || null;
   const parts: string[] = [];
   if (a.kind && a.count > 0) parts.push(`${plural(a.count, 'Teilnahme', 'Teilnahmen')} an „${a.kind}“`);
   if (a.months > 0) parts.push(`${plural(a.months, 'Monat', 'Monate')} als Anwärter`);
@@ -20,6 +23,7 @@ export function admissionRule(a: Pick<Admission, 'kind' | 'count' | 'months'>): 
 export function admissionState(a: Admission): string {
   if (a.status === 'none') return 'Ohne Voraussetzung';
   if (a.status === 'fulfilled') return `Voraussetzung erfüllt${a.fulfilled_on ? ` seit ${formatDate(a.fulfilled_on)}` : ''}`;
+  if (a.result) return missingText(a.result) || 'Noch nicht erfüllt';
   const open: string[] = [];
   if (a.kind && a.count > 0 && a.missing > 0) open.push(`noch ${plural(a.missing, 'Teilnahme', 'Teilnahmen')} an „${a.kind}“`);
   if (a.months > 0) {
@@ -63,7 +67,7 @@ export function Admissions() {
                 <div className="row-sub">
                   {a.role}
                   {a.since ? ` seit ${formatDate(a.since)}` : ''}
-                  {rule && a.kind && a.count > 0 ? ` · ${a.attended} von ${a.count} ${a.kind}` : ''}
+                  {!a.result && rule && a.kind && a.count > 0 ? ` · ${a.attended} von ${a.count} ${a.kind}` : ''}
                 </div>
                 <div className="row-sub">{admissionState(a)}</div>
               </div>
@@ -162,8 +166,9 @@ export function MemberAdmission({
         </p>
         <p className={a.status === 'fulfilled' ? 'admission-fulfilled' : 'muted'}>
           {admissionState(a)}
-          {a.kind && a.count > 0 ? ` (${a.attended} von ${a.count})` : ''}
+          {!a.result && a.kind && a.count > 0 ? ` (${a.attended} von ${a.count})` : ''}
         </p>
+        {a.result && <RuleResult result={a.result} />}
         {!editable && a.since && <p className="muted">Anwärter seit {formatDate(a.since)}</p>}
         {editable && (
           <form className="stack" onSubmit={saveSince}>
@@ -248,5 +253,47 @@ export function AdmissionNotice() {
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Eigener Stand als Anwärter (Meins → Übersicht und Konto): Rolle, „Anwärter seit“ und was noch fehlt, ohne Knöpfe.
+ * Erscheint nur bei Anwärtern (GET /me/admission liefert sonst null) und nie bei älteren Servern ohne den Weg.
+ */
+export function MyAdmission() {
+  const [a, setA] = useState<Admission | null>(null);
+  useEffect(() => {
+    let live = true;
+    api
+      .myAdmission()
+      .then((res) => {
+        if (live) setA(res.admission);
+      })
+      .catch(() => {
+        // Ältere Server oder offline: nichts zeigen.
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+  if (!a) return null;
+  const rule = admissionRule(a);
+  return (
+    <section className="member-admission my-admission">
+      <h3 className="section-title">Aufnahme als {levelLabel('member')}</h3>
+      <div className="card stack">
+        <p>
+          {a.role}
+          {a.since ? ` seit ${formatDate(a.since)}` : ''}
+        </p>
+        <p className={a.status === 'fulfilled' ? 'admission-fulfilled' : 'muted'}>
+          {a.status === 'none' ? 'Für die Aufnahme ist keine Voraussetzung festgelegt.' : rule ? `Voraussetzung: ${rule}` : ''}
+        </p>
+        {a.result && <RuleResult result={a.result} />}
+        {a.status === 'fulfilled' && (
+          <p className="admission-fulfilled">Du erfüllst die Voraussetzung. Aufgenommen wirst du von Hand, nicht automatisch.</p>
+        )}
+      </div>
+    </section>
   );
 }

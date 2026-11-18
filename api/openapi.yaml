@@ -172,6 +172,28 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /me/admission:
+    get:
+      tags: [Eigene Daten]
+      summary: Eigener Stand als Anwärter für die Aufnahme (Regel und was fehlt)
+      description: |
+        Jeder Angemeldete bekommt nur den eigenen Stand (`Admission`), `null`, wenn er kein Anwärter ist oder der Bereich
+        Anwesenheit aus ist. Den Stand anderer gibt es nur über `GET /admissions` (view_accounts).
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [admission]
+                properties:
+                  admission:
+                    oneOf:
+                      - $ref: '#/components/schemas/Admission'
+                      - type: 'null'
+        '401': { $ref: '#/components/responses/Error' }
+
   /me/attendance:
     get:
       tags: [Eigene Daten]
@@ -5298,6 +5320,7 @@ paths:
       description: |
         Alle Anwärter (Grundrolle mit `promotable` oder `admission_extra`, Zusatzrolle mit `admission_extra`, ohne Ehemalige): zuerst wer die
         Voraussetzung erfüllt (nach `fulfilled_on`), dann `open`, dann `none`. Es zählen alle Teilnahmen der Terminart bis heute.
+        `result` ist die ausgewertete Voraussetzung (`AdmissionRuleResult`).
         Aufnehmen (`POST /members/{id}/admit`) nur mit `create_users`.
       x-capability: view_accounts
       responses:
@@ -9936,9 +9959,10 @@ components:
               }
             deletable: { type: boolean, description: 'false für guest, member und admin' }
             admission_extra: { type: boolean, description: 'Anwärter-Rolle (als Grund- oder Zusatzrolle, auch mit Mitgliederbereich)' }
-            admission_kind: { type: [string, 'null'] }
+            admission_kind: { type: [string, 'null'], description: 'Frühere Form (Teilnahmen einer Art UND Dauer); null/0, wenn admission_rule mehr ausdrückt' }
             admission_count: { type: integer }
             admission_months: { type: integer }
+            admission_rule: { $ref: '#/components/schemas/AdmissionRule' }
 
     RoleInput:
       type: object
@@ -10042,6 +10066,47 @@ components:
             description: 'Mindestens so viele Teilnahmen (present) an Listen dieser Art, 0–100; > 0 nur mit admission_kind',
           }
         admission_months: { type: [integer, string], description: 'Mindestens so viele Monate seit „Anwärter seit“, 0–120' }
+        admission_rule:
+          description: 'Voraussetzung als Baum; geht admission_kind/count/months vor. null oder leere Gruppe: keine Voraussetzung'
+          oneOf:
+            - $ref: '#/components/schemas/AdmissionRule'
+            - type: 'null'
+
+    AdmissionRule:
+      type: object
+      description: |
+        Voraussetzung für die Aufnahme (Domain\AdmissionRule): ein Knoten. Gruppe `{type: group, op: and|or, items}` (UND: alle,
+        ODER: eine reicht; beliebig tief, leere Gruppen fallen weg), Teilnahmen `{type: attendance, kind, count}` (1–100 Mal
+        present an Listen der Terminart), Dauer `{type: duration, months}` (1–120 Monate seit „Anwärter seit“). Höchstens 20
+        Bedingungen und 20 Gruppen unter der obersten. Die oberste Ebene ist immer eine Gruppe.
+      required: [type]
+      properties:
+        type: { type: string, enum: [group, attendance, duration] }
+        op: { type: string, enum: [and, or] }
+        items: { type: array, items: { $ref: '#/components/schemas/AdmissionRule' } }
+        kind: { type: string }
+        count: { type: [integer, string] }
+        months: { type: [integer, string] }
+
+    AdmissionRuleResult:
+      type: object
+      description: |
+        Ausgewertete Voraussetzung einer Person: jeder Knoten wie in `AdmissionRule` mit `status` (fulfilled, open, unknown =
+        Dauer ohne „Anwärter seit“) und `on` (Tag, an dem er erfüllt wurde: UND das späteste, ODER das früheste der erfüllten).
+        Teilnahmen zusätzlich mit `attended` und `missing`, Dauer mit `due` (Tag, ab dem sie erfüllt ist).
+      required: [type, status, 'on']
+      properties:
+        type: { type: string, enum: [group, attendance, duration] }
+        status: { type: string, enum: [fulfilled, open, unknown] }
+        'on': { type: [string, 'null'] }
+        op: { type: string, enum: [and, or] }
+        items: { type: array, items: { $ref: '#/components/schemas/AdmissionRuleResult' } }
+        kind: { type: string }
+        count: { type: integer }
+        attended: { type: integer }
+        missing: { type: integer }
+        months: { type: integer }
+        due: { type: [string, 'null'] }
 
     Admission:
       type: object
@@ -10054,14 +10119,19 @@ components:
         role_key: { $ref: '#/components/schemas/Level' }
         way: { type: string, enum: [base, extra], description: 'base: Grundrolle wird member; extra: diese Zusatzrolle wird entfernt' }
         since: { type: [string, 'null'], description: 'Anwärter seit (JJJJ-MM-TT); null, wenn unbekannt' }
-        kind: { type: [string, 'null'], description: Terminart der Voraussetzung }
-        count: { type: integer, description: Nötige Teilnahmen (0 keine) }
-        months: { type: integer, description: Mindestdauer in Monaten (0 keine) }
+        kind: { type: [string, 'null'], description: Terminart der ersten Bedingung „Teilnahmen“ (für ältere Oberflächen) }
+        count: { type: integer, description: Nötige Teilnahmen der ersten Bedingung „Teilnahmen“ (0 keine) }
+        months: { type: integer, description: Mindestdauer der ersten Bedingung „Dauer“ in Monaten (0 keine) }
         attended: { type: integer, description: 'Teilnahmen (present) an Listen der Art bis heute, auch vor since' }
         missing: { type: integer }
-        months_on: { type: [string, 'null'], description: Tag, ab dem die Mindestdauer erfüllt ist }
+        months_on: { type: [string, 'null'], description: Tag, ab dem die erste Mindestdauer erfüllt ist }
         fulfilled_on: { type: [string, 'null'], description: Tag, an dem alles erfüllt war }
         status: { type: string, enum: [fulfilled, open, none], description: 'none: Rolle ohne Voraussetzung' }
+        result:
+          description: Ausgewertete Voraussetzung; null ohne Voraussetzung
+          oneOf:
+            - $ref: '#/components/schemas/AdmissionRuleResult'
+            - type: 'null'
 
     AppUser:
       type: object

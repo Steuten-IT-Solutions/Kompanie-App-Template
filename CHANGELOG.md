@@ -68,13 +68,15 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Aufnahmen**: Unter [Verwaltung → Aufnahmen](app:verwaltung/aufnahmen) siehst du wie bei den Beförderungen, welche
   Anwärter die Voraussetzung für die Aufnahme als Mitglied erfüllen; die Zahl im Kreis am Knopf zeigt, wie viele es
   sind. Unter [Einstellungen → Rollen](app:einstellungen/rollen) setzt du an einer Rolle den Haken „Anwärter-Rolle“
-  und legst die Voraussetzung fest: Teilnahmen an Terminen einer Terminart (z. B. 6 Versammlungen) und eine
-  Mindestdauer als Anwärter. Die Anwärter-Rolle kann die Rolle der Person sein (beim Aufnehmen wird sie zu Mitglied)
+  und legst die Voraussetzung fest: Bedingungen wie Teilnahmen an Terminen einer Terminart (z. B. 6 Versammlungen)
+  und eine Mindestdauer als Anwärter, verknüpft mit „Alle müssen erfüllt sein“ (UND) oder „Eine reicht“ (ODER), auch
+  in Gruppen innerhalb von Gruppen (z. B. 12 Monate und dazu 6 Versammlungen oder 10 Arbeitsdienste). Die Anwärter-Rolle kann die Rolle der Person sein (beim Aufnehmen wird sie zu Mitglied)
   oder eine Zusatzrolle zu Mitglied (beim Aufnehmen wird sie entfernt). Der Knopf ist da, sobald die Anwesenheit an ist. Auf der Seite eines Anwärters
   stehen „Anwärter seit“ (bei bisherigen Anwärtern nachtragen) und der Stand; aufnehmen geht dort jederzeit, ohne
   erfüllte Voraussetzung mit Hinweis. Ohne Eintritt trägt die App den Tag der Aufnahme ein. Nach dem Speichern einer
   Anwesenheitsliste zeigt die App, wer neu die Voraussetzung erfüllt. Sehen und aufnehmen darf, wer Mitglieder anlegen
-  darf.
+  darf. Anwärter sehen ihren eigenen Stand (was noch fehlt) unter [Meins](app:meins) bzw. unter
+  [Konto](app:meins/konto), den Stand anderer nicht.
 - **Rechte zum Sehen und zum Ändern getrennt**: Unter [Einstellungen → Rollen](app:einstellungen/rollen) gibt es
   jetzt eigene Rechte, um Punkte, Strafen, Dienstgrade mit Beförderungen, Titel und die Anwesenheit der Mitglieder nur
   zu sehen, z. B. „Punkte aller Mitglieder sehen“ neben „Punkte vergeben“. Ebenso gibt es eigene Rechte, um das

@@ -224,6 +224,108 @@ final class AdmissionsTest extends TestCase
         $this->assertSame([2, 'fulfilled', '2026-10-08'], [$e['attended'], $e['status'], $e['fulfilled_on']]);
     }
 
+    public function testRuleTreeWithAndOrIsValidatedAndKeepsLegacyFields(): void
+    {
+        $key = $this->baseRole();
+        $tree = ['type' => 'group', 'op' => 'and', 'items' => [
+            ['type' => 'duration', 'months' => 12],
+            ['type' => 'group', 'op' => 'or', 'items' => [
+                ['type' => 'attendance', 'kind' => 'Versammlung', 'count' => '6'],
+                ['type' => 'attendance', 'kind' => 'Arbeitsdienst', 'count' => 10],
+                ['type' => 'group', 'op' => 'and', 'items' => []],
+            ]],
+        ]];
+        $roles = array_column($this->ok('PATCH', "/admin/roles/$key", ['admission_extra' => true, 'admission_rule' => $tree]), null, 'key');
+        $saved = $roles[$key]['admission_rule'];
+        $this->assertSame(['type' => 'group', 'op' => 'or', 'items' => [
+            ['type' => 'attendance', 'kind' => 'Versammlung', 'count' => 6],
+            ['type' => 'attendance', 'kind' => 'Arbeitsdienst', 'count' => 10],
+        ]], $saved['items'][1], 'Zahlen als Zahl, leere Gruppe fällt weg');
+        $this->assertSame([null, 0, 0], [$roles[$key]['admission_kind'], $roles[$key]['admission_count'], $roles[$key]['admission_months']], 'mehr als die frühere Form: alte Felder 0');
+        $this->assertSame('12 Monate als Anwärter und (6 Teilnahmen an Versammlung oder 10 Teilnahmen an Arbeitsdienst)', \KompanieApp\Core\Domain\AdmissionRule::describe($saved));
+
+        // Die frühere Form schreibt die alten Felder mit (für ältere Versionen)
+        $simple = ['type' => 'group', 'op' => 'and', 'items' => [['type' => 'attendance', 'kind' => 'Versammlung', 'count' => 6], ['type' => 'duration', 'months' => 3]]];
+        $roles = array_column($this->ok('PATCH', "/admin/roles/$key", ['admission_rule' => $simple]), null, 'key');
+        $this->assertSame(['Versammlung', 6, 3], [$roles[$key]['admission_kind'], $roles[$key]['admission_count'], $roles[$key]['admission_months']]);
+        $raw = $this->app->settings->get(AdmissionService::RULES_SETTING);
+        $this->assertSame(['Versammlung', 6, 3], [$raw[$key]['kind'], $raw[$key]['count'], $raw[$key]['months']]);
+
+        // Fehler ändern nichts
+        foreach ([
+            ['type' => 'group', 'op' => 'xor', 'items' => []],
+            ['type' => 'group', 'op' => 'and', 'items' => [['type' => 'attendance', 'kind' => 'Feier', 'count' => 1]]],
+            ['type' => 'group', 'op' => 'and', 'items' => [['type' => 'attendance', 'kind' => 'Versammlung', 'count' => 0]]],
+            ['type' => 'group', 'op' => 'and', 'items' => [['type' => 'duration', 'months' => 121]]],
+            ['type' => 'group', 'op' => 'and', 'items' => [['type' => 'points', 'count' => 1]]],
+            ['type' => 'attendance', 'kind' => 'Versammlung', 'count' => 1],
+            ['type' => 'group', 'op' => 'and', 'items' => array_fill(0, 21, ['type' => 'duration', 'months' => 1])],
+        ] as $bad) {
+            $this->assertSame(400, $this->call('PATCH', "/admin/roles/$key", ['admission_rule' => $bad])->status, json_encode($bad) ?: '');
+        }
+        $this->assertSame(['Versammlung', 6, 3], [$this->app->admissions()->rule($key)['kind'], $this->app->admissions()->rule($key)['count'], $this->app->admissions()->rule($key)['months']]);
+
+        // Tiefe ist frei, solange die Zahl der Gruppen reicht
+        $deep = ['type' => 'duration', 'months' => 1];
+        for ($i = 0; $i < 15; $i++) {
+            $deep = ['type' => 'group', 'op' => $i % 2 === 0 ? 'or' : 'and', 'items' => [$deep]];
+        }
+        $this->ok('PATCH', "/admin/roles/$key", ['admission_rule' => ['type' => 'group', 'op' => 'and', 'items' => [$deep]]]);
+
+        // Leer = ohne Voraussetzung
+        $roles = array_column($this->ok('PATCH', "/admin/roles/$key", ['admission_rule' => null]), null, 'key');
+        $this->assertSame([], $roles[$key]['admission_rule']['items']);
+    }
+
+    public function testOldRuleIsReadAsTreeWithSameResult(): void
+    {
+        $key = $this->baseRole(['admission_kind' => 'Versammlung', 'admission_count' => 2, 'admission_months' => 1]);
+        $raw = $this->app->settings->get(AdmissionService::RULES_SETTING);
+        unset($raw[$key]['rule']);
+        $this->app->settings->set(AdmissionService::RULES_SETTING, $raw);
+        $this->assertSame(['type' => 'group', 'op' => 'and', 'items' => [
+            ['type' => 'attendance', 'kind' => 'Versammlung', 'count' => 2],
+            ['type' => 'duration', 'months' => 1],
+        ]], $this->app->admissions()->rule($key)['rule']);
+    }
+
+    public function testOrGroupFulfilsWithEarliestDateAndShowsResult(): void
+    {
+        $key = $this->baseRole(['admission_rule' => ['type' => 'group', 'op' => 'and', 'items' => [
+            ['type' => 'attendance', 'kind' => 'Versammlung', 'count' => 1],
+            ['type' => 'group', 'op' => 'or', 'items' => [
+                ['type' => 'attendance', 'kind' => 'Versammlung', 'count' => 3],
+                ['type' => 'attendance', 'kind' => 'Arbeitsdienst', 'count' => 2],
+                ['type' => 'duration', 'months' => 6],
+            ]],
+        ]]]);
+        $fritz = $this->users->add('fritz', $key);
+        $this->list('2026-09-01', 'Versammlung', [$fritz]);
+        $e = $this->entry($fritz);
+        $this->assertSame('open', $e['status']);
+        $or = $e['result']['items'][1];
+        $this->assertSame(['unknown', 'open', 'open', 'unknown'], [$or['status'], $or['items'][0]['status'], $or['items'][1]['status'], $or['items'][2]['status']], 'ohne „Anwärter seit“ unbekannt, die ODER-Gruppe damit auch; die Person bleibt offen');
+        $this->assertSame([1, 2, 'Versammlung', 1, 0], [$or['items'][0]['attended'], $or['items'][0]['missing'], $e['kind'], $e['count'], $e['missing']], 'alte Felder: erste Bedingung');
+
+        $this->list('2026-10-01', 'Arbeitsdienst', [$fritz]);
+        $this->list('2026-10-10', 'Arbeitsdienst', [$fritz]);
+        $this->ok('PUT', "/members/$fritz/candidate-since", ['since' => '01.04.2026'], $this->clerk);
+        $e = $this->entry($fritz);
+        $this->assertSame(['fulfilled', '2026-10-01'], [$e['status'], $e['fulfilled_on']], 'ODER: frühestes (Dauer ab 01.10.), UND: spätestes');
+        $this->assertSame(['fulfilled', '2026-10-01'], [$e['result']['items'][1]['status'], $e['result']['items'][1]['on']]);
+        $this->assertSame('2026-10-01', $e['months_on']);
+    }
+
+    public function testOwnStatusOnlyForOneself(): void
+    {
+        $key = $this->baseRole(['admission_kind' => 'Versammlung', 'admission_count' => 1]);
+        $fritz = (int) $this->ok('POST', '/users', ['name' => 'Fritz Neu', 'level' => $key])['id'];
+        $own = $this->ok('GET', '/me/admission', [], $fritz)['admission'];
+        $this->assertSame([$fritz, 'open', 1], [$own['id'], $own['status'], $own['result']['items'][0]['missing']]);
+        $this->assertNull($this->ok('GET', '/me/admission', [], $this->clerk)['admission'], 'kein Anwärter');
+        $this->assertSame(403, $this->call('GET', '/admissions', [], $fritz)->status, 'nie der Stand anderer');
+    }
+
     public function testAddMonthsKeepsEndOfMonth(): void
     {
         $this->assertSame('2027-02-28', AdmissionService::addMonths('2027-01-31', 1));
