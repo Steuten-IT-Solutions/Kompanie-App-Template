@@ -430,7 +430,8 @@ final class PollService
                 // Art, Möglichkeiten, Anonymität und Sichtbarkeit sind fest, sobald es Antworten gibt.
                 'locked' => $counts[$id] > 0,
                 'has_voted' => $hasVoted,
-                'my_answer' => $hasVoted ? [
+                // Anonyme Antworten sieht nur die Person selbst, nie ein Admin in der Vorschau als diese Person.
+                'my_answer' => $hasVoted && !($p['anonymous'] && $user->previewPerson) ? [
                     'option_ids' => array_values(array_filter(array_column($own, 'option_id'))),
                     'text' => $p['type'] === 'text' ? ($own[0]['answer_text'] ?? '') : null,
                 ] : null,

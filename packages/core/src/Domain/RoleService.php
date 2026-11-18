@@ -560,8 +560,9 @@ final class RoleService
      */
     public function extraRolesOf(User $user): array
     {
-        // Vorschau (Issue #63): genau die gewählte Rolle, nicht die gespeicherten Zusatzrollen des Admin-Kontos.
-        return $user->preview ? [] : $this->extraRoles($user->id, $user->role);
+        // Vorschau (Issue #63) als Rolle: genau die gewählte Rolle, nicht die gespeicherten Zusatzrollen des Admin-Kontos.
+        // Als Person sind ID und Grundrolle die der Person: dann ihre Zusatzrollen.
+        return $user->preview && !$user->previewPerson ? [] : $this->extraRoles($user->id, $user->role);
     }
 
     /** Kann eine Person mit dieser Grundrolle Zusatzrollen haben? Nur mit Mitgliederbereich und nicht als Admin. */
