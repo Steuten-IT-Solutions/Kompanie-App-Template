@@ -2491,6 +2491,10 @@ test('Ehemalig eintragen: Vorschau der endenden Ämter, danach enden sie mit dem
   await sheet.getByRole('button', { name: 'Als ehemalig eintragen', exact: true }).click();
   await expect(page.locator('.toast')).toContainText('ist jetzt als ehemalig eingetragen');
   await expect(page.locator('.toast')).toContainText('beendet: 2');
+  // Das Fenster bleibt offen (jetzt zum Bearbeiten); erst schließen: Ein Seitenwechsel bei offenem Fenster schließt
+  // sonst nur das Fenster (backClose.ts), und die Seite bleibt beim Mitglied
+  await sheet.getByRole('button', { name: 'Schließen' }).click();
+  await expect(sheet).toBeHidden();
 
   // Öffentlicher Zeitstrahl: beendet statt „seit“; der Partner bleibt im Amt
   await page.goto('/app/#/mitglieder/aemter');
