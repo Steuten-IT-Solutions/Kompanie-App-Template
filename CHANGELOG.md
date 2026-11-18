@@ -26,6 +26,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Neustart nach einem Update anbieten**: Holt jemand die App aus dem Hintergrund, sucht sie nach einer neuen Version
+  (höchstens alle 15 Minuten, bei offener App einmal pro Stunde). Ist eine da, lädt die App sie im Hintergrund und
+  zeigt oben _Die App wurde aktualisiert_ mit dem Knopf _Neu starten_. So sieht man Neuerungen sofort, statt erst beim
+  nächsten Öffnen. Neu geladen wird nur auf Knopfdruck; nicht gespeicherte Eingaben fragt die App vorher ab.
 - **Kompanie beim Zugang beantragen**: Ist der Bereich [Kompanien](app:kompanien) an, wählt die Person beim
   [Zugang beantragen](app:registrieren) freiwillig ihre Kompanie (nur aktive, auch mehrere). Unter
   [Verwaltung → Anfragen](app:verwaltung/anfragen) steht die Wahl auf der Karte, und die Freigabe ordnet die Person

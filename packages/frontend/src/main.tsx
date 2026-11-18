@@ -8,6 +8,7 @@ import App from './App';
 import { config, preparePreview } from './api';
 import { dataUpdated } from './dataCache';
 import { handlePageMessage } from './pageUpdate';
+import { watchForUpdates } from './appUpdate';
 import { deviceStore } from './deviceStore';
 import { previewRole } from './preview';
 import { skeletons } from './skeleton';
@@ -98,6 +99,8 @@ if ('serviceWorker' in navigator && cfg) {
     const sw = new URL(cfg.swUrl, location.href);
     sw.searchParams.set('api', new URL(cfg.apiBase, location.href).href);
     sw.searchParams.set('assets', assets);
+    // Neue Version beim Zurückholen der App erkennen und den Neustart anbieten (appUpdate.ts).
+    watchForUpdates(cfg.appUrl);
     navigator.serviceWorker
       .register(sw.toString(), { scope: cfg.appUrl })
       // In der Vorschau nicht: Der Server lehnt dort jede Änderung ab (auch das Freigeben fremder Abos).

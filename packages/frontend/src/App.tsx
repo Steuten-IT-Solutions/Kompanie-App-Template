@@ -6,6 +6,7 @@ import { detectPlatform, isStandalone, promptInstall, useCanPrompt } from './ins
 import BoardBanner from './BoardBanner';
 import { caps } from './sharpS';
 import PushHint from './PushHint';
+import UpdateBanner from './UpdateBanner';
 import { boardReadable, canManagePolls, canPostBoard, pollsVisible } from './board';
 import { ErrorBoundary, lazyView, Loading } from './ui';
 import { forgetPushOnLogout } from './push';
@@ -681,6 +682,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
           </Suspense>
         </ErrorBoundary>
       )}
+      <UpdateBanner />
       {boardReadable() && tab !== 'brett' && <BoardBanner />}
       {!online && <div className="offline">Offline – angezeigt werden die zuletzt geladenen Daten.</div>}
       {online && stale && (

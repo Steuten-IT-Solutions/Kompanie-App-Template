@@ -57,6 +57,9 @@ Läuft die Verbindung immer wieder nach 7 Tagen ab, ist das Google-Projekt noch 
 - Die Zeile **Push-Benachrichtigungen** der Ampel zeigt, ob der Server Benachrichtigungen senden kann. Fehlt dort etwas, kann das nur der Hoster nachrüsten.
 - Liegt es am Gerät (abgelehnte Nachfrage des Browsers, iPhone ohne installierte App), hilft [Benachrichtigungen](seite:benachrichtigungen).
 
+## Neues ist nach einem Update nicht zu sehen
+Eine App, die im Hintergrund weiterläuft, zeigt noch die Version, mit der sie gestartet wurde. Sobald sie die neue Version geladen hat, erscheint oben der Hinweis **Die App wurde aktualisiert** mit **Neu starten**. Wer ihn ausgeblendet hat, sieht die neue Version beim nächsten Öffnen der App. Erscheint der Hinweis nicht, schließe die App ganz und öffne sie neu.
+
 ## Updates kommen nicht an
 Unter **Verwaltung** → **Einstellungen** → **Zustand und Updates** steht unter **Updates**, was zuletzt passiert ist und warum eine neue Version nicht eingespielt werden kann. Häufige Gründe:
 - **Automatische Updates sind gesperrt** (mit WordPress z. B. in den Einstellungen der Webseite): Spiel neue Versionen dort von Hand ein.
