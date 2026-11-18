@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Storage\CandidateSinceRepository;
+use KompanieApp\Core\Storage\EventKindRepository;
 
 /**
  * Aufnahmen: Wer als Anwärter die Voraussetzung erfüllt, als Mitglied aufgenommen zu werden (wie die Beförderungen).
@@ -417,17 +418,20 @@ final class AdmissionService
             return [];
         }
         $wanted = array_fill_keys($userIds, true);
-        $marks = implode(', ', array_fill(0, count($kinds), '?'));
+        // Eine Liste kann mehrere Arten haben (kinds) und zählt für jede; kind ist ihre erste, leer ohne Art.
         $rows = $this->app->db->select(
-            "SELECT e.user_id, l.kind, l.event_date FROM {attendance_entries} e JOIN {attendance_lists} l ON l.id = e.list_id
-             WHERE e.status = ? AND l.kind IN ($marks) AND l.event_date <= ? ORDER BY l.event_date, l.id",
-            array_merge([AttendanceService::PRESENT], $kinds, [$this->app->time()->today()->format('Y-m-d')]),
+            "SELECT e.user_id, l.kind, l.kinds, l.event_date FROM {attendance_entries} e JOIN {attendance_lists} l ON l.id = e.list_id
+             WHERE e.status = ? AND l.kind <> '' AND l.event_date <= ? ORDER BY l.event_date, l.id",
+            [AttendanceService::PRESENT, $this->app->time()->today()->format('Y-m-d')],
         );
         $out = [];
         foreach ($rows as $row) {
             $uid = (int) $row['user_id'];
-            if (isset($wanted[$uid])) {
-                $out[$uid][(string) $row['kind']][] = substr((string) $row['event_date'], 0, 10);
+            if (!isset($wanted[$uid])) {
+                continue;
+            }
+            foreach (array_intersect(EventKindRepository::decode($row['kind'], $row['kinds']), $kinds) as $kind) {
+                $out[$uid][$kind][] = substr((string) $row['event_date'], 0, 10);
             }
         }
         return $out;

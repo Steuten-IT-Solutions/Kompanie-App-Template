@@ -3551,12 +3551,13 @@ paths:
       - { name: key, in: path, required: true, schema: { type: string }, description: 'Kennung des Termins wie in `GET /calendar` (`id`)' }
     put:
       tags: [Termine]
-      summary: Terminart eines Termins setzen (z. B. Versammlung)
+      summary: Terminarten eines Termins setzen (z. B. Versammlung und Arbeitsdienst)
       description: |
-        Bei jeder Quelle des Kalenders (App, Google, iCal); die App speichert die Art selbst, nichts geht an Google. Erlaubt
-        sind die Terminarten aus den Einstellungen und die bisherige Art des Termins; `null` oder leer entfernt sie. Eine
-        Anwesenheitsliste zu dem Termin übernimmt die neue Art. Geht auch bei vergangenen Terminen, solange der Kalender
-        sie liefert (sonst 404).
+        Bei jeder Quelle des Kalenders (App, Google, iCal); die App speichert die Arten selbst, nichts geht an Google.
+        `kinds` ist die ganze Liste (leer entfernt alle; doppelte fallen weg, sortiert wie in den Einstellungen). Erlaubt
+        sind die Terminarten aus den Einstellungen und die bisherigen Arten des Termins. Ältere Oberflächen schicken statt
+        `kinds` eine einzelne Art als `kind` (`null` oder leer = keine). Eine Anwesenheitsliste zu dem Termin übernimmt
+        die neuen Arten. Geht auch bei vergangenen Terminen, solange der Kalender sie liefert (sonst 404).
       x-capability: manage_calendar
       requestBody:
         required: true
@@ -3565,17 +3566,19 @@ paths:
             schema:
               type: object
               properties:
-                kind: { type: [string, 'null'], maxLength: 40 }
+                kinds: { type: array, maxItems: 30, items: { type: string, maxLength: 40 } }
+                kind: { type: [string, 'null'], maxLength: 40, description: 'Ältere Oberflächen: eine Art statt `kinds`' }
       responses:
         '200':
-          description: Die gespeicherte Art
+          description: Die gespeicherten Arten
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   id: { type: string }
-                  kind: { type: [string, 'null'] }
+                  kind: { type: [string, 'null'], description: Die erste Art }
+                  kinds: { type: array, items: { type: string } }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
@@ -3636,9 +3639,9 @@ paths:
         `date`. Titel und Datum sind eine Momentaufnahme. `entries` setzt den Status je Person (null entfernt ihn);
         nur Personen mit einer Rolle (keine Gäste). Liegt das Datum nach heute (Zeitzone der Kompanie), ist nur
         `excused` erlaubt; das gilt auch für schon gespeicherte Einträge, wenn das Datum einer freien Liste in die Zukunft
-        rückt (sonst 400, ohne dass eine Liste entsteht). `kind` setzt die Terminart der Liste (eine der eingerichteten
-        oder die bisherige, leer für keine); ohne Angabe übernimmt eine neue Liste die Art des Termins im Kalender, sonst
-        den Vorschlag aus dem Titel (Name einer Terminart als eigenes Wort).
+        rückt (sonst 400, ohne dass eine Liste entsteht). `kinds` setzt die Terminarten der Liste (eingerichtete oder
+        bisherige, leer für keine; ältere Oberflächen schicken eine als `kind`); ohne Angabe übernimmt eine neue Liste die
+        Arten des Termins im Kalender, sonst die Vorschläge aus dem Titel (Namen von Terminarten als eigenes Wort).
       x-capability: manage_attendance
       requestBody:
         required: true
@@ -3652,7 +3655,8 @@ paths:
                 event_key: { type: string }
                 title: { type: string, maxLength: 191 }
                 date: { type: string, format: date }
-                kind: { type: [string, 'null'], maxLength: 40, description: Terminart (leer = keine) }
+                kinds: { type: array, maxItems: 30, items: { type: string, maxLength: 40 }, description: Terminarten (leer = keine) }
+                kind: { type: [string, 'null'], maxLength: 40, description: 'Ältere Oberflächen: eine Terminart statt `kinds` (leer = keine)' }
                 entries:
                   type: object
                   description: Benutzer-ID → Status
@@ -3697,7 +3701,8 @@ paths:
                     start: { type: string }
                     end: { type: string }
                     all_day: { type: boolean }
-                    kind: { type: [string, 'null'], description: Terminart des Termins }
+                    kind: { type: [string, 'null'], description: Erste Terminart des Termins }
+                    kinds: { type: array, items: { type: string }, description: Alle Terminarten des Termins }
                     upcoming: { type: boolean, description: Datum nach heute (Zeitzone der Kompanie) }
                     today: { type: boolean, description: Datum ist heute (Zeitzone der Kompanie) }
                     list_id: { type: [integer, 'null'], description: Schon angelegte Liste }
@@ -10481,10 +10486,18 @@ components:
             open: { type: boolean, description: Noch änderbar }
             can_respond: { type: boolean, description: 'Hat respond_calendar' }
             can_list: { type: boolean, description: 'Hat view_responses: sieht die Namen (`GET /calendar/{key}/responses`)' }
-        kind: { type: [string, 'null'], description: 'Terminart (nur in `GET /calendar`), z. B. Versammlung' }
+        kind: { type: [string, 'null'], description: 'Erste Terminart (nur in `GET /calendar`), z. B. Versammlung' }
+        kinds:
+          type: array
+          items: { type: string }
+          description: 'Alle Terminarten (nur in `GET /calendar`), sortiert wie in den Einstellungen; leer ohne'
         kind_suggestion:
           type: [string, 'null']
-          description: 'Nur mit manage_calendar und ohne gesetzte Art: Vorschlag aus dem Titel (zählt erst gespeichert)'
+          description: 'Nur mit manage_calendar und ohne gesetzte Art: längster Vorschlag aus dem Titel (zählt erst gespeichert)'
+        kind_suggestions:
+          type: array
+          items: { type: string }
+          description: 'Nur mit manage_calendar und ohne gesetzte Art: alle Vorschläge aus dem Titel'
 
     EventResponsePerson:
       type: object
@@ -12305,7 +12318,8 @@ components:
         source: { type: string, enum: [calendar, free] }
         title: { type: string, description: Momentaufnahme beim Anlegen }
         date: { type: string, format: date }
-        kind: { type: [string, 'null'], description: Terminart der Liste }
+        kind: { type: [string, 'null'], description: Erste Terminart der Liste }
+        kinds: { type: array, items: { type: string }, description: Alle Terminarten der Liste (eine Teilnahme zählt für jede) }
         upcoming:
           type: boolean
           description: Datum nach heute (Zeitzone der Kompanie); dann ist nur der Status excused erlaubt.

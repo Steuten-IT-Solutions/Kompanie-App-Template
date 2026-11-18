@@ -30,7 +30,7 @@ Ist die Anwärter-Rolle die Grundrolle der Person, wird sie {rolle.member}. Ist 
 2. Trage unter **Aufnahme** das Datum bei **Anwärter seit** ein und tippe auf **Datum speichern**.
 
 ## Gut zu wissen
-- Es zählen alle Anwesenheitslisten mit der passenden Terminart, in denen die Person **anwesend** ist, auch aus der Zeit vor **Anwärter seit**. **Entschuldigt** zählt nicht. Die Terminart einer Liste kommt vom Termin im Kalender oder wird an der Liste gewählt.
+- Es zählen alle Anwesenheitslisten mit der passenden Terminart, in denen die Person **anwesend** ist, auch aus der Zeit vor **Anwärter seit**. **Entschuldigt** zählt nicht. Die Terminarten einer Liste kommen vom Termin im Kalender oder werden an der Liste gewählt. Hat eine Liste mehrere Arten, zählt sie für jede.
 - **Anwärter seit** setzt die App selbst, wenn jemand in der App die Anwärter-Rolle bekommt (beim Anlegen, beim Ändern der Rolle oder bei der Freigabe einer Anfrage). Bei Personen, die schon vorher Anwärter waren, fehlt das Datum; die Mindestdauer gilt dann erst, wenn du es nachträgst.
 - Nach dem Speichern einer Anwesenheitsliste zeigt die App oben in der Verwaltung, wer dadurch neu die Voraussetzung erfüllt.
 - Die Voraussetzung legt ein {rolle.admin} je Anwärter-Rolle unter *Einstellungen → Rollen* fest.

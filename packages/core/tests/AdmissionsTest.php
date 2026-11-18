@@ -212,6 +212,18 @@ final class AdmissionsTest extends TestCase
         $this->assertSame(400, $this->call('POST', "/members/$other/promote", [], $this->clerk)->status);
     }
 
+    public function testListWithSeveralKindsCountsForEach(): void
+    {
+        $key = $this->baseRole(['admission_kind' => 'Arbeitsdienst', 'admission_count' => 2]);
+        $fritz = (int) $this->ok('POST', '/users', ['name' => 'Fritz Neu', 'level' => $key])['id'];
+        $this->ok('PUT', '/attendance', ['source' => 'free', 'title' => 'Treffen', 'date' => '2026-10-01', 'kinds' => ['Versammlung', 'Arbeitsdienst'], 'entries' => [(string) $fritz => 'present']]);
+        $this->list('2026-10-05', 'Versammlung', [$fritz]);
+        $this->assertSame(1, $this->entry($fritz)['attended'], 'zählt für die zweite Art der Liste, die Liste nur mit Versammlung nicht');
+        $this->ok('PUT', '/attendance', ['source' => 'free', 'title' => 'Treffen', 'date' => '2026-10-08', 'kinds' => ['Arbeitsdienst', 'Versammlung'], 'entries' => [(string) $fritz => 'present']]);
+        $e = $this->entry($fritz);
+        $this->assertSame([2, 'fulfilled', '2026-10-08'], [$e['attended'], $e['status'], $e['fulfilled_on']]);
+    }
+
     public function testAddMonthsKeepsEndOfMonth(): void
     {
         $this->assertSame('2027-02-28', AdmissionService::addMonths('2027-01-31', 1));

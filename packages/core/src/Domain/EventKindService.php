@@ -15,16 +15,17 @@ use KompanieApp\Core\Storage\EventKindRepository;
  *
  * - Welche Arten es gibt, legt der Admin fest (Einstellungen → Kalender, OPTIONS_SETTING, Vorgabe leer). Gespeichert wird
  *   die Bezeichnung; wird eine Art aus der Liste entfernt, behalten Termine und Listen ihren Eintrag.
- * - Die Art steht am Termin des internen Kalenders, bei jeder Quelle (App, Google, iCal). Die App speichert sie selbst
- *   (Tabelle event_kinds je stabiler Kennung wie bei den Zu- und Absagen), nichts geht zurück an Google. Setzen darf sie,
- *   wer Termine pflegen darf (manage_calendar); sehen jeder, der den Termin sieht.
- * - Ohne gesetzte Art schlägt die App eine vor, wenn ihr Name als eigenes Wort im Titel steht (suggest; „Versammlung März“
+ * - Die Arten stehen am Termin des internen Kalenders, bei jeder Quelle (App, Google, iCal). Ein Termin kann mehrere
+ *   haben (z. B. Versammlung und Arbeitsdienst) und zählt dann für jede. Die App speichert sie selbst (Tabelle event_kinds
+ *   je stabiler Kennung wie bei den Zu- und Absagen), nichts geht zurück an Google. Setzen darf sie, wer Termine pflegen
+ *   darf (manage_calendar); sehen jeder, der den Termin sieht.
+ * - Ohne gesetzte Art schlägt die App die vor, deren Name als eigenes Wort im Titel steht (suggestAll; „Versammlung März“
  *   → Versammlung). Zählt erst, wenn sie gespeichert ist.
  * - Je Art legt der Admin fest, ob sie als Schild (Tag) neben dem Titel des Termins steht (HIDDEN_TAGS_SETTING: Arten
  *   ohne Schild, Vorgabe leer = alle mit Schild). Das betrifft nur die Anzeige; die Art bleibt gespeichert und zählt.
- * - Jede Anwesenheitsliste hat die Art als eigene Momentaufnahme (AttendanceService): Beim Anlegen übernimmt sie die des
- *   Termins (sonst den Vorschlag aus dem Titel), ändern lässt sie sich an der Liste. Wer die Art eines Termins ändert,
- *   ändert sie auch an dessen Liste. So zählt eine Teilnahme auch, wenn der Termin aus dem Kalender verschwunden ist.
+ * - Jede Anwesenheitsliste hat die Arten als eigene Momentaufnahme (AttendanceService): Beim Anlegen übernimmt sie die
+ *   des Termins (sonst den Vorschlag aus dem Titel), ändern lassen sie sich an der Liste. Wer die Arten eines Termins
+ *   ändert, ändert sie auch an dessen Liste. So zählt eine Teilnahme auch, wenn der Termin aus dem Kalender verschwunden ist.
  */
 final class EventKindService
 {
@@ -136,13 +137,37 @@ final class EventKindService
     public function suggest(string $title): ?string
     {
         $best = null;
-        foreach ($this->options() as $kind) {
-            if (preg_match('/(?<![\p{L}\p{N}])' . preg_quote($kind, '/') . '(?![\p{L}\p{N}])/iu', $title) === 1
-                && ($best === null || mb_strlen($kind) > mb_strlen($best))) {
+        foreach ($this->suggestAll($title) as $kind) {
+            if ($best === null || mb_strlen($kind) > mb_strlen($best)) {
                 $best = $kind;
             }
         }
         return $best;
+    }
+
+    /**
+     * Vorschläge aus dem Titel: alle Arten, deren Name als eigenes Wort (Groß- und Kleinschreibung egal) im Titel steht, in
+     * der Reihenfolge der Liste. Eine Art, die nur als Teil einer längeren passenden steht, fällt weg
+     * („Außerordentliche Versammlung“ schlägt nicht auch „Versammlung“ vor).
+     *
+     * @return list<string>
+     */
+    public function suggestAll(string $title): array
+    {
+        $hits = array_values(array_filter($this->options(), static fn (string $kind): bool => self::containsWord($title, $kind)));
+        return array_values(array_filter($hits, static function (string $kind) use ($hits): bool {
+            foreach ($hits as $other) {
+                if (mb_strlen($other) > mb_strlen($kind) && self::containsWord($other, $kind)) {
+                    return false;
+                }
+            }
+            return true;
+        }));
+    }
+
+    private static function containsWord(string $text, string $word): bool
+    {
+        return preg_match('/(?<![\p{L}\p{N}])' . preg_quote($word, '/') . '(?![\p{L}\p{N}])/iu', $text) === 1;
     }
 
     /**
@@ -167,8 +192,40 @@ final class EventKindService
     }
 
     /**
-     * Termine mit dem Feld kind (gespeicherte Art oder null); wer Termine pflegen darf, bekommt ohne gesetzte Art den
-     * Vorschlag aus dem Titel (kind_suggestion). Die stabile Kennung (response_key) bleibt für EventResponseService.
+     * Prüft die Arten aus einer Eingabe: Liste von Arten (leer = keine), eine einzelne Art oder null (ältere Oberflächen).
+     * Jede muss eingerichtet sein oder in $current stehen (bisherige bleiben erlaubt, auch wenn sie nicht mehr in der Liste
+     * stehen). Doppelte fallen weg; sortiert wie die Liste, bisherige ohne Eintrag dahinter.
+     *
+     * @param list<string> $current
+     * @return list<string>
+     */
+    public function validList(mixed $raw, array $current = []): array
+    {
+        if ($raw === null || $raw === '') {
+            return [];
+        }
+        if (!is_array($raw)) {
+            $raw = [$raw];
+        }
+        $picked = [];
+        foreach ($raw as $x) {
+            $name = is_string($x) && in_array($x, $current, true) ? $x : $this->valid($x);
+            if ($name !== '') {
+                $picked[$name] = true;
+            }
+        }
+        $order = array_merge($this->options(), $current);
+        $out = array_values(array_unique(array_filter($order, static fn (string $k): bool => isset($picked[$k]))));
+        if (count($out) > self::OPTIONS_MAX) {
+            throw ApiError::invalid(sprintf('Ein Termin kann höchstens %d Terminarten haben.', self::OPTIONS_MAX));
+        }
+        return $out;
+    }
+
+    /**
+     * Termine mit den Feldern kinds (gespeicherte Arten, leer ohne) und kind (die erste oder null, für ältere Oberflächen);
+     * wer Termine pflegen darf, bekommt ohne gesetzte Art die Vorschläge aus dem Titel (kind_suggestions, dazu
+     * kind_suggestion: der längste oder null). Die stabile Kennung (response_key) bleibt für EventResponseService.
      *
      * @param array<int, array<string, mixed>> $events
      * @return list<array<string, mixed>>
@@ -180,47 +237,54 @@ final class EventKindService
         $suggest = $viewer !== null && $viewer->can(Capability::ManageCalendar) && $this->options() !== [];
         $out = [];
         foreach ($events as $e) {
-            $e['kind'] = $kinds[self::key($e)] ?? null;
-            if ($suggest && $e['kind'] === null) {
-                $e['kind_suggestion'] = $this->suggest((string) $e['title']);
+            $e['kinds'] = $kinds[self::key($e)] ?? [];
+            $e['kind'] = $e['kinds'][0] ?? null;
+            if ($suggest && $e['kinds'] === []) {
+                $title = (string) $e['title'];
+                $e['kind_suggestions'] = $this->suggestAll($title);
+                $e['kind_suggestion'] = $this->suggest($title);
             }
             $out[] = $e;
         }
         return $out;
     }
 
-    /** Gespeicherte Art eines Termins (wie ihn CalendarService liefert), null ohne. */
-    public function ofEvent(array $event): ?string
+    /**
+     * Gespeicherte Arten eines Termins (wie ihn CalendarService liefert), leer ohne.
+     *
+     * @param array<string, mixed> $event
+     * @return list<string>
+     */
+    public function ofEvent(array $event): array
     {
-        return $this->repository()->forKeys([self::key($event)])[self::key($event)] ?? null;
+        return $this->repository()->forKeys([self::key($event)])[self::key($event)] ?? [];
     }
 
     /**
-     * Art eines Termins setzen ($kind leer bzw. null = keine); $id wie in GET /calendar. Eine Anwesenheitsliste zu dem
-     * Termin übernimmt die neue Art.
+     * Arten eines Termins setzen ($kinds: Liste, leer = keine; eine einzelne Art oder null geht auch); $id wie in GET
+     * /calendar. Eine Anwesenheitsliste zu dem Termin übernimmt die neuen Arten.
      *
-     * @return array{id: string, kind: string|null}
+     * @return array{id: string, kind: string|null, kinds: list<string>}
      */
-    public function set(User $actor, string $id, mixed $kind): array
+    public function set(User $actor, string $id, mixed $kinds): array
     {
         $event = $this->event($id);
         $key = self::key($event);
-        $current = $this->ofEvent($event);
-        $name = $this->valid($kind, $current);
-        if ($name === '') {
+        $list = $this->validList($kinds, $this->ofEvent($event));
+        if ($list === []) {
             $this->repository()->delete($key);
         } else {
             $this->repository()->save(
                 $key,
-                $name,
+                $list,
                 mb_substr(Text::line((string) $event['title']), 0, 191),
                 $this->localDate((string) $event['start']),
                 $actor->id,
                 $this->app->time()->nowUtc(),
             );
         }
-        $this->app->attendance()->kindOfEventChanged($actor, (string) $event['id'], $name);
-        return ['id' => (string) $event['id'], 'kind' => $name === '' ? null : $name];
+        $this->app->attendance()->kindOfEventChanged($actor, (string) $event['id'], $list);
+        return ['id' => (string) $event['id'], 'kind' => $list[0] ?? null, 'kinds' => $list];
     }
 
     /** Kennung der Zeile zu einem Termin (Änderungsprotokoll), null ohne Art oder ohne den Termin. */

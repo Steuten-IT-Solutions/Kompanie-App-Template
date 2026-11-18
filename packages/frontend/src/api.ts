@@ -1054,10 +1054,14 @@ export interface CalendarEvent {
   respond_until?: string | null;
   /** Zu- und Absagen (nur internen Kalender, fehlt bei älteren Servern) */
   responses?: EventResponses;
-  /** Terminart, z. B. Versammlung (nur GET /calendar; fehlt bei älteren Servern) */
+  /** Erste Terminart, z. B. Versammlung (nur GET /calendar; fehlt bei älteren Servern) */
   kind?: string | null;
+  /** Alle Terminarten (fehlt bei älteren Servern, dann nur kind) */
+  kinds?: string[];
   /** Nur mit manage_calendar und ohne gesetzte Art: Vorschlag aus dem Titel */
   kind_suggestion?: string | null;
+  /** Wie kind_suggestion, alle passenden Arten (fehlt bei älteren Servern) */
+  kind_suggestions?: string[];
 }
 
 export type ResponseStatus = 'yes' | 'no';
@@ -1995,8 +1999,10 @@ export interface AttendanceSummary {
   source: 'calendar' | 'free';
   title: string;
   date: string;
-  /** Terminart der Liste (fehlt bei älteren Servern) */
+  /** Erste Terminart der Liste (fehlt bei älteren Servern) */
   kind?: string | null;
+  /** Alle Terminarten der Liste (fehlt bei älteren Servern, dann nur kind) */
+  kinds?: string[];
   /** Termin nach heute: nur „entschuldigt“ möglich */
   upcoming: boolean;
   counts: AttendanceCounts;
@@ -2010,8 +2016,10 @@ export interface AttendanceEvent {
   start: string;
   end: string;
   all_day: boolean;
-  /** Terminart des Termins (fehlt bei älteren Servern) */
+  /** Erste Terminart des Termins (fehlt bei älteren Servern) */
   kind?: string | null;
+  /** Alle Terminarten des Termins (fehlt bei älteren Servern, dann nur kind) */
+  kinds?: string[];
   /** Termin nach heute */
   upcoming: boolean;
   /** Termin heute (Zeitzone der Kompanie) */
@@ -2050,7 +2058,7 @@ export interface AttendanceDetail extends AttendanceSummary {
 }
 
 export type AttendanceInput = (
-  | { id: number; title?: string; date?: string; kind?: string }
+  | { id: number; title?: string; date?: string; kinds?: string[] }
   | { source: 'calendar'; event_key: string }
   | { source: 'free'; title: string; date: string }
 ) & { entries?: Record<number, AttendanceStatus | null> };
@@ -2719,8 +2727,8 @@ export const api = {
     requestRepeatable<CalendarEvent>('PUT', `/calendar/${encodeURIComponent(id)}/response`, { status, note }),
   withdrawResponse: (id: string) => requestRepeatable<CalendarEvent>('DELETE', `/calendar/${encodeURIComponent(id)}/response`),
   eventResponses: (id: string) => request<EventResponseOverview>('GET', `/calendar/${encodeURIComponent(id)}/responses`),
-  setEventKind: (id: string, kind: string | null) =>
-    request<{ id: string; kind: string | null }>('PUT', `/calendar/${encodeURIComponent(id)}/kind`, { kind }),
+  setKindsOfEvent: (id: string, kinds: string[]) =>
+    request<{ id: string; kind: string | null; kinds?: string[] }>('PUT', `/calendar/${encodeURIComponent(id)}/kind`, { kinds }),
   respondFor: (id: string, userId: number, status: ResponseStatus | null) =>
     request<{ user_id: number; status: ResponseStatus | null; note: string }>(
       'PUT',

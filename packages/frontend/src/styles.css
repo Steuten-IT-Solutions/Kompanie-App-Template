@@ -1009,6 +1009,23 @@ p.small + p.small:not(.muted) {
 .event-kind-picker .field {
   margin-bottom: 4px;
 }
+/* Terminarten ankreuzen (am Termin und an der Anwesenheitsliste), mehrere möglich */
+.event-kind-checks {
+  border: 0;
+  padding: 0;
+  margin-left: 0;
+  margin-right: 0;
+}
+.event-kind-checks .toggle {
+  margin-bottom: 8px;
+}
+/* Am Termin eingeklappt: Knopf „Terminarten ›“, darunter nur die gewählten Arten */
+.event-kind-toggle {
+  padding-left: 0;
+}
+.event-kind-summary {
+  margin: 0 0 8px;
+}
 
 /* ------------------------------------------------------------------ */
 /* Spieß & Formulare                                                   */
