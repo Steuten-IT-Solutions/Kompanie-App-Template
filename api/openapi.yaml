@@ -761,10 +761,15 @@ paths:
                 username: { type: string, pattern: '^[A-Za-z0-9._@-]{1,60}$' }
                 password: { type: string, minLength: 8, maxLength: 72 }
                 message: { type: string, maxLength: 500, description: Freiwillig, z. B. wer man ist }
-                company_ids:
+                company_choice:
+                  type: string
+                  enum: [company, none, passive]
                   description: >-
-                    Freiwillig: gewählte Kompanien, nur aus `companies` des Formulars (sonst 400). Ohne den Bereich Kompanien
-                    nicht beachtet.
+                    Pflicht, wenn `companies` des Formulars nicht leer ist (sonst 400): `company` mit `company_ids`, „Keine
+                    Kompanie“ (`none`) oder „Passiv“ (`passive`), dann ohne `company_ids`. Ohne Auswahl im Formular nicht
+                    beachtet.
+                company_ids:
+                  description: Bei `company_choice` `company` die gewählten Kompanien, nur aus `companies` des Formulars (sonst 400)
                   type: array
                   items: { type: integer }
                 website: { type: string, description: Verstecktes Feld; muss leer bleiben }
@@ -6204,6 +6209,10 @@ paths:
                         created_at: { type: string, format: date-time }
                         email_confirmed: { type: boolean, description: Adresse per Link bestätigt (nur mit Mailversand) }
                         expires_at: { type: string, format: date-time, description: Danach wird die Anfrage gelöscht }
+                        company_choice:
+                          type: [string, 'null']
+                          enum: [company, none, passive, null]
+                          description: Wahl im Formular; null bei Anfragen ohne Angabe; nur mit dem Bereich Kompanien
                         companies:
                           description: Kompanien, die die Person gewählt hat (die es noch gibt); nur mit dem Bereich Kompanien
                           type: array
@@ -10514,7 +10523,11 @@ components:
         cover_uid: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app: Kennung des Titelbilds, für PATCH' }
         updated_at: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app, mit manage_news: Stand für PATCH' }
         updated_by_name: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app, mit manage_news' }
-        edit_url: { type: [string, 'null'], description: 'Nur Einzelansicht, WordPress mit Quelle site, mit manage_news: Adresse des Beitrags im Editor von WordPress' }
+        edit_url:
+          {
+            type: [string, 'null'],
+            description: 'Nur Einzelansicht, WordPress mit Quelle site, mit manage_news: Adresse des Beitrags im Editor von WordPress',
+          }
 
     GalleryAlbumSummary:
       type: object

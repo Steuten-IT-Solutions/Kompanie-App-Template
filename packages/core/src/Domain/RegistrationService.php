@@ -32,8 +32,10 @@ use KompanieApp\Core\Push\PushService;
  *   Benutzername gelten im Formular als frei, damit sich die Person selbst registrieren kann. Beim Freigeben schlägt die
  *   App passende Mitglieder ohne Zugang vor (MemberService::noAccessMatches); mit user_id verbindet approve() den Antrag mit
  *   diesem Mitglied statt ein zweites Konto anzulegen (MemberService::linkRegistration).
- * - Bereich Kompanien (CompanyService::FEATURE) an: Im Formular wählt die Person freiwillig ihre Kompanie(n) aus den
- *   aktiven (nur Namen). Wer freigibt, sieht die Wahl; die Freigabe übernimmt sie als Zuordnung, ändern lässt sie sich
+ * - Bereich Kompanien (CompanyService::FEATURE) an und aktive Kompanien da: Im Formular muss die Person wählen, ihre
+ *   Kompanie(n) aus den aktiven (nur Namen), „Keine Kompanie“ (CHOICE_NONE) oder „Passiv“ (CHOICE_PASSIVE); vorgewählt
+ *   ist nichts. Gespeichert in company_ids: IDs mit Komma oder das Wort none bzw. passive (leer: Antrag von vorher,
+ *   ohne Angabe). Wer freigibt, sieht die Wahl; die Freigabe übernimmt sie als Zuordnung, ändern lässt sie sich
  *   dabei nur mit „Kompanien verwalten“ (manage_companies). Zugeordnet werden wie sonst nur Mitglieder.
  * - Fristen (Aufgabe registrations, stündlich): unbestätigte Anträge nach CONFIRM_HOURS, unbearbeitete nach PENDING_DAYS,
  *   Ablehnungen nach REJECTED_DAYS gelöscht.
@@ -49,6 +51,11 @@ final class RegistrationService
     public const UNCONFIRMED = 'unconfirmed';
     public const PENDING = 'pending';
     public const REJECTED = 'rejected';
+
+    /** Wahl im Formular (company_choice): Kompanie(n), keine Kompanie oder passiv */
+    public const CHOICE_COMPANY = 'company';
+    public const CHOICE_NONE = 'none';
+    public const CHOICE_PASSIVE = 'passive';
 
     public const MIN_SECONDS = 3;
     public const MAX_FORM_AGE = 6 * 3600;
@@ -157,21 +164,44 @@ final class RegistrationService
     }
 
     /**
-     * Gewählte Kompanien aus dem Formular prüfen (optional, nur aktive); ohne den Bereich gibt es keine.
-     *
-     * @return list<int>
+     * Wahl aus dem Formular prüfen und so zurückgeben, wie sie in company_ids steht: Pflicht, sobald es aktive Kompanien
+     * gibt (company_choice company mit company_ids aus den aktiven, none oder passive); ohne Auswahl im Formular leer.
      */
-    private function chosenCompanies(mixed $in): array
+    private function chosenCompanies(mixed $choice, mixed $in): string
     {
-        if (!$this->companiesOn() || $in === null || $in === []) {
-            return [];
+        $choosable = $this->choosableCompanies();
+        if ($choosable === []) {
+            return '';
+        }
+        if ($choice === self::CHOICE_NONE || $choice === self::CHOICE_PASSIVE) {
+            if ($in !== null && $in !== []) {
+                throw ApiError::invalid('Bitte entweder Kompanien wählen oder „Keine Kompanie“ bzw. „Passiv“.');
+            }
+            return $choice;
+        }
+        if ($choice !== self::CHOICE_COMPANY || $in === null || $in === []) {
+            throw ApiError::invalid('Bitte wähle deine Kompanie, „Keine Kompanie“ oder „Passiv“.');
         }
         $ids = self::companyIdList($in);
-        $known = array_column($this->choosableCompanies(), 'id');
-        if (array_diff($ids, $known) !== []) {
+        if (array_diff($ids, array_column($choosable, 'id')) !== []) {
             throw ApiError::invalid('Bitte die Kompanie aus der Liste wählen.');
         }
-        return $ids;
+        return implode(',', $ids);
+    }
+
+    /**
+     * Wahl eines Antrags: company, none, passive oder null (Antrag ohne Angabe).
+     *
+     * @param array<string, mixed> $row
+     */
+    private static function choiceOfRow(array $row): ?string
+    {
+        $raw = (string) ($row['company_ids'] ?? '');
+        return match ($raw) {
+            '' => null,
+            self::CHOICE_NONE, self::CHOICE_PASSIVE => $raw,
+            default => self::CHOICE_COMPANY,
+        };
     }
 
     /** @return list<int> */
@@ -199,10 +229,10 @@ final class RegistrationService
      */
     private function companiesOfRow(array $row): array
     {
-        $ids = array_map('intval', array_filter(explode(',', (string) ($row['company_ids'] ?? '')), static fn (string $v): bool => $v !== ''));
-        if ($ids === [] || !$this->companiesOn()) {
+        if (self::choiceOfRow($row) !== self::CHOICE_COMPANY || !$this->companiesOn()) {
             return [];
         }
+        $ids = array_map('intval', explode(',', (string) $row['company_ids']));
         $out = [];
         foreach ($this->app->companies()->repository()->all() as $c) {
             if (in_array($c['id'], $ids, true)) {
@@ -215,7 +245,7 @@ final class RegistrationService
     /**
      * Antrag annehmen. Mit Mailversand: Status unconfirmed und Mail mit dem Link zum Bestätigen; ohne: gleich pending.
      *
-     * @param array<string, mixed> $in first_name, last_name, email, username, password, message, company_ids, consent, token, website
+     * @param array<string, mixed> $in first_name, last_name, email, username, password, message, company_choice, company_ids, consent, token, website
      * @return array{status: string}
      */
     public function submit(?User $user, array $in, string $client): array
@@ -253,7 +283,7 @@ final class RegistrationService
         if (mb_strlen($message) > self::MESSAGE_MAX) {
             throw ApiError::invalid(sprintf('Die Nachricht darf höchstens %d Zeichen lang sein.', self::MESSAGE_MAX));
         }
-        $companyIds = $this->chosenCompanies($in['company_ids'] ?? null);
+        $companyIds = $this->chosenCompanies($in['company_choice'] ?? null, $in['company_ids'] ?? null);
         if (($in['consent'] ?? null) !== true) {
             throw ApiError::invalid('Bitte bestätige, dass du die Datenschutzerklärung gelesen hast.');
         }
@@ -292,7 +322,7 @@ final class RegistrationService
             'login' => $login,
             'password_hash' => password_hash($password, PASSWORD_DEFAULT),
             'message' => $message !== '' ? $message : null,
-            'company_ids' => implode(',', $companyIds),
+            'company_ids' => $companyIds,
             'status' => $mail ? self::UNCONFIRMED : self::PENDING,
             'token_hash' => $mail ? hash('sha256', $token) : null,
             'reason' => null,
@@ -481,7 +511,7 @@ final class RegistrationService
     /**
      * Anträge, die auf Freigabe warten (älteste zuerst), mit der vorgeschlagenen Rolle, je Antrag passenden Mitgliedern
      * ohne Zugang (matches) und allen Mitgliedern ohne Zugang zum Auswählen (no_access_members). Mit dem Bereich Kompanien
-     * je Antrag die gewählten Kompanien (companies) und alle Kompanien zum Ändern beim Freigeben (companies).
+     * je Antrag die Wahl (company_choice: company, none, passive, null) und die gewählten Kompanien (companies) und alle Kompanien zum Ändern beim Freigeben (companies).
      *
      * @return array<string, mixed> requests, default_role, email_confirmation, no_access_members, companies (nur mit dem Bereich)
      */
@@ -510,7 +540,7 @@ final class RegistrationService
                 'email_confirmed' => $r['confirmed_at'] !== null,
                 'expires_at' => Time::utcToIso((string) $r['expires_at']),
                 'matches' => $members->noAccessMatches((string) $r['first_name'], (string) $r['last_name'], (string) $r['email']),
-            ] + ($this->companiesOn() ? ['companies' => $this->companiesOfRow($r)] : []), $rows),
+            ] + ($this->companiesOn() ? ['companies' => $this->companiesOfRow($r), 'company_choice' => self::choiceOfRow($r)] : []), $rows),
             'default_role' => $this->defaultRole(),
             'email_confirmation' => $this->withMail(),
             'no_access_members' => array_values(array_map(static fn (User $u): array => ['id' => $u->id, 'name' => $u->name], $members->noAccessMembers())),

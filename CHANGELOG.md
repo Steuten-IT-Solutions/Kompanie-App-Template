@@ -31,7 +31,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   zeigt oben _Die App wurde aktualisiert_ mit dem Knopf _Neu starten_. So sieht man Neuerungen sofort, statt erst beim
   nächsten Öffnen. Neu geladen wird nur auf Knopfdruck; nicht gespeicherte Eingaben fragt die App vorher ab.
 - **Kompanie beim Zugang beantragen**: Ist der Bereich [Kompanien](app:kompanien) an, wählt die Person beim
-  [Zugang beantragen](app:registrieren) freiwillig ihre Kompanie (nur aktive, auch mehrere). Unter
+  [Zugang beantragen](app:registrieren) ihre Kompanie (nur aktive, auch mehrere) oder „Keine Kompanie“ bzw.
+  „Passiv“. Die Wahl ist Pflicht, vorausgewählt ist nichts. Unter
   [Verwaltung → Anfragen](app:verwaltung/anfragen) steht die Wahl auf der Karte, und die Freigabe ordnet die Person
   der Kompanie zu, sofern sie eine Rolle mit dem Recht „Mitglied“ bekommt. Ändern lässt sich die Kompanie beim
   Freigeben mit dem Recht „Kompanien verwalten“.

@@ -161,7 +161,14 @@ function RequestCard({
       </div>
       {companies && (
         <div className="row-sub">
-          Kompanie: {r.companies && r.companies.length > 0 ? r.companies.map((c) => c.name).join(', ') : 'keine angegeben'}
+          Kompanie:{' '}
+          {r.company_choice === 'none'
+            ? 'Keine Kompanie'
+            : r.company_choice === 'passive'
+              ? 'Passiv'
+              : r.companies && r.companies.length > 0
+                ? r.companies.map((c) => c.name).join(', ')
+                : 'keine Angabe'}
         </div>
       )}
       {r.message && <p className="registration-message">{r.message}</p>}

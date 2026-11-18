@@ -348,19 +348,34 @@ final class RegistrationTest extends TestCase
 
         [, $form] = $this->api($app, 'GET', '/registration/form');
         $this->assertSame([['id' => $a, 'name' => 'Erste Kompanie'], ['id' => $b, 'name' => 'Zweite Kompanie']], $form['companies'], 'nur aktive, nur Namen');
-        // Nur Kompanien aus der Liste, keine ehemaligen
+        // Pflicht: Kompanie(n) aus der Liste (keine ehemaligen), „Keine Kompanie“ oder „Passiv“, nichts davon gemischt
+        $invalid = [
+            [],
+            ['company_ids' => [$a]],
+            ['company_choice' => 'company'],
+            ['company_choice' => 'company', 'company_ids' => []],
+            ['company_choice' => 'irgendwas'],
+            ['company_choice' => 'none', 'company_ids' => [$a]],
+            ['company_choice' => 'passive', 'company_ids' => [$a]],
+        ];
         foreach ([[$old], [999], ['x'], 'abc', [$a => $a]] as $case) {
-            $this->assertSame(400, $this->submit($app, ['company_ids' => $case])[0], json_encode($case));
+            $invalid[] = ['company_choice' => 'company', 'company_ids' => $case];
+        }
+        foreach ($invalid as $case) {
+            $this->assertSame(400, $this->submit($app, $case)[0], json_encode($case));
         }
         $this->assertSame(0, (int) $app->db->scalar('SELECT COUNT(*) FROM {registration_requests}'));
 
-        [$s, $d] = $this->submit($app, ['company_ids' => [$b]]);
+        [$s, $d] = $this->submit($app, ['company_choice' => 'company', 'company_ids' => [$b]]);
         $this->assertSame(201, $s, json_encode($d));
-        [$s, $d] = $this->submit($app, ['first_name' => 'Otto', 'email' => 'otto@example.org', 'username' => 'otto', 'company_ids' => []], '203.0.113.6');
+        [$s, $d] = $this->submit($app, ['first_name' => 'Otto', 'email' => 'otto@example.org', 'username' => 'otto', 'company_choice' => 'none'], '203.0.113.6');
+        $this->assertSame(201, $s, json_encode($d));
+        [$s, $d] = $this->submit($app, ['first_name' => 'Karl', 'email' => 'karl@example.org', 'username' => 'karl', 'company_choice' => 'passive'], '203.0.113.7');
         $this->assertSame(201, $s, json_encode($d));
         [, $list] = $this->asAdmin($app, 'GET', '/registrations');
         $this->assertSame([['id' => $b, 'name' => 'Zweite Kompanie']], $list['requests'][0]['companies']);
-        $this->assertSame([], $list['requests'][1]['companies'], 'freiwillig');
+        $this->assertSame(['company', 'none', 'passive'], array_column($list['requests'], 'company_choice'));
+        $this->assertSame([[], []], [$list['requests'][1]['companies'], $list['requests'][2]['companies']]);
         $this->assertSame([$a, $b, $old], array_column($list['companies'], 'id'), 'alle zum Ändern');
 
         // Ohne „Kompanien verwalten“: Wahl wird übernommen, ändern geht nicht.
@@ -389,7 +404,7 @@ final class RegistrationTest extends TestCase
         $a = $this->asAdmin($app, 'POST', '/companies', ['name' => 'Erste Kompanie'])[1]['id'];
 
         // Rolle ohne „Mitglied“ (Anwärter): nicht zugeordnet, die Freigabe klappt trotzdem.
-        $this->submit($app, ['company_ids' => [$a]]);
+        $this->submit($app, ['company_choice' => 'company', 'company_ids' => [$a]]);
         $id = $this->asAdmin($app, 'GET', '/registrations')[1]['requests'][0]['id'];
         [$s, $d] = $this->asAdmin($app, 'POST', "/registrations/$id/approve", ['level' => TestApp::candidateRole($app)]);
         $this->assertSame(200, $s, json_encode($d));
@@ -402,12 +417,23 @@ final class RegistrationTest extends TestCase
         $this->assertSame(201, $noAccess[0], json_encode($noAccess[1]));
         $ottoId = (int) $noAccess[1]['id'];
         $this->asAdmin($app, 'PUT', "/members/$ottoId/companies", ['company_ids' => [$b]]);
-        $this->submit($app, ['first_name' => 'Otto', 'email' => 'otto@example.org', 'username' => 'otto', 'company_ids' => [$a]], '203.0.113.6');
+        $this->submit($app, ['first_name' => 'Otto', 'email' => 'otto@example.org', 'username' => 'otto', 'company_choice' => 'company', 'company_ids' => [$a]], '203.0.113.6');
         $id = $this->asAdmin($app, 'GET', '/registrations')[1]['requests'][0]['id'];
         [$s, $d] = $this->asAdmin($app, 'POST', "/registrations/$id/approve", ['user_id' => $ottoId]);
         $this->assertSame(200, $s, json_encode($d));
         $this->assertTrue($d['linked']);
         $this->assertEqualsCanonicalizing([$a, $b], $app->companies()->repository()->companyIdsOf($ottoId));
+
+        // Ohne aktive Kompanien keine Pflicht
+        foreach ([$a, $b] as $id) {
+            $this->asAdmin($app, 'PATCH', "/companies/$id", ['active' => false]);
+        }
+        $this->assertSame([], $this->api($app, 'GET', '/registration/form')[1]['companies']);
+        [$s, $d] = $this->submit($app, ['first_name' => 'Paul', 'email' => 'paul@example.org', 'username' => 'paul'], '203.0.113.8');
+        $this->assertSame(201, $s, json_encode($d));
+        [, $list] = $this->asAdmin($app, 'GET', '/registrations');
+        $this->assertNull($list['requests'][0]['company_choice']);
+        $this->asAdmin($app, 'POST', '/registrations/' . $list['requests'][0]['id'] . '/reject', []);
 
         // Bereich aus: keine Auswahl, mitgeschickte Kompanien zählen nicht, keine Angaben beim Freigeben.
         $app->features()->update(['companies' => false]);
