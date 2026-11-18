@@ -10094,11 +10094,11 @@ components:
         Ausgewertete Voraussetzung einer Person: jeder Knoten wie in `AdmissionRule` mit `status` (fulfilled, open, unknown =
         Dauer ohne „Anwärter seit“) und `on` (Tag, an dem er erfüllt wurde: UND das späteste, ODER das früheste der erfüllten).
         Teilnahmen zusätzlich mit `attended` und `missing`, Dauer mit `due` (Tag, ab dem sie erfüllt ist).
-      required: [type, status, on]
+      required: [type, status, 'on']
       properties:
         type: { type: string, enum: [group, attendance, duration] }
         status: { type: string, enum: [fulfilled, open, unknown] }
-        on: { type: [string, 'null'] }
+        'on': { type: [string, 'null'] }
         op: { type: string, enum: [and, or] }
         items: { type: array, items: { $ref: '#/components/schemas/AdmissionRuleResult' } }
         kind: { type: string }
