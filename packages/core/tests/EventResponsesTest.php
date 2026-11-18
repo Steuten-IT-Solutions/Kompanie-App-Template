@@ -263,6 +263,9 @@ final class EventResponsesTest extends TestCase
         };
         $events = $byTitle();
         $this->assertArrayNotHasKey('response_key', $events['Fest 2026-11-20'], 'nur intern');
+        $festKey = $events['Fest 2026-11-20']['responses']['key'];
+        $this->assertIsString($festKey);
+        $this->assertNotSame($events['Fest 2026-11-20']['id'], $festKey, 'bei iCal eigene stabile Kennung');
         $this->ok('PUT', '/calendar/' . $events['Fest 2026-11-20']['id'] . '/response', ['status' => 'yes'], $this->anna);
         $this->ok('PUT', '/calendar/' . $events['Probe 2026-11-23']['id'] . '/response', ['status' => 'no'], $this->anna);
 
@@ -277,6 +280,14 @@ final class EventResponsesTest extends TestCase
         $this->assertSame('no', $events['Probe 2026-11-24']['responses']['mine'], 'einzeln verschobener Termin einer Serie');
         $this->assertNull($events['Probe 2026-11-16']['responses']['mine'], 'andere Termine der Serie nicht');
         $this->assertNull($events['Probe 2026-11-30']['responses']['mine']);
+
+        // Offline vorgemerkt (unter der stabilen Kennung) und erst nach dem Verschieben gesendet: kommt an
+        $this->assertSame($festKey, $events['Fest 2026-11-21']['responses']['key'], 'Kennung bleibt beim Verschieben');
+        $sent = $this->ok('PUT', '/calendar/' . $festKey . '/response', ['status' => 'no', 'note' => 'krank'], $this->anna);
+        $this->assertSame($events['Fest 2026-11-21']['id'], $sent['id']);
+        $this->assertSame('no', $sent['responses']['mine']);
+        $this->ok('DELETE', '/calendar/' . $festKey . '/response', [], $this->anna);
+        $this->assertNull($byTitle()['Fest 2026-11-21']['responses']['mine']);
     }
 
     public function testPersonalDataBackupAndCleanup(): void

@@ -47,7 +47,7 @@ Wer zusätzlich die {bereich.attendance} erfasst, kann aus einer {bereich.attend
 - **{bereich.points}faktor**: Manche Rollen haben einen Faktor, z. B. ×0,5 für junge Mitglieder. Er steht in der Auswahl hinter dem Namen, z. B. „×0,5“. Mit Häkchen bei **{bereich.points}faktor der Rolle anwenden** zählt der Eintrag entsprechend weniger (oder mehr); ohne Häkchen zählt er für alle voll. Hat jemand mehrere Rollen, gilt der kleinste Faktor. Den Faktor legt ein {rolle.admin} bei den Rollen in den Einstellungen fest.
 - Wer Benachrichtigungen eingeschaltet hat, bekommt eine Nachricht mit Wert und Grund.
 - Einen falschen Eintrag stornierst du auf der Seite des Mitglieds.
-- **Ohne Internet**: Die App speichert die Buchung auf dem Gerät und bucht sie von selbst, sobald du wieder online bist. Bis dahin steht im Formular „1 Buchung noch nicht übertragen“. Ging nur die Antwort unterwegs verloren, bucht der Server beim erneuten Senden nicht doppelt.
+- **Ohne Internet** (oder wenn der Server gestört ist, nicht nach 20 Sekunden antwortet oder deine Anmeldung abgelaufen ist): Die App speichert die Buchung auf dem Gerät und bucht sie von selbst, sobald die Verbindung wieder klappt. Lehnt der Server sie dann ab, steht oben in der App **Nicht übertragen**, bis du es wegtippst. Bis dahin steht im Formular „1 Buchung noch nicht übertragen“. Ging nur die Antwort unterwegs verloren, bucht der Server beim erneuten Senden nicht doppelt.
 
 ## Siehe auch
 - [{bereich.catalog}](seite:punktekatalog)

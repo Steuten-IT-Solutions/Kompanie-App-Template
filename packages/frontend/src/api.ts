@@ -1064,6 +1064,8 @@ export type ResponseStatus = 'yes' | 'no';
 
 /** Zu- und Absagen bei einem Termin des internen Kalenders */
 export interface EventResponses {
+  /** Stabile Kennung des Termins für Zu- und Absagen (bleibt bei iCal beim Verschieben); fehlt bei älteren Servern */
+  key?: string;
   mine: ResponseStatus | null;
   note: string;
   yes: number;
@@ -2578,6 +2580,14 @@ export function inBackground<T>(start: () => Promise<T>): Promise<T> {
 }
 /** Meldung, wenn eine Änderung ohne Verbindung nicht beim Server ankam. */
 export const OFFLINE_NOT_SAVED = 'Keine Verbindung – nicht gespeichert. Deine Eingaben stehen noch hier; bitte später erneut speichern.';
+/** Meldung, wenn der Server in der Zeit (WRITE_TIMEOUT_MS) nicht geantwortet hat; ob die Änderung ankam, ist offen. */
+export const NO_ANSWER = 'Keine Antwort vom Server. Ob es gespeichert ist, ist nicht sicher; bitte später nachsehen oder erneut speichern.';
+/**
+ * So lange wartet die App bei Änderungen, die sie vormerken und gefahrlos noch einmal senden kann (Zu- und Absagen,
+ * Anwesenheit, Punkte und Strafen mit request_id), auf die Antwort. Danach gilt die Anfrage als gescheitert (Status 0,
+ * Code `timeout`) und wird vorgemerkt, statt dass „Speichert …“ bei schlechtem Netz ohne Ende stehen bleibt.
+ */
+export const WRITE_TIMEOUT_MS = 20000;
 
 /** Header für den Service Worker (public/sw.js): Antwort darf zuerst aus seinem Speicher kommen. */
 const STALE_OK_HEADER = 'X-Kompanie-Stale-Ok';
@@ -2593,6 +2603,8 @@ async function requestFull<T>(
   quiet = false,
   /** im Hintergrund (inBackground): wie quiet, dazu ohne Eintrag unter „Fehler melden“ */
   silent = background > 0,
+  /** > 0: nach so vielen ms abbrechen (nur für Änderungen, die sich gefahrlos wiederholen lassen, WRITE_TIMEOUT_MS) */
+  timeoutMs = 0,
 ): Promise<{ data: T; headers: Headers }> {
   quiet ||= silent;
   if (!config) {
@@ -2603,9 +2615,12 @@ async function requestFull<T>(
   // letzten eigenen Änderung gespeichert wurde, holt er zuerst aus dem Netz (public/sw.js). Nicht /config: Damit prüft
   // die App den aktuellen Stand (z. B. „Erneut versuchen“ auf der Wartungsseite).
   const staleOk = method === 'GET' && !previewRole() && path !== '/config';
+  const abort = timeoutMs > 0 && typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = abort ? setTimeout(() => abort.abort(), timeoutMs) : null;
   try {
     res = await fetch(url(path, query), {
       method,
+      ...(abort ? { signal: abort.signal } : {}),
       credentials: 'same-origin',
       headers: {
         Accept: 'application/json',
@@ -2620,9 +2635,15 @@ async function requestFull<T>(
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
+    if (abort?.signal.aborted) {
+      if (!silent) noteError('Keine Antwort vom Server');
+      throw new ApiError(NO_ANSWER, 0, 'timeout');
+    }
     if (!path.startsWith('/reports') && !silent) noteError('Keine Verbindung zum Server');
     // Bei Änderungen sagen, dass nichts gespeichert ist (Offline-Prüfung): Die Eingaben stehen noch in der Ansicht.
     throw new ApiError(method === 'GET' ? 'Keine Verbindung. Bitte später erneut versuchen.' : OFFLINE_NOT_SAVED, 0);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
   // Gespeicherte Version statt einer Antwort aus dem Netz (schlechte Verbindung): Hinweis oben (connection.ts).
   if (method === 'GET') noteResponse(res.headers);
@@ -2636,7 +2657,7 @@ async function requestFull<T>(
 
   if (res.status === 403 && retry && CSRF_ERRORS.includes(data?.code)) {
     await refreshCsrf(quiet);
-    return requestFull<T>(method, path, body, query, false, quiet, silent);
+    return requestFull<T>(method, path, body, query, false, quiet, silent, timeoutMs);
   }
   if (res.status === 401 && config.user && !quiet) {
     sessionExpired();
@@ -2684,14 +2705,19 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
   return (await requestFull<T>(method, path, body, query)).data;
 }
 
+/** Änderung, die die App bei einem Fehler vormerkt und später gefahrlos noch einmal sendet: mit Zeitlimit. */
+async function requestRepeatable<T>(method: string, path: string, body?: unknown): Promise<T> {
+  return (await requestFull<T>(method, path, body, undefined, true, false, background > 0, WRITE_TIMEOUT_MS)).data;
+}
+
 export const api = {
   me: () => request<Me>('GET', '/me'),
   myPoints: () => request<PointEntry[]>('GET', '/me/points'),
   myPenalties: () => request<Penalty[]>('GET', '/me/penalties'),
   calendar: () => request<CalendarEvent[]>('GET', '/calendar'),
   respondEvent: (id: string, status: ResponseStatus, note: string) =>
-    request<CalendarEvent>('PUT', `/calendar/${encodeURIComponent(id)}/response`, { status, note }),
-  withdrawResponse: (id: string) => request<CalendarEvent>('DELETE', `/calendar/${encodeURIComponent(id)}/response`),
+    requestRepeatable<CalendarEvent>('PUT', `/calendar/${encodeURIComponent(id)}/response`, { status, note }),
+  withdrawResponse: (id: string) => requestRepeatable<CalendarEvent>('DELETE', `/calendar/${encodeURIComponent(id)}/response`),
   eventResponses: (id: string) => request<EventResponseOverview>('GET', `/calendar/${encodeURIComponent(id)}/responses`),
   setEventKind: (id: string, kind: string | null) =>
     request<{ id: string; kind: string | null }>('PUT', `/calendar/${encodeURIComponent(id)}/kind`, { kind }),
@@ -2946,7 +2972,7 @@ export const api = {
   attendanceLists: () => request<AttendanceSummary[]>('GET', '/attendance'),
   attendanceEvents: () => request<AttendanceEvent[]>('GET', '/attendance/events'),
   attendance: (id: number) => request<AttendanceDetail>('GET', `/attendance/${id}`),
-  saveAttendance: (data: AttendanceInput) => request<AttendanceDetail>('PUT', '/attendance', data),
+  saveAttendance: (data: AttendanceInput) => requestRepeatable<AttendanceDetail>('PUT', '/attendance', data),
   setEventKinds: (kinds: string[], hidden: string[]) =>
     request<{ kinds: string[]; hidden?: string[] }>('PUT', '/admin/event-kinds', { kinds, hidden }),
   deleteAttendance: (id: number) => request<{ deleted: boolean }>('DELETE', `/attendance/${id}`),
@@ -3053,11 +3079,11 @@ export const api = {
     attendance_id?: number;
     /** Kennung der Buchung (bookingOutbox.ts): dieselbe noch einmal bucht nicht doppelt. */
     request_id?: string;
-  }) => request<PointEntry[]>('POST', '/points', data),
+  }) => (data.request_id ? requestRepeatable : request)<PointEntry[]>('POST', '/points', data),
   deletePoints: (id: number) => request<{ deleted: boolean }>('DELETE', `/points/${id}`),
 
   givePenalty: (data: { user_ids: number[]; amount_cents: number; reason: string; date?: string; request_id?: string }) =>
-    request<Penalty[]>('POST', '/penalties', data),
+    (data.request_id ? requestRepeatable : request)<Penalty[]>('POST', '/penalties', data),
   openPenalties: () => request<OpenPenalty[]>('GET', '/penalties/open'),
   setPenaltyStatus: (id: number, status: 'open' | 'paid') => request<Penalty>('PATCH', `/penalties/${id}`, { status }),
   deletePenalty: (id: number) => request<{ deleted: boolean }>('DELETE', `/penalties/${id}`),

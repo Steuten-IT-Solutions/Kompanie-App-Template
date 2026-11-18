@@ -196,6 +196,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Vorgemerkte Änderungen gehen nicht mehr verloren**: Zu- und Absagen, Anwesenheit sowie Punkte und Strafen merkt
+  die App jetzt nicht nur ohne Internet auf dem Gerät vor, sondern auch, wenn der Server gestört oder im
+  Wartungsmodus ist, nicht nach 20 Sekunden antwortet oder die Anmeldung abgelaufen ist; sie sendet sie später von
+  selbst. Vorgemerkte Zu- und Absagen kommen auch an, wenn der Termin aus iCal inzwischen verschoben wurde. Lehnt der
+  Server eine vorgemerkte Änderung ab (z. B. Anmeldeschluss vorbei), steht oben in der App „Nicht übertragen“ mit dem
+  Grund, bis die Person den Hinweis wegtippt; bisher verschwand sie nach einer kurzen Meldung.
+
 - **Album herunterladen neben Einreichen**: In einem Album der [Galerie](app:galerie) steht der Knopf zum Herunterladen
   als ZIP jetzt in der Reihe der Knöpfe direkt neben _Bilder und Videos in dieses Album einreichen_ statt rechts neben
   dem Titel. Der Hinweis „Mit Videos kann das ZIP groß werden; am besten im WLAN laden.“ entfällt.

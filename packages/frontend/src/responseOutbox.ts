@@ -25,6 +25,14 @@ export interface PendingResponse {
   at: number;
 }
 
+/**
+ * Stabile Kennung eines Termins für Zu- und Absagen (`responses.key` vom Server): Bei iCal hängt die id am Beginn und
+ * ändert sich beim Verschieben, die Kennung nicht. Ältere Server liefern sie nicht, dann die id.
+ */
+export function responseKey(ev: { id: string; responses?: { key?: string } }): string {
+  return ev.responses?.key || ev.id;
+}
+
 export function validResponse(raw: unknown): PendingResponse | null {
   if (!raw || typeof raw !== 'object') return null;
   const p = raw as Record<string, unknown>;

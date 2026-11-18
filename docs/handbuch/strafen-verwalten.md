@@ -48,7 +48,7 @@ Anders als bei {bereich.points} merkt sich die Liste nicht, wer schon einen Eint
 - Wer Benachrichtigungen eingeschaltet hat, bekommt eine Nachricht zum neuen Eintrag.
 - Als bezahlt markierst du einen Eintrag in der Liste aller offenen oder auf der Seite des Mitglieds. Falsche Einträge stornierst du auf der Seite des Mitglieds.
 - In der Mitgliederliste der Verwaltung steht bei jedem Mitglied, wie viel bei ihm noch offen ist.
-- **Ohne Internet**: Die App speichert den Eintrag auf dem Gerät und überträgt ihn von selbst, sobald du wieder online bist. Bis dahin steht im Formular „1 Buchung noch nicht übertragen“. Doppelt eingetragen wird dabei nichts, auch wenn nur die Antwort unterwegs verloren ging.
+- **Ohne Internet** (oder wenn der Server gestört ist, nicht nach 20 Sekunden antwortet oder deine Anmeldung abgelaufen ist): Die App speichert den Eintrag auf dem Gerät und überträgt ihn von selbst, sobald die Verbindung wieder klappt. Lehnt der Server ihn dann ab, steht oben in der App **Nicht übertragen**, bis du es wegtippst. Bis dahin steht im Formular „1 Buchung noch nicht übertragen“. Doppelt eingetragen wird dabei nichts, auch wenn nur die Antwort unterwegs verloren ging.
 
 ## Siehe auch
 - [{bereich.penalties} eines Mitglieds](seite:mitglied-strafen)

@@ -114,8 +114,11 @@ final class EventResponseService
                 }
             }
             $deadline = $this->deadline($e);
+            $key = self::key($e);
             unset($e['response_key']);
             $e['responses'] = [
+                // Stabile Kennung: Die App merkt Antworten darunter vor und sendet sie damit (gilt auch nach dem Verschieben)
+                'key' => $key,
                 'mine' => $mine['status'] ?? null,
                 'note' => $mine['note'] ?? '',
                 'yes' => $counts[self::YES],
@@ -434,14 +437,22 @@ final class EventResponseService
     }
 
     /**
-     * Ein Termin des internen Kalenders nach seiner Kennung (wie in GET /calendar).
+     * Ein Termin des internen Kalenders nach seiner Kennung (wie in GET /calendar) oder seiner stabilen Kennung (responses.key).
      *
      * @return array<string, mixed>
      */
     private function event(string $id): array
     {
-        foreach ($this->app->calendar()->events() as $e) {
+        $events = $this->app->calendar()->events();
+        foreach ($events as $e) {
             if ((string) $e['id'] === $id) {
+                return $e;
+            }
+        }
+        // Auch unter der stabilen Kennung (responses.key): Bei iCal ändert sich die id beim Verschieben des Termins,
+        // eine offline vorgemerkte Antwort soll trotzdem ankommen.
+        foreach ($events as $e) {
+            if (isset($e['response_key']) && (string) $e['response_key'] === $id) {
                 return $e;
             }
         }

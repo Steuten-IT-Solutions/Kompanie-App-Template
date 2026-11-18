@@ -2,7 +2,7 @@
 // Stand auf dem Server entspricht, und nur gültige Einträge aus dem Speicher.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { applyPendingResponse, pendingFor, validResponse } from '../src/responseOutbox.ts';
+import { applyPendingResponse, pendingFor, responseKey, validResponse } from '../src/responseOutbox.ts';
 import type { EventResponses } from '../src/api.ts';
 
 const server = (mine: 'yes' | 'no' | null, yes = 3, no = 1, note = ''): EventResponses => ({
@@ -50,4 +50,10 @@ test('aus dem Speicher nur gültige Einträge', () => {
   assert.equal(validResponse({ status: 'vielleicht', note: '', label: 'P', at: 2 }), null);
   assert.equal(validResponse({ status: 'yes', label: 'P', at: 2 }), null);
   assert.equal(validResponse(null), null);
+});
+
+test('stabile Kennung des Termins, bei älteren Servern die id', () => {
+  assert.equal(responseKey({ id: 'abc', responses: { ...server(null), key: 'stabil' } }), 'stabil');
+  assert.equal(responseKey({ id: 'abc', responses: server(null) }), 'abc');
+  assert.equal(responseKey({ id: 'abc' }), 'abc');
 });

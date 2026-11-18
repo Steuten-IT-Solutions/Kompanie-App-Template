@@ -7666,3 +7666,24 @@ fieldset.block-source legend {
 .passive-card-actions {
   justify-content: center;
 }
+
+/* Abgelehnte offline vorgemerkte Änderungen (OfflineRejectedBanner): wie der Hinweis auf ein Update, in Warnfarbe */
+.update-hint.offline-rejected {
+  background: var(--warn-surface);
+  color: var(--on-warn);
+  border-bottom-color: var(--warn-deep);
+}
+.offline-rejected .update-hint-text strong {
+  color: inherit;
+}
+.offline-rejected-more summary {
+  cursor: pointer;
+}
+.offline-rejected-more ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.offline-rejected-hint {
+  margin-top: 4px;
+  opacity: 0.9;
+}

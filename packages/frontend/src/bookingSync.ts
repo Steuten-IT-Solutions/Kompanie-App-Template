@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError, config, inBackground } from './api';
 import { BOOKINGS_AREA, BOOKINGS_CHANGED, validBooking, type BookingKind, type PendingBooking } from './bookingOutbox';
 import { createOfflineQueue, failureAction, type KeyValue } from './offlineQueue';
+import { noteRejected } from './offlineRejectedStore';
 import { previewRole } from './preview';
 
 function storage(): KeyValue | null {
@@ -89,6 +90,7 @@ async function run(): Promise<BookingSyncResult> {
       result.rejected.push({ label: b.label, message: (e as Error).message });
     }
   }
+  noteRejected('booking', result.rejected);
   return result;
 }
 

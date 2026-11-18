@@ -20,6 +20,8 @@ import { navigate } from '../router';
 import { Caps, Empty, ErrorBox, Loading, useAsync, useUnsaved } from '../ui';
 import { prefetchOnTap, sources } from '../viewData';
 import { confirmAsk } from '../ask';
+import { queuedMessage, shouldQueue } from '../offlineQueue';
+import { askPersistentStorage } from '../offlineRejectedStore';
 import { noteAdmissions } from './Aufnahmen';
 import { applyPending, pendingCount, type PendingSave } from '../attendanceOutbox';
 import {
@@ -378,14 +380,16 @@ function Editor({
       onSaved(saved);
       return true;
     } catch (e) {
-      // Keine Verbindung: auf dem Gerät ablegen und später übertragen (attendanceSync.ts).
+      // Keine Verbindung, Server gestört, Sitzung abgelaufen: auf dem Gerät ablegen und später übertragen
+      // (attendanceSync.ts). Was der Server ablehnt (z. B. ungültig), meldet er gleich.
       if (
         e instanceof ApiError &&
-        e.status === 0 &&
+        shouldQueue(e) &&
         attendanceOutbox.add(list.id, { entries: changes, ...(freeInput ?? {}), label: freeInput?.title ?? list.title })
       ) {
         outboxChanged();
-        onToast('Keine Verbindung. Auf diesem Gerät gespeichert, die App überträgt es, sobald du wieder online bist.');
+        askPersistentStorage();
+        onToast(queuedMessage(e));
       } else {
         onToast((e as Error).message);
       }
@@ -475,7 +479,7 @@ function Editor({
         <p className="attendance-pending small" role="status">
           Noch nicht übertragen: offline gespeicherte Änderungen
           {pendingCount(pending) > 0 && ` bei ${pendingCount(pending)} ${pendingCount(pending) === 1 ? 'Person' : 'Personen'}`}. Die App
-          sendet sie, sobald du wieder online bist.{' '}
+          sendet sie, sobald die Verbindung wieder klappt.{' '}
           <button
             type="button"
             className="btn btn-link inline-link"
