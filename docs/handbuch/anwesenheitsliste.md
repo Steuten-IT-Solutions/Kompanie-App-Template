@@ -68,7 +68,7 @@ Meldet sich jemand z. B. per Telefon ab:
 ### Ohne Internet eintragen
 1. Öffne die Liste, solange du noch Netz hast. Die App merkt sich dann ihren Stand, auch die Übersicht.
 2. Ohne Verbindung setzt du die Häkchen wie gewohnt und tippst auf **Speichern**.
-3. Es erscheint „Keine Verbindung. Auf diesem Gerät gespeichert, die App überträgt es, sobald du wieder online bist.“ Über der Liste steht **Noch nicht übertragen**, in der Übersicht steht das auch bei der Liste.
+3. Es erscheint „Keine Verbindung zum Server. Auf diesem Gerät gespeichert, die App überträgt es, sobald es wieder geht.“ Über der Liste steht **Noch nicht übertragen**, in der Übersicht steht das auch bei der Liste.
 4. Hast du wieder Netz, überträgt die App die Änderungen von selbst (beim Start der App, sobald das Handy wieder online ist, und beim Öffnen der Liste). Danach erscheint „Offline gespeicherte Anwesenheit übertragen“.
 
 ### Eine Liste löschen
@@ -85,7 +85,8 @@ Meldet sich jemand z. B. per Telefon ab:
 - Unten steht, wer die Liste zuletzt gespeichert hat.
 - Offline gespeichert wird nur auf diesem Gerät und nur für dich. Übertragen werden nur die Personen, die du geändert hast. Hat jemand anderes inzwischen dieselbe Person geändert, gilt, was zuletzt beim Server ankommt.
 - Ohne Verbindung lässt sich keine neue Liste anlegen, auch nicht zu einem Termin ohne Liste. Für Punkte, Strafen und Zu- oder Absagen braucht die App weiterhin eine Verbindung.
-- Lehnt der Server offline gespeicherte Änderungen ab (z. B. weil die Liste inzwischen gelöscht ist), verwirft die App sie und meldet das.
+- Genauso speichert die App auf dem Gerät, wenn der Server nicht nach 20 Sekunden antwortet, gestört oder im Wartungsmodus ist oder deine Anmeldung abgelaufen ist.
+- Lehnt der Server offline gespeicherte Änderungen ab (z. B. weil die Liste inzwischen gelöscht ist), steht oben in der App **Nicht übertragen** mit der Liste und dem Grund, bis du den Hinweis mit ✕ wegtippst.
 - Meldest du dich ab, bevor alles übertragen ist, fragt die App nach: Beim Abmelden gehen nicht übertragene Änderungen verloren.
 - Eine Zusage trägt nichts ein: Ob jemand da war, steht erst am Termin fest.
 - Für jemanden zu- oder absagen geht nur bei Personen, die selbst zu- und absagen dürfen, und nur bis zur selben Frist (Beginn bzw. Anmeldeschluss). Danach siehst du die Rückmeldungen nur noch. Ein Hinweis der Person bleibt dabei erhalten.

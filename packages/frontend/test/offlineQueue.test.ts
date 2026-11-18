@@ -1,7 +1,7 @@
 // Allgemeine Warteschlange für offline gemachte Änderungen (src/offlineQueue.ts): je Bereich und Konto, Löschen beim Abmelden.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { clearOfflineQueues, createOfflineQueue, failureAction, OFFLINE_PREFIX } from '../src/offlineQueue.ts';
+import { clearOfflineQueues, createOfflineQueue, failureAction, OFFLINE_PREFIX, queuedMessage, shouldQueue } from '../src/offlineQueue.ts';
 
 function memory() {
   const items = new Map<string, string>();
@@ -62,4 +62,15 @@ test('ohne Speicher', () => {
 test('später erneut senden oder verwerfen', () => {
   for (const status of [0, 401, 408, 429, 500, 503]) assert.equal(failureAction(status), 'retry', String(status));
   for (const status of [400, 403, 404, 409, 422]) assert.equal(failureAction(status), 'drop', String(status));
+});
+
+test('vormerken statt nur melden: bei allem, was ein späterer Versuch behebt', () => {
+  for (const status of [0, 401, 408, 429, 500, 502, 503]) assert.equal(shouldQueue({ status }), true, String(status));
+  for (const status of [400, 403, 404, 409]) assert.equal(shouldQueue({ status }), false, String(status));
+  // Fehler im Code der App (ohne Status) nicht
+  assert.equal(shouldQueue(new TypeError('kaputt')), false);
+  assert.equal(shouldQueue(null), false);
+  assert.match(queuedMessage({ status: 0 }), /^Keine Verbindung zum Server\. Auf diesem Gerät gespeichert/);
+  assert.match(queuedMessage({ status: 503 }), /^Der Server ist gerade nicht erreichbar\./);
+  assert.match(queuedMessage({ status: 401 }), /^Deine Anmeldung ist abgelaufen\./);
 });

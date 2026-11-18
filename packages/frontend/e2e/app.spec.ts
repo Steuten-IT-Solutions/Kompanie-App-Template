@@ -4858,6 +4858,34 @@ test('Admin stellt den internen Kalender auf „In der App pflegen“ um, legt e
   await expect(card.getByRole('button', { name: 'Zugesagt' })).toHaveAttribute('aria-pressed', 'true');
   await card.getByRole('button', { name: 'Zugesagt' }).click();
   await expect(card.locator('.event-response-counts')).toHaveCount(0);
+  // Server gestört (503): Die Absage wird vorgemerkt statt nur gemeldet. Lehnt der Server sie beim Nachsenden ab (hier
+  // Frist vorbei, 409), steht oben „Nicht übertragen“, auch nach dem Neuladen, bis man es wegtippt.
+  const ownResponse = (url: URL) => /\/calendar\/[^/]+\/response(?:$|[?&])/.test(decodeURIComponent(url.href));
+  const answer = (status: number, code: string, message: string) => (route: import('@playwright/test').Route) =>
+    route.request().method() === 'GET'
+      ? route.continue()
+      : route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ code, message }) });
+  await page.route(ownResponse, answer(503, 'unavailable', 'Server gestört'));
+  await card.getByRole('button', { name: 'Absagen' }).click();
+  await expect(card.getByRole('button', { name: 'Abgesagt' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(card.locator('.event-response-pending')).toContainText('Noch nicht übertragen');
+  await page.unroute(ownResponse);
+  await page.route(ownResponse, answer(409, 'responses_closed', 'Für diesen Termin kannst du nicht mehr zu- oder absagen.'));
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  const rejected = page.locator('.offline-rejected');
+  await expect(rejected).toContainText(
+    'Zu- oder Absage zu „E2E Vorstandssitzung“: Für diesen Termin kannst du nicht mehr zu- oder absagen.',
+  );
+  await expect(card.locator('.event-response-pending')).toHaveCount(0);
+  await page.unroute(ownResponse);
+  await page.reload();
+  await expect(rejected).toBeVisible();
+  await rejected.getByRole('button', { name: 'Gelesen' }).click();
+  await expect(rejected).toHaveCount(0);
+  await page.reload();
+  await expect(card).toBeVisible();
+  await expect(rejected).toHaveCount(0);
+  await expect(card.getByRole('button', { name: 'Absagen' })).toHaveAttribute('aria-pressed', 'false');
   await page.context().clearCookies();
   await page.goto('/app/');
   await page.reload();

@@ -10,7 +10,9 @@ import {
   type EventResponses,
   type ResponseStatus,
 } from './api';
-import { applyPendingResponse, pendingFor } from './responseOutbox';
+import { applyPendingResponse, pendingFor, responseKey } from './responseOutbox';
+import { shouldQueue } from './offlineQueue';
+import { askPersistentStorage } from './offlineRejectedStore';
 import { responseOutbox, usePendingResponse } from './responseSync';
 import { formatDate } from './format';
 import { ErrorBox, Loading } from './ui';
@@ -30,7 +32,10 @@ export function responseCounts(r: EventResponses): string {
  * nur noch die eigene Antwort und die Zähler.
  */
 /**
- * Antwort senden; ohne Verbindung vormerken (responseOutbox.ts) und später übertragen. true: gesendet oder vorgemerkt.
+ * Antwort senden; scheitert das aus einem Grund, den ein späterer Versuch behebt (keine Verbindung, keine Antwort in
+ * der Zeit, Server gestört, Sitzung abgelaufen), vormerken (responseOutbox.ts) und später übertragen. Gesendet und
+ * vorgemerkt wird unter der stabilen Kennung des Termins (responseKey), die auch nach dem Verschieben eines Termins
+ * aus iCal gilt. true: gesendet oder vorgemerkt.
  */
 async function send(
   ev: CalendarEvent,
@@ -40,15 +45,17 @@ async function send(
   setError: (msg: string | null) => void,
 ): Promise<boolean> {
   const server = ev.responses!;
-  const before = responseOutbox.get(ev.id);
+  const key = responseKey(ev);
+  const before = responseOutbox.get(key);
   try {
-    const next = status === null ? await api.withdrawResponse(ev.id) : await api.respondEvent(ev.id, status, note);
+    const next = status === null ? await api.withdrawResponse(key) : await api.respondEvent(key, status, note);
     // Gesendet: Eine ältere Vormerkung ist damit überholt.
-    if (before) responseOutbox.remove(ev.id, before);
+    if (before) responseOutbox.remove(key, before);
     onChange(next);
     return true;
   } catch (e) {
-    if (e instanceof ApiError && e.status === 0 && responseOutbox.set(ev.id, pendingFor(server, status, note, ev.title, Date.now()))) {
+    if (e instanceof ApiError && shouldQueue(e) && responseOutbox.set(key, pendingFor(server, status, note, ev.title, Date.now()))) {
+      askPersistentStorage();
       return true;
     }
     setError((e as Error).message);
@@ -58,11 +65,11 @@ async function send(
 
 /** Hinweis, solange eine offline vorgemerkte Antwort noch nicht übertragen ist. */
 function PendingHint() {
-  return <p className="event-response-pending small">Noch nicht übertragen – die App sendet es, sobald du wieder online bist.</p>;
+  return <p className="event-response-pending small">Noch nicht übertragen – die App sendet es, sobald die Verbindung wieder klappt.</p>;
 }
 
 export function ResponseBar({ ev, onChange }: { ev: CalendarEvent; onChange: (ev: CalendarEvent) => void }) {
-  const pending = usePendingResponse(ev.id);
+  const pending = usePendingResponse(responseKey(ev));
   // Ausgeschaltet (Einstellungen → Kalender) keine Knöpfe, auch nicht aus offline gespeicherten Terminen
   const r = ev.responses && eventResponsesOn() ? applyPendingResponse(ev.responses, pending) : undefined;
   const [busy, setBusy] = useState(false);
@@ -119,7 +126,7 @@ export function ResponseBar({ ev, onChange }: { ev: CalendarEvent; onChange: (ev
 
 /** Im aufgeklappten Termin: eigener Hinweis (nach der Antwort) und für alle, die Termine pflegen, wer wie geantwortet hat. */
 export function ResponseDetails({ ev, onChange }: { ev: CalendarEvent; onChange: (ev: CalendarEvent) => void }) {
-  const pending = usePendingResponse(ev.id);
+  const pending = usePendingResponse(responseKey(ev));
   // Ausgeschaltet (Einstellungen → Kalender) keine Knöpfe, auch nicht aus offline gespeicherten Terminen
   const r = ev.responses && eventResponsesOn() ? applyPendingResponse(ev.responses, pending) : undefined;
   const [note, setNote] = useState(r?.note ?? '');

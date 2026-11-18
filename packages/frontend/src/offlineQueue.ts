@@ -4,8 +4,9 @@
  * Allgemeiner Teil: Speicher auf dem Gerät (localStorage, übersteht Neustart und Update der App), je Bereich ein Eintrag
  * `kompanie-offline/<bereich>` mit Einträgen nach Schlüssel (z. B. ID der Liste). Die Einträge gehören zu einem Konto:
  * Was ein anderes Konto abgelegt hat, sieht und sendet die App nicht. Beim Abmelden löscht die App alle Warteschlangen
- * (clearOfflineQueues in App.tsx). Was ein Bereich ablegt, wie er zusammenführt und sendet, regelt er selbst (bisher:
- * Anwesenheit, attendanceOutbox.ts); Punkte, Strafen oder Zu- und Absagen können dieselbe Grundlage nutzen.
+ * (clearOfflineQueues in App.tsx). Was ein Bereich ablegt, wie er zusammenführt und sendet, regelt er selbst: Anwesenheit
+ * (attendanceOutbox.ts), Zu- und Absagen (responseOutbox.ts), Punkte und Strafen (bookingOutbox.ts). Was der Server beim
+ * späteren Senden ablehnt, bleibt sichtbar, bis die Person es gelesen hat (offlineRejected.ts).
  *
  * Reine Logik ohne API, damit sie sich ohne Browser testen lässt.
  */
@@ -95,4 +96,32 @@ export function clearOfflineQueues(storage: KeyValue | null | undefined): void {
  */
 export function failureAction(status: number): 'retry' | 'drop' {
   return status === 0 || status === 401 || status === 408 || status === 429 || status >= 500 ? 'retry' : 'drop';
+}
+
+/** HTTP-Status eines Fehlers der API (ApiError); andere Fehler (z. B. im Code der App) haben keinen. */
+function statusOf(e: unknown): number | null {
+  const status = (e as { status?: unknown } | null)?.status;
+  return typeof status === 'number' ? status : null;
+}
+
+/**
+ * Soll eine Änderung, deren Senden gerade gescheitert ist, auf dem Gerät vorgemerkt werden? Ja bei allem, was ein
+ * späterer Versuch beheben kann (failureAction `retry`): keine Verbindung, keine Antwort in der Zeit, Server gestört,
+ * Wartung, Sitzung abgelaufen. Nein, wenn der Server die Änderung ablehnt: Dann sieht die Person die Meldung gleich.
+ */
+export function shouldQueue(e: unknown): boolean {
+  const status = statusOf(e);
+  return status !== null && failureAction(status) === 'retry';
+}
+
+/** Meldung nach dem Vormerken: warum es nicht gleich ging und dass die App es später sendet. */
+export function queuedMessage(e: unknown): string {
+  const status = statusOf(e) ?? 0;
+  const why =
+    status === 0
+      ? 'Keine Verbindung zum Server.'
+      : status === 401
+        ? 'Deine Anmeldung ist abgelaufen.'
+        : 'Der Server ist gerade nicht erreichbar.';
+  return `${why} Auf diesem Gerät gespeichert, die App überträgt es, sobald es wieder geht.`;
 }

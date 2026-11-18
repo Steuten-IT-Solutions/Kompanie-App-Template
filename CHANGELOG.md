@@ -196,6 +196,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Vorgemerkte Änderungen gehen nicht mehr verloren**: Zu- und Absagen, Anwesenheit sowie Punkte und Strafen merkt
+  die App jetzt nicht nur ohne Internet auf dem Gerät vor, sondern auch, wenn der Server gestört oder im
+  Wartungsmodus ist, nicht nach 20 Sekunden antwortet oder die Anmeldung abgelaufen ist; sie sendet sie später von
+  selbst. Vorgemerkte Zu- und Absagen kommen auch an, wenn der Termin aus iCal inzwischen verschoben wurde. Lehnt der
+  Server eine vorgemerkte Änderung ab (z. B. Anmeldeschluss vorbei), steht oben in der App „Nicht übertragen“ mit dem
+  Grund, bis die Person den Hinweis wegtippt; bisher verschwand sie nach einer kurzen Meldung.
 - **Anfragen auf einen Zugang übersichtlicher**: Unter [Verwaltung → Anfragen](app:verwaltung/anfragen) steht jetzt wie
   bei den Passiven nur eine Liste mit Namen, mit Suche und (mit dem Bereich Kompanien) Filter nach der gewählten Kompanie.
   Antippen öffnet die Karte der Anfrage mit allen Angaben, Verbinden, Kompanie, Benutzername, Rolle, Freigeben und

@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError, config, inBackground } from './api';
 import { createOfflineQueue, failureAction, type KeyValue } from './offlineQueue';
 import { RESPONSES_AREA, RESPONSES_CHANGED, validResponse, type PendingResponse } from './responseOutbox';
+import { noteRejected } from './offlineRejectedStore';
 import { previewRole } from './preview';
 
 function storage(): KeyValue | null {
@@ -94,6 +95,7 @@ async function run(): Promise<ResponseSyncResult> {
       result.rejected.push({ label: pending.label, message: (e as Error).message });
     }
   }
+  noteRejected('response', result.rejected);
   return result;
 }
 

@@ -9,6 +9,7 @@ import { api, ApiError, can, config, inBackground, type AttendanceInput, type At
 import { createOutbox, OUTBOX_AREA, OUTBOX_CHANGED, validEntry, type PendingSave } from './attendanceOutbox';
 import { clearOfflineQueues, createOfflineQueue, failureAction } from './offlineQueue';
 import { dataUpdated } from './dataCache';
+import { noteRejected } from './offlineRejectedStore';
 import { previewRole } from './preview';
 
 function storage(): Storage | null {
@@ -115,6 +116,7 @@ async function run(): Promise<SyncResult> {
       result.rejected.push({ label: pending.label, message: (e as Error).message });
     }
   }
+  noteRejected('attendance', result.rejected);
   if (result.sent > 0 || result.rejected.length > 0) {
     outboxChanged();
     // Offene Ansichten laden den Stand vom Server.

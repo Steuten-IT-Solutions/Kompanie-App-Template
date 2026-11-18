@@ -1070,7 +1070,13 @@ paths:
 
   /calendar/{key}/response:
     parameters:
-      - { name: key, in: path, required: true, schema: { type: string }, description: 'Kennung des Termins wie in `GET /calendar` (`id`)' }
+      - {
+          name: key,
+          in: path,
+          required: true,
+          schema: { type: string },
+          description: 'Kennung des Termins wie in `GET /calendar` (`id`) oder seine stabile Kennung (`responses.key`)',
+        }
     put:
       tags: [Termine]
       summary: Bei einem Termin zu- oder absagen (eigene Rückmeldung)
@@ -1119,7 +1125,13 @@ paths:
 
   /calendar/{key}/responses:
     parameters:
-      - { name: key, in: path, required: true, schema: { type: string }, description: 'Kennung des Termins wie in `GET /calendar` (`id`)' }
+      - {
+          name: key,
+          in: path,
+          required: true,
+          schema: { type: string },
+          description: 'Kennung des Termins wie in `GET /calendar` (`id`) oder seine stabile Kennung (`responses.key`)',
+        }
     get:
       tags: [Termine]
       summary: Wer zu- oder abgesagt hat und wer sich noch nicht gemeldet hat
@@ -1149,7 +1161,13 @@ paths:
 
   /calendar/{key}/responses/{id}:
     parameters:
-      - { name: key, in: path, required: true, schema: { type: string }, description: 'Kennung des Termins wie in `GET /calendar` (`id`)' }
+      - {
+          name: key,
+          in: path,
+          required: true,
+          schema: { type: string },
+          description: 'Kennung des Termins wie in `GET /calendar` (`id`) oder seine stabile Kennung (`responses.key`)',
+        }
       - { name: id, in: path, required: true, schema: { type: integer }, description: ID der Person }
     put:
       tags: [Termine]
@@ -10450,6 +10468,11 @@ components:
           type: object
           description: Zu- und Absagen (nur in `GET /calendar` und den Antworten der Rückmeldung); fehlt, solange Zu- und Absagen ausgeschaltet sind
           properties:
+            key:
+              {
+                type: string,
+                description: 'Stabile Kennung für Zu- und Absagen: bleibt bei iCal gleich, wenn der Termin verschoben wird (die `id` ändert sich dann); gilt überall, wo `{key}` steht',
+              }
             mine: { type: [string, 'null'], enum: ['yes', 'no', null], description: Eigene Rückmeldung }
             note: { type: string, description: Eigener Hinweis }
             'yes': { type: integer, description: 'Zusagen (von allen, die zusagen dürfen)' }

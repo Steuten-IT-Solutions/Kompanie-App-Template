@@ -54,6 +54,8 @@ import { createImageQueue } from '../imageQueue';
 import Anwesenheit from './Anwesenheit';
 import { newRequestId, type BookingKind, type PendingBooking } from '../bookingOutbox';
 import { bookingOutbox, usePendingBookings } from '../bookingSync';
+import { queuedMessage, shouldQueue } from '../offlineQueue';
+import { askPersistentStorage } from '../offlineRejectedStore';
 import { markSaved } from '../unsaved';
 import { preloadBadge, RankBadge, RankStack } from '../RankBadge';
 import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
@@ -1844,18 +1846,30 @@ function FromAttendance({ listId, kind, onToast }: { listId: number; kind: 'punk
 
 const OFFLINE_BOOKED = 'Keine Verbindung – auf dem Gerät gespeichert. Die App bucht es, sobald du wieder online bist.';
 
+/** Meldung nach dem Vormerken einer Buchung */
+function bookedLater(err: ApiError): string {
+  return err.status === 0 ? OFFLINE_BOOKED : queuedMessage(err);
+}
+
 /**
- * Buchen; ohne Verbindung (status 0) stattdessen in die Warteschlange (bookingSync.ts) mit derselben Kennung, damit
- * eine Buchung, deren Antwort nur unterwegs verloren ging, nicht doppelt ankommt. null: vorgemerkt.
+ * Buchen; scheitert das aus einem Grund, den ein späterer Versuch behebt (keine Verbindung, Server gestört, Sitzung
+ * abgelaufen; shouldQueue), stattdessen in die Warteschlange (bookingSync.ts) mit derselben Kennung, damit eine
+ * Buchung, deren Antwort nur unterwegs verloren ging, nicht doppelt ankommt. `{ queued }`: vorgemerkt, mit Meldung.
  */
-async function bookOrQueue<T>(kind: BookingKind, body: PendingBooking['body'], label: string, send: () => Promise<T>): Promise<T | null> {
+async function bookOrQueue<T>(
+  kind: BookingKind,
+  body: PendingBooking['body'],
+  label: string,
+  send: () => Promise<T>,
+): Promise<T | { queued: string }> {
   try {
     return await send();
   } catch (err) {
-    if (!(err instanceof ApiError) || err.status !== 0 || !bookingOutbox.add({ kind, body, label, at: Date.now() })) throw err;
+    if (!(err instanceof ApiError) || !shouldQueue(err) || !bookingOutbox.add({ kind, body, label, at: Date.now() })) throw err;
+    askPersistentStorage();
     // Vorgemerkt gilt wie gespeichert: keine Rückfrage beim Verlassen des Formulars (unsaved.ts).
     markSaved();
-    return null;
+    return { queued: bookedLater(err) };
   }
 }
 
@@ -1865,7 +1879,7 @@ function PendingBookings({ kind }: { kind: BookingKind }) {
   if (count === 0) return null;
   return (
     <p className="muted small pending-bookings" role="status">
-      {count === 1 ? '1 Buchung' : `${count} Buchungen`} noch nicht übertragen – die App sendet sie, sobald du wieder online bist.
+      {count === 1 ? '1 Buchung' : `${count} Buchungen`} noch nicht übertragen – die App sendet sie, sobald die Verbindung wieder klappt.
     </p>
   );
 }
@@ -1941,8 +1955,8 @@ function GivePoints({
         request_id: newRequestId(),
       };
       const rows = await bookOrQueue('points', body, `${formatPoints(n)} ${sec.points}: ${body.reason}`, () => api.givePoints(body));
-      if (rows === null) {
-        onToast(OFFLINE_BOOKED);
+      if ('queued' in rows) {
+        onToast(rows.queued);
       } else {
         // Aus einer Anwesenheitsliste bucht der Server nur für, wer noch keine Punkte für sie hat.
         onToast(`${formatPoints(n)} ${sec.points} an ${rows.length} ${rows.length === 1 ? 'Mitglied' : 'Mitglieder'} vergeben`);
@@ -2079,8 +2093,8 @@ function GivePenalty({
       const body = { user_ids: selected, amount_cents: cents, reason: reason.trim(), date, request_id: newRequestId() };
       const rows = await bookOrQueue('penalty', body, `${formatEuro(cents)}: ${body.reason}`, () => api.givePenalty(body));
       onToast(
-        rows === null
-          ? OFFLINE_BOOKED
+        'queued' in rows
+          ? rows.queued
           : `${formatEuro(cents)} an ${selected.length} ${selected.length === 1 ? 'Mitglied' : 'Mitglieder'} eingetragen`,
       );
       if (!fixed) setSelected([]);
