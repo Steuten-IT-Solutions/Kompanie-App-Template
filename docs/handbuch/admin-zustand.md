@@ -50,7 +50,7 @@ Die Fehler der letzten 14 Tage (höchstens 50) mit Zeitpunkt, Art des Fehlers un
 
 Lass die Seite offen, bis die App neu lädt. Bricht die Verbindung zwischendurch ab, läuft das Update auf dem Server weiter und die App wartet darauf. Läuft schon ein Update, wenn du die Seite öffnest (z. B. das automatische), zeigt sie dessen Fortschritt.
 
-Klappt die Sicherung in Google Drive vor dem Update nicht (z. B. weil der Speicher voll ist), fragt die App nach: Bestätigst du, spielt sie das Update trotzdem ein; die Sicherung auf dem Server ist dann da. Brichst du ab, bleibt die bisherige Version.
+Kurze Störungen bei Google (z. B. „HTTP 502“) überbrückt die App selbst: Sie versucht das Hochladen nach einer Pause bis zu viermal erneut. Klappt die Sicherung in Google Drive vor dem Update nicht (z. B. weil der Speicher voll ist), fragt die App nach: Bestätigst du, spielt sie das Update trotzdem ein; die Sicherung auf dem Server ist dann da. Brichst du ab, bleibt die bisherige Version.
 
 ### Ein zurückgestelltes Update entscheiden
 Vor einem automatischen Update kann niemand nachgefragt werden. Klappt dann die Sicherung in Google Drive nicht, spielt die App das Update nicht ein und zeigt unter **Updates** den Grund.

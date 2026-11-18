@@ -20,5 +20,6 @@ export function uploadStatsText(s: BackupUploadStats): string {
     `Lesen von der Platte: ${seconds(s.read_seconds)}`,
   ];
   if (s.chunks > 1) parts.push(`langsamstes Stück: ${seconds(s.slowest_seconds)}`);
+  if (s.retries > 0) parts.push(s.retries === 1 ? '1 neuer Versuch nach einem Fehler' : `${s.retries} neue Versuche nach Fehlern`);
   return parts.join(' · ');
 }
