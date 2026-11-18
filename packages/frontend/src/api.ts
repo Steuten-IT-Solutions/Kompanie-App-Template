@@ -3354,7 +3354,9 @@ export interface RegistrationInput {
   username: string;
   password: string;
   message?: string;
-  /** Gewählte Kompanien (freiwillig, nur mit dem Bereich Kompanien) */
+  /** Pflicht, wenn das Formular Kompanien anbietet: Kompanie(n) (company_ids), keine Kompanie oder passiv */
+  company_choice?: 'company' | 'none' | 'passive';
+  /** Gewählte Kompanien bei company_choice company */
   company_ids?: number[];
   /** Verstecktes Feld gegen Programme (bleibt leer) */
   website?: string;
@@ -3382,6 +3384,8 @@ export interface RegistrationRequest {
   matches?: RegistrationMatch[];
   /** Kompanien, die die Person gewählt hat; nur mit dem Bereich Kompanien */
   companies?: { id: number; name: string }[];
+  /** Wahl im Formular; null bei Anfragen ohne Angabe; nur mit dem Bereich Kompanien */
+  company_choice?: 'company' | 'none' | 'passive' | null;
 }
 
 /** Vorschlag zum Verbinden: gleiche E-Mail-Adresse, gleicher Name oder ähnlicher Name (gleicher Nachname, Vorname beginnt gleich) */

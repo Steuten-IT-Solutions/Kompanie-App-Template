@@ -45,6 +45,8 @@ function RegistrationForm() {
   const [password2, setPassword2] = useState('');
   const [message, setMessage] = useState('');
   const [companyIds, setCompanyIds] = useState<number[]>([]);
+  // Pflicht, sobald es Kompanien zur Wahl gibt; vorgewählt ist nichts, damit jede Wahl bewusst ist.
+  const [noCompany, setNoCompany] = useState<'none' | 'passive' | null>(null);
   const [consent, setConsent] = useState(false);
   const [website, setWebsite] = useState('');
   const [busy, setBusy] = useState(false);
@@ -102,6 +104,10 @@ function RegistrationForm() {
     if (!shownUsername.trim()) return setError('Bitte einen Benutzernamen wählen.');
     if (password.length < MIN_PASSWORD) return setError(`Das Passwort muss mindestens ${MIN_PASSWORD} Zeichen lang sein.`);
     if (password !== password2) return setError('Die beiden Passwörter stimmen nicht überein.');
+    const chosenIds = companyIds.filter((id) => companies.some((c) => c.id === id));
+    if (companies.length > 0 && !noCompany && chosenIds.length === 0) {
+      return setError('Bitte wähle deine Kompanie, „Keine Kompanie“ oder „Passiv“.');
+    }
     if (!consent) return setError('Bitte bestätige, dass du die Datenschutzerklärung gelesen hast.');
     setBusy(true);
     try {
@@ -117,7 +123,11 @@ function RegistrationForm() {
         username: shownUsername.trim(),
         password,
         message: message.trim(),
-        ...(companies.length > 0 ? { company_ids: companyIds.filter((id) => companies.some((c) => c.id === id)) } : {}),
+        ...(companies.length > 0
+          ? noCompany
+            ? { company_choice: noCompany }
+            : { company_choice: 'company' as const, company_ids: chosenIds }
+          : {}),
         website,
       });
       setDone(res.status);
@@ -193,16 +203,37 @@ function RegistrationForm() {
       </label>
       {companies.length > 0 && (
         <fieldset className="fieldset registration-companies">
-          <legend>Deine Kompanie (freiwillig)</legend>
-          <p className="muted small">Gehörst du schon zu einer Kompanie? Dann wähle sie hier, das hilft bei der Freigabe.</p>
+          <legend>Deine Kompanie</legend>
+          <p className="muted small">Bitte wähle, zu welcher Kompanie du gehörst (auch mehrere), oder „Keine Kompanie“ bzw. „Passiv“.</p>
           {companies.map((c) => (
             <label key={c.id} className="toggle">
               <input
                 type="checkbox"
                 checked={companyIds.includes(c.id)}
-                onChange={(e) => setCompanyIds((ids) => (e.target.checked ? [...ids, c.id] : ids.filter((x) => x !== c.id)))}
+                onChange={(e) => {
+                  setNoCompany(null);
+                  setCompanyIds((ids) => (e.target.checked ? [...ids, c.id] : ids.filter((x) => x !== c.id)));
+                }}
               />
               {c.name}
+            </label>
+          ))}
+          {(
+            [
+              ['none', 'Keine Kompanie'],
+              ['passive', 'Passiv'],
+            ] as const
+          ).map(([key, label]) => (
+            <label key={key} className="toggle">
+              <input
+                type="checkbox"
+                checked={noCompany === key}
+                onChange={(e) => {
+                  setCompanyIds([]);
+                  setNoCompany(e.target.checked ? key : null);
+                }}
+              />
+              {label}
             </label>
           ))}
         </fieldset>
