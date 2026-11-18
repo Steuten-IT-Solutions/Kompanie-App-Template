@@ -1934,6 +1934,18 @@ test('Ämter: gemeinsame Amtszeiten einer Gruppe mit Gruppenbild, öffentlich al
   await expect(page.locator('.toast')).toHaveText('Gemeinsame Amtszeit angelegt');
   await expect(admin.locator('li.card')).toContainText(`${offices[0]}: ${holders[0]}`);
   await expect(admin.locator('li.card')).toContainText(`${offices[1]}: ${holders[1]}`);
+  // Eine frühere gemeinsame Amtszeit: steht öffentlich eingeklappt da
+  await admin.getByRole('button', { name: 'Neue gemeinsame Amtszeit' }).click();
+  const earlier = admin.locator('form.joint-term-form');
+  await earlier.getByLabel('Von (Jahr)', { exact: true }).fill('2020');
+  await earlier.getByLabel('Bis (leer: bis heute)').fill('2022');
+  const former = `Clara ${n}`;
+  const firstSet = earlier.locator('fieldset', { hasText: offices[0] });
+  await firstSet.getByRole('button', { name: 'Person hinzufügen' }).click();
+  await firstSet.getByLabel('Name', { exact: true }).fill(former);
+  await earlier.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gemeinsame Amtszeit angelegt');
+  await expect(admin.locator('li.card')).toHaveCount(2);
 
   // Einzahl des ersten Amts: steht auf der Karte statt seiner Bezeichnung
   const officeSingular = `König ${n}`;
@@ -1958,7 +1970,7 @@ test('Ämter: gemeinsame Amtszeiten einer Gruppe mit Gruppenbild, öffentlich al
   // Öffentlich: eine Karte je gemeinsame Amtszeit mit Bild und den Personen je Amt
   await page.goto('/app/#/mitglieder/aemter');
   await expect(page.locator('.office-group h2', { hasText: group })).toBeVisible();
-  const card = page.locator('.joint-term', { hasText: singular });
+  const card = page.locator('.joint-term', { hasText: `${singular} seit 2023` });
   await expect(card.locator('.joint-term-title')).toContainText(`${singular} seit 2023`);
   await expect(card.locator('.joint-term-title')).toContainText('aktuell');
   await expect(card.locator('img.joint-term-image')).toBeVisible();
@@ -1966,12 +1978,36 @@ test('Ämter: gemeinsame Amtszeiten einer Gruppe mit Gruppenbild, öffentlich al
   await expect(card.locator('.joint-term-offices > div', { hasText: officeSingular }).locator('dd')).toContainText(holders[0]);
   await expect(card.locator('.joint-term-offices dt', { hasText: offices[0] })).toHaveCount(0);
   await expect(card.locator('.joint-term-offices > div', { hasText: offices[1] }).locator('dd')).toContainText(holders[1]);
+  // Die laufende ist aufgeklappt, die frühere zu: nur Jahre und Namen, ein Tipp auf den Kopf klappt sie auf und zu
+  const current = card;
+  await expect(current.locator('.joint-term-head')).toHaveAttribute('aria-expanded', 'true');
+  const past = page.locator('.joint-term', { hasText: `${singular} 2020–2022` });
+  const pastHead = past.locator('.joint-term-head');
+  await expect(pastHead).toHaveAttribute('aria-expanded', 'false');
+  await expect(pastHead).toContainText(former);
+  await expect(past.locator('.joint-term-offices')).toHaveCount(0);
+  await pastHead.click();
+  await expect(pastHead).toHaveAttribute('aria-expanded', 'true');
+  await expect(past.locator('.joint-term-offices > div', { hasText: officeSingular }).locator('dd')).toContainText(former);
+  await current.locator('.joint-term-head').click();
+  await expect(current.locator('.joint-term-offices')).toHaveCount(0);
+  // „Alle aufklappen“ öffnet auch die gemeinsamen Amtszeiten, „Alle zuklappen“ schließt sie
+  await page.getByRole('button', { name: 'Alle aufklappen' }).click();
+  await expect(current.locator('.joint-term-head')).toHaveAttribute('aria-expanded', 'true');
+  await expect(pastHead).toHaveAttribute('aria-expanded', 'true');
+  await page.getByRole('button', { name: 'Alle zuklappen' }).click();
+  await expect(current.locator('.joint-term-head')).toHaveAttribute('aria-expanded', 'false');
+  await expect(pastHead).toHaveAttribute('aria-expanded', 'false');
 
-  // Aufräumen: gemeinsame Amtszeit, Ämter und Gruppe löschen
+  // Aufräumen: gemeinsame Amtszeiten, Ämter und Gruppe löschen
   await page.goto('/app/#/verwaltung/aemter');
-  await page.locator('.office-admin-group', { hasText: group }).locator('.joint-admin').getByRole('button', { name: 'Löschen' }).click();
-  await askOk(page);
-  await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  const jointAdmin = page.locator('.office-admin-group', { hasText: group }).locator('.joint-admin');
+  for (let left = 2; left > 0; left--) {
+    await jointAdmin.getByRole('button', { name: 'Löschen' }).first().click();
+    await askOk(page);
+    await expect(page.locator('.toast')).toHaveText('Gelöscht');
+    await expect(jointAdmin.locator('li.card')).toHaveCount(left - 1);
+  }
   for (const office of offices) {
     await page.getByRole('button', { name: office, exact: true }).click();
     await page.getByRole('button', { name: 'Amt löschen' }).click();
@@ -2528,6 +2564,10 @@ test('Ehemalig eintragen: Vorschau der endenden Ämter, danach enden sie mit dem
   await sheet.getByRole('button', { name: 'Als ehemalig eintragen', exact: true }).click();
   await expect(page.locator('.toast')).toContainText('ist jetzt als ehemalig eingetragen');
   await expect(page.locator('.toast')).toContainText('beendet: 2');
+  // Das Fenster bleibt offen (jetzt zum Bearbeiten); erst schließen: Ein Seitenwechsel bei offenem Fenster schließt
+  // sonst nur das Fenster (backClose.ts), und die Seite bleibt beim Mitglied
+  await sheet.getByRole('button', { name: 'Schließen' }).click();
+  await expect(sheet).toBeHidden();
 
   // Öffentlicher Zeitstrahl: beendet statt „seit“; der Partner bleibt im Amt
   await page.goto('/app/#/mitglieder/aemter');

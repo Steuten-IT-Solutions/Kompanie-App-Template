@@ -12,9 +12,9 @@ Unter **{bereich.offices}** siehst du, wer welches Amt gerade hat und wer es fr�
 Tippe unten in der Leiste auf **Intern**, dann auf **{bereich.directory}** und oben auf **{bereich.offices}**. Ohne Anmeldung gibt es **Intern** nicht, dann tippst du unten gleich auf **{bereich.directory}**. Nutzt die Kompanie keine Mitgliederliste, heißt der Knopf gleich **{bereich.offices}**.
 
 ## Was du hier siehst
-- **Alle aufklappen** (bzw. **Alle zuklappen**): öffnet oder schließt alle Karten auf einmal.
+- **Alle aufklappen** (bzw. **Alle zuklappen**): öffnet oder schließt alle Karten auf einmal, auch die gemeinsamen Amtszeiten.
 - **Gruppen**, z. B. Vorstand: Darunter stehen ihre Ämter.
-- **Gemeinsame Amtszeiten**: Hat eine Gruppe gemeinsame Amtszeiten (z. B. ein Königshaus), steht je Amtszeit eine Karte mit dem Gruppenbild, dem Namen der Gruppe in der Einzahl und den Jahren (z. B. „Königshaus 2026–2028“) und wer welches Amt hatte, mit dem Amt in der Einzahl (z. B. „Prinz“); die laufende trägt **aktuell**.
+- **Gemeinsame Amtszeiten**: Hat eine Gruppe gemeinsame Amtszeiten (z. B. ein Königshaus), steht je Amtszeit eine Karte mit dem Gruppenbild, dem Namen der Gruppe in der Einzahl und den Jahren (z. B. „Königshaus 2026–2028“) und wer welches Amt hatte, mit dem Amt in der Einzahl (z. B. „Prinz“); die laufende trägt **aktuell**. Die laufende Amtszeit ist aufgeklappt (läuft keine, die neueste), die anderen sind eingeklappt und zeigen nur Jahre und Namen; tippe auf den Kopf einer Amtszeit, um sie auf- oder zuzuklappen.
 - **Je Amt eine Karte**: ein Siegel mit den Anfangsbuchstaben des Amts, wer es gerade hat (mit Fotos) – sonst „zuletzt“ und die letzte Amtszeit – und seit wann die Chronik reicht.
 
 ## So gehst du vor
