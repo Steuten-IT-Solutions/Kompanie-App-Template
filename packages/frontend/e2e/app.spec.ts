@@ -232,7 +232,7 @@ test('Mitglied sieht Termine, aber keine Verwaltung', async ({ page }) => {
   await expect(page.locator('.topbar-title')).toHaveText('Termine');
 });
 
-test('Mehrere Terminarten am Termin ankreuzen, je Art ein Schild', async ({ page }) => {
+test('Mehrere Terminarten am Termin ankreuzen (aufklappbar), je Art ein Schild', async ({ page }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   const api = (path: string, method: string, body?: unknown) =>
     page.evaluate(
@@ -255,14 +255,24 @@ test('Mehrere Terminarten am Termin ankreuzen, je Art ein Schild', async ({ page
     await page.getByText('Vereinsabend').click();
     const card = page.locator('.card.event.open');
     const checks = card.getByRole('group', { name: 'Terminarten' });
+    const toggle = card.getByRole('button', { name: 'Terminarten' });
+    // Eingeklappt: nur die gewählten Arten (noch keine)
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(checks).toHaveCount(0);
+    await expect(card.locator('.event-kind-summary')).toHaveText('keine');
+    await toggle.click();
     await checks.getByLabel('Versammlung').check();
     await expect(card.locator('.badge.event-kind')).toHaveText(['Versammlung']);
     await checks.getByLabel('Arbeitsdienst').check();
     await expect(card.locator('.badge.event-kind')).toHaveText(['Versammlung', 'Arbeitsdienst']);
     await shot(page, 'termin-mehrere-arten');
+    await toggle.click();
+    await expect(card.locator('.event-kind-summary')).toHaveText('Versammlung, Arbeitsdienst');
+    await shot(page, 'termin-mehrere-arten-zu');
     // Gespeichert: nach dem Neuladen beide angehakt; Haken heraus entfernt nur diese Art
     await page.reload();
     await page.getByText('Vereinsabend').click();
+    await toggle.click();
     await expect(checks.getByLabel('Arbeitsdienst')).toBeChecked();
     await checks.getByLabel('Versammlung').uncheck();
     await expect(card.locator('.badge.event-kind')).toHaveText(['Arbeitsdienst']);

@@ -187,13 +187,19 @@ function EventList({ focus }: { focus?: string }) {
   );
 }
 
-/** Terminarten eines Termins ankreuzen (mehrere möglich); speichert sofort. Ohne Art mit Vorschlag aus dem Titel (zählt erst übernommen). */
+/**
+ * Terminarten eines Termins ankreuzen (mehrere möglich); speichert sofort. Eingeklappt, bis man auf „Terminarten“ tippt;
+ * dann stehen nur die gewählten Arten da. Ohne Art mit Vorschlag aus dem Titel (zählt erst übernommen).
+ */
 function KindPicker({ ev, onChange }: { ev: CalendarEvent; onChange: (id: string, kinds: string[]) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Während des Speicherns schon die neue Auswahl zeigen
   const [draft, setDraft] = useState<string[] | null>(null);
+  const [open, setOpen] = useState(false);
   const current = kindsOf(ev);
+  const shown = draft ?? current;
+  const listId = `event-kinds-${ev.id}`;
   const suggestions = ev.kind_suggestions ?? (ev.kind_suggestion ? [ev.kind_suggestion] : []);
 
   async function choose(kinds: string[]) {
@@ -213,7 +219,20 @@ function KindPicker({ ev, onChange }: { ev: CalendarEvent; onChange: (id: string
 
   return (
     <div className="event-kind-picker">
-      <EventKindChecks value={draft ?? current} disabled={busy} onChange={(kinds) => void choose(kinds)} />
+      <button
+        type="button"
+        className="member-filters-toggle event-kind-toggle"
+        aria-expanded={open}
+        aria-controls={listId}
+        onClick={() => setOpen(!open)}
+      >
+        Terminarten
+        <span className="member-filters-arrow" aria-hidden="true">
+          ›
+        </span>
+      </button>
+      {!open && <p className="small event-kind-summary">{shown.length > 0 ? shown.join(', ') : <span className="muted">keine</span>}</p>}
+      {open && <EventKindChecks id={listId} hideLegend value={shown} disabled={busy} onChange={(kinds) => void choose(kinds)} />}
       {current.length === 0 && suggestions.length > 0 && (
         <p className="small muted">
           Vorschlag aus dem Titel: {suggestions.join(', ')}.{' '}

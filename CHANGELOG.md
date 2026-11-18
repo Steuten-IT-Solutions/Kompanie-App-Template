@@ -58,8 +58,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   im Jahresordner), umbenennen, in ein anderes Jahr setzen und löschen. Alben, die bisher nur in der App lagen, bekommen
   einmalig einen Ordner im Jahresordner von Drive, ihre Bilder ziehen im Hintergrund dorthin um.
 - **Terminarten**: Unter [Einstellungen → Kalender](app:einstellungen/kalender) richtest du Terminarten ein, z. B.
-  Versammlung oder Arbeitsdienst. Wer Termine pflegen darf, hakt im aufgeklappten Termin unter [Termine](app:termine)
-  eine oder mehrere Arten an (z. B. Versammlung und Arbeitsdienst), bei jeder Quelle des Kalenders, auch bei Google
+  Versammlung oder Arbeitsdienst. Wer Termine pflegen darf, klappt im Termin unter [Termine](app:termine) die
+  Terminarten auf und hakt eine oder mehrere an (z. B. Versammlung und Arbeitsdienst), bei jeder Quelle des Kalenders, auch bei Google
   Kalender und iCal. Ein Termin mit mehreren Arten zählt für jede, etwa bei den Aufnahmen. Die App speichert die Arten
   selbst und ändert nichts in Google. Steht der Name einer Art im Titel, schlägt die App sie vor. Anwesenheitslisten
   übernehmen die Arten ihres Termins und zeigen sie an; ändern lassen sie sich auch an der Liste. Je Art legst du mit

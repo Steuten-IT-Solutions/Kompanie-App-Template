@@ -1019,6 +1019,13 @@ p.small + p.small:not(.muted) {
 .event-kind-checks .toggle {
   margin-bottom: 8px;
 }
+/* Am Termin eingeklappt: Knopf „Terminarten ›“, darunter nur die gewählten Arten */
+.event-kind-toggle {
+  padding-left: 0;
+}
+.event-kind-summary {
+  margin: 0 0 8px;
+}
 
 /* ------------------------------------------------------------------ */
 /* Spieß & Formulare                                                   */

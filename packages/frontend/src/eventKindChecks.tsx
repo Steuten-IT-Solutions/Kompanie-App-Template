@@ -12,18 +12,23 @@ export function EventKindChecks({
   disabled,
   onChange,
   className,
+  id,
+  hideLegend,
 }: {
   value: string[];
   disabled?: boolean;
   onChange: (kinds: string[]) => void;
   className?: string;
+  id?: string;
+  /** Überschrift nur für Screenreader (wenn ein Knopf zum Aufklappen sie schon zeigt) */
+  hideLegend?: boolean;
 }) {
   const kinds = eventKinds();
   const options = [...kinds, ...value.filter((k) => !kinds.includes(k))];
   const toggle = (kind: string, on: boolean) => onChange(options.filter((k) => (k === kind ? on : value.includes(k))));
   return (
-    <fieldset className={`field event-kind-checks ${className ?? ''}`}>
-      <legend className="field-label">Terminarten</legend>
+    <fieldset id={id} className={`field event-kind-checks ${className ?? ''}`}>
+      <legend className={hideLegend ? 'visually-hidden' : 'field-label'}>Terminarten</legend>
       {options.map((k) => (
         <label key={k} className="toggle">
           <input type="checkbox" checked={value.includes(k)} disabled={disabled} onChange={(e) => toggle(k, e.target.checked)} />
