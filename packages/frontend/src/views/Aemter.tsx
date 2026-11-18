@@ -7,6 +7,7 @@ import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { titleBreaks, columnChars, lanes, yearRange } from '../yearGrid';
 import { officeSingular } from '../officeName';
+import { defaultOpenJoint } from '../jointTerms';
 
 const sec = brand.labels.sections;
 
@@ -600,7 +601,7 @@ export function YearGrid({
 export function OfficesView() {
   const { data, error, loading, reload } = useOffices();
   const [open, setOpen] = useState<Set<number>>(new Set());
-  // Offene gemeinsame Amtszeiten; null = Vorgabe: nur die laufenden offen, alle früheren zu
+  // Offene gemeinsame Amtszeiten; null = Vorgabe (defaultOpenJoint)
   const [jointOpen, setJointOpen] = useState<Set<number> | null>(null);
   const [view, setView] = useState(loadView);
 
@@ -627,7 +628,7 @@ export function OfficesView() {
     { key: 'none', title: '', singular: '', offices: offices.filter((o) => o.group_id === null), joint: null },
   ].filter((s) => s.offices.length > 0);
   const jointTerms = sections.flatMap((s) => s.joint ?? []);
-  const jointIds = jointOpen ?? new Set(jointTerms.filter((t) => t.current).map((t) => t.id));
+  const jointIds = jointOpen ?? new Set(sections.flatMap((s) => (s.joint ? defaultOpenJoint(s.joint) : [])));
   const toggleJoint = (t: OfficeGroupTerm) => {
     const next = new Set(jointIds);
     if (next.has(t.id)) next.delete(t.id);

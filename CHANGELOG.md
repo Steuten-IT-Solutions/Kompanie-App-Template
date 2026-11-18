@@ -199,7 +199,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 - **Gemeinsame Amtszeiten einklappbar**: Bei einer Ämtergruppe mit gemeinsamen Amtszeiten (z. B. Königshaus) unter
   [Ämter](app:mitglieder/aemter) lässt sich jede Amtszeit mit einem Tipp auf ihren Kopf auf- und zuklappen. Die laufende
-  Amtszeit ist aufgeklappt, alle früheren sind zu und zeigen nur Jahre und Namen; Bild und Ämter erscheinen erst beim
+  Amtszeit ist aufgeklappt (läuft keine, die neueste), alle anderen sind zu und zeigen nur Jahre und Namen; Bild und Ämter erscheinen erst beim
   Aufklappen. _Alle aufklappen_ und _Alle zuklappen_ gelten auch für sie.
 - **Vorgemerkte Änderungen gehen nicht mehr verloren**: Zu- und Absagen, Anwesenheit sowie Punkte und Strafen merkt
   die App jetzt nicht nur ohne Internet auf dem Gerät vor, sondern auch, wenn der Server gestört oder im
