@@ -104,6 +104,20 @@ final class Plugin
         add_action('rest_api_init', static fn () => RestBridge::register(self::app()));
         // Nach einem Update im selben Aufruf keine weiteren Aufgaben: Im Speicher ist noch der alte Code.
         add_filter('cron_schedules', [WpScheduler::class, 'schedules']);
+        // News im Editor von WordPress schreiben: Wer in der App „News schreiben“ hat, bekommt die Rechte für Beiträge.
+        add_filter('user_has_cap', static function ($allcaps, $caps, $args, $user) {
+            // Vor init ist die App noch nicht bereit (Plugin::upgrade); danach erst, wenn ein Recht für Beiträge gefragt ist.
+            if (!is_array($allcaps) || !is_array($caps) || !$user instanceof \WP_User || WpUpdateTarget::$installed || !did_action('init')) {
+                return $allcaps;
+            }
+            return WpNewsSource::grant(
+                $allcaps,
+                array_values(array_filter($caps, 'is_string')),
+                (int) $user->ID,
+                static fn (int $id): ?\KompanieApp\Core\Auth\User => self::app()->users->find($id),
+                static fn (\KompanieApp\Core\Auth\User $u): bool => self::app()->newsService()->canEditSite($u),
+            );
+        }, 10, 4);
         // Hintergrundaufgaben laufen als System, nicht als die Person, deren Seitenaufruf WP-Cron gerade auslöst
         // (ALTERNATE_WP_CRON, wp cron event run --user=…): Sonst gälten ihre Rechte, z. B. beim Löschen nach Ablauf der
         // Aufbewahrungsfrist (WpUsers::guardAccount).

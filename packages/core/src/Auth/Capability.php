@@ -134,7 +134,10 @@ enum Capability: string
      * Drive bleiben bei manage_settings.
      */
     case ManageGallery = 'manage_gallery';
-    /** News in der App schreiben, bearbeiten und löschen (nur mit der Quelle „In der App“, NewsService). */
+    /**
+     * News schreiben, bearbeiten und löschen: mit der Quelle „In der App“ in der App, mit den Beiträgen der WordPress-Seite
+     * im Editor von WordPress (NewsService::canEditSite).
+     */
     case ManageNews = 'manage_news';
     /** Eigene Seiten anlegen, bearbeiten, sortieren und löschen (Bereich Seiten, Issue #287). */
     case ManagePages = 'manage_pages';

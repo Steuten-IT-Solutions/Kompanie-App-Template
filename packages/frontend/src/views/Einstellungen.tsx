@@ -1756,6 +1756,8 @@ export function News({ settings, onSaved, onToast }: SectionProps) {
   const { busy, error, setError, save } = useSave((s) => {
     // Knöpfe zum Schreiben gleich zeigen bzw. ausblenden, ohne die App neu zu laden.
     if (config && s.news) config.newsInApp = s.news.source === 'app' && !!config.features.news;
+    // Adresse des Editors von WordPress gilt nur mit den Beiträgen der Seite; nach einem Wechsel dorthin bringt sie das nächste Laden.
+    if (config && s.news && s.news.source !== 'site') config.newsEditorUrl = null;
     onSaved(s);
   }, onToast);
   const needsUrl = source === 'wordpress' || source === 'rss';

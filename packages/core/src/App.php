@@ -258,6 +258,12 @@ final class App
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Recht „Galerie verwalten“ nicht ergänzt: ' . $e->getMessage());
         }
+        // News im Editor der WordPress-Seite schreiben: Standardrolle „News verwalten“ einmalig auch für die Quelle site
+        try {
+            $this->newsService()->initialize();
+        } catch (\Throwable $e) {
+            error_log('Kompanie-App: Rolle „News verwalten“ nicht angelegt: ' . $e->getMessage());
+        }
         // Fehlermeldungen zuerst an die Admins: Benachrichtigungen dazu einmalig auf bestehenden Geräten einschalten
         try {
             $this->bugReports()->initialize();

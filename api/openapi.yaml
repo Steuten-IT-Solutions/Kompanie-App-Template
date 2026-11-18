@@ -707,7 +707,8 @@ paths:
       description: |
         Zeitmarke für die Zeitfalle (frühestens `minSeconds`, spätestens 6 Stunden später absenden). Ist „Zugang
         beantragen“ aus, 404 `registration_unavailable`. `email_confirmation`: Mailversand eingerichtet, die Person
-        bestätigt ihre Adresse über einen Link und erfährt das Ergebnis per Mail.
+        bestätigt ihre Adresse über einen Link und erfährt das Ergebnis per Mail. `companies`: aktive Kompanien zum
+        Auswählen, wenn der Bereich Kompanien an ist (sonst leer).
       security: []
       responses:
         '200':
@@ -716,12 +717,21 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [token, minSeconds, email_confirmation, privacy_url]
+                required: [token, minSeconds, email_confirmation, privacy_url, companies]
                 properties:
                   token: { type: string, description: 'Zeitpunkt.HMAC; beim Absenden mitschicken' }
                   minSeconds: { type: integer }
                   email_confirmation: { type: boolean }
                   privacy_url: { type: [string, 'null'], description: Link auf die Datenschutzerklärung der Kompanie }
+                  companies:
+                    description: Aktive Kompanien in der Reihenfolge der Liste (nur Namen); leer ohne den Bereich Kompanien
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name]
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
         '404': { $ref: '#/components/responses/Error' }
 
   /registration:
@@ -751,6 +761,12 @@ paths:
                 username: { type: string, pattern: '^[A-Za-z0-9._@-]{1,60}$' }
                 password: { type: string, minLength: 8, maxLength: 72 }
                 message: { type: string, maxLength: 500, description: Freiwillig, z. B. wer man ist }
+                company_ids:
+                  description: >-
+                    Freiwillig: gewählte Kompanien, nur aus `companies` des Formulars (sonst 400). Ohne den Bereich Kompanien
+                    nicht beachtet.
+                  type: array
+                  items: { type: integer }
                 website: { type: string, description: Verstecktes Feld; muss leer bleiben }
       responses:
         '201':
@@ -6188,6 +6204,14 @@ paths:
                         created_at: { type: string, format: date-time }
                         email_confirmed: { type: boolean, description: Adresse per Link bestätigt (nur mit Mailversand) }
                         expires_at: { type: string, format: date-time, description: Danach wird die Anfrage gelöscht }
+                        companies:
+                          description: Kompanien, die die Person gewählt hat (die es noch gibt); nur mit dem Bereich Kompanien
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id: { type: integer }
+                              name: { type: string }
                         matches:
                           description: >-
                             Mitglieder ohne Zugang, die passen könnten, beste zuerst: gleiche E-Mail-Adresse (email), gleicher
@@ -6210,6 +6234,15 @@ paths:
                       properties:
                         id: { type: integer }
                         name: { type: string }
+                  companies:
+                    description: Alle Kompanien (auch ehemalige) zum Ändern beim Freigeben; nur mit dem Bereich Kompanien
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+                        active: { type: boolean }
         '403': { $ref: '#/components/responses/Error' }
 
   /registrations/{id}/approve:
@@ -6221,6 +6254,9 @@ paths:
         vergeben darf; Benutzername und E-Mail-Adresse frei). Mit Mailversand bekommt die Person eine Mail (`mailed`).
         Mit `user_id` entsteht kein Konto: Das Mitglied ohne Zugang bekommt Benutzername, E-Mail-Adresse und Passwort
         aus der Anfrage und behält Name, Rolle und alle Einträge (`linked`). Nur bei Mitgliedern ohne Zugang (sonst 400).
+        Mit dem Bereich Kompanien ordnet die Freigabe die Person den Kompanien aus der Anfrage zu (bei `user_id` zusätzlich
+        zu seinen), aber nur, wenn sie danach das Recht `member` hat. `company_ids` ändert die Wahl; eine andere als die
+        aus der Anfrage nur mit `manage_companies` (sonst 403).
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer } }
       requestBody:
@@ -6233,6 +6269,10 @@ paths:
                 username: { type: string, description: Anderer Benutzername, wenn der gewünschte vergeben ist }
                 user_id:
                   { type: integer, description: Mit diesem Mitglied ohne Zugang verbinden statt ein Konto anzulegen; level gilt dann nicht }
+                company_ids:
+                  description: Kompanien statt der aus der Anfrage (alle der Liste, auch ehemalige); anders als in der Anfrage nur mit manage_companies
+                  type: array
+                  items: { type: integer }
       responses:
         '200':
           description: Freigegeben
@@ -6253,6 +6293,16 @@ paths:
                       level: { type: string }
                   mailed: { type: boolean }
                   linked: { type: boolean, description: Mit einem Mitglied ohne Zugang verbunden (user_id) }
+                  companies:
+                    description: Kompanien der Person nach der Freigabe; nur mit dem Bereich Kompanien
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+                        short_name: { type: string }
+                        active: { type: boolean }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
@@ -10222,6 +10272,9 @@ components:
         newsInApp:
           type: boolean
           description: 'News werden in der App geschrieben (Quelle app, Bereich news an); wer manage_news hat, sieht die Knöpfe dazu'
+        newsEditorUrl:
+          type: [string, 'null']
+          description: 'WordPress, Quelle site, mit manage_news: Adresse des Editors von WordPress für einen neuen Beitrag (Knopf „Neuer Beitrag“); null ohne das Recht oder mit anderen Quellen. Das Recht gibt in WordPress die Rechte für alle Beiträge (keine Seiten).'
         calendarInApp:
           type: boolean
           description: 'Der interne Kalender wird in der App gepflegt (Quelle app, Bereich calendar an); wer manage_calendar hat, sieht den Knopf dazu'
@@ -10461,6 +10514,7 @@ components:
         cover_uid: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app: Kennung des Titelbilds, für PATCH' }
         updated_at: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app, mit manage_news: Stand für PATCH' }
         updated_by_name: { type: [string, 'null'], description: 'Nur Einzelansicht, Quelle app, mit manage_news' }
+        edit_url: { type: [string, 'null'], description: 'Nur Einzelansicht, WordPress mit Quelle site, mit manage_news: Adresse des Beitrags im Editor von WordPress' }
 
     GalleryAlbumSummary:
       type: object

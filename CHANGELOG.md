@@ -30,6 +30,19 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   (höchstens alle 15 Minuten, bei offener App einmal pro Stunde). Ist eine da, lädt die App sie im Hintergrund und
   zeigt oben _Die App wurde aktualisiert_ mit dem Knopf _Neu starten_. So sieht man Neuerungen sofort, statt erst beim
   nächsten Öffnen. Neu geladen wird nur auf Knopfdruck; nicht gespeicherte Eingaben fragt die App vorher ab.
+- **Kompanie beim Zugang beantragen**: Ist der Bereich [Kompanien](app:kompanien) an, wählt die Person beim
+  [Zugang beantragen](app:registrieren) freiwillig ihre Kompanie (nur aktive, auch mehrere). Unter
+  [Verwaltung → Anfragen](app:verwaltung/anfragen) steht die Wahl auf der Karte, und die Freigabe ordnet die Person
+  der Kompanie zu, sofern sie eine Rolle mit dem Recht „Mitglied“ bekommt. Ändern lässt sich die Kompanie beim
+  Freigeben mit dem Recht „Kompanien verwalten“.
+- **News aus der App in WordPress schreiben**: Läuft die App als WordPress-Plugin und kommen die [News](app:news) aus
+  den Beiträgen der Webseite, gibt es dort für alle mit dem Recht _News schreiben_ den Knopf _Neuer Beitrag_ und im
+  geöffneten Beitrag _In WordPress bearbeiten_. Beide öffnen den Editor von WordPress mit allen seinen Möglichkeiten;
+  zurück in der App ist der Beitrag gleich zu sehen. Das Recht gibt in WordPress die Rechte für alle Beiträge
+  (schreiben, ändern, veröffentlichen, löschen, Bilder hochladen), aber keine Seiten; eine Rolle wie Autor oder
+  Redakteur in WordPress braucht es nicht. Die Rolle „News verwalten“ gibt es jetzt auch mit dieser Quelle; vergib sie
+  unter [Einstellungen → Rollen](app:einstellungen/rollen).
+
 - **Galerie in Google Drive ablegen**: Nutzt die Galerie Google Drive, landen eingereichte und in der App hochgeladene
   Bilder und Videos jetzt in Drive statt auf dem Server. Offene Einreichungen liegen im Ordner „Einreichungen …“ in der
   Ablage des verbundenen Google-Kontos, außerhalb des Galerie-Ordners. Bei der Freigabe verschiebt die App sie in den

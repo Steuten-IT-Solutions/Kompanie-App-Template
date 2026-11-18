@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
@@ -31,6 +32,9 @@ use KompanieApp\Core\Push\PushService;
  *   Benutzername gelten im Formular als frei, damit sich die Person selbst registrieren kann. Beim Freigeben schlägt die
  *   App passende Mitglieder ohne Zugang vor (MemberService::noAccessMatches); mit user_id verbindet approve() den Antrag mit
  *   diesem Mitglied statt ein zweites Konto anzulegen (MemberService::linkRegistration).
+ * - Bereich Kompanien (CompanyService::FEATURE) an: Im Formular wählt die Person freiwillig ihre Kompanie(n) aus den
+ *   aktiven (nur Namen). Wer freigibt, sieht die Wahl; die Freigabe übernimmt sie als Zuordnung, ändern lässt sie sich
+ *   dabei nur mit „Kompanien verwalten“ (manage_companies). Zugeordnet werden wie sonst nur Mitglieder.
  * - Fristen (Aufgabe registrations, stündlich): unbestätigte Anträge nach CONFIRM_HOURS, unbearbeitete nach PENDING_DAYS,
  *   Ablehnungen nach REJECTED_DAYS gelöscht.
  */
@@ -111,7 +115,9 @@ final class RegistrationService
     /**
      * Zum Öffnen des Formulars: Zeitmarke und was das Formular zeigt.
      *
-     * @return array{token: string, minSeconds: int, email_confirmation: bool, privacy_url: string|null}
+     * companies: aktive Kompanien zum Auswählen (leer, wenn der Bereich Kompanien aus ist).
+     *
+     * @return array{token: string, minSeconds: int, email_confirmation: bool, privacy_url: string|null, companies: list<array{id: int, name: string}>}
      */
     public function form(): array
     {
@@ -122,13 +128,94 @@ final class RegistrationService
             'minSeconds' => self::MIN_SECONDS,
             'email_confirmation' => $this->withMail(),
             'privacy_url' => $privacy !== '' ? $privacy : null,
+            'companies' => array_map(static fn (array $c): array => ['id' => $c['id'], 'name' => $c['name']], $this->choosableCompanies()),
         ];
+    }
+
+    private function companiesOn(): bool
+    {
+        return $this->app->features()->enabled(CompanyService::FEATURE);
+    }
+
+    /**
+     * Kompanien, die sich im Formular wählen lassen: die aktiven, in der Reihenfolge der Liste; keine ohne den Bereich.
+     *
+     * @return list<array{id: int, name: string}>
+     */
+    private function choosableCompanies(): array
+    {
+        if (!$this->companiesOn()) {
+            return [];
+        }
+        $out = [];
+        foreach ($this->app->companies()->repository()->all() as $c) {
+            if ($c['active']) {
+                $out[] = ['id' => $c['id'], 'name' => $c['name']];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Gewählte Kompanien aus dem Formular prüfen (optional, nur aktive); ohne den Bereich gibt es keine.
+     *
+     * @return list<int>
+     */
+    private function chosenCompanies(mixed $in): array
+    {
+        if (!$this->companiesOn() || $in === null || $in === []) {
+            return [];
+        }
+        $ids = self::companyIdList($in);
+        $known = array_column($this->choosableCompanies(), 'id');
+        if (array_diff($ids, $known) !== []) {
+            throw ApiError::invalid('Bitte die Kompanie aus der Liste wählen.');
+        }
+        return $ids;
+    }
+
+    /** @return list<int> */
+    private static function companyIdList(mixed $in): array
+    {
+        if (!is_array($in) || !array_is_list($in)) {
+            throw ApiError::invalid('Bitte die Kompanien als Liste angeben.');
+        }
+        $ids = [];
+        foreach ($in as $v) {
+            $id = Input::integer($v);
+            if ($id === null || $id <= 0) {
+                throw ApiError::invalid('Bitte die Kompanien als Liste angeben.');
+            }
+            $ids[$id] = $id;
+        }
+        return array_values($ids);
+    }
+
+    /**
+     * Kompanien eines Antrags, die es noch gibt (in der Reihenfolge der Liste).
+     *
+     * @param array<string, mixed> $row
+     * @return list<array{id: int, name: string}>
+     */
+    private function companiesOfRow(array $row): array
+    {
+        $ids = array_map('intval', array_filter(explode(',', (string) ($row['company_ids'] ?? '')), static fn (string $v): bool => $v !== ''));
+        if ($ids === [] || !$this->companiesOn()) {
+            return [];
+        }
+        $out = [];
+        foreach ($this->app->companies()->repository()->all() as $c) {
+            if (in_array($c['id'], $ids, true)) {
+                $out[] = ['id' => $c['id'], 'name' => $c['name']];
+            }
+        }
+        return $out;
     }
 
     /**
      * Antrag annehmen. Mit Mailversand: Status unconfirmed und Mail mit dem Link zum Bestätigen; ohne: gleich pending.
      *
-     * @param array<string, mixed> $in first_name, last_name, email, username, password, message, consent, token, website
+     * @param array<string, mixed> $in first_name, last_name, email, username, password, message, company_ids, consent, token, website
      * @return array{status: string}
      */
     public function submit(?User $user, array $in, string $client): array
@@ -166,6 +253,7 @@ final class RegistrationService
         if (mb_strlen($message) > self::MESSAGE_MAX) {
             throw ApiError::invalid(sprintf('Die Nachricht darf höchstens %d Zeichen lang sein.', self::MESSAGE_MAX));
         }
+        $companyIds = $this->chosenCompanies($in['company_ids'] ?? null);
         if (($in['consent'] ?? null) !== true) {
             throw ApiError::invalid('Bitte bestätige, dass du die Datenschutzerklärung gelesen hast.');
         }
@@ -204,6 +292,7 @@ final class RegistrationService
             'login' => $login,
             'password_hash' => password_hash($password, PASSWORD_DEFAULT),
             'message' => $message !== '' ? $message : null,
+            'company_ids' => implode(',', $companyIds),
             'status' => $mail ? self::UNCONFIRMED : self::PENDING,
             'token_hash' => $mail ? hash('sha256', $token) : null,
             'reason' => null,
@@ -391,9 +480,10 @@ final class RegistrationService
 
     /**
      * Anträge, die auf Freigabe warten (älteste zuerst), mit der vorgeschlagenen Rolle, je Antrag passenden Mitgliedern
-     * ohne Zugang (matches) und allen Mitgliedern ohne Zugang zum Auswählen (no_access_members).
+     * ohne Zugang (matches) und allen Mitgliedern ohne Zugang zum Auswählen (no_access_members). Mit dem Bereich Kompanien
+     * je Antrag die gewählten Kompanien (companies) und alle Kompanien zum Ändern beim Freigeben (companies).
      *
-     * @return array{requests: list<array<string, mixed>>, default_role: string, email_confirmation: bool, no_access_members: list<array{id: int, name: string}>}
+     * @return array<string, mixed> requests, default_role, email_confirmation, no_access_members, companies (nur mit dem Bereich)
      */
     public function pending(): array
     {
@@ -420,11 +510,15 @@ final class RegistrationService
                 'email_confirmed' => $r['confirmed_at'] !== null,
                 'expires_at' => Time::utcToIso((string) $r['expires_at']),
                 'matches' => $members->noAccessMatches((string) $r['first_name'], (string) $r['last_name'], (string) $r['email']),
-            ], $rows),
+            ] + ($this->companiesOn() ? ['companies' => $this->companiesOfRow($r)] : []), $rows),
             'default_role' => $this->defaultRole(),
             'email_confirmation' => $this->withMail(),
             'no_access_members' => array_values(array_map(static fn (User $u): array => ['id' => $u->id, 'name' => $u->name], $members->noAccessMembers())),
-        ];
+        ] + ($this->companiesOn() ? ['companies' => array_map(static fn (array $c): array => [
+            'id' => $c['id'],
+            'name' => $c['name'],
+            'active' => $c['active'],
+        ], $this->app->companies()->repository()->all())] : []);
     }
 
     public function countPending(): int
@@ -447,17 +541,21 @@ final class RegistrationService
      * Gleiche Prüfungen wie beim Anlegen (MemberService::prepare: Rolle, die $actor vergeben darf, Benutzername und
      * E-Mail-Adresse frei); ein anderer Benutzername (username) geht, wenn der gewünschte inzwischen vergeben ist.
      * Mit user_id: statt ein Konto anzulegen den Antrag mit diesem Mitglied ohne Zugang verbinden (die Rolle bleibt).
+     * Mit dem Bereich Kompanien ordnet die Freigabe die Person den Kompanien aus dem Antrag zu (bei einem verbundenen
+     * Mitglied zusätzlich zu seinen); company_ids ändert die Wahl, nur mit manage_companies. Nur Mitglieder (Recht member)
+     * werden zugeordnet; companies in der Antwort sind die Kompanien der Person danach.
      *
-     * @param array<string, mixed> $in level, username, user_id
-     * @return array{member: array<string, mixed>, mailed: bool, linked: bool}
+     * @param array<string, mixed> $in level, username, user_id, company_ids
+     * @return array{member: array<string, mixed>, mailed: bool, linked: bool, companies?: list<array{id: int, name: string, short_name: string, active: bool}>}
      */
     public function approve(User $actor, int $id, array $in): array
     {
         $row = $this->pendingRow($id);
         $username = is_string($in['username'] ?? null) && trim($in['username']) !== '' ? trim($in['username']) : (string) $row['login'];
+        $companyIds = $this->approvedCompanies($actor, $row, $in);
         $linkTo = Input::integer($in['user_id'] ?? null);
         if ($linkTo !== null && $linkTo > 0) {
-            return $this->approveLinked($actor, $row, $linkTo, $username);
+            return $this->withCompanies($this->approveLinked($actor, $row, $linkTo, $username), $companyIds);
         }
         $level = is_string($in['level'] ?? null) && $in['level'] !== '' ? $in['level'] : $this->defaultRole();
         // Admin nie über eine Anfrage: Wer sich selbst meldet, ist noch niemandem bekannt.
@@ -484,7 +582,58 @@ final class RegistrationService
             $this->db()->insert('registration_requests', $row);
             throw $e;
         }
-        return ['member' => $member, 'mailed' => $this->mailApproved($prepared['email'], $prepared['name'], $prepared['first_name'], $prepared['login']), 'linked' => false];
+        return $this->withCompanies(['member' => $member, 'mailed' => $this->mailApproved($prepared['email'], $prepared['name'], $prepared['first_name'], $prepared['login']), 'linked' => false], $companyIds);
+    }
+
+    /**
+     * Kompanien, denen die Freigabe die Person zuordnet: die aus dem Antrag oder, mit manage_companies, company_ids (alle
+     * Kompanien der Liste, auch ehemalige). null: Bereich aus, nichts zuordnen.
+     *
+     * @param array<string, mixed> $row
+     * @param array<string, mixed> $in
+     * @return list<int>|null
+     */
+    private function approvedCompanies(User $actor, array $row, array $in): ?array
+    {
+        if (!$this->companiesOn()) {
+            return null;
+        }
+        $requested = array_column($this->companiesOfRow($row), 'id');
+        if (!array_key_exists('company_ids', $in)) {
+            return $requested;
+        }
+        $ids = self::companyIdList($in['company_ids'] ?? []);
+        $same = array_diff($ids, $requested) === [] && array_diff($requested, $ids) === [];
+        if (!$same && !$actor->can(Capability::ManageCompanies)) {
+            throw ApiError::forbidden('Die Kompanie ändern darf beim Freigeben nur, wer Kompanien verwalten darf.');
+        }
+        $known = array_column($this->app->companies()->repository()->all(), 'id');
+        if (array_diff($ids, $known) !== []) {
+            throw ApiError::invalid('Unbekannte Kompanie.');
+        }
+        return $ids;
+    }
+
+    /**
+     * Nach dem Anlegen bzw. Verbinden: Kompanien zuordnen (bestehende Zuordnungen bleiben), nur bei Mitgliedern.
+     *
+     * @param array{member: array<string, mixed>, mailed: bool, linked: bool} $result
+     * @param list<int>|null $companyIds
+     * @return array{member: array<string, mixed>, mailed: bool, linked: bool, companies?: list<array{id: int, name: string, short_name: string, active: bool}>}
+     */
+    private function withCompanies(array $result, ?array $companyIds): array
+    {
+        if ($companyIds === null) {
+            return $result;
+        }
+        $userId = (int) $result['member']['id'];
+        $companies = $this->app->companies();
+        $user = $this->app->users->find($userId);
+        if ($companyIds !== [] && $user !== null && $user->isMember()) {
+            $current = $companies->repository()->companyIdsOf($userId);
+            $companies->repository()->replaceOfUser($userId, array_values(array_unique([...$current, ...$companyIds])), $this->app->time()->nowUtc());
+        }
+        return $result + ['companies' => $companies->of($userId)];
     }
 
     /**
@@ -559,6 +708,7 @@ final class RegistrationService
                 'last_name' => '',
                 'email' => '',
                 'message' => null,
+                'company_ids' => '',
                 'token_hash' => null,
                 'reason' => $reason,
                 'expires_at' => gmdate('Y-m-d H:i:s', $this->app->time()->timestamp() + self::REJECTED_DAYS * 86400),

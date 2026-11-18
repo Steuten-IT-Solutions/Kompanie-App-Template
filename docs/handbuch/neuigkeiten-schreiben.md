@@ -4,7 +4,7 @@ reihenfolge: 38
 rechte: [manage_news]
 bereiche: [news]
 ---
-Hier schreibst du Beiträge für die {bereich.news} direkt in der App, aus Blöcken mit formatiertem Text, Bildern und vorgefertigten Blöcken wie einem **Countdown**, und änderst oder löschst sie später. Das geht nur, wenn ein {rolle.admin} als Quelle der {bereich.news} **In der App schreiben** gewählt hat (Einstellungen → Neuigkeiten).
+Hier schreibst du Beiträge für die {bereich.news} direkt in der App, aus Blöcken mit formatiertem Text, Bildern und vorgefertigten Blöcken wie einem **Countdown**, und änderst oder löschst sie später. Das geht, wenn ein {rolle.admin} als Quelle der {bereich.news} **In der App schreiben** gewählt hat (Einstellungen → Neuigkeiten). Läuft eure App als WordPress-Plugin mit der Quelle **Beiträge dieser WordPress-Seite**, schreibst du die Beiträge im Editor von WordPress; die App öffnet ihn für dich (siehe [Mit WordPress: Beiträge der Webseite schreiben](#mit-wordpress-beitrage-der-webseite-schreiben)).
 
 ## So öffnest du die Seite
 Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum Ändern öffnest du einen Beitrag; unter dem Text stehen **Bearbeiten** (Stift) und **Löschen** (Mülleimer).
@@ -51,13 +51,22 @@ Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum 
 1. Öffne den Beitrag und tippe auf **Löschen**.
 2. Bestätige die Rückfrage. Der Beitrag und seine Bilder sind dann endgültig weg.
 
+### Mit WordPress: Beiträge der Webseite schreiben
+Mit der Quelle **Beiträge dieser WordPress-Seite** stehen die {bereich.news} als Beiträge auf eurer Webseite. Du schreibst sie dann im Editor von WordPress, mit allem, was er kann (Blöcke, Bilder aus der Mediathek, Kategorien, Entwürfe, geplante Veröffentlichung).
+1. Tippe unter **{bereich.news}** auf **Neuer Beitrag**. Der Editor von WordPress öffnet sich in einem eigenen Fenster.
+2. Schreibe den Beitrag und tippe dort auf **Veröffentlichen**. Ein Entwurf oder ein geplanter Beitrag erscheint in der App erst, wenn er veröffentlicht ist.
+3. Wechsle zurück in die App. Sie lädt die Liste neu, der Beitrag steht oben.
+4. Zum Ändern öffnest du den Beitrag in der App und tippst unter dem Text auf **In WordPress bearbeiten** (Stift). Löschen kannst du ihn im Editor von WordPress (**In den Papierkorb verschieben**).
+
 ## Gut zu wissen
 - Wer die {bereich.news} mit Benachrichtigungen abonniert hat, bekommt bei einem neuen Beitrag eine Benachrichtigung, beim Ändern nicht.
 - Hat jemand den Beitrag gespeichert, während du ihn bearbeitet hast, meldet die App das beim Speichern. Lade den Beitrag dann neu und trage deine Änderungen noch einmal ein.
 - Bilder, die in keinem Block mehr stehen, löscht die App beim Speichern, ebenso ein ersetztes oder entferntes Titelbild.
 - Bei jedem Block wählst du **Für alle, die die Seite sehen** oder **Nur Mitglieder**. Blöcke nur für Mitglieder samt ihren Bildern fehlen ohne Anmeldung und für Gäste.
 - Wechselt ein {rolle.admin} die Quelle wieder auf eine Webseite oder einen Feed, verschwinden die Beiträge aus der App, bleiben aber gespeichert. Mit **In der App schreiben** sind sie wieder da.
-- Das Recht dazu heißt **{bereich.news} schreiben**. Mit der Quelle **In der App schreiben** legt die App die Rolle „{bereich.news} verwalten“ an; die vergibt ein {rolle.admin}.
+- Das Recht dazu heißt **{bereich.news} schreiben**. Mit der Quelle **In der App schreiben** und mit WordPress auch mit **Beiträge dieser WordPress-Seite** legt die App die Rolle „{bereich.news} verwalten“ an; die vergibt ein {rolle.admin}.
+- Mit WordPress gibt dir das Recht im Editor von WordPress die Rechte für alle Beiträge: schreiben, ändern, veröffentlichen, löschen und Bilder in die Mediathek hochladen. Seiten der Webseite, neue Kategorien und die übrigen Einstellungen von WordPress gehören nicht dazu.
+- Bist du im Fenster des Editors nicht angemeldet (das kann bei einer auf dem iPhone installierten App vorkommen), melde dich dort mit deinem Konto an.
 
 ## Siehe auch
 - [{bereich.news}](seite:neuigkeiten)
