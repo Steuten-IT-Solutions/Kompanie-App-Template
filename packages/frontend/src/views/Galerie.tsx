@@ -20,7 +20,7 @@ import { useSwipeDrag } from '../swipe';
 import { prefetchAlbumOnTap, sources } from '../viewData';
 import { confirmAsk, promptAsk } from '../ask';
 import { dataUpdated } from '../dataCache';
-import { IconButton } from '../icons';
+import { Icon, IconButton } from '../icons';
 import {
   AlbumEditSheet,
   MoveSheet,
@@ -478,17 +478,21 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
   // Album (vorgewählt), wie oben in der Übersicht nur mit Haken „Einreichen erlauben“; Bearbeiten nur für Alben der App.
   const submit = can('submit_gallery') && gallerySubmissionsOpen();
   const edit = manage && albumEditable(album);
-  const tools = (submit || edit) && !selecting && (
-    <div className="button-row gallery-actions">
-      {submit && (
-        <IconButton
-          icon="submit"
-          label="Bilder und Videos in dieses Album einreichen"
-          onClick={() => navigate(`galerie/einreichen/${album.id}`)}
-        />
-      )}
-      {edit && <IconButton icon="edit" label="Album bearbeiten" onClick={() => setSheet({ kind: 'edit' })} />}
-    </div>
+  const tools = (
+    <AlbumActions
+      album={album}
+      hidden={selecting}
+      submit={
+        submit && (
+          <IconButton
+            icon="submit"
+            label="Bilder und Videos in dieses Album einreichen"
+            onClick={() => navigate(`galerie/einreichen/${album.id}`)}
+          />
+        )
+      }
+      edit={edit && <IconButton icon="edit" label="Album bearbeiten" onClick={() => setSheet({ kind: 'edit' })} />}
+    />
   );
   const selectBar = selecting && (
     <div className="gallery-select-bar" role="toolbar" aria-label="Gewählte Bilder und Videos">
@@ -532,7 +536,9 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
       <button className="btn btn-link back" onClick={() => navigate('galerie')}>
         ‹ Alle Alben
       </button>
-      <AlbumHeading album={album} />
+      <h2 className="member-name">
+        {album.title} <span className="muted album-year">{album.year}</span>
+      </h2>
       {tools}
       {selectBar}
       <ul className={selecting ? 'photo-grid selecting' : 'photo-grid'}>
@@ -647,29 +653,21 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
 }
 
 /**
- * Das ganze Album als ZIP (nur mit „Knöpfe zum Herunterladen zeigen“ in Einstellungen → Galerie). Die Bilder lädt der
- * Browser einzeln und packt sie selbst (galleryDownload.ts), Videos eingeschlossen.
+ * Knöpfe über den Bildern eines Albums: Einreichen, daneben das ganze Album als ZIP (nur mit „Knöpfe zum Herunterladen
+ * zeigen“ in Einstellungen → Galerie), dann Bearbeiten. Die Bilder lädt der Browser einzeln und packt sie selbst
+ * (galleryDownload.ts), Videos eingeschlossen. Beim Auswählen sind die Knöpfe verborgen; ein laufendes Herunterladen
+ * geht dabei weiter und zeigt seinen Stand.
  */
-/** Titel des Albums, rechts daneben der Knopf zum Herunterladen als ZIP (wenn erlaubt). */
-function AlbumHeading({ album }: { album: GalleryAlbum }) {
-  const heading = (
-    <h2 className="member-name">
-      {album.title} <span className="muted album-year">{album.year}</span>
-    </h2>
-  );
-  return album.downloads ? <AlbumDownload album={album} heading={heading} /> : heading;
-}
-
-function AlbumDownload({ album, heading }: { album: GalleryAlbum; heading: ReactNode }) {
+function AlbumActions({ album, hidden, submit, edit }: { album: GalleryAlbum; hidden: boolean; submit: ReactNode; edit: ReactNode }) {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
-  const list = downloadablePhotos(album.photos);
+  const list = album.downloads ? downloadablePhotos(album.photos) : [];
   const count = list.length;
   const videos = list.filter(isVideo).length;
-  if (count === 0) return heading;
+  if (!submit && !edit && count === 0) return null;
   const label = `Album herunterladen (${mediaCount(count, videos)}, ZIP)`;
   const files = (n: number) => `${n} ${n === 1 ? 'Datei' : 'Dateien'}`;
 
@@ -695,12 +693,24 @@ function AlbumDownload({ album, heading }: { album: GalleryAlbum; heading: React
 
   return (
     <div className="album-download">
-      <div className="album-head">
-        {heading}
-        <button type="button" className="album-download-btn" onClick={start} disabled={progress !== null} aria-label={label} title={label}>
-          {progress ? <span className="img-loading album-download-busy" aria-hidden="true" /> : <DownloadIcon />}
-        </button>
-      </div>
+      {!hidden && (
+        <div className="button-row gallery-actions">
+          {submit}
+          {count > 0 && (
+            <button
+              type="button"
+              className="icon-btn icon-btn-secondary album-download-btn"
+              onClick={start}
+              disabled={progress !== null}
+              aria-label={label}
+              title={label}
+            >
+              {progress ? <span className="img-loading album-download-busy" aria-hidden="true" /> : <Icon name="download" />}
+            </button>
+          )}
+          {edit}
+        </div>
+      )}
       {progress && (
         <div className="album-download-progress">
           <p className="small" role="status">
@@ -711,7 +721,6 @@ function AlbumDownload({ album, heading }: { album: GalleryAlbum; heading: React
           </button>
         </div>
       )}
-      {videos > 0 && !progress && !result && <p className="muted small">Mit Videos kann das ZIP groß werden; am besten im WLAN laden.</p>}
       {result && (
         <p className="small" role="status">
           {result}

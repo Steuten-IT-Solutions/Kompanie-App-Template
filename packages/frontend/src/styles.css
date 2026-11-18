@@ -6848,38 +6848,12 @@ section.settings-section > .gallery-upload-list:last-child {
 .gallery-actions {
   margin-bottom: 12px;
 }
-.album-download {
-  margin-bottom: 12px;
-}
-/* Albumtitel mit rundem Knopf zum Herunterladen rechts daneben (wie in der Großansicht) */
-.album-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-.album-head .member-name {
-  min-width: 0;
-}
+/* Knopf „Album herunterladen“ in der Reihe neben Einreichen: beim Laden dreht sich darin ein Ring, nicht abgeblendet */
 .album-download-btn {
   position: relative;
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  margin-top: 2px;
-  border-radius: 999px;
-  border: 1.5px solid var(--line-strong);
-  background: transparent;
-  color: var(--accent-text);
-  cursor: pointer;
 }
-.album-download-btn:hover {
-  background: color-mix(in srgb, var(--accent-text) 10%, transparent);
-}
-.album-download-btn:disabled {
-  cursor: default;
+.icon-btn.album-download-btn:disabled {
+  opacity: 1;
 }
 .album-download-btn .album-download-busy {
   width: 22px;

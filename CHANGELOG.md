@@ -191,6 +191,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Album herunterladen neben Einreichen**: In einem Album der [Galerie](app:galerie) steht der Knopf zum Herunterladen
+  als ZIP jetzt in der Reihe der Knöpfe direkt neben _Bilder und Videos in dieses Album einreichen_ statt rechts neben
+  dem Titel. Der Hinweis „Mit Videos kann das ZIP groß werden; am besten im WLAN laden.“ entfällt.
 - **Navigation nur mit verfügbaren Punkten**: Unter [Einstellungen → Navigation](app:einstellungen/navigation) stehen
   nur noch Bereiche zur Auswahl, die eingeschaltet sind. In der Leiste _Für Gäste_ stehen außerdem nur Bereiche und
   eigene Seiten, die Gäste sehen dürfen (Rechte der Rolle Gast, bei eigenen Seiten deren Zielgruppe). Darunter steht,

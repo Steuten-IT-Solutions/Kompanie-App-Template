@@ -2018,10 +2018,19 @@ test('Galerie: Knöpfe zum Herunterladen für ein Bild und das Album als ZIP, nu
 
     await page.goto(`/app/#/galerie/${albumId}`);
     const zipButton = page.getByRole('button', { name: 'Album herunterladen (1 Bild, ZIP)' });
-    // Runder Icon-Knopf neben dem Titel wie in der Großansicht: Anzahl nur im Namen und Tooltip, nicht als Text
+    // Runder Icon-Knopf in der Reihe direkt neben Einreichen: Anzahl nur im Namen und Tooltip, nicht als Text
     await expect(zipButton).toHaveText('');
     await expect(zipButton).toHaveAttribute('title', 'Album herunterladen (1 Bild, ZIP)');
-    await expect(page.locator('.album-head h2 + .album-download-btn svg')).toBeVisible();
+    await expect(page.locator('.gallery-actions .album-download-btn svg')).toBeVisible();
+    const row = page.locator('.gallery-actions > button');
+    const names = await row.evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')));
+    const at = names.indexOf('Album herunterladen (1 Bild, ZIP)');
+    // Reihenfolge: Einreichen (nur mit Haken „Einreichen erlauben“), Herunterladen, Album bearbeiten
+    expect(names.slice(0, at)).toEqual(
+      names.includes('Bilder und Videos in dieses Album einreichen') ? ['Bilder und Videos in dieses Album einreichen'] : [],
+    );
+    expect(names[at + 1]).toBe('Album bearbeiten');
+    await expect(page.getByText(/WLAN/)).toHaveCount(0);
     const [zip] = await Promise.all([page.waitForEvent('download'), zipButton.click()]);
     expect(zip.suggestedFilename()).toBe(`${title} 2026.zip`);
     const bytes = readFileSync((await zip.path())!);
