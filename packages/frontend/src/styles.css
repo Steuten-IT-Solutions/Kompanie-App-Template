@@ -6963,9 +6963,18 @@ section.settings-section > .gallery-upload-list:last-child {
   margin: 4px 0 12px;
   text-align: center;
 }
-.registration-request .registration-message {
+.registration-card .registration-message {
   white-space: pre-line;
-  margin: 8px 0;
+}
+.registration-card-actions {
+  justify-content: center;
+}
+.registration-footnote {
+  margin-top: 14px;
+}
+/* Tag der Anfrage mittig unter dem Namen */
+.registration-date {
+  text-align: center;
 }
 .registration-result {
   margin: 0;
@@ -7639,12 +7648,12 @@ fieldset.block-source legend {
   color: var(--muted);
 }
 
-/* Karte eines Passiven (Verwaltung → Passive bzw. Meins → Meine Passiven): Beiträge und Angaben als eigene Karten */
-.passive-card .card {
+/* Karte zum Blättern (browseCard.tsx: Passive, Anfragen auf einen Zugang): Abschnitte als eigene Karten */
+.browse-card .card {
   margin-top: var(--space-3);
   padding: 14px 16px;
 }
-.passive-card h3 {
+.browse-card h3 {
   margin: 0 0 8px;
 }
 .passive-payment-years {
@@ -7659,8 +7668,9 @@ fieldset.block-source legend {
   margin-top: var(--space-3);
   align-items: end;
 }
-/* Aufgeklappter Filter der Passiven: Abstand zur Liste darunter (wie die Suche darüber) */
-.passive-filters {
+/* Aufgeklappter Filter der Passiven und der Anfragen: Abstand zur Liste darunter (wie die Suche darüber) */
+.passive-filters,
+.registration-filters {
   margin-bottom: 14px;
 }
 .passive-card-actions {

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { api, can, type PassiveBirthday, type PassiveInput, type PassiveList, type PassiveMember, type PassivePayment } from '../api';
 import { addressInput, EMPTY_ADDRESS, formatAddress, mapLinkTarget, mapPlatform, mapUrl, type Address } from '../address';
 import { normalizeEmail } from '../email';
@@ -9,9 +9,9 @@ import { AddressFields, EmailField, Empty, ErrorBox, Loading, PhoneField, useAsy
 import { IconButton } from '../icons';
 import { confirmAsk } from '../ask';
 import { parseAges } from '../passiveAges';
-import { navigate, redirect as redirectTo } from '../router';
+import { navigate } from '../router';
 import { joinedBy, joinYear } from '../passiveDue';
-import { neighbors, useSwipeDrag } from '../swipe';
+import { BrowseCard, BrowseList } from '../browseCard';
 
 const NAME_MAX = 100;
 /** Höchstlängen von Eintritt und Bemerkung (wie auf dem Server) */
@@ -604,9 +604,6 @@ function PassiveForm({
 /** Liste, aus der ein Passiver geöffnet wurde: Verwaltung → Passive oder Meins → Meine Passiven. */
 type PassiveBase = 'verwaltung/passive' | 'meins/passive';
 
-/** Reihenfolge der Liste beim Öffnen (gefiltert und sortiert): Auf der Karte blättert man darin weiter. */
-let browse: { base: PassiveBase; ids: number[] } | null = null;
-
 /** Suche und Filter der Liste in der Verwaltung, gemerkt bis zum Neuladen (zurück von der Karte steht die Liste wie zuvor). */
 let listState: { query: string; year: number | null; show: 'all' | 'open' | 'paid'; filtersOpen: boolean } = {
   query: '',
@@ -617,25 +614,17 @@ let listState: { query: string; year: number | null; show: 'all' | 'open' | 'pai
 
 /** Liste nur mit Namen; Antippen öffnet die Karte mit allen Angaben (wie bei den Mitgliedern). */
 function NameList({ base, passives }: { base: PassiveBase; passives: PassiveMember[] }) {
-  function open(id: number) {
-    browse = { base, ids: passives.map((p) => p.id) };
-    navigate(`${base}/${id}`);
-  }
   return (
-    <ul className="card-list passive-list">
-      {passives.map((p) => (
-        <li key={p.id} className="card row clickable member-row" onClick={() => open(p.id)}>
-          <div className="row-main">
-            <div className="row-title">
-              {p.last_name}, {p.first_name}
-            </div>
-          </div>
-          <span className="chevron" aria-hidden="true">
-            ›
-          </span>
-        </li>
-      ))}
-    </ul>
+    <BrowseList
+      base={base}
+      items={passives}
+      className="passive-list"
+      title={(p) => (
+        <>
+          {p.last_name}, {p.first_name}
+        </>
+      )}
+    />
   );
 }
 
@@ -756,50 +745,18 @@ function PassiveCard({
   caretaker: boolean;
   render: (p: PassiveMember) => ReactNode;
 }) {
-  const known = passives.map((p) => p.id);
-  const order = browse && browse.base === base && browse.ids.includes(id) ? browse.ids.filter((x) => known.includes(x)) : known;
-  const { prev, next, index } = neighbors(order, id, true);
-  const show = (other: number | null) => other !== null && redirectTo(`${base}/${other}`);
-  const root = useRef<HTMLDivElement>(null);
-  const track = useRef<HTMLDivElement>(null);
-  const swipe = useSwipeDrag(root, track, {
-    canPrev: prev !== null,
-    canNext: next !== null,
-    onCommit: (step) => show(step === 1 ? next : prev),
-  });
-  const p = passives.find((x) => x.id === id);
-  const back = base === 'meins/passive' ? '‹ Meine Passiven' : '‹ Alle Passiven';
-  const nav = (position: number, live: boolean) => (
-    <div className="member-nav">
-      <button type="button" className="btn btn-link back" onClick={live ? () => navigate(base) : undefined}>
-        {back}
-      </button>
-      {order.length > 1 && (
-        <span className="member-step">
-          <button
-            type="button"
-            className="btn btn-link"
-            onClick={live ? () => swipe.slide(-1) : undefined}
-            aria-label="Vorheriger Passiver"
-          >
-            ‹
-          </button>
-          <span className="muted small">
-            {position} / {order.length}
-          </span>
-          <button type="button" className="btn btn-link" onClick={live ? () => swipe.slide(1) : undefined} aria-label="Nächster Passiver">
-            ›
-          </button>
-        </span>
-      )}
-    </div>
-  );
-  const peek = (other: number | null, side: 'prev' | 'next') => {
-    const o = passives.find((x) => x.id === other);
-    if (!o) return null;
-    return (
-      <div className={`member-peek member-peek-${side}`} aria-hidden="true" ref={(el) => el?.setAttribute('inert', '')}>
-        {nav(order.indexOf(o.id) + 1, false)}
+  return (
+    <BrowseCard
+      base={base}
+      id={id}
+      items={passives}
+      className="passive-card"
+      back={base === 'meins/passive' ? '‹ Meine Passiven' : '‹ Alle Passiven'}
+      prevLabel="Vorheriger Passiver"
+      nextLabel="Nächster Passiver"
+      missing="Diesen Passiven gibt es nicht mehr."
+      render={render}
+      peek={(o) => (
         <CardBody
           p={o}
           caretaker={caretaker}
@@ -812,25 +769,8 @@ function PassiveCard({
             </section>
           }
         />
-      </div>
-    );
-  };
-  if (!p)
-    return (
-      <div>
-        {nav(0, true)}
-        <Empty>Diesen Passiven gibt es nicht mehr.</Empty>
-      </div>
-    );
-  return (
-    <div className="member-detail passive-card" ref={root}>
-      <div className={`member-track${swipe.peeking ? ' peeking' : ''}`} ref={track}>
-        {swipe.peeking && peek(prev, 'prev')}
-        {swipe.peeking && peek(next, 'next')}
-        {nav(index + 1, true)}
-        {render(p)}
-      </div>
-    </div>
+      )}
+    />
   );
 }
 

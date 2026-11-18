@@ -7383,3 +7383,75 @@ test('Passive: Liste aus einer Tabelle importieren, mit Kopfzeile unter dem Tite
   await page.locator('.passive-list .card', { hasText: `${id}, Otto` }).click();
   await expect(page.locator('.passive-card')).toContainText('vor 2014');
 });
+
+test('Anfragen auf einen Zugang: Liste nur mit Namen, Karte je Anfrage zum Blättern, nach dem Freigeben zurück', async ({ page }) => {
+  // Anfragen stellt das Formular nur mit Zeitsperre; hier kommen sie vom Testserver-Ersatz (die API prüfen die HTTP-Tests).
+  const request = (id: number, first: string, last: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    name: `${first} ${last}`,
+    first_name: first,
+    last_name: last,
+    email: `${first.toLowerCase()}@example.org`,
+    username: first.toLowerCase(),
+    username_taken: false,
+    email_taken: false,
+    message: '',
+    created_at: '2026-11-10 08:00:00',
+    email_confirmed: false,
+    expires_at: '2026-12-10 08:00:00',
+    matches: [],
+    ...extra,
+  });
+  let requests = [request(9101, 'Zora', 'Zander'), request(9102, 'Anna', 'Ahrens', { message: 'Ich bin neu dabei.' })];
+  const approved: number[] = [];
+  await page.addInitScript(() => {
+    // „Zugang beantragen“ an, ohne die Einstellung der Testinstallation zu ändern
+    let value: unknown;
+    Object.defineProperty(window, 'KOMPANIE_CONFIG', {
+      configurable: true,
+      get: () => value,
+      set: (v: Record<string, unknown> | undefined) => {
+        value = v && { ...v, registration: true };
+      },
+    });
+  });
+  // Über den Kontext: Der Service Worker stellt Anfragen selbst, die sieht page.route nicht.
+  await page.context().route('**/registrations', async (route) => {
+    if (route.request().method() !== 'GET') return route.continue();
+    await route.fulfill({ json: { requests, default_role: 'member', email_confirmation: false, no_access_members: [] } });
+  });
+  await page.context().route('**/registrations/*/approve', async (route) => {
+    const id = Number(/registrations\/(\d+)\/approve/.exec(route.request().url())![1]);
+    const r = requests.find((x) => x.id === id)!;
+    approved.push(id);
+    requests = requests.filter((x) => x.id !== id);
+    await route.fulfill({ json: { member: { id: 1, name: r.name }, linked: false, mailed: false } });
+  });
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await adminMenu(page, 'Anfragen');
+  await expect(page.locator('.member-counts')).toHaveText('2 offene Anfragen');
+  // Nur die Namen, nach Nachnamen sortiert; Nachricht und Formular erst auf der Karte
+  const rows = page.locator('.registration-list .card .row-title');
+  await expect(rows).toHaveText(['Ahrens, Anna', 'Zander, Zora']);
+  await expect(page.getByText('Ich bin neu dabei.')).toHaveCount(0);
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/anfragen-liste.png`, fullPage: true });
+  await page.getByLabel('Anfragen suchen').fill('zora');
+  await expect(rows).toHaveText(['Zander, Zora']);
+  await page.getByLabel('Anfragen suchen').fill('');
+  await rows.filter({ hasText: 'Ahrens, Anna' }).click();
+  const card = page.locator('.registration-card');
+  await expect(card.getByRole('heading', { name: 'Anna Ahrens' })).toBeVisible();
+  await expect(card.locator('.registration-details')).toContainText('Ich bin neu dabei.');
+  await expect(card.locator('.registration-details')).toContainText('anna@example.org');
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/anfrage-karte.png`, fullPage: true });
+  // Blättern zur nächsten Anfrage der Liste
+  await card.getByRole('button', { name: 'Nächste Anfrage' }).click();
+  await expect(card.getByRole('heading', { name: 'Zora Zander' })).toBeVisible();
+  await expect(card).toContainText('2 / 2');
+  await card.getByRole('button', { name: 'Freigeben', exact: true }).click();
+  await expect(page.locator('.toast')).toContainText('Zora Zander ist freigegeben');
+  expect(approved).toEqual([9101]);
+  // Zurück in der Liste, ohne die freigegebene Anfrage
+  await expect(page.locator('.member-counts')).toHaveText('1 offene Anfrage');
+  await expect(rows).toHaveText(['Ahrens, Anna']);
+});

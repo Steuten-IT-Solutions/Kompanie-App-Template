@@ -202,7 +202,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   selbst. Vorgemerkte Zu- und Absagen kommen auch an, wenn der Termin aus iCal inzwischen verschoben wurde. Lehnt der
   Server eine vorgemerkte Änderung ab (z. B. Anmeldeschluss vorbei), steht oben in der App „Nicht übertragen“ mit dem
   Grund, bis die Person den Hinweis wegtippt; bisher verschwand sie nach einer kurzen Meldung.
-
+- **Anfragen auf einen Zugang übersichtlicher**: Unter [Verwaltung → Anfragen](app:verwaltung/anfragen) steht jetzt wie
+  bei den Passiven nur eine Liste mit Namen, mit Suche und (mit dem Bereich Kompanien) Filter nach der gewählten Kompanie.
+  Antippen öffnet die Karte der Anfrage mit allen Angaben, Verbinden, Kompanie, Benutzername, Rolle, Freigeben und
+  Ablehnen; dort blätterst du (auch per Wischen) zur nächsten Anfrage. Nach dem Freigeben oder Ablehnen geht es zurück
+  zur Liste.
 - **Album herunterladen neben Einreichen**: In einem Album der [Galerie](app:galerie) steht der Knopf zum Herunterladen
   als ZIP jetzt in der Reihe der Knöpfe direkt neben _Bilder und Videos in dieses Album einreichen_ statt rechts neben
   dem Titel. Der Hinweis „Mit Videos kann das ZIP groß werden; am besten im WLAN laden.“ entfällt.
