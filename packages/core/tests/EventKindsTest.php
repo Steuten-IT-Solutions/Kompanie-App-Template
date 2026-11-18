@@ -128,7 +128,7 @@ final class EventKindsTest extends TestCase
         $this->assertSame(403, $this->call('PUT', "/calendar/$id/kind", ['kind' => 'Versammlung'], $this->anna)->status);
         $this->assertSame(400, $this->call('PUT', "/calendar/$id/kind", ['kind' => 'Feier'])->status);
         $this->assertSame(404, $this->call('PUT', '/calendar/igibtsnicht/kind', ['kind' => 'Versammlung'])->status);
-        $this->assertSame(['id' => $id, 'kind' => 'Arbeitsdienst'], $this->ok('PUT', "/calendar/$id/kind", ['kind' => 'Arbeitsdienst']));
+        $this->assertSame(['id' => $id, 'kind' => 'Arbeitsdienst', 'kinds' => ['Arbeitsdienst']], $this->ok('PUT', "/calendar/$id/kind", ['kind' => 'Arbeitsdienst']));
         $this->assertSame('Arbeitsdienst', $this->event($id, $this->anna)['kind']);
         $this->assertArrayNotHasKey('kind_suggestion', $this->event($id));
 
@@ -171,6 +171,71 @@ final class EventKindsTest extends TestCase
         $this->assertNull($this->ok('PUT', '/attendance', ['source' => 'free', 'title' => 'Treffen', 'date' => '2026-11-12'])['kind']);
         $id = $this->appEvent('Versammlung', '2026-11-13');
         $this->assertSame('Versammlung', $this->ok('PUT', '/attendance', ['source' => 'calendar', 'event_key' => $id])['kind'], 'ohne Art am Termin: Vorschlag');
+    }
+
+    public function testSuggestionsListEveryMatchingKind(): void
+    {
+        $this->ok('PUT', '/admin/event-kinds', ['kinds' => ['Arbeitsdienst', 'Versammlung', 'Außerordentliche Versammlung']]);
+        $kinds = $this->app->eventKinds();
+        $this->assertSame(['Arbeitsdienst', 'Versammlung'], $kinds->suggestAll('Versammlung mit Arbeitsdienst'));
+        $this->assertSame(['Außerordentliche Versammlung'], $kinds->suggestAll('Außerordentliche Versammlung'), 'Teil einer längeren Art fällt weg');
+        $this->assertSame([], $kinds->suggestAll('Feier'));
+
+        $id = $this->appEvent('Versammlung und Arbeitsdienst');
+        $e = $this->event($id);
+        $this->assertSame([], $e['kinds']);
+        $this->assertSame(['Arbeitsdienst', 'Versammlung'], $e['kind_suggestions']);
+        $this->assertSame('Arbeitsdienst', $e['kind_suggestion'], 'ältere Oberflächen: der längste Vorschlag');
+        $list = $this->ok('PUT', '/attendance', ['source' => 'free', 'title' => 'Versammlung, danach Arbeitsdienst', 'date' => '2026-11-10']);
+        $this->assertSame(['Arbeitsdienst', 'Versammlung'], $list['kinds']);
+    }
+
+    public function testEventAndListCanHaveSeveralKinds(): void
+    {
+        $this->ok('PUT', '/admin/event-kinds', ['kinds' => ['Versammlung', 'Arbeitsdienst', 'Schießen']]);
+        $id = $this->appEvent('Treffen', '2026-11-12');
+        // Reihenfolge wie in den Einstellungen, doppelte fallen weg
+        $this->assertSame(
+            ['id' => $id, 'kind' => 'Versammlung', 'kinds' => ['Versammlung', 'Arbeitsdienst']],
+            $this->ok('PUT', "/calendar/$id/kind", ['kinds' => ['Arbeitsdienst', 'Versammlung', 'Arbeitsdienst']]),
+        );
+        $this->assertSame(400, $this->call('PUT', "/calendar/$id/kind", ['kinds' => ['Versammlung', 'Feier']])->status);
+        $this->assertSame(['Versammlung', 'Arbeitsdienst'], $this->ok('GET', '/attendance/events')[0]['kinds'], 'Fehler ändern nichts');
+
+        $list = $this->ok('PUT', '/attendance', ['source' => 'calendar', 'event_key' => $id]);
+        $this->assertSame(['Versammlung', 'Arbeitsdienst'], $list['kinds']);
+        $this->assertSame('Versammlung', $list['kind'], 'ältere Oberflächen: die erste');
+        $this->assertSame(['Versammlung', 'Arbeitsdienst'], $this->ok('GET', '/attendance')[0]['kinds']);
+
+        // Termin ändern: Liste folgt; an der Liste ändern: nur die Liste
+        $this->ok('PUT', "/calendar/$id/kind", ['kinds' => ['Schießen', 'Arbeitsdienst']]);
+        $this->assertSame(['Arbeitsdienst', 'Schießen'], $this->ok('GET', '/attendance/' . $list['id'])['kinds']);
+        $this->assertSame(['Versammlung'], $this->ok('PUT', '/attendance', ['id' => $list['id'], 'kinds' => ['Versammlung']])['kinds']);
+        $this->assertSame([], $this->ok('PUT', '/attendance', ['id' => $list['id'], 'kinds' => []])['kinds']);
+
+        // Eine entfernte Art bleibt neben einer neuen erhalten
+        $this->ok('PUT', "/calendar/$id/kind", ['kinds' => ['Schießen', 'Versammlung']]);
+        $this->ok('PUT', '/admin/event-kinds', ['kinds' => ['Versammlung', 'Arbeitsdienst']]);
+        $this->assertSame(['Versammlung', 'Arbeitsdienst', 'Schießen'], $this->ok('PUT', "/calendar/$id/kind", ['kinds' => ['Schießen', 'Versammlung', 'Arbeitsdienst']])['kinds']);
+        $this->assertSame([], $this->ok('PUT', "/calendar/$id/kind", ['kinds' => []])['kinds']);
+    }
+
+    public function testRowsOfOlderVersionsAndAfterRollbackReadTheFirstKind(): void
+    {
+        $this->ok('PUT', '/admin/event-kinds', ['kinds' => ['Versammlung', 'Arbeitsdienst']]);
+        $id = $this->appEvent('Treffen', '2026-11-12');
+        $list = $this->ok('PUT', '/attendance', ['source' => 'free', 'title' => 'Treffen', 'date' => '2026-11-10', 'kinds' => ['Versammlung', 'Arbeitsdienst']]);
+        $row = $this->app->db->selectOne('SELECT kind, kinds FROM {attendance_lists} WHERE id = ?', [$list['id']]);
+        $this->assertSame(['kind' => 'Versammlung', 'kinds' => "Versammlung\nArbeitsdienst"], ['kind' => (string) $row['kind'], 'kinds' => (string) $row['kinds']]);
+        // Ältere Version hat nur kind geändert: kinds passt nicht mehr dazu
+        $this->app->db->update('attendance_lists', ['kind' => 'Arbeitsdienst'], ['id' => $list['id']]);
+        $this->assertSame(['Arbeitsdienst'], $this->ok('GET', '/attendance/' . $list['id'])['kinds']);
+        $this->app->db->update('attendance_lists', ['kind' => ''], ['id' => $list['id']]);
+        $this->assertSame([], $this->ok('GET', '/attendance/' . $list['id'])['kinds']);
+        // Zeile von vor den mehreren Arten (kinds leer)
+        $this->ok('PUT', "/calendar/$id/kind", ['kinds' => ['Arbeitsdienst']]);
+        $this->app->db->execute("UPDATE {event_kinds} SET kinds = ''");
+        $this->assertSame(['Arbeitsdienst'], $this->ok('GET', '/attendance/events')[0]['kinds']);
     }
 
     public function testStoredInBackup(): void

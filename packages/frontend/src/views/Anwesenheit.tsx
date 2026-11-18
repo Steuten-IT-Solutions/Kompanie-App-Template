@@ -14,6 +14,7 @@ import {
   type AttendanceStatus,
   type ResponseStatus,
 } from '../api';
+import { EventKindChecks, kindsOf } from '../eventKindChecks';
 import { formatDate, formatEventWhen, todayYmd } from '../format';
 import brand from '../generated/brand';
 import { navigate } from '../router';
@@ -173,7 +174,7 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
                 </div>
                 <div className="row-sub">
                   {formatDate(l.date)}
-                  {l.kind && ` · ${l.kind}`} · {countsText(l.counts)}
+                  {kindsOf(l).length > 0 && ` · ${kindsOf(l).join(', ')}`} · {countsText(l.counts)}
                 </div>
               </div>
               <span className="chevron" aria-hidden="true">
@@ -224,7 +225,7 @@ function EventList({
               </div>
               <div className="row-sub">
                 {formatEventWhen(ev)}
-                {ev.kind && ` · ${ev.kind}`}
+                {kindsOf(ev).length > 0 && ` · ${kindsOf(ev).join(', ')}`}
               </div>
             </div>
             <span className="chevron" aria-hidden="true">
@@ -265,8 +266,8 @@ function ListView({ id, onToast }: { id: number; onToast: (msg: string) => void 
       list={applyPending(data!, pending)}
       pending={pending}
       onSaved={setData}
-      // Nur die Art übernehmen: Ein neuer Stand würde die noch nicht gespeicherten Häkchen verwerfen.
-      onKind={(kind) => setData({ ...data!, kind })}
+      // Nur die Arten übernehmen: Ein neuer Stand würde die noch nicht gespeicherten Häkchen verwerfen.
+      onKinds={(kinds) => setData({ ...data!, kind: kinds[0] ?? null, kinds })}
       onToast={onToast}
     />
   );
@@ -312,14 +313,14 @@ function Editor({
   list,
   pending,
   onSaved,
-  onKind,
+  onKinds,
   onToast,
 }: {
   list: AttendanceDetail;
   /** Offline gespeicherte, noch nicht übertragene Änderungen (in `list` schon eingerechnet) */
   pending: PendingSave | null;
   onSaved: (l: AttendanceDetail) => void;
-  onKind: (kind: string | null) => void;
+  onKinds: (kinds: string[]) => void;
   onToast: (msg: string) => void;
 }) {
   const initial = useMemo(() => Object.fromEntries(list.people.map((p) => [p.id, p.status])), [list]);
@@ -458,7 +459,7 @@ function Editor({
           <p className="muted small">{formatDate(list.date)}</p>
         </>
       )}
-      <KindSelect list={list} onKind={onKind} onToast={onToast} />
+      <KindSelect list={list} onKinds={onKinds} onToast={onToast} />
       <p className="attendance-counts" role="status">
         {countsText(counts, open)}
       </p>
@@ -598,46 +599,36 @@ function Editor({
   );
 }
 
-/** Terminart der Liste (z. B. Versammlung); speichert sofort, unabhängig von den Häkchen. */
+/** Terminarten der Liste (z. B. Versammlung, auch mehrere); speichert sofort, unabhängig von den Häkchen der Personen. */
 function KindSelect({
   list,
-  onKind,
+  onKinds,
   onToast,
 }: {
   list: AttendanceDetail;
-  onKind: (kind: string | null) => void;
+  onKinds: (kinds: string[]) => void;
   onToast: (msg: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
-  const kinds = eventKinds();
-  const current = list.kind ?? null;
-  if (list.kind === undefined || (kinds.length === 0 && !current)) return null;
-  const options = current && !kinds.includes(current) ? [...kinds, current] : kinds;
+  // Während des Speicherns schon die neue Auswahl zeigen
+  const [draft, setDraft] = useState<string[] | null>(null);
+  const current = kindsOf(list);
+  if (list.kind === undefined || (eventKinds().length === 0 && current.length === 0)) return null;
 
-  async function choose(kind: string) {
+  async function choose(kinds: string[]) {
     setBusy(true);
+    setDraft(kinds);
     try {
-      const saved = await api.saveAttendance({ id: list.id, kind });
-      onKind(saved.kind ?? null);
-      onToast('Terminart gespeichert');
+      const saved = await api.saveAttendance({ id: list.id, kinds });
+      onKinds(kindsOf(saved));
+      onToast('Terminarten gespeichert');
     } catch (e) {
       onToast((e as Error).message);
     } finally {
+      setDraft(null);
       setBusy(false);
     }
   }
 
-  return (
-    <label className="field attendance-kind">
-      <span>Terminart</span>
-      <select value={current ?? ''} disabled={busy} onChange={(e) => void choose(e.target.value)}>
-        <option value="">keine</option>
-        {options.map((k) => (
-          <option key={k} value={k}>
-            {k}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
+  return <EventKindChecks className="attendance-kind" value={draft ?? current} disabled={busy} onChange={(kinds) => void choose(kinds)} />;
 }

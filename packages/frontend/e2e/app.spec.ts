@@ -232,6 +232,48 @@ test('Mitglied sieht Termine, aber keine Verwaltung', async ({ page }) => {
   await expect(page.locator('.topbar-title')).toHaveText('Termine');
 });
 
+test('Mehrere Terminarten am Termin ankreuzen, je Art ein Schild', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json()) as { id?: string; kinds?: string[] }[] };
+      },
+      [path, method, body] as const,
+    );
+  expect((await api('admin/event-kinds', 'PUT', { kinds: ['Versammlung', 'Arbeitsdienst'], hidden: [] })).status).toBe(200);
+  try {
+    await page.goto('/app/');
+    await page.locator('.tabbar').getByRole('button', { name: 'Termine' }).click();
+    await page.getByText('Vereinsabend').click();
+    const card = page.locator('.card.event.open');
+    const checks = card.getByRole('group', { name: 'Terminarten' });
+    await checks.getByLabel('Versammlung').check();
+    await expect(card.locator('.badge.event-kind')).toHaveText(['Versammlung']);
+    await checks.getByLabel('Arbeitsdienst').check();
+    await expect(card.locator('.badge.event-kind')).toHaveText(['Versammlung', 'Arbeitsdienst']);
+    await shot(page, 'termin-mehrere-arten');
+    // Gespeichert: nach dem Neuladen beide angehakt; Haken heraus entfernt nur diese Art
+    await page.reload();
+    await page.getByText('Vereinsabend').click();
+    await expect(checks.getByLabel('Arbeitsdienst')).toBeChecked();
+    await checks.getByLabel('Versammlung').uncheck();
+    await expect(card.locator('.badge.event-kind')).toHaveText(['Arbeitsdienst']);
+  } finally {
+    for (const e of (await api('calendar', 'GET')).data) {
+      if (e.kinds && e.kinds.length > 0) await api(`calendar/${encodeURIComponent(e.id!)}/kind`, 'PUT', { kinds: [] });
+    }
+    expect((await api('admin/event-kinds', 'PUT', { kinds: [], hidden: [] })).status).toBe(200);
+  }
+});
+
 test('Verwalter legt Katalog an, vergibt Punkte und Kassen-Einträge', async ({ page }) => {
   await login(page, 'verwalter');
   await adminMenu(page, 'Mitglieder');

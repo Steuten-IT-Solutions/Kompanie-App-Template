@@ -964,7 +964,7 @@ final class Api
             // Mit Zu- und Absagen je Termin (responses, EventResponseService); Namen dazu nur mit view_responses.
             // Terminart (kind) vor den Rückmeldungen: annotate() der Rückmeldungen entfernt die stabile Kennung.
             new Route('GET', '/calendar', Cap::Calendar, fn () => $a->eventResponses()->annotate($a->authContext->currentUser(), $a->eventKinds()->annotate($a->authContext->currentUser(), $a->calendar()->upcoming())), 'calendar', $denyCalendar),
-            new Route('PUT', '/calendar/{key}/kind', Cap::ManageCalendar, fn (Request $r) => $a->eventKinds()->set($this->user(), (string) $r->params['key'], $r->input('kind')), 'calendar', $denyRights),
+            new Route('PUT', '/calendar/{key}/kind', Cap::ManageCalendar, fn (Request $r) => $a->eventKinds()->set($this->user(), (string) $r->params['key'], $r->input('kinds') ?? $r->input('kind')), 'calendar', $denyRights),
             new Route('PUT', '/calendar/{key}/response', Cap::RespondCalendar, fn (Request $r) => $a->eventResponses()->respond($this->user(), (string) $r->params['key'], $r->input('status'), $r->input('note')), 'calendar', $denyRespond),
             new Route('DELETE', '/calendar/{key}/response', Cap::RespondCalendar, fn (Request $r) => $a->eventResponses()->withdraw($this->user(), (string) $r->params['key']), 'calendar', $denyRespond),
             new Route('PUT', '/calendar/{key}/responses/{id}', Cap::ManageAttendance, fn (Request $r) => $a->eventResponses()->respondFor($this->user(), (string) $r->params['key'], $r->id(), $r->input('status')), 'calendar', $denyRights),

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, can, config, eventKindTag, eventKinds } from '../api';
+import { EventKindChecks, kindsOf } from '../eventKindChecks';
 import GuestPushButton from '../GuestPushButton';
 import { birthdaysVisible, UpcomingBirthdays, UpcomingBirthdaysCard, useUpcomingBirthdays } from '../upcomingBirthdays';
 import { navigate } from '../router';
@@ -30,8 +31,14 @@ function EventList({ focus }: { focus?: string }) {
   // Nach einer Zu- oder Absage: den Termin in der Liste (und im Zwischenspeicher) ersetzen.
   const replace = (ev: CalendarEvent) => setData((data ?? []).map((e) => (e.id === ev.id ? { ...e, responses: ev.responses } : e)));
   // Nach dem Setzen der Terminart: nur die Art übernehmen (der Vorschlag entfällt mit einer gesetzten Art).
-  const replaceKind = (id: string, kind: string | null) =>
-    setData((data ?? []).map((e) => (e.id === id ? { ...e, kind, kind_suggestion: kind === null ? e.kind_suggestion : null } : e)));
+  const replaceKinds = (id: string, kinds: string[]) =>
+    setData(
+      (data ?? []).map((e) =>
+        e.id === id
+          ? { ...e, kind: kinds[0] ?? null, kinds, ...(kinds.length > 0 ? { kind_suggestion: null, kind_suggestions: [] } : {}) }
+          : e,
+      ),
+    );
   // Geburtstage gleichzeitig laden und erst mit den Terminen zeigen: Sonst taucht die Karte oben nachträglich auf und
   // schiebt die Liste nach unten.
   const showBirthdays = birthdaysVisible();
@@ -133,7 +140,14 @@ function EventList({ focus }: { focus?: string }) {
                     </div>
                     <div className="event-main">
                       <div className="event-title">
-                        {ev.title} {eventKindTag(ev.kind) && <span className="badge event-kind">{ev.kind}</span>}
+                        {ev.title}{' '}
+                        {kindsOf(ev)
+                          .filter(eventKindTag)
+                          .map((k) => (
+                            <span key={k} className="badge event-kind">
+                              {k}
+                            </span>
+                          ))}
                       </div>
                       <div className="event-when">{formatEventWhen(ev)}</div>
                       {ev.location && <div className="event-where">{ev.location}</div>}
@@ -143,7 +157,7 @@ function EventList({ focus }: { focus?: string }) {
                   {isOpen && (
                     <div className="event-body">
                       {ev.description && <p className="event-desc">{ev.description}</p>}
-                      {canSetKind() && <KindPicker ev={ev} onChange={replaceKind} />}
+                      {canSetKind() && <KindPicker ev={ev} onChange={replaceKinds} />}
                       <ResponseDetails ev={ev} onChange={replace} />
                       <div className="event-actions">
                         <button className="btn btn-secondary" onClick={() => downloadIcs(ev)}>
@@ -173,44 +187,37 @@ function EventList({ focus }: { focus?: string }) {
   );
 }
 
-/** Terminart eines Termins wählen; speichert sofort. Ohne Art mit Vorschlag aus dem Titel (zählt erst übernommen). */
-function KindPicker({ ev, onChange }: { ev: CalendarEvent; onChange: (id: string, kind: string | null) => void }) {
+/** Terminarten eines Termins ankreuzen (mehrere möglich); speichert sofort. Ohne Art mit Vorschlag aus dem Titel (zählt erst übernommen). */
+function KindPicker({ ev, onChange }: { ev: CalendarEvent; onChange: (id: string, kinds: string[]) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const kinds = eventKinds();
-  // Eine Art, die nicht mehr in der Liste steht, bleibt wählbar, bis jemand eine andere wählt.
-  const options = ev.kind && !kinds.includes(ev.kind) ? [...kinds, ev.kind] : kinds;
+  // Während des Speicherns schon die neue Auswahl zeigen
+  const [draft, setDraft] = useState<string[] | null>(null);
+  const current = kindsOf(ev);
+  const suggestions = ev.kind_suggestions ?? (ev.kind_suggestion ? [ev.kind_suggestion] : []);
 
-  async function choose(kind: string | null) {
+  async function choose(kinds: string[]) {
     setBusy(true);
+    setDraft(kinds);
     setError(null);
     try {
-      const r = await api.setEventKind(ev.id, kind);
-      onChange(ev.id, r.kind);
+      const r = await api.setKindsOfEvent(ev.id, kinds);
+      onChange(ev.id, kindsOf(r));
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      setDraft(null);
       setBusy(false);
     }
   }
 
   return (
     <div className="event-kind-picker">
-      <label className="field">
-        <span>Terminart</span>
-        <select value={ev.kind ?? ''} disabled={busy} onChange={(e) => void choose(e.target.value || null)}>
-          <option value="">keine</option>
-          {options.map((k) => (
-            <option key={k} value={k}>
-              {k}
-            </option>
-          ))}
-        </select>
-      </label>
-      {!ev.kind && ev.kind_suggestion && (
+      <EventKindChecks value={draft ?? current} disabled={busy} onChange={(kinds) => void choose(kinds)} />
+      {current.length === 0 && suggestions.length > 0 && (
         <p className="small muted">
-          Vorschlag aus dem Titel: {ev.kind_suggestion}.{' '}
-          <button type="button" className="btn btn-link inline-link" disabled={busy} onClick={() => void choose(ev.kind_suggestion!)}>
+          Vorschlag aus dem Titel: {suggestions.join(', ')}.{' '}
+          <button type="button" className="btn btn-link inline-link" disabled={busy} onClick={() => void choose(suggestions)}>
             Übernehmen
           </button>
         </p>

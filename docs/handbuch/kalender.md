@@ -16,7 +16,7 @@ Tippe unten auf **{bereich.events}**. Meist ist das auch die Startseite der App.
 - **Internen Kalender verwalten**: nur, wenn die {kompanie.name} ihren Kalender in der App pflegt und du das darfst.
 - **Öffentliche Termine verwalten**: nur, wenn du öffentliche Termine pflegen darfst.
 - **Monatsüberschrift**: z. B. „Oktober 2026“; darunter die Termine dieses Monats.
-- **Termin**: links das Datum, rechts Titel, Wochentag und Uhrzeit und, falls angegeben, der Ort. Liegt der Termin nicht im laufenden Jahr, steht auch das Jahr dabei. Steht keine Uhrzeit dabei, dauert der Termin den ganzen Tag. Hat der Termin eine Terminart, z. B. **Versammlung**, steht sie als kleines Schild neben dem Titel.
+- **Termin**: links das Datum, rechts Titel, Wochentag und Uhrzeit und, falls angegeben, der Ort. Liegt der Termin nicht im laufenden Jahr, steht auch das Jahr dabei. Steht keine Uhrzeit dabei, dauert der Termin den ganzen Tag. Hat der Termin eine Terminart, z. B. **Versammlung**, steht sie als kleines Schild neben dem Titel, bei mehreren Arten je ein Schild.
 - **Zusagen** und **Absagen** unter dem Termin, mit der Zahl der Zusagen und Absagen: siehe [Bei Terminen zu- und absagen](seite:zu-und-absagen).
 
 ## So gehst du vor

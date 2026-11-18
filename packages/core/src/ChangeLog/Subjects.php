@@ -7,6 +7,7 @@ namespace KompanieApp\Core\ChangeLog;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Domain\Blocks\Blocks;
 use KompanieApp\Core\Http\Request;
+use KompanieApp\Core\Storage\EventKindRepository;
 
 /**
  * Welche Routen das Änderungsprotokoll erfasst und wie sie ihre Einträge laden (Schlüssel „METHODE /pfad“ wie in der
@@ -329,7 +330,7 @@ final class Subjects
             'title' => 'Titel', 'description' => 'Beschreibung', 'type' => 'Art', 'anonymous' => ['Anonym', 'bool'], 'results' => 'Ergebnisse sichtbar', 'ends_at' => 'Ende', 'closed_at' => 'Beendet',
         ], extra: fn (array $r): array => ['Antworten' => $this->column('SELECT title FROM {poll_options} WHERE poll_id = ? ORDER BY sort, id', $r['id'])]);
         $inventory = $this->spec('Inventar', 'inventory_items', 'title', ['title' => 'Bezeichnung', 'category' => 'Kategorie', 'quantity' => 'Menge', 'unit' => 'Einheit', 'location' => 'Lagerort', 'note' => 'Notiz']);
-        $attendance = $this->spec('Anwesenheitsliste', 'attendance_lists', 'title', ['title' => 'Titel', 'event_date' => 'Datum', 'kind' => 'Terminart'], extra: function (array $r): array {
+        $attendance = $this->spec('Anwesenheitsliste', 'attendance_lists', 'title', ['title' => 'Titel', 'event_date' => 'Datum', 'kinds' => ['Terminarten', 'kinds']], extra: function (array $r): array {
             $entries = $this->app->db->select('SELECT user_id, status FROM {attendance_entries} WHERE list_id = ? ORDER BY user_id', [$r['id']]);
             $names = $this->people($entries);
             return ['Einträge' => array_map(static fn (array $e, string $name): string => $name . ': ' . (self::ATTENDANCE[$e['status']] ?? $e['status']), $entries, $names)];
@@ -440,7 +441,7 @@ final class Subjects
             return is_scalar($id) ? [(string) $id] : [];
         }, true);
         // Terminart eines Termins im Kalender (EventKindService)
-        $kinds = $this->spec('Terminart eines Termins', 'event_kinds', 'event_title', ['event_title' => 'Termin', 'event_date' => 'Datum', 'kind' => 'Terminart']);
+        $kinds = $this->spec('Terminart eines Termins', 'event_kinds', 'event_title', ['event_title' => 'Termin', 'event_date' => 'Datum', 'kinds' => ['Terminarten', 'kinds']]);
         $map['PUT /calendar/{key}/kind'] = $this->table($kinds, function (Request $r): array {
             $id = $this->app->eventKinds()->rowIdOf((string) ($r->params['key'] ?? ''));
             return $id === null ? [] : [(string) $id];
@@ -896,6 +897,11 @@ final class Subjects
             // Inhalt aus Blöcken als reiner Text (ältere Einträge: nur body)
             $text = $this->app->blocks()->plain(Blocks::decode($v, (string) ($row['body'] ?? '')), true);
             return trim((string) preg_replace('/\s+/u', ' ', $text)) ?: null;
+        }
+        if ($kind === 'kinds') {
+            // Terminarten (EventKindRepository): kinds mit der ersten in kind, ältere Zeilen nur kind
+            $kinds = EventKindRepository::decode($row['kind'] ?? '', $v);
+            return $kinds === [] ? null : implode(', ', $kinds);
         }
         if ($v === null || $v === '') {
             return null;
