@@ -327,17 +327,22 @@ function OfficeCard({ office, open, onToggle }: { office: Office; open: boolean;
 
 /**
  * Gruppe mit gemeinsamen Amtszeiten (Issue #282): je Amtszeit eine Karte mit Gruppenbild und allen Personen mit ihren
- * Ämtern (in der Einzahl, „Prinz“ statt „Prinzen“), die laufende oben als „aktuell“.
+ * Ämtern (in der Einzahl, „Prinz“ statt „Prinzen“), die laufende oben als „aktuell“. Jede Karte klappt über ihren Kopf
+ * auf und zu; zugeklappt stehen nur Jahre und Namen da (welche offen sind, hält OfficesView).
  */
 export function JointTerms({
   terms,
   offices,
   group,
+  isOpen,
+  onToggle,
 }: {
   terms: OfficeGroupTerm[];
   offices: Office[];
   /** Einzahl der Gruppe („Königshaus“), sonst ihre Bezeichnung */
   group: string;
+  isOpen: (term: OfficeGroupTerm) => boolean;
+  onToggle: (term: OfficeGroupTerm) => void;
 }) {
   if (terms.length === 0) return null;
   return (
@@ -347,30 +352,45 @@ export function JointTerms({
           const t = o.terms.find((x) => x.group_term_id === gt.id);
           return t && t.holders.length > 0 ? [{ office: o, holders: t.holders }] : [];
         });
+        const open = isOpen(gt);
+        const id = `joint-term-${gt.id}`;
+        const names = rows.flatMap((r) => r.holders.map((h) => h.name));
         return (
-          <li key={gt.id} className={`card joint-term${gt.current ? ' current' : ''}`}>
-            {gt.image_url && (
-              <img className="joint-term-image" src={gt.image_url} alt={`${group} ${termYears(gt)}`} loading="lazy" decoding="async" />
+          <li key={gt.id} className={`card joint-term${gt.current ? ' current' : ''}${open ? ' open' : ''}`}>
+            <button type="button" className="joint-term-head" aria-expanded={open} aria-controls={id} onClick={() => onToggle(gt)}>
+              <span className="joint-term-head-main">
+                <span className="joint-term-title">
+                  {group} {termYears(gt)}
+                  {gt.current && <span className="badge">aktuell</span>}
+                </span>
+                {!open && names.length > 0 && <span className="joint-term-names small muted">{names.join(', ')}</span>}
+              </span>
+              <span className="office-arrow" aria-hidden="true">
+                ›
+              </span>
+            </button>
+            {open && (
+              <div id={id} className="joint-term-content">
+                {gt.image_url && (
+                  <img className="joint-term-image" src={gt.image_url} alt={`${group} ${termYears(gt)}`} loading="lazy" decoding="async" />
+                )}
+                <div className="joint-term-body">
+                  {gt.note && <p className="muted small">{gt.note}</p>}
+                  <dl className="joint-term-offices">
+                    {rows.map((r) => (
+                      <div key={r.office.id}>
+                        <dt>
+                          <Title text={officeSingular(r.office)} />
+                        </dt>
+                        <dd>
+                          <Holders holders={r.holders} to={memberPath} />
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              </div>
             )}
-            <div className="joint-term-body">
-              <h3 className="joint-term-title">
-                {group} {termYears(gt)}
-                {gt.current && <span className="badge">aktuell</span>}
-              </h3>
-              {gt.note && <p className="muted small">{gt.note}</p>}
-              <dl className="joint-term-offices">
-                {rows.map((r) => (
-                  <div key={r.office.id}>
-                    <dt>
-                      <Title text={officeSingular(r.office)} />
-                    </dt>
-                    <dd>
-                      <Holders holders={r.holders} to={memberPath} />
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
           </li>
         );
       })}
@@ -580,6 +600,8 @@ export function YearGrid({
 export function OfficesView() {
   const { data, error, loading, reload } = useOffices();
   const [open, setOpen] = useState<Set<number>>(new Set());
+  // Offene gemeinsame Amtszeiten; null = Vorgabe: nur die laufenden offen, alle früheren zu
+  const [jointOpen, setJointOpen] = useState<Set<number> | null>(null);
   const [view, setView] = useState(loadView);
 
   if (loading && !data) return <Loading />;
@@ -604,7 +626,15 @@ export function OfficesView() {
     })),
     { key: 'none', title: '', singular: '', offices: offices.filter((o) => o.group_id === null), joint: null },
   ].filter((s) => s.offices.length > 0);
-  const all = offices.every((o) => open.has(o.id));
+  const jointTerms = sections.flatMap((s) => s.joint ?? []);
+  const jointIds = jointOpen ?? new Set(jointTerms.filter((t) => t.current).map((t) => t.id));
+  const toggleJoint = (t: OfficeGroupTerm) => {
+    const next = new Set(jointIds);
+    if (next.has(t.id)) next.delete(t.id);
+    else next.add(t.id);
+    setJointOpen(next);
+  };
+  const all = offices.every((o) => open.has(o.id)) && jointTerms.every((t) => jointIds.has(t.id));
 
   const years = view === 'jahre';
   const choose = (next: 'chronik' | 'jahre') => {
@@ -631,7 +661,10 @@ export function OfficesView() {
           <button
             type="button"
             className="btn btn-small btn-secondary"
-            onClick={() => setOpen(all ? new Set() : new Set(offices.map((o) => o.id)))}
+            onClick={() => {
+              setOpen(all ? new Set() : new Set(offices.map((o) => o.id)));
+              setJointOpen(all ? new Set() : new Set(jointTerms.map((t) => t.id)));
+            }}
           >
             {all ? 'Alle zuklappen' : 'Alle aufklappen'}
           </button>
@@ -642,7 +675,15 @@ export function OfficesView() {
         sections.map((s) => (
           <section key={s.key} className="office-group">
             {s.title && <h2 className="section-title">{s.title}</h2>}
-            {s.joint && <JointTerms terms={s.joint} offices={s.offices} group={s.singular} />}
+            {s.joint && (
+              <JointTerms
+                terms={s.joint}
+                offices={s.offices}
+                group={s.singular}
+                isOpen={(t) => jointIds.has(t.id)}
+                onToggle={toggleJoint}
+              />
+            )}
             {/* Mit gemeinsamen Amtszeiten nur noch, was nicht dazugehört (z. B. Ehrungen) je Amt */}
             {(s.joint
               ? s.offices.map((o) => ({ ...o, terms: o.terms.filter((t) => !t.group_term_id) })).filter((o) => o.terms.length > 0)
