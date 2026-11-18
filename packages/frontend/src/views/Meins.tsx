@@ -1,4 +1,5 @@
 import { api, can, config, isMember, roleLabels, type Me } from '../api';
+import { MyAdmission } from './Aufnahmen';
 import brand from '../generated/brand';
 import { formatEuro } from '../format';
 import { navigate } from '../router';
@@ -175,6 +176,7 @@ function Uebersicht({ me }: { me: Me }) {
           <PersonOffices userId={config!.user!.id} empty={`Du hast keine ${sec.offices} eingetragen.`} />
         </section>
       )}
+      {config?.features.attendance && <MyAdmission />}
     </div>
   );
 }

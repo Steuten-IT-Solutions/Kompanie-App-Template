@@ -1,4 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
+import { fromDraft, legacyOf, ruleFromRole } from '../admissionRule';
+import { RuleEditor } from '../admissionRuleView';
 import { api, applyRoles, config, eventKinds, levelLabel, type Capability, type Level, type RoleAdmin } from '../api';
 import { CAPABILITIES, isView, lockedFor, orderedCaps, toggleForRole } from '../capabilities';
 import { RightsTree } from '../rightsTree';
@@ -254,9 +256,8 @@ function RoleForm({
   // Anwärter-Rolle (Aufnahmen): als Grundrolle oder Zusatzrolle; ein Haken. Ohne „Gehört zur Kompanie“ zusätzlich
   // promotable (Grundrolle → Mitglied wie bisher), sonst nur admission_extra. Dazu die Voraussetzung.
   const [promotable, setPromotable] = useState((role?.promotable ?? false) || (role?.admission_extra ?? false));
-  const [admissionKind, setAdmissionKind] = useState(role?.admission_kind ?? '');
-  const [admissionCount, setAdmissionCount] = useState(String(role?.admission_count ?? 0));
-  const [admissionMonths, setAdmissionMonths] = useState(String(role?.admission_months ?? 0));
+  // Voraussetzung als Baum aus UND/ODER-Gruppen; ältere Server ohne admission_rule: aus den früheren Feldern.
+  const [admissionRule, setAdmissionRule] = useState(() => ruleFromRole(role));
   const [replacement, setReplacement] = useState<Level>('member');
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -273,7 +274,9 @@ function RoleForm({
   // Ältere Server kennen die Felder nicht (dann fehlen sie in der Antwort).
   const admissionKnown = !role || role.admission_count !== undefined;
   const candidate = !fixed && admissionKnown && promotable;
-  const kinds = [...eventKinds(), ...(admissionKind && !eventKinds().includes(admissionKind) ? [admissionKind] : [])];
+  const ruleKnown = !role || role.admission_rule !== undefined;
+  const kinds = eventKinds();
+  const legacyRule = ruleKnown ? null : legacyOf(admissionRule);
 
   async function run(action: () => Promise<RoleAdmin[]>, msg: string) {
     setBusy(true);
@@ -299,9 +302,8 @@ function RoleForm({
         : candidate
           ? {
               admission_extra: true,
-              admission_kind: admissionKind,
-              admission_count: admissionKind ? admissionCount : 0,
-              admission_months: admissionMonths,
+              // Ältere Server kennen nur Teilnahmen einer Art UND Mindestdauer.
+              ...(ruleKnown ? { admission_rule: fromDraft(admissionRule) ?? undefined } : (legacyRule ?? {})),
             }
           : { admission_extra: false }),
       ...(withFactor ? { points_factor: factor } : {}),
@@ -386,28 +388,14 @@ function RoleForm({
       {candidate && (
         <fieldset className="feature-list role-admission">
           <legend className="field-label">Voraussetzung für die Aufnahme (Vorschlag unter Verwaltung → Aufnahmen)</legend>
-          <label className="field">
-            <span>Teilnahmen an Terminen der Art</span>
-            <select value={admissionKind} onChange={(e) => setAdmissionKind(e.target.value)}>
-              <option value="">keine</option>
-              {kinds.map((k) => (
-                <option key={k} value={k}>
-                  {k}
-                </option>
-              ))}
-            </select>
-          </label>
+          <RuleEditor value={admissionRule} onChange={setAdmissionRule} kinds={kinds} />
           {kinds.length === 0 && <p className="small muted">Terminarten legst du unter Einstellungen → Kalender an.</p>}
-          {admissionKind && (
-            <label className="field">
-              <span>Mindestens so viele Teilnahmen („anwesend“)</span>
-              <input type="number" min={0} max={100} value={admissionCount} onChange={(e) => setAdmissionCount(e.target.value)} />
-            </label>
+          {!ruleKnown && !legacyRule && (
+            <p className="small rights-warning" role="note">
+              Dieser Server kennt nur Teilnahmen einer Terminart und Monate, verknüpft mit „Alle müssen erfüllt sein“. Bitte zuerst die App
+              aktualisieren.
+            </p>
           )}
-          <label className="field">
-            <span>Mindestens so viele Monate als Anwärter (0: keine)</span>
-            <input type="number" min={0} max={120} value={admissionMonths} onChange={(e) => setAdmissionMonths(e.target.value)} />
-          </label>
         </fieldset>
       )}
       {withFactor && (

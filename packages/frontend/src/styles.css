@@ -7727,3 +7727,100 @@ fieldset.block-source legend {
   margin-top: 4px;
   opacity: 0.9;
 }
+
+/* Voraussetzung für die Aufnahme als Baum (admissionRule.tsx): Gruppen mit UND/ODER, beliebig tief. Jede Ebene rückt
+   nur wenig ein und bekommt eine Linie am Rand, damit auch tiefe Gruppen auf 360 px Breite passen. */
+.rule-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rule-group .rule-group {
+  margin-left: 0.5rem;
+  padding-left: 8px;
+  border-left: 2px solid var(--accent);
+}
+.rule-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rule-group-head .segmented {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-bottom: 0;
+}
+/* Beide Wahlen gleich breit und umbrechend: Auf schmalen Handys passt „Alle müssen erfüllt sein“ sonst nicht. */
+.rule-group-head .segmented button {
+  flex: 1 1 0;
+  white-space: normal;
+}
+/* Ein fieldset ist sonst mindestens so breit wie sein Inhalt und schöbe den Editor über den Rand. */
+.role-admission {
+  min-width: 0;
+}
+.rule-condition {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+}
+.rule-fields {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rule-fields .field {
+  flex: 1 1 10rem;
+  min-width: 0;
+  margin: 0;
+}
+.rule-joiner {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: center;
+  list-style: none;
+}
+.rule-add {
+  margin: 0;
+}
+.rule-sentence {
+  margin: 0;
+}
+.rule-result-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rule-result-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.rule-result-group {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-left: 8px;
+  border-left: 2px solid var(--line-strong);
+}
+.rule-mark {
+  flex: 0 0 1.2em;
+  text-align: center;
+  color: var(--muted);
+}
+.rule-fulfilled > .rule-mark {
+  color: var(--good);
+}
+.rule-result-list .rule-joiner {
+  text-align: left;
+  padding-left: calc(1.2em + 8px);
+}

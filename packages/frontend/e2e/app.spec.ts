@@ -1234,6 +1234,79 @@ test('Anwärter: sieht den internen Kalender, aber keinen Mitgliederbereich, bis
   await expect(page.locator('.meins-menu')).toBeVisible();
 });
 
+test('Aufnahme: Voraussetzung mit UND/ODER und Gruppen an der Anwärter-Rolle', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json()) as { key?: string; label?: string }[] };
+      },
+      [path, method, body] as const,
+    );
+  expect((await api('admin/event-kinds', 'PUT', { kinds: ['Versammlung', 'Arbeitsdienst'], hidden: [] })).status).toBe(200);
+  const key = (await api('admin/roles', 'GET')).data.find((r) => r.label === 'Anwärter')?.key;
+  expect(key).toBeTruthy();
+  try {
+    expect((await api(`admin/roles/${key}`, 'PATCH', { admission_rule: null })).status).toBe(200);
+    await page.goto('/app/');
+    await adminMenu(page, 'Einstellungen');
+    await page
+      .locator('.settings-link')
+      .filter({ has: page.getByText('Rollen', { exact: true }) })
+      .click();
+    const rollen = page.locator('#einstellungen-rollen');
+    await rollen.getByRole('button', { name: 'Anwärter bearbeiten', exact: true }).click();
+    const editor = rollen.locator('.rule-editor');
+    await expect(editor.locator('.rule-sentence')).toHaveText('Ohne Voraussetzung');
+
+    // 12 Monate UND (6 Versammlungen ODER 10 Arbeitsdienste)
+    await editor.getByRole('button', { name: '+ Dauer' }).click();
+    await editor.getByLabel('Mindestens so viele Monate als Anwärter').fill('12');
+    await editor.getByRole('button', { name: '+ Gruppe' }).click();
+    const group = editor.locator('.rule-group .rule-group');
+    await expect(group.getByRole('button', { name: 'Eine reicht' })).toHaveAttribute('aria-pressed', 'true');
+    await group.getByLabel('Mindestens so viele Teilnahmen („anwesend“)').fill('6');
+    await group.getByRole('button', { name: '+ Teilnahmen' }).click();
+    await group.getByLabel('Mindestens so viele Teilnahmen („anwesend“)').nth(1).fill('10');
+    await group.getByLabel('an Terminen der Art').nth(1).selectOption('Arbeitsdienst');
+    const sentence = 'Voraussetzung: 12 Monate als Anwärter und (6 Teilnahmen an „Versammlung“ oder 10 Teilnahmen an „Arbeitsdienst“)';
+    await expect(editor.locator('.rule-sentence')).toHaveText(sentence);
+    await shotsNarrowAndWide(page, 'aufnahme-regeln');
+    await rollen.getByRole('button', { name: 'Speichern', exact: true }).click();
+    await expect(page.locator('.toast')).toHaveText('Rolle gespeichert');
+
+    // Gespeichert als Baum; beim nächsten Öffnen wieder da
+    const saved = (await api('admin/roles', 'GET')).data.find((r) => r.key === key) as { admission_rule?: unknown };
+    expect(saved.admission_rule).toEqual({
+      type: 'group',
+      op: 'and',
+      items: [
+        { type: 'duration', months: 12 },
+        {
+          type: 'group',
+          op: 'or',
+          items: [
+            { type: 'attendance', kind: 'Versammlung', count: 6 },
+            { type: 'attendance', kind: 'Arbeitsdienst', count: 10 },
+          ],
+        },
+      ],
+    });
+    await rollen.getByRole('button', { name: 'Anwärter bearbeiten', exact: true }).click();
+    await expect(rollen.locator('.rule-editor .rule-sentence')).toHaveText(sentence);
+  } finally {
+    await api(`admin/roles/${key}`, 'PATCH', { admission_rule: null });
+    expect((await api('admin/event-kinds', 'PUT', { kinds: [], hidden: [] })).status).toBe(200);
+  }
+});
+
 /** Navigation per API zurücksetzen (Standardnavigation, ohne eigene Namen und Startseiten), falls ein Test mittendrin scheitert. */
 async function resetNavigation(page: Page) {
   await page.evaluate(async () => {

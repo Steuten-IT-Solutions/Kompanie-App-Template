@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
-import { api, can, config, roleLabels, type MailPreference, type OwnAccount } from '../api';
+import { MyAdmission } from './Aufnahmen';
+import { api, can, config, isMember, roleLabels, type MailPreference, type OwnAccount } from '../api';
 import { boardVisible, SIGNATURE_RETURN_KEY } from '../board';
 import brand from '../generated/brand';
 import { isStandalone } from '../install';
@@ -231,6 +232,9 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
           {(config?.user?.extra_roles ?? []).length > 0 ? 'Rollen' : 'Rolle'}: {roleLabels(config?.user ?? { level: 'guest' })}
         </p>
       </div>
+
+      {/* Anwärter sehen hier ihren Stand für die Aufnahme; mit Mitgliederbereich steht er auch unter Meins → Übersicht. */}
+      {config?.features.attendance && !isMember() && <MyAdmission />}
 
       <ContactCard onToast={onToast} />
 

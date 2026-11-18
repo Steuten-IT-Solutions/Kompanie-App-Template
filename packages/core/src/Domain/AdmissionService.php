@@ -18,13 +18,19 @@ use KompanieApp\Core\Storage\EventKindRepository;
  *   angehakt hat (extra, auch mit Mitgliederbereich). Aufnehmen heißt dann: Grundrolle → Mitglied
  *   (MemberService::promote) bzw. diese Zusatzrolle entfernen. Beides darf, wer Mitglieder anlegen darf (create_users).
  *   Ist der Eintritt leer, wird er auf den Aufnahmetag gesetzt.
- * - Voraussetzung je Anwärter-Rolle (Einstellungen → Rollen, gespeichert in RULES_SETTING): mindestens count Teilnahmen
- *   („anwesend“) an Anwesenheitslisten der Terminart kind und/oder mindestens months Monate seit „Anwärter seit“. Ohne
- *   beides steht die Person unter „ohne Voraussetzung“. Es zählen alle Teilnahmen, auch vor „Anwärter seit“.
+ * - Voraussetzung je Anwärter-Rolle (Einstellungen → Rollen, gespeichert in RULES_SETTING): ein Baum aus Bedingungen,
+ *   verknüpft mit UND/ODER (Domain\AdmissionRule): Teilnahmen („anwesend“) an Anwesenheitslisten einer Terminart und
+ *   Monate seit „Anwärter seit“. Ohne Bedingung steht die Person unter „ohne Voraussetzung“. Es zählen alle Teilnahmen,
+ *   auch vor „Anwärter seit“. Gespeichert wird der Baum unter rule; kind/count/months tragen für ältere Versionen die
+ *   frühere feste Form (Teilnahmen UND Dauer), wenn der Baum genau sie ausdrückt, sonst 0. Ohne rule entsteht der Baum
+ *   beim Lesen aus kind/count/months.
+ * - Den eigenen Stand sieht jeder Anwärter (GET /me/admission), den anderer nur, wer Konten sehen darf.
  * - Die Voraussetzung sperrt nichts: Aufnehmen geht jederzeit, die App weist in der Rückfrage darauf hin.
  * - „Anwärter seit“ (Tabelle candidate_since je Person und Rolle): gesetzt, wenn jemand die Grundrolle bekommt (in der
  *   App: anlegen, Rolle ändern, Anfrage freigeben); bei Zusatzrollen das Datum der Zuordnung, wenn sie nach dem Anhaken
  *   der Rolle als Anwärter-Rolle war. Sonst leer (nachtragen); ändern darf es, wer Mitglieder anlegen darf.
+ *
+ * @phpstan-type Rule array{kind: string, count: int, months: int, extra: bool, extra_since: string, rule: array<string, mixed>}
  */
 final class AdmissionService
 {
@@ -32,7 +38,7 @@ final class AdmissionService
     public const COUNT_MAX = 100;
     public const MONTHS_MAX = 120;
     /** Felder an PATCH /admin/roles/{key} bzw. POST /admin/roles */
-    public const ROLE_FIELDS = ['admission_extra', 'admission_kind', 'admission_count', 'admission_months'];
+    public const ROLE_FIELDS = ['admission_extra', 'admission_kind', 'admission_count', 'admission_months', 'admission_rule'];
 
     public const FULFILLED = 'fulfilled';
     public const OPEN = 'open';
@@ -52,7 +58,7 @@ final class AdmissionService
     /**
      * Gespeicherte Angaben je Rolle (nur geprüfte Werte).
      *
-     * @return array<string, array{kind: string, count: int, months: int, extra: bool, extra_since: string}>
+     * @return array<string, Rule>
      */
     public function rules(): array
     {
@@ -62,27 +68,37 @@ final class AdmissionService
             if (!is_string($key) || !is_array($r)) {
                 continue;
             }
+            $kind = is_string($r['kind'] ?? null) ? $r['kind'] : '';
+            $count = is_int($r['count'] ?? null) ? max(0, min(self::COUNT_MAX, $r['count'])) : 0;
+            $months = is_int($r['months'] ?? null) ? max(0, min(self::MONTHS_MAX, $r['months'])) : 0;
             $out[$key] = [
-                'kind' => is_string($r['kind'] ?? null) ? $r['kind'] : '',
-                'count' => is_int($r['count'] ?? null) ? max(0, min(self::COUNT_MAX, $r['count'])) : 0,
-                'months' => is_int($r['months'] ?? null) ? max(0, min(self::MONTHS_MAX, $r['months'])) : 0,
+                'kind' => $kind,
+                'count' => $count,
+                'months' => $months,
                 'extra' => ($r['extra'] ?? false) === true,
                 'extra_since' => is_string($r['extra_since'] ?? null) ? $r['extra_since'] : '',
+                'rule' => AdmissionRule::fromStored($r['rule'] ?? null) ?? AdmissionRule::fromLegacy($kind, $count, $months),
             ];
         }
         return $out;
     }
 
-    /** @return array{kind: string, count: int, months: int, extra: bool, extra_since: string} */
+    /** @return Rule */
     public function rule(string $key): array
     {
-        return $this->rules()[$key] ?? ['kind' => '', 'count' => 0, 'months' => 0, 'extra' => false, 'extra_since' => ''];
+        return $this->rules()[$key] ?? self::emptyRule();
+    }
+
+    /** @return Rule */
+    private static function emptyRule(): array
+    {
+        return ['kind' => '', 'count' => 0, 'months' => 0, 'extra' => false, 'extra_since' => '', 'rule' => AdmissionRule::none()];
     }
 
     /**
      * Für Einstellungen → Rollen (GET /admin/roles): Anwärter-Rolle (Grund- oder Zusatzrolle) und Voraussetzung.
      *
-     * @return array{admission_extra: bool, admission_kind: string|null, admission_count: int, admission_months: int}
+     * @return array{admission_extra: bool, admission_kind: string|null, admission_count: int, admission_months: int, admission_rule: array<string, mixed>}
      */
     public function describeRole(string $key): array
     {
@@ -92,12 +108,14 @@ final class AdmissionService
             'admission_kind' => $r['kind'] !== '' ? $r['kind'] : null,
             'admission_count' => $r['count'],
             'admission_months' => $r['months'],
+            'admission_rule' => $r['rule'],
         ];
     }
 
     /**
-     * Angaben einer Rolle ändern (PATCH /admin/roles/{key}): admission_extra, admission_kind, admission_count,
-     * admission_months; nur mitgeschickte Felder. Erst alles prüfen, dann speichern (zusammen mit RoleService::update bzw.
+     * Angaben einer Rolle ändern (PATCH /admin/roles/{key}): admission_extra, admission_rule (Baum, AdmissionRule) oder
+     * wie früher admission_kind, admission_count, admission_months (ergeben Teilnahmen UND Dauer); nur mitgeschickte
+     * Felder, admission_rule geht vor. Erst alles prüfen, dann speichern (zusammen mit RoleService::update bzw.
      * create). $key null: neue Rolle (POST /admin/roles), ihr Schlüssel kommt beim Speichern.
      *
      * @param array<string, mixed> $in
@@ -125,20 +143,32 @@ final class AdmissionService
             }
             $r['extra'] = $extra;
         }
-        if (array_key_exists('admission_kind', $in)) {
-            $r['kind'] = $this->app->eventKinds()->valid($in['admission_kind'], $r['kind'] !== '' ? $r['kind'] : null);
-        }
-        foreach (['admission_count' => ['count', self::COUNT_MAX, 'Teilnahmen'], 'admission_months' => ['months', self::MONTHS_MAX, 'Monate']] as $field => [$name, $max, $label]) {
-            if (array_key_exists($field, $in)) {
-                $n = $in[$field] === null || $in[$field] === '' ? 0 : Input::integer($in[$field]);
-                if ($n === null || $n < 0 || $n > $max) {
-                    throw ApiError::invalid(sprintf('%s: bitte eine Zahl von 0 bis %d.', $label, $max));
-                }
-                $r[$name] = $n;
+        if (array_key_exists('admission_rule', $in)) {
+            // Bisherige Arten bleiben erlaubt, auch wenn sie nicht mehr in der Liste stehen.
+            $current = AdmissionRule::kinds($r['rule']);
+            $kinds = $this->app->eventKinds();
+            $r['rule'] = AdmissionRule::parse($in['admission_rule'], static fn (string $kind): string => $kinds->valid($kind, in_array($kind, $current, true) ? $kind : null));
+            $legacy = AdmissionRule::legacy($r['rule']) ?? ['kind' => '', 'count' => 0, 'months' => 0];
+            $r['kind'] = $legacy['kind'];
+            $r['count'] = $legacy['count'];
+            $r['months'] = $legacy['months'];
+        } elseif (array_intersect(['admission_kind', 'admission_count', 'admission_months'], array_keys($in)) !== []) {
+            if (array_key_exists('admission_kind', $in)) {
+                $r['kind'] = $this->app->eventKinds()->valid($in['admission_kind'], $r['kind'] !== '' ? $r['kind'] : null);
             }
-        }
-        if ($r['count'] > 0 && $r['kind'] === '') {
-            throw ApiError::invalid('Für die Teilnahmen bitte eine Terminart wählen.');
+            foreach (['admission_count' => ['count', self::COUNT_MAX, 'Teilnahmen'], 'admission_months' => ['months', self::MONTHS_MAX, 'Monate']] as $field => [$name, $max, $label]) {
+                if (array_key_exists($field, $in)) {
+                    $n = $in[$field] === null || $in[$field] === '' ? 0 : Input::integer($in[$field]);
+                    if ($n === null || $n < 0 || $n > $max) {
+                        throw ApiError::invalid(sprintf('%s: bitte eine Zahl von 0 bis %d.', $label, $max));
+                    }
+                    $r[$name] = $n;
+                }
+            }
+            if ($r['count'] > 0 && $r['kind'] === '') {
+                throw ApiError::invalid('Für die Teilnahmen bitte eine Terminart wählen.');
+            }
+            $r['rule'] = AdmissionRule::fromLegacy($r['kind'], $r['count'], $r['months']);
         }
         return function (string $key) use ($r): void {
             $rules = $this->rules();
@@ -196,6 +226,8 @@ final class AdmissionService
 
     /**
      * Alle Anwärter mit Stand (GET /admissions): erfüllt (nach Datum, ältestes zuerst), noch nicht, ohne Voraussetzung.
+     * Je Person result: der ausgewertete Baum (AdmissionRule::evaluate); kind/count/attended/missing beschreiben die erste
+     * Bedingung „Teilnahmen“, months/months_on die erste „Dauer“ (für ältere Oberflächen).
      *
      * @return list<array<string, mixed>>
      */
@@ -338,24 +370,45 @@ final class AdmissionService
         $assigned = $roles->extraAssignedAt();
         $kinds = [];
         foreach ($candidates as [, $c]) {
-            $r = $rules[$c['key']] ?? null;
-            if ($r !== null && $r['count'] > 0 && $r['kind'] !== '') {
-                $kinds[$r['kind']] = true;
+            foreach (AdmissionRule::kinds(($rules[$c['key']] ?? self::emptyRule())['rule']) as $kind) {
+                $kinds[$kind] = true;
             }
         }
-        $dates = $this->attendanceDates(array_keys($kinds), array_map(static fn (array $x): int => $x[0]->id, $candidates));
+        $dates = $this->attendanceDates(array_map('strval', array_keys($kinds)), array_map(static fn (array $x): int => $x[0]->id, $candidates));
         $today = $this->app->time()->today();
         $out = [];
         foreach ($candidates as [$u, $c]) {
-            $r = $rules[$c['key']] ?? ['kind' => '', 'count' => 0, 'months' => 0, 'extra' => false, 'extra_since' => ''];
+            $r = $rules[$c['key']] ?? self::emptyRule();
             $since = $stored[$u->id][$c['key']] ?? null;
             if ($since === null && $c['way'] === 'extra') {
                 $at = $assigned[$u->id][$c['key']] ?? '';
                 $since = $at !== '' && $r['extra_since'] !== '' && $at >= $r['extra_since'] ? $this->localDate($at) : '';
             }
             $since ??= '';
-            $count = $r['kind'] !== '' ? $r['count'] : 0;
-            $attended = $r['kind'] !== '' ? ($dates[$u->id][$r['kind']] ?? []) : [];
+            $mine = $dates[$u->id] ?? [];
+            $result = AdmissionRule::evaluate($r['rule'], static function (array $leaf) use ($mine, $since, $today): array {
+                if (($leaf['type'] ?? '') === AdmissionRule::ATTENDANCE) {
+                    $need = is_int($leaf['count'] ?? null) ? $leaf['count'] : 0;
+                    $attended = $mine[is_string($leaf['kind'] ?? null) ? $leaf['kind'] : ''] ?? [];
+                    $ok = count($attended) >= $need;
+                    return $leaf + [
+                        'attended' => count($attended),
+                        'missing' => max(0, $need - count($attended)),
+                        'status' => $ok ? AdmissionRule::FULFILLED : AdmissionRule::OPEN,
+                        'on' => $ok ? ($attended[$need - 1] ?? null) : null,
+                    ];
+                }
+                $months = is_int($leaf['months'] ?? null) ? $leaf['months'] : 0;
+                if ($since === '') {
+                    return $leaf + ['due' => null, 'status' => AdmissionRule::UNKNOWN, 'on' => null];
+                }
+                $due = self::addMonths($since, $months);
+                $ok = $due <= $today->format('Y-m-d');
+                return $leaf + ['due' => $due, 'status' => $ok ? AdmissionRule::FULFILLED : AdmissionRule::OPEN, 'on' => $ok ? $due : null];
+            });
+            $attendance = AdmissionRule::first($result, AdmissionRule::ATTENDANCE);
+            $duration = AdmissionRule::first($result, AdmissionRule::DURATION);
+            $empty = AdmissionRule::isEmpty($r['rule']);
             $entry = [
                 'id' => $u->id,
                 'name' => $u->name,
@@ -363,43 +416,17 @@ final class AdmissionService
                 'role_key' => $c['key'],
                 'way' => $c['way'],
                 'since' => $since !== '' ? $since : null,
-                'kind' => $r['kind'] !== '' ? $r['kind'] : null,
-                'count' => $count,
-                'months' => $r['months'],
-                'attended' => count($attended),
-                'missing' => max(0, $count - count($attended)),
-                // Tag, ab dem die Mindestdauer erfüllt ist (null ohne Mindestdauer oder ohne „Anwärter seit“)
-                'months_on' => null,
-                'fulfilled_on' => null,
-                'status' => self::NONE,
+                'kind' => $attendance['kind'] ?? null,
+                'count' => $attendance['count'] ?? 0,
+                'months' => $duration['months'] ?? 0,
+                'attended' => $attendance['attended'] ?? 0,
+                'missing' => $attendance['missing'] ?? 0,
+                // Tag, ab dem die (erste) Mindestdauer erfüllt ist (null ohne Mindestdauer oder ohne „Anwärter seit“)
+                'months_on' => $duration['due'] ?? null,
+                'fulfilled_on' => !$empty && $result['status'] === AdmissionRule::FULFILLED ? $result['on'] : null,
+                'status' => $empty ? self::NONE : ($result['status'] === AdmissionRule::FULFILLED ? self::FULFILLED : self::OPEN),
+                'result' => $empty ? null : $result,
             ];
-            if ($count === 0 && $r['months'] === 0) {
-                $out[] = $entry;
-                continue;
-            }
-            $on = [];
-            $ok = true;
-            if ($count > 0) {
-                if (count($attended) >= $count) {
-                    $on[] = $attended[$count - 1];
-                } else {
-                    $ok = false;
-                }
-            }
-            if ($r['months'] > 0) {
-                if ($since === '') {
-                    $ok = false;
-                } else {
-                    $monthsOn = self::addMonths($since, $r['months']);
-                    $entry['months_on'] = $monthsOn;
-                    $on[] = $monthsOn;
-                    if ($monthsOn > $today->format('Y-m-d')) {
-                        $ok = false;
-                    }
-                }
-            }
-            $entry['status'] = $ok ? self::FULFILLED : self::OPEN;
-            $entry['fulfilled_on'] = $ok && $on !== [] ? max($on) : null;
             $out[] = $entry;
         }
         return $out;

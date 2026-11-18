@@ -706,8 +706,10 @@ export interface RoleAdmin extends RoleInfo {
   /** Voraussetzung für die Aufnahme: Teilnahmen an Terminen dieser Art (null: keine) … */
   admission_kind?: string | null;
   admission_count?: number;
-  /** … und Mindestdauer als Anwärter in Monaten (0: keine) */
+  /** … und Mindestdauer als Anwärter in Monaten (0: keine); 0/null, wenn admission_rule mehr ausdrückt */
   admission_months?: number;
+  /** Voraussetzung als Baum aus UND/ODER-Gruppen (fehlt bei älteren Servern) */
+  admission_rule?: AdmissionRuleNode;
 }
 
 export type RoleInput = {
@@ -720,7 +722,31 @@ export type RoleInput = {
   admission_kind?: string | null;
   admission_count?: number | string;
   admission_months?: number | string;
+  admission_rule?: AdmissionRuleNode;
 };
+
+/** Voraussetzung für die Aufnahme (Server: Domain\AdmissionRule): Gruppen mit UND/ODER, beliebig tief. */
+export type AdmissionRuleNode =
+  | { type: 'group'; op: 'and' | 'or'; items: AdmissionRuleNode[] }
+  | { type: 'attendance'; kind: string; count: number }
+  | { type: 'duration'; months: number };
+
+/** Ausgewertete Voraussetzung einer Person: jeder Knoten mit Stand, Gruppen mit ihren ausgewerteten items. */
+export interface AdmissionRuleResult {
+  type: 'group' | 'attendance' | 'duration';
+  status: 'fulfilled' | 'open' | 'unknown';
+  /** Tag, an dem der Knoten erfüllt wurde */
+  on: string | null;
+  op?: 'and' | 'or';
+  items?: AdmissionRuleResult[];
+  kind?: string;
+  count?: number;
+  attended?: number;
+  missing?: number;
+  months?: number;
+  /** Dauer: Tag, ab dem sie erfüllt ist (null ohne „Anwärter seit“) */
+  due?: string | null;
+}
 
 /** Stand eines Anwärters für die Aufnahme als Mitglied (GET /admissions, Mitgliedsseite). */
 export interface Admission {
@@ -745,6 +771,8 @@ export interface Admission {
   fulfilled_on: string | null;
   /** fulfilled: erfüllt; open: noch nicht; none: Rolle ohne Voraussetzung */
   status: 'fulfilled' | 'open' | 'none';
+  /** Ausgewertete Voraussetzung (null ohne; fehlt bei älteren Servern) */
+  result?: AdmissionRuleResult | null;
 }
 
 export const roleInfo = (level: Level): RoleInfo | undefined => config?.roles?.find((r) => r.key === level);
@@ -2784,6 +2812,8 @@ export const api = {
   promote: (id: number) => request<{ id: number; level: Level }>('POST', `/members/${id}/promote`),
   /** Anwärter mit Stand der Voraussetzung (create_users). */
   admissions: () => request<Admission[]>('GET', '/admissions'),
+  /** Eigener Stand als Anwärter (null, wenn man keiner ist) */
+  myAdmission: () => request<{ admission: Admission | null }>('GET', '/me/admission'),
   /** Als Mitglied aufnehmen: Grundrolle → Mitglied bzw. Anwärter-Zusatzrolle entfernen; Eintritt = heute, wenn leer. */
   admit: (id: number) =>
     request<{ id: number; level: Level; extra_roles: Level[]; join_date: string | null }>('POST', `/members/${id}/admit`),

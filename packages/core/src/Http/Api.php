@@ -898,6 +898,8 @@ final class Api
             // Dienstgrade (Issue #9): eigener Stand und Verlauf, die Liste mit Schwellen (mit Punkten)
             new Route('GET', '/me/rank', Cap::ViewOwnRank, fn () => $a->ranks()->status($this->user()->id)
                 + ['ranks' => $a->ranks()->list(false), 'history' => $a->ranks()->history($this->user()->id)], 'ranks', $denyMember),
+            // Aufnahme: eigener Stand als Anwärter (Regel und was fehlt), null für alle anderen; nie der Stand anderer
+            new Route('GET', '/me/admission', $L, fn () => ['admission' => $a->features()->enabled('attendance') ? $a->admissions()->statusOf($this->user()->id) : null]),
             new Route('GET', '/me/attendance', Cap::ViewOwnAttendance, fn () => $a->attendance()->mine($this->user()->id), 'attendance', $denyMember),
             new Route('GET', '/me/points', Cap::ViewOwnPoints, fn () => $a->scores()->pointsFor($this->user()->id), 'points', $denyMember),
             // Meins → Meine Passiven: die Passiven, die die Person betreut, mit allen Angaben (bewusst auch ohne view_personal,
