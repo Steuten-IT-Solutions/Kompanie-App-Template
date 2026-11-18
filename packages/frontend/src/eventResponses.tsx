@@ -190,7 +190,7 @@ export function ResponseDetails({ ev, onChange }: { ev: CalendarEvent; onChange:
 }
 
 function ResponseNames({ list }: { list: EventResponseOverview }) {
-  const group = (title: string, people: { id: number; name: string; note?: string }[]) => (
+  const group = (title: string, people: { id: number; name: string; note?: string; late?: boolean }[]) => (
     <section className="event-response-group">
       <h4>
         {title} ({people.length})
@@ -203,6 +203,7 @@ function ResponseNames({ list }: { list: EventResponseOverview }) {
             <li key={p.id}>
               {p.name}
               {p.note && <span className="muted"> – {p.note}</span>}
+              {p.late && <span className="muted"> (nachträglich übertragen)</span>}
             </li>
           ))}
         </ul>

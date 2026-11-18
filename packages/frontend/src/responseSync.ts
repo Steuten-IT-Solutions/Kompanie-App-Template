@@ -85,7 +85,11 @@ async function run(): Promise<ResponseSyncResult> {
   const items = Object.entries(queue.all()).sort(([, a], [, b]) => a.at - b.at);
   for (const [id, pending] of items) {
     try {
-      await inBackground(() => (pending.status === null ? api.withdrawResponse(id) : api.respondEvent(id, pending.status, pending.note)));
+      // Mit der Zeit des Tippens: Was vor dem Ende der Frist getippt wurde, gilt auch, wenn es erst danach ankommt.
+      const decidedAt = new Date(pending.at).toISOString();
+      await inBackground(() =>
+        pending.status === null ? api.withdrawResponse(id, decidedAt) : api.respondEvent(id, pending.status, pending.note, decidedAt),
+      );
       responseOutbox.remove(id, pending);
       result.sent++;
     } catch (e) {

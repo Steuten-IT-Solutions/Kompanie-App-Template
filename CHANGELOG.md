@@ -26,6 +26,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Rechtzeitig getippte Zu- und Absagen gelten auch verspätet**: Wer vor dem Ende der Frist zu- oder absagt, aber kein
+  Netz hat, dessen Antwort gilt auch dann, wenn die App sie erst nach Beginn des Termins übertragen kann, ohne
+  zeitliche Grenze; maßgeblich ist die Uhrzeit des Handys. Bei den Rückmeldungen und in der
+  [Anwesenheit](app:verwaltung/anwesenheit) steht dann „nachträglich übertragen“.
+
 - **Neustart nach einem Update anbieten**: Holt jemand die App aus dem Hintergrund, sucht sie nach einer neuen Version
   (höchstens alle 15 Minuten, bei offener App einmal pro Stunde). Ist eine da, lädt die App sie im Hintergrund und
   zeigt oben _Die App wurde aktualisiert_ mit dem Knopf _Neu starten_. So sieht man Neuerungen sofort, statt erst beim

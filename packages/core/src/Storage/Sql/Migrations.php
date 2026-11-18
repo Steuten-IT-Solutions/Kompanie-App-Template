@@ -2174,6 +2174,12 @@ WHERE title IS NULL",
                 'mysql' => ['ALTER TABLE {registration_requests} ADD COLUMN company_ids varchar(255) NOT NULL DEFAULT \'\''],
                 'sqlite' => ['ALTER TABLE {registration_requests} ADD COLUMN company_ids TEXT NOT NULL DEFAULT \'\''],
             ],
+            // Zu- und Absagen, die offline vor dem Ende der Frist getippt wurden und erst danach ankamen (EventResponseService):
+            // Zeit des Tippens (UTC) zum Kennzeichnen „nachträglich übertragen“; NULL bei allen anderen.
+            72 => [
+                'mysql' => ['ALTER TABLE {event_responses} ADD COLUMN decided_at datetime DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {event_responses} ADD COLUMN decided_at TEXT DEFAULT NULL'],
+            ],
         ];
     }
 

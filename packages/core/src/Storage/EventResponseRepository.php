@@ -11,7 +11,7 @@ use KompanieApp\Core\Storage\Sql\Connection;
  * event_key ist die stabile Kennung des Termins in seiner Quelle (bei iCal response_key, sonst die Kennung des Termins).
  *
  * @phpstan-type EventResponse array{event_key: string, user_id: int, status: string, note: string, event_title: string,
- *     event_date: string, updated_by: int, created_at: string, updated_at: string}
+ *     event_date: string, updated_by: int, created_at: string, updated_at: string, decided_at: string|null}
  */
 final class EventResponseRepository
 {
@@ -45,10 +45,12 @@ final class EventResponseRepository
         return $r === null ? null : self::row($r);
     }
 
-    /** Rückmeldung setzen (anlegen oder ändern). */
-    public function save(string $key, int $userId, string $status, string $note, string $title, string $date, int $by, string $now): void
+    /**
+     * Rückmeldung setzen (anlegen oder ändern). $decidedAt: nach der Frist angekommen, aber vorher getippt (UTC), sonst null.
+     */
+    public function save(string $key, int $userId, string $status, string $note, string $title, string $date, int $by, string $now, ?string $decidedAt = null): void
     {
-        $values = ['status' => $status, 'note' => $note, 'event_title' => $title, 'event_date' => $date, 'updated_by' => $by, 'updated_at' => $now];
+        $values = ['status' => $status, 'note' => $note, 'event_title' => $title, 'event_date' => $date, 'updated_by' => $by, 'updated_at' => $now, 'decided_at' => $decidedAt];
         $this->db->transaction(function () use ($key, $userId, $values, $now): void {
             if ($this->db->update('event_responses', $values, ['event_key' => $key, 'user_id' => $userId]) === 0
                 && $this->find($key, $userId) === null) {
@@ -94,6 +96,7 @@ final class EventResponseRepository
             'updated_by' => (int) $r['updated_by'],
             'created_at' => (string) $r['created_at'],
             'updated_at' => (string) $r['updated_at'],
+            'decided_at' => isset($r['decided_at']) && $r['decided_at'] !== '' ? (string) $r['decided_at'] : null,
         ];
     }
 }

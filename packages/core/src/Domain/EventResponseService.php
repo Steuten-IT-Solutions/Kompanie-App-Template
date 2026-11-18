@@ -23,6 +23,10 @@ use KompanieApp\Core\Storage\EventResponseRepository;
  *   Namen und Hinweise sieht nur, wer Zu- und Absagen sehen darf (view_responses; Admins haben alle Rechte).
  * - Gezählt werden alle, die zusagen dürfen; die Rückmeldungen anderer (z. B. von Personen, denen das Recht inzwischen
  *   fehlt) bleiben gespeichert, zählen aber nicht.
+ * - Offline vorgemerkt (die App sendet später, decided_at = wann getippt): Wurde vor dem Ende der Frist getippt, gilt die
+ *   Antwort auch, wenn sie erst danach ankommt, ohne zeitliche Grenze (Entscheidung 18.11.2026). Die Zeit kommt vom
+ *   Gerät; liegt sie mehr als CLOCK_SKEW Sekunden in der Zukunft, gilt sie nicht. Solche Antworten sind als
+ *   „nachträglich übertragen“ gekennzeichnet (Spalte decided_at, sonst leer).
  * - Gespeichert wird je Person und stabiler Kennung des Termins (response_key, sonst id), mit Titel und Datum als
  *   Momentaufnahme. Rückmeldungen zu Terminen, die länger als CalendarService::PAST_DAYS vorbei sind, löscht cleanup().
  */
@@ -32,6 +36,8 @@ final class EventResponseService
     public const NO = 'no';
     public const STATUSES = [self::YES, self::NO];
     public const NOTE_MAX = 191;
+    /** So weit darf die Uhr des Geräts vorgehen (Sekunden), damit eine Zeit „wann getippt“ noch gilt */
+    public const CLOCK_SKEW = 300;
     /** Zu- und Absagen eingeschaltet (Einstellungen → Kalender); fehlt der Wert, sind sie aus */
     public const ENABLED_SETTING = 'event_responses_enabled';
     /** Erinnerung an alle ohne Rückmeldung (Einstellungen → Kalender): an/aus und Vorlauf in Tagen vor Beginn */
@@ -138,7 +144,7 @@ final class EventResponseService
      *
      * @return array<string, mixed>
      */
-    public function respond(User $user, string $id, mixed $status, mixed $note): array
+    public function respond(User $user, string $id, mixed $status, mixed $note, mixed $decidedAt = null): array
     {
         if (!is_string($status) || !in_array($status, self::STATUSES, true)) {
             throw ApiError::invalid('Bitte zusagen oder absagen.');
@@ -148,7 +154,7 @@ final class EventResponseService
         if (mb_strlen($note) > self::NOTE_MAX) {
             throw ApiError::invalid('Der Hinweis ist zu lang (höchstens ' . self::NOTE_MAX . ' Zeichen).');
         }
-        $event = $this->openEvent($id);
+        [$event, $late] = $this->openOrDecidedInTime($id, $decidedAt);
         $this->repository()->save(
             self::key($event),
             $user->id,
@@ -158,6 +164,7 @@ final class EventResponseService
             $this->localDate((string) $event['start']),
             $user->id,
             $this->app->time()->nowUtc(),
+            $late,
         );
         return $this->annotate($user, [$event])[0];
     }
@@ -167,10 +174,10 @@ final class EventResponseService
      *
      * @return array<string, mixed>
      */
-    public function withdraw(User $user, string $id): array
+    public function withdraw(User $user, string $id, mixed $decidedAt = null): array
     {
         $this->assertEnabled();
-        $event = $this->openEvent($id);
+        [$event] = $this->openOrDecidedInTime($id, $decidedAt);
         $this->repository()->delete(self::key($event), $user->id);
         return $this->annotate($user, [$event])[0];
     }
@@ -178,7 +185,7 @@ final class EventResponseService
     /**
      * Wer zu- oder abgesagt hat und wer sich noch nicht gemeldet hat (für alle, die Termine pflegen dürfen).
      *
-     * @return array{event: array<string, mixed>, yes: list<array{id: int, name: string, note: string}>, no: list<array{id: int, name: string, note: string}>, none: list<array{id: int, name: string}>}
+     * @return array{event: array<string, mixed>, yes: list<array{id: int, name: string, note: string, late: bool}>, no: list<array{id: int, name: string, note: string, late: bool}>, none: list<array{id: int, name: string}>}
      */
     public function overview(User $viewer, string $id): array
     {
@@ -194,7 +201,7 @@ final class EventResponseService
             if ($r === null || !in_array($r['status'], self::STATUSES, true)) {
                 $out['none'][] = ['id' => $u->id, 'name' => $u->name];
             } else {
-                $out[$r['status']][] = ['id' => $u->id, 'name' => $u->name, 'note' => $r['note']];
+                $out[$r['status']][] = ['id' => $u->id, 'name' => $u->name, 'note' => $r['note'], 'late' => $r['decided_at'] !== null];
             }
         }
         return $out;
@@ -239,7 +246,7 @@ final class EventResponseService
      * Rückmeldungen zu einem Termin für seine Anwesenheitsliste: ob es den Termin noch gibt, ob die Frist läuft, wer
      * zu- und absagen darf und wer wie geantwortet hat. Ohne den Termin (gelöscht, Kalender gestört) oder ausgeschaltet null.
      *
-     * @return array{open: bool, audience: array<int, true>, rows: array<int, array{status: string, note: string}>}|null
+     * @return array{open: bool, audience: array<int, true>, rows: array<int, array{status: string, note: string, late: bool}>}|null
      */
     public function forAttendance(string $id): ?array
     {
@@ -254,7 +261,7 @@ final class EventResponseService
         $rows = [];
         foreach ($this->repository()->forEvents([self::key($event)])[self::key($event)] ?? [] as $r) {
             if (in_array($r['status'], self::STATUSES, true)) {
-                $rows[$r['user_id']] = ['status' => $r['status'], 'note' => $r['note']];
+                $rows[$r['user_id']] = ['status' => $r['status'], 'note' => $r['note'], 'late' => $r['decided_at'] !== null];
             }
         }
         return [
@@ -471,6 +478,38 @@ final class EventResponseService
             throw new ApiError(409, 'responses_closed', 'Für diesen Termin kannst du nicht mehr zu- oder absagen.');
         }
         return $event;
+    }
+
+    /**
+     * Ein Termin, bei dem man noch zu- oder absagen kann, oder bei dem die Antwort vor dem Ende der Frist getippt wurde
+     * ($decidedAt, ISO 8601 vom Gerät; offline vorgemerkt). Zurück: der Termin und, wenn die Frist schon vorbei ist, die
+     * Zeit des Tippens (UTC, Y-m-d H:i:s) zum Kennzeichnen „nachträglich übertragen“, sonst null.
+     *
+     * @return array{0: array<string, mixed>, 1: string|null}
+     */
+    private function openOrDecidedInTime(string $id, mixed $decidedAt): array
+    {
+        $event = $this->event($id);
+        $now = $this->app->time()->timestamp();
+        $deadline = $this->deadline($event);
+        if ($now < $deadline) {
+            return [$event, null];
+        }
+        $decided = self::decidedAt($decidedAt);
+        if ($decided === null || $decided >= $deadline || $decided > $now + self::CLOCK_SKEW) {
+            throw new ApiError(409, 'responses_closed', 'Für diesen Termin kannst du nicht mehr zu- oder absagen.');
+        }
+        return [$event, gmdate('Y-m-d H:i:s', $decided)];
+    }
+
+    /** Zeit „wann getippt“ als Unix-Zeit; null, wenn nicht angegeben oder ungültig. */
+    private static function decidedAt(mixed $value): ?int
+    {
+        if (!is_string($value) || !preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/', $value)) {
+            return null;
+        }
+        $t = strtotime($value);
+        return $t === false ? null : $t;
     }
 
     /** @param array<string, mixed> $e */
