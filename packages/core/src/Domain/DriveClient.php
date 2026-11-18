@@ -40,6 +40,11 @@ final class DriveClient implements GallerySource
     /** uploadFile(): Größe der Stücke (Vielfaches von 256 KB). */
     public const UPLOAD_CHUNK = 8 * 1024 * 1024;
     /**
+     * uploadFile(): Wartezeiten in Sekunden vor den neuen Versuchen nach vorübergehenden Fehlern (HTTP 408, 429, 5xx,
+     * abgebrochene Verbindung), hintereinander; danach gilt das Hochladen als fehlgeschlagen.
+     */
+    public const RETRY_WAIT = [2, 5, 10, 20];
+    /**
      * Verbindung über OAuth: {client_id, client_secret, refresh_token, email, scope}. Entsteht über „Mit Google
      * verbinden“ (saveClient, createState, authorizeUrl, exchangeCode) oder durch die Übernahme einer früheren App
      * (saveOAuth, gleiches Format). `scope` sind die bei Google erlaubten Berechtigungen, durch Leerzeichen getrennt
@@ -72,8 +77,10 @@ final class DriveClient implements GallerySource
     public const UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
     public const FOLDER_MIME = 'application/vnd.google-apps.folder';
     private const TOKEN_CACHE = 'drive_token';
-    /** @var array{bytes: int, chunks: int, start_seconds: float, read_seconds: float, send_seconds: float, slowest_seconds: float, total_seconds: float}|null */
+    /** @var array{bytes: int, chunks: int, retries: int, start_seconds: float, read_seconds: float, send_seconds: float, slowest_seconds: float, total_seconds: float}|null */
     private ?array $lastUpload = null;
+    /** Wartet die angegebenen Sekunden (Tests ersetzen das über pauseWith()). */
+    private \Closure $pause;
 
     public function __construct(
         private readonly Settings $settings,
@@ -82,6 +89,15 @@ final class DriveClient implements GallerySource
         private readonly FileStorage $files,
         private readonly Time $time,
     ) {
+        $this->pause = static function (int $seconds): void {
+            sleep($seconds);
+        };
+    }
+
+    /** Ersetzt das Warten zwischen zwei Versuchen beim Hochladen (für Tests). */
+    public function pauseWith(\Closure $pause): void
+    {
+        $this->pause = $pause;
     }
 
     /** @return array{client_email: string, private_key: string, token_uri?: string}|null */
@@ -619,6 +635,11 @@ final class DriveClient implements GallerySource
      * Stücken von $chunk Bytes (Vielfaches von 256 KB, wie Google es verlangt): Die Datei muss nie ganz in den
      * Arbeitsspeicher (große Sicherungen).
      *
+     * Antwortet Google vorübergehend mit einem Fehler (HTTP 408, 429, 5xx, z. B. 502) oder bricht die Verbindung ab,
+     * wartet die App kurz (RETRY_WAIT), fragt nach, wie weit die Datei angekommen ist, und macht dort weiter, wie Google
+     * es für fortsetzbares Hochladen vorsieht. Erst wenn das mehrmals hintereinander scheitert, gilt das Hochladen als
+     * fehlgeschlagen.
+     *
      * Wie lange das gedauert hat, steht danach in lastUploadStats().
      *
      * @param (callable(int, int): void)|null $onProgress nach jedem angenommenen Stück: übertragene Bytes, Größe
@@ -633,27 +654,31 @@ final class DriveClient implements GallerySource
         }
         $this->lastUpload = null;
         $began = hrtime(true);
-        $stats = ['bytes' => $size, 'chunks' => 0, 'start_seconds' => 0.0, 'read_seconds' => 0.0, 'send_seconds' => 0.0, 'slowest_seconds' => 0.0];
+        $stats = ['bytes' => $size, 'chunks' => 0, 'retries' => 0, 'start_seconds' => 0.0, 'read_seconds' => 0.0, 'send_seconds' => 0.0, 'slowest_seconds' => 0.0];
         // Lesen von der Platte und Senden getrennt messen: Auf geteiltem Webspace kann beides begrenzt sein.
-        $read = static function (int $length) use ($in, &$stats): string {
+        $read = static function (int $offset, int $length) use ($in, &$stats): string {
             $t = hrtime(true);
+            fseek($in, $offset);
             $data = (string) ($length > 0 ? fread($in, $length) : stream_get_contents($in));
             $stats['read_seconds'] += (hrtime(true) - $t) / 1e9;
             return $data;
         };
         $send = function (string $location, array $headers, string $part) use (&$stats): array {
             $t = hrtime(true);
-            $res = $this->http->request('PUT', $location, $headers, $part, 300);
-            $seconds = (hrtime(true) - $t) / 1e9;
-            $stats['chunks']++;
-            $stats['send_seconds'] += $seconds;
-            $stats['slowest_seconds'] = max($stats['slowest_seconds'], $seconds);
-            return $res;
+            try {
+                return $this->http->request('PUT', $location, $headers, $part, 300);
+            } finally {
+                $seconds = (hrtime(true) - $t) / 1e9;
+                $stats['chunks']++;
+                $stats['send_seconds'] += $seconds;
+                $stats['slowest_seconds'] = max($stats['slowest_seconds'], $seconds);
+            }
         };
         $done = function () use (&$stats, $began): void {
             $this->lastUpload = [
                 'bytes' => $stats['bytes'],
                 'chunks' => $stats['chunks'],
+                'retries' => $stats['retries'],
                 'start_seconds' => round($stats['start_seconds'], 3),
                 'read_seconds' => round($stats['read_seconds'], 3),
                 'send_seconds' => round($stats['send_seconds'], 3),
@@ -666,34 +691,97 @@ final class DriveClient implements GallerySource
             $location = $this->startUpload($folderId, $name, $mime, $size);
             $stats['start_seconds'] = (hrtime(true) - $t) / 1e9;
             $onProgress && $onProgress(0, $size);
-            if ($size <= $chunk) {
-                $id = self::uploadedId($send($location, ['Content-Type' => $mime], $read(0)));
-                $done();
-                return $id;
-            }
-            for ($start = 0; $start < $size; $start += $chunk) {
-                $part = $read($chunk);
-                $end = $start + strlen($part) - 1;
-                $res = $send($location, [
-                    'Content-Type' => $mime,
-                    'Content-Range' => sprintf('bytes %d-%d/%d', $start, $end, $size),
-                ], $part);
-                if ($end + 1 < $size) {
-                    // 308: Stück angenommen, weiter
-                    if ($res['status'] !== 308) {
-                        throw new \RuntimeException('Google Drive: Das Hochladen ist fehlgeschlagen: ' . self::errorMessage(json_decode($res['body'], true), $res['status']));
-                    }
-                    $onProgress && $onProgress($end + 1, $size);
+            $offset = 0;
+            $failures = 0;
+            while (true) {
+                // Kleine Datei in einem Stück (ohne Content-Range); sonst ab $offset
+                $whole = $size <= $chunk && $offset === 0;
+                $part = $read($offset, $whole ? 0 : $chunk);
+                $end = $offset + strlen($part) - 1;
+                $headers = ['Content-Type' => $mime] + ($whole ? [] : ['Content-Range' => sprintf('bytes %d-%d/%d', $offset, $end, $size)]);
+                try {
+                    $res = $send($location, $headers, $part);
+                    $error = null;
+                } catch (\RuntimeException $e) {
+                    $res = null;
+                    $error = $e->getMessage();
+                }
+                if ($res !== null && in_array($res['status'], [200, 201], true)) {
+                    $id = self::uploadedId($res);
+                    $done();
+                    return $id;
+                }
+                if ($res !== null && $res['status'] === 308 && $end + 1 < $size) {
+                    // Stück angenommen; Google bestätigt, was angekommen ist (nicht unbedingt das ganze Stück)
+                    $offset = self::confirmedOffset($res, $end + 1);
+                    $failures = 0;
+                    $onProgress && $onProgress($offset, $size);
                     continue;
                 }
-                $id = self::uploadedId($res);
-                $done();
-                return $id;
+                if ($res !== null && !self::retryable($res['status'])) {
+                    throw new \RuntimeException('Google Drive: Das Hochladen ist fehlgeschlagen: ' . self::errorMessage(json_decode($res['body'], true), $res['status']));
+                }
+                // Vorübergehender Fehler: warten, nachfragen, wie weit die Datei ist, dort weitermachen
+                $reason = $error ?? self::errorMessage(json_decode($res['body'] ?? '', true), $res['status'] ?? 0);
+                if ($failures >= count(self::RETRY_WAIT)) {
+                    throw new \RuntimeException('Google Drive: Das Hochladen ist fehlgeschlagen: ' . $reason . ' (' . ($failures + 1) . ' Versuche)');
+                }
+                ($this->pause)(self::RETRY_WAIT[$failures++]);
+                $stats['retries']++;
+                $state = $this->uploadState($location, $size);
+                if ($state === null) {
+                    continue; // auch die Nachfrage scheiterte vorübergehend: nächster Versuch ab demselben Stand
+                }
+                if (is_string($state)) {
+                    $done();
+                    return $state; // war doch schon ganz angekommen
+                }
+                $offset = $state;
             }
-            throw new \RuntimeException('Google Drive: Das Hochladen ist fehlgeschlagen (unvollständig).');
         } finally {
             fclose($in);
         }
+    }
+
+    /** Ob ein Fehler beim Hochladen vorübergehend ist und ein neuer Versuch lohnt (Google: 408, 429, 5xx). */
+    private static function retryable(int $status): bool
+    {
+        return $status === 408 || $status === 429 || $status >= 500;
+    }
+
+    /**
+     * Fragt nach einem vorübergehenden Fehler, wie weit ein fortsetzbares Hochladen angekommen ist.
+     *
+     * @return string|int|null ID der fertigen Datei, bestätigte Bytes, oder null (Nachfrage scheiterte vorübergehend)
+     * @throws \RuntimeException wenn die Sitzung bei Google abgelaufen ist oder Google den Stand verweigert
+     */
+    private function uploadState(string $location, int $size): string|int|null
+    {
+        try {
+            $res = $this->http->request('PUT', $location, ['Content-Range' => 'bytes */' . $size], '', 30);
+        } catch (\RuntimeException) {
+            return null;
+        }
+        if (in_array($res['status'], [200, 201], true)) {
+            return self::uploadedId($res);
+        }
+        if ($res['status'] === 308) {
+            return self::confirmedOffset($res, 0);
+        }
+        if (self::retryable($res['status'])) {
+            return null;
+        }
+        throw new \RuntimeException('Google Drive: Das Hochladen ließ sich nicht fortsetzen: ' . self::errorMessage(json_decode($res['body'], true), $res['status']));
+    }
+
+    /**
+     * Bestätigte Bytes aus der Antwort 308 (Kopfzeile Range „bytes=0-<letztes>“); ohne Range ist noch nichts da.
+     *
+     * @param array{status: int, headers?: array<string, string>, body: string} $res
+     */
+    private static function confirmedOffset(array $res, int $fallback): int
+    {
+        return preg_match('/bytes=0-(\d+)/', (string) ($res['headers']['range'] ?? ''), $m) === 1 ? (int) $m[1] + 1 : $fallback;
     }
 
     /**
@@ -701,7 +789,7 @@ final class DriveClient implements GallerySource
      * beginnen, eine kleine Anfrage: Verbindungsaufbau und Antwortzeit), read (Datei von der Platte lesen), send (alle
      * Stücke senden, bis Google sie bestätigt), slowest (langsamstes Stück), total (alles).
      *
-     * @return array{bytes: int, chunks: int, start_seconds: float, read_seconds: float, send_seconds: float, slowest_seconds: float, total_seconds: float}|null
+     * @return array{bytes: int, chunks: int, retries: int, start_seconds: float, read_seconds: float, send_seconds: float, slowest_seconds: float, total_seconds: float}|null
      */
     public function lastUploadStats(): ?array
     {

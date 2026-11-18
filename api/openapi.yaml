@@ -8497,10 +8497,11 @@ components:
               last_upload:
                 type: [object, 'null']
                 description: Messung des letzten erfolgreichen Hochladens (Sekunden); null, solange es keine gibt
-                required: [bytes, chunks, start_seconds, read_seconds, send_seconds, slowest_seconds, total_seconds]
+                required: [bytes, chunks, retries, start_seconds, read_seconds, send_seconds, slowest_seconds, total_seconds]
                 properties:
                   bytes: { type: integer }
                   chunks: { type: integer, description: Anzahl der Anfragen mit Daten (Stücke von 8 MB) }
+                  retries: { type: integer, description: Neue Versuche nach vorübergehenden Fehlern (HTTP 408, 429, 5xx) }
                   start_seconds:
                     { type: number, description: Sitzung bei Google beginnen (kleine Anfrage, Verbindungsaufbau und Antwortzeit) }
                   read_seconds: { type: number, description: Datei von der Platte des Servers lesen }

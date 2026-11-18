@@ -324,7 +324,7 @@ final class BackupUploadService implements OffsiteBackup
         if (!is_array($raw) || !is_int($raw['bytes'] ?? null) || !is_int($raw['chunks'] ?? null)) {
             return null;
         }
-        $out = ['bytes' => $raw['bytes'], 'chunks' => $raw['chunks']];
+        $out = ['bytes' => $raw['bytes'], 'chunks' => $raw['chunks'], 'retries' => is_int($raw['retries'] ?? null) ? $raw['retries'] : 0];
         foreach (['start_seconds', 'read_seconds', 'send_seconds', 'slowest_seconds', 'total_seconds'] as $k) {
             $out[$k] = is_int($raw[$k] ?? null) || is_float($raw[$k] ?? null) ? (float) $raw[$k] : 0.0;
         }

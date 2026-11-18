@@ -3547,6 +3547,8 @@ export interface BackupDriveStatus {
 export interface BackupUploadStats {
   bytes: number;
   chunks: number;
+  /** neue Versuche nach vorübergehenden Fehlern (z. B. HTTP 502 von Google) */
+  retries: number;
   /** Sitzung bei Google beginnen (eine kleine Anfrage: Verbindungsaufbau und Antwortzeit) */
   start_seconds: number;
   /** Datei von der Platte des Servers lesen */
