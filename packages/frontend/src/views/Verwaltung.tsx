@@ -114,7 +114,7 @@ import { FORMER_SORTS, FormerImport, FormerList, FormerPanel, NewFormer, REASON_
 import { MemberImport } from './MitgliederImport';
 import { startPersonPreview } from '../preview';
 import { MemberAttendance } from '../memberAttendance';
-import { Anfragen } from './Anfragen';
+import { AnfrageDetail, Anfragen } from './Anfragen';
 import { Meldungen } from './Meldungen';
 import { Aenderungen } from './Aenderungen';
 import { newlyDue } from '../promotionCheck';
@@ -242,8 +242,10 @@ export default function Verwaltung({ path, onToast }: { path: string[]; onToast:
         <PassiveDetail key="passive-card" id={Number(arg)} onToast={onToast} />
       ) : active === 'passive' ? (
         <PassiveAdmin onToast={onToast} />
+      ) : active === 'anfragen' && arg && /^\d+$/.test(arg) ? (
+        <AnfrageDetail key="registration-card" id={Number(arg)} onToast={onToast} />
       ) : active === 'anfragen' ? (
-        <Anfragen onToast={onToast} />
+        <Anfragen />
       ) : active === 'meldungen' ? (
         <Meldungen onToast={onToast} />
       ) : active === 'aenderungen' ? (
