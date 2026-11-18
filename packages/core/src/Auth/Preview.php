@@ -24,10 +24,12 @@ use KompanieApp\Core\Port\UserDirectory;
  *   /config meldet dann preview: null, und die App beendet die Vorschau.
  * - Als Rolle: dieselbe Person (ID, Name, Benutzername – persönliche Bereiche zeigen die eigenen Daten des Admins), aber
  *   mit dieser Grundrolle, ohne Zusatzrollen, und mit genau deren Rechten.
- * - Als Person: ebenso dieselbe Person (persönliche Bereiche wie Mails, Punkte oder Konto zeigen weiter die eigenen Daten
- *   des Admins, nie die der Person), aber mit der Grundrolle der Person und genau ihren Rechten, wie das
- *   Benutzerverzeichnis sie ausrechnet: Grundrolle, Zusatzrollen und Ausnahmen zusammen. Nie mehr als die Rechte des
- *   Admins selbst.
+ * - Als Person: ID, Name und Benutzername der Person (User::$previewPerson), damit „Meins“ und andere eigene Bereiche
+ *   ihre Daten zeigen (Punkte, Strafen, Anwesenheit, Zu- und Absagen, Konto), mit der Grundrolle der Person und genau
+ *   ihren Rechten, wie das Benutzerverzeichnis sie ausrechnet: Grundrolle, Zusatzrollen und Ausnahmen zusammen. Nie mehr
+ *   als die Rechte des Admins selbst. Nur lesen (siehe unten); angemeldet bleibt der Admin (Sitzung, Abmelden). Die
+ *   eigenen Daten der Person gibt es nur, wenn der Admin persönliche Angaben sehen darf (view_personal), sonst behält
+ *   die Vorschau seine Identität. Anonyme Antworten der Person in Umfragen zeigt sie nie (PollService).
  * - @public: wie ohne Anmeldung (Gast ohne Konto).
  * - Nur ansehen: Trägt eine Anfrage den Header oder Parameter (auch ungültig oder von Nicht-Admins), lehnt die API jede
  *   ändernde Anfrage ab (403 preview_readonly), außer dem Abmelden (Api::PREVIEW_OPEN).
@@ -142,7 +144,10 @@ final class Preview implements AuthContext
         return $this->role() !== null;
     }
 
-    /** Wer die Anfrage stellt – in der Vorschau die Person mit der gewählten Rolle bzw. niemand (@public). */
+    /**
+     * Wer die Anfrage stellt – in der Vorschau als Rolle der Admin mit dieser Rolle, als Person die Person selbst (nur
+     * lesen), bei @public niemand.
+     */
     public function currentUser(): ?User
     {
         $real = $this->real->currentUser();
@@ -159,7 +164,9 @@ final class Preview implements AuthContext
             if ($person !== null) {
                 // Rechte der Person (Grundrolle, Zusatzrollen, Ausnahmen), aber nie mehr als die des Admins selbst.
                 $caps = array_values(array_filter($person->capabilities, static fn (Capability $c): bool => $real->can($c)));
-                $this->substitute = [$key, new User($real->id, $real->name, $real->login, $person->role, $caps, $real->firstName, $real->lastName, true)];
+                // Ihre eigenen Daten nur, wenn der Admin persönliche Angaben sehen darf; sonst seine Identität wie als Rolle.
+                $own = $real->can(Capability::ViewPersonal) ? $person : $real;
+                $this->substitute = [$key, new User($own->id, $own->name, $own->login, $person->role, $caps, $own->firstName, $own->lastName, true, $own === $person)];
             } else {
                 // Nur die Rechte der Rolle selbst, nicht capabilitiesFor (das nähme gespeicherte Zusatzrollen des Kontos dazu).
                 $this->substitute = [$key, new User($real->id, $real->name, $real->login, $role, ($this->roles)()->capabilities($role), $real->firstName, $real->lastName, true)];

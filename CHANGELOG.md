@@ -148,8 +148,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   sie sieht, mit allen ihren Rollen zusammen (Grundrolle, Zusatzrollen und einzeln gegebene oder entzogene Rechte). Du
   startest sie auf der Seite der Person in der [Verwaltung → Mitglieder](app:verwaltung/mitglieder) unter _Konto und
   Rolle_ mit _App als … ansehen_; das Banner zeigt ihren Namen und ihre Rollen. Wie die Vorschau als Rolle ist sie nur
-  für Admins, nur zum Ansehen und zeigt bei persönlichen Seiten (z. B. _Meins_) weiter deine eigenen Daten, nicht die
-  der Person.
+  für Admins und nur zum Ansehen. _Meins_ und andere persönliche Stellen zeigen dabei die Daten der Person (z. B. ihre
+  Punkte, Strafen, Anwesenheit, Zu- und Absagen und ihr Konto), nur ihre Antworten in anonymen Umfragen nicht.
 
 - **Zu- und Absagen ohne Internet**: Ohne Verbindung merkt sich die App Zusagen, Absagen, Hinweise und das Zurücknehmen
   auf dem Gerät, zeigt sie gleich an (mit „Noch nicht übertragen“) und sendet sie von selbst, sobald wieder Netz da ist.
