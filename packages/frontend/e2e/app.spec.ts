@@ -7403,6 +7403,12 @@ test('Anfragen auf einen Zugang: Liste nur mit Namen, Karte je Anfrage zum Blät
     ...extra,
   });
   let requests = [request(9101, 'Zora', 'Zander'), request(9102, 'Anna', 'Ahrens', { message: 'Ich bin neu dabei.' })];
+  // Mit dem Bereich Kompanien: Anna hat die zweite Kompanie gewählt
+  const companies = [
+    { id: 9201, name: 'Erste Testkompanie', active: true },
+    { id: 9202, name: 'Zweite Testkompanie', active: true },
+  ];
+  requests[1] = { ...requests[1], companies: [{ id: 9202, name: 'Zweite Testkompanie' }], company_choice: 'company' };
   const approved: number[] = [];
   await page.addInitScript(() => {
     // „Zugang beantragen“ an, ohne die Einstellung der Testinstallation zu ändern
@@ -7418,7 +7424,7 @@ test('Anfragen auf einen Zugang: Liste nur mit Namen, Karte je Anfrage zum Blät
   // Über den Kontext: Der Service Worker stellt Anfragen selbst, die sieht page.route nicht.
   await page.context().route('**/registrations', async (route) => {
     if (route.request().method() !== 'GET') return route.continue();
-    await route.fulfill({ json: { requests, default_role: 'member', email_confirmation: false, no_access_members: [] } });
+    await route.fulfill({ json: { requests, companies, default_role: 'member', email_confirmation: false, no_access_members: [] } });
   });
   await page.context().route('**/registrations/*/approve', async (route) => {
     const id = Number(/registrations\/(\d+)\/approve/.exec(route.request().url())![1]);
@@ -7444,6 +7450,15 @@ test('Anfragen auf einen Zugang: Liste nur mit Namen, Karte je Anfrage zum Blät
   await expect(card.locator('.registration-details')).toContainText('Ich bin neu dabei.');
   await expect(card.locator('.registration-details')).toContainText('anna@example.org');
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/anfrage-karte.png`, fullPage: true });
+  // Kompanie zuordnen: eingeklappt mit der gewählten Kompanie, aufgeklappt alle mit Haken an der gewählten
+  const assign = card.locator('.registration-companies');
+  await expect(assign.locator('.registration-companies-summary')).toHaveText('Zweite Testkompanie');
+  await expect(assign.getByRole('checkbox', { name: 'Erste Testkompanie' })).toBeHidden();
+  await assign.getByRole('button', { name: 'Kompanie zuordnen' }).click();
+  await expect(assign.getByRole('checkbox', { name: 'Zweite Testkompanie' })).toBeChecked();
+  await assign.getByRole('checkbox', { name: 'Erste Testkompanie' }).check();
+  await assign.getByRole('button', { name: 'Kompanie zuordnen' }).click();
+  await expect(assign.locator('.registration-companies-summary')).toHaveText('Erste Testkompanie, Zweite Testkompanie');
   // Blättern zur nächsten Anfrage der Liste
   await card.getByRole('button', { name: 'Nächste Anfrage' }).click();
   await expect(card.getByRole('heading', { name: 'Zora Zander' })).toBeVisible();

@@ -233,6 +233,9 @@ function RequestCard({
   const [companyIds, setCompanyIds] = useState<number[]>(chosen);
   // Ändern nur mit „Kompanien verwalten“ (prüft der Server); zur Wahl stehen die aktiven und die gewählten.
   const companyChoices = companies && can('manage_companies') ? companies.filter((c) => c.active || chosen.includes(c.id)) : null;
+  // Eingeklappt: nur die gewählten Kompanien; Aufklappen zeigt alle zum Ändern
+  const [companiesOpen, setCompaniesOpen] = useState(false);
+  const selectedNames = (companyChoices ?? []).filter((c) => companyIds.includes(c.id)).map((c) => c.name);
   const companiesChanged = companyIds.length !== chosen.length || companyIds.some((id) => !chosen.includes(id));
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
@@ -323,18 +326,51 @@ function RequestCard({
       )}
       {companyChoices && companyChoices.length > 0 && (
         <section className="card registration-companies" aria-label="Kompanie zuordnen">
-          <h3>Kompanie zuordnen</h3>
-          {companyChoices.map((c) => (
-            <label key={c.id} className="toggle">
-              <input
-                type="checkbox"
-                checked={companyIds.includes(c.id)}
-                onChange={(e) => setCompanyIds((ids) => (e.target.checked ? [...ids, c.id] : ids.filter((x) => x !== c.id)))}
-              />
-              {c.name}
-              {!c.active && <span className="muted small"> (ehemalig)</span>}
-            </label>
-          ))}
+          <h3>
+            <button
+              type="button"
+              className="member-filters-toggle registration-companies-toggle"
+              aria-expanded={companiesOpen}
+              aria-controls={`registration-companies-${r.id}`}
+              onClick={() => setCompaniesOpen(!companiesOpen)}
+            >
+              Kompanie zuordnen
+              <span className="member-filters-arrow" aria-hidden="true">
+                ›
+              </span>
+            </button>
+          </h3>
+          {!companiesOpen && (
+            <p className="small registration-companies-summary">
+              {selectedNames.length > 0 ? (
+                selectedNames.join(', ')
+              ) : (
+                <span className="muted">
+                  keine ausgewählt
+                  {r.company_choice === 'none'
+                    ? ' (in der Anfrage: Keine Kompanie)'
+                    : r.company_choice === 'passive'
+                      ? ' (in der Anfrage: Passiv)'
+                      : !r.company_choice
+                        ? ' (die Anfrage hat keine Angabe)'
+                        : ''}
+                </span>
+              )}
+            </p>
+          )}
+          <div id={`registration-companies-${r.id}`} hidden={!companiesOpen}>
+            {companyChoices.map((c) => (
+              <label key={c.id} className="toggle">
+                <input
+                  type="checkbox"
+                  checked={companyIds.includes(c.id)}
+                  onChange={(e) => setCompanyIds((ids) => (e.target.checked ? [...ids, c.id] : ids.filter((x) => x !== c.id)))}
+                />
+                {c.name}
+                {!c.active && <span className="muted small"> (ehemalig)</span>}
+              </label>
+            ))}
+          </div>
           <p className="muted small">
             {linkTo ? 'Zusätzlich zu den Kompanien des Mitglieds. ' : ''}Zugeordnet werden nur Personen mit einer Rolle für Mitglieder.
           </p>

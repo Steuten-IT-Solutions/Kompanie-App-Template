@@ -6972,6 +6972,19 @@ section.settings-section > .gallery-upload-list:last-child {
 .registration-footnote {
   margin-top: 14px;
 }
+/* „Kompanie zuordnen“ einklappbar: Knopf als Überschrift, eingeklappt nur die gewählten Kompanien */
+.registration-companies h3 {
+  margin: 0;
+}
+.registration-companies-toggle {
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  padding-left: 0;
+}
+.registration-companies-summary {
+  margin: 0 0 8px;
+}
 /* Tag der Anfrage mittig unter dem Namen */
 .registration-date {
   text-align: center;
