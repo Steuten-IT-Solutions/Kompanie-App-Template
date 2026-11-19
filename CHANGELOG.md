@@ -32,8 +32,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   für die Breite; Zurücksetzen auf die Vorgabe). Die Anordnung gilt nur für die Person, wird im Konto gespeichert und
   gilt je Bildschirmbreite (2, 3 oder 4 Spalten); ohne Anmeldung merkt sie sich das Gerät. Die Reihenfolge unter
   [Einstellungen → Navigation](app:einstellungen/navigation) bleibt die Vorgabe für alle anderen; fehlt jemandem eine
-  Kachel, rücken die Kacheln derselben Zeile nach links. Am Computer und auf dem Handy quer haben die Kachel-Seiten
-  dafür jetzt eine feste Spaltenzahl.
+  Kachel, wird die schmalste Kachel derselben Zeile (bei gleicher Breite die linke) um deren Breite breiter. Am
+  Computer und auf dem Handy quer haben die Kachel-Seiten dafür jetzt eine feste Spaltenzahl.
 - **Raster als Vorgabe für alle**: Wer die Einstellungen ändern darf, ordnet eine Kachel-Seite an und tippt beim
   Anordnen auf _Als Vorgabe für alle_. Plätze und Breiten gelten dann für jede Person ohne eigene Anordnung, auch ohne
   Anmeldung und in der Vorschau, je Bildschirmbreite; _Vorgabe löschen_ kehrt zur Reihenfolge unter

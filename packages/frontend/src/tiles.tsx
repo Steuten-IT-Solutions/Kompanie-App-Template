@@ -109,7 +109,7 @@ export function TileArrange({ pages, children }: { pages: string[]; children: Re
     const shown = [...grids.current].map(([page, current]) => ({ page, ...current() }));
     const cols = shown[0]?.cols ?? 2;
     const ok = await confirmAsk(
-      `Diese Anordnung als Vorgabe für alle festlegen? Sie gilt für jede Person ohne eigene Anordnung, bei ${cols} Spalten (diese Bildschirmbreite); wer eine Kachel nicht sieht, bei dem rücken die Kacheln der Zeile nach links.`,
+      `Diese Anordnung als Vorgabe für alle festlegen? Sie gilt für jede Person ohne eigene Anordnung, bei ${cols} Spalten (diese Bildschirmbreite); wer eine Kachel nicht sieht, bei dem wird die schmalste Kachel der Zeile breiter.`,
       { title: 'Vorgabe für alle', okLabel: 'Festlegen' },
     );
     if (!ok) return;
