@@ -2184,6 +2184,15 @@ code {
   display: grid;
   place-items: center;
 }
+.lb-share {
+  top: calc(14px + env(safe-area-inset-top));
+  right: 70px;
+  display: grid;
+  place-items: center;
+}
+.lb-download ~ .lb-share {
+  right: 126px;
+}
 .lightbox .lb-download-busy {
   width: 22px;
   height: 22px;
