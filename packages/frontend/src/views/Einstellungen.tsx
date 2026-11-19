@@ -39,12 +39,23 @@ import { formatBytes, formatUntil } from '../format';
 import { menuSources, prefetchOnTap, sources, usePrefetchMenu } from '../viewData';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
+import { TileGrid } from '../tiles';
 
 const sec = brand.labels.sections;
 
 /** Seiten der Einstellungen: Adresse (#/einstellungen/<id>), Titel und ein Satz für die Übersicht. */
 /** Gruppen der Übersicht (Issue #348): Kacheln je Gruppe statt einer langen Liste. */
 const GROUPS = ['App', 'Mitglieder und Zugang', 'Benachrichtigungen', 'Verbindungen', 'Termine und Kalender', 'Betrieb'] as const;
+
+/** Kennung je Gruppe für die persönliche Anordnung der Kacheln (Seite einstellungen/<Kennung>); nie ändern. */
+const GROUP_KEYS: Record<(typeof GROUPS)[number], string> = {
+  App: 'app',
+  'Mitglieder und Zugang': 'mitglieder',
+  Benachrichtigungen: 'benachrichtigungen',
+  Verbindungen: 'verbindungen',
+  'Termine und Kalender': 'termine',
+  Betrieb: 'betrieb',
+};
 
 const PAGES = [
   { id: 'bereiche', group: 'App', title: 'Bereiche' },
@@ -133,9 +144,12 @@ function Overview() {
         return (
           <section key={g} className="settings-group" aria-label={g}>
             <h3 className="settings-group-title">{g}</h3>
-            <ul className="settings-tiles">
-              {list.map((p) => (
-                <li key={p.id}>
+            <TileGrid
+              page={`einstellungen/${GROUP_KEYS[g]}`}
+              className="settings-tiles"
+              tiles={list.map((p) => ({
+                id: p.id,
+                node: (
                   <button
                     type="button"
                     className="card settings-link settings-tile"
@@ -147,9 +161,9 @@ function Overview() {
                       ›
                     </span>
                   </button>
-                </li>
-              ))}
-            </ul>
+                ),
+              }))}
+            />
           </section>
         );
       })}

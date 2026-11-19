@@ -1,28 +1,33 @@
 import { AdminIcon } from './adminNav';
 import { targetIcon } from './navigation';
 import { navigate } from './router';
+import { TileGrid } from './tiles';
 import { Caps } from './ui';
 
 /** Bereich eines Untermenüs: eigene Ansicht (#/<id>). */
 export type InternTab = { id: string; label: string };
 
 /** Startseite eines Untermenüs („Intern“ mit dem Recht view_intern oder eines aus Einstellungen → Navigation, Issue #277):
- * je Bereich, den die Person sieht, ein Knopf mit Symbol wie in der Verwaltung. */
-export function InternMenu({ tabs, label = 'Intern' }: { tabs: InternTab[]; label?: string }) {
+ * je Bereich, den die Person sieht, ein Knopf mit Symbol wie in der Verwaltung, in der persönlichen Anordnung (page:
+ * intern oder menue/<n>). */
+export function InternMenu({ tabs, label = 'Intern', page = 'intern' }: { tabs: InternTab[]; label?: string; page?: string }) {
   return (
     <nav aria-label={label}>
-      <ul className="admin-tiles">
-        {tabs.map((t) => (
-          <li key={t.id}>
+      <TileGrid
+        page={page}
+        className="admin-tiles"
+        tiles={tabs.map((t) => ({
+          id: t.id,
+          node: (
             <button type="button" className="card admin-tile" onClick={() => navigate(t.id)}>
               <AdminIcon id={targetIcon(t.id)} />
               <span>
                 <Caps text={t.label} />
               </span>
             </button>
-          </li>
-        ))}
-      </ul>
+          ),
+        }))}
+      />
     </nav>
   );
 }

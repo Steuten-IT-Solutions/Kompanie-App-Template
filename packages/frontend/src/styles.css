@@ -2614,7 +2614,7 @@ code {
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
-/* Startseite der Verwaltung: je Bereich ein Knopf mit Symbol */
+/* Startseite der Verwaltung: je Bereich ein Knopf mit Symbol; die Spaltenzahl (2 bis 4) setzt tiles.tsx */
 .admin-tiles {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2622,11 +2622,6 @@ code {
   margin: 0;
   padding: 0;
   list-style: none;
-}
-@media (min-width: 560px) {
-  .admin-tiles {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 .admin-tiles li {
   display: flex;
@@ -2660,6 +2655,12 @@ code {
 .admin-tile svg {
   flex: none;
   color: var(--accent-text);
+}
+/* Kachelraster mit persönlicher Anordnung (tiles.tsx): Spalten und Lage setzt die App; breite Kacheln zeigen Symbol und
+   Text nebeneinander */
+.tile-grid > li.wide > .admin-tile {
+  flex-direction: row;
+  gap: 14px;
 }
 /* Kleine Zahl im Kreis an der oberen rechten Ecke einer Kachel (z. B. Mitglieder, die zur Beförderung bereit sind) */
 .admin-tile {
@@ -6432,10 +6433,6 @@ button.spotlight-person:focus-visible {
   .office-group > .section-title,
   .office-group > .office-card.open {
     grid-column: 1 / -1;
-  }
-  .admin-tiles {
-    /* so viele Spalten, wie lange Wörter („Beförderungen“) ungebrochen passen; bei 844 px vier */
-    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   }
   .album-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));

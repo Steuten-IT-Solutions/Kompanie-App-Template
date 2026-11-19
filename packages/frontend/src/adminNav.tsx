@@ -8,6 +8,7 @@ import { Caps } from './ui';
 import { useAdminCounts } from './adminCounts';
 import { usePromotionsDue } from './promotionsDue';
 import { tileCount } from './tileCount';
+import { TileGrid } from './tiles';
 import { menuSources, prefetchOnTap, usePrefetchMenu } from './viewData';
 
 const sec = brand.labels.sections;
@@ -444,11 +445,14 @@ export function AdminMenu({ group }: { group?: string }) {
   );
   return (
     <nav aria-label={group ? 'Einrichtungen' : 'Verwaltung'}>
-      <ul className="admin-tiles">
-        {(group ? setupTabs() : startTabs()).map((t) => {
+      <TileGrid
+        page={group ? 'einrichtungen' : 'verwaltung'}
+        className="admin-tiles"
+        tiles={(group ? setupTabs() : startTabs()).map((t) => {
           const badge = tileCount(t.id, counts);
-          return (
-            <li key={t.id}>
+          return {
+            id: t.id,
+            node: (
               <button
                 type="button"
                 className="card admin-tile"
@@ -467,10 +471,10 @@ export function AdminMenu({ group }: { group?: string }) {
                   </span>
                 )}
               </button>
-            </li>
-          );
+            ),
+          };
         })}
-      </ul>
+      />
     </nav>
   );
 }

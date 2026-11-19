@@ -11,6 +11,7 @@ import { rememberRoute } from './share';
 import { markSaved } from './unsaved';
 import { noteResponse } from './connection';
 import type { AdminOrder, NavigationSetting, NavNames, NavStart } from './navigation';
+import type { TileLayouts } from './tileGrid';
 
 /** Schlüssel einer Rolle: guest, member, admin, früher fest (organizer, manager, candidate) oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
@@ -193,6 +194,8 @@ export interface AppConfig {
   navigation_intern_order?: string[];
   /** Reihenfolge der Kacheln der Verwaltung je Gruppe (leer kann als [] kommen); fehlt bei älteren Servern */
   admin_order?: AdminOrder | [];
+  /** Eigene Anordnung der Kacheln je Seite (tileGrid.ts); null ohne Anmeldung und in der Vorschau, fehlt bei älteren Servern */
+  tile_layouts?: Record<string, TileLayouts> | null;
   /** Eigene Namen als Abschnitte (brand.labels.sections), übernimmt generated/brand.ts beim Laden */
   section_labels?: Record<string, string>;
   /** Eigene Seiten (Issue #287), die die Person lesen darf, in ihrer Reihenfolge; fehlt bei älteren Servern */

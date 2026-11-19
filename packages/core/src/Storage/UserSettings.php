@@ -35,6 +35,22 @@ final class UserSettings
         $this->db->execute('DELETE FROM {user_settings} WHERE user_id = ? AND name = ?', [$userId, $name]);
     }
 
+    /**
+     * Alle Einträge eines Kontos, deren Name mit $prefix beginnt (ohne % und _ im Präfix).
+     *
+     * @return array<string, string> Name => Wert
+     */
+    public function withPrefix(int $userId, string $prefix): array
+    {
+        $out = [];
+        foreach ($this->db->select('SELECT name, value FROM {user_settings} WHERE user_id = ? AND name LIKE ?', [$userId, $prefix . '%']) as $r) {
+            if (str_starts_with((string) $r['name'], $prefix)) {
+                $out[(string) $r['name']] = (string) $r['value'];
+            }
+        }
+        return $out;
+    }
+
     /** @return array<int, string> Benutzer-ID => Wert, für alle Konten mit Eintrag */
     public function all(string $name): array
     {

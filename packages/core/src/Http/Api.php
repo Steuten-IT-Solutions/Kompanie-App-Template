@@ -780,6 +780,9 @@ final class Api
             // Reihenfolge der Kacheln in „Intern“ der Standardnavigation und in der Verwaltung; leer = Standard
             'navigation_intern_order' => $a->navigation()->internOrder(),
             'admin_order' => self::jsonObject($a->navigation()->adminOrder()),
+            // Persönliche Anordnung der Kacheln (Seite => Spaltenzahl => Kacheln), nur angemeldet; in der Vorschau null, damit
+            // sie die Vorgabe zeigt (die Identität bleibt die des Admins)
+            'tile_layouts' => $user !== null && !$a->preview()->active() ? self::jsonObject(array_map(self::jsonObject(...), $a->tileLayouts()->all($user->id))) : null,
             'section_labels' => self::jsonObject($a->navigation()->sectionOverrides($a->features()->enabled('directory'), $a->features()->enabled('offices'))),
             // News in der App geschrieben (Quelle „app“): Wer manage_news hat, sieht dort Knöpfe zum Schreiben und Ändern
             'newsInApp' => ($features['news'] ?? false) && $a->newsService()->inApp(),
@@ -923,6 +926,13 @@ final class Api
                 $a->joinYears()->remove($this->user()->id);
                 return ['join_year' => null];
             }, null, $denyMember),
+            // Persönliche Anordnung der Kacheln (Verwaltung, Einrichtungen, Untermenüs, Einstellungen): je Seite und Spaltenzahl;
+            // die App bekommt alle mit /config (tile_layouts). Zurücksetzen löscht alle Spaltenzahlen der Seite.
+            new Route('PUT', '/me/tiles', $L, fn (Request $r) => ['page' => $r->input('page'), 'layouts' => self::jsonObject($a->tileLayouts()->save($this->user()->id, $r->body))]),
+            new Route('DELETE', '/me/tiles', $L, function (Request $r) use ($a) {
+                $a->tileLayouts()->reset($this->user()->id, $r->query['page'] ?? null);
+                return ['page' => $r->query['page'], 'layouts' => new \stdClass()];
+            }),
             new Route('POST', '/me/password', $L, function (Request $r) use ($a) {
                 $a->members()->changeOwnPassword($this->user(), $r->input('current_password'), $r->input('new_password'));
                 return ['changed' => true];

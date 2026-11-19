@@ -496,6 +496,48 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Error' }
 
+  /me/tiles:
+    put:
+      tags: [Eigene Daten]
+      summary: Eigene Anordnung der Kacheln einer Seite für eine Spaltenzahl speichern
+      description: |
+        Für jedes angemeldete Konto. `page`: `verwaltung`, `einrichtungen`, `intern`, `menue/<n>` oder
+        `einstellungen/<gruppe>`. `cols`: Spaltenzahl des Rasters (2 Handy, 3 ab 560 px, 4 ab 900 px); die anderen
+        Spaltenzahlen der Seite bleiben. Jede Kachel liegt mit `col` (ab 1), `row` (1 bis 200) und `span` (Breite in
+        Spalten) im Raster, ohne Überlappung, höchstens 100 Kacheln. Kennungen gerade nicht sichtbarer Kacheln bleiben
+        erlaubt; was eine Person sieht, entscheiden ihre Rechte. In der Vorschau nicht möglich (nur ansehen).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [page, cols, tiles]
+              properties:
+                page: { type: string, examples: [intern, 'einstellungen/betrieb'] }
+                cols: { type: integer, enum: [2, 3, 4] }
+                tiles: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/TilePlace' } }
+      responses:
+        '200':
+          description: Gespeichert; alle Spaltenzahlen der Seite
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TileLayoutResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Eigene Daten]
+      summary: Eigene Anordnung einer Seite zurücksetzen (alle Spaltenzahlen); danach gilt die Vorgabe
+      parameters:
+        - { name: page, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Zurückgesetzt; `layouts` leer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TileLayoutResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
   /me/password:
     post:
       tags: [Eigene Daten]
@@ -9521,6 +9563,25 @@ components:
       description: 'Reihenfolge der Kacheln in „Intern“ der Standardnavigation, ohne eigene Navigation. Bereiche, die fehlen, stehen hinter ihrem Vorgänger aus der Standardreihenfolge. Leer = Standard.'
       items: { $ref: '#/components/schemas/NavigationTarget' }
       uniqueItems: true
+    TilePlace:
+      type: object
+      description: Lage einer Kachel im Raster
+      required: [id, col, row, span]
+      properties:
+        id: { type: string, description: 'Bereich bzw. Ziel, z. B. mitglieder, seite/3, einstellungen' }
+        col: { type: integer, minimum: 1, maximum: 4 }
+        row: { type: integer, minimum: 1, maximum: 200 }
+        span: { type: integer, minimum: 1, maximum: 4 }
+    TileLayouts:
+      type: object
+      description: 'Spaltenzahl (2, 3, 4) => Kacheln, nach Zeile und Spalte geordnet'
+      additionalProperties: { type: array, items: { $ref: '#/components/schemas/TilePlace' } }
+    TileLayoutResponse:
+      type: object
+      required: [page, layouts]
+      properties:
+        page: { type: string }
+        layouts: { $ref: '#/components/schemas/TileLayouts' }
     AdminOrder:
       type: object
       description: 'Reihenfolge der Kacheln der Verwaltung, für alle gleich, je Gruppe: start (Startseite, mit dem Sammelknopf einrichtungen) und setup (unter „Einrichtungen“). Eine Kachel wechselt die Gruppe nicht. Kacheln, die fehlen, stehen hinter ihrem Vorgänger aus der Standardreihenfolge. Leer kommt als [] an.'
@@ -10368,6 +10429,11 @@ components:
         navigation_labels: { type: boolean, description: 'Namen unter den Symbolen der Leiste (Issue #362)' }
         navigation_intern_order: { $ref: '#/components/schemas/NavigationInternOrder' }
         admin_order: { $ref: '#/components/schemas/AdminOrder' }
+        tile_layouts:
+          description: 'Eigene Anordnung der Kacheln: Seite => TileLayouts (leer als {}); null ohne Anmeldung und in der Vorschau'
+          oneOf:
+            - { type: object, additionalProperties: { $ref: '#/components/schemas/TileLayouts' } }
+            - type: 'null'
         section_labels:
           type: object
           description: 'Eigene Namen als Abschnitte der Bezeichnungen (z. B. gallery, catalog, intern), gehen vor kompanie.json (Issue #362). Leer kommt als [] an.'
