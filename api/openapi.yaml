@@ -502,7 +502,7 @@ paths:
       summary: Eigene Anordnung der Kacheln einer Seite für eine Spaltenzahl speichern
       description: |
         Für jedes angemeldete Konto. `page`: `verwaltung`, `einrichtungen`, `intern`, `menue/<n>` oder
-        `einstellungen/<gruppe>`. `cols`: Spaltenzahl des Rasters (2 Handy, 3 ab 560 px, 4 ab 900 px); die anderen
+        `einstellungen/<gruppe>`. `cols`: Spaltenzahl des Rasters (nach seiner Breite: 2, ab 528 px 3, ab 680 px 4); die anderen
         Spaltenzahlen der Seite bleiben. Jede Kachel liegt mit `col` (ab 1), `row` (1 bis 200) und `span` (Breite in
         Spalten) im Raster, ohne Überlappung, höchstens 100 Kacheln. Kennungen gerade nicht sichtbarer Kacheln bleiben
         erlaubt; was eine Person sieht, entscheiden ihre Rechte. In der Vorschau nicht möglich (nur ansehen).
@@ -7048,6 +7048,63 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+  /admin/tiles:
+    get:
+      tags: [Einstellungen]
+      summary: Vorgabe für die Anordnung der Kacheln (für alle ohne eigene Anordnung)
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: Seite => TileLayouts (leer als {})
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [defaults]
+                properties:
+                  defaults: { type: object, additionalProperties: { $ref: '#/components/schemas/TileLayouts' } }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Einstellungen]
+      summary: Vorgabe einer Seite für eine Spaltenzahl festlegen
+      x-capability: manage_settings
+      description: |
+        Gleiche Form und Prüfung wie `PUT /me/tiles`. Gilt für jede Person ohne eigene Anordnung der Seite, auch ohne
+        Anmeldung und in der Vorschau; wer eine Kachel nicht sieht, bei dem rücken die Kacheln derselben Zeile nach links.
+        Die anderen Spaltenzahlen der Seite bleiben. Kommt ins Änderungsprotokoll.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [page, cols, tiles]
+              properties:
+                page: { type: string, examples: [verwaltung, intern] }
+                cols: { type: integer, enum: [2, 3, 4] }
+                tiles: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/TilePlace' } }
+      responses:
+        '200':
+          description: Gespeichert; alle Spaltenzahlen der Seite
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TileLayoutResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Einstellungen]
+      summary: Vorgabe einer Seite löschen (alle Spaltenzahlen); danach gilt die Reihenfolge aus der Navigation
+      x-capability: manage_settings
+      parameters:
+        - { name: page, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Gelöscht; `layouts` leer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TileLayoutResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /admin/navigation:
     get:
       tags: [Einstellungen]
@@ -10434,6 +10491,10 @@ components:
           oneOf:
             - { type: object, additionalProperties: { $ref: '#/components/schemas/TileLayouts' } }
             - type: 'null'
+        tile_defaults:
+          description: 'Vorgabe des Admins für die Anordnung der Kacheln: Seite => TileLayouts (leer als {}); gilt ohne eigene Anordnung'
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/TileLayouts' }
         section_labels:
           type: object
           description: 'Eigene Namen als Abschnitte der Bezeichnungen (z. B. gallery, catalog, intern), gehen vor kompanie.json (Issue #362). Leer kommt als [] an.'

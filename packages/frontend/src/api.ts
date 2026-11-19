@@ -196,6 +196,8 @@ export interface AppConfig {
   admin_order?: AdminOrder | [];
   /** Eigene Anordnung der Kacheln je Seite (tileGrid.ts); null ohne Anmeldung und in der Vorschau, fehlt bei älteren Servern */
   tile_layouts?: Record<string, TileLayouts> | null;
+  /** Vorgabe des Admins für die Anordnung der Kacheln je Seite (gilt ohne eigene Anordnung); fehlt bei älteren Servern */
+  tile_defaults?: Record<string, TileLayouts>;
   /** Eigene Namen als Abschnitte (brand.labels.sections), übernimmt generated/brand.ts beim Laden */
   section_labels?: Record<string, string>;
   /** Eigene Seiten (Issue #287), die die Person lesen darf, in ihrer Reihenfolge; fehlt bei älteren Servern */
@@ -2993,6 +2995,10 @@ export const api = {
   saveTiles: (page: string, cols: number, tiles: TilePlace[]) =>
     request<{ page: string; layouts: TileLayouts }>('PUT', '/me/tiles', { page, cols, tiles }),
   resetTiles: (page: string) => request<{ page: string; layouts: TileLayouts }>('DELETE', '/me/tiles', undefined, { page }),
+  /** Vorgabe für alle (manage_settings) */
+  saveTileDefault: (page: string, cols: number, tiles: TilePlace[]) =>
+    request<{ page: string; layouts: TileLayouts }>('PUT', '/admin/tiles', { page, cols, tiles }),
+  resetTileDefault: (page: string) => request<{ page: string; layouts: TileLayouts }>('DELETE', '/admin/tiles', undefined, { page }),
   setMemberJoinYear: (id: number, date: string) => request<{ join_year: JoinYear | null }>('PUT', `/members/${id}/join-year`, { date }),
   deleteMemberJoinYear: (id: number) => request<{ join_year: null }>('DELETE', `/members/${id}/join-year`),
 

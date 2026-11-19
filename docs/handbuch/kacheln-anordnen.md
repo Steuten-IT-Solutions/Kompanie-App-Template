@@ -36,5 +36,5 @@ Tippe auf **Zurücksetzen** und bestätige. Danach gilt auf dieser Seite wieder 
 - Ohne Verbindung gilt die Änderung gleich und wird auf dem Gerät vorgemerkt; die App speichert sie, sobald wieder Netz da ist.
 - Ohne Anmeldung merkt sich nur dieses Gerät die Anordnung. Nach dem Anmelden gilt die Anordnung deines Kontos.
 - Kommt eine Kachel neu dazu (z. B. durch ein neues Recht), steht sie unten. Fehlt eine Kachel, rücken die Kacheln derselben Zeile nach links.
-- Die Reihenfolge, die ein {rolle.admin} festlegt, ist die Vorgabe für alle, die nichts angeordnet haben.
+- Die Vorgabe für alle, die nichts angeordnet haben, legt ein {rolle.admin} fest: die Reihenfolge oder ein Raster mit Plätzen und Breiten.
 - In der Vorschau **App als … ansehen** gilt immer die Vorgabe.

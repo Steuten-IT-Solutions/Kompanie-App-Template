@@ -1,4 +1,4 @@
-import { api, ApiError, config } from './api';
+import { api, ApiError, can, config } from './api';
 import { previewRole } from './preview';
 import type { TileLayouts, TilePlace } from './tileGrid';
 
@@ -9,6 +9,8 @@ import type { TileLayouts, TilePlace } from './tileGrid';
  *   wieder Netz gibt oder sie neu startet. Bei zwei Geräten gewinnt, was zuletzt ankommt.
  * - Ohne Anmeldung: nur auf diesem Gerät (localStorage). Beim Anmelden wird sie nicht ins Konto übernommen.
  * - In der Vorschau („App als … ansehen“) kommt null vom Server: Es gilt die Vorgabe, Anordnen ist aus (tiles.tsx).
+ * - Vorgabe für alle (/config tile_defaults, PUT/DELETE /admin/tiles): legt fest, wer Einstellungen ändern darf; sie gilt
+ *   für jede Seite ohne eigene Anordnung (auch ohne Anmeldung und in der Vorschau). Nur mit Verbindung.
  */
 
 /** Ereignis nach jeder Änderung einer Anordnung (TileGrid zeichnet neu) */
@@ -41,9 +43,41 @@ const userId = () => config?.user?.id ?? null;
 
 /** Gespeicherte Anordnung einer Seite; undefined ohne (auch in der Vorschau: dort gilt die Vorgabe). */
 export function layoutsOf(page: string): TileLayouts | undefined {
-  if (!config || previewRole()) return undefined;
-  if (userId() === null) return read<Record<string, TileLayouts>>(GUEST_KEY, {})[page];
-  return config.tile_layouts?.[page] ?? undefined;
+  if (!config) return undefined;
+  const fallback = config.tile_defaults?.[page] ?? undefined;
+  if (previewRole()) return fallback;
+  if (userId() === null) return read<Record<string, TileLayouts>>(GUEST_KEY, {})[page] ?? fallback;
+  return config.tile_layouts?.[page] ?? fallback;
+}
+
+/** Vorgabe für alle festlegen möglich: Einstellungen ändern, nicht in der Vorschau */
+export function canSetDefault(): boolean {
+  return canArrange() && userId() !== null && can('manage_settings');
+}
+
+/** Gibt es für eine der Seiten eine Vorgabe? */
+export function hasDefault(pages: string[]): boolean {
+  return pages.some((p) => !!config?.tile_defaults?.[p]);
+}
+
+/** Anordnung als Vorgabe für alle (diese Spaltenzahl); die anderen Spaltenzahlen der Seite bleiben. */
+export async function saveDefault(page: string, cols: number, tiles: TilePlace[]): Promise<void> {
+  const res = await api.saveTileDefault(page, cols, tiles);
+  if (config) config.tile_defaults = { ...(config.tile_defaults ?? {}), [page]: res.layouts };
+  changed();
+}
+
+/** Vorgabe der Seiten löschen (alle Spaltenzahlen); danach gilt die Reihenfolge aus Einstellungen → Navigation. */
+export async function resetDefaults(pages: string[]): Promise<void> {
+  for (const page of pages) {
+    await api.resetTileDefault(page);
+    if (config?.tile_defaults) {
+      const rest = { ...config.tile_defaults };
+      delete rest[page];
+      config.tile_defaults = rest;
+    }
+  }
+  changed();
 }
 
 /** Anordnen möglich: nicht in der Vorschau (dort kommt null, angemeldet) */

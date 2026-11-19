@@ -7788,3 +7788,61 @@ test('Kacheln anordnen: ziehen, Breite, Tastatur, je Konto gespeichert, Zurück-
   await page.reload();
   await expect.poll(layout).toEqual(before);
 });
+
+test('Kacheln: Admin legt ein Raster als Vorgabe für alle fest, gilt ohne eigene Anordnung, Vorgabe löschen', async ({ page }) => {
+  const grid = page.locator('.admin-tiles');
+  const tile = (id: string) => grid.locator(`li[data-tile="${id}"]`);
+  const placeOf = async (id: string) => {
+    const s = await tile(id).evaluate((e) => (e as HTMLElement).style);
+    return `${s.gridColumn.replace(' / span ', '+')}/${s.gridRow}`;
+  };
+  const response = (method: string, path: string) => page.waitForResponse((r) => r.url().includes(path) && r.request().method() === method);
+
+  await login(page, 'verwalter');
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await expect(tile('mitglieder')).toBeVisible();
+  // Für alle ohne Vorgabe: der Reihe nach, Breite 1; der Verwalter sieht den Knopf für die Vorgabe nicht
+  expect(await placeOf('mitglieder')).toMatch(/\+1\//);
+  await page.getByRole('button', { name: 'Kacheln anordnen' }).click();
+  await expect(page.getByRole('button', { name: 'Als Vorgabe für alle' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Fertig' }).click();
+
+  // Admin: Mitglieder breiter (eigene Anordnung), dann als Vorgabe für alle
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await expect(tile('mitglieder')).toBeVisible();
+  await page.getByRole('button', { name: 'Kacheln anordnen' }).click();
+  let saved = response('PUT', '/me/tiles');
+  await tile('mitglieder').locator('.tile-size button').last().click();
+  await saved;
+  saved = response('PUT', '/admin/tiles');
+  await page.getByRole('button', { name: 'Als Vorgabe für alle' }).click();
+  await askOk(page);
+  expect((await saved).status()).toBe(200);
+  await expect(page.getByRole('button', { name: 'Vorgabe löschen' })).toBeVisible();
+  await page.getByRole('button', { name: 'Fertig' }).click();
+
+  // Verwalter ohne eigene Anordnung bekommt die Vorgabe: Mitglieder zwei Spalten breit
+  await login(page, 'verwalter');
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await expect.poll(() => placeOf('mitglieder')).toBe('1+2/1');
+
+  // Vorgabe löschen: wieder der Reihe nach
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.getByRole('button', { name: 'Kacheln anordnen' }).click();
+  const removed = response('DELETE', '/admin/tiles');
+  await page.getByRole('button', { name: 'Vorgabe löschen' }).click();
+  await askOk(page);
+  expect((await removed).status()).toBe(200);
+  await expect(page.getByRole('button', { name: 'Vorgabe löschen' })).toHaveCount(0);
+  const own = response('DELETE', '/me/tiles');
+  await page.locator('.tile-arrange').getByRole('button', { name: 'Zurücksetzen' }).click();
+  await askOk(page);
+  await own;
+  await page.getByRole('button', { name: 'Fertig' }).click();
+  await login(page, 'verwalter');
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await expect(tile('mitglieder')).toBeVisible();
+  await expect.poll(() => placeOf('mitglieder')).toMatch(/\+1\//);
+});

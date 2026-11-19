@@ -13,7 +13,7 @@ use KompanieApp\Core\Tests\Support\TestApp;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
-/** Persönliche Anordnung der Kacheln: speichern je Seite und Spaltenzahl, prüfen, zurücksetzen, /config, je Konto. */
+/** Anordnung der Kacheln: persönlich speichern je Seite und Spaltenzahl, prüfen, zurücksetzen, /config, je Konto; Vorgabe für alle. */
 final class TileLayoutTest extends TestCase
 {
     private FakeUsers $users;
@@ -66,6 +66,31 @@ final class TileLayoutTest extends TestCase
         $res = $this->call($this->m, 'DELETE', '/me/tiles', [], ['page' => 'intern']);
         $this->assertSame(200, $res->status);
         $this->assertSame(['einstellungen/betrieb' => ['3' => []]], $this->layouts($this->m), 'Zurücksetzen: alle Spaltenzahlen der Seite');
+    }
+
+    public function testDefaultsForEveryoneSetByAdmin(): void
+    {
+        $config = fn (?int $user): array => json_decode((string) json_encode($this->call($user, 'GET', '/config')->data['tile_defaults']), true);
+        $this->assertSame([], $config(null), 'ohne Vorgabe leer');
+        $tiles = [['id' => 'mitglieder', 'col' => 1, 'row' => 1, 'span' => 2], ['id' => 'termine', 'col' => 2, 'row' => 2, 'span' => 1]];
+        $body = ['page' => 'verwaltung', 'cols' => 2, 'tiles' => $tiles];
+        $this->assertSame(403, $this->call($this->m, 'PUT', '/admin/tiles', $body)->status, 'nur wer Einstellungen ändern darf');
+        $res = $this->call($this->admin, 'PUT', '/admin/tiles', $body);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame(['page' => 'verwaltung', 'layouts' => ['2' => $tiles]], json_decode((string) json_encode($res->data), true));
+        $this->assertSame(200, $this->call($this->admin, 'PUT', '/admin/tiles', ['page' => 'intern', 'cols' => 3, 'tiles' => []])->status);
+        $expected = ['intern' => ['3' => []], 'verwaltung' => ['2' => $tiles]];
+        $this->assertSame($expected, $config($this->m), 'gilt für alle, auch ohne Anmeldung');
+        $this->assertSame($expected, $config(null));
+        $this->assertSame([], $this->layouts($this->admin), 'eigene Anordnung des Admins bleibt leer');
+        $this->assertSame($expected, json_decode((string) json_encode($this->call($this->admin, 'GET', '/admin/tiles')->data['defaults']), true));
+        $this->assertSame(400, $this->call($this->admin, 'PUT', '/admin/tiles', ['page' => 'verwaltung', 'cols' => 2, 'tiles' => [$tiles[0], $tiles[0]]])->status);
+
+        $this->assertSame(403, $this->call($this->m, 'DELETE', '/admin/tiles', [], ['page' => 'verwaltung'])->status);
+        $this->assertSame(200, $this->call($this->admin, 'DELETE', '/admin/tiles', [], ['page' => 'verwaltung'])->status);
+        $this->assertSame(['intern' => ['3' => []]], $config($this->m));
+        $this->assertSame(200, $this->call($this->admin, 'DELETE', '/admin/tiles', [], ['page' => 'intern'])->status);
+        $this->assertSame([], $config($this->m));
     }
 
     public function testGuestAccountMayArrangeButNotAnonymous(): void

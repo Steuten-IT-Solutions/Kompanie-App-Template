@@ -2706,6 +2706,10 @@ code {
   margin: 10px 0 0;
   font-size: 0.92rem;
 }
+/* Vorgabe für alle (nur wer Einstellungen ändern darf): direkt unter Zurücksetzen und Fertig */
+.tile-arrange .button-row.tile-arrange-default {
+  margin-top: -4px;
+}
 /* Freie Felder: gestrichelt, so hoch wie eine Kachel */
 .tile-grid-editing > li.tile-slot {
   min-height: 56px;

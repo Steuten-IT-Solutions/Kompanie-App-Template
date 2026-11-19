@@ -782,6 +782,8 @@ final class Api
             'admin_order' => self::jsonObject($a->navigation()->adminOrder()),
             // Persönliche Anordnung der Kacheln (Seite => Spaltenzahl => Kacheln), nur angemeldet; in der Vorschau null, damit
             // sie die Vorgabe zeigt (die Identität bleibt die des Admins)
+            // Vorgabe des Admins für die Anordnung der Kacheln (gilt ohne eigene Anordnung und in der Vorschau)
+            'tile_defaults' => self::jsonObject(array_map(self::jsonObject(...), $a->tileLayouts()->defaults())),
             'tile_layouts' => $user !== null && !$a->preview()->active() ? self::jsonObject(array_map(self::jsonObject(...), $a->tileLayouts()->all($user->id))) : null,
             'section_labels' => self::jsonObject($a->navigation()->sectionOverrides($a->features()->enabled('directory'), $a->features()->enabled('offices'))),
             // News in der App geschrieben (Quelle „app“): Wer manage_news hat, sieht dort Knöpfe zum Schreiben und Ändern
@@ -1593,6 +1595,13 @@ final class Api
             new Route('PUT', '/admin/changes/settings', Cap::ManageSettings, fn (Request $r) => $a->changeLog()->updateSettings($r->body), null, $denySettings),
             new Route('GET', '/admin/maintenance', Cap::ManageSettings, fn () => $a->maintenance()->state() + ['log' => $a->maintenance()->log()], null, $denySettings),
             new Route('POST', '/admin/maintenance', Cap::ManageSettings, fn (Request $r) => $a->maintenance()->set($r->input('on'), $r->body['reason'] ?? null, $this->user()) + ['log' => $a->maintenance()->log()], null, $denySettings),
+            // Vorgabe für die Anordnung der Kacheln (für alle ohne eigene Anordnung), festgelegt beim Anordnen einer Seite
+            new Route('GET', '/admin/tiles', Cap::ManageSettings, fn () => ['defaults' => self::jsonObject(array_map(self::jsonObject(...), $a->tileLayouts()->defaults()))], null, $denySettings),
+            new Route('PUT', '/admin/tiles', Cap::ManageSettings, fn (Request $r) => ['page' => $r->input('page'), 'layouts' => self::jsonObject($a->tileLayouts()->saveDefault($r->body))], null, $denySettings),
+            new Route('DELETE', '/admin/tiles', Cap::ManageSettings, function (Request $r) use ($a) {
+                $a->tileLayouts()->resetDefault($r->query['page'] ?? null);
+                return ['page' => $r->query['page'], 'layouts' => new \stdClass()];
+            }, null, $denySettings),
             new Route('GET', '/admin/navigation', Cap::ManageSettings, fn () => $a->navigation()->describe(), null, $denySettings),
             new Route('PUT', '/admin/navigation', Cap::ManageSettings, fn (Request $r) => $a->navigation()->save((array) $r->body), null, $denySettings),
             new Route('GET', '/admin/settings', Cap::ManageSettings, fn () => $a->settingsService()->get(), null, $denySettings),

@@ -764,10 +764,10 @@ final class App
         return $this->service(JoinYearService::class, fn () => new JoinYearService($this));
     }
 
-    /** Persönliche Anordnung der Kacheln (Meins: Seiten anordnen) */
+    /** Anordnung der Kacheln: persönlich je Konto und Vorgabe für alle */
     public function tileLayouts(): TileLayoutService
     {
-        return $this->service(TileLayoutService::class, fn () => new TileLayoutService(new UserSettings($this->db)));
+        return $this->service(TileLayoutService::class, fn () => new TileLayoutService(new UserSettings($this->db), $this->settings));
     }
 
     public function memberPhotos(): MemberPhotoService
