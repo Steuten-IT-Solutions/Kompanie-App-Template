@@ -2113,6 +2113,9 @@ code {
   align-items: center;
   justify-content: center;
   transition: transform 0.22s ease-out;
+  /* Mitte zwischen den Knöpfen oben und der Leiste unten (Galerie.tsx misst beide) */
+  padding: var(--lb-top, 0) 0 var(--lb-bottom, 0);
+  box-sizing: border-box;
 }
 .lb-track.peeking {
   will-change: transform;
@@ -2127,6 +2130,8 @@ code {
   align-items: center;
   justify-content: center;
   pointer-events: none;
+  padding: var(--lb-top, 0) 0 var(--lb-bottom, 0);
+  box-sizing: border-box;
 }
 .lb-peek-prev {
   right: calc(100% + 32px);
@@ -2136,7 +2141,7 @@ code {
 }
 .lightbox img {
   max-width: calc(100vw / var(--kompanie-zoom, 1));
-  max-height: calc(86vh / var(--kompanie-zoom, 1));
+  max-height: var(--lb-space, calc(86vh / var(--kompanie-zoom, 1)));
   object-fit: contain;
   transition: transform 0.15s ease-out;
 }
@@ -2155,7 +2160,7 @@ code {
 }
 .lightbox video {
   max-width: calc(100vw / var(--kompanie-zoom, 1));
-  max-height: calc(80vh / var(--kompanie-zoom, 1));
+  max-height: var(--lb-space, calc(80vh / var(--kompanie-zoom, 1)));
   background: #000;
 }
 .lb-error {
@@ -7491,7 +7496,14 @@ fieldset.block-source legend {
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  gap: 8px 0;
+  gap: 10px 12px;
+}
+/* Anzahl allein in der ersten Zeile, die Knöpfe darunter */
+.lb-count-text {
+  flex-basis: 100%;
+}
+.lb-count .lb-intern {
+  margin-left: 0;
 }
 /* Runde Knöpfe nur mit Symbol in der Galerie (Name als aria-label und Tooltip) */
 .icon-btn {

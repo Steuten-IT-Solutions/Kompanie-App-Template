@@ -889,6 +889,28 @@ function Lightbox({
     [photos.length],
   );
   const root = useRef<HTMLDivElement>(null);
+  const bar = useRef<HTMLDivElement>(null);
+  // Platz zwischen den Knöpfen oben (✕) und der Leiste unten (Anzahl, Knöpfe): Unvergrößert passt das Bild genau
+  // dazwischen, statt unter den Knöpfen zu liegen. Die Leiste unten wächst mit ihren Knöpfen (auch zweizeilig).
+  useLayoutEffect(() => {
+    const box = root.current;
+    const close = closeRef.current;
+    const count = bar.current;
+    if (!box || !close || !count) return;
+    const fit = () => {
+      const top = close.offsetTop + close.offsetHeight + 8;
+      const bottom = box.clientHeight - count.offsetTop + 8;
+      box.style.setProperty('--lb-top', `${top}px`);
+      box.style.setProperty('--lb-bottom', `${bottom}px`);
+      box.style.setProperty('--lb-space', `${Math.max(120, box.clientHeight - top - bottom)}px`);
+    };
+    fit();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(fit);
+    observer.observe(box);
+    observer.observe(count);
+    return () => observer.disconnect();
+  }, []);
   const track = useRef<HTMLDivElement>(null);
   const many = photos.length > 1;
   // Vergrößert verschiebt ein Finger das Bild, statt zu blättern.
@@ -1129,10 +1151,13 @@ function Lightbox({
           </button>
         </>
       )}
-      <div className="lb-count">
-        {i + 1} / {photos.length}
-        {p.intern && ' · intern'}
-        {coverId === p.id && ' · Titelbild'}
+      {/* Anzahl in eigener Zeile, die Knöpfe zum Verwalten darunter */}
+      <div className="lb-count" ref={bar}>
+        <span className="lb-count-text">
+          {i + 1} / {photos.length}
+          {p.intern && ' · intern'}
+          {coverId === p.id && ' · Titelbild'}
+        </span>
         {onCover && !isVideo(p) && (
           <IconButton
             icon="cover"
