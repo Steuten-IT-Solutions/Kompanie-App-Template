@@ -26,6 +26,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Kacheln selbst anordnen**: Jede Person legt auf der Startseite der [Verwaltung](app:verwaltung), unter
+  Einrichtungen, in den Untermenüs wie [Intern](app:intern) und in den [Einstellungen](app:einstellungen) selbst fest,
+  wo jede Kachel steht und wie breit sie ist (Symbol oben rechts über den Kacheln: ziehen, am Handy kurz halten; − und +
+  für die Breite; Zurücksetzen auf die Vorgabe). Die Anordnung gilt nur für die Person, wird im Konto gespeichert und
+  gilt je Bildschirmbreite (2, 3 oder 4 Spalten); ohne Anmeldung merkt sie sich das Gerät. Die Reihenfolge unter
+  [Einstellungen → Navigation](app:einstellungen/navigation) bleibt die Vorgabe für alle anderen; fehlt jemandem eine
+  Kachel, rücken die Kacheln derselben Zeile nach links. Am Computer und auf dem Handy quer haben die Kachel-Seiten
+  dafür jetzt eine feste Spaltenzahl.
 - **Link auf ein Bild der Galerie teilen**: In der Großansicht eines Bildes oder Videos verschickt ein neues
   Teilen-Symbol einen Link auf genau dieses Bild (Teilen-Menü des Handys, am Computer wird der Link kopiert). Der Link
   öffnet das Album mit dem Bild in der Großansicht. Interne Bilder sieht nur, wer angemeldet ist und sie sehen darf; alle

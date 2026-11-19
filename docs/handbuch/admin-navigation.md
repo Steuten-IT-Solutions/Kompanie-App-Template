@@ -46,7 +46,7 @@ Beide Leisten sind unabhängig: Die Angemeldeten können dabei auch bei der Stan
 1. Ziehe unter **Verwaltung** einen Knopf am Griff an seine neue Stelle, in der Liste **Startseite der Verwaltung** oder **Einrichtungen**. Ein Knopf bleibt dabei in seiner Liste.
 2. Tippe auf **Navigation speichern**.
 
-Die Reihenfolge gilt für alle; jede Person sieht weiter nur die Knöpfe, für die sie das Recht hat. **Standardreihenfolge der Verwaltung** stellt die ursprüngliche Reihenfolge wieder her; tippe danach auf **Navigation speichern**. Ein Knopf, der mit einem Update neu dazukommt, steht hinter dem Knopf, hinter dem er auch ohne eure Reihenfolge stünde.
+Die Reihenfolge ist die Vorgabe für alle; jede Person sieht weiter nur die Knöpfe, für die sie das Recht hat, und kann sie für sich selbst anders anordnen ([Kacheln anordnen](seite:kacheln-anordnen)). **Standardreihenfolge der Verwaltung** stellt die ursprüngliche Reihenfolge wieder her; tippe danach auf **Navigation speichern**. Ein Knopf, der mit einem Update neu dazukommt, steht hinter dem Knopf, hinter dem er auch ohne eure Reihenfolge stünde.
 
 ### Ein Untermenü anlegen
 1. Tippe auf **Untermenü hinzufügen**.

@@ -1520,7 +1520,7 @@ test('Intern: Knöpfe für Mitglieder, Dokumente, Brett, Dienstgrade und Punktek
   await expect(page.locator('.topbar-title')).toHaveText('Intern');
   const tiles = page.getByRole('navigation', { name: 'Intern' });
   // Unten höchstens fünf Punkte (mit Intern): Sponsoren passen nicht mehr und stehen vorn unter Intern.
-  await expect(tiles.getByRole('button')).toHaveText([
+  await expect(tiles.getByRole('listitem').getByRole('button')).toHaveText([
     'Sponsoren',
     'Mitglieder',
     'Dokumente',
@@ -7705,4 +7705,86 @@ test('Anfragen auf einen Zugang: Liste nur mit Namen, Karte je Anfrage zum Blät
   // Zurück in der Liste, ohne die freigegebene Anfrage
   await expect(page.locator('.member-counts')).toHaveText('1 offene Anfrage');
   await expect(rows).toHaveText(['Ahrens, Anna']);
+});
+
+test('Kacheln anordnen: ziehen, Breite, Tastatur, je Konto gespeichert, Zurück-Taste, zurücksetzen', async ({ page }) => {
+  const grid = page.locator('.admin-tiles');
+  const tile = (id: string) => grid.locator(`li[data-tile="${id}"]`);
+  /** Kacheln in der Reihenfolge im Raster (ohne freie Felder): Kennung@Spalte+Breite/Zeile */
+  const layout = () =>
+    grid.locator('li[data-tile]').evaluateAll((els) =>
+      els.map((e) => {
+        const s = (e as HTMLElement).style;
+        return `${(e as HTMLElement).dataset.tile}@${s.gridColumn.replace(' / span ', '+')}/${s.gridRow}`;
+      }),
+    );
+  const id = (entry: string | undefined) => entry?.split('@')[0] ?? '';
+  const put = () => page.waitForResponse((r) => r.url().includes('/me/tiles') && r.request().method() === 'PUT');
+
+  // Hoch genug, dass Kachel und freies Feld zugleich zu sehen sind (Ziehen ohne Mitscrollen)
+  const size = page.viewportSize()!;
+  await page.setViewportSize({ width: size.width, height: 1600 });
+  await login(page, 'verwalter');
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await expect(tile('mitglieder')).toBeVisible();
+  const before = await layout();
+  expect(before.length).toBeGreaterThan(2);
+  const [first, second] = [id(before[0]), id(before[1])];
+  // Ohne Anordnung: der Reihe nach, zwei Spalten am Handy
+  expect(before.slice(0, 2)).toEqual([`${first}@1+1/1`, `${second}@2+1/1`]);
+
+  await page.getByRole('button', { name: 'Kacheln anordnen' }).click();
+  // Im Bearbeiten-Modus ist die Kachel selbst nicht bedienbar
+  await expect(tile(first).locator('.tile-body')).toHaveAttribute('inert', '');
+  // Erste Kachel mit der Maus in die freie Zeile unten ziehen
+  const slot = grid.locator('li.tile-slot').last();
+  const to = (await slot.boundingBox())!;
+  const from = (await tile(first).locator('.tile-handle').boundingBox())!;
+  let saved = put();
+  await page.mouse.move(from.x + from.width / 2, from.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 6 });
+  await page.mouse.up();
+  expect((await saved).status()).toBe(200);
+  expect(id((await layout()).at(-1))).toBe(first);
+  // Zweite Kachel breiter: ganze Zeile, breiter geht dann nicht mehr
+  saved = put();
+  await tile(second).locator('.tile-size button').last().click();
+  expect((await saved).status()).toBe(200);
+  expect((await layout())[0]).toBe(`${second}@1+2/1`);
+  await expect(tile(second).locator('.tile-size button').last()).toBeDisabled();
+  // Tastatur: die nächste Kachel (erste der zweiten Zeile) mit Pfeil rechts eine Spalte weiter
+  const third = id((await layout())[1]);
+  saved = put();
+  await tile(third).locator('.tile-handle').focus();
+  await page.keyboard.press('ArrowRight');
+  await saved;
+  expect((await layout()).find((l) => l.startsWith(`${third}@`))).toBe(`${third}@2+1/2`);
+  await expect(tile(third).locator('.tile-handle')).toBeFocused();
+  // Zurück-Taste beendet das Anordnen, die Seite bleibt
+  await page.goBack();
+  await expect(page.getByRole('button', { name: 'Fertig' })).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/verwaltung$/);
+  const arranged = await layout();
+
+  // Bleibt nach dem Neuladen; gilt nur für dieses Konto
+  await page.reload();
+  await expect.poll(layout).toEqual(arranged);
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await expect.poll(async () => (await layout())[0]?.split('@')[1]).toBe('1+1/1');
+
+  // Zurücksetzen: wieder die Vorgabe
+  await login(page, 'verwalter');
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await expect.poll(layout).toEqual(arranged);
+  await page.getByRole('button', { name: 'Kacheln anordnen' }).click();
+  const removed = page.waitForResponse((r) => r.url().includes('/me/tiles') && r.request().method() === 'DELETE');
+  await page.locator('.tile-arrange').getByRole('button', { name: 'Zurücksetzen' }).click();
+  await askOk(page);
+  expect((await removed).status()).toBeLessThan(300);
+  await expect.poll(layout).toEqual(before);
+  await page.getByRole('button', { name: 'Fertig' }).click();
+  await page.reload();
+  await expect.poll(layout).toEqual(before);
 });
