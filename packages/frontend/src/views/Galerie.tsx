@@ -1098,6 +1098,17 @@ function Lightbox({
           {saving ? <span className="img-loading lb-download-busy" aria-hidden="true" /> : <DownloadIcon />}
         </button>
       )}
+      {/* Oben neben dem Herunterladen (ohne dieses direkt neben ✕) */}
+      {onShare && (
+        <button
+          className="lb-btn lb-share"
+          onClick={() => onShare(p)}
+          aria-label={isVideo(p) ? 'Link zu diesem Video teilen' : 'Link zu diesem Bild teilen'}
+          title={isVideo(p) ? 'Link zu diesem Video teilen' : 'Link zu diesem Bild teilen'}
+        >
+          <Icon name="share" />
+        </button>
+      )}
       {saveProgress && (
         <p className="lb-save-error" role="status">
           {saveProgress}
@@ -1122,15 +1133,6 @@ function Lightbox({
         {i + 1} / {photos.length}
         {p.intern && ' · intern'}
         {coverId === p.id && ' · Titelbild'}
-        {onShare && (
-          <IconButton
-            icon="share"
-            label={isVideo(p) ? 'Link zu diesem Video teilen' : 'Link zu diesem Bild teilen'}
-            variant="lb"
-            className="lb-intern"
-            onClick={() => onShare(p)}
-          />
-        )}
         {onCover && !isVideo(p) && (
           <IconButton
             icon="cover"
