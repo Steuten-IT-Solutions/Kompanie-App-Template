@@ -32,6 +32,8 @@ final class Subjects
         // Benachrichtigungen auf einem Gerät (zählen auch nicht als Nutzung)
         'POST /me/push/status', 'POST /push/status', 'POST /me/push', 'POST /push', 'PUT /me/push', 'PUT /push', 'DELETE /me/push', 'DELETE /push',
         'POST /me/push/test', 'POST /push/test',
+        // Persönliche Anordnung der Kacheln: eine Vorliebe der Person, keine Daten des Vereins
+        'PUT /me/tiles', 'DELETE /me/tiles',
         // Abstimmen in Umfragen (absichtlich nicht, auch nicht bei offenen Umfragen)
         'PUT /polls/{id}/vote', 'DELETE /polls/{id}/vote',
         // Eigene Zu- und Absage bei einem Termin (wie Abstimmen; was die Verwaltung für andere einträgt, wird erfasst)

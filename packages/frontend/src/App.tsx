@@ -765,7 +765,11 @@ export default function App({ notice = null }: { notice?: string | null }) {
             {tab === 'sponsoren' && <Sponsoren />}
             {tab === 'seiten' && <Seiten id={/^\d+$/.test(route[1] ?? '') ? Number(route[1]) : null} />}
             {openMenu?.children && (
-              <InternMenu label={openMenu.label} tabs={openMenu.children.map((v) => ({ id: v, label: targetLabels()[v] ?? v }))} />
+              <InternMenu
+                page={openMenu.key}
+                label={openMenu.label}
+                tabs={openMenu.children.map((v) => ({ id: v, label: targetLabels()[v] ?? v }))}
+              />
             )}
             {tab === 'dokumente' &&
               (path[1] === 'verwalten' && can('manage_documents') ? (

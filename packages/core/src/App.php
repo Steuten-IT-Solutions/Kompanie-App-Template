@@ -48,6 +48,7 @@ use KompanieApp\Core\Domain\RoleService;
 use KompanieApp\Core\Domain\ScoreService;
 use KompanieApp\Core\Domain\SettingsService;
 use KompanieApp\Core\Domain\ServerBackupService;
+use KompanieApp\Core\Domain\TileLayoutService;
 use KompanieApp\Core\Domain\TitleService;
 use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Time;
@@ -761,6 +762,12 @@ final class App
     public function joinYears(): JoinYearService
     {
         return $this->service(JoinYearService::class, fn () => new JoinYearService($this));
+    }
+
+    /** Persönliche Anordnung der Kacheln (Meins: Seiten anordnen) */
+    public function tileLayouts(): TileLayoutService
+    {
+        return $this->service(TileLayoutService::class, fn () => new TileLayoutService(new UserSettings($this->db)));
     }
 
     public function memberPhotos(): MemberPhotoService
