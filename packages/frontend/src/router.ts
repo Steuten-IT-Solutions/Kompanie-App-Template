@@ -42,11 +42,13 @@ export function useRoute(): string[] {
 /**
  * Schlüssel einer Ansicht: Wechselt er, baut die App die Ansicht neu auf (und lädt ihre Daten neu). Die Seiten eines
  * Mitglieds (bzw. einer ehemaligen Person) und von „Meins“ teilen sich einen Schlüssel: Beim Umschalten bleiben Name, Menü
- * und geladene Daten stehen.
+ * und geladene Daten stehen. Ein Album und der Link auf eines seiner Bilder (galerie/<Album>/bild/<Bild>) ebenso: Das Album
+ * öffnet das Bild und wechselt dabei auf seine eigene Adresse.
  */
 export function viewKey(path: string[]): string {
   if (path[0] === 'verwaltung' && path[1] === 'mitglied' && path[2]) return path.slice(0, 3).join('/');
   if (path[0] === 'verwaltung' && path[1] === 'ehemalige' && /^\d+$/.test(path[2] ?? '')) return path.slice(0, 3).join('/');
   if (path[0] === 'meins') return 'meins';
+  if (path[0] === 'galerie' && /^\d+$/.test(path[1] ?? '') && path[2] === 'bild') return path.slice(0, 2).join('/');
   return path.join('/');
 }

@@ -10,7 +10,17 @@ import {
   type TouchList,
   type ReactNode,
 } from 'react';
-import { albumEditable, api, can, gallerySubmissionsOpen, photoEditable, type GalleryAlbum, type GalleryPhoto } from '../api';
+import {
+  albumEditable,
+  api,
+  can,
+  config,
+  gallerySubmissionsOpen,
+  photoEditable,
+  toLogin,
+  type GalleryAlbum,
+  type GalleryPhoto,
+} from '../api';
 import { downloadablePhotos } from '../downloadFiles';
 import { downloadAlbum, downloadMedia } from '../galleryDownload';
 import { afterBackSync, useBackClose } from '../backClose';
@@ -21,6 +31,8 @@ import { prefetchAlbumOnTap, sources } from '../viewData';
 import { confirmAsk, promptAsk } from '../ask';
 import { dataUpdated } from '../dataCache';
 import { Icon, IconButton } from '../icons';
+import { photoUrl, shareLink } from '../share';
+import brand from '../generated/brand';
 import {
   AlbumEditSheet,
   MoveSheet,
@@ -34,8 +46,9 @@ import {
 
 type Toast = (msg: string) => void;
 
-export default function Galerie({ albumId, onToast = () => {} }: { albumId?: number; onToast?: Toast }) {
-  return albumId ? <Album id={albumId} onToast={onToast} /> : <Overview onToast={onToast} />;
+/** photoId: Bild oder Video aus der Adresse galerie/<Album>/bild/<Bild> (geteilter Link), öffnet groß. */
+export default function Galerie({ albumId, photoId, onToast = () => {} }: { albumId?: number; photoId?: number; onToast?: Toast }) {
+  return albumId ? <Album id={albumId} photoId={photoId} onToast={onToast} /> : <Overview onToast={onToast} />;
 }
 
 /**
@@ -332,7 +345,7 @@ function retryUrl(url: string, n: number): string {
 
 type AlbumSheet = { kind: 'move'; ids: number[]; top: boolean; done?: (ok: boolean) => void } | { kind: 'edit' } | null;
 
-function Album({ id, onToast }: { id: number; onToast: Toast }) {
+function Album({ id, photoId, onToast }: { id: number; photoId?: number; onToast: Toast }) {
   const s = sources.album(id);
   const { data, error, loading, reload } = useAsync(s.load, s.deps, s.key);
   const [open, setOpen] = useState<number | null>(null);
@@ -379,6 +392,31 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
       reload();
     }
   }, [emptied, stale, open, reload]);
+  // Geteilter Link auf ein Bild (galerie/<Album>/bild/<Bild>): einmal groß öffnen. Die Adresse wird dabei zu der des
+  // Albums (ersetzt, nicht neu im Verlauf), damit die Großansicht ihren Eintrag dahinter legt und „Zurück“ ins Album führt.
+  // Fehlt das Bild (gelöscht, verschoben oder nur für Mitglieder), bleibt die Adresse: Nach der Anmeldung geht es dorthin.
+  // Erst wenn die neue Adresse angekommen ist (photoId fehlt dann), öffnet die Großansicht: Der Wechsel der Adresse löst
+  // ein popstate aus, das eine schon offene Ebene sonst gleich wieder schlösse (backClose.ts).
+  const [missing, setMissing] = useState<number | null>(null);
+  const [linkedIndex, setLinkedIndex] = useState<number | null>(null);
+  const linked = useRef<number | null>(null);
+  useEffect(() => {
+    if (!data || photoId === undefined || linked.current === photoId) return;
+    linked.current = photoId;
+    const index = data.photos.findIndex((p) => p.id === photoId);
+    if (index < 0) {
+      setMissing(photoId);
+      return;
+    }
+    setMissing(null);
+    setLinkedIndex(index);
+    redirect(`galerie/${id}`);
+  }, [data, photoId, id]);
+  useEffect(() => {
+    if (linkedIndex === null || photoId !== undefined) return;
+    setLinkedIndex(null);
+    setOpen(linkedIndex);
+  }, [linkedIndex, photoId]);
   const pending = !!data?.photos.some((p) => !p.ready);
   // Solange die App noch nachsieht, drehen sich in den Platzhaltern die Ladeschnecken.
   const preparing = retry < PENDING_RETRIES;
@@ -539,6 +577,20 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
       <h2 className="member-name">
         {album.title} <span className="muted album-year">{album.year}</span>
       </h2>
+      {missing !== null && (
+        <div className="card login-first" role="status">
+          <p>
+            {config?.user
+              ? 'Das verlinkte Bild gibt es in diesem Album nicht mehr, oder du darfst es nicht sehen.'
+              : 'Das verlinkte Bild gibt es in diesem Album nicht mehr, oder es ist nur für angemeldete Mitglieder.'}
+          </p>
+          {!config?.user && (
+            <button className="btn btn-block" onClick={toLogin}>
+              Anmelden
+            </button>
+          )}
+        </div>
+      )}
       {tools}
       {selectBar}
       <ul className={selecting ? 'photo-grid selecting' : 'photo-grid'}>
@@ -583,12 +635,15 @@ function Album({ id, onToast }: { id: number; onToast: Toast }) {
           </li>
         ))}
       </ul>
-      {open !== null && (
+      {open !== null && photos.length > 0 && (
         <Lightbox
           photos={photos}
           start={open}
           onClose={close}
           downloads={!!album.downloads}
+          onShare={(p) =>
+            void shareLink(photoUrl(config?.appUrl ?? window.location.href, album.id, p.id), `${brand.shortName}: ${album.title}`, onToast)
+          }
           onIntern={
             canIntern
               ? async (p, intern) => {
@@ -783,6 +838,7 @@ function Lightbox({
   start,
   onClose,
   downloads = false,
+  onShare,
   onIntern,
   coverId = null,
   onCover,
@@ -793,6 +849,8 @@ function Lightbox({
   start: number;
   onClose: (last: number) => void;
   downloads?: boolean;
+  /** Link auf das gezeigte Bild oder Video verschicken (Teilen-Menü des Geräts, sonst kopieren); öffnet es in der App */
+  onShare?: (p: GalleryPhoto) => void;
   /** Umstellen intern/öffentlich für hochgeladene Bilder und Videos (manage_gallery oder review_gallery) */
   onIntern?: (p: GalleryPhoto, intern: boolean) => Promise<void>;
   /** Gewähltes Titelbild des Albums (null: automatisch) */
@@ -873,7 +931,7 @@ function Lightbox({
     const t = e.changedTouches[0];
     const moved = Math.hypot(t.clientX - g.x, t.clientY - g.y);
     // Doppeltes Tippen: zweifach vergrößern bzw. zurück (nicht bei Videos)
-    if (g.kind !== 'pinch' && moved < 10 && !isVideo(photos[i])) {
+    if (g.kind !== 'pinch' && moved < 10 && !isVideo(p)) {
       const now = Date.now();
       if (now - lastTap.current < 300) {
         setZoom(zoom.scale > 1 ? NO_ZOOM : { scale: 2, x: 0, y: 0 });
@@ -912,7 +970,7 @@ function Lightbox({
   // Originalauflösung des gezeigten Bildes nachladen; fehlt sie (404) oder dauert es, bleibt die 1600er stehen.
   useEffect(() => {
     const cur = photos[i];
-    if (isVideo(cur) || !cur.ready || !cur.original || originals.has(cur.id)) return;
+    if (!cur || isVideo(cur) || !cur.ready || !cur.original || originals.has(cur.id)) return;
     const big = new Image();
     big.onload = () => setOriginals((s) => new Set(s).add(cur.id));
     big.src = cur.original;
@@ -921,7 +979,12 @@ function Lightbox({
     };
   }, [i, photos, originals]);
 
-  const p = photos[i];
+  // Kommen frische Daten mit weniger Bildern (z. B. inzwischen gelöscht oder nicht mehr sichtbar), schließt die
+  // Großansicht, statt auf ein fehlendes Bild zu zeigen.
+  const p = photos[Math.min(i, photos.length - 1)];
+  useEffect(() => {
+    if (i >= photos.length) close();
+  }, [i, photos.length, close]);
   // Herunterladen des gezeigten Bilds oder Videos (Knopf oben rechts, mit „Knöpfe zum Herunterladen zeigen“). Videos laden
   // in Stücken; solange zeigt die Ansicht, wie weit es ist.
   const [saving, setSaving] = useState(false);
@@ -1059,6 +1122,15 @@ function Lightbox({
         {i + 1} / {photos.length}
         {p.intern && ' · intern'}
         {coverId === p.id && ' · Titelbild'}
+        {onShare && (
+          <IconButton
+            icon="share"
+            label={isVideo(p) ? 'Link zu diesem Video teilen' : 'Link zu diesem Bild teilen'}
+            variant="lb"
+            className="lb-intern"
+            onClick={() => onShare(p)}
+          />
+        )}
         {onCover && !isVideo(p) && (
           <IconButton
             icon="cover"

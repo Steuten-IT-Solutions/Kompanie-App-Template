@@ -34,7 +34,7 @@ import {
 } from './navigation';
 import { helpSlug } from './helpSlug';
 import { setReportOrigin } from './lastError';
-import { shareLink, shareUrl } from './share';
+import { photoFromPath, shareLink, shareUrl } from './share';
 import { toggleTheme, useTheme } from './theme';
 import News from './views/News';
 import Termine, { canManageCalendar } from './views/Termine';
@@ -759,7 +759,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
                   <GalleryAlbums onToast={showToast} />
                 </div>
               ) : (
-                <Galerie albumId={albumId} onToast={showToast} />
+                <Galerie albumId={albumId} photoId={photoFromPath(path)} onToast={showToast} />
               ))}
             {tab === 'kompanien' && <Kompanien id={companyId} />}
             {tab === 'sponsoren' && <Sponsoren />}
