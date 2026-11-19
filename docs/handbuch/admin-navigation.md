@@ -48,6 +48,13 @@ Beide Leisten sind unabhängig: Die Angemeldeten können dabei auch bei der Stan
 
 Die Reihenfolge ist die Vorgabe für alle; jede Person sieht weiter nur die Knöpfe, für die sie das Recht hat, und kann sie für sich selbst anders anordnen ([Kacheln anordnen](seite:kacheln-anordnen)). **Standardreihenfolge der Verwaltung** stellt die ursprüngliche Reihenfolge wieder her; tippe danach auf **Navigation speichern**. Ein Knopf, der mit einem Update neu dazukommt, steht hinter dem Knopf, hinter dem er auch ohne eure Reihenfolge stünde.
 
+### Ein Raster mit Plätzen und Breiten für alle vorgeben
+Statt nur der Reihenfolge kannst du auch festlegen, wo jede Kachel steht und wie breit sie ist, für die Verwaltung, die Einrichtungen, jedes Untermenü und die Einstellungen:
+1. Öffne die Seite und ordne die Kacheln an wie für dich selbst ([Kacheln anordnen](seite:kacheln-anordnen)).
+2. Tippe im Hinweis über den Kacheln auf **Als Vorgabe für alle** und bestätige.
+
+Die Vorgabe gilt für jede Person, die die Seite nicht selbst angeordnet hat, auch ohne Anmeldung und in der Vorschau **App als … ansehen**. Sie gilt für die Bildschirmbreite, an der du sie festlegst (2, 3 oder 4 Spalten); für die anderen Breiten übernimmt die App ihre Reihenfolge, bis du dort auch eine festlegst. Wer eine Kachel nicht sehen darf, bei dem rücken die Kacheln derselben Zeile nach links; keine Kachel wechselt die Zeile. **Vorgabe löschen** entfernt sie für alle Breiten; danach gilt wieder die Reihenfolge von hier. Die Änderung steht im Änderungsprotokoll.
+
 ### Ein Untermenü anlegen
 1. Tippe auf **Untermenü hinzufügen**.
 2. Gib ihm einen **Namen** (höchstens 24 Zeichen) und wähle ein **Symbol**.

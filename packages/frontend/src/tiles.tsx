@@ -26,7 +26,17 @@ import {
   type GridColumns,
   type TilePlace,
 } from './tileGrid';
-import { canArrange, layoutsOf, resetLayouts, saveLayout, TILES_CHANGED } from './tileStore';
+import {
+  canArrange,
+  canSetDefault,
+  hasDefault,
+  layoutsOf,
+  resetDefaults,
+  resetLayouts,
+  saveDefault,
+  saveLayout,
+  TILES_CHANGED,
+} from './tileStore';
 
 /**
  * Spaltenzahl des Kachelrasters nach seiner eigenen Breite (columnsForWidth); folgt Drehen und Größe. Bis zum ersten
@@ -63,7 +73,12 @@ function useTilesChanged(): void {
 }
 
 /** Bearbeiten-Modus einer Seite (TileArrange) für alle Raster darin; Fehler beim Speichern zeigt die Leiste. */
-type Arrange = { editing: boolean; onError: (message: string | null) => void };
+type Arrange = {
+  editing: boolean;
+  onError: (message: string | null) => void;
+  /** Raster meldet seine Seite und die gerade gezeigte Lage an (für „Als Vorgabe für alle“); Rückgabe meldet ab */
+  register: (page: string, current: () => { cols: number; tiles: TilePlace[] }) => () => void;
+};
 const ArrangeContext = createContext<Arrange | null>(null);
 
 const HINT_ID = 'kacheln-anordnen-hinweis';
@@ -78,8 +93,50 @@ const PENDING = 'pending';
 export function TileArrange({ pages, children }: { pages: string[]; children: ReactNode }) {
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const grids = useRef(new Map<string, () => { cols: number; tiles: TilePlace[] }>());
+  useTilesChanged();
   useBackClose(editing, () => setEditing(false));
   if (!canArrange()) return <>{children}</>;
+  const admin = canSetDefault();
+  const register = (page: string, current: () => { cols: number; tiles: TilePlace[] }) => {
+    grids.current.set(page, current);
+    return () => {
+      if (grids.current.get(page) === current) grids.current.delete(page);
+    };
+  };
+
+  async function setDefault() {
+    const shown = [...grids.current].map(([page, current]) => ({ page, ...current() }));
+    const cols = shown[0]?.cols ?? 2;
+    const ok = await confirmAsk(
+      `Diese Anordnung als Vorgabe für alle festlegen? Sie gilt für jede Person ohne eigene Anordnung, bei ${cols} Spalten (diese Bildschirmbreite); wer eine Kachel nicht sieht, bei dem rücken die Kacheln der Zeile nach links.`,
+      { title: 'Vorgabe für alle', okLabel: 'Festlegen' },
+    );
+    if (!ok) return;
+    try {
+      for (const g of shown) await saveDefault(g.page, g.cols, g.tiles);
+      setError(null);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function dropDefault() {
+    const ok = await confirmAsk(
+      'Vorgabe für alle auf dieser Seite löschen (alle Bildschirmbreiten)? Danach gilt die Reihenfolge aus Einstellungen → Navigation.',
+      {
+        title: 'Vorgabe löschen',
+        okLabel: 'Löschen',
+      },
+    );
+    if (!ok) return;
+    try {
+      await resetDefaults(pages);
+      setError(null);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
 
   async function reset() {
     const ok = await confirmAsk('Eigene Anordnung dieser Seite zurücksetzen? Danach gilt wieder die Vorgabe, für alle Bildschirmbreiten.', {
@@ -95,7 +152,7 @@ export function TileArrange({ pages, children }: { pages: string[]; children: Re
   }
 
   return (
-    <ArrangeContext.Provider value={{ editing, onError: setError }}>
+    <ArrangeContext.Provider value={{ editing, onError: setError, register }}>
       {editing ? (
         <div className="tile-arrange card">
           <p id={HINT_ID} className="tile-arrange-hint">
@@ -114,6 +171,18 @@ export function TileArrange({ pages, children }: { pages: string[]; children: Re
               Fertig
             </button>
           </div>
+          {admin && (
+            <div className="button-row tile-arrange-default">
+              <button type="button" className="btn btn-secondary" onClick={() => void setDefault()}>
+                Als Vorgabe für alle
+              </button>
+              {hasDefault(pages) && (
+                <button type="button" className="btn btn-secondary" onClick={() => void dropDefault()}>
+                  Vorgabe löschen
+                </button>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <div className="tile-arrange-bar">
@@ -184,6 +253,10 @@ export function TileGrid({ page, tiles, className }: { page: string; tiles: Grid
   const live = useRef<{ move: (e: Point) => void; end: (e: Point, cancelled: boolean) => void }>({ move: () => {}, end: () => {} });
   useEffect(() => () => drag.current?.stop(), []);
   const placed = preview && preview.cols === cols ? preview.tiles : saved;
+  const current = useRef(() => ({ cols, tiles: placed }));
+  current.current = () => ({ cols, tiles: placed });
+  const register = arrange?.register;
+  useEffect(() => register?.(page, () => current.current()), [register, page]);
 
   useEffect(() => {
     if (!editing) {

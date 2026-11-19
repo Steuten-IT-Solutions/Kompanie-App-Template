@@ -211,6 +211,8 @@ final class Subjects
             'PATCH /admin/push' => $this->settings('Benachrichtigungen', '/admin/push'),
             'PATCH /admin/birthdays' => $this->settings('Geburtstage', '/admin/birthdays'),
             'PUT /admin/navigation' => $this->settings('Navigation', '/admin/navigation'),
+            'PUT /admin/tiles' => $this->values('Vorgabe der Kacheln', fn (): array => $this->app->tileLayouts()->describeDefaults()),
+            'DELETE /admin/tiles' => $this->values('Vorgabe der Kacheln', fn (): array => $this->app->tileLayouts()->describeDefaults()),
             'PATCH /admin/website' => $this->settings('Webseite', '/admin/website'),
             'POST /admin/website/entry' => $this->settings('Webseite', '/admin/website'),
             'PUT /admin/features' => $this->values('Bereiche', function (): array {

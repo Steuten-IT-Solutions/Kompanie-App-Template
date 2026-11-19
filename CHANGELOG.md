@@ -34,6 +34,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   [Einstellungen → Navigation](app:einstellungen/navigation) bleibt die Vorgabe für alle anderen; fehlt jemandem eine
   Kachel, rücken die Kacheln derselben Zeile nach links. Am Computer und auf dem Handy quer haben die Kachel-Seiten
   dafür jetzt eine feste Spaltenzahl.
+- **Raster als Vorgabe für alle**: Wer die Einstellungen ändern darf, ordnet eine Kachel-Seite an und tippt beim
+  Anordnen auf _Als Vorgabe für alle_. Plätze und Breiten gelten dann für jede Person ohne eigene Anordnung, auch ohne
+  Anmeldung und in der Vorschau, je Bildschirmbreite; _Vorgabe löschen_ kehrt zur Reihenfolge unter
+  [Einstellungen → Navigation](app:einstellungen/navigation) zurück. Die Änderung steht im Änderungsprotokoll.
 - **Link auf ein Bild der Galerie teilen**: In der Großansicht eines Bildes oder Videos verschickt ein neues
   Teilen-Symbol einen Link auf genau dieses Bild (Teilen-Menü des Handys, am Computer wird der Link kopiert). Der Link
   öffnet das Album mit dem Bild in der Großansicht. Interne Bilder sieht nur, wer angemeldet ist und sie sehen darf; alle
