@@ -1520,7 +1520,7 @@ test('Intern: Knöpfe für Mitglieder, Dokumente, Brett, Dienstgrade und Punktek
   await expect(page.locator('.topbar-title')).toHaveText('Intern');
   const tiles = page.getByRole('navigation', { name: 'Intern' });
   // Unten höchstens fünf Punkte (mit Intern): Sponsoren passen nicht mehr und stehen vorn unter Intern.
-  await expect(tiles.getByRole('button')).toHaveText([
+  await expect(tiles.getByRole('listitem').getByRole('button')).toHaveText([
     'Sponsoren',
     'Mitglieder',
     'Dokumente',
@@ -7726,7 +7726,7 @@ test('Kacheln anordnen: ziehen, Breite, Tastatur, je Konto gespeichert, Zurück-
   await page.setViewportSize({ width: size.width, height: 1600 });
   await login(page, 'verwalter');
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
-  await grid.waitFor();
+  await expect(tile('mitglieder')).toBeVisible();
   const before = await layout();
   expect(before.length).toBeGreaterThan(2);
   const [first, second] = [id(before[0]), id(before[1])];
@@ -7769,24 +7769,22 @@ test('Kacheln anordnen: ziehen, Breite, Tastatur, je Konto gespeichert, Zurück-
 
   // Bleibt nach dem Neuladen; gilt nur für dieses Konto
   await page.reload();
-  await grid.waitFor();
-  expect(await layout()).toEqual(arranged);
+  await expect.poll(layout).toEqual(arranged);
   await login(page, 'admin', ADMIN_PASSWORD);
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
-  await grid.waitFor();
-  expect((await layout())[0].split('@')[1]).toBe('1+1/1');
+  await expect.poll(async () => (await layout())[0]?.split('@')[1]).toBe('1+1/1');
 
   // Zurücksetzen: wieder die Vorgabe
   await login(page, 'verwalter');
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
-  await grid.waitFor();
-  expect(await layout()).toEqual(arranged);
+  await expect.poll(layout).toEqual(arranged);
   await page.getByRole('button', { name: 'Kacheln anordnen' }).click();
+  const removed = page.waitForResponse((r) => r.url().includes('/me/tiles') && r.request().method() === 'DELETE');
   await page.locator('.tile-arrange').getByRole('button', { name: 'Zurücksetzen' }).click();
   await askOk(page);
+  expect((await removed).status()).toBeLessThan(300);
   await expect.poll(layout).toEqual(before);
   await page.getByRole('button', { name: 'Fertig' }).click();
   await page.reload();
-  await grid.waitFor();
-  expect(await layout()).toEqual(before);
+  await expect.poll(layout).toEqual(before);
 });
