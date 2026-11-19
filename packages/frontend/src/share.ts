@@ -14,6 +14,18 @@ export function shareUrl(appUrl: string, tab: string, requested: string | undefi
   return appUrl.split('#')[0] + '#/' + parts.join('/');
 }
 
+/** Adresse eines Bildes oder Videos der Galerie: öffnet das Album mit diesem in der Großansicht (#/galerie/<Album>/bild/<Bild>). */
+export function photoUrl(appUrl: string, albumId: number, photoId: number): string {
+  return appUrl.split('#')[0] + `#/galerie/${albumId}/bild/${photoId}`;
+}
+
+/** Bild aus der Adresse galerie/<Album>/bild/<Bild> (path wie in router.ts); sonst undefined. */
+export function photoFromPath(path: string[]): number | undefined {
+  return path[0] === 'galerie' && /^\d+$/.test(path[1] ?? '') && path[2] === 'bild' && /^\d+$/.test(path[3] ?? '')
+    ? Number(path[3])
+    : undefined;
+}
+
 /** Teilen-Menü des Geräts; sonst in die Zwischenablage; sonst zum Abschreiben anzeigen. */
 export async function shareLink(url: string, title: string, onToast: (msg: string) => void, text?: string): Promise<void> {
   if (typeof navigator.share === 'function') {

@@ -26,6 +26,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Link auf ein Bild der Galerie teilen**: In der Großansicht eines Bildes oder Videos verschickt ein neues
+  Teilen-Symbol einen Link auf genau dieses Bild (Teilen-Menü des Handys, am Computer wird der Link kopiert). Der Link
+  öffnet das Album mit dem Bild in der Großansicht. Interne Bilder sieht nur, wer angemeldet ist und sie sehen darf; alle
+  anderen bekommen einen Hinweis mit „Anmelden“.
 - **Neustart nach einem Update anbieten**: Holt jemand die App aus dem Hintergrund, sucht sie nach einer neuen Version
   (höchstens alle 15 Minuten, bei offener App einmal pro Stunde). Ist eine da, lädt die App sie im Hintergrund und
   zeigt oben _Die App wurde aktualisiert_ mit dem Knopf _Neu starten_. So sieht man Neuerungen sofort, statt erst beim

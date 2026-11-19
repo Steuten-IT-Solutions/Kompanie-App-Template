@@ -2351,6 +2351,76 @@ test('Galerie verwalten: Bilder auswählen, verschieben und löschen, Alben ins 
   }
 });
 
+test('Galerie: Link auf ein Bild aus der Großansicht teilen, öffnet das Bild; intern nur nach Anmeldung', async ({ page }) => {
+  const title = `Bildlink ${Date.now() % 1000000}`;
+  // Teilen-Menü des Geräts nachgestellt: Was die App teilt, landet in window.__shared.
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: async (data: ShareData) => {
+        (window as unknown as { __shared: ShareData }).__shared = data;
+      },
+    });
+  });
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json()) as { id?: number; photos?: { id: number }[] } };
+      },
+      [path, method, body] as const,
+    );
+  const albumId = (await api('admin/gallery/albums', 'POST', { title, year: 2026 })).data.id!;
+  for (const name of ['a-eins.png', 'b-zwei.png']) {
+    expect(
+      (await api(`admin/gallery/albums/${albumId}/photos`, 'POST', { file: { name, data: PNG.buffer.toString('base64') } })).status,
+    ).toBe(201);
+  }
+  try {
+    const second = (await api(`gallery/${albumId}`, 'GET')).data.photos![1].id;
+    await page.goto(`/app/#/galerie/${albumId}`);
+    await page.getByRole('button', { name: 'Bild 2 öffnen' }).click();
+    const share = page.locator('.lb-count').getByRole('button', { name: 'Link zu diesem Bild teilen' });
+    await expect(share).toHaveAttribute('title', 'Link zu diesem Bild teilen');
+    await share.click();
+    const sharedData = () => page.evaluate(() => (window as unknown as { __shared?: ShareData }).__shared ?? null);
+    await expect.poll(sharedData).not.toBeNull();
+    const shared = (await sharedData())!;
+    expect(shared.url).toMatch(new RegExp(`/app/#/galerie/${albumId}/bild/${second}$`));
+    expect(shared.title).toContain(title);
+
+    // Der Link öffnet das Bild groß; die Adresse wird die des Albums, Schließen führt ins Album.
+    await page.goto('/app/#/galerie');
+    await page.goto(shared.url!);
+    await expect(page.locator('.lb-count')).toContainText('2 / 2');
+    await expect(page).toHaveURL(new RegExp(`#/galerie/${albumId}$`));
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.lightbox')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Bild 2 öffnen' })).toBeVisible();
+
+    // Intern: Gäste sehen das Bild nicht, nur den Hinweis mit Anmelden
+    expect((await api(`gallery/photos/${second}`, 'PATCH', { intern: true })).status).toBe(200);
+    page.on('console', (m) => console.log('CONSOLE', m.type(), m.text()));
+    page.on('pageerror', (e) => console.log('PAGEERROR', e.message, e.stack));
+    await page.context().clearCookies();
+    await page.goto('/app/');
+    await page.goto(shared.url!);
+    await expect(page.locator('.login-first')).toContainText('nur für angemeldete Mitglieder');
+    await expect(page.locator('.lightbox')).toHaveCount(0);
+    await expect(page).toHaveURL(new RegExp(`#/galerie/${albumId}/bild/${second}$`));
+  } finally {
+    await login(page, 'admin', ADMIN_PASSWORD);
+    expect((await api(`admin/gallery/albums/${albumId}`, 'DELETE')).status).toBe(200);
+  }
+});
+
 test('Galerie verwalten: Titelbild eines Albums in der Großansicht wählen und zurück auf automatisch', async ({ page }) => {
   const title = `Titelbild ${Date.now() % 1000000}`;
   await login(page, 'admin', ADMIN_PASSWORD);
