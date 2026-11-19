@@ -7070,7 +7070,7 @@ paths:
       x-capability: manage_settings
       description: |
         Gleiche Form und Prüfung wie `PUT /me/tiles`. Gilt für jede Person ohne eigene Anordnung der Seite, auch ohne
-        Anmeldung und in der Vorschau; wer eine Kachel nicht sieht, bei dem rücken die Kacheln derselben Zeile nach links.
+        Anmeldung und in der Vorschau; wer eine Kachel nicht sieht, bei dem wird die schmalste Kachel derselben Zeile breiter.
         Die anderen Spaltenzahlen der Seite bleiben. Kommt ins Änderungsprotokoll.
       requestBody:
         required: true

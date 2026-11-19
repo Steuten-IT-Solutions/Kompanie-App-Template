@@ -35,11 +35,19 @@ test('gespeicherte Lage mit Lücken und Breiten bleibt, Ergebnis nach Zeile und 
   assert.deepEqual(resolveTiles(['a', 'b', 'c'], saved, 4), [t('a', 1, 1, 2), t('b', 2, 2), t('c', 4, 2)]);
 });
 
-test('nicht sichtbare Kachel: rechts davon in derselben Zeile rücken nach links, keine wechselt die Zeile', () => {
+test('nicht sichtbare Kachel: die schmalste der Zeile (bei Gleichstand die linke) wird breiter; keine wechselt die Zeile', () => {
   const saved = { '4': [t('a', 1, 1), t('x', 2, 1, 2), t('b', 4, 1), t('c', 1, 2)] };
-  assert.deepEqual(resolveTiles(['a', 'b', 'c'], saved, 4), [t('a', 1, 1), t('b', 2, 1), t('c', 1, 2)]);
-  // gewollte Lücke rechts der fehlenden Kachel bleibt
-  const gap = { '4': [t('x', 1, 1), t('b', 3, 1, 2)] };
+  assert.deepEqual(resolveTiles(['a', 'b', 'c'], saved, 4), [t('a', 1, 1, 3), t('b', 4, 1), t('c', 1, 2)], 'a und b gleich schmal: a');
+  // die schmalste, auch wenn sie nicht neben der fehlenden steht
+  const narrow = { '4': [t('w', 1, 1, 2), t('x', 3, 1), t('n', 4, 1)] };
+  assert.deepEqual(resolveTiles(['w', 'n'], narrow, 4), [t('w', 1, 1, 2), t('n', 3, 1, 2)]);
+  // fehlende ganz links: die Kachel rückt nach und wird breiter
+  assert.deepEqual(resolveTiles(['b'], { '2': [t('x', 1, 1), t('b', 2, 1)] }, 2), [t('b', 1, 1, 2)]);
+  // zwei fehlende: der Reihe nach an die jeweils schmalste
+  const two = { '4': [t('a', 1, 1), t('x', 2, 1), t('y', 3, 1), t('b', 4, 1)] };
+  assert.deepEqual(resolveTiles(['a', 'b'], two, 4), [t('a', 1, 1, 2), t('b', 3, 1, 2)]);
+  // gewollte Lücke bleibt
+  const gap = { '4': [t('x', 1, 1), t('b', 3, 1)] };
   assert.deepEqual(resolveTiles(['b'], gap, 4), [t('b', 2, 1, 2)]);
 });
 

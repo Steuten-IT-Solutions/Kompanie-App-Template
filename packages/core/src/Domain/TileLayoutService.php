@@ -20,7 +20,7 @@ use KompanieApp\Core\Storage\UserSettings;
  *
  * Dazu eine Vorgabe für alle (Einstellung „tile_defaults“, gleiche Form je Seite): legt fest, wer die Einstellungen
  * ändern darf, direkt beim Anordnen einer Seite. Sie gilt für jede Person ohne eigene Anordnung der Seite und in der
- * Vorschau; wer eine Kachel nicht sieht, bei dem rücken die Kacheln derselben Zeile nach links.
+ * Vorschau; wer eine Kachel nicht sieht, bei dem wird die schmalste Kachel derselben Zeile breiter (tileGrid.ts).
  *
  * @phpstan-type Tile array{id: string, col: int, row: int, span: int}
  */

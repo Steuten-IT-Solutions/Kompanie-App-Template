@@ -53,7 +53,7 @@ Statt nur der Reihenfolge kannst du auch festlegen, wo jede Kachel steht und wie
 1. Öffne die Seite und ordne die Kacheln an wie für dich selbst ([Kacheln anordnen](seite:kacheln-anordnen)).
 2. Tippe im Hinweis über den Kacheln auf **Als Vorgabe für alle** und bestätige.
 
-Die Vorgabe gilt für jede Person, die die Seite nicht selbst angeordnet hat, auch ohne Anmeldung und in der Vorschau **App als … ansehen**. Sie gilt für die Bildschirmbreite, an der du sie festlegst (2, 3 oder 4 Spalten); für die anderen Breiten übernimmt die App ihre Reihenfolge, bis du dort auch eine festlegst. Wer eine Kachel nicht sehen darf, bei dem rücken die Kacheln derselben Zeile nach links; keine Kachel wechselt die Zeile. **Vorgabe löschen** entfernt sie für alle Breiten; danach gilt wieder die Reihenfolge von hier. Die Änderung steht im Änderungsprotokoll.
+Die Vorgabe gilt für jede Person, die die Seite nicht selbst angeordnet hat, auch ohne Anmeldung und in der Vorschau **App als … ansehen**. Sie gilt für die Bildschirmbreite, an der du sie festlegst (2, 3 oder 4 Spalten); für die anderen Breiten übernimmt die App ihre Reihenfolge, bis du dort auch eine festlegst. Wer eine Kachel nicht sehen darf, bei dem wird die schmalste Kachel derselben Zeile breiter (bei gleicher Breite die linke); keine Kachel wechselt die Zeile. **Vorgabe löschen** entfernt sie für alle Breiten; danach gilt wieder die Reihenfolge von hier. Die Änderung steht im Änderungsprotokoll.
 
 ### Ein Untermenü anlegen
 1. Tippe auf **Untermenü hinzufügen**.

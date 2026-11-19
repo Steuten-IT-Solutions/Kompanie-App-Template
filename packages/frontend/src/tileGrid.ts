@@ -6,8 +6,9 @@
  *
  * Zusammenführen mit der Vorgabe (Reihenfolge des Admins bzw. im Code), ohne DOM:
  * - Ohne Anordnung: der Reihe nach, Breite 1, ohne Lücken (wie früher).
- * - Gespeicherte Kacheln, die die Person gerade nicht sieht, fallen weg; die Kacheln rechts davon in derselben Zeile
- *   rücken um ihre Breite nach links. Keine Kachel wechselt die Zeile, Breiten bleiben; ganz leere Zeilen fallen weg.
+ * - Gespeicherte Kacheln, die die Person gerade nicht sieht, fallen weg; die schmalste Kachel derselben Zeile (bei
+ *   Gleichstand die linke) wird um ihre Breite breiter, die Zeile reicht so weit wie vorher. Keine Kachel wechselt die
+ *   Zeile; ganz leere Zeilen fallen weg.
  * - Neue Kacheln (nicht gespeichert) kommen in der Reihenfolge der Vorgabe in neue Zeilen unter die letzte, Breite 1.
  * - Fehlt die Anordnung für diese Spaltenzahl, aber eine andere ist gespeichert, gilt deren Lesereihenfolge (Zeile,
  *   dann Spalte) mit gekürzten Breiten, ohne Lücken.
@@ -98,21 +99,15 @@ export function resolveTiles(ids: string[], saved: TileLayouts | undefined, cols
   const kept: TilePlace[] = [];
   const taken = new Set<string>();
   for (const [row, tiles] of rows) {
-    let shift = 0;
-    for (const t of tiles) {
-      if (!visible.has(t.id)) {
-        shift += t.span;
-        continue;
-      }
-      const col = t.col - shift;
+    for (const t of closeGaps(tiles, visible)) {
       // Überlappung (nur bei beschädigten Daten möglich): Kachel kommt als neue dazu
-      const cells = Array.from({ length: t.span }, (_, i) => `${row}:${col + i}`);
+      const cells = Array.from({ length: t.span }, (_, i) => `${row}:${t.col + i}`);
       if (cells.some((c) => taken.has(c))) {
         seen.delete(t.id);
         continue;
       }
       cells.forEach((c) => taken.add(c));
-      kept.push({ id: t.id, col, row, span: t.span });
+      kept.push({ id: t.id, col: t.col, row, span: t.span });
     }
   }
   // Ganz leere Zeilen fallen weg
@@ -120,6 +115,32 @@ export function resolveTiles(ids: string[], saved: TileLayouts | undefined, cols
   const renumber = new Map(used.map((r, i) => [r, i + 1]));
   const compact = kept.map((t) => ({ ...t, row: renumber.get(t.row)! }));
   return appendNew(compact, ids, cols);
+}
+
+/**
+ * Eine Zeile ohne die nicht sichtbaren Kacheln (nach Spalte geordnet): Die Kacheln rechts einer fehlenden rücken um
+ * ihre Breite nach links, dann bekommt die schmalste Kachel der Zeile (bei Gleichstand die linke) die Breite der
+ * fehlenden dazu, die Kacheln rechts von ihr rücken dafür wieder nach rechts. Bei mehreren fehlenden der Reihe nach,
+ * jeweils an die dann schmalste. So reicht die Zeile so weit wie vorher; gewollte Lücken bleiben.
+ */
+function closeGaps(tiles: TilePlace[], visible: Set<string>): TilePlace[] {
+  const out: TilePlace[] = [];
+  const missing: number[] = [];
+  let shift = 0;
+  for (const t of tiles) {
+    if (visible.has(t.id)) out.push({ ...t, col: t.col - shift });
+    else {
+      shift += t.span;
+      missing.push(t.span);
+    }
+  }
+  if (out.length === 0) return out;
+  for (const span of missing) {
+    const k = out.reduce((best, t, i) => (t.span < out[best].span ? i : best), 0);
+    out[k].span += span;
+    for (let i = k + 1; i < out.length; i++) out[i].col += span;
+  }
+  return out;
 }
 
 /** Sichtbare Kacheln, die noch nicht liegen: der Reihe nach in neue Zeilen unter die letzte, Breite 1. */

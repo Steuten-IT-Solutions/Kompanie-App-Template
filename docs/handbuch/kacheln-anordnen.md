@@ -35,6 +35,6 @@ Tippe auf **Zurücksetzen** und bestätige. Danach gilt auf dieser Seite wieder 
 - Das Raster hat je nach Breite 2, 3 oder 4 Spalten (Handy, Handy quer, Tablet oder Computer). Für jede Spaltenzahl gibt es eine eigene Anordnung. Hast du eine Breite noch nicht angeordnet, übernimmt sie die Reihenfolge einer anderen.
 - Ohne Verbindung gilt die Änderung gleich und wird auf dem Gerät vorgemerkt; die App speichert sie, sobald wieder Netz da ist.
 - Ohne Anmeldung merkt sich nur dieses Gerät die Anordnung. Nach dem Anmelden gilt die Anordnung deines Kontos.
-- Kommt eine Kachel neu dazu (z. B. durch ein neues Recht), steht sie unten. Fehlt eine Kachel, rücken die Kacheln derselben Zeile nach links.
+- Kommt eine Kachel neu dazu (z. B. durch ein neues Recht), steht sie unten. Fehlt eine Kachel, wird die schmalste Kachel derselben Zeile um ihre Breite breiter (bei gleicher Breite die linke); die Zeile bleibt so breit wie vorher.
 - Die Vorgabe für alle, die nichts angeordnet haben, legt ein {rolle.admin} fest: die Reihenfolge oder ein Raster mit Plätzen und Breiten.
 - In der Vorschau **App als … ansehen** gilt immer die Vorgabe.
