@@ -8,7 +8,7 @@ import { Caps } from './ui';
 import { useAdminCounts } from './adminCounts';
 import { usePromotionsDue } from './promotionsDue';
 import { tileCount } from './tileCount';
-import { TileGrid } from './tiles';
+import { TileArrange, TileGrid } from './tiles';
 import { menuSources, prefetchOnTap, usePrefetchMenu } from './viewData';
 
 const sec = brand.labels.sections;
@@ -445,36 +445,39 @@ export function AdminMenu({ group }: { group?: string }) {
   );
   return (
     <nav aria-label={group ? 'Einrichtungen' : 'Verwaltung'}>
-      <TileGrid
-        page={group ? 'einrichtungen' : 'verwaltung'}
-        className="admin-tiles"
-        tiles={(group ? setupTabs() : startTabs()).map((t) => {
-          const badge = tileCount(t.id, counts);
-          return {
-            id: t.id,
-            node: (
-              <button
-                type="button"
-                className="card admin-tile"
-                title={badge?.title}
-                onClick={() => navigate(t.route ?? `verwaltung/${t.id}`)}
-                {...prefetchOnTap(...menuSources('verwaltung', t.id))}
-              >
-                <AdminIcon id={t.id} />
-                <span>
-                  <Caps text={t.label} />
-                </span>
-                {badge && (
-                  // Zahl im Kreis an der Ecke: was dort gerade ansteht (erklärt im title).
-                  <span className="count-badge" aria-hidden="true">
-                    {badge.text}
+      <TileArrange pages={[group ? 'einrichtungen' : 'verwaltung']}>
+        <TileGrid
+          page={group ? 'einrichtungen' : 'verwaltung'}
+          className="admin-tiles"
+          tiles={(group ? setupTabs() : startTabs()).map((t) => {
+            const badge = tileCount(t.id, counts);
+            return {
+              id: t.id,
+              label: t.label,
+              node: (
+                <button
+                  type="button"
+                  className="card admin-tile"
+                  title={badge?.title}
+                  onClick={() => navigate(t.route ?? `verwaltung/${t.id}`)}
+                  {...prefetchOnTap(...menuSources('verwaltung', t.id))}
+                >
+                  <AdminIcon id={t.id} />
+                  <span>
+                    <Caps text={t.label} />
                   </span>
-                )}
-              </button>
-            ),
-          };
-        })}
-      />
+                  {badge && (
+                    // Zahl im Kreis an der Ecke: was dort gerade ansteht (erklärt im title).
+                    <span className="count-badge" aria-hidden="true">
+                      {badge.text}
+                    </span>
+                  )}
+                </button>
+              ),
+            };
+          })}
+        />
+      </TileArrange>
     </nav>
   );
 }

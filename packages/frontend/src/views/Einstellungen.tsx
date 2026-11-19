@@ -39,7 +39,7 @@ import { formatBytes, formatUntil } from '../format';
 import { menuSources, prefetchOnTap, sources, usePrefetchMenu } from '../viewData';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
-import { TileGrid } from '../tiles';
+import { TileArrange, TileGrid } from '../tiles';
 
 const sec = brand.labels.sections;
 
@@ -138,35 +138,38 @@ function Overview() {
   if (loading && !data) return <Loading />;
   return (
     <div className="settings-overview">
-      {GROUPS.map((g) => {
-        const list = pages.filter((p) => p.group === g);
-        if (list.length === 0) return null;
-        return (
-          <section key={g} className="settings-group" aria-label={g}>
-            <h3 className="settings-group-title">{g}</h3>
-            <TileGrid
-              page={`einstellungen/${GROUP_KEYS[g]}`}
-              className="settings-tiles"
-              tiles={list.map((p) => ({
-                id: p.id,
-                node: (
-                  <button
-                    type="button"
-                    className="card settings-link settings-tile"
-                    onClick={() => navigate(`einstellungen/${p.id}`)}
-                    {...prefetchOnTap(...menuSources('einstellungen', p.id))}
-                  >
-                    <span className="row-title">{p.title}</span>
-                    <span className="settings-chevron" aria-hidden="true">
-                      ›
-                    </span>
-                  </button>
-                ),
-              }))}
-            />
-          </section>
-        );
-      })}
+      <TileArrange pages={GROUPS.map((g) => `einstellungen/${GROUP_KEYS[g]}`)}>
+        {GROUPS.map((g) => {
+          const list = pages.filter((p) => p.group === g);
+          if (list.length === 0) return null;
+          return (
+            <section key={g} className="settings-group" aria-label={g}>
+              <h3 className="settings-group-title">{g}</h3>
+              <TileGrid
+                page={`einstellungen/${GROUP_KEYS[g]}`}
+                className="settings-tiles"
+                tiles={list.map((p) => ({
+                  id: p.id,
+                  label: p.title,
+                  node: (
+                    <button
+                      type="button"
+                      className="card settings-link settings-tile"
+                      onClick={() => navigate(`einstellungen/${p.id}`)}
+                      {...prefetchOnTap(...menuSources('einstellungen', p.id))}
+                    >
+                      <span className="row-title">{p.title}</span>
+                      <span className="settings-chevron" aria-hidden="true">
+                        ›
+                      </span>
+                    </button>
+                  ),
+                }))}
+              />
+            </section>
+          );
+        })}
+      </TileArrange>
     </div>
   );
 }

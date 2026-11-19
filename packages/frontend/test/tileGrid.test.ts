@@ -2,7 +2,18 @@
 // Kacheln, abgeleitete Spaltenzahl.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { columnsForWidth, flow, resolveTiles, rowCount, type TilePlace } from '../src/tileGrid.ts';
+import {
+  cellAt,
+  columnsForWidth,
+  emptyCells,
+  flow,
+  moveTile,
+  resizeTile,
+  resolveTiles,
+  rowCount,
+  sameTiles,
+  type TilePlace,
+} from '../src/tileGrid.ts';
 
 const t = (id: string, col: number, row: number, span = 1): TilePlace => ({ id, col, row, span });
 
@@ -69,4 +80,44 @@ test('flow: zu breite Kachel beginnt eine neue Zeile', () => {
   const placed = flow([{ id: 'a' }, { id: 'b', span: 2 }, { id: 'c', span: 9 }], 3);
   assert.deepEqual(placed, [t('a', 1, 1), t('b', 2, 1, 2), t('c', 1, 2, 3)]);
   assert.equal(rowCount(placed), 2);
+});
+
+test('verschieben auf ein freies Feld; zu weit rechts rückt nach links', () => {
+  const tiles = [t('a', 1, 1), t('b', 2, 1)];
+  assert.deepEqual(moveTile(tiles, 'a', 2, 2, 2), [t('b', 2, 1), t('a', 2, 2)]);
+  assert.deepEqual(moveTile([t('a', 1, 1, 2), t('b', 1, 2)], 'a', 2, 3, 3), [t('b', 1, 1), t('a', 2, 2, 2)], 'leere Zeile 1 fällt weg');
+});
+
+test('verschieben auf eine belegte Stelle: die Kachel dort rutscht mit allem darunter nach unten', () => {
+  const tiles = [t('a', 1, 1), t('b', 2, 1), t('c', 1, 2), t('d', 1, 3)];
+  assert.deepEqual(moveTile(tiles, 'd', 1, 1, 2), [t('d', 1, 1), t('b', 2, 1), t('a', 1, 2), t('c', 1, 3)]);
+  // breite Kachel verdrängt zwei
+  assert.deepEqual(moveTile([t('a', 1, 1), t('b', 2, 1), t('w', 1, 2, 2)], 'w', 1, 1, 2), [t('w', 1, 1, 2), t('a', 1, 2), t('b', 2, 2)]);
+});
+
+test('Breite ändern: begrenzt auf 1 bis Spaltenzahl, rückt am rechten Rand nach links, verdrängt Nachbarn', () => {
+  const tiles = [t('a', 1, 1), t('b', 2, 1)];
+  assert.deepEqual(resizeTile(tiles, 'a', 1, 2), [t('a', 1, 1, 2), t('b', 2, 2)]);
+  assert.deepEqual(resizeTile(tiles, 'b', 1, 2), [t('b', 1, 1, 2), t('a', 1, 2)]);
+  assert.deepEqual(resizeTile(tiles, 'a', -1, 2), tiles);
+  assert.deepEqual(resizeTile([t('a', 1, 1, 2)], 'a', 5, 3), [t('a', 1, 1, 3)]);
+});
+
+test('Feld unter dem Zeiger, auch unterhalb der letzten Zeile', () => {
+  const cols = [100, 100, 100];
+  const rows = [112, 112];
+  assert.deepEqual(cellAt(5, 5, cols, rows, 12), { col: 1, row: 1 });
+  assert.deepEqual(cellAt(150, 130, cols, rows, 12), { col: 2, row: 2 });
+  assert.deepEqual(cellAt(999, 999, cols, rows, 12), { col: 3, row: 9 }, 'je 124 px eine Zeile weiter');
+  assert.deepEqual(cellAt(-20, -20, cols, rows, 12), { col: 1, row: 1 });
+});
+
+test('leere Felder und gleiche Lage', () => {
+  assert.deepEqual(emptyCells([t('a', 1, 1, 2), t('b', 2, 2)], 2, 3), [
+    { col: 1, row: 2 },
+    { col: 1, row: 3 },
+    { col: 2, row: 3 },
+  ]);
+  assert.ok(sameTiles([t('a', 1, 1), t('b', 2, 1)], [t('b', 2, 1), t('a', 1, 1)]));
+  assert.ok(!sameTiles([t('a', 1, 1)], [t('a', 2, 1)]));
 });

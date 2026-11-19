@@ -11,7 +11,7 @@ import { rememberRoute } from './share';
 import { markSaved } from './unsaved';
 import { noteResponse } from './connection';
 import type { AdminOrder, NavigationSetting, NavNames, NavStart } from './navigation';
-import type { TileLayouts } from './tileGrid';
+import type { TileLayouts, TilePlace } from './tileGrid';
 
 /** Schlüssel einer Rolle: guest, member, admin, früher fest (organizer, manager, candidate) oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
@@ -2989,6 +2989,10 @@ export const api = {
   saveMyJoinYear: (data: { date: string; profile?: ProfileVisibility }) =>
     request<{ join_year: JoinYear | null }>('PUT', '/me/join-year', data),
   deleteMyJoinYear: () => request<{ join_year: null }>('DELETE', '/me/join-year'),
+  /** Eigene Anordnung der Kacheln einer Seite für eine Spaltenzahl (tiles.tsx) */
+  saveTiles: (page: string, cols: number, tiles: TilePlace[]) =>
+    request<{ page: string; layouts: TileLayouts }>('PUT', '/me/tiles', { page, cols, tiles }),
+  resetTiles: (page: string) => request<{ page: string; layouts: TileLayouts }>('DELETE', '/me/tiles', undefined, { page }),
   setMemberJoinYear: (id: number, date: string) => request<{ join_year: JoinYear | null }>('PUT', `/members/${id}/join-year`, { date }),
   deleteMemberJoinYear: (id: number) => request<{ join_year: null }>('DELETE', `/members/${id}/join-year`),
 

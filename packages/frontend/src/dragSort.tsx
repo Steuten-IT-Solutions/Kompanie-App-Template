@@ -31,7 +31,7 @@ const MAX_SPEED = 14;
  * Scrollgeschwindigkeit für die Zeigerposition: in der Randzone unter der Kopfleiste nach oben, über der Tab-Leiste
  * nach unten, je näher am Rand, desto schneller. Kopf- und Tab-Leiste bleiben stehen und verdecken die Seite.
  */
-function scrollSpeed(y: number): number {
+export function scrollSpeed(y: number): number {
   const bar = (sel: string) => {
     const r = document.querySelector(sel)?.getBoundingClientRect();
     return r && r.height > 0 ? r : null;

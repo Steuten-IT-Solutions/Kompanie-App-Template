@@ -2672,9 +2672,118 @@ code {
 }
 /* Kachelraster mit persönlicher Anordnung (tiles.tsx): Spalten und Lage setzt die App; breite Kacheln zeigen Symbol und
    Text nebeneinander */
-.tile-grid > li.wide > .admin-tile {
+.tile-grid > li {
+  position: relative;
+  min-width: 0;
+}
+.tile-grid > li > .tile-body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+.tile-grid > li.wide .admin-tile {
   flex-direction: row;
   gap: 14px;
+}
+/* Knopf „Kacheln anordnen“ über dem Raster, rechts */
+.tile-arrange-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 var(--space-2);
+}
+/* Bearbeiten-Modus: Hinweis, Zurücksetzen und Fertig über dem Raster */
+.tile-arrange {
+  padding: 14px 16px 2px;
+  margin: 0 0 12px;
+}
+.tile-arrange-hint {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+.tile-arrange-note,
+.tile-arrange .form-error {
+  margin: 10px 0 0;
+  font-size: 0.92rem;
+}
+/* Freie Felder: gestrichelt, so hoch wie eine Kachel */
+.tile-grid-editing > li.tile-slot {
+  min-height: 56px;
+  border: 1.5px dashed var(--line-strong);
+  border-radius: var(--radius);
+}
+.admin-tiles.tile-grid-editing > li.tile-slot {
+  min-height: 112px;
+}
+.tile-grid-editing > li > .tile-body {
+  opacity: 0.92;
+}
+/* Platz für − und + unter dem Inhalt der Kachel */
+.tile-grid-editing > li > .tile-body > .card {
+  padding-bottom: 48px;
+}
+/* Griff über der ganzen Kachel: ziehen (Finger: kurz halten, damit die Seite weiter scrollt), Tastatur: Pfeile, + und − */
+.tile-edit {
+  position: absolute;
+  inset: 0;
+}
+.tile-handle {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  padding: 0;
+  border: 2px dashed var(--accent-text);
+  border-radius: var(--radius);
+  background: transparent;
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.tile-handle:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.tile-dragging .tile-handle {
+  cursor: grabbing;
+  border-style: solid;
+  background: color-mix(in srgb, var(--accent-text) 10%, transparent);
+}
+.tile-dragging > .tile-body {
+  transform: scale(1.03);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18);
+  border-radius: var(--radius);
+}
+/* Breite: − und + unten rechts in der Kachel */
+.tile-size {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: flex;
+  gap: 6px;
+}
+.tile-size button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1.5px solid var(--line-strong);
+  background: var(--card);
+  color: var(--accent-text);
+  font: inherit;
+  font-weight: 700;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.tile-size button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.tile-size button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 /* Kleine Zahl im Kreis an der oberen rechten Ecke einer Kachel (z. B. Mitglieder, die zur Beförderung bereit sind) */
 .admin-tile {

@@ -14,3 +14,6 @@ Je Bereich im Untermenü einen Knopf. Du siehst nur die Bereiche, die du sehen d
 ## So gehst du vor
 1. Tippe auf den Knopf des Bereichs, den du öffnen willst.
 2. **‹** mit dem Namen des Untermenüs oben führt zurück zu dieser Seite.
+
+## Gut zu wissen
+- Wo die Knöpfe für dich stehen und wie breit sie sind, legst du selbst fest: [Kacheln anordnen](seite:kacheln-anordnen).

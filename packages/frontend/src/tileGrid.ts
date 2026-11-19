@@ -141,3 +141,83 @@ function appendNew(placed: TilePlace[], ids: string[], cols: number): TilePlace[
 export function rowCount(tiles: TilePlace[]): number {
   return tiles.reduce((m, t) => Math.max(m, t.row), 0);
 }
+
+// ---- Anordnen (Bearbeiten-Modus) ----
+
+const overlaps = (a: TilePlace, b: TilePlace) => a.row === b.row && a.col < b.col + b.span && b.col < a.col + a.span;
+
+/**
+ * Verdrängen: fixed bleibt, wo es ist; jede Kachel, die mit einer schon gelegten überlappt, rutscht so weit nach unten,
+ * bis sie frei ist (und schiebt dabei weitere). Danach fallen ganz leere Zeilen weg. Ergebnis nach Zeile und Spalte.
+ */
+function settle(fixed: TilePlace, others: TilePlace[]): TilePlace[] {
+  const placed: TilePlace[] = [fixed];
+  for (const t of [...others].sort(byPlace)) {
+    const next = { ...t };
+    while (placed.some((p) => overlaps(p, next))) next.row++;
+    placed.push(next);
+  }
+  const used = [...new Set(placed.map((t) => t.row))].sort((a, b) => a - b);
+  const renumber = new Map(used.map((r, i) => [r, i + 1]));
+  return placed.map((t) => ({ ...t, row: renumber.get(t.row)! })).sort(byPlace);
+}
+
+/** Kachel id nach Spalte col, Zeile row legen (zu weit rechts: so weit nach links, dass sie passt); belegt: verdrängen. */
+export function moveTile(tiles: TilePlace[], id: string, col: number, row: number, cols: number): TilePlace[] {
+  const tile = tiles.find((t) => t.id === id);
+  if (!tile) return tiles;
+  const span = Math.min(tile.span, cols);
+  const moved = { id, span, row: Math.max(1, Math.round(row)), col: Math.max(1, Math.min(Math.round(col), cols - span + 1)) };
+  return settle(
+    moved,
+    tiles.filter((t) => t.id !== id),
+  );
+}
+
+/** Breite um delta ändern (1 bis cols); passt sie nicht mehr bis zum rechten Rand, rückt die Kachel nach links. */
+export function resizeTile(tiles: TilePlace[], id: string, delta: number, cols: number): TilePlace[] {
+  const tile = tiles.find((t) => t.id === id);
+  if (!tile) return tiles;
+  const span = Math.max(1, Math.min(tile.span + delta, cols));
+  return settle(
+    { ...tile, span, col: Math.min(tile.col, cols - span + 1) },
+    tiles.filter((t) => t.id !== id),
+  );
+}
+
+/** Gleiche Lage aller Kacheln? (Speichern nur bei echter Änderung) */
+export function sameTiles(a: TilePlace[], b: TilePlace[]): boolean {
+  const key = (l: TilePlace[]) =>
+    [...l]
+      .sort(byPlace)
+      .map((t) => `${t.id}@${t.col},${t.row},${t.span}`)
+      .join(';');
+  return key(a) === key(b);
+}
+
+/**
+ * Feld unter einem Punkt: x, y relativ zur linken oberen Ecke des Rasters; Spalten- und Zeilenhöhen aus dem gerechneten
+ * Stil (grid-template-columns/-rows in px), gap der Abstand. Unterhalb der letzten Zeile zählen weitere Zeilen in der
+ * Höhe der letzten.
+ */
+export function cellAt(x: number, y: number, columns: number[], rows: number[], gap: number): { col: number; row: number } {
+  const index = (pos: number, sizes: number[], open: boolean) => {
+    let edge = 0;
+    for (let i = 0; i < sizes.length; i++) {
+      edge += sizes[i] + gap;
+      if (pos < edge - gap / 2) return i + 1;
+    }
+    if (!open || sizes.length === 0) return Math.max(1, sizes.length);
+    const last = sizes[sizes.length - 1] + gap;
+    return sizes.length + 1 + Math.floor(Math.max(0, pos - edge + gap / 2) / last);
+  };
+  return { col: index(Math.max(0, x), columns, false), row: index(Math.max(0, y), rows, true) };
+}
+
+/** Leere Felder in den Zeilen 1 bis rows (für die Felder im Bearbeiten-Modus) */
+export function emptyCells(tiles: TilePlace[], cols: number, rows: number): { col: number; row: number }[] {
+  const taken = new Set(tiles.flatMap((t) => Array.from({ length: t.span }, (_, i) => `${t.row}:${t.col + i}`)));
+  const out: { col: number; row: number }[] = [];
+  for (let row = 1; row <= rows; row++) for (let col = 1; col <= cols; col++) if (!taken.has(`${row}:${col}`)) out.push({ col, row });
+  return out;
+}

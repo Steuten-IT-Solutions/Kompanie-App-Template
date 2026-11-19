@@ -21,6 +21,7 @@ import { afterBackSync, initBackClose, openBackLayer } from './backClose';
 import { beforeLeave, initUnsaved } from './unsaved';
 import { setLeaveGuard } from './router';
 import { confirmAsk } from './ask';
+import { initTileLayouts } from './tileStore';
 // Gewählte Schrift aus kompanie.json, lokal gebündelt (kein Abruf bei Google).
 import './generated/fonts';
 import './generated/theme.css';
@@ -76,13 +77,15 @@ function restoreSkeletons(): Promise<unknown> {
 }
 
 // Vorschau „App als Rolle ansehen“ (Issue #63): erst die Konfiguration der Rolle holen, dann starten.
-void Promise.all([preparePreview(), restoreSkeletons()]).then(([notice]) =>
+void Promise.all([preparePreview(), restoreSkeletons()]).then(([notice]) => {
+  // Vorgemerkte Anordnungen der Kacheln (ohne Verbindung geändert) gelten sofort und gehen an den Server.
+  initTileLayouts();
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App notice={notice} />
     </StrictMode>,
-  ),
-);
+  );
+});
 
 const cfg = config;
 if ('serviceWorker' in navigator && cfg) {
