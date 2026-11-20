@@ -76,7 +76,7 @@ So lässt sich auch **Intern** der Standardnavigation umbenennen, ohne dass ihr 
 1. Wähle unter **Startseite** bei **Für Gäste** und bei **Angemeldet** jeweils einen Punkt. Zur Wahl steht, was in der jeweiligen Leiste steht, auch Untermenüs; für Angemeldete auch **Meins**.
 2. Tippe auf **Navigation speichern**.
 
-Wer die gewählte Startseite nicht sehen darf, landet auf dem ersten Punkt der Leiste, den er sehen darf. Geteilte Links und Benachrichtigungen öffnen weiter ihre eigene Seite. Die Begrüßung für Gäste und die Hinweise zum Zugang und zu Benachrichtigungen stehen auf der Startseite.
+Wer die gewählte Startseite nicht sehen darf, landet auf dem ersten Punkt der Leiste, den er sehen darf. Geteilte Links und Benachrichtigungen öffnen weiter ihre eigene Seite. Die Begrüßung für Gäste und der Hinweis zum Zugang stehen auf der Startseite.
 
 ### Nur Symbole zeigen
 Schalte unter **Darstellung** **Namen unter den Symbolen zeigen** aus und tippe auf **Navigation speichern**. Unten stehen dann nur noch die Symbole, das hilft bei vielen Punkten. Die Namen stehen weiter oben auf jeder Seite.

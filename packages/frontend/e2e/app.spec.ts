@@ -3493,19 +3493,29 @@ test.describe('Android', () => {
     expect(await status()).toBeNull();
   });
 
-  test('Startseite: Hinweis schaltet Benachrichtigungen mit allen Arten ein, „Nicht jetzt“ blendet ihn aus', async ({ page }) => {
+  test('Nach der Anmeldung: Fenster schaltet Benachrichtigungen mit allen Arten ein, „Nicht jetzt“ blendet es aus', async ({ page }) => {
     await fakePush(page);
     await login(page, 'mitglied1');
     await page.evaluate(() => navigator.serviceWorker.ready);
-    const hint = page.locator('.push-hint');
-    await expect(hint).toContainText('Nichts mehr verpassen');
+    const hint = page.getByRole('dialog', { name: 'Nichts mehr verpassen' });
+    await expect(hint).toBeVisible();
     await hint.getByRole('button', { name: 'Nicht jetzt' }).click();
     await expect(hint).toHaveCount(0);
     await page.reload();
     await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
     await expect(hint).toHaveCount(0);
 
+    // Auch auf einer anderen Seite als der Startseite (z. B. nach einem geteilten Link); ✕ zählt wie „Nicht jetzt“.
     await page.evaluate(() => localStorage.removeItem('kompanie-push-hint-later'));
+    await page.goto('/app/#/news');
+    await page.reload();
+    await expect(hint).toBeVisible();
+    await hint.getByRole('button', { name: 'Schließen' }).click();
+    await expect(hint).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem('kompanie-push-hint-later'))).not.toBeNull();
+
+    await page.evaluate(() => localStorage.removeItem('kompanie-push-hint-later'));
+    await page.goto('/app/');
     await page.reload();
     await hint.getByRole('button', { name: 'Benachrichtigungen einschalten' }).click();
     await expect(page.getByText('Benachrichtigungen sind an')).toBeVisible();

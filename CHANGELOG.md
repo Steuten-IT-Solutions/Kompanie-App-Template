@@ -221,6 +221,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Benachrichtigungen gleich nach der Anmeldung anbieten**: Der Hinweis _Nichts mehr verpassen_ erscheint jetzt als
+  Fenster direkt nach der Anmeldung, auf jeder Seite (auch wenn jemand über einen geteilten Link kommt), statt als Karte
+  nur auf der Startseite. Er kommt weiterhin nur, solange der Browser auf diesem Gerät noch nie nach Benachrichtigungen
+  gefragt hat; _Nicht jetzt_ oder Schließen blendet ihn für 30 Tage aus, nach einer Ablehnung im Browser fragt die App
+  nicht wieder. Die Abfrage des Browsers kommt erst nach dem Tippen auf _Benachrichtigungen einschalten_.
 - **Volle Breite am Computer**: Auf Tablet und Computer (Fenster ab 900 px breit) nutzen die Ansichten jetzt die ganze
   Breite statt einer schmalen Spalte von 640 px. Listen wie Mitglieder, Termine oder Dokumente stehen in Spalten,
   Formulare zeigen drei oder vier kurze Felder je Zeile, Alben und Bilder der Galerie passen sich der Breite an. Lesetexte
