@@ -2767,7 +2767,7 @@ test('Computer: Inhalt über die ganze Breite, Formulare mit mehr Feldern je Zei
   // Mitgliederliste: Inhalt fast so breit wie das Fenster, mindestens vier Karten nebeneinander
   await page.goto('/app/#/verwaltung/mitglieder');
   await expect(page.locator('main [data-loading]')).toHaveCount(0);
-  await expect.poll(async () => (await box('.content')).width).toBeGreaterThan(1350);
+  await expect.poll(async () => (await box('.content')).width).toBeGreaterThan(1300);
   const rows = page.locator('.card-list .member-row');
   await expect(rows.nth(3)).toBeVisible();
   const ys = await Promise.all([0, 1, 2, 3].map(async (i) => (await rows.nth(i).boundingBox())!.y));
@@ -2816,6 +2816,24 @@ test('Computer: eigenes Profil und Mitglied in der Verwaltung zweispaltig', asyn
   // Handy hochkant: keine Spalten
   await page.setViewportSize({ width: 390, height: 844 });
   await expect.poll(() => page.locator('.member-columns').evaluate((e) => getComputedStyle(e).display)).toBe('contents');
+});
+
+test('Computer: Leiste mit den Bereichen senkrecht am linken Rand', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/app/#/meins');
+  const bar = page.locator('.tabbar');
+  await expect(bar).toBeVisible();
+  const r = (await bar.boundingBox())!;
+  expect(r.x).toBe(0);
+  expect(r.width).toBeLessThan(120);
+  expect(r.height).toBeGreaterThan(600);
+  const c = (await page.locator('.content').first().boundingBox())!;
+  expect(c.x).toBeGreaterThanOrEqual(r.x + r.width - 1);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  // Handy hochkant: Leiste wieder unten
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(async () => (await bar.boundingBox())!.y).toBeGreaterThan(700);
 });
 
 test('Ämter: Jahresübersicht, eine Spalte je Amt, auch auf dem Handy, gemerkt (Issue #112)', async ({ page }) => {
@@ -7917,7 +7935,7 @@ test('Kacheln: am Computer 5 Spalten auf Kachel-Seiten (904 px), andere Seiten �
   expect(await width()).toBe(904);
   await page.goto('/app/#/termine');
   await expect(page.locator('.admin-tiles')).toHaveCount(0);
-  await expect.poll(width).toBeGreaterThan(1200);
+  await expect.poll(width).toBeGreaterThan(1150);
   // Schmaleres Fenster unter 900 px: Inhalt wie bisher 640 px, 3 Spalten
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.setViewportSize({ width: 880, height: 800 });

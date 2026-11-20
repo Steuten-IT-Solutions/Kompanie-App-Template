@@ -16,7 +16,7 @@ Hier lernst du den Aufbau der App kennen: die Kopfleiste oben, die Leiste mit de
 - **?**: öffnet die Hilfe passend zum aktuellen Bildschirm.
 - **Mond bzw. Sonne**: wechselt zwischen dunkler und heller Darstellung.
 - **Login** (oben rechts, nur ohne Anmeldung): führt zur Anmeldung, siehe [Anmelden](seite:anmelden).
-- **Untere Leiste**: Hier wechselst du zwischen den Bereichen. Der Bereich, in dem du gerade bist, ist hervorgehoben. Hältst du das Handy quer, steht die Leiste links.
+- **Untere Leiste**: Hier wechselst du zwischen den Bereichen. Der Bereich, in dem du gerade bist, ist hervorgehoben. Hältst du das Handy quer oder nutzt du die App an einem Computer oder Tablet, steht die Leiste links.
 
 Welche Bereiche unten stehen, hängt davon ab, welche die {kompanie.name} nutzt und ob du angemeldet bist:
 - **{bereich.events}**, **{bereich.news}** und **{bereich.gallery}**: für alle, auch ohne Anmeldung.
@@ -52,6 +52,16 @@ Wer den Link öffnet, landet direkt auf diesem Bildschirm. Ist er nur für Angem
 3. Dreh das Handy zurück, und alles steht wieder wie gewohnt.
 
 Hast du die App schon länger installiert und sie bleibt hochkant, öffne sie einmal neu; es kann bis zu einem Tag dauern, bis das Handy die Änderung übernimmt.
+
+### Am Computer oder Tablet
+Ist das Fenster mindestens 900 Pixel breit, nutzt die App die ganze Breite:
+- Die Leiste mit den Bereichen steht als senkrechte Leiste am linken Rand.
+- Listen stehen in mehreren Spalten, in Formularen stehen drei oder vier kurze Felder nebeneinander. Lange Textfelder gehen über die ganze Zeile.
+- Lesetexte wie Neuigkeiten oder das Handbuch bleiben in einer gut lesbaren Spalte in der Mitte, Seiten mit Kacheln ebenso.
+- Listen, die du per Ziehen sortierst, stehen in einer Spalte in der Mitte.
+- Das eigene Profil unter **Meins** und ein Mitglied in der Verwaltung stehen in zwei Spalten.
+
+Machst du das Fenster schmaler, sieht die App wieder aus wie auf dem Handy.
 
 ### Zwischen hell und dunkel wechseln
 1. Tippe oben auf den Mond, um die dunkle Darstellung einzuschalten, oder auf die Sonne für die helle.
