@@ -4783,13 +4783,6 @@ fieldset.board-targets legend {
 .event-kind-edit .toggle {
   margin: 0 2px 10px;
 }
-@media (min-width: 900px) {
-  .poll-page,
-  .poll-admin,
-  .poll-list {
-    max-width: 720px;
-  }
-}
 
 /* Geburtstage (Issue #1): Karte „Anstehende Geburtstage“, Eingabe Tag/Monat/Jahr */
 .birthdays-upcoming {
@@ -5024,12 +5017,6 @@ fieldset.board-targets legend {
 @media (prefers-reduced-motion: reduce) {
   .inventory-group-arrow {
     transition: none;
-  }
-}
-@media (min-width: 900px) {
-  .inventory-page,
-  .inventory-history {
-    max-width: 760px;
   }
 }
 
@@ -6384,9 +6371,8 @@ button.spotlight-person:focus-visible {
 
 /* ------------------------------------------------------------------ */
 /* Handy quer: Navigation als Leiste links, flache Kopfleiste und      */
-/* Banner, Inhalt über die ganze Breite (Listen und Formulare zwei-    */
-/* spaltig, Lesetexte begrenzt). Tablets und Computer sind höher und   */
-/* bleiben, wie sie sind.                                              */
+/* Banner. Den Inhalt über die ganze Breite teilt es sich mit Tablet   */
+/* und Computer (Block „Breite Ansicht“ darunter).                     */
 /* ------------------------------------------------------------------ */
 @media (orientation: landscape) and (max-height: 520px) {
   :root {
@@ -6521,7 +6507,14 @@ button.spotlight-person:focus-visible {
     max-height: calc(100vh / var(--kompanie-zoom, 1) - 16px);
     max-height: calc(100dvh / var(--kompanie-zoom, 1) - 16px);
   }
+}
 
+/* ------------------------------------------------------------------ */
+/* Breite Ansicht: Handy quer sowie Tablet und Computer ab 900 px      */
+/* (dieselbe Grenze wie die Kachel-Seiten oben). Inhalt über die ganze */
+/* Breite, Listen in Spalten, Lesetexte und Listen zum Ziehen begrenzt.*/
+/* ------------------------------------------------------------------ */
+@media (orientation: landscape) and (max-height: 520px), (min-width: 900px) and ((orientation: portrait) or (min-height: 521px)) {
   /* Inhalt über die ganze Breite */
   .content {
     max-width: none;
@@ -6602,6 +6595,35 @@ button.spotlight-person:focus-visible {
   .changelog-text {
     max-width: 760px;
     margin-inline: auto;
+  }
+
+  /* Listen zum Ziehen (dragSort.tsx) bleiben einspaltig; damit Name und Wert nah beieinander stehen, höchstens 960 px
+     und mittig, ebenso Einstellungen, die nur aus so einer Liste bestehen (Navigation, Rollen). */
+  .card-list:has(.drag-handle),
+  .settings-section:has(.card-list .drag-handle) {
+    width: 100%;
+    max-width: 960px;
+    margin-inline: auto;
+  }
+}
+
+/* Nur Tablet und Computer: etwas mehr Rand, Formulare mit drei oder vier kurzen Feldern je Zeile, Alben und Bilder
+   nach der Breite. */
+@media (min-width: 900px) and ((orientation: portrait) or (min-height: 521px)) {
+  :root {
+    --content-pad-r: 24px;
+  }
+  .content {
+    padding: 18px 24px 24px;
+  }
+  .form {
+    grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+  }
+  .album-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+  .photo-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   }
 }
 

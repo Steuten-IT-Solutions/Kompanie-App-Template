@@ -217,6 +217,13 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Volle Breite am Computer**: Auf Tablet und Computer (Fenster ab 900 px breit) nutzen die Ansichten jetzt die ganze
+  Breite statt einer schmalen Spalte von 640 px. Listen wie Mitglieder, Termine oder Dokumente stehen in Spalten,
+  Formulare zeigen drei oder vier kurze Felder je Zeile, Alben und Bilder der Galerie passen sich der Breite an. Lesetexte
+  wie News-Artikel und das Handbuch bleiben höchstens 760 px breit und mittig, Kachel-Seiten 904 px, Listen zum
+  Ziehen (z. B. [Rollen](app:einstellungen/rollen) oder Punktekatalog) höchstens 960 px. Handy hochkant bleibt, wie es
+  ist.
+
 - **Gemeinsame Amtszeiten einklappbar**: Bei einer Ämtergruppe mit gemeinsamen Amtszeiten (z. B. Königshaus) unter
   [Ämter](app:mitglieder/aemter) lässt sich jede Amtszeit mit einem Tipp auf ihren Kopf auf- und zuklappen. Die laufende
   Amtszeit ist aufgeklappt (läuft keine, die neueste), alle anderen sind zu und zeigen nur Jahre und Namen; Bild und Ämter erscheinen erst beim
