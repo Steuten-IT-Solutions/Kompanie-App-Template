@@ -2759,6 +2759,39 @@ test('Querformat: Navigation links, Listen und Formulare zweispaltig, nichts scr
     .toBe(true);
 });
 
+test('Computer: Inhalt über die ganze Breite, Formulare mit mehr Feldern je Zeile, Ziehlisten begrenzt', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const noSideScroll = () => expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const box = async (selector: string) => (await page.locator(selector).first().boundingBox())!;
+  // Mitgliederliste: Inhalt fast so breit wie das Fenster, mindestens vier Karten nebeneinander
+  await page.goto('/app/#/verwaltung/mitglieder');
+  await expect(page.locator('main [data-loading]')).toHaveCount(0);
+  await expect.poll(async () => (await box('.content')).width).toBeGreaterThan(1350);
+  const rows = page.locator('.card-list .member-row');
+  await expect(rows.nth(3)).toBeVisible();
+  const ys = await Promise.all([0, 1, 2, 3].map(async (i) => (await rows.nth(i).boundingBox())!.y));
+  expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(2);
+  await noSideScroll();
+  // Formular über die ganze Breite mit mindestens vier Spalten
+  await page.goto('/app/#/verwaltung/neu');
+  const form = page.locator('form.form').first();
+  await expect(form).toBeVisible();
+  await expect.poll(() => form.evaluate((e) => getComputedStyle(e).gridTemplateColumns.split(' ').length)).toBeGreaterThanOrEqual(4);
+  expect((await form.boundingBox())!.width).toBeGreaterThan(1300);
+  await noSideScroll();
+  // Liste zum Ziehen (Rollen): höchstens 960 px, mittig
+  await page.goto('/app/#/einstellungen/rollen');
+  const list = page.locator('.card-list:has(.drag-handle)').first();
+  await expect(list).toBeVisible();
+  const l = (await list.boundingBox())!;
+  expect(l.width).toBeLessThanOrEqual(960);
+  const c = await box('.content');
+  expect(Math.abs(l.x + l.width / 2 - (c.x + c.width / 2))).toBeLessThan(2);
+  await noSideScroll();
+  await shot(page, '1f-computer');
+});
+
 test('Ämter: Jahresübersicht, eine Spalte je Amt, auch auf dem Handy, gemerkt (Issue #112)', async ({ page }) => {
   const id = Date.now() % 1000000;
   const office = `Fähnriche ${id}`;
@@ -7847,7 +7880,7 @@ test('Kacheln: Admin legt ein Raster als Vorgabe für alle fest, gilt ohne eigen
   await expect.poll(() => placeOf('mitglieder')).toMatch(/\+1\//);
 });
 
-test('Kacheln: am Computer 5 Spalten auf Kachel-Seiten, andere Seiten bleiben schmal', async ({ page }) => {
+test('Kacheln: am Computer 5 Spalten auf Kachel-Seiten (904 px), andere Seiten über die ganze Breite', async ({ page }) => {
   const columns = () => page.locator('.admin-tiles').evaluate((e) => getComputedStyle(e).gridTemplateColumns.split(' ').length);
   const width = () => page.locator('.content').evaluate((e) => e.getBoundingClientRect().width);
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -7858,7 +7891,7 @@ test('Kacheln: am Computer 5 Spalten auf Kachel-Seiten, andere Seiten bleiben sc
   expect(await width()).toBe(904);
   await page.goto('/app/#/termine');
   await expect(page.locator('.admin-tiles')).toHaveCount(0);
-  await expect.poll(width).toBe(640);
+  await expect.poll(width).toBeGreaterThan(1200);
   // Schmaleres Fenster unter 900 px: Inhalt wie bisher 640 px, 3 Spalten
   await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
   await page.setViewportSize({ width: 880, height: 800 });
