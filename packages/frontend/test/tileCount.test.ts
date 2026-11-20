@@ -43,6 +43,7 @@ test('Aufnahmen: zweiter Kreis für Anwärter kurz vor der Aufnahme', () => {
   assert.equal(tileSoonCount('aufnahmen', { admissionsSoon: null }), null);
   assert.equal(tileSoonCount('aufnahmen', { admissionsSoon: 0 }), null);
   assert.equal(tileSoonCount('befoerderungen', { admissionsSoon: 2 }), null, 'nur an der Kachel Aufnahmen');
+  assert.equal(tileSoonCount('anfragen', { admissionsSoon: 2, promotionsSoon: 2 }), null, 'Anfragen ohne zweiten Kreis');
   assert.equal(tileSoonCount('aufnahmen', { admissionsSoon: 1 })?.title, '1 Anwärter steht kurz vor der Aufnahme');
   assert.equal(tileSoonCount('aufnahmen', { admissionsSoon: 2 })?.text, '2');
   assert.equal(tileCount('aufnahmen', { admissions: 0, admissionsSoon: 2 }), null, 'der rote Kreis zählt nur Erfüllte');
@@ -56,4 +57,16 @@ test('Erklärung beider Zahlen in einem Satz', () => {
   );
   assert.equal(tileTitle(null, tileSoonCount('aufnahmen', counts)), '2 Anwärter stehen kurz vor der Aufnahme');
   assert.equal(tileTitle(null, null), undefined);
+});
+
+test('Beförderungen: zweiter Kreis für Mitglieder, die bald bereit sind', () => {
+  assert.equal(tileSoonCount('befoerderungen', { promotionsSoon: null }), null);
+  assert.equal(tileSoonCount('befoerderungen', { promotionsSoon: 0 }), null);
+  assert.equal(tileSoonCount('aufnahmen', { promotionsSoon: 2 }), null, 'nur an der Kachel Beförderungen');
+  assert.equal(tileSoonCount('befoerderungen', { promotionsSoon: 1 })?.title, '1 Mitglied ist bald zur Beförderung bereit');
+  const counts = { promotions: 2, promotionsSoon: 3 };
+  assert.equal(
+    tileTitle(tileCount('befoerderungen', counts), tileSoonCount('befoerderungen', counts)),
+    '2 Mitglieder zur Beförderung bereit, 3 Mitglieder sind bald zur Beförderung bereit',
+  );
 });

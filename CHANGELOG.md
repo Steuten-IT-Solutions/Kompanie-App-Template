@@ -26,6 +26,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Bald fällige Beförderungen**: Am Knopf [Beförderungen](app:verwaltung/befoerderungen) zeigt neben der Zahl im roten
+  Kreis ein Kreis in der Farbe der Kompanie, wie viele Mitglieder bald die Schwelle für ihren nächsten Dienstgrad
+  erreichen (es fehlt höchstens noch ein Punkt); sie stehen in der Übersicht im neuen Abschnitt „Bald erreicht“.
 - **Kacheln selbst anordnen**: Jede Person legt auf der Startseite der [Verwaltung](app:verwaltung), unter
   Einrichtungen, in den Untermenüs wie [Intern](app:intern) und in den [Einstellungen](app:einstellungen) selbst fest,
   wo jede Kachel steht und wie breit sie ist (Symbol oben rechts über den Kacheln: ziehen, am Handy kurz halten; − und +

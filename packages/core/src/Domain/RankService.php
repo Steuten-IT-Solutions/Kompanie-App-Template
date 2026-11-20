@@ -37,6 +37,11 @@ final class RankService
     public const KIND_PROMOTION = 'promotion';
     public const KIND_DEMOTION = 'demotion';
     public const KIND_INITIAL = 'initial';
+    /**
+     * „Bald zur Beförderung bereit“: Bis zur Schwelle des nächsten Dienstgrads fehlt höchstens so viel (wie bei den
+     * Aufnahmen „noch eine Teilnahme“). Fest, nicht einstellbar.
+     */
+    public const SOON_POINTS = 1;
 
     public const BADGE_MAX_BYTES = 1024 * 1024;
     /** Größen der PNG-Fassungen (längere Kante); badge_url zeigt auf BADGE_DEFAULT_SIZE, die App ändert s bei Bedarf. */
@@ -720,13 +725,15 @@ final class RankService
                 }
             }
         }
+        $toNext = $threshold === null ? null : round($threshold - $total, 2);
         return [
             'points' => ScoreService::pointsValue($total),
             'next_rank' => $next === null ? null : ['id' => $next['id'], 'title' => $next['title'], 'min_points' => $next['min_points'], 'badge_url' => $this->badgeUrl($next)],
-            'points_to_next' => $threshold === null ? null : ScoreService::pointsValue($threshold - $total),
+            'points_to_next' => $toNext === null ? null : ScoreService::pointsValue($toNext),
             'reachable_rank' => $this->ref($reachable),
             'threshold_reached_since' => $since,
             'below_current_threshold' => $current !== null && $current['min_points'] !== null && $total < $current['min_points'],
+            'soon' => $next !== null && $toNext !== null && $toNext > 0 && $toNext <= self::SOON_POINTS,
         ];
     }
 

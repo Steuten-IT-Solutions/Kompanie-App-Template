@@ -6,6 +6,8 @@
 export type TileCounts = {
   /** Mitglieder, die zur Beförderung bereit sind */
   promotions?: number | null;
+  /** Mitglieder, die bald zur Beförderung bereit sind (Schwelle noch nicht erreicht) */
+  promotionsSoon?: number | null;
   /** offene Anfragen auf einen Zugang */
   registrations?: number | null;
   /** offene Fehlermeldungen */
@@ -25,12 +27,19 @@ const make = (n: number | null | undefined, title: (n: number) => string): TileC
   n && n > 0 ? { count: n, text: n > 99 ? '99+' : String(n), title: title(n) } : null;
 
 /**
- * Zweite Zahl in einem Kreis in Akzentfarbe neben der ersten: was bald ansteht (bisher nur Aufnahmen: Anwärter kurz
- * davor, z. B. noch eine Teilnahme oder Mindestdauer in höchstens 30 Tagen); null ohne.
+ * Zweite Zahl in einem Kreis in Akzentfarbe neben der ersten: was bald ansteht (Aufnahmen: Anwärter kurz davor, z. B.
+ * noch eine Teilnahme oder Mindestdauer in höchstens 30 Tagen; Beförderungen: höchstens 1 Punkt bis zur
+ * Schwelle); null ohne.
  */
 export function tileSoonCount(id: string, counts: TileCounts): TileCount | null {
-  if (id !== 'aufnahmen') return null;
-  return make(counts.admissionsSoon, (n) => `${plural(n, 'Anwärter steht', 'Anwärter stehen')} kurz vor der Aufnahme`);
+  switch (id) {
+    case 'aufnahmen':
+      return make(counts.admissionsSoon, (n) => `${plural(n, 'Anwärter steht', 'Anwärter stehen')} kurz vor der Aufnahme`);
+    case 'befoerderungen':
+      return make(counts.promotionsSoon, (n) => `${plural(n, 'Mitglied ist', 'Mitglieder sind')} bald zur Beförderung bereit`);
+    default:
+      return null;
+  }
 }
 
 /** Erklärung beider Zahlen einer Kachel in einem Satz (title des Knopfs); undefined ohne Zahl. */

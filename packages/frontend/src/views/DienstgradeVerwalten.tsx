@@ -7,7 +7,7 @@ import { RankBadge, RankLabel } from '../RankBadge';
 import { useDragSort, useSaveQueue } from '../dragSort';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { RankHistory } from './Dienstgrad';
-import { isDue } from '../promotionCheck';
+import { isDue, isSoon } from '../promotionCheck';
 import { notePromotions } from '../promotionsDue';
 import { sources } from '../viewData';
 import { confirmAsk } from '../ask';
@@ -347,7 +347,7 @@ function RankForm({
 
 /**
  * Verwaltung → Beförderungen (nur mit Punkten): zuerst, wer unter der Schwelle des eigenen Dienstgrads liegt (Kandidaten
- * zum Degradieren, Issue #178), dann erreichte Schwellen, dann nach fehlenden Punkten.
+ * zum Degradieren, Issue #178), dann erreichte Schwellen, bald erreichte, dann nach fehlenden Punkten.
  */
 export function Promotions() {
   const { data, error, loading, reload } = useAsync(sources.promotions.load, sources.promotions.deps, sources.promotions.key);
@@ -359,8 +359,10 @@ export function Promotions() {
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   // Ohne nächsten Dienstgrad (schon ganz oben) gibt es nichts zu befördern; zum Degradieren können sie trotzdem anstehen.
   // Nach Abschnitten gruppiert; innerhalb eines Abschnitts bleibt die Reihenfolge des Servers (sort ist stabil).
-  const list = (data ?? []).filter((p) => p.below_current_threshold || p.next_rank !== null).sort((a, b) => section(a) - section(b));
-  const headings = ['Unter der Schwelle', 'Schwelle erreicht', 'Noch nicht erreicht'];
+  const list = (data ?? [])
+    .filter((p) => p.below_current_threshold || p.next_rank !== null)
+    .sort((a, b) => promotionSection(a) - promotionSection(b));
+  const headings = ['Unter der Schwelle', 'Schwelle erreicht', 'Bald erreicht', 'Noch nicht erreicht'];
   return (
     <div>
       {list.length === 0 ? (
@@ -370,7 +372,7 @@ export function Promotions() {
           {list.map((p, i) => {
             const due = isDue(p);
             // Überschrift vor dem ersten Eintrag jedes Abschnitts.
-            const heading = i === 0 || section(list[i - 1]) !== section(p) ? headings[section(p)] : null;
+            const heading = i === 0 || promotionSection(list[i - 1]) !== promotionSection(p) ? headings[promotionSection(p)] : null;
             return (
               <Fragment key={p.user_id}>
                 {heading && <li className="section-title list-divider">{heading}</li>}
@@ -404,11 +406,12 @@ export function Promotions() {
 }
 
 /**
- * Abschnitt der Beförderungsliste: 0 unter der Schwelle des eigenen Dienstgrads, 1 Schwelle erreicht, 2 noch nicht
- * erreicht. Wer unter der eigenen Schwelle liegt, hat die nächste nicht erreicht; jeder steht in genau einem Abschnitt.
+ * Abschnitt der Beförderungsliste: 0 unter der Schwelle des eigenen Dienstgrads, 1 Schwelle erreicht, 2 bald erreicht
+ * (höchstens 1 Punkt fehlt), 3 noch nicht erreicht. Wer unter der eigenen Schwelle liegt, hat die nächste
+ * nicht erreicht; jeder steht in genau einem Abschnitt.
  */
-function section(p: Promotion): number {
-  return p.below_current_threshold ? 0 : isDue(p) ? 1 : 2;
+export function promotionSection(p: Promotion): number {
+  return p.below_current_threshold ? 0 : isDue(p) ? 1 : isSoon(p) ? 2 : 3;
 }
 
 /** Mitgliedsdetails: Dienstgrad, mit Punkten der Stand zur Schwelle, befördern oder degradieren, Verlauf. */

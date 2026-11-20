@@ -12625,6 +12625,9 @@ components:
         threshold_reached_since:
           { type: [string, 'null'], format: date, description: 'Seit wann die Summe durchgehend die Schwelle des nächsten erreicht' }
         below_current_threshold: { type: boolean }
+        soon:
+          type: boolean
+          description: 'Bald bereit: Schwelle des nächsten noch nicht erreicht, es fehlt höchstens 1 Punkt; zweiter Kreis an der Kachel „Beförderungen“, Abschnitt „Bald erreicht“'
 
     RankHistoryEntry:
       type: object
