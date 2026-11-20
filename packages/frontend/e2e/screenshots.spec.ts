@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { quietPushHint } from './pushHintQuiet';
 
 // Bildschirmfotos für die Download-Seite und für Pull Requests einer Kompanie.
 // Unabhängig von den Bezeichnungen in kompanie.json: Navigation über die Adressen (#/…).
@@ -25,7 +26,7 @@ test.beforeEach(async ({ page }) => {
   // Den Hinweis „App aufs Handy holen“ ausblenden: Er verdeckt sonst den Inhalt.
   await page.addInitScript(() => localStorage.setItem('kompanie-install-hint-dismissed', '1'));
   // Ebenso den Hinweis „Benachrichtigungen einschalten“ auf der Startseite (pushHint.ts).
-  await page.addInitScript(() => localStorage.setItem('kompanie-push-hint-later', String(Date.now())));
+  await quietPushHint(page);
 });
 
 test('Bildschirmfotos', async ({ page }) => {

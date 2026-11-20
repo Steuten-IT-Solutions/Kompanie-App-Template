@@ -76,7 +76,7 @@ Nur für {rolle.member}:
 Bei {bereich.points}, {bereich.penalties}, {begriff.rank} und {bereich.titles} geht es immer nur um deine eigenen Einträge.
 
 ## Auf dem iPhone und iPad
-Dort gibt es Benachrichtigungen nur in der installierten App (ab iOS 16.4), nicht in Safari. Öffnest du die Seite im Browser, siehst du nur einen Hinweis und den Knopf **App installieren**. Hol dir die App zuerst auf den Home-Bildschirm, siehe [Die App aufs Handy holen](seite:app-installieren), öffne sie von dort und schalte die Benachrichtigungen dann ein.
+Dort gibt es Benachrichtigungen nur in der installierten App (ab iOS 16.4), nicht in Safari. Öffnest du die Seite im Browser, siehst du nur einen Hinweis und den Knopf **App installieren**. Bist du angemeldet, öffnet sich nach der Anmeldung außerdem das Fenster **Nichts mehr verpassen** mit dem Knopf **App installieren**; **Nicht jetzt** blendet es für 30 Tage aus. Hol dir die App zuerst auf den Home-Bildschirm, siehe [Die App aufs Handy holen](seite:app-installieren), öffne sie von dort und schalte die Benachrichtigungen dann ein.
 
 ![Hinweis auf dem iPhone: Benachrichtigungen nur in der installierten App](bild:benachrichtigungen-iphone)
 

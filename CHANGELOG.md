@@ -228,7 +228,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   nicht wieder. Die Abfrage des Browsers kommt erst nach dem Tippen auf _Benachrichtigungen einschalten_. Nach diesem
   Update fragt das Fenster alle Angemeldeten einmal, auch wer früher _Nicht jetzt_ gewählt oder die Benachrichtigungen
   erlaubt und wieder ausgeschaltet hat; nicht gefragt wird, wer sie auf dem Gerät schon an hat oder im Browser
-  blockiert hat.
+  blockiert hat. Auf iPhone und iPad im Browser (Safari) führt das Fenster zu _App installieren_, weil es
+  Benachrichtigungen dort nur in der installierten App gibt.
 - **Volle Breite am Computer**: Auf Tablet und Computer (Fenster ab 900 px breit) nutzen die Ansichten jetzt die ganze
   Breite statt einer schmalen Spalte von 640 px. Listen wie Mitglieder, Termine oder Dokumente stehen in Spalten,
   Formulare zeigen drei oder vier kurze Felder je Zeile, Alben und Bilder der Galerie passen sich der Breite an. Lesetexte

@@ -1,7 +1,16 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { devices, expect, test, type Locator, type Page, type Request } from '@playwright/test';
+import { devices, expect, test as base, type Locator, type Page, type Request } from '@playwright/test';
 import { strToU8, zipSync } from 'fflate';
 import { askCancel, askOk, autoAsk } from './ask';
+import { quietPushHint } from './pushHintQuiet';
+
+// Jeder Test: Fenster „Nichts mehr verpassen“ als iPhone ausblenden (pushHintQuiet.ts).
+const test = base.extend({
+  context: async ({ context }, use) => {
+    await quietPushHint(context);
+    await use(context);
+  },
+});
 
 // E2E-Tests gegen eine Test-Instanz mit der Beispielkonfiguration (config/kompanie.example.json):
 // Der Bereich Strafen heißt dort „Kasse“. Die Testdaten legen die eigene Rolle „Spieß“ an (Punkte, Kasse, Termine). Die App liegt unter /app/.
@@ -3391,6 +3400,26 @@ async function fakePush(page: Page) {
     };
   });
 }
+
+test('iPhone im Browser-Tab: Fenster nach der Anmeldung führt zu „App installieren“', async ({ page }) => {
+  await page.goto('/app/');
+  await page.evaluate(() => {
+    localStorage.setItem('e2e-keep-push-hint', '1');
+    localStorage.removeItem('kompanie-push-hint-later');
+    localStorage.removeItem('kompanie-push-hint-round');
+  });
+  await login(page, 'mitglied1');
+  const hint = page.getByRole('dialog', { name: 'Nichts mehr verpassen' });
+  await expect(hint).toContainText('nur in der installierten App');
+  await hint.getByRole('button', { name: 'App installieren' }).click();
+  await expect(page).toHaveURL(/#\/installieren$/);
+  await expect(hint).toHaveCount(0);
+  // Einmal je Runde: nach dem Neustart nicht wieder
+  await page.goto('/app/');
+  await page.reload();
+  await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
+  await expect(hint).toHaveCount(0);
+});
 
 test('Benachrichtigungen auf dem iPhone: erst die App installieren', async ({ page }) => {
   await page.context().clearCookies();
@@ -7139,6 +7168,7 @@ test('Schwarzes Brett: Enddatum in der Ortszeit eines Geräts in New York, gespe
   page,
 }) => {
   const context = await browser.newContext({ ...devices['iPhone 13'], locale: 'de-DE', timezoneId: 'America/New_York' });
+  await quietPushHint(context);
   const ny = await context.newPage();
   autoAsk(ny);
   const title = `Zeitzone ${Date.now().toString(36)}`;
