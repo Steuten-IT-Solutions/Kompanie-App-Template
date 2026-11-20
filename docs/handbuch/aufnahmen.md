@@ -8,12 +8,13 @@ bereiche: [attendance]
 Die Übersicht **Aufnahmen** zeigt alle Anwärter und wer von ihnen die Voraussetzung erfüllt, als {rolle.member} aufgenommen zu werden, zum Beispiel sechs Teilnahmen an Versammlungen. Aufgenommen wird nie automatisch: Die Liste ist ein Vorschlag, aufnehmen tust du auf der Seite der Person.
 
 ## So öffnest du die Seite
-Tippe unten auf **Verwaltung** und dann auf den Knopf **Aufnahmen**. Mit **‹ Verwaltung** kommst du zurück. Die kleine Zahl im roten Kreis an der Ecke des Knopfs zeigt, wie viele Anwärter die Voraussetzung gerade erfüllen; ist es niemand, fehlt sie.
+Tippe unten auf **Verwaltung** und dann auf den Knopf **Aufnahmen**. Mit **‹ Verwaltung** kommst du zurück. Die kleine Zahl im roten Kreis an der Ecke des Knopfs zeigt, wie viele Anwärter die Voraussetzung gerade erfüllen. Daneben zeigt eine Zahl in einem Kreis in der Farbe eurer Kompanie, wie viele kurz vor der Aufnahme stehen (siehe **Bald erfüllt**). Ist es niemand, fehlt der jeweilige Kreis.
 
 Den Knopf gibt es, wenn {bereich.attendance} an ist. Damit dort jemand erscheint, richtet ein {rolle.admin} unter *Einstellungen → Rollen* eine Anwärter-Rolle ein: an der Rolle den Haken **Anwärter-Rolle**. Die Rolle kann die Rolle der Person sein oder eine Zusatzrolle. Solange es keine gibt, steht auf der Seite, wie das geht.
 
 ## Was du hier siehst
 - **Voraussetzung erfüllt**: wer alles erfüllt, mit dem Tag, seit dem. Wer am längsten wartet, steht oben.
+- **Bald erfüllt**: wer kurz vor der Aufnahme steht. Das heißt: Bei jeder Bedingung mit Teilnahmen fehlt höchstens noch eine, und jede Mindestdauer ist in höchstens 30 Tagen erreicht. Bei **Eine reicht** genügt es, wenn eine Möglichkeit so nah ist. Fehlt **Anwärter seit**, gilt eine Mindestdauer nie als bald erfüllt.
 - **Noch nicht erfüllt**: wer noch etwas braucht, z. B. „noch 2 Teilnahmen an „Versammlung““ oder „Mindestdauer ab …“. Bei einer Voraussetzung mit **Eine reicht** steht „oder“ zwischen den Möglichkeiten.
 - **Ohne Voraussetzung**: Anwärter, deren Rolle keine Voraussetzung hat.
 - Bei jedem Namen: die Anwärter-Rolle, **Anwärter seit** (wenn bekannt) und was noch fehlt. Auf der Seite der Person steht unter **Aufnahme** jede Bedingung einzeln mit ✓ (erfüllt) oder ○ (offen) und dem Stand, z. B. „4 von 6 Teilnahmen an „Versammlung““; Gruppen sind eingerückt.

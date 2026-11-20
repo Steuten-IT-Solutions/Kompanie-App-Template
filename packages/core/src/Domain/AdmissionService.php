@@ -25,6 +25,9 @@ use KompanieApp\Core\Storage\EventKindRepository;
  *   frühere feste Form (Teilnahmen UND Dauer), wenn der Baum genau sie ausdrückt, sonst 0. Ohne rule entsteht der Baum
  *   beim Lesen aus kind/count/months.
  * - Den eigenen Stand sieht jeder Anwärter (GET /me/admission), den anderer nur, wer Konten sehen darf.
+ * - Bald erfüllt („kurz vor der Aufnahme“, AdmissionRule::SOON_MISSING/SOON_DAYS): noch nicht erfüllt, aber je
+ *   Bedingung fehlt höchstens eine Teilnahme bzw. die Mindestdauer ist in höchstens 30 Tagen erreicht. Die Kachel zeigt
+ *   sie in einem zweiten Kreis, die Übersicht unter „Bald erfüllt“.
  * - Die Voraussetzung sperrt nichts: Aufnehmen geht jederzeit, die App weist in der Rückfrage darauf hin.
  * - „Anwärter seit“ (Tabelle candidate_since je Person und Rolle): gesetzt, wenn jemand die Grundrolle bekommt (in der
  *   App: anlegen, Rolle ändern, Anfrage freigeben); bei Zusatzrollen das Datum der Zuordnung, wenn sie nach dem Anhaken
@@ -225,7 +228,8 @@ final class AdmissionService
     }
 
     /**
-     * Alle Anwärter mit Stand (GET /admissions): erfüllt (nach Datum, ältestes zuerst), noch nicht, ohne Voraussetzung.
+     * Alle Anwärter mit Stand (GET /admissions): erfüllt (nach Datum, ältestes zuerst), bald erfüllt, noch nicht, ohne
+     * Voraussetzung.
      * Je Person result: der ausgewertete Baum (AdmissionRule::evaluate); kind/count/attended/missing beschreiben die erste
      * Bedingung „Teilnahmen“, months/months_on die erste „Dauer“ (für ältere Oberflächen).
      *
@@ -234,16 +238,36 @@ final class AdmissionService
     public function list(): array
     {
         $out = $this->evaluate(null);
-        $order = [self::FULFILLED => 0, self::OPEN => 1, self::NONE => 2];
-        usort($out, static fn (array $a, array $b): int => [$order[$a['status']], (string) ($a['fulfilled_on'] ?? ''), $a['name']]
-            <=> [$order[$b['status']], (string) ($b['fulfilled_on'] ?? ''), $b['name']]);
+        $order = [self::FULFILLED => 0, self::OPEN => 2, self::NONE => 3];
+        $rank = static fn (array $c): int => $c['soon'] ? 1 : $order[$c['status']];
+        usort($out, static fn (array $a, array $b): int => [$rank($a), (string) ($a['fulfilled_on'] ?? ''), $a['name']]
+            <=> [$rank($b), (string) ($b['fulfilled_on'] ?? ''), $b['name']]);
         return $out;
     }
 
     /** Zahl an der Kachel „Aufnahmen“: Anwärter, die die Voraussetzung erfüllen. */
     public function dueCount(): int
     {
-        return count($this->fulfilledIds());
+        return $this->counts()['due'];
+    }
+
+    /**
+     * Beide Zahlen an der Kachel „Aufnahmen“ mit einer Auswertung: due erfüllt (roter Kreis), soon bald erfüllt (zweiter
+     * Kreis).
+     *
+     * @return array{due: int, soon: int}
+     */
+    public function counts(): array
+    {
+        $out = ['due' => 0, 'soon' => 0];
+        foreach ($this->evaluate(null) as $c) {
+            if ($c['status'] === self::FULFILLED) {
+                $out['due']++;
+            } elseif ($c['soon']) {
+                $out['soon']++;
+            }
+        }
+        return $out;
     }
 
     /** @return array<int, string> Benutzer-ID => Name aller, die die Voraussetzung erfüllen */
@@ -386,7 +410,8 @@ final class AdmissionService
             }
             $since ??= '';
             $mine = $dates[$u->id] ?? [];
-            $result = AdmissionRule::evaluate($r['rule'], static function (array $leaf) use ($mine, $since, $today): array {
+            $soonDay = $today->modify(sprintf('+%d days', AdmissionRule::SOON_DAYS))->format('Y-m-d');
+            $result = AdmissionRule::evaluate($r['rule'], static function (array $leaf) use ($mine, $since, $today, $soonDay): array {
                 if (($leaf['type'] ?? '') === AdmissionRule::ATTENDANCE) {
                     $need = is_int($leaf['count'] ?? null) ? $leaf['count'] : 0;
                     $attended = $mine[is_string($leaf['kind'] ?? null) ? $leaf['kind'] : ''] ?? [];
@@ -396,15 +421,16 @@ final class AdmissionService
                         'missing' => max(0, $need - count($attended)),
                         'status' => $ok ? AdmissionRule::FULFILLED : AdmissionRule::OPEN,
                         'on' => $ok ? ($attended[$need - 1] ?? null) : null,
+                        'soon' => $need - count($attended) <= AdmissionRule::SOON_MISSING,
                     ];
                 }
                 $months = is_int($leaf['months'] ?? null) ? $leaf['months'] : 0;
                 if ($since === '') {
-                    return $leaf + ['due' => null, 'status' => AdmissionRule::UNKNOWN, 'on' => null];
+                    return $leaf + ['due' => null, 'status' => AdmissionRule::UNKNOWN, 'on' => null, 'soon' => false];
                 }
                 $due = self::addMonths($since, $months);
                 $ok = $due <= $today->format('Y-m-d');
-                return $leaf + ['due' => $due, 'status' => $ok ? AdmissionRule::FULFILLED : AdmissionRule::OPEN, 'on' => $ok ? $due : null];
+                return $leaf + ['due' => $due, 'status' => $ok ? AdmissionRule::FULFILLED : AdmissionRule::OPEN, 'on' => $ok ? $due : null, 'soon' => $due <= $soonDay];
             });
             $attendance = AdmissionRule::first($result, AdmissionRule::ATTENDANCE);
             $duration = AdmissionRule::first($result, AdmissionRule::DURATION);
@@ -425,6 +451,8 @@ final class AdmissionService
                 'months_on' => $duration['due'] ?? null,
                 'fulfilled_on' => !$empty && $result['status'] === AdmissionRule::FULFILLED ? $result['on'] : null,
                 'status' => $empty ? self::NONE : ($result['status'] === AdmissionRule::FULFILLED ? self::FULFILLED : self::OPEN),
+                // Noch nicht erfüllt, aber kurz davor (AdmissionRule::SOON_MISSING, SOON_DAYS)
+                'soon' => !$empty && $result['status'] !== AdmissionRule::FULFILLED && ($result['soon'] ?? false) === true,
                 'result' => $empty ? null : $result,
             ];
             $out[] = $entry;

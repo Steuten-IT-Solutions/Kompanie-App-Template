@@ -33,8 +33,11 @@ export function admissionState(a: Admission): string {
   return open.length > 0 ? open.join(' · ') : 'Noch nicht erfüllt';
 }
 
-const SECTION: Record<Admission['status'], number> = { fulfilled: 0, open: 1, none: 2 };
-const HEADINGS = ['Voraussetzung erfüllt', 'Noch nicht erfüllt', 'Ohne Voraussetzung'];
+const SECTION: Record<Admission['status'], number> = { fulfilled: 0, open: 2, none: 3 };
+const HEADINGS = ['Voraussetzung erfüllt', 'Bald erfüllt', 'Noch nicht erfüllt', 'Ohne Voraussetzung'];
+/** Abschnitt einer Person: bald erfüllt (noch nicht erfüllt, aber kurz davor) zwischen erfüllt und noch nicht. */
+export const admissionSection = (a: Pick<Admission, 'status' | 'soon'>): number =>
+  a.status !== 'fulfilled' && a.soon ? 1 : SECTION[a.status];
 
 /**
  * Verwaltung → Aufnahmen (view_accounts; aufnehmen mit create_users): alle Anwärter, zuerst wer die Voraussetzung erfüllt (ältestes Datum zuerst),
@@ -44,7 +47,11 @@ export function Admissions() {
   const { data, error, loading, reload } = useAsync(sources.admissions.load, sources.admissions.deps, sources.admissions.key);
   // Zahl an der Kachel gleich mit aktualisieren.
   useEffect(() => {
-    if (data) applyAdmissionsDue(data.filter((a) => a.status === 'fulfilled').length);
+    if (data)
+      applyAdmissionsDue(
+        data.filter((a) => a.status === 'fulfilled').length,
+        data.filter((a) => a.status !== 'fulfilled' && a.soon).length,
+      );
   }, [data]);
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -53,7 +60,8 @@ export function Admissions() {
   return (
     <ul className="card-list admissions">
       {list.map((a, i) => {
-        const heading = i === 0 || SECTION[list[i - 1].status] !== SECTION[a.status] ? HEADINGS[SECTION[a.status]] : null;
+        const section = admissionSection(a);
+        const heading = i === 0 || admissionSection(list[i - 1]) !== section ? HEADINGS[section] : null;
         const rule = admissionRule(a);
         return (
           <Fragment key={a.id}>
@@ -214,7 +222,12 @@ export function noteAdmissions(list: NewAdmission[] | undefined) {
   if (!list || list.length === 0) return;
   const known = new Set(admitted.map((a) => a.user_id));
   setAdmitted([...admitted, ...list.filter((a) => !known.has(a.user_id))]);
-  if (config?.admissionsDue != null) applyAdmissionsDue(config.admissionsDue + list.length);
+  // Wer jetzt erfüllt, war vorher bald erfüllt (eine Liste bringt je Terminart höchstens eine Teilnahme).
+  if (config?.admissionsDue != null)
+    applyAdmissionsDue(
+      config.admissionsDue + list.length,
+      config.admissionsSoon != null ? Math.max(0, config.admissionsSoon - list.length) : undefined,
+    );
 }
 
 export function AdmissionNotice() {

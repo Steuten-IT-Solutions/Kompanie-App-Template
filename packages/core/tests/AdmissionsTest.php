@@ -316,6 +316,63 @@ final class AdmissionsTest extends TestCase
         $this->assertSame('2026-10-01', $e['months_on']);
     }
 
+    public function testSoonWhenOneAttendanceMissingOrDurationWithinThirtyDays(): void
+    {
+        $key = $this->baseRole(['admission_rule' => ['type' => 'group', 'op' => 'and', 'items' => [
+            ['type' => 'attendance', 'kind' => 'Versammlung', 'count' => 3],
+            ['type' => 'duration', 'months' => 6],
+        ]]]);
+        $fritz = $this->users->add('fritz', $key);
+        $this->list('2026-09-01', 'Versammlung', [$fritz]);
+        // heute 14.11.2026: Dauer ab 01.12.2026 (17 Tage), aber noch 2 Teilnahmen
+        $this->ok('PUT', "/members/$fritz/candidate-since", ['since' => '01.06.2026'], $this->clerk);
+        $e = $this->entry($fritz);
+        $this->assertSame(['open', false], [$e['status'], $e['soon']]);
+        $this->assertSame([false, true], [$e['result']['items'][0]['soon'], $e['result']['items'][1]['soon']]);
+
+        $this->list('2026-10-01', 'Versammlung', [$fritz]);
+        $e = $this->entry($fritz);
+        $this->assertSame(['open', true, true], [$e['status'], $e['soon'], $e['result']['soon']], 'noch 1 Teilnahme und Dauer in 17 Tagen');
+        $config = $this->ok('GET', '/config', [], $this->clerk);
+        $this->assertSame([0, 1], [$config['admissionsDue'], $config['admissionsSoon']]);
+        $this->assertNull($this->ok('GET', '/config', [], $fritz)['admissionsSoon'] ?? null, 'nur mit Konten sehen');
+
+        // Dauer erst in 31 Tagen: nicht mehr bald
+        $this->ok('PUT', "/members/$fritz/candidate-since", ['since' => '15.06.2026'], $this->clerk);
+        $this->assertSame([false, '2026-12-15'], [$this->entry($fritz)['soon'], $this->entry($fritz)['months_on']]);
+        $this->ok('PUT', "/members/$fritz/candidate-since", ['since' => '14.06.2026'], $this->clerk);
+        $this->assertTrue($this->entry($fritz)['soon'], 'genau 30 Tage zählen noch');
+
+        // Erfüllt: nicht mehr bald, sondern fällig
+        $this->list('2026-11-10', 'Versammlung', [$fritz]);
+        $this->ok('PUT', "/members/$fritz/candidate-since", ['since' => '01.05.2026'], $this->clerk);
+        $e = $this->entry($fritz);
+        $this->assertSame(['fulfilled', false], [$e['status'], $e['soon']]);
+        $this->assertSame(['due' => 1, 'soon' => 0], $this->app->admissions()->counts());
+    }
+
+    public function testSoonInOrGroupAndUnknownDurationAndOrder(): void
+    {
+        $key = $this->baseRole(['admission_rule' => ['type' => 'group', 'op' => 'or', 'items' => [
+            ['type' => 'attendance', 'kind' => 'Versammlung', 'count' => 5],
+            ['type' => 'duration', 'months' => 12],
+        ]]]);
+        $soon = $this->users->add('anna', $key);
+        $far = $this->users->add('bert', $key);
+        $done = $this->users->add('carl', $key);
+        foreach (['2026-08-01', '2026-09-01', '2026-10-01', '2026-11-01'] as $day) {
+            $this->list($day, 'Versammlung', [$soon]);
+        }
+        foreach (['2026-07-01', '2026-08-02', '2026-09-02', '2026-10-02', '2026-11-02'] as $day) {
+            $this->list($day, 'Versammlung', [$done]);
+        }
+        $this->assertFalse($this->entry($far)['soon'], 'ohne „Anwärter seit“ ist die Dauer unbekannt, nie bald');
+        $this->assertTrue($this->entry($soon)['soon'], 'ODER: eine bald erfüllte Möglichkeit reicht');
+        $this->assertSame([$done, $soon, $far], array_column($this->ok('GET', '/admissions', [], $this->clerk), 'id'), 'erfüllt, bald, noch nicht');
+        $this->assertSame(['due' => 1, 'soon' => 1], $this->app->admissions()->counts());
+        $this->assertSame(1, $this->app->admissions()->dueCount());
+    }
+
     public function testOwnStatusOnlyForOneself(): void
     {
         $key = $this->baseRole(['admission_kind' => 'Versammlung', 'admission_count' => 1]);
