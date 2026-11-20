@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { eventKinds } from './api';
 
 /** Arten eines Termins oder einer Anwesenheitsliste; ältere Server schicken nur kind (eine oder null). */
@@ -36,5 +37,41 @@ export function EventKindChecks({
         </label>
       ))}
     </fieldset>
+  );
+}
+
+/**
+ * Terminarten eingeklappt: Knopf „Terminarten ›“, darunter nur die gewählten Arten; erst auf Tipp die Häkchen
+ * (am Termin und an der Anwesenheitsliste).
+ */
+export function CollapsibleKindChecks({
+  id,
+  value,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  value: string[];
+  disabled?: boolean;
+  onChange: (kinds: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        className="member-filters-toggle event-kind-toggle"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen(!open)}
+      >
+        Terminarten
+        <span className="member-filters-arrow" aria-hidden="true">
+          ›
+        </span>
+      </button>
+      {!open && <p className="small event-kind-summary">{value.length > 0 ? value.join(', ') : <span className="muted">keine</span>}</p>}
+      {open && <EventKindChecks id={id} hideLegend value={value} disabled={disabled} onChange={onChange} />}
+    </>
   );
 }

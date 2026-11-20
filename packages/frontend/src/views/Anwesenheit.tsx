@@ -14,7 +14,7 @@ import {
   type AttendanceStatus,
   type ResponseStatus,
 } from '../api';
-import { EventKindChecks, kindsOf } from '../eventKindChecks';
+import { CollapsibleKindChecks, kindsOf } from '../eventKindChecks';
 import { formatDate, formatEventWhen, todayYmd } from '../format';
 import brand from '../generated/brand';
 import { navigate } from '../router';
@@ -599,7 +599,7 @@ function Editor({
   );
 }
 
-/** Terminarten der Liste (z. B. Versammlung, auch mehrere); speichert sofort, unabhängig von den Häkchen der Personen. */
+/** Terminarten der Liste (z. B. Versammlung, auch mehrere), eingeklappt; speichert sofort, unabhängig von den Häkchen der Personen. */
 function KindSelect({
   list,
   onKinds,
@@ -630,5 +630,14 @@ function KindSelect({
     }
   }
 
-  return <EventKindChecks className="attendance-kind" value={draft ?? current} disabled={busy} onChange={(kinds) => void choose(kinds)} />;
+  return (
+    <div className="event-kind-picker">
+      <CollapsibleKindChecks
+        id={`attendance-kinds-${list.id}`}
+        value={draft ?? current}
+        disabled={busy}
+        onChange={(kinds) => void choose(kinds)}
+      />
+    </div>
+  );
 }
