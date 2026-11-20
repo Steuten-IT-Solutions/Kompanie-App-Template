@@ -3454,8 +3454,15 @@ test.describe('Android', () => {
     await page.getByRole('button', { name: 'Benachrichtigungen ausschalten' }).click();
     await expect(page.getByRole('button', { name: 'Benachrichtigungen einschalten' })).toBeVisible();
 
-    // Mitglied: eigene Punkte und Kasse, Schalter für Beträge
+    // Mitglied: eigene Punkte und Kasse, Schalter für Beträge. Erlaubt, aber ausgeschaltet: Nach dem Update fragt das
+    // Fenster einmal (pushHint.ts, Runde), danach nicht mehr.
     await login(page, 'mitglied1');
+    const once = page.getByRole('dialog', { name: 'Nichts mehr verpassen' });
+    await once.getByRole('button', { name: 'Nicht jetzt' }).click();
+    await expect(once).toHaveCount(0);
+    await page.reload();
+    await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
+    await expect(once).toHaveCount(0);
     await openKonto(page);
     await page.getByRole('button', { name: 'Benachrichtigungen einstellen' }).click();
     await expect(page.getByLabel('Punkte: neue Einträge')).toBeChecked();
