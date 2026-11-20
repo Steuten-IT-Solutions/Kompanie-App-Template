@@ -221,8 +221,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Breite statt einer schmalen Spalte von 640 px. Listen wie Mitglieder, Termine oder Dokumente stehen in Spalten,
   Formulare zeigen drei oder vier kurze Felder je Zeile, Alben und Bilder der Galerie passen sich der Breite an. Lesetexte
   wie News-Artikel und das Handbuch bleiben höchstens 760 px breit und mittig, Kachel-Seiten 904 px, Listen zum
-  Ziehen (z. B. [Rollen](app:einstellungen/rollen) oder Punktekatalog) höchstens 960 px. Handy hochkant bleibt, wie es
-  ist.
+  Ziehen (z. B. [Rollen](app:einstellungen/rollen) oder Punktekatalog) höchstens 960 px. Listen mit Haken wie
+  [Bereiche](app:einstellungen/bereiche), Benachrichtigungen oder die Bereiche im [Bericht](app:verwaltung/bericht)
+  stehen in Spalten, die Auswahl über den [Änderungen](app:verwaltung/aenderungen) in einer Zeile, die Kennzahlen unter
+  [Nutzung](app:einstellungen/nutzung) in einer Reihe. Handy hochkant bleibt, wie es ist.
 
 - **Gemeinsame Amtszeiten einklappbar**: Bei einer Ämtergruppe mit gemeinsamen Amtszeiten (z. B. Königshaus) unter
   [Ämter](app:mitglieder/aemter) lässt sich jede Amtszeit mit einem Tipp auf ihren Kopf auf- und zuklappen. Die laufende

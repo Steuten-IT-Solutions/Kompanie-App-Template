@@ -1831,6 +1831,12 @@ input[aria-invalid='true'] {
 .push-types {
   margin-top: 12px;
 }
+/* Bericht: Haken der Bereiche (am Computer in Spalten, Block „Breite Ansicht“) */
+.toggle-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
 .push-card .btn + .btn {
   margin-top: 8px;
 }
@@ -6593,6 +6599,48 @@ button.spotlight-person:focus-visible {
   .hilfe-text,
   .lizenz-text,
   .changelog-text {
+    max-width: 760px;
+    margin-inline: auto;
+  }
+
+  /* Haken-Listen (Bereiche, Bericht, Benachrichtigungen, Zusatzrollen) in Spalten statt einer langen Spalte */
+  .feature-list,
+  .push-types,
+  .toggle-grid,
+  .extra-roles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+    column-gap: 24px;
+    align-items: start;
+  }
+  .toggle-grid {
+    row-gap: var(--space-3);
+  }
+  .extra-roles > :not(.toggle) {
+    grid-column: 1 / -1;
+  }
+  /* Änderungen: Auswahl (Zeitraum, Wer, Bereich) in einer Zeile */
+  .changes .settings-section:has(> .usage-range) {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+    gap: 0 16px;
+    align-items: start;
+  }
+  .changes .settings-section:has(> .usage-range) > :not(.field, .usage-range) {
+    grid-column: 1 / -1;
+  }
+  .changes .settings-section > .usage-range {
+    display: contents;
+  }
+  .changes .settings-section > .field select {
+    width: 100%;
+  }
+  /* Nutzung: vier Kennzahlen in einer Reihe */
+  .usage-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  /* Was ist neu: die ganze Karte so breit wie der Lesetext, mittig */
+  .changelog-version {
     max-width: 760px;
     margin-inline: auto;
   }
