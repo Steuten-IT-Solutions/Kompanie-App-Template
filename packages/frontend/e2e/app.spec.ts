@@ -2799,6 +2799,25 @@ test('Computer: Inhalt über die ganze Breite, Formulare mit mehr Feldern je Zei
   await shot(page, '1f-computer');
 });
 
+test('Computer: eigenes Profil und Mitglied in der Verwaltung zweispaltig', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  for (const route of ['/app/#/meins', '/app/#/verwaltung/mitglieder']) {
+    await page.goto(route);
+    await expect(page.locator('main [data-loading]')).toHaveCount(0);
+    if (route.includes('verwaltung')) await page.locator('.card-list li').first().click();
+    const cols = page.locator('.member-col');
+    await expect(cols).toHaveCount(2);
+    const [a, b] = await Promise.all([cols.nth(0).boundingBox(), cols.nth(1).boundingBox()]);
+    expect(b!.x).toBeGreaterThan(a!.x + a!.width - 1);
+    expect(Math.abs(a!.y - b!.y)).toBeLessThan(2);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
+  // Handy hochkant: keine Spalten
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => page.locator('.member-columns').evaluate((e) => getComputedStyle(e).display)).toBe('contents');
+});
+
 test('Ämter: Jahresübersicht, eine Spalte je Amt, auch auf dem Handy, gemerkt (Issue #112)', async ({ page }) => {
   const id = Date.now() % 1000000;
   const office = `Fähnriche ${id}`;

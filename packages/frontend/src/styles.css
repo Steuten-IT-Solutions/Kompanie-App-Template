@@ -1190,6 +1190,11 @@ button.member-date {
 .member-offices .section-title {
   margin-top: 18px;
 }
+/* Profil (Mitglied in der Verwaltung, Meins → Übersicht): Spalten erst am Computer, auf dem Handy wie ohne Hülle */
+.member-columns,
+.member-col {
+  display: contents;
+}
 /* Mitgliedsdetails: Anwesenheit mit Zeitraum (memberAttendance.tsx); drei Zahlen nebeneinander, auch auf schmalen Handys */
 .member-attendance {
   margin-bottom: 12px;
@@ -6643,6 +6648,20 @@ button.spotlight-person:focus-visible {
   .changelog-version {
     max-width: 760px;
     margin-inline: auto;
+  }
+  /* Profil zweispaltig; die erste Überschrift rechts ohne Abstand nach oben, damit beide Spalten oben bündig sind */
+  .member-columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 24px;
+    align-items: start;
+  }
+  .member-col {
+    display: block;
+    min-width: 0;
+  }
+  .member-col > :first-child > .section-title:first-child {
+    margin-top: 0;
   }
 
   /* Listen zum Ziehen (dragSort.tsx) bleiben einspaltig; damit Name und Wert nah beieinander stehen, höchstens 960 px
