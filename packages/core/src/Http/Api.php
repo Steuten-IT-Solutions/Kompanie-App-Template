@@ -716,6 +716,8 @@ final class Api
             $features[$key] = $on && $a->features()->configured($key);
         }
         $user = $a->authContext->currentUser();
+        // Kachel „Aufnahmen“: erfüllt und bald erfüllt (eine Auswertung für beide Zahlen)
+        $admissionCounts = $user !== null && $this->can(Cap::ViewAccounts) && ($features['attendance'] ?? false) ? $a->admissions()->counts() : null;
         return [
             'apiBase' => $a->env->apiBase(),
             'appUrl' => $a->env->appUrl(),
@@ -753,7 +755,9 @@ final class Api
             // admissionsDue: Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“), für create_users
             // mit dem Bereich Anwesenheit (auch ohne Anwärter-Rolle: die Seite erklärt dann, wie man sie einrichtet); sonst null
             // (keine Kachel)
-            'admissionsDue' => $user !== null && $this->can(Cap::ViewAccounts) && ($features['attendance'] ?? false) ? $a->admissions()->dueCount() : null,
+            'admissionsDue' => $admissionCounts['due'] ?? null,
+            // admissionsSoon: Anwärter kurz vor der Aufnahme (noch nicht erfüllt; zweiter Kreis an der Kachel), sonst wie oben null
+            'admissionsSoon' => $admissionCounts['soon'] ?? null,
             // Impressum und Datenschutzerklärung der Kompanie (Einstellungen → Impressum und Datenschutz): für alle, auch Gäste
             'legal' => self::legalLinks($a->settingsService()->legal()),
             // Handbuch auf GitHub Pages der Kompanie: neben updates.json (Issue #12)

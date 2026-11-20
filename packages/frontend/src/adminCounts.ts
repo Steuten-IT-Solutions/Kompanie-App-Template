@@ -18,7 +18,8 @@ export function refreshAdminCounts(now = Date.now()): void {
     .then((next) => {
       if (typeof next.pendingRegistrations === 'number') applyPendingRegistrations(next.pendingRegistrations);
       if (typeof next.openReports === 'number') applyOpenReports(next.openReports);
-      if (typeof next.admissionsDue === 'number') applyAdmissionsDue(next.admissionsDue);
+      if (typeof next.admissionsDue === 'number')
+        applyAdmissionsDue(next.admissionsDue, typeof next.admissionsSoon === 'number' ? next.admissionsSoon : undefined);
     })
     .catch(() => {
       // offline oder Fehler: die bisherigen Zahlen bleiben stehen

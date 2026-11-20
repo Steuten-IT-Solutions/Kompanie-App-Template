@@ -10226,6 +10226,9 @@ components:
         missing: { type: integer }
         months: { type: integer }
         due: { type: [string, 'null'] }
+        soon:
+          type: boolean
+          description: 'Erfüllt oder bald erfüllt (Teilnahmen: höchstens 1 fehlt; Dauer: in höchstens 30 Tagen erreicht; UND: alle Teile, ODER: einer)'
 
     Admission:
       type: object
@@ -10246,6 +10249,7 @@ components:
         months_on: { type: [string, 'null'], description: Tag, ab dem die erste Mindestdauer erfüllt ist }
         fulfilled_on: { type: [string, 'null'], description: Tag, an dem alles erfüllt war }
         status: { type: string, enum: [fulfilled, open, none], description: 'none: Rolle ohne Voraussetzung' }
+        soon: { type: boolean, description: 'Noch nicht erfüllt, aber kurz davor (status open, result.soon); unter „Bald erfüllt“ und im zweiten Kreis der Kachel' }
         result:
           description: Ausgewertete Voraussetzung; null ohne Voraussetzung
           oneOf:
@@ -10440,6 +10444,9 @@ components:
         admissionsDue:
           type: [integer, 'null']
           description: 'Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“); nur für view_accounts mit Bereich Anwesenheit (auch ohne Anwärter-Rolle, dann 0), sonst null'
+        admissionsSoon:
+          type: [integer, 'null']
+          description: 'Anwärter kurz vor der Aufnahme (noch nicht erfüllt, siehe Admission.soon; zweiter Kreis an der Kachel „Aufnahmen“); wie admissionsDue nur für view_accounts mit Bereich Anwesenheit, sonst null'
         gallerySubmissions:
           {
             type: boolean,

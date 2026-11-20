@@ -158,6 +158,8 @@ export interface AppConfig {
    * Anwesenheit und einer Anwärter-Rolle, sonst null (keine Kachel). Fehlt bei älteren Servern.
    */
   admissionsDue?: number | null;
+  /** Anwärter kurz vor der Aufnahme (noch nicht erfüllt): zweiter Kreis an der Kachel „Aufnahmen“; null ohne Recht */
+  admissionsSoon?: number | null;
   /** Einreichen von Bildern und Videos erlaubt (Einstellungen → Galerie); fehlt bei älteren Servern (dann erlaubt) */
   gallerySubmissions?: boolean;
   /** Zu- und Absagen bei Terminen eingeschaltet (Einstellungen → Kalender); fehlt bei älteren Servern (dann an) */
@@ -608,10 +610,16 @@ export function applyPendingRegistrations(count: number): void {
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
-/** Zahl der Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“). */
-export function applyAdmissionsDue(count: number): void {
-  if (!config || config.admissionsDue == null || config.admissionsDue === count) return;
+/**
+ * Zahl der Anwärter, die die Voraussetzung für die Aufnahme erfüllen, und (soon) derer kurz davor (Kachel „Aufnahmen“).
+ * Ohne soon bleibt die zweite Zahl, wie sie ist.
+ */
+export function applyAdmissionsDue(count: number, soon?: number): void {
+  if (!config || config.admissionsDue == null) return;
+  const nextSoon = soon ?? config.admissionsSoon;
+  if (config.admissionsDue === count && config.admissionsSoon === nextSoon) return;
   config.admissionsDue = count;
+  if (nextSoon != null) config.admissionsSoon = nextSoon;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -751,6 +759,8 @@ export interface AdmissionRuleResult {
   months?: number;
   /** Dauer: Tag, ab dem sie erfüllt ist (null ohne „Anwärter seit“) */
   due?: string | null;
+  /** erfüllt oder bald erfüllt (höchstens 1 Teilnahme fehlt bzw. Dauer in höchstens 30 Tagen); fehlt bei älteren Servern */
+  soon?: boolean;
 }
 
 /** Stand eines Anwärters für die Aufnahme als Mitglied (GET /admissions, Mitgliedsseite). */
@@ -776,6 +786,8 @@ export interface Admission {
   fulfilled_on: string | null;
   /** fulfilled: erfüllt; open: noch nicht; none: Rolle ohne Voraussetzung */
   status: 'fulfilled' | 'open' | 'none';
+  /** Noch nicht erfüllt, aber kurz davor („Bald erfüllt“); fehlt bei älteren Servern */
+  soon?: boolean;
   /** Ausgewertete Voraussetzung (null ohne; fehlt bei älteren Servern) */
   result?: AdmissionRuleResult | null;
 }

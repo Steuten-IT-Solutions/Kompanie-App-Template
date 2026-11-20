@@ -2811,10 +2811,15 @@ code {
 .admin-tile {
   position: relative;
 }
-.count-badge {
+/* Mehrere Kreise (z. B. Aufnahmen: bald erfüllt, dann erfüllt) nebeneinander an der Ecke */
+.count-badges {
   position: absolute;
   top: -7px;
   right: -7px;
+  display: flex;
+  gap: 4px;
+}
+.count-badge {
   min-width: 24px;
   height: 24px;
   padding: 0 7px;
@@ -2829,6 +2834,11 @@ code {
   line-height: 24px;
   text-align: center;
   text-transform: none;
+}
+/* Was bald ansteht (Anwärter kurz vor der Aufnahme): Akzentfarbe statt Rot */
+.count-badge-soon {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 /* Hinweis in der Verwaltung, z. B. neu erreichte Beförderungsschwellen nach dem Vergeben von Punkten */

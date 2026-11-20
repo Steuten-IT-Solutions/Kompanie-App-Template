@@ -37,6 +37,10 @@ final class AdmissionRule
     public const MONTHS_MAX = 120;
     public const CONDITIONS_MAX = 20;
     public const GROUPS_MAX = 20;
+    /** „Bald erfüllt“: höchstens so viele fehlende Teilnahmen je Bedingung */
+    public const SOON_MISSING = 1;
+    /** „Bald erfüllt“: Mindestdauer in höchstens so vielen Tagen erreicht */
+    public const SOON_DAYS = 30;
 
     /** @return array<string, mixed> leere Voraussetzung */
     public static function none(): array
@@ -201,8 +205,9 @@ final class AdmissionRule
     }
 
     /**
-     * Baum auswerten. $leaf wertet eine Bedingung aus und gibt sie mit status (FULFILLED, OPEN, UNKNOWN) und on (Tag,
-     * an dem sie erfüllt wurde, sonst null) zurück; Gruppen bekommen dieselben Felder und ihre ausgewerteten items.
+     * Baum auswerten. $leaf wertet eine Bedingung aus und gibt sie mit status (FULFILLED, OPEN, UNKNOWN), on (Tag,
+     * an dem sie erfüllt wurde, sonst null) und soon (erfüllt oder bald erfüllt; fehlt es, gilt nur erfüllt) zurück;
+     * Gruppen bekommen dieselben Felder und ihre ausgewerteten items.
      *
      * @param array<string, mixed> $node
      * @param \Closure(array<string, mixed>): array<string, mixed> $leaf
@@ -231,7 +236,9 @@ final class AdmissionRule
         if ($status === self::FULFILLED && $dates !== []) {
             $on = $or ? min($dates) : max($dates);
         }
-        return ['type' => self::GROUP, 'op' => $or ? self::OR : self::AND, 'status' => $status, 'on' => $on, 'items' => $items];
+        $soonItems = array_map(static fn (array $i): bool => ($i['soon'] ?? false) === true || ($i['status'] ?? '') === self::FULFILLED, $items);
+        $soon = $status === self::FULFILLED || ($or ? in_array(true, $soonItems, true) : !in_array(false, $soonItems, true));
+        return ['type' => self::GROUP, 'op' => $or ? self::OR : self::AND, 'status' => $status, 'on' => $on, 'soon' => $soon, 'items' => $items];
     }
 
     /**

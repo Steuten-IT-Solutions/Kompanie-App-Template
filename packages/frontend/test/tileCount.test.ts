@@ -1,7 +1,7 @@
 // Zahl im Kreis an den Kacheln der Verwaltung (src/tileCount.ts): Beförderungen, Aufnahmen, Anfragen und Fehlermeldungen.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { tileCount } from '../src/tileCount.ts';
+import { tileCount, tileSoonCount, tileTitle } from '../src/tileCount.ts';
 
 test('keine Zahl ohne offene Einträge oder ohne Recht (null vom Server)', () => {
   for (const id of ['befoerderungen', 'anfragen', 'meldungen']) {
@@ -37,4 +37,23 @@ test('Aufnahmen: Anwärter, die die Voraussetzung erfüllen', () => {
   assert.equal(tileCount('aufnahmen', { admissions: 0 }), null);
   assert.equal(tileCount('aufnahmen', { admissions: 1 })?.title, '1 Anwärter erfüllt die Voraussetzung für die Aufnahme');
   assert.equal(tileCount('aufnahmen', { admissions: 3 })?.title, '3 Anwärter erfüllen die Voraussetzung für die Aufnahme');
+});
+
+test('Aufnahmen: zweiter Kreis für Anwärter kurz vor der Aufnahme', () => {
+  assert.equal(tileSoonCount('aufnahmen', { admissionsSoon: null }), null);
+  assert.equal(tileSoonCount('aufnahmen', { admissionsSoon: 0 }), null);
+  assert.equal(tileSoonCount('befoerderungen', { admissionsSoon: 2 }), null, 'nur an der Kachel Aufnahmen');
+  assert.equal(tileSoonCount('aufnahmen', { admissionsSoon: 1 })?.title, '1 Anwärter steht kurz vor der Aufnahme');
+  assert.equal(tileSoonCount('aufnahmen', { admissionsSoon: 2 })?.text, '2');
+  assert.equal(tileCount('aufnahmen', { admissions: 0, admissionsSoon: 2 }), null, 'der rote Kreis zählt nur Erfüllte');
+});
+
+test('Erklärung beider Zahlen in einem Satz', () => {
+  const counts = { admissions: 1, admissionsSoon: 2 };
+  assert.equal(
+    tileTitle(tileCount('aufnahmen', counts), tileSoonCount('aufnahmen', counts)),
+    '1 Anwärter erfüllt die Voraussetzung für die Aufnahme, 2 Anwärter stehen kurz vor der Aufnahme',
+  );
+  assert.equal(tileTitle(null, tileSoonCount('aufnahmen', counts)), '2 Anwärter stehen kurz vor der Aufnahme');
+  assert.equal(tileTitle(null, null), undefined);
 });

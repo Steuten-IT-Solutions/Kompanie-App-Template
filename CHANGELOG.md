@@ -84,8 +84,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   dem Haken „Als Schild am Termin zeigen“ fest, ob sie neben dem Titel des Termins steht (anfangs an); ohne Schild
   bleibt sie gespeichert und zählt weiter.
 - **Aufnahmen**: Unter [Verwaltung → Aufnahmen](app:verwaltung/aufnahmen) siehst du wie bei den Beförderungen, welche
-  Anwärter die Voraussetzung für die Aufnahme als Mitglied erfüllen; die Zahl im Kreis am Knopf zeigt, wie viele es
-  sind. Unter [Einstellungen → Rollen](app:einstellungen/rollen) setzt du an einer Rolle den Haken „Anwärter-Rolle“
+  Anwärter die Voraussetzung für die Aufnahme als Mitglied erfüllen; die Zahl im roten Kreis am Knopf zeigt, wie viele es
+  sind. Daneben zeigt ein Kreis in der Farbe der Kompanie, wie viele kurz vor der Aufnahme stehen (noch höchstens eine
+  Teilnahme je Bedingung, Mindestdauer in höchstens 30 Tagen); sie stehen in der Übersicht unter „Bald erfüllt“. Unter [Einstellungen → Rollen](app:einstellungen/rollen) setzt du an einer Rolle den Haken „Anwärter-Rolle“
   und legst die Voraussetzung fest: Bedingungen wie Teilnahmen an Terminen einer Terminart (z. B. 6 Versammlungen)
   und eine Mindestdauer als Anwärter, verknüpft mit „Alle müssen erfüllt sein“ (UND) oder „Eine reicht“ (ODER), auch
   in Gruppen innerhalb von Gruppen (z. B. 12 Monate und dazu 6 Versammlungen oder 10 Arbeitsdienste). Die Anwärter-Rolle kann die Rolle der Person sein (beim Aufnehmen wird sie zu Mitglied)

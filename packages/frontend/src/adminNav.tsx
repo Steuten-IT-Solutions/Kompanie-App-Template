@@ -7,7 +7,7 @@ import { navigate } from './router';
 import { Caps } from './ui';
 import { useAdminCounts } from './adminCounts';
 import { usePromotionsDue } from './promotionsDue';
-import { tileCount } from './tileCount';
+import { tileCount, tileSoonCount, tileTitle } from './tileCount';
 import { TileArrange, TileGrid } from './tiles';
 import { menuSources, prefetchOnTap, usePrefetchMenu } from './viewData';
 
@@ -437,6 +437,7 @@ export function AdminMenu({ group }: { group?: string }) {
     registrations: config?.pendingRegistrations,
     reports: config?.openReports,
     admissions: config?.admissionsDue,
+    admissionsSoon: config?.admissionsSoon,
   };
   // Daten der Bereiche hinter den Knöpfen im Leerlauf vorab laden (auch die unter „Einrichtungen“), beim Antippen sofort.
   usePrefetchMenu(
@@ -451,6 +452,7 @@ export function AdminMenu({ group }: { group?: string }) {
           className="admin-tiles"
           tiles={(group ? setupTabs() : startTabs()).map((t) => {
             const badge = tileCount(t.id, counts);
+            const soon = tileSoonCount(t.id, counts);
             return {
               id: t.id,
               label: t.label,
@@ -458,7 +460,7 @@ export function AdminMenu({ group }: { group?: string }) {
                 <button
                   type="button"
                   className="card admin-tile"
-                  title={badge?.title}
+                  title={tileTitle(badge, soon)}
                   onClick={() => navigate(t.route ?? `verwaltung/${t.id}`)}
                   {...prefetchOnTap(...menuSources('verwaltung', t.id))}
                 >
@@ -466,10 +468,12 @@ export function AdminMenu({ group }: { group?: string }) {
                   <span>
                     <Caps text={t.label} />
                   </span>
-                  {badge && (
-                    // Zahl im Kreis an der Ecke: was dort gerade ansteht (erklärt im title).
-                    <span className="count-badge" aria-hidden="true">
-                      {badge.text}
+                  {(badge || soon) && (
+                    // Zahl im Kreis an der Ecke: was dort gerade ansteht (rot), daneben was bald ansteht (Akzentfarbe);
+                    // erklärt im title.
+                    <span className="count-badges" aria-hidden="true">
+                      {soon && <span className="count-badge count-badge-soon">{soon.text}</span>}
+                      {badge && <span className="count-badge">{badge.text}</span>}
                     </span>
                   )}
                 </button>
