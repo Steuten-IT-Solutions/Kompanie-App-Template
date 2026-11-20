@@ -225,7 +225,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Fenster direkt nach der Anmeldung, auf jeder Seite (auch wenn jemand über einen geteilten Link kommt), statt als Karte
   nur auf der Startseite. Er kommt weiterhin nur, solange der Browser auf diesem Gerät noch nie nach Benachrichtigungen
   gefragt hat; _Nicht jetzt_ oder Schließen blendet ihn für 30 Tage aus, nach einer Ablehnung im Browser fragt die App
-  nicht wieder. Die Abfrage des Browsers kommt erst nach dem Tippen auf _Benachrichtigungen einschalten_.
+  nicht wieder. Die Abfrage des Browsers kommt erst nach dem Tippen auf _Benachrichtigungen einschalten_. Nach diesem
+  Update fragt das Fenster alle Angemeldeten einmal, auch wer früher _Nicht jetzt_ gewählt oder die Benachrichtigungen
+  erlaubt und wieder ausgeschaltet hat; nicht gefragt wird, wer sie auf dem Gerät schon an hat oder im Browser
+  blockiert hat.
 - **Volle Breite am Computer**: Auf Tablet und Computer (Fenster ab 900 px breit) nutzen die Ansichten jetzt die ganze
   Breite statt einer schmalen Spalte von 640 px. Listen wie Mitglieder, Termine oder Dokumente stehen in Spalten,
   Formulare zeigen drei oder vier kurze Felder je Zeile, Alben und Bilder der Galerie passen sich der Breite an. Lesetexte

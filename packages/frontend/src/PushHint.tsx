@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, config, type PushStatus } from './api';
-import { enablePush, pushSupport } from './push';
-import { pushHintDue, pushHintLater } from './pushHint';
+import { currentDevice, enablePush, pushSupport } from './push';
+import { pushHintDue, pushHintLater, pushHintRoundDone } from './pushHint';
 import { previewRole } from './preview';
 import { navigate } from './router';
 import { Sheet } from './ui';
@@ -11,7 +11,8 @@ let closedThisRun = false;
 
 /**
  * Fenster „Nichts mehr verpassen“ gleich nach der Anmeldung, auf jeder Seite: für angemeldete Mitglieder, deren Browser
- * auf diesem Gerät noch nie nach Benachrichtigungen gefragt hat (pushHint.ts). Die Abfrage des Browsers kommt erst
+ * auf diesem Gerät noch nie nach Benachrichtigungen gefragt hat, und nach einem Update mit neuer Runde einmal für alle
+ * ohne Benachrichtigungen auf diesem Gerät (pushHint.ts). Die Abfrage des Browsers kommt erst
  * nach dem Tippen auf „Einschalten“ (Browser zeigen sie nur nach einer Nutzeraktion); dann meldet sich das Gerät mit
  * allen angebotenen Arten an (wie unter Konto → Benachrichtigungen). „Nicht jetzt“, ✕ und „Zurück“ blenden es für eine
  * Weile aus; nach „Blockieren“ im Browser fragt die App nicht wieder. Ohne Push auf dem Server oder ohne Arten bleibt
@@ -27,10 +28,16 @@ export default function PushHint({ onToast }: { onToast: (msg: string) => void }
   useEffect(() => {
     if (!eligible) return;
     let alive = true;
-    api
-      .pushStatus(null)
-      .then((s) => alive && setStatus(s))
-      .catch(() => undefined); // offline o. ä.: dann eben kein Fenster
+    (async () => {
+      // Hat dieses Gerät schon Benachrichtigungen (Erlaubnis früher erteilt), gibt es nichts zu fragen.
+      const device = await currentDevice().catch(() => null);
+      const s = await api.pushStatus(device);
+      if (device && s.subscription) {
+        pushHintRoundDone();
+        return;
+      }
+      if (alive) setStatus(s);
+    })().catch(() => undefined); // offline o. ä.: dann eben kein Fenster
     return () => {
       alive = false;
     };
@@ -40,6 +47,7 @@ export default function PushHint({ onToast }: { onToast: (msg: string) => void }
 
   const close = () => {
     closedThisRun = true;
+    pushHintRoundDone();
     setHidden(true);
   };
 
