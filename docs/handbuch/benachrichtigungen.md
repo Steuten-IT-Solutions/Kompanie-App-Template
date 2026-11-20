@@ -8,7 +8,7 @@ Die App kann dich auf dem Handy oder am Computer benachrichtigen, wenn es etwas 
 ![Benachrichtigungen mit der Liste der Arten, alle angehakt](bild:benachrichtigungen)
 
 ## So öffnest du die Seite
-- Mit Konto: Tippe unten auf **Meins**, wähle oben im Menü **Konto** und tippe auf **Benachrichtigungen einstellen**. Hat dein Gerät noch keine Benachrichtigungen, siehst du außerdem auf der Startseite den Hinweis **Nichts mehr verpassen** (siehe unten).
+- Mit Konto: Tippe unten auf **Meins**, wähle oben im Menü **Konto** und tippe auf **Benachrichtigungen einstellen**. Hat dein Gerät noch keine Benachrichtigungen, öffnet sich nach der Anmeldung außerdem das Fenster **Nichts mehr verpassen** (siehe unten).
 - Ohne Konto: Tippe unter **{bereich.events}** auf **Bei neuen Terminen benachrichtigen** oder unter **{bereich.news}** auf **Bei neuen Beiträgen benachrichtigen**.
 
 ## Was du hier siehst
@@ -27,13 +27,13 @@ Die App kann dich auf dem Handy oder am Computer benachrichtigen, wenn es etwas 
 
 ![Benachrichtigungen ohne Konto: Termine, Erinnerung und News](bild:benachrichtigungen-gast)
 
-### Über den Hinweis auf der Startseite einschalten
-Angemeldet siehst du auf der Startseite den Hinweis **Nichts mehr verpassen**, solange dein Browser auf diesem Gerät noch nicht nach Benachrichtigungen gefragt hat.
+### Über das Fenster nach der Anmeldung einschalten
+Nach der Anmeldung öffnet sich das Fenster **Nichts mehr verpassen**, egal auf welcher Seite du landest, solange dein Browser auf diesem Gerät noch nicht nach Benachrichtigungen gefragt hat.
 1. Tippe auf **Benachrichtigungen einschalten**.
 2. Dein Browser fragt, ob die Seite Benachrichtigungen senden darf. Tippe auf **Erlauben**.
 3. Es erscheint „Benachrichtigungen sind an“. Alle Arten, die es für dich gibt, sind eingeschaltet. Ändern kannst du sie wie unten beschrieben.
 
-Mit **Nicht jetzt** verschwindet der Hinweis auf diesem Gerät für 30 Tage. Einschalten kannst du die Benachrichtigungen ohne deine Zustimmung im Browser nicht; das kann auch die {kompanie.name} nicht für dich tun.
+Mit **Nicht jetzt** oder **✕** verschwindet das Fenster auf diesem Gerät für 30 Tage. Hast du im Browser **Blockieren** gewählt, fragt die App nicht wieder; erlauben kannst du sie dann nur noch in den Einstellungen des Browsers. Einschalten kannst du die Benachrichtigungen ohne deine Zustimmung im Browser nicht; das kann auch die {kompanie.name} nicht für dich tun.
 
 ### Arten ändern
 1. Öffne die Seite.

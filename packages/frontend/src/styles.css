@@ -341,12 +341,9 @@ h3,
   padding: 4px;
   font-size: 1.1rem;
 }
-/* Startseite: Benachrichtigungen einschalten (PushHint) */
+/* Fenster nach der Anmeldung: Benachrichtigungen einschalten (PushHint); Abstände über .stack */
 .push-hint p {
-  margin: 0 0 10px;
-}
-.push-hint .push-hint-later {
-  margin-top: 4px;
+  margin: 0;
 }
 
 /* ------------------------------------------------------------------ */

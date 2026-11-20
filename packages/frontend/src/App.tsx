@@ -693,6 +693,10 @@ export default function App({ notice = null }: { notice?: string | null }) {
         </div>
       )}
       {!['installieren', 'anmelden', 'registrieren', 'einstellungen', 'einrichtung'].includes(tab) && <InstallBanner onToast={showToast} />}
+      {/* Gleich nach der Anmeldung, auf jeder Seite (auch nach einem geteilten Link): Benachrichtigungen anbieten */}
+      {user && !config.setupPending && !['anmelden', 'registrieren', 'einrichtung', 'benachrichtigungen'].includes(tab) && (
+        <PushHint onToast={showToast} />
+      )}
 
       <main className="content">
         <ErrorBoundary key={viewKey(path)}>
@@ -732,7 +736,6 @@ export default function App({ notice = null }: { notice?: string | null }) {
                 </button>
               </p>
             )}
-            {user && !config.setupPending && activeTab === homeTab && !path[1] && <PushHint onToast={showToast} />}
             {tab === 'termine' &&
               (path[1] === 'verwalten' && features?.events && can('manage_events') ? (
                 <TermineVerwalten onToast={showToast} />
