@@ -225,7 +225,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   [Bereiche](app:einstellungen/bereiche), Benachrichtigungen oder die Bereiche im [Bericht](app:verwaltung/bericht)
   stehen in Spalten, die Auswahl über den [Änderungen](app:verwaltung/aenderungen) in einer Zeile, die Kennzahlen unter
   [Nutzung](app:einstellungen/nutzung) in einer Reihe. Die eigene [Übersicht](app:meins) und ein Mitglied in der
-  Verwaltung stehen in zwei Spalten. Handy hochkant bleibt, wie es ist.
+  Verwaltung stehen in zwei Spalten. Die Leiste mit den Bereichen steht am Computer wie beim Handy quer senkrecht am
+  linken Rand. Handy hochkant bleibt, wie es ist.
 
 - **Gemeinsame Amtszeiten einklappbar**: Bei einer Ämtergruppe mit gemeinsamen Amtszeiten (z. B. Königshaus) unter
   [Ämter](app:mitglieder/aemter) lässt sich jede Amtszeit mit einem Tipp auf ihren Kopf auf- und zuklappen. Die laufende

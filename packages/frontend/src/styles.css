@@ -6381,60 +6381,13 @@ button.spotlight-person:focus-visible {
 }
 
 /* ------------------------------------------------------------------ */
-/* Handy quer: Navigation als Leiste links, flache Kopfleiste und      */
-/* Banner. Den Inhalt über die ganze Breite teilt es sich mit Tablet   */
-/* und Computer (Block „Breite Ansicht“ darunter).                     */
+/* Handy quer: flache Kopfleiste und Banner. Die Navigation links und  */
+/* den Inhalt über die ganze Breite teilt es sich mit dem Computer     */
+/* (Blöcke darunter).                                                  */
 /* ------------------------------------------------------------------ */
 @media (orientation: landscape) and (max-height: 520px) {
   :root {
-    /* Die Tab-Leiste steht links; unten braucht nichts mehr Platz (.app, .toast, .list-save, Jahresübersicht). */
-    --tabbar-h: 0px;
-    --rail-w: 76px;
     --content-pad-r: max(16px, env(safe-area-inset-right));
-  }
-  .app {
-    padding-left: calc(var(--rail-w) + env(safe-area-inset-left));
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-  .tabbar {
-    top: 0;
-    right: auto;
-    flex-direction: column;
-    justify-content: space-around;
-    width: calc(var(--rail-w) + env(safe-area-inset-left));
-    height: auto;
-    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) env(safe-area-inset-left);
-    overflow-y: auto;
-    scrollbar-width: none;
-    background: linear-gradient(90deg, var(--bar-top), var(--bar-bottom));
-    border-top: 0;
-    border-right: 3px solid var(--accent);
-  }
-  .tabbar button,
-  .tabbar button:first-child:nth-last-child(n + 6),
-  .tabbar button:first-child:nth-last-child(n + 6) ~ button,
-  .tabbar button:first-child:nth-last-child(n + 7),
-  .tabbar button:first-child:nth-last-child(n + 7) ~ button {
-    flex: 1 1 0;
-    min-height: 44px;
-    gap: 2px;
-    padding: 0 3px;
-    font-size: 0.58rem;
-    letter-spacing: 0.02em;
-  }
-  .tabbar button svg {
-    width: 22px;
-    height: 22px;
-  }
-  /* Markierung des aktiven Tabs am rechten Rand statt oben */
-  .tabbar button.active::before {
-    top: 22%;
-    bottom: 22%;
-    left: auto;
-    right: 0;
-    width: 3px;
-    height: auto;
-    border-radius: 3px 0 0 3px;
   }
   /* Kopfleiste einzeilig und nicht fest: Sie scrollt mit weg, der Inhalt bekommt die Höhe. */
   .topbar {
@@ -6502,6 +6455,70 @@ button.spotlight-person:focus-visible {
   .offline {
     padding: 6px var(--content-pad-r) 6px 16px;
   }
+  /* Fenster (Sheet): ganz auf den niedrigen Bildschirm */
+  .sheet-backdrop {
+    padding: 8px;
+  }
+  .sheet {
+    max-height: calc(100vh / var(--kompanie-zoom, 1) - 16px);
+    max-height: calc(100dvh / var(--kompanie-zoom, 1) - 16px);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Navigation als Leiste links: Handy quer und Computer (ab 900 px     */
+/* breit), dort ist die Höhe knapp und die Breite reichlich.           */
+/* ------------------------------------------------------------------ */
+@media (orientation: landscape) and (max-height: 520px), (min-width: 900px) and ((orientation: portrait) or (min-height: 521px)) {
+  :root {
+    /* Die Tab-Leiste steht links; unten braucht nichts mehr Platz (.app, .toast, .list-save, Jahresübersicht). */
+    --tabbar-h: 0px;
+    --rail-w: 76px;
+  }
+  .app {
+    padding-left: calc(var(--rail-w) + env(safe-area-inset-left));
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tabbar {
+    top: 0;
+    right: auto;
+    flex-direction: column;
+    justify-content: space-around;
+    width: calc(var(--rail-w) + env(safe-area-inset-left));
+    height: auto;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) env(safe-area-inset-left);
+    overflow-y: auto;
+    scrollbar-width: none;
+    background: linear-gradient(90deg, var(--bar-top), var(--bar-bottom));
+    border-top: 0;
+    border-right: 3px solid var(--accent);
+  }
+  .tabbar button,
+  .tabbar button:first-child:nth-last-child(n + 6),
+  .tabbar button:first-child:nth-last-child(n + 6) ~ button,
+  .tabbar button:first-child:nth-last-child(n + 7),
+  .tabbar button:first-child:nth-last-child(n + 7) ~ button {
+    flex: 1 1 0;
+    min-height: 44px;
+    gap: 2px;
+    padding: 0 3px;
+    font-size: 0.58rem;
+    letter-spacing: 0.02em;
+  }
+  .tabbar button svg {
+    width: 22px;
+    height: 22px;
+  }
+  /* Markierung des aktiven Tabs am rechten Rand statt oben */
+  .tabbar button.active::before {
+    top: 22%;
+    bottom: 22%;
+    left: auto;
+    right: 0;
+    width: 3px;
+    height: auto;
+    border-radius: 3px 0 0 3px;
+  }
   /* Fest positionierte Hinweise mittig über dem Inhalt, nicht über der Leiste */
   .toast,
   .yg-detail {
@@ -6510,13 +6527,29 @@ button.spotlight-person:focus-visible {
   .yg-detail {
     width: min(760px, calc(100% - var(--rail-w) - env(safe-area-inset-left) - 32px));
   }
-  /* Fenster (Sheet): ganz auf den niedrigen Bildschirm */
-  .sheet-backdrop {
-    padding: 8px;
+}
+/* Am Computer ist die Leiste hoch genug: Punkte oben untereinander statt über die ganze Höhe verteilt, etwas breiter
+   und mit größerer Schrift. */
+@media (min-width: 900px) and ((orientation: portrait) or (min-height: 521px)) {
+  :root {
+    --rail-w: 88px;
   }
-  .sheet {
-    max-height: calc(100vh / var(--kompanie-zoom, 1) - 16px);
-    max-height: calc(100dvh / var(--kompanie-zoom, 1) - 16px);
+  .tabbar {
+    justify-content: flex-start;
+  }
+  .app .tabbar button,
+  .app .tabbar button:first-child:nth-last-child(n + 6),
+  .app .tabbar button:first-child:nth-last-child(n + 6) ~ button,
+  .app .tabbar button:first-child:nth-last-child(n + 7),
+  .app .tabbar button:first-child:nth-last-child(n + 7) ~ button {
+    flex: none;
+    min-height: 72px;
+    gap: 4px;
+    font-size: 0.62rem;
+  }
+  .app .tabbar button svg {
+    width: 24px;
+    height: 24px;
   }
 }
 
@@ -6682,6 +6715,14 @@ button.spotlight-person:focus-visible {
   }
   .content {
     padding: 18px 24px 24px;
+  }
+  /* Neben der Leiste links bleiben bei 1440 px noch vier Karten je Zeile */
+  .card-list,
+  .poll-list,
+  .install-steps,
+  .status-list,
+  .office-group {
+    grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
   }
   .form {
     grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
