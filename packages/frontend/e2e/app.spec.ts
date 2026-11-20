@@ -2789,6 +2789,13 @@ test('Computer: Inhalt über die ganze Breite, Formulare mit mehr Feldern je Zei
   const c = await box('.content');
   expect(Math.abs(l.x + l.width / 2 - (c.x + c.width / 2))).toBeLessThan(2);
   await noSideScroll();
+  // Haken-Liste (Bereiche) in mehreren Spalten
+  await page.goto('/app/#/einstellungen/bereiche');
+  const features = page.locator('.feature-list').first();
+  await expect(features).toBeVisible();
+  await expect.poll(() => features.evaluate((e) => getComputedStyle(e).gridTemplateColumns.split(' ').length)).toBeGreaterThanOrEqual(3);
+  await noSideScroll();
+  await page.goto('/app/#/einstellungen/rollen');
   await shot(page, '1f-computer');
 });
 

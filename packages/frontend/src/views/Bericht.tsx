@@ -97,15 +97,17 @@ export function Bericht({ onToast }: { onToast: (msg: string) => void }) {
           </section>
           <section className="card settings-section stack" aria-labelledby="report-sections-title">
             <h3 id="report-sections-title">Bereiche</h3>
-            {sections.map((s) => (
-              <label key={s.key} className="toggle">
-                <input type="checkbox" checked={!off.has(s.key)} onChange={(e) => toggle(s.key, e.target.checked)} />
-                <span>
-                  {s.title}
-                  {!s.dated && <span className="muted"> (Stand heute)</span>}
-                </span>
-              </label>
-            ))}
+            <div className="toggle-grid">
+              {sections.map((s) => (
+                <label key={s.key} className="toggle">
+                  <input type="checkbox" checked={!off.has(s.key)} onChange={(e) => toggle(s.key, e.target.checked)} />
+                  <span>
+                    {s.title}
+                    {!s.dated && <span className="muted"> (Stand heute)</span>}
+                  </span>
+                </label>
+              ))}
+            </div>
           </section>
           {fail && (
             <p className="form-error small" role="alert">
