@@ -6158,6 +6158,52 @@ test('Anwesenheit: freie Liste, Status, Punkte aus dem Vorschlag, Mitglied sieht
   await expect(page.locator('.my-attendance .row', { hasText: title })).toContainText('anwesend');
 });
 
+test('Anwesenheit: Terminarten der Liste eingeklappt, Häkchen erst auf Tipp', async ({ page }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return res.status;
+      },
+      [path, method, body] as const,
+    );
+  expect(await api('admin/event-kinds', 'PUT', { kinds: ['Versammlung', 'Arbeitsdienst'], hidden: [] })).toBe(200);
+  let listId: number | null = null;
+  try {
+    await page.goto('/app/');
+    await adminMenu(page, 'Anwesenheit');
+    await page
+      .locator('.free-event')
+      .getByLabel('Titel')
+      .fill(`Arten ${Date.now().toString(36)}`);
+    await page.getByRole('button', { name: 'Liste anlegen' }).click();
+    await expect(page).toHaveURL(/#\/verwaltung\/anwesenheit\/\d+$/);
+    listId = Number(/(\d+)$/.exec(page.url())![1]);
+    const checks = page.getByRole('group', { name: 'Terminarten' });
+    const toggle = page.getByRole('button', { name: 'Terminarten' });
+    // Eingeklappt: keine Häkchen, nur die gewählten Arten
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(checks).toHaveCount(0);
+    await expect(page.locator('.event-kind-summary')).toHaveText('keine');
+    await toggle.click();
+    await checks.getByLabel('Versammlung').check();
+    await expect(page.locator('.toast')).toHaveText('Terminarten gespeichert');
+    await toggle.click();
+    await expect(checks).toHaveCount(0);
+    await expect(page.locator('.event-kind-summary')).toHaveText('Versammlung');
+  } finally {
+    if (listId !== null) await api(`attendance/${listId}`, 'DELETE');
+    expect(await api('admin/event-kinds', 'PUT', { kinds: [], hidden: [] })).toBe(200);
+  }
+});
+
 test('Anwesenheit offline: auf dem Gerät gespeichert, nach dem Neustart noch da, online von selbst übertragen', async ({ page }) => {
   const title = `Offline ${Date.now().toString(36)}`;
   await login(page, 'admin', ADMIN_PASSWORD);

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, can, config, eventKindTag, eventKinds } from '../api';
-import { EventKindChecks, kindsOf } from '../eventKindChecks';
+import { CollapsibleKindChecks, kindsOf } from '../eventKindChecks';
 import GuestPushButton from '../GuestPushButton';
 import { birthdaysVisible, UpcomingBirthdays, UpcomingBirthdaysCard, useUpcomingBirthdays } from '../upcomingBirthdays';
 import { navigate } from '../router';
@@ -196,7 +196,6 @@ function KindPicker({ ev, onChange }: { ev: CalendarEvent; onChange: (id: string
   const [error, setError] = useState<string | null>(null);
   // Während des Speicherns schon die neue Auswahl zeigen
   const [draft, setDraft] = useState<string[] | null>(null);
-  const [open, setOpen] = useState(false);
   const current = kindsOf(ev);
   const shown = draft ?? current;
   const listId = `event-kinds-${ev.id}`;
@@ -219,20 +218,7 @@ function KindPicker({ ev, onChange }: { ev: CalendarEvent; onChange: (id: string
 
   return (
     <div className="event-kind-picker">
-      <button
-        type="button"
-        className="member-filters-toggle event-kind-toggle"
-        aria-expanded={open}
-        aria-controls={listId}
-        onClick={() => setOpen(!open)}
-      >
-        Terminarten
-        <span className="member-filters-arrow" aria-hidden="true">
-          ›
-        </span>
-      </button>
-      {!open && <p className="small event-kind-summary">{shown.length > 0 ? shown.join(', ') : <span className="muted">keine</span>}</p>}
-      {open && <EventKindChecks id={listId} hideLegend value={shown} disabled={busy} onChange={(kinds) => void choose(kinds)} />}
+      <CollapsibleKindChecks id={listId} value={shown} disabled={busy} onChange={(kinds) => void choose(kinds)} />
       {current.length === 0 && suggestions.length > 0 && (
         <p className="small muted">
           Vorschlag aus dem Titel: {suggestions.join(', ')}.{' '}
