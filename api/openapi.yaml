@@ -502,7 +502,7 @@ paths:
       summary: Eigene Anordnung der Kacheln einer Seite für eine Spaltenzahl speichern
       description: |
         Für jedes angemeldete Konto. `page`: `verwaltung`, `einrichtungen`, `intern`, `menue/<n>` oder
-        `einstellungen/<gruppe>`. `cols`: Spaltenzahl des Rasters (nach seiner Breite: 2, ab 528 px 3, ab 680 px 4); die anderen
+        `einstellungen/<gruppe>`. `cols`: Spaltenzahl des Rasters (nach seiner Breite: 2, ab 528 px 3, ab 680 px 4, ab 840 px 5); die anderen
         Spaltenzahlen der Seite bleiben. Jede Kachel liegt mit `col` (ab 1), `row` (1 bis 200) und `span` (Breite in
         Spalten) im Raster, ohne Überlappung, höchstens 100 Kacheln. Kennungen gerade nicht sichtbarer Kacheln bleiben
         erlaubt; was eine Person sieht, entscheiden ihre Rechte. In der Vorschau nicht möglich (nur ansehen).
@@ -515,7 +515,7 @@ paths:
               required: [page, cols, tiles]
               properties:
                 page: { type: string, examples: [intern, 'einstellungen/betrieb'] }
-                cols: { type: integer, enum: [2, 3, 4] }
+                cols: { type: integer, enum: [2, 3, 4, 5] }
                 tiles: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/TilePlace' } }
       responses:
         '200':
@@ -7081,7 +7081,7 @@ paths:
               required: [page, cols, tiles]
               properties:
                 page: { type: string, examples: [verwaltung, intern] }
-                cols: { type: integer, enum: [2, 3, 4] }
+                cols: { type: integer, enum: [2, 3, 4, 5] }
                 tiles: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/TilePlace' } }
       responses:
         '200':

@@ -10,7 +10,7 @@ use KompanieApp\Core\Storage\UserSettings;
 
 /**
  * Persönliche Anordnung der Kacheln einer Seite (Verwaltung, Einrichtungen, Untermenüs, Gruppen der Einstellungen): je
- * Konto, Seite und Spaltenzahl des Rasters (2, 3 oder 4) eine Liste {id, col, row, span}. Gespeichert in user_settings
+ * Konto, Seite und Spaltenzahl des Rasters (2, 3, 4 oder 5) eine Liste {id, col, row, span}. Gespeichert in user_settings
  * unter „tiles:<Seite>“ als JSON {"2": [...], "4": [...]}; beim Löschen des Kontos entfernt (UserData::purge).
  *
  * Der Server prüft nur die Form (bekannte Art von Seite, Ganzzahlen im Raster, keine Überlappung). Welche Kacheln eine
@@ -33,7 +33,7 @@ final class TileLayoutService
     public const DEFAULTS = 'tile_defaults';
 
     /** Spaltenzahlen des Rasters: Handy, Handy quer bzw. kleines Tablet, ab 900 px */
-    public const COLUMNS = [2, 3, 4];
+    public const COLUMNS = [2, 3, 4, 5];
 
     public const MAX_TILES = 100;
 
@@ -166,7 +166,7 @@ final class TileLayoutService
         $page = self::page($body['page'] ?? null);
         $cols = $body['cols'] ?? null;
         if (!is_int($cols) || !in_array($cols, self::COLUMNS, true)) {
-            throw ApiError::invalid('Die Spaltenzahl muss 2, 3 oder 4 sein.');
+            throw ApiError::invalid('Die Spaltenzahl muss 2, 3, 4 oder 5 sein.');
         }
         return [$page, $cols, self::tiles($body['tiles'] ?? null, $cols)];
     }

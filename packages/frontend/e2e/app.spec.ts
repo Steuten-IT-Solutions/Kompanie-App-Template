@@ -7846,3 +7846,21 @@ test('Kacheln: Admin legt ein Raster als Vorgabe für alle fest, gilt ohne eigen
   await expect(tile('mitglieder')).toBeVisible();
   await expect.poll(() => placeOf('mitglieder')).toMatch(/\+1\//);
 });
+
+test('Kacheln: am Computer 5 Spalten auf Kachel-Seiten, andere Seiten bleiben schmal', async ({ page }) => {
+  const columns = () => page.locator('.admin-tiles').evaluate((e) => getComputedStyle(e).gridTemplateColumns.split(' ').length);
+  const width = () => page.locator('.content').evaluate((e) => e.getBoundingClientRect().width);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await login(page, 'verwalter');
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await expect(page.locator('.admin-tiles li').first()).toBeVisible();
+  await expect.poll(columns).toBe(5);
+  expect(await width()).toBe(904);
+  await page.goto('/app/#/termine');
+  await expect(page.locator('.admin-tiles')).toHaveCount(0);
+  await expect.poll(width).toBe(640);
+  // Schmaleres Fenster unter 900 px: Inhalt wie bisher 640 px, 3 Spalten
+  await page.locator('.tabbar').getByRole('button', { name: MANAGER }).click();
+  await page.setViewportSize({ width: 880, height: 800 });
+  await expect.poll(columns).toBe(3);
+});

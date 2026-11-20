@@ -197,6 +197,13 @@ h3,
   margin: 0 auto;
   padding: 18px 16px 24px;
 }
+/* Seiten mit Kacheln (tiles.tsx) sind am Computer breiter: Das Raster erreicht 872 px und damit 5 Spalten
+   (columnsForWidth). Handy quer hat ohnehin die ganze Breite. */
+@media (min-width: 900px) and ((orientation: portrait) or (min-height: 521px)) {
+  .content:has(.tile-grid) {
+    max-width: 904px;
+  }
+}
 
 .tabbar {
   position: fixed;
@@ -2628,7 +2635,7 @@ code {
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
-/* Startseite der Verwaltung: je Bereich ein Knopf mit Symbol; die Spaltenzahl (2 bis 4) setzt tiles.tsx */
+/* Startseite der Verwaltung: je Bereich ein Knopf mit Symbol; die Spaltenzahl (2 bis 5) setzt tiles.tsx */
 .admin-tiles {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

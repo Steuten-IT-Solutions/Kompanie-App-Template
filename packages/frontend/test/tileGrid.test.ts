@@ -17,12 +17,20 @@ import {
 
 const t = (id: string, col: number, row: number, span = 1): TilePlace => ({ id, col, row, span });
 
-test('Spaltenzahl nach Breite des Rasters: 2, ab 528 px 3, ab 680 px 4', () => {
+test('Spaltenzahl nach Breite des Rasters: 2, ab 528 px 3, ab 680 px 4, ab 840 px 5', () => {
   assert.equal(columnsForWidth(358), 2);
   assert.equal(columnsForWidth(527), 2);
   assert.equal(columnsForWidth(528), 3);
-  assert.equal(columnsForWidth(608), 3, 'Computer: Inhalt höchstens 640 px');
+  assert.equal(columnsForWidth(608), 3, 'andere Seiten am Computer: Inhalt höchstens 640 px');
   assert.equal(columnsForWidth(680), 4);
+  assert.equal(columnsForWidth(839), 4);
+  assert.equal(columnsForWidth(840), 5);
+  assert.equal(columnsForWidth(872), 5, 'Kachel-Seiten am Computer: Inhalt bis 904 px');
+});
+
+test('5 Spalten ohne eigene Anordnung: übernimmt die gespeicherte für 4, Breiten bleiben', () => {
+  const saved = { '4': [t('a', 1, 1, 4), t('b', 1, 2, 2), t('c', 3, 2, 2)] };
+  assert.deepEqual(resolveTiles(['a', 'b', 'c'], saved, 5), [t('a', 1, 1, 4), t('b', 1, 2, 2), t('c', 3, 2, 2)]);
 });
 
 test('ohne Anordnung: der Reihe nach, Breite 1, ohne Lücken', () => {

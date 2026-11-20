@@ -32,7 +32,7 @@ Tippe auf **Zurücksetzen** und bestätige. Danach gilt auf dieser Seite wieder 
 
 ## Gut zu wissen
 - Jede Änderung ist sofort gespeichert, in deinem Konto. Auf deinen anderen Geräten siehst du dieselbe Anordnung.
-- Das Raster hat je nach Breite 2, 3 oder 4 Spalten (Handy, Handy quer, Tablet oder Computer). Für jede Spaltenzahl gibt es eine eigene Anordnung. Hast du eine Breite noch nicht angeordnet, übernimmt sie die Reihenfolge einer anderen.
+- Das Raster hat je nach Breite 2 bis 5 Spalten: 2 am Handy, 3 oder 4 auf dem Tablet und am Handy quer, 5 am Computer (ab etwa 900 px Fensterbreite; Seiten mit Kacheln sind dort breiter als andere Seiten). Für jede Spaltenzahl gibt es eine eigene Anordnung. Hast du eine Breite noch nicht angeordnet, übernimmt sie die Reihenfolge einer anderen.
 - Ohne Verbindung gilt die Änderung gleich und wird auf dem Gerät vorgemerkt; die App speichert sie, sobald wieder Netz da ist.
 - Ohne Anmeldung merkt sich nur dieses Gerät die Anordnung. Nach dem Anmelden gilt die Anordnung deines Kontos.
 - Kommt eine Kachel neu dazu (z. B. durch ein neues Recht), steht sie unten. Fehlt eine Kachel, wird die schmalste Kachel derselben Zeile um ihre Breite breiter (bei gleicher Breite die linke); die Zeile bleibt so breit wie vorher.
