@@ -20,7 +20,7 @@ Die App der {kompanie.name} läuft im Browser und lässt sich wie jede andere Ap
 ## So gehst du vor
 ### Auf dem iPhone oder iPad
 1. Öffne die Adresse der App in **Safari**.
-2. Tippe unten auf das **Teilen-Symbol** (Quadrat mit Pfeil nach oben). Steht unten rechts nur **•••**, tippe zuerst darauf und dann auf **Teilen**.
+2. Tippe auf das **Teilen-Symbol** (Quadrat mit Pfeil nach oben). Am iPhone steht es meist in der Leiste unten, am iPad in der Leiste oben. Ab iOS 26 ist in Safari die Darstellung **Kompakt** voreingestellt: Dann tippe zuerst auf **•••** an der Adresszeile und dann auf **Teilen**. Umstellen lässt sich das unter Einstellungen → Apps → Safari → Tabs (**Kompakt**, **Unten** oder **Oben**).
 3. Wähle **Zum Home-Bildschirm**. Der Eintrag steht weiter unten in der Liste; wische nach oben, bis er erscheint.
 4. Tippe oben rechts auf **Hinzufügen**. Steht dort der Schalter „Als Web-App öffnen“, lass ihn eingeschaltet.
 5. Starte die App ab jetzt immer über das neue Symbol mit dem Logo. Die Anmeldung bleibt gespeichert.
@@ -38,7 +38,7 @@ Die App der {kompanie.name} läuft im Browser und lässt sich wie jede andere Ap
 2. Wähle z. B. WhatsApp oder E-Mail. Am Computer kopiert die App den Link.
 
 ## Gut zu wissen
-- In anderen Browsern auf dem iPhone (z. B. Chrome) fehlt **Zum Home-Bildschirm** oft. Die App zeigt dann einen Hinweis; kopiere die Adresse und öffne sie in Safari.
+- Ab iOS 16.4 können auch andere Browser auf dem iPhone (z. B. Chrome, Edge, Firefox) **Zum Home-Bildschirm** im Teilen-Menü anbieten; ob der Eintrag da ist, hängt vom Browser ab. Die App zeigt in diesen Browsern einen Hinweis; fehlt der Eintrag, kopiere die Adresse und öffne sie in Safari.
 - Bitte nicht im Samsung-Browser installieren: Dort blockiert Google Play Protect die App fälschlich als „Unsichere App“. Die App bietet dann **In Chrome öffnen** an.
 - Ist die Adresse in Facebook, Instagram o. Ä. geöffnet, klappt die Installation nicht. Die App zeigt dann **Adresse kopieren**; öffne die Adresse in Safari bzw. Chrome.
 - Bekommt die App ein neues Logo, übernimmt Chrome auf Android das neue Symbol nach einiger Zeit von selbst; bei einer größeren Änderung fragt Chrome vorher nach. Auf dem iPhone bleibt das Symbol, das beim Hinzufügen gespeichert wurde.

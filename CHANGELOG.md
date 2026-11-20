@@ -230,6 +230,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   erlaubt und wieder ausgeschaltet hat; nicht gefragt wird, wer sie auf dem Gerät schon an hat oder im Browser
   blockiert hat. Auf iPhone und iPad im Browser (Safari) führt das Fenster zu _App installieren_, weil es
   Benachrichtigungen dort nur in der installierten App gibt.
+- **Installationsanleitung für iPhone und iPad genauer**: Die Anleitung unter [App installieren](app:installieren)
+  sagt jetzt, wo das Teilen-Symbol je nach Gerät und Safari-Darstellung steht (iPhone unten, iPad oben, ab iOS 26 bei
+  „Kompakt“ hinter „•••“) und dass ab iOS 16.4 auch andere Browser wie Chrome, Edge oder Firefox die App zum
+  Home-Bildschirm hinzufügen können, wenn sie den Eintrag anbieten.
 - **Volle Breite am Computer**: Auf Tablet und Computer (Fenster ab 900 px breit) nutzen die Ansichten jetzt die ganze
   Breite statt einer schmalen Spalte von 640 px. Listen wie Mitglieder, Termine oder Dokumente stehen in Spalten,
   Formulare zeigen drei oder vier kurze Felder je Zeile, Alben und Bilder der Galerie passen sich der Breite an. Lesetexte
