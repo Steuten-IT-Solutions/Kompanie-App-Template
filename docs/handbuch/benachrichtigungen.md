@@ -33,8 +33,11 @@ Nach der Anmeldung öffnet sich das Fenster **Nichts mehr verpassen**, egal auf 
 2. Dein Browser fragt, ob die Seite Benachrichtigungen senden darf. Tippe auf **Erlauben**.
 3. Es erscheint „Benachrichtigungen sind an“. Alle Arten, die es für dich gibt, sind eingeschaltet. Ändern kannst du sie wie unten beschrieben.
 
+<<<<<<< HEAD
 Nach manchen Updates fragt das Fenster außerdem einmal alle, die auf diesem Gerät keine Benachrichtigungen haben, auch wenn du früher abgelehnt oder sie ausgeschaltet hast.
 
+=======
+>>>>>>> cd639c260aaa8a2094518359268bdb133b0f36fc
 Mit **Nicht jetzt** oder **✕** verschwindet das Fenster auf diesem Gerät für 30 Tage. Hast du im Browser **Blockieren** gewählt, fragt die App nicht wieder; erlauben kannst du sie dann nur noch in den Einstellungen des Browsers. Einschalten kannst du die Benachrichtigungen ohne deine Zustimmung im Browser nicht; das kann auch die {kompanie.name} nicht für dich tun.
 
 ### Arten ändern
