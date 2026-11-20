@@ -743,6 +743,18 @@ final class DriveClient implements GallerySource
         }
     }
 
+    /**
+     * Kopfzeilen der Nachfrage, wie weit ein fortsetzbares Hochladen ist (PUT ohne Daten). Content-Length: 0 steht
+     * ausdrücklich da: WordPress (Requests mit cURL) lässt die Kopfzeile bei einem PUT ohne Daten weg, und Google lehnt
+     * die Nachfrage dann mit HTTP 411 (Length Required) ab.
+     *
+     * @return array<string, string>
+     */
+    private static function statusQueryHeaders(int $size): array
+    {
+        return ['Content-Range' => 'bytes */' . $size, 'Content-Length' => '0'];
+    }
+
     /** Ob ein Fehler beim Hochladen vorübergehend ist und ein neuer Versuch lohnt (Google: 408, 429, 5xx). */
     private static function retryable(int $status): bool
     {
@@ -758,7 +770,7 @@ final class DriveClient implements GallerySource
     private function uploadState(string $location, int $size): string|int|null
     {
         try {
-            $res = $this->http->request('PUT', $location, ['Content-Range' => 'bytes */' . $size], '', 30);
+            $res = $this->http->request('PUT', $location, self::statusQueryHeaders($size), '', 30);
         } catch (\RuntimeException) {
             return null;
         }
@@ -904,7 +916,7 @@ final class DriveClient implements GallerySource
             throw new \RuntimeException('Google Drive: Die Datei zum Hochladen ließ sich nicht lesen.');
         }
         // Wie weit ist Google? (308 mit Range „bytes=0-<letztes>“, ohne Range noch nichts; 200/201: schon fertig)
-        $res = $this->http->request('PUT', $location, ['Content-Range' => 'bytes */' . $size], '', 30);
+        $res = $this->http->request('PUT', $location, self::statusQueryHeaders($size), '', 30);
         if (in_array($res['status'], [200, 201], true)) {
             return ['id' => self::uploadedId($res), 'offset' => $size];
         }

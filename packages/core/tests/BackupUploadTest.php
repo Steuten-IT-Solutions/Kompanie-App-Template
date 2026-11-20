@@ -104,6 +104,9 @@ final class BackupUploadTest extends TestCase
                 $id = substr($url, strlen('https://upload.example/session/'));
                 // Nachfrage nach dem Stand (Content-Range: bytes */<Größe>): 308 mit Range, oder fertig
                 if (preg_match('#^bytes \*/(\d+)$#', $headers['Content-Range'] ?? '', $m) === 1) {
+                    if (($headers['Content-Length'] ?? null) !== '0') {
+                        return ['status' => 411, 'body' => '<html><title>Error 411 (Length Required)!!1</title></html>'];
+                    }
                     $have = strlen($this->drive[$id]['content']);
                     if ($have === (int) $m[1]) {
                         return ['status' => 200, 'body' => (string) json_encode(['id' => $id])];

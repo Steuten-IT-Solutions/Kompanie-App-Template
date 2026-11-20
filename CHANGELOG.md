@@ -281,6 +281,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Bilder und Videos nach Google Drive (WordPress)**: Eingereichte und hochgeladene Dateien einer Galerie mit
+  Google Drive blieben auf dem Server liegen, mit dem Hinweis „Das Hochladen ließ sich nicht fortsetzen: HTTP 411“.
+  Die App hat bei der Nachfrage, wie weit eine Datei angekommen ist, eine Angabe weggelassen, die Google verlangt. Jetzt
+  kommen die wartenden Dateien beim nächsten Lauf im Hintergrund nach Drive. Dasselbe betraf neue Versuche beim
+  Hochladen einer Sicherung nach einer Störung.
 - **Sicherung in Google Drive bei kurzen Störungen**: Meldet Google beim Hochladen einer Sicherung einen
   vorübergehenden Fehler (z. B. „HTTP 502“) oder bricht die Verbindung ab, versucht die App es nach kurzer Pause bis zu
   viermal erneut und macht dort weiter, wo die Datei angekommen ist. Vorher scheiterte die Sicherung sofort, und ein
