@@ -56,10 +56,12 @@ final class TileLayoutTest extends TestCase
         $this->assertSame(['page' => 'intern', 'layouts' => ['2' => $sorted]], json_decode((string) json_encode($res->data), true), 'nach Zeile und Spalte');
         $wide = [['id' => 'mitglieder', 'col' => 3, 'row' => 1, 'span' => 2]];
         $this->assertSame(200, $this->call($this->m, 'PUT', '/me/tiles', ['page' => 'intern', 'cols' => 4, 'tiles' => $wide])->status);
+        $five = [['id' => 'mitglieder', 'col' => 4, 'row' => 1, 'span' => 2]];
+        $this->assertSame(200, $this->call($this->m, 'PUT', '/me/tiles', ['page' => 'intern', 'cols' => 5, 'tiles' => $five])->status, '5 Spalten am Computer');
         $this->assertSame(200, $this->call($this->m, 'PUT', '/me/tiles', ['page' => 'einstellungen/betrieb', 'cols' => 3, 'tiles' => []])->status);
         $this->assertSame([
             'einstellungen/betrieb' => ['3' => []],
-            'intern' => ['2' => $sorted, '4' => $wide],
+            'intern' => ['2' => $sorted, '4' => $wide, '5' => $five],
         ], $this->layouts($this->m), 'andere Spaltenzahl kommt dazu');
         $this->assertSame([], $this->layouts($this->admin), 'je Konto');
 
@@ -107,7 +109,7 @@ final class TileLayoutTest extends TestCase
         $t = ['id' => 'termine', 'col' => 1, 'row' => 1, 'span' => 1];
         yield 'unbekannte Seite' => [['page' => 'meins', 'cols' => 2, 'tiles' => [$t]]];
         yield 'Seite fehlt' => [['cols' => 2, 'tiles' => [$t]]];
-        yield 'Spaltenzahl 5' => [['page' => 'intern', 'cols' => 5, 'tiles' => [$t]]];
+        yield 'Spaltenzahl 6' => [['page' => 'intern', 'cols' => 6, 'tiles' => [$t]]];
         yield 'Spaltenzahl als Text' => [['page' => 'intern', 'cols' => '2', 'tiles' => [$t]]];
         yield 'Kacheln fehlen' => [['page' => 'intern', 'cols' => 2]];
         yield 'zu breit' => [['page' => 'intern', 'cols' => 2, 'tiles' => [['span' => 2, 'col' => 2] + $t]]];

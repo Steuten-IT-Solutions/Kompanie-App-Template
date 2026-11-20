@@ -14,8 +14,9 @@
  *   dann Spalte) mit gekürzten Breiten, ohne Lücken.
  */
 
-export const GRID_COLUMNS = [2, 3, 4] as const;
+export const GRID_COLUMNS = [2, 3, 4, 5] as const;
 export type GridColumns = (typeof GRID_COLUMNS)[number];
+const MAX_COLUMNS = Math.max(...GRID_COLUMNS);
 
 /** Lage einer Kachel im Raster */
 export type TilePlace = { id: string; col: number; row: number; span: number };
@@ -26,10 +27,11 @@ export type TileLayouts = Partial<Record<string, TilePlace[]>>;
 /**
  * Spaltenzahl nach der Breite des Rasters selbst (CSS-Pixel): 2, ab 528 px 3 (so breit ist der Inhalt bei 560 px
  * Bildschirm, der früheren Grenze), ab 680 px 4 (vier Kacheln, in die lange Wörter wie „Beförderungen“ passen; erreicht
- * nur der Inhalt über die ganze Breite, z. B. Handy quer). Am Computer ist der Inhalt höchstens 640 px breit: 3 Spalten.
+ * nur der Inhalt über die ganze Breite, z. B. Handy quer), ab 840 px 5 (gleich breite Kacheln wie 4 bei 680 px). Am
+ * Computer sind Seiten mit Kacheln bis 904 px breit (styles.css): 5 Spalten ab etwa 900 px Fensterbreite.
  */
 export function columnsForWidth(width: number): GridColumns {
-  return width >= 680 ? 4 : width >= 528 ? 3 : 2;
+  return width >= 840 ? 5 : width >= 680 ? 4 : width >= 528 ? 3 : 2;
 }
 
 const valid = (t: TilePlace, cols: number) =>
@@ -86,7 +88,7 @@ export function resolveTiles(ids: string[], saved: TileLayouts | undefined, cols
         cols,
       );
     const seen = new Set<string>();
-    const ordered = [...other].filter((t) => valid(t, 4) && visible.has(t.id) && !seen.has(t.id) && seen.add(t.id)).sort(byPlace);
+    const ordered = [...other].filter((t) => valid(t, MAX_COLUMNS) && visible.has(t.id) && !seen.has(t.id) && seen.add(t.id)).sort(byPlace);
     const placed = flow(ordered, cols);
     return appendNew(placed, ids, cols);
   }
