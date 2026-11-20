@@ -2471,6 +2471,8 @@ export interface RankStatus {
   reachable_rank?: RankRef | null;
   threshold_reached_since?: string | null;
   below_current_threshold?: boolean;
+  /** Bald bereit: Schwelle noch nicht erreicht, es fehlt höchstens 1 Punkt */
+  soon?: boolean;
 }
 
 export interface RankHistoryEntry {

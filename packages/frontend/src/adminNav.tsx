@@ -430,10 +430,11 @@ export function AdminIcon({ id }: { id: string }) {
 
 /** Startseite der Verwaltung: je Bereich ein Knopf mit Symbol; mit group die Bereiche unter „Einrichtungen“. */
 export function AdminMenu({ group }: { group?: string }) {
-  const due = usePromotionsDue();
+  const promotion = usePromotionsDue();
   useAdminCounts(!group);
   const counts = {
-    promotions: due,
+    promotions: promotion.due,
+    promotionsSoon: promotion.soon,
     registrations: config?.pendingRegistrations,
     reports: config?.openReports,
     admissions: config?.admissionsDue,

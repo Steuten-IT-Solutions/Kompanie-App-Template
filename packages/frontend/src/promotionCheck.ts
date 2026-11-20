@@ -1,6 +1,7 @@
 import type { Promotion } from './api';
 
 type Due = Pick<Promotion, 'points_to_next' | 'next_rank'>;
+type Soon = Due & Pick<Promotion, 'soon' | 'below_current_threshold'>;
 
 /** Schwelle des nächsten Dienstgrads erreicht: zur Beförderung bereit (ohne höheren Dienstgrad nie). */
 export function isDue(p: Due): boolean {
@@ -10,6 +11,19 @@ export function isDue(p: Due): boolean {
 /** Anzahl der Mitglieder, die zur Beförderung bereit sind (Zahl an der Kachel „Beförderungen“). */
 export function dueCount(list: Due[]): number {
   return list.filter(isDue).length;
+}
+
+/**
+ * Bald zur Beförderung bereit (zweiter Kreis an der Kachel, Abschnitt „Bald erreicht“): Der Server kennzeichnet, wem
+ * höchstens 1 Punkt zur Schwelle fehlt; wer schon bereit ist oder unter der eigenen Schwelle liegt, nie.
+ */
+export function isSoon(p: Soon): boolean {
+  return !!p.soon && !isDue(p) && !p.below_current_threshold;
+}
+
+/** Anzahl der Mitglieder, die bald zur Beförderung bereit sind. */
+export function soonCount(list: Soon[]): number {
+  return list.filter(isSoon).length;
 }
 
 export type NewlyDue = { user_id: number; name: string; rank: string };

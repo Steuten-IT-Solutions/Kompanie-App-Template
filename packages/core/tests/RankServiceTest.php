@@ -158,6 +158,36 @@ final class RankServiceTest extends TestCase
         $this->assertSame('Gefreiter', $this->call('GET', '/me')->data['rank']['title']);
     }
 
+    public function testSoonReadyWithAtMostOnePointMissing(): void
+    {
+        $this->setUpApp(['ranks' => true, 'points' => true]);
+        $r = $this->ranks([['Gefreiter', 10], ['Ehrenrang', null], ['Unteroffizier', 50]]);
+        $a = $this->users->add('anna', Roles::MEMBER);
+        $b = $this->users->add('bernd', Roles::MEMBER);
+        $c = $this->users->add('carla', Roles::MEMBER);
+        $this->points($a, 9, '2026-01-10');  // 1 zur 10 fehlt: bald
+        $this->points($b, 49, '2026-01-10'); // 1 zur 50 fehlt: bald
+        $this->points($c, 48, '2026-01-10'); // 2 fehlen: nicht bald
+        $this->points($this->m, 12, '2026-01-10'); // Schwelle erreicht: nicht bald, sondern bereit
+        foreach ([$b, $c] as $id) {
+            $this->assertSame(200, $this->call('PUT', "/members/$id/rank", ['rank_id' => $r['Gefreiter']])->status);
+        }
+
+        $soon = [];
+        foreach ($this->call('GET', '/promotions')->data as $row) {
+            $soon[$row['name']] = $row['soon'];
+        }
+        ksort($soon);
+        $this->assertSame(['Admin' => false, 'Anna' => true, 'Bernd' => true, 'Carla' => false, 'Mitglied' => false], $soon);
+
+        // Auch im Stand des Mitglieds; ohne nächsten Dienstgrad mit Schwelle nie.
+        $this->users->current = $b;
+        $this->assertTrue($this->call('GET', '/me/rank')->data['soon']);
+        $this->users->current = $this->admin;
+        $this->assertSame(200, $this->call('PATCH', '/ranks/' . $r['Unteroffizier'], ['min_points' => null])->status);
+        $this->assertFalse($this->call('GET', "/members/$b")->data['rank']['soon']);
+    }
+
     public function testCreateMemberWithInitialPointsAndRank(): void
     {
         $this->setUpApp(['ranks' => true, 'points' => true]);
