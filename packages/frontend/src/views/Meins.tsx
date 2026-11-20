@@ -133,50 +133,62 @@ function Uebersicht({ me }: { me: Me }) {
       <p className="muted small member-level">
         {(me.extra_roles ?? []).length > 0 ? 'Rollen' : 'Rolle'}: {roleLabels(me)}
       </p>
-      {((f?.points && can('view_own_points')) || (f?.penalties && can('view_own_penalties'))) && (
-        <div className="stats member-stats">
-          {f.points && can('view_own_points') && (
-            <StatCard label={sec.points} value={me.points.toLocaleString('de-DE')} tone="good" onClick={() => navigate('meins/punkte')} />
+      {/* Am Computer zwei Spalten wie beim Mitglied in der Verwaltung: links Kacheln, Titel und Daten, rechts Ämter */}
+      <div className="member-columns">
+        <div className="member-col">
+          {((f?.points && can('view_own_points')) || (f?.penalties && can('view_own_penalties'))) && (
+            <div className="stats member-stats">
+              {f.points && can('view_own_points') && (
+                <StatCard
+                  label={sec.points}
+                  value={me.points.toLocaleString('de-DE')}
+                  tone="good"
+                  onClick={() => navigate('meins/punkte')}
+                />
+              )}
+              {f.penalties && can('view_own_penalties') && (
+                <StatCard
+                  label="Offen"
+                  value={formatEuro(me.open_cents)}
+                  tone={me.open_cents > 0 ? 'warn' : 'good'}
+                  onClick={() => navigate('meins/strafen')}
+                />
+              )}
+            </div>
           )}
-          {f.penalties && can('view_own_penalties') && (
-            <StatCard
-              label="Offen"
-              value={formatEuro(me.open_cents)}
-              tone={me.open_cents > 0 ? 'warn' : 'good'}
-              onClick={() => navigate('meins/strafen')}
-            />
+          {f?.titles && me.titles !== undefined && (
+            <div className="card member-tile member-titles-tile my-titles">
+              <span className="member-tile-label">{sec.titles}</span>
+              <span className="member-tile-value">
+                {me.titles.length > 0 ? <TitleBadges titles={me.titles} /> : <span className="muted">Keine</span>}
+              </span>
+            </div>
+          )}
+          {(birthday.data || joinYear.data) && (
+            <ul className="card member-dates">
+              {birthday.data && (
+                <DateRow label="Geburtstag" onOpen={toAccount}>
+                  {birthday.data.birthday ? formatBirthday(birthday.data.birthday) : null}
+                </DateRow>
+              )}
+              {joinYear.data && (
+                <DateRow label="Eintritt" onOpen={profileChoice() ? toAccount : undefined}>
+                  {joinYear.data.join_year ? joinText(joinYear.data.join_year) : null}
+                </DateRow>
+              )}
+            </ul>
           )}
         </div>
-      )}
-      {f?.titles && me.titles !== undefined && (
-        <div className="card member-tile member-titles-tile my-titles">
-          <span className="member-tile-label">{sec.titles}</span>
-          <span className="member-tile-value">
-            {me.titles.length > 0 ? <TitleBadges titles={me.titles} /> : <span className="muted">Keine</span>}
-          </span>
+        <div className="member-col">
+          {offices && (
+            <section className="member-offices">
+              <h3 className="section-title">{sec.offices}</h3>
+              <PersonOffices userId={config!.user!.id} empty={`Du hast keine ${sec.offices} eingetragen.`} />
+            </section>
+          )}
+          {config?.features.attendance && <MyAdmission />}
         </div>
-      )}
-      {(birthday.data || joinYear.data) && (
-        <ul className="card member-dates">
-          {birthday.data && (
-            <DateRow label="Geburtstag" onOpen={toAccount}>
-              {birthday.data.birthday ? formatBirthday(birthday.data.birthday) : null}
-            </DateRow>
-          )}
-          {joinYear.data && (
-            <DateRow label="Eintritt" onOpen={profileChoice() ? toAccount : undefined}>
-              {joinYear.data.join_year ? joinText(joinYear.data.join_year) : null}
-            </DateRow>
-          )}
-        </ul>
-      )}
-      {offices && (
-        <section className="member-offices">
-          <h3 className="section-title">{sec.offices}</h3>
-          <PersonOffices userId={config!.user!.id} empty={`Du hast keine ${sec.offices} eingetragen.`} />
-        </section>
-      )}
-      {config?.features.attendance && <MyAdmission />}
+      </div>
     </div>
   );
 }

@@ -1081,170 +1081,186 @@ function MemberDetailView({
       )}
       {roleLine(m) && <p className="muted small member-level">{roleLine(m)}</p>}
 
-      {(seePoints() || seePenalties()) && (
-        <div className="stats member-stats">
-          {seePoints() && (
-            <StatCard label={sec.points} value={(m.points ?? 0).toLocaleString('de-DE')} tone="good" onClick={() => openSheet('punkte')} />
+      {/* Am Computer zwei Spalten (styles.css „Breite Ansicht“): links Kacheln, Titel, Kompanien und Daten, rechts
+          Anwesenheit, Ämter, persönliche Angaben und Konto. Auf dem Handy untereinander (display: contents). */}
+      <div className="member-columns">
+        <div className="member-col">
+          {(seePoints() || seePenalties()) && (
+            <div className="stats member-stats">
+              {seePoints() && (
+                <StatCard
+                  label={sec.points}
+                  value={(m.points ?? 0).toLocaleString('de-DE')}
+                  tone="good"
+                  onClick={() => openSheet('punkte')}
+                />
+              )}
+              {seePenalties() && (
+                <StatCard
+                  label="Offen"
+                  value={formatEuro(m.open_cents ?? 0)}
+                  tone={(m.open_cents ?? 0) > 0 ? 'warn' : 'good'}
+                  onClick={() => openSheet('strafen')}
+                />
+              )}
+            </div>
           )}
-          {seePenalties() && (
-            <StatCard
-              label="Offen"
-              value={formatEuro(m.open_cents ?? 0)}
-              tone={(m.open_cents ?? 0) > 0 ? 'warn' : 'good'}
-              onClick={() => openSheet('strafen')}
-            />
+
+          {titlesOn && (
+            <button type="button" className="card member-tile member-titles-tile" onClick={() => openSheet('titel')}>
+              <span className="member-tile-label">{sec.titles}</span>
+              <span className="member-tile-value">
+                {(m.titles ?? []).length > 0 ? <TitleBadges titles={m.titles} /> : <span className="muted">Keine</span>}
+              </span>
+              <span className="chevron" aria-hidden="true">
+                ›
+              </span>
+            </button>
+          )}
+
+          {companiesOn && (
+            <button type="button" className="card member-tile member-companies-tile" onClick={() => openSheet('kompanien')}>
+              <span className="member-tile-label">{sec.companies}</span>
+              <span className="member-tile-value">
+                {(m.companies ?? []).length > 0 ? (
+                  (m.companies ?? []).map((c) => c.short_name || c.name).join(', ')
+                ) : (
+                  <span className="muted">Keine</span>
+                )}
+              </span>
+              <span className="chevron" aria-hidden="true">
+                ›
+              </span>
+            </button>
+          )}
+
+          {((birthdayOn && !birthdayPersonal) || joinOn || !!m.former || formerEditable) && (
+            <ul className="card member-dates">
+              {birthdayOn && !birthdayPersonal && (
+                <DateRow label="Geburtstag" onOpen={() => openSheet('geburtstag')}>
+                  {m.birthday ? formatBirthday(m.birthday) : null}
+                </DateRow>
+              )}
+              {joinOn && (
+                <DateRow label="Eintritt" onOpen={can('create_users') ? () => openSheet('eintritt') : undefined}>
+                  {m.join_year ? joinText(m.join_year) : null}
+                </DateRow>
+              )}
+              {m.former && (
+                <DateRow label="Eintritt" onOpen={formerEditable ? () => openSheet('austritt') : undefined}>
+                  {[m.former.founder && 'Gründungsmitglied', m.former.joined_on && formatYearOrDate(m.former.joined_on)]
+                    .filter(Boolean)
+                    .join(' · ') || null}
+                </DateRow>
+              )}
+              {(m.former || formerEditable) && (
+                <DateRow label="Austritt" onOpen={formerEditable ? () => openSheet('austritt') : undefined}>
+                  {m.former
+                    ? `${REASON_OPTIONS[m.former.reason]}${m.former.left_on ? ` ${formatYearOrDate(m.former.left_on)}` : ''}`
+                    : null}
+                </DateRow>
+              )}
+            </ul>
           )}
         </div>
-      )}
+        <div className="member-col">
+          {attendanceOn && m.attendance && (
+            <MemberAttendance
+              key={m.id}
+              data={m.attendance}
+              open={sheet === 'anwesenheit'}
+              onOpen={() => openSheet('anwesenheit')}
+              onClose={closeSheet}
+            />
+          )}
 
-      {titlesOn && (
-        <button type="button" className="card member-tile member-titles-tile" onClick={() => openSheet('titel')}>
-          <span className="member-tile-label">{sec.titles}</span>
-          <span className="member-tile-value">
-            {(m.titles ?? []).length > 0 ? <TitleBadges titles={m.titles} /> : <span className="muted">Keine</span>}
-          </span>
-          <span className="chevron" aria-hidden="true">
-            ›
-          </span>
-        </button>
-      )}
+          {officesOn && (
+            <section className="member-offices">
+              <h3 className="section-title">{sec.offices}</h3>
+              <PersonOffices userId={m.id} empty={`Keine ${sec.offices} eingetragen.`} to={(other) => `verwaltung/mitglied/${other}`} />
+            </section>
+          )}
 
-      {companiesOn && (
-        <button type="button" className="card member-tile member-companies-tile" onClick={() => openSheet('kompanien')}>
-          <span className="member-tile-label">{sec.companies}</span>
-          <span className="member-tile-value">
-            {(m.companies ?? []).length > 0 ? (
-              (m.companies ?? []).map((c) => c.short_name || c.name).join(', ')
-            ) : (
-              <span className="muted">Keine</span>
+          {m.personal && (
+            <PersonalPanel
+              id={m.id}
+              personal={m.personal}
+              self={self}
+              birthday={
+                birthdayPersonal
+                  ? { text: m.birthday ? formatBirthday(m.birthday) : null, onOpen: () => openSheet('geburtstag') }
+                  : undefined
+              }
+              onChanged={reload}
+              onToast={onToast}
+            />
+          )}
+
+          <FoldSection
+            id="member-account"
+            className="member-account"
+            title="Konto und Rolle"
+            open={accountOpen}
+            onToggle={() => setAccountOpen((o) => !o)}
+          >
+            {/* Ehemalige: Rolle, Rechte und Passwort erst nach „Wieder aufnehmen“ */}
+            {!m.former && (
+              <RoleControl id={m.id} level={m.level} extra={m.extra_roles ?? []} member={m.member} onChanged={reload} onToast={onToast} />
             )}
-          </span>
-          <span className="chevron" aria-hidden="true">
-            ›
-          </span>
-        </button>
-      )}
-
-      {((birthdayOn && !birthdayPersonal) || joinOn || !!m.former || formerEditable) && (
-        <ul className="card member-dates">
-          {birthdayOn && !birthdayPersonal && (
-            <DateRow label="Geburtstag" onOpen={() => openSheet('geburtstag')}>
-              {m.birthday ? formatBirthday(m.birthday) : null}
-            </DateRow>
-          )}
-          {joinOn && (
-            <DateRow label="Eintritt" onOpen={can('create_users') ? () => openSheet('eintritt') : undefined}>
-              {m.join_year ? joinText(m.join_year) : null}
-            </DateRow>
-          )}
-          {m.former && (
-            <DateRow label="Eintritt" onOpen={formerEditable ? () => openSheet('austritt') : undefined}>
-              {[m.former.founder && 'Gründungsmitglied', m.former.joined_on && formatYearOrDate(m.former.joined_on)]
-                .filter(Boolean)
-                .join(' · ') || null}
-            </DateRow>
-          )}
-          {(m.former || formerEditable) && (
-            <DateRow label="Austritt" onOpen={formerEditable ? () => openSheet('austritt') : undefined}>
-              {m.former ? `${REASON_OPTIONS[m.former.reason]}${m.former.left_on ? ` ${formatYearOrDate(m.former.left_on)}` : ''}` : null}
-            </DateRow>
-          )}
-        </ul>
-      )}
-
-      {attendanceOn && m.attendance && (
-        <MemberAttendance
-          key={m.id}
-          data={m.attendance}
-          open={sheet === 'anwesenheit'}
-          onOpen={() => openSheet('anwesenheit')}
-          onClose={closeSheet}
-        />
-      )}
-
-      {officesOn && (
-        <section className="member-offices">
-          <h3 className="section-title">{sec.offices}</h3>
-          <PersonOffices userId={m.id} empty={`Keine ${sec.offices} eingetragen.`} to={(other) => `verwaltung/mitglied/${other}`} />
-        </section>
-      )}
-
-      {m.personal && (
-        <PersonalPanel
-          id={m.id}
-          personal={m.personal}
-          self={self}
-          birthday={
-            birthdayPersonal ? { text: m.birthday ? formatBirthday(m.birthday) : null, onOpen: () => openSheet('geburtstag') } : undefined
-          }
-          onChanged={reload}
-          onToast={onToast}
-        />
-      )}
-
-      <FoldSection
-        id="member-account"
-        className="member-account"
-        title="Konto und Rolle"
-        open={accountOpen}
-        onToggle={() => setAccountOpen((o) => !o)}
-      >
-        {/* Ehemalige: Rolle, Rechte und Passwort erst nach „Wieder aufnehmen“ */}
-        {!m.former && (
-          <RoleControl id={m.id} level={m.level} extra={m.extra_roles ?? []} member={m.member} onChanged={reload} onToast={onToast} />
-        )}
-        {m.rights && (
-          <MemberRightsPanel
-            key={`${roleLabels(m)}:${JSON.stringify(m.rights)}`}
-            id={m.id}
-            name={m.name}
-            roles={roleLabels(m)}
-            plural={(m.extra_roles ?? []).length > 0}
-            rights={m.rights}
-            onChanged={reload}
-            onToast={onToast}
-          />
-        )}
-        {/* Aufnahme mit „Anwärter seit“ und Stand der Voraussetzung; ältere Server ohne admission: nur der Knopf */}
-        {m.admission !== undefined
-          ? m.admission && (
-              <MemberAdmission key={JSON.stringify(m.admission)} admission={m.admission} onChanged={reload} onToast={onToast} />
-            )
-          : roleInfo(m.level)?.promotable &&
-            can('create_users') && (
-              <button
-                className="btn btn-block promote-candidate"
-                disabled={busy}
-                onClick={async () =>
-                  (await confirmAsk(`${m.name} als ${levelLabel('member')} aufnehmen?`)) &&
-                  run(() => api.promote(m.id), `${m.name} ist jetzt ${levelLabel('member')}`)
-                }
-              >
-                Als {levelLabel('member')} aufnehmen
+            {m.rights && (
+              <MemberRightsPanel
+                key={`${roleLabels(m)}:${JSON.stringify(m.rights)}`}
+                id={m.id}
+                name={m.name}
+                roles={roleLabels(m)}
+                plural={(m.extra_roles ?? []).length > 0}
+                rights={m.rights}
+                onChanged={reload}
+                onToast={onToast}
+              />
+            )}
+            {/* Aufnahme mit „Anwärter seit“ und Stand der Voraussetzung; ältere Server ohne admission: nur der Knopf */}
+            {m.admission !== undefined
+              ? m.admission && (
+                  <MemberAdmission key={JSON.stringify(m.admission)} admission={m.admission} onChanged={reload} onToast={onToast} />
+                )
+              : roleInfo(m.level)?.promotable &&
+                can('create_users') && (
+                  <button
+                    className="btn btn-block promote-candidate"
+                    disabled={busy}
+                    onClick={async () =>
+                      (await confirmAsk(`${m.name} als ${levelLabel('member')} aufnehmen?`)) &&
+                      run(() => api.promote(m.id), `${m.name} ist jetzt ${levelLabel('member')}`)
+                    }
+                  >
+                    Als {levelLabel('member')} aufnehmen
+                  </button>
+                )}
+            {/* Vorschau mit den Rechten dieser Person (alle Rollen zusammen); nur Admins, nicht für Admins selbst. */}
+            {config?.user?.level === 'admin' && !self && m.level !== 'admin' && (
+              <button type="button" className="btn btn-secondary btn-block member-preview-start" onClick={() => startPersonPreview(m.id)}>
+                App als {m.name} ansehen
               </button>
             )}
-        {/* Vorschau mit den Rechten dieser Person (alle Rollen zusammen); nur Admins, nicht für Admins selbst. */}
-        {config?.user?.level === 'admin' && !self && m.level !== 'admin' && (
-          <button type="button" className="btn btn-secondary btn-block member-preview-start" onClick={() => startPersonPreview(m.id)}>
-            App als {m.name} ansehen
-          </button>
-        )}
-        {!m.former && <ResetPassword id={m.id} name={m.name} level={m.level} noAccess={!!m.no_access} onToast={onToast} />}
-        {/* Gäste gehören nicht zur Kompanie. */}
-        {formerEditable && formerPanel(false)}
-        {/* Das eigene Konto ohne Löschen; E-Mail auch unter Meins → Konto. */}
-        {can('view_accounts') && (
-          <AccountPanel
-            id={m.id}
-            level={m.level}
-            former={!!m.former}
-            self={self}
-            readOnly={!can('create_users')}
-            onChanged={reload}
-            onToast={onToast}
-          />
-        )}
-      </FoldSection>
+            {!m.former && <ResetPassword id={m.id} name={m.name} level={m.level} noAccess={!!m.no_access} onToast={onToast} />}
+            {/* Gäste gehören nicht zur Kompanie. */}
+            {formerEditable && formerPanel(false)}
+            {/* Das eigene Konto ohne Löschen; E-Mail auch unter Meins → Konto. */}
+            {can('view_accounts') && (
+              <AccountPanel
+                id={m.id}
+                level={m.level}
+                former={!!m.former}
+                self={self}
+                readOnly={!can('create_users')}
+                onChanged={reload}
+                onToast={onToast}
+              />
+            )}
+          </FoldSection>
+        </div>
+      </div>
 
       {sheet === 'punkte' && seePoints() && (
         <Sheet title={sec.points} onClose={closeSheet} routed>
