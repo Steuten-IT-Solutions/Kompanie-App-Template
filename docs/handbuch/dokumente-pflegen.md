@@ -56,6 +56,9 @@ Die alte Datei wird dabei gelöscht. Passt der Stand nicht mehr, ändere ihn dan
 
 In dieser Reihenfolge stehen die Kategorien auch bei den {rolle.member}n.
 
+### Namen auch auf Englisch
+Hat der Admin unter **Einstellungen → Sprachen** Englisch eingeschaltet, steht beim Hochladen und Bearbeiten unter den Feldern der aufklappbare Abschnitt **Auf English schreiben (freiwillig)** mit **Titel auf English**. Bei jeder Kategorie gibt es den Knopf **Auf English**: Trage dort den englischen Namen ein und bestätige. Wer die App auf Englisch nutzt, sieht diese Namen; ohne Eintrag erscheint der deutsche. Die Datei selbst ist für alle Sprachen dieselbe. Benutzt du die App selbst auf Englisch, siehst und bearbeitest du hier trotzdem die deutschen Namen.
+
 ## Gut zu wissen
 - Erlaubt sind PDF, Word, Excel, PowerPoint, OpenDocument sowie JPG- und PNG-Bilder, höchstens 20 MB. Nimmt der Server nur kleinere Dateien an, steht die Grenze unter dem Formular.
 - Der Titel darf höchstens 191 Zeichen lang sein. Zwei Kategorien dürfen nicht gleich heißen.

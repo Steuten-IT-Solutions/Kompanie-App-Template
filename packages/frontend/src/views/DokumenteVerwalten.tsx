@@ -10,6 +10,13 @@ import { ACCEPT, DocGroupSection, DocSortSelect, typeLabel, useDocSort, useOpenG
 import { confirmAsk, promptAsk } from '../ask';
 import { IconButton } from '../icons';
 import { t, tn } from '../i18n';
+import { LANGUAGE_NAMES } from '../language';
+import { extraLocales, fieldTranslationsInput, FieldTranslationsEditor, type FieldTranslations } from '../translationFields';
+
+/** Titel je weitere Sprache (Plan „Mehrsprachigkeit“, PR 9e) */
+const TITLE_FIELD = [{ key: 'title', label: (language: string) => t('Titel auf {language}', { language }), maxLength: 191 }];
+const titleInput = (value: FieldTranslations | undefined, before?: FieldTranslations) =>
+  fieldTranslationsInput(['title'], value ?? {}, before);
 
 const sec = brand.labels.sections;
 
@@ -64,6 +71,15 @@ function MetaFields({
           </select>
         </label>
       </div>
+      <FieldTranslationsEditor
+        fields={TITLE_FIELD}
+        german={{ title: meta.title }}
+        value={(meta.translations ?? {}) as FieldTranslations}
+        onChange={(translations) => onChange({ ...meta, translations })}
+        hint={(language) =>
+          t('Wer die App auf {language} nutzt, sieht diesen Titel. Bleibt er leer, erscheint der deutsche.', { language })
+        }
+      />
     </>
   );
 }
@@ -86,12 +102,13 @@ const titleFromFile = (name: string) =>
 
 /** Wer Dokumente pflegt (manage_documents), verwaltet hier alle Dokumente und ihre Kategorien. */
 export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string) => void }) {
-  const { data, error, loading, reload, setData } = useAsync(api.documents, [], 'documents');
+  // Zum Bearbeiten die deutschen Namen samt Fassungen je Sprache
+  const { data, error, loading, reload, setData } = useAsync(api.documentsSource, [], 'documents-source');
   const fileInput = useRef<HTMLInputElement>(null);
   const replaceInput = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [meta, setMeta] = useState<DocumentMeta>({ title: '', category_id: null, date: todayYmd(), visibility: 'members' });
-  const [editing, setEditing] = useState<{ id: number; meta: DocumentMeta } | null>(null);
+  const [editing, setEditing] = useState<{ id: number; meta: DocumentMeta; before?: FieldTranslations } | null>(null);
   const [replacing, setReplacing] = useState<DocumentInfo | null>(null);
   const [newCategory, setNewCategory] = useState('');
   const [busy, setBusy] = useState(false);
@@ -148,12 +165,16 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
     if (!meta.date) return setFormError(t('Bitte den Stand angeben.'));
     setBusy(true);
     try {
-      await api.createDocument(file, { ...meta, title: meta.title.trim() });
+      await api.createDocument(file, {
+        ...meta,
+        title: meta.title.trim(),
+        translations: titleInput(meta.translations as FieldTranslations),
+      });
       onToast(t('„{title}“ hochgeladen', { title: meta.title.trim() }));
       // Kategorie des neuen Dokuments aufklappen, damit man das Ergebnis sieht.
       show(docGroupKey(meta.category_id, categories));
       setFile(null);
-      setMeta((m) => ({ ...m, title: '' }));
+      setMeta((m) => ({ ...m, title: '', translations: {} }));
       if (fileInput.current) fileInput.current.value = '';
       reload();
     } catch (err) {
@@ -182,7 +203,10 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
     e.preventDefault();
     if (!editing) return;
     if (!editing.meta.title.trim()) return onToast(t('Bitte einen Titel angeben.'));
-    if (await run(() => api.updateDocument(editing.id, { ...editing.meta, title: editing.meta.title.trim() }), t('Gespeichert'))) {
+    const translations = titleInput(editing.meta.translations as FieldTranslations, editing.before ?? {});
+    if (
+      await run(() => api.updateDocument(editing.id, { ...editing.meta, title: editing.meta.title.trim(), translations }), t('Gespeichert'))
+    ) {
       // Wurde die Kategorie geändert, ist danach die neue aufgeklappt.
       show(docGroupKey(editing.meta.category_id, categories));
       setEditing(null);
@@ -239,7 +263,7 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
                 editing?.id === doc.id ? (
                   <li key={doc.id} className="card">
                     <form className="form doc-edit" onSubmit={saveEdit}>
-                      <MetaFields meta={editing.meta} categories={categories} onChange={(m) => setEditing({ id: doc.id, meta: m })} />
+                      <MetaFields meta={editing.meta} categories={categories} onChange={(m) => setEditing({ ...editing, meta: m })} />
                       <div className="button-row">
                         <button className="btn" type="submit" disabled={busy}>
                           {t('Speichern')}
@@ -267,7 +291,14 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
                           onClick={() =>
                             setEditing({
                               id: doc.id,
-                              meta: { title: doc.title, category_id: doc.category_id, date: doc.date, visibility: doc.visibility },
+                              meta: {
+                                title: doc.title,
+                                category_id: doc.category_id,
+                                date: doc.date,
+                                visibility: doc.visibility,
+                                translations: doc.translations ?? {},
+                              },
+                              before: (doc.translations ?? {}) as FieldTranslations,
                             })
                           }
                         />
@@ -339,6 +370,24 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
                   >
                     {t('Umbenennen')}
                   </button>
+                  {extraLocales().map((lang) => (
+                    <button
+                      key={lang}
+                      className="btn btn-small btn-secondary"
+                      disabled={busy}
+                      onClick={async () => {
+                        const language = LANGUAGE_NAMES[lang];
+                        const next = await promptAsk(
+                          t('Name der Kategorie auf {language} (leer: der deutsche „{title}“)', { language, title: c.title }),
+                          c.translations?.[lang]?.title ?? '',
+                        );
+                        if (next !== null)
+                          run(() => api.updateDocCategory(c.id, null, { [lang]: { title: next.trim() } }), t('Kategorie umbenannt'));
+                      }}
+                    >
+                      {t('Auf {language}', { language: LANGUAGE_NAMES[lang] })}
+                    </button>
+                  ))}
                   <IconButton
                     icon="delete"
                     label={t('Löschen')}

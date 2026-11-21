@@ -256,6 +256,61 @@ final class ContentTranslations
         return $out;
     }
 
+    /**
+     * Titel je weitere Sprache aus einer Anfrage (translations: {Sprache: {title}}; Plan „Mehrsprachigkeit“, PR 9e:
+     * Namen von Dokumenten, Kategorien, Alben). '' löscht, länger als $max → 400.
+     *
+     * @return array<string, array{title: string}>
+     */
+    public function titlesInput(mixed $in, int $max): array
+    {
+        $out = [];
+        foreach ($this->input($in) as $locale => $fields) {
+            if (!array_key_exists('title', $fields)) {
+                continue;
+            }
+            $title = is_scalar($fields['title']) ? Text::line((string) $fields['title'], $max + 1) : '';
+            if (mb_strlen($title) > $max) {
+                throw ApiError::invalid(I18n::t('Der Titel darf höchstens {max} Zeichen lang sein.', ['max' => $max]));
+            }
+            $out[$locale] = ['title' => $title];
+        }
+        return $out;
+    }
+
+    /** @param array<string, array<string, string>> $byLocale Sprache => Feld => Text */
+    public function saveAll(string $kind, int $id, array $byLocale, int $by): void
+    {
+        foreach ($byLocale as $locale => $fields) {
+            $this->save($kind, $id, $locale, $fields, $by);
+        }
+    }
+
+    /**
+     * Titel in der Sprache der Anfrage (fehlt er dort, der deutsche).
+     *
+     * @param array<string, array<string, string>> $tr Fassungen des Inhalts
+     */
+    public function titleIn(array $tr, string $german): string
+    {
+        $locale = $this->current();
+        return $locale !== null && ($tr[$locale]['title'] ?? '') !== '' ? $tr[$locale]['title'] : $german;
+    }
+
+    /**
+     * Titel aller eingeschalteten weiteren Sprachen für die Pflege ('' = deutsch).
+     *
+     * @param array<string, array<string, string>> $tr
+     */
+    public function titlesSource(array $tr): object
+    {
+        $out = [];
+        foreach ($this->locales() as $locale) {
+            $out[$locale] = ['title' => $tr[$locale]['title'] ?? ''];
+        }
+        return (object) $out;
+    }
+
     /** Hinweis für die Antwort aus übersetzbaren und übersetzten Feldern: null (alles da), NONE oder PARTLY. */
     public static function untranslated(int $total, int $done): ?string
     {

@@ -32,6 +32,8 @@ final class GalleryUploadService
 {
     public const ALBUM_PREFIX = 'app:';
     public const TITLE_MAX = 120;
+    /** Art in der Tabelle translations: Titel eines Albums je Sprache (Plan „Mehrsprachigkeit“, PR 9e) */
+    public const KIND = 'album';
     /** Höchstens so viele Bilder auf einmal verschieben oder löschen. */
     public const BATCH_MAX = 500;
     /** Erlaubte Endungen und der Anfang der Datei. */
@@ -58,7 +60,10 @@ final class GalleryUploadService
     /** @return list<array<string, mixed>> */
     public function albums(): array
     {
-        return array_map(fn (array $a): array => [
+        $rows = $this->repo()->adminAlbums();
+        $content = $this->app->contentTranslations();
+        $tr = $content->locales() !== [] ? $content->ofMany(self::KIND, array_map(static fn (array $a): int => (int) $a['id'], $rows)) : [];
+        return array_map(fn (array $a): array => $this->withTranslations((int) $a['id'], $tr[(int) $a['id']] ?? [], [
             'id' => (int) $a['id'],
             'title' => (string) $a['title'],
             'year' => (string) $a['year'],
@@ -66,7 +71,20 @@ final class GalleryUploadService
             'editable' => (string) $a['source'] === 'app' || $this->app->galleryDrive()->active(),
             'uploads' => (int) $a['upload_cnt'],
             'drive_photos' => (int) $a['drive_cnt'],
-        ], $this->repo()->adminAlbums());
+        ]), $rows);
+    }
+
+    /**
+     * Zum Bearbeiten: deutscher Titel, mit weiteren Sprachen dazu translations ({Sprache: {title}}, '' = deutsch).
+     *
+     * @param array<string, array<string, string>> $tr
+     * @param array<string, mixed> $album
+     * @return array<string, mixed>
+     */
+    private function withTranslations(int $id, array $tr, array $album): array
+    {
+        $content = $this->app->contentTranslations();
+        return $content->locales() !== [] ? $album + ['translations' => $content->titlesSource($tr)] : $album;
     }
 
     /** @return array<string, mixed> Album mit seinen hochgeladenen Bildern */
@@ -74,7 +92,7 @@ final class GalleryUploadService
     {
         $album = $this->repo()->album($id) ?? throw ApiError::notFound(I18n::t('Album nicht gefunden.'));
         $gallery = $this->app->gallery();
-        return [
+        return $this->withTranslations($id, $this->app->contentTranslations()->of(self::KIND, $id), [
             'id' => (int) $album['id'],
             'title' => (string) $album['title'],
             'year' => (string) $album['year'],
@@ -90,7 +108,7 @@ final class GalleryUploadService
                 'status' => (string) $p['status'],
                 'error' => (string) $p['error'],
             ], $this->repo()->uploads($id)),
-        ];
+        ]);
     }
 
     /** Lässt sich das Bild in der App ändern? Hochgeladene immer, aus Drive mit Drive als Ablage. */
@@ -100,11 +118,12 @@ final class GalleryUploadService
     }
 
     /** @return array<string, mixed> */
-    public function createAlbum(mixed $in): array
+    public function createAlbum(mixed $in, int $by = 0): array
     {
         $in = is_array($in) ? $in : [];
         $title = $this->validTitle($in['title'] ?? null);
         $year = $this->validYear($in['year'] ?? null);
+        $translations = $this->app->contentTranslations()->titlesInput($in['translations'] ?? null, self::TITLE_MAX);
         $now = $this->app->time()->nowUtc();
         $drive = $this->app->galleryDrive();
         $folder = null;
@@ -127,14 +146,16 @@ final class GalleryUploadService
             }
             return $repo->insertAlbum(['drive_id' => $folder ?? self::ALBUM_PREFIX . bin2hex(random_bytes(12))] + $data);
         });
+        $this->app->contentTranslations()->saveAll(self::KIND, $id, $translations, $by);
         return $this->album($id);
     }
 
     /** @return array<string, mixed> */
-    public function updateAlbum(int $id, mixed $in): array
+    public function updateAlbum(int $id, mixed $in, int $by = 0): array
     {
         $album = $this->appAlbum($id);
         $in = is_array($in) ? $in : [];
+        $translations = $this->app->contentTranslations()->titlesInput($in['translations'] ?? null, self::TITLE_MAX);
         $data = [];
         if (array_key_exists('title', $in)) {
             $data['title'] = $this->validTitle($in['title']);
@@ -152,6 +173,7 @@ final class GalleryUploadService
         if ($data !== []) {
             $this->repo()->updateAlbum((int) $album['id'], $data);
         }
+        $this->app->contentTranslations()->saveAll(self::KIND, (int) $album['id'], $translations, $by);
         return $this->album($id);
     }
 
@@ -179,6 +201,7 @@ final class GalleryUploadService
         }
         $this->app->gallerySubmissions()->albumDeleted($id);
         $repo->deleteAlbum($id);
+        $this->app->contentTranslations()->delete(self::KIND, $id);
     }
 
     /**

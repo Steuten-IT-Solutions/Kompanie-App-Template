@@ -5,6 +5,8 @@ import { confirmAsk } from '../ask';
 import { InternToggle } from '../galleryIntern';
 import { VIDEO_ACCEPT, countFiles, isVideoFile, uploadAlbumVideo } from '../videoUpload';
 import { t } from '../i18n';
+import { AlbumTitleTranslations, albumTitleInput } from '../galleryManage';
+import type { FieldTranslations } from '../translationFields';
 
 /**
  * Alben der App und hochgeladene Bilder (Issue #285), unter Einstellungen → Galerie: Album anlegen (nur in der App),
@@ -14,6 +16,7 @@ import { t } from '../i18n';
 export default function GalleryAlbums({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload } = useAsync(api.galleryAlbums, []);
   const [title, setTitle] = useState('');
+  const [titles, setTitles] = useState<FieldTranslations>({});
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -23,8 +26,9 @@ export default function GalleryAlbums({ onToast }: { onToast: (msg: string) => v
     setBusy(true);
     setFormError(null);
     try {
-      const a = await api.createGalleryAlbum({ title: title.trim(), year: Number(year) });
+      const a = await api.createGalleryAlbum({ title: title.trim(), year: Number(year), translations: albumTitleInput(titles) });
       setTitle('');
+      setTitles({});
       onToast(t('Album angelegt'));
       reload();
       setOpen(a.id);
@@ -76,6 +80,7 @@ export default function GalleryAlbums({ onToast }: { onToast: (msg: string) => v
           <span>{t('Titel')}</span>
           <input type="text" maxLength={120} value={title} onChange={(e) => setTitle(e.target.value)} required />
         </label>
+        <AlbumTitleTranslations german={title} value={titles} onChange={setTitles} />
         <label className="field">
           <span>{t('Jahr')}</span>
           <input type="number" min={1800} value={year} onChange={(e) => setYear(e.target.value)} required />
@@ -117,6 +122,7 @@ function AlbumUploads({
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [title, setTitle] = useState(album.title);
+  const [titles, setTitles] = useState<FieldTranslations>((album.translations ?? {}) as FieldTranslations);
   const [year, setYear] = useState(album.year);
 
   async function upload(files: File[]) {
@@ -252,7 +258,10 @@ function AlbumUploads({
           className="form gallery-album-edit"
           onSubmit={async (e) => {
             e.preventDefault();
-            if (await run(() => api.updateGalleryAlbum(album.id, { title: title.trim(), year: Number(year) }), t('Gespeichert')))
+            const translations = albumTitleInput(titles, (album.translations ?? {}) as FieldTranslations);
+            if (
+              await run(() => api.updateGalleryAlbum(album.id, { title: title.trim(), year: Number(year), translations }), t('Gespeichert'))
+            )
               onChanged();
           }}
         >
@@ -260,6 +269,7 @@ function AlbumUploads({
             <span>{t('Titel des Albums')}</span>
             <input type="text" maxLength={120} value={title} onChange={(e) => setTitle(e.target.value)} required />
           </label>
+          <AlbumTitleTranslations german={title} value={titles} onChange={setTitles} />
           <label className="field">
             <span>{t('Jahr des Albums')}</span>
             <input type="number" min={1800} value={year} onChange={(e) => setYear(e.target.value)} required />

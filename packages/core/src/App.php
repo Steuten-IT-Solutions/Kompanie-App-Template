@@ -1003,6 +1003,7 @@ final class App
             $this->scheduler,
             $this->cache,
             $this->mediaStore(),
+            fn (): ContentTranslations => $this->contentTranslations(),
         ));
     }
 

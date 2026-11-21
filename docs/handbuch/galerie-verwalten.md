@@ -57,6 +57,10 @@ Wähle sie wie oben aus und tippe auf **Nur für Mitglieder** (nur {rolle.member
 2. Ändere **Titel** oder **Jahr** und tippe auf **Speichern**.
    Mehrere Alben setzt du in der Übersicht in ein anderes Jahr: lange auf ein Album drücken, weitere antippen, **Jahr ändern**, Jahr eingeben, **Ändern**.
 
+### Den Titel eines Albums auch auf Englisch eintragen
+
+Hat der Admin unter **Einstellungen → Sprachen** Englisch eingeschaltet, steht unter **Album bearbeiten** (und beim Anlegen unter **Einstellungen → Galerie**) der aufklappbare Abschnitt **Auf English schreiben (freiwillig)** mit **Titel auf English**. Wer die App auf Englisch nutzt, sieht diesen Titel; bleibt er leer, erscheint der deutsche. Ein Album aus Google Drive behält in Drive den deutschen Namen.
+
 ### Ein Album löschen
 
 Tippe im Album auf **Album bearbeiten** und dann auf **Album löschen**, oder wähle in der Übersicht mit langem Drücken ein oder mehrere Alben und tippe auf **Löschen**. Die Rückfrage nennt, wie viele Bilder und Videos mitgelöscht werden.

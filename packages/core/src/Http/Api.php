@@ -1247,17 +1247,17 @@ final class Api
             new Route('POST', '/lists/{id}/sync-members', Cap::ManageLists, fn (Request $r) => $a->lists()->syncMembers($this->user(), $r->id(), Input::bool($r->input('apply'))), 'lists', $denyRights),
 
             // Dokumente (Issue #2): sichtbare für Mitglieder, Pflege mit manage_documents; Dateien Base64 im JSON
-            new Route('GET', '/documents', [Cap::ViewDocuments, Cap::ViewRestrictedDocuments], fn () => $a->documents()->list($a->viewer()), 'documents', $denyView),
+            new Route('GET', '/documents', [Cap::ViewDocuments, Cap::ViewRestrictedDocuments], fn (Request $r) => $a->documents()->list($a->viewer(), $r->queryFlag('source')), 'documents', $denyView),
             new Route('POST', '/documents', Cap::ManageDocuments, fn (Request $r) => Response::created($a->documents()->create($r->body, $this->user()->id)), 'documents', $denyRights),
-            new Route('PATCH', '/documents/{id}', Cap::ManageDocuments, fn (Request $r) => $a->documents()->update($r->id(), $r->body), 'documents', $denyRights),
+            new Route('PATCH', '/documents/{id}', Cap::ManageDocuments, fn (Request $r) => $a->documents()->update($r->id(), $r->body, $this->user()->id), 'documents', $denyRights),
             new Route('POST', '/documents/{id}/file', Cap::ManageDocuments, fn (Request $r) => $a->documents()->replaceFile($r->id(), $r->input('file'), $this->user()->id), 'documents', $denyRights),
             new Route('DELETE', '/documents/{id}', Cap::ManageDocuments, function (Request $r) use ($a) {
                 $a->documents()->delete($r->id());
                 return ['deleted' => true];
             }, 'documents', $denyRights),
-            new Route('POST', '/document-categories', Cap::ManageDocuments, fn (Request $r) => Response::created($a->documents()->createCategory($r->input('title'))), 'documents', $denyRights),
+            new Route('POST', '/document-categories', Cap::ManageDocuments, fn (Request $r) => Response::created($a->documents()->createCategory($r->input('title'), $r->input('translations'), $this->user()->id)), 'documents', $denyRights),
             new Route('PUT', '/document-categories/order', Cap::ManageDocuments, fn (Request $r) => $a->documents()->reorderCategories($r->input('ids')), 'documents', $denyRights),
-            new Route('PATCH', '/document-categories/{id}', Cap::ManageDocuments, fn (Request $r) => $a->documents()->renameCategory($r->id(), $r->input('title')), 'documents', $denyRights),
+            new Route('PATCH', '/document-categories/{id}', Cap::ManageDocuments, fn (Request $r) => $a->documents()->renameCategory($r->id(), $r->input('title'), $r->input('translations'), $this->user()->id), 'documents', $denyRights),
             new Route('DELETE', '/document-categories/{id}', Cap::ManageDocuments, function (Request $r) use ($a) {
                 $a->documents()->deleteCategory($r->id());
                 return ['deleted' => true];
@@ -1719,9 +1719,9 @@ final class Api
             new Route('POST', '/admin/gallery/sync', Cap::ManageSettings, fn (Request $r) => $a->settingsService()->syncGallery(Input::bool($r->input('only_process'))), null, $denySettings),
             // Alben der App und hochgeladene Bilder (Issue #285)
             new Route('GET', '/admin/gallery/albums', [Cap::ManageSettings, Cap::ManageGallery], fn () => ['albums' => $a->galleryUploads()->albums()], null, $denyRights),
-            new Route('POST', '/admin/gallery/albums', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => Response::created($a->galleryUploads()->createAlbum($r->body)), null, $denyRights),
+            new Route('POST', '/admin/gallery/albums', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => Response::created($a->galleryUploads()->createAlbum($r->body, $this->user()->id)), null, $denyRights),
             new Route('GET', '/admin/gallery/albums/{id}', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => $a->galleryUploads()->album($r->id()), null, $denyRights),
-            new Route('PATCH', '/admin/gallery/albums/{id}', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => $a->galleryUploads()->updateAlbum($r->id(), $r->body), null, $denyRights),
+            new Route('PATCH', '/admin/gallery/albums/{id}', [Cap::ManageSettings, Cap::ManageGallery], fn (Request $r) => $a->galleryUploads()->updateAlbum($r->id(), $r->body, $this->user()->id), null, $denyRights),
             new Route('DELETE', '/admin/gallery/albums/{id}', [Cap::ManageSettings, Cap::ManageGallery], function (Request $r) use ($a) {
                 $a->galleryUploads()->deleteAlbum($r->id());
                 return ['deleted' => true];

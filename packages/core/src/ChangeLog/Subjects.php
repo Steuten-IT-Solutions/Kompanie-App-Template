@@ -7,7 +7,9 @@ namespace KompanieApp\Core\ChangeLog;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Domain\AdmissionRule;
 use KompanieApp\Core\Domain\Blocks\Blocks;
+use KompanieApp\Core\Domain\DocumentService;
 use KompanieApp\Core\Domain\EventService;
+use KompanieApp\Core\Domain\GalleryUploadService;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\EventKindRepository;
@@ -335,8 +337,10 @@ final class Subjects
             'Spalten' => array_map(static fn (array $c): string => (string) ($c['label'] !== null && $c['label'] !== '' ? $c['label'] : $c['field']), $this->app->db->select('SELECT label, field FROM {list_columns} WHERE list_id = ? ORDER BY sort, id', [$r['id']])),
             'Zeilen' => $this->people($this->app->db->select('SELECT user_id, name FROM {list_rows} WHERE list_id = ? ORDER BY sort, id', [$r['id']])),
         ]);
-        $documents = $this->spec('Dokument', 'documents', 'title', ['title' => 'Titel', 'category_id' => ['Kategorie', 'lookup:doc_categories.title'], 'doc_date' => 'Datum', 'visibility' => 'Sichtbarkeit', 'ext' => 'Dateityp', 'version' => ['Datei', 'secret']]);
-        $docCategories = $this->spec('Kategorie der Dokumente', 'doc_categories', 'title', ['title' => 'Bezeichnung']);
+        $documents = $this->spec('Dokument', 'documents', 'title', ['title' => 'Titel', 'category_id' => ['Kategorie', 'lookup:doc_categories.title'], 'doc_date' => 'Datum', 'visibility' => 'Sichtbarkeit', 'ext' => 'Dateityp', 'version' => ['Datei', 'secret']],
+            extra: fn (array $r): array => $this->app->contentTranslations()->fieldsLog(DocumentService::KIND, (int) $r['id'], ['title' => 'Titel']));
+        $docCategories = $this->spec('Kategorie der Dokumente', 'doc_categories', 'title', ['title' => 'Bezeichnung'],
+            extra: fn (array $r): array => $this->app->contentTranslations()->fieldsLog(DocumentService::KIND_CATEGORY, (int) $r['id'], ['title' => 'Bezeichnung']));
         $board = $this->spec('Nachricht am Brett', 'board_messages', 'title', ['title' => 'Titel', 'blocks' => ['Inhalt', 'blocks'], 'expires_at' => 'Sichtbar bis', 'audience' => 'Für', 'audience_ids' => ['Für (Auswahl)', 'json']],
             extra: fn (array $r): array => $this->app->contentTranslations()->blocksLog('board', (int) $r['id'], Blocks::decode($r['blocks'] ?? null, (string) ($r['body'] ?? ''))));
         $polls = $this->spec('Umfrage', 'polls', 'title', [
@@ -359,7 +363,8 @@ final class Subjects
             'name' => 'Datei', 'user_id' => ['Von', 'user'], 'album_id' => ['Album', 'lookup:albums.title'], 'status' => 'Status', 'reason' => 'Begründung',
         ], subject: 'user_id');
         $photos = $this->spec('Bild der Galerie', 'photos', 'name', ['name' => 'Datei', 'album_id' => ['Album', 'lookup:albums.title'], 'is_intern' => ['Intern', 'bool']]);
-        $albums = $this->spec('Album', 'albums', 'title', ['title' => 'Titel', 'year' => 'Jahr', 'cover_photo_id' => ['Titelbild', 'lookup:photos.name']]);
+        $albums = $this->spec('Album', 'albums', 'title', ['title' => 'Titel', 'year' => 'Jahr', 'cover_photo_id' => ['Titelbild', 'lookup:photos.name']],
+            extra: fn (array $r): array => $this->app->contentTranslations()->fieldsLog(GalleryUploadService::KIND, (int) $r['id'], ['title' => 'Titel']));
         $mailings = $this->spec('E-Mail', 'mailings', 'subject', ['subject' => 'Betreff', 'body' => ['Text', 'html'], 'selection' => ['Empfänger', 'json']]);
         $reports = $this->spec('Fehlermeldung', 'report_inbox', static function (array $r): string {
             $report = json_decode((string) $r['report'], true);
