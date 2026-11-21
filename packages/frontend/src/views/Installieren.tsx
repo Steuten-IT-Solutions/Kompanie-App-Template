@@ -7,12 +7,12 @@ import {
   detectPlatform,
   installUrl,
   isInAppBrowser,
-  isSamsungInternet,
   isStandalone,
   promptInstall,
   useCanPrompt,
   type Platform,
 } from '../install';
+import { androidBrowser, BROWSER_NAMES, shortcutOnly, type AndroidBrowser } from '../androidBrowser';
 import { shareLink } from '../share';
 import { promptAsk } from '../ask';
 
@@ -323,10 +323,83 @@ function AndroidGuide() {
         }
         pic={<AndroidStep2 />}
       >
-        Je nach Handy heißt der Eintrag auch „Zum Startbildschirm hinzufügen“. Danach mit „Installieren“ bzw. „Hinzufügen“ bestätigen.
+        Je nach Handy und Chrome-Version heißt der Eintrag auch „Zum Startbildschirm hinzufügen“ oder ähnlich. Danach mit „Installieren“
+        bzw. „Hinzufügen“ bestätigen. Fragt Chrome „Installieren“ oder „Verknüpfung erstellen“: „Installieren“ wählen.
       </Step>
       <Step n={3} title={<>Fertig! Die App mit unserem Logo öffnen</>} pic={<HomeScreen label="Startbildschirm mit dem Logo der App" />} />
     </ol>
+  );
+}
+
+/** Was tun, wenn es auf Android nicht klappt (Quellen: docs/handbuch/app-installieren.md). */
+function AndroidTrouble() {
+  return (
+    <div className="card install-trouble stack">
+      <h3>Klappt es nicht?</h3>
+      <ul className="small">
+        <li>
+          <strong>Kein Eintrag zum Installieren:</strong> Ist die App schon installiert, bietet Chrome sie nicht noch einmal an. Sieh in der
+          Liste deiner Apps nach. Sonst die Seite einmal antippen, kurz warten und das Menü erneut öffnen.
+        </li>
+        <li>
+          <strong>Xiaomi, Redmi, POCO:</strong> Dort darf ein Browser erst Symbole auf den Startbildschirm legen, wenn du es erlaubst: in
+          den Einstellungen des Handys bei den Berechtigungen von Chrome „Verknüpfungen auf dem Startbildschirm“ einschalten.
+        </li>
+        <li>
+          <strong>Huawei ohne Google-Dienste:</strong> Ohne Google-Dienste legt Chrome nur eine Verknüpfung an, und Benachrichtigungen
+          können ausbleiben, weil sie über Google zugestellt werden.
+        </li>
+        <li>
+          <strong>Benachrichtigungen kommen nicht an:</strong> Manche Handys (z. B. Samsung, Xiaomi, Huawei) beenden Apps im Hintergrund, um
+          Akku zu sparen. Nimm Chrome und die App in den Akku-Einstellungen von der Optimierung aus.
+        </li>
+        <li>
+          <strong>Android 8 oder 9:</strong> Dort bekommt Chrome keine neuen Versionen mehr (letzte ist Chrome 138). Die App kann dann
+          eingeschränkt laufen.
+        </li>
+      </ul>
+    </div>
+  );
+}
+
+/** Andere Browser als Chrome auf Android: warum Chrome besser ist und wie es trotzdem geht. */
+function OtherBrowserNote({ browser }: { browser: AndroidBrowser }) {
+  const name = BROWSER_NAMES[browser];
+  const steps: Partial<Record<AndroidBrowser, ReactNode>> = {
+    firefox: (
+      <>
+        Oben rechts auf <strong>⋮</strong> tippen, <strong>„Installieren“</strong> wählen und dann <strong>„Automatisch hinzufügen“</strong>
+        .
+      </>
+    ),
+    opera: (
+      <>
+        Das Menü öffnen, <strong>„Hinzufügen zu …“</strong> und dann <strong>„Startbildschirm“</strong> wählen.
+      </>
+    ),
+  };
+  return (
+    <div className="install-warn" role="note">
+      <strong>Am besten mit Chrome installieren.</strong> {browser === 'other' ? 'Dieser Browser' : name} legt nur eine Verknüpfung auf dem
+      Startbildschirm an, keine richtige App: Sie steht nicht in der Liste deiner Apps und öffnet sich über den Browser.{' '}
+      {browser === 'firefox' || browser === 'opera'
+        ? 'Benachrichtigungen gehen dort zwar auch, '
+        : 'Ob Benachrichtigungen dort ankommen, ist nicht sicher; '}
+      mit Chrome wird die App eine richtige App mit Benachrichtigungen.
+      <a className="btn btn-block install-chrome" href={chromeUrl(installUrl())}>
+        In Chrome öffnen
+      </a>
+      Falls das nicht funktioniert: Adresse kopieren und in Chrome einfügen.
+      <CopyLink />
+      <p className="small install-other-steps">
+        Lieber bei {browser === 'other' ? 'diesem Browser' : name} bleiben?{' '}
+        {steps[browser] ?? (
+          <>
+            Im Menü des Browsers den Eintrag <strong>„Zum Startbildschirm hinzufügen“</strong> (oder ähnlich) wählen.
+          </>
+        )}
+      </p>
+    </div>
   );
 }
 
@@ -334,8 +407,9 @@ export default function Installieren({ onToast }: { onToast: (msg: string) => vo
   const detected = detectPlatform();
   const [platform, setPlatform] = useState<Platform>(detected === 'other' ? 'ios' : detected);
   const canPrompt = useCanPrompt();
-  const inApp = isInAppBrowser();
-  const samsung = isSamsungInternet();
+  const browser = detected === 'android' ? androidBrowser(navigator.userAgent, 'brave' in navigator) : null;
+  const inApp = isInAppBrowser() || browser === 'webview';
+  const samsung = browser === 'samsung';
   const iosOtherBrowser = detected === 'ios' && /CriOS|FxiOS|EdgiOS/i.test(navigator.userAgent);
 
   async function install() {
@@ -369,15 +443,18 @@ export default function Installieren({ onToast }: { onToast: (msg: string) => vo
 
       {inApp && (
         <div className="install-warn" role="alert">
-          <strong>Achtung:</strong> Diese Seite ist gerade in Facebook, Instagram o. Ä. geöffnet. Von dort aus lässt sich die App nicht
-          installieren. Bitte die Adresse kopieren und in {detected === 'ios' ? 'Safari' : 'Chrome'} öffnen:
+          <strong>Achtung:</strong> Diese Seite ist gerade im eingebauten Browser einer anderen App geöffnet (z. B. WhatsApp, Facebook,
+          Instagram). Solche Browser können keine Apps installieren und keine Benachrichtigungen zeigen. Bitte die Adresse kopieren und in{' '}
+          {detected === 'ios' ? 'Safari' : 'Chrome'} öffnen:
           <CopyLink />
         </div>
       )}
       {samsung && !inApp && (
         <div className="install-warn" role="alert">
-          <strong>Bitte nicht im Samsung-Browser installieren.</strong> Dort meldet Google Play Protect die App fälschlich als „Unsichere
-          App“ und blockiert sie – ein bekannter Fehler des Samsung-Browsers, nicht der App. Mit <strong>Chrome</strong> klappt es:
+          <strong>Bitte nicht im Samsung-Browser installieren.</strong> Warum: Ab Android 14 blockiert Google Play Protect die App, die der
+          Samsung-Browser anlegt, als „unsicher“ bzw. „für eine ältere Android-Version entwickelt“. Das ist ein Fehler des Samsung-Browsers,
+          nicht der App; er ist seit April 2026 gemeldet und noch nicht behoben. Mit <strong>Chrome</strong> klappt es, auch auf
+          Samsung-Handys:
           <a className="btn btn-block install-chrome" href={chromeUrl(installUrl())}>
             In Chrome öffnen
           </a>
@@ -385,6 +462,7 @@ export default function Installieren({ onToast }: { onToast: (msg: string) => vo
           <CopyLink />
         </div>
       )}
+      {browser && shortcutOnly(browser) && !inApp && <OtherBrowserNote browser={browser} />}
       {iosOtherBrowser && !inApp && (
         <div className="install-warn" role="note">
           Am einfachsten klappt es in <strong>Safari</strong> (blauer Kompass). Ab iOS 16.4 können auch Chrome, Edge oder Firefox die App
@@ -409,6 +487,7 @@ export default function Installieren({ onToast }: { onToast: (msg: string) => vo
             </button>
           </nav>
           {platform === 'ios' ? <IosGuide /> : <AndroidGuide />}
+          {platform === 'android' && <AndroidTrouble />}
           {platform === 'ios' && (
             <p className="muted small install-foot">
               Kein „Zum Home-Bildschirm“ zu finden? Dann wurde der Link wahrscheinlich in einer anderen App geöffnet. Bitte die Adresse in

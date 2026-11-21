@@ -89,7 +89,9 @@ Dort gibt es Benachrichtigungen nur in der installierten App (ab iOS 16.4), nich
 - Ohne Konto eingeschaltete Benachrichtigungen enden von selbst, wenn die App auf dem Gerät ein halbes Jahr lang nicht geöffnet wurde und keine Nachricht kam.
 
 ## Wenn nichts ankommt
-- Steht dort „Benachrichtigungen sind für diese Seite blockiert“, hast du die Nachfrage des Browsers abgelehnt. Erlaube Benachrichtigungen in den Einstellungen des Browsers (bzw. des Handys unter Mitteilungen) und lade die App neu.
+- Steht dort „Benachrichtigungen sind für diese Seite blockiert“, hast du die Nachfrage des Browsers abgelehnt. Erlaube Benachrichtigungen in den Einstellungen des Browsers (bzw. des Handys unter Mitteilungen) und lade die App neu. In Chrome auf Android: links neben der Adresse auf das Symbol tippen → **Berechtigungen** → **Benachrichtigungen** → **Zulassen** (oder **⋮ → Einstellungen → Website-Einstellungen → Benachrichtigungen**). Für die installierte App außerdem in den Einstellungen des Handys unter **Apps** → die App → **Benachrichtigungen**.
+- Öffnest du die Seite im eingebauten Browser einer anderen App (z. B. nach einem Link in WhatsApp oder Facebook), gibt es keine Benachrichtigungen: Solche Browser können sie nicht zeigen. Öffne die Adresse in Chrome bzw. Safari.
+- Benachrichtigungen kommen auf Android nicht an, obwohl alles eingeschaltet ist: Manche Handys beenden Apps zum Akkusparen. Nimm Chrome und die App in den Akku-Einstellungen von der Optimierung aus.
 - Stromsparmodus und „Nicht stören“ halten Nachrichten manchmal zurück.
 - Steht dort „Der Server dieser App kann noch keine Benachrichtigungen senden“, sag bitte einem {rolle.admin} Bescheid.
 - Steht dort „Dieser Browser unterstützt keine Benachrichtigungen“, probier es mit einem aktuellen Chrome, Firefox, Edge oder Safari.

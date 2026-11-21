@@ -4446,6 +4446,37 @@ test.describe('Android', () => {
     expect(await page.evaluate(() => (window as unknown as { __prompted: number }).__prompted)).toBe(1);
     await expect(page.locator('.install-hint').getByRole('button', { name: "So geht's" })).toBeVisible();
   });
+
+  // Andere Browser als Chrome: Hinweis mit Grund (androidBrowser.ts), Weg zu Chrome und Schritte im eigenen Browser.
+  for (const [name, ua, expected] of [
+    ['Firefox', 'Mozilla/5.0 (Android 14; Mobile; rv:145.0) Gecko/145.0 Firefox/145.0', 'Firefox legt nur eine Verknüpfung'],
+    [
+      'Samsung Internet',
+      'Mozilla/5.0 (Linux; Android 14; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/27.0 Chrome/125.0.0.0 Mobile Safari/537.36',
+      'Ab Android 14 blockiert Google Play Protect',
+    ],
+    [
+      'eingebauter Browser',
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/AP2A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/158.0.0.0 Mobile Safari/537.36',
+      'können keine Apps installieren und keine Benachrichtigungen zeigen',
+    ],
+  ] as const) {
+    test(`Anleitung in ${name}: Hinweis mit Grund und Weg zu Chrome`, async ({ browser }) => {
+      const context = await browser.newContext({ ...pixel, userAgent: ua, locale: 'de-DE' });
+      const page = await context.newPage();
+      await page.goto('/app/#/installieren');
+      await expect(page.locator('.install-warn')).toContainText(expected);
+      if (name === 'Firefox') {
+        await expect(page.locator('.install-warn')).toContainText('Automatisch hinzufügen');
+        await expect(page.locator('.install-warn').getByRole('link', { name: 'In Chrome öffnen' })).toHaveAttribute(
+          'href',
+          /^intent:\/\/.+package=com\.android\.chrome;end$/,
+        );
+      }
+      await expect(page.locator('.install-trouble')).toContainText('Xiaomi');
+      await context.close();
+    });
+  }
 });
 
 test('Angemeldet bleiben ist vorausgewählt und hält rund 400 Tage', async ({ page }) => {

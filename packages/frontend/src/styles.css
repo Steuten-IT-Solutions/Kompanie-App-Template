@@ -2374,6 +2374,24 @@ code {
 .install-foot {
   margin-top: 16px;
 }
+/* Android: „Klappt es nicht?“ und die Schritte im eigenen Browser (Installieren.tsx) */
+.install-trouble {
+  margin-top: 16px;
+  padding: 16px;
+}
+.install-trouble h3 {
+  margin: 0;
+}
+.install-trouble ul {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.install-trouble li + li {
+  margin-top: 8px;
+}
+.install-other-steps {
+  margin: 12px 0 0;
+}
 .install-share {
   padding: 16px;
   margin-top: 20px;
