@@ -2077,7 +2077,12 @@ export interface DocCategory {
   id: number;
   title: string;
   sort: number;
+  /** Nur zum Bearbeiten (?source=1) mit weiteren Sprachen: Name je Sprache, '' = deutsch */
+  translations?: TitleTranslations;
 }
+
+/** Name eines Dokuments, einer Kategorie oder eines Albums je weitere Sprache ({title}; Plan „Mehrsprachigkeit“, PR 9e) */
+export type TitleTranslations = Partial<Record<Locale, Record<string, string>>>;
 
 export interface DocumentInfo {
   id: number;
@@ -2095,6 +2100,8 @@ export interface DocumentInfo {
   /** Auslieferung mit Prüfung der Anmeldung; wechselt mit jeder Fassung */
   url: string;
   updated_at: string;
+  /** Nur zum Bearbeiten (?source=1) mit weiteren Sprachen: Titel je Sprache, '' = deutsch */
+  translations?: TitleTranslations;
 }
 
 export interface DocumentMeta {
@@ -2102,6 +2109,8 @@ export interface DocumentMeta {
   category_id: number | null;
   date: string;
   visibility: DocVisibility;
+  /** Titel je weitere Sprache; nur die genannten Sprachen ändern sich */
+  translations?: TitleTranslations;
 }
 
 export interface DocumentsResponse {
@@ -3062,6 +3071,8 @@ export const api = {
 
   // Dokumente (Issue #2)
   documents: () => request<DocumentsResponse>('GET', '/documents'),
+  /** Zum Bearbeiten (manage_documents): deutsche Namen, dazu translations */
+  documentsSource: () => request<DocumentsResponse>('GET', '/documents?source=1'),
   createDocument: async (file: File, meta: DocumentMeta) =>
     request<DocumentInfo>('POST', '/documents', { ...meta, file: await encodeFile(file) }),
   updateDocument: (id: number, meta: Partial<DocumentMeta>) => request<DocumentInfo>('PATCH', `/documents/${id}`, meta),
@@ -3069,7 +3080,9 @@ export const api = {
     request<DocumentInfo>('POST', `/documents/${id}/file`, { file: await encodeFile(file) }),
   deleteDocument: (id: number) => request<{ deleted: boolean }>('DELETE', `/documents/${id}`),
   createDocCategory: (title: string) => request<DocCategory>('POST', '/document-categories', { title }),
-  updateDocCategory: (id: number, title: string) => request<DocCategory>('PATCH', `/document-categories/${id}`, { title }),
+  /** title null: nur translations ändern */
+  updateDocCategory: (id: number, title: string | null, translations?: TitleTranslations) =>
+    request<DocCategory>('PATCH', `/document-categories/${id}`, title === null ? { translations } : { title, translations }),
   deleteDocCategory: (id: number) => request<{ deleted: boolean }>('DELETE', `/document-categories/${id}`),
   reorderDocCategories: (ids: number[]) => request<DocCategory[]>('PUT', '/document-categories/order', { ids }),
 
@@ -3357,8 +3370,9 @@ export const api = {
   // Alben der App und hochgeladene Bilder (Issue #285)
   galleryAlbums: () => request<{ albums: GalleryAdminAlbum[] }>('GET', '/admin/gallery/albums'),
   galleryAdminAlbum: (id: number) => request<GalleryAdminAlbumDetail>('GET', `/admin/gallery/albums/${id}`),
-  createGalleryAlbum: (input: { title: string; year: number }) => request<GalleryAdminAlbumDetail>('POST', '/admin/gallery/albums', input),
-  updateGalleryAlbum: (id: number, input: { title?: string; year?: number }) =>
+  createGalleryAlbum: (input: { title: string; year: number; translations?: TitleTranslations }) =>
+    request<GalleryAdminAlbumDetail>('POST', '/admin/gallery/albums', input),
+  updateGalleryAlbum: (id: number, input: { title?: string; year?: number; translations?: TitleTranslations }) =>
     request<GalleryAdminAlbumDetail>('PATCH', `/admin/gallery/albums/${id}`, input),
   deleteGalleryAlbum: (id: number) => request<{ deleted: boolean }>('DELETE', `/admin/gallery/albums/${id}`),
   uploadGalleryPhoto: async (albumId: number, file: File, intern: boolean) =>
@@ -4011,6 +4025,8 @@ export interface GalleryAdminAlbum {
   editable?: boolean;
   uploads: number;
   drive_photos: number;
+  /** Mit weiteren Sprachen: Titel je Sprache, '' = deutsch */
+  translations?: TitleTranslations;
 }
 
 export interface GalleryAdminAlbumDetail {
@@ -4022,6 +4038,8 @@ export interface GalleryAdminAlbumDetail {
   editable?: boolean;
   /** thumb '' bei einem Video ohne Standbild */
   uploads: { id: number; type: 'image' | 'video'; name: string; intern: boolean; thumb: string; status: string; error: string }[];
+  /** Mit weiteren Sprachen: Titel je Sprache, '' = deutsch */
+  translations?: TitleTranslations;
 }
 
 export interface FailedPhoto {

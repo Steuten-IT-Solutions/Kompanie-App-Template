@@ -38,7 +38,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   bekommen unter [Verwaltung → Seiten](app:verwaltung/seiten) mit _Schreiben auf: English_ eine englische Fassung, ebenso
   [News](app:news), die ihr in der App schreibt (beim Bearbeiten), und Nachrichten am [Schwarzen Brett](app:brett)
   (_Auf English schreiben_ unter dem Inhalt; Benachrichtigung und Mail gehen dann in der Sprache der Empfänger),
-  ebenso [Termine](app:termine/verwalten) und [Umfragen](app:umfragen/verwalten) im Formular; wer
+  ebenso [Termine](app:termine/verwalten), [Umfragen](app:umfragen/verwalten), die Namen von
+  [Dokumenten](app:dokumente/verwalten) und ihren Kategorien und die Titel der Alben in der [Galerie](app:galerie); wer
   auf Englisch liest und sie nicht hat, sieht die deutsche mit dem Hinweis „Nur auf Deutsch verfügbar“. Was ihr sonst
   eintragt, bleibt, wie es ist.
 - **Wartung**: Unter [Einstellungen → Zustand und Updates](app:einstellungen/zustand) steht, bis wann eure App neue

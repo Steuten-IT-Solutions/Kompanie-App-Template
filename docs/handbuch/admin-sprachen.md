@@ -39,7 +39,7 @@ Genauso geht es bei den Terminarten unter [Kalender](seite:admin-kalender) und b
 Ein leeres Feld heißt: Auf Englisch gilt der deutsche Name (bzw. die englische Vorgabe, wenn ihr den Bereich nicht umbenannt habt).
 
 ### Inhalte auf Englisch
-Eigene Seiten und {bereich.news}, die in der App geschrieben werden, können eine englische Fassung bekommen: Wer sie pflegt, wählt beim Bearbeiten oben **Schreiben auf: English**. Nachrichten am {bereich.board}, Termine und {bereich.polls} bekommen ihre englische Fassung im Formular im Abschnitt **Auf English schreiben (freiwillig)**; Benachrichtigungen (und bei Nachrichten am {bereich.board} die Mail) gehen dann in der Sprache der Empfänger. Wer die App auf Englisch nutzt und einen Inhalt ohne englische Fassung öffnet, sieht die deutsche mit dem Hinweis *Nur auf Deutsch verfügbar*.
+Eigene Seiten und {bereich.news}, die in der App geschrieben werden, können eine englische Fassung bekommen: Wer sie pflegt, wählt beim Bearbeiten oben **Schreiben auf: English**. Nachrichten am {bereich.board}, Termine, {bereich.polls}, {bereich.documents} und Alben der {bereich.gallery} bekommen ihre englische Fassung im Formular im Abschnitt **Auf English schreiben (freiwillig)**, Kategorien der {bereich.documents} über den Knopf **Auf English**; Benachrichtigungen (und bei Nachrichten am {bereich.board} die Mail) gehen dann in der Sprache der Empfänger. Wer die App auf Englisch nutzt und einen Inhalt ohne englische Fassung öffnet, sieht die deutsche mit dem Hinweis *Nur auf Deutsch verfügbar*.
 
 ### Englisch wieder ausschalten
 

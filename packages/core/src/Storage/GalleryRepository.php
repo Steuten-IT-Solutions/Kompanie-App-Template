@@ -150,7 +150,17 @@ final class GalleryRepository
                  AND NOT EXISTS (SELECT 1 FROM {photos} p WHERE p.album_id = {albums}.id AND p.source = 'upload')
                  AND NOT EXISTS (SELECT 1 FROM {gallery_submissions} s WHERE s.album_id = {albums}.id AND s.status = 'pending')",
             );
+            $this->deleteOrphanTranslations();
         }
+    }
+
+    /**
+     * Titel je Sprache gelöschter Alben entfernen (Plan „Mehrsprachigkeit“, PR 9e), damit ein neues Album mit derselben ID
+     * sie nicht erbt.
+     */
+    private function deleteOrphanTranslations(): void
+    {
+        $this->db->execute("DELETE FROM {translations} WHERE kind = 'album' AND ref NOT IN (SELECT CAST(id AS CHAR) FROM {albums})");
     }
 
     /**
@@ -186,6 +196,7 @@ final class GalleryRepository
     public function deleteAlbum(int $id): void
     {
         $this->db->execute('DELETE FROM {albums} WHERE id = ?', [$id]);
+        $this->deleteOrphanTranslations();
     }
 
     /** @return array<int, array<string, mixed>> hochgeladene Bilder eines Albums */
@@ -322,5 +333,6 @@ final class GalleryRepository
         $this->db->execute("DELETE FROM {photos} WHERE source = 'drive'");
         $this->db->execute("DELETE FROM {albums} WHERE source = 'drive' AND NOT EXISTS (SELECT 1 FROM {photos} p WHERE p.album_id = {albums}.id)
             AND NOT EXISTS (SELECT 1 FROM {gallery_submissions} s WHERE s.album_id = {albums}.id AND s.status = 'pending')");
+        $this->deleteOrphanTranslations();
     }
 }

@@ -123,7 +123,25 @@ final class GalleryService
         private readonly Scheduler $scheduler,
         private readonly Cache $cache,
         private readonly ?MediaStore $media = null,
+        /** Namen der Alben je Sprache (Plan „Mehrsprachigkeit“, PR 9e); null in Tests ohne App */
+        private readonly ?\Closure $content = null,
     ) {
+    }
+
+    /**
+     * Titel der Alben in der Sprache der Anfrage (fehlt er dort: deutsch).
+     *
+     * @param list<int> $ids
+     * @return \Closure(int, string): string
+     */
+    private function titles(array $ids): \Closure
+    {
+        $content = $this->content !== null ? ($this->content)() : null;
+        if (!$content instanceof ContentTranslations || $content->current() === null || $ids === []) {
+            return static fn (int $id, string $title): string => $title;
+        }
+        $tr = $content->ofMany(GalleryUploadService::KIND, $ids);
+        return static fn (int $id, string $title): string => $content->titleIn($tr[$id] ?? [], $title);
     }
 
     /**
@@ -1322,13 +1340,15 @@ final class GalleryService
     {
         $years = [];
         // Eine Abfrage für alle Alben samt Titelbild (keine je Album).
-        foreach ($this->repo->albumSummaries($member) as $r) {
+        $rows = $this->repo->albumSummaries($member);
+        $title = $this->titles(array_map(static fn (array $r): int => (int) $r['id'], $rows));
+        foreach ($rows as $r) {
             $cover = $r['cover_id'] !== null
                 ? ['id' => (int) $r['cover_id'], 'file_key' => (string) $r['cover_file_key'], 'is_intern' => (int) $r['cover_is_intern'], 'album_id' => (int) $r['cover_album_id'], 'status' => (string) $r['cover_status'], 'media' => (string) $r['cover_media'], 'md5' => (string) ($r['cover_md5'] ?? '')]
                 : null;
             $years[(string) $r['year']][] = [
                 'id' => (int) $r['id'],
-                'title' => (string) $r['title'],
+                'title' => $title((int) $r['id'], (string) $r['title']),
                 // Album der App (in der App änderbar) oder aus Drive
                 'source' => (string) ($r['source'] ?? '') === 'app' ? 'app' : 'drive',
                 // In der App änderbar: Alben der App, mit Drive als Ablage auch die aus Drive
@@ -1371,7 +1391,7 @@ final class GalleryService
         $editable = $this->store() === 'drive';
         return [
             'id' => (int) $album['id'],
-            'title' => (string) $album['title'],
+            'title' => $this->titles([(int) $album['id']])((int) $album['id'], (string) $album['title']),
             'year' => (string) $album['year'],
             'source' => (string) $album['source'] === 'app' ? 'app' : 'drive',
             'editable' => (string) $album['source'] === 'app' || $this->store() === 'drive',

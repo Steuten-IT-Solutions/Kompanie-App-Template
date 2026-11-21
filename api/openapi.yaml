@@ -2542,8 +2542,16 @@ paths:
     get:
       tags: [Verwaltung]
       summary: Sichtbare Dokumente (nach Titel) und alle Kategorien (Issue #2)
-      description: Dokumente mit Sichtbarkeit `managers` nur für alle mit `view_restricted_documents` (`manage_documents` setzt es voraus); mit `manage_documents` auch `max_bytes`.
+      description: |
+        Dokumente mit Sichtbarkeit `managers` nur für alle mit `view_restricted_documents` (`manage_documents` setzt es voraus); mit `manage_documents` auch `max_bytes`.
+        In einer weiteren Sprache (X-Kompanie-Lang) Titel und Namen der Kategorien dieser Fassung, ohne Eintrag die deutschen.
       x-capability: 'view_documents oder view_restricted_documents'
+      parameters:
+        - name: source
+          in: query
+          required: false
+          schema: { type: string, enum: ['1'] }
+          description: 'Nur mit manage_documents, zum Bearbeiten: deutsche Namen und dazu translations.'
       responses:
         '200':
           description: OK
@@ -2573,6 +2581,7 @@ paths:
                 date: { type: string, format: date }
                 visibility: { type: string, enum: [members, managers], default: members }
                 file: { $ref: '#/components/schemas/DocumentFile' }
+                translations: { $ref: '#/components/schemas/TitleTranslationsInput' }
       responses:
         '201':
           description: Angelegt
@@ -2600,6 +2609,7 @@ paths:
                 category_id: { type: [integer, 'null'] }
                 date: { type: string, format: date }
                 visibility: { type: string, enum: [members, managers] }
+                translations: { $ref: '#/components/schemas/TitleTranslationsInput' }
       responses:
         '200':
           description: OK
@@ -2658,6 +2668,7 @@ paths:
               required: [title]
               properties:
                 title: { type: string, maxLength: 191 }
+                translations: { $ref: '#/components/schemas/TitleTranslationsInput' }
       responses:
         '201':
           description: Angelegt
@@ -2697,7 +2708,7 @@ paths:
       - $ref: '#/components/parameters/Id'
     patch:
       tags: [Verwaltung]
-      summary: Kategorie umbenennen
+      summary: Kategorie umbenennen und/oder Namen je Sprache ändern
       x-capability: manage_documents
       requestBody:
         required: true
@@ -2705,9 +2716,10 @@ paths:
           application/json:
             schema:
               type: object
-              required: [title]
+              description: 'title oder translations; ohne title bleibt der deutsche Name'
               properties:
                 title: { type: string, maxLength: 191 }
+                translations: { $ref: '#/components/schemas/TitleTranslationsInput' }
       responses:
         '200':
           description: OK
@@ -10033,6 +10045,7 @@ components:
       properties:
         title: { type: string, maxLength: 120 }
         year: { type: integer, minimum: 1800, description: höchstens das nächste Jahr }
+        translations: { $ref: '#/components/schemas/TitleTranslationsInput' }
     GalleryAdminAlbum:
       type: object
       required: [id, title, year, source, uploads, drive_photos]
@@ -10044,6 +10057,10 @@ components:
         editable: { type: boolean, description: 'In der App änderbar: Alben der App, mit Google Drive als Ablage auch aus Drive' }
         uploads: { type: integer, description: Anzahl hochgeladener Bilder }
         drive_photos: { type: integer, description: Anzahl Bilder aus Drive }
+        translations:
+          type: object
+          description: 'Mit weiteren Sprachen, zum Bearbeiten: Titel je Sprache (alle eingeschalteten, '''' = deutsch)'
+          additionalProperties: { type: object, properties: { title: { type: string } } }
     GalleryAdminAlbumDetail:
       type: object
       required: [id, title, year, source, uploads]
@@ -10052,6 +10069,10 @@ components:
         title: { type: string }
         year: { type: string }
         source: { type: string, enum: [app, drive] }
+        translations:
+          type: object
+          description: 'Mit weiteren Sprachen, zum Bearbeiten: Titel je Sprache (alle eingeschalteten, '''' = deutsch)'
+          additionalProperties: { type: object, properties: { title: { type: string } } }
         uploads:
           type: array
           items:
@@ -12779,6 +12800,15 @@ components:
         id: { type: integer }
         title: { type: string, maxLength: 191 }
         sort: { type: integer }
+        translations:
+          type: object
+          description: 'Mit weiteren Sprachen, zum Bearbeiten: Titel je Sprache (alle eingeschalteten, '''' = deutsch)'
+          additionalProperties: { type: object, properties: { title: { type: string } } }
+
+    TitleTranslationsInput:
+      type: object
+      description: 'Name je weiterer eingeschalteter Sprache (Sprache => {title}; nicht de, sonst → 400); nur die genannten Sprachen ändern sich, leer = deutsch'
+      additionalProperties: { type: object, properties: { title: { type: string } } }
 
     DocumentInfo:
       type: object
@@ -12795,6 +12825,10 @@ components:
         version: { type: string, description: Wechselt mit jeder neuen Fassung }
         url: { type: string, description: 'Auslieferung mit Prüfung der Anmeldung: <App>/dokument/<id>?v=<version>' }
         updated_at: { type: string }
+        translations:
+          type: object
+          description: 'Mit weiteren Sprachen, zum Bearbeiten: Titel je Sprache (alle eingeschalteten, '''' = deutsch)'
+          additionalProperties: { type: object, properties: { title: { type: string } } }
 
     DocumentFile:
       type: object

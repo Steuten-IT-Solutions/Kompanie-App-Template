@@ -5321,6 +5321,86 @@ test('Sprachen: öffentlichen Termin und Umfrage auch auf Englisch eintragen', a
   }
 });
 
+test('Sprachen: Dokument, Kategorie und Album auch mit englischem Namen', async ({ page }) => {
+  const id = Date.now().toString(36);
+  const pdf = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n');
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ({ path, method, body }) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json().catch(() => null)) as Record<string, unknown> | null };
+      },
+      { path, method, body },
+    );
+  expect((await api('admin/settings', 'PATCH', { languages: 'de,en' })).status).toBe(200);
+  let albumId = 0;
+  try {
+    await page.goto('/app/#/dokumente/verwalten');
+    await page.reload();
+    await page.getByLabel('Neue Kategorie').fill(`Satzungen ${id}`);
+    await page.getByRole('button', { name: 'Kategorie hinzufügen' }).click();
+    await expect(page.locator('.toast')).toHaveText('Kategorie angelegt');
+    const cat = page.locator('.doc-categories li', { hasText: `Satzungen ${id}` });
+    await cat.getByRole('button', { name: 'Auf English' }).click();
+    await askOk(page, `Statutes ${id}`);
+    await expect(page.locator('.toast')).toHaveText('Kategorie umbenannt');
+    await expect(cat).toContainText(`Satzungen ${id}`);
+
+    await page.getByLabel('Datei').setInputFiles({ name: 'satzung.pdf', mimeType: 'application/pdf', buffer: pdf });
+    const upload = page.locator('form', { has: page.getByRole('button', { name: 'Hochladen' }) });
+    await upload.getByLabel('Titel', { exact: true }).fill(`Satzung ${id}`);
+    await upload.getByLabel('Kategorie', { exact: true }).selectOption({ label: `Satzungen ${id}` });
+    await upload.locator('.board-translation').getByText('Auf English schreiben (freiwillig)').click();
+    await upload.getByLabel('Titel auf English').fill(`Constitution ${id}`);
+    await upload.getByRole('button', { name: 'Hochladen' }).click();
+    await expect(page.locator('.toast')).toHaveText(`„Satzung ${id}“ hochgeladen`);
+
+    // Album mit englischem Titel (Schnittstelle der Verwaltung: deutsch mit Fassung)
+    const album = await api('admin/gallery/albums', 'POST', { title: `Kirmes ${id}`, year: 2026 });
+    albumId = Number(album.data?.id);
+    expect(albumId).toBeGreaterThan(0);
+    const updated = await api(`admin/gallery/albums/${albumId}`, 'PATCH', { translations: { en: { title: `Fair ${id}` } } });
+    expect((updated.data?.translations as Record<string, { title: string }>).en.title).toBe(`Fair ${id}`);
+
+    // Auf Englisch (Sprache der Anfrage; das Konto des Admins kann auf Deutsch stehen): englische Namen
+    const english = await page.evaluate(async () => {
+      const cfg = window.KOMPANIE_CONFIG!;
+      const res = await fetch(cfg.apiBase + 'documents', {
+        credentials: 'same-origin',
+        headers: { 'X-Kompanie-Lang': 'en', [cfg.csrf.header]: cfg.csrf.token },
+      });
+      return (await res.json()) as { documents: { title: string }[]; categories: { title: string }[] };
+    });
+    expect(english.documents.map((d) => d.title)).toContain(`Constitution ${id}`);
+    expect(english.categories.map((c) => c.title)).toContain(`Statutes ${id}`);
+    // Zum Bearbeiten weiter die deutschen, die englische Fassung im Abschnitt
+    const row = page.locator('.card.row', { hasText: `Satzung ${id}` }).first();
+    // Die Kategorie des neuen Dokuments ist nach dem Hochladen schon aufgeklappt
+    await row.getByRole('button', { name: 'Bearbeiten' }).click();
+    const edit = page.locator('form.doc-edit');
+    await expect(edit.getByLabel('Titel', { exact: true })).toHaveValue(`Satzung ${id}`);
+    await expect(edit.getByLabel('Titel auf English')).toHaveValue(`Constitution ${id}`);
+  } finally {
+    const docs = (await api('documents?source=1', 'GET')).data as {
+      documents: { id: number; title: string }[];
+      categories: { id: number; title: string }[];
+    } | null;
+    for (const d of docs?.documents.filter((d) => d.title === `Satzung ${id}`) ?? [])
+      expect((await api(`documents/${d.id}`, 'DELETE')).status).toBe(200);
+    for (const c of docs?.categories.filter((c) => c.title === `Satzungen ${id}`) ?? [])
+      expect((await api(`document-categories/${c.id}`, 'DELETE')).status).toBe(200);
+    if (albumId > 0) expect((await api(`admin/gallery/albums/${albumId}`, 'DELETE')).status).toBe(200);
+    expect((await api('admin/settings', 'PATCH', { languages: 'de' })).status).toBe(200);
+  }
+});
+
 test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nicht', async ({ page }) => {
   // So, wie scripts/changelog.php es beim Bauen in die App gelegt hat.
   const changelog = JSON.parse(readFileSync(new URL('../src/generated/changelog.json', import.meta.url), 'utf8')) as {
