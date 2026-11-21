@@ -96,6 +96,16 @@ Schrift, Farben, Aufzählungen und Tabellen kommen mit. Bilder übernimmt die Ap
 
 ![Eine Nachricht wird bearbeitet](bild:schwarzes-brett-schreiben-bearbeiten)
 
+### Eine Nachricht auch auf Englisch schreiben
+Hat der Admin unter **Einstellungen → Sprachen** Englisch eingeschaltet, steht unter dem **Inhalt** der aufklappbare Abschnitt **Auf English schreiben (freiwillig)**.
+
+1. Tippe auf **Auf English schreiben (freiwillig)**.
+2. Trage bei **Titel auf English** den englischen Titel ein. Grau steht im Feld der deutsche.
+3. Darunter steht jeder Block mit Text noch einmal, nur mit seinen Texten. Schreibe sie auf Englisch. Beim Textblock zeigt **Deutscher Text** zum Aufklappen, was auf Deutsch steht.
+4. Veröffentliche oder speichere die Nachricht wie sonst auch.
+
+Wer die App auf Englisch nutzt, sieht die englische Fassung und bekommt Benachrichtigung und Mail auf Englisch. Was du leer lässt, erscheint auf Deutsch, mit dem Hinweis *Teilweise nur auf Deutsch verfügbar*. Ändern kannst du die englische Fassung später beim Bearbeiten im selben Abschnitt. Benachrichtigung und Mail gehen aber nur beim Veröffentlichen raus, also schreibe die englische Fassung am besten gleich mit.
+
 ### Nachsehen, wer was geändert hat
 1. Tippe bei der Nachricht auf **Verlauf**.
 2. Du siehst jede Änderung mit Zeit und Namen. Bei Titel, Inhalt, Anhängen, Sichtbarkeit und Ende stehen der alte und der neue Stand nebeneinander (**vorher**, **nachher**). Blöcke wie ein Countdown stehen dort als Satz, Blöcke nur für Mitglieder mit **Nur für Mitglieder:** davor.
@@ -123,6 +133,9 @@ Unter **Verlauf: abgelaufene und gelöschte Nachrichten** steht sie noch 30 Tage
 - Ändern und löschen darf jede und jeder mit diesem Recht, nicht nur, wer die Nachricht geschrieben hat. Den Verlauf sehen nur Personen mit diesem Recht oder dem Recht **{bereich.board}-Verlauf sehen**.
 - Eine Längengrenze für den Titel gibt es nicht, die Texte aller Blöcke zusammen dürfen bis etwa 1 MB lang sein (weit mehr als jede Nachricht). Sehr lange Titel kürzt das Banner, gespeichert wird alles. Grenzen setzt nur der Server, z. B. bei sehr großen Bildern; die App sagt dir dann, welche.
 - Nimm das {bereich.board} für Dringendes.
+
+- Aufbau, Bilder, Anhänge, **Sichtbar für** und **Sichtbar bis** gelten für alle Sprachen. Nur die Texte gibt es je Sprache. Benutzt du die App selbst auf Englisch, bearbeitest du trotzdem die deutsche Fassung, die englische steht im Abschnitt darunter.
+- Im **Verlauf** steht jede Änderung der englischen Fassung als **Übersetzung geändert**.
 
 ## Siehe auch
 - [Signatur](seite:signatur)

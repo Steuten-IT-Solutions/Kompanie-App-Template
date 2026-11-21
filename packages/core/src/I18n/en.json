@@ -25,6 +25,7 @@
   "(sehen nur die Admins)": "(visible to the admins only)",
   "(Stand heute)": "(as of today)",
   "(stellt nur die Person selbst ein)": "(only the person can change this)",
+  "(Titel deutsch)": "(title in German)",
   "(und {count} weitere Fehler)": {
     "one": "(and {count} more error)",
     "other": "(and {count} more errors)"
@@ -390,6 +391,7 @@
   "Auf eine ältere Version zurück": "Go back to an older version",
   "Auf meiner Seite unter „{directory}“": "On my page under “{directory}”",
   "Auf Version {version} zurückgehen?": "Go back to version {version}?",
+  "Auf {language} schreiben (freiwillig)": "Write in {language} (optional)",
   "Aufbau in Drive: {structure}. Bilder im Unterordner {folder} eines Albums sehen nur angemeldete Mitglieder.": "Structure in Drive: {structure}. Only logged-in members see photos in an album’s {folder} subfolder.",
   "Aufbewahrungsfrist": "Retention period",
   "Aufgelöst (steht als „ehemalig“ unten in der Liste)": "Disbanded (shown as “former” at the bottom of the list)",
@@ -3483,6 +3485,7 @@
   "Tippen zum Ansehen.": "Tap to view.",
   "Titel": "Title",
   "Titel angelegt": "Title created",
+  "Titel auf {language}": "Title in {language}",
   "Titel des Albums": "Album title",
   "Titel gespeichert": "Titles saved",
   "Titel geändert": "Title changed",
@@ -3838,6 +3841,7 @@
   "Wer abgesagt hat, ist als „entschuldigt“ vorausgewählt. Gespeichert ist das erst mit „Speichern“.": "Anyone who declined is preselected as “excused”. This is only saved when you tap “Save”.",
   "Wer alle Ergebnisse sehen darf, sieht, wer was geantwortet hat.": "Those allowed to see all results can see who answered what.",
   "Wer das Recht „Bilder und Videos einreichen“ hat, kann dann Bilder und Videos für die {section} einreichen. Sie erscheinen erst, wenn jemand sie unter „Einreichungen prüfen“ freigibt.": "Anyone with the “Submit images and videos” permission can then submit images and videos for the {section}. They only appear once someone approves them under “Review submissions”.",
+  "Wer die App auf {language} nutzt, bekommt Nachricht, Benachrichtigung und E-Mail in dieser Fassung. Was leer bleibt, erscheint auf Deutsch.": "Anyone using the app in {language} gets the message, notification and email in this version. Anything left blank appears in German.",
   "Wer die Ergebnisse sieht, sieht auch, wer was geantwortet hat.": "Anyone who can see the results can also see who answered what.",
   "Wer die {section} sieht, kann dann jedes Bild und Video in der Großansicht und jedes Album als ZIP herunterladen (Bilder in Originalauflösung, Videos unverändert).": "Anyone who can see the {section} can then download every image and video in full view and every album as a ZIP (images in original resolution, videos unchanged).",
   "Wer ein Amt gemeinsam innehat, bleibt darin; nur dieser Eintrag endet.": "Anyone sharing an office keeps it; only this entry ends.",
@@ -4398,6 +4402,7 @@
     "one": "Found {count} event.",
     "other": "Found {count} events."
   },
+  "{count} Texte nur auf Deutsch": "{count} texts only in German",
   "{count} Versuche": {
     "one": "{count} attempt",
     "other": "{count} attempts"
@@ -4737,6 +4742,7 @@
   "Übernehmen": "Apply",
   "Überschrift": "Heading",
   "Überschrift (optional)": "Heading (optional)",
+  "Übersetzung geändert": "Translation changed",
   "Übersetzungen gibt es nur für weitere Sprachen, nicht für Deutsch.": "Translations exist only for additional languages, not for German.",
   "Übersicht": "Overview",
   "– freie Eingabe –": "– free text –",

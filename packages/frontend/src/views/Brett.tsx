@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { Suspense, useEffect, useState, type FormEvent } from 'react';
 import {
   api,
   config,
@@ -12,11 +12,13 @@ import {
   type BoardPoll,
   type BoardRevision,
   type Attachment,
+  type BlockTranslation,
 } from '../api';
 import { AttachmentList, AttachmentsField } from '../attachments';
 import { blocksInput, draftsFrom, hasContent, newBlock, type BlockDraft } from '../blocks/blockDrafts';
 import BlocksEditor from '../blocks/BlocksEditor';
 import BlocksView from '../blocks/BlocksView';
+import { missingCount, translationInput } from '../blocks/blockTranslation';
 import { boardLoaded, boardSeesAll, boardVisible, canManagePolls, canPostBoard, pollsVisible, refreshBoard, useBoard } from '../board';
 import { ComposeEditor } from '../composeEditor';
 import { BoardMeta, pollEndText } from '../BoardBanner';
@@ -25,10 +27,13 @@ import { navigate } from '../router';
 import { useFocusEntry } from '../focus';
 import { formatShortTime, formatUntil, fromLocalInput, toLocalInput } from '../format';
 import RichTextView from '../richtext/RichTextView';
-import { Caps, Empty, ErrorBox, Loading } from '../ui';
+import { Caps, Empty, ErrorBox, lazyView, Loading } from '../ui';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
-import { t } from '../i18n';
+import { t, type Locale } from '../i18n';
+import { enabledLocales, LANGUAGE_NAMES, UntranslatedNote } from '../language';
+
+const BlocksTranslator = lazyView(() => import('../blocks/BlocksTranslator'));
 
 /** Entwurf der neuen Nachricht (auf diesem Gerät): geht beim Sprung zur Signatur-Einrichtung nicht verloren. */
 const DRAFT_KEY = 'kompanie-board-draft';
@@ -51,6 +56,91 @@ interface Draft {
   mail: boolean;
   /** schon hochgeladene Anhänge (Entwürfe auf dem Server, 7 Tage gültig) */
   attachments: Attachment[];
+  /** Fassungen in weiteren Sprachen (freiwillig) */
+  translations?: Translations;
+}
+
+/** Fassungen je Sprache: Titel (leer: der deutsche) und Texte der Blöcke nach Kennung. */
+type Translations = Partial<Record<Locale, { title: string; blocks: BlockTranslation }>>;
+
+const extraLocales = (): Locale[] => enabledLocales().filter((l) => l !== 'de');
+
+/** Fassungen für die Anfrage (nur Sprachen, in denen etwas steht, oder die sich gegenüber $before ändern). */
+function translationsInput(german: BlockDraft[], value: Translations, before?: BoardMessage['translations']) {
+  const out: Record<string, { title: string; blocks: BlockTranslation }> = {};
+  for (const lang of extraLocales()) {
+    const own = value[lang];
+    const next = { title: (own?.title ?? '').trim(), blocks: translationInput(german, own?.blocks ?? {}) };
+    const old = before?.[lang];
+    const empty = next.title === '' && Object.keys(next.blocks).length === 0;
+    if (
+      before === undefined
+        ? !empty
+        : JSON.stringify(next) !== JSON.stringify({ title: old?.title ?? '', blocks: translationInput(german, old?.blocks ?? {}) })
+    ) {
+      out[lang] = next;
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/**
+ * Nachricht in weiteren Sprachen (Plan „Mehrsprachigkeit“, PR 9c): je eingeschaltete Sprache aufklappbar Titel und Texte
+ * der Blöcke; Aufbau, Bilder und Einstellungen kommen aus der deutschen Fassung. Leere Felder erscheinen deutsch.
+ */
+function TranslationsField(props: {
+  german: BlockDraft[];
+  germanTitle: string;
+  value: Translations;
+  onChange: (next: Translations) => void;
+  id: string;
+}) {
+  const { german, value, onChange } = props;
+  return (
+    <>
+      {extraLocales().map((lang) => {
+        const own = value[lang] ?? { title: '', blocks: {} };
+        const missing = missingCount(german, own.blocks) + (own.title.trim() === '' ? 1 : 0);
+        const language = LANGUAGE_NAMES[lang];
+        return (
+          <details key={lang} className="board-translation" open={own.title !== '' || Object.keys(own.blocks).length > 0}>
+            <summary>
+              {t('Auf {language} schreiben (freiwillig)', { language })}
+              {missing > 0 && own.title !== '' && (
+                <span className="muted small"> · {t('{count} Texte nur auf Deutsch', { count: missing })}</span>
+              )}
+            </summary>
+            <p className="muted small">
+              {t(
+                'Wer die App auf {language} nutzt, bekommt Nachricht, Benachrichtigung und E-Mail in dieser Fassung. Was leer bleibt, erscheint auf Deutsch.',
+                {
+                  language,
+                },
+              )}
+            </p>
+            <label className="field">
+              <span>{t('Titel auf {language}', { language })}</span>
+              <input
+                type="text"
+                className="board-translation-title"
+                value={own.title}
+                placeholder={props.germanTitle}
+                onChange={(e) => onChange({ ...value, [lang]: { ...own, title: e.target.value } })}
+              />
+            </label>
+            <Suspense fallback={<Loading shape="text" chunk />}>
+              <BlocksTranslator
+                german={german}
+                value={own.blocks}
+                onChange={(blocks) => onChange({ ...value, [lang]: { ...own, blocks } })}
+                idPrefix={`${props.id}-${lang}`}
+              />
+            </Suspense>
+          </details>
+        );
+      })}
+    </>
+  );
 }
 
 function readDraft(): Draft | null {
@@ -372,6 +462,7 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
         push: draft.push,
         mail: mailOn,
         attachments: draft.attachments.map((a) => a.uid),
+        translations: translationsInput(draft.blocks, draft.translations ?? {}),
       });
       saveDraft(null);
       setDraft(emptyDraft());
@@ -396,6 +487,14 @@ function NewMessage({ onToast }: { onToast: (msg: string) => void }) {
         <span>{t('Inhalt')}</span>
         <ContentEditor key={editorKey} value={draft.blocks} onChange={(blocks) => update({ blocks })} id="board-new-text" draft={draft} />
       </div>
+      <TranslationsField
+        key={`tr-${editorKey}`}
+        german={draft.blocks}
+        germanTitle={draft.title}
+        value={draft.translations ?? {}}
+        onChange={(translations) => update({ translations })}
+        id="board-new"
+      />
       <AttachmentsField
         id="board-new-attachments"
         items={draft.attachments}
@@ -458,6 +557,7 @@ const ACTIONS: Record<BoardRevision['action'], string> = {
   attachments: t('Anhänge geändert'),
   deleted: t('gelöscht'),
   mailed: t('per E-Mail versendet'),
+  translation: t('Übersetzung geändert'),
 };
 
 /** Verlauf einer Nachricht (nur view_board_history): wer wann was geändert hat, bei Inhalten vorher/nachher. */
@@ -476,6 +576,18 @@ function History({ id }: { id: number }) {
     if (r.action === 'audience') return <span>{audienceRevisionText(String(v))}</span>;
     if (r.action === 'content') return <RichTextView html={String(v)} className="board-rev-content" />;
     if (r.action === 'attachments') return <span>{Array.isArray(v) && v.length > 0 ? v.join(', ') : t('keine')}</span>;
+    if (r.action === 'translation' && typeof v === 'object') {
+      const tr = v as { locale?: string; title?: string; text?: string };
+      const language = LANGUAGE_NAMES[tr.locale as Locale] ?? tr.locale ?? '';
+      return (
+        <>
+          <span>
+            {language}: {tr.title || t('(Titel deutsch)')}
+          </span>
+          {tr.text && <RichTextView html={tr.text} className="board-rev-content" />}
+        </>
+      );
+    }
     return null;
   };
   return (
@@ -494,7 +606,8 @@ function History({ id }: { id: number }) {
               r.action === 'content' ||
               r.action === 'expires' ||
               r.action === 'audience' ||
-              r.action === 'attachments') && (
+              r.action === 'attachments' ||
+              r.action === 'translation') && (
               <div className="board-diff">
                 <div className="board-before">
                   <span className="muted small">{t('vorher')}</span>
@@ -539,12 +652,16 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
     audience: BoardAudience;
     audience_ids: number[];
     attachments: Attachment[];
+    translations: Translations;
   } | null>(null);
   const [history, setHistory] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canPost = canPostBoard();
   const seeAll = boardSeesAll();
+  // Bearbeitet wird die deutsche Fassung, auch wenn die App in einer anderen Sprache läuft (source).
+  const germanTitle = item.source?.title ?? item.title;
+  const germanDrafts = () => (item.source ? draftsFrom(item.source.blocks, '') : draftsFrom(item.blocks, item.text));
 
   async function run(action: () => Promise<unknown>, message: string) {
     setBusy(true);
@@ -571,8 +688,9 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
       audience?: BoardAudience;
       audience_ids?: number[];
       attachments?: string[];
+      translations?: ReturnType<typeof translationsInput>;
     } = {};
-    if (edit.title !== item.title) changes.title = edit.title;
+    if (edit.title !== germanTitle) changes.title = edit.title;
     if (targeted(edit.audience) && edit.audience_ids.length === 0) {
       return setError(
         edit.audience === 'company' ? t('Bitte mindestens eine Kompanie auswählen.') : t('Bitte mindestens eine Person auswählen.'),
@@ -586,7 +704,9 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
       if (targeted(edit.audience)) changes.audience_ids = edit.audience_ids;
     }
     const blocks = blocksInput(edit.blocks);
-    if (JSON.stringify(blocks) !== JSON.stringify(blocksInput(draftsFrom(item.blocks, item.text)))) changes.blocks = blocks;
+    if (JSON.stringify(blocks) !== JSON.stringify(blocksInput(germanDrafts()))) changes.blocks = blocks;
+    const translations = translationsInput(edit.blocks, edit.translations, item.translations ?? {});
+    if (translations) changes.translations = translations;
     const uids = edit.attachments.map((a) => a.uid);
     if (uids.join() !== (item.attachments ?? []).map((a) => a.uid).join()) changes.attachments = uids;
     const expires = fromLocalInput(edit.expires);
@@ -601,6 +721,7 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
       {edit === null ? (
         <>
           <h3 className="board-title">{item.title}</h3>
+          <UntranslatedNote untranslated={item.untranslated} />
           <MessageContent item={item} manager={seeAll} />
           <AttachmentList items={item.attachments} />
         </>
@@ -624,6 +745,13 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
               id={`board-edit-${item.id}`}
             />
           </div>
+          <TranslationsField
+            german={edit.blocks}
+            germanTitle={edit.title}
+            value={edit.translations}
+            onChange={(translations) => setEdit((d) => (d ? { ...d, translations } : d))}
+            id={`board-edit-${item.id}`}
+          />
           <AttachmentsField
             id={`board-edit-attachments-${item.id}`}
             items={edit.attachments}
@@ -657,8 +785,9 @@ function Entry({ item, focused, onToast }: { item: BoardMessage; focused: boolea
                   disabled={busy}
                   onClick={() =>
                     setEdit({
-                      title: item.title,
-                      blocks: draftsFrom(item.blocks, item.text),
+                      title: germanTitle,
+                      blocks: germanDrafts(),
+                      translations: { ...(item.translations ?? {}) },
                       expires: toLocalInput(item.expires_at),
                       audience: item.audience ?? 'members',
                       audience_ids: item.audience_ids ?? [],

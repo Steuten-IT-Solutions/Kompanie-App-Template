@@ -165,13 +165,23 @@ final class PushTriggers
     {
         $expires = $item['expires_at'] !== null ? (int) strtotime($item['expires_at']) : 0;
         $ttl = min($expires - $this->app->time()->timestamp(), PushService::MAX_TTL);
-        $title = $this->app->config->sectionLabel('board', 'Schwarzes Brett') . ($item['author_name'] !== null ? ': ' . $item['author_name'] : '');
+        $label = fn (): string => $this->app->config->sectionLabel('board', 'Schwarzes Brett') . ($item['author_name'] !== null ? ': ' . $item['author_name'] : '');
         $public = ($item['audience'] ?? null) === BoardService::AUDIENCE_PUBLIC;
         if ($public) {
             $this->push->offerTypeToExisting(PushService::TYPE_BOARD_PUBLIC);
         }
         $only = $this->app->board()->readerIds(['audience' => (string) ($item['audience'] ?? BoardService::AUDIENCE_MEMBERS), 'audience_ids' => $item['audience_ids'] ?? []]);
-        return $this->push->notifyBoard(PushService::message($title, $item['title'], 'brett/' . $item['id'], 'brett-' . $item['id']), $authorId, $ttl, $public, $only);
+        $board = $this->app->board();
+        $german = $board->repository()->find((int) $item['id'])['title'] ?? $item['title'];
+        // Je Sprache der Empfänger: Bezeichnung des Bereichs und Titel aus der Fassung dieser Sprache (sonst deutsch).
+        return $this->perLanguage(fn (?\Closure $lang): int => $this->push->notifyBoard(
+            PushService::message($label(), $board->titleIn((int) $item['id'], $german, I18n::locale()), 'brett/' . $item['id'], 'brett-' . $item['id']),
+            $authorId,
+            $ttl,
+            $public,
+            $only,
+            $lang,
+        ));
     }
 
     /**

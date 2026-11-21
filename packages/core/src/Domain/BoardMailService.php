@@ -192,6 +192,7 @@ final class BoardMailService
         $stats = ['sent' => 0, 'failed' => 0, 'processed' => 0];
         $messages = [];
         $files = [];
+        $tr = [];
         $names = new UserNames($this->app->users);
         foreach ($this->due($nowTs, $limit) as $row) {
             if (microtime(true) - $start > MailService::BUDGET) {
@@ -206,10 +207,15 @@ final class BoardMailService
             $user = $this->app->users->find((int) $row['user_id']);
             $recipient = ['name' => (string) ($user?->name ?? ''), 'email' => (string) $row['email']];
             $files[$mid] ??= $this->app->attachments()->forMail($this->app->attachments()->of(AttachmentService::OWNER_BOARD, $mid));
-            // In der Sprache des Empfängers (Fußzeile und Hinweise; der Text der Nachricht bleibt, wie er geschrieben ist).
+            // In der Sprache des Empfängers: Fußzeile und Hinweise, Titel und Inhalt aus der Fassung dieser Sprache
+            // (fehlt sie oder ein Teil davon: deutsch, BoardService::mailParts).
+            $tr[$mid] ??= $this->app->contentTranslations()->of(BoardService::KIND, $mid);
             $mail = I18n::in(
                 $this->app->languages()->forRecipient((int) $row['user_id']),
-                fn (): Mail => $this->compose($mid, $message['title'], $this->app->board()->mailHtml($message, $user), (string) $names->name($message['author_id']), $recipient, $files[$mid]),
+                function () use ($mid, $message, $user, $names, $recipient, $files, $tr): Mail {
+                    [$title, $html] = $this->app->board()->mailParts($message, $user, $tr[$mid]);
+                    return $this->compose($mid, $title, $html, (string) $names->name($message['author_id']), $recipient, $files[$mid]);
+                },
             );
             $result = $mailer->send($mail);
             $attempts = (int) $row['attempts'] + 1;
@@ -305,7 +311,7 @@ final class BoardMailService
             'Du bekommst diese Mail, weil du in der App „{app}“ Nachrichten aus dem Bereich „{section}“ per E-Mail erhältst. Abschalten kannst du das in der App unter Konto → Benachrichtigungen.',
             ['app' => $this->app->config->name(), 'section' => $board],
         );
-        $document = '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>' . $esc($title) . '</title></head>'
+        $document = '<!DOCTYPE html><html lang="' . $esc(I18n::locale()) . '"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>' . $esc($title) . '</title></head>'
             . '<body style="margin: 0; padding: 16px; font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.5; color: #222222; background-color: #ffffff">'
             . '<h1 style="font-size: 20px; line-height: 1.3; margin: 0 0 12px 0">' . $esc($title) . '</h1>'
             . '<div>' . $html . '</div>'

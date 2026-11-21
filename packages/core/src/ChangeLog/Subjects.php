@@ -336,7 +336,8 @@ final class Subjects
         ]);
         $documents = $this->spec('Dokument', 'documents', 'title', ['title' => 'Titel', 'category_id' => ['Kategorie', 'lookup:doc_categories.title'], 'doc_date' => 'Datum', 'visibility' => 'Sichtbarkeit', 'ext' => 'Dateityp', 'version' => ['Datei', 'secret']]);
         $docCategories = $this->spec('Kategorie der Dokumente', 'doc_categories', 'title', ['title' => 'Bezeichnung']);
-        $board = $this->spec('Nachricht am Brett', 'board_messages', 'title', ['title' => 'Titel', 'blocks' => ['Inhalt', 'blocks'], 'expires_at' => 'Sichtbar bis', 'audience' => 'Für', 'audience_ids' => ['Für (Auswahl)', 'json']]);
+        $board = $this->spec('Nachricht am Brett', 'board_messages', 'title', ['title' => 'Titel', 'blocks' => ['Inhalt', 'blocks'], 'expires_at' => 'Sichtbar bis', 'audience' => 'Für', 'audience_ids' => ['Für (Auswahl)', 'json']],
+            extra: fn (array $r): array => $this->app->contentTranslations()->blocksLog('board', (int) $r['id'], Blocks::decode($r['blocks'] ?? null, (string) ($r['body'] ?? ''))));
         $polls = $this->spec('Umfrage', 'polls', 'title', [
             'title' => 'Titel', 'description' => 'Beschreibung', 'type' => 'Art', 'anonymous' => ['Anonym', 'bool'], 'results' => 'Ergebnisse sichtbar', 'ends_at' => 'Ende', 'closed_at' => 'Beendet',
         ], extra: fn (array $r): array => ['Antworten' => $this->column('SELECT title FROM {poll_options} WHERE poll_id = ? ORDER BY sort, id', $r['id'])]);
