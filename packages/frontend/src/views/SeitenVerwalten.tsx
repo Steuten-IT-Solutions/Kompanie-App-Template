@@ -67,14 +67,17 @@ function PageFields({
   );
 }
 
-/** Eine Seite bearbeiten: lädt den Text und den Stand; hat jemand dazwischen gespeichert, sagt der Server 409 conflict. */
+/**
+ * Eine Seite bearbeiten: lädt die deutsche Fassung (source, auch wenn die App auf Englisch läuft) und den Stand; hat jemand
+ * dazwischen gespeichert, sagt der Server 409 conflict.
+ */
 function PageEditor({ id, onDone, onToast }: { id: number; onDone: (saved: boolean) => void; onToast: (msg: string) => void }) {
   const [loaded, setLoaded] = useState<PageDetail | null>(null);
   const [draft, setDraft] = useState<Draft>(empty);
   const [editorKey, setEditorKey] = useState(0);
   const { error, reload } = useAsync(
     () =>
-      api.page(id).then((p) => {
+      api.pageSource(id).then((p) => {
         setLoaded(p);
         setDraft({ title: p.title, audience: p.audience, blocks: draftsFrom(p.blocks, p.body) });
         setEditorKey((k) => k + 1);
