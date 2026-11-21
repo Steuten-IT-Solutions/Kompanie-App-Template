@@ -230,7 +230,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Android: Installation in jedem Browser erklärt**: Die Anleitung unter [App installieren](app:installieren) erkennt
   den Browser. In Edge, Firefox, Opera, Brave und anderen erklärt ein Hinweis, warum Chrome besser ist (diese Browser
   legen nur eine Verknüpfung an, keine richtige App), mit _In Chrome öffnen_, _Chrome herunterladen_ (Play Store, falls
-  Chrome fehlt), _Adresse kopieren_ und den Schritten im eigenen Browser. Fehlt Chrome, führt auch _In Chrome öffnen_ in
+  Chrome fehlt), _Adresse kopieren_ und den Schritten im eigenen Browser. In Chrome erklärt ein Hinweis, warum der Knopf
+  _App installieren_ erst nach etwa 30 Sekunden erscheint (Regel von Chrome), und verweist bis dahin auf die Schritte. Fehlt Chrome, führt auch _In Chrome öffnen_ in
   den Play Store. Der Hinweis im Samsung-Browser nennt den Grund genauer (Google Play Protect blockiert ab Android 14,
   Fehler seit April 2026 gemeldet). Im eingebauten Browser anderer Apps (WhatsApp, Facebook …) erklären Anleitung und
   Benachrichtigungen, dass dort weder Installation noch Benachrichtigungen gehen. Neu ist _Klappt es nicht?_ mit
