@@ -31,7 +31,7 @@ Tap **{bereich.companies}** at the bottom. If the item isn’t in the bar, you�
 4. **‹ All {bereich.companies}** at the top (or “Back” in the browser) takes you back to the list, to the same place and with the same search.
 
 ## Good to know
-- You only see a company’s members if your app uses the **{bereich.directory}** area and you have the right to see it. Without this area, the companies’ pages don’t show any members either.
+- You only see a company’s members if your app uses the **{bereich.directory}** area and you have the permission to see it. Without this area, the companies’ pages don’t show any members either.
 - {bereich.offices} belong to people, not to a company. They are listed under **{bereich.offices}**, not on the company’s page.
 - Under **{bereich.directory}** you can filter the list by company; a person’s page shows their companies; tapping one opens the company’s page.
 - If there are no entries yet, the page says “No {bereich.companies} yet.”

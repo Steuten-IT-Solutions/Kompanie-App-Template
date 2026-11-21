@@ -12,7 +12,7 @@ Tap **{bereich.news}** at the bottom.
 - **Post**: image (if there is one), date, title and a short preview of the text.
 - **Older posts** (at the bottom): loads more, older posts. The button is missing once all posts are shown.
 - **Notify me about new posts** (at the bottom, only when not logged in): takes you to the notifications.
-- **New post** (at the top): only if you have the right to do so and the {bereich.news} are written in the app or, with WordPress, come from the website’s posts (help page “Write {bereich.news}”).
+- **New post** (at the top): only if you have the permission to do so and the {bereich.news} are written in the app or, with WordPress, come from the website’s posts (help page “Write {bereich.news}”).
 
 ## Step by step
 ### Read a post

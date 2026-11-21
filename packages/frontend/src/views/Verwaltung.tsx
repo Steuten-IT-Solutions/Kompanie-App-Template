@@ -2148,7 +2148,7 @@ function GivePenalty({
   const total = useAsync(() => (noTotal ? Promise.resolve(null) : api.members(false, true)), [], noTotal ? undefined : 'penalty-total');
   const [selected, setSelected] = useState<number[]>(preselect);
   const [amount, setAmount] = useState('');
-  const [reason, setReason] = useState(attendance ? `Gefehlt: ${attendance.title}` : '');
+  const [reason, setReason] = useState(attendance ? t('Gefehlt: {title}', { title: attendance.title }) : '');
   const [date, setDate] = useState(attendance?.date ?? todayYmd());
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
