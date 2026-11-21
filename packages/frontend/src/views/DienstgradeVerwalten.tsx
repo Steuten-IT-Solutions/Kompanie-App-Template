@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react';
-import { api, config, type Promotion, type Rank, type RankHistoryEntry, type RankStatus } from '../api';
+import { api, config, type Promotion, type Rank, type RankHistoryEntry, type RankRef, type RankStatus } from '../api';
 import brand from '../generated/brand';
 import { formatDate, todayYmd } from '../format';
 import { navigate } from '../router';
@@ -386,11 +386,12 @@ export function Promotions() {
                     <div className="row-sub">
                       {p.rank ? <RankLabel url={p.rank.badge_url} title={p.rank.title} /> : `Kein ${rank}`} ·{' '}
                       {p.points.toLocaleString(localeTag())} {sec.points}
-                      {p.next_rank &&
-                        p.points_to_next !== null &&
-                        (due
-                          ? ` · Schwelle für „${p.next_rank.title}“ erreicht${p.threshold_reached_since ? ` seit ${formatDate(p.threshold_reached_since)}` : ''}`
-                          : ` · noch ${p.points_to_next.toLocaleString(localeTag())} bis „${p.next_rank.title}“`)}
+                      {p.next_rank && p.points_to_next !== null && (
+                        <>
+                          {' · '}
+                          <NextRankText next={p.next_rank} pointsToNext={p.points_to_next} since={p.threshold_reached_since} />
+                        </>
+                      )}
                     </div>
                   </div>
                   <span className="chevron" aria-hidden="true">
@@ -403,6 +404,24 @@ export function Promotions() {
         </ul>
       )}
     </div>
+  );
+}
+
+/**
+ * Stand zum nächsten Dienstgrad („Schwelle für „Maat“ erreicht seit …“ bzw. „noch 3 bis „Maat““), mit dem Abzeichen des
+ * nächsten Dienstgrads vor seiner Bezeichnung wie beim aktuellen.
+ */
+function NextRankText({ next, pointsToNext, since, unit }: { next: RankRef; pointsToNext: number; since: string | null; unit?: string }) {
+  const label = <RankLabel url={next.badge_url} title={next.title} quoted />;
+  return pointsToNext <= 0 ? (
+    <>
+      Schwelle für {label} erreicht{since ? ` seit ${formatDate(since)}` : ''}
+    </>
+  ) : (
+    <>
+      noch {pointsToNext.toLocaleString(localeTag())}
+      {unit ? ` ${unit}` : ''} bis {label}
+    </>
   );
 }
 
@@ -500,9 +519,12 @@ export function MemberRank({
           <span className="muted small">
             {' '}
             ·{' '}
-            {status.points_to_next <= 0
-              ? `Schwelle für „${status.next_rank.title}“ erreicht${status.threshold_reached_since ? ` seit ${formatDate(status.threshold_reached_since)}` : ''}`
-              : `noch ${status.points_to_next.toLocaleString(localeTag())} ${sec.points} bis „${status.next_rank.title}“`}
+            <NextRankText
+              next={status.next_rank}
+              pointsToNext={status.points_to_next}
+              since={status.threshold_reached_since ?? null}
+              unit={sec.points}
+            />
           </span>
         )}
       </p>

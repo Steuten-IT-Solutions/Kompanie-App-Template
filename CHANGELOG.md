@@ -227,6 +227,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Abzeichen des nächsten Dienstgrads**: In der Übersicht [Beförderungen](app:verwaltung/befoerderungen) und beim
+  Dienstgrad eines Mitglieds steht jetzt auch vor dem nächsten Dienstgrad („Schwelle für … erreicht“, „noch … bis …“)
+  dessen Abzeichen, nicht nur vor dem aktuellen.
 - **Android: Installation in jedem Browser erklärt**: Die Anleitung unter [App installieren](app:installieren) erkennt
   den Browser. In Edge, Firefox, Opera, Brave und anderen erklärt ein Hinweis, warum Chrome besser ist (diese Browser
   legen nur eine Verknüpfung an, keine richtige App), mit _In Chrome öffnen_, _Chrome herunterladen_ (Play Store, falls
