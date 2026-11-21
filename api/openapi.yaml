@@ -2225,6 +2225,9 @@ paths:
         Ohne den Bereich Punkte frei. Mit Punkten (für alle, auch Admins): befördern erst ab der Schwelle des Ziels;
         degradieren immer, auch über der Schwelle. Dienstgrade ohne Schwelle frei. Schreibt den Verlauf.
         Wer kein Mitglied mehr ist (z. B. Gast), kann den Dienstgrad nur verlieren (`rank_id: null`, ohne Punkteregeln).
+        `date` legt den Tag des Wechsels fest (leer = heute): nicht in der Zukunft und nicht vor dem letzten Wechsel der
+        Person. Bei einem früheren Tag zählen für Schwelle und `points_at_change` nur Punkte bis zu diesem Tag; der
+        Verlauf speichert dann 12:00 Uhr Ortszeit dieses Tages als `changed_at`.
       x-capability: manage_ranks
       requestBody:
         required: true
@@ -2235,12 +2238,46 @@ paths:
               properties:
                 rank_id: { type: [integer, 'null'], description: null = kein Dienstgrad }
                 reason: { type: string, maxLength: 255 }
+                date: { type: string, format: date, description: Tag des Wechsels (JJJJ-MM-TT); leer = heute }
       responses:
         '200':
           description: Neuer Stand
           content:
             application/json:
               schema: { $ref: '#/components/schemas/RankStatus' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /members/{id}/rank-history/{entry}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - { name: entry, in: path, required: true, schema: { type: integer }, description: ID des Eintrags im Verlauf }
+    patch:
+      tags: [Verwaltung]
+      summary: Datum eines Eintrags im Dienstgrad-Verlauf nachträglich ändern
+      description: |
+        Nicht in der Zukunft, nicht vor dem vorigen und nicht nach dem nächsten Eintrag der Person (die Reihenfolge
+        bleibt). Gespeichert wird 12:00 Uhr Ortszeit des Tages (heute höchstens jetzt), zwischen den Nachbarn. Mit Punkten
+        wird `points_at_change` auf die Punkte bis zu diesem Tag gesetzt; bei einer Beförderung muss dieser Stand die
+        heutige Schwelle des neuen Dienstgrads erreichen. Die Ersteinstufung behält ihren Stand. Der Dienstgrad selbst
+        ändert sich nicht.
+      x-capability: manage_ranks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date]
+              properties:
+                date: { type: string, format: date }
+      responses:
+        '200':
+          description: Neuer Verlauf, neueste zuerst
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/RankHistoryEntry' } }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
@@ -12632,6 +12669,7 @@ components:
     RankHistoryEntry:
       type: object
       properties:
+        id: { type: integer, description: 'Für PATCH /members/{id}/rank-history/{entry}' }
         from: { type: [string, 'null'] }
         to: { type: [string, 'null'] }
         to_badge_url:

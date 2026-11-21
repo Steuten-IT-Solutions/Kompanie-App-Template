@@ -185,6 +185,7 @@ final class Subjects
             'PUT /members/{id}/birthday' => $member,
             'DELETE /members/{id}/birthday' => $member,
             'PUT /members/{id}/rank' => $member,
+            'PATCH /members/{id}/rank-history/{key}' => $member,
             'PUT /members/{id}/titles' => $member,
             'PUT /members/{id}/companies' => $member,
             'PUT /members/{id}/former' => $member,
@@ -667,6 +668,11 @@ final class Subjects
         $fields['Ehemalig seit'] = $former['left_on'] ?? null;
         $fields['Grund des Ausscheidens'] = $former['reason'] ?? null;
         $fields['Dienstgrad'] = $this->column('SELECT r.title FROM {member_ranks} m JOIN {ranks} r ON r.id = m.rank_id WHERE m.user_id = ?', $id)[0] ?? null;
+        // Mit Datum, damit ein nachträglich geändertes Datum im Protokoll steht (Ortszeit, wie in der App).
+        $fields['Dienstgrad-Verlauf'] = array_map(
+            fn (array $h): string => $this->app->time()->format((int) strtotime($h['changed_at'] . ' UTC'), 'd.m.Y') . ': ' . ($h['to_title'] !== '' ? $h['to_title'] : 'kein'),
+            $this->app->db->select('SELECT changed_at, to_title FROM {rank_history} WHERE user_id = ? ORDER BY changed_at, id', [$id]),
+        );
         $fields['Titel'] = $this->column('SELECT t.title FROM {member_titles} m JOIN {titles} t ON t.id = m.title_id WHERE m.user_id = ? ORDER BY t.sort, t.id', $id);
         $fields['Kompanien'] = $this->column('SELECT c.name FROM {member_companies} m JOIN {companies} c ON c.id = m.company_id WHERE m.user_id = ? ORDER BY c.sort, c.id', $id);
         $fields['Mails vom Brett'] = $this->app->boardMail()->wants($id);

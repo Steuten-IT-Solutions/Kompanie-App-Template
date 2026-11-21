@@ -1,6 +1,8 @@
-import { config, type RankHistoryEntry } from '../api';
+import { useState, type FormEvent } from 'react';
+import { api, config, type RankHistoryEntry } from '../api';
 import brand from '../generated/brand';
-import { formatDate, formatUtcDate } from '../format';
+import { formatDate, formatUtcDate, todayYmd } from '../format';
+import { IconButton } from '../icons';
 import { RankBadge, RankLabel } from '../RankBadge';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
@@ -75,12 +77,51 @@ export default function Dienstgrad() {
 
 const KIND: Record<RankHistoryEntry['kind'], string> = { promotion: 'Beförderung', demotion: 'Degradierung', initial: 'Ersteinstufung' };
 
-export function RankHistory({ entries }: { entries: RankHistoryEntry[] }) {
+/** Tag eines UTC-Zeitpunkts in Ortszeit als JJJJ-MM-TT (für das Datumsfeld). */
+function localYmd(utc: string): string {
+  const d = new Date(utc.replace(' ', 'T') + 'Z');
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/**
+ * Verlauf des Dienstgrads. Mit edit (Dienstgrade verwalten) lässt sich das Datum eines Eintrags nachträglich ändern;
+ * der Server prüft Zukunft, Reihenfolge und Schwelle.
+ */
+export function RankHistory({
+  entries,
+  edit,
+}: {
+  entries: RankHistoryEntry[];
+  edit?: { memberId: number; onChanged: () => void; onToast: (msg: string) => void };
+}) {
+  const [editing, setEditing] = useState<number | null>(null);
+  const [date, setDate] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   if (entries.length === 0) return <Empty>Noch keine Einträge.</Empty>;
+
+  async function save(e: FormEvent, entryId: number) {
+    e.preventDefault();
+    if (!edit) return;
+    setBusy(true);
+    setFormError(null);
+    try {
+      await api.setRankHistoryDate(edit.memberId, entryId, date);
+      edit.onToast('Datum geändert');
+      setEditing(null);
+      edit.onChanged();
+    } catch (err) {
+      setFormError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <ul className="card-list">
       {entries.map((h, i) => (
-        <li key={i} className="card row">
+        <li key={h.id ?? i} className="card row">
           {h.to && <RankBadge url={h.to_badge_url} title={h.to} size="small" />}
           <div className="row-main">
             <div className="row-title">
@@ -92,6 +133,39 @@ export function RankHistory({ entries }: { entries: RankHistoryEntry[] }) {
               {h.points_at_change !== null && ` · ${h.points_at_change.toLocaleString('de-DE')} ${sec.points}`}
               {h.reason && ` · ${h.reason}`}
             </div>
+            {edit && h.id !== undefined && editing === h.id && (
+              <form className="form rank-history-date" onSubmit={(e) => save(e, h.id!)}>
+                <label className="field">
+                  <span>Neues Datum</span>
+                  <input type="date" max={todayYmd()} value={date} onChange={(e) => setDate(e.target.value)} required />
+                </label>
+                {formError && (
+                  <p className="form-error" role="alert">
+                    {formError}
+                  </p>
+                )}
+                <button className="btn btn-block" type="submit" disabled={busy || date === ''}>
+                  Datum speichern
+                </button>
+                <button type="button" className="btn btn-secondary btn-block" disabled={busy} onClick={() => setEditing(null)}>
+                  Abbrechen
+                </button>
+              </form>
+            )}
+            {edit && h.id !== undefined && editing !== h.id && (
+              <div className="row-actions icon-row">
+                <IconButton
+                  icon="edit"
+                  label="Datum ändern"
+                  disabled={busy}
+                  onClick={() => {
+                    setDate(localYmd(h.changed_at));
+                    setFormError(null);
+                    setEditing(h.id!);
+                  }}
+                />
+              </div>
+            )}
           </div>
         </li>
       ))}

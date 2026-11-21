@@ -26,6 +26,12 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Beförderung mit Datum**: Beim Ändern des Dienstgrads eines Mitglieds (z. B. aus
+  [Beförderungen](app:verwaltung/befoerderungen)) wählst du jetzt das Datum der Änderung, vorgegeben ist heute. Ein
+  früherer Tag geht, ein Tag in der Zukunft oder vor der letzten Änderung dieser Person nicht. Mit Punkten zählen bei
+  einem früheren Tag nur die Punkte bis zu diesem Tag, für die Schwelle und für den Stand im Verlauf. Das Datum einer
+  schon eingetragenen Änderung korrigierst du nachträglich im Verlauf mit dem Stift (_Datum ändern_), nach denselben
+  Regeln; die Korrektur steht im Änderungsprotokoll.
 - **Bald fällige Beförderungen**: Am Knopf [Beförderungen](app:verwaltung/befoerderungen) zeigt neben der Zahl im roten
   Kreis ein Kreis in der Farbe der Kompanie, wie viele Mitglieder bald die Schwelle für ihren nächsten Dienstgrad
   erreichen (es fehlt höchstens noch ein Punkt); sie stehen in der Übersicht im neuen Abschnitt „Bald erreicht“.

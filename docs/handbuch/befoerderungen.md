@@ -23,7 +23,7 @@ Tippe unten auf **Verwaltung** und dann auf den Knopf **Beförderungen**. Mit **
 ### Ein Mitglied befördern
 1. Tippe unter **Schwelle erreicht** auf den Namen.
 2. Das Fenster **{begriff.rank}** des Mitglieds öffnet sich; unter **Neuer {begriff.rank}** ist der nächste {begriff.rank} schon gewählt.
-3. Trage bei Bedarf eine **Begründung** ein und tippe auf **{begriff.rank} ändern**.
+3. Wähle bei Bedarf unter **Datum** einen früheren Tag (vorgegeben ist heute), trage eine **Begründung** ein und tippe auf **{begriff.rank} ändern**.
 
 ### Kandidaten zum Degradieren finden
 1. Sieh in den Abschnitt **Unter der Schwelle** ganz oben.
