@@ -18,6 +18,8 @@ final class I18n
 {
     public const LOCALES = ['de', 'en'];
     public const SOURCE_LOCALE = 'de';
+    /** Header, mit dem die App ihre Sprache mitschickt */
+    public const HEADER = 'X-Kompanie-Lang';
 
     private static string $locale = self::SOURCE_LOCALE;
 

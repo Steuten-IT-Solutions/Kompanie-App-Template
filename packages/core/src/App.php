@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\PreviewEnvironment;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Domain\ActivityService;
+use KompanieApp\Core\Domain\LanguageService;
 use KompanieApp\Core\Domain\ChangeLogService;
 use KompanieApp\Core\Domain\AttendanceService;
 use KompanieApp\Core\Domain\BackupEncryptionService;
@@ -762,6 +763,12 @@ final class App
     public function joinYears(): JoinYearService
     {
         return $this->service(JoinYearService::class, fn () => new JoinYearService($this));
+    }
+
+    /** Sprachen der App: eingeschaltete und die Wahl je Konto (Plan „Mehrsprachigkeit“) */
+    public function languages(): LanguageService
+    {
+        return $this->service(LanguageService::class, fn () => new LanguageService($this->settings, new UserSettings($this->db)));
     }
 
     /** Anordnung der Kacheln: persönlich je Konto und Vorgabe für alle */
