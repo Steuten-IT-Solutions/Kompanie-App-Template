@@ -139,7 +139,8 @@ h3,
   /* Teilen, Hilfe, Darstellung und „Login“ nebeneinander: Platz für den Titel lassen */
   .topbar .topbar-help,
   .topbar .topbar-share,
-  .topbar .topbar-theme {
+  .topbar .topbar-theme,
+  .topbar .topbar-lang {
     width: 30px;
     height: 30px;
   }
@@ -185,6 +186,82 @@ h3,
   flex: none;
   border: 1px solid var(--on-primary-soft);
   border-radius: 50%;
+}
+.topbar .topbar-lang {
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  padding: 0;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--on-primary-soft);
+  border-radius: 50%;
+}
+.topbar .topbar-lang .flag {
+  width: 20px;
+  height: 14px;
+}
+/* Sprachwahl: Auswahl unter der Flagge */
+.lang-menu-wrap {
+  position: relative;
+  flex: none;
+}
+.flag {
+  width: 24px;
+  height: 16px;
+  flex: none;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 15%);
+  vertical-align: middle;
+}
+.lang-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 20;
+  min-width: 180px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+}
+.lang-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.lang-menu button:hover,
+.lang-menu button:focus-visible {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+.lang-menu button[aria-checked='true'] {
+  font-weight: 700;
+}
+.lang-check {
+  margin-left: auto;
+  color: var(--accent);
+}
+.lang-choice button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 .topbar .topbar-help.active {
   background: var(--accent);

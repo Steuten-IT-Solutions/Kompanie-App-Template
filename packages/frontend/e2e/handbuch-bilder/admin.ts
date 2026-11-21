@@ -119,6 +119,11 @@ const gruppe: Gruppe = async (f) => {
   await rechtliches.getByLabel('Datenschutzerklärung').fill('https://www.beispiel.de/datenschutz');
   await f.foto('admin-rechtliches');
 
+  // Sprachen (Englisch nur angehakt, nicht gespeichert)
+  await f.oeffnen('einstellungen/sprachen');
+  await page.locator('#einstellungen-sprachen').getByLabel('English').check();
+  await f.foto('admin-sprachen');
+
   // Datensicherung
   await f.oeffnen('einstellungen/datensicherung');
   await f.foto('admin-updates-und-sicherung');

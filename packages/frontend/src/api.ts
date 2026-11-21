@@ -3843,6 +3843,8 @@ export interface AdminSettings {
   news: { source: NewsSourceType; url: string; sources?: NewsSourceType[] } | null;
   /** Links auf Impressum und Datenschutzerklärung; leer, solange keiner eingetragen ist (fehlt bei älteren Servern) */
   legal?: { imprint_url: string; privacy_url: string };
+  /** Eingeschaltete Sprachen (Deutsch immer zuerst) und alle, die die App kann */
+  languages?: { enabled: Locale[]; available: Locale[] };
 }
 
 /** Bild der Galerie, das sich nicht aufbereiten ließ (Einstellungen → Galerie). */
@@ -3918,6 +3920,8 @@ export interface FailedPhoto {
 }
 
 export interface AdminSettingsInput {
+  /** Eingeschaltete Sprachen, durch Komma getrennt (Deutsch kommt immer dazu) */
+  languages?: string;
   calendar_source?: CalendarSourceChoice;
   calendar_ics_url?: string;
   google_api_key?: string;

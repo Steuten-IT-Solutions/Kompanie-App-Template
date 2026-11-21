@@ -20,6 +20,7 @@ Tippe unten auf **Meins** und wähle oben im Menü **Konto**. Gibt es unter **Me
 - **Benachrichtigungen einstellen**: worüber dich die App auf diesem Gerät benachrichtigt. Darunter, wenn die {kompanie.name} den Mailversand eingerichtet hat, der Schalter für Nachrichten vom Brett per E-Mail (anfangs an).
 - **Signatur**: dein Gruß für Nachrichten am Brett, mit Text und Bildern (für {rolle.member}, Anwärter und alle, die am Brett schreiben). Mehr dazu steht auf der Hilfeseite **Signatur**.
 - **Darstellung**: **Wie Gerät**, **Hell** oder **Dunkel**.
+- **Sprache** (nur, wenn die {kompanie.name} außer Deutsch eine weitere Sprache eingeschaltet hat): **Deutsch** oder **English**. Sie gilt für die App, für Mails und für Benachrichtigungen an dich. Dieselbe Wahl hast du über die Flagge oben in der Kopfzeile.
 - **App installieren**: die Anleitung, wie du die App aufs Handy holst. Die Karte fehlt, wenn du die App schon installiert geöffnet hast.
 - **Passwort ändern**: dein Passwort neu festlegen.
 - **Abmelden**: dich auf diesem Gerät abmelden.

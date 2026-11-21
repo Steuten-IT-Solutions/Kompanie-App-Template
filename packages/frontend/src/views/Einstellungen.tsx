@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import brand from '../generated/brand';
-import { t, tn } from '../i18n';
+import { t, tn, type Locale } from '../i18n';
+import { Flag, LANGUAGE_NAMES } from '../language';
 import {
   api,
   can,
@@ -87,6 +88,7 @@ const PAGES = [
   { id: 'bereiche', group: 'App', title: t('Bereiche') },
   { id: 'navigation', group: 'App', title: t('Navigation') },
   { id: 'rechtliches', group: 'App', title: t('Impressum und Datenschutz') },
+  { id: 'sprachen', group: 'App', title: t('Sprachen') },
   { id: 'rollen', group: 'Mitglieder und Zugang', title: t('Rollen') },
   { id: 'benachrichtigungen', group: 'Benachrichtigungen', title: t('Benachrichtigungen') },
   { id: 'email', group: 'Verbindungen', title: t('E-Mail') },
@@ -140,9 +142,12 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
       {page.id === 'wartung' && <MaintenanceCard onToast={onToast} />}
       {page.id === 'datensicherung' && <Wartung part="datensicherung" onToast={onToast} />}
       {page.id === 'neuerungen' && <Neuerungen />}
-      {(page.id === 'google' || page.id === 'kalender' || page.id === 'galerie' || page.id === 'news' || page.id === 'rechtliches') && (
-        <Verbindung page={page.id} onToast={onToast} />
-      )}
+      {(page.id === 'google' ||
+        page.id === 'kalender' ||
+        page.id === 'galerie' ||
+        page.id === 'news' ||
+        page.id === 'rechtliches' ||
+        page.id === 'sprachen') && <Verbindung page={page.id} onToast={onToast} />}
       {page.id === 'kalender' && config?.features.birthdays && <BirthdaySettingsSection onToast={onToast} />}
     </div>
   );
@@ -205,7 +210,7 @@ function Verbindung({
   page,
   onToast,
 }: {
-  page: 'google' | 'kalender' | 'galerie' | 'news' | 'rechtliches';
+  page: 'google' | 'kalender' | 'galerie' | 'news' | 'rechtliches' | 'sprachen';
   onToast: (msg: string) => void;
 }) {
   const { data, error, loading, reload, setData, revision } = useAsync(sources.settings.load, sources.settings.deps, sources.settings.key);
@@ -231,6 +236,7 @@ function Verbindung({
       </>
     );
   if (page === 'rechtliches') return <Legal key={revision} {...props} />;
+  if (page === 'sprachen') return <Languages key={revision} {...props} />;
   return s.news ? <News key={revision} {...props} /> : null;
 }
 
@@ -1931,6 +1937,56 @@ export function News({ settings, onSaved, onToast }: SectionProps) {
           {result}
         </p>
       )}
+    </Section>
+  );
+}
+
+/**
+ * Sprachen der App: Deutsch ist immer an; weitere schaltet der Admin hier ein. Erst dann erscheint die Flagge in der
+ * Kopfzeile und die Wahl unter Meins → Konto. Namen und Inhalte bleiben, wo nichts anderes eingetragen ist, deutsch.
+ */
+export function Languages({ settings, onSaved, onToast }: SectionProps) {
+  const saved = settings.languages ?? { enabled: ['de'], available: ['de'] };
+  const [enabled, setEnabled] = useState<Locale[]>(saved.enabled);
+  const { busy, error, save } = useSave((s) => {
+    if (config && s.languages) config.languages = s.languages.enabled;
+    onSaved(s);
+  }, onToast);
+  const others = saved.available.filter((l) => l !== 'de');
+  return (
+    <Section
+      id="sprachen"
+      title={t('Sprachen')}
+      busy={busy}
+      error={error}
+      onSubmit={(e) => {
+        e.preventDefault();
+        save({ languages: enabled.join(',') });
+      }}
+    >
+      <p className="small muted">
+        {t(
+          'Deutsch ist immer eingeschaltet. Mit einer weiteren Sprache erscheint oben eine Flagge zum Wechseln; jede Person wählt ihre Sprache selbst. Mails und Benachrichtigungen kommen in der Sprache, die jemand gewählt hat.',
+        )}
+      </p>
+      <label className="toggle">
+        <input type="checkbox" checked disabled />
+        <span lang="de">
+          <Flag lang="de" /> {LANGUAGE_NAMES.de}
+        </span>
+      </label>
+      {others.map((l) => (
+        <label key={l} className="toggle">
+          <input
+            type="checkbox"
+            checked={enabled.includes(l)}
+            onChange={(e) => setEnabled(e.target.checked ? [...enabled, l] : enabled.filter((x) => x !== l))}
+          />
+          <span lang={l}>
+            <Flag lang={l} /> {LANGUAGE_NAMES[l]}
+          </span>
+        </label>
+      ))}
     </Section>
   );
 }

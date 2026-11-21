@@ -1,6 +1,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, can, config, CONFIG_CHANGED, toLogin, newsTitle, type Capability } from './api';
 import { t } from './i18n';
+import { LanguageButton } from './language';
 import brand from './generated/brand';
 import logoUrl from './generated/logo-small.webp';
 import { detectPlatform, isStandalone, promptInstall, useCanPrompt } from './install';
@@ -658,6 +659,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
       >
         ?
       </button>
+      <LanguageButton />
       <ThemeButton />
       {!user && tab !== 'anmelden' && (
         <button className="btn btn-link topbar-account" onClick={toLogin}>

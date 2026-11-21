@@ -4685,6 +4685,76 @@ test('Impressum und Datenschutz: Admin trägt die Links ein, alle sehen sie (Anm
   await expect(page.locator('.account-legal')).toHaveCount(0);
 });
 
+test('Sprachen: Admin schaltet Englisch ein, Flagge oben, Wahl gilt am Konto, zurück auf Deutsch', async ({ page, browser }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/einstellungen');
+  // Nur Deutsch: keine Flagge
+  await expect(page.locator('.settings-link', { hasText: 'Sprachen' })).toBeVisible();
+  await expect(page.locator('.topbar-lang')).toHaveCount(0);
+  await page.goto('/app/#/einstellungen/sprachen');
+  const form = page.locator('.settings-section', { hasText: 'Sprachen' });
+  await expect(form.getByLabel('Deutsch')).toBeDisabled();
+  await form.getByLabel('English').check();
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+
+  // Flagge in der Kopfzeile, Auswahl mit den Namen der Sprachen
+  const flag = page.getByRole('button', { name: 'Sprache: Deutsch' });
+  await expect(flag).toHaveAttribute('aria-haspopup', 'menu');
+  await flag.click();
+  await expect(flag).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('menuitemradio', { name: 'Deutsch' })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByRole('menuitemradio', { name: 'English' })).toHaveAttribute('lang', 'en');
+  // Escape schließt
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await flag.click();
+  await page.getByRole('menuitemradio', { name: 'English' }).click();
+
+  // Nach dem Neuladen auf Englisch, auch Meldungen des Servers
+  await expect(page.getByRole('button', { name: 'Language: English' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.locator('.topbar-title')).toHaveText('Settings');
+  await page.goto('/app/#/einstellungen/rechtliches');
+  const legal = page.locator('.settings-section', { hasText: 'Legal notice and privacy' });
+  await legal.getByLabel('Legal notice').fill('javascript:alert(1)');
+  await legal.getByLabel('Legal notice').evaluate((el) => el.setAttribute('type', 'text'));
+  await legal.getByRole('button', { name: 'Save' }).click();
+  await expect(legal.locator('.form-error')).toContainText('address of the legal notice');
+
+  // Am Konto gespeichert: gilt auch ohne die Wahl am Gerät
+  await page.evaluate(() => localStorage.removeItem('kompanie-locale'));
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+
+  // Gäste wählen am Gerät; ohne Wahl gilt Deutsch (Browser auf Deutsch)
+  const guest = await quietPage(browser);
+  await guest.goto('/app/#/hilfe');
+  await expect(guest.getByRole('button', { name: 'Sprache: Deutsch' })).toBeVisible();
+  await guest.close();
+
+  // Zurück unter Meins → Konto
+  await page.goto('/app/#/meins');
+  const menu = page.locator('.meins-menu');
+  if (await menu.count()) {
+    await menu.locator('.admin-menu-toggle').click();
+    await menu.locator('.admin-menu-list').getByRole('button', { name: 'Account', exact: true }).click();
+  }
+  const card = page.locator('.account-card', { hasText: 'Language' });
+  await expect(card.getByRole('button', { name: 'English' })).toHaveAttribute('aria-pressed', 'true');
+  await card.getByRole('button', { name: 'Deutsch' }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'de');
+  await expect(page.getByRole('button', { name: 'Sprache: Deutsch' })).toBeVisible();
+
+  // Aufräumen: nur Deutsch, die Flagge verschwindet
+  await page.goto('/app/#/einstellungen/sprachen');
+  await form.getByLabel('English').uncheck();
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  await page.reload();
+  await expect(page.locator('.topbar-lang')).toHaveCount(0);
+});
+
 test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nicht', async ({ page }) => {
   // So, wie scripts/changelog.php es beim Bauen in die App gelegt hat.
   const changelog = JSON.parse(readFileSync(new URL('../src/generated/changelog.json', import.meta.url), 'utf8')) as {
