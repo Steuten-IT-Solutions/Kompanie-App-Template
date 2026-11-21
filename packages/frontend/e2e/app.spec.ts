@@ -7944,8 +7944,14 @@ test('Kacheln anordnen: ziehen, Breite, Tastatur, je Konto gespeichert, Zurück-
   const [first, second] = [id(before[0]), id(before[1])];
   // Ohne Anordnung: der Reihe nach, zwei Spalten am Handy
   expect(before.slice(0, 2)).toEqual([`${first}@1+1/1`, `${second}@2+1/1`]);
+  // Der Knopf steht unter den Kacheln, der Bearbeiten-Hinweis darüber
+  const arrangeBox = await page.getByRole('button', { name: 'Kacheln anordnen' }).boundingBox();
+  const gridBox = await grid.boundingBox();
+  expect(arrangeBox!.y).toBeGreaterThanOrEqual(gridBox!.y + gridBox!.height);
 
   await page.getByRole('button', { name: 'Kacheln anordnen' }).click();
+  const hintBox = await page.locator('.tile-arrange').boundingBox();
+  expect(hintBox!.y + hintBox!.height).toBeLessThanOrEqual((await grid.boundingBox())!.y);
   // Im Bearbeiten-Modus ist die Kachel selbst nicht bedienbar
   await expect(tile(first).locator('.tile-body')).toHaveAttribute('inert', '');
   // Erste Kachel mit der Maus in die freie Zeile unten ziehen

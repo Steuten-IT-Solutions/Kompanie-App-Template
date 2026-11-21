@@ -31,7 +31,7 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   erreichen (es fehlt höchstens noch ein Punkt); sie stehen in der Übersicht im neuen Abschnitt „Bald erreicht“.
 - **Kacheln selbst anordnen**: Jede Person legt auf der Startseite der [Verwaltung](app:verwaltung), unter
   Einrichtungen, in den Untermenüs wie [Intern](app:intern) und in den [Einstellungen](app:einstellungen) selbst fest,
-  wo jede Kachel steht und wie breit sie ist (Symbol oben rechts über den Kacheln: ziehen, am Handy kurz halten; − und +
+  wo jede Kachel steht und wie breit sie ist (Symbol unten rechts unter den Kacheln: ziehen, am Handy kurz halten; − und +
   für die Breite; Zurücksetzen auf die Vorgabe). Die Anordnung gilt nur für die Person, wird im Konto gespeichert und
   gilt je Bildschirmbreite (2 bis 5 Spalten); ohne Anmeldung merkt sie sich das Gerät. Die Reihenfolge unter
   [Einstellungen → Navigation](app:einstellungen/navigation) bleibt die Vorgabe für alle anderen; fehlt jemandem eine

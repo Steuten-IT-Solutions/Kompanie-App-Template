@@ -6,7 +6,7 @@ rechte: []
 Auf den Seiten mit Knöpfen (Kacheln) legst du selbst fest, wo jede Kachel steht und wie breit sie ist: in der **Verwaltung**, unter **Einrichtungen**, in jedem [Untermenü](seite:untermenue) wie **Intern** und in den **Einstellungen**. Die Anordnung gilt nur für dich; alle anderen sehen weiter ihre eigene oder die Vorgabe.
 
 ## So öffnest du die Seite
-Öffne eine dieser Seiten und tippe oben rechts auf das Symbol **Kacheln anordnen** (Raster mit einer breiten Kachel).
+Öffne eine dieser Seiten und tippe unten rechts unter den Kacheln auf das Symbol **Kacheln anordnen** (Raster mit einer breiten Kachel).
 
 ## Was du hier siehst
 - Über den Kacheln ein Hinweis mit **Zurücksetzen** und **Fertig**.
