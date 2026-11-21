@@ -11,6 +11,7 @@ use KompanieApp\WordPress\Roles;
 final class WpDriver implements ApiDriver
 {
     private ?string $preview = null;
+    private ?string $lang = null;
 
     public function request(string $method, string $path, array $body = [], array $query = []): array
     {
@@ -22,6 +23,9 @@ final class WpDriver implements ApiDriver
         }
         if ($this->preview !== null) {
             $req->set_header('X-Kompanie-Preview', $this->preview);
+        }
+        if ($this->lang !== null) {
+            $req->set_header('X-Kompanie-Lang', $this->lang);
         }
         $res = rest_do_request($req);
         $data = json_decode((string) wp_json_encode(rest_get_server()->response_to_data($res, false)), true);
@@ -36,6 +40,12 @@ final class WpDriver implements ApiDriver
     public function preview(?string $value): void
     {
         $this->preview = $value;
+    }
+
+    /** Sprache der App für die folgenden Anfragen (Header X-Kompanie-Lang); null = ohne Angabe */
+    public function lang(?string $value): void
+    {
+        $this->lang = $value;
     }
 
     public function createUser(string $login, string $level): int

@@ -59,7 +59,7 @@ final class Plugin
                 files: $files,
                 images: new WpImageResizer(),
                 scheduler: new WpScheduler(),
-                news: new WpNewsSource(),
+                news: new WpNewsSource(static fn (): ?string => self::app()->contentTranslations()->current()),
                 clock: new \KompanieApp\Core\Infra\SystemClock(wp_timezone()),
                 env: $env,
                 authContext: $users,

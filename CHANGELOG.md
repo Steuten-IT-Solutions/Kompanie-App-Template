@@ -40,8 +40,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   (_Auf English schreiben_ unter dem Inhalt; Benachrichtigung und Mail gehen dann in der Sprache der Empfänger),
   ebenso [Termine](app:termine/verwalten), [Umfragen](app:umfragen/verwalten), die Namen von
   [Dokumenten](app:dokumente/verwalten) und ihren Kategorien und die Titel der Alben in der [Galerie](app:galerie); wer
-  auf Englisch liest und sie nicht hat, sieht die deutsche mit dem Hinweis „Nur auf Deutsch verfügbar“. Was ihr sonst
-  eintragt, bleibt, wie es ist.
+  auf Englisch liest und sie nicht hat, sieht die deutsche mit dem Hinweis „Nur auf Deutsch verfügbar“. Mit WordPress
+  zeigen die News aus den Beiträgen der Seite auf Englisch die Übersetzung aus dem Plugin Polylang, wenn es aktiv ist;
+  Beiträge einer anderen Webseite oder aus einem Feed bleiben deutsch (mit dem Hinweis). Was ihr sonst eintragt, bleibt,
+  wie es ist.
 - **Wartung**: Unter [Einstellungen → Zustand und Updates](app:einstellungen/zustand) steht, bis wann eure App neue
   Versionen bekommt (Wartung bis …, oder unbefristet). Nach dem Ende läuft die App mit ihrer Version weiter; neue
   Versionen, auch Sicherheitsupdates, gibt es erst nach einer Verlängerung. Zurückgehen auf ältere Versionen bleibt

@@ -310,6 +310,49 @@ foreach ([$pub, $draft, $pw] as $pid) {
     wp_delete_post($pid, true);
 }
 
+$c->section('Neuigkeiten aus Beiträgen je Sprache (Polylang)');
+require_once __DIR__ . '/polylang-stub.php';
+$languagesBefore = $app->settings->get('languages', '');
+$app->settings->set('languages', 'de,en');
+$deMit = wp_insert_post(['post_title' => 'Kpwp Schützenfest', 'post_content' => '<p>Deutsch</p>', 'post_status' => 'publish']);
+$enMit = wp_insert_post(['post_title' => 'Kpwp Shooting fair', 'post_content' => '<p>English</p>', 'post_status' => 'publish']);
+$deOhne = wp_insert_post(['post_title' => 'Kpwp Nur deutsch', 'post_content' => '<p>Nur deutsch</p>', 'post_status' => 'publish']);
+$enEntwurf = wp_insert_post(['post_title' => 'Kpwp Draft', 'post_content' => 'x', 'post_status' => 'draft']);
+$ohneSprache = wp_insert_post(['post_title' => 'Kpwp Ohne Sprache', 'post_content' => '<p>alt</p>', 'post_status' => 'publish']);
+$GLOBALS['kpwp_pll'] = [
+    'lang' => [$deMit => 'de', $enMit => 'en', $deOhne => 'de', $enEntwurf => 'en'],
+    'groups' => [['de' => $deMit, 'en' => $enMit], ['de' => $deOhne, 'en' => $enEntwurf]],
+];
+$byId = static fn (array $list): array => array_column(array_filter($list, static fn (array $n): bool => str_starts_with($n['title'], 'Kpwp')), null, 'id');
+$d->actAs(null);
+$d->lang('en');
+[$s, $news] = $d->request('GET', '/news');
+$en = $byId($news);
+$c->ok($s === 200 && count($en) === 3 && isset($en[(string) $deMit], $en[(string) $deOhne], $en[(string) $ohneSprache]), 'Polylang: Liste aus den deutschen Beiträgen und denen ohne Sprache, Kennung des deutschen');
+$c->ok(($en[(string) $deMit]['title'] ?? '') === 'Kpwp Shooting fair' && !isset($en[(string) $deMit]['untranslated']) && ($en[(string) $deMit]['link'] ?? '') === get_permalink($enMit), 'Auf Englisch die Übersetzung');
+$c->ok(($en[(string) $deOhne]['title'] ?? '') === 'Kpwp Nur deutsch' && ($en[(string) $deOhne]['untranslated'] ?? '') === 'all', 'Ohne veröffentlichte Übersetzung deutsch mit Hinweis');
+[$s, $item] = $d->request('GET', '/news/' . $deMit);
+$c->ok($s === 200 && $item['id'] === (string) $deMit && str_contains($item['content'], 'English') && !isset($item['untranslated']), 'Beitrag auf Englisch');
+[, $item] = $d->request('GET', '/news/' . $deOhne);
+$c->ok(str_contains($item['content'], 'Nur deutsch') && ($item['untranslated'] ?? '') === 'all', 'Beitrag ohne Übersetzung mit Hinweis');
+$d->lang(null);
+[, $news] = $d->request('GET', '/news');
+$de = $byId($news);
+$c->ok(($de[(string) $deMit]['title'] ?? '') === 'Kpwp Schützenfest' && !isset($de[(string) $deMit]['untranslated'], $de[(string) $deOhne]['untranslated']), 'Auf Deutsch die deutschen ohne Hinweis');
+[, $item] = $d->request('GET', '/news/' . $enMit);
+$c->ok(str_contains($item['content'], 'Deutsch') && $item['id'] === (string) $enMit, 'Übersetzter Beitrag auf Deutsch aufgerufen: die deutsche Fassung');
+$GLOBALS['kpwp_pll'] = null;
+$d->lang('en');
+[, $news] = $d->request('GET', '/news');
+$en = $byId($news);
+$c->ok(count($en) === 4 && ($en[(string) $enMit]['untranslated'] ?? '') === 'all', 'Ohne Polylang: alle Beiträge, auf Englisch mit Hinweis');
+$d->lang(null);
+\KompanieApp\Core\I18n\I18n::setLocale('de');
+$app->settings->set('languages', $languagesBefore);
+foreach ([$deMit, $enMit, $deOhne, $enEntwurf, $ohneSprache] as $pid) {
+    wp_delete_post($pid, true);
+}
+
 $c->section('News im Editor von WordPress schreiben');
 $newsWasOn = $app->features()->enabled('news');
 $app->features()->update(['news' => true]);
