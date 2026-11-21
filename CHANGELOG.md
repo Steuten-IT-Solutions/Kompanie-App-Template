@@ -221,6 +221,14 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Android: Installation in jedem Browser erklärt**: Die Anleitung unter [App installieren](app:installieren) erkennt
+  den Browser. In Edge, Firefox, Opera, Brave und anderen erklärt ein Hinweis, warum Chrome besser ist (diese Browser
+  legen nur eine Verknüpfung an, keine richtige App), mit _In Chrome öffnen_, _Adresse kopieren_ und den Schritten im
+  eigenen Browser. Der Hinweis im Samsung-Browser nennt den Grund genauer (Google Play Protect blockiert ab Android 14,
+  Fehler seit April 2026 gemeldet). Im eingebauten Browser anderer Apps (WhatsApp, Facebook …) erklären Anleitung und
+  Benachrichtigungen, dass dort weder Installation noch Benachrichtigungen gehen. Neu ist _Klappt es nicht?_ mit
+  Hinweisen zu schon installierter App, Xiaomi, Huawei ohne Google-Dienste, Akku-Sparen und Android 8/9; bei blockierten
+  Benachrichtigungen steht der Weg in Chrome dabei.
 - **Benachrichtigungen gleich nach der Anmeldung anbieten**: Der Hinweis _Nichts mehr verpassen_ erscheint jetzt als
   Fenster direkt nach der Anmeldung, auf jeder Seite (auch wenn jemand über einen geteilten Link kommt), statt als Karte
   nur auf der Startseite. Er kommt weiterhin nur, solange der Browser auf diesem Gerät noch nie nach Benachrichtigungen

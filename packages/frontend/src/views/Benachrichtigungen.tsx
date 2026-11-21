@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import brand from '../generated/brand';
 import { api, config, type PushDevice, type PushStatus, type PushType } from '../api';
 import { currentDevice, disablePush, enablePush, matchesServerKey, pushSupport } from '../push';
+import { androidBrowser } from '../androidBrowser';
+import { detectPlatform, isInAppBrowser } from '../install';
 import { previewRole } from '../preview';
 import { navigate } from '../router';
 import { ErrorBox, Loading } from '../ui';
@@ -12,6 +14,8 @@ import { ErrorBox, Loading } from '../ui';
  */
 export default function Benachrichtigungen({ onToast }: { onToast: (msg: string) => void }) {
   const support = pushSupport();
+  const android = detectPlatform() === 'android';
+  const inAppBrowser = isInAppBrowser() || (android && androidBrowser(navigator.userAgent) === 'webview');
   const [device, setDevice] = useState<PushDevice | null>(null);
   const [status, setStatus] = useState<PushStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +82,9 @@ export default function Benachrichtigungen({ onToast }: { onToast: (msg: string)
       <div className="card push-card">
         <h3>Benachrichtigungen</h3>
         <p className="small muted">
-          Dieser Browser unterstützt keine Benachrichtigungen. Probier es mit einem aktuellen Chrome, Firefox, Edge oder Safari.
+          {inAppBrowser
+            ? 'Diese Seite ist im eingebauten Browser einer anderen App geöffnet (z. B. WhatsApp, Facebook). Solche Browser können keine Benachrichtigungen zeigen. Öffne die Adresse in Chrome (Android) bzw. Safari (iPhone).'
+            : 'Dieser Browser unterstützt keine Benachrichtigungen. Probier es mit einem aktuellen Chrome, Firefox, Edge oder Safari.'}
         </p>
       </div>
     );
@@ -200,7 +206,16 @@ export default function Benachrichtigungen({ onToast }: { onToast: (msg: string)
       )}
       {blocked && !active && (
         <p className="small" role="alert">
-          Benachrichtigungen sind für diese Seite blockiert. Erlaube sie in den Einstellungen des Browsers und lade die Seite neu.
+          Benachrichtigungen sind für diese Seite blockiert, deshalb fragt der Browser nicht mehr nach. Erlaube sie in den Einstellungen des
+          Browsers und lade die Seite neu.
+          {android && (
+            <>
+              {' '}
+              In Chrome: links neben der Adresse auf das Symbol tippen → <strong>Berechtigungen</strong> →{' '}
+              <strong>Benachrichtigungen</strong> → <strong>Zulassen</strong>. In der installierten App außerdem: Einstellungen des Handys →{' '}
+              <strong>Apps</strong> → die App → <strong>Benachrichtigungen</strong>.
+            </>
+          )}
         </p>
       )}
       {actionError && (
