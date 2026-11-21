@@ -33,6 +33,6 @@ Tap **Reset** and confirm. The default then applies to this page again, for all 
 - Depending on the width, the grid has 2 to 5 columns: 2 on a phone, 3 or 4 on a tablet and on a phone held sideways, 5 on a computer (from a window width of about 900 px; pages with tiles are wider there than other pages). Each number of columns has its own arrangement. If you haven’t arranged a width yet, it takes over the order of another one.
 - Without a connection the change applies immediately and is noted on the device; the app saves it as soon as there is a network again.
 - Without logging in, only this device remembers the arrangement. After logging in, your account’s arrangement applies.
-- If a new tile is added (e.g. through a new right), it goes at the bottom. If a tile disappears, the narrowest tile in the same row gets wider by its width (the left one if they are equally wide); the row stays as wide as before.
+- If a new tile is added (e.g. through a new permission), it goes at the bottom. If a tile disappears, the narrowest tile in the same row gets wider by its width (the left one if they are equally wide); the row stays as wide as before.
 - The default for everyone who hasn’t arranged anything is set by an {rolle.admin}: the order or a grid with positions and widths.
 - In the **View the app as …** preview, the default always applies.

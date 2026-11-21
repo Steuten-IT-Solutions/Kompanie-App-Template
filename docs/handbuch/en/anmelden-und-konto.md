@@ -31,7 +31,7 @@ Tap **My area** at the bottom and choose **Account** in the menu at the top. If 
 4. If you have changed your email address, enter your **Current password** to confirm. You don’t need a password for the mobile number and address.
 5. Tap **Save**.
 
-The app puts everything into the right form itself: spaces in the email address are dropped, and the mobile number is stored in a consistent format, e.g. +49 171 1234567. In the address, the house number moves into its own field if you write it into the street (“Hauptstraße 5a”), and the postcode is written as usual in that country (e.g. “1234 AB” in the Netherlands). If something isn’t right, it says so directly below the field, for example if the postcode doesn’t match the country; for a mistyped provider such as “gmial.com”, the app suggests the correct address for you to tap. Only you and people with the **View personal details** right can see these details.
+The app puts everything into the right form itself: spaces in the email address are dropped, and the mobile number is stored in a consistent format, e.g. +49 171 1234567. In the address, the house number moves into its own field if you write it into the street (“Hauptstraße 5a”), and the postcode is written as usual in that country (e.g. “1234 AB” in the Netherlands). If something isn’t right, it says so directly below the field, for example if the postcode doesn’t match the country; for a mistyped provider such as “gmial.com”, the app suggests the correct address for you to tap. Only you and people with the **See personal details** permission can see these details.
 
 ### Enter your birthday
 1. In the **Birthday** card, choose the **Day** and **Month**; the **Year** is optional.

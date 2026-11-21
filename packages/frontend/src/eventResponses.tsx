@@ -214,7 +214,7 @@ function ResponseNames({ list }: { list: EventResponseOverview }) {
             <li key={p.id}>
               {p.name}
               {p.note && <span className="muted"> – {p.note}</span>}
-              {p.late && <span className="muted"> (nachträglich übertragen)</span>}
+              {p.late && <span className="muted"> ({t('nachträglich übertragen')})</span>}
             </li>
           ))}
         </ul>
