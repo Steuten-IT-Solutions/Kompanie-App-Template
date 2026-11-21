@@ -5304,7 +5304,11 @@ test('Sprachen: öffentlichen Termin und Umfrage auch auf Englisch eintragen', a
     expect(pollId).toBeTruthy();
     const en = await page.evaluate(async (pollId) => {
       const cfg = window.KOMPANIE_CONFIG!;
-      const res = await fetch(cfg.apiBase + `polls/${pollId}`, { credentials: 'same-origin', headers: { 'X-Kompanie-Lang': 'en' } });
+      // Mit dem CSRF-Kopf: WordPress meldet die Sitzung sonst nicht an (REST-Nonce)
+      const res = await fetch(cfg.apiBase + `polls/${pollId}`, {
+        credentials: 'same-origin',
+        headers: { 'X-Kompanie-Lang': 'en', [cfg.csrf.header]: cfg.csrf.token },
+      });
       return (await res.json()) as { title: string; options: { title: string }[]; source?: { title: string } };
     }, pollId);
     expect([en.title, en.options.map((o) => o.title), en.source?.title]).toEqual(['Barbecue?', ['Yes', 'Nein'], question]);
