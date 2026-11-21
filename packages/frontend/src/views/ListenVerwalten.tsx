@@ -13,7 +13,7 @@ import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { confirmAsk } from '../ask';
 import { Icon, IconButton } from '../icons';
-import { localeTag, t, tn } from '../i18n';
+import { localeTag, t, tc, tn } from '../i18n';
 
 const sec = brand.labels.sections;
 
@@ -35,7 +35,7 @@ const FIELD_LABELS: Record<ListField, string> = {
   address: t('Adresse'),
   street: t('Straße und Nr.'),
   postal_code: t('PLZ'),
-  city: t('Ort'),
+  city: tc('Adresse', 'Ort'),
   country: t('Land'),
   phone: t('Handynummer'),
   email: t('E-Mail'),

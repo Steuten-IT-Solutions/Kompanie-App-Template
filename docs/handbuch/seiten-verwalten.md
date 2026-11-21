@@ -57,7 +57,7 @@ Webseiten öffnen sich in einem neuen Fenster, Seiten der App im selben.
 1. Füge einen Block **Nächste Termine** ein.
 2. Trage bei Bedarf eine **Überschrift** ein und wähle bei **Wie viele Termine**, wie viele erscheinen (1 bis 20).
 
-Der Block zeigt immer die nächsten Termine ab heute aus den {bereich.events}, mit Datum, Uhrzeit und Ort, darunter **Alle Termine**. Du musst ihn nie anpassen. Wer die {bereich.events} nicht sehen darf, sieht dort „Zurzeit keine anstehenden Termine.“ Sind die {bereich.events} ausgeschaltet, fehlt der Block.
+Der Block zeigt immer die nächsten Termine ab heute aus den {bereich.events}, mit Datum, Uhrzeit und Ort, darunter **Alle Termine**. Du musst ihn nie anpassen. Wer die {bereich.events} nicht sehen darf, sieht dort „Zurzeit steht nichts an.“ Sind die {bereich.events} ausgeschaltet, fehlt der Block.
 
 ### Ansprechpartner zeigen
 1. Füge einen Block **Ansprechpartner** ein.

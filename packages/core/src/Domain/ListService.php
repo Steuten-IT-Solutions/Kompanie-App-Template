@@ -136,7 +136,7 @@ final class ListService
 
     /**
      * Neue Liste. Ohne Spalten wie die Tabellen der Kompanie: Name (Nachname), Vorname und eine breite leere Spalte
-     * „Unterschrift“; ohne Zeilen leer.
+     * „Unterschrift“ (Überschriften in der Sprache der Person, die die Liste anlegt); ohne Zeilen leer.
      *
      * @param array<string, mixed> $in
      * @return array<string, mixed>
@@ -145,9 +145,9 @@ final class ListService
     {
         $in += [
             'columns' => [
-                ['kind' => self::KIND_FIELD, 'field' => 'last_name', 'label' => 'Name'],
+                ['kind' => self::KIND_FIELD, 'field' => 'last_name', 'label' => I18n::t('Name')],
                 ['kind' => self::KIND_FIELD, 'field' => 'first_name'],
-                ['kind' => self::KIND_BLANK, 'label' => 'Unterschrift', 'width' => 'wide'],
+                ['kind' => self::KIND_BLANK, 'label' => I18n::t('Unterschrift'), 'width' => 'wide'],
             ],
             'rows' => [],
             'groups' => [self::GROUP_MEMBERS],
@@ -191,13 +191,14 @@ final class ListService
         return $this->detail($actor, $id);
     }
 
-    /** Kopie mit allen Spalten und Zeilen, Titel mit „(Kopie)“. @return array<string, mixed> */
+    /** Kopie mit allen Spalten und Zeilen, Titel mit „(Kopie)“ in der Sprache der Person. @return array<string, mixed> */
     public function copy(User $actor, int $id): array
     {
         $list = $this->find($id);
         $repo = $this->repository();
         $now = $this->app->time()->nowUtc();
-        $title = mb_substr($list['title'], 0, self::TITLE_MAX - 8) . ' (Kopie)';
+        $suffix = ' ' . I18n::t('(Kopie)');
+        $title = mb_substr($list['title'], 0, self::TITLE_MAX - mb_strlen($suffix)) . $suffix;
         $newId = $this->app->db->transaction(function () use ($repo, $list, $id, $title, $actor, $now): int {
             $newId = $repo->insert([
                 'title' => $title,

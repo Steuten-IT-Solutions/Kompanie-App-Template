@@ -10,6 +10,7 @@ use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Domain\ListService;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Http\Response;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\Backup;
 use KompanieApp\Core\Tests\Support\FakeUsers;
 use KompanieApp\Core\Tests\Support\FixedClock;
@@ -151,6 +152,27 @@ final class ListServiceTest extends TestCase
         $this->assertSame(0, (int) $this->app->db->scalar('SELECT COUNT(*) FROM {list_columns} WHERE list_id = ?', [$list['id']]));
         foreach (['lists', 'list_columns', 'list_rows'] as $table) {
             $this->assertContains($table, Backup::CORE_TABLES);
+        }
+    }
+
+    public function testDefaultsInTheLanguageOfTheUser(): void
+    {
+        $this->setUpApp();
+        $this->app->settings->set('languages', 'de,en');
+        $en = function (string $method, string $path, array $body = []): array {
+            $res = $this->app->api()->handle(new Request($method, $path, [], $body, [], '', null, 'en'));
+            $this->assertLessThan(300, $res->status, json_encode($res->data));
+            return (array) $res->data;
+        };
+        try {
+            // Plan „Mehrsprachigkeit“: vorgegebene Spaltenköpfe und „(Kopie)“ in der Sprache der Person
+            $list = $en('POST', '/lists', ['title' => 'Trip']);
+            $this->assertSame(['Name', '', 'Signature'], array_column($list['columns'], 'label'));
+            $this->assertSame('Trip (copy)', $en('POST', "/lists/{$list['id']}/copy")['title']);
+            $long = $en('POST', '/lists', ['title' => str_repeat('x', ListService::TITLE_MAX)]);
+            $this->assertSame(ListService::TITLE_MAX, mb_strlen($en('POST', "/lists/{$long['id']}/copy")['title']));
+        } finally {
+            I18n::setLocale(I18n::SOURCE_LOCALE);
         }
     }
 

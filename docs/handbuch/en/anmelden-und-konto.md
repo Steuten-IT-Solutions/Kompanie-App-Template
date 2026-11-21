@@ -27,7 +27,7 @@ Tap **My area** at the bottom and choose **Account** in the menu at the top. If 
 ### Change your email address, mobile number and address
 1. In the **Contact** card, tap **Edit**.
 2. Enter the new **Email address** or **Mobile number**. For the mobile number, choose the country on the left (🇩🇪 +49 by default) and type the number as usual, e.g. 0171 1234567. An empty field removes the entry.
-3. For the **Address**, choose the **Country** (🇩🇪 Germany by default) and enter the **Street**, **No.**, an **Address line 2** if needed (e.g. c/o), the **Postcode** and the **Location** (town). If all fields are empty, no address is stored.
+3. For the **Address**, choose the **Country** (🇩🇪 Germany by default) and enter the **Street**, **No.**, an **Address line 2** if needed (e.g. c/o), the **Postcode** and the **Town**. If all fields are empty, no address is stored.
 4. If you have changed your email address, enter your **Current password** to confirm. You don’t need a password for the mobile number and address.
 5. Tap **Save**.
 
