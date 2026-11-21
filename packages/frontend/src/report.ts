@@ -1,6 +1,8 @@
 // Bericht als PDF (Verwaltung → Bericht): Zeiträume zur Schnellwahl, Beschriftungen und der Dateiname. Ohne jsPDF, damit
 // die Ansicht und die Tests es laden können; das PDF selbst baut reportPdf.ts.
 
+import { t } from './i18n';
+
 /** 'JJJJ-MM-TT' als TT.MM.JJJJ */
 export function dayLabel(ymd: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
@@ -24,12 +26,12 @@ export interface ReportPreset {
 export function reportPresets(today: string): ReportPreset[] {
   const [y, m, d] = today.split('-').map(Number);
   return [
-    { id: 'year', label: 'Dieses Jahr', range: { from: `${y}-01-01`, to: today } },
-    { id: 'last-year', label: 'Letztes Jahr', range: { from: `${y - 1}-01-01`, to: `${y - 1}-12-31` } },
+    { id: 'year', label: t('Dieses Jahr'), range: { from: `${y}-01-01`, to: today } },
+    { id: 'last-year', label: t('Letztes Jahr'), range: { from: `${y - 1}-01-01`, to: `${y - 1}-12-31` } },
     // Am Tag nach demselben Datum vor einem Jahr beginnen (am 29.02. gilt im Vorjahr der 28.02.): genau 12 Monate bis heute
     {
       id: 'twelve-months',
-      label: 'Letzte 12 Monate',
+      label: t('Letzte 12 Monate'),
       range: { from: ymd(new Date(y - 1, m - 1, Math.min(d, new Date(y - 1, m, 0).getDate()) + 1)), to: today },
     },
   ];
@@ -37,7 +39,7 @@ export function reportPresets(today: string): ReportPreset[] {
 
 /** Zeitraum zum Lesen: „01.01.2026 bis 31.12.2026“, an einem Tag nur das Datum */
 export function rangeLabel(r: ReportRange): string {
-  return r.from === r.to ? dayLabel(r.from) : `${dayLabel(r.from)} bis ${dayLabel(r.to)}`;
+  return r.from === r.to ? dayLabel(r.from) : t('{from} bis {to}', { from: dayLabel(r.from), to: dayLabel(r.to) });
 }
 
 /** Dateiname: bericht-2026-01-01-bis-2026-12-31.pdf */

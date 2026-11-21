@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { t } from './i18n';
 import { Sheet } from './ui';
 
 /**
@@ -51,9 +52,12 @@ export function confirmAsk(message: string, options: AskOptions = {}): Promise<b
       kind: 'confirm',
       message,
       value: '',
-      title: options.title ?? 'Bitte bestätigen',
+      title: options.title ?? t('Bitte bestätigen'),
       okLabel: options.okLabel ?? 'OK',
-      danger: /lösch|entfern|zurückzieh|stornier|verwerf|trenn|leeren/i.test(message),
+      // Auch die englischen Texte erkennen (Übersetzung der Frage)
+      danger: /lösch|entfern|zurückzieh|stornier|verwerf|trenn|leeren|delete|remove|withdraw|cancel|discard|disconnect|clear|empty/i.test(
+        message,
+      ),
       resolve: (v) => resolve(v === true),
     }),
   );
@@ -66,7 +70,7 @@ export function promptAsk(message: string, value = '', options: AskOptions = {})
       kind: 'prompt',
       message,
       value,
-      title: options.title ?? 'Eingabe',
+      title: options.title ?? t('Eingabe'),
       okLabel: options.okLabel ?? 'OK',
       danger: false,
       resolve: (v) => resolve(typeof v === 'string' ? v : null),
@@ -81,7 +85,7 @@ export function alertAsk(message: string, options: AskOptions = {}): Promise<voi
       kind: 'alert',
       message,
       value: '',
-      title: options.title ?? 'Hinweis',
+      title: options.title ?? t('Hinweis'),
       okLabel: options.okLabel ?? 'OK',
       danger: false,
       resolve: () => resolve(),
@@ -144,7 +148,7 @@ function AskDialog({ request, onDone }: { request: Request; onDone: (value: stri
         <div className="ask-actions">
           {request.kind !== 'alert' && (
             <button type="button" className="btn btn-secondary" onClick={cancel}>
-              Abbrechen
+              {t('Abbrechen')}
             </button>
           )}
           <button ref={ok} type="submit" className={request.danger ? 'btn btn-danger-solid' : 'btn'}>

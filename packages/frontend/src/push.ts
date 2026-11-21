@@ -5,6 +5,7 @@
 // iPhone/iPad: nur in der installierten App (ab iOS 16.4), nicht im Browser-Tab.
 
 import { api, config, type PushDevice } from './api';
+import { t } from './i18n';
 import { detectPlatform, isStandalone } from './install';
 import { pushCheckDone, pushCheckDue, pushFingerprint } from './pushCheck';
 
@@ -70,12 +71,12 @@ export async function enablePush(publicKey: string): Promise<PushDevice> {
   if (permission !== 'granted') {
     throw new Error(
       permission === 'denied'
-        ? 'Benachrichtigungen sind für diese Seite blockiert. Du kannst sie in den Einstellungen des Browsers erlauben.'
-        : 'Ohne deine Erlaubnis kann die App keine Benachrichtigungen zeigen.',
+        ? t('Benachrichtigungen sind für diese Seite blockiert. Du kannst sie in den Einstellungen des Browsers erlauben.')
+        : t('Ohne deine Erlaubnis kann die App keine Benachrichtigungen zeigen.'),
     );
   }
   const reg = await registration();
-  if (!reg) throw new Error('Die App ist noch nicht bereit. Bitte die Seite neu laden und erneut versuchen.');
+  if (!reg) throw new Error(t('Die App ist noch nicht bereit. Bitte die Seite neu laden und erneut versuchen.'));
   const key = fromB64u(publicKey);
   let sub = await reg.pushManager.getSubscription();
   if (sub && !sameKey(sub, key)) {
@@ -84,7 +85,7 @@ export async function enablePush(publicKey: string): Promise<PushDevice> {
   }
   sub ??= await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
   const device = toDevice(sub);
-  if (!device) throw new Error('Der Browser hat keine gültige Push-Adresse geliefert.');
+  if (!device) throw new Error(t('Der Browser hat keine gültige Push-Adresse geliefert.'));
   return device;
 }
 

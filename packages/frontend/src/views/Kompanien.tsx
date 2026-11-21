@@ -13,6 +13,7 @@ import {
   type CompanySort,
 } from '../companySort';
 import brand from '../generated/brand';
+import { t, tn } from '../i18n';
 import RichTextView from '../richtext/RichTextView';
 import { setBrowseOrder } from '../memberSort';
 import { MemberRow } from '../MemberRow';
@@ -21,6 +22,8 @@ import { Caps, Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 
 const sec = brand.labels.sections;
+/** „<Kompanien> verwalten“: Bezeichnung der Kompanie mit Caps, der Rest übersetzt. */
+const MANAGE = t('{companies} verwalten').split('{companies}').concat('');
 
 /** Logo bzw. ohne Logo der Kurzname (oder die Anfangsbuchstaben); der Name ist zugleich der Alternativtext. */
 export function CompanyLogo({ company }: { company: Pick<Company, 'name' | 'short_name' | 'logo_url'> }) {
@@ -35,7 +38,11 @@ export function CompanyLogo({ company }: { company: Pick<Company, 'name' | 'shor
 
 /** Kurzname, Gründungsjahr und Zahl der Mitglieder in einer Zeile. */
 function facts(c: Company): string {
-  return [c.short_name, c.founded_year ? `gegründet ${c.founded_year}` : '', c.member_count ? `${c.member_count} Mitglieder` : '']
+  return [
+    c.short_name,
+    c.founded_year ? t('gegründet {year}', { year: c.founded_year }) : '',
+    c.member_count ? tn('{count} Mitglied', '{count} Mitglieder', c.member_count) : '',
+  ]
     .filter(Boolean)
     .join(' · ');
 }
@@ -89,17 +96,22 @@ function CompanyList() {
     listScroll = null;
   }, [ready]);
   if (loading && !data) return <Loading />;
-  if (error || !data) return <ErrorBox message={error ?? `Die ${sec.companies} konnten nicht geladen werden.`} onRetry={reload} />;
+  if (error || !data)
+    return (
+      <ErrorBox message={error ?? t('Die {companies} konnten nicht geladen werden.', { companies: sec.companies })} onRetry={reload} />
+    );
   const manage = can('manage_companies') && (
     <button type="button" className="btn btn-secondary btn-block manage-events" onClick={() => navigate('verwaltung/kompanien')}>
-      <Caps text={sec.companies} /> verwalten
+      {MANAGE[0]}
+      <Caps text={sec.companies} />
+      {MANAGE[1]}
     </button>
   );
   if (data.length === 0)
     return (
       <div className="company-directory">
         {manage}
-        <Empty>Noch keine {sec.companies}.</Empty>
+        <Empty>{t('Noch keine {companies}.', { companies: sec.companies })}</Empty>
       </div>
     );
   return (
@@ -110,15 +122,15 @@ function CompanyList() {
           <input
             className="search"
             type="search"
-            placeholder="Suchen …"
+            placeholder={t('Suchen …')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            aria-label={`${sec.companies} suchen`}
+            aria-label={t('{companies} suchen', { companies: sec.companies })}
           />
           <div className="field-row member-sort">
             {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
             <div className="field">
-              <span id="companies-sort-label">Sortierung</span>
+              <span id="companies-sort-label">{t('Sortierung')}</span>
               <select
                 aria-labelledby="companies-sort-label"
                 value={order.sort}
@@ -135,12 +147,12 @@ function CompanyList() {
               </select>
             </div>
             <div className="field member-sort-dir">
-              <span id="companies-sort-dir-label">Reihenfolge</span>
+              <span id="companies-sort-dir-label">{t('Reihenfolge')}</span>
               <button
                 type="button"
                 className="btn btn-secondary"
                 aria-labelledby="companies-sort-dir-label companies-sort-dir-value"
-                title="Reihenfolge umkehren"
+                title={t('Reihenfolge umkehren')}
                 onClick={() => changeOrder({ ...order, dir: order.dir === 'asc' ? 'desc' : 'asc' })}
               >
                 <span id="companies-sort-dir-value">{companyDirLabel(order.sort, order.dir)}</span>
@@ -166,7 +178,7 @@ function CompanyList() {
               <span className="company-head">
                 <span className="row-title">
                   {c.name}
-                  {!c.active && <span className="badge badge-level-guest">ehemalig</span>}
+                  {!c.active && <span className="badge badge-level-guest">{t('ehemalig')}</span>}
                 </span>
                 <span className="row-sub">{facts(c)}</span>
               </span>
@@ -176,7 +188,7 @@ function CompanyList() {
             </button>
           </li>
         ))}
-        {list.length === 0 && <Empty>Nichts gefunden.</Empty>}
+        {list.length === 0 && <Empty>{t('Nichts gefunden.')}</Empty>}
       </ul>
     </div>
   );
@@ -193,7 +205,7 @@ function CompanyDetail({ id }: { id: number }) {
   const linked = !!config?.features.directory && can('view_directory');
   const back = (
     <button type="button" className="btn btn-link back" onClick={() => navigate('kompanien')}>
-      ‹ Alle {sec.companies}
+      {t('‹ Alle {companies}', { companies: sec.companies })}
     </button>
   );
   if (loading && !data) return <Loading shape="detail" />;
@@ -201,7 +213,7 @@ function CompanyDetail({ id }: { id: number }) {
     return (
       <>
         {back}
-        <ErrorBox message={error ?? `Die ${sec.companies} konnten nicht geladen werden.`} onRetry={reload} />
+        <ErrorBox message={error ?? t('Die {companies} konnten nicht geladen werden.', { companies: sec.companies })} onRetry={reload} />
       </>
     );
   const c = data.find((x) => x.id === id);
@@ -209,7 +221,7 @@ function CompanyDetail({ id }: { id: number }) {
     return (
       <>
         {back}
-        <Empty>Diesen Eintrag gibt es nicht (mehr).</Empty>
+        <Empty>{t('Diesen Eintrag gibt es nicht (mehr).')}</Empty>
       </>
     );
   return (
@@ -222,7 +234,7 @@ function CompanyDetail({ id }: { id: number }) {
         <div className="company-head">
           <h2 className="member-name">
             {c.name}
-            {!c.active && <span className="badge badge-level-guest">ehemalig</span>}
+            {!c.active && <span className="badge badge-level-guest">{t('ehemalig')}</span>}
           </h2>
           {facts(c) && <p className="row-sub">{facts(c)}</p>}
         </div>
@@ -232,19 +244,19 @@ function CompanyDetail({ id }: { id: number }) {
         <p className="company-links">
           {c.website_url && (
             <a className="btn btn-secondary btn-small" href={c.website_url} target="_blank" rel="noopener noreferrer">
-              Webseite
+              {t('Webseite')}
             </a>
           )}
           {c.app_url && (
             <a className="btn btn-secondary btn-small" href={c.app_url} target="_blank" rel="noopener noreferrer">
-              App der Kompanie
+              {t('App der Kompanie')}
             </a>
           )}
         </p>
       )}
       {c.members && c.members.length > 0 && (
         <>
-          <h3 className="section-title">Mitglieder</h3>
+          <h3 className="section-title">{t('Mitglieder')}</h3>
           <ul className="card-list company-members">
             {c.members.map((m) => (
               <MemberRow

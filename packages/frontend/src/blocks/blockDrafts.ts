@@ -18,6 +18,7 @@ import type {
   SponsorsBlock,
   TextBlock,
 } from '../api';
+import { t } from '../i18n';
 
 export type TextDraft = Omit<TextBlock, never>;
 export type CountdownDraft = Omit<CountdownBlock, 'starts_at' | 'ends_at' | 'timezone' | 'event_title'> & { event_title?: string | null };
@@ -52,20 +53,20 @@ export type BlockKind = BlockDraft['type'];
 
 /** Blöcke, die man einfügen kann, mit Bezeichnung und Erklärung (Reihenfolge der Auswahl). */
 export const BLOCK_KINDS: { type: BlockKind; label: string; hint: string }[] = [
-  { type: 'text', label: 'Text', hint: 'Formatierter Text mit Bildern' },
-  { type: 'countdown', label: 'Countdown', hint: 'Zählt bis zu einem Datum oder Termin herunter' },
-  { type: 'button', label: 'Knopf mit Link', hint: 'Führt zu einer Webseite, Mail, Telefonnummer oder Seite der App' },
-  { type: 'events', label: 'Nächste Termine', hint: 'Was als Nächstes ansteht, immer aktuell' },
-  { type: 'contacts', label: 'Ansprechpartner', hint: 'Wer ein Amt gerade innehat, mit Foto' },
-  { type: 'notice', label: 'Hinweis-Kasten', hint: 'Kurzer Text, farbig hervorgehoben' },
-  { type: 'divider', label: 'Trennlinie', hint: 'Linie oder Abstand zwischen Blöcken' },
-  { type: 'schedule', label: 'Ablauf', hint: 'Uhrzeit und Programmpunkt untereinander' },
-  { type: 'facts', label: 'Zahlen und Fakten', hint: 'Kurze Kennzahlen nebeneinander' },
-  { type: 'poll', label: 'Umfrage', hint: 'Eine Umfrage zum Mitmachen einbinden' },
-  { type: 'album', label: 'Album', hint: 'Einige Bilder aus einem Album' },
-  { type: 'document', label: 'Dokument', hint: 'Eine Datei aus den Dokumenten zum Herunterladen' },
-  { type: 'sponsors', label: 'Sponsoren', hint: 'Alle Logos mit Link, in ihrer Reihenfolge' },
-  { type: 'map', label: 'Karte zur Anfahrt', hint: 'Ort mit Knopf zur Karten-App' },
+  { type: 'text', label: t('Text'), hint: t('Formatierter Text mit Bildern') },
+  { type: 'countdown', label: t('Countdown'), hint: t('Zählt bis zu einem Datum oder Termin herunter') },
+  { type: 'button', label: t('Knopf mit Link'), hint: t('Führt zu einer Webseite, Mail, Telefonnummer oder Seite der App') },
+  { type: 'events', label: t('Nächste Termine'), hint: t('Was als Nächstes ansteht, immer aktuell') },
+  { type: 'contacts', label: t('Ansprechpartner'), hint: t('Wer ein Amt gerade innehat, mit Foto') },
+  { type: 'notice', label: t('Hinweis-Kasten'), hint: t('Kurzer Text, farbig hervorgehoben') },
+  { type: 'divider', label: t('Trennlinie'), hint: t('Linie oder Abstand zwischen Blöcken') },
+  { type: 'schedule', label: t('Ablauf'), hint: t('Uhrzeit und Programmpunkt untereinander') },
+  { type: 'facts', label: t('Zahlen und Fakten'), hint: t('Kurze Kennzahlen nebeneinander') },
+  { type: 'poll', label: t('Umfrage'), hint: t('Eine Umfrage zum Mitmachen einbinden') },
+  { type: 'album', label: t('Album'), hint: t('Einige Bilder aus einem Album') },
+  { type: 'document', label: t('Dokument'), hint: t('Eine Datei aus den Dokumenten zum Herunterladen') },
+  { type: 'sponsors', label: t('Sponsoren'), hint: t('Alle Logos mit Link, in ihrer Reihenfolge') },
+  { type: 'map', label: t('Karte zur Anfahrt'), hint: t('Ort mit Knopf zur Karten-App') },
 ];
 
 let counter = 0;

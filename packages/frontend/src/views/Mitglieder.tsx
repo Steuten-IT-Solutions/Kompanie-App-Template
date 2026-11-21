@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { can, config, type CompanyRef, type DirectoryBirthday, type DirectoryEntry, type DirectoryFormerEntry } from '../api';
 import { formatBirthday } from '../birthdays';
 import brand from '../generated/brand';
+import { t, tn } from '../i18n';
 import { formatYearOrDate, groupCounts } from '../format';
 import { MemberAvatar, preloadAvatar, ZoomableAvatar } from '../memberPhoto';
 import { preloadBadge, RankStack } from '../RankBadge';
@@ -54,11 +55,11 @@ export function formerYears(
         ? `${joined} – ${left}`
         : `${joined}–${left}`
       : joined
-        ? `Eintritt ${joined}`
+        ? t('Eintritt {date}', { date: joined })
         : left
-          ? `bis ${left}`
+          ? t('bis {date}', { date: left })
           : '';
-  return [f.founder ? 'Gründungsmitglied' : '', years].filter(Boolean).join(' · ');
+  return [f.founder ? t('Gründungsmitglied') : '', years].filter(Boolean).join(' · ');
 }
 
 /** Eintritt eines Mitglieds, wie eingetragen: „01.04.2005“ oder „2005“ (ältere Server: nur das Jahr); leer ohne. */
@@ -71,9 +72,13 @@ export const joinedText = (m: { join_year?: number | null; join_date?: string | 
  */
 export function personFacts(m: { birthday?: DirectoryBirthday | null; join_year?: number | null; join_date?: string | null }): string {
   const b = m.birthday;
-  const birthday = b ? `Geburtstag ${formatBirthday(b)}${b.age !== null ? ` (${b.age} Jahre)` : ''}` : '';
+  const birthday = b
+    ? b.age !== null
+      ? t('Geburtstag {date} ({age} Jahre)', { date: formatBirthday(b), age: b.age })
+      : t('Geburtstag {date}', { date: formatBirthday(b) })
+    : '';
   const joined = joinedText(m);
-  return [birthday, joined ? `Eintritt ${joined}` : ''].filter(Boolean).join(' · ');
+  return [birthday, joined ? t('Eintritt {date}', { date: joined }) : ''].filter(Boolean).join(' · ');
 }
 
 /**
@@ -129,10 +134,10 @@ export default function Mitglieder({ path = [] }: { path?: string[] }) {
   return (
     <div>
       {available.length > 1 && (
-        <nav className="segmented members-switch" aria-label="Abschnitt">
+        <nav className="segmented members-switch" aria-label={t('Abschnitt')}>
           {directory && tab('liste', sec.directory)}
           {offices && tab('aemter', sec.offices)}
-          {formerOn && tab('ehemalige', 'Ehemalige')}
+          {formerOn && tab('ehemalige', t('Ehemalige'))}
         </nav>
       )}
       {person !== null ? (
@@ -212,7 +217,7 @@ function PersonHead({
       <h2 className={`${peek ? 'member-peek-name' : 'member-name'} member-name-centered`}>
         <PersonName name={name} />
       </h2>
-      {f && <p className="small muted">{['Ehemalig', formerYears(f)].filter(Boolean).join(' · ')}</p>}
+      {f && <p className="small muted">{[t('Ehemalig'), formerYears(f)].filter(Boolean).join(' · ')}</p>}
       {m && !f && personFacts(m) && <p className="small muted member-page-facts">{personFacts(m)}</p>}
       {((m?.titles && m.titles.length > 0) || m?.candidate_role) && (
         <p className="member-page-titles">
@@ -254,17 +259,22 @@ function PageNav({
   return (
     <div className="member-nav">
       <button type="button" className="btn btn-link back" onClick={onStep ? back : undefined}>
-        ‹ Zurück
+        {t('‹ Zurück')}
       </button>
       {position >= 1 && total > 1 && (
         <span className="member-step">
-          <button type="button" className="btn btn-link" onClick={onStep && (() => onStep(-1))} aria-label={onStep && 'Vorherige Person'}>
+          <button
+            type="button"
+            className="btn btn-link"
+            onClick={onStep && (() => onStep(-1))}
+            aria-label={onStep && t('Vorherige Person')}
+          >
             ‹
           </button>
           <span className="muted small">
             {position} / {total}
           </span>
-          <button type="button" className="btn btn-link" onClick={onStep && (() => onStep(1))} aria-label={onStep && 'Nächste Person'}>
+          <button type="button" className="btn btn-link" onClick={onStep && (() => onStep(1))} aria-label={onStep && t('Nächste Person')}>
             ›
           </button>
         </span>
@@ -321,7 +331,7 @@ function MemberPage({
   const name =
     m?.name ??
     officeData.data?.offices
-      .flatMap((o) => o.terms.flatMap((t) => t.holders.flatMap((h) => [h, ...(h.companions ?? [])])))
+      .flatMap((o) => o.terms.flatMap((term) => term.holders.flatMap((h) => [h, ...(h.companions ?? [])])))
       .find((h) => h.user_id === userId)?.name;
 
   const order = useDirectoryOrder(userId, list.data, former.data);
@@ -376,20 +386,20 @@ function MemberPage({
           <>
             <PersonHead name={nameOf(userId)} waiting />
             <div role="status" data-loading="">
-              <span className="visually-hidden">Lädt …</span>
+              <span className="visually-hidden">{t('Lädt …')}</span>
             </div>
           </>
         ) : list.error && !list.data ? (
           <ErrorBox message={list.error} onRetry={list.reload} />
         ) : name === undefined ? (
-          <Empty>Diese Person steht nicht (mehr) in der Liste.</Empty>
+          <Empty>{t('Diese Person steht nicht (mehr) in der Liste.')}</Empty>
         ) : (
           <>
             <PersonHead name={name} m={m} f={f} />
             {offices && (
               <section>
                 <h3 className="section-title">{sec.offices}</h3>
-                <PersonOffices userId={userId} empty={`Keine ${sec.offices} eingetragen.`} />
+                <PersonOffices userId={userId} empty={t('Keine {offices} eingetragen.', { offices: sec.offices })} />
               </section>
             )}
           </>
@@ -459,17 +469,17 @@ function MemberList({ former = false }: { former?: boolean }) {
       <p className="member-counts small muted" role="status">
         {groups.length > 0
           ? groups.join(' · ')
-          : total === 1
-            ? `1 ${former ? 'ehemalige ' : ''}Person`
-            : `${total} ${former ? 'ehemalige ' : ''}Personen`}
+          : former
+            ? tn('{count} ehemalige Person', '{count} ehemalige Personen', total)
+            : tn('{count} Person', '{count} Personen', total)}
       </p>
       <input
         className="search"
         type="search"
-        placeholder={former ? 'Ehemalige suchen …' : 'Mitglied suchen …'}
+        placeholder={former ? t('Ehemalige suchen …') : t('Mitglied suchen …')}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        aria-label={former ? 'Ehemalige suchen' : 'Mitglied suchen'}
+        aria-label={former ? t('Ehemalige suchen') : t('Mitglied suchen')}
       />
       {companies.length > 0 && (
         <label className="field member-company-filter">
@@ -477,11 +487,11 @@ function MemberList({ former = false }: { former?: boolean }) {
             <Caps text={sec.companies} />
           </span>
           <select value={companyFilter} onChange={(e) => setCompanyId(Number(e.target.value))}>
-            <option value={0}>alle</option>
+            <option value={0}>{t('alle')}</option>
             {companies.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
-                {c.active ? '' : ' (ehemalig)'}
+                {c.active ? '' : ' ' + t('(ehemalig)')}
               </option>
             ))}
           </select>
@@ -490,7 +500,7 @@ function MemberList({ former = false }: { former?: boolean }) {
       <div className="field-row member-sort">
         {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
         <div className="field">
-          <span id="directory-sort-label">Sortierung</span>
+          <span id="directory-sort-label">{t('Sortierung')}</span>
           <select
             aria-labelledby="directory-sort-label"
             value={order.sort}
@@ -507,12 +517,12 @@ function MemberList({ former = false }: { former?: boolean }) {
           </select>
         </div>
         <div className="field member-sort-dir">
-          <span id="directory-sort-dir-label">Reihenfolge</span>
+          <span id="directory-sort-dir-label">{t('Reihenfolge')}</span>
           <button
             type="button"
             className="btn btn-secondary"
             aria-labelledby="directory-sort-dir-label directory-sort-dir-value"
-            title="Reihenfolge umkehren"
+            title={t('Reihenfolge umkehren')}
             onClick={() => changeOrder({ ...order, dir: order.dir === 'asc' ? 'desc' : 'asc' })}
           >
             <span id="directory-sort-dir-value">{dirLabel(order.sort, order.dir)}</span>
@@ -524,10 +534,12 @@ function MemberList({ former = false }: { former?: boolean }) {
           <MemberRow key={m.id} m={m} name={listName(m, order.sort)} onOpen={() => open(m.id)}>
             {former && formerYears(m) && <div className="row-sub">{formerYears(m)}</div>}
             {/* Nach Eintritt sortiert: das Jahr, soweit die Person es zeigt (Ehemalige haben ihre Jahre oben). */}
-            {!former && order.sort === 'joined' && joinedText(m) && <div className="row-sub">Eintritt {joinedText(m)}</div>}
+            {!former && order.sort === 'joined' && joinedText(m) && (
+              <div className="row-sub">{t('Eintritt {date}', { date: joinedText(m) })}</div>
+            )}
           </MemberRow>
         ))}
-        {list.length === 0 && <Empty>Niemand gefunden.</Empty>}
+        {list.length === 0 && <Empty>{t('Niemand gefunden.')}</Empty>}
       </ul>
     </div>
   );

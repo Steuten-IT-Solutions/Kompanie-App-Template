@@ -4,6 +4,7 @@
 import { type BirthdayEntry } from './api';
 import brand from './generated/brand';
 import { formatWeekdayDateYear, parseLocalDate, shortMonth } from './format';
+import { t } from './i18n';
 import { ErrorBox, useAsync } from './ui';
 import { sources, upcomingBirthdayDays } from './viewData';
 
@@ -13,7 +14,7 @@ const sec = brand.labels.sections;
 export { birthdaysVisible } from './viewData';
 
 function whenText(b: BirthdayEntry): string {
-  if (b.days_until === 1) return 'Morgen';
+  if (b.days_until === 1) return t('Morgen');
   return formatWeekdayDateYear(parseLocalDate(b.date));
 }
 
@@ -29,18 +30,18 @@ function BirthdayRow({ b }: { b: BirthdayEntry }) {
         <div className="birthday-name">{b.name}</div>
         <div className="birthday-when">
           {whenText(b)}
-          {b.age !== null && ` · wird ${b.age}`}
+          {b.age !== null && ` · ${t('wird {age}', { age: b.age })}`}
         </div>
       </div>
-      {b.today && <span className="badge birthday-badge">Heute</span>}
+      {b.today && <span className="badge birthday-badge">{t('Heute')}</span>}
     </li>
   );
 }
 
 function noneText(days: number): string {
-  if (days === 0) return 'Heute hat niemand Geburtstag.';
-  if (days === 1) return 'Heute und morgen hat niemand Geburtstag.';
-  return `In den nächsten ${days} Tagen hat niemand Geburtstag.`;
+  if (days === 0) return t('Heute hat niemand Geburtstag.');
+  if (days === 1) return t('Heute und morgen hat niemand Geburtstag.');
+  return t('In den nächsten {days} Tagen hat niemand Geburtstag.', { days });
 }
 
 /**
@@ -68,8 +69,8 @@ export function UpcomingBirthdaysCard({
   if (!data) return error && always ? <ErrorBox message={error} /> : null;
   if (data.length === 0 && !always) return null;
   return (
-    <section className="card birthdays-upcoming" aria-label={`Anstehende ${sec.birthdays}`}>
-      <h2 className="birthdays-title">Anstehende {sec.birthdays}</h2>
+    <section className="card birthdays-upcoming" aria-label={t('Anstehende {birthdays}', { birthdays: sec.birthdays })}>
+      <h2 className="birthdays-title">{t('Anstehende {birthdays}', { birthdays: sec.birthdays })}</h2>
       {data.length === 0 ? (
         <p className="muted small">{noneText(upcomingBirthdayDays())}</p>
       ) : (

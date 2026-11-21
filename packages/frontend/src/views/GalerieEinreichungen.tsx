@@ -6,6 +6,7 @@ import { confirmAsk, promptAsk } from '../ask';
 import { IconButton } from '../icons';
 import { InternToggle } from '../galleryIntern';
 import { VIDEO_ACCEPT, countFiles, isVideoFile, submitVideo } from '../videoUpload';
+import { t } from '../i18n';
 
 /**
  * Bilder und Videos (Issue #350) für die Galerie einreichen (submit_gallery) und Einreichungen prüfen (review_gallery),
@@ -25,7 +26,7 @@ export default function GalerieEinreichungen({
   return (
     <div className="gallery-submissions">
       <button className="btn btn-link back" onClick={() => navigate(fromAlbum ? `galerie/${albumId}` : 'galerie')}>
-        {fromAlbum ? '‹ Zum Album' : '‹ Alle Alben'}
+        {fromAlbum ? t('‹ Zum Album') : t('‹ Alle Alben')}
       </button>
       {mode === 'einreichen' ? <Submit albumId={albumId} onToast={onToast} /> : <Review onToast={onToast} />}
     </div>
@@ -33,9 +34,9 @@ export default function GalerieEinreichungen({
 }
 
 const STATUS: Record<GallerySubmission['status'], string> = {
-  pending: 'wartet auf Freigabe',
-  approved: 'freigegeben',
-  rejected: 'nicht freigegeben',
+  pending: t('wartet auf Freigabe'),
+  approved: t('freigegeben'),
+  rejected: t('nicht freigegeben'),
 };
 
 function Submit({ albumId, onToast }: { albumId?: number; onToast: (msg: string) => void }) {
@@ -51,23 +52,31 @@ function Submit({ albumId, onToast }: { albumId?: number; onToast: (msg: string)
     let done = 0;
     try {
       for (const f of files) {
-        const step = files.length > 1 ? ` ${done + 1} von ${files.length}` : '';
-        setProgress(`Lädt${step} …`);
+        const step = { current: done + 1, total: files.length };
+        setProgress(files.length > 1 ? t('Lädt {current} von {total} …', step) : t('Lädt …'));
         if (isVideoFile(f)) {
           await submitVideo(f, {
             albumId: Number(album),
-            onProgress: (share) => setProgress(`Lädt${step} … ${Math.floor(share * 100)} %`),
+            onProgress: (share) => {
+              const percent = Math.floor(share * 100);
+              setProgress(
+                files.length > 1
+                  ? t('Lädt {current} von {total} … {percent} %', { ...step, percent })
+                  : t('Lädt … {percent} %', { percent }),
+              );
+            },
           });
         } else {
           await api.submitGalleryPhoto(Number(album), f);
         }
         done++;
       }
-      onToast(`${countFiles(files)} eingereicht`);
+      onToast(t('{files} eingereicht', { files: countFiles(files) }));
       setFiles([]);
       setConsent(false);
     } catch (e) {
-      setFormError(`${done > 0 ? `${done} eingereicht, dann: ` : ''}${(e as Error).message}`);
+      const message = (e as Error).message;
+      setFormError(done > 0 ? t('{count} eingereicht, dann: {error}', { count: done, error: message }) : message);
     } finally {
       setProgress(null);
       reload();
@@ -90,17 +99,17 @@ function Submit({ albumId, onToast }: { albumId?: number; onToast: (msg: string)
           void send();
         }}
       >
-        <h2>Bilder und Videos einreichen</h2>
+        <h2>{t('Bilder und Videos einreichen')}</h2>
         {data?.enabled === false ? (
-          <p className="muted small">Das Einreichen ist zurzeit ausgeschaltet.</p>
+          <p className="muted small">{t('Das Einreichen ist zurzeit ausgeschaltet.')}</p>
         ) : albums.length === 0 ? (
-          <p className="muted small">Noch keine Alben, in die du einreichen kannst.</p>
+          <p className="muted small">{t('Noch keine Alben, in die du einreichen kannst.')}</p>
         ) : (
           <>
             <label className="field">
-              <span>Album</span>
+              <span>{t('Album')}</span>
               <select value={album} onChange={(e) => setAlbum(e.target.value)} required>
-                <option value="">Bitte wählen …</option>
+                <option value="">{t('Bitte wählen …')}</option>
                 {albums.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.year} · {a.title}
@@ -109,7 +118,7 @@ function Submit({ albumId, onToast }: { albumId?: number; onToast: (msg: string)
               </select>
             </label>
             <label className="field">
-              <span>Bilder oder Videos</span>
+              <span>{t('Bilder oder Videos')}</span>
               <FileInput
                 accept={`.jpg,.jpeg,.png,.webp,${VIDEO_ACCEPT}`}
                 multiple
@@ -117,11 +126,11 @@ function Submit({ albumId, onToast }: { albumId?: number; onToast: (msg: string)
                 disabled={busy}
                 onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
               />
-              <span className="small muted">Bilder als JPG, PNG oder WebP, Videos als MP4 oder WebM bis 1 GB.</span>
+              <span className="small muted">{t('Bilder als JPG, PNG oder WebP, Videos als MP4 oder WebM bis 1 GB.')}</span>
             </label>
             <label className="toggle">
               <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} required />
-              <span>Ich habe die Rechte an den Bildern und Videos, und die erkennbaren Personen sind einverstanden.</span>
+              <span>{t('Ich habe die Rechte an den Bildern und Videos, und die erkennbaren Personen sind einverstanden.')}</span>
             </label>
             {formError && (
               <p className="form-error small" role="alert">
@@ -129,15 +138,15 @@ function Submit({ albumId, onToast }: { albumId?: number; onToast: (msg: string)
               </p>
             )}
             <button className="btn btn-primary" type="submit" disabled={busy || files.length === 0 || !consent || album === ''}>
-              {progress ?? 'Einreichen'}
+              {progress ?? t('Einreichen')}
             </button>
           </>
         )}
       </form>
       <section className="card settings-section">
-        <h3>Deine Einreichungen</h3>
+        <h3>{t('Deine Einreichungen')}</h3>
         {(data?.submissions ?? []).length === 0 ? (
-          <p className="muted small">Noch keine.</p>
+          <p className="muted small">{t('Noch keine.')}</p>
         ) : (
           <ul className="gallery-upload-list">
             {data!.submissions.map((s) => (
@@ -152,17 +161,17 @@ function Submit({ albumId, onToast }: { albumId?: number; onToast: (msg: string)
                     type="button"
                     className="btn btn-small btn-secondary"
                     onClick={async () => {
-                      if (!(await confirmAsk(`Einreichung „${s.name}“ zurückziehen?`))) return;
+                      if (!(await confirmAsk(t('Einreichung „{name}“ zurückziehen?', { name: s.name })))) return;
                       try {
                         await api.withdrawGallerySubmission(s.id);
-                        onToast('Zurückgezogen');
+                        onToast(t('Zurückgezogen'));
                       } catch (e) {
                         setFormError((e as Error).message);
                       }
                       reload();
                     }}
                   >
-                    Zurückziehen
+                    {t('Zurückziehen')}
                   </button>
                 )}
               </li>
@@ -204,14 +213,14 @@ function Review({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <>
-      <h2>{editable ? 'Einreichungen prüfen' : 'Einreichungen'}</h2>
+      <h2>{editable ? t('Einreichungen prüfen') : t('Einreichungen')}</h2>
       {actionError && (
         <p className="form-error small" role="alert">
           {actionError}
         </p>
       )}
       {pending.length === 0 ? (
-        <Empty>Keine offenen Einreichungen.</Empty>
+        <Empty>{t('Keine offenen Einreichungen.')}</Empty>
       ) : (
         <ul className="gallery-review-list">
           {pending.map((s) => (
@@ -223,7 +232,7 @@ function Review({ onToast }: { onToast: (msg: string) => void }) {
                 <Preview s={s} />
               )}
               <p className="small">
-                <strong>{s.name}</strong> für {s.album}, von {s.user_name}
+                <strong>{s.name}</strong> {t('für {album}, von {name}', { album: s.album, name: s.user_name ?? '' })}
               </p>
               {editable && (
                 <div className="button-row">
@@ -231,29 +240,29 @@ function Review({ onToast }: { onToast: (msg: string) => void }) {
                     type="button"
                     className="btn btn-small btn-primary"
                     disabled={busy}
-                    onClick={() => void run(() => api.approveGallerySubmission(s.id, false), 'Freigegeben')}
+                    onClick={() => void run(() => api.approveGallerySubmission(s.id, false), t('Freigegeben'))}
                   >
-                    Öffentlich freigeben
+                    {t('Öffentlich freigeben')}
                   </button>
                   <button
                     type="button"
                     className="btn btn-small btn-secondary"
                     disabled={busy}
-                    onClick={() => void run(() => api.approveGallerySubmission(s.id, true), 'Intern freigegeben')}
+                    onClick={() => void run(() => api.approveGallerySubmission(s.id, true), t('Intern freigegeben'))}
                   >
-                    Nur für Mitglieder freigeben
+                    {t('Nur für Mitglieder freigeben')}
                   </button>
                   <button
                     type="button"
                     className="btn btn-small btn-danger"
                     disabled={busy}
                     onClick={async () => {
-                      const reason = await promptAsk(`Warum kommt „${s.name}“ nicht in die Galerie?`);
+                      const reason = await promptAsk(t('Warum kommt „{name}“ nicht in die Galerie?', { name: s.name }));
                       if (reason === null) return;
-                      void run(() => api.rejectGallerySubmission(s.id, reason), 'Abgelehnt');
+                      void run(() => api.rejectGallerySubmission(s.id, reason), t('Abgelehnt'));
                     }}
                   >
-                    Ablehnen
+                    {t('Ablehnen')}
                   </button>
                 </div>
               )}
@@ -263,13 +272,13 @@ function Review({ onToast }: { onToast: (msg: string) => void }) {
       )}
       {approved.length > 0 && (
         <section className="card settings-section">
-          <h3>Zuletzt freigegeben</h3>
+          <h3>{t('Zuletzt freigegeben')}</h3>
           <ul className="gallery-upload-list">
             {approved.map((s) => (
               <li key={s.id} className="gallery-upload gallery-approved">
                 <Preview s={s} />
                 <span className="small">
-                  {s.name} · {s.album} · von {s.user_name}
+                  {s.name} · {s.album} · {t('von {name}', { name: s.user_name ?? '' })}
                 </span>
                 {editable && (
                   <div className="gallery-approved-actions">
@@ -279,19 +288,25 @@ function Review({ onToast }: { onToast: (msg: string) => void }) {
                         name={s.name}
                         disabled={busy}
                         onChange={(next) =>
-                          run(() => api.setGalleryPhotoIntern(s.photo_id!, next), next ? 'Jetzt nur für Mitglieder' : 'Jetzt öffentlich')
+                          run(
+                            () => api.setGalleryPhotoIntern(s.photo_id!, next),
+                            next ? t('Jetzt nur für Mitglieder') : t('Jetzt öffentlich'),
+                          )
                         }
                       />
                     )}
                     <IconButton
                       icon="delete"
-                      label="Wieder entfernen"
+                      label={t('Wieder entfernen')}
                       variant="danger"
                       disabled={busy}
                       onClick={async () => {
-                        if (!(await confirmAsk(`${s.type === 'video' ? 'Video' : 'Bild'} „${s.name}“ wieder aus der Galerie entfernen?`)))
-                          return;
-                        void run(() => api.removeGallerySubmission(s.id), 'Entfernt');
+                        const question =
+                          s.type === 'video'
+                            ? t('Video „{name}“ wieder aus der Galerie entfernen?', { name: s.name })
+                            : t('Bild „{name}“ wieder aus der Galerie entfernen?', { name: s.name });
+                        if (!(await confirmAsk(question))) return;
+                        void run(() => api.removeGallerySubmission(s.id), t('Entfernt'));
                       }}
                     />
                   </div>
@@ -309,7 +324,7 @@ function Review({ onToast }: { onToast: (msg: string) => void }) {
 function Preview({ s }: { s: GallerySubmission }) {
   if (s.type !== 'video') return s.thumb ? <img src={s.thumb} alt={s.name} loading="lazy" /> : null;
   return (
-    <span className="gallery-upload-video" role="img" aria-label={`Video ${s.name}`}>
+    <span className="gallery-upload-video" role="img" aria-label={t('Video {name}', { name: s.name })}>
       {s.thumb && <img src={s.thumb} alt="" loading="lazy" />}
       <span aria-hidden="true">▶</span>
     </span>

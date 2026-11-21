@@ -19,6 +19,7 @@ import { GlobalWorkerOptions, getDocument, type PDFDocumentProxy } from 'pdfjs-d
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 import { whenControlled } from '../offline';
 import { Loading } from '../ui';
+import { t } from '../i18n';
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -88,7 +89,7 @@ export default function PdfViewer({ url, title }: { url: string; title: string }
 
     const fail = (e: Error) => {
       if (!cancelled) {
-        setError(e.name === 'InvalidPDFException' ? 'Die PDF konnte nicht angezeigt werden.' : e.message);
+        setError(e.name === 'InvalidPDFException' ? t('Die PDF konnte nicht angezeigt werden.') : e.message);
       }
     };
 
@@ -125,10 +126,10 @@ export default function PdfViewer({ url, title }: { url: string; title: string }
       try {
         res = await fetch(url, { credentials: 'same-origin' });
       } catch {
-        throw new Error('Keine Verbindung und noch nicht offline gespeichert.');
+        throw new Error(t('Keine Verbindung und noch nicht offline gespeichert.'));
       }
       if (!res.ok) {
-        throw new Error(res.status === 404 ? 'Das Dokument wurde nicht gefunden.' : `Fehler ${res.status}`);
+        throw new Error(res.status === 404 ? t('Das Dokument wurde nicht gefunden.') : t('Fehler {status}', { status: res.status }));
       }
       const data = new Uint8Array(await res.arrayBuffer());
       if (cancelled) return;
@@ -199,7 +200,14 @@ export default function PdfViewer({ url, title }: { url: string; title: string }
       {!error && count === 0 && <Loading shape="text" />}
       {pages.map((p, i) =>
         p.src ? (
-          <img key={i} className="pdf-page" src={p.src} width={p.width} height={p.height} alt={`${title}, Seite ${i + 1} von ${count}`} />
+          <img
+            key={i}
+            className="pdf-page"
+            src={p.src}
+            width={p.width}
+            height={p.height}
+            alt={t('{title}, Seite {page} von {count}', { title, page: i + 1, count })}
+          />
         ) : (
           // Leere Zeichenfläche im Seitenverhältnis der Seite (skaliert per CSS wie das Bild), bis sie gezeichnet ist.
           <canvas
@@ -209,7 +217,7 @@ export default function PdfViewer({ url, title }: { url: string; title: string }
             width={Math.max(1, Math.round(p.width / 10))}
             height={Math.max(1, Math.round(p.height / 10))}
             role="img"
-            aria-label={`${title}, Seite ${i + 1} von ${count} wird aufbereitet`}
+            aria-label={t('{title}, Seite {page} von {count} wird aufbereitet', { title, page: i + 1, count })}
           />
         ),
       )}

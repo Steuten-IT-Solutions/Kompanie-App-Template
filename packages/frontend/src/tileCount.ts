@@ -1,3 +1,5 @@
+import { tn } from './i18n';
+
 /**
  * Zahl im Kreis an einer Kachel: wie viel dort gerade ansteht (Beförderungen, Aufnahmen, Anfragen auf einen Zugang,
  * Fehlermeldungen in der Verwaltung).
@@ -20,8 +22,6 @@ export type TileCounts = {
 
 export type TileCount = { count: number; text: string; title: string };
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-
 /** Zahl und Erklärung (title) für eine Kachel; null, wenn dort nichts ansteht oder die Kachel keine Zahl hat. */
 const make = (n: number | null | undefined, title: (n: number) => string): TileCount | null =>
   n && n > 0 ? { count: n, text: n > 99 ? '99+' : String(n), title: title(n) } : null;
@@ -34,9 +34,13 @@ const make = (n: number | null | undefined, title: (n: number) => string): TileC
 export function tileSoonCount(id: string, counts: TileCounts): TileCount | null {
   switch (id) {
     case 'aufnahmen':
-      return make(counts.admissionsSoon, (n) => `${plural(n, 'Anwärter steht', 'Anwärter stehen')} kurz vor der Aufnahme`);
+      return make(counts.admissionsSoon, (n) =>
+        tn('{count} Anwärter steht kurz vor der Aufnahme', '{count} Anwärter stehen kurz vor der Aufnahme', n),
+      );
     case 'befoerderungen':
-      return make(counts.promotionsSoon, (n) => `${plural(n, 'Mitglied ist', 'Mitglieder sind')} bald zur Beförderung bereit`);
+      return make(counts.promotionsSoon, (n) =>
+        tn('{count} Mitglied ist bald zur Beförderung bereit', '{count} Mitglieder sind bald zur Beförderung bereit', n),
+      );
     default:
       return null;
   }
@@ -51,13 +55,21 @@ export function tileTitle(first: TileCount | null, soon: TileCount | null): stri
 export function tileCount(id: string, counts: TileCounts): TileCount | null {
   switch (id) {
     case 'befoerderungen':
-      return make(counts.promotions, (n) => `${plural(n, 'Mitglied', 'Mitglieder')} zur Beförderung bereit`);
+      return make(counts.promotions, (n) => tn('{count} Mitglied zur Beförderung bereit', '{count} Mitglieder zur Beförderung bereit', n));
     case 'aufnahmen':
-      return make(counts.admissions, (n) => `${plural(n, 'Anwärter erfüllt', 'Anwärter erfüllen')} die Voraussetzung für die Aufnahme`);
+      return make(counts.admissions, (n) =>
+        tn(
+          '{count} Anwärter erfüllt die Voraussetzung für die Aufnahme',
+          '{count} Anwärter erfüllen die Voraussetzung für die Aufnahme',
+          n,
+        ),
+      );
     case 'anfragen':
-      return make(counts.registrations, (n) => `${plural(n, 'offene Anfrage', 'offene Anfragen')} auf einen Zugang`);
+      return make(counts.registrations, (n) =>
+        tn('{count} offene Anfrage auf einen Zugang', '{count} offene Anfragen auf einen Zugang', n),
+      );
     case 'meldungen':
-      return make(counts.reports, (n) => plural(n, 'offene Fehlermeldung', 'offene Fehlermeldungen'));
+      return make(counts.reports, (n) => tn('{count} offene Fehlermeldung', '{count} offene Fehlermeldungen', n));
     default:
       return null;
   }

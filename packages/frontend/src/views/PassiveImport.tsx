@@ -5,31 +5,30 @@ import { formatDate, formatEuro, todayYmd } from '../format';
 import { navigate } from '../router';
 import { readSheet } from '../sheet';
 import { FileInput } from '../ui';
+import { t, tn } from '../i18n';
 
 /** Felder, denen man Spalten zuordnen kann, in dieser Reihenfolge; personal = nur mit manage_personal */
 const FIELDS: { key: PassiveImportField; label: string; personal?: boolean }[] = [
-  { key: 'first_name', label: 'Vorname' },
-  { key: 'last_name', label: 'Nachname' },
-  { key: 'street', label: 'Straße (auch mit Hausnummer)', personal: true },
-  { key: 'house_number', label: 'Hausnummer', personal: true },
-  { key: 'extra', label: 'Adresszusatz', personal: true },
-  { key: 'postal_code', label: 'PLZ', personal: true },
-  { key: 'city', label: 'Ort', personal: true },
-  { key: 'country', label: 'Land', personal: true },
-  { key: 'phone', label: 'Telefon', personal: true },
-  { key: 'email', label: 'E-Mail-Adresse', personal: true },
-  { key: 'birth_date', label: 'Geburtsdatum', personal: true },
-  { key: 'joined', label: 'Eintritt' },
-  { key: 'note', label: 'Bemerkung' },
-  { key: 'caretaker', label: 'Betreuer' },
-  { key: 'amount', label: 'Betrag' },
-  { key: 'method', label: 'Zahlungsart' },
-  { key: 'paid_on', label: 'Bezahlt am' },
+  { key: 'first_name', label: t('Vorname') },
+  { key: 'last_name', label: t('Nachname') },
+  { key: 'street', label: t('Straße (auch mit Hausnummer)'), personal: true },
+  { key: 'house_number', label: t('Hausnummer'), personal: true },
+  { key: 'extra', label: t('Adresszusatz'), personal: true },
+  { key: 'postal_code', label: t('PLZ'), personal: true },
+  { key: 'city', label: t('Ort'), personal: true },
+  { key: 'country', label: t('Land'), personal: true },
+  { key: 'phone', label: t('Telefon'), personal: true },
+  { key: 'email', label: t('E-Mail-Adresse'), personal: true },
+  { key: 'birth_date', label: t('Geburtsdatum'), personal: true },
+  { key: 'joined', label: t('Eintritt') },
+  { key: 'note', label: t('Bemerkung') },
+  { key: 'caretaker', label: t('Betreuer') },
+  { key: 'amount', label: t('Betrag') },
+  { key: 'method', label: t('Zahlungsart') },
+  { key: 'paid_on', label: t('Bezahlt am') },
 ];
 
 type Columns = Partial<Record<PassiveImportField, number | null>>;
-
-const count = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : `${n} ${many}`);
 
 /** Was die App aus einer Zeile verstanden hat, kurz. */
 function rowSummary(r: PassiveImportRow): string {
@@ -37,12 +36,19 @@ function rowSummary(r: PassiveImportRow): string {
   if (r.address) parts.push(formatAddress(r.address).join(', '));
   if (r.phone) parts.push(r.phone);
   if (r.email) parts.push(r.email);
-  if (r.birth_date) parts.push(`geboren ${formatDate(r.birth_date)}`);
-  if (r.joined) parts.push(`Eintritt ${r.joined}`);
-  if (r.caretaker) parts.push(`Betreuer: ${r.caretaker.name}`);
+  if (r.birth_date) parts.push(t('geboren {date}', { date: formatDate(r.birth_date) }));
+  if (r.joined) parts.push(t('Eintritt {date}', { date: r.joined }));
+  if (r.caretaker) parts.push(t('Betreuer: {name}', { name: r.caretaker.name }));
   if (r.payment)
-    parts.push(`Beitrag ${r.payment.year}: ${formatEuro(r.payment.amount_cents)} (${r.payment.method}, ${formatDate(r.payment.paid_on)})`);
-  if (r.note) parts.push(`Bemerkung: ${r.note}`);
+    parts.push(
+      t('Beitrag {year}: {amount} ({method}, {date})', {
+        year: r.payment.year,
+        amount: formatEuro(r.payment.amount_cents),
+        method: r.payment.method,
+        date: formatDate(r.payment.paid_on),
+      }),
+    );
+  if (r.note) parts.push(t('Bemerkung: {note}', { note: r.note }));
   return parts.join(' · ');
 }
 
@@ -79,8 +85,8 @@ export function PassiveImport({ onToast }: { onToast: (msg: string) => void }) {
       });
       if (apply) {
         onToast(
-          `${count(res.new, 'Passiver', 'Passive')} angelegt` +
-            (res.payments > 0 ? `, ${count(res.payments, 'Zahlung', 'Zahlungen')}` : ''),
+          tn('{count} Passiver angelegt', '{count} Passive angelegt', res.new) +
+            (res.payments > 0 ? ', ' + tn('{count} Zahlung', '{count} Zahlungen', res.payments) : ''),
         );
         navigate('verwaltung/passive');
         return;
@@ -121,22 +127,23 @@ export function PassiveImport({ onToast }: { onToast: (msg: string) => void }) {
   return (
     <div className="office-import passive-import stack">
       <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/passive')}>
-        ‹ Passive
+        ‹ {t('Passive')}
       </button>
-      <h2 className="member-name">Passive importieren</h2>
+      <h2 className="member-name">{t('Passive importieren')}</h2>
       <p className="small muted">
-        Eine Liste aus Excel (.xlsx) oder als CSV. Über der Kopfzeile darf z. B. ein Titel stehen. Wer schon als Passiver eingetragen ist
-        (gleicher Vor- und Nachname), wird übersprungen.
+        {t(
+          'Eine Liste aus Excel (.xlsx) oder als CSV. Über der Kopfzeile darf z. B. ein Titel stehen. Wer schon als Passiver eingetragen ist (gleicher Vor- und Nachname), wird übersprungen.',
+        )}
       </p>
       <label className="field">
-        <span>Datei wählen (Excel .xlsx oder CSV)</span>
+        <span>{t('Datei wählen (Excel .xlsx oder CSV)')}</span>
         <FileInput
           accept=".xlsx,.csv,.txt,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           onChange={(e) => pick(e.target.files?.[0])}
         />
       </label>
       <label className="field">
-        <span>{fileName ? `Inhalt von ${fileName}` : 'Oder Tabelle einfügen (z. B. aus Excel kopiert)'}</span>
+        <span>{fileName ? t('Inhalt von {name}', { name: fileName }) : t('Oder Tabelle einfügen (z. B. aus Excel kopiert)')}</span>
         <textarea
           value={csv}
           placeholder={'Vorname;Nachname;Betreuer;Bar\nErika;Muster;A. Beispiel;25'}
@@ -149,7 +156,7 @@ export function PassiveImport({ onToast }: { onToast: (msg: string) => void }) {
       </label>
       <div className="field-row">
         <label className="field">
-          <span>Beitrag für das Jahr</span>
+          <span>{t('Beitrag für das Jahr')}</span>
           <input
             type="number"
             min={1900}
@@ -162,7 +169,7 @@ export function PassiveImport({ onToast }: { onToast: (msg: string) => void }) {
           />
         </label>
         <label className="field">
-          <span>Datum für Zahlungen ohne Datum</span>
+          <span>{t('Datum für Zahlungen ohne Datum')}</span>
           <input
             type="date"
             min="1900-01-01"
@@ -182,8 +189,10 @@ export function PassiveImport({ onToast }: { onToast: (msg: string) => void }) {
       )}
       {result && columns && (
         <fieldset className="fieldset passive-import-columns">
-          <legend>Spalten zuordnen</legend>
-          <p className="small muted">Kopfzeile ist Zeile {result.header_line}. Was nicht passt, hier ändern; danach „Vorschau“.</p>
+          <legend>{t('Spalten zuordnen')}</legend>
+          <p className="small muted">
+            {t('Kopfzeile ist Zeile {line}. Was nicht passt, hier ändern; danach „Vorschau“.', { line: result.header_line })}
+          </p>
           {fields.map((f) => (
             <label key={f.key} className="field">
               <span>{f.label}</span>
@@ -194,10 +203,10 @@ export function PassiveImport({ onToast }: { onToast: (msg: string) => void }) {
                   changed();
                 }}
               >
-                <option value="">keine Spalte</option>
+                <option value="">{t('keine Spalte')}</option>
                 {result.headers.map((h, i) => (
                   <option key={i} value={i}>
-                    {h.trim() !== '' ? h : `Spalte ${i + 1} (ohne Namen)`}
+                    {h.trim() !== '' ? h : t('Spalte {number} (ohne Namen)', { number: i + 1 })}
                   </option>
                 ))}
               </select>
@@ -205,14 +214,19 @@ export function PassiveImport({ onToast }: { onToast: (msg: string) => void }) {
           ))}
           {result.method_columns.length > 0 ? (
             <p className="small">
-              Beträge aus den Spalten der Zahlungsarten:{' '}
-              {result.method_columns.map((m) => `„${result.headers[m.column]}“ (${m.method})`).join(', ')}.
+              {t('Beträge aus den Spalten der Zahlungsarten: {columns}.', {
+                columns: result.method_columns
+                  .map((m) => t('„{column}“ ({reason})', { column: result.headers[m.column], reason: m.method }))
+                  .join(', '),
+              })}
             </p>
           ) : (
             columns.amount == null && (
               <p className="small muted">
-                Steht der Beitrag in Spalten je Zahlungsart (z. B. „Bar“), erkennt die App sie, wenn sie so heißen wie die eingerichteten
-                Zahlungsarten ({result.methods.join(', ')}).
+                {t(
+                  'Steht der Beitrag in Spalten je Zahlungsart (z. B. „Bar“), erkennt die App sie, wenn sie so heißen wie die eingerichteten Zahlungsarten ({methods}).',
+                  { methods: result.methods.join(', ') },
+                )}
               </p>
             )
           )}
@@ -220,44 +234,62 @@ export function PassiveImport({ onToast }: { onToast: (msg: string) => void }) {
       )}
       <div className="button-row">
         <button className="btn btn-secondary" disabled={busy || csv.trim() === ''} onClick={() => send(false)}>
-          {busy ? 'Prüft …' : 'Vorschau'}
+          {busy ? t('Prüft …') : t('Vorschau')}
         </button>
         {result && (
           <button className="btn" disabled={!canApply} onClick={() => send(true)}>
-            Übernehmen
+            {t('Übernehmen')}
           </button>
         )}
       </div>
       {result && (
         <section>
-          {stale && <p className="small muted">Geändert: Bitte die Vorschau aktualisieren.</p>}
+          {stale && <p className="small muted">{t('Geändert: Bitte die Vorschau aktualisieren.')}</p>}
           <p role="status">
-            Neu: {count(result.new, 'Passiver', 'Passive')} · davon mit Beitrag {result.year}: {result.payments} · schon vorhanden:{' '}
-            {result.existing}
+            {t('Neu: {passives} · davon mit Beitrag {year}: {payments}', {
+              passives: tn('{count} Passiver', '{count} Passive', result.new),
+              year: result.year,
+              payments: result.payments,
+            })}
+            {' · '}
+            {t('schon vorhanden: {count}', { count: result.existing })}
           </p>
           {result.ignored.length > 0 && (
-            <p className="small">Übergangene Spalten: {result.ignored.map((c) => `„${c.column}“ (${c.reason})`).join(', ')}</p>
+            <p className="small">
+              {t('Übergangene Spalten: {columns}', {
+                columns: result.ignored.map((c) => t('„{column}“ ({reason})', { column: c.column, reason: c.reason })).join(', '),
+              })}
+            </p>
           )}
           {warnings > 0 && (
-            <p className="small">{count(warnings, 'Zeile hat', 'Zeilen haben')} einen Hinweis (wird trotzdem übernommen).</p>
+            <p className="small">
+              {tn(
+                '{count} Zeile hat einen Hinweis (wird trotzdem übernommen).',
+                '{count} Zeilen haben einen Hinweis (wird trotzdem übernommen).',
+                warnings,
+              )}
+            </p>
           )}
           {result.errors > 0 && (
             <>
               <p className="form-error">
-                {result.errors === 1 ? '1 Zeile hat' : `${result.errors} Zeilen haben`} einen Fehler. In der Datei korrigieren oder diese
-                Zeilen überspringen (z. B. Summen unter der Liste).
+                {tn(
+                  '{count} Zeile hat einen Fehler. In der Datei korrigieren oder diese Zeilen überspringen (z. B. Summen unter der Liste).',
+                  '{count} Zeilen haben einen Fehler. In der Datei korrigieren oder diese Zeilen überspringen (z. B. Summen unter der Liste).',
+                  result.errors,
+                )}
               </p>
               <label className="toggle">
                 <input type="checkbox" checked={skipErrors} onChange={(e) => setSkipErrors(e.target.checked)} />
-                <span>Zeilen mit Fehler überspringen</span>
+                <span>{t('Zeilen mit Fehler überspringen')}</span>
               </label>
             </>
           )}
           <ul className="office-import-rows">
             {result.rows.map((r) => (
               <li key={r.line} className={r.existing || r.error ? 'muted' : ''}>
-                <strong>Zeile {r.line}</strong> {r.name}
-                {r.existing && ' · schon eingetragen, wird übersprungen'}
+                <strong>{t('Zeile {line}', { line: r.line })}</strong> {r.name}
+                {r.existing && ' · ' + t('schon eingetragen, wird übersprungen')}
                 {!r.existing && !r.error && rowSummary(r) && ` · ${rowSummary(r)}`}
                 {r.warnings?.map((w) => (
                   <p key={w} className="small passive-import-warning">

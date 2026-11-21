@@ -11,6 +11,7 @@ import {
   type RefObject,
 } from 'react';
 import { confirmAsk } from './ask';
+import { t } from './i18n';
 import { useBackClose } from './backClose';
 import { scrollSpeed } from './dragSort';
 import { IconButton } from './icons';
@@ -109,8 +110,11 @@ export function TileArrange({ pages, children }: { pages: string[]; children: Re
     const shown = [...grids.current].map(([page, current]) => ({ page, ...current() }));
     const cols = shown[0]?.cols ?? 2;
     const ok = await confirmAsk(
-      `Diese Anordnung als Vorgabe für alle festlegen? Sie gilt für jede Person ohne eigene Anordnung, bei ${cols} Spalten (diese Bildschirmbreite); wer eine Kachel nicht sieht, bei dem wird die schmalste Kachel der Zeile breiter.`,
-      { title: 'Vorgabe für alle', okLabel: 'Festlegen' },
+      t(
+        'Diese Anordnung als Vorgabe für alle festlegen? Sie gilt für jede Person ohne eigene Anordnung, bei {cols} Spalten (diese Bildschirmbreite); wer eine Kachel nicht sieht, bei dem wird die schmalste Kachel der Zeile breiter.',
+        { cols },
+      ),
+      { title: t('Vorgabe für alle'), okLabel: t('Festlegen') },
     );
     if (!ok) return;
     try {
@@ -123,10 +127,10 @@ export function TileArrange({ pages, children }: { pages: string[]; children: Re
 
   async function dropDefault() {
     const ok = await confirmAsk(
-      'Vorgabe für alle auf dieser Seite löschen (alle Bildschirmbreiten)? Danach gilt die Reihenfolge aus Einstellungen → Navigation.',
+      t('Vorgabe für alle auf dieser Seite löschen (alle Bildschirmbreiten)? Danach gilt die Reihenfolge aus Einstellungen → Navigation.'),
       {
-        title: 'Vorgabe löschen',
-        okLabel: 'Löschen',
+        title: t('Vorgabe löschen'),
+        okLabel: t('Löschen'),
       },
     );
     if (!ok) return;
@@ -139,10 +143,13 @@ export function TileArrange({ pages, children }: { pages: string[]; children: Re
   }
 
   async function reset() {
-    const ok = await confirmAsk('Eigene Anordnung dieser Seite zurücksetzen? Danach gilt wieder die Vorgabe, für alle Bildschirmbreiten.', {
-      title: 'Zurücksetzen',
-      okLabel: 'Zurücksetzen',
-    });
+    const ok = await confirmAsk(
+      t('Eigene Anordnung dieser Seite zurücksetzen? Danach gilt wieder die Vorgabe, für alle Bildschirmbreiten.'),
+      {
+        title: t('Zurücksetzen'),
+        okLabel: t('Zurücksetzen'),
+      },
+    );
     if (!ok) return;
     try {
       setError((await resetLayouts(pages)) === 'pending' ? PENDING : null);
@@ -156,29 +163,29 @@ export function TileArrange({ pages, children }: { pages: string[]; children: Re
       {editing && (
         <div className="tile-arrange card">
           <p id={HINT_ID} className="tile-arrange-hint">
-            Zum Verschieben ziehen (am Handy erst kurz halten), mit − und + die Breite ändern. Gilt für diese Bildschirmbreite.
+            {t('Zum Verschieben ziehen (am Handy erst kurz halten), mit − und + die Breite ändern. Gilt für diese Bildschirmbreite.')}
           </p>
           {error && (
             <p className={error === PENDING ? 'tile-arrange-note' : 'form-error'} role="alert">
-              {error === PENDING ? 'Keine Verbindung: Die Anordnung ist auf diesem Gerät vorgemerkt und wird nachgeholt.' : error}
+              {error === PENDING ? t('Keine Verbindung: Die Anordnung ist auf diesem Gerät vorgemerkt und wird nachgeholt.') : error}
             </p>
           )}
           <div className="button-row">
             <button type="button" className="btn btn-secondary" onClick={() => void reset()}>
-              Zurücksetzen
+              {t('Zurücksetzen')}
             </button>
             <button type="button" className="btn btn-primary" onClick={() => setEditing(false)}>
-              Fertig
+              {t('Fertig')}
             </button>
           </div>
           {admin && (
             <div className="button-row tile-arrange-default">
               <button type="button" className="btn btn-secondary" onClick={() => void setDefault()}>
-                Als Vorgabe für alle
+                {t('Als Vorgabe für alle')}
               </button>
               {hasDefault(pages) && (
                 <button type="button" className="btn btn-secondary" onClick={() => void dropDefault()}>
-                  Vorgabe löschen
+                  {t('Vorgabe löschen')}
                 </button>
               )}
             </div>
@@ -190,7 +197,7 @@ export function TileArrange({ pages, children }: { pages: string[]; children: Re
         <div className="tile-arrange-bar">
           <IconButton
             icon="arrange"
-            label="Kacheln anordnen"
+            label={t('Kacheln anordnen')}
             onClick={() => {
               setError(null);
               setEditing(true);
@@ -459,7 +466,7 @@ export function TileGrid({ page, tiles, className }: { page: string; tiles: Grid
                 <button
                   type="button"
                   className="tile-handle"
-                  aria-label={`${label} verschieben (Pfeiltasten), Breite ${p.span} von ${cols} (Plus, Minus)`}
+                  aria-label={t('{label} verschieben (Pfeiltasten), Breite {span} von {cols} (Plus, Minus)', { label, span: p.span, cols })}
                   aria-describedby={HINT_ID}
                   ref={(el) => {
                     if (el) handles.current.set(p.id, el);
@@ -472,7 +479,7 @@ export function TileGrid({ page, tiles, className }: { page: string; tiles: Grid
                 <div className="tile-size">
                   <button
                     type="button"
-                    aria-label={`${label} schmaler`}
+                    aria-label={t('{label} schmaler', { label })}
                     disabled={p.span <= 1}
                     onClick={() => commit(resizeTile(placed, p.id, -1, cols))}
                   >
@@ -480,7 +487,7 @@ export function TileGrid({ page, tiles, className }: { page: string; tiles: Grid
                   </button>
                   <button
                     type="button"
-                    aria-label={`${label} breiter`}
+                    aria-label={t('{label} breiter', { label })}
                     disabled={p.span >= cols}
                     onClick={() => commit(resizeTile(placed, p.id, 1, cols))}
                   >

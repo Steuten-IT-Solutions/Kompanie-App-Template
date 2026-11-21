@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { config, type Capability } from './api';
+import { t } from './i18n';
 import { CAPABILITY_GROUPS, groupState, rightsRows, shown, type CapabilityGroup, type GroupState } from './capabilities';
 
 /** Gruppen mit den Rechten, die zu eingeschalteten Bereichen gehören; leere Gruppen fallen weg. */
@@ -81,7 +82,7 @@ export function RightsTree({
         className="btn btn-link rights-tree-all"
         onClick={() => setOpen(allOpen ? new Set() : new Set(groups.map((g) => g.key)))}
       >
-        {allOpen ? 'Alle zuklappen' : 'Alle aufklappen'}
+        {allOpen ? t('Alle zuklappen') : t('Alle aufklappen')}
       </button>
       {groups.map((g) => {
         const keys = g.items.map((i) => i.key);
@@ -93,7 +94,12 @@ export function RightsTree({
         return (
           <div key={g.key} className="rights-group">
             <div className="rights-group-head">
-              <TriCheckbox state={state} disabled={free.length === 0} label={`${g.label}: alle`} onChange={(on) => onToggle(free, on)} />
+              <TriCheckbox
+                state={state}
+                disabled={free.length === 0}
+                label={t('{group}: alle', { group: g.label })}
+                onChange={(on) => onToggle(free, on)}
+              />
               <button
                 type="button"
                 className="rights-group-toggle"
@@ -102,9 +108,7 @@ export function RightsTree({
                 onClick={() => flip(g.key)}
               >
                 <span className="rights-group-label">{g.label}</span>
-                <span className="rights-group-count muted small">
-                  {count} von {keys.length}
-                </span>
+                <span className="rights-group-count muted small">{t('{count} von {total}', { count, total: keys.length })}</span>
                 <span className="fold-arrow" aria-hidden="true">
                   ›
                 </span>
@@ -132,8 +136,8 @@ export function RightsTree({
                     <div className="rights-pair-boxes">
                       {(
                         [
-                          [row.read, 'Lesen'],
-                          [row.write, 'Schreiben'],
+                          [row.read, t('Lesen')],
+                          [row.write, t('Schreiben')],
                         ] as const
                       ).map(([item, word]) => (
                         <label key={item.key} className="toggle rights-pair-box">
@@ -152,7 +156,7 @@ export function RightsTree({
                       ))}
                     </div>
                     <p className="small muted rights-pair-desc">
-                      Lesen: {row.read.label}. Schreiben: {row.write.label}.
+                      {t('Lesen: {read}. Schreiben: {write}.', { read: row.read.label, write: row.write.label })}
                     </p>
                   </div>
                 ),

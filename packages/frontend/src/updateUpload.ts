@@ -1,5 +1,6 @@
 import { api, ApiError } from './api';
 import { readBase64 } from './backupFile';
+import { t } from './i18n';
 
 /**
  * Update-Paket hochladen statt herunterladen: in Stücken (jede Anfrage bleibt unter der Grenze des Servers). Der Server
@@ -17,7 +18,7 @@ const wait = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
  * @param onProgress Anteil 0 bis 1
  */
 export async function uploadUpdatePackage(file: File, onProgress?: (share: number) => void): Promise<string> {
-  if (!/\.zip$/i.test(file.name)) throw new Error('Bitte das Update-Paket als ZIP-Datei wählen (z. B. kompanie-app-standalone.zip).');
+  if (!/\.zip$/i.test(file.name)) throw new Error(t('Bitte das Update-Paket als ZIP-Datei wählen (z. B. kompanie-app-standalone.zip).'));
   const session = await api.startUpdateUpload(file.size);
   try {
     let offset = 0;

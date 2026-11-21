@@ -3,6 +3,7 @@ import { api, type Capability, type MemberRights } from '../api';
 import { requires, toggleMany } from '../capabilities';
 import { RightsTree } from '../rightsTree';
 import { confirmAsk } from '../ask';
+import { t } from '../i18n';
 
 /** Rechte nach den Rollen und Ausnahmen; was seine Voraussetzung nicht hat, fällt weg (wie RoleService::effective). */
 function effective(r: MemberRights): Set<Capability> {
@@ -67,29 +68,34 @@ export function MemberRightsPanel({
 
   return (
     <section className="member-rights">
-      <h3 className="section-title">Rechte</h3>
+      <h3 className="section-title">{t('Rechte')}</h3>
       <div className="card">
         <p className="small muted">
-          {plural ? `Grundlage sind die Rollen „${roles}“.` : `Grundlage ist die Rolle „${roles}“.`}{' '}
+          {plural ? t('Grundlage sind die Rollen „{roles}“.', { roles }) : t('Grundlage ist die Rolle „{roles}“.', { roles })}{' '}
           {readOnly
-            ? `Markiert ist, was ${name} zusätzlich bekommen hat oder was entzogen ist.`
-            : `Hier kannst du ${name} einzelne Rechte zusätzlich geben oder entziehen. Die Ausnahmen bleiben auch bei einem Rollenwechsel bestehen.`}
+            ? t('Markiert ist, was {name} zusätzlich bekommen hat oder was entzogen ist.', { name })
+            : t(
+                'Hier kannst du {name} einzelne Rechte zusätzlich geben oder entziehen. Die Ausnahmen bleiben auch bei einem Rollenwechsel bestehen.',
+                { name },
+              )}
         </p>
         <RightsTree
-          legend={`Rechte von ${name}`}
+          legend={t('Rechte von {name}', { name })}
           disabled={busy}
           isOn={(c) => checked.has(c)}
           isDisabled={(c) => !rights.editable.includes(c)}
           onToggle={(keys, on) => setChecked((prev) => toggleMany(prev, keys, on))}
           badge={(c) =>
-            checked.has(c) !== fromRole.has(c) && <span className="badge badge-override">{checked.has(c) ? 'zusätzlich' : 'entzogen'}</span>
+            checked.has(c) !== fromRole.has(c) && (
+              <span className="badge badge-override">{checked.has(c) ? t('zusätzlich') : t('entzogen')}</span>
+            )
           }
           initiallyOpen={(g) => g.items.some((i) => overridden.has(i.key))}
         />
         {!readOnly && (
           <div className="button-row">
-            <button className="btn" disabled={busy || !dirty} onClick={() => save(grant, revoke, 'Rechte gespeichert')}>
-              Rechte speichern
+            <button className="btn" disabled={busy || !dirty} onClick={() => save(grant, revoke, t('Rechte gespeichert'))}>
+              {t('Rechte speichern')}
             </button>
             {hasOverrides(rights) && (
               <button
@@ -97,11 +103,13 @@ export function MemberRightsPanel({
                 disabled={busy}
                 onClick={async () =>
                   (await confirmAsk(
-                    `Alle Ausnahmen von ${name} entfernen? Dann gelten nur die Rechte ${plural ? 'der Rollen' : 'der Rolle'}.`,
-                  )) && save([], [], 'Rechte wie die Rolle')
+                    plural
+                      ? t('Alle Ausnahmen von {name} entfernen? Dann gelten nur die Rechte der Rollen.', { name })
+                      : t('Alle Ausnahmen von {name} entfernen? Dann gelten nur die Rechte der Rolle.', { name }),
+                  )) && save([], [], t('Rechte wie die Rolle'))
                 }
               >
-                Wie die Rolle
+                {t('Wie die Rolle')}
               </button>
             )}
           </div>

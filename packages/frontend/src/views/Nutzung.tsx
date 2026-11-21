@@ -4,15 +4,15 @@ import { formatDate, todayYmd } from '../format';
 import { toCsv } from '../lists';
 import { ErrorBox, Loading, Sheet, StatCard, useAsync } from '../ui';
 import { confirmAsk } from '../ask';
-import { localeTag } from '../i18n';
+import { localeTag, t, tn } from '../i18n';
 
 const ACTION_TEXT: Record<ActivityAction, string> = {
-  view: 'angesehen',
-  create: 'angelegt',
-  update: 'geändert',
-  delete: 'gelöscht',
-  vote: 'abgestimmt',
-  login: 'angemeldet',
+  view: t('angesehen'),
+  create: t('angelegt'),
+  update: t('geändert'),
+  delete: t('gelöscht'),
+  vote: t('abgestimmt'),
+  login: t('angemeldet'),
 };
 
 /** Ab so vielen Tagen ohne Nutzung gilt jemand als „lange nicht aktiv“. */
@@ -46,19 +46,19 @@ export default function Nutzung({ onToast }: { onToast: (msg: string) => void })
   return (
     <>
       <section className="card settings-section" aria-labelledby="usage-title">
-        <h3 id="usage-title">Nutzung</h3>
+        <h3 id="usage-title">{t('Nutzung')}</h3>
         <div className="stats usage-stats">
-          <StatCard label="Konten" value={String(o.users)} />
-          <StatCard label="Aktiv (24 Std.)" value={String(o.active.d1)} />
-          <StatCard label="Aktiv (7 Tage)" value={String(o.active.d7)} />
-          <StatCard label="Aktiv (30 Tage)" value={String(o.active.d30)} />
+          <StatCard label={t('Konten')} value={String(o.users)} />
+          <StatCard label={t('Aktiv (24 Std.)')} value={String(o.active.d1)} />
+          <StatCard label={t('Aktiv (7 Tage)')} value={String(o.active.d7)} />
+          <StatCard label={t('Aktiv (30 Tage)')} value={String(o.active.d30)} />
         </div>
       </section>
       <section className="card settings-section" aria-labelledby="usage-range-title">
-        <h3 id="usage-range-title">Zeitraum</h3>
+        <h3 id="usage-range-title">{t('Zeitraum')}</h3>
         <div className="usage-range">
           <label className="field">
-            <span>Von</span>
+            <span>{t('Von')}</span>
             <input
               type="date"
               value={range.from}
@@ -67,7 +67,7 @@ export default function Nutzung({ onToast }: { onToast: (msg: string) => void })
             />
           </label>
           <label className="field">
-            <span>Bis</span>
+            <span>{t('Bis')}</span>
             <input
               type="date"
               value={range.to}
@@ -97,9 +97,9 @@ function Days({ overview }: { overview: ActivityOverview }) {
   const max = Math.max(1, ...overview.days.map((d) => d.users));
   return (
     <>
-      <h4 className="usage-subtitle">Aktive Personen je Tag</h4>
+      <h4 className="usage-subtitle">{t('Aktive Personen je Tag')}</h4>
       {overview.days.length === 0 ? (
-        <p className="small muted">Im Zeitraum hat niemand die App genutzt.</p>
+        <p className="small muted">{t('Im Zeitraum hat niemand die App genutzt.')}</p>
       ) : (
         <ul className="usage-bars">
           {overview.days.map((d) => (
@@ -121,16 +121,16 @@ function Areas({ overview }: { overview: ActivityOverview }) {
   const max = Math.max(1, ...overview.areas.map((a) => a.actions));
   return (
     <>
-      <h4 className="usage-subtitle">Nutzung je Bereich</h4>
+      <h4 className="usage-subtitle">{t('Nutzung je Bereich')}</h4>
       {overview.areas.length === 0 ? (
-        <p className="small muted">Noch keine Nutzung.</p>
+        <p className="small muted">{t('Noch keine Nutzung.')}</p>
       ) : (
         <ul className="usage-bars">
           {overview.areas.map((a) => (
             <li key={a.area}>
               <span className="usage-bar-label">
                 {a.label}
-                <span className="small muted"> · {a.people === 1 ? '1 Person' : `${a.people} Personen`} in 30 Tagen</span>
+                <span className="small muted"> · {tn('{count} Person in 30 Tagen', '{count} Personen in 30 Tagen', a.people)}</span>
               </span>
               <span className="usage-bar" aria-hidden="true">
                 <span style={{ width: `${(a.actions / max) * 100}%` }} />
@@ -154,7 +154,7 @@ function CsvExport({ from, to, onToast }: { from: string; to: string; onToast: (
     try {
       const res = await api.activityEntries(from, to);
       const rows = res.entries.map((e) => [dateTime(e.at), e.name, e.label, ACTION_TEXT[e.action] ?? e.action]);
-      const blob = new Blob([toCsv(['Zeit', 'Name', 'Bereich', 'Aktion'], rows)], { type: 'text/csv;charset=utf-8' });
+      const blob = new Blob([toCsv([t('Zeit'), t('Name'), t('Bereich'), t('Aktion')], rows)], { type: 'text/csv;charset=utf-8' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `nutzung-${from}-bis-${to}.csv`;
@@ -162,7 +162,11 @@ function CsvExport({ from, to, onToast }: { from: string; to: string; onToast: (
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-      onToast(res.truncated ? `CSV-Datei mit den neuesten ${res.entries.length} Einträgen heruntergeladen` : 'CSV-Datei heruntergeladen');
+      onToast(
+        res.truncated
+          ? t('CSV-Datei mit den neuesten {count} Einträgen heruntergeladen', { count: res.entries.length })
+          : t('CSV-Datei heruntergeladen'),
+      );
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -173,10 +177,10 @@ function CsvExport({ from, to, onToast }: { from: string; to: string; onToast: (
     <>
       <div className="button-row">
         <button type="button" className="btn btn-secondary" disabled={busy} onClick={download}>
-          {busy ? 'Wird erstellt …' : 'Als CSV-Datei herunterladen'}
+          {busy ? t('Wird erstellt …') : t('Als CSV-Datei herunterladen')}
         </button>
       </div>
-      <p className="small muted">Enthält Namen. Die Datei nach Gebrauch bitte löschen.</p>
+      <p className="small muted">{t('Enthält Namen. Die Datei nach Gebrauch bitte löschen.')}</p>
       {error && (
         <p className="form-error" role="alert">
           {error}
@@ -204,15 +208,15 @@ function Members({
   const shown = sorted.filter(onlyInactive ? inactive : (m) => m.actions > 0);
   return (
     <section className="card settings-section" aria-labelledby="usage-members-title">
-      <h3 id="usage-members-title">Mitglieder</h3>
+      <h3 id="usage-members-title">{t('Mitglieder')}</h3>
       <label className="toggle">
         <input type="checkbox" checked={onlyInactive} onChange={(e) => setOnlyInactive(e.target.checked)} />
         <span>
-          Nur, wer seit {INACTIVE_DAYS} Tagen nicht aktiv war ({members.filter(inactive).length})
+          {t('Nur, wer seit {days} Tagen nicht aktiv war ({count})', { days: INACTIVE_DAYS, count: members.filter(inactive).length })}
         </span>
       </label>
       {shown.length === 0 && (
-        <p className="small muted">{onlyInactive ? 'Alle waren in dieser Zeit aktiv.' : 'Im Zeitraum war niemand aktiv.'}</p>
+        <p className="small muted">{onlyInactive ? t('Alle waren in dieser Zeit aktiv.') : t('Im Zeitraum war niemand aktiv.')}</p>
       )}
       <ul className="card-list usage-members">
         {shown.map((m) => (
@@ -221,7 +225,9 @@ function Members({
               <span className="row-main">
                 <span className="row-title">{m.name}</span>
                 <span className="row-sub">
-                  {m.last_active ? `zuletzt aktiv: ${dateTime(m.last_active)}` : 'nicht aktiv, seit die Erfassung läuft'}
+                  {m.last_active
+                    ? t('zuletzt aktiv: {time}', { time: dateTime(m.last_active) })
+                    : t('nicht aktiv, seit die Erfassung läuft')}
                 </span>
               </span>
               <span className="settings-chevron" aria-hidden="true">
@@ -240,23 +246,22 @@ function History({ person, from, to, onClose }: { person: { id: number; name: st
   const { data, error, loading, reload } = useAsync(() => api.activityEntries(from, to, person.id), [person.id, from, to]);
   return (
     <Sheet title={person.name} onClose={onClose}>
-      <p className="small muted">
-        {formatDate(from)} bis {formatDate(to)}
-      </p>
+      <p className="small muted">{t('{from} bis {to}', { from: formatDate(from), to: formatDate(to) })}</p>
       {loading && !data ? (
         <Loading shape="text" />
       ) : error ? (
         <ErrorBox message={error} onRetry={reload} />
       ) : data!.entries.length === 0 ? (
-        <p className="small">In diesem Zeitraum nicht aktiv.</p>
+        <p className="small">{t('In diesem Zeitraum nicht aktiv.')}</p>
       ) : (
         <ul className="usage-history">
           {data!.entries.map((e: ActivityEntry, i) => (
             <li key={i}>
-              <span className="small muted">{dateTime(e.at)}</span> {e.label}: {ACTION_TEXT[e.action] ?? e.action}
+              <span className="small muted">{dateTime(e.at)}</span>{' '}
+              {t('{area}: {action}', { area: e.label, action: ACTION_TEXT[e.action] ?? e.action })}
             </li>
           ))}
-          {data!.truncated && <li className="small muted">Nur die neuesten {data!.entries.length} Einträge.</li>}
+          {data!.truncated && <li className="small muted">{t('Nur die neuesten {count} Einträge.', { count: data!.entries.length })}</li>}
         </ul>
       )}
     </Sheet>
@@ -279,7 +284,7 @@ function PersonalSwitch({
     if (
       !on &&
       !(await confirmAsk(
-        'Nutzung nicht mehr je Person erfassen? Alle bisherigen Einträge mit Namen werden sofort gelöscht, auch „zuletzt aktiv“.',
+        t('Nutzung nicht mehr je Person erfassen? Alle bisherigen Einträge mit Namen werden sofort gelöscht, auch „zuletzt aktiv“.'),
       ))
     )
       return;
@@ -296,15 +301,18 @@ function PersonalSwitch({
   }
   return (
     <section className="card settings-section" aria-labelledby="usage-personal-title">
-      <h3 id="usage-personal-title">Erfassung je Person</h3>
+      <h3 id="usage-personal-title">{t('Erfassung je Person')}</h3>
       <label className="toggle">
         <input type="checkbox" checked={overview.personal} disabled={busy} onChange={(e) => void change(e.target.checked)} />
-        <span>Nutzung je Person erfassen (wer, wann, welcher Bereich)</span>
+        <span>{t('Nutzung je Person erfassen (wer, wann, welcher Bereich)')}</span>
       </label>
       <p className="small muted">
         {overview.personal
-          ? `Einträge je Person werden nach ${overview.keep_days} Tagen automatisch gelöscht, ebenso mit dem Konto. Bitte informiert eure Mitglieder darüber, z. B. in der Datenschutzerklärung.`
-          : 'Ausgeschaltet: Die App zählt nur noch, wie viele Personen welchen Bereich nutzen, ohne Namen.'}
+          ? t(
+              'Einträge je Person werden nach {days} Tagen automatisch gelöscht, ebenso mit dem Konto. Bitte informiert eure Mitglieder darüber, z. B. in der Datenschutzerklärung.',
+              { days: overview.keep_days },
+            )
+          : t('Ausgeschaltet: Die App zählt nur noch, wie viele Personen welchen Bereich nutzen, ohne Namen.')}
       </p>
       {error && (
         <p className="form-error" role="alert">

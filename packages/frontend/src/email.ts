@@ -6,6 +6,8 @@
  * davor darf es laut RFC 5321 (Abschnitt 2.4).
  */
 
+import { t } from './i18n';
+
 /** Wie MemberService::EMAIL_MAX auf dem Server. */
 export const EMAIL_MAX = 100;
 
@@ -44,7 +46,8 @@ export function normalizeEmail(input: string): string {
   return s.slice(0, at + 1) + domain;
 }
 
-const LOCAL = /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*$/;
+// \x27 und \x60 statt ' und `: So liest scripts/check-i18n.php (ohne Regex-Erkennung) die Texte dahinter richtig.
+const LOCAL = /^[A-Za-z0-9!#$%&\x27*+/=?^_\x60{|}~-]+(\.[A-Za-z0-9!#$%&\x27*+/=?^_\x60{|}~-]+)*$/;
 const LABEL = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
 
 /** Was an der (schon geglätteten) Adresse nicht stimmt, sonst null; leer ist erlaubt (die Felder sind optional). */
@@ -52,17 +55,17 @@ export function emailProblem(input: string): string | null {
   const s = normalizeEmail(input);
   if (s === '') return null;
   const at = s.lastIndexOf('@');
-  if (at < 0) return 'Es fehlt das @.';
+  if (at < 0) return t('Es fehlt das @.');
   const local = s.slice(0, at);
   const domain = s.slice(at + 1).toLowerCase();
-  if (local === '') return 'Vor dem @ fehlt der Name.';
-  if (local.includes('@')) return 'Bitte nur ein @ verwenden.';
-  if (domain === '') return 'Hinter dem @ fehlt der Anbieter, z. B. gmx.de.';
-  if (!domain.includes('.')) return `Hinter „${domain}“ fehlt die Endung, z. B. .de oder .com.`;
-  if (s.length > EMAIL_MAX) return `Die Adresse ist zu lang (höchstens ${EMAIL_MAX} Zeichen).`;
+  if (local === '') return t('Vor dem @ fehlt der Name.');
+  if (local.includes('@')) return t('Bitte nur ein @ verwenden.');
+  if (domain === '') return t('Hinter dem @ fehlt der Anbieter, z. B. gmx.de.');
+  if (!domain.includes('.')) return t('Hinter „{host}“ fehlt die Endung, z. B. .de oder .com.', { host: domain });
+  if (s.length > EMAIL_MAX) return t('Die Adresse ist zu lang (höchstens {max} Zeichen).', { max: EMAIL_MAX });
   const labels = domain.split('.');
   if (!LOCAL.test(local) || !labels.every((l) => LABEL.test(l)) || !/^[a-z]{2,}$/.test(labels[labels.length - 1])) {
-    return 'Die E-Mail-Adresse ist ungültig.';
+    return t('Die E-Mail-Adresse ist ungültig.');
   }
   return null;
 }

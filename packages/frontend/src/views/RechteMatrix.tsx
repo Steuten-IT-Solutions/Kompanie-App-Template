@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react';
 import { api, type Capability, type Level, type RoleAdmin } from '../api';
 import { groupState, lockedFor, orderedCaps, toggleForRole } from '../capabilities';
+import { t, tn } from '../i18n';
 import { TriCheckbox, visibleGroups } from '../rightsTree';
 
 /**
@@ -48,10 +49,10 @@ export default function RechteMatrix({
         try {
           list = await api.updateRole(r.key, { capabilities: orderedCaps(draft[r.key] ?? new Set()) });
         } catch (e) {
-          throw new Error(`${r.label}: ${(e as Error).message}`);
+          throw new Error(t('{role}: {message}', { role: r.label, message: (e as Error).message }));
         }
       }
-      if (list) onSaved(list, changed.length === 1 ? 'Rechte gespeichert' : `Rechte von ${changed.length} Rollen gespeichert`);
+      if (list) onSaved(list, tn('Rechte gespeichert', 'Rechte von {count} Rollen gespeichert', changed.length));
     } catch (e) {
       // Was schon gespeichert ist, bleibt; die Liste zeigt den Stand des Servers.
       if (list) onSaved(list, (e as Error).message);
@@ -67,7 +68,7 @@ export default function RechteMatrix({
         <table className="rights-matrix">
           <thead>
             <tr>
-              <th scope="col">Recht</th>
+              <th scope="col">{t('Recht')}</th>
               {roles.map((r) => (
                 <th key={r.key} scope="col">
                   {r.label}
@@ -97,7 +98,7 @@ export default function RechteMatrix({
                           <TriCheckbox
                             state={groupState((c) => isOn(r, c), keys)}
                             disabled={busy || free.length === 0}
-                            label={`${g.label} für ${r.label}`}
+                            label={t('{right} für {role}', { right: g.label, role: r.label })}
                             onChange={(on) => toggle(r, free, on)}
                           />
                         </td>
@@ -112,7 +113,7 @@ export default function RechteMatrix({
                           <td key={r.key}>
                             <input
                               type="checkbox"
-                              aria-label={`${i.label} für ${r.label}`}
+                              aria-label={t('{right} für {role}', { right: i.label, role: r.label })}
                               checked={isOn(r, i.key)}
                               disabled={busy || locked(r, i.key)}
                               onChange={(e) => toggle(r, [i.key], e.target.checked)}
@@ -129,10 +130,10 @@ export default function RechteMatrix({
       </div>
       <div className="button-row">
         <button type="button" className="btn" disabled={busy || changed.length === 0} onClick={save}>
-          {busy ? 'Speichert …' : 'Speichern'}
+          {busy ? t('Speichert …') : t('Speichern')}
         </button>
         <button type="button" className="btn btn-secondary" disabled={busy || changed.length === 0} onClick={() => setDraft(initial())}>
-          Verwerfen
+          {t('Verwerfen')}
         </button>
       </div>
     </div>

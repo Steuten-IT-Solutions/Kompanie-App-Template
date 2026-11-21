@@ -1,4 +1,5 @@
 import type { Company } from './api';
+import { t } from './i18n';
 import type { SortDir } from './memberSort';
 
 /**
@@ -8,10 +9,10 @@ import type { SortDir } from './memberSort';
 export type CompanySort = 'order' | 'name' | 'founded' | 'members';
 
 export const COMPANY_SORT_LABELS: Record<CompanySort, string> = {
-  order: 'Wie festgelegt',
-  name: 'Name',
-  founded: 'Gründung',
-  members: 'Mitglieder',
+  order: t('Wie festgelegt'),
+  name: t('Name'),
+  founded: t('Gründung'),
+  members: t('Mitglieder'),
 };
 
 export const DEFAULT_COMPANY_SORT: CompanySort = 'order';
@@ -21,9 +22,9 @@ export const defaultCompanyDir = (sort: CompanySort): SortDir => (sort === 'memb
 
 /** Beschriftung der Richtung zur Sortierung. */
 export function companyDirLabel(sort: CompanySort, dir: SortDir): string {
-  if (sort === 'order') return dir === 'asc' ? 'Wie festgelegt' : 'Umgekehrt';
-  if (sort === 'members') return dir === 'desc' ? 'Meiste zuerst' : 'Wenigste zuerst';
-  if (sort === 'founded') return dir === 'asc' ? 'Älteste zuerst' : 'Jüngste zuerst';
+  if (sort === 'order') return dir === 'asc' ? t('Wie festgelegt') : t('Umgekehrt');
+  if (sort === 'members') return dir === 'desc' ? t('Meiste zuerst') : t('Wenigste zuerst');
+  if (sort === 'founded') return dir === 'asc' ? t('Älteste zuerst') : t('Jüngste zuerst');
   return dir === 'asc' ? 'A → Z' : 'Z → A';
 }
 

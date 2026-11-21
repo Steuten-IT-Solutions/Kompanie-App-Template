@@ -3,6 +3,7 @@ import { MyAdmission } from './Aufnahmen';
 import { api, can, config, isMember, roleLabels, type MailPreference, type OwnAccount } from '../api';
 import { boardVisible, SIGNATURE_RETURN_KEY } from '../board';
 import brand from '../generated/brand';
+import { t } from '../i18n';
 import { isStandalone } from '../install';
 import { OwnBirthdayCard, ownBirthday } from '../birthdays';
 import { OwnJoinYearCard, profileChoice } from '../joinYear';
@@ -34,8 +35,8 @@ const signatureAllowed = () =>
 
 /** Rückwege von der Signatur-Einrichtung zum Entwurf (composeEditor.tsx): Seite => Beschriftung des Knopfs. */
 const RETURN_LABELS: Record<string, string> = {
-  brett: `‹ Zurück zur Nachricht (${brand.labels.sections.board})`,
-  'verwaltung/mail': '‹ Zurück zur E-Mail',
+  brett: t('‹ Zurück zur Nachricht ({section})', { section: brand.labels.sections.board }),
+  'verwaltung/mail': t('‹ Zurück zur E-Mail'),
 };
 
 function returnTarget(): string | null {
@@ -91,7 +92,7 @@ function SignatureCard({ onToast }: { onToast: (msg: string) => void }) {
       const r = await api.saveSignature(draft);
       setSaved(r.signature?.content ?? null);
       setDraft(null);
-      onToast(r.signature ? 'Signatur gespeichert' : 'Signatur gelöscht');
+      onToast(r.signature ? t('Signatur gespeichert') : t('Signatur gelöscht'));
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -100,13 +101,13 @@ function SignatureCard({ onToast }: { onToast: (msg: string) => void }) {
   }
 
   async function remove() {
-    if (!(await confirmAsk('Signatur löschen? Nachrichten, in die du sie schon eingefügt hast, bleiben unverändert.'))) return;
+    if (!(await confirmAsk(t('Signatur löschen? Nachrichten, in die du sie schon eingefügt hast, bleiben unverändert.')))) return;
     setBusy(true);
     try {
       await api.deleteSignature();
       setSaved(null);
       setDraft(null);
-      onToast('Signatur gelöscht');
+      onToast(t('Signatur gelöscht'));
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -116,39 +117,39 @@ function SignatureCard({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <section className="card account-card signature-card" id="signatur" ref={ref}>
-      <h3>Signatur</h3>
+      <h3>{t('Signatur')}</h3>
       {saved === undefined && !error ? (
         <Loading shape="text" />
       ) : draft !== null ? (
         <>
           <Suspense fallback={<Loading shape="text" chunk />}>
-            <RichTextEditor value={draft} onChange={setDraft} label="Signatur" id="signature-text" />
+            <RichTextEditor value={draft} onChange={setDraft} label={t('Signatur')} id="signature-text" />
           </Suspense>
           <div className="button-row">
             <button className="btn signature-save" disabled={busy} onClick={() => void save()}>
-              {busy ? 'Speichert …' : 'Speichern'}
+              {busy ? t('Speichert …') : t('Speichern')}
             </button>
             <button className="btn btn-secondary" disabled={busy} onClick={() => setDraft(null)}>
-              Abbrechen
+              {t('Abbrechen')}
             </button>
           </div>
         </>
       ) : saved ? (
         <>
-          <span className="muted small">Vorschau</span>
+          <span className="muted small">{t('Vorschau')}</span>
           <RichTextView html={saved} className="signature-preview" />
           <div className="button-row">
             <button className="btn btn-secondary signature-edit" onClick={() => setDraft(saved)}>
-              Ändern
+              {t('Ändern')}
             </button>
             <button className="btn btn-danger" disabled={busy} onClick={() => void remove()}>
-              Löschen
+              {t('Löschen')}
             </button>
           </div>
         </>
       ) : (
         <button className="btn btn-secondary btn-block signature-edit" onClick={() => setDraft('')}>
-          Signatur einrichten
+          {t('Signatur einrichten')}
         </button>
       )}
       {error && <p className="form-error small">{error}</p>}
@@ -178,16 +179,16 @@ function BoardMailToggle({ onToast }: { onToast: (msg: string) => void }) {
             void api.setMailPreference(e.target.checked).then(
               (p) => {
                 setPref(p);
-                onToast(p.board ? 'Mails vom Brett: an' : 'Mails vom Brett: aus');
+                onToast(p.board ? t('Mails vom Brett: an') : t('Mails vom Brett: aus'));
               },
               (err: Error) => onToast(err.message),
             )
           }
         />
-        <span>Nachrichten aus „{brand.labels.sections.board}“ per E-Mail</span>
+        <span>{t('Nachrichten aus „{section}“ per E-Mail', { section: brand.labels.sections.board })}</span>
       </label>
       {pref.board && !pref.email && (
-        <p className="muted small">Für dein Konto ist keine Mailadresse hinterlegt; bitte beim Admin melden.</p>
+        <p className="muted small">{t('Für dein Konto ist keine Mailadresse hinterlegt; bitte beim Admin melden.')}</p>
       )}
     </>
   );
@@ -204,17 +205,17 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
   async function submit(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
-    if (!current) return setFormError('Bitte das aktuelle Passwort eingeben.');
-    if (next.length < MIN_LENGTH) return setFormError(`Das neue Passwort muss mindestens ${MIN_LENGTH} Zeichen lang sein.`);
-    if (next !== repeat) return setFormError('Die beiden neuen Passwörter stimmen nicht überein.');
-    if (next === current) return setFormError('Das neue Passwort muss sich vom aktuellen unterscheiden.');
+    if (!current) return setFormError(t('Bitte das aktuelle Passwort eingeben.'));
+    if (next.length < MIN_LENGTH) return setFormError(t('Das neue Passwort muss mindestens {min} Zeichen lang sein.', { min: MIN_LENGTH }));
+    if (next !== repeat) return setFormError(t('Die beiden neuen Passwörter stimmen nicht überein.'));
+    if (next === current) return setFormError(t('Das neue Passwort muss sich vom aktuellen unterscheiden.'));
     setBusy(true);
     try {
       await api.changePassword(current, next);
       setCurrent('');
       setNext('');
       setRepeat('');
-      onToast('Passwort geändert – andere Geräte wurden abgemeldet');
+      onToast(t('Passwort geändert – andere Geräte wurden abgemeldet'));
     } catch (err) {
       setFormError((err as Error).message);
     } finally {
@@ -229,7 +230,9 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
         {config?.user?.photo_url && <MemberAvatar url={config.user.photo_url} name={config.user.name} size="large" />}
         <h2 className="account-name">{config?.user?.name}</h2>
         <p className="muted small">
-          {(config?.user?.extra_roles ?? []).length > 0 ? 'Rollen' : 'Rolle'}: {roleLabels(config?.user ?? { level: 'guest' })}
+          {(config?.user?.extra_roles ?? []).length > 0
+            ? t('Rollen: {roles}', { roles: roleLabels(config?.user ?? { level: 'guest' }) })
+            : t('Rolle: {roles}', { roles: roleLabels(config?.user ?? { level: 'guest' }) })}
         </p>
       </div>
 
@@ -242,10 +245,10 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
       {profileChoice() && <OwnJoinYearCard onToast={onToast} />}
 
       <div className="card account-card">
-        <h3>Benachrichtigungen</h3>
-        <p className="muted small">Auf diesem Gerät benachrichtigt werden, wenn es Neues für dich gibt.</p>
+        <h3>{t('Benachrichtigungen')}</h3>
+        <p className="muted small">{t('Auf diesem Gerät benachrichtigt werden, wenn es Neues für dich gibt.')}</p>
         <button className="btn btn-secondary btn-block push-konto" onClick={() => navigate('benachrichtigungen')}>
-          Benachrichtigungen einstellen
+          {t('Benachrichtigungen einstellen')}
         </button>
         {boardVisible() && <BoardMailToggle onToast={onToast} />}
       </div>
@@ -256,8 +259,8 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
       {!previewRole() && <MyDataCard />}
 
       <div className="card account-card">
-        <h3>Darstellung</h3>
-        <nav className="segmented theme-choice" aria-label="Darstellung">
+        <h3>{t('Darstellung')}</h3>
+        <nav className="segmented theme-choice" aria-label={t('Darstellung')}>
           {(Object.keys(THEME_LABELS) as ThemeChoice[]).map((choice) => (
             <button
               key={choice}
@@ -273,24 +276,24 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
 
       {!isStandalone() && (
         <div className="card account-card">
-          <h3>App aufs Handy holen</h3>
-          <p className="muted small">Mit unserem Logo auf dem Startbildschirm – Schritt für Schritt erklärt.</p>
+          <h3>{t('App aufs Handy holen')}</h3>
+          <p className="muted small">{t('Mit unserem Logo auf dem Startbildschirm – Schritt für Schritt erklärt.')}</p>
           <button className="btn btn-secondary btn-block install-konto" onClick={() => navigate('installieren')}>
-            App installieren
+            {t('App installieren')}
           </button>
         </div>
       )}
 
       <form className="form card account-card" onSubmit={submit}>
-        <h3>Passwort ändern</h3>
+        <h3>{t('Passwort ändern')}</h3>
         {/* Verstecktes Benutzerfeld, damit Passwort-Manager (z. B. iCloud-Schlüsselbund) das Konto zuordnen. */}
         <input type="text" name="username" autoComplete="username" value={config?.user?.login ?? ''} readOnly hidden />
         <label className="field">
-          <span>Aktuelles Passwort</span>
+          <span>{t('Aktuelles Passwort')}</span>
           <input type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} required />
         </label>
         <label className="field">
-          <span>Neues Passwort (mind. {MIN_LENGTH} Zeichen)</span>
+          <span>{t('Neues Passwort (mind. {min} Zeichen)', { min: MIN_LENGTH })}</span>
           <input
             type="password"
             autoComplete="new-password"
@@ -301,7 +304,7 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
           />
         </label>
         <label className="field">
-          <span>Neues Passwort wiederholen</span>
+          <span>{t('Neues Passwort wiederholen')}</span>
           <input type="password" autoComplete="new-password" value={repeat} onChange={(e) => setRepeat(e.target.value)} required />
         </label>
         {formError && (
@@ -310,13 +313,13 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
           </p>
         )}
         <button className="btn btn-block" type="submit" disabled={busy}>
-          {busy ? 'Speichert …' : 'Passwort ändern'}
+          {busy ? t('Speichert …') : t('Passwort ändern')}
         </button>
-        <p className="muted small">Nach der Änderung bleibst du hier angemeldet; auf anderen Geräten musst du dich neu anmelden.</p>
+        <p className="muted small">{t('Nach der Änderung bleibst du hier angemeldet; auf anderen Geräten musst du dich neu anmelden.')}</p>
       </form>
 
       <button className="btn btn-danger btn-block logout" onClick={onLogout}>
-        Abmelden
+        {t('Abmelden')}
       </button>
       <LegalLinks className="account-legal" />
     </div>
@@ -329,7 +332,7 @@ function MyDataCard() {
   const [error, setError] = useState<string | null>(null);
   return (
     <div className="card account-card">
-      <h3>Meine Daten</h3>
+      <h3>{t('Meine Daten')}</h3>
       <button
         className="btn btn-secondary btn-block"
         disabled={busy}
@@ -341,7 +344,7 @@ function MyDataCard() {
             .finally(() => setBusy(false));
         }}
       >
-        {busy ? 'Wird zusammengestellt …' : 'Meine Daten herunterladen'}
+        {busy ? t('Wird zusammengestellt …') : t('Meine Daten herunterladen')}
       </button>
       {error && (
         <p className="form-error small" role="alert">
@@ -372,7 +375,7 @@ function ContactCard({ onToast }: { onToast: (msg: string) => void }) {
     e.preventDefault();
     if (!editing) return;
     setFormError(null);
-    if (emailChanged && !password) return setFormError('Bitte zur Bestätigung das aktuelle Passwort eingeben.');
+    if (emailChanged && !password) return setFormError(t('Bitte zur Bestätigung das aktuelle Passwort eingeben.'));
     setBusy(true);
     try {
       setData(
@@ -385,7 +388,7 @@ function ContactCard({ onToast }: { onToast: (msg: string) => void }) {
       );
       setEditing(null);
       setPassword('');
-      onToast('Gespeichert');
+      onToast(t('Gespeichert'));
     } catch (err) {
       setFormError((err as Error).message);
     } finally {
@@ -401,23 +404,28 @@ function ContactCard({ onToast }: { onToast: (msg: string) => void }) {
 
   return editing ? (
     <form className="form card account-card" onSubmit={save}>
-      <h3>Kontakt</h3>
+      <h3>{t('Kontakt')}</h3>
       <EmailField
-        label="E-Mail-Adresse"
+        label={t('E-Mail-Adresse')}
         autoComplete="email"
         value={editing.email}
         onChange={(email) => setEditing({ ...editing, email })}
       />
-      <PhoneField label="Handynummer" autoComplete="tel" value={editing.phone} onChange={(phone) => setEditing({ ...editing, phone })} />
+      <PhoneField
+        label={t('Handynummer')}
+        autoComplete="tel"
+        value={editing.phone}
+        onChange={(phone) => setEditing({ ...editing, phone })}
+      />
       <AddressFields
-        label="Adresse"
+        label={t('Adresse')}
         own
         value={editing.address ?? EMPTY_ADDRESS}
         onChange={(address) => setEditing({ ...editing, address })}
       />
       {emailChanged && (
         <label className="field">
-          <span>Aktuelles Passwort (zur Bestätigung der neuen E-Mail-Adresse)</span>
+          <span>{t('Aktuelles Passwort (zur Bestätigung der neuen E-Mail-Adresse)')}</span>
           <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </label>
       )}
@@ -428,27 +436,29 @@ function ContactCard({ onToast }: { onToast: (msg: string) => void }) {
       )}
       <div className="button-row">
         <button className="btn" type="submit" disabled={busy}>
-          {busy ? 'Speichert …' : 'Speichern'}
+          {busy ? t('Speichert …') : t('Speichern')}
         </button>
         <button className="btn btn-secondary" type="button" onClick={cancel} disabled={busy}>
-          Abbrechen
+          {t('Abbrechen')}
         </button>
       </div>
     </form>
   ) : (
     <div className="card account-card">
-      <h3>Kontakt</h3>
+      <h3>{t('Kontakt')}</h3>
       <dl className="contact-list">
-        <dt>E-Mail-Adresse</dt>
-        <dd>{account.email || <span className="muted">nicht hinterlegt</span>}</dd>
-        <dt>Handynummer</dt>
-        <dd>{account.phone || <span className="muted">nicht hinterlegt</span>}</dd>
-        <dt>Adresse</dt>
-        <dd className="address-lines">{formatAddress(account.address).join('\n') || <span className="muted">nicht hinterlegt</span>}</dd>
+        <dt>{t('E-Mail-Adresse')}</dt>
+        <dd>{account.email || <span className="muted">{t('nicht hinterlegt')}</span>}</dd>
+        <dt>{t('Handynummer')}</dt>
+        <dd>{account.phone || <span className="muted">{t('nicht hinterlegt')}</span>}</dd>
+        <dt>{t('Adresse')}</dt>
+        <dd className="address-lines">
+          {formatAddress(account.address).join('\n') || <span className="muted">{t('nicht hinterlegt')}</span>}
+        </dd>
       </dl>
-      <p className="muted small">Sehen können das nur du und wer in der Verwaltung persönliche Angaben sehen darf.</p>
+      <p className="muted small">{t('Sehen können das nur du und wer in der Verwaltung persönliche Angaben sehen darf.')}</p>
       <button className="btn btn-secondary btn-block" onClick={() => setEditing(account)}>
-        Ändern
+        {t('Ändern')}
       </button>
     </div>
   );

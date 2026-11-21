@@ -9,6 +9,7 @@ import { ErrorBox, lazyView, Loading, useAsync } from '../ui';
 import { canWriteNews, openNewsEditor } from './News';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
+import { t } from '../i18n';
 
 const NewsSchreiben = lazyView(() => import('./NewsSchreiben'));
 
@@ -57,7 +58,7 @@ export default function NewsArtikel({ id, onToast }: { id: string; onToast: (msg
   const inApp = !!config?.newsInApp;
   const back = (
     <button className="btn btn-link back" onClick={() => navigate('news')}>
-      ‹ Alle Neuigkeiten
+      {t('‹ Alle Neuigkeiten')}
     </button>
   );
 
@@ -77,12 +78,12 @@ export default function NewsArtikel({ id, onToast }: { id: string; onToast: (msg
     );
 
   async function remove() {
-    if (!(await confirmAsk(`Beitrag „${n.title}“ samt seinen Bildern löschen?`))) return;
+    if (!(await confirmAsk(t('Beitrag „{title}“ samt seinen Bildern löschen?', { title: n.title })))) return;
     setBusy(true);
     setActionError(null);
     try {
       await api.deleteNews(n.id);
-      onToast('Beitrag gelöscht');
+      onToast(t('Beitrag gelöscht'));
       navigate('news');
     } catch (err) {
       setActionError((err as Error).message);
@@ -107,20 +108,21 @@ export default function NewsArtikel({ id, onToast }: { id: string; onToast: (msg
       )}
       {n.link && (
         <a className="btn btn-secondary btn-block" href={n.link} target="_blank" rel="noreferrer">
-          Auf der Webseite öffnen
+          {t('Auf der Webseite öffnen')}
         </a>
       )}
       {!inApp && n.edit_url && (
         <div className="icon-row news-article-actions">
-          <IconButton icon="edit" label="In WordPress bearbeiten" onClick={() => openNewsEditor(n.edit_url!, reload)} />
+          <IconButton icon="edit" label={t('In WordPress bearbeiten')} onClick={() => openNewsEditor(n.edit_url!, reload)} />
         </div>
       )}
       {inApp && canWriteNews() && (
         <>
           {n.updated_at && (
             <p className="muted small">
-              Zuletzt geändert {formatShortTime(n.updated_at)}
-              {n.updated_by_name ? ` von ${n.updated_by_name}` : ''}
+              {n.updated_by_name
+                ? t('Zuletzt geändert {time} von {name}', { time: formatShortTime(n.updated_at), name: n.updated_by_name })
+                : t('Zuletzt geändert {time}', { time: formatShortTime(n.updated_at) })}
             </p>
           )}
           {actionError && (
@@ -129,8 +131,8 @@ export default function NewsArtikel({ id, onToast }: { id: string; onToast: (msg
             </p>
           )}
           <div className="icon-row news-article-actions">
-            <IconButton icon="edit" label="Bearbeiten" disabled={busy} onClick={() => setEditing(true)} />
-            <IconButton icon="delete" label="Löschen" variant="danger" disabled={busy} onClick={remove} />
+            <IconButton icon="edit" label={t('Bearbeiten')} disabled={busy} onClick={() => setEditing(true)} />
+            <IconButton icon="delete" label={t('Löschen')} variant="danger" disabled={busy} onClick={remove} />
           </div>
         </>
       )}

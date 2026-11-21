@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, type WebsiteSettings } from '../api';
+import { t } from '../i18n';
 import { ErrorBox, Loading, useAsync } from '../ui';
 
 /**
@@ -41,47 +42,50 @@ export function WebsiteAdmin({ onToast }: { onToast: (msg: string) => void }) {
   return (
     <div className="stack">
       <section className="card stack">
-        <h3>Adresse</h3>
+        <h3>{t('Adresse')}</h3>
         <p>{entry.message}</p>
         {canInstall && (
-          <button className="btn" disabled={busy} onClick={() => void run(() => api.installWebsiteEntry(), 'Einstiegsdatei angelegt')}>
-            Einstiegsdatei anlegen
+          <button className="btn" disabled={busy} onClick={() => void run(() => api.installWebsiteEntry(), t('Einstiegsdatei angelegt'))}>
+            {t('Einstiegsdatei anlegen')}
           </button>
         )}
         {entry.state === 'not_writable' && (
           <>
-            <p className="muted small">Inhalt der Datei index.php im Ordner über „{entry.folder}“:</p>
+            <p className="muted small">{t('Inhalt der Datei index.php im Ordner über „{folder}“:', { folder: entry.folder })}</p>
             <pre className="small payload">{entry.content}</pre>
           </>
         )}
         {entry.state === 'installed' && site.url && (
           <a className="btn btn-secondary" href={site.url} target="_blank" rel="noopener noreferrer">
-            Webseite öffnen
+            {t('Webseite öffnen')}
           </a>
         )}
       </section>
 
       <section className="card stack">
-        <h3>Startseite</h3>
+        <h3>{t('Startseite')}</h3>
         {!site.pages_enabled ? (
-          <p className="muted">Die Webseite zeigt eure Seiten. Bitte zuerst unter Einstellungen → Bereiche die Seiten einschalten.</p>
+          <p className="muted">
+            {t('Die Webseite zeigt eure Seiten. Bitte zuerst unter Einstellungen → Bereiche die Seiten einschalten.')}
+          </p>
         ) : site.pages.length === 0 ? (
           <p className="muted">
-            Es gibt noch keine Seite, die für alle sichtbar ist. Bitte unter Verwaltung → Seiten eine anlegen und bei „Für wen?“ „Alle, auch
-            ohne Anmeldung“ wählen.
+            {t(
+              'Es gibt noch keine Seite, die für alle sichtbar ist. Bitte unter Verwaltung → Seiten eine anlegen und bei „Für wen?“ „Alle, auch ohne Anmeldung“ wählen.',
+            )}
           </p>
         ) : (
           <form
             className="stack"
             onSubmit={(e) => {
               e.preventDefault();
-              void run(() => api.updateWebsite({ home_page_id: home === '' ? null : Number(home) }), 'Startseite gespeichert');
+              void run(() => api.updateWebsite({ home_page_id: home === '' ? null : Number(home) }), t('Startseite gespeichert'));
             }}
           >
             <label className="field">
-              <span>Seite</span>
+              <span>{t('Seite')}</span>
               <select value={home} onChange={(e) => setHome(e.target.value)}>
-                <option value="">Keine</option>
+                <option value="">{t('Keine')}</option>
                 {site.pages.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.title}
@@ -90,16 +94,16 @@ export function WebsiteAdmin({ onToast }: { onToast: (msg: string) => void }) {
               </select>
             </label>
             <p className="muted small">
-              Die Webseite zeigt die Seite so, wie Gäste sie in der App sehen. Blöcke nur für Mitglieder fehlen dort.
+              {t('Die Webseite zeigt die Seite so, wie Gäste sie in der App sehen. Blöcke nur für Mitglieder fehlen dort.')}
             </p>
             <button className="btn" type="submit" disabled={busy || !homeChanged}>
-              Speichern
+              {t('Speichern')}
             </button>
           </form>
         )}
         {site.home_page_missing && (
           <p className="form-error">
-            Die gewählte Startseite gibt es nicht mehr oder sie ist nicht mehr für alle sichtbar. Bitte eine andere wählen.
+            {t('Die gewählte Startseite gibt es nicht mehr oder sie ist nicht mehr für alle sichtbar. Bitte eine andere wählen.')}
           </p>
         )}
       </section>

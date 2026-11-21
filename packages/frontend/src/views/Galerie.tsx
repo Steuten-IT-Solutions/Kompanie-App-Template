@@ -33,6 +33,7 @@ import { dataUpdated } from '../dataCache';
 import { Icon, IconButton } from '../icons';
 import { photoUrl, shareLink } from '../share';
 import brand from '../generated/brand';
+import { t, tn } from '../i18n';
 import {
   AlbumEditSheet,
   MoveSheet,
@@ -159,7 +160,8 @@ function Overview({ onToast }: { onToast: Toast }) {
       onToast(doneMsg(done));
       stopSelecting();
     } catch (e) {
-      setActionError(`${done > 0 ? `${done} erledigt, dann: ` : ''}${(e as Error).message}`);
+      const message = (e as Error).message;
+      setActionError(done > 0 ? t('{count} erledigt, dann: {message}', { count: done, message }) : message);
     } finally {
       setBusy(false);
       if (done > 0) {
@@ -171,22 +173,22 @@ function Overview({ onToast }: { onToast: Toast }) {
 
   async function changeYear() {
     const raw = await promptAsk(
-      `In welches Jahr sollen ${chosen.length === 1 ? 'das Album' : `die ${chosen.length} Alben`}?`,
+      tn('In welches Jahr sollen das Album?', 'In welches Jahr sollen die {count} Alben?', chosen.length),
       chosen[0]?.year ?? '',
       {
-        title: 'Jahr ändern',
-        okLabel: 'Ändern',
+        title: t('Jahr ändern'),
+        okLabel: t('Ändern'),
       },
     );
     if (raw === null) return;
     const year = Number(raw.trim());
     if (!Number.isInteger(year)) {
-      setActionError('Bitte ein Jahr als Zahl angeben, z. B. 2026.');
+      setActionError(t('Bitte ein Jahr als Zahl angeben, z. B. 2026.'));
       return;
     }
     await each(
       (id) => api.updateGalleryAlbum(id, { year }),
-      (n) => (n === 1 ? `Album ins Jahr ${year} gesetzt` : `${n} Alben ins Jahr ${year} gesetzt`),
+      (n) => tn('Album ins Jahr {year} gesetzt', '{count} Alben ins Jahr {year} gesetzt', n, { year }),
     );
   }
 
@@ -194,7 +196,7 @@ function Overview({ onToast }: { onToast: Toast }) {
     if (!(await confirmAsk(deleteAlbumsQuestion(chosen)))) return;
     await each(
       (id) => api.deleteGalleryAlbum(id),
-      (n) => (n === 1 ? 'Album gelöscht' : `${n} Alben gelöscht`),
+      (n) => tn('Album gelöscht', '{count} Alben gelöscht', n),
     );
   }
 
@@ -203,31 +205,29 @@ function Overview({ onToast }: { onToast: Toast }) {
   const actions =
     submit || can('view_submissions') || manage ? (
       <div className="button-row gallery-actions">
-        {submit && <IconButton icon="submit" label="Bilder und Videos einreichen" onClick={() => navigate('galerie/einreichen')} />}
+        {submit && <IconButton icon="submit" label={t('Bilder und Videos einreichen')} onClick={() => navigate('galerie/einreichen')} />}
         {can('view_submissions') && (
           <IconButton
             icon="review"
-            label={can('review_gallery') ? 'Einreichungen prüfen' : 'Einreichungen ansehen'}
+            label={can('review_gallery') ? t('Einreichungen prüfen') : t('Einreichungen ansehen')}
             onClick={() => navigate('galerie/pruefen')}
           />
         )}
-        {manage && <IconButton icon="albumAdd" label="Alben anlegen und hochladen" onClick={() => navigate('galerie/verwalten')} />}
+        {manage && <IconButton icon="albumAdd" label={t('Alben anlegen und hochladen')} onClick={() => navigate('galerie/verwalten')} />}
       </div>
     ) : null;
   const selectBar = selecting && (
-    <div className="gallery-select-bar" role="toolbar" aria-label="Gewählte Alben">
+    <div className="gallery-select-bar" role="toolbar" aria-label={t('Gewählte Alben')}>
       <span className="small">
         {chosen.length === 0
-          ? 'Tippe auf Alben aus der App, um sie zu wählen.'
-          : chosen.length === 1
-            ? '1 Album gewählt'
-            : `${chosen.length} Alben gewählt`}
+          ? t('Tippe auf Alben aus der App, um sie zu wählen.')
+          : tn('{count} Album gewählt', '{count} Alben gewählt', chosen.length)}
       </span>
       <div className="button-row">
-        <IconButton icon="year" label="Jahr ändern" disabled={busy || chosen.length === 0} onClick={() => void changeYear()} />
+        <IconButton icon="year" label={t('Jahr ändern')} disabled={busy || chosen.length === 0} onClick={() => void changeYear()} />
         <IconButton
           icon="delete"
-          label="Löschen"
+          label={t('Löschen')}
           variant="danger"
           disabled={busy || chosen.length === 0}
           onClick={() => void removeAlbums()}
@@ -244,7 +244,7 @@ function Overview({ onToast }: { onToast: Toast }) {
     return (
       <>
         {actions}
-        <Empty>Noch keine Bilder.</Empty>
+        <Empty>{t('Noch keine Bilder.')}</Empty>
       </>
     );
 
@@ -262,7 +262,7 @@ function Overview({ onToast }: { onToast: Toast }) {
                   className={selected.has(a.id) ? 'album-card selected' : 'album-card'}
                   aria-pressed={selecting ? selected.has(a.id) : undefined}
                   disabled={selecting && !albumEditable(a)}
-                  title={selecting && !albumEditable(a) ? 'Aus Google Drive: in Drive ändern' : undefined}
+                  title={selecting && !albumEditable(a) ? t('Aus Google Drive: in Drive ändern') : undefined}
                   onClick={() => {
                     if (selecting) {
                       setSelected((old) => toggle(old, a.id));
@@ -284,7 +284,7 @@ function Overview({ onToast }: { onToast: Toast }) {
                   <span className="album-title">{a.title}</span>
                   <span className="album-count">
                     {mediaCount(a.count, a.video_count ?? 0)}
-                    {a.intern_count > 0 && ` · ${a.intern_count} intern`}
+                    {a.intern_count > 0 && ` · ${t('{count} intern', { count: a.intern_count })}`}
                   </span>
                 </button>
               </li>
@@ -320,8 +320,8 @@ function toggle(set: ReadonlySet<number>, id: number): ReadonlySet<number> {
 export function mediaCount(count: number, videos: number): string {
   const images = count - videos;
   const parts: string[] = [];
-  if (images > 0 || videos === 0) parts.push(`${images} ${images === 1 ? 'Bild' : 'Bilder'}`);
-  if (videos > 0) parts.push(`${videos} ${videos === 1 ? 'Video' : 'Videos'}`);
+  if (images > 0 || videos === 0) parts.push(tn('{count} Bild', '{count} Bilder', images));
+  if (videos > 0) parts.push(tn('{count} Video', '{count} Videos', videos));
   return parts.join(' · ');
 }
 
@@ -486,9 +486,9 @@ function Album({ id, photoId, onToast }: { id: number; photoId?: number; onToast
   }
 
   async function deleteItems(ids: number[]): Promise<boolean> {
-    if (!(await confirmAsk(`${itemsLabel(ids.length)} löschen? Das lässt sich nicht rückgängig machen.`))) return false;
+    if (!(await confirmAsk(t('{items} löschen? Das lässt sich nicht rückgängig machen.', { items: itemsLabel(ids.length) })))) return false;
     if (!(await run(() => api.deleteGalleryPhotos(ids)))) return false;
-    onToast(ids.length === 1 ? 'Gelöscht' : `${ids.length} gelöscht`);
+    onToast(tn('Gelöscht', '{count} gelöscht', ids.length));
     removed(ids.length);
     return true;
   }
@@ -507,7 +507,7 @@ function Album({ id, photoId, onToast }: { id: number; photoId?: number; onToast
       reload();
     }
     if (ok) {
-      onToast(intern ? `${itemsLabel(done)} nur für Mitglieder` : `${itemsLabel(done)} öffentlich`);
+      onToast(intern ? t('{items} nur für Mitglieder', { items: itemsLabel(done) }) : t('{items} öffentlich', { items: itemsLabel(done) }));
       stopSelecting();
     }
   }
@@ -524,43 +524,50 @@ function Album({ id, photoId, onToast }: { id: number; photoId?: number; onToast
         submit && (
           <IconButton
             icon="submit"
-            label="Bilder und Videos in dieses Album einreichen"
+            label={t('Bilder und Videos in dieses Album einreichen')}
             onClick={() => navigate(`galerie/einreichen/${album.id}`)}
           />
         )
       }
-      edit={edit && <IconButton icon="edit" label="Album bearbeiten" onClick={() => setSheet({ kind: 'edit' })} />}
+      edit={edit && <IconButton icon="edit" label={t('Album bearbeiten')} onClick={() => setSheet({ kind: 'edit' })} />}
     />
   );
   const selectBar = selecting && (
-    <div className="gallery-select-bar" role="toolbar" aria-label="Gewählte Bilder und Videos">
+    <div className="gallery-select-bar" role="toolbar" aria-label={t('Gewählte Bilder und Videos')}>
       <span className="small">
-        {chosen.length === 0 ? 'Tippe auf Bilder und Videos, um sie zu wählen.' : `${itemsLabel(chosen.length)} gewählt`}
+        {chosen.length === 0
+          ? t('Tippe auf Bilder und Videos, um sie zu wählen.')
+          : t('{items} gewählt', { items: itemsLabel(chosen.length) })}
       </span>
       <div className="button-row">
         <IconButton
           icon="selectAll"
-          label="Alle wählen"
+          label={t('Alle wählen')}
           disabled={busy || chosen.length === uploads.length}
           onClick={() => setSelected(new Set(uploads.map((p) => p.id)))}
         />
         <IconButton
           icon="move"
-          label="Verschieben"
+          label={t('Verschieben')}
           disabled={busy || chosen.length === 0}
           onClick={() => setSheet({ kind: 'move', ids: chosen.map((p) => p.id), top: false })}
         />
-        <IconButton icon="intern" label="Nur für Mitglieder" disabled={busy || chosen.length === 0} onClick={() => void setIntern(true)} />
-        <IconButton icon="public" label="Öffentlich" disabled={busy || chosen.length === 0} onClick={() => void setIntern(false)} />
+        <IconButton
+          icon="intern"
+          label={t('Nur für Mitglieder')}
+          disabled={busy || chosen.length === 0}
+          onClick={() => void setIntern(true)}
+        />
+        <IconButton icon="public" label={t('Öffentlich')} disabled={busy || chosen.length === 0} onClick={() => void setIntern(false)} />
         <IconButton
           icon="delete"
-          label="Löschen"
+          label={t('Löschen')}
           variant="danger"
           disabled={busy || chosen.length === 0}
           onClick={() => void deleteItems(chosen.map((p) => p.id))}
         />
       </div>
-      {uploads.length < photos.length && <p className="small muted">Bilder aus Google Drive verschiebst und löschst du in Drive.</p>}
+      {uploads.length < photos.length && <p className="small muted">{t('Bilder aus Google Drive verschiebst und löschst du in Drive.')}</p>}
       {actionError && (
         <p className="form-error small" role="alert">
           {actionError}
@@ -572,7 +579,7 @@ function Album({ id, photoId, onToast }: { id: number; photoId?: number; onToast
   return (
     <div className={manage ? 'gallery-manage' : undefined}>
       <button className="btn btn-link back" onClick={() => navigate('galerie')}>
-        ‹ Alle Alben
+        {t('‹ Alle Alben')}
       </button>
       <h2 className="member-name">
         {album.title} <span className="muted album-year">{album.year}</span>
@@ -581,12 +588,12 @@ function Album({ id, photoId, onToast }: { id: number; photoId?: number; onToast
         <div className="card login-first" role="status">
           <p>
             {config?.user
-              ? 'Das verlinkte Bild gibt es in diesem Album nicht mehr, oder du darfst es nicht sehen.'
-              : 'Das verlinkte Bild gibt es in diesem Album nicht mehr, oder es ist nur für angemeldete Mitglieder.'}
+              ? t('Das verlinkte Bild gibt es in diesem Album nicht mehr, oder du darfst es nicht sehen.')
+              : t('Das verlinkte Bild gibt es in diesem Album nicht mehr, oder es ist nur für angemeldete Mitglieder.')}
           </p>
           {!config?.user && (
             <button className="btn btn-block" onClick={toLogin}>
-              Anmelden
+              {t('Anmelden')}
             </button>
           )}
         </div>
@@ -606,11 +613,15 @@ function Album({ id, photoId, onToast }: { id: number; photoId?: number; onToast
               disabled={selecting && !photoEditable(p)}
               aria-pressed={selecting ? selected.has(p.id) : undefined}
               data-intern={p.intern ? '' : undefined}
-              aria-label={
+              aria-label={`${
                 selecting
-                  ? `${isVideo(p) ? 'Video' : 'Bild'} ${i + 1} wählen${p.intern ? ' (nur für Mitglieder)' : ''}`
-                  : `${isVideo(p) ? 'Video' : 'Bild'} ${i + 1} öffnen${p.intern ? ' (nur für Mitglieder)' : ''}`
-              }
+                  ? isVideo(p)
+                    ? t('Video {number} wählen', { number: i + 1 })
+                    : t('Bild {number} wählen', { number: i + 1 })
+                  : isVideo(p)
+                    ? t('Video {number} öffnen', { number: i + 1 })
+                    : t('Bild {number} öffnen', { number: i + 1 })
+              }${p.intern ? ` ${t('(nur für Mitglieder)')}` : ''}`}
             >
               {p.thumb && <LoadingImage src={p.thumb} busy={!p.ready && preparing} lazy />}
               {isVideo(p) && (
@@ -660,7 +671,7 @@ function Album({ id, photoId, onToast }: { id: number; photoId?: number; onToast
               ? async (p, cover) => {
                   await api.setGalleryAlbumCover(album.id, cover ? p.id : null);
                   dataUpdated();
-                  onToast(cover ? 'Titelbild gewählt' : 'Titelbild wieder automatisch');
+                  onToast(cover ? t('Titelbild gewählt') : t('Titelbild wieder automatisch'));
                   reload();
                 }
               : undefined
@@ -681,7 +692,7 @@ function Album({ id, photoId, onToast }: { id: number; photoId?: number; onToast
           onMoved={(_, title) => {
             sheet.done?.(true);
             setSheet(null);
-            onToast(`${itemsLabel(sheet.ids.length)} nach „${title}“ verschoben`);
+            onToast(t('{items} nach „{title}“ verschoben', { items: itemsLabel(sheet.ids.length), title }));
             removed(sheet.ids.length);
           }}
         />
@@ -693,12 +704,12 @@ function Album({ id, photoId, onToast }: { id: number; photoId?: number; onToast
           onClose={() => setSheet(null)}
           onSaved={() => {
             setSheet(null);
-            onToast('Album gespeichert');
+            onToast(t('Album gespeichert'));
             reload();
           }}
           onDeleted={() => {
             setSheet(null);
-            onToast('Album gelöscht');
+            onToast(t('Album gelöscht'));
             navigate('galerie');
           }}
         />
@@ -723,8 +734,7 @@ function AlbumActions({ album, hidden, submit, edit }: { album: GalleryAlbum; hi
   const count = list.length;
   const videos = list.filter(isVideo).length;
   if (!submit && !edit && count === 0) return null;
-  const label = `Album herunterladen (${mediaCount(count, videos)}, ZIP)`;
-  const files = (n: number) => `${n} ${n === 1 ? 'Datei' : 'Dateien'}`;
+  const label = t('Album herunterladen ({media}, ZIP)', { media: mediaCount(count, videos) });
 
   async function start() {
     const ctrl = new AbortController();
@@ -735,8 +745,11 @@ function AlbumActions({ album, hidden, submit, edit }: { album: GalleryAlbum; hi
       const r = await downloadAlbum(album, (done, total) => setProgress({ done, total }), ctrl.signal);
       setResult(
         r.missing > 0
-          ? `${files(r.saved)} gespeichert. ${r.missing} ließen sich gerade nicht laden (noch nicht fertig aufbereitet?).`
-          : `${files(r.saved)} gespeichert.`,
+          ? `${tn('{count} Datei gespeichert.', '{count} Dateien gespeichert.', r.saved)} ${t(
+              '{count} ließen sich gerade nicht laden (noch nicht fertig aufbereitet?).',
+              { count: r.missing },
+            )}`
+          : tn('{count} Datei gespeichert.', '{count} Dateien gespeichert.', r.saved),
       );
     } catch (e) {
       if ((e as Error).name !== 'AbortError') setError((e as Error).message);
@@ -769,10 +782,10 @@ function AlbumActions({ album, hidden, submit, edit }: { album: GalleryAlbum; hi
       {progress && (
         <div className="album-download-progress">
           <p className="small" role="status">
-            Lädt {progress.done} von {progress.total} …
+            {t('Lädt {current} von {total} …', { current: progress.done, total: progress.total })}
           </p>
           <button type="button" className="btn btn-link" onClick={() => abort.current?.abort()}>
-            Abbrechen
+            {t('Abbrechen')}
           </button>
         </div>
       )}
@@ -1018,7 +1031,9 @@ function Lightbox({
     setSaving(true);
     setSaveError(null);
     try {
-      await downloadMedia(p, i, (loaded, total) => setSaveProgress(`Video wird geladen … ${Math.floor((loaded / total) * 100)} %`));
+      await downloadMedia(p, i, (loaded, total) =>
+        setSaveProgress(t('Video wird geladen … {percent} %', { percent: Math.floor((loaded / total) * 100) })),
+      );
     } catch (e) {
       setSaveError((e as Error).message);
     } finally {
@@ -1060,7 +1075,7 @@ function Lightbox({
       className="lightbox"
       role="dialog"
       aria-modal="true"
-      aria-label={`Bild ${i + 1} von ${photos.length}`}
+      aria-label={t('Bild {number} von {count}', { number: i + 1, count: photos.length })}
       ref={root}
       onClick={(e) => (e.target === e.currentTarget || e.target === track.current) && zoom.scale === 1 && close()}
       onTouchStart={onTouchStart}
@@ -1072,7 +1087,7 @@ function Lightbox({
         {peek(i + 1, 'next')}
         {isVideo(p) ? (
           unplayable === p.id ? (
-            <p className="lb-error">Dieses Video kann dein Browser nicht abspielen.</p>
+            <p className="lb-error">{t('Dieses Video kann dein Browser nicht abspielen.')}</p>
           ) : (
             // key: Beim Blättern hält das alte Video an, das neue lädt von vorn. preload auto: Es lädt schon beim Öffnen,
             // nicht erst beim Tippen auf Abspielen (nur ein Hinweis an den Browser, er darf z. B. zum Datensparen weniger laden).
@@ -1106,7 +1121,7 @@ function Lightbox({
           />
         )}
       </div>
-      <button ref={closeRef} className="lb-btn lb-close" onClick={close} aria-label="Schließen">
+      <button ref={closeRef} className="lb-btn lb-close" onClick={close} aria-label={t('Schließen')}>
         ✕
       </button>
       {downloads && (
@@ -1114,8 +1129,8 @@ function Lightbox({
           className="lb-btn lb-download"
           onClick={save}
           disabled={saving}
-          aria-label={isVideo(p) ? 'Video herunterladen' : 'Bild herunterladen'}
-          title={isVideo(p) ? 'Video herunterladen' : 'Bild herunterladen'}
+          aria-label={isVideo(p) ? t('Video herunterladen') : t('Bild herunterladen')}
+          title={isVideo(p) ? t('Video herunterladen') : t('Bild herunterladen')}
         >
           {saving ? <span className="img-loading lb-download-busy" aria-hidden="true" /> : <DownloadIcon />}
         </button>
@@ -1125,8 +1140,8 @@ function Lightbox({
         <button
           className="lb-btn lb-share"
           onClick={() => onShare(p)}
-          aria-label={isVideo(p) ? 'Link zu diesem Video teilen' : 'Link zu diesem Bild teilen'}
-          title={isVideo(p) ? 'Link zu diesem Video teilen' : 'Link zu diesem Bild teilen'}
+          aria-label={isVideo(p) ? t('Link zu diesem Video teilen') : t('Link zu diesem Bild teilen')}
+          title={isVideo(p) ? t('Link zu diesem Video teilen') : t('Link zu diesem Bild teilen')}
         >
           <Icon name="share" />
         </button>
@@ -1143,10 +1158,10 @@ function Lightbox({
       )}
       {many && (
         <>
-          <button className="lb-btn lb-prev" onClick={() => swipe.slide(-1)} aria-label="Vorheriges">
+          <button className="lb-btn lb-prev" onClick={() => swipe.slide(-1)} aria-label={t('Vorheriges')}>
             ‹
           </button>
-          <button className="lb-btn lb-next" onClick={() => swipe.slide(1)} aria-label="Nächstes">
+          <button className="lb-btn lb-next" onClick={() => swipe.slide(1)} aria-label={t('Nächstes')}>
             ›
           </button>
         </>
@@ -1155,13 +1170,13 @@ function Lightbox({
       <div className="lb-count" ref={bar}>
         <span className="lb-count-text">
           {i + 1} / {photos.length}
-          {p.intern && ' · intern'}
-          {coverId === p.id && ' · Titelbild'}
+          {p.intern && ` · ${t('intern')}`}
+          {coverId === p.id && ` · ${t('Titelbild')}`}
         </span>
         {onCover && !isVideo(p) && (
           <IconButton
             icon="cover"
-            label={coverId === p.id ? 'Titelbild wieder automatisch wählen' : 'Als Titelbild des Albums verwenden'}
+            label={coverId === p.id ? t('Titelbild wieder automatisch wählen') : t('Als Titelbild des Albums verwenden')}
             variant="lb"
             className={coverId === p.id ? 'lb-intern lb-active' : 'lb-intern'}
             disabled={switching}
@@ -1181,7 +1196,7 @@ function Lightbox({
         {onIntern && photoEditable(p) && (
           <IconButton
             icon={p.intern ? 'public' : 'intern'}
-            label={p.intern ? 'Öffentlich zeigen' : 'Nur für Mitglieder'}
+            label={p.intern ? t('Öffentlich zeigen') : t('Nur für Mitglieder')}
             variant="lb"
             className="lb-intern"
             disabled={switching}
@@ -1201,7 +1216,7 @@ function Lightbox({
         {onMove && photoEditable(p) && (
           <IconButton
             icon="move"
-            label="Verschieben"
+            label={t('Verschieben')}
             variant="lb"
             className="lb-intern"
             disabled={switching}
@@ -1213,7 +1228,7 @@ function Lightbox({
         {onDelete && photoEditable(p) && (
           <IconButton
             icon="delete"
-            label="Löschen"
+            label={t('Löschen')}
             variant="lb-danger"
             className="lb-intern"
             disabled={switching}

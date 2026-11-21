@@ -5,7 +5,7 @@ import logoUrl from './generated/logo-small.webp';
 import { ErrorBox, Loading, useAsync } from './ui';
 import { sources } from './viewData';
 import { confirmAsk } from './ask';
-import { localeTag } from './i18n';
+import { localeTag, t } from './i18n';
 
 /** Höchstlänge der Begründung (wie MaintenanceService::REASON_MAX im Kern). */
 export const REASON_MAX = 500;
@@ -28,9 +28,9 @@ export function MaintenancePage({ reason }: { reason: string }) {
         return;
       }
       applyMaintenance(c.maintenance);
-      setNote('Die Wartung läuft noch.');
+      setNote(t('Die Wartung läuft noch.'));
     } catch {
-      setNote('Keine Verbindung. Bitte später erneut versuchen.');
+      setNote(t('Keine Verbindung. Bitte später erneut versuchen.'));
     } finally {
       setBusy(false);
     }
@@ -40,10 +40,10 @@ export function MaintenancePage({ reason }: { reason: string }) {
     <main className="content maintenance-page">
       <img src={logoUrl} alt="" className="maintenance-logo" />
       <h1>{brand.name}</h1>
-      <p>Die App wird gerade gewartet. Bitte versuche es später noch einmal.</p>
+      <p>{t('Die App wird gerade gewartet. Bitte versuche es später noch einmal.')}</p>
       {reason && <p className="maintenance-reason">{reason}</p>}
       <button className="btn btn-block" onClick={retry} disabled={busy}>
-        {busy ? 'Prüft …' : 'Erneut versuchen'}
+        {busy ? t('Prüft …') : t('Erneut versuchen')}
       </button>
       {note && (
         <p className="small" role="status">
@@ -52,7 +52,7 @@ export function MaintenancePage({ reason }: { reason: string }) {
       )}
       {!config?.user && (
         <button className="btn btn-link" onClick={toLogin}>
-          Anmelden (Admins)
+          {t('Anmelden (Admins)')}
         </button>
       )}
     </main>
@@ -66,7 +66,7 @@ export function MaintenanceBanner({ reason, onToast }: { reason: string; onToast
     setBusy(true);
     try {
       applyMaintenance(await api.setMaintenance(false));
-      onToast('Wartungsmodus beendet.');
+      onToast(t('Wartungsmodus beendet.'));
     } catch (err) {
       onToast((err as Error).message);
     } finally {
@@ -76,11 +76,11 @@ export function MaintenanceBanner({ reason, onToast }: { reason: string; onToast
   return (
     <div className="maintenance-banner" role="alert">
       <div>
-        <strong>Wartungsmodus aktiv – nur Admins können die App nutzen.</strong>
+        <strong>{t('Wartungsmodus aktiv – nur Admins können die App nutzen.')}</strong>
         {reason && <div className="maintenance-reason">{reason}</div>}
       </div>
       <button className="btn btn-small" onClick={end} disabled={busy}>
-        Beenden
+        {t('Beenden')}
       </button>
     </div>
   );
@@ -98,7 +98,8 @@ export function MaintenanceCard({ onToast }: { onToast: (msg: string) => void })
   const text = reason ?? m.reason;
 
   async function save(on: boolean, message: string) {
-    if (on && !m.on && !(await confirmAsk('Alle außer Admins können die App dann nicht mehr nutzen. Wartungsmodus einschalten?'))) return;
+    if (on && !m.on && !(await confirmAsk(t('Alle außer Admins können die App dann nicht mehr nutzen. Wartungsmodus einschalten?'))))
+      return;
     setBusy(true);
     setSaveError(null);
     try {
@@ -116,39 +117,43 @@ export function MaintenanceCard({ onToast }: { onToast: (msg: string) => void })
 
   return (
     <section className="card settings-section" aria-labelledby="maintenance-title">
-      <h3 id="maintenance-title">Wartungsmodus</h3>
+      <h3 id="maintenance-title">{t('Wartungsmodus')}</h3>
       <label className="field">
-        <span>Begründung (optional, erscheint auf der Wartungsseite)</span>
+        <span>{t('Begründung (optional, erscheint auf der Wartungsseite)')}</span>
         <textarea rows={3} maxLength={REASON_MAX} value={text} onChange={(e) => setReason(e.target.value)} />
-        <span className="muted small">
-          {text.length}/{REASON_MAX} Zeichen
-        </span>
+        <span className="muted small">{t('{count}/{max} Zeichen', { count: text.length, max: REASON_MAX })}</span>
       </label>
       {saveError && <p className="form-error small">{saveError}</p>}
       <div className="button-row">
         {m.on ? (
           <>
-            <button className="btn btn-secondary" disabled={busy || reason === null} onClick={() => save(true, 'Begründung gespeichert.')}>
-              Begründung speichern
+            <button
+              className="btn btn-secondary"
+              disabled={busy || reason === null}
+              onClick={() => save(true, t('Begründung gespeichert.'))}
+            >
+              {t('Begründung speichern')}
             </button>
-            <button className="btn" disabled={busy} onClick={() => save(false, 'Wartungsmodus beendet.')}>
-              Wartungsmodus beenden
+            <button className="btn" disabled={busy} onClick={() => save(false, t('Wartungsmodus beendet.'))}>
+              {t('Wartungsmodus beenden')}
             </button>
           </>
         ) : (
-          <button className="btn btn-danger" disabled={busy} onClick={() => save(true, 'Wartungsmodus ist an.')}>
-            Wartungsmodus einschalten
+          <button className="btn btn-danger" disabled={busy} onClick={() => save(true, t('Wartungsmodus ist an.'))}>
+            {t('Wartungsmodus einschalten')}
           </button>
         )}
       </div>
       {m.log.length > 0 && (
         <details className="small">
-          <summary>Verlauf</summary>
+          <summary>{t('Verlauf')}</summary>
           <ul>
             {m.log.map((e, i) => (
               <li key={i}>
-                {new Date(e.at * 1000).toLocaleString(localeTag(), { dateStyle: 'medium', timeStyle: 'short' })}: {e.by_name}{' '}
-                {e.on ? 'ein bzw. Begründung geändert' : 'aus'}
+                {((p) => (e.on ? t('{date}: {name} ein bzw. Begründung geändert', p) : t('{date}: {name} aus', p)))({
+                  date: new Date(e.at * 1000).toLocaleString(localeTag(), { dateStyle: 'medium', timeStyle: 'short' }),
+                  name: e.by_name,
+                })}
               </li>
             ))}
           </ul>

@@ -9,6 +9,7 @@ import { BOOKINGS_AREA, BOOKINGS_CHANGED, validBooking, type BookingKind, type P
 import { createOfflineQueue, failureAction, type KeyValue } from './offlineQueue';
 import { noteRejected } from './offlineRejectedStore';
 import { previewRole } from './preview';
+import { t } from './i18n';
 
 function storage(): KeyValue | null {
   try {
@@ -98,7 +99,9 @@ async function run(): Promise<BookingSyncResult> {
 export function bookingSyncMessage(r: BookingSyncResult): string | null {
   if (r.rejected.length > 0) {
     const first = r.rejected[0];
-    return `Offline vorgemerkte Buchung${first.label ? ` „${first.label}“` : ''} wurde nicht übernommen: ${first.message}`;
+    return first.label
+      ? t('Offline vorgemerkte Buchung „{label}“ wurde nicht übernommen: {message}', { label: first.label, message: first.message })
+      : t('Offline vorgemerkte Buchung wurde nicht übernommen: {message}', { message: first.message });
   }
-  return r.sent > 0 ? 'Offline vorgemerkte Punkte und Strafen übertragen' : null;
+  return r.sent > 0 ? t('Offline vorgemerkte Punkte und Strafen übertragen') : null;
 }

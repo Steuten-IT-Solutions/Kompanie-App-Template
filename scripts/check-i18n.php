@@ -141,6 +141,11 @@ function i18n_js_calls(string $src): array
             $i = i18n_js_skip_string($src, $i);
             continue;
         }
+        if ($c === '/' && i18n_js_regex_allowed($src, $i)) {
+            // Regulärer Ausdruck: Anführungszeichen darin beginnen keine Zeichenkette.
+            $i = i18n_js_skip_regex($src, $i);
+            continue;
+        }
         if ($c === '`') {
             // Aufrufe in ${…} einer Vorlage zählen.
             $end = i18n_js_skip_string($src, $i);
@@ -155,7 +160,7 @@ function i18n_js_calls(string $src): array
             $i = $end;
             continue;
         }
-        if (preg_match('/\G(tn|t)\s*\(/', $src, $m, 0, $i) && ($i === 0 || !preg_match('/[\w$.]/', $src[$i - 1]))) {
+        if (preg_match('/\G(tn|t)\s*\(/', $src, $m, 0, $i) && ($i === 0 || !preg_match('/[\w$.]/', $src[$i - 1]) || substr($src, $i - 3, 3) === '...')) {
             $kind = $m[1];
             $j = $i + strlen($m[0]);
             $args = [];
@@ -218,6 +223,54 @@ function i18n_js_template_expressions(string $body): array
         }
     }
     return $out;
+}
+
+/** Steht ab $i ein regulärer Ausdruck (/…/) und keine Division? Entscheidet das Zeichen oder Wort davor. */
+function i18n_js_regex_allowed(string $src, int $i): bool
+{
+    if ($i > 0 && $src[$i - 1] === '<') {
+        return false; // schließendes JSX-Element </…>
+    }
+    $j = $i - 1;
+    while ($j >= 0 && ctype_space($src[$j])) {
+        $j--;
+    }
+    if ($j < 0) {
+        return true;
+    }
+    if (strpbrk($src[$j], '(,=:[!&|?{;+-*%<>~^') !== false) {
+        return true;
+    }
+    if (preg_match('/(?:^|[^\w$])(return|typeof|case|do|else|in|of|void|yield|await|throw|delete|instanceof)$/', substr($src, max(0, $j - 11), $j - max(0, $j - 11) + 1))) {
+        return true;
+    }
+    return false;
+}
+
+/** Position hinter dem regulären Ausdruck ab $i (samt Schalter wie /gi). */
+function i18n_js_skip_regex(string $src, int $i): int
+{
+    $n = strlen($src);
+    $class = false;
+    for ($j = $i + 1; $j < $n; $j++) {
+        $c = $src[$j];
+        if ($c === '\\') {
+            $j++;
+        } elseif ($c === "\n") {
+            return $j;
+        } elseif ($class) {
+            $class = $c !== ']';
+        } elseif ($c === '[') {
+            $class = true;
+        } elseif ($c === '/') {
+            $j++;
+            while ($j < $n && ctype_alpha($src[$j])) {
+                $j++;
+            }
+            return $j;
+        }
+    }
+    return $n;
 }
 
 /** Position hinter der Zeichenkette ab $i (Vorlagen samt ${…}). */

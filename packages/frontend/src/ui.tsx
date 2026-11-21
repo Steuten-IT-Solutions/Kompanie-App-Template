@@ -1,5 +1,6 @@
 import {
   Component,
+  Fragment,
   lazy,
   useCallback,
   useEffect,
@@ -17,6 +18,7 @@ import { useBackClose } from './backClose';
 import { setUnsaved } from './unsaved';
 import type { MemberSummary, PersonName } from './api';
 import { cacheKey as keyOf, DATA_UPDATED, dataCache, pendingPrefetch, takeFresh } from './dataCache';
+import { t, tn } from './i18n';
 import { noteError } from './lastError';
 import { caps } from './sharpS';
 import { emailProblem, emailSuggestion, normalizeEmail, tidyEmail } from './email';
@@ -104,7 +106,7 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: st
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, tick]);
 
-  const reload = useCallback(() => setTick((t) => t + 1), []);
+  const reload = useCallback(() => setTick((n) => n + 1), []);
   // Der Service Worker hat im Hintergrund neue Daten geholt (Issue #108): neu laden, die Antwort kommt dann aus seinem
   // Speicher.
   useEffect(() => {
@@ -121,9 +123,9 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = [], key?: st
 export function useUnsaved(dirty: boolean): void {
   const token = useRef(Symbol('unsaved'));
   useEffect(() => {
-    const t = token.current;
-    setUnsaved(t, dirty);
-    return () => setUnsaved(t, false);
+    const own = token.current;
+    setUnsaved(own, dirty);
+    return () => setUnsaved(own, false);
   }, [dirty]);
 }
 
@@ -136,11 +138,26 @@ export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () =
       <p>{message}</p>
       {onRetry && (
         <button className="btn btn-secondary" onClick={onRetry}>
-          Erneut versuchen
+          {t('Erneut versuchen')}
         </button>
       )}
     </div>
   );
+}
+
+/**
+ * Übersetzter Satz mit Elementen an Platzhaltern, z. B. ein Wort fett:
+ * `rich(t('Wird {only} angezeigt.'), { only: <strong>{t('nur jetzt')}</strong> })`. t() lässt Platzhalter ohne Wert stehen;
+ * rich() setzt an ihre Stelle die Elemente, damit die Wortstellung jeder Sprache erhalten bleibt.
+ */
+export function rich(text: string, nodes: Readonly<Record<string, ReactNode>>): ReactNode {
+  const parts = text.split(/\{(\w+)\}/);
+  return parts.map((part, i) => <Fragment key={i}>{i % 2 === 1 ? (part in nodes ? nodes[part] : `{${part}}`) : part}</Fragment>);
+}
+
+/** Übersetzter Satz mit Hervorhebungen: <b>…</b> im Text wird fett (die Wortstellung bleibt der Übersetzung überlassen). */
+export function bold(text: string): ReactNode {
+  return text.split(/<b>(.*?)<\/b>/).map((part, i) => (i % 2 === 1 ? <strong key={i}>{part}</strong> : part));
 }
 
 export function Empty({ children }: { children: ReactNode }) {
@@ -152,7 +169,7 @@ export function DateRow({ label, onOpen, children }: { label: string; onOpen?: (
   const content = (
     <>
       <span className="member-date-label">{label}</span>
-      <span className={`member-date-value${children ? '' : ' muted'}`}>{children ?? 'Nicht eingetragen'}</span>
+      <span className={`member-date-value${children ? '' : ' muted'}`}>{children ?? t('Nicht eingetragen')}</span>
       {onOpen && (
         <span className="chevron" aria-hidden="true">
           ›
@@ -315,7 +332,7 @@ export function Sheet({
       <div className="sheet" role="dialog" aria-modal="true" aria-label={title}>
         <div className="sheet-head">
           <h2 className="sheet-title">{title}</h2>
-          <button ref={closeRef} type="button" className="sheet-close" onClick={onClose} aria-label="Schließen">
+          <button ref={closeRef} type="button" className="sheet-close" onClick={onClose} aria-label={t('Schließen')}>
             ✕
           </button>
         </div>
@@ -353,13 +370,13 @@ export function MemberPicker({
       <div className="picker-head">
         <input
           type="search"
-          placeholder="Mitglied suchen …"
+          placeholder={t('Mitglied suchen …')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          aria-label="Mitglied suchen"
+          aria-label={t('Mitglied suchen')}
         />
         <button type="button" className="btn btn-link" onClick={toggleAll}>
-          {allFilteredSelected ? 'Keine' : 'Alle'}
+          {allFilteredSelected ? t('Keine') : t('Alle')}
         </button>
       </div>
       <ul className="picker-list">
@@ -372,9 +389,9 @@ export function MemberPicker({
             </label>
           </li>
         ))}
-        {filtered.length === 0 && <li className="muted">Niemand gefunden.</li>}
+        {filtered.length === 0 && <li className="muted">{t('Niemand gefunden.')}</li>}
       </ul>
-      <div className="picker-count">{selected.length} ausgewählt</div>
+      <div className="picker-count">{t('{count} ausgewählt', { count: selected.length })}</div>
     </div>
   );
 }
@@ -397,7 +414,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
 
   render() {
     return this.state.failed ? (
-      <ErrorBox message="Diese Ansicht konnte nicht angezeigt werden." onRetry={() => this.setState({ failed: false })} />
+      <ErrorBox message={t('Diese Ansicht konnte nicht angezeigt werden.')} onRetry={() => this.setState({ failed: false })} />
     ) : (
       this.props.children
     );
@@ -472,7 +489,7 @@ export function NameFields({
   return (
     <div className="field-row">
       <label className="field">
-        <span>Vorname</span>
+        <span>{t('Vorname')}</span>
         <input
           type="text"
           autoComplete="off"
@@ -482,7 +499,7 @@ export function NameFields({
         />
       </label>
       <label className="field">
-        <span>Nachname</span>
+        <span>{t('Nachname')}</span>
         <input type="text" autoComplete="off" value={value.last_name} onChange={(e) => onChange({ ...value, last_name: e.target.value })} />
       </label>
     </div>
@@ -510,7 +527,7 @@ type ContactFieldProps = {
  * beim Verlassen (email.ts), zeigt danach, was nicht stimmt, und schlägt vertippte Anbieter vor. Eine ungültige Adresse
  * hält das Formular an; beim Speichern trotzdem normalizeEmail() verwenden, falls das Feld nicht verlassen wurde.
  */
-export function EmailField({ label = 'E-Mail (optional)', ...props }: ContactFieldProps) {
+export function EmailField({ label = t('E-Mail (optional)'), ...props }: ContactFieldProps) {
   const suggestion = emailProblem(props.value) ? null : emailSuggestion(props.value);
   return (
     <ContactField
@@ -523,11 +540,13 @@ export function EmailField({ label = 'E-Mail (optional)', ...props }: ContactFie
       note={
         suggestion && (
           <p className="field-note muted">
-            Meintest du{' '}
-            <button type="button" className="btn btn-link inline-link" onClick={() => props.onChange(suggestion)}>
-              {suggestion}
-            </button>
-            ?
+            {rich(t('Meintest du {suggestion}?'), {
+              suggestion: (
+                <button type="button" className="btn btn-link inline-link" onClick={() => props.onChange(suggestion)}>
+                  {suggestion}
+                </button>
+              ),
+            })}
           </p>
         )
       }
@@ -541,7 +560,7 @@ export function EmailField({ label = 'E-Mail (optional)', ...props }: ContactFie
  * Formular an. Kein type="url", sonst lehnt der Browser „beispiel.de“ mit eigener Meldung ab. Beim Speichern trotzdem
  * normalizeLink() verwenden, falls das Feld nicht verlassen wurde.
  */
-export function LinkField({ placeholder = 'beispiel.de', ...props }: ContactFieldProps & { label: string }) {
+export function LinkField({ placeholder = t('beispiel.de'), ...props }: ContactFieldProps & { label: string }) {
   return (
     <ContactField
       {...props}
@@ -563,9 +582,9 @@ export function LinkField({ placeholder = 'beispiel.de', ...props }: ContactFiel
 export function PhoneField({
   value,
   onChange,
-  label = 'Handynummer (optional)',
+  label = t('Handynummer (optional)'),
   autoComplete = 'off',
-  placeholder = 'z. B. 0171 1234567',
+  placeholder = t('z. B. 0171 1234567'),
   disabled,
 }: ContactFieldProps) {
   const ref = useRef<HTMLInputElement>(null);
@@ -593,7 +612,7 @@ export function PhoneField({
       </span>
       <div className="phone-row">
         <select
-          aria-label="Ländervorwahl"
+          aria-label={t('Ländervorwahl')}
           value={known ? code : OTHER}
           disabled={disabled}
           onChange={(e) => change(e.target.value, national)}
@@ -603,8 +622,8 @@ export function PhoneField({
               {c.flag} +{c.code}
             </option>
           ))}
-          <option value={OTHER} aria-label="anderes Land">
-            🌐 andere
+          <option value={OTHER} aria-label={t('anderes Land')}>
+            🌐 {t('andere')}
           </option>
         </select>
         <input
@@ -613,7 +632,7 @@ export function PhoneField({
           inputMode="tel"
           aria-labelledby={labelId}
           autoComplete={autoComplete === 'tel' ? 'tel-national' : autoComplete}
-          placeholder={code === OTHER ? 'z. B. +1 212 5550100' : placeholder}
+          placeholder={code === OTHER ? t('z. B. +1 212 5550100') : placeholder}
           value={national}
           disabled={disabled}
           aria-invalid={left && problem !== null}
@@ -639,7 +658,7 @@ export function PhoneField({
 export function AddressFields({
   value,
   onChange,
-  label = 'Adresse (optional)',
+  label = t('Adresse (optional)'),
   own = false,
   disabled,
 }: {
@@ -694,7 +713,7 @@ export function AddressFields({
     <fieldset className="fieldset address-fields">
       <legend>{label}</legend>
       <label className="field">
-        <span>Land</span>
+        <span>{t('Land')}</span>
         <select
           autoComplete={ac('country')}
           value={country ? value.country : OTHER_COUNTRY}
@@ -706,22 +725,22 @@ export function AddressFields({
               {c.flag} {c.name}
             </option>
           ))}
-          <option value={OTHER_COUNTRY}>🌐 anderes Land</option>
+          <option value={OTHER_COUNTRY}>🌐 {t('anderes Land')}</option>
         </select>
       </label>
-      {!country && input('country_name', 'Name des Landes', { autoComplete: ac('country-name'), maxLength: COUNTRY_NAME_MAX })}
+      {!country && input('country_name', t('Name des Landes'), { autoComplete: ac('country-name'), maxLength: COUNTRY_NAME_MAX })}
       <div className="address-row">
-        {input('street', 'Straße', { autoComplete: ac('address-line1'), maxLength: STREET_MAX })}
-        {input('house_number', 'Nr.', { autoComplete: 'off', maxLength: HOUSE_NUMBER_MAX })}
+        {input('street', t('Straße'), { autoComplete: ac('address-line1'), maxLength: STREET_MAX })}
+        {input('house_number', t('Nr.'), { autoComplete: 'off', maxLength: HOUSE_NUMBER_MAX })}
       </div>
-      {input('extra', 'Adresszusatz (optional)', { autoComplete: ac('address-line2'), maxLength: STREET_MAX })}
+      {input('extra', t('Adresszusatz (optional)'), { autoComplete: ac('address-line2'), maxLength: STREET_MAX })}
       <div className="address-row">
-        {input('postal_code', 'PLZ', {
+        {input('postal_code', t('PLZ'), {
           autoComplete: ac('postal-code'),
           maxLength: 12,
           inputMode: country && /^\d/.test(country.example) && country.code !== 'NL' && country.code !== 'GB' ? 'numeric' : 'text',
         })}
-        {input('city', 'Ort', { autoComplete: ac('address-level2'), maxLength: CITY_MAX })}
+        {input('city', t('Ort'), { autoComplete: ac('address-level2'), maxLength: CITY_MAX })}
       </div>
     </fieldset>
   );
@@ -816,16 +835,16 @@ export function FileInput({
         }}
       />
       <button type="button" className="btn btn-secondary btn-small" disabled={props.disabled} onClick={() => own.current?.click()}>
-        {props.multiple ? 'Dateien auswählen' : 'Datei auswählen'}
+        {props.multiple ? t('Dateien auswählen') : t('Datei auswählen')}
       </button>
       <span className="file-input-name">
         {names.length === 0
           ? props.multiple
-            ? 'Keine Dateien ausgewählt'
-            : 'Keine Datei ausgewählt'
+            ? t('Keine Dateien ausgewählt')
+            : t('Keine Datei ausgewählt')
           : names.length === 1
             ? names[0]
-            : `${names.length} Dateien ausgewählt`}
+            : tn('{count} Datei ausgewählt', '{count} Dateien ausgewählt', names.length)}
       </span>
     </span>
   );

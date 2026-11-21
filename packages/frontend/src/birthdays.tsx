@@ -7,6 +7,7 @@ import { PROFILE_OPTIONS, profileChoice, profileHint, ProfileSelect } from './jo
 import brand from './generated/brand';
 import { ErrorBox, useAsync } from './ui';
 import { confirmAsk } from './ask';
+import { t } from './i18n';
 
 export { birthdaysVisible } from './upcomingBirthdays';
 export { ownBirthday } from './viewData';
@@ -28,7 +29,20 @@ export function canEnterFormerBirthdays(): boolean {
   return canEnterBirthdays() || canSetBirthdays();
 }
 
-const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+const MONTHS = [
+  t('Januar'),
+  t('Februar'),
+  t('März'),
+  t('April'),
+  t('Mai'),
+  t('Juni'),
+  t('Juli'),
+  t('August'),
+  t('September'),
+  t('Oktober'),
+  t('November'),
+  t('Dezember'),
+];
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
@@ -54,14 +68,14 @@ export const toBirthdayValue = (b: Birthday | null | undefined): BirthdayValue =
  */
 export function readBirthday(v: BirthdayValue): { month: number; day: number; year: number | null } | null | string {
   if (!v.day && !v.month && !v.year.trim()) return null;
-  if (!v.day || !v.month) return 'Bitte Tag und Monat des Geburtstags wählen.';
+  if (!v.day || !v.month) return t('Bitte Tag und Monat des Geburtstags wählen.');
   const year = v.year.trim();
-  if (year && !/^\d{4}$/.test(year)) return 'Das Geburtsjahr bitte vierstellig angeben (oder leer lassen).';
+  if (year && !/^\d{4}$/.test(year)) return t('Das Geburtsjahr bitte vierstellig angeben (oder leer lassen).');
   const day = Number(v.day);
   const month = Number(v.month);
   // Ohne Jahr gilt der 29.02. (Maßstab: ein Schaltjahr).
   const check = new Date(year ? Number(year) : 2000, month - 1, day);
-  if (check.getMonth() !== month - 1) return 'Dieses Datum gibt es nicht.';
+  if (check.getMonth() !== month - 1) return t('Dieses Datum gibt es nicht.');
   return { month, day, year: year ? Number(year) : null };
 }
 
@@ -84,7 +98,7 @@ export function BirthdayFields({
   return (
     <div className="field-row birthday-fields">
       <label className="field birthday-day">
-        <span>Tag</span>
+        <span>{t('Tag')}</span>
         <select value={value.day} disabled={disabled} onChange={(e) => onChange({ ...value, day: e.target.value })}>
           <option value="">–</option>
           {Array.from({ length: 31 }, (_, i) => (
@@ -95,7 +109,7 @@ export function BirthdayFields({
         </select>
       </label>
       <label className="field birthday-month">
-        <span>Monat</span>
+        <span>{t('Monat')}</span>
         <select value={value.month} disabled={disabled} onChange={(e) => onChange({ ...value, month: e.target.value })}>
           <option value="">–</option>
           {MONTHS.map((m, i) => (
@@ -106,13 +120,13 @@ export function BirthdayFields({
         </select>
       </label>
       <label className="field birthday-year">
-        <span>Jahr</span>
+        <span>{t('Jahr')}</span>
         <input
           type="text"
           inputMode="numeric"
           autoComplete="off"
           maxLength={4}
-          placeholder="freiwillig"
+          placeholder={t('freiwillig')}
           value={value.year}
           disabled={disabled}
           onChange={(e) => onChange({ ...value, year: e.target.value.replace(/\D/g, '') })}
@@ -155,12 +169,12 @@ export function OwnBirthdayCard({ onToast }: { onToast: (msg: string) => void })
     e.preventDefault();
     setFormError(null);
     const parsed = readBirthday(v);
-    if (parsed === null) return setFormError('Bitte Tag und Monat des Geburtstags wählen.');
+    if (parsed === null) return setFormError(t('Bitte Tag und Monat des Geburtstags wählen.'));
     if (typeof parsed === 'string') return setFormError(parsed);
     setBusy(true);
     try {
       const res = await api.saveMyBirthday({ ...parsed, visible: vis, show_age: age, ...(withProfile ? { profile: prof } : {}) });
-      done(res.birthday, 'Geburtstag gespeichert');
+      done(res.birthday, t('Geburtstag gespeichert'));
     } catch (err) {
       setFormError((err as Error).message);
     } finally {
@@ -169,11 +183,11 @@ export function OwnBirthdayCard({ onToast }: { onToast: (msg: string) => void })
   }
 
   async function remove() {
-    if (!(await confirmAsk('Deinen Geburtstag entfernen?'))) return;
+    if (!(await confirmAsk(t('Deinen Geburtstag entfernen?')))) return;
     setBusy(true);
     try {
       await api.deleteMyBirthday();
-      done(null, 'Geburtstag entfernt');
+      done(null, t('Geburtstag entfernt'));
     } catch (err) {
       setFormError((err as Error).message);
     } finally {
@@ -183,25 +197,29 @@ export function OwnBirthdayCard({ onToast }: { onToast: (msg: string) => void })
 
   return (
     <form className="form card account-card birthday-card" onSubmit={save}>
-      <h3>Geburtstag</h3>
+      <h3>{t('Geburtstag')}</h3>
       <p className="muted small">
-        Für die {sec.birthdays} bei den {sec.events} und eine Benachrichtigung der anderen am Tag selbst. Das Jahr ist freiwillig.
+        {t('Für die {birthdays} bei den {events} und eine Benachrichtigung der anderen am Tag selbst. Das Jahr ist freiwillig.', {
+          birthdays: sec.birthdays,
+          events: sec.events,
+        })}
       </p>
       <BirthdayFields value={v} onChange={setValue} disabled={busy || pending} />
       <label className="toggle">
         <input type="checkbox" checked={vis} disabled={pending} onChange={(e) => setVisible(e.target.checked)} />
-        Anderen Mitgliedern zeigen
+        {t('Anderen Mitgliedern zeigen')}
       </label>
       <label className="toggle">
         <input type="checkbox" checked={age} disabled={pending} onChange={(e) => setShowAge(e.target.checked)} />
-        Alter anzeigen{!v.year.trim() && ' (nur mit Jahr)'}
+        {v.year.trim() ? t('Alter anzeigen') : t('Alter anzeigen (nur mit Jahr)')}
       </label>
       {withProfile && (
         <>
           <ProfileSelect value={prof} onChange={setProfile} disabled={pending} />
           {prof !== 'none' && (
             <p className="muted small">
-              {profileHint(prof)} {age && v.year.trim() ? 'Dort steht das ganze Datum mit deinem Alter.' : 'Dort stehen nur Tag und Monat.'}
+              {profileHint(prof)}{' '}
+              {age && v.year.trim() ? t('Dort steht das ganze Datum mit deinem Alter.') : t('Dort stehen nur Tag und Monat.')}
             </p>
           )}
         </>
@@ -212,14 +230,14 @@ export function OwnBirthdayCard({ onToast }: { onToast: (msg: string) => void })
         </p>
       )}
       <button className="btn btn-block" type="submit" disabled={busy || pending}>
-        {busy ? 'Speichert …' : 'Geburtstag speichern'}
+        {busy ? t('Speichert …') : t('Geburtstag speichern')}
       </button>
       {current && (
         <button type="button" className="btn btn-secondary btn-block birthday-remove" disabled={busy} onClick={remove}>
-          Entfernen
+          {t('Entfernen')}
         </button>
       )}
-      {!vis && current && <p className="muted small">Andere sehen deinen Geburtstag nicht und werden nicht benachrichtigt.</p>}
+      {!vis && current && <p className="muted small">{t('Andere sehen deinen Geburtstag nicht und werden nicht benachrichtigt.')}</p>}
     </form>
   );
 }
@@ -261,23 +279,30 @@ export function MemberBirthday({
   function save(e: FormEvent) {
     e.preventDefault();
     const parsed = readBirthday(value);
-    if (parsed === null) return setFormError('Bitte Tag und Monat des Geburtstags wählen.');
+    if (parsed === null) return setFormError(t('Bitte Tag und Monat des Geburtstags wählen.'));
     if (typeof parsed === 'string') return setFormError(parsed);
-    void run(() => api.setMemberBirthday(id, parsed), 'Geburtstag gespeichert');
+    void run(() => api.setMemberBirthday(id, parsed), t('Geburtstag gespeichert'));
   }
 
   return (
     <form className="member-birthday" onSubmit={save}>
-      <h3 className="section-title">Geburtstag</h3>
+      <h3 className="section-title">{t('Geburtstag')}</h3>
       <div className="card member-birthday-card">
-        <p className="member-birthday-current">{birthday ? formatBirthday(birthday) : 'Nicht eingetragen.'}</p>
+        <p className="member-birthday-current">{birthday ? formatBirthday(birthday) : t('Nicht eingetragen.')}</p>
         {birthday && (
           <p className="muted small member-birthday-switches">
-            Anderen Mitgliedern zeigen: {birthday.visible ? 'an' : 'aus'} · Alter anzeigen: {birthday.show_age ? 'an' : 'aus'}
+            {t('Anderen Mitgliedern zeigen: {visible} · Alter anzeigen: {age}', {
+              visible: birthday.visible ? t('an') : t('aus'),
+              age: birthday.show_age ? t('an') : t('aus'),
+            })}
             {config?.features.directory &&
               birthday.profile &&
-              ` · Auf der Seite unter „${sec.directory}“: ${PROFILE_OPTIONS[birthday.profile]}`}{' '}
-            (stellt nur die Person selbst ein)
+              ' · ' +
+                t('Auf der Seite unter „{directory}“: {choice}', {
+                  directory: sec.directory,
+                  choice: PROFILE_OPTIONS[birthday.profile],
+                })}{' '}
+            {t('(stellt nur die Person selbst ein)')}
           </p>
         )}
         {editable && (
@@ -290,7 +315,7 @@ export function MemberBirthday({
             )}
             <div className="button-row">
               <button className="btn" type="submit" disabled={busy}>
-                Geburtstag speichern
+                {t('Geburtstag speichern')}
               </button>
               {birthday && (
                 <button
@@ -298,14 +323,14 @@ export function MemberBirthday({
                   className="btn btn-secondary"
                   disabled={busy}
                   onClick={async () =>
-                    (await confirmAsk('Geburtstag entfernen?')) &&
+                    (await confirmAsk(t('Geburtstag entfernen?'))) &&
                     run(async () => {
                       await api.deleteMemberBirthday(id);
                       setValue(toBirthdayValue(null));
-                    }, 'Geburtstag entfernt')
+                    }, t('Geburtstag entfernt'))
                   }
                 >
-                  Entfernen
+                  {t('Entfernen')}
                 </button>
               )}
             </div>

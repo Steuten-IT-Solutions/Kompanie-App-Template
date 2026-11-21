@@ -11,6 +11,7 @@
  * Reine Logik ohne API, damit sie sich ohne Browser testen lässt.
  */
 
+import { t } from './i18n';
 export const OFFLINE_PREFIX = 'kompanie-offline/';
 
 export type KeyValue = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> & Partial<Pick<Storage, 'key' | 'length'>>;
@@ -119,9 +120,9 @@ export function queuedMessage(e: unknown): string {
   const status = statusOf(e) ?? 0;
   const why =
     status === 0
-      ? 'Keine Verbindung zum Server.'
+      ? t('Keine Verbindung zum Server.')
       : status === 401
-        ? 'Deine Anmeldung ist abgelaufen.'
-        : 'Der Server ist gerade nicht erreichbar.';
-  return `${why} Auf diesem Gerät gespeichert, die App überträgt es, sobald es wieder geht.`;
+        ? t('Deine Anmeldung ist abgelaufen.')
+        : t('Der Server ist gerade nicht erreichbar.');
+  return t('{why} Auf diesem Gerät gespeichert, die App überträgt es, sobald es wieder geht.', { why });
 }

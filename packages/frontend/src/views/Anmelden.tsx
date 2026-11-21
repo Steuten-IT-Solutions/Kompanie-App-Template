@@ -4,6 +4,7 @@ import brand from '../generated/brand';
 import logoUrl from '../generated/logo.png';
 import { LegalLinks } from '../legal';
 import { navigate } from '../router';
+import { t } from '../i18n';
 
 /** Anmeldeformular der eigenständigen Version (bei WordPress geht es zu wp-login.php). */
 export default function Anmelden() {
@@ -16,7 +17,7 @@ export default function Anmelden() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!username.trim() || !password) return setError('Bitte Benutzername und Passwort eingeben.');
+    if (!username.trim() || !password) return setError(t('Bitte Benutzername und Passwort eingeben.'));
     setBusy(true);
     try {
       await api.login(username.trim(), password, remember);
@@ -33,7 +34,7 @@ export default function Anmelden() {
       <img src={logoUrl} alt="" className="login-logo" />
       <h2>{brand.name}</h2>
       <label className="field">
-        <span>Benutzername</span>
+        <span>{t('Benutzername')}</span>
         <input
           type="text"
           name="username"
@@ -46,7 +47,7 @@ export default function Anmelden() {
         />
       </label>
       <label className="field">
-        <span>Passwort</span>
+        <span>{t('Passwort')}</span>
         <input
           type="password"
           name="password"
@@ -58,7 +59,7 @@ export default function Anmelden() {
       </label>
       <label className="toggle">
         <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-        Angemeldet bleiben
+        {t('Angemeldet bleiben')}
       </label>
       {error && (
         <p className="form-error" role="alert">
@@ -66,14 +67,14 @@ export default function Anmelden() {
         </p>
       )}
       <button className="btn btn-block" type="submit" disabled={busy}>
-        {busy ? 'Meldet an …' : 'Anmelden'}
+        {busy ? t('Meldet an …') : t('Anmelden')}
       </button>
-      <p className="muted small">Passwort vergessen? Bitte bei einem Admin melden – er kann ein neues Startpasswort erzeugen.</p>
+      <p className="muted small">{t('Passwort vergessen? Bitte bei einem Admin melden – er kann ein neues Startpasswort erzeugen.')}</p>
       {config?.registration && (
         <p className="muted small">
-          Noch keinen Zugang?{' '}
+          {t('Noch keinen Zugang?')}{' '}
           <button type="button" className="btn btn-link inline-link" onClick={() => navigate('registrieren')}>
-            Zugang beantragen
+            {t('Zugang beantragen')}
           </button>
         </p>
       )}

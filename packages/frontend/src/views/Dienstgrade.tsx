@@ -3,7 +3,7 @@ import brand from '../generated/brand';
 import { RankLabel } from '../RankBadge';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
-import { localeTag } from '../i18n';
+import { localeTag, t } from '../i18n';
 
 const rank = brand.labels.rank;
 const sec = brand.labels.sections;
@@ -17,7 +17,7 @@ export default function Dienstgrade() {
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const ranks = data ?? [];
-  if (ranks.length === 0) return <Empty>Noch keine {sec.ranks} angelegt.</Empty>;
+  if (ranks.length === 0) return <Empty>{t('Noch keine {ranks} angelegt.', { ranks: sec.ranks })}</Empty>;
   const withPoints = !!config?.features.points;
   const mine = me.data?.rank?.id;
 
@@ -30,9 +30,11 @@ export default function Dienstgrade() {
               <div className="row-title">
                 <RankLabel url={r.badge_url} title={r.title} />
               </div>
-              {r.id === mine && <div className="row-sub">Dein {rank}</div>}
+              {r.id === mine && <div className="row-sub">{t('Dein {rank}', { rank })}</div>}
             </div>
-            {withPoints && r.min_points !== null && <div className="row-value">ab {r.min_points.toLocaleString(localeTag())}</div>}
+            {withPoints && r.min_points !== null && (
+              <div className="row-value">{t('ab {points}', { points: r.min_points.toLocaleString(localeTag()) })}</div>
+            )}
           </li>
         ))}
       </ul>

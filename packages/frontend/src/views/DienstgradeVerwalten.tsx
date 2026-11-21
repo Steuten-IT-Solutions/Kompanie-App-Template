@@ -12,7 +12,7 @@ import { notePromotions } from '../promotionsDue';
 import { sources } from '../viewData';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
-import { localeTag } from '../i18n';
+import { localeTag, t } from '../i18n';
 
 const rank = brand.labels.rank;
 const sec = brand.labels.sections;
@@ -69,14 +69,14 @@ async function svgToPng(file: File): Promise<string | null> {
 /** Vorschau eines Abzeichens auf heller und dunkler Fläche: Transparente Abzeichen müssen auf beiden wirken. */
 function BadgePreview({ rank: r }: { rank: Rank }) {
   return (
-    <div className="badge-preview" aria-label={`Vorschau des Abzeichens von ${r.title}`}>
+    <div className="badge-preview" aria-label={t('Vorschau des Abzeichens von {title}', { title: r.title })}>
       <div className="badge-preview-light">
         <RankBadge url={r.badge_url} title={r.title} size="medium" />
-        <span>hell</span>
+        <span>{t('hell')}</span>
       </div>
       <div className="badge-preview-dark">
         <RankBadge url={r.badge_url} title={r.title} size="medium" />
-        <span>dunkel</span>
+        <span>{t('dunkel')}</span>
       </div>
     </div>
   );
@@ -99,7 +99,9 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
   const badgeFor = useRef<number | null>(null);
   const points = ranksUsePoints();
   // Schwellen immer pflegbar (gespeichert und geprüft auch ohne Punkte); sie wirken nur zusammen mit Punkten.
-  const thresholdLabel = points ? `${sec.points}schwelle` : `${sec.points}schwelle (wirkt nur mit ${sec.points})`;
+  const thresholdLabel = points
+    ? t('{points}schwelle', { points: sec.points })
+    : t('{points}schwelle (wirkt nur mit {points})', { points: sec.points });
 
   async function run(action: () => Promise<unknown>, msg: string) {
     setBusy(true);
@@ -129,19 +131,19 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
     if (!file || id === null) return;
     const ext = file.name.toLowerCase().split('.').pop() ?? '';
     if (!['png', 'jpg', 'jpeg', 'webp', 'svg'].includes(ext)) {
-      setFormError('Erlaubt sind PNG, JPG, WebP und SVG.');
+      setFormError(t('Erlaubt sind PNG, JPG, WebP und SVG.'));
       return;
     }
     if (file.size > BADGE_MAX_BYTES) {
-      setFormError('Das Abzeichen darf höchstens 1 MB groß sein.');
+      setFormError(t('Das Abzeichen darf höchstens 1 MB groß sein.'));
       return;
     }
-    await run(async () => api.uploadRankBadge(id, file, ext === 'svg' ? await svgToPng(file) : null), 'Abzeichen gespeichert');
+    await run(async () => api.uploadRankBadge(id, file, ext === 'svg' ? await svgToPng(file) : null), t('Abzeichen gespeichert'));
   }
 
   async function add(e: FormEvent) {
     e.preventDefault();
-    if (await run(() => api.createRank({ title: title.trim(), min_points: parseThreshold(min) }), `${rank} angelegt`)) {
+    if (await run(() => api.createRank({ title: title.trim(), min_points: parseThreshold(min) }), t('{rank} angelegt', { rank }))) {
       setTitle('');
       setMin('');
     }
@@ -174,7 +176,10 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
     <div className="stack">
       {missing && (
         <p className="small">
-          Noch nicht alle {sec.ranks} haben eine {sec.points}schwelle; für diese gelten keine Regeln zu {sec.points}.
+          {t('Noch nicht alle {ranks} haben eine {points}schwelle; für diese gelten keine Regeln zu {points}.', {
+            ranks: sec.ranks,
+            points: sec.points,
+          })}
         </p>
       )}
       {formError && (
@@ -183,7 +188,7 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
         </p>
       )}
       {list.length === 0 ? (
-        <Empty>Noch keine {sec.ranks}.</Empty>
+        <Empty>{t('Noch keine {ranks}.', { ranks: sec.ranks })}</Empty>
       ) : (
         <ul className="card-list">
           {list.map((r, i) =>
@@ -195,7 +200,7 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
                   busy={busy}
                   onCancel={() => setEditing(null)}
                   onSave={async (data) => {
-                    if (await run(() => api.updateRank(r.id, data), 'Gespeichert')) setEditing(null);
+                    if (await run(() => api.updateRank(r.id, data), t('Gespeichert'))) setEditing(null);
                   }}
                 />
               </li>
@@ -205,64 +210,68 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
                 <div className="row-main">
                   <div className="row-title">
                     <RankLabel url={r.badge_url} title={r.title} />
-                    {!r.active && <span className="badge badge-level-guest">inaktiv</span>}
+                    {!r.active && <span className="badge badge-level-guest">{t('inaktiv')}</span>}
                   </div>
                   <div className="row-sub">
-                    {r.min_points !== null ? `ab ${r.min_points.toLocaleString(localeTag())} ${sec.points}` : 'ohne Schwelle'}
+                    {r.min_points !== null
+                      ? t('ab {count} {points}', { count: r.min_points.toLocaleString(localeTag()), points: sec.points })
+                      : t('ohne Schwelle')}
                     {' · '}
-                    {r.assigned ? `${r.assigned}× vergeben` : 'nicht vergeben'}
+                    {r.assigned ? t('{count}× vergeben', { count: r.assigned }) : t('nicht vergeben')}
                   </div>
                   <div className="row-actions">
                     <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => setEditing(r.id)}>
-                      Ändern
+                      {t('Ändern')}
                     </button>
                     {(r.assigned || !r.active) && (
                       <button
                         className="btn btn-small btn-secondary"
                         disabled={busy}
-                        onClick={() => run(() => api.updateRank(r.id, { active: !r.active }), r.active ? 'Deaktiviert' : 'Aktiviert')}
+                        onClick={() => run(() => api.updateRank(r.id, { active: !r.active }), r.active ? t('Deaktiviert') : t('Aktiviert'))}
                       >
-                        {r.active ? 'Deaktivieren' : 'Aktivieren'}
+                        {r.active ? t('Deaktivieren') : t('Aktivieren')}
                       </button>
                     )}
                     {!r.assigned && (
                       <IconButton
                         icon="delete"
-                        label="Löschen"
+                        label={t('Löschen')}
                         variant="danger"
                         disabled={busy}
-                        onClick={async () => (await confirmAsk(`„${r.title}“ löschen?`)) && run(() => api.deleteRank(r.id), 'Gelöscht')}
+                        onClick={async () =>
+                          (await confirmAsk(t('„{title}“ löschen?', { title: r.title }))) && run(() => api.deleteRank(r.id), t('Gelöscht'))
+                        }
                       />
                     )}
                   </div>
-                  <div className="rank-badge-tools" role="group" aria-label={`Abzeichen von ${r.title}`}>
+                  <div className="rank-badge-tools" role="group" aria-label={t('Abzeichen von {title}', { title: r.title })}>
                     {r.badge_url && <BadgePreview rank={r} />}
                     <div className="row-actions">
                       {r.badge_url ? (
                         <>
                           <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => chooseBadge(r.id)}>
-                            Ersetzen
+                            {t('Ersetzen')}
                           </button>
                           <button
                             className="btn btn-small btn-danger"
                             disabled={busy}
                             onClick={async () =>
-                              (await confirmAsk(`Abzeichen von „${r.title}“ entfernen?`)) &&
-                              run(() => api.removeRankBadge(r.id), 'Abzeichen entfernt')
+                              (await confirmAsk(t('Abzeichen von „{title}“ entfernen?', { title: r.title }))) &&
+                              run(() => api.removeRankBadge(r.id), t('Abzeichen entfernt'))
                             }
                           >
-                            Entfernen
+                            {t('Entfernen')}
                           </button>
                         </>
                       ) : (
                         <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => chooseBadge(r.id)}>
-                          Abzeichen hochladen
+                          {t('Abzeichen hochladen')}
                         </button>
                       )}
                     </div>
                     {r.badge_type === 'svg' && !r.badge_push && (
                       <p className="muted small">
-                        Ohne Bild in Benachrichtigungen (keine PNG-Fassung); zum Nachholen das SVG erneut hochladen.
+                        {t('Ohne Bild in Benachrichtigungen (keine PNG-Fassung); zum Nachholen das SVG erneut hochladen.')}
                       </p>
                     )}
                   </div>
@@ -278,25 +287,28 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
         type="file"
         accept={BADGE_ACCEPT}
         hidden
-        aria-label="Abzeichen-Datei"
+        aria-label={t('Abzeichen-Datei')}
         onChange={(e) => uploadBadge(e.target.files?.[0] ?? null)}
       />
 
       <form className="form card" onSubmit={add}>
-        <h3>Neuer {rank}</h3>
+        <h3>{t('Neuer {rank}', { rank })}</h3>
         <label className="field">
-          <span>Bezeichnung</span>
+          <span>{t('Bezeichnung')}</span>
           <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required />
         </label>
         <label className="field">
-          <span>{thresholdLabel} (optional)</span>
+          <span>{t('{label} (optional)', { label: thresholdLabel })}</span>
           <input type="number" inputMode="numeric" min={0} value={min} onChange={(e) => setMin(e.target.value)} />
         </label>
         <button className="btn btn-block" type="submit" disabled={busy}>
-          Anlegen
+          {t('Anlegen')}
         </button>
         <p className="muted small">
-          Neue {sec.ranks} kommen ans Ende der Liste, also als höchster {rank}; den Platz änderst du per Ziehen am Griff.
+          {t('Neue {ranks} kommen ans Ende der Liste, also als höchster {rank}; den Platz änderst du per Ziehen am Griff.', {
+            ranks: sec.ranks,
+            rank,
+          })}
         </p>
       </form>
     </div>
@@ -327,19 +339,19 @@ function RankForm({
       }}
     >
       <label className="field">
-        <span>Bezeichnung</span>
+        <span>{t('Bezeichnung')}</span>
         <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
       </label>
       <label className="field">
-        <span>{thresholdLabel} (leer = ohne)</span>
+        <span>{t('{label} (leer = ohne)', { label: thresholdLabel })}</span>
         <input type="number" inputMode="numeric" min={0} value={min} onChange={(e) => setMin(e.target.value)} />
       </label>
       <div className="button-row">
         <button className="btn" type="submit" disabled={busy}>
-          Speichern
+          {t('Speichern')}
         </button>
         <button className="btn btn-secondary" type="button" onClick={onCancel}>
-          Abbrechen
+          {t('Abbrechen')}
         </button>
       </div>
     </form>
@@ -363,11 +375,11 @@ export function Promotions() {
   const list = (data ?? [])
     .filter((p) => p.below_current_threshold || p.next_rank !== null)
     .sort((a, b) => promotionSection(a) - promotionSection(b));
-  const headings = ['Unter der Schwelle', 'Schwelle erreicht', 'Bald erreicht', 'Noch nicht erreicht'];
+  const headings = [t('Unter der Schwelle'), t('Schwelle erreicht'), t('Bald erreicht'), t('Noch nicht erreicht')];
   return (
     <div>
       {list.length === 0 ? (
-        <Empty>Niemand gefunden.</Empty>
+        <Empty>{t('Niemand gefunden.')}</Empty>
       ) : (
         <ul className="card-list promotions">
           {list.map((p, i) => {
@@ -384,13 +396,23 @@ export function Promotions() {
                   <div className="row-main">
                     <div className="row-title">{p.name}</div>
                     <div className="row-sub">
-                      {p.rank ? <RankLabel url={p.rank.badge_url} title={p.rank.title} /> : `Kein ${rank}`} ·{' '}
-                      {p.points.toLocaleString(localeTag())} {sec.points}
+                      {p.rank ? <RankLabel url={p.rank.badge_url} title={p.rank.title} /> : t('Kein {rank}', { rank })} ·{' '}
+                      {t('{count} {points}', { count: p.points.toLocaleString(localeTag()), points: sec.points })}
                       {p.next_rank &&
                         p.points_to_next !== null &&
-                        (due
-                          ? ` · Schwelle für „${p.next_rank.title}“ erreicht${p.threshold_reached_since ? ` seit ${formatDate(p.threshold_reached_since)}` : ''}`
-                          : ` · noch ${p.points_to_next.toLocaleString(localeTag())} bis „${p.next_rank.title}“`)}
+                        ` · ${
+                          due
+                            ? p.threshold_reached_since
+                              ? t('Schwelle für „{title}“ erreicht seit {date}', {
+                                  title: p.next_rank.title,
+                                  date: formatDate(p.threshold_reached_since),
+                                })
+                              : t('Schwelle für „{title}“ erreicht', { title: p.next_rank.title })
+                            : t('noch {count} bis „{title}“', {
+                                count: p.points_to_next.toLocaleString(localeTag()),
+                                title: p.next_rank.title,
+                              })
+                        }`}
                     </div>
                   </div>
                   <span className="chevron" aria-hidden="true">
@@ -469,7 +491,7 @@ export function MemberRank({
   useEffect(() => {
     if (suggested === null || suggestedOnce.current) return;
     suggestedOnce.current = true;
-    setTarget((t) => t || String(suggested));
+    setTarget((prev) => prev || String(suggested));
   }, [suggested]);
 
   async function submit(e: FormEvent) {
@@ -478,7 +500,7 @@ export function MemberRank({
     setFormError(null);
     try {
       await api.setMemberRank(id, target === 'none' ? null : Number(target), reason.trim(), date);
-      onToast(`${rank} geändert`);
+      onToast(t('{rank} geändert', { rank }));
       setTarget('');
       setReason('');
       setDate(todayYmd());
@@ -495,14 +517,23 @@ export function MemberRank({
       <h3 className="section-title">{rank}</h3>
       <p className="member-rank-current">
         {status.rank && <RankBadge url={status.rank.badge_url} title={status.rank.title} size="medium" />}
-        <strong>{status.rank?.title ?? `Kein ${rank}`}</strong>
+        <strong>{status.rank?.title ?? t('Kein {rank}', { rank })}</strong>
         {points && status.next_rank && status.points_to_next !== null && status.points_to_next !== undefined && (
           <span className="muted small">
             {' '}
             ·{' '}
             {status.points_to_next <= 0
-              ? `Schwelle für „${status.next_rank.title}“ erreicht${status.threshold_reached_since ? ` seit ${formatDate(status.threshold_reached_since)}` : ''}`
-              : `noch ${status.points_to_next.toLocaleString(localeTag())} ${sec.points} bis „${status.next_rank.title}“`}
+              ? status.threshold_reached_since
+                ? t('Schwelle für „{title}“ erreicht seit {date}', {
+                    title: status.next_rank.title,
+                    date: formatDate(status.threshold_reached_since),
+                  })
+                : t('Schwelle für „{title}“ erreicht', { title: status.next_rank.title })
+              : t('noch {count} {points} bis „{title}“', {
+                  count: status.points_to_next.toLocaleString(localeTag()),
+                  points: sec.points,
+                  title: status.next_rank.title,
+                })}
           </span>
         )}
       </p>
@@ -510,29 +541,31 @@ export function MemberRank({
       {!readOnly && (
         <form className="form rank-change" onSubmit={submit}>
           <label className="field">
-            <span>Neuer {rank}</span>
+            <span>{t('Neuer {rank}', { rank })}</span>
             <select value={target} onChange={(e) => setTarget(e.target.value)} required>
               <option value="" disabled>
-                Bitte wählen …
+                {t('Bitte wählen …')}
               </option>
               {options.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.title}
-                  {points && r.min_points !== null ? ` (ab ${r.min_points.toLocaleString(localeTag())})` : ''}
+                  {points && r.min_points !== null ? ` ${t('(ab {count})', { count: r.min_points.toLocaleString(localeTag()) })}` : ''}
                 </option>
               ))}
-              {status.rank && <option value="none">Kein {rank}</option>}
+              {status.rank && <option value="none">{t('Kein {rank}', { rank })}</option>}
             </select>
           </label>
           <label className="field">
-            <span>Datum</span>
+            <span>{t('Datum')}</span>
             <input type="date" max={todayYmd()} value={date} onChange={(e) => setDate(e.target.value)} required />
           </label>
           {points && date !== todayYmd() && (
-            <p className="muted small">Bei einem früheren Datum zählen nur die {sec.points} bis zu diesem Tag.</p>
+            <p className="muted small">
+              {t('Bei einem früheren Datum zählen nur die {points} bis zu diesem Tag.', { points: sec.points })}
+            </p>
           )}
           <label className="field">
-            <span>Begründung (optional)</span>
+            <span>{t('Begründung (optional)')}</span>
             <input type="text" maxLength={255} value={reason} onChange={(e) => setReason(e.target.value)} />
           </label>
           {formError && (
@@ -541,10 +574,10 @@ export function MemberRank({
             </p>
           )}
           <button className="btn btn-block" type="submit" disabled={busy || target === ''}>
-            {rank} ändern
+            {t('{rank} ändern', { rank })}
           </button>
           {points && ranks.data && options.length === 0 && !status.rank && (
-            <p className="muted small">Zurzeit ist keine Änderung möglich: Befördern erst ab der Schwelle.</p>
+            <p className="muted small">{t('Zurzeit ist keine Änderung möglich: Befördern erst ab der Schwelle.')}</p>
           )}
         </form>
       )}

@@ -4,6 +4,8 @@
  * Leerzeichen und + ( ) / -, 5–20 Ziffern, höchstens 30 Zeichen).
  */
 
+import { t } from './i18n';
+
 /** Wie MemberService::PHONE_MAX auf dem Server. */
 export const PHONE_MAX = 30;
 
@@ -12,20 +14,20 @@ export const PHONE_MAX = 30;
  * sie weg (in Italien gehört sie zur Nummer, in Polen, Spanien, Dänemark, Luxemburg und Tschechien gibt es sie nicht).
  */
 export const COUNTRIES = [
-  { code: '49', name: 'Deutschland', flag: '🇩🇪', trunk: true },
-  { code: '43', name: 'Österreich', flag: '🇦🇹', trunk: true },
-  { code: '41', name: 'Schweiz', flag: '🇨🇭', trunk: true },
-  { code: '31', name: 'Niederlande', flag: '🇳🇱', trunk: true },
-  { code: '32', name: 'Belgien', flag: '🇧🇪', trunk: true },
-  { code: '352', name: 'Luxemburg', flag: '🇱🇺', trunk: false },
-  { code: '33', name: 'Frankreich', flag: '🇫🇷', trunk: true },
-  { code: '45', name: 'Dänemark', flag: '🇩🇰', trunk: false },
-  { code: '48', name: 'Polen', flag: '🇵🇱', trunk: false },
-  { code: '420', name: 'Tschechien', flag: '🇨🇿', trunk: false },
-  { code: '39', name: 'Italien', flag: '🇮🇹', trunk: false },
-  { code: '34', name: 'Spanien', flag: '🇪🇸', trunk: false },
-  { code: '44', name: 'Großbritannien', flag: '🇬🇧', trunk: true },
-  { code: '90', name: 'Türkei', flag: '🇹🇷', trunk: true },
+  { code: '49', name: t('Deutschland'), flag: '🇩🇪', trunk: true },
+  { code: '43', name: t('Österreich'), flag: '🇦🇹', trunk: true },
+  { code: '41', name: t('Schweiz'), flag: '🇨🇭', trunk: true },
+  { code: '31', name: t('Niederlande'), flag: '🇳🇱', trunk: true },
+  { code: '32', name: t('Belgien'), flag: '🇧🇪', trunk: true },
+  { code: '352', name: t('Luxemburg'), flag: '🇱🇺', trunk: false },
+  { code: '33', name: t('Frankreich'), flag: '🇫🇷', trunk: true },
+  { code: '45', name: t('Dänemark'), flag: '🇩🇰', trunk: false },
+  { code: '48', name: t('Polen'), flag: '🇵🇱', trunk: false },
+  { code: '420', name: t('Tschechien'), flag: '🇨🇿', trunk: false },
+  { code: '39', name: t('Italien'), flag: '🇮🇹', trunk: false },
+  { code: '34', name: t('Spanien'), flag: '🇪🇸', trunk: false },
+  { code: '44', name: t('Großbritannien'), flag: '🇬🇧', trunk: true },
+  { code: '90', name: t('Türkei'), flag: '🇹🇷', trunk: true },
 ];
 
 /** Vorwahl in der Auswahl für „anderes Land“: Die Nummer steht dann mit + im Feld. */
@@ -102,11 +104,11 @@ function format(intl: string): string {
 export function phoneProblem(value: string): string | null {
   const s = value.trim();
   if (s === '') return null;
-  if (!s.startsWith('+')) return 'Bitte die Nummer mit + und Ländervorwahl eingeben, z. B. +31 6 12345678.';
+  if (!s.startsWith('+')) return t('Bitte die Nummer mit + und Ländervorwahl eingeben, z. B. +31 6 12345678.');
   const digits = s.replace(/\D/g, '');
   // Internationale Nummern haben höchstens 15 Ziffern (ITU-T E.164), die kürzesten etwa 7.
-  if (digits.length < 7) return 'Die Nummer ist zu kurz.';
-  if (digits.length > 15 || s.length > PHONE_MAX) return 'Die Nummer hat zu viele Ziffern.';
+  if (digits.length < 7) return t('Die Nummer ist zu kurz.');
+  if (digits.length > 15 || s.length > PHONE_MAX) return t('Die Nummer hat zu viele Ziffern.');
   return null;
 }
 
@@ -117,5 +119,5 @@ export function phoneProblem(value: string): string | null {
 export function phoneHint(value: string): string | null {
   if (!/^\+49 1[5-7]/.test(value) || phoneProblem(value)) return null;
   const n = value.replace(/\D/g, '').length - 2;
-  return n === 10 || n === 11 ? null : 'Deutsche Handynummern haben ohne die 0 am Anfang 10 oder 11 Ziffern. Bitte prüfen.';
+  return n === 10 || n === 11 ? null : t('Deutsche Handynummern haben ohne die 0 am Anfang 10 oder 11 Ziffern. Bitte prüfen.');
 }

@@ -1,4 +1,5 @@
 import type { MemberSummary } from './api';
+import { t } from './i18n';
 
 /**
  * Was die Sortierung braucht: Mitgliederliste der Verwaltung und die für alle (DirectoryEntry), dazu die Ehemaligen.
@@ -25,11 +26,11 @@ export type MemberSort = 'last-name' | 'first-name' | 'joined' | 'left' | 'point
 export type SortDir = 'asc' | 'desc';
 
 export const MEMBER_SORT_LABELS: Record<MemberSort, string> = {
-  'last-name': 'Nachname',
-  'first-name': 'Vorname',
-  joined: 'Eintritt',
-  left: 'Austritt',
-  points: 'Punkte',
+  'last-name': t('Nachname'),
+  'first-name': t('Vorname'),
+  joined: t('Eintritt'),
+  left: t('Austritt'),
+  points: t('Punkte'),
 };
 
 export const DEFAULT_MEMBER_SORT: MemberSort = 'last-name';
@@ -39,8 +40,8 @@ export const defaultDir = (sort: MemberSort): SortDir => (sort === 'points' ? 'd
 
 /** Beschriftung der Richtung zur Sortierung. */
 export function dirLabel(sort: MemberSort, dir: SortDir): string {
-  if (sort === 'points') return dir === 'desc' ? 'Meiste zuerst' : 'Wenigste zuerst';
-  if (sort === 'joined' || sort === 'left') return dir === 'asc' ? 'Früheste zuerst' : 'Neueste zuerst';
+  if (sort === 'points') return dir === 'desc' ? t('Meiste zuerst') : t('Wenigste zuerst');
+  if (sort === 'joined' || sort === 'left') return dir === 'asc' ? t('Früheste zuerst') : t('Neueste zuerst');
   return dir === 'asc' ? 'A → Z' : 'Z → A';
 }
 

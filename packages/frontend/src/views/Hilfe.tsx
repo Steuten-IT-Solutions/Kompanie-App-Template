@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { can, config, levelLabel, type Capability, type Feature } from '../api';
 import brand from '../generated/brand';
 import handbuch from '../generated/handbuch.json';
+import { t } from '../i18n';
 import { LegalLinks } from '../legal';
 import { navigate } from '../router';
 import { Empty, lazyView } from '../ui';
@@ -23,6 +24,13 @@ interface Seite {
 }
 
 const GRUPPEN = ['Für alle', 'Für Mitglieder', 'Für Aufgaben in der Verwaltung', 'Für Admins'];
+/** Überschriften der Gruppen in der Sprache der App (die Gruppe der Seite bleibt der deutsche Wert). */
+const GRUPPEN_TITEL: Record<string, string> = {
+  'Für alle': t('Für alle'),
+  'Für Mitglieder': t('Für Mitglieder'),
+  'Für Aufgaben in der Verwaltung': t('Für Aufgaben in der Verwaltung'),
+  'Für Admins': t('Für Admins'),
+};
 
 const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 /** Text einer Seite für die Suche: ohne Tags, Zeichen wie & und " wieder als Zeichen. */
@@ -134,7 +142,7 @@ export default function Hilfe({ slug }: { slug?: string }) {
     return (
       <article className="hilfe-seite">
         <button className="btn btn-link back" onClick={() => navigate('hilfe')}>
-          ‹ Alle Hilfeseiten
+          ‹ {t('Alle Hilfeseiten')}
         </button>
         <h2 className="news-headline">{fill(seite.titel, map, false)}</h2>
         <div className="hilfe-text" ref={text} dangerouslySetInnerHTML={{ __html: images(fill(seite.html, map, true)) }} />
@@ -153,18 +161,18 @@ export default function Hilfe({ slug }: { slug?: string }) {
       <input
         type="search"
         className="search"
-        placeholder="Hilfe durchsuchen …"
-        aria-label="Hilfe durchsuchen"
+        placeholder={t('Hilfe durchsuchen …')}
+        aria-label={t('Hilfe durchsuchen')}
         value={suche}
         onChange={(e) => setSuche(e.target.value)}
       />
-      {treffer.length === 0 && <Empty>Nichts gefunden.</Empty>}
+      {treffer.length === 0 && <Empty>{t('Nichts gefunden.')}</Empty>}
       {GRUPPEN.map((g) => {
         const liste = treffer.filter((s) => s.gruppe === g);
         if (liste.length === 0) return null;
         return (
           <section key={g}>
-            <h2 className="section-title">{g}</h2>
+            <h2 className="section-title">{GRUPPEN_TITEL[g] ?? g}</h2>
             <ul className="card-list">
               {liste.map((s) => (
                 <li key={s.slug} className="card row clickable" onClick={() => navigate(`hilfe/${s.slug}`)}>
@@ -180,14 +188,14 @@ export default function Hilfe({ slug }: { slug?: string }) {
       <ReportButton />
       {config?.handbookUrl && (
         <p className="small muted hilfe-web">
-          Das ganze Handbuch, auch für Bereiche, die eure Kompanie nicht nutzt:{' '}
+          {t('Das ganze Handbuch, auch für Bereiche, die eure Kompanie nicht nutzt:')}{' '}
           <a href={config.handbookUrl} target="_blank" rel="noopener noreferrer">
-            Handbuch im Browser öffnen
+            {t('Handbuch im Browser öffnen')}
           </a>
         </p>
       )}
       <p className="small muted hilfe-web">
-        <a href="#/hilfe/lizenzen">Lizenzen</a> der App und der enthaltenen Bausteine anderer Anbieter
+        <a href="#/hilfe/lizenzen">{t('Lizenzen')}</a> {t('der App und der enthaltenen Bausteine anderer Anbieter')}
       </p>
       <LegalLinks className="hilfe-web" />
     </div>

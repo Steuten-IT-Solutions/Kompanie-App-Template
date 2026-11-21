@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import type { CountdownBlock } from '../api';
 import { countdownParts, countdownPhase, nextChange, remaining, unitLabel } from './countdown';
-import { localeTag } from '../i18n';
+import { localeTag, t } from '../i18n';
 
 /** Datum (und Uhrzeit) des Beginns in Ortszeit des Geräts, z. B. „Sa., 12. Juni 2027, 14:00 Uhr“. */
 function formatStart(iso: string, withTime: boolean): string {
   const d = new Date(iso);
   const date = d.toLocaleDateString(localeTag(), { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
-  return withTime ? `${date}, ${d.toLocaleTimeString(localeTag(), { hour: '2-digit', minute: '2-digit' })} Uhr` : date;
+  return withTime
+    ? t('{date}, {time} Uhr', { date, time: d.toLocaleTimeString(localeTag(), { hour: '2-digit', minute: '2-digit' }) })
+    : date;
 }
 
 /** Aktuelle Zeit, neu gesetzt, wenn sich die Anzeige ändert, und nur solange die Seite sichtbar ist. */
@@ -46,7 +48,7 @@ export default function Countdown({ block }: { block: CountdownBlock }) {
   const start = block.starts_at ? new Date(block.starts_at) : null;
   const withTime = block.source === 'event' ? !!start && (start.getHours() !== 0 || start.getMinutes() !== 0) : !!block.time;
   return (
-    <section className="block-countdown" aria-label={title || 'Countdown'}>
+    <section className="block-countdown" aria-label={title || t('Countdown')}>
       {title && <h3 className="block-countdown-title">{title}</h3>}
       {phase === 'before' && block.starts_at ? (
         <>

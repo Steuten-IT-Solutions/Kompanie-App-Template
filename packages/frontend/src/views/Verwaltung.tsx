@@ -37,6 +37,7 @@ import {
   MemberPicker,
   NameFields,
   PhoneField,
+  rich,
   Sheet,
   StatCard,
   trimName,
@@ -123,7 +124,7 @@ import { newlyDue } from '../promotionCheck';
 import { promotionsAllowed, refreshPromotions, setReached, useReached } from '../promotionsDue';
 import { confirmAsk, promptAsk } from '../ask';
 import { AdmissionNotice, Admissions, MemberAdmission } from './Aufnahmen';
-import { localeTag } from '../i18n';
+import { localeTag, t, tn } from '../i18n';
 
 type Sub =
   | 'mitglieder'
@@ -166,12 +167,12 @@ function ReachedNotice() {
   return (
     <div className="card notice-card" role="status">
       <h3 className="section-title">
-        {reached.length === 1 ? 'Neue Beförderungsschwelle erreicht' : 'Neue Beförderungsschwellen erreicht'}
+        {reached.length === 1 ? t('Neue Beförderungsschwelle erreicht') : t('Neue Beförderungsschwellen erreicht')}
       </h3>
       <ul className="notice-list">
         {reached.map((r) => (
           <li key={r.user_id}>
-            <strong>{r.name}</strong>: Schwelle für „{r.rank}“ erreicht
+            <strong>{r.name}</strong>: {t('Schwelle für „{rank}“ erreicht', { rank: r.rank })}
           </li>
         ))}
       </ul>
@@ -184,10 +185,10 @@ function ReachedNotice() {
             navigate('verwaltung/befoerderungen');
           }}
         >
-          Zu den Beförderungen
+          {t('Zu den Beförderungen')}
         </button>
         <button className="btn btn-secondary" type="button" onClick={() => setReached([])}>
-          Schließen
+          {t('Schließen')}
         </button>
       </div>
     </div>
@@ -305,9 +306,9 @@ function ImportPage() {
   return (
     <div>
       <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/neu')}>
-        ‹ Einzeln anlegen
+        ‹ {t('Einzeln anlegen')}
       </button>
-      <h2 className="member-name">Mitglieder importieren</h2>
+      <h2 className="member-name">{t('Mitglieder importieren')}</h2>
       <MemberImport onDone={() => navigate('verwaltung/mitglieder')} />
     </div>
   );
@@ -429,17 +430,17 @@ function Members() {
       {can('create_users') && (
         <div className="button-row add-member">
           <button className="btn" onClick={() => navigate('verwaltung/neu')}>
-            + Mitglied anlegen
+            + {t('Mitglied anlegen')}
           </button>
         </div>
       )}
       <input
         className="search"
         type="search"
-        placeholder="Mitglied suchen …"
+        placeholder={t('Mitglied suchen …')}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        aria-label="Mitglied suchen"
+        aria-label={t('Mitglied suchen')}
       />
       <button
         type="button"
@@ -448,16 +449,16 @@ function Members() {
         aria-controls="member-filters"
         onClick={() => setFiltersOpen(!filtersOpen)}
       >
-        Filter und Sortierung
-        {filtersActive && <span className="badge badge-role">aktiv</span>}
+        {t('Filter und Sortierung')}
+        {filtersActive && <span className="badge badge-role">{t('aktiv')}</span>}
         <span className="member-filters-arrow" aria-hidden="true">
           ›
         </span>
       </button>
       <div id="member-filters" className="member-filters" hidden={!filtersOpen}>
         {canPromote && roleOptions.length > 1 && (
-          <select className="role-filter" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Nach Rolle filtern">
-            <option value="">Alle Rollen</option>
+          <select className="role-filter" value={role} onChange={(e) => setRole(e.target.value)} aria-label={t('Nach Rolle filtern')}>
+            <option value="">{t('Alle Rollen')}</option>
             {roleOptions.map((r) => (
               <option key={r.key} value={r.key}>
                 {r.label}
@@ -470,9 +471,9 @@ function Members() {
             className="role-filter"
             value={activeTitle ?? ''}
             onChange={(e) => setTitle(e.target.value === '' ? null : Number(e.target.value))}
-            aria-label={`Nach ${sec.titles} filtern`}
+            aria-label={t('Nach {titles} filtern', { titles: sec.titles })}
           >
-            <option value="">Alle {sec.titles}</option>
+            <option value="">{t('Alle {titles}', { titles: sec.titles })}</option>
             {titleOptions.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.title}
@@ -483,7 +484,7 @@ function Members() {
         <div className="field-row member-sort">
           {/* Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen. */}
           <div className="field">
-            <span id="member-sort-label">Sortierung</span>
+            <span id="member-sort-label">{t('Sortierung')}</span>
             <select
               aria-labelledby="member-sort-label"
               value={order.sort}
@@ -501,12 +502,12 @@ function Members() {
             </select>
           </div>
           <div className="field member-sort-dir">
-            <span id="member-sort-dir-label">Reihenfolge</span>
+            <span id="member-sort-dir-label">{t('Reihenfolge')}</span>
             <button
               type="button"
               className="btn btn-secondary"
               aria-labelledby="member-sort-dir-label member-sort-dir-value"
-              title="Reihenfolge umkehren"
+              title={t('Reihenfolge umkehren')}
               onClick={() => changeOrder({ ...order, dir: order.dir === 'asc' ? 'desc' : 'asc' })}
             >
               <span id="member-sort-dir-value">{dirLabel(order.sort, order.dir)}</span>
@@ -516,7 +517,7 @@ function Members() {
         {canPromote && (
           <label className="toggle">
             <input type="checkbox" checked={showGuests} onChange={(e) => setShowGuests(e.target.checked)} />
-            Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)
+            {t('Auch Gast-Konten anzeigen (um ihnen eine Rolle zu geben)')}
           </label>
         )}
       </div>
@@ -527,15 +528,15 @@ function Members() {
             <div className="row-main">
               <div className="row-title">
                 {listName(m, order.sort)} <TitleBadges titles={m.titles} role={admitRole(m.level)} />
-                {m.no_access && <span className="badge badge-no-access">ohne Zugang</span>}
+                {m.no_access && <span className="badge badge-no-access">{t('ohne Zugang')}</span>}
               </div>
               <div className="row-sub">
                 {/* Eintritt und Punkte nur, wenn danach sortiert ist, damit die Reihenfolge nachvollziehbar ist. */}
-                {order.sort === 'joined' && m.joined_on && `Eintritt ${formatYearOrDate(m.joined_on)}`}
+                {order.sort === 'joined' && m.joined_on && t('Eintritt {date}', { date: formatYearOrDate(m.joined_on) })}
                 {order.sort === 'joined' && m.joined_on && (m.open_cents ?? 0) > 0 && ' · '}
                 {order.sort === 'points' && seePoints() && `${(m.points ?? 0).toLocaleString(localeTag())} ${sec.points}`}
                 {order.sort === 'points' && seePoints() && (m.open_cents ?? 0) > 0 && ' · '}
-                {(m.open_cents ?? 0) > 0 && <span className="neg">{formatEuro(m.open_cents ?? 0)} offen</span>}
+                {(m.open_cents ?? 0) > 0 && <span className="neg">{t('{amount} offen', { amount: formatEuro(m.open_cents ?? 0) })}</span>}
               </div>
             </div>
             {/* Dienstgrad rechts, gegenüber dem Foto: Abzeichen, darunter die Bezeichnung. Ohne Dienstgrad bleibt die
@@ -548,7 +549,7 @@ function Members() {
             </span>
           </li>
         ))}
-        {list.length === 0 && <Empty>Niemand gefunden.</Empty>}
+        {list.length === 0 && <Empty>{t('Niemand gefunden.')}</Empty>}
       </ul>
     </div>
   );
@@ -588,13 +589,13 @@ function rankEditable(m: MemberDetail): boolean {
  * sonst bleiben „Ehemalig“ und „Ohne Zugang“.
  */
 function roleLine(m: MemberDetail): string {
-  if (!can('view_accounts')) return [m.former ? 'Ehemalig' : '', m.no_access ? 'Ohne Zugang' : ''].filter(Boolean).join(' · ');
+  if (!can('view_accounts')) return [m.former ? t('Ehemalig') : '', m.no_access ? t('Ohne Zugang') : ''].filter(Boolean).join(' · ');
   const role = m.former
-    ? `Ehemalig (zuvor ${levelLabel(m.former.previous_level)})`
+    ? t('Ehemalig (zuvor {role})', { role: levelLabel(m.former.previous_level) })
     : (m.extra_roles ?? []).length > 0
-      ? `Rollen: ${roleLabels(m)}`
-      : `Rolle: ${levelLabel(m.level)}`;
-  return role + (m.no_access ? ' · ohne Zugang' : '') + (hasOverrides(m.rights) ? ' · mit Ausnahmen bei den Rechten' : '');
+      ? t('Rollen: {roles}', { roles: roleLabels(m) })
+      : t('Rolle: {role}', { role: levelLabel(m.level) });
+  return role + (m.no_access ? ` · ${t('ohne Zugang')}` : '') + (hasOverrides(m.rights) ? ` · ${t('mit Ausnahmen bei den Rechten')}` : '');
 }
 
 /**
@@ -613,12 +614,12 @@ function previewFromLists(id: number, former: boolean): MemberPreview | null {
 
 /** Rollenzeile aus der Liste (ohne den Hinweis auf Ausnahmen bei den Rechten, den kennt erst die Seite). */
 function previewRoleLine(p: MemberPreview): string {
-  if (!can('view_accounts')) return p.previous_level ? 'Ehemalig' : '';
-  if (p.previous_level) return `Ehemalig (zuvor ${levelLabel(p.previous_level)})`;
+  if (!can('view_accounts')) return p.previous_level ? t('Ehemalig') : '';
+  if (p.previous_level) return t('Ehemalig (zuvor {role})', { role: levelLabel(p.previous_level) });
   if (!p.level) return '';
   return p.extra_roles.length > 0
-    ? `Rollen: ${roleLabels({ level: p.level, extra_roles: p.extra_roles })}`
-    : `Rolle: ${levelLabel(p.level)}`;
+    ? t('Rollen: {roles}', { roles: roleLabels({ level: p.level, extra_roles: p.extra_roles }) })
+    : t('Rolle: {role}', { role: levelLabel(p.level) });
 }
 
 /**
@@ -656,7 +657,7 @@ function MemberPreviewHead({ p, onOpen }: { p: MemberPreview; onOpen?: (sheet: '
           )}
           {seePenalties() && (
             <StatCard
-              label="Offen"
+              label={t('Offen')}
               value={formatEuro(p.open_cents ?? 0)}
               tone={(p.open_cents ?? 0) > 0 ? 'warn' : 'good'}
               onClick={open('strafen')}
@@ -726,7 +727,7 @@ function MemberPeek({
     <div className={`member-peek member-peek-${side}`} aria-hidden="true" ref={(el) => el?.setAttribute('inert', '')}>
       <div className="member-nav">
         <button type="button" className="btn btn-link back">
-          {(m ? m.former : former) ? '‹ Ehemalige' : '‹ Alle Mitglieder'}
+          ‹ {(m ? m.former : former) ? t('Ehemalige') : t('Alle Mitglieder')}
         </button>
         <span className="member-step">
           <button type="button" className="btn btn-link" disabled={position === 1}>
@@ -755,7 +756,7 @@ function MemberPeek({
                   ) : (
                     <>
                       <span className="rank-badge-none">+</span>
-                      <span>Kein {brand.labels.rank}</span>
+                      <span>{t('Kein {rank}', { rank: brand.labels.rank })}</span>
                     </>
                   )}
                 </span>
@@ -775,7 +776,7 @@ function MemberPeek({
               )}
               {seePenalties() && (
                 <StatCard
-                  label="Offen"
+                  label={t('Offen')}
                   value={formatEuro(m.open_cents ?? 0)}
                   tone={(m.open_cents ?? 0) > 0 ? 'warn' : 'good'}
                   onClick={none}
@@ -965,22 +966,27 @@ function MemberDetailView({
         <div className="member-nav">
           {former ? (
             <button className="btn btn-link back" onClick={() => navigate('verwaltung/ehemalige')}>
-              ‹ Ehemalige
+              ‹ {t('Ehemalige')}
             </button>
           ) : (
             <button className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
-              ‹ Alle Mitglieder
+              ‹ {t('Alle Mitglieder')}
             </button>
           )}
           {index >= 0 && order.length > 1 && (
             <span className="member-step">
-              <button className="btn btn-link" disabled={prev === null} onClick={() => swipe.slide(-1)} aria-label="Vorheriges Mitglied">
+              <button
+                className="btn btn-link"
+                disabled={prev === null}
+                onClick={() => swipe.slide(-1)}
+                aria-label={t('Vorheriges Mitglied')}
+              >
                 ‹
               </button>
               <span className="muted small">
                 {index + 1} / {order.length}
               </span>
-              <button className="btn btn-link" disabled={next === null} onClick={() => swipe.slide(1)} aria-label="Nächstes Mitglied">
+              <button className="btn btn-link" disabled={next === null} onClick={() => swipe.slide(1)} aria-label={t('Nächstes Mitglied')}>
                 ›
               </button>
             </span>
@@ -1002,7 +1008,7 @@ function MemberDetailView({
         <>
           <MemberPreviewHead p={preview} onOpen={openSheet} />
           <div role="status" data-loading="">
-            <span className="visually-hidden">Lädt …</span>
+            <span className="visually-hidden">{t('Lädt …')}</span>
           </div>
         </>
       ) : (
@@ -1041,7 +1047,7 @@ function MemberDetailView({
       <span className="rank-badge-none" aria-hidden="true">
         +
       </span>
-      <span>Kein {brand.labels.rank}</span>
+      <span>{t('Kein {rank}', { rank: brand.labels.rank })}</span>
     </>
   );
   const formerPanel = (editing: boolean) => (
@@ -1100,7 +1106,7 @@ function MemberDetailView({
               )}
               {seePenalties() && (
                 <StatCard
-                  label="Offen"
+                  label={t('Offen')}
                   value={formatEuro(m.open_cents ?? 0)}
                   tone={(m.open_cents ?? 0) > 0 ? 'warn' : 'good'}
                   onClick={() => openSheet('strafen')}
@@ -1113,7 +1119,7 @@ function MemberDetailView({
             <button type="button" className="card member-tile member-titles-tile" onClick={() => openSheet('titel')}>
               <span className="member-tile-label">{sec.titles}</span>
               <span className="member-tile-value">
-                {(m.titles ?? []).length > 0 ? <TitleBadges titles={m.titles} /> : <span className="muted">Keine</span>}
+                {(m.titles ?? []).length > 0 ? <TitleBadges titles={m.titles} /> : <span className="muted">{t('Keine')}</span>}
               </span>
               <span className="chevron" aria-hidden="true">
                 ›
@@ -1128,7 +1134,7 @@ function MemberDetailView({
                 {(m.companies ?? []).length > 0 ? (
                   (m.companies ?? []).map((c) => c.short_name || c.name).join(', ')
                 ) : (
-                  <span className="muted">Keine</span>
+                  <span className="muted">{t('Keine')}</span>
                 )}
               </span>
               <span className="chevron" aria-hidden="true">
@@ -1140,24 +1146,24 @@ function MemberDetailView({
           {((birthdayOn && !birthdayPersonal) || joinOn || !!m.former || formerEditable) && (
             <ul className="card member-dates">
               {birthdayOn && !birthdayPersonal && (
-                <DateRow label="Geburtstag" onOpen={() => openSheet('geburtstag')}>
+                <DateRow label={t('Geburtstag')} onOpen={() => openSheet('geburtstag')}>
                   {m.birthday ? formatBirthday(m.birthday) : null}
                 </DateRow>
               )}
               {joinOn && (
-                <DateRow label="Eintritt" onOpen={can('create_users') ? () => openSheet('eintritt') : undefined}>
+                <DateRow label={t('Eintritt')} onOpen={can('create_users') ? () => openSheet('eintritt') : undefined}>
                   {m.join_year ? joinText(m.join_year) : null}
                 </DateRow>
               )}
               {m.former && (
-                <DateRow label="Eintritt" onOpen={formerEditable ? () => openSheet('austritt') : undefined}>
-                  {[m.former.founder && 'Gründungsmitglied', m.former.joined_on && formatYearOrDate(m.former.joined_on)]
+                <DateRow label={t('Eintritt')} onOpen={formerEditable ? () => openSheet('austritt') : undefined}>
+                  {[m.former.founder && t('Gründungsmitglied'), m.former.joined_on && formatYearOrDate(m.former.joined_on)]
                     .filter(Boolean)
                     .join(' · ') || null}
                 </DateRow>
               )}
               {(m.former || formerEditable) && (
-                <DateRow label="Austritt" onOpen={formerEditable ? () => openSheet('austritt') : undefined}>
+                <DateRow label={t('Austritt')} onOpen={formerEditable ? () => openSheet('austritt') : undefined}>
                   {m.former
                     ? `${REASON_OPTIONS[m.former.reason]}${m.former.left_on ? ` ${formatYearOrDate(m.former.left_on)}` : ''}`
                     : null}
@@ -1180,7 +1186,11 @@ function MemberDetailView({
           {officesOn && (
             <section className="member-offices">
               <h3 className="section-title">{sec.offices}</h3>
-              <PersonOffices userId={m.id} empty={`Keine ${sec.offices} eingetragen.`} to={(other) => `verwaltung/mitglied/${other}`} />
+              <PersonOffices
+                userId={m.id}
+                empty={t('Keine {offices} eingetragen.', { offices: sec.offices })}
+                to={(other) => `verwaltung/mitglied/${other}`}
+              />
             </section>
           )}
 
@@ -1202,7 +1212,7 @@ function MemberDetailView({
           <FoldSection
             id="member-account"
             className="member-account"
-            title="Konto und Rolle"
+            title={t('Konto und Rolle')}
             open={accountOpen}
             onToggle={() => setAccountOpen((o) => !o)}
           >
@@ -1233,17 +1243,17 @@ function MemberDetailView({
                     className="btn btn-block promote-candidate"
                     disabled={busy}
                     onClick={async () =>
-                      (await confirmAsk(`${m.name} als ${levelLabel('member')} aufnehmen?`)) &&
-                      run(() => api.promote(m.id), `${m.name} ist jetzt ${levelLabel('member')}`)
+                      (await confirmAsk(t('{name} als {role} aufnehmen?', { name: m.name, role: levelLabel('member') }))) &&
+                      run(() => api.promote(m.id), t('{name} ist jetzt {role}', { name: m.name, role: levelLabel('member') }))
                     }
                   >
-                    Als {levelLabel('member')} aufnehmen
+                    {t('Als {role} aufnehmen', { role: levelLabel('member') })}
                   </button>
                 )}
             {/* Vorschau mit den Rechten dieser Person (alle Rollen zusammen); nur Admins, nicht für Admins selbst. */}
             {config?.user?.level === 'admin' && !self && m.level !== 'admin' && (
               <button type="button" className="btn btn-secondary btn-block member-preview-start" onClick={() => startPersonPreview(m.id)}>
-                App als {m.name} ansehen
+                {t('App als {name} ansehen', { name: m.name })}
               </button>
             )}
             {!m.former && <ResetPassword id={m.id} name={m.name} level={m.level} noAccess={!!m.no_access} onToast={onToast} />}
@@ -1268,7 +1278,7 @@ function MemberDetailView({
       {sheet === 'punkte' && seePoints() && (
         <Sheet title={sec.points} onClose={closeSheet} routed>
           {m.member && canPoints() && <GivePoints preselect={[m.id]} fixed onToast={onToast} onDone={reload} />}
-          <h3 className="section-title">Einträge</h3>
+          <h3 className="section-title">{t('Einträge')}</h3>
           <PointEntries entries={m.point_list} busy={busy} run={run} editable={canPoints()} />
         </Sheet>
       )}
@@ -1276,7 +1286,7 @@ function MemberDetailView({
       {sheet === 'strafen' && seePenalties() && (
         <Sheet title={sec.penalties} onClose={closeSheet} routed>
           {m.member && canPenalties() && <GivePenalty preselect={[m.id]} fixed onToast={onToast} onDone={reload} />}
-          <h3 className="section-title">Einträge</h3>
+          <h3 className="section-title">{t('Einträge')}</h3>
           <PenaltyEntries entries={m.penalties} busy={busy} run={run} editable={canPenalties()} />
         </Sheet>
       )}
@@ -1324,19 +1334,19 @@ function MemberDetailView({
         </Sheet>
       )}
       {sheet === 'geburtstag' && birthdayOn && m.birthday !== undefined && (
-        <Sheet title="Geburtstag" onClose={closeSheet} routed>
+        <Sheet title={t('Geburtstag')} onClose={closeSheet} routed>
           <MemberBirthday key={JSON.stringify(m.birthday)} id={m.id} birthday={m.birthday} onChanged={reload} onToast={onToast} />
         </Sheet>
       )}
 
       {sheet === 'eintritt' && joinOn && can('create_users') && m.join_year !== undefined && (
-        <Sheet title="Eintritt" onClose={closeSheet} routed>
+        <Sheet title={t('Eintritt')} onClose={closeSheet} routed>
           <MemberJoinYear key={JSON.stringify(m.join_year)} id={m.id} joinYear={m.join_year} onChanged={reload} onToast={onToast} />
         </Sheet>
       )}
 
       {sheet === 'austritt' && formerEditable && (
-        <Sheet title="Austritt" onClose={closeSheet} routed>
+        <Sheet title={t('Austritt')} onClose={closeSheet} routed>
           {formerPanel(true)}
         </Sheet>
       )}
@@ -1349,7 +1359,7 @@ type Run = (action: () => Promise<unknown>, msg: string) => Promise<void>;
 /** Punkte einer Person mit „Stornieren“. */
 /** Punkte einer Person; „Stornieren“ nur mit dem Schreibrecht (editable). */
 function PointEntries({ entries, busy, run, editable }: { entries: PointEntry[]; busy: boolean; run: Run; editable: boolean }) {
-  if (entries.length === 0) return <Empty>Keine Einträge.</Empty>;
+  if (entries.length === 0) return <Empty>{t('Keine Einträge.')}</Empty>;
   return (
     <ul className="card-list">
       {entries.map((p) => (
@@ -1358,7 +1368,7 @@ function PointEntries({ entries, busy, run, editable }: { entries: PointEntry[];
             <div className="row-title">{p.reason}</div>
             <div className="row-sub">
               {formatDate(p.date)}
-              {p.created_by_name && ` · von ${p.created_by_name}`}
+              {p.created_by_name && ` · ${t('von {name}', { name: p.created_by_name })}`}
             </div>
             {editable && (
               <div className="row-actions">
@@ -1366,11 +1376,12 @@ function PointEntries({ entries, busy, run, editable }: { entries: PointEntry[];
                   className="btn btn-small btn-danger"
                   disabled={busy}
                   onClick={async () =>
-                    (await confirmAsk(`Eintrag „${p.reason}“ (${formatPoints(p.points)}) wirklich stornieren?`)) &&
-                    run(() => api.deletePoints(p.id), 'Storniert')
+                    (await confirmAsk(
+                      t('Eintrag „{reason}“ ({value}) wirklich stornieren?', { reason: p.reason, value: formatPoints(p.points) }),
+                    )) && run(() => api.deletePoints(p.id), t('Storniert'))
                   }
                 >
-                  Stornieren
+                  {t('Stornieren')}
                 </button>
               </div>
             )}
@@ -1384,7 +1395,7 @@ function PointEntries({ entries, busy, run, editable }: { entries: PointEntry[];
 
 /** Strafen einer Person mit „Bezahlt“ bzw. „Doch offen“ und „Stornieren“. */
 function PenaltyEntries({ entries, busy, run, editable }: { entries: Penalty[]; busy: boolean; run: Run; editable: boolean }) {
-  if (entries.length === 0) return <Empty>Keine Einträge.</Empty>;
+  if (entries.length === 0) return <Empty>{t('Keine Einträge.')}</Empty>;
   return (
     <ul className="card-list">
       {entries.map((p) => (
@@ -1398,28 +1409,29 @@ function PenaltyEntries({ entries, busy, run, editable }: { entries: Penalty[]; 
                   <button
                     className="btn btn-small"
                     disabled={busy}
-                    onClick={() => run(() => api.setPenaltyStatus(p.id, 'paid'), 'Als bezahlt markiert')}
+                    onClick={() => run(() => api.setPenaltyStatus(p.id, 'paid'), t('Als bezahlt markiert'))}
                   >
-                    Bezahlt
+                    {t('Bezahlt')}
                   </button>
                 ) : (
                   <button
                     className="btn btn-small btn-secondary"
                     disabled={busy}
-                    onClick={() => run(() => api.setPenaltyStatus(p.id, 'open'), 'Wieder auf offen gesetzt')}
+                    onClick={() => run(() => api.setPenaltyStatus(p.id, 'open'), t('Wieder auf offen gesetzt'))}
                   >
-                    Doch offen
+                    {t('Doch offen')}
                   </button>
                 )}
                 <button
                   className="btn btn-small btn-danger"
                   disabled={busy}
                   onClick={async () =>
-                    (await confirmAsk(`Eintrag „${p.reason}“ (${formatEuro(p.amount_cents)}) wirklich stornieren?`)) &&
-                    run(() => api.deletePenalty(p.id), 'Storniert')
+                    (await confirmAsk(
+                      t('Eintrag „{reason}“ ({value}) wirklich stornieren?', { reason: p.reason, value: formatEuro(p.amount_cents) }),
+                    )) && run(() => api.deletePenalty(p.id), t('Storniert'))
                   }
                 >
-                  Stornieren
+                  {t('Stornieren')}
                 </button>
               </>
             )
@@ -1461,10 +1473,12 @@ function RoleControl({
   const readOnly = (
     <>
       <p className="muted small member-level">
-        {extra.length > 0 ? 'Grundrolle' : 'Rolle'}: {levelLabel(level)}
-        {level === 'admin' && !adminsHere && ' (wird im WordPress-Backend verwaltet)'}
+        {extra.length > 0 ? t('Grundrolle: {role}', { role: levelLabel(level) }) : t('Rolle: {role}', { role: levelLabel(level) })}
+        {level === 'admin' && !adminsHere && ` ${t('(wird im WordPress-Backend verwaltet)')}`}
       </p>
-      {extra.length > 0 && <p className="muted small member-level">Zusatzrollen: {extra.map(levelLabel).join(', ')}</p>}
+      {extra.length > 0 && (
+        <p className="muted small member-level">{t('Zusatzrollen: {roles}', { roles: extra.map(levelLabel).join(', ') })}</p>
+      )}
     </>
   );
   // Ohne das Recht steht die Rolle nirgends auf der Seite (Issue #349); wer Konten nur sieht, sieht sie ohne Ändern.
@@ -1489,11 +1503,11 @@ function RoleControl({
     if (next === level) return;
     if (
       next === 'admin' &&
-      !(await confirmAsk(`Wirklich zum ${levelLabel('admin')} machen? Admins dürfen alles, auch Einstellungen ändern.`))
+      !(await confirmAsk(t('Wirklich zum {role} machen? Admins dürfen alles, auch Einstellungen ändern.', { role: levelLabel('admin') })))
     ) {
       return;
     }
-    void save(() => api.setRole(id, next), `Grundrolle geändert: ${levelLabel(next)}`);
+    void save(() => api.setRole(id, next), t('Grundrolle geändert: {role}', { role: levelLabel(next) }));
   }
   function toggle(key: Level, on: boolean) {
     // In der Reihenfolge der Rollen speichern, wie der Server sie zurückgibt.
@@ -1501,7 +1515,7 @@ function RoleControl({
     setChecked(next);
     void save(
       () => api.setExtraRoles(id, next),
-      on ? `Zusatzrolle vergeben: ${levelLabel(key)}` : `Zusatzrolle entfernt: ${levelLabel(key)}`,
+      on ? t('Zusatzrolle vergeben: {role}', { role: levelLabel(key) }) : t('Zusatzrolle entfernt: {role}', { role: levelLabel(key) }),
     );
   }
   // Rollen der Installation (Einstellungen → Rollen); Admin nur, wo Admins in der App ernannt werden.
@@ -1511,11 +1525,11 @@ function RoleControl({
   return (
     <>
       <label className="field role-control">
-        <span className="field-label">Grundrolle</span>
+        <span className="field-label">{t('Grundrolle')}</span>
         <select value={level} disabled={busy} onChange={(e) => change(e.target.value)}>
           {!levels.includes(level) && (
             <option value={level} disabled>
-              Unbekannte Rolle – bitte wählen
+              {t('Unbekannte Rolle – bitte wählen')}
             </option>
           )}
           {levels.map((l) => (
@@ -1527,8 +1541,8 @@ function RoleControl({
       </label>
       {member && level !== 'admin' && extras.length > 0 && (
         <fieldset className="field role-control extra-roles">
-          <legend className="field-label">Zusatzrollen</legend>
-          <p className="muted small">Die Person hat die Rechte aller ihrer Rollen zusammen.</p>
+          <legend className="field-label">{t('Zusatzrollen')}</legend>
+          <p className="muted small">{t('Die Person hat die Rechte aller ihrer Rollen zusammen.')}</p>
           {extras.map((r) => (
             <label key={r.key} className="toggle">
               <input type="checkbox" checked={checked.includes(r.key)} disabled={busy} onChange={(e) => toggle(r.key, e.target.checked)} />
@@ -1538,7 +1552,7 @@ function RoleControl({
         </fieldset>
       )}
       {!member && extra.length === 0 && level !== 'admin' && level !== 'guest' && (
-        <p className="muted small">Zusatzrollen gibt es nur zu einer Grundrolle, die zur Kompanie gehört.</p>
+        <p className="muted small">{t('Zusatzrollen gibt es nur zu einer Grundrolle, die zur Kompanie gehört.')}</p>
       )}
     </>
   );
@@ -1569,8 +1583,10 @@ function ResetPassword({
     if (
       !(await confirmAsk(
         noAccess
-          ? `Zugang für ${name} einrichten? Die App erzeugt ein Startpasswort, das du der Person weitergibst.`
-          : `Neues Startpasswort für ${name} erzeugen? Das bisherige Passwort gilt danach nicht mehr, alle Geräte werden abgemeldet.`,
+          ? t('Zugang für {name} einrichten? Die App erzeugt ein Startpasswort, das du der Person weitergibst.', { name })
+          : t('Neues Startpasswort für {name} erzeugen? Das bisherige Passwort gilt danach nicht mehr, alle Geräte werden abgemeldet.', {
+              name,
+            }),
       ))
     ) {
       return;
@@ -1594,11 +1610,18 @@ function ResetPassword({
     return (
       <div className="no-access-panel">
         <p className="muted small">
-          {name} hat noch keinen Zugang. Stellt die Person eine Anfrage, kannst du sie unter <strong>Anfragen</strong> mit diesem Mitglied
-          verbinden.
+          {rich(
+            t(
+              '{name} hat noch keinen Zugang. Stellt die Person eine Anfrage, kannst du sie unter {requests} mit diesem Mitglied verbinden.',
+              {
+                name,
+              },
+            ),
+            { requests: <strong>{t('Anfragen')}</strong> },
+          )}
         </p>
         <button className="btn btn-secondary btn-block set-up-access" disabled={busy} onClick={reset}>
-          {busy ? 'Richtet ein …' : 'Zugang einrichten'}
+          {busy ? t('Richtet ein …') : t('Zugang einrichten')}
         </button>
       </div>
     );
@@ -1607,20 +1630,22 @@ function ResetPassword({
     return (
       <div className="card created">
         <p className="muted small">
-          Neues Startpasswort – wird <strong>nur jetzt</strong> angezeigt. Bitte persönlich weitergeben.
+          {rich(t('Neues Startpasswort – wird {only} angezeigt. Bitte persönlich weitergeben.'), {
+            only: <strong>{t('nur jetzt')}</strong>,
+          })}
         </p>
         <p className="credentials-password" data-testid="reset-password">
           {password}
         </p>
         <p className="small">
-          App noch nicht installiert? Anleitung: <span className="credentials-url">{installUrl()}</span>
+          {rich(t('App noch nicht installiert? Anleitung: {url}'), { url: <span className="credentials-url">{installUrl()}</span> })}
         </p>
       </div>
     );
   }
   return (
     <button className="btn btn-link small reset-password" disabled={busy} onClick={reset}>
-      Passwort vergessen? Neues Startpasswort erzeugen
+      {t('Passwort vergessen? Neues Startpasswort erzeugen')}
     </button>
   );
 }
@@ -1654,7 +1679,7 @@ function NewMember() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
-    if (!name.first_name.trim()) return setFormError('Bitte einen Vornamen angeben.');
+    if (!name.first_name.trim()) return setFormError(t('Bitte einen Vornamen angeben.'));
     const bday = canEnterBirthdays() ? readBirthday(birthday) : null;
     if (typeof bday === 'string') return setFormError(bday);
     if (!(await confirmNewAdmin(level))) return;
@@ -1686,7 +1711,7 @@ function NewMember() {
   if (created) {
     return (
       <div>
-        <h2 className="member-name no-print">{created.name} ist angelegt</h2>
+        <h2 className="member-name no-print">{t('{name} ist angelegt', { name: created.name })}</h2>
         {created.no_access ? (
           <div className="card created no-access-created">
             {created.warning && (
@@ -1695,15 +1720,26 @@ function NewMember() {
               </p>
             )}
             <p>
-              Ohne Zugang: {created.name} meldet sich noch nicht an, steht aber wie jedes Mitglied in der Mitgliederliste und lässt sich z.
-              B. bei {sec.offices} auswählen.
+              {t(
+                'Ohne Zugang: {name} meldet sich noch nicht an, steht aber wie jedes Mitglied in der Mitgliederliste und lässt sich z. B. bei {offices} auswählen.',
+                { name: created.name, offices: sec.offices },
+              )}
             </p>
             <p className="muted small">
-              Einen Zugang bekommt {created.name} später beim Mitglied mit <strong>Zugang einrichten</strong> oder beim Freigeben einer
-              Anfrage unter <strong>Anfragen</strong> mit <strong>Mit diesem Mitglied verbinden</strong>.
+              {rich(
+                t(
+                  'Einen Zugang bekommt {name} später beim Mitglied mit {setUp} oder beim Freigeben einer Anfrage unter {requests} mit {link}.',
+                  { name: created.name },
+                ),
+                {
+                  setUp: <strong>{t('Zugang einrichten')}</strong>,
+                  requests: <strong>{t('Anfragen')}</strong>,
+                  link: <strong>{t('Mit diesem Mitglied verbinden')}</strong>,
+                },
+              )}
             </p>
             <button className="btn btn-block" onClick={() => navigate('verwaltung/mitglieder')}>
-              ‹ Zur Mitgliederliste
+              ‹ {t('Zur Mitgliederliste')}
             </button>
           </div>
         ) : (
@@ -1725,7 +1761,7 @@ function NewMember() {
             setNoAccess(false);
           }}
         >
-          Weiteres Mitglied
+          {t('Weiteres Mitglied')}
         </button>
       </div>
     );
@@ -1736,27 +1772,27 @@ function NewMember() {
   return (
     <form className="form" onSubmit={submit}>
       <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/mitglieder')}>
-        ‹ Alle Mitglieder
+        ‹ {t('Alle Mitglieder')}
       </button>
       <button type="button" className="btn btn-secondary btn-block bulk-link" onClick={() => navigate('verwaltung/neu-mehrere')}>
-        Mehrere auf einmal anlegen
+        {t('Mehrere auf einmal anlegen')}
       </button>
       <button type="button" className="btn btn-secondary btn-block bulk-link" onClick={() => navigate('verwaltung/import')}>
-        Aus Datei importieren (Excel oder CSV)
+        {t('Aus Datei importieren (Excel oder CSV)')}
       </button>
       <NameFields value={name} onChange={setName} />
       <label className="toggle no-access-toggle">
         <input type="checkbox" checked={noAccess} onChange={(e) => setNoAccess(e.target.checked)} />
-        Ohne Zugang (meldet sich noch nicht an)
+        {t('Ohne Zugang (meldet sich noch nicht an)')}
       </label>
       {!noAccess && (
         <label className="field">
-          <span>Benutzername (optional)</span>
+          <span>{t('Benutzername (optional)')}</span>
           <input
             type="text"
             autoComplete="off"
             autoCapitalize="none"
-            placeholder="wird sonst aus dem Namen gebildet"
+            placeholder={t('wird sonst aus dem Namen gebildet')}
             value={username}
             onChange={(e) => setUsername(e.target.value)}
           />
@@ -1765,18 +1801,18 @@ function NewMember() {
       <EmailField value={email} onChange={setEmail} />
       <PhoneField value={phone} onChange={setPhone} />
       <AddressFields value={address} onChange={setAddress} />
-      <NewAccountRole label="Rolle" value={level} onChange={setLevel} />
+      <NewAccountRole label={t('Rolle')} value={level} onChange={setLevel} />
       <NewAccountExtraRoles base={level} value={validExtraRoles(level, extraRoles)} onChange={setExtraRoles} />
       {extras && canPoints() && (
         <>
           <label className="field">
             <span>
-              <Caps text={sec.points} /> (Anfangsbestand, optional)
+              <Caps text={sec.points} /> {t('(Anfangsbestand, optional)')}
             </span>
             <input type="number" inputMode="numeric" min={0} value={initialPoints} onChange={(e) => setInitialPoints(e.target.value)} />
           </label>
           <label className="field">
-            <span>Stand vom</span>
+            <span>{t('Stand vom')}</span>
             <input type="date" value={initialDate} onChange={(e) => setInitialDate(e.target.value)} />
           </label>
         </>
@@ -1784,10 +1820,10 @@ function NewMember() {
       {extras && canRanks() && (ranks.data ?? []).length > 0 && (
         <label className="field">
           <span>
-            <Caps text={brand.labels.rank} /> (optional)
+            <Caps text={brand.labels.rank} /> {t('(optional)')}
           </span>
           <select value={rankOptions.some((r) => String(r.id) === rankId) ? rankId : ''} onChange={(e) => setRankId(e.target.value)}>
-            <option value="">Kein {brand.labels.rank}</option>
+            <option value="">{t('Kein {rank}', { rank: brand.labels.rank })}</option>
             {rankOptions.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.title}
@@ -1798,22 +1834,25 @@ function NewMember() {
       )}
       {extras && (canPoints() || canRanks()) && (
         <p className="muted small">
-          Für die Übernahme bestehender Mitglieder: aktuellen Stand an {sec.points} und {brand.labels.rank} eintragen.
+          {t('Für die Übernahme bestehender Mitglieder: aktuellen Stand an {points} und {rank} eintragen.', {
+            points: sec.points,
+            rank: brand.labels.rank,
+          })}
         </p>
       )}
       {canEnterBirthdays() && (
         <fieldset className="fieldset new-member-birthday">
-          <legend>Geburtstag (optional)</legend>
+          <legend>{t('Geburtstag (optional)')}</legend>
           <BirthdayFields value={birthday} onChange={setBirthday} />
         </fieldset>
       )}
       <fieldset className="fieldset new-member-photo">
-        <legend>Foto (optional)</legend>
+        <legend>{t('Foto (optional)')}</legend>
         <PhotoPicker name={`${name.first_name} ${name.last_name}`.trim()} value={photo} onChange={setPhoto} onError={setFormError} />
       </fieldset>
       <p className="muted small">
-        {noAccess ? 'Ohne Zugang gibt es kein Startpasswort.' : 'Das neue Konto bekommt ein zufälliges Startpasswort.'}
-        {!can('promote_users') && ' Andere Rollen vergibt danach, wer Rollen vergeben darf.'}
+        {noAccess ? t('Ohne Zugang gibt es kein Startpasswort.') : t('Das neue Konto bekommt ein zufälliges Startpasswort.')}
+        {!can('promote_users') && ` ${t('Andere Rollen vergibt danach, wer Rollen vergeben darf.')}`}
       </p>
       {formError && (
         <p className="form-error" role="alert">
@@ -1821,7 +1860,7 @@ function NewMember() {
         </p>
       )}
       <button className="btn btn-block" type="submit" disabled={busy}>
-        {busy ? 'Legt an …' : 'Mitglied anlegen'}
+        {busy ? t('Legt an …') : t('Mitglied anlegen')}
       </button>
     </form>
   );
@@ -1851,8 +1890,11 @@ function FromAttendance({ listId, kind, onToast }: { listId: number; kind: 'punk
       </button>
       <p className="muted small">
         {kind === 'punkte'
-          ? `Vorschlag: alle Anwesenden, die für „${list.title}“ noch keine ${sec.points} haben.`
-          : `Vorschlag: alle, die bei „${list.title}“ gefehlt haben. Anders als bei ${sec.points} merkt sich die Liste nicht, wer schon einen Eintrag hat.`}
+          ? t('Vorschlag: alle Anwesenden, die für „{title}“ noch keine {points} haben.', { title: list.title, points: sec.points })
+          : t(
+              'Vorschlag: alle, die bei „{title}“ gefehlt haben. Anders als bei {points} merkt sich die Liste nicht, wer schon einen Eintrag hat.',
+              { title: list.title, points: sec.points },
+            )}
       </p>
       {kind === 'punkte' ? (
         <GivePoints preselect={ids} attendance={list} onToast={onToast} onDone={back} />
@@ -1863,7 +1905,7 @@ function FromAttendance({ listId, kind, onToast }: { listId: number; kind: 'punk
   );
 }
 
-const OFFLINE_BOOKED = 'Keine Verbindung – auf dem Gerät gespeichert. Die App bucht es, sobald du wieder online bist.';
+const OFFLINE_BOOKED = t('Keine Verbindung – auf dem Gerät gespeichert. Die App bucht es, sobald du wieder online bist.');
 
 /** Meldung nach dem Vormerken einer Buchung */
 function bookedLater(err: ApiError): string {
@@ -1898,7 +1940,11 @@ function PendingBookings({ kind }: { kind: BookingKind }) {
   if (count === 0) return null;
   return (
     <p className="muted small pending-bookings" role="status">
-      {count === 1 ? '1 Buchung' : `${count} Buchungen`} noch nicht übertragen – die App sendet sie, sobald die Verbindung wieder klappt.
+      {tn(
+        '{count} Buchung noch nicht übertragen – die App sendet sie, sobald die Verbindung wieder klappt.',
+        '{count} Buchungen noch nicht übertragen – die App sendet sie, sobald die Verbindung wieder klappt.',
+        count,
+      )}
     </p>
   );
 }
@@ -1955,9 +2001,9 @@ function GivePoints({
     e.preventDefault();
     setFormError(null);
     const n = Number(points);
-    if (selected.length === 0) return setFormError('Bitte mindestens ein Mitglied auswählen.');
-    if (!Number.isInteger(n) || n === 0) return setFormError('Bitte eine ganze Punktzahl ungleich 0 angeben.');
-    if (!reason.trim()) return setFormError('Bitte einen Grund angeben.');
+    if (selected.length === 0) return setFormError(t('Bitte mindestens ein Mitglied auswählen.'));
+    if (!Number.isInteger(n) || n === 0) return setFormError(t('Bitte eine ganze Punktzahl ungleich 0 angeben.'));
+    if (!reason.trim()) return setFormError(t('Bitte einen Grund angeben.'));
     setBusy(true);
     setReached([]);
     try {
@@ -1978,7 +2024,12 @@ function GivePoints({
         onToast(rows.queued);
       } else {
         // Aus einer Anwesenheitsliste bucht der Server nur für, wer noch keine Punkte für sie hat.
-        onToast(`${formatPoints(n)} ${sec.points} an ${rows.length} ${rows.length === 1 ? 'Mitglied' : 'Mitglieder'} vergeben`);
+        onToast(
+          tn('{value} {points} an {count} Mitglied vergeben', '{value} {points} an {count} Mitglieder vergeben', rows.length, {
+            value: formatPoints(n),
+            points: sec.points,
+          }),
+        );
         const after = before && (await refreshPromotions());
         if (before && after) setReached(newlyDue(before, after));
       }
@@ -2001,9 +2052,9 @@ function GivePoints({
     <form className="form" onSubmit={submit}>
       <PendingBookings kind="points" />
       <label className="field">
-        <span>Vorlage aus dem Katalog</span>
+        <span>{t('Vorlage aus dem Katalog')}</span>
         <select value={catalogId} onChange={(e) => chooseCatalog(e.target.value)}>
-          <option value="">– freie Eingabe –</option>
+          <option value="">{t('– freie Eingabe –')}</option>
           {catalog.map((c) => (
             <option key={c.id} value={c.id}>
               {c.title} ({formatPoints(c.points)})
@@ -2019,17 +2070,17 @@ function GivePoints({
           <input type="number" inputMode="numeric" step="1" value={points} onChange={(e) => setPoints(e.target.value)} required />
         </label>
         <label className="field">
-          <span>Datum</span>
+          <span>{t('Datum')}</span>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
         </label>
       </div>
       <label className="field">
-        <span>Grund</span>
+        <span>{t('Grund')}</span>
         <input type="text" maxLength={255} value={reason} onChange={(e) => setReason(e.target.value)} required />
       </label>
       {!fixed && (
         <div className="field">
-          <span>Mitglieder</span>
+          <span>{t('Mitglieder')}</span>
           <MemberPicker members={members} selected={selected} onChange={setSelected} note={factorNote} />
         </div>
       )}
@@ -2037,16 +2088,21 @@ function GivePoints({
         <label className="toggle">
           <input type="checkbox" checked={applyFactor} onChange={(e) => setApplyFactor(e.target.checked)} />
           <span>
-            {sec.points}faktor der Rolle anwenden
+            {t('{points}faktor der Rolle anwenden', { points: sec.points })}
             <span className="small muted feature-desc">
               {fixed
-                ? 'Die Rolle hat'
-                : withFactor.length === 1
-                  ? 'Ein ausgewähltes Mitglied hat'
-                  : `${withFactor.length} ausgewählte Mitglieder haben`}{' '}
-              einen anderen Faktor als 1
+                ? t('Die Rolle hat einen anderen Faktor als 1')
+                : tn(
+                    'Ein ausgewähltes Mitglied hat einen anderen Faktor als 1',
+                    '{count} ausgewählte Mitglieder haben einen anderen Faktor als 1',
+                    withFactor.length,
+                  )}
               {Number(points) && applyFactor
-                ? `, z. B. ×${factorOf(withFactor[0]).toLocaleString(localeTag())} → ${(Number(points) * factorOf(withFactor[0])).toLocaleString(localeTag())} ${sec.points}`
+                ? t(', z. B. ×{factor} → {result} {points}', {
+                    factor: factorOf(withFactor[0]).toLocaleString(localeTag()),
+                    result: (Number(points) * factorOf(withFactor[0])).toLocaleString(localeTag()),
+                    points: sec.points,
+                  })
                 : ''}
               .
             </span>
@@ -2059,7 +2115,7 @@ function GivePoints({
         </p>
       )}
       <button className="btn btn-block" type="submit" disabled={busy}>
-        {busy ? 'Speichert …' : `${sec.points} vergeben`}
+        {busy ? t('Speichert …') : t('{points} vergeben', { points: sec.points })}
       </button>
     </form>
   );
@@ -2103,10 +2159,10 @@ function GivePenalty({
     e.preventDefault();
     setFormError(null);
     const cents = parseEuroToCents(amount);
-    if (selected.length === 0) return setFormError('Bitte mindestens ein Mitglied auswählen.');
-    if (cents === null || cents <= 0) return setFormError('Bitte einen gültigen Betrag angeben, z. B. 2,50.');
-    if (cents > 100000) return setFormError('Ein einzelner Eintrag darf höchstens 1.000 € betragen.');
-    if (!reason.trim()) return setFormError('Bitte einen Grund angeben.');
+    if (selected.length === 0) return setFormError(t('Bitte mindestens ein Mitglied auswählen.'));
+    if (cents === null || cents <= 0) return setFormError(t('Bitte einen gültigen Betrag angeben, z. B. 2,50.'));
+    if (cents > 100000) return setFormError(t('Ein einzelner Eintrag darf höchstens 1.000 € betragen.'));
+    if (!reason.trim()) return setFormError(t('Bitte einen Grund angeben.'));
     setBusy(true);
     try {
       const body = { user_ids: selected, amount_cents: cents, reason: reason.trim(), date, request_id: newRequestId() };
@@ -2114,7 +2170,9 @@ function GivePenalty({
       onToast(
         'queued' in rows
           ? rows.queued
-          : `${formatEuro(cents)} an ${selected.length} ${selected.length === 1 ? 'Mitglied' : 'Mitglieder'} eingetragen`,
+          : tn('{amount} an {count} Mitglied eingetragen', '{amount} an {count} Mitglieder eingetragen', selected.length, {
+              amount: formatEuro(cents),
+            }),
       );
       if (!fixed) setSelected([]);
       setAmount('');
@@ -2133,29 +2191,29 @@ function GivePenalty({
       <PendingBookings kind="penalty" />
       {!noTotal && totalOpen !== undefined && (
         <StatCard
-          label={`Offen gesamt: ${sec.penalties}`}
+          label={t('Offen gesamt: {penalties}', { penalties: sec.penalties })}
           value={formatEuro(totalOpen)}
           tone={totalOpen > 0 ? 'warn' : 'good'}
           onClick={totalOpen > 0 ? () => navigate('verwaltung/strafe/offen') : undefined}
-          action="Alle offenen ansehen"
+          action={t('Alle offenen ansehen')}
         />
       )}
       <div className="field-row">
         <label className="field">
-          <span>Betrag in €</span>
+          <span>{t('Betrag in €')}</span>
           <input type="text" inputMode="decimal" placeholder="2,50" value={amount} onChange={(e) => setAmount(e.target.value)} required />
         </label>
         <label className="field">
-          <span>Datum</span>
+          <span>{t('Datum')}</span>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
         </label>
       </div>
       <label className="field">
-        <span>Grund</span>
+        <span>{t('Grund')}</span>
         <input
           type="text"
           maxLength={255}
-          placeholder="z. B. Zu spät gekommen"
+          placeholder={t('z. B. Zu spät gekommen')}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           required
@@ -2163,7 +2221,7 @@ function GivePenalty({
       </label>
       {!fixed && (
         <div className="field">
-          <span>Mitglieder</span>
+          <span>{t('Mitglieder')}</span>
           <MemberPicker members={data ?? []} selected={selected} onChange={setSelected} />
         </div>
       )}
@@ -2173,7 +2231,7 @@ function GivePenalty({
         </p>
       )}
       <button className="btn btn-warn btn-block" type="submit" disabled={busy}>
-        {busy ? 'Speichert …' : 'Eintragen'}
+        {busy ? t('Speichert …') : t('Eintragen')}
       </button>
     </form>
   );
@@ -2203,7 +2261,7 @@ function OpenPenalties({ onToast }: { onToast: (msg: string) => void }) {
     setBusy(true);
     try {
       await api.setPenaltyStatus(p.id, 'paid');
-      onToast('Als bezahlt markiert');
+      onToast(t('Als bezahlt markiert'));
       reload();
     } catch (e) {
       onToast((e as Error).message);
@@ -2215,11 +2273,15 @@ function OpenPenalties({ onToast }: { onToast: (msg: string) => void }) {
   return (
     <div>
       <button className="btn btn-link back" onClick={() => navigate('verwaltung/strafe')}>
-        ‹ {sec.penalties} eintragen
+        ‹ {t('{penalties} eintragen', { penalties: sec.penalties })}
       </button>
-      <StatCard label={`Offen gesamt: ${sec.penalties}`} value={formatEuro(total)} tone={total > 0 ? 'warn' : 'good'} />
+      <StatCard
+        label={t('Offen gesamt: {penalties}', { penalties: sec.penalties })}
+        value={formatEuro(total)}
+        tone={total > 0 ? 'warn' : 'good'}
+      />
       {people.length === 0 ? (
-        <Empty>Keine offenen Einträge.</Empty>
+        <Empty>{t('Keine offenen Einträge.')}</Empty>
       ) : (
         people.map(([id, list]) => (
           <section key={id} className="open-penalties">
@@ -2236,7 +2298,7 @@ function OpenPenalties({ onToast }: { onToast: (msg: string) => void }) {
                   p={p}
                   actions={
                     <button className="btn btn-small" disabled={busy} onClick={() => paid(p)}>
-                      Bezahlt
+                      {t('Bezahlt')}
                     </button>
                   }
                 />
@@ -2292,10 +2354,10 @@ function Catalog({ onToast }: { onToast: (msg: string) => void }) {
     e.preventDefault();
     const n = Number(points);
     if (!title.trim() || !Number.isInteger(n)) {
-      onToast('Bitte Titel und ganze Punktzahl angeben.');
+      onToast(t('Bitte Titel und ganze Punktzahl angeben.'));
       return;
     }
-    if (await run(() => api.createCatalogItem(title.trim(), n), 'Vorlage angelegt')) {
+    if (await run(() => api.createCatalogItem(title.trim(), n), t('Vorlage angelegt'))) {
       setTitle('');
       setPoints('');
     }
@@ -2309,8 +2371,8 @@ function Catalog({ onToast }: { onToast: (msg: string) => void }) {
       <form className="form card" onSubmit={add}>
         <div className="field-row">
           <label className="field grow">
-            <span>Neue Vorlage</span>
-            <input type="text" placeholder="z. B. Teilnahme am Sommerfest" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <span>{t('Neue Vorlage')}</span>
+            <input type="text" placeholder={t('z. B. Teilnahme am Sommerfest')} value={title} onChange={(e) => setTitle(e.target.value)} />
           </label>
           <label className="field narrow">
             <span>
@@ -2320,11 +2382,11 @@ function Catalog({ onToast }: { onToast: (msg: string) => void }) {
           </label>
         </div>
         <button className="btn btn-block" type="submit" disabled={busy}>
-          Hinzufügen
+          {t('Hinzufügen')}
         </button>
       </form>
       {(data ?? []).length > 1 && (
-        <p className="muted small">Die Reihenfolge gilt auch für die Vorlagen beim Vergeben; zum Ändern am Griff links ziehen.</p>
+        <p className="muted small">{t('Die Reihenfolge gilt auch für die Vorlagen beim Vergeben; zum Ändern am Griff links ziehen.')}</p>
       )}
       <ul className="card-list">
         {(data ?? []).map((c, i, list) => (
@@ -2334,7 +2396,7 @@ function Catalog({ onToast }: { onToast: (msg: string) => void }) {
               <div className="catalog-row-top">
                 <div>
                   <div className="row-title">{c.title}</div>
-                  <div className="row-sub">{c.active ? 'aktiv' : 'deaktiviert'}</div>
+                  <div className="row-sub">{c.active ? t('aktiv') : t('deaktiviert')}</div>
                 </div>
                 <div className="row-value pos">{formatPoints(c.points)}</div>
               </div>
@@ -2343,27 +2405,29 @@ function Catalog({ onToast }: { onToast: (msg: string) => void }) {
                   className="btn btn-small btn-secondary"
                   disabled={busy}
                   onClick={async () => {
-                    const next = await promptAsk(`${sec.points} für „${c.title}“`, String(c.points));
+                    const next = await promptAsk(t('{points} für „{title}“', { points: sec.points, title: c.title }), String(c.points));
                     if (next === null) return;
                     const n = Number(next);
-                    if (!Number.isInteger(n)) return onToast('Bitte eine ganze Zahl angeben.');
-                    run(() => api.updateCatalogItem(c.id, { points: n }), 'Gespeichert');
+                    if (!Number.isInteger(n)) return onToast(t('Bitte eine ganze Zahl angeben.'));
+                    run(() => api.updateCatalogItem(c.id, { points: n }), t('Gespeichert'));
                   }}
                 >
-                  Wert ändern
+                  {t('Wert ändern')}
                 </button>
                 <button
                   className="btn btn-small btn-secondary"
                   disabled={busy}
-                  onClick={() => run(() => api.updateCatalogItem(c.id, { active: !c.active }), c.active ? 'Deaktiviert' : 'Aktiviert')}
+                  onClick={() =>
+                    run(() => api.updateCatalogItem(c.id, { active: !c.active }), c.active ? t('Deaktiviert') : t('Aktiviert'))
+                  }
                 >
-                  {c.active ? 'Deaktivieren' : 'Aktivieren'}
+                  {c.active ? t('Deaktivieren') : t('Aktivieren')}
                 </button>
               </div>
             </div>
           </li>
         ))}
-        {(data ?? []).length === 0 && <Empty>Noch keine Vorlagen. Lege oben die erste an.</Empty>}
+        {(data ?? []).length === 0 && <Empty>{t('Noch keine Vorlagen. Lege oben die erste an.')}</Empty>}
       </ul>
     </div>
   );

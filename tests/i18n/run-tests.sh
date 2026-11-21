@@ -70,4 +70,20 @@ OUT="$(check)" && fail "Ausdruck statt Zeichenkette nicht erkannt: $OUT"
 [[ "$(grep -c 'braucht den Text als einfache Zeichenkette' <<< "$OUT")" == 3 ]] || fail "Nicht alle Ausdrücke gemeldet: $OUT"
 ok "Ausdrücke statt Zeichenketten werden gemeldet"
 
+rm "$T/fe/B.ts"
+cat > "$T/fe/R.tsx" <<'TS'
+const q = /["'`]/g.test(s) ? t('Nach dem Muster') : x / 2;
+const r = [...t('Nach drei Punkten').split('{x}')];
+export const D = () => <p><b>{t('Fett')}</b> <Caps text={y} /> {t('Nach dem Element')}</p>;
+TS
+python3 - "$T/cat/en.json" <<'PY'
+import json, sys
+p = sys.argv[1]; d = json.load(open(p))
+d.update({'Nach dem Muster': 'After the pattern', 'Nach drei Punkten': 'After three dots', 'Fett': 'Bold', 'Nach dem Element': 'After the element'})
+json.dump(d, open(p, 'w'), ensure_ascii=False)
+PY
+OUT="$(check)" || fail "Reguläre Ausdrücke oder JSX falsch gelesen: $OUT"
+[[ "$OUT" == "12 Texte, 1 Kataloge vollständig." ]] || fail "Falsche Zählung: $OUT"
+ok "Anführungszeichen in regulären Ausdrücken, ...t( und JSX-Elemente stören nicht"
+
 echo "$pass Tests bestanden."
