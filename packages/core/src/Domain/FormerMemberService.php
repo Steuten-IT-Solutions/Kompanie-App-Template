@@ -191,7 +191,9 @@ final class FormerMemberService
     {
         $target = $this->markable($actor, $id);
         $year = $this->leftYear(self::date(is_string($leftOn) ? $leftOn : '', 'Ausgeschieden', $this->app->time()->today()));
-        $terms = array_map(static fn (array $t): array => array_intersect_key($t, array_flip(['office', 'start_year', 'end_year', 'clamped', 'shared'])), $this->app->offices()->endFor($target->id, $year, false));
+        // Bezeichnung des Amts in der Sprache der Anfrage (eigener Name je Sprache, sonst der deutsche)
+        $names = $this->app->translations();
+        $terms = array_map(static fn (array $t): array => ['office' => $names->name('office', (string) $t['office_id'], $t['office'])] + array_intersect_key($t, array_flip(['start_year', 'end_year', 'clamped', 'shared'])), $this->app->offices()->endFor($target->id, $year, false));
         return ['end_year' => $year, 'terms' => $terms];
     }
 

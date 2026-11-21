@@ -7,7 +7,7 @@ import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { titleBreaks, columnChars, lanes, yearRange } from '../yearGrid';
-import { officeSingular } from '../officeName';
+import { officeGroupSingular, officeGroupTitle, officeSingular, officeTitle } from '../officeName';
 import { defaultOpenJoint } from '../jointTerms';
 
 const sec = brand.labels.sections;
@@ -294,14 +294,15 @@ function OfficeCard({ office, open, onToggle }: { office: Office; open: boolean;
   const since = n > 0 ? Math.min(...office.terms.map((t) => t.start_year)) : null;
   const current = office.terms.filter((t) => t.current);
   const history = office.terms.filter((t) => !t.current);
+  const title = officeTitle(office);
   return (
     <section className={`card office-card${open ? ' open' : ''}`}>
       <button type="button" className="office-head" aria-expanded={open} aria-controls={id} onClick={onToggle}>
         <span className="office-mono" aria-hidden="true">
-          {monogram(office.title)}
+          {monogram(title)}
         </span>
         <span className="office-head-main">
-          <span className="office-title">{office.title}</span>
+          <span className="office-title">{title}</span>
           <Summary office={office} />
           {since !== null && (
             <span className="office-meta">
@@ -320,7 +321,7 @@ function OfficeCard({ office, open, onToggle }: { office: Office; open: boolean;
           {history.length > 0 && (
             <>
               {current.length > 0 && <h3 className="tl-heading">{t('Frühere')}</h3>}
-              <Timeline label={office.title} entries={history.map((t) => ({ key: t.id, term: t }))} />
+              <Timeline label={title} entries={history.map((t) => ({ key: t.id, term: t }))} />
             </>
           )}
         </div>
@@ -481,7 +482,7 @@ export function YearGrid({
   const top = years[0];
   const row = (year: number) => 1 + (top - year);
   const ordered = [
-    ...groups.map((g) => ({ key: `g${g.id}`, title: g.title, offices: offices.filter((o) => o.group_id === g.id) })),
+    ...groups.map((g) => ({ key: `g${g.id}`, title: officeGroupTitle(g), offices: offices.filter((o) => o.group_id === g.id) })),
     { key: 'none', title: '', offices: offices.filter((o) => o.group_id === null) },
   ].filter((s) => s.offices.length > 0);
   const grouped = ordered.some((s) => s.title);
@@ -494,8 +495,9 @@ export function YearGrid({
     for (const o of section.offices) {
       const { bars, count } = lanes(o.terms, thisYear);
       // Breit genug, dass Bezeichnung und Namen nicht abgeschnitten werden (verteilt auf die Spuren des Amts)
+      const title = officeTitle(o);
       const chars = columnChars(
-        o.title,
+        title,
         o.terms.flatMap((t) => t.holders.map((h) => h.name)),
       );
       const min = `max(var(--yg-col), calc(${(chars * 1.1) / count}ch + ${Math.ceil(16 / count)}px))`;
@@ -503,7 +505,7 @@ export function YearGrid({
       heads.push(
         <div key={`o${o.id}`} className="yg-office" style={{ gridColumn: `${column} / span ${count}`, gridRow: 2 }}>
           <span>
-            <Title text={o.title} />
+            <Title text={title} />
           </span>
         </div>,
       );
@@ -625,8 +627,8 @@ export function OfficesView() {
   const sections = [
     ...(data?.groups ?? []).map((g) => ({
       key: `g${g.id}`,
-      title: g.title,
-      singular: g.singular || g.title,
+      title: officeGroupTitle(g),
+      singular: officeGroupSingular(g),
       offices: offices.filter((o) => o.group_id === g.id),
       joint: g.joint_terms ? (data?.group_terms ?? []).filter((t) => t.group_id === g.id) : null,
     })),

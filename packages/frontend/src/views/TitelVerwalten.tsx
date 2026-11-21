@@ -8,6 +8,7 @@ import { sources } from '../viewData';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
 import { t } from '../i18n';
+import { officeTitle } from '../officeName';
 
 const sec = brand.labels.sections;
 
@@ -16,7 +17,7 @@ const sec = brand.labels.sections;
  * Ämter pflegt, kommt mit dem Link direkt zum Amt.
  */
 function OfficeHint({ office }: { office: { id: number; title: string } }) {
-  const name = t('das Amt „{title}“', { title: office.title });
+  const name = t('das Amt „{title}“', { title: officeTitle(office) });
   // Satz um den Namen des Amts herum (der Name ist ein Link), Wortstellung je Sprache
   const [before, after = ''] = t('Wird über {office} vergeben').split('{office}');
   return (

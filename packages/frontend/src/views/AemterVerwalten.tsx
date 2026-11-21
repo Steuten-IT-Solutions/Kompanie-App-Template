@@ -25,7 +25,9 @@ import { Caps, Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
 import { nameWithCompanions, termYears } from './Aemter';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
-import { t, tn } from '../i18n';
+import { SOURCE_LOCALE, t, tn, type Locale } from '../i18n';
+import { EditLanguageSwitch, LANGUAGE_NAMES, useEditLocale } from '../language';
+import { nameIn, setNameTranslations, translatedName, type NameKind } from '../names';
 
 const sec = brand.labels.sections;
 
@@ -53,6 +55,56 @@ function useRunner(onToast: Toast, after: () => void) {
   return { busy, error, setError, run };
 }
 
+/**
+ * Namen in der Sprache, auf der eingerichtet wird („Einrichten auf“): der eigene Name dieser Sprache, sonst der deutsche.
+ * Auf Deutsch der gespeicherte deutsche Name.
+ */
+function useShownNames() {
+  const lang = useEditLocale();
+  return {
+    office: (o: { id: number; title: string }) => nameIn('office', String(o.id), o.title, 'label', lang),
+    group: (g: { id: number; title: string }) => nameIn('office_group', String(g.id), g.title, 'label', lang),
+  };
+}
+
+/**
+ * Bezeichnung auf einer weiteren Sprache (Einrichten auf ≠ Deutsch): Das Feld trägt den Namen dieser Sprache, der
+ * deutsche bleibt gespeichert und steht als Platzhalter da. foreign ist false auf Deutsch.
+ */
+function useForeignName(kind: NameKind, id: number) {
+  const lang: Locale = useEditLocale();
+  const saved = translatedName(kind, String(id), lang);
+  const [text, setText] = useState(saved);
+  const [seen, setSeen] = useState({ lang, saved });
+  if (seen.lang !== lang || seen.saved !== saved) {
+    setSeen({ lang, saved });
+    setText(saved);
+  }
+  return {
+    lang,
+    foreign: lang !== SOURCE_LOCALE,
+    text,
+    setText,
+    /** Speichert den Namen der Sprache, wenn er sich geändert hat ('' löscht ihn). */
+    async save() {
+      const next = text.trim();
+      if (lang === SOURCE_LOCALE || next === saved) return;
+      setNameTranslations((await api.saveTranslations(lang, [{ kind, ref: String(id), text: next }])).translations);
+    },
+  };
+}
+
+/** Hinweis an einer Bezeichnung auf einer weiteren Sprache: Die Einzahl gibt es nur auf Deutsch. */
+function ForeignSingularNote({ lang }: { lang: Locale }) {
+  return (
+    <p className="muted small">
+      {t('Die Einzahl gibt es nur auf Deutsch; auf {language} gilt die Bezeichnung auch für eine einzelne Amtszeit.', {
+        language: LANGUAGE_NAMES[lang],
+      })}
+    </p>
+  );
+}
+
 function FormError({ error }: { error: string | null }) {
   return error ? (
     <p className="form-error" role="alert">
@@ -76,6 +128,7 @@ export function OfficeAdmin({ path, onToast }: { path: string[]; onToast: Toast 
   const overview = data!;
   return (
     <KnownPhotos.Provider value={knownPhotos(overview.offices)}>
+      <EditLanguageSwitch />
       {/^\d+$/.test(path[0] ?? '') ? (
         <OfficeEditorFor overview={overview} id={Number(path[0])} onToast={onToast} reload={reload} />
       ) : (
@@ -125,6 +178,7 @@ function OfficeOverview({
   const [title, setTitle] = useState('');
   const [group, setGroup] = useState<string>(overview.groups[0] ? String(overview.groups[0].id) : '');
   const saveOrder = useSaveQueue();
+  const names = useShownNames();
 
   function reorderOffices(groupId: number | null, next: Office[]) {
     // Neue Reihenfolge innerhalb der Gruppe, die übrigen bleiben, wo sie sind
@@ -146,8 +200,9 @@ function OfficeOverview({
     ...overview.groups.map((g) => ({
       key: `g${g.id}`,
       group: g.id as number | null,
-      title: g.title,
-      singular: g.singular || g.title,
+      title: names.group(g),
+      // Ein eigener Name der Sprache gilt auch für eine einzelne gemeinsame Amtszeit (Einzahl nur auf Deutsch)
+      singular: names.group(g) !== g.title ? names.group(g) : g.singular || g.title,
       joint: !!g.joint_terms,
     })),
     { key: 'none', group: null, title: t('Ohne Gruppe'), singular: '', joint: false },
@@ -213,7 +268,7 @@ function OfficeOverview({
           <select value={group} onChange={(e) => setGroup(e.target.value)}>
             {overview.groups.map((g) => (
               <option key={g.id} value={g.id}>
-                {g.title}
+                {names.group(g)}
               </option>
             ))}
             <option value="">{t('Ohne Gruppe')}</option>
@@ -229,14 +284,15 @@ function OfficeOverview({
 
 function OfficeSortList({ offices, onMove }: { offices: Office[]; onMove: (next: Office[]) => void }) {
   const sort = useDragSort(offices, onMove);
+  const names = useShownNames();
   return (
     <ul className="card-list">
       {offices.map((o, i) => (
         <li key={o.id} {...sort.itemProps(i, 'card row')}>
-          {offices.length > 1 && sort.handle(i, o.title)}
+          {offices.length > 1 && sort.handle(i, names.office(o))}
           <div className="row-main">
             <button type="button" className="btn btn-link row-title" onClick={() => navigate(`verwaltung/aemter/${o.id}`)}>
-              {o.title}
+              {names.office(o)}
             </button>
             <div className="row-sub">
               {tn('{count} Amtszeit', '{count} Amtszeiten', o.terms.length)}
@@ -253,9 +309,8 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
   const { busy, error, setError, run } = useRunner(onToast, reload);
   const [title, setTitle] = useState('');
   const [editing, setEditing] = useState<number | null>(null);
-  const [editTitle, setEditTitle] = useState('');
-  const [editSingular, setEditSingular] = useState('');
   const [list, setList] = useState(groups);
+  const names = useShownNames();
   const [seen, setSeen] = useState(groups);
   if (seen !== groups) {
     setSeen(groups);
@@ -288,57 +343,25 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
           {list.map((g, i) =>
             editing === g.id ? (
               <li key={g.id} {...sort.itemProps(i, 'card')}>
-                <form
-                  className="form"
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    if (await run(() => api.updateOfficeGroup(g.id, editTitle.trim(), editSingular.trim()), t('Gespeichert')))
-                      setEditing(null);
+                <GroupForm
+                  group={g}
+                  busy={busy}
+                  onCancel={() => setEditing(null)}
+                  onSave={async (save) => {
+                    if (await run(save, t('Gespeichert'))) setEditing(null);
                   }}
-                >
-                  <label className="field">
-                    <span>{t('Bezeichnung')}</span>
-                    <input type="text" maxLength={60} value={editTitle} onChange={(e) => setEditTitle(e.target.value)} required autoFocus />
-                  </label>
-                  <label className="field">
-                    <span>{t('Einzahl (optional, z. B. „Königshaus“ zu „Königshäuser“)')}</span>
-                    <input
-                      type="text"
-                      maxLength={60}
-                      value={editSingular}
-                      placeholder={editTitle}
-                      onChange={(e) => setEditSingular(e.target.value)}
-                    />
-                  </label>
-                  <div className="button-row">
-                    <button className="btn" type="submit" disabled={busy}>
-                      {t('Speichern')}
-                    </button>
-                    <button className="btn btn-secondary" type="button" onClick={() => setEditing(null)}>
-                      {t('Abbrechen')}
-                    </button>
-                  </div>
-                </form>
+                />
               </li>
             ) : (
               <li key={g.id} {...sort.itemProps(i, 'card row')}>
-                {list.length > 1 && sort.handle(i, g.title)}
+                {list.length > 1 && sort.handle(i, names.group(g))}
                 <div className="row-main">
                   <div className="row-title">
-                    {g.title}
+                    {names.group(g)}
                     {g.singular && <span className="muted small"> · {t('Einzahl: {singular}', { singular: g.singular })}</span>}
                   </div>
                   <div className="row-actions">
-                    <IconButton
-                      icon="edit"
-                      label={t('Bearbeiten')}
-                      disabled={busy}
-                      onClick={() => {
-                        setEditTitle(g.title);
-                        setEditSingular(g.singular ?? '');
-                        setEditing(g.id);
-                      }}
-                    />
+                    <IconButton icon="edit" label={t('Bearbeiten')} disabled={busy} onClick={() => setEditing(g.id)} />
                     <label className="toggle joint-toggle">
                       <input
                         type="checkbox"
@@ -359,7 +382,7 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
                       variant="danger"
                       disabled={busy}
                       onClick={async () =>
-                        (await confirmAsk(t('Gruppe „{name}“ löschen?', { name: g.title }))) &&
+                        (await confirmAsk(t('Gruppe „{name}“ löschen?', { name: names.group(g) }))) &&
                         run(() => api.deleteOfficeGroup(g.id), t('Gelöscht'))
                       }
                     />
@@ -386,6 +409,71 @@ function GroupList({ groups, onToast, reload }: { groups: OfficeGroup[]; onToast
         </button>
       </form>
     </section>
+  );
+}
+
+/**
+ * Gruppe bearbeiten: Bezeichnung und Einzahl. Auf einer weiteren Sprache (Einrichten auf) trägt das Feld den Namen dieser
+ * Sprache; Bezeichnung und Einzahl auf Deutsch bleiben, wie sie sind.
+ */
+function GroupForm({
+  group,
+  busy,
+  onSave,
+  onCancel,
+}: {
+  group: OfficeGroup;
+  busy: boolean;
+  onSave: (save: () => Promise<unknown>) => void;
+  onCancel: () => void;
+}) {
+  const [title, setTitle] = useState(group.title);
+  const [singular, setSingular] = useState(group.singular ?? '');
+  const own = useForeignName('office_group', group.id);
+  return (
+    <form
+      className="form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave(async () => {
+          await api.updateOfficeGroup(group.id, title.trim(), singular.trim());
+          await own.save();
+        });
+      }}
+    >
+      <label className="field">
+        <span>{t('Bezeichnung')}</span>
+        {own.foreign ? (
+          <input
+            type="text"
+            lang={own.lang}
+            maxLength={60}
+            value={own.text}
+            placeholder={group.title}
+            onChange={(e) => own.setText(e.target.value)}
+            autoFocus
+          />
+        ) : (
+          <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
+        )}
+      </label>
+      {own.foreign ? (
+        <ForeignSingularNote lang={own.lang} />
+      ) : (
+        <label className="field">
+          <span>{t('Einzahl (optional, z. B. „Königshaus“ zu „Königshäuser“)')}</span>
+          <input type="text" maxLength={60} value={singular} placeholder={title} onChange={(e) => setSingular(e.target.value)} />
+        </label>
+      )}
+      <div className="button-row">
+        <button className="btn" type="submit" disabled={busy}>
+          {t('Speichern')}
+        </button>
+        <button className="btn btn-secondary" type="button" onClick={onCancel}>
+          {t('Abbrechen')}
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -426,13 +514,16 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
   const [group, setGroup] = useState(office.group_id === null ? '' : String(office.group_id));
   const [editing, setEditing] = useState<number | 'new' | null>(null);
   const people = usePeople();
+  const names = useShownNames();
+  const own = useForeignName('office', office.id);
+  const shown = names.office(office);
 
   return (
     <div>
       <button className="btn btn-link back" onClick={() => navigate('verwaltung/aemter')}>
         ‹ {t('Alle {offices}', { offices: sec.offices })}
       </button>
-      <h2 className="member-name">{office.title}</h2>
+      <h2 className="member-name">{shown}</h2>
       <FormError error={error} />
 
       <h3 className="section-title">{t('Amtszeiten')}</h3>
@@ -495,38 +586,52 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
         className="form card"
         onSubmit={async (e) => {
           e.preventDefault();
-          await run(
-            () =>
-              api.updateOffice(office.id, {
-                title: title.trim(),
-                singular: singular.trim(),
-                group_id: group === '' ? null : Number(group),
-              }),
-            t('Gespeichert'),
-          );
+          await run(async () => {
+            await api.updateOffice(office.id, {
+              title: title.trim(),
+              singular: singular.trim(),
+              group_id: group === '' ? null : Number(group),
+            });
+            await own.save();
+          }, t('Gespeichert'));
         }}
       >
         <h3>{t('Amt bearbeiten')}</h3>
         <label className="field">
           <span>{t('Bezeichnung')}</span>
-          <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required />
+          {own.foreign ? (
+            <input
+              type="text"
+              lang={own.lang}
+              maxLength={60}
+              value={own.text}
+              placeholder={office.title}
+              onChange={(e) => own.setText(e.target.value)}
+            />
+          ) : (
+            <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required />
+          )}
         </label>
-        <label className="field">
-          <span>{t('Einzahl (optional, z. B. „Kapitän“ zu „Kapitäne“)')}</span>
-          <input
-            type="text"
-            maxLength={60}
-            value={singular}
-            placeholder={office.linked_title ?? ''}
-            onChange={(e) => setSingular(e.target.value)}
-          />
-        </label>
+        {own.foreign ? (
+          <ForeignSingularNote lang={own.lang} />
+        ) : (
+          <label className="field">
+            <span>{t('Einzahl (optional, z. B. „Kapitän“ zu „Kapitäne“)')}</span>
+            <input
+              type="text"
+              maxLength={60}
+              value={singular}
+              placeholder={office.linked_title ?? ''}
+              onChange={(e) => setSingular(e.target.value)}
+            />
+          </label>
+        )}
         <label className="field">
           <span>{t('Gruppe')}</span>
           <select value={group} onChange={(e) => setGroup(e.target.value)}>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
-                {g.title}
+                {names.group(g)}
               </option>
             ))}
             <option value="">{t('Ohne Gruppe')}</option>
@@ -544,9 +649,9 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
               const n = office.terms.length;
               const question =
                 n === 0
-                  ? t('„{name}“ löschen?', { name: office.title })
+                  ? t('„{name}“ löschen?', { name: shown })
                   : tn('„{name}“ mit seiner Amtszeit löschen?', '„{name}“ mit allen {count} Amtszeiten löschen?', n, {
-                      name: office.title,
+                      name: shown,
                     });
               if ((await confirmAsk(question)) && (await run(() => api.deleteOffice(office.id), t('Amt gelöscht'))))
                 navigate('verwaltung/aemter');
@@ -672,6 +777,7 @@ function JointTermAdmin({
   const { busy, error, run } = useRunner(onToast, reload);
   const [editing, setEditing] = useState<number | 'new' | null>(null);
   const people = usePeople();
+  const names = useShownNames();
   const holdersOf = (gt: OfficeGroupTerm | undefined, o: Office) => o.terms.find((t) => gt && t.group_term_id === gt.id)?.holders;
   const form = (gt?: OfficeGroupTerm) => (
     <JointTermForm
@@ -713,7 +819,7 @@ function JointTermAdmin({
                     .flatMap((o) => {
                       const h = holdersOf(gt, o);
                       return h && h.length > 0
-                        ? [t('{office}: {people}', { office: o.title, people: h.map(nameWithCompanions).join(', ') })]
+                        ? [t('{office}: {people}', { office: names.office(o), people: h.map(nameWithCompanions).join(', ') })]
                         : [];
                     })
                     .join(' · ') || t('Noch keine Personen')}
@@ -766,6 +872,7 @@ function JointTermForm({
   onCancel: () => void;
   busy: boolean;
 }) {
+  const names = useShownNames();
   const [kind, setKind] = useState<OfficeTermKind>(initial?.kind ?? 'period');
   const [start, setStart] = useState(initial ? String(initial.start_year) : '');
   const [end, setEnd] = useState(initial?.end_year != null ? String(initial.end_year) : '');
@@ -848,7 +955,7 @@ function JointTermForm({
           setHolders={(rows) => setHolders({ ...holders, [o.id]: rows })}
           people={people}
           initial={holdersOf(o)}
-          legend={o.title}
+          legend={names.office(o)}
           optional
         />
       ))}

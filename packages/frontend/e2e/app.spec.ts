@@ -4867,6 +4867,65 @@ test('Sprachen: englischer Name eines Dienstgrads über „Einrichten auf“, An
   await expect(page.locator('.toast')).toHaveText('Gespeichert');
 });
 
+test('Sprachen: englischer Name eines Amts über „Einrichten auf“, Gäste auf Englisch sehen ihn', async ({ page, browser }) => {
+  const id = Date.now() % 1000000;
+  const office = `Schriftführer ${id}`;
+  const english = `Secretary ${id}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json()) as { id?: number } };
+      },
+      [path, method, body] as const,
+    );
+  expect((await api('admin/settings', 'PATCH', { languages: 'de,en' })).status).toBe(200);
+  const created = await api('offices', 'POST', { title: office, group_id: null });
+  expect(created.status).toBe(201);
+  const officeId = created.data.id!;
+  try {
+    expect(
+      (await api(`offices/${officeId}/terms`, 'POST', { kind: 'period', start_year: 2020, holders: [{ name: `Sabine Schreiber ${id}` }] }))
+        .status,
+    ).toBe(201);
+    await page.goto(`/app/#/verwaltung/aemter/${officeId}`);
+    await page.reload();
+    await page.locator('.edit-lang').getByRole('button', { name: 'English' }).click();
+    const edit = page.locator('form', { hasText: 'Amt bearbeiten' });
+    const title = edit.getByLabel('Bezeichnung');
+    await expect(title).toHaveValue('');
+    await expect(title).toHaveAttribute('placeholder', office);
+    await title.fill(english);
+    await edit.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
+    await expect(page.locator('h2.member-name')).toHaveText(english);
+    // Auf Deutsch bleibt der deutsche Name
+    await page.locator('.edit-lang').getByRole('button', { name: 'Deutsch' }).click();
+    await expect(edit.getByLabel('Bezeichnung')).toHaveValue(office);
+    await expect(page.locator('h2.member-name')).toHaveText(office);
+
+    // Gäste auf Englisch sehen den englischen Namen im Zeitstrahl, auf Deutsch den deutschen
+    const visitor = await quietPage(browser);
+    await visitor.goto('/app/#/mitglieder/aemter');
+    await expect(visitor.locator('.office-title', { hasText: office })).toBeVisible();
+    await visitor.evaluate(() => localStorage.setItem('kompanie-locale', 'en'));
+    await visitor.reload();
+    await expect(visitor.locator('.office-title', { hasText: english })).toBeVisible();
+    await expect(visitor.locator('.office-title', { hasText: office })).toHaveCount(0);
+    await visitor.close();
+  } finally {
+    expect((await api(`offices/${officeId}`, 'DELETE')).status).toBe(200);
+    expect((await api('admin/settings', 'PATCH', { languages: 'de' })).status).toBe(200);
+  }
+});
+
 test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nicht', async ({ page }) => {
   // So, wie scripts/changelog.php es beim Bauen in die App gelegt hat.
   const changelog = JSON.parse(readFileSync(new URL('../src/generated/changelog.json', import.meta.url), 'utf8')) as {

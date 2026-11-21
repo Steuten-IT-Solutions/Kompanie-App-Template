@@ -202,6 +202,7 @@ final class OfficeService
             $images->deleteOwner(RichImageService::OWNER_OFFICE_GROUP_TERM, $t['id']);
         }
         $repo->deleteGroup($id);
+        $this->app->translations()->repository()->deleteRef('office_group', (string) $id);
         $this->pruneHolderPhotos();
         $this->app->companies()->repository()->unlinkOfficeGroup($id);
     }
@@ -279,6 +280,7 @@ final class OfficeService
         $repo = $this->repository();
         $office = $repo->findOffice($id) ?? throw ApiError::notFound(I18n::t('Amt nicht gefunden.'));
         $repo->deleteOffice($id);
+        $this->app->translations()->repository()->deleteRef('office', (string) $id);
         $this->pruneHolderPhotos();
         $this->syncTitles($office['title_id'] !== null ? [$office['title_id']] : []);
     }

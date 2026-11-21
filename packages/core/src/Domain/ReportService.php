@@ -553,6 +553,7 @@ final class ReportService
             }
         }
         $out = [];
+        $translations = $this->app->translations();
         foreach ($repo->offices() as $o) {
             $list = $terms[$o['id']] ?? [];
             usort($list, static fn (array $a, array $b): int => [$a['start_year'], $a['id']] <=> [$b['start_year'], $b['id']]);
@@ -563,7 +564,7 @@ final class ReportService
                     $t['end_year'] === null => I18n::t('seit {year}', ['year' => $t['start_year']]),
                     default => $t['start_year'] . '–' . $t['end_year'],
                 };
-                $out[] = [$o['title'], $years, implode(', ', $people), $t['note']];
+                $out[] = [$translations->name('office', (string) $o['id'], $o['title']), $years, implode(', ', $people), $t['note']];
             }
         }
         return self::section('offices', $this->title('offices'), true, [self::table(
