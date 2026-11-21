@@ -74,9 +74,10 @@ final class UpdateServiceTest extends TestCase
     /**
      * @param string[] $stable nacheinander freigegebene Versionen
      */
-    private function publish(array $versions, array $stable, array $withdrawn = [], array $extra = []): void
+    private function publish(array $versions, array $stable, array $withdrawn = [], array $extra = [], ?string $maintenance = null): void
     {
         $list = UpdateList::create('org/k', 'K');
+        $list->setMaintenance($maintenance);
         foreach ($versions as $v) {
             $this->zips[$v] ??= 'ZIP-' . $v;
             $file = fn (string $n) => ['name' => $n, 'sha256' => hash('sha256', $this->zips[$v]), 'size' => strlen($this->zips[$v])];
@@ -239,6 +240,37 @@ final class UpdateServiceTest extends TestCase
         $this->assertThrows(fn () => $s->install('2.0.0.1'), 'ausdrückliche Bestätigung');
         $s->install('2.0.0.1', 'manual', true);
         $this->assertSame('2.0.0.1', $this->installed[0][0]);
+    }
+
+    public function testMaintenanceFromTheSignedList(): void
+    {
+        $this->publish(['1.0.0.1'], ['1.0.0.1']);
+        $s = $this->service('1.0.0.1');
+        $s->check();
+        $this->assertNull($s->status()['maintenance'], 'Ohne Angabe in der Liste nichts');
+        $this->assertFalse($s->status()['maintenanceEnded']);
+
+        $this->publish(['1.0.0.1'], ['1.0.0.1'], [], [], '2999-12-31');
+        $s->check();
+        $this->assertSame('2999-12-31', $s->status()['maintenance']);
+        $this->assertFalse($s->status()['maintenanceEnded']);
+
+        $this->publish(['1.0.0.1'], ['1.0.0.1'], [], [], '2000-01-31');
+        $s->check();
+        $this->assertTrue($s->status()['maintenanceEnded'], 'Nach dem letzten Tag abgelaufen');
+
+        $this->publish(['1.0.0.1'], ['1.0.0.1'], [], [], 'unbefristet');
+        $s->check();
+        $this->assertSame('unbefristet', $s->status()['maintenance']);
+        $this->assertFalse($s->status()['maintenanceEnded']);
+
+        $list = UpdateList::create('org/k', 'K');
+        $this->assertThrows(fn () => $list->setMaintenance('2027-02-30'), 'Ungültige Angabe');
+        $list->setMaintenance('2027-06-30');
+        $this->assertFalse($list->maintenanceEnded('2027-06-30'), 'Der letzte Tag zählt noch');
+        $this->assertTrue($list->maintenanceEnded('2027-07-01'));
+        $list->setMaintenance(null);
+        $this->assertNull($list->maintenance());
     }
 
     public function testEarlyChannelAutoOffAndSkip(): void

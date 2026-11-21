@@ -3692,6 +3692,10 @@ export interface UpdateStatus {
   withdrawn: boolean;
   /** Bei zurückgezogener Version: Ziel des automatischen Wechsels (null = keins da). */
   fallback: string | null;
+  /** Wartungsabo laut Update-Liste: letzter Tag (JJJJ-MM-TT) oder „unbefristet“; null = keine Angabe. */
+  maintenance: string | null;
+  /** Das Wartungsabo ist abgelaufen: keine neuen Versionen mehr. */
+  maintenanceEnded: boolean;
   /** Nach dem Zurückrollen: latest wird nicht automatisch eingespielt. */
   skipped: boolean;
   /** Automatische Updates sind hier erlaubt (WordPress kann sie sperren). */

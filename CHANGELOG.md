@@ -26,6 +26,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Wartung**: Unter [Einstellungen → Zustand und Updates](app:einstellungen/zustand) steht, bis wann eure App neue
+  Versionen bekommt (Wartung bis …, oder unbefristet). Nach dem Ende läuft die App mit ihrer Version weiter; neue
+  Versionen, auch Sicherheitsupdates, gibt es erst nach einer Verlängerung. Zurückgehen auf ältere Versionen bleibt
+  möglich.
 - **Beförderung mit Datum**: Beim Ändern des Dienstgrads eines Mitglieds (z. B. aus
   [Beförderungen](app:verwaltung/befoerderungen)) wählst du jetzt das Datum der Änderung, vorgegeben ist heute. Ein
   früherer Tag geht, ein Tag in der Zukunft oder vor der letzten Änderung dieser Person nicht. Mit Punkten zählen bei

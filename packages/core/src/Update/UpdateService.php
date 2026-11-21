@@ -162,6 +162,8 @@ final class UpdateService
             'major' => false,
             'withdrawn' => false,
             'fallback' => null,
+            'maintenance' => null,
+            'maintenanceEnded' => false,
             'skipped' => false,
             'autoAllowed' => $this->target?->autoUpdateAllowed() ?? false,
             'problems' => [],
@@ -187,6 +189,9 @@ final class UpdateService
         }
         $list = UpdateList::fromPayload($state['list']);
         $out['withdrawn'] = $list->isWithdrawn($this->currentVersion);
+        // Wartungsabo laut Liste: danach gibt es keine neuen Versionen mehr (die App läuft weiter).
+        $out['maintenance'] = $list->maintenance();
+        $out['maintenanceEnded'] = $list->maintenanceEnded(gmdate('Y-m-d', $this->time->timestamp()));
         // Updates innerhalb der eigenen Hauptversion, auch wenn der Kanal schon auf eine neuere zeigt.
         $latest = $list->latestFor(Version::major($this->currentVersion), $this->channel());
         if ($out['withdrawn'] && $latest !== null && $latest !== $this->currentVersion) {
