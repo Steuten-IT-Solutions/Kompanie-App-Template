@@ -12,7 +12,7 @@ import Strafen from './Strafen';
 import { TitleBadges } from '../TitleBadges';
 import { MenuNav } from '../adminNav';
 import { ZoomableAvatar } from '../memberPhoto';
-import { RankBadge } from '../RankBadge';
+import { RankBadge, rankName } from '../RankBadge';
 import { formatBirthday, ownBirthday } from '../birthdays';
 import { joinText, profileChoice } from '../joinYear';
 import { PersonOffices } from './Aemter';
@@ -124,8 +124,8 @@ function Uebersicht({ me }: { me: Me }) {
         <div className="member-rank-line">
           {rank && (
             <button type="button" className="member-rank-badge member-rank-open" onClick={() => navigate('meins/dienstgrad')}>
-              <RankBadge url={rank.badge_url} title={rank.title} size="large" />
-              <span>{rank.title}</span>
+              <RankBadge url={rank.badge_url} title={rankName(rank.id, rank.title)} size="large" />
+              <span>{rankName(rank.id, rank.title)}</span>
             </button>
           )}
           {photo && <ZoomableAvatar url={photo} name={me.name} />}

@@ -4795,6 +4795,78 @@ test('Sprachen: Admin schaltet Englisch ein, Flagge oben, Wahl gilt am Konto, zu
   await expect(page.locator('.topbar-lang')).toHaveCount(0);
 });
 
+test('Sprachen: englischer Name eines Dienstgrads über „Einrichten auf“, Ansicht auf Englisch zeigt ihn', async ({ page }) => {
+  const stamp = String(Date.now()).slice(-6);
+  const german = `Feldwebel ${stamp}`;
+  const english = `Sergeant ${stamp}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  await page.goto('/app/#/einstellungen/sprachen');
+  const form = page.locator('.settings-section', { hasText: 'Sprachen' });
+  await form.getByLabel('English').check();
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+
+  // Neu angelegt wird immer mit dem deutschen Namen
+  await adminMenu(page, 'Dienstgrade');
+  await page.getByLabel('Bezeichnung').fill(german);
+  await page.getByRole('button', { name: 'Anlegen' }).click();
+  const row = page.locator('.card-list > li', { hasText: german });
+  await expect(row).toBeVisible();
+
+  // Einrichten auf Englisch: „Ändern“ trägt den englischen Namen ein, der deutsche bleibt
+  await page.locator('.edit-lang').getByRole('button', { name: 'English' }).click();
+  await row.getByRole('button', { name: 'Ändern' }).click();
+  const field = page.locator('.card-list').getByLabel('Bezeichnung');
+  await expect(field).toHaveAttribute('placeholder', german);
+  await expect(field).toHaveValue('');
+  await field.fill(english);
+  await page.locator('.card-list').getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  await expect(page.locator('.card-list .row-title', { hasText: english })).toBeVisible();
+  await page.locator('.edit-lang').getByRole('button', { name: 'Deutsch' }).click();
+  await expect(page.locator('.card-list .row-title', { hasText: german })).toBeVisible();
+
+  // Mitglied1 bekommt den Dienstgrad
+  await adminMenu(page, 'Mitglieder');
+  await page.locator('.row', { hasText: 'Mitglied1' }).click();
+  const id = Number(page.url().split('/').pop());
+  await page.goto(`/app/#/verwaltung/mitglied/${id}/dienstgrad`);
+  await page.getByLabel('Neuer Dienstgrad').selectOption({ label: german });
+  await page.getByRole('button', { name: 'Dienstgrad ändern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Dienstgrad geändert');
+
+  // Auf Englisch: der englische Name an der Seite des Mitglieds, im Verlauf und in der Liste der Dienstgrade
+  await page.goto(`/app/#/verwaltung/mitglied/${id}`);
+  await page.getByRole('button', { name: 'Sprache: Deutsch' }).click();
+  await page.getByRole('menuitemradio', { name: 'English' }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.locator('.member-rank-badge')).toContainText(english);
+  await page.goto(`/app/#/verwaltung/mitglied/${id}/dienstgrad`);
+  await expect(page.locator('.member-rank strong')).toHaveText(english);
+  await expect(page.locator('.member-rank .card-list')).toContainText(english);
+  await page.goto('/app/#/dienstgrade');
+  await expect(page.locator('.rank-list')).toContainText(english);
+
+  // Aufräumen: zurück auf Deutsch, Dienstgrad abnehmen und löschen, nur Deutsch
+  await page.goto(`/app/#/verwaltung/mitglied/${id}`);
+  await page.getByRole('button', { name: 'Language: English' }).click();
+  await page.getByRole('menuitemradio', { name: 'Deutsch' }).click();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'de');
+  await page.goto(`/app/#/verwaltung/mitglied/${id}/dienstgrad`);
+  await expect(page.locator('.member-rank strong')).toHaveText(german);
+  await page.getByLabel('Neuer Dienstgrad').selectOption({ label: 'Kein Dienstgrad' });
+  await page.getByRole('button', { name: 'Dienstgrad ändern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Dienstgrad geändert');
+  await page.goto('/app/#/verwaltung/dienstgrade');
+  await page.locator('.card-list > li', { hasText: german }).getByRole('button', { name: 'Löschen' }).click();
+  await askOk(page);
+  await expect(page.locator('.toast')).toHaveText('Gelöscht');
+  await page.goto('/app/#/einstellungen/sprachen');
+  await form.getByLabel('English').uncheck();
+  await form.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+});
+
 test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nicht', async ({ page }) => {
   // So, wie scripts/changelog.php es beim Bauen in die App gelegt hat.
   const changelog = JSON.parse(readFileSync(new URL('../src/generated/changelog.json', import.meta.url), 'utf8')) as {

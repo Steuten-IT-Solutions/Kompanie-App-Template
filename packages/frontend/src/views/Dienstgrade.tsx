@@ -1,6 +1,6 @@
 import { config } from '../api';
 import brand from '../generated/brand';
-import { RankLabel } from '../RankBadge';
+import { RankLabel, rankName } from '../RankBadge';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { localeTag, t } from '../i18n';
@@ -28,7 +28,7 @@ export default function Dienstgrade() {
           <li key={r.id} className={`card row${r.id === mine ? ' rank-mine' : ''}`}>
             <div className="row-main">
               <div className="row-title">
-                <RankLabel url={r.badge_url} title={r.title} />
+                <RankLabel url={r.badge_url} title={rankName(r.id, r.title)} />
               </div>
               {r.id === mine && <div className="row-sub">{t('Dein {rank}', { rank })}</div>}
             </div>

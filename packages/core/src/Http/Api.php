@@ -498,7 +498,7 @@ final class Api
         }
         $status = $this->showRanks() ? $this->app->ranks()->status($userId) : null;
         $rank = $status !== null ? $status['rank'] : $this->app->ranks()->current($userId);
-        return ['rank_title' => $rank['title'] ?? null, 'rank_badge_url' => $rank['badge_url'] ?? null]
+        return ['rank_id' => $rank['id'] ?? null, 'rank_title' => $rank['title'] ?? null, 'rank_badge_url' => $rank['badge_url'] ?? null]
             + ($status !== null ? ['rank' => $status, 'rank_history' => $this->app->ranks()->history($userId)] : []);
     }
 
@@ -591,7 +591,7 @@ final class Api
         $joined = $entries === null ? $a->joinYears()->shownTo($viewer) : null;
         return array_map(static fn (array $m): array => $m
             + ['photo_url' => $photos[$m['id']] ?? null]
-            + ($ranks !== null ? ['rank_title' => $ranks[$m['id']]['title'] ?? null, 'rank_badge_url' => $ranks[$m['id']]['badge_url'] ?? null] : [])
+            + ($ranks !== null ? ['rank_id' => $ranks[$m['id']]['id'] ?? null, 'rank_title' => $ranks[$m['id']]['title'] ?? null, 'rank_badge_url' => $ranks[$m['id']]['badge_url'] ?? null] : [])
             + ($titles !== null ? ['titles' => $titles[$m['id']] ?? []] : [])
             + ($companies !== null ? ['companies' => $companies[$m['id']] ?? []] : [])
             + ($birthdays !== null ? ['birthday' => $birthdays[$m['id']] ?? null] : [])
@@ -1474,6 +1474,7 @@ final class Api
                 if ($a->features()->enabled('ranks')) {
                     $ranks = $a->ranks()->assigned();
                     $list = array_map(static fn (array $m): array => $m + [
+                        'rank_id' => $ranks[$m['id']]['id'] ?? null,
                         'rank_title' => $ranks[$m['id']]['title'] ?? null,
                         'rank_badge_url' => $ranks[$m['id']]['badge_url'] ?? null,
                     ], $list);

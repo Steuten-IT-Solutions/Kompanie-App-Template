@@ -67,7 +67,7 @@ final class DirectoryTest extends TestCase
         $this->call('POST', '/points', ['user_ids' => [$this->m], 'points' => 5, 'reason' => 'Fest']);
 
         $entry = array_column($this->as(null)->data, null, 'id')[$this->m];
-        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'candidate_role', 'photo_url', 'rank_title', 'rank_badge_url', 'titles', 'companies', 'birthday', 'join_year', 'join_date'], array_keys($entry), 'auch ohne Anmeldung keine Punkte');
+        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'candidate_role', 'photo_url', 'rank_id', 'rank_title', 'rank_badge_url', 'titles', 'companies', 'birthday', 'join_year', 'join_date'], array_keys($entry), 'auch ohne Anmeldung keine Punkte');
         $this->assertNull($entry['candidate_role'], 'Mitglieder ohne Rollenname');
         $this->assertNull($entry['birthday'], 'ohne Freigabe kein Geburtstag');
         $this->assertNull($entry['join_year'], 'ohne Freigabe kein Eintrittsjahr');
@@ -137,7 +137,7 @@ final class DirectoryTest extends TestCase
             $this->assertSame([$this->m], array_column($res->data, 'id'));
         }
         $entry = $res->data[0];
-        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'founder', 'joined_year', 'left_year', 'joined_on', 'left_on', 'photo_url', 'rank_title', 'rank_badge_url', 'titles', 'companies'], array_keys($entry), 'kein Grund');
+        $this->assertSame(['id', 'name', 'first_name', 'last_name', 'founder', 'joined_year', 'left_year', 'joined_on', 'left_on', 'photo_url', 'rank_id', 'rank_title', 'rank_badge_url', 'titles', 'companies'], array_keys($entry), 'kein Grund');
         $this->assertSame([true, '1993', '2016', '1993-05-03', '2016-06-30'], [$entry['founder'], $entry['joined_year'], $entry['left_year'], $entry['joined_on'], $entry['left_on']], 'Daten wie eingetragen, dazu die Jahre');
         $this->assertSame([['id' => $title, 'title' => 'Ehrenmitglied']], $entry['titles']);
 

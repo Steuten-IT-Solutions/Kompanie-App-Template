@@ -104,19 +104,21 @@ final class ReportRepository
     /**
      * Dienstgrad-Wechsel im Zeitraum, älteste zuerst. Grenzen als UTC-Zeitpunkte 'Y-m-d H:i:s', $to ausgeschlossen.
      *
-     * @return list<array{user_id: int, from_title: string, to_title: string, kind: string, reason: string, changed_at: string}>
+     * @return list<array{user_id: int, from_rank_id: int|null, to_rank_id: int|null, from_title: string, to_title: string, kind: string, reason: string, changed_at: string}>
      */
     public function rankChanges(string $fromUtc, string $toUtc): array
     {
         return array_values(array_map(static fn (array $r): array => [
             'user_id' => (int) $r['user_id'],
+            'from_rank_id' => $r['from_rank_id'] === null ? null : (int) $r['from_rank_id'],
+            'to_rank_id' => $r['to_rank_id'] === null ? null : (int) $r['to_rank_id'],
             'from_title' => (string) $r['from_title'],
             'to_title' => (string) $r['to_title'],
             'kind' => (string) $r['kind'],
             'reason' => (string) $r['reason'],
             'changed_at' => (string) $r['changed_at'],
         ], $this->db->select(
-            'SELECT user_id, from_title, to_title, kind, reason, changed_at FROM {rank_history} WHERE changed_at >= ? AND changed_at < ? ORDER BY changed_at, id',
+            'SELECT user_id, from_rank_id, to_rank_id, from_title, to_title, kind, reason, changed_at FROM {rank_history} WHERE changed_at >= ? AND changed_at < ? ORDER BY changed_at, id',
             [$fromUtc, $toUtc],
         )));
     }

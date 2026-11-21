@@ -5,7 +5,7 @@ import brand from '../generated/brand';
 import { t, tn } from '../i18n';
 import { formatYearOrDate, groupCounts } from '../format';
 import { MemberAvatar, preloadAvatar, ZoomableAvatar } from '../memberPhoto';
-import { preloadBadge, RankStack } from '../RankBadge';
+import { preloadBadge, rankName, RankStack } from '../RankBadge';
 import { TitleBadges } from '../TitleBadges';
 import { Caps, Empty, ErrorBox, Loading, useAsync } from '../ui';
 import {
@@ -238,7 +238,7 @@ function PersonHead({
       )}
       {m?.rank_title && (
         <div className="member-page-rank">
-          <RankStack url={m.rank_badge_url} title={m.rank_title} />
+          <RankStack url={m.rank_badge_url} title={rankName(m.rank_id, m.rank_title)} />
         </div>
       )}
     </div>

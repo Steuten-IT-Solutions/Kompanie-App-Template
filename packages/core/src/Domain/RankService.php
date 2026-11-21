@@ -150,7 +150,17 @@ final class RankService
             throw ApiError::invalid(I18n::t('Dieser {rank} ist vergeben und lässt sich nur deaktivieren.', ['rank' => $this->app->config->rankLabel()]));
         }
         $repo->delete($id);
+        $this->app->translations()->repository()->deleteRef('rank', (string) $id);
         $this->removeBadgeFiles($rank['badge_file']);
+    }
+
+    /**
+     * Bezeichnung in der Sprache der Anfrage („Einrichten je Sprache“): eingetragene Übersetzung, sonst die deutsche.
+     * Gespeichert (Verlauf, Änderungsprotokoll) wird immer die deutsche.
+     */
+    public function displayTitle(int $id, string $german): string
+    {
+        return $this->app->translations()->name('rank', (string) $id, $german);
     }
 
     /**
@@ -476,10 +486,10 @@ final class RankService
         return $out + $this->progress($ranks, $current, $entries);
     }
 
-    /** @return array<int, string> Benutzer-ID => Bezeichnung des Dienstgrads (für die Mitgliederliste) */
+    /** @return array<int, string> Benutzer-ID => Bezeichnung des Dienstgrads in der Sprache der Anfrage (für Listen) */
     public function titles(): array
     {
-        return array_map(static fn (array $r): string => $r['title'], $this->assigned());
+        return array_map(fn (array $r): string => $this->displayTitle($r['id'], $r['title']), $this->assigned());
     }
 
     /** @return array<int, array{id: int, title: string, badge_url: string|null}> Benutzer-ID => Dienstgrad (für die Mitgliederliste) */
@@ -512,6 +522,9 @@ final class RankService
             'id' => $h['id'],
             'from' => $h['from_title'] !== '' ? $h['from_title'] : null,
             'to' => $h['to_title'] !== '' ? $h['to_title'] : null,
+            // Zum Anzeigen in einer weiteren Sprache (Übersetzung des Dienstgrads, sonst die gespeicherte Bezeichnung)
+            'from_rank_id' => $h['from_rank_id'],
+            'to_rank_id' => $h['to_rank_id'],
             'to_badge_url' => $h['to_rank_id'] !== null && isset($ranks[$h['to_rank_id']]) ? $this->badgeUrl($ranks[$h['to_rank_id']]) : null,
             'kind' => $h['kind'],
             'points_at_change' => $h['points_at_change'] === null ? null : ScoreService::pointsValue($h['points_at_change']),
@@ -662,7 +675,7 @@ final class RankService
             $target = $entry['to_rank_id'] === null ? null : $repo->find($entry['to_rank_id']);
             if ($entry['kind'] === self::KIND_PROMOTION && $target !== null && $target['min_points'] !== null && $points < $target['min_points']) {
                 throw ApiError::invalid(I18n::t('Schwelle für „{rank}“ am {date} noch nicht erreicht (fehlen {missing} Punkte).', [
-                    'rank' => $target['title'],
+                    'rank' => $this->displayTitle($target['id'], $target['title']),
                     'date' => implode('.', array_reverse(explode('-', $day))),
                     'missing' => self::number($target['min_points'] - $points),
                 ]));
@@ -741,7 +754,7 @@ final class RankService
             }
             $rank = $this->target($this->repository()->all(false), $in['rank_id']);
             if ($rank !== null && $this->usesPoints() && $rank['min_points'] !== null && $points < $rank['min_points']) {
-                throw ApiError::invalid(I18n::t('Für „{rank}“ sind mindestens {min} Punkte nötig.', ['rank' => $rank['title'], 'min' => $rank['min_points']]));
+                throw ApiError::invalid(I18n::t('Für „{rank}“ sind mindestens {min} Punkte nötig.', ['rank' => $this->displayTitle($rank['id'], $rank['title']), 'min' => $rank['min_points']]));
             }
         }
         return ['points' => $points, 'date' => $date, 'rank' => $rank];
@@ -786,9 +799,9 @@ final class RankService
         if ($promotion && $target['min_points'] !== null && $total < $target['min_points']) {
             $missing = self::number($target['min_points'] - $total);
             throw ApiError::invalid($pastDay === null
-                ? I18n::t('Schwelle für „{rank}“ noch nicht erreicht (fehlen {missing} Punkte).', ['rank' => $target['title'], 'missing' => $missing])
+                ? I18n::t('Schwelle für „{rank}“ noch nicht erreicht (fehlen {missing} Punkte).', ['rank' => $this->displayTitle($target['id'], $target['title']), 'missing' => $missing])
                 : I18n::t('Schwelle für „{rank}“ am {date} noch nicht erreicht (fehlen {missing} Punkte).', [
-                    'rank' => $target['title'],
+                    'rank' => $this->displayTitle($target['id'], $target['title']),
                     'date' => implode('.', array_reverse(explode('-', $pastDay))),
                     'missing' => $missing,
                 ]));
@@ -876,9 +889,9 @@ final class RankService
             }
             if ($prev !== null && $r['min_points'] <= $prev['min_points']) {
                 throw ApiError::invalid(I18n::t('Die Punkteschwellen müssen mit der Reihenfolge steigen: „{rank}“ ({points}) steht über „{prev}“ ({prevPoints}).', [
-                    'rank' => $r['title'],
+                    'rank' => $this->displayTitle($r['id'], $r['title']),
                     'points' => (int) $r['min_points'],
-                    'prev' => $prev['title'],
+                    'prev' => $this->displayTitle($prev['id'], $prev['title']),
                     'prevPoints' => (int) $prev['min_points'],
                 ]));
             }

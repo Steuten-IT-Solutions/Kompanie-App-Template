@@ -1,4 +1,5 @@
-import type { Promotion } from './api';
+import type { Promotion, RankRef } from './api';
+import { nameIn } from './names';
 
 type Due = Pick<Promotion, 'points_to_next' | 'next_rank'>;
 type Soon = Due & Pick<Promotion, 'soon' | 'below_current_threshold'>;
@@ -40,5 +41,10 @@ export function newlyDue(before: Promotion[], after: Promotion[]): NewlyDue[] {
       const prev = old.get(p.user_id);
       return !prev || !isDue(prev) || (prev.reachable_rank?.id ?? null) !== (p.reachable_rank?.id ?? null);
     })
-    .map((p) => ({ user_id: p.user_id, name: p.name, rank: (p.reachable_rank ?? p.next_rank)!.title }));
+    .map((p) => ({ user_id: p.user_id, name: p.name, rank: rankRefName((p.reachable_rank ?? p.next_rank)!) }));
+}
+
+/** Bezeichnung in der Sprache der App (eigener Name je Sprache, sonst die deutsche). */
+function rankRefName(r: RankRef): string {
+  return nameIn('rank', String(r.id), r.title);
 }

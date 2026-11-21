@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { DirectoryEntry } from './api';
 import { ZoomableAvatar } from './memberPhoto';
-import { RankStack } from './RankBadge';
+import { rankName, RankStack } from './RankBadge';
 import { TitleBadges } from './TitleBadges';
 
 /**
@@ -16,7 +16,7 @@ export function MemberRow({
   children,
 }: {
   m: Pick<DirectoryEntry, 'id' | 'name'> &
-    Partial<Pick<DirectoryEntry, 'photo_url' | 'titles' | 'candidate_role' | 'rank_title' | 'rank_badge_url'>>;
+    Partial<Pick<DirectoryEntry, 'photo_url' | 'titles' | 'candidate_role' | 'rank_title' | 'rank_id' | 'rank_badge_url'>>;
   /** Angezeigter Name, z. B. „Nachname, Vorname“ bei Sortierung nach Nachname */
   name?: string;
   onOpen?: () => void;
@@ -43,7 +43,9 @@ export function MemberRow({
       </div>
       {/* Dienstgrad rechts, gegenüber dem Foto; ohne Dienstgrad bleibt die Spalte leer (Text in allen Zeilen mittig). */}
       {m.rank_title !== undefined && (
-        <div className="member-row-rank">{m.rank_title && <RankStack url={m.rank_badge_url} title={m.rank_title} />}</div>
+        <div className="member-row-rank">
+          {m.rank_title && <RankStack url={m.rank_badge_url} title={rankName(m.rank_id, m.rank_title)} />}
+        </div>
       )}
     </li>
   );

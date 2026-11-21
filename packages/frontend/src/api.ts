@@ -1308,6 +1308,8 @@ export interface MemberSummary {
   group?: Level | null;
   /** Dienstgrad (nur mit Bereich Dienstgrade) */
   rank_title?: string | null;
+  /** ID des Dienstgrads (für seinen Namen in einer weiteren Sprache; fehlt bei älteren Servern) */
+  rank_id?: number | null;
   /** Abzeichen des Dienstgrads (wie rank_title) */
   rank_badge_url?: string | null;
   /** Titel (nur mit Bereich und Recht „Titel verwalten“) */
@@ -1333,6 +1335,8 @@ export interface DirectoryEntry {
   photo_url: string | null;
   /** Dienstgrad (fehlt ohne Bereich Dienstgrade) */
   rank_title?: string | null;
+  /** ID des Dienstgrads (für seinen Namen in einer weiteren Sprache; fehlt bei älteren Servern) */
+  rank_id?: number | null;
   rank_badge_url?: string | null;
   /** Titel (fehlen ohne Bereich Titel) */
   titles?: TitleRef[];
@@ -2175,7 +2179,12 @@ export interface Company extends CompanyRef {
 
 /** Mitglied einer Kompanie: Eintrag wie in der Mitgliederliste; ältere Server schicken nur id und name. */
 export type CompanyMember = Pick<DirectoryEntry, 'id' | 'name'> &
-  Partial<Pick<DirectoryEntry, 'first_name' | 'last_name' | 'candidate_role' | 'photo_url' | 'rank_title' | 'rank_badge_url' | 'titles'>>;
+  Partial<
+    Pick<
+      DirectoryEntry,
+      'first_name' | 'last_name' | 'candidate_role' | 'photo_url' | 'rank_title' | 'rank_id' | 'rank_badge_url' | 'titles'
+    >
+  >;
 
 export interface CompanyInput {
   name?: string;
@@ -2498,8 +2507,12 @@ export interface RankStatus {
 export interface RankHistoryEntry {
   /** fehlt bei älteren Servern */
   id?: number;
+  /** Deutsche Bezeichnungen von damals */
   from: string | null;
   to: string | null;
+  /** IDs der Dienstgrade (für ihre Namen in einer weiteren Sprache; fehlen bei älteren Servern) */
+  from_rank_id?: number | null;
+  to_rank_id?: number | null;
   /** Heutiges Abzeichen des neuen Dienstgrads */
   to_badge_url?: string | null;
   kind: 'promotion' | 'demotion' | 'initial';

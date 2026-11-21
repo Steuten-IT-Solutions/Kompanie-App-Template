@@ -10,6 +10,11 @@ test('Übersetzung, sonst der deutsche Name; Deutsch bleibt Deutsch', () => {
   assert.equal(nameIn('role', 'member', 'Mitglied', 'label', 'de'), 'Mitglied');
   assert.equal(translatedName('role', 'member', 'en'), 'Fellow');
   assert.equal(translatedName('role', 'member', 'de'), '');
+  // Dienstgrade: Kennung ist die ID
+  setNameTranslations({ en: { rank: { '4': { label: 'Sergeant' } } } });
+  assert.equal(nameIn('rank', '4', 'Feldwebel', 'label', 'en'), 'Sergeant');
+  assert.equal(nameIn('rank', '5', 'Leutnant', 'label', 'en'), 'Leutnant');
+  assert.equal(nameIn('rank', '4', 'Feldwebel', 'label', 'de'), 'Feldwebel');
   // Leer kommt vom Server als []
   setNameTranslations([]);
   assert.equal(nameIn('nav', 'termine', 'Feste', 'label', 'en'), 'Feste');

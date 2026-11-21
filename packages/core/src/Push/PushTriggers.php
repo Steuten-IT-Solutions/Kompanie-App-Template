@@ -118,11 +118,14 @@ final class PushTriggers
     public function rankChanged(int $userId, array $entry): void
     {
         $label = $this->app->config->rankLabel();
-        $image = ($entry['to_rank_id'] ?? null) !== null ? $this->app->ranks()->badgePushImage((int) $entry['to_rank_id']) : null;
+        $rankId = ($entry['to_rank_id'] ?? null) !== null ? (int) $entry['to_rank_id'] : null;
+        $image = $rankId !== null ? $this->app->ranks()->badgePushImage($rankId) : null;
+        $ranks = $this->app->ranks();
+        // Bezeichnung in der Sprache der Person (eigener Name je Sprache, sonst die deutsche)
         $this->push->notifyUser($userId, PushService::TYPE_RANKS, $this->forUser($userId, static fn (): array => PushService::message(
             $entry['kind'] === RankService::KIND_PROMOTION ? I18n::t('Beförderung') : I18n::t('{rank} geändert', ['rank' => $label]),
             $entry['to_title'] !== ''
-                ? I18n::t('Dein {rank}: {title}', ['rank' => $label, 'title' => $entry['to_title']])
+                ? I18n::t('Dein {rank}: {title}', ['rank' => $label, 'title' => $rankId !== null ? $ranks->displayTitle($rankId, $entry['to_title']) : $entry['to_title']])
                 : I18n::t('Du hast keinen {rank} mehr.', ['rank' => $label]),
             'meins/dienstgrad',
             'dienstgrad',

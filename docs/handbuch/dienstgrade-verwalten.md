@@ -40,6 +40,14 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{
 2. Ändere **Bezeichnung** oder **{bereich.points}schwelle**. Leer heißt: ohne Schwelle.
 3. Tippe auf **Speichern** (oder **Abbrechen**).
 
+### Den Namen auf Englisch eintragen
+Hat eure App außer Deutsch auch Englisch eingeschaltet, steht oben **Einrichten auf**. So trägst du den englischen Namen eines {begriff.rank}s ein:
+1. Wähle oben bei **Einrichten auf** die Sprache **English**. Die Liste zeigt jetzt die englischen Namen; wo noch keiner eingetragen ist, den deutschen.
+2. Tippe beim {begriff.rank} auf **Ändern** und trage bei **Bezeichnung** den englischen Namen ein. Im leeren Feld steht grau der deutsche.
+3. Tippe auf **Speichern**. Die deutsche Bezeichnung bleibt, wie sie ist.
+
+Wer die App auf Englisch nutzt, sieht dann den englischen Namen, auch in Benachrichtigungen. Ein leeres Feld löscht den englischen Namen wieder; dann gilt der deutsche. Neue {bereich.ranks} bekommen unter **Neuer {begriff.rank}** immer zuerst den deutschen Namen, auch wenn oben **English** gewählt ist.
+
 ### Ein Abzeichen hochladen
 1. Tippe beim {begriff.rank} auf **Abzeichen hochladen** und wähle die Bilddatei.
 2. Prüfe in der Vorschau, ob das Abzeichen auf heller und auf dunkler Fläche gut zu erkennen ist.

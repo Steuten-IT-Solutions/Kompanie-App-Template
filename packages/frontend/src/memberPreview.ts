@@ -9,6 +9,7 @@ export interface MemberPreview {
   id: number;
   name: string;
   rank_title: string | null;
+  rank_id: number | null;
   rank_badge_url: string | null;
   photo_url: string | null;
   points: number | null;
@@ -40,6 +41,7 @@ export function memberPreview(lists: ReadonlyArray<readonly ListEntry[] | null |
       id: e.id,
       name: e.name,
       rank_title: summary?.rank_title ?? null,
+      rank_id: summary?.rank_id ?? null,
       rank_badge_url: summary?.rank_badge_url ?? null,
       photo_url: e.photo_url ?? null,
       points: e.points ?? null,

@@ -1,4 +1,13 @@
 import { useEffect, useState } from 'react';
+import { nameIn } from './names';
+
+/**
+ * Bezeichnung eines Dienstgrads in der Sprache der App („Einrichten je Sprache“): eigener Name dieser Sprache, sonst
+ * die deutsche Bezeichnung. Ohne ID (ältere Server) die deutsche.
+ */
+export function rankName(id: number | null | undefined, german: string): string {
+  return id === null || id === undefined ? german : nameIn('rank', String(id), german);
+}
 
 /** Darstellungsgrößen der Abzeichen; geladen wird die passende PNG-Fassung (für hochauflösende Displays doppelt). */
 export type RankBadgeSize = 'small' | 'medium' | 'large';
