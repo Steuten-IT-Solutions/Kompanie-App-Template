@@ -123,6 +123,7 @@ import { newlyDue } from '../promotionCheck';
 import { promotionsAllowed, refreshPromotions, setReached, useReached } from '../promotionsDue';
 import { confirmAsk, promptAsk } from '../ask';
 import { AdmissionNotice, Admissions, MemberAdmission } from './Aufnahmen';
+import { localeTag } from '../i18n';
 
 type Sub =
   | 'mitglieder'
@@ -532,7 +533,7 @@ function Members() {
                 {/* Eintritt und Punkte nur, wenn danach sortiert ist, damit die Reihenfolge nachvollziehbar ist. */}
                 {order.sort === 'joined' && m.joined_on && `Eintritt ${formatYearOrDate(m.joined_on)}`}
                 {order.sort === 'joined' && m.joined_on && (m.open_cents ?? 0) > 0 && ' · '}
-                {order.sort === 'points' && seePoints() && `${(m.points ?? 0).toLocaleString('de-DE')} ${sec.points}`}
+                {order.sort === 'points' && seePoints() && `${(m.points ?? 0).toLocaleString(localeTag())} ${sec.points}`}
                 {order.sort === 'points' && seePoints() && (m.open_cents ?? 0) > 0 && ' · '}
                 {(m.open_cents ?? 0) > 0 && <span className="neg">{formatEuro(m.open_cents ?? 0)} offen</span>}
               </div>
@@ -651,7 +652,7 @@ function MemberPreviewHead({ p, onOpen }: { p: MemberPreview; onOpen?: (sheet: '
       {(seePoints() || seePenalties()) && (
         <div className="stats member-stats">
           {seePoints() && (
-            <StatCard label={sec.points} value={(p.points ?? 0).toLocaleString('de-DE')} tone="good" onClick={open('punkte')} />
+            <StatCard label={sec.points} value={(p.points ?? 0).toLocaleString(localeTag())} tone="good" onClick={open('punkte')} />
           )}
           {seePenalties() && (
             <StatCard
@@ -769,7 +770,9 @@ function MemberPeek({
           {roleLine(m) && <p className="muted small member-level">{roleLine(m)}</p>}
           {(seePoints() || seePenalties()) && (
             <div className="stats member-stats">
-              {seePoints() && <StatCard label={sec.points} value={(m.points ?? 0).toLocaleString('de-DE')} tone="good" onClick={none} />}
+              {seePoints() && (
+                <StatCard label={sec.points} value={(m.points ?? 0).toLocaleString(localeTag())} tone="good" onClick={none} />
+              )}
               {seePenalties() && (
                 <StatCard
                   label="Offen"
@@ -1090,7 +1093,7 @@ function MemberDetailView({
               {seePoints() && (
                 <StatCard
                   label={sec.points}
-                  value={(m.points ?? 0).toLocaleString('de-DE')}
+                  value={(m.points ?? 0).toLocaleString(localeTag())}
                   tone="good"
                   onClick={() => openSheet('punkte')}
                 />
@@ -1936,7 +1939,7 @@ function GivePoints({
   const withFactor = selected.filter((id) => factorOf(id) !== 1);
   const factorNote = (m: MemberSummary) => {
     const f = personFactor(m);
-    return f !== 1 ? `×${f.toLocaleString('de-DE')}` : null;
+    return f !== 1 ? `×${f.toLocaleString(localeTag())}` : null;
   };
 
   function chooseCatalog(id: string) {
@@ -2043,7 +2046,7 @@ function GivePoints({
                   : `${withFactor.length} ausgewählte Mitglieder haben`}{' '}
               einen anderen Faktor als 1
               {Number(points) && applyFactor
-                ? `, z. B. ×${factorOf(withFactor[0]).toLocaleString('de-DE')} → ${(Number(points) * factorOf(withFactor[0])).toLocaleString('de-DE')} ${sec.points}`
+                ? `, z. B. ×${factorOf(withFactor[0]).toLocaleString(localeTag())} → ${(Number(points) * factorOf(withFactor[0])).toLocaleString(localeTag())} ${sec.points}`
                 : ''}
               .
             </span>

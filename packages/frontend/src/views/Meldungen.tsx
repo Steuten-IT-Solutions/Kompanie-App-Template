@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { api, applyOpenReports, can, type ReportStatus, type ReviewReport } from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
+import { localeTag } from '../i18n';
 
 /** Zeitpunkt einer Meldung (Unix-Zeit) in Ortszeit */
 export const reportTime = (unix: number): string =>
-  new Date(unix * 1000).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' });
+  new Date(unix * 1000).toLocaleString(localeTag(), { dateStyle: 'medium', timeStyle: 'short' });
 
 export const REPORT_STATUS: Record<ReportStatus, string> = {
   open: 'offen',

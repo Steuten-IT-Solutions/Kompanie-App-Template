@@ -23,6 +23,7 @@ import { confirmAsk } from '../ask';
 import { UPDATE_ACCEPT, uploadUpdatePackage } from '../updateUpload';
 import { IconButton } from '../icons';
 import { serverBackupLabel, serverBackupUrl } from '../serverBackup';
+import { localeTag } from '../i18n';
 
 /**
  * Wartung für Admins: Ampel (Status), Updates mit Zurückrollen, Statusmeldungen (nur mit
@@ -85,7 +86,7 @@ function supportHref(s: string): string | undefined {
 }
 
 function date(ts: number | null | undefined): string {
-  return ts ? new Date(ts * 1000).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }) : '–';
+  return ts ? new Date(ts * 1000).toLocaleString(localeTag(), { dateStyle: 'medium', timeStyle: 'short' }) : '–';
 }
 
 const STEP_TEXT: Record<UpdateStep, string> = {
@@ -111,7 +112,7 @@ function stillRunning(err: unknown): boolean {
 }
 
 function mb(bytes: number): string {
-  return (bytes / 1024 / 1024).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  return (bytes / 1024 / 1024).toLocaleString(localeTag(), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
 /**

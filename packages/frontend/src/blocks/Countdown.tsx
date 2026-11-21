@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import type { CountdownBlock } from '../api';
 import { countdownParts, countdownPhase, nextChange, remaining, unitLabel } from './countdown';
+import { localeTag } from '../i18n';
 
 /** Datum (und Uhrzeit) des Beginns in Ortszeit des Geräts, z. B. „Sa., 12. Juni 2027, 14:00 Uhr“. */
 function formatStart(iso: string, withTime: boolean): string {
   const d = new Date(iso);
-  const date = d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
-  return withTime ? `${date}, ${d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr` : date;
+  const date = d.toLocaleDateString(localeTag(), { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+  return withTime ? `${date}, ${d.toLocaleTimeString(localeTag(), { hour: '2-digit', minute: '2-digit' })} Uhr` : date;
 }
 
 /** Aktuelle Zeit, neu gesetzt, wenn sich die Anzeige ändert, und nur solange die Seite sichtbar ist. */

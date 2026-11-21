@@ -3,6 +3,7 @@ import brand from '../generated/brand';
 import { RankLabel } from '../RankBadge';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
+import { localeTag } from '../i18n';
 
 const rank = brand.labels.rank;
 const sec = brand.labels.sections;
@@ -31,7 +32,7 @@ export default function Dienstgrade() {
               </div>
               {r.id === mine && <div className="row-sub">Dein {rank}</div>}
             </div>
-            {withPoints && r.min_points !== null && <div className="row-value">ab {r.min_points.toLocaleString('de-DE')}</div>}
+            {withPoints && r.min_points !== null && <div className="row-value">ab {r.min_points.toLocaleString(localeTag())}</div>}
           </li>
         ))}
       </ul>
