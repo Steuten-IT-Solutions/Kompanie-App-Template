@@ -13,6 +13,8 @@ import { markSaved } from './unsaved';
 import { noteResponse } from './connection';
 import type { AdminOrder, NavigationSetting, NavNames, NavStart } from './navigation';
 import type { TileLayouts, TilePlace } from './tileGrid';
+import { nameIn, setNameTranslations, type NameKind, type NameTranslations } from './names';
+import { presetRoleLabel } from './brandLocale';
 
 /** Schlüssel einer Rolle: guest, member, admin, früher fest (organizer, manager, candidate) oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
@@ -207,6 +209,10 @@ export interface AppConfig {
   tile_defaults?: Record<string, TileLayouts>;
   /** Eigene Namen als Abschnitte (brand.labels.sections), übernimmt generated/brand.ts beim Laden */
   section_labels?: Record<string, string>;
+  /** Dieselben Namen je weiterer Sprache (eingetragen, sonst deutsch); fehlt bei älteren Servern */
+  section_labels_i18n?: Partial<Record<Locale, Record<string, string>>>;
+  /** Eigene Namen je weiterer Sprache (names.ts); fehlt bei älteren Servern, leer kommt als [] an */
+  name_translations?: NameTranslations | [];
   /** Eigene Seiten (Issue #287), die die Person lesen darf, in ihrer Reihenfolge; fehlt bei älteren Servern */
   pages?: { id: number; title: string }[];
   /** News werden in der App geschrieben (Quelle „In der App“); fehlt bei älteren Servern */
@@ -565,6 +571,11 @@ declare global {
 }
 
 export const config: AppConfig | undefined = window.KOMPANIE_CONFIG;
+
+// Namen in der Sprache der App (Plan „Mehrsprachigkeit“): Die Seite bringt /config so mit, wie der Server sie beim Laden
+// kannte; die Sprache am Gerät kennt er nicht. Rollen daher hier: eingetragener Name, sonst übersetzte Vorgabe.
+setNameTranslations(config?.name_translations);
+for (const r of config?.roles ?? []) r.label = nameIn('role', r.key, presetRoleLabel(r.key, r.label));
 
 /** Bereich mit Schalter für die Ersteinrichtung und die Einstellungen der Admins. */
 export interface FeatureInfo {
@@ -3043,6 +3054,9 @@ export const api = {
     request<{ page: string; layouts: TileLayouts }>('PUT', '/me/tiles', { page, cols, tiles }),
   /** Sprache am Konto (Plan „Mehrsprachigkeit“); null löscht die Wahl */
   setMyLocale: (l: Locale | null) => request<{ locale: Locale | null }>('PUT', '/me/locale', { locale: l }),
+  /** Eigene Namen in einer weiteren Sprache (Einrichten auf …); text '' löscht die Übersetzung */
+  saveTranslations: (locale: Locale, items: { kind: NameKind; ref: string; field?: string; text: string }[]) =>
+    request<{ translations: NameTranslations | [] }>('PUT', '/admin/translations', { locale, items }),
   resetTiles: (page: string) => request<{ page: string; layouts: TileLayouts }>('DELETE', '/me/tiles', undefined, { page }),
   /** Vorgabe für alle (manage_settings) */
   saveTileDefault: (page: string, cols: number, tiles: TilePlace[]) =>

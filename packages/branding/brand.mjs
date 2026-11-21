@@ -55,7 +55,7 @@ const FONT_STACK = {
  */
 const BRAND_TS = `// Automatisch erzeugt aus kompanie.json – nicht von Hand ändern.
 import brand from './brand.json';
-import { localizeBrand } from '../brandLocale';
+import { localizeBrand, ownSections } from '../brandLocale';
 
 // In einer weiteren Sprache: Vorgaben übersetzt, translations.<sprache> aus kompanie.json davor (Plan „Mehrsprachigkeit“)
 localizeBrand(brand);
@@ -63,11 +63,10 @@ localizeBrand(brand);
 /** Namen aus kompanie.json bzw. der Standard, ohne die eigenen der Installation (Einstellungen → Navigation zeigt sie an). */
 export const defaultSections: Readonly<typeof brand.labels.sections> = { ...brand.labels.sections };
 
-const own = (globalThis as { KOMPANIE_CONFIG?: { section_labels?: Record<string, string> | unknown[] } }).KOMPANIE_CONFIG?.section_labels;
-if (own && !Array.isArray(own)) {
-  const sections = brand.labels.sections as Record<string, string>;
-  for (const [key, label] of Object.entries(own)) if (key in sections && typeof label === 'string' && label !== '') sections[key] = label;
-}
+// Eigene Namen der Installation, in einer weiteren Sprache die für sie eingetragenen
+const own = ownSections((globalThis as { KOMPANIE_CONFIG?: Parameters<typeof ownSections>[0] }).KOMPANIE_CONFIG);
+const sections = brand.labels.sections as Record<string, string>;
+for (const [key, label] of Object.entries(own)) if (key in sections && typeof label === 'string' && label !== '') sections[key] = label;
 
 export default brand;
 export type Brand = typeof brand;

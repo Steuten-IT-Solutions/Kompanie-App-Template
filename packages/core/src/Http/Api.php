@@ -12,6 +12,7 @@ use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\ChangeLog\Item;
 use KompanieApp\Core\ChangeLog\Subject;
 use KompanieApp\Core\ChangeLog\Subjects;
+use KompanieApp\Core\Domain\TranslationService;
 use KompanieApp\Core\Domain\AdmissionService;
 use KompanieApp\Core\Domain\AttachmentService;
 use KompanieApp\Core\Domain\BoardService;
@@ -770,7 +771,8 @@ final class Api
             // Handbuch auf GitHub Pages der Kompanie: neben updates.json (Issue #12)
             'handbookUrl' => self::handbookUrl((string) ($a->packageConfig['updatesUrl'] ?? '')),
             // Bezeichnungen und Punktefaktor der Rollen (vom Admin in der App festgelegt)
-            'roles' => $a->roles()->publicList(),
+            // Bezeichnungen in der Sprache der Anfrage (eingetragen, sonst übersetzte Vorgabe, sonst deutsch)
+            'roles' => array_map(static fn (array $r): array => ['label' => $a->translations()->name('role', $r['key'], $r['label'])] + $r, $a->roles()->publicList()),
             // Sprachen, die die App anbietet (Deutsch zuerst; nur Deutsch = kein Umschalter)
             'languages' => $a->languages()->enabled(),
             // level ist die Grundrolle; extra_roles die Zusatzrollen (Issue #66), capabilities alle Rechte zusammen
@@ -800,6 +802,10 @@ final class Api
             'tile_defaults' => self::jsonObject(array_map(self::jsonObject(...), $a->tileLayouts()->defaults())),
             'tile_layouts' => $user !== null && !$a->preview()->active() ? self::jsonObject(array_map(self::jsonObject(...), $a->tileLayouts()->all($user->id))) : null,
             'section_labels' => self::jsonObject($a->navigation()->sectionOverrides($a->features()->enabled('directory'), $a->features()->enabled('offices'))),
+            // Dieselben Namen in jeder weiteren eingeschalteten Sprache (Plan „Mehrsprachigkeit“): eingetragen, sonst deutsch
+            'section_labels_i18n' => self::jsonObject($this->sectionLabelsByLocale()),
+            // Eigene Namen je weiterer Sprache: Sprache => Art (nav, role) => Kennung => Feld => Text (TranslationService)
+            'name_translations' => self::jsonObject($a->translations()->all()),
             // News in der App geschrieben (Quelle „app“): Wer manage_news hat, sieht dort Knöpfe zum Schreiben und Ändern
             'newsInApp' => ($features['news'] ?? false) && $a->newsService()->inApp(),
             // Beiträge der WordPress-Seite im Editor von WordPress schreiben (Quelle site, manage_news): Adresse für „Neuer Beitrag“
@@ -847,6 +853,21 @@ final class Api
      * @param array<mixed> $map
      * @return array<mixed>|\stdClass
      */
+    /**
+     * Eigene Namen der Bereiche (section_labels) in jeder weiteren eingeschalteten Sprache.
+     *
+     * @return array<string, array<string, string>|\stdClass>
+     */
+    private function sectionLabelsByLocale(): array
+    {
+        $a = $this->app;
+        $out = [];
+        foreach (array_diff($a->languages()->enabled(), [I18n::SOURCE_LOCALE]) as $locale) {
+            $out[$locale] = self::jsonObject($a->navigation()->sectionOverrides($a->features()->enabled('directory'), $a->features()->enabled('offices'), $locale));
+        }
+        return $out;
+    }
+
     private static function jsonObject(array $map): array|\stdClass
     {
         return $map === [] ? new \stdClass() : $map;
@@ -1619,6 +1640,8 @@ final class Api
                 $a->tileLayouts()->resetDefault($r->query['page'] ?? null);
                 return ['page' => $r->query['page'], 'layouts' => new \stdClass()];
             }, null, $denySettings),
+            // Eigene Namen je weiterer Sprache (Einrichten auf …): jede Art verlangt ihr eigenes Recht (TranslationService::KINDS)
+            new Route('PUT', '/admin/translations', TranslationService::capabilities(), fn (Request $r) => ['translations' => self::jsonObject($a->translations()->save($this->user(), $r->body['locale'] ?? null, $r->body['items'] ?? null))]),
             new Route('GET', '/admin/navigation', Cap::ManageSettings, fn () => $a->navigation()->describe(), null, $denySettings),
             new Route('PUT', '/admin/navigation', Cap::ManageSettings, fn (Request $r) => $a->navigation()->save((array) $r->body), null, $denySettings),
             new Route('GET', '/admin/settings', Cap::ManageSettings, fn () => $a->settingsService()->get(), null, $denySettings),
@@ -1671,6 +1694,7 @@ final class Api
             new Route('DELETE', '/admin/roles/{key}', Cap::ManageSettings, function (Request $r) use ($a) {
                 $replacement = $r->query['replacement'] ?? null;
                 $a->roles()->delete((string) $r->params['key'], is_string($replacement) ? $replacement : null);
+                $a->translations()->repository()->deleteRef('role', (string) $r->params['key']);
                 return $this->roles();
             }, null, $denySettings),
             new Route('GET', '/admin/features', Cap::ManageSettings, fn () => $a->features()->describe(), null, $denySettings),

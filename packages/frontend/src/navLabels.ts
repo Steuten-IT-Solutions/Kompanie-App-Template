@@ -1,5 +1,6 @@
 import { config } from './api';
 import brand from './generated/brand';
+import { nameIn } from './names';
 import { pageTarget, type FixedTarget, type NavNames, type NavTarget } from './navigation';
 
 /**
@@ -13,7 +14,10 @@ export function targetLabels(
 ): Record<FixedTarget, string> & Partial<Record<NavTarget, string>> {
   const sec = brand.labels.sections;
   const f = config?.features;
-  const own = Object.fromEntries(pages.map((p) => [pageTarget(p.id), names[pageTarget(p.id)]?.label || p.title]));
+  // Eigener Tab-Name einer Seite in der Sprache der App (names.ts), sonst der deutsche, sonst der Titel
+  const own = Object.fromEntries(
+    pages.map((p) => [pageTarget(p.id), nameIn('nav', pageTarget(p.id), names[pageTarget(p.id)]?.label || p.title)]),
+  );
   return {
     ...own,
     termine: sec.events,

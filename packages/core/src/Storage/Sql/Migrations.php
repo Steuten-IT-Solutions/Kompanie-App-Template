@@ -2187,9 +2187,41 @@ WHERE title IS NULL",
                     'ALTER TABLE {attendance_lists} ADD COLUMN kinds TEXT NOT NULL DEFAULT \'\'',
                 ],
             ],
+            // Namen je weiterer Sprache (Plan „Mehrsprachigkeit“, Storage\TranslationRepository): Art (z. B. nav, role), Kennung
+            // in dieser Art, Feld und Sprache; der deutsche Name bleibt, wo er ist. Kurze Spalten, damit der Schlüssel auch
+            // in älterem MySQL passt.
+            73 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {translations} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  kind varchar(20) NOT NULL,
+  ref varchar(100) NOT NULL,
+  field varchar(20) NOT NULL,
+  locale varchar(8) NOT NULL,
+  text text NOT NULL,
+  updated_by bigint(20) unsigned NOT NULL DEFAULT 0,
+  updated_at datetime NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY kind_ref (kind, ref, field, locale)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {translations} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,
+  ref TEXT NOT NULL,
+  field TEXT NOT NULL,
+  locale TEXT NOT NULL,
+  text TEXT NOT NULL,
+  updated_by INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {translations}_kind_ref ON {translations} (kind, ref, field, locale)',
+                ],
+            ],
             // Zu- und Absagen, die offline vor dem Ende der Frist getippt wurden und erst danach ankamen (EventResponseService):
             // Zeit des Tippens (UTC) zum Kennzeichnen „nachträglich übertragen“; NULL bei allen anderen.
-            73 => [
+            74 => [
                 'mysql' => ['ALTER TABLE {event_responses} ADD COLUMN decided_at datetime DEFAULT NULL'],
                 'sqlite' => ['ALTER TABLE {event_responses} ADD COLUMN decided_at TEXT DEFAULT NULL'],
             ],

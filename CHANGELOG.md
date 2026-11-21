@@ -30,8 +30,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Sprache ein (anfangs nur Deutsch). Dann steht oben eine Flagge, mit der jede Person Deutsch oder Englisch wählt, auch
   ohne Anmeldung; unter [Meins → Konto](app:meins/konto) gibt es dieselbe Wahl. Angemeldete behalten ihre Sprache auf allen
   Geräten und bekommen Mails und Benachrichtigungen in dieser Sprache. Übersetzt sind die Texte der App und die vorgegebenen Namen
-  der Bereiche und Rollen (z. B. „Termine“ → „Events“); Namen, die ihr selbst vergeben habt, und was ihr eintragt,
-  bleiben, wie sie sind.
+  der Bereiche und Rollen (z. B. „Termine“ → „Events“); Für eure eigenen Namen von Bereichen und Rollen wählst du in
+  [Einstellungen → Navigation](app:einstellungen/navigation) und [Einstellungen → Rollen](app:einstellungen/rollen) oben
+  _Einrichten auf: English_ und trägst die englischen Namen ein; ohne Eintrag bleibt der deutsche. Was ihr sonst
+  eintragt, bleibt, wie es ist.
 - **Wartung**: Unter [Einstellungen → Zustand und Updates](app:einstellungen/zustand) steht, bis wann eure App neue
   Versionen bekommt (Wartung bis …, oder unbefristet). Nach dem Ende läuft die App mit ihrer Version weiter; neue
   Versionen, auch Sicherheitsupdates, gibt es erst nach einer Verlängerung. Zurückgehen auf ältere Versionen bleibt
