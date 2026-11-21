@@ -27,6 +27,9 @@ use KompanieApp\Core\Storage\EventKindRepository;
  * - Jede Anwesenheitsliste hat die Arten als eigene Momentaufnahme (AttendanceService): Beim Anlegen übernimmt sie die
  *   des Termins (sonst den Vorschlag aus dem Titel), ändern lassen sie sich an der Liste. Wer die Arten eines Termins
  *   ändert, ändert sie auch an dessen Liste. So zählt eine Teilnahme auch, wenn der Termin aus dem Kalender verschwunden ist.
+ * - Namen je weiterer Sprache stehen in translations (Art event_kind, Kennung ist der deutsche Name; label()). Umbenennen
+ *   oder Entfernen einer Art lässt ihre Übersetzung stehen: Termine und Listen behalten den alten Namen, er erscheint dann
+ *   weiter übersetzt.
  */
 final class EventKindService
 {
@@ -189,7 +192,7 @@ final class EventKindService
         $options = $this->options();
         throw ApiError::invalid($options === []
             ? I18n::t('Es sind noch keine Terminarten eingerichtet (Einstellungen → Kalender).')
-            : I18n::t('Bitte eine der Terminarten wählen: {options}.', ['options' => implode(', ', $options)]));
+            : I18n::t('Bitte eine der Terminarten wählen: {options}.', ['options' => implode(', ', array_map($this->label(...), $options))]));
     }
 
     /**
@@ -296,6 +299,12 @@ final class EventKindService
         } catch (ApiError) {
             return null;
         }
+    }
+
+    /** Name einer Art in der Sprache der Anfrage (eigener Name je Sprache, sonst der deutsche). */
+    public function label(string $kind): string
+    {
+        return $this->app->translations()->name('event_kind', $kind, $kind);
     }
 
     /** @param array<string, mixed> $e */

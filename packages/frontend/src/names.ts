@@ -30,3 +30,6 @@ export function translatedName(kind: NameKind, ref: string, lang: Locale, field 
 export function nameIn(kind: NameKind, ref: string, german: string, field = 'label', lang: Locale = locale()): string {
   return translatedName(kind, ref, lang, field) || german;
 }
+
+/** Name einer Terminart in der Sprache der App (Kennung ist ihr deutscher Name, wie er an Terminen steht). */
+export const kindName = (german: string, lang: Locale = locale()): string => nameIn('event_kind', german, german, 'label', lang);

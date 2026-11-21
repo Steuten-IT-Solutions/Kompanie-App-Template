@@ -4926,6 +4926,95 @@ test('Sprachen: englischer Name eines Amts über „Einrichten auf“, Gäste au
   }
 });
 
+test('Sprachen: englische Namen für eine Terminart und ein Untermenü, Mitglied mit Englisch am Gerät sieht sie', async ({
+  page,
+  browser,
+}) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json()) as { id?: string; title?: string; kinds?: string[] }[] };
+      },
+      [path, method, body] as const,
+    );
+  expect((await api('admin/settings', 'PATCH', { languages: 'de,en' })).status).toBe(200);
+  expect((await api('admin/event-kinds', 'PUT', { kinds: ['Versammlung'], hidden: [] })).status).toBe(200);
+  const evening = (await api('calendar', 'GET')).data.find((e) => e.title === 'Vereinsabend');
+  expect((await api(`calendar/${encodeURIComponent(evening!.id!)}/kind`, 'PUT', { kinds: ['Versammlung'] })).status).toBe(200);
+  try {
+    // Terminart: Einstellungen → Kalender, Einrichten auf Englisch; der deutsche Name ist Platzhalter
+    // Neu laden: Die eingeschaltete Sprache und die Arten kommen mit der Konfiguration
+    await page.goto('/app/#/einstellungen/kalender');
+    await page.reload();
+    const kinds = page.locator('.settings-section', { has: page.getByRole('heading', { name: 'Terminarten' }) });
+    await kinds.locator('.edit-lang').getByRole('button', { name: 'English' }).click();
+    const kind = kinds.getByLabel('Terminart 1', { exact: true });
+    await expect(kind).toHaveAttribute('placeholder', 'Versammlung');
+    await expect(kinds.getByRole('button', { name: '+ Terminart' })).toHaveCount(0);
+    await kind.fill('Meeting');
+    await kinds.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
+
+    // Untermenü: auf Deutsch „Intern“ in „Verein“ umbenennen (eigene Navigation), dann auf Englisch „Club“
+    await page.goto('/app/#/einstellungen/navigation');
+    const navCard = page.locator('#einstellungen-navigation');
+    await page.locator('.edit-lang').getByRole('button', { name: 'Deutsch' }).click();
+    await navCard.getByLabel('Name des Untermenüs').fill('Verein');
+    await navCard.getByLabel('Platz von Termine').selectOption({ label: 'Im Untermenü „Verein“' });
+    await navCard.getByRole('button', { name: 'Navigation speichern' }).click();
+    await expect(page.getByText('Navigation gespeichert')).toBeVisible();
+    await expect(navCard.getByText('Zurzeit gilt eure eigene Navigation.')).toBeVisible();
+    await page.locator('.edit-lang').getByRole('button', { name: 'English' }).click();
+    const menuName = navCard.getByLabel('Name des Untermenüs');
+    await expect(menuName).toHaveAttribute('placeholder', 'Verein');
+    await menuName.fill('Club');
+    const reloaded = page.waitForEvent('load');
+    await navCard.getByRole('button', { name: 'Navigation speichern' }).click();
+    await expect(page.getByText('Navigation gespeichert')).toBeVisible();
+    await reloaded;
+    // Auf Deutsch bleibt alles beim deutschen Namen
+    await expect(page.locator('.tabbar').getByRole('button', { name: 'Verein' })).toBeVisible();
+
+    // Mitglied ohne Sprache am Konto, Englisch am Gerät
+    const member = await quietPage(browser);
+    await login(member, 'mitglied1');
+    await member.evaluate(() => localStorage.setItem('kompanie-locale', 'en'));
+    await member.reload();
+    await expect(member.locator('html')).toHaveAttribute('lang', 'en');
+    const tabbar = member.locator('.tabbar');
+    await expect(tabbar.getByRole('button', { name: 'Verein' })).toHaveCount(0);
+    await tabbar.getByRole('button', { name: 'Club' }).click();
+    await expect(member.locator('.topbar-title')).toHaveText('Club');
+    await member.getByRole('navigation', { name: 'Club' }).getByRole('button', { name: 'Events', exact: true }).click();
+    await expect(member.locator('.card.event', { hasText: 'Vereinsabend' }).locator('.badge.event-kind')).toHaveText(['Meeting']);
+    await member.close();
+  } finally {
+    await page.goto('/app/');
+    for (const e of (await api('calendar', 'GET')).data) {
+      if (e.kinds && e.kinds.length > 0) await api(`calendar/${encodeURIComponent(e.id!)}/kind`, 'PUT', { kinds: [] });
+    }
+    await api('admin/event-kinds', 'PUT', { kinds: [], hidden: [] });
+    await api('admin/translations', 'PUT', {
+      locale: 'en',
+      items: [
+        { kind: 'event_kind', ref: 'Versammlung', text: '' },
+        { kind: 'menu', ref: 'Verein', text: '' },
+      ],
+    });
+    await resetNavigation(page).catch(() => undefined);
+    await page.evaluate(() => localStorage.removeItem('kompanie-edit-locale'));
+    await api('admin/settings', 'PATCH', { languages: 'de' });
+  }
+});
+
 test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nicht', async ({ page }) => {
   // So, wie scripts/changelog.php es beim Bauen in die App gelegt hat.
   const changelog = JSON.parse(readFileSync(new URL('../src/generated/changelog.json', import.meta.url), 'utf8')) as {

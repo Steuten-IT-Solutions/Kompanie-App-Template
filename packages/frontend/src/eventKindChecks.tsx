@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { eventKinds } from './api';
 import { t } from './i18n';
+import { kindName } from './names';
 
 /** Arten eines Termins oder einer Anwesenheitsliste; ältere Server schicken nur kind (eine oder null). */
 export const kindsOf = (x: { kind?: string | null; kinds?: string[] }): string[] => x.kinds ?? (x.kind ? [x.kind] : []);
@@ -34,7 +35,7 @@ export function EventKindChecks({
       {options.map((k) => (
         <label key={k} className="toggle">
           <input type="checkbox" checked={value.includes(k)} disabled={disabled} onChange={(e) => toggle(k, e.target.checked)} />
-          {k}
+          {kindName(k)}
         </label>
       ))}
     </fieldset>
@@ -72,7 +73,9 @@ export function CollapsibleKindChecks({
         </span>
       </button>
       {!open && (
-        <p className="small event-kind-summary">{value.length > 0 ? value.join(', ') : <span className="muted">{t('keine')}</span>}</p>
+        <p className="small event-kind-summary">
+          {value.length > 0 ? value.map((k) => kindName(k)).join(', ') : <span className="muted">{t('keine')}</span>}
+        </p>
       )}
       {open && <EventKindChecks id={id} hideLegend value={value} disabled={disabled} onChange={onChange} />}
     </>

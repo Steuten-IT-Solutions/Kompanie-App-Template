@@ -1,5 +1,6 @@
 import type { AdmissionRuleNode, AdmissionRuleResult } from './api';
 import { t, tn } from './i18n';
+import { kindName } from './names';
 
 /**
  * Voraussetzung für die Aufnahme als Baum (Anzeige: admissionRuleView.tsx) (Server: Domain\AdmissionRule): Gruppen verknüpfen Bedingungen und weitere
@@ -87,7 +88,9 @@ type AnyNode = { type: string; op?: string; items?: AnyNode[]; kind?: string; co
 /** Voraussetzung in einer Zeile, z. B. „6 Teilnahmen an Versammlung und (12 Monate als Anwärter oder …)“; leer ohne. */
 export function describeRule(n: AnyNode, inner = false): string {
   if (n.type === 'attendance')
-    return tn('{count} Teilnahme an „{kind}“', '{count} Teilnahmen an „{kind}“', Number(n.count ?? 0), { kind: n.kind || '?' });
+    return tn('{count} Teilnahme an „{kind}“', '{count} Teilnahmen an „{kind}“', Number(n.count ?? 0), {
+      kind: n.kind ? kindName(n.kind) : '?',
+    });
   if (n.type === 'duration') return tn('{count} Monat als Anwärter', '{count} Monate als Anwärter', Number(n.months ?? 0));
   const parts = (n.items ?? []).map((i) => describeRule(i, true)).filter((p) => p !== '');
   const text = parts.join(n.op === 'or' ? ` ${t('oder')} ` : ` ${t('und')} `);
@@ -98,7 +101,9 @@ export function describeRule(n: AnyNode, inner = false): string {
 function leafState(r: AdmissionRuleResult): string | null {
   if (r.status === 'fulfilled') return null;
   if (r.type === 'attendance')
-    return tn('noch {count} Teilnahme an „{kind}“', 'noch {count} Teilnahmen an „{kind}“', r.missing ?? 0, { kind: r.kind ?? '' });
+    return tn('noch {count} Teilnahme an „{kind}“', 'noch {count} Teilnahmen an „{kind}“', r.missing ?? 0, {
+      kind: r.kind ? kindName(r.kind) : '',
+    });
   if (r.type === 'duration') return r.due ? t('Mindestdauer ab {date}', { date: dateText(r.due) }) : t('„Anwärter seit“ fehlt');
   return null;
 }
