@@ -95,6 +95,10 @@ final class LanguageService
     public function resolve(?string $requested, ?User $user): string
     {
         $enabled = $this->enabled();
+        // Nur Deutsch an (Vorgabe): keine Abfrage der Wahl am Konto
+        if (count($enabled) === 1) {
+            return I18n::SOURCE_LOCALE;
+        }
         foreach ([$requested, $user !== null && $user->id > 0 ? $this->ofUser($user->id) : null] as $candidate) {
             if (is_string($candidate) && in_array($candidate, $enabled, true)) {
                 return $candidate;
