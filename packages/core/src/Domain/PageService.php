@@ -72,12 +72,8 @@ final class PageService
         if ($uid === null) {
             return true;
         }
-        $blocks = Blocks::decode($page['blocks'] ?? null, (string) ($page['body'] ?? ''));
         // Das Bild kann auch in der Fassung einer weiteren Sprache stehen: dort gilt die Zielgruppe des Blocks ebenso.
-        $all = $blocks;
-        foreach ($this->app->contentTranslations()->of(self::KIND, $pageId) as $fields) {
-            array_push($all, ...Blocks::translate($blocks, Blocks::decodeTranslation($fields['blocks'] ?? null))[0]);
-        }
+        $all = $this->app->contentTranslations()->allBlocks(self::KIND, $pageId, Blocks::decode($page['blocks'] ?? null, (string) ($page['body'] ?? '')));
         if (!Blocks::imageOnlyForMembers($all, $uid)) {
             return true;
         }
@@ -167,14 +163,7 @@ final class PageService
             'blocks' => $this->app->blocks()->forViewer($blocks, $viewer, $this->isMember($viewer), $manager),
         ] + ($untranslated !== null ? ['untranslated' => $untranslated] : []) + ($manager ? $this->meta($p) : []);
         if ($source && $manager) {
-            $out['translations'] = [];
-            foreach ($content->of(self::KIND, $id) as $locale => $fields) {
-                $out['translations'][$locale] = [
-                    'title' => $fields['title'] ?? '',
-                    'blocks' => (object) $this->app->blocks()->renderTranslation(Blocks::decodeTranslation($fields['blocks'] ?? null)),
-                ];
-            }
-            $out['translations'] = (object) $out['translations'];
+            $out['translations'] = $content->blocksSource(self::KIND, $id);
         }
         return $out;
     }
@@ -188,15 +177,7 @@ final class PageService
      */
     private function localized(array $p, array $fields): array
     {
-        $german = Blocks::decode($p['blocks'] ?? null, (string) ($p['body'] ?? ''));
-        [$blocks, $total, $done] = Blocks::translate($german, Blocks::decodeTranslation($fields['blocks'] ?? null));
-        $title = (string) $p['title'];
-        $total++;
-        if (($fields['title'] ?? '') !== '') {
-            $title = $fields['title'];
-            $done++;
-        }
-        return [$title, $blocks, $total, $done];
+        return ContentTranslations::blocksIn((string) $p['title'], Blocks::decode($p['blocks'] ?? null, (string) ($p['body'] ?? '')), $fields);
     }
 
     /**
@@ -244,7 +225,7 @@ final class PageService
         $german = $blocks ?? Blocks::decode($page['blocks'] ?? null, (string) ($page['body'] ?? ''));
         $translations = [];
         foreach ($given as $locale => $fields) {
-            $translations[$locale] = $this->translationInput($fields, $german, $actor, $id);
+            $translations[$locale] = $content->blocksInput($fields, $german, $actor, RichImageService::OWNER_PAGE, $id, self::TITLE_MAX, self::BODY_MAX);
         }
         $this->app->db->transaction(function () use ($id, $data, $blocks, $translations, $content, $actor): void {
             foreach ($translations as $locale => $fields) {
@@ -252,41 +233,12 @@ final class PageService
             }
             if ($blocks !== null || $translations !== []) {
                 // Bilder, die in keinem Block und keiner Fassung mehr stehen, werden gelöscht (es gibt keinen Verlauf).
-                $keep = [];
-                foreach ($content->of(self::KIND, $id) as $fields) {
-                    array_push($keep, ...Blocks::translationImages(Blocks::decodeTranslation($fields['blocks'] ?? null)));
-                }
                 $page = $this->row($id) ?? [];
-                $data += $this->content($blocks ?? Blocks::decode($page['blocks'] ?? null, (string) ($page['body'] ?? '')), $actor, $id, $keep);
+                $data += $this->content($blocks ?? Blocks::decode($page['blocks'] ?? null, (string) ($page['body'] ?? '')), $actor, $id, $content->blockImages(self::KIND, $id));
             }
             $this->app->db->update('app_pages', $data + ['updated_by' => $actor->id, 'updated_at' => $this->app->time()->nowUtc()], ['id' => $id]);
         });
         return $this->get($id, $actor, $translations !== []);
-    }
-
-    /**
-     * Eine Fassung aus der App: title und blocks (Kennung => Feld => Wert), jeweils optional; '' löscht.
-     *
-     * @param array<string, mixed> $in
-     * @param list<array<string, mixed>> $german
-     * @return array<string, string> Feld => gespeicherter Text
-     */
-    private function translationInput(array $in, array $german, User $actor, int $id): array
-    {
-        $out = [];
-        if (array_key_exists('title', $in)) {
-            $title = Text::line(is_string($in['title']) ? $in['title'] : '', self::TITLE_MAX + 1);
-            if (mb_strlen($title) > self::TITLE_MAX) {
-                throw ApiError::invalid(I18n::t('Der Titel darf höchstens {max} Zeichen lang sein.', ['max' => self::TITLE_MAX]));
-            }
-            $out['title'] = $title;
-        }
-        if (array_key_exists('blocks', $in)) {
-            $blocks = $this->app->blocks();
-            $tr = $blocks->claimTranslation($blocks->validateTranslation($german, $in['blocks'], self::BODY_MAX), $actor, RichImageService::OWNER_PAGE, $id);
-            $out['blocks'] = Blocks::encodeTranslation($tr);
-        }
-        return $out;
     }
 
     public function delete(int $id): void
@@ -353,14 +305,7 @@ final class PageService
      */
     public function translationFields(array $p): array
     {
-        $out = [];
-        foreach ($this->app->translations()->repository()->forRef(self::KIND, (string) $p['id']) as $locale => $fields) {
-            [, $blocks] = $this->localized($p, $fields);
-            $text = trim((string) preg_replace('/\s+/u', ' ', $this->app->blocks()->plain($blocks, true)));
-            $out["Titel ($locale)"] = ($fields['title'] ?? '') !== '' ? $fields['title'] : null;
-            $out["Inhalt ($locale)"] = ($fields['blocks'] ?? '') !== '' && $text !== '' ? $text : null;
-        }
-        return $out;
+        return $this->app->contentTranslations()->blocksLog(self::KIND, (int) $p['id'], Blocks::decode($p['blocks'] ?? null, (string) ($p['body'] ?? '')));
     }
 
     /**

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Auth\User;
+use KompanieApp\Core\Domain\Blocks\Blocks;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\I18n\I18n;
 
@@ -116,6 +118,115 @@ final class ContentTranslations
     public function delete(string $kind, int $id): void
     {
         $this->app->translations()->repository()->deleteRef($kind, (string) $id);
+    }
+
+    /**
+     * Titel und Blöcke eines Inhalts aus Blöcken (Seite, News, Brett) in einer Fassung ($fields: title, blocks), dazu
+     * übersetzbare und übersetzte Felder (der Titel zählt mit).
+     *
+     * @param list<array<string, mixed>> $german
+     * @param array<string, string> $fields
+     * @return array{0: string, 1: list<array<string, mixed>>, 2: int, 3: int}
+     */
+    public static function blocksIn(string $title, array $german, array $fields): array
+    {
+        [$blocks, $total, $done] = Blocks::translate($german, Blocks::decodeTranslation($fields['blocks'] ?? null));
+        $total++;
+        if (($fields['title'] ?? '') !== '') {
+            $title = $fields['title'];
+            $done++;
+        }
+        return [$title, $blocks, $total, $done];
+    }
+
+    /**
+     * Fassung eines Inhalts aus Blöcken aus der App prüfen: title und blocks (Kennung => Feld => Wert), jeweils optional;
+     * '' löscht. Bilder in den Textblöcken gehören danach $ownerType/$ownerId.
+     *
+     * @param array<string, mixed> $in
+     * @param list<array<string, mixed>> $german die deutschen Blöcke
+     * @return array<string, string> Feld => zu speichernder Text
+     */
+    public function blocksInput(array $in, array $german, User $actor, string $ownerType, int $ownerId, int $titleMax, int $textMax): array
+    {
+        $out = [];
+        if (array_key_exists('title', $in)) {
+            $title = Text::line(is_string($in['title']) ? $in['title'] : '', $titleMax + 1);
+            if (mb_strlen($title) > $titleMax) {
+                throw ApiError::invalid(I18n::t('Der Titel darf höchstens {max} Zeichen lang sein.', ['max' => $titleMax]));
+            }
+            $out['title'] = $title;
+        }
+        if (array_key_exists('blocks', $in)) {
+            $blocks = $this->app->blocks();
+            $tr = $blocks->claimTranslation($blocks->validateTranslation($german, $in['blocks'], $textMax), $actor, $ownerType, $ownerId);
+            $out['blocks'] = Blocks::encodeTranslation($tr);
+        }
+        return $out;
+    }
+
+    /**
+     * Bilder in den Textblöcken aller Fassungen eines Inhalts (damit das Aufräumen der deutschen sie behält).
+     *
+     * @return list<string>
+     */
+    public function blockImages(string $kind, int $id): array
+    {
+        $keep = [];
+        foreach ($this->app->translations()->repository()->forRef($kind, (string) $id) as $fields) {
+            array_push($keep, ...Blocks::translationImages(Blocks::decodeTranslation($fields['blocks'] ?? null)));
+        }
+        return $keep;
+    }
+
+    /**
+     * Fassungen zum Bearbeiten (source): Sprache => title, blocks (Bilder als Adressen).
+     *
+     * @return object
+     */
+    public function blocksSource(string $kind, int $id): object
+    {
+        $out = [];
+        foreach ($this->of($kind, $id) as $locale => $fields) {
+            $out[$locale] = [
+                'title' => $fields['title'] ?? '',
+                'blocks' => (object) $this->app->blocks()->renderTranslation(Blocks::decodeTranslation($fields['blocks'] ?? null)),
+            ];
+        }
+        return (object) $out;
+    }
+
+    /**
+     * Alle Blöcke eines Inhalts, auch die der Fassungen (für die Sichtbarkeit von Bildern, Blocks::imageOnlyForMembers).
+     *
+     * @param list<array<string, mixed>> $german
+     * @return list<array<string, mixed>>
+     */
+    public function allBlocks(string $kind, int $id, array $german): array
+    {
+        $all = $german;
+        foreach ($this->of($kind, $id) as $fields) {
+            array_push($all, ...Blocks::translate($german, Blocks::decodeTranslation($fields['blocks'] ?? null))[0]);
+        }
+        return $all;
+    }
+
+    /**
+     * Fassungen für das Änderungsprotokoll: „Titel (en)“, „Inhalt (en)“ (reiner Text).
+     *
+     * @param list<array<string, mixed>> $german
+     * @return array<string, string|null>
+     */
+    public function blocksLog(string $kind, int $id, array $german): array
+    {
+        $out = [];
+        foreach ($this->app->translations()->repository()->forRef($kind, (string) $id) as $locale => $fields) {
+            [, $blocks] = self::blocksIn('', $german, $fields);
+            $text = trim((string) preg_replace('/\s+/u', ' ', $this->app->blocks()->plain($blocks, true)));
+            $out["Titel ($locale)"] = ($fields['title'] ?? '') !== '' ? $fields['title'] : null;
+            $out["Inhalt ($locale)"] = ($fields['blocks'] ?? '') !== '' && $text !== '' ? $text : null;
+        }
+        return $out;
     }
 
     /** Hinweis für die Antwort aus übersetzbaren und übersetzten Feldern: null (alles da), NONE oder PARTLY. */

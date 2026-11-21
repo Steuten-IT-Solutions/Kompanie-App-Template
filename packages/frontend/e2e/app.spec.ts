@@ -5102,6 +5102,65 @@ test('Sprachen: eigene Seite auf Englisch schreiben, Gäste auf Englisch lesen s
   }
 });
 
+test('Sprachen: News aus der App auf Englisch schreiben, Gäste auf Englisch lesen sie', async ({ page, browser }) => {
+  const id = Date.now() % 1000000;
+  const german = `Schützenfest ${id}`;
+  const english = `Shooting festival ${id}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json()) as { id?: string; news?: { source: string } } };
+      },
+      [path, method, body] as const,
+    );
+  const before = (await api('admin/settings', 'GET')).data.news!.source;
+  expect((await api('admin/settings', 'PATCH', { languages: 'de,en', news_source: 'app' })).status).toBe(200);
+  const created = await api('news', 'POST', { title: german, blocks: [{ id: 't1', type: 'text', html: '<p>Am Samstag feiern wir.</p>' }] });
+  expect(created.status).toBe(201);
+  const newsId = created.data.id!;
+  try {
+    await page.goto(`/app/#/news/${newsId}`);
+    await page.reload();
+    await page.getByRole('button', { name: 'Bearbeiten' }).click();
+    await page.locator('.edit-lang').getByRole('button', { name: 'English' }).click();
+    const form = page.locator('form.news-editor');
+    await expect(form.getByLabel('Titel', { exact: true })).toHaveAttribute('placeholder', german);
+    await form.getByLabel('Titel', { exact: true }).fill(english);
+    await form.getByRole('textbox', { name: 'Text', exact: true }).fill('We celebrate on Saturday.');
+    await form.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
+    // Auf Deutsch bleibt der deutsche Beitrag, auch beim Bearbeiten
+    await expect(page.locator('.news-headline')).toHaveText(german);
+    await page.getByRole('button', { name: 'Bearbeiten' }).click();
+    await page.locator('.edit-lang').getByRole('button', { name: 'Deutsch' }).click();
+    await expect(page.locator('form.news-editor').getByLabel('Titel', { exact: true })).toHaveValue(german);
+    await page.locator('form.news-editor').getByRole('button', { name: 'Abbrechen' }).click();
+
+    const visitor = await quietPage(browser);
+    await visitor.goto('/app/');
+    await visitor.evaluate(() => localStorage.setItem('kompanie-locale', 'en'));
+    await visitor.goto('/app/#/news');
+    await visitor.reload();
+    await expect(visitor.locator('.news-card', { hasText: english })).toBeVisible();
+    await visitor.locator('.news-card', { hasText: english }).click();
+    await expect(visitor.locator('.news-headline')).toHaveText(english);
+    await expect(visitor.locator('.news-content')).toContainText('We celebrate on Saturday.');
+    await expect(visitor.locator('.untranslated-note')).toHaveCount(0);
+    await visitor.close();
+  } finally {
+    expect((await api(`news/${newsId}`, 'DELETE')).status).toBe(200);
+    expect((await api('admin/settings', 'PATCH', { languages: 'de', news_source: before })).status).toBe(200);
+  }
+});
+
 test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nicht', async ({ page }) => {
   // So, wie scripts/changelog.php es beim Bauen in die App gelegt hat.
   const changelog = JSON.parse(readFileSync(new URL('../src/generated/changelog.json', import.meta.url), 'utf8')) as {

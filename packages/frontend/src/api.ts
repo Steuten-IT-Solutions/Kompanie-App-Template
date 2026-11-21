@@ -1228,6 +1228,10 @@ export interface NewsItem {
   updated_by_name?: string | null;
   /** Beiträge der WordPress-Seite, nur mit manage_news: Adresse im Editor von WordPress; fehlt sonst */
   edit_url?: string | null;
+  /** News in der App: fehlt etwas in der Sprache der App, all oder some (dann steht dort Deutsch) */
+  untranslated?: 'all' | 'some';
+  /** Nur mit newsSource: Fassungen je weiterer Sprache zum Bearbeiten */
+  translations?: Record<string, { title: string; blocks: BlockTranslation }>;
 }
 
 /** Beitrag der News in der App: Titel und formatierter Text (RichText mit Bildern). */
@@ -1238,6 +1242,8 @@ export interface NewsInput {
   /** Titelbild: Kennung aus POST /rich-images oder cover_uid; null entfernt es (Issue #351) */
   cover?: string | null;
   updated_at?: string | null;
+  /** Fassungen je weiterer Sprache ('' löscht ein Feld) */
+  translations?: Record<string, { title?: string; blocks?: BlockTranslation }>;
 }
 
 /** In der App änderbar? Ältere Server liefern kein editable: dann nur Alben der App bzw. hochgeladene Bilder. */
@@ -2874,6 +2880,8 @@ export const api = {
     return { items: data, totalPages: Number(headers.get('X-Total-Pages') ?? 1) };
   },
   newsItem: (id: string) => request<NewsItem>('GET', `/news/${encodeURIComponent(id)}`),
+  /** Zum Bearbeiten: deutsche Fassung und die Fassungen je weiterer Sprache */
+  newsSource: (id: string) => request<NewsItem>('GET', `/news/${encodeURIComponent(id)}?source=1`),
   createNews: (data: NewsInput) => request<NewsItem>('POST', '/news', data),
   updateNews: (id: string, data: NewsInput) => request<NewsItem>('PATCH', `/news/${encodeURIComponent(id)}`, data),
   deleteNews: (id: string) => request<{ deleted: boolean }>('DELETE', `/news/${encodeURIComponent(id)}`),

@@ -47,6 +47,15 @@ Tippe unten auf **{bereich.news}**. Oben steht der Knopf **Neuer Beitrag**. Zum 
 1. Öffne den Beitrag und tippe auf **Bearbeiten**.
 2. Ändere Titel oder Blöcke und tippe auf **Speichern**. Das Datum bleibt das der Veröffentlichung.
 
+### Einen Beitrag auf Englisch schreiben
+Ist in der App Englisch eingeschaltet, steht beim Bearbeiten oben **Schreiben auf: Deutsch | English**.
+1. Veröffentliche den Beitrag wie gewohnt auf Deutsch.
+2. Öffne ihn, tippe auf **Bearbeiten** und wähle oben **English**.
+3. Trage den englischen Titel und die Texte der Blöcke ein. Leere Felder zeigen grau den deutschen Text.
+4. Tippe auf **Speichern**.
+
+Titelbild, Blöcke und ihre Einstellungen änderst du auf Deutsch; sie gelten für beide Sprachen. Wer die App auf Englisch nutzt, sieht die englische Fassung. Was fehlt, erscheint auf Deutsch mit dem Hinweis *Nur auf Deutsch verfügbar*.
+
 ### Einen Beitrag löschen
 1. Öffne den Beitrag und tippe auf **Löschen**.
 2. Bestätige die Rückfrage. Der Beitrag und seine Bilder sind dann endgültig weg.
@@ -59,7 +68,8 @@ Mit der Quelle **Beiträge dieser WordPress-Seite** stehen die {bereich.news} al
 4. Zum Ändern öffnest du den Beitrag in der App und tippst unter dem Text auf **In WordPress bearbeiten** (Stift). Löschen kannst du ihn im Editor von WordPress (**In den Papierkorb verschieben**).
 
 ## Gut zu wissen
-- Wer die {bereich.news} mit Benachrichtigungen abonniert hat, bekommt bei einem neuen Beitrag eine Benachrichtigung, beim Ändern nicht.
+- Wer die {bereich.news} mit Benachrichtigungen abonniert hat, bekommt bei einem neuen Beitrag eine Benachrichtigung, beim Ändern nicht. Sie kommt in der Sprache der Person; den englischen Titel enthält sie nur, wenn er beim Versand schon eingetragen ist.
+- Beiträge, die als WordPress-Beiträge oder aus einem Feed kommen, haben nur ihre eine Sprache.
 - Hat jemand den Beitrag gespeichert, während du ihn bearbeitet hast, meldet die App das beim Speichern. Lade den Beitrag dann neu und trage deine Änderungen noch einmal ein.
 - Bilder, die in keinem Block mehr stehen, löscht die App beim Speichern, ebenso ein ersetztes oder entferntes Titelbild.
 - Bei jedem Block wählst du **Für alle, die die Seite sehen** oder **Nur Mitglieder**. Blöcke nur für Mitglieder samt ihren Bildern fehlen ohne Anmeldung und für Gäste.
