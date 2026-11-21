@@ -22,6 +22,8 @@ final class Request
         public readonly string $client = '',
         /** Header X-Kompanie-Preview der Anfrage (Vorschau „App als Rolle ansehen“, Issue #63); sonst gilt ?vorschau=… */
         public readonly ?string $preview = null,
+        /** Header X-Kompanie-Lang: Sprache der App (Plan „Mehrsprachigkeit“); null ohne Angabe */
+        public readonly ?string $locale = null,
     ) {
     }
 

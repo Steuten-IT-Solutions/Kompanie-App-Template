@@ -26,9 +26,58 @@ const CATALOGS: Readonly<Record<Locale, Catalog>> = { de: {}, en: en as Catalog 
 /** Sprachkennung für Intl (Datum, Zahlen): Englisch in britischer Schreibweise und Form. */
 const TAGS: Readonly<Record<Locale, string>> = { de: 'de-DE', en: 'en-GB' };
 
-let current: Locale = SOURCE_LOCALE;
-
 export const isLocale = (value: unknown): value is Locale => typeof value === 'string' && (LOCALES as readonly string[]).includes(value);
+
+/** Header, mit dem jede Anfrage die Sprache der App nennt (Meldungen des Servers in dieser Sprache). */
+export const LOCALE_HEADER = 'X-Kompanie-Lang';
+/** Wahl am Gerät (für Gäste und vor der Anmeldung). */
+const DEVICE_KEY = 'kompanie-locale';
+
+/**
+ * Sprache beim Start, nur aus den eingeschalteten: Wahl am Konto, sonst am Gerät, sonst die erste passende Sprache des
+ * Browsers (navigator.languages, „en-US“ zählt als „en“), sonst Deutsch.
+ */
+export function chooseLocale(input: {
+  enabled?: readonly string[];
+  account?: unknown;
+  device?: unknown;
+  browser?: readonly string[];
+}): Locale {
+  const enabled = (input.enabled ?? []).filter(isLocale);
+  const ok = (l: unknown): l is Locale => isLocale(l) && enabled.includes(l);
+  if (ok(input.account)) return input.account;
+  if (ok(input.device)) return input.device;
+  for (const tag of input.browser ?? []) {
+    const base = tag.toLowerCase().split('-')[0];
+    if (ok(base)) return base;
+  }
+  return SOURCE_LOCALE;
+}
+
+/** Gewählte Sprache am Gerät; null ohne Wahl (oder ohne Speicher, z. B. privates Fenster). */
+export function deviceLocale(storage: Pick<Storage, 'getItem'> | undefined = globalThis.localStorage): Locale | null {
+  try {
+    const v = storage?.getItem(DEVICE_KEY);
+    return isLocale(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Sprache am Gerät merken; null löscht die Wahl. */
+export function saveDeviceLocale(
+  l: Locale | null,
+  storage: Pick<Storage, 'setItem' | 'removeItem'> | undefined = globalThis.localStorage,
+): void {
+  try {
+    if (l) storage?.setItem(DEVICE_KEY, l);
+    else storage?.removeItem(DEVICE_KEY);
+  } catch {
+    // ohne Speicher: gilt nur bis zum Neuladen
+  }
+}
+
+let current: Locale = SOURCE_LOCALE;
 
 /** Aktuelle Sprache der Oberfläche. */
 export const locale = (): Locale => current;
@@ -71,4 +120,18 @@ export function tn(
   const entry = catalog[other];
   if (entry !== undefined && typeof entry !== 'string' && entry[form] !== '') return fill(entry[form], values);
   return fill(form === 'one' ? one : other, values);
+}
+
+// Sprache gleich beim Laden dieses Moduls festlegen, vor allen anderen Modulen der App (sie importieren es): Die
+// Konfiguration steht schon in der Seite (window.KOMPANIE_CONFIG).
+if (typeof window !== 'undefined') {
+  const boot = (window as { KOMPANIE_CONFIG?: { languages?: string[]; user?: { locale?: string | null } | null } }).KOMPANIE_CONFIG;
+  setLocale(
+    chooseLocale({
+      enabled: boot?.languages,
+      account: boot?.user?.locale,
+      device: deviceLocale(),
+      browser: globalThis.navigator?.languages,
+    }),
+  );
 }

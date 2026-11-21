@@ -22,6 +22,7 @@ use KompanieApp\Core\Domain\ReportService;
 use KompanieApp\Core\Domain\SignatureService;
 use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Text;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Push\PushService;
 use KompanieApp\Core\Storage\BackupCrypto;
 use KompanieApp\Core\Storage\Sql\DatabaseException;
@@ -96,10 +97,14 @@ final class Api
     {
         $preview = $this->app->preview();
         $before = $preview->begin(Preview::valueFrom($request->preview, $request->query[Preview::QUERY] ?? null));
+        // Sprache der Antwort (Meldungen): die der App, sonst die am Konto (LanguageService::resolve)
+        $locale = I18n::locale();
+        I18n::setLocale($this->app->languages()->resolve($request->locale, $this->app->authContext->currentUser()));
         try {
             return $this->run($route, $request);
         } finally {
             $preview->begin($before);
+            I18n::setLocale($locale);
         }
     }
 
@@ -764,10 +769,13 @@ final class Api
             'handbookUrl' => self::handbookUrl((string) ($a->packageConfig['updatesUrl'] ?? '')),
             // Bezeichnungen und Punktefaktor der Rollen (vom Admin in der App festgelegt)
             'roles' => $a->roles()->publicList(),
+            // Sprachen, die die App anbietet (Deutsch zuerst; nur Deutsch = kein Umschalter)
+            'languages' => $a->languages()->enabled(),
             // level ist die Grundrolle; extra_roles die Zusatzrollen (Issue #66), capabilities alle Rechte zusammen
             // photo_url: eigenes Foto (Konto), null ohne; create_roles bzw. create_extra_roles: Grund- bzw. Zusatzrollen, die
             // die Person beim Anlegen vergeben darf (RoleService::canCreateAs, creatableExtraRoles), nur mit create_users
-            'user' => $user !== null ? $user->toArray() + ['extra_roles' => $a->roles()->extraRolesOf($user), 'photo_url' => $a->memberPhotos()->url($user->id)]
+            // locale: Sprache am Konto (null = nichts gewählt)
+            'user' => $user !== null ? $user->toArray() + ['extra_roles' => $a->roles()->extraRolesOf($user), 'photo_url' => $a->memberPhotos()->url($user->id), 'locale' => $a->languages()->ofUser($user->id)]
                 + ($this->can(Cap::CreateUsers) ? ['create_roles' => $a->roles()->creatableRoles($user), 'create_extra_roles' => $a->roles()->creatableExtraRoles($user)] : []) : null,
             // Rechte ohne Anmeldung (die der Rolle Gast): Was die App dann zeigt
             'guestCapabilities' => array_map(static fn (Cap $c): string => $c->value, $a->roles()->guestCapabilities()),
@@ -924,6 +932,8 @@ final class Api
             }, 'birthdays', $denyBirthdays),
             // Eigene E-Mail-Adresse und Handynummer (Meins → Konto); eine neue E-Mail-Adresse nur mit dem aktuellen Passwort.
             new Route('GET', '/me/account', $L, fn () => $a->members()->ownAccount($this->user())),
+            // Sprache am Konto (Plan „Mehrsprachigkeit“): gilt auf allen Geräten, für Mails und Push; null löscht die Wahl
+            new Route('PUT', '/me/locale', $L, fn (Request $r) => ['locale' => $a->languages()->saveForUser($this->user(), $r->input('locale'))]),
             new Route('PATCH', '/me/account', $L, fn (Request $r) => $a->members()->updateOwnAccount($this->user(), $r->body)),
             // Eintrittsjahr mit der Anzeige auf der eigenen Seite in der Mitgliederliste
             new Route('GET', '/me/join-year', Cap::Member, fn () => ['join_year' => $a->joinYears()->of($this->user()->id)], null, $denyMember),

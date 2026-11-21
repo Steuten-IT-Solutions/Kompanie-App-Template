@@ -1,7 +1,19 @@
 // Übersetzungen (src/i18n.ts): Deutsch als Schlüssel, Rückfall auf Deutsch, Platzhalter, Mehrzahl, Sprache der Seite.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { fill, isLocale, locale, localeTag, setLocale, t, tn, type Catalog } from '../src/i18n.ts';
+import {
+  chooseLocale,
+  deviceLocale,
+  fill,
+  isLocale,
+  locale,
+  localeTag,
+  saveDeviceLocale,
+  setLocale,
+  t,
+  tn,
+  type Catalog,
+} from '../src/i18n.ts';
 
 const en: Catalog = {
   Speichern: 'Save',
@@ -49,4 +61,45 @@ test('Nur bekannte Sprachen', () => {
   assert.ok(isLocale('en'));
   assert.ok(!isLocale('fr'));
   assert.ok(!isLocale(undefined));
+});
+
+test('Sprache beim Start: Konto, Gerät, Browser, Deutsch – nur eingeschaltete', () => {
+  const enabled = ['de', 'en'];
+  assert.equal(chooseLocale({ enabled: ['de'], account: 'en', device: 'en', browser: ['en-US'] }), 'de', 'nur Deutsch an');
+  assert.equal(chooseLocale({ enabled, account: 'en', device: 'de', browser: ['de-DE'] }), 'en', 'Konto zuerst');
+  assert.equal(chooseLocale({ enabled, account: null, device: 'en', browser: ['de-DE'] }), 'en', 'dann Gerät');
+  assert.equal(
+    chooseLocale({ enabled, account: 'fr', device: 'xx', browser: ['fr-FR', 'en-GB', 'de'] }),
+    'en',
+    'dann Browser, erste passende',
+  );
+  assert.equal(chooseLocale({ enabled, browser: ['fr'] }), 'de', 'sonst Deutsch');
+  assert.equal(chooseLocale({}), 'de', 'ältere Server ohne languages');
+});
+
+test('Wahl am Gerät merken und lesen, ohne Speicher kein Fehler', () => {
+  const data = new Map<string, string>();
+  const storage = {
+    getItem: (k: string) => data.get(k) ?? null,
+    setItem: (k: string, v: string) => void data.set(k, v),
+    removeItem: (k: string) => void data.delete(k),
+  };
+  assert.equal(deviceLocale(storage), null);
+  saveDeviceLocale('en', storage);
+  assert.equal(deviceLocale(storage), 'en');
+  saveDeviceLocale(null, storage);
+  assert.equal(deviceLocale(storage), null);
+  data.set('kompanie-locale', 'fr');
+  assert.equal(deviceLocale(storage), null, 'Unbekanntes zählt nicht');
+  const broken = {
+    getItem: () => {
+      throw new Error('gesperrt');
+    },
+    setItem: () => {
+      throw new Error('gesperrt');
+    },
+    removeItem: () => undefined,
+  };
+  assert.equal(deviceLocale(broken), null);
+  saveDeviceLocale('en', broken);
 });

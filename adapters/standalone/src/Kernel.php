@@ -12,6 +12,7 @@ use KompanieApp\Core\Http\FileCache;
 use KompanieApp\Core\Http\ManifestIcons;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\Http\Response;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Infra\CurlHttpClient;
 use KompanieApp\Core\Infra\GdImageResizer;
 use KompanieApp\Core\Infra\LocalFileStorage;
@@ -507,7 +508,7 @@ final class Kernel
             }
             $query = $_GET;
             unset($query['r']);
-            $res = $this->app()->api()->handle(new Request($method, $path, $query, $body, [], $this->http->clientIp(), $this->http->header(Preview::HEADER)));
+            $res = $this->app()->api()->handle(new Request($method, $path, $query, $body, [], $this->http->clientIp(), $this->http->header(Preview::HEADER), $this->http->header(I18n::HEADER)));
         } catch (ApiError $e) {
             $res = Response::error($e);
         }

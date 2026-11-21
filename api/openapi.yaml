@@ -496,6 +496,36 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Error' }
 
+  /me/locale:
+    put:
+      tags: [Eigene Daten]
+      summary: Sprache am Konto wählen
+      description: |
+        Gilt auf allen Geräten nach der Anmeldung und für Mails und Push an diese Person. Nur Sprachen, die der Admin
+        eingeschaltet hat (`languages` in `/config`). `null` löscht die Wahl (dann gilt die am Gerät bzw. Deutsch).
+        Jede Anfrage der App nennt ihre Sprache im Header `X-Kompanie-Lang`; ohne ihn gilt die Wahl am Konto, sonst
+        Deutsch. Danach richten sich die Meldungen (`message`) der Antworten.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [locale]
+              properties:
+                locale: { type: [string, 'null'], enum: [de, en, null] }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [locale]
+                properties:
+                  locale: { type: [string, 'null'], enum: [de, en, null] }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
   /me/tiles:
     put:
       tags: [Eigene Daten]
@@ -7421,6 +7451,12 @@ paths:
                 calendar_cache_minutes: { type: integer, minimum: 1, maximum: 1440 }
                 calendar_responses:
                   { type: string, enum: ['0', '1'], description: 'Zu- und Absagen bei Terminen einschalten (Vorgabe aus)' }
+                languages:
+                  {
+                    type: string,
+                    description: 'Sprachen der App, durch Komma getrennt (de, en); Deutsch ist immer dabei',
+                    examples: ['de,en'],
+                  }
                 calendar_response_reminder:
                   { type: string, enum: ['0', '1'], description: An Zu- und Absage erinnern (Push an alle ohne Rückmeldung) }
                 calendar_response_reminder_days:
@@ -9978,6 +10014,13 @@ components:
           properties:
             imprint_url: { type: string }
             privacy_url: { type: string }
+        languages:
+          type: object
+          description: 'Sprachen der App: eingeschaltete (Deutsch immer, zuerst) und mögliche'
+          required: [enabled, available]
+          properties:
+            enabled: { type: array, items: { type: string, enum: [de, en] } }
+            available: { type: array, items: { type: string, enum: [de, en] } }
 
     Level:
       type: string
@@ -10303,6 +10346,8 @@ components:
         level: { $ref: '#/components/schemas/Level' }
         extra_roles: { $ref: '#/components/schemas/ExtraRoles' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
+        locale:
+          { type: [string, 'null'], enum: [de, en, null], description: 'Sprache am Konto (PUT /me/locale); null = nichts gewählt' }
         create_roles:
           type: array
           items: { $ref: '#/components/schemas/Level' }
@@ -10461,6 +10506,10 @@ components:
         version: { type: string, description: 'Version der Installation, z. B. 1.4.0.3' }
         variant: { type: string, enum: [wordpress, standalone], description: Art der Installation }
         siteUrl: { type: [string, 'null'], description: Startseite der Webseite, falls vorhanden }
+        languages:
+          type: array
+          items: { type: string, enum: [de, en] }
+          description: 'Sprachen, die die App anbietet (Einstellung des Admins), Deutsch zuerst; nur Deutsch = kein Umschalter'
         handbookUrl:
           {
             type: [string, 'null'],

@@ -4,6 +4,7 @@
 import type { Address } from './address';
 import { readBase64 } from './backupFile';
 import { dataCache } from './dataCache';
+import { LOCALE_HEADER, SOURCE_LOCALE, locale, type Locale } from './i18n';
 import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
 import { noteError } from './lastError';
@@ -125,6 +126,8 @@ export interface AppUser {
   capabilities: Capability[];
   /** Eigenes Foto (128 Pixel), null ohne; fehlt bei älteren Servern */
   photo_url?: string | null;
+  /** Sprache am Konto (PUT /me/locale), null = nichts gewählt; fehlt bei älteren Servern */
+  locale?: Locale | null;
   /** Rollen, die die Person beim Anlegen vergeben darf (nur mit create_users); fehlt bei älteren Servern */
   create_roles?: Level[];
   /** Zusatzrollen, die die Person beim Anlegen vergeben darf (nur mit create_users) */
@@ -136,6 +139,8 @@ export interface AppConfig {
   appUrl: string;
   swUrl: string;
   siteUrl: string | null;
+  /** Sprachen, die die App anbietet (Deutsch zuerst; nur Deutsch = kein Umschalter); fehlt bei älteren Servern */
+  languages?: Locale[];
   variant: 'wordpress' | 'standalone';
   version: string;
   csrf: { header: string; token: string; refreshUrl: string };
@@ -2682,7 +2687,9 @@ async function requestFull<T>(
       headers: {
         Accept: 'application/json',
         // Für wen die Antwort gilt: Nur dieselbe Person bekommt sie später sofort aus dem Speicher.
-        ...(method === 'GET' ? { [USER_HEADER]: String(config.user?.id ?? 0) } : {}),
+        // Mit Sprache, wenn nicht Deutsch: Gespeicherte Antworten (Meldungen) gelten dann nur für dieselbe Sprache.
+        ...(method === 'GET' ? { [USER_HEADER]: String(config.user?.id ?? 0) + (locale() === SOURCE_LOCALE ? '' : `:${locale()}`) } : {}),
+        [LOCALE_HEADER]: locale(),
         ...(staleOk ? { [STALE_OK_HEADER]: '1' } : {}),
         ...(csrfToken ? { [config.csrf.header]: csrfToken } : {}),
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
@@ -3014,6 +3021,8 @@ export const api = {
   /** Eigene Anordnung der Kacheln einer Seite für eine Spaltenzahl (tiles.tsx) */
   saveTiles: (page: string, cols: number, tiles: TilePlace[]) =>
     request<{ page: string; layouts: TileLayouts }>('PUT', '/me/tiles', { page, cols, tiles }),
+  /** Sprache am Konto (Plan „Mehrsprachigkeit“); null löscht die Wahl */
+  setMyLocale: (l: Locale | null) => request<{ locale: Locale | null }>('PUT', '/me/locale', { locale: l }),
   resetTiles: (page: string) => request<{ page: string; layouts: TileLayouts }>('DELETE', '/me/tiles', undefined, { page }),
   /** Vorgabe für alle (manage_settings) */
   saveTileDefault: (page: string, cols: number, tiles: TilePlace[]) =>
