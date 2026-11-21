@@ -4447,6 +4447,19 @@ test.describe('Android', () => {
     await expect(page.locator('.install-hint').getByRole('button', { name: "So geht's" })).toBeVisible();
   });
 
+  test('Anleitung in Chrome: Hinweis aufs Warten, bis Chrome den Installieren-Knopf freigibt', async ({ page }) => {
+    await page.goto('/app/#/installieren');
+    await expect(page.locator('.install-wait')).toContainText('30 Sekunden');
+    await page.evaluate(() => {
+      const ev = new Event('beforeinstallprompt', { cancelable: true }) as Event & Record<string, unknown>;
+      ev.prompt = () => Promise.resolve();
+      ev.userChoice = Promise.resolve({ outcome: 'dismissed' });
+      window.dispatchEvent(ev);
+    });
+    await expect(page.locator('.install-intro').getByRole('button', { name: 'App installieren' })).toBeVisible();
+    await expect(page.locator('.install-wait')).toHaveCount(0);
+  });
+
   // Andere Browser als Chrome: Hinweis mit Grund (androidBrowser.ts), Weg zu Chrome und Schritte im eigenen Browser.
   for (const [name, ua, expected] of [
     ['Firefox', 'Mozilla/5.0 (Android 14; Mobile; rv:145.0) Gecko/145.0 Firefox/145.0', 'Firefox legt nur eine Verknüpfung'],

@@ -27,7 +27,7 @@ Die App der {kompanie.name} läuft im Browser und lässt sich wie jede andere Ap
 
 ### Auf einem Android-Handy
 1. Öffne die Adresse der App in **Chrome**. Warum Chrome: Nur Chrome legt auf Android eine richtige App an, die in der Liste deiner Apps steht und Benachrichtigungen zeigt. Andere Browser legen nur eine Verknüpfung an (siehe unten).
-2. Steht oben der Knopf **App installieren**, tippe darauf und bestätige. Fertig.
+2. Steht oben der Knopf **App installieren**, tippe darauf und bestätige. Fertig. Chrome zeigt diesen Knopf erst, wenn die Seite insgesamt etwa 30 Sekunden offen war und du einmal irgendwo getippt hast; das ist eine Regel von Chrome und lässt sich von der App nicht abkürzen. Bis dahin steht dort ein Hinweis, und du kannst auch gleich die Schritte darunter nehmen.
 3. Sonst zeigt die Anleitung unter **Android** die Schritte mit Bildern: Tippe in Chrome oben rechts auf die drei Punkte **⋮** und wähle **App installieren** (je nach Handy heißt der Eintrag auch „Zum Startbildschirm hinzufügen“).
 4. Bestätige mit **Installieren** bzw. **Hinzufügen**. Fragt Chrome „Installieren“ oder „Verknüpfung erstellen“, wähle **Installieren**.
 

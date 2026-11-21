@@ -455,6 +455,14 @@ export default function Installieren({ onToast }: { onToast: (msg: string) => vo
             App installieren
           </button>
         )}
+        {!canPrompt && browser === 'chrome' && !inApp && (
+          // Chrome meldet „installierbar“ (beforeinstallprompt) erst, wenn die Seite insgesamt etwa 30 Sekunden offen war und
+          // einmal angetippt wurde (https://web.dev/articles/install-criteria). Das lässt sich von der Seite aus nicht beschleunigen.
+          <p className="small install-wait" role="status">
+            Gleich erscheint hier der Knopf <strong>„App installieren“</strong>. Chrome zeigt ihn erst, wenn die Seite etwa 30 Sekunden
+            offen war und du einmal irgendwo getippt hast. Ohne Warten geht es mit den Schritten unten.
+          </p>
+        )}
       </div>
 
       {inApp && (

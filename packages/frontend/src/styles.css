@@ -4193,6 +4193,9 @@ select.attendance-response {
 .install-chrome-get {
   margin: 0;
 }
+.install-wait {
+  margin: 12px 0 0;
+}
 .credentials-text {
   width: 100%;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
