@@ -63,6 +63,8 @@ Die Vorgabe gilt für jede Person, die die Seite nicht selbst angeordnet hat, au
 
 Ein Untermenü braucht mindestens einen Bereich. **Untermenü entfernen** schiebt seine Bereiche zu **Nicht in der Navigation**; gib ihnen dann einen neuen Platz.
 
+Den englischen Namen eines Untermenüs (wenn eure App Englisch eingeschaltet hat) trägst du so ein: Wähle oben bei **Einrichten auf** die Sprache **English**, trage beim Untermenü unter **Name des Untermenüs** den englischen Namen ein (grau steht der deutsche) und tippe auf **Navigation speichern**. Anlegen und umbenennen geht auf **Deutsch**; benennst du ein Untermenü dort um, trägst du den englischen Namen danach noch einmal ein. Bei **Intern** der Standardnavigation ist es derselbe Name wie unter **Umbenennen**.
+
 ### Einen Bereich umbenennen oder ein anderes Symbol wählen
 1. Tippe beim Bereich auf **Umbenennen**.
 2. Trage einen **eigenen Namen** ein (höchstens 24 Zeichen) und wähle bei Bedarf ein **Symbol**. Ein leeres Feld heißt: wie bisher.

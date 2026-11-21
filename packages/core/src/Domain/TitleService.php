@@ -184,7 +184,7 @@ final class TitleService
                 throw ApiError::invalid(I18n::t('Unbekannter Titel.'));
             }
             if (isset($linked[$id]) && !in_array($id, $current, true)) {
-                throw ApiError::invalid(self::linkedMessage($titles[$id]['title'], $linked[$id]['title']));
+                throw ApiError::invalid(self::linkedMessage($titles[$id]['title'], $this->app->translations()->name('office', (string) $linked[$id]['id'], $linked[$id]['title'])));
             }
             // Wer kein Mitglied (mehr) ist, z. B. nach einem Rollenwechsel zum Gast, kann Titel nur verlieren.
             if (!$user->isMember() && !in_array($id, $current, true)) {
@@ -197,7 +197,7 @@ final class TitleService
         }
         foreach (array_intersect($current, array_keys($linked)) as $id) {
             if (!isset($ids[$id])) {
-                throw ApiError::invalid(self::linkedMessage($titles[$id]['title'], $linked[$id]['title']));
+                throw ApiError::invalid(self::linkedMessage($titles[$id]['title'], $this->app->translations()->name('office', (string) $linked[$id]['id'], $linked[$id]['title'])));
             }
         }
         $ids = array_values($ids);

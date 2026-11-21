@@ -34,6 +34,8 @@ Habt ihr Bereiche oder Rollen umbenannt, bleiben diese Namen zunächst auch auf 
 3. Trage die englischen Namen ein und speichere wie gewohnt.
 4. Wähle danach wieder **Deutsch**, wenn du deutsche Namen ändern möchtest.
 
+Genauso geht es bei den Terminarten unter [Kalender](seite:admin-kalender) und bei Untermenüs in der Navigation, und in der **Verwaltung** bei {bereich.ranks} und {bereich.offices} (wer sie verwalten darf).
+
 Ein leeres Feld heißt: Auf Englisch gilt der deutsche Name (bzw. die englische Vorgabe, wenn ihr den Bereich nicht umbenannt habt).
 
 ### Englisch wieder ausschalten

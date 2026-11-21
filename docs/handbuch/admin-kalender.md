@@ -66,6 +66,14 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und unter **Termine u
 3. Tippe in diesem Abschnitt auf **Speichern**.
 4. Ab jetzt wählen alle mit dem Recht **Kalender pflegen** die Art im aufgeklappten Termin unter **{bereich.events}**, und in der Anwesenheit steht sie an jeder Liste.
 
+### Terminarten auf Englisch benennen
+Hat eure App außer Deutsch auch Englisch eingeschaltet, bekommt jede Art einen englischen Namen dazu:
+1. Wähle im Abschnitt **Terminarten** oben bei **Einrichten auf** die Sprache **English**.
+2. Trage in jedes Feld den englischen Namen ein. Im leeren Feld steht grau der deutsche Name; bleibt es leer, sehen alle mit Englisch den deutschen.
+3. Tippe in diesem Abschnitt auf **Speichern**.
+
+Anlegen, umbenennen und entfernen geht nur auf **Deutsch**. Der englische Name hängt am deutschen: Benennst du eine Art auf Deutsch um, trägst du den englischen Namen für den neuen Namen noch einmal ein. Termine und Listen mit dem alten Namen zeigen weiter den englischen Namen, den du dazu eingetragen hattest. Mehr dazu: [Sprachen](seite:admin-sprachen).
+
 ### Prüfen, ob der Kalender ankommt
 1. Tippe auf **Kalender testen**.
 2. Die App zeigt, wie viele kommende Termine sie gefunden hat, z. B. „5 Termine gefunden, z. B. „Schützenfest“.“ Lehnt Google ab, nennt die Meldung die wahrscheinliche Ursache.

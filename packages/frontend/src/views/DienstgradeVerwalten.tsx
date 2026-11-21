@@ -3,7 +3,7 @@ import { api, config, type Promotion, type Rank, type RankHistoryEntry, type Ran
 import brand from '../generated/brand';
 import { formatDate, todayYmd } from '../format';
 import { navigate } from '../router';
-import { RankBadge, RankLabel } from '../RankBadge';
+import { RankBadge, RankLabel, rankName } from '../RankBadge';
 import { useDragSort, useSaveQueue } from '../dragSort';
 import { Empty, ErrorBox, Loading, rich, useAsync } from '../ui';
 import { RankHistory } from './Dienstgrad';
@@ -12,7 +12,9 @@ import { notePromotions } from '../promotionsDue';
 import { sources } from '../viewData';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
-import { localeTag, t } from '../i18n';
+import { localeTag, SOURCE_LOCALE, t, type Locale } from '../i18n';
+import { EditLanguageSwitch, useEditLocale } from '../language';
+import { nameIn, setNameTranslations, translatedName } from '../names';
 
 const rank = brand.labels.rank;
 const sec = brand.labels.sections;
@@ -67,15 +69,15 @@ async function svgToPng(file: File): Promise<string | null> {
 }
 
 /** Vorschau eines Abzeichens auf heller und dunkler Fläche: Transparente Abzeichen müssen auf beiden wirken. */
-function BadgePreview({ rank: r }: { rank: Rank }) {
+function BadgePreview({ rank: r, title }: { rank: Rank; title: string }) {
   return (
-    <div className="badge-preview" aria-label={t('Vorschau des Abzeichens von {title}', { title: r.title })}>
+    <div className="badge-preview" aria-label={t('Vorschau des Abzeichens von {title}', { title })}>
       <div className="badge-preview-light">
-        <RankBadge url={r.badge_url} title={r.title} size="medium" />
+        <RankBadge url={r.badge_url} title={title} size="medium" />
         <span>{t('hell')}</span>
       </div>
       <div className="badge-preview-dark">
-        <RankBadge url={r.badge_url} title={r.title} size="medium" />
+        <RankBadge url={r.badge_url} title={title} size="medium" />
         <span>{t('dunkel')}</span>
       </div>
     </div>
@@ -85,7 +87,9 @@ function BadgePreview({ rank: r }: { rank: Rank }) {
 /**
  * Verwaltung → Dienstgrade: anlegen, umbenennen, Schwelle (nur mit Punkten), Reihenfolge (Ziehen am Griff), deaktivieren,
  * löschen.
- * Die Liste läuft vom niedrigsten zum höchsten Dienstgrad.
+ * Die Liste läuft vom niedrigsten zum höchsten Dienstgrad. Mit einer weiteren Sprache oben „Einrichten auf“: Auf einer
+ * weiteren Sprache zeigt die Liste deren Namen (sonst den deutschen) und „Ändern“ trägt den Namen dieser Sprache ein;
+ * die deutsche Bezeichnung bleibt. Neue Dienstgrade bekommen immer zuerst die deutsche.
  */
 export function RankList({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(sources.ranksAll.load, sources.ranksAll.deps, sources.ranksAll.key);
@@ -97,6 +101,9 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
   const badgeInput = useRef<HTMLInputElement>(null);
   // Ref statt State: Der Dateidialog meldet sich erst später, dann zählt der zuletzt gewählte Dienstgrad.
   const badgeFor = useRef<number | null>(null);
+  const editLang = useEditLocale();
+  // Bezeichnung in der Sprache, auf der eingerichtet wird (ohne eigenen Namen die deutsche)
+  const shown = (r: Rank): string => nameIn('rank', String(r.id), r.title, 'label', editLang);
   const points = ranksUsePoints();
   // Schwellen immer pflegbar (gespeichert und geprüft auch ohne Punkte); sie wirken nur zusammen mit Punkten.
   const thresholdLabel = points
@@ -174,6 +181,7 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <div className="stack">
+      <EditLanguageSwitch />
       {missing && (
         <p className="small">
           {t('Noch nicht alle {ranks} haben eine {points}schwelle; für diese gelten keine Regeln zu {points}.', {
@@ -195,21 +203,31 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
             editing === r.id ? (
               <li key={r.id} {...sort.itemProps(i, 'card')}>
                 <RankForm
+                  key={editLang}
                   rank={r}
                   thresholdLabel={thresholdLabel}
                   busy={busy}
+                  editLang={editLang}
                   onCancel={() => setEditing(null)}
-                  onSave={async (data) => {
-                    if (await run(() => api.updateRank(r.id, data), t('Gespeichert'))) setEditing(null);
+                  onSave={async (data, foreign) => {
+                    const saved = await run(async () => {
+                      await api.updateRank(r.id, data);
+                      // Name der weiteren Sprache; die deutsche Bezeichnung geht unverändert mit
+                      if (foreign !== null) {
+                        const res = await api.saveTranslations(editLang, [{ kind: 'rank', ref: String(r.id), text: foreign }]);
+                        setNameTranslations(res.translations);
+                      }
+                    }, t('Gespeichert'));
+                    if (saved) setEditing(null);
                   }}
                 />
               </li>
             ) : (
               <li key={r.id} {...sort.itemProps(i, `card row ${r.active ? '' : 'inactive'}`)}>
-                {list.length > 1 && sort.handle(i, r.title)}
+                {list.length > 1 && sort.handle(i, shown(r))}
                 <div className="row-main">
                   <div className="row-title">
-                    <RankLabel url={r.badge_url} title={r.title} />
+                    <RankLabel url={r.badge_url} title={shown(r)} />
                     {!r.active && <span className="badge badge-level-guest">{t('inaktiv')}</span>}
                   </div>
                   <div className="row-sub">
@@ -239,13 +257,13 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
                         variant="danger"
                         disabled={busy}
                         onClick={async () =>
-                          (await confirmAsk(t('„{title}“ löschen?', { title: r.title }))) && run(() => api.deleteRank(r.id), t('Gelöscht'))
+                          (await confirmAsk(t('„{title}“ löschen?', { title: shown(r) }))) && run(() => api.deleteRank(r.id), t('Gelöscht'))
                         }
                       />
                     )}
                   </div>
-                  <div className="rank-badge-tools" role="group" aria-label={t('Abzeichen von {title}', { title: r.title })}>
-                    {r.badge_url && <BadgePreview rank={r} />}
+                  <div className="rank-badge-tools" role="group" aria-label={t('Abzeichen von {title}', { title: shown(r) })}>
+                    {r.badge_url && <BadgePreview rank={r} title={shown(r)} />}
                     <div className="row-actions">
                       {r.badge_url ? (
                         <>
@@ -256,7 +274,7 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
                             className="btn btn-small btn-danger"
                             disabled={busy}
                             onClick={async () =>
-                              (await confirmAsk(t('Abzeichen von „{title}“ entfernen?', { title: r.title }))) &&
+                              (await confirmAsk(t('Abzeichen von „{title}“ entfernen?', { title: shown(r) }))) &&
                               run(() => api.removeRankBadge(r.id), t('Abzeichen entfernt'))
                             }
                           >
@@ -315,32 +333,54 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
   );
 }
 
+/**
+ * Dienstgrad ändern. Auf einer weiteren Sprache (editLang) trägt das Feld „Bezeichnung“ den Namen dieser Sprache ein
+ * (leer: es gilt die deutsche); onSave bekommt ihn als zweiten Wert, sonst null.
+ */
 function RankForm({
   rank: r,
   thresholdLabel,
   busy,
+  editLang,
   onSave,
   onCancel,
 }: {
   rank: Rank;
   thresholdLabel: string;
   busy: boolean;
-  onSave: (data: { title: string; min_points?: number | null }) => void;
+  editLang: Locale;
+  onSave: (data: { title: string; min_points?: number | null }, foreign: string | null) => void;
   onCancel: () => void;
 }) {
   const [title, setTitle] = useState(r.title);
   const [min, setMin] = useState(r.min_points === null ? '' : String(r.min_points));
+  const foreign = editLang !== SOURCE_LOCALE;
+  const savedForeign = translatedName('rank', String(r.id), editLang);
+  const [foreignTitle, setForeignTitle] = useState(savedForeign);
   return (
     <form
       className="form"
       onSubmit={(e) => {
         e.preventDefault();
-        onSave({ title: title.trim(), min_points: parseThreshold(min) });
+        const text = foreignTitle.trim();
+        onSave({ title: title.trim(), min_points: parseThreshold(min) }, foreign && text !== savedForeign ? text : null);
       }}
     >
       <label className="field">
         <span>{t('Bezeichnung')}</span>
-        <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
+        {foreign ? (
+          <input
+            type="text"
+            lang={editLang}
+            maxLength={60}
+            value={foreignTitle}
+            placeholder={r.title}
+            onChange={(e) => setForeignTitle(e.target.value)}
+            autoFocus
+          />
+        ) : (
+          <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
+        )}
       </label>
       <label className="field">
         <span>{t('{label} (leer = ohne)', { label: thresholdLabel })}</span>
@@ -396,8 +436,8 @@ export function Promotions() {
                   <div className="row-main">
                     <div className="row-title">{p.name}</div>
                     <div className="row-sub">
-                      {p.rank ? <RankLabel url={p.rank.badge_url} title={p.rank.title} /> : t('Kein {rank}', { rank })} ·{' '}
-                      {t('{count} {points}', { count: p.points.toLocaleString(localeTag()), points: sec.points })}
+                      {p.rank ? <RankLabel url={p.rank.badge_url} title={rankName(p.rank.id, p.rank.title)} /> : t('Kein {rank}', { rank })}{' '}
+                      · {t('{count} {points}', { count: p.points.toLocaleString(localeTag()), points: sec.points })}
                       {p.next_rank && p.points_to_next !== null && (
                         <>
                           {' · '}
@@ -424,7 +464,7 @@ export function Promotions() {
  * nächsten Dienstgrads vor seiner Bezeichnung wie beim aktuellen.
  */
 function NextRankText({ next, pointsToNext, since, unit }: { next: RankRef; pointsToNext: number; since: string | null; unit?: string }) {
-  const label = <RankLabel url={next.badge_url} title={next.title} quoted />;
+  const label = <RankLabel url={next.badge_url} title={rankName(next.id, next.title)} quoted />;
   const count = pointsToNext.toLocaleString(localeTag());
   if (pointsToNext <= 0) {
     return since
@@ -524,8 +564,8 @@ export function MemberRank({
     <section className="member-rank" ref={sectionRef}>
       <h3 className="section-title">{rank}</h3>
       <p className="member-rank-current">
-        {status.rank && <RankBadge url={status.rank.badge_url} title={status.rank.title} size="medium" />}
-        <strong>{status.rank?.title ?? t('Kein {rank}', { rank })}</strong>
+        {status.rank && <RankBadge url={status.rank.badge_url} title={rankName(status.rank.id, status.rank.title)} size="medium" />}
+        <strong>{status.rank ? rankName(status.rank.id, status.rank.title) : t('Kein {rank}', { rank })}</strong>
         {points && status.next_rank && status.points_to_next !== null && status.points_to_next !== undefined && (
           <span className="muted small">
             {' '}
@@ -550,7 +590,7 @@ export function MemberRank({
               </option>
               {options.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.title}
+                  {rankName(r.id, r.title)}
                   {points && r.min_points !== null ? ` ${t('(ab {count})', { count: r.min_points.toLocaleString(localeTag()) })}` : ''}
                 </option>
               ))}

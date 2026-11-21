@@ -11057,6 +11057,7 @@ components:
             type: [string, 'null'],
             description: 'Aktueller Dienstgrad (nur mit Bereich Dienstgrade; für alle mit Zugang zur Mitgliederliste)',
           }
+        rank_id: { type: [integer, 'null'], description: 'ID des Dienstgrads (wie rank_title), für seinen Namen in einer weiteren Sprache' }
         rank_badge_url: { $ref: '#/components/schemas/BadgeUrl' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
         titles:
@@ -11085,6 +11086,7 @@ components:
           type: [string, 'null']
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
         rank_title: { type: [string, 'null'], description: 'Aktueller Dienstgrad (nur mit Bereich Dienstgrade)' }
+        rank_id: { type: [integer, 'null'], description: 'ID des Dienstgrads (wie rank_title), für seinen Namen in einer weiteren Sprache' }
         rank_badge_url: { $ref: '#/components/schemas/BadgeUrl' }
         titles:
           description: Titel in der Reihenfolge der Titelliste (nur mit Bereich Titel)
@@ -12803,6 +12805,8 @@ components:
         id: { type: integer, description: 'Für PATCH /members/{id}/rank-history/{entry}' }
         from: { type: [string, 'null'] }
         to: { type: [string, 'null'] }
+        from_rank_id: { type: [integer, 'null'], description: 'Dienstgrad vorher (null ohne); from/to sind die deutschen Bezeichnungen von damals' }
+        to_rank_id: { type: [integer, 'null'], description: 'Dienstgrad nachher (null ohne), für seinen Namen in einer weiteren Sprache' }
         to_badge_url:
           description: Heutiges Abzeichen des neuen Dienstgrads (der Verlauf speichert nur Bezeichnungen); null ohne
           $ref: '#/components/schemas/BadgeUrl'

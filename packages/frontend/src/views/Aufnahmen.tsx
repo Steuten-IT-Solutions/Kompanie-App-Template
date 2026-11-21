@@ -3,6 +3,7 @@ import { api, applyAdmissionsDue, can, config, levelLabel, type Admission } from
 import { confirmAsk } from '../ask';
 import { formatDate } from '../format';
 import { t, tn } from '../i18n';
+import { kindName } from '../names';
 import { navigate } from '../router';
 import { ErrorBox, Loading, useAsync } from '../ui';
 import { describeRule, missingText } from '../admissionRule';
@@ -13,7 +14,8 @@ import { sources } from '../viewData';
 export function admissionRule(a: Pick<Admission, 'kind' | 'count' | 'months' | 'result'>): string | null {
   if (a.result) return describeRule(a.result) || null;
   const parts: string[] = [];
-  if (a.kind && a.count > 0) parts.push(tn('{count} Teilnahme an „{kind}“', '{count} Teilnahmen an „{kind}“', a.count, { kind: a.kind }));
+  if (a.kind && a.count > 0)
+    parts.push(tn('{count} Teilnahme an „{kind}“', '{count} Teilnahmen an „{kind}“', a.count, { kind: kindName(a.kind) }));
   if (a.months > 0) parts.push(tn('{count} Monat als Anwärter', '{count} Monate als Anwärter', a.months));
   if (parts.length === 2) return t('{first} und {second}', { first: parts[0], second: parts[1] });
   return parts[0] ?? null;
@@ -27,7 +29,7 @@ export function admissionState(a: Admission): string {
   if (a.result) return missingText(a.result) || t('Noch nicht erfüllt');
   const open: string[] = [];
   if (a.kind && a.count > 0 && a.missing > 0)
-    open.push(tn('noch {count} Teilnahme an „{kind}“', 'noch {count} Teilnahmen an „{kind}“', a.missing, { kind: a.kind }));
+    open.push(tn('noch {count} Teilnahme an „{kind}“', 'noch {count} Teilnahmen an „{kind}“', a.missing, { kind: kindName(a.kind) }));
   if (a.months > 0) {
     if (!a.since) open.push(t('„Anwärter seit“ fehlt'));
     else if (a.months_on) open.push(t('Mindestdauer ab {date}', { date: formatDate(a.months_on) }));
@@ -78,7 +80,7 @@ export function Admissions() {
                   {a.role}
                   {a.since ? ' ' + t('seit {date}', { date: formatDate(a.since) }) : ''}
                   {!a.result && rule && a.kind && a.count > 0
-                    ? ' · ' + t('{attended} von {count} {kind}', { attended: a.attended, count: a.count, kind: a.kind })
+                    ? ' · ' + t('{attended} von {count} {kind}', { attended: a.attended, count: a.count, kind: kindName(a.kind) })
                     : ''}
                 </div>
                 <div className="row-sub">{admissionState(a)}</div>

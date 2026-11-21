@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, can, config, eventKindTag, eventKinds } from '../api';
 import { CollapsibleKindChecks, kindsOf } from '../eventKindChecks';
+import { kindName } from '../names';
 import GuestPushButton from '../GuestPushButton';
 import { birthdaysVisible, UpcomingBirthdays, UpcomingBirthdaysCard, useUpcomingBirthdays } from '../upcomingBirthdays';
 import { navigate } from '../router';
@@ -146,7 +147,7 @@ function EventList({ focus }: { focus?: string }) {
                           .filter(eventKindTag)
                           .map((k) => (
                             <span key={k} className="badge event-kind">
-                              {k}
+                              {kindName(k)}
                             </span>
                           ))}
                       </div>
@@ -222,7 +223,7 @@ function KindPicker({ ev, onChange }: { ev: CalendarEvent; onChange: (id: string
       <CollapsibleKindChecks id={listId} value={shown} disabled={busy} onChange={(kinds) => void choose(kinds)} />
       {current.length === 0 && suggestions.length > 0 && (
         <p className="small muted">
-          {t('Vorschlag aus dem Titel: {kinds}.', { kinds: suggestions.join(', ') })}{' '}
+          {t('Vorschlag aus dem Titel: {kinds}.', { kinds: suggestions.map((k) => kindName(k)).join(', ') })}{' '}
           <button type="button" className="btn btn-link inline-link" disabled={busy} onClick={() => void choose(suggestions)}>
             {t('Übernehmen')}
           </button>

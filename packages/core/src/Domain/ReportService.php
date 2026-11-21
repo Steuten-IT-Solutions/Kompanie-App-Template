@@ -309,7 +309,7 @@ final class ReportService
             $id = (int) $m['id'];
             $row = [(string) $m['name'], $a->roles()->label((string) $m['level'])];
             if ($ranks !== null) {
-                $row[] = isset($ranks[$id]) ? (string) $ranks[$id]['title'] : '';
+                $row[] = isset($ranks[$id]) ? $a->ranks()->displayTitle($ranks[$id]['id'], $ranks[$id]['title']) : '';
             }
             if ($personal) {
                 $address = $contacts[$id]['address'] ?? null;
@@ -496,8 +496,11 @@ final class ReportService
         [$start, $end] = $this->utcBounds($from, $to);
         $rows = $this->repository()->rankChanges($start, $end);
         $names = (new UserNames($this->app->users))->prime(array_column($rows, 'user_id'));
+        // Gespeichert ist die deutsche Bezeichnung von damals; in einer weiteren Sprache gilt der eigene Name des Dienstgrads.
+        $ranks = $this->app->ranks();
+        $title = static fn (?int $id, string $german): string => $id !== null && $german !== '' ? $ranks->displayTitle($id, $german) : $german;
         $out = array_map(fn (array $r): array => [
-            $this->utcDay($r['changed_at']), (string) $names->name($r['user_id']), self::rankKind($r['kind']), $r['from_title'], $r['to_title'], $r['reason'],
+            $this->utcDay($r['changed_at']), (string) $names->name($r['user_id']), self::rankKind($r['kind']), $title($r['from_rank_id'], $r['from_title']), $title($r['to_rank_id'], $r['to_title']), $r['reason'],
         ], $rows);
         return self::section('ranks', $this->title('ranks'), true, [self::table(I18n::t('Wechsel im Zeitraum'), [
             self::col(I18n::t('Datum')), self::col(I18n::t('Name')), self::col(I18n::t('Art')), self::col(I18n::t('Vorher')), self::col(I18n::t('Nachher')), self::col(I18n::t('Grund'), wrap: true),
@@ -550,6 +553,7 @@ final class ReportService
             }
         }
         $out = [];
+        $translations = $this->app->translations();
         foreach ($repo->offices() as $o) {
             $list = $terms[$o['id']] ?? [];
             usort($list, static fn (array $a, array $b): int => [$a['start_year'], $a['id']] <=> [$b['start_year'], $b['id']]);
@@ -560,7 +564,7 @@ final class ReportService
                     $t['end_year'] === null => I18n::t('seit {year}', ['year' => $t['start_year']]),
                     default => $t['start_year'] . '–' . $t['end_year'],
                 };
-                $out[] = [$o['title'], $years, implode(', ', $people), $t['note']];
+                $out[] = [$translations->name('office', (string) $o['id'], $o['title']), $years, implode(', ', $people), $t['note']];
             }
         }
         return self::section('offices', $this->title('offices'), true, [self::table(

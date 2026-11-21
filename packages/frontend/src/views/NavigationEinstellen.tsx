@@ -159,6 +159,10 @@ function Editor({
   const savedForeign = (key: string): string => translatedName('nav', key, editLang);
   const [foreignNames, setForeignNames] = useState<Record<string, string>>({});
   const foreignValue = (key: string): string => foreignNames[key] ?? savedForeign(key);
+  // Untermenüs: Kennung ist ihr deutscher Name
+  const savedForeignMenu = (label: string): string => translatedName('menu', label.trim(), editLang);
+  const [foreignMenus, setForeignMenus] = useState<Record<string, string>>({});
+  const foreignMenuValue = (label: string): string => foreignMenus[label.trim()] ?? savedForeignMenu(label);
   const [start, setStart] = useState<NavStart>(savedStart);
   const [showLabels, setShowLabels] = useState(data.show_labels);
   const internLabel = savedNames.intern?.label || defaultLabel('intern', pages);
@@ -254,12 +258,21 @@ function Editor({
     )
       .map((ref) => ({ kind: 'nav' as const, ref, text: reset ? '' : (foreignNames[ref] ?? '').trim() }))
       .filter((i) => i.text !== savedForeign(i.ref));
+    // Untermenüs (beim Zurücksetzen die der bisherigen Leisten löschen)
+    const menuRefs = reset
+      ? [...draft.items, ...guestDraft.items].flatMap((i) => (typeof i === 'string' ? [] : [i.label.trim()]))
+      : Object.keys(foreignMenus);
+    const changedMenus = [...new Set(menuRefs)]
+      .filter((ref) => ref !== '')
+      .map((ref) => ({ kind: 'menu' as const, ref, text: reset ? '' : (foreignMenus[ref] ?? '').trim() }))
+      .filter((i) => i.text !== savedForeignMenu(i.ref));
+    const translations = [...changedForeign, ...changedMenus];
     // Neue Namen stehen überall in der App (auch in Überschriften): dann einmal neu laden.
     const reload =
-      JSON.stringify(body.names) !== JSON.stringify(savedNames) || body.show_labels !== data.show_labels || changedForeign.length > 0;
+      JSON.stringify(body.names) !== JSON.stringify(savedNames) || body.show_labels !== data.show_labels || translations.length > 0;
     try {
       const next = await api.saveNavigation(body);
-      if (changedForeign.length > 0 && foreign) setNameTranslations((await api.saveTranslations(editLang, changedForeign)).translations);
+      if (translations.length > 0 && foreign) setNameTranslations((await api.saveTranslations(editLang, translations)).translations);
       applyNavigation(next);
       onSaved(next);
       onToast(reset ? t('Standardnavigation wiederhergestellt') : t('Navigation gespeichert'));
@@ -494,13 +507,43 @@ function Editor({
                 <div className="row-main nav-menu">
                   <label className="field">
                     <span>{t('Name des Untermenüs')}</span>
-                    <input
-                      type="text"
-                      value={item.label}
-                      maxLength={data.label_max}
-                      disabled={busy}
-                      onChange={(e) => updateMenu(index, { label: e.target.value })}
-                    />
+                    {foreign && keepDefault && !editingGuest ? (
+                      // Standardnavigation: Das Untermenü ist „Intern“, sein Name in dieser Sprache wie unter „Umbenennen“.
+                      <input
+                        type="text"
+                        lang={editLang}
+                        value={foreignValue('intern')}
+                        placeholder={item.label}
+                        maxLength={data.label_max}
+                        disabled={busy}
+                        onChange={(e) => {
+                          setForeignNames((n) => ({ ...n, intern: e.target.value }));
+                          setSaveError(null);
+                        }}
+                      />
+                    ) : foreign ? (
+                      // Weitere Sprache: Name dieser Sprache zum deutschen (Platzhalter); umbenannt wird auf Deutsch.
+                      <input
+                        type="text"
+                        lang={editLang}
+                        value={foreignMenuValue(item.label)}
+                        placeholder={item.label}
+                        maxLength={data.label_max}
+                        disabled={busy || !item.label.trim()}
+                        onChange={(e) => {
+                          setForeignMenus((n) => ({ ...n, [item.label.trim()]: e.target.value }));
+                          setSaveError(null);
+                        }}
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        value={item.label}
+                        maxLength={data.label_max}
+                        disabled={busy}
+                        onChange={(e) => updateMenu(index, { label: e.target.value })}
+                      />
+                    )}
                   </label>
                   <label className="field">
                     <span>{t('Symbol')}</span>

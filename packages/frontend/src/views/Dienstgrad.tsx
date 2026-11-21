@@ -3,7 +3,7 @@ import { api, config, type RankHistoryEntry } from '../api';
 import brand from '../generated/brand';
 import { formatDate, formatUtcDate, todayYmd } from '../format';
 import { IconButton } from '../icons';
-import { RankBadge, RankLabel } from '../RankBadge';
+import { RankBadge, RankLabel, rankName } from '../RankBadge';
 import { Empty, ErrorBox, Loading, rich, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { localeTag, t } from '../i18n';
@@ -18,7 +18,8 @@ export default function Dienstgrad() {
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const d = data!;
   const withPoints = !!config?.features.points && d.points !== undefined;
-  const next = d.next_rank ?? null;
+  const next = d.next_rank ? { ...d.next_rank, title: rankName(d.next_rank.id, d.next_rank.title) } : null;
+  const mine = d.rank ? rankName(d.rank.id, d.rank.title) : null;
   const missing = d.points_to_next ?? null;
   const progress = withPoints && next?.min_points ? Math.max(0, Math.min(1, (d.points ?? 0) / next.min_points)) : null;
 
@@ -26,12 +27,12 @@ export default function Dienstgrad() {
     <div>
       {d.rank?.badge_url && (
         <div className="rank-badge-hero">
-          <RankBadge url={d.rank.badge_url} title={d.rank.title} size="large" />
+          <RankBadge url={d.rank.badge_url} title={mine ?? ''} size="large" />
         </div>
       )}
       <div className="card rank-card rank-progress">
         <div className="rank-card-label">{t('Mein {rank}', { rank })}</div>
-        <div className="rank-card-title">{d.rank?.title ?? t('Noch kein {rank}', { rank })}</div>
+        <div className="rank-card-title">{mine ?? t('Noch kein {rank}', { rank })}</div>
         {withPoints && next && missing !== null && (
           <>
             {progress !== null && (
@@ -73,7 +74,7 @@ export default function Dienstgrad() {
           <li key={r.id} className={`card row${r.id === d.rank?.id ? ' rank-mine' : ''}`}>
             <div className="row-main">
               <div className="row-title">
-                <RankLabel url={r.badge_url} title={r.title} />
+                <RankLabel url={r.badge_url} title={rankName(r.id, r.title)} />
               </div>
               {r.id === d.rank?.id && <div className="row-sub">{t('Dein {rank}', { rank })}</div>}
             </div>
@@ -141,10 +142,11 @@ export function RankHistory({
     <ul className="card-list">
       {entries.map((h, i) => (
         <li key={h.id ?? i} className="card row">
-          {h.to && <RankBadge url={h.to_badge_url} title={h.to} size="small" />}
+          {h.to && <RankBadge url={h.to_badge_url} title={rankName(h.to_rank_id, h.to)} size="small" />}
           <div className="row-main">
             <div className="row-title">
-              {KIND[h.kind]}: {h.from ?? t('kein {rank}', { rank })} → {h.to ?? t('kein {rank}', { rank })}
+              {KIND[h.kind]}: {h.from ? rankName(h.from_rank_id, h.from) : t('kein {rank}', { rank })} →{' '}
+              {h.to ? rankName(h.to_rank_id, h.to) : t('kein {rank}', { rank })}
             </div>
             <div className="row-sub">
               {formatUtcDate(h.changed_at)}

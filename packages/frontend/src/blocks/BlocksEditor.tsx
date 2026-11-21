@@ -27,6 +27,7 @@ import { previewRange } from './countdown';
 import { confirmAsk } from '../ask';
 import brand from '../generated/brand';
 import { t } from '../i18n';
+import { officeTitle } from '../officeName';
 
 /** Name einer Blockart; „Sponsoren“ heißt wie der Bereich (eigener Name aus Einstellungen → Navigation, Issue #362). */
 const kindLabel = (k: { type: string; label: string }): string => (k.type === 'sponsors' ? brand.labels.sections.sponsors : k.label);
@@ -87,7 +88,8 @@ function ContactsFields({ block, onChange }: { block: ContactsDraft; onChange: (
         ) : (
           list.map((o) => (
             <label key={o.id} className="toggle">
-              <input type="checkbox" checked={block.office_ids.includes(o.id)} onChange={(e) => toggle(o.id, e.target.checked)} /> {o.title}
+              <input type="checkbox" checked={block.office_ids.includes(o.id)} onChange={(e) => toggle(o.id, e.target.checked)} />{' '}
+              {officeTitle(o)}
             </label>
           ))
         )}

@@ -134,7 +134,9 @@ final class BlockHtml
         }
         $out = self::heading($b) . '<ul class="block-contacts-list">';
         foreach ($offices as $o) {
-            $office = (string) (($o['holder_title'] ?? '') !== '' && $o['holder_title'] !== null ? $o['holder_title'] : $o['title']);
+            // Eigener Name der Sprache vor der deutschen Einzahl, sonst wie im Zeitstrahl: Einzahl, sonst Bezeichnung
+            $office = $this->app->translations()->text('office', (string) ($o['id'] ?? ''))
+                ?? (string) (($o['holder_title'] ?? '') !== '' && $o['holder_title'] !== null ? $o['holder_title'] : $o['title']);
             $holders = is_array($o['holders'] ?? null) && $o['holders'] !== [] ? $o['holders'] : [null];
             foreach ($holders as $h) {
                 $photo = is_array($h) && is_string($h['photo_url'] ?? null)

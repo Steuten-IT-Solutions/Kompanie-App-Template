@@ -15,6 +15,7 @@ import {
   type ResponseStatus,
 } from '../api';
 import { CollapsibleKindChecks, kindsOf } from '../eventKindChecks';
+import { kindName } from '../names';
 import { formatDate, formatEventWhen, todayYmd } from '../format';
 import brand from '../generated/brand';
 import { navigate } from '../router';
@@ -175,7 +176,11 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
                 </div>
                 <div className="row-sub">
                   {formatDate(l.date)}
-                  {kindsOf(l).length > 0 && ` · ${kindsOf(l).join(', ')}`} · {countsText(l.counts)}
+                  {kindsOf(l).length > 0 &&
+                    ` · ${kindsOf(l)
+                      .map((k) => kindName(k))
+                      .join(', ')}`}{' '}
+                  · {countsText(l.counts)}
                 </div>
               </div>
               <span className="chevron" aria-hidden="true">
@@ -226,7 +231,10 @@ function EventList({
               </div>
               <div className="row-sub">
                 {formatEventWhen(ev)}
-                {kindsOf(ev).length > 0 && ` · ${kindsOf(ev).join(', ')}`}
+                {kindsOf(ev).length > 0 &&
+                  ` · ${kindsOf(ev)
+                    .map((k) => kindName(k))
+                    .join(', ')}`}
               </div>
             </div>
             <span className="chevron" aria-hidden="true">

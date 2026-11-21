@@ -3,6 +3,7 @@ import type { AdmissionRuleResult } from './api';
 import { countNodes, CONDITIONS_MAX, dateText, describeRule, GROUPS_MAX, type DraftGroup, type DraftNode } from './admissionRule';
 import { IconButton } from './icons';
 import { t, tn } from './i18n';
+import { kindName } from './names';
 
 const STATE_LABEL = { fulfilled: t('erfüllt'), open: t('offen'), unknown: t('unbekannt') } as const;
 
@@ -40,7 +41,7 @@ function ResultGroup({ group }: { group: AdmissionRuleResult }) {
                 {r.type === 'attendance'
                   ? tn('{attended} von {count} Teilnahme an „{kind}“', '{attended} von {count} Teilnahmen an „{kind}“', r.count ?? 0, {
                       attended: r.attended ?? 0,
-                      kind: r.kind ?? '',
+                      kind: r.kind ? kindName(r.kind) : '',
                     })
                   : r.due
                     ? tn('{count} Monat als Anwärter (ab {date})', '{count} Monate als Anwärter (ab {date})', r.months ?? 0, {
@@ -197,7 +198,7 @@ function ConditionEditor({
               {options.length === 0 && <option value="">{t('keine Terminart eingerichtet')}</option>}
               {options.map((k) => (
                 <option key={k} value={k}>
-                  {k}
+                  {kindName(k)}
                 </option>
               ))}
             </select>

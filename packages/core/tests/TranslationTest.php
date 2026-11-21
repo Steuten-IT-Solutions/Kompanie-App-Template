@@ -97,4 +97,39 @@ final class TranslationTest extends TestCase
         I18n::setLocale('de');
         $this->assertSame('Feste', $this->app->config->sectionLabel('events'));
     }
+
+    public function testEventKindAndMenuNamesPerLanguage(): void
+    {
+        $this->call($this->admin, 'PATCH', '/admin/settings', ['languages' => 'de,en']);
+        $this->assertSame(200, $this->call($this->admin, 'PUT', '/admin/event-kinds', ['kinds' => ['Versammlung', 'Arbeitsdienst']])->status);
+        $this->assertSame(403, $this->save($this->m, [['kind' => 'event_kind', 'ref' => 'Versammlung', 'text' => 'Meeting']])->status);
+        $this->assertSame(400, $this->save($this->admin, [['kind' => 'event_kind', 'ref' => 'Versammlung', 'text' => str_repeat('x', 41)]])->status, 'zu lang');
+        $res = $this->save($this->admin, [
+            ['kind' => 'event_kind', 'ref' => 'Versammlung', 'text' => 'Meeting'],
+            ['kind' => 'menu', 'ref' => 'Mehr', 'text' => 'More'],
+        ]);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $config = $this->call(null, 'GET', '/config')->data;
+        $this->assertSame('Meeting', $config['name_translations']['en']['event_kind']['Versammlung']['label']);
+        $this->assertSame('More', $config['name_translations']['en']['menu']['Mehr']['label']);
+        $this->assertSame(['Versammlung', 'Arbeitsdienst'], $config['eventKinds'], 'gespeichert bleibt der deutsche Name');
+
+        // Meldungen des Servers in der Sprache der Anfrage, ohne Eintrag der deutsche Name
+        I18n::setLocale('en');
+        $kinds = $this->app->eventKinds();
+        $this->assertSame('Meeting', $kinds->label('Versammlung'));
+        $this->assertSame('Arbeitsdienst', $kinds->label('Arbeitsdienst'));
+        try {
+            $kinds->valid('Gibt es nicht');
+            $this->fail('unbekannte Art');
+        } catch (\KompanieApp\Core\Http\ApiError $e) {
+            $this->assertStringContainsString('Meeting, Arbeitsdienst', $e->getMessage());
+        }
+        I18n::setLocale('de');
+        $this->assertSame('Versammlung', $kinds->label('Versammlung'));
+
+        // Entfernte Art: Termine und Listen behalten den Namen, die Übersetzung bleibt.
+        $this->call($this->admin, 'PUT', '/admin/event-kinds', ['kinds' => ['Arbeitsdienst']]);
+        $this->assertSame('Meeting', $this->call(null, 'GET', '/config')->data['name_translations']['en']['event_kind']['Versammlung']['label']);
+    }
 }

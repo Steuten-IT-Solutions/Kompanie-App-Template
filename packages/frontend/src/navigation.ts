@@ -6,6 +6,7 @@
 
 import type { Capability, Feature } from './api';
 import { t } from './i18n';
+import { nameIn } from './names';
 
 /** Bereiche, die in der Navigation stehen können (wie NavigationService::TARGETS im Kern), in der Standardreihenfolge. */
 export const NAV_TARGETS = [
@@ -219,7 +220,8 @@ export function buildNav(setting: NavigationSetting | null | undefined, ctx: Nav
     menus++;
     item.items.forEach((t) => listed.add(t));
     const children = item.items.filter(isTarget).filter(ctx.visible);
-    if (children.length > 0) out.push({ key: `menue/${menus}`, label: item.label, icon: item.icon, children });
+    // Name in der Sprache der App (eigener Name je Sprache, Kennung ist der deutsche Name)
+    if (children.length > 0) out.push({ key: `menue/${menus}`, label: nameIn('menu', item.label, item.label), icon: item.icon, children });
   }
   // Bereiche, die die Einstellung noch nicht kennt (z. B. mit einer neuen Version dazugekommen): hinten anhängen.
   for (const t of [...NAV_TARGETS, ...pages]) if (!listed.has(t) && ctx.visible(t)) out.push(view(t));

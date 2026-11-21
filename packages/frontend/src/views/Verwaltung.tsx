@@ -58,7 +58,7 @@ import { bookingOutbox, usePendingBookings } from '../bookingSync';
 import { queuedMessage, shouldQueue } from '../offlineQueue';
 import { askPersistentStorage } from '../offlineRejectedStore';
 import { markSaved } from '../unsaved';
-import { preloadBadge, RankBadge, RankStack } from '../RankBadge';
+import { preloadBadge, RankBadge, rankName, RankStack } from '../RankBadge';
 import { MemberRank, Promotions, RankList, ranksUsePoints } from './DienstgradeVerwalten';
 import { installUrl } from '../install';
 import { useDragSort, useSaveQueue } from '../dragSort';
@@ -542,7 +542,9 @@ function Members() {
             {/* Dienstgrad rechts, gegenüber dem Foto: Abzeichen, darunter die Bezeichnung. Ohne Dienstgrad bleibt die
                 Spalte leer, damit der Text in allen Zeilen gleich mittig steht. */}
             {m.rank_title !== undefined && (
-              <div className="member-row-rank">{m.rank_title && <RankStack url={m.rank_badge_url} title={m.rank_title} />}</div>
+              <div className="member-row-rank">
+                {m.rank_title && <RankStack url={m.rank_badge_url} title={rankName(m.rank_id, m.rank_title)} />}
+              </div>
             )}
             <span className="chevron" aria-hidden="true">
               ›
@@ -635,8 +637,8 @@ function MemberPreviewHead({ p, onOpen }: { p: MemberPreview; onOpen?: (sheet: '
       <div className="member-rank-line">
         {p.rank_title && (
           <span className="member-rank-badge">
-            <RankBadge url={p.rank_badge_url} title={p.rank_title} size="large" />
-            <span>{p.rank_title}</span>
+            <RankBadge url={p.rank_badge_url} title={rankName(p.rank_id, p.rank_title)} size="large" />
+            <span>{rankName(p.rank_id, p.rank_title)}</span>
           </span>
         )}
         {p.photo_url ? (
@@ -750,8 +752,8 @@ function MemberPeek({
                 <span className={`member-rank-badge${rankOn ? ' member-rank-open' : ''}`}>
                   {m.rank_title ? (
                     <>
-                      <RankBadge url={m.rank_badge_url} title={m.rank_title} size="large" />
-                      <span>{m.rank_title}</span>
+                      <RankBadge url={m.rank_badge_url} title={rankName(m.rank_id, m.rank_title)} size="large" />
+                      <span>{rankName(m.rank_id, m.rank_title)}</span>
                     </>
                   ) : (
                     <>
@@ -1039,8 +1041,8 @@ function MemberDetailView({
   const attendanceOn = !!m.attendance && (m.level !== 'guest' || m.attendance.entries.length > 0);
   const rankBadge = m.rank_title ? (
     <>
-      <RankBadge url={m.rank_badge_url} title={m.rank_title} size="large" />
-      <span>{m.rank_title}</span>
+      <RankBadge url={m.rank_badge_url} title={rankName(m.rank_id, m.rank_title)} size="large" />
+      <span>{rankName(m.rank_id, m.rank_title)}</span>
     </>
   ) : (
     <>
@@ -1826,7 +1828,7 @@ function NewMember() {
             <option value="">{t('Kein {rank}', { rank: brand.labels.rank })}</option>
             {rankOptions.map((r) => (
               <option key={r.id} value={r.id}>
-                {r.title}
+                {rankName(r.id, r.title)}
               </option>
             ))}
           </select>
