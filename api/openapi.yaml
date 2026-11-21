@@ -1177,7 +1177,9 @@ paths:
       description: |
         Setzt oder ändert die eigene Rückmeldung, mit kurzem Hinweis (höchstens 191 Zeichen). Geht bei jeder Quelle des
         Kalenders bis zum Beginn des Termins (ganztägig: 0 Uhr), bei Terminen der App bis zum Ende des Anmeldeschlusses
-        (`respond_until`), wenn der früher ist; danach 409 `responses_closed`. Bei iCal gilt die Rückmeldung auch, wenn
+        (`respond_until`), wenn der früher ist; danach 409 `responses_closed`, außer `decided_at` liegt vor dem Ende der
+        Frist (offline vorgemerkt; ohne zeitliche Grenze, höchstens 5 Minuten in der Zukunft): Dann gilt die Rückmeldung
+        und ist in `GET /calendar/{key}/responses` und der Anwesenheitsliste als `late` gekennzeichnet. Bei iCal gilt die Rückmeldung auch, wenn
         der Termin verschoben wird (stabile Kennung aus UID und ursprünglichem Beginn). Kommt nicht ins Änderungsprotokoll.
         Sind Zu- und Absagen ausgeschaltet (Einstellungen → Kalender, `calendar_responses`), 403 – wie bei allen
         Rückmeldungen (`/calendar/{key}/response`, `/calendar/{key}/responses`, `/calendar/{key}/responses/{id}`).
@@ -1192,6 +1194,12 @@ paths:
               properties:
                 status: { type: string, enum: ['yes', 'no'] }
                 note: { type: string, maxLength: 191 }
+                decided_at:
+                  {
+                    type: string,
+                    format: date-time,
+                    description: 'Wann auf dem Gerät getippt (offline vorgemerkt, nur beim späteren Senden); zählt nur nach dem Ende der Frist',
+                  }
       responses:
         '200':
           description: Der Termin mit der neuen Rückmeldung
@@ -1205,8 +1213,16 @@ paths:
     delete:
       tags: [Termine]
       summary: Eigene Rückmeldung zurücknehmen
-      description: Wieder „keine Rückmeldung“; gleiche Frist wie beim Zusagen (sonst 409 `responses_closed`).
+      description: Wieder „keine Rückmeldung“; gleiche Frist wie beim Zusagen (sonst 409 `responses_closed`), auch mit `decided_at`.
       x-capability: respond_calendar
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                decided_at: { type: string, format: date-time, description: 'Wann auf dem Gerät getippt (offline vorgemerkt)' }
       responses:
         '200':
           description: Der Termin ohne eigene Rückmeldung
@@ -10860,6 +10876,7 @@ components:
         id: { type: integer }
         name: { type: string }
         note: { type: string }
+        late: { type: boolean, description: 'Vor dem Ende der Frist getippt, erst danach angekommen (nachträglich übertragen)' }
 
     PublicEvent:
       type: object
@@ -12720,6 +12737,7 @@ components:
                     enum: ['yes', 'no', null]
                     description: Zu- oder Absage zum Termin (nur Listen aus dem Kalender, solange es den Termin gibt)
                   response_note: { type: string, description: Hinweis zur Zu- oder Absage }
+                  response_late: { type: boolean, description: 'Zu- oder Absage nachträglich übertragen (vor der Frist getippt, danach angekommen)' }
                   may_respond: { type: boolean, description: Darf bei Terminen zu- und absagen (nur dann lässt sich etwas eintragen) }
             counts_by_group:
               type: object

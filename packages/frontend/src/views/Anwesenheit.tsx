@@ -556,6 +556,7 @@ function Editor({
                   )
                 )}
                 {p.response_note && <span className="attendance-response-note">„{p.response_note}“</span>}
+                {p.response && p.response_late && <span className="attendance-response-note">nachträglich übertragen</span>}
               </span>
               {STATUSES.map((st) => (
                 <span key={st} className="attendance-cell">

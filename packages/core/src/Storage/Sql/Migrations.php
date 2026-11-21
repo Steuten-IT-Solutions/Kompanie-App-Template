@@ -2219,6 +2219,12 @@ WHERE title IS NULL",
                     'CREATE UNIQUE INDEX IF NOT EXISTS {translations}_kind_ref ON {translations} (kind, ref, field, locale)',
                 ],
             ],
+            // Zu- und Absagen, die offline vor dem Ende der Frist getippt wurden und erst danach ankamen (EventResponseService):
+            // Zeit des Tippens (UTC) zum Kennzeichnen „nachträglich übertragen“; NULL bei allen anderen.
+            74 => [
+                'mysql' => ['ALTER TABLE {event_responses} ADD COLUMN decided_at datetime DEFAULT NULL'],
+                'sqlite' => ['ALTER TABLE {event_responses} ADD COLUMN decided_at TEXT DEFAULT NULL'],
+            ],
         ];
     }
 

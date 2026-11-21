@@ -147,6 +147,8 @@ final class AttendanceService
             if ($responses !== null) {
                 $person['response'] = $responses['rows'][$u->id]['status'] ?? null;
                 $person['response_note'] = $responses['rows'][$u->id]['note'] ?? '';
+                // Vor der Frist getippt, erst danach angekommen (offline vorgemerkt)
+                $person['response_late'] = $responses['rows'][$u->id]['late'] ?? false;
                 $person['may_respond'] = isset($responses['audience'][$u->id]);
             }
             $people[] = $person;

@@ -148,8 +148,8 @@ final class EventResponsesTest extends TestCase
         $this->assertSame(403, $this->call('GET', "/calendar/$id/responses", [], $this->anna)->status);
 
         $list = $this->ok('GET', "/calendar/$id/responses");
-        $this->assertSame([['id' => $this->anna, 'name' => 'Anna', 'note' => 'mit Fahrrad']], $list['yes']);
-        $this->assertSame([['id' => $this->ben, 'name' => 'Ben', 'note' => 'Urlaub']], $list['no']);
+        $this->assertSame([['id' => $this->anna, 'name' => 'Anna', 'note' => 'mit Fahrrad', 'late' => false]], $list['yes']);
+        $this->assertSame([['id' => $this->ben, 'name' => 'Ben', 'note' => 'Urlaub', 'late' => false]], $list['no']);
         $this->assertSame(['Admin'], array_column($list['none'], 'name'), 'noch nicht gemeldet');
         $this->assertTrue($list['event']['responses']['can_list']);
 
@@ -185,6 +185,38 @@ final class EventResponsesTest extends TestCase
         $this->assertSame(200, $this->call('PUT', "/calendar/$day/response", ['status' => 'yes'], $this->anna)->status);
         $this->clock->at = new \DateTimeImmutable('2026-11-18 23:30:00', new \DateTimeZone('UTC'));
         $this->assertSame(409, $this->call('PUT', "/calendar/$day/response", ['status' => 'no'], $this->anna)->status);
+    }
+
+    /** Offline vor dem Ende der Frist getippt, erst danach angekommen: gilt, ohne zeitliche Grenze, gekennzeichnet. */
+    public function testDecidedInTimeCountsAfterTheDeadline(): void
+    {
+        $id = $this->appEvent(['respond_until' => '2026-11-17']);
+        $this->ok('PUT', "/calendar/$id/response", ['status' => 'yes'], $this->anna);
+        // Frist endet 2026-11-17 23:00 UTC (Ende des Tages in Berlin); angekommen Wochen später
+        $this->clock->at = new \DateTimeImmutable('2026-12-10 12:00:00', new \DateTimeZone('UTC'));
+        $late = $this->ok('PUT', "/calendar/$id/response", ['status' => 'no', 'note' => 'krank', 'decided_at' => '2026-11-17T21:30:00.000Z'], $this->anna);
+        $this->assertSame('no', $late['responses']['mine']);
+        $overview = $this->ok('GET', "/calendar/$id/responses");
+        $this->assertSame([['id' => $this->anna, 'name' => 'Anna', 'note' => 'krank', 'late' => true]], array_map(static fn (array $p): array => array_intersect_key($p, array_flip(['id', 'name', 'note', 'late'])), $overview['no']));
+
+        // Nach der Frist getippt, ungültige oder fehlende Zeit, Zeit weit in der Zukunft: abgelehnt
+        foreach (['2026-11-17T23:00:00Z', 'gestern', '', null, '2026-12-10T12:10:00Z'] as $decided) {
+            $res = $this->call('PUT', "/calendar/$id/response", ['status' => 'yes', 'decided_at' => $decided], $this->anna);
+            $this->assertSame([409, 'responses_closed'], [$res->status, $res->data['code'] ?? null], var_export($decided, true));
+        }
+        // Uhr des Geräts geht etwas vor: noch in Ordnung
+        $this->clock->at = new \DateTimeImmutable('2026-11-17 22:58:00', new \DateTimeZone('UTC'));
+        $this->ok('PUT', "/calendar/$id/response", ['status' => 'yes'], $this->anna);
+        $this->clock->at = new \DateTimeImmutable('2026-11-17 23:01:00', new \DateTimeZone('UTC'));
+        $this->ok('PUT', "/calendar/$id/response", ['status' => 'no', 'decided_at' => '2026-11-17T22:59:30+00:00'], $this->anna);
+        // Zurücknehmen genauso
+        $this->assertSame(409, $this->call('DELETE', "/calendar/$id/response", [], $this->anna)->status);
+        $this->ok('DELETE', "/calendar/$id/response", ['decided_at' => '2026-11-17T22:00:00Z'], $this->anna);
+        $this->assertNull($this->responses($id, $this->anna)['mine']);
+        // Rechtzeitig angekommen: nicht gekennzeichnet
+        $this->clock->at = new \DateTimeImmutable('2026-11-16 12:00:00', new \DateTimeZone('UTC'));
+        $this->ok('PUT', "/calendar/$id/response", ['status' => 'no', 'decided_at' => '2026-11-16T11:00:00Z'], $this->anna);
+        $this->assertFalse($this->ok('GET', "/calendar/$id/responses")['no'][0]['late']);
     }
 
     public function testRightRespondCalendar(): void

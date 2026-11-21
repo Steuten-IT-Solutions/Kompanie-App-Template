@@ -1147,6 +1147,8 @@ export interface EventResponsePerson {
   id: number;
   name: string;
   note: string;
+  /** Vor der Frist getippt, erst danach angekommen (offline vorgemerkt); fehlt bei älteren Servern */
+  late?: boolean;
 }
 
 export interface EventResponseOverview {
@@ -2106,6 +2108,8 @@ export interface AttendancePerson {
   /** Zu- oder Absage zum Termin (nur Listen aus dem Kalender, solange es den Termin gibt) */
   response?: ResponseStatus | null;
   response_note?: string;
+  /** Vor der Frist getippt, erst danach angekommen (offline vorgemerkt) */
+  response_late?: boolean;
   /** Darf bei Terminen zu- und absagen (nur dann lässt sich für die Person etwas eintragen) */
   may_respond?: boolean;
 }
@@ -2796,9 +2800,19 @@ export const api = {
   myPoints: () => request<PointEntry[]>('GET', '/me/points'),
   myPenalties: () => request<Penalty[]>('GET', '/me/penalties'),
   calendar: () => request<CalendarEvent[]>('GET', '/calendar'),
-  respondEvent: (id: string, status: ResponseStatus, note: string) =>
-    requestRepeatable<CalendarEvent>('PUT', `/calendar/${encodeURIComponent(id)}/response`, { status, note }),
-  withdrawResponse: (id: string) => requestRepeatable<CalendarEvent>('DELETE', `/calendar/${encodeURIComponent(id)}/response`),
+  /** decidedAt: wann offline getippt (ISO 8601); dann gilt die Antwort auch nach dem Ende der Frist */
+  respondEvent: (id: string, status: ResponseStatus, note: string, decidedAt?: string) =>
+    requestRepeatable<CalendarEvent>('PUT', `/calendar/${encodeURIComponent(id)}/response`, {
+      status,
+      note,
+      ...(decidedAt ? { decided_at: decidedAt } : {}),
+    }),
+  withdrawResponse: (id: string, decidedAt?: string) =>
+    requestRepeatable<CalendarEvent>(
+      'DELETE',
+      `/calendar/${encodeURIComponent(id)}/response`,
+      decidedAt ? { decided_at: decidedAt } : undefined,
+    ),
   eventResponses: (id: string) => request<EventResponseOverview>('GET', `/calendar/${encodeURIComponent(id)}/responses`),
   setKindsOfEvent: (id: string, kinds: string[]) =>
     request<{ id: string; kind: string | null; kinds?: string[] }>('PUT', `/calendar/${encodeURIComponent(id)}/kind`, { kinds }),
