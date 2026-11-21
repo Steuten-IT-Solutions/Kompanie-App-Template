@@ -8246,3 +8246,23 @@ fieldset.block-source legend {
   flex-basis: 100%;
   margin: 0;
 }
+
+/* Inhalte je Sprache (PR 9b): Hinweis „Nur auf Deutsch verfügbar“ und Blöcke in einer weiteren Sprache schreiben */
+.untranslated-note {
+  margin: 0 0 0.75rem;
+  font-style: italic;
+}
+.blocks-translator {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.block-translate .row-sub {
+  margin-bottom: 0.5rem;
+}
+.block-german {
+  margin-bottom: 0.5rem;
+}
+.block-german > summary {
+  cursor: pointer;
+}

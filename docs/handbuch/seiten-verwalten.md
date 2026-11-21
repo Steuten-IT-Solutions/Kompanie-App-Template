@@ -88,6 +88,15 @@ Trage optional eine **Überschrift** und den **Ort oder die Adresse** ein (z. B.
 ### Die Reihenfolge ändern
 Halte einen Eintrag am Griff links fest, ziehe ihn an die gewünschte Stelle und lass los. Die Reihenfolge ist sofort gespeichert. Am Computer geht es auch mit der Tastatur: Griff mit der Tab-Taste auswählen, dann Pfeil hoch oder runter. Die Reihenfolge gilt in der Standardnavigation; mit eurer eigenen Navigation bestimmt die dort den Platz jeder Seite.
 
+### Eine Seite auf Englisch schreiben
+Ist in der App Englisch eingeschaltet, steht oben **Schreiben auf: Deutsch | English**. So schreibst du die englische Fassung einer Seite:
+1. Lege die Seite wie gewohnt auf Deutsch an.
+2. Wähle oben **English** und tippe bei der Seite auf **Bearbeiten**.
+3. Trage den englischen Titel und die Texte der Blöcke ein. Leere Felder zeigen grau den deutschen Text; beim Textblock klappt **Deutscher Text** ihn auf.
+4. Tippe auf **Speichern**.
+
+Auf Englisch schreibst du nur Texte. Welche Blöcke es gibt, ihre Reihenfolge, **Für wen?** und Einstellungen wie Datum, Link oder Termine änderst du auf Deutsch; sie gelten für beide Sprachen. Ein Block, den du auf Deutsch behältst, behält auch seine englische Fassung. Seiten, denen noch etwas auf Englisch fehlt, tragen in der Liste den Hinweis **ohne English**.
+
 ### Eine Seite löschen
 Tippe auf **Löschen** und bestätige. Die Bilder der Seite sind damit ebenfalls weg, und die Seite verschwindet aus der Navigation.
 
@@ -101,7 +110,9 @@ Tippe auf **Löschen** und bestätige. Die Bilder der Seite sind damit ebenfalls
 - Ist ein Termin gelöscht oder sind die {bereich.events} ausgeschaltet, verhält sich ein Countdown auf diesen Termin wie nach dem Ende.
 - Wer {bereich.pages} verwalten darf, sieht alle Seiten. Das Recht vergeben {rolle.admin}s unter **Einstellungen** → **Rollen**; mit dem Bereich entsteht die Rolle *{bereich.pages} verwalten*.
 - Wo jede Seite steht, unten in der Leiste oder in einem Untermenü, legen {rolle.admin}s unter **Einstellungen** → **Navigation** fest. Ohne eigene Navigation stehen die Seiten nach den Bereichen; wer das Recht **Intern** hat, findet sie unter **Intern**, wenn unten kein Platz mehr ist. Eine neue Seite erscheint mit eigener Navigation hinten in der Leiste, bis ein {rolle.admin} ihr einen Platz gibt.
-- Die Seiten samt Bildern sind Teil der Datensicherung.
+- Wer die App auf Englisch nutzt, sieht die englische Fassung. Was dort fehlt, erscheint auf Deutsch, oben mit dem Hinweis *Nur auf Deutsch verfügbar* (oder *Teilweise nur auf Deutsch verfügbar*).
+- Bei **Ablauf** und **Zahlen und Fakten** gilt die englische Fassung nur, solange sie so viele Zeilen hat wie die deutsche. Fügst du auf Deutsch eine Zeile hinzu, trage die englischen Zeilen danach noch einmal ein.
+- Die Seiten samt Bildern und englischer Fassung sind Teil der Datensicherung.
 
 ## Siehe auch
 - [{bereich.pages}](seite:seiten)

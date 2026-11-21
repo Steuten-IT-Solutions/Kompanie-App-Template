@@ -17,20 +17,64 @@ final class TranslationRepository
     }
 
     /**
-     * Alle Übersetzungen in einer Abfrage. Fehlt die Tabelle noch (Migration noch nicht gelaufen), gibt es keine.
+     * Alle Übersetzungen der Arten $kinds in einer Abfrage. Fehlt die Tabelle noch (Migration noch nicht gelaufen), gibt
+     * es keine.
      *
+     * @param list<string> $kinds
      * @return array<string, array<string, array<string, array<string, string>>>> Sprache => Art => Kennung => Feld => Text
      */
-    public function all(): array
+    public function all(array $kinds): array
     {
+        if ($kinds === []) {
+            return [];
+        }
         try {
-            $rows = $this->db->select('SELECT kind, ref, field, locale, text FROM {translations}');
+            $rows = $this->db->select(
+                'SELECT kind, ref, field, locale, text FROM {translations} WHERE kind IN (' . implode(', ', array_fill(0, count($kinds), '?')) . ')',
+                array_values($kinds),
+            );
         } catch (\RuntimeException) {
             return [];
         }
         $out = [];
         foreach ($rows as $r) {
             $out[(string) $r['locale']][(string) $r['kind']][(string) $r['ref']][(string) $r['field']] = (string) $r['text'];
+        }
+        return $out;
+    }
+
+    /**
+     * Fassungen eines Inhalts (z. B. einer Seite) je Sprache. Fehlt die Tabelle noch, gibt es keine.
+     *
+     * @return array<string, array<string, string>> Sprache => Feld => Text
+     */
+    public function forRef(string $kind, string $ref): array
+    {
+        return $this->forRefs($kind, [$ref])[$ref] ?? [];
+    }
+
+    /**
+     * Fassungen mehrerer Inhalte einer Art in einer Abfrage.
+     *
+     * @param list<string> $refs
+     * @return array<string, array<string, array<string, string>>> Kennung => Sprache => Feld => Text
+     */
+    public function forRefs(string $kind, array $refs): array
+    {
+        if ($refs === []) {
+            return [];
+        }
+        try {
+            $rows = $this->db->select(
+                'SELECT ref, field, locale, text FROM {translations} WHERE kind = ? AND ref IN (' . implode(', ', array_fill(0, count($refs), '?')) . ')',
+                [$kind, ...array_values($refs)],
+            );
+        } catch (\RuntimeException) {
+            return [];
+        }
+        $out = [];
+        foreach ($rows as $r) {
+            $out[(string) $r['ref']][(string) $r['locale']][(string) $r['field']] = (string) $r['text'];
         }
         return $out;
     }

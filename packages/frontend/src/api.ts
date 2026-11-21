@@ -214,7 +214,7 @@ export interface AppConfig {
   /** Eigene Namen je weiterer Sprache (names.ts); fehlt bei älteren Servern, leer kommt als [] an */
   name_translations?: NameTranslations | [];
   /** Eigene Seiten (Issue #287), die die Person lesen darf, in ihrer Reihenfolge; fehlt bei älteren Servern */
-  pages?: { id: number; title: string }[];
+  pages?: { id: number; title: string; title_i18n?: Record<string, string> }[];
   /** News werden in der App geschrieben (Quelle „In der App“); fehlt bei älteren Servern */
   newsInApp?: boolean;
   /**
@@ -241,14 +241,32 @@ export interface PageSummary {
   audience: PageAudience;
   updated_at?: string;
   updated_by_name?: string | null;
+  /** Titel je weiterer Sprache, soweit eingetragen (Plan „Mehrsprachigkeit“, PR 9b) */
+  title_i18n?: Record<string, string>;
+  /** Nur für die Pflege: weitere Sprachen, in denen noch etwas fehlt */
+  untranslated_locales?: string[];
 }
+/** Fassung eines Inhalts aus Blöcken in einer weiteren Sprache: Kennung des Blocks => übersetzte Felder. */
+export type BlockTranslation = Record<string, Record<string, unknown>>;
 export interface PageDetail extends PageSummary {
   /** Text der Textblöcke für alle (für ältere Apps), Bilder als Adressen */
   body: string;
   /** Inhalt aus Blöcken, nur die für die Person sichtbaren; fehlt bei älteren Servern */
   blocks?: Block[];
+  /** Fehlt etwas in der Sprache der App: all (nichts übersetzt) oder some; dann steht dort Deutsch */
+  untranslated?: 'all' | 'some';
+  /** Nur mit pageSource: Fassungen je weiterer Sprache zum Bearbeiten */
+  translations?: Record<string, { title: string; blocks: BlockTranslation }>;
 }
-export type PageInput = { title?: string; audience?: PageAudience; body?: string; blocks?: BlockInput[]; updated_at?: string };
+export type PageInput = {
+  title?: string;
+  audience?: PageAudience;
+  body?: string;
+  blocks?: BlockInput[];
+  updated_at?: string;
+  /** Fassungen je weiterer Sprache ('' löscht ein Feld) */
+  translations?: Record<string, { title?: string; blocks?: BlockTranslation }>;
+};
 
 /** Vorgefertigte Blöcke (eigene Seiten): all für alle, die den Inhalt sehen; members nur für Mitglieder. */
 export type BlockAudience = 'all' | 'members';
@@ -3121,6 +3139,8 @@ export const api = {
   // Eigene Seiten (Issue #287)
   pages: () => request<{ pages: PageSummary[] }>('GET', '/pages').then((r) => r.pages),
   page: (id: number) => request<PageDetail>('GET', `/pages/${id}`),
+  /** Zum Bearbeiten: deutsche Fassung und die Fassungen je weiterer Sprache */
+  pageSource: (id: number) => request<PageDetail>('GET', `/pages/${id}?source=1`),
   createPage: (data: PageInput) => request<PageDetail>('POST', '/pages', data),
   updatePage: (id: number, data: PageInput) => request<PageDetail>('PATCH', `/pages/${id}`, data),
   deletePage: (id: number) => request<{ deleted: boolean }>('DELETE', `/pages/${id}`),

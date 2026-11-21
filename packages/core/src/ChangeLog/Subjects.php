@@ -313,7 +313,8 @@ final class Subjects
         $officeTerms = $this->spec('Amtszeit', 'office_terms', fn (array $r): string => $this->lookup('offices', 'title', $r['office_id']) . ' ' . $years($r), [
             'kind' => 'Art', 'start_year' => 'Von', 'end_year' => 'Bis', 'note' => 'Notiz', 'honor' => ['Ehrenamt', 'bool'],
         ], extra: fn (array $r): array => ['Inhaber' => $holders('term_id = ?', $r['id'])]);
-        $pages = $this->spec('Seite', 'app_pages', 'title', ['title' => 'Titel', 'blocks' => ['Inhalt', 'blocks'], 'audience' => 'Sichtbar für']);
+        $pages = $this->spec('Seite', 'app_pages', 'title', ['title' => 'Titel', 'blocks' => ['Inhalt', 'blocks'], 'audience' => 'Sichtbar für'],
+            extra: fn (array $r): array => $this->app->pages()->translationFields($r));
         // Passive: Adresse, Telefon, E-Mail und Geburtsdatum sind persönliche Angaben (Werte nur mit view_personal)
         $passives = $this->spec('Passiver', 'passive_members', static fn (array $r): string => trim($r['first_name'] . ' ' . $r['last_name']), [
             'first_name' => 'Vorname', 'last_name' => 'Nachname', 'street' => 'Straße', 'house_number' => 'Hausnummer', 'address_extra' => 'Adresszusatz',
