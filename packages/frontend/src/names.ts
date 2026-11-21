@@ -3,11 +3,13 @@
  * immer steht; die Übersetzungen kommen mit /config (name_translations, Domain\TranslationService). Fehlt eine, gilt der
  * deutsche Name.
  *
- * Arten: nav (Bereiche, eigene Seiten und „Intern“ in der Navigation, Kennung wie in navigation_names), role (Rollen).
+ * Arten (wie TranslationService::KINDS): nav (Bereiche, eigene Seiten und „Intern“ in der Navigation, Kennung wie in
+ * navigation_names), role (Rollen), rank (Dienstgrade, ID), office und office_group (Ämter, ID), event_kind (Terminarten,
+ * Kennung = deutscher Name), menu (Untermenüs, Kennung = deutscher Name).
  */
 import { locale, SOURCE_LOCALE, type Locale } from './i18n';
 
-export type NameKind = 'nav' | 'role';
+export type NameKind = 'nav' | 'role' | 'rank' | 'office' | 'office_group' | 'event_kind' | 'menu';
 /** Sprache => Art => Kennung => Feld => Text */
 export type NameTranslations = Partial<Record<Locale, Partial<Record<string, Record<string, Record<string, string>>>>>>;
 

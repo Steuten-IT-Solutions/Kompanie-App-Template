@@ -19,9 +19,12 @@ use KompanieApp\Core\Storage\TranslationRepository;
  * und Einstellungen, auf welcher Sprache sie einrichtet („Einrichten auf“), und schreibt die Namen dieser Sprache über
  * PUT /admin/translations.
  *
- * Arten (KINDS): Kennung und wer sie pflegen darf. Weitere Arten (Dienstgrade, Ämter, Terminarten) kommen dazu.
+ * Arten (KINDS): Kennung und wer sie pflegen darf.
  * - nav: Name eines Bereichs, einer eigenen Seite oder von „Intern“ in der Navigation (Kennung wie in navigation_names),
- * - role: Name einer Rolle (Kennung der Rolle).
+ * - role: Name einer Rolle (Kennung der Rolle),
+ * - rank: Bezeichnung eines Dienstgrads (ID), office und office_group: Amt bzw. Gruppe der Ämter (ID),
+ * - event_kind: Terminart (Kennung ist ihr deutscher Name, wie er an Terminen steht),
+ * - menu: Untermenü der Navigation (Kennung ist sein deutscher Name).
  */
 final class TranslationService
 {
@@ -29,6 +32,11 @@ final class TranslationService
     public const KINDS = [
         'nav' => [Capability::ManageSettings, ['label'], NavigationService::LABEL_MAX],
         'role' => [Capability::ManageSettings, ['label'], RoleService::LABEL_MAX],
+        'rank' => [Capability::ManageRanks, ['label'], RankService::TITLE_MAX],
+        'office' => [Capability::ManageOffices, ['label'], OfficeService::TITLE_MAX],
+        'office_group' => [Capability::ManageOffices, ['label'], OfficeService::TITLE_MAX],
+        'event_kind' => [Capability::ManageSettings, ['label'], EventKindService::NAME_MAX],
+        'menu' => [Capability::ManageSettings, ['label'], NavigationService::LABEL_MAX],
     ];
 
     private ?TranslationRepository $repo = null;
