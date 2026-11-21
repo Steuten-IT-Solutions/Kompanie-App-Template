@@ -4,10 +4,12 @@ import { can, config, type Feature } from './api';
 import { boardSeesAll, canManagePolls } from './board';
 import brand from './generated/brand';
 import { navigate } from './router';
+import { t } from './i18n';
 import { Caps } from './ui';
 import { useAdminCounts } from './adminCounts';
 import { usePromotionsDue } from './promotionsDue';
-import { tileCount } from './tileCount';
+import { tileCount, tileSoonCount, tileTitle } from './tileCount';
+import { TileArrange, TileGrid } from './tiles';
 import { menuSources, prefetchOnTap, usePrefetchMenu } from './viewData';
 
 const sec = brand.labels.sections;
@@ -63,41 +65,41 @@ export function adminTabs(): AdminTab[] {
   const points = canPoints();
   const tabs = (
     [
-      { id: 'mitglieder', label: 'Mitglieder', on: memberListAllowed() },
-      { id: 'ehemalige', label: 'Ehemalige', on: can('manage_former') },
-      { id: 'passive', label: 'Passive', on: canPassive() },
+      { id: 'mitglieder', label: t('Mitglieder'), on: memberListAllowed() },
+      { id: 'ehemalige', label: t('Ehemalige'), on: can('manage_former') },
+      { id: 'passive', label: t('Passive'), on: canPassive() },
       // Anfragen auf einen Zugang (Issue #314): auch nach dem Ausschalten, solange welche warten; Zahl der offenen im Kreis
       {
         id: 'anfragen',
-        label: 'Anfragen',
+        label: t('Anfragen'),
         on: can('view_accounts') && (!!config?.registration || (config?.pendingRegistrations ?? 0) > 0),
       },
       // Fehlermeldungen aus der App: Zahl der offenen im Kreis
-      { id: 'meldungen', label: 'Fehlermeldungen', on: can('view_reports') },
+      { id: 'meldungen', label: t('Fehlermeldungen'), on: can('view_reports') },
       // Änderungsprotokoll: wer wann was angelegt, geändert oder gelöscht hat
-      { id: 'aenderungen', label: 'Änderungen', on: can('view_changes') },
+      { id: 'aenderungen', label: t('Änderungen'), on: can('view_changes') },
       // Bericht als PDF: Daten mehrerer Bereiche für einen Zeitraum
-      { id: 'bericht', label: 'Bericht', on: reportAllowed() },
+      { id: 'bericht', label: t('Bericht'), on: reportAllowed() },
       { id: 'punkte', label: `${sec.points} +`, on: points },
       { id: 'strafe', label: `${sec.penalties} +`, on: canPenalties() },
       { id: 'katalog', label: sec.catalog, on: points, group: SETUP },
       { id: 'dienstgrade', label: sec.ranks, on: canRanks(), group: SETUP },
-      { id: 'befoerderungen', label: 'Beförderungen', on: seeRanks() && !!config?.features.points },
+      { id: 'befoerderungen', label: t('Beförderungen'), on: seeRanks() && !!config?.features.points },
       // Aufnahmen: Anwärter, die die Voraussetzung erfüllen (Zahl im Kreis); der Server schickt die Zahl nur, wenn es passt
-      { id: 'aufnahmen', label: 'Aufnahmen', on: can('view_accounts') && config?.admissionsDue != null },
+      { id: 'aufnahmen', label: t('Aufnahmen'), on: can('view_accounts') && config?.admissionsDue != null },
       { id: 'titel', label: sec.titles, on: seeTitles(), group: SETUP },
       { id: 'aemter', label: sec.offices, on: canOffices(), group: SETUP },
       { id: 'kompanien', label: sec.companies, on: canCompanies(), group: SETUP },
       { id: 'sponsoren', label: sec.sponsors, on: canSponsors(), group: SETUP },
       { id: 'seiten', label: sec.pages, on: canPages(), group: SETUP },
-      { id: 'webseite', label: 'Webseite', on: canWebsite(), group: SETUP },
+      { id: 'webseite', label: t('Webseite'), on: canWebsite(), group: SETUP },
       { id: 'anwesenheit', label: sec.attendance, on: seeAttendance() },
       { id: 'brett', label: sec.board, on: boardSeesAll(), route: 'brett' },
       { id: 'umfragen', label: sec.polls, on: canManagePolls(), route: 'umfragen/verwalten' },
       { id: 'inventar', label: sec.inventory, on: seeInventory(), route: 'inventar' },
       { id: 'listen', label: sec.lists, on: seeLists() },
       { id: 'mail', label: sec.mail, on: seeMail() },
-      { id: 'einstellungen', label: 'Einstellungen', on: can('manage_settings'), route: 'einstellungen' },
+      { id: 'einstellungen', label: t('Einstellungen'), on: can('manage_settings'), route: 'einstellungen' },
     ] as AdminTab[]
   ).filter((t) => t.on);
   // Reihenfolge aus Einstellungen → Navigation (Abschnitt „Verwaltung“); ohne sie die Folge oben.
@@ -112,25 +114,25 @@ export function adminTileCatalog(): Record<string, { label: string; on: boolean 
   const f = config?.features;
   const on = (...keys: Feature[]) => keys.every((k) => !!f?.[k]);
   return {
-    mitglieder: { label: 'Mitglieder', on: true },
-    ehemalige: { label: 'Ehemalige', on: true },
-    passive: { label: 'Passive', on: on('passive') },
-    anfragen: { label: 'Anfragen', on: !!config?.registration || (config?.pendingRegistrations ?? 0) > 0 },
-    meldungen: { label: 'Fehlermeldungen', on: true },
-    aenderungen: { label: 'Änderungen', on: true },
-    bericht: { label: 'Bericht', on: true },
+    mitglieder: { label: t('Mitglieder'), on: true },
+    ehemalige: { label: t('Ehemalige'), on: true },
+    passive: { label: t('Passive'), on: on('passive') },
+    anfragen: { label: t('Anfragen'), on: !!config?.registration || (config?.pendingRegistrations ?? 0) > 0 },
+    meldungen: { label: t('Fehlermeldungen'), on: true },
+    aenderungen: { label: t('Änderungen'), on: true },
+    bericht: { label: t('Bericht'), on: true },
     punkte: { label: `${sec.points} +`, on: on('points') },
     strafe: { label: `${sec.penalties} +`, on: on('penalties') },
-    befoerderungen: { label: 'Beförderungen', on: on('ranks', 'points') },
-    aufnahmen: { label: 'Aufnahmen', on: on('attendance') },
+    befoerderungen: { label: t('Beförderungen'), on: on('ranks', 'points') },
+    aufnahmen: { label: t('Aufnahmen'), on: on('attendance') },
     anwesenheit: { label: sec.attendance, on: on('attendance') },
     brett: { label: sec.board, on: on('board') },
     umfragen: { label: sec.polls, on: on('polls') },
     inventar: { label: sec.inventory, on: on('inventory') },
     listen: { label: sec.lists, on: on('lists') },
     mail: { label: sec.mail, on: on('mail') },
-    [SETUP]: { label: 'Einrichtungen', on: true },
-    einstellungen: { label: 'Einstellungen', on: true },
+    [SETUP]: { label: t('Einrichtungen'), on: true },
+    einstellungen: { label: t('Einstellungen'), on: true },
     katalog: { label: sec.catalog, on: on('points') },
     dienstgrade: { label: sec.ranks, on: on('ranks') },
     titel: { label: sec.titles, on: on('titles') },
@@ -138,7 +140,7 @@ export function adminTileCatalog(): Record<string, { label: string; on: boolean 
     kompanien: { label: sec.companies, on: on('companies') },
     sponsoren: { label: sec.sponsors, on: on('sponsors') },
     seiten: { label: sec.pages, on: on('pages') },
-    webseite: { label: 'Webseite', on: on('website') },
+    webseite: { label: t('Webseite'), on: on('website') },
   };
 }
 
@@ -158,7 +160,7 @@ function startTabs(): AdminTab[] {
   // Nur Bereiche der Einrichtungen: keine Seite mit einem einzigen Knopf, sie stehen gleich auf der Startseite.
   if (setup.length === 0 || tabs.length === 0) return adminTabs();
   // „Einrichtungen“ steht, wo die Reihenfolge es sagt (Standard: vor den Einstellungen).
-  const entry: AdminTab = { id: SETUP, label: 'Einrichtungen', on: true, route: `verwaltung/${SETUP}` };
+  const entry: AdminTab = { id: SETUP, label: t('Einrichtungen'), on: true, route: `verwaltung/${SETUP}` };
   return sortByIds([...tabs, entry], startOrder(config?.admin_order));
 }
 
@@ -429,13 +431,15 @@ export function AdminIcon({ id }: { id: string }) {
 
 /** Startseite der Verwaltung: je Bereich ein Knopf mit Symbol; mit group die Bereiche unter „Einrichtungen“. */
 export function AdminMenu({ group }: { group?: string }) {
-  const due = usePromotionsDue();
+  const promotion = usePromotionsDue();
   useAdminCounts(!group);
   const counts = {
-    promotions: due,
+    promotions: promotion.due,
+    promotionsSoon: promotion.soon,
     registrations: config?.pendingRegistrations,
     reports: config?.openReports,
     admissions: config?.admissionsDue,
+    admissionsSoon: config?.admissionsSoon,
   };
   // Daten der Bereiche hinter den Knöpfen im Leerlauf vorab laden (auch die unter „Einrichtungen“), beim Antippen sofort.
   usePrefetchMenu(
@@ -443,34 +447,43 @@ export function AdminMenu({ group }: { group?: string }) {
     (group ? setupTabs() : adminTabs()).map((t) => t.id),
   );
   return (
-    <nav aria-label={group ? 'Einrichtungen' : 'Verwaltung'}>
-      <ul className="admin-tiles">
-        {(group ? setupTabs() : startTabs()).map((t) => {
-          const badge = tileCount(t.id, counts);
-          return (
-            <li key={t.id}>
-              <button
-                type="button"
-                className="card admin-tile"
-                title={badge?.title}
-                onClick={() => navigate(t.route ?? `verwaltung/${t.id}`)}
-                {...prefetchOnTap(...menuSources('verwaltung', t.id))}
-              >
-                <AdminIcon id={t.id} />
-                <span>
-                  <Caps text={t.label} />
-                </span>
-                {badge && (
-                  // Zahl im Kreis an der Ecke: was dort gerade ansteht (erklärt im title).
-                  <span className="count-badge" aria-hidden="true">
-                    {badge.text}
+    <nav aria-label={group ? t('Einrichtungen') : t('Verwaltung')}>
+      <TileArrange pages={[group ? 'einrichtungen' : 'verwaltung']}>
+        <TileGrid
+          page={group ? 'einrichtungen' : 'verwaltung'}
+          className="admin-tiles"
+          tiles={(group ? setupTabs() : startTabs()).map((t) => {
+            const badge = tileCount(t.id, counts);
+            const soon = tileSoonCount(t.id, counts);
+            return {
+              id: t.id,
+              label: t.label,
+              node: (
+                <button
+                  type="button"
+                  className="card admin-tile"
+                  title={tileTitle(badge, soon)}
+                  onClick={() => navigate(t.route ?? `verwaltung/${t.id}`)}
+                  {...prefetchOnTap(...menuSources('verwaltung', t.id))}
+                >
+                  <AdminIcon id={t.id} />
+                  <span>
+                    <Caps text={t.label} />
                   </span>
-                )}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+                  {(badge || soon) && (
+                    // Zahl im Kreis an der Ecke: was dort gerade ansteht (rot), daneben was bald ansteht (Akzentfarbe);
+                    // erklärt im title.
+                    <span className="count-badges" aria-hidden="true">
+                      {soon && <span className="count-badge count-badge-soon">{soon.text}</span>}
+                      {badge && <span className="count-badge">{badge.text}</span>}
+                    </span>
+                  )}
+                </button>
+              ),
+            };
+          })}
+        />
+      </TileArrange>
     </nav>
   );
 }
@@ -482,12 +495,12 @@ export function AdminBack({ from }: { from?: string } = {}) {
   if (from && setupTabs().some((t) => t.id === from) && startTabs().some((t) => t.id === SETUP))
     return (
       <button type="button" className="btn btn-link back" onClick={() => navigate(`verwaltung/${SETUP}`)}>
-        ‹ Einrichtungen
+        ‹ {t('Einrichtungen')}
       </button>
     );
   return (
     <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung')}>
-      ‹ Verwaltung
+      ‹ {t('Verwaltung')}
     </button>
   );
 }

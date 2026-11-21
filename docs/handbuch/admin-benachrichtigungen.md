@@ -22,7 +22,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einstellungen** und auf **Benachricht
 
 ## Gut zu wissen
 - Worüber eine Person benachrichtigt wird, wählt sie selbst auf ihrem Gerät (**Meins → Konto → Benachrichtigungen**, siehe [Benachrichtigungen](seite:benachrichtigungen)). Anfangs sind alle Arten an; neue Arten (neuer Bereich, neue Rolle) kommen von selbst dazu, selbst abgeschaltete bleiben aus.
-- Einschalten muss jede Person die Benachrichtigungen auf ihrem Gerät selbst, weil der Browser dafür ihre Zustimmung braucht. Mitglieder ohne Benachrichtigungen sehen dazu auf der Startseite den Hinweis **Nichts mehr verpassen**.
+- Einschalten muss jede Person die Benachrichtigungen auf ihrem Gerät selbst, weil der Browser dafür ihre Zustimmung braucht. Mitglieder, deren Browser noch nie nach Benachrichtigungen gefragt hat, sehen dazu nach der Anmeldung das Fenster **Nichts mehr verpassen**.
 - Kommt eine Benachrichtigung auf einem Gerät nicht an, obwohl sie unter **Zuletzt verschickt** steht, der Push-Dienst sie danach angenommen hat und keine Nachrichten mehr warten, hat der Server seinen Teil erledigt. Dann liegt es meist am Gerät: Prüfe dort, ob die Art eingeschaltet ist und ob das Handy Benachrichtigungen des Browsers zurückhält (z. B. im Energiesparmodus).
 - Kann der Server keine Benachrichtigungen senden, steht statt der Zahl der Geräte, was ihm fehlt. Das kann euer Hoster einschalten.
 

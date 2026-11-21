@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\EventRepository;
 
 /**
@@ -65,7 +66,7 @@ final class EventService
     {
         $current = $this->events->find($id);
         if (!$current) {
-            throw ApiError::notFound('Termin nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Termin nicht gefunden.'));
         }
         $data = $this->validate($input, $current);
         $this->events->update($id, $data + ['updated_at' => $this->time->nowUtc()]);
@@ -75,7 +76,7 @@ final class EventService
     public function delete(int $id): void
     {
         if (!$this->events->delete($id)) {
-            throw ApiError::notFound('Termin nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Termin nicht gefunden.'));
         }
     }
 
@@ -109,46 +110,46 @@ final class EventService
 
         $title = Text::line($get('title'));
         if ($title === '') {
-            throw ApiError::invalid('Bitte einen Titel angeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Titel angeben.'));
         }
         if (mb_strlen($title) > 191) {
-            throw ApiError::invalid('Der Titel ist zu lang.');
+            throw ApiError::invalid(I18n::t('Der Titel ist zu lang.'));
         }
 
         $startDate = $get('start_date');
         if (!Input::isDate($startDate)) {
-            throw ApiError::invalid('Bitte ein gültiges Startdatum angeben.');
+            throw ApiError::invalid(I18n::t('Bitte ein gültiges Startdatum angeben.'));
         }
         $endDate = $get('end_date');
         if ($endDate !== '' && !Input::isDate($endDate)) {
-            throw ApiError::invalid('Das Enddatum ist ungültig.');
+            throw ApiError::invalid(I18n::t('Das Enddatum ist ungültig.'));
         }
         if ($endDate !== '' && $endDate < $startDate) {
-            throw ApiError::invalid('Das Enddatum liegt vor dem Startdatum.');
+            throw ApiError::invalid(I18n::t('Das Enddatum liegt vor dem Startdatum.'));
         }
 
         $startTime = self::normTime($get('start_time'));
         $endTime = self::normTime($get('end_time'));
         if ($startTime === false || $endTime === false) {
-            throw ApiError::invalid('Bitte Uhrzeiten im Format HH:MM angeben.');
+            throw ApiError::invalid(I18n::t('Bitte Uhrzeiten im Format HH:MM angeben.'));
         }
         if ($startTime === null && $endTime !== null) {
-            throw ApiError::invalid('Eine Endzeit braucht auch eine Startzeit.');
+            throw ApiError::invalid(I18n::t('Eine Endzeit braucht auch eine Startzeit.'));
         }
         if ($endTime !== null && ($endDate === '' || $endDate === $startDate) && $endTime < $startTime) {
-            throw ApiError::invalid('Die Endzeit liegt vor der Startzeit.');
+            throw ApiError::invalid(I18n::t('Die Endzeit liegt vor der Startzeit.'));
         }
 
-        $url = Input::url($get('url'), 'Der Link muss mit http:// oder https:// beginnen.');
+        $url = Input::url($get('url'), I18n::t('Der Link muss mit http:// oder https:// beginnen.'));
 
         $deadline = [];
         if ($this->deadline) {
             $until = $get('respond_until');
             if ($until !== '' && !Input::isDate($until)) {
-                throw ApiError::invalid('Der Anmeldeschluss ist ungültig.');
+                throw ApiError::invalid(I18n::t('Der Anmeldeschluss ist ungültig.'));
             }
             if ($until !== '' && $until > $startDate) {
-                throw ApiError::invalid('Der Anmeldeschluss liegt nach dem Beginn.');
+                throw ApiError::invalid(I18n::t('Der Anmeldeschluss liegt nach dem Beginn.'));
             }
             $deadline = ['respond_until' => $until === '' ? null : $until];
         }

@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Domain;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Push\PushService;
 use KompanieApp\Core\Update\StatusReporter;
 
@@ -140,22 +141,22 @@ final class BugReportService
         }
         $this->trap()->check($in['token'] ?? null, $this->app->time()->timestamp());
         if (($in['consent'] ?? null) !== true) {
-            throw ApiError::invalid('Bitte bestätige, dass die Meldung an die Admins und, wenn nötig, an die Betreuer der App gehen darf.');
+            throw ApiError::invalid(I18n::t('Bitte bestätige, dass die Meldung an die Admins und, wenn nötig, an die Betreuer der App gehen darf.'));
         }
         $description = self::text($in['description'] ?? null, 0, true);
         if ($description === '') {
-            throw ApiError::invalid('Bitte beschreibe kurz, was nicht klappt.');
+            throw ApiError::invalid(I18n::t('Bitte beschreibe kurz, was nicht klappt.'));
         }
         if (mb_strlen($description) > self::MAX_DESCRIPTION) {
-            throw ApiError::invalid(sprintf('Die Beschreibung darf höchstens %d Zeichen lang sein.', self::MAX_DESCRIPTION));
+            throw ApiError::invalid(I18n::t('Die Beschreibung darf höchstens {max} Zeichen lang sein.', ['max' => self::MAX_DESCRIPTION]));
         }
         $expected = self::text($in['expected'] ?? null, 0, true);
         if (mb_strlen($expected) > self::MAX_EXPECTED) {
-            throw ApiError::invalid(sprintf('„Was hast du erwartet?“ darf höchstens %d Zeichen lang sein.', self::MAX_EXPECTED));
+            throw ApiError::invalid(I18n::t('„Was hast du erwartet?“ darf höchstens {max} Zeichen lang sein.', ['max' => self::MAX_EXPECTED]));
         }
         $includeName = ($in['includeName'] ?? false) === true;
         if ($includeName && $user === null) {
-            throw ApiError::invalid('Ohne Anmeldung kann kein Name mitgeschickt werden.');
+            throw ApiError::invalid(I18n::t('Ohne Anmeldung kann kein Name mitgeschickt werden.'));
         }
         [$screenshot, $type] = $this->validScreenshot($in['screenshot'] ?? null);
 
@@ -220,7 +221,7 @@ final class BugReportService
     {
         $row = $this->app->db->selectOne('SELECT screenshot, screenshot_type FROM {report_inbox} WHERE id = ?', [$id]);
         if ($row === null || !is_string($row['screenshot']) || $row['screenshot'] === '') {
-            throw ApiError::notFound('Zu dieser Meldung gibt es kein Bildschirmfoto (mehr).');
+            throw ApiError::notFound(I18n::t('Zu dieser Meldung gibt es kein Bildschirmfoto (mehr).'));
         }
         return ['type' => (string) $row['screenshot_type'], 'data' => $row['screenshot']];
     }
@@ -236,16 +237,16 @@ final class BugReportService
         $row = $this->openRow($id);
         $reason = self::text($reason, 0, true);
         if ($reason === '') {
-            throw ApiError::invalid('Bitte schreibe kurz, warum die Meldung geschlossen wird.');
+            throw ApiError::invalid(I18n::t('Bitte schreibe kurz, warum die Meldung geschlossen wird.'));
         }
         if (mb_strlen($reason) > self::MAX_REASON) {
-            throw ApiError::invalid(sprintf('Die Begründung darf höchstens %d Zeichen lang sein.', self::MAX_REASON));
+            throw ApiError::invalid(I18n::t('Die Begründung darf höchstens {max} Zeichen lang sein.', ['max' => self::MAX_REASON]));
         }
         $this->app->db->update('report_inbox', [
             'status' => self::CLOSED, 'reason' => $reason, 'reviewed_by' => $actor->id, 'reviewed_at' => $this->app->time()->timestamp(),
             'screenshot' => null, 'screenshot_type' => '',
         ], ['id' => $id]);
-        $this->notifyReporter($row, sprintf('Deine Fehlermeldung ist erledigt: %s', $reason));
+        $this->notifyReporter($row, static fn (): string => I18n::t('Deine Fehlermeldung ist erledigt: {reason}', ['reason' => $reason]));
         return $this->item($id);
     }
 
@@ -258,11 +259,11 @@ final class BugReportService
     public function forward(User $actor, int $id): array
     {
         if (!$this->forwardable()) {
-            throw new ApiError(409, 'reports_not_forwardable', 'In dieser App ist kein Empfänger für Fehlermeldungen eingerichtet. Weiterleiten geht deshalb nicht.');
+            throw new ApiError(409, 'reports_not_forwardable', I18n::t('In dieser App ist kein Empfänger für Fehlermeldungen eingerichtet. Weiterleiten geht deshalb nicht.'));
         }
         $row = $this->openRow($id);
         if ($this->queued() >= self::MAX_QUEUED) {
-            throw new ApiError(503, 'reports_full', 'Zurzeit warten zu viele Meldungen auf den Versand. Bitte versuche es später erneut.');
+            throw new ApiError(503, 'reports_full', I18n::t('Zurzeit warten zu viele Meldungen auf den Versand. Bitte versuche es später erneut.'));
         }
         $full = $this->app->db->selectOne('SELECT screenshot FROM {report_inbox} WHERE id = ?', [$id]);
         $report = self::decode((string) $row['report']);
@@ -292,7 +293,7 @@ final class BugReportService
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Versand der Fehlermeldung nicht vorgezogen: ' . $e->getMessage());
         }
-        $this->notifyReporter($row, 'Deine Fehlermeldung ist an die Betreuer der App weitergeleitet.');
+        $this->notifyReporter($row, static fn (): string => I18n::t('Deine Fehlermeldung ist an die Betreuer der App weitergeleitet.'));
         return $this->item($id);
     }
 
@@ -445,10 +446,10 @@ final class BugReportService
         $cache = $this->app->cache;
         if ($cache->increment('bug_report_c_' . hash('sha256', PushService::clientKey($client)), 3600) > self::CLIENT_RATE
             || $cache->increment('bug_report_day', 86400) > self::DAILY_RATE) {
-            throw new ApiError(429, 'too_many_attempts', 'Zu viele Meldungen in kurzer Zeit. Bitte versuche es später erneut.');
+            throw new ApiError(429, 'too_many_attempts', I18n::t('Zu viele Meldungen in kurzer Zeit. Bitte versuche es später erneut.'));
         }
         if ($this->openCount() >= self::MAX_OPEN) {
-            throw new ApiError(503, 'reports_full', 'Zurzeit können keine weiteren Meldungen angenommen werden. Bitte versuche es später erneut.');
+            throw new ApiError(503, 'reports_full', I18n::t('Zurzeit können keine weiteren Meldungen angenommen werden. Bitte versuche es später erneut.'));
         }
     }
 
@@ -457,10 +458,10 @@ final class BugReportService
     {
         $row = $this->app->db->selectOne('SELECT id, uuid, user_id, share_name, report, screenshot_type, status FROM {report_inbox} WHERE id = ?', [$id]);
         if ($row === null) {
-            throw ApiError::notFound('Meldung nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Meldung nicht gefunden.'));
         }
         if ((string) $row['status'] !== self::OPEN) {
-            throw new ApiError(409, 'report_done', 'Diese Meldung ist schon bearbeitet.');
+            throw new ApiError(409, 'report_done', I18n::t('Diese Meldung ist schon bearbeitet.'));
         }
         return $row;
     }
@@ -511,7 +512,12 @@ final class BugReportService
         try {
             $this->app->push()->notifyAudience(
                 PushService::TYPE_REPORTS_REVIEW,
-                PushService::message('Neue Fehlermeldung', $user !== null ? sprintf('%s hat einen Fehler gemeldet.', $user->name) : 'Jemand hat ohne Anmeldung einen Fehler gemeldet.', 'verwaltung/meldungen', 'meldungen'),
+                PushService::message(
+                    I18n::t('Neue Fehlermeldung'),
+                    $user !== null ? I18n::t('{name} hat einen Fehler gemeldet.', ['name' => $user->name]) : I18n::t('Jemand hat ohne Anmeldung einen Fehler gemeldet.'),
+                    'verwaltung/meldungen',
+                    'meldungen',
+                ),
                 // Wer selbst meldet, braucht keinen Hinweis auf die eigene Meldung.
                 static fn (int $uid): bool => $uid !== ($user?->id ?? 0),
             );
@@ -520,15 +526,19 @@ final class BugReportService
         }
     }
 
-    /** @param array<string, mixed> $row */
-    private function notifyReporter(array $row, string $body): void
+    /**
+     * @param array<string, mixed> $row
+     * @param \Closure(): string $body Text der Nachricht, erzeugt in der Sprache der Person
+     */
+    private function notifyReporter(array $row, \Closure $body): void
     {
         $uid = (int) $row['user_id'];
         if ($uid <= 0) {
             return;
         }
         try {
-            $this->app->push()->notifyUser($uid, PushService::TYPE_REPORTS, PushService::message('Deine Fehlermeldung', $body, 'hilfe/melden', 'meldung-' . $row['id']));
+            $message = I18n::in($this->app->languages()->forRecipient($uid), static fn (): array => PushService::message(I18n::t('Deine Fehlermeldung'), $body(), 'hilfe/melden', 'meldung-' . $row['id']));
+            $this->app->push()->notifyUser($uid, PushService::TYPE_REPORTS, $message);
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Benachrichtigung zu Fehlermeldung ' . $row['id'] . ' nicht eingereiht: ' . $e->getMessage());
         }
@@ -570,14 +580,14 @@ final class BugReportService
         }
         // Grobe Grenze vor dem Dekodieren (Base64 ist ein Drittel größer).
         if (strlen($data) > intdiv(self::MAX_SCREENSHOT_BYTES * 4, 3) + 8) {
-            throw ApiError::invalid('Das Bildschirmfoto darf höchstens 2 MB groß sein.');
+            throw ApiError::invalid(I18n::t('Das Bildschirmfoto darf höchstens 2 MB groß sein.'));
         }
         $bytes = $data === '' ? false : base64_decode($data, true);
         if ($bytes === false || $bytes === '') {
-            throw ApiError::invalid('Das Bildschirmfoto konnte nicht gelesen werden.');
+            throw ApiError::invalid(I18n::t('Das Bildschirmfoto konnte nicht gelesen werden.'));
         }
         if (strlen($bytes) > self::MAX_SCREENSHOT_BYTES) {
-            throw ApiError::invalid('Das Bildschirmfoto darf höchstens 2 MB groß sein.');
+            throw ApiError::invalid(I18n::t('Das Bildschirmfoto darf höchstens 2 MB groß sein.'));
         }
         $type = null;
         foreach (self::TYPES as $mime => $signature) {
@@ -587,10 +597,10 @@ final class BugReportService
         }
         $info = $type !== null ? @getimagesizefromstring($bytes) : false;
         if ($type === null || $info === false || ($info['mime'] ?? '') !== $type) {
-            throw ApiError::invalid('Als Bildschirmfoto gehen nur PNG-, JPEG- oder WebP-Bilder.');
+            throw ApiError::invalid(I18n::t('Als Bildschirmfoto gehen nur PNG-, JPEG- oder WebP-Bilder.'));
         }
         if ($info[0] < 1 || $info[1] < 1 || $info[0] > self::MAX_EDGE || $info[1] > self::MAX_EDGE || $info[0] * $info[1] > self::MAX_PIXELS) {
-            throw ApiError::invalid('Das Bildschirmfoto hat ungewöhnliche Maße. Bitte ein normales Bildschirmfoto wählen.');
+            throw ApiError::invalid(I18n::t('Das Bildschirmfoto hat ungewöhnliche Maße. Bitte ein normales Bildschirmfoto wählen.'));
         }
         // Neu kodiert statt der Eingabe: sicher gültiges Base64 ohne Zeilenumbrüche.
         return [base64_encode($bytes), $type];

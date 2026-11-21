@@ -10,6 +10,7 @@ use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\Blocks\Blocks;
 use KompanieApp\Core\Domain\Blocks\TextBlock;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\BoardRepository;
 
 /**
@@ -283,7 +284,7 @@ final class BoardService
             }
         }
         if (!array_key_exists('title', $in) && !$content && !array_key_exists('expires_at', $in) && !array_key_exists('attachments', $in) && !array_key_exists('audience', $in) && !array_key_exists('audience_ids', $in)) {
-            throw ApiError::invalid('Bitte Titel, Inhalt, Anhänge, Enddatum oder Sichtbarkeit angeben.');
+            throw ApiError::invalid(I18n::t('Bitte Titel, Inhalt, Anhänge, Enddatum oder Sichtbarkeit angeben.'));
         }
         // Anhänge: die genannten Kennungen sind danach genau die Anhänge (neue Entwürfe kommen dazu, fehlende gehen).
         $files = null;
@@ -358,7 +359,7 @@ final class BoardService
      */
     public function history(int $id, ?User $viewer = null): array
     {
-        $message = $this->repository()->find($id) ?? throw ApiError::notFound('Diese Nachricht gibt es nicht mehr.');
+        $message = $this->repository()->find($id) ?? throw ApiError::notFound(I18n::t('Diese Nachricht gibt es nicht mehr.'));
         $revisions = $this->repository()->revisions([$id])[$id] ?? [];
         $names = (new UserNames($this->app->users))->prime([$message['author_id'], $message['deleted_by'], ...array_column($revisions, 'user_id')]);
         // Namen auch für die Sichtbarkeiten im Verlauf
@@ -466,7 +467,7 @@ final class BoardService
     public function active(int $id): array
     {
         return $this->repository()->findActive($id, $this->app->time()->nowUtc())
-            ?? throw ApiError::notFound('Diese Nachricht gibt es nicht mehr (abgelaufen oder gelöscht).');
+            ?? throw ApiError::notFound(I18n::t('Diese Nachricht gibt es nicht mehr (abgelaufen oder gelöscht).'));
     }
 
     /** @return BoardItem */
@@ -702,7 +703,7 @@ final class BoardService
     {
         $title = is_string($title) ? Text::line($title) : '';
         if ($title === '') {
-            throw ApiError::invalid('Bitte einen Titel eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Titel eingeben.'));
         }
         return $title;
     }
@@ -725,7 +726,7 @@ final class BoardService
                 return $blocks;
             }
         }
-        throw ApiError::invalid('Bitte einen Text eingeben oder einen Block einfügen.');
+        throw ApiError::invalid(I18n::t('Bitte einen Text eingeben oder einen Block einfügen.'));
     }
 
     /**
@@ -750,11 +751,11 @@ final class BoardService
     private static function validBody(mixed $text): string
     {
         if (!is_string($text)) {
-            throw ApiError::invalid('Bitte einen Text eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Text eingeben.'));
         }
         $body = RichText::sanitize($text);
         if (RichText::isEmpty($body)) {
-            throw ApiError::invalid('Bitte einen Text eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Text eingeben.'));
         }
         return $body;
     }
@@ -762,7 +763,7 @@ final class BoardService
     private static function validAudience(mixed $audience): string
     {
         if (!is_string($audience) || !in_array($audience, self::AUDIENCES, true)) {
-            throw ApiError::invalid('Sichtbarkeit muss „members“ (intern), „public“ (öffentlich), „company“ (Kompanie) oder „person“ (einzeln) sein.');
+            throw ApiError::invalid(I18n::t('Sichtbarkeit muss „members“ (intern), „public“ (öffentlich), „company“ (Kompanie) oder „person“ (einzeln) sein.'));
         }
         return $audience;
     }
@@ -779,14 +780,13 @@ final class BoardService
             return [];
         }
         $company = $audience === self::AUDIENCE_COMPANY;
-        $what = $company ? 'mindestens eine Kompanie' : 'mindestens eine Person';
         if (!is_array($ids) || $ids === []) {
-            throw ApiError::invalid('Bitte ' . $what . ' auswählen.');
+            throw ApiError::invalid($company ? I18n::t('Bitte mindestens eine Kompanie auswählen.') : I18n::t('Bitte mindestens eine Person auswählen.'));
         }
         $out = [];
         foreach ($ids as $id) {
             if (!is_int($id) || $id <= 0) {
-                throw ApiError::invalid('audience_ids muss eine Liste von IDs sein.');
+                throw ApiError::invalid(I18n::t('audience_ids muss eine Liste von IDs sein.'));
             }
             $out[$id] = $id;
         }
@@ -794,17 +794,17 @@ final class BoardService
         sort($out);
         if ($company) {
             if (!$this->app->features()->enabled(CompanyService::FEATURE)) {
-                throw ApiError::invalid(sprintf('Der Bereich %s ist ausgeschaltet.', $this->app->config->sectionLabel('companies', 'Kompanien')));
+                throw ApiError::invalid(I18n::t('Der Bereich {section} ist ausgeschaltet.', ['section' => $this->app->config->sectionLabel('companies', I18n::t('Kompanien'))]));
             }
             $known = array_column($this->app->companies()->repository()->all(), 'id');
             if (array_diff($out, $known) !== []) {
-                throw ApiError::invalid('Diese Kompanie gibt es nicht.');
+                throw ApiError::invalid(I18n::t('Diese Kompanie gibt es nicht.'));
             }
         } else {
             $users = $this->app->users->findMany($out);
             foreach ($out as $id) {
                 if (!self::isRecipient($users[$id] ?? null)) {
-                    throw ApiError::invalid('Nachrichten am Brett lassen sich nur Personen freigeben, die das Brett lesen.');
+                    throw ApiError::invalid(I18n::t('Nachrichten am Brett lassen sich nur Personen freigeben, die das Brett lesen.'));
                 }
             }
         }
@@ -816,10 +816,10 @@ final class BoardService
     {
         $utc = $this->app->time()->parseToUtc($value);
         if ($utc === null) {
-            throw ApiError::invalid('Ungültiges Enddatum (Datum und Uhrzeit erwartet).');
+            throw ApiError::invalid(I18n::t('Ungültiges Enddatum (Datum und Uhrzeit erwartet).'));
         }
         if ($utc <= $this->app->time()->nowUtc()) {
-            throw ApiError::invalid('Das Enddatum muss in der Zukunft liegen.');
+            throw ApiError::invalid(I18n::t('Das Enddatum muss in der Zukunft liegen.'));
         }
         return $utc;
     }

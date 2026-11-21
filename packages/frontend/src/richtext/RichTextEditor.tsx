@@ -19,6 +19,7 @@ import { formatBytes } from '../format';
 import { Indent } from './indent';
 import { cleanPastedHtml, isOfficeHtml, rtfImages } from './wordPaste';
 import { alertAsk, promptAsk } from '../ask';
+import { t, tn } from '../i18n';
 
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 /** Anfangsbreite eingefügter Bilder (nur die Anzeige; gespeichert wird das Bild mit höchstens 2048 Pixeln an der längeren Kante, die Breite ist änderbar). */
@@ -39,7 +40,7 @@ const RichImage = Image.extend({
 });
 
 const FONTS = [
-  ['', 'Schriftart'],
+  ['', t('Schriftart')],
   ['Arial, Helvetica, sans-serif', 'Arial'],
   ['Calibri, Carlito, sans-serif', 'Calibri'],
   ['Verdana, Geneva, sans-serif', 'Verdana'],
@@ -132,7 +133,7 @@ function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() 
   const [more, setMore] = useState(false);
   const setLink = async () => {
     const current = (editor.getAttributes('link').href as string | undefined) ?? '';
-    const input = await promptAsk('Adresse des Links (https://…, E-Mail-Adresse oder Telefonnummer). Leer entfernt den Link.', current);
+    const input = await promptAsk(t('Adresse des Links (https://…, E-Mail-Adresse oder Telefonnummer). Leer entfernt den Link.'), current);
     if (input === null) return;
     if (input.trim() === '') {
       editor.chain().focus().extendMarkRange('link').unsetLink().run();
@@ -140,7 +141,7 @@ function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() 
     }
     const href = normalizeLink(input);
     if (href === null) {
-      await alertAsk('Erlaubt sind Adressen mit https://, E-Mail-Adressen und Telefonnummern.');
+      await alertAsk(t('Erlaubt sind Adressen mit https://, E-Mail-Adressen und Telefonnummern.'));
       return;
     }
     if (editor.state.selection.empty && !editor.isActive('link')) {
@@ -154,29 +155,34 @@ function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() 
     }
   };
   return (
-    <div className="rich-toolbar" role="toolbar" aria-label="Formatierung">
+    <div className="rich-toolbar" role="toolbar" aria-label={t('Formatierung')}>
       <div className="rich-group">
-        <Button editor={editor} label="Fett" active={editor.isActive('bold')} onClick={(e) => e.chain().focus().toggleBold().run()}>
-          <b>F</b>
-        </Button>
-        <Button editor={editor} label="Kursiv" active={editor.isActive('italic')} onClick={(e) => e.chain().focus().toggleItalic().run()}>
-          <i>K</i>
+        <Button editor={editor} label={t('Fett')} active={editor.isActive('bold')} onClick={(e) => e.chain().focus().toggleBold().run()}>
+          <b>{t('F')}</b>
         </Button>
         <Button
           editor={editor}
-          label="Unterstrichen"
+          label={t('Kursiv')}
+          active={editor.isActive('italic')}
+          onClick={(e) => e.chain().focus().toggleItalic().run()}
+        >
+          <i>{t('K')}</i>
+        </Button>
+        <Button
+          editor={editor}
+          label={t('Unterstrichen')}
           active={editor.isActive('underline')}
           onClick={(e) => e.chain().focus().toggleUnderline().run()}
         >
           <u>U</u>
         </Button>
-        <label className="rich-tool rich-color" title="Textfarbe">
+        <label className="rich-tool rich-color" title={t('Textfarbe')}>
           <span aria-hidden="true" style={{ borderBottomColor: style.color ?? 'currentColor' }}>
             A
           </span>
           <input
             type="color"
-            aria-label="Textfarbe"
+            aria-label={t('Textfarbe')}
             value={toHex(style.color) ?? '#000000'}
             onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
           />
@@ -185,7 +191,7 @@ function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() 
       <div className="rich-group">
         <Button
           editor={editor}
-          label="Aufzählung"
+          label={t('Aufzählung')}
           active={editor.isActive('bulletList')}
           onClick={(e) => e.chain().focus().toggleBulletList().run()}
         >
@@ -193,33 +199,33 @@ function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() 
         </Button>
         <Button
           editor={editor}
-          label="Nummerierte Liste"
+          label={t('Nummerierte Liste')}
           active={editor.isActive('orderedList')}
           onClick={(e) => e.chain().focus().toggleOrderedList().run()}
         >
           1.
         </Button>
-        <Button editor={editor} label="Link" active={editor.isActive('link')} onClick={setLink}>
+        <Button editor={editor} label={t('Link')} active={editor.isActive('link')} onClick={setLink}>
           🔗
         </Button>
         {onImage && (
-          <Button editor={editor} label="Bild einfügen" onClick={onImage}>
+          <Button editor={editor} label={t('Bild einfügen')} onClick={onImage}>
             🖼
           </Button>
         )}
       </div>
       <div className="rich-group">
-        <Button editor={editor} label="Rückgängig" disabled={!editor.can().undo()} onClick={(e) => e.chain().focus().undo().run()}>
+        <Button editor={editor} label={t('Rückgängig')} disabled={!editor.can().undo()} onClick={(e) => e.chain().focus().undo().run()}>
           ↶
         </Button>
-        <Button editor={editor} label="Wiederholen" disabled={!editor.can().redo()} onClick={(e) => e.chain().focus().redo().run()}>
+        <Button editor={editor} label={t('Wiederholen')} disabled={!editor.can().redo()} onClick={(e) => e.chain().focus().redo().run()}>
           ↷
         </Button>
         <button
           type="button"
           className={`rich-tool rich-more${more ? ' active' : ''}`}
-          aria-label="Weitere Werkzeuge"
-          title="Weitere Werkzeuge"
+          aria-label={t('Weitere Werkzeuge')}
+          title={t('Weitere Werkzeuge')}
           aria-expanded={more}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => setMore(!more)}
@@ -233,7 +239,7 @@ function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() 
           <div className="rich-group">
             <select
               className="rich-select"
-              aria-label="Schriftart"
+              aria-label={t('Schriftart')}
               value={FONTS.some(([v]) => v === style.fontFamily) ? style.fontFamily : ''}
               onChange={(e) =>
                 e.target.value ? editor.chain().focus().setFontFamily(e.target.value).run() : editor.chain().focus().unsetFontFamily().run()
@@ -247,13 +253,13 @@ function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() 
             </select>
             <select
               className="rich-select rich-size"
-              aria-label="Schriftgröße"
+              aria-label={t('Schriftgröße')}
               value={SIZES.includes(style.fontSize ?? '') ? style.fontSize : ''}
               onChange={(e) =>
                 e.target.value ? editor.chain().focus().setFontSize(e.target.value).run() : editor.chain().focus().unsetFontSize().run()
               }
             >
-              <option value="">Größe</option>
+              <option value="">{t('Größe')}</option>
               {SIZES.map((s) => (
                 <option key={s} value={s}>
                   {s.replace('pt', '')}
@@ -264,26 +270,26 @@ function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() 
           <div className="rich-group">
             <Button
               editor={editor}
-              label="Durchgestrichen"
+              label={t('Durchgestrichen')}
               active={editor.isActive('strike')}
               onClick={(e) => e.chain().focus().toggleStrike().run()}
             >
               <s>S</s>
             </Button>
-            <label className="rich-tool rich-color" title="Hintergrundfarbe (markieren)">
+            <label className="rich-tool rich-color" title={t('Hintergrundfarbe (markieren)')}>
               <span aria-hidden="true" className="rich-highlight" style={{ backgroundColor: style.backgroundColor ?? 'transparent' }}>
                 ab
               </span>
               <input
                 type="color"
-                aria-label="Hintergrundfarbe"
+                aria-label={t('Hintergrundfarbe')}
                 value={toHex(style.backgroundColor) ?? '#ffff00'}
                 onChange={(e) => editor.chain().focus().setBackgroundColor(e.target.value).run()}
               />
             </label>
             <Button
               editor={editor}
-              label="Formatierung entfernen"
+              label={t('Formatierung entfernen')}
               onClick={(e) => e.chain().focus().unsetAllMarks().unsetTextAlign().run()}
             >
               ⌫
@@ -292,10 +298,10 @@ function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() 
           <div className="rich-group">
             {(
               [
-                ['left', 'Linksbündig', '⇤'],
-                ['center', 'Zentriert', '↔'],
-                ['right', 'Rechtsbündig', '⇥'],
-                ['justify', 'Blocksatz', '≡'],
+                ['left', t('Linksbündig'), '⇤'],
+                ['center', t('Zentriert'), '↔'],
+                ['right', t('Rechtsbündig'), '⇥'],
+                ['justify', t('Blocksatz'), '≡'],
               ] as const
             ).map(([align, label, icon]) => (
               <Button
@@ -308,20 +314,20 @@ function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() 
                 {icon}
               </Button>
             ))}
-            <Button editor={editor} label="Einzug verkleinern" onClick={(e) => e.chain().focus().outdent().run()}>
+            <Button editor={editor} label={t('Einzug verkleinern')} onClick={(e) => e.chain().focus().outdent().run()}>
               ⇠
             </Button>
-            <Button editor={editor} label="Einzug vergrößern" onClick={(e) => e.chain().focus().indent().run()}>
+            <Button editor={editor} label={t('Einzug vergrößern')} onClick={(e) => e.chain().focus().indent().run()}>
               ⇢
             </Button>
           </div>
           <div className="rich-group">
-            <Button editor={editor} label="Trennlinie" onClick={(e) => e.chain().focus().setHorizontalRule().run()}>
+            <Button editor={editor} label={t('Trennlinie')} onClick={(e) => e.chain().focus().setHorizontalRule().run()}>
               ―
             </Button>
             <Button
               editor={editor}
-              label="Tabelle einfügen"
+              label={t('Tabelle einfügen')}
               onClick={(e) => e.chain().focus().insertTable({ rows: 2, cols: 2, withHeaderRow: false }).run()}
             >
               ▦
@@ -331,19 +337,19 @@ function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() 
       )}
       {inTable && (
         <div className="rich-group">
-          <Button editor={editor} label="Zeile darunter einfügen" onClick={(e) => e.chain().focus().addRowAfter().run()}>
-            +Z
+          <Button editor={editor} label={t('Zeile darunter einfügen')} onClick={(e) => e.chain().focus().addRowAfter().run()}>
+            {t('+Z')}
           </Button>
-          <Button editor={editor} label="Spalte rechts einfügen" onClick={(e) => e.chain().focus().addColumnAfter().run()}>
-            +S
+          <Button editor={editor} label={t('Spalte rechts einfügen')} onClick={(e) => e.chain().focus().addColumnAfter().run()}>
+            {t('+S')}
           </Button>
-          <Button editor={editor} label="Zeile löschen" onClick={(e) => e.chain().focus().deleteRow().run()}>
-            −Z
+          <Button editor={editor} label={t('Zeile löschen')} onClick={(e) => e.chain().focus().deleteRow().run()}>
+            {t('−Z')}
           </Button>
-          <Button editor={editor} label="Spalte löschen" onClick={(e) => e.chain().focus().deleteColumn().run()}>
-            −S
+          <Button editor={editor} label={t('Spalte löschen')} onClick={(e) => e.chain().focus().deleteColumn().run()}>
+            {t('−S')}
           </Button>
-          <Button editor={editor} label="Tabelle löschen" onClick={(e) => e.chain().focus().deleteTable().run()}>
+          <Button editor={editor} label={t('Tabelle löschen')} onClick={(e) => e.chain().focus().deleteTable().run()}>
             ✕▦
           </Button>
         </div>
@@ -363,11 +369,11 @@ function Toolbar({ editor, onImage, signature }: { editor: Editor; onImage: (() 
                 .run();
             }}
           >
-            Signatur einfügen
+            {t('Signatur einfügen')}
           </button>
         ) : (
           <button type="button" className="btn btn-small btn-link rich-signature" onClick={signature.onSetup}>
-            Noch keine Signatur – jetzt einrichten
+            {t('Noch keine Signatur – jetzt einrichten')}
           </button>
         ))}
     </div>
@@ -396,11 +402,11 @@ export default function RichTextEditor({ value, onChange, label, signature, id, 
   /** Bilder hochladen und einfügen; meldet technische Grenzen des Servers verständlich. */
   async function upload(files: File[], pos?: number): Promise<{ uid: string; url: string; width: number }[]> {
     if (!images) {
-      setNotice('Bilder sind hier nicht möglich.');
+      setNotice(t('Bilder sind hier nicht möglich.'));
       return [];
     }
     const ok = files.filter((f) => IMAGE_TYPES.includes(f.type));
-    if (ok.length < files.length) setNotice('Erlaubt sind Bilder als JPG, PNG oder WebP.');
+    if (ok.length < files.length) setNotice(t('Erlaubt sind Bilder als JPG, PNG oder WebP.'));
     const out: { uid: string; url: string; width: number }[] = [];
     setBusy((n) => n + 1);
     try {
@@ -409,7 +415,11 @@ export default function RichTextEditor({ value, onChange, label, signature, id, 
       for (const file of ok) {
         if (max !== null && file.size > max) {
           setNotice(
-            `„${file.name}“ ist ${formatBytes(file.size)} groß; der Server nimmt Bilder bis ${formatBytes(max)} an. Bitte ein kleineres Bild wählen.`,
+            t('„{name}“ ist {size} groß; der Server nimmt Bilder bis {max} an. Bitte ein kleineres Bild wählen.', {
+              name: file.name,
+              size: formatBytes(file.size),
+              max: formatBytes(max),
+            }),
           );
           continue;
         }
@@ -495,9 +505,11 @@ export default function RichTextEditor({ value, onChange, label, signature, id, 
           editorRef.current?.chain().focus().insertContent(out).run();
           if (cleaned.missingImages > 0) {
             setNotice(
-              cleaned.missingImages === 1
-                ? 'Ein Bild konnte nicht übernommen werden. Bitte einzeln einfügen (über 🖼 oder per Kopieren nur des Bilds).'
-                : `${cleaned.missingImages} Bilder konnten nicht übernommen werden. Bitte einzeln einfügen (über 🖼 oder per Kopieren nur des Bilds).`,
+              tn(
+                'Ein Bild konnte nicht übernommen werden. Bitte einzeln einfügen (über 🖼 oder per Kopieren nur des Bilds).',
+                '{count} Bilder konnten nicht übernommen werden. Bitte einzeln einfügen (über 🖼 oder per Kopieren nur des Bilds).',
+                cleaned.missingImages,
+              ),
             );
           }
         })();
@@ -513,7 +525,7 @@ export default function RichTextEditor({ value, onChange, label, signature, id, 
             dropped++;
           }
         });
-        if (dropped > 0) setNotice('Bilder aus anderen Quellen werden nicht übernommen. Bitte das Bild speichern und über 🖼 einfügen.');
+        if (dropped > 0) setNotice(t('Bilder aus anderen Quellen werden nicht übernommen. Bitte das Bild speichern und über 🖼 einfügen.'));
         return doc.body.innerHTML;
       },
     },
@@ -540,7 +552,8 @@ export default function RichTextEditor({ value, onChange, label, signature, id, 
       />
       {busy > 0 && (
         <p className="muted small">
-          Bild wird hochgeladen …{maxBytes !== null && ` (der Server nimmt Bilder bis ${formatBytes(maxBytes)} an)`}
+          {t('Bild wird hochgeladen …')}
+          {maxBytes !== null && ' ' + t('(der Server nimmt Bilder bis {max} an)', { max: formatBytes(maxBytes) })}
         </p>
       )}
       {notice && (

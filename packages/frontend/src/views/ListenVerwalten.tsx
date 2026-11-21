@@ -13,6 +13,7 @@ import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { confirmAsk } from '../ask';
 import { Icon, IconButton } from '../icons';
+import { localeTag, t, tn } from '../i18n';
 
 const sec = brand.labels.sections;
 
@@ -23,23 +24,23 @@ const ROWS_MAX = 500;
 
 /** Standardbezeichnungen der Datenspalten (Überschrift, wenn die Spalte keine eigene hat). */
 const FIELD_LABELS: Record<ListField, string> = {
-  nr: 'Nr.',
-  name: 'Name',
-  first_name: 'Vorname',
-  last_name: 'Nachname',
-  role: 'Rolle',
+  nr: t('Nr.'),
+  name: t('Name'),
+  first_name: t('Vorname'),
+  last_name: t('Nachname'),
+  role: t('Rolle'),
   rank: brand.labels.rank,
   titles: sec.titles,
-  birthday: 'Geburtstag',
-  address: 'Adresse',
-  street: 'Straße und Nr.',
-  postal_code: 'PLZ',
-  city: 'Ort',
-  country: 'Land',
-  phone: 'Handynummer',
-  email: 'E-Mail',
+  birthday: t('Geburtstag'),
+  address: t('Adresse'),
+  street: t('Straße und Nr.'),
+  postal_code: t('PLZ'),
+  city: t('Ort'),
+  country: t('Land'),
+  phone: t('Handynummer'),
+  email: t('E-Mail'),
   points: sec.points,
-  penalties: `${sec.penalties} (offen)`,
+  penalties: t('{penalties} (offen)', { penalties: sec.penalties }),
 };
 
 /** Breite einer neuen Datenspalte (sonst normal) */
@@ -50,7 +51,12 @@ const FIELD_WIDTHS: Partial<Record<ListField, ListColumn['width']>> = {
   email: 'wide',
 };
 
-const WIDTH_LABELS: Record<ListColumn['width'], string> = { narrow: 'schmal', normal: 'normal', wide: 'breit', auto: 'automatisch' };
+const WIDTH_LABELS: Record<ListColumn['width'], string> = {
+  narrow: t('schmal'),
+  normal: t('normal'),
+  wide: t('breit'),
+  auto: t('automatisch'),
+};
 /** Anteil an der Breite der Tabelle (automatisch: nur, wenn der Platz für den Inhalt nicht reicht, siehe columnWidths) */
 const WIDTH_WEIGHT: Record<ListColumn['width'], number> = { narrow: 1, normal: 2.5, wide: 5, auto: 2.5 };
 
@@ -99,7 +105,7 @@ function sortValue(c: ListColumn, r: ListRow, index: number): SortValue {
 function cellText(c: ListColumn, r: ListRow, index: number): string {
   const v = cell(c, r, index);
   if (typeof v !== 'number') return v;
-  return c.field === 'penalties' ? formatEuro(Math.round(v * 100)) : v.toLocaleString('de-DE');
+  return c.field === 'penalties' ? formatEuro(Math.round(v * 100)) : v.toLocaleString(localeTag());
 }
 
 /**
@@ -137,7 +143,7 @@ function ListOverview({ onToast }: { onToast: Toast }) {
 
   async function add(e: FormEvent) {
     e.preventDefault();
-    const list = await run(() => api.createList({ title: title.trim() }), 'Liste angelegt');
+    const list = await run(() => api.createList({ title: title.trim() }), t('Liste angelegt'));
     if (list) navigate(`verwaltung/listen/${list.id}`);
   }
 
@@ -153,7 +159,7 @@ function ListOverview({ onToast }: { onToast: Toast }) {
         </p>
       )}
       {lists.length === 0 ? (
-        <Empty>Noch keine {sec.lists}.</Empty>
+        <Empty>{t('Noch keine {lists}.', { lists: sec.lists })}</Empty>
       ) : (
         <ul className="card-list">
           {lists.map((l) => (
@@ -163,32 +169,35 @@ function ListOverview({ onToast }: { onToast: Toast }) {
                 <div className="row-sub">
                   {[
                     l.date ? formatDate(l.date) : null,
-                    `${l.rows} ${l.rows === 1 ? 'Zeile' : 'Zeilen'}`,
-                    l.updated_by_name ? `zuletzt: ${l.updated_by_name}` : null,
+                    tn('{count} Zeile', '{count} Zeilen', l.rows),
+                    l.updated_by_name ? t('zuletzt: {name}', { name: l.updated_by_name }) : null,
                   ]
                     .filter(Boolean)
                     .join(' · ')}
                 </div>
                 <div className="row-actions" onClick={(e) => e.stopPropagation()}>
                   <button className="btn btn-small btn-secondary" disabled={busy} onClick={() => navigate(`verwaltung/listen/${l.id}`)}>
-                    Öffnen
+                    {t('Öffnen')}
                   </button>
                   {editable && (
                     <button
                       className="btn btn-small btn-secondary"
                       disabled={busy}
-                      onClick={() => run(() => api.copyList(l.id), 'Liste kopiert')}
+                      onClick={() => run(() => api.copyList(l.id), t('Liste kopiert'))}
                     >
-                      Kopieren
+                      {t('Kopieren')}
                     </button>
                   )}
                   {editable && (
                     <IconButton
                       icon="delete"
-                      label="Löschen"
+                      label={t('Löschen')}
                       variant="danger"
                       disabled={busy}
-                      onClick={async () => (await confirmAsk(`Liste „${l.title}“ löschen?`)) && run(() => api.deleteList(l.id), 'Gelöscht')}
+                      onClick={async () =>
+                        (await confirmAsk(t('Liste „{title}“ löschen?', { title: l.title }))) &&
+                        run(() => api.deleteList(l.id), t('Gelöscht'))
+                      }
                     />
                   )}
                 </div>
@@ -200,20 +209,20 @@ function ListOverview({ onToast }: { onToast: Toast }) {
 
       {editable && (
         <form className="form card" onSubmit={add}>
-          <h3>Neue Liste</h3>
+          <h3>{t('Neue Liste')}</h3>
           <label className="field">
-            <span>Titel</span>
+            <span>{t('Titel')}</span>
             <input
               type="text"
               maxLength={120}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="z. B. Ausflug – Anmeldung"
+              placeholder={t('z. B. Ausflug – Anmeldung')}
               required
             />
           </label>
           <button className="btn btn-block" type="submit" disabled={busy}>
-            Anlegen
+            {t('Anlegen')}
           </button>
         </form>
       )}
@@ -296,7 +305,7 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
   async function save(): Promise<boolean> {
     const result = await run(() => api.saveList(list.id, { ...toInput(draft), updated_at: basis }));
     if (!result) return false;
-    onToast('Gespeichert');
+    onToast(t('Gespeichert'));
     adopt(result);
     return true;
   }
@@ -306,7 +315,7 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
     if (dirty && !(await save())) return;
     const result = await run(() => api.syncListMembers(list.id, false));
     if (!result) return;
-    if (result.added.length === 0 && result.removed.length === 0) onToast('Die Liste ist aktuell');
+    if (result.added.length === 0 && result.removed.length === 0) onToast(t('Die Liste ist aktuell'));
     else setSync(result);
   }
 
@@ -316,11 +325,11 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
     const result = await run(() => api.syncListMembers(list.id, true));
     setSync(null);
     if (result?.list) {
-      onToast('Mitglieder aktualisiert');
+      onToast(t('Mitglieder aktualisiert'));
       adopt(result.list);
     } else if (result) {
       // Inzwischen schon aktualisiert (z. B. von jemand anderem)
-      onToast('Die Liste ist aktuell');
+      onToast(t('Die Liste ist aktuell'));
     }
   }
 
@@ -333,14 +342,14 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
       const { downloadListPdf } = await import('../listPdf');
       await downloadListPdf(pdfInput(draft));
     } catch (e) {
-      setError(`Das PDF ließ sich nicht erstellen: ${(e as Error).message}`);
+      setError(t('Das PDF ließ sich nicht erstellen: {error}', { error: (e as Error).message }));
     } finally {
       setPdfBusy(false);
     }
   }
 
   async function leave() {
-    if (!dirty || (await confirmAsk('Änderungen verwerfen?'))) navigate('verwaltung/listen');
+    if (!dirty || (await confirmAsk(t('Änderungen verwerfen?')))) navigate('verwaltung/listen');
   }
 
   const deleted = draft.rows.filter((r) => r.kind === 'member' && r.deleted).length;
@@ -349,31 +358,31 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
   return (
     <div className="list-editor">
       <button className="btn btn-link no-print" onClick={leave}>
-        ‹ Alle {sec.lists}
+        ‹ {t('Alle {lists}', { lists: sec.lists })}
       </button>
 
       {!editable && <h2>{draft.title}</h2>}
       {editable && (
         <section className="card form">
-          <h3>Liste</h3>
+          <h3>{t('Liste')}</h3>
           <label className="field">
-            <span>Titel</span>
+            <span>{t('Titel')}</span>
             <input type="text" maxLength={120} value={draft.title} onChange={(e) => update({ title: e.target.value })} required />
           </label>
           <label className="field">
-            <span>Untertitel / Hinweis (optional)</span>
+            <span>{t('Untertitel / Hinweis (optional)')}</span>
             <input type="text" maxLength={200} value={draft.subtitle} onChange={(e) => update({ subtitle: e.target.value })} />
           </label>
           <div className="field-row">
             <label className="field">
-              <span>Datum (optional)</span>
+              <span>{t('Datum (optional)')}</span>
               <input type="date" value={draft.date} onChange={(e) => update({ date: e.target.value })} />
             </label>
             <label className="field">
-              <span>Druck</span>
+              <span>{t('Druck')}</span>
               <select value={draft.orientation} onChange={(e) => update({ orientation: e.target.value as Draft['orientation'] })}>
-                <option value="portrait">Hochformat</option>
-                <option value="landscape">Querformat</option>
+                <option value="portrait">{t('Hochformat')}</option>
+                <option value="landscape">{t('Querformat')}</option>
               </select>
             </label>
           </div>
@@ -407,15 +416,17 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
       {editable && dirty && (
         <div className="list-save no-print">
           <button className="btn" disabled={busy || draft.title.trim() === ''} onClick={save}>
-            Speichern
+            {t('Speichern')}
           </button>
         </div>
       )}
 
       <section className="card list-output">
-        <h3>Ausgabe</h3>
+        <h3>{t('Ausgabe')}</h3>
         {hidden.length > 0 && (
-          <p className="muted small">Ohne die Rechte dazu bleiben diese Spalten leer: {hidden.map((c) => columnLabel(c)).join(', ')}.</p>
+          <p className="muted small">
+            {t('Ohne die Rechte dazu bleiben diese Spalten leer: {columns}.', { columns: hidden.map((c) => columnLabel(c)).join(', ') })}
+          </p>
         )}
         {/* Symbol und kurzer Text: Herunterladen als PDF bzw. CSV, Drucken nur als Symbol (passt auf schmale Handys) */}
         <div className="list-output-buttons">
@@ -423,8 +434,8 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
             className="btn btn-icon-text"
             disabled={pdfBusy}
             onClick={downloadPdf}
-            aria-label={pdfBusy ? 'PDF wird erstellt' : 'PDF herunterladen'}
-            title="PDF herunterladen"
+            aria-label={pdfBusy ? t('PDF wird erstellt') : t('PDF herunterladen')}
+            title={t('PDF herunterladen')}
           >
             <Icon name="download" />
             {pdfBusy ? 'PDF …' : 'PDF'}
@@ -432,16 +443,16 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
           <button
             className="btn btn-secondary btn-icon-text"
             onClick={() => downloadCsv(draft)}
-            aria-label="CSV herunterladen"
-            title="CSV herunterladen"
+            aria-label={t('CSV herunterladen')}
+            title={t('CSV herunterladen')}
           >
             <Icon name="download" />
             CSV
           </button>
-          <IconButton icon="print" label="Drucken" onClick={() => window.print()} />
+          <IconButton icon="print" label={t('Drucken')} onClick={() => window.print()} />
         </div>
-        <p className="muted small">Die Liste enthält personenbezogene Daten. Bitte nach Gebrauch vernichten bzw. löschen.</p>
-        <div className="list-preview" aria-label="Vorschau">
+        <p className="muted small">{t('Die Liste enthält personenbezogene Daten. Bitte nach Gebrauch vernichten bzw. löschen.')}</p>
+        <div className="list-preview" aria-label={t('Vorschau')}>
           <PrintSheet draft={draft} />
         </div>
       </section>
@@ -454,7 +465,7 @@ function ListEditor({ list, onSaved, onToast }: { list: PrintList; onSaved: (l: 
 /** Liste für das PDF: dieselben Spalten und Texte wie im Ausdruck. */
 function pdfInput(d: Draft): ListPdfInput {
   return {
-    title: d.title || 'Ohne Titel',
+    title: d.title || t('Ohne Titel'),
     subtitle: d.subtitle,
     metaLeft: brand.name,
     metaRight: metaText(d),
@@ -480,7 +491,8 @@ function pdfInput(d: Draft): ListPdfInput {
 }
 
 /** Unter dem Balken rechts: Datum der Liste und Stand (heute) */
-const metaText = (d: Draft): string => [d.date ? formatDate(d.date) : null, `Stand: ${formatDate(todayYmd())}`].filter(Boolean).join(' · ');
+const metaText = (d: Draft): string =>
+  [d.date ? formatDate(d.date) : null, t('Stand: {date}', { date: formatDate(todayYmd()) })].filter(Boolean).join(' · ');
 
 function downloadCsv(d: Draft) {
   const header = d.columns.map((c) => columnLabel(c));
@@ -518,29 +530,29 @@ function ColumnEditor({
 
   return (
     <section className="card form">
-      <h3>Spalten</h3>
+      <h3>{t('Spalten')}</h3>
       <ul className="card-list list-columns">
         {columns.map((c, i) => (
           <li key={i} {...sort.itemProps(i, 'card row list-column')}>
-            {columns.length > 1 && sort.handle(i, columnLabel(c) || 'Spalte')}
+            {columns.length > 1 && sort.handle(i, columnLabel(c) || t('Spalte'))}
             <div className="row-main">
               <div className="row-sub">
-                {c.kind === 'field' ? `Datenspalte: ${c.field ? FIELD_LABELS[c.field] : ''}` : 'Leere Spalte'}
-                {c.available === false && ' (für dich nicht sichtbar)'}
+                {c.kind === 'field' ? t('Datenspalte: {field}', { field: c.field ? FIELD_LABELS[c.field] : '' }) : t('Leere Spalte')}
+                {c.available === false && ` ${t('(für dich nicht sichtbar)')}`}
               </div>
               <div className="field-row">
                 <label className="field">
-                  <span>Überschrift</span>
+                  <span>{t('Überschrift')}</span>
                   <input
                     type="text"
                     maxLength={60}
                     value={c.label}
-                    placeholder={c.kind === 'field' && c.field ? FIELD_LABELS[c.field] : 'ohne Überschrift'}
+                    placeholder={c.kind === 'field' && c.field ? FIELD_LABELS[c.field] : t('ohne Überschrift')}
                     onChange={(e) => set(i, { label: e.target.value })}
                   />
                 </label>
                 <label className="field narrow">
-                  <span>Breite</span>
+                  <span>{t('Breite')}</span>
                   <select value={c.width} onChange={(e) => set(i, { width: e.target.value as ListColumn['width'] })}>
                     {(Object.keys(WIDTH_LABELS) as ListColumn['width'][]).map((w) => (
                       <option key={w} value={w}>
@@ -554,12 +566,12 @@ function ColumnEditor({
                 {c.kind === 'blank' && (
                   <label className="toggle">
                     <input type="checkbox" checked={c.checkbox} onChange={(e) => set(i, { checkbox: e.target.checked })} />
-                    <span>Kästchen zum Abhaken</span>
+                    <span>{t('Kästchen zum Abhaken')}</span>
                   </label>
                 )}
                 {columns.length > 1 && (
                   <button type="button" className="btn btn-small btn-secondary" onClick={() => onChange(columns.filter((_, j) => j !== i))}>
-                    Entfernen
+                    {t('Entfernen')}
                   </button>
                 )}
               </div>
@@ -569,7 +581,7 @@ function ColumnEditor({
       </ul>
       <div className="field-row list-add-column">
         <label className="field">
-          <span>Datenspalte</span>
+          <span>{t('Datenspalte')}</span>
           <select value={field} onChange={(e) => setField(e.target.value as ListField)}>
             {fields
               .filter((f) => f.available)
@@ -591,7 +603,7 @@ function ColumnEditor({
             ])
           }
         >
-          + Datenspalte
+          + {t('Datenspalte')}
         </button>
       </div>
       <div className="button-row">
@@ -603,10 +615,10 @@ function ColumnEditor({
             onChange([...columns, { kind: 'blank', field: null, label: '', width: 'normal', checkbox: false, available: true }])
           }
         >
-          + Leere Spalte
+          + {t('Leere Spalte')}
         </button>
       </div>
-      {full && <p className="muted small">Höchstens {COLUMNS_MAX} Spalten.</p>}
+      {full && <p className="muted small">{t('Höchstens {max} Spalten.', { max: COLUMNS_MAX })}</p>}
     </section>
   );
 }
@@ -664,16 +676,19 @@ function RowEditor({
 
   return (
     <section className="card form">
-      <h3>Zeilen</h3>
+      <h3>{t('Zeilen')}</h3>
       <p className="muted small">
-        {rows.length} {rows.length === 1 ? 'Zeile' : 'Zeilen'}, davon {members}{' '}
-        {onlyMembers ? (members === 1 ? 'Mitglied' : 'Mitglieder') : members === 1 ? 'Person aus der App' : 'Personen aus der App'}.
-        „Mitglieder aktualisieren“ legt Zeilen für alle an, die in die Liste gehören, und löscht die von Konten, die es nicht mehr gibt oder
-        die nicht mehr dazugehören; eigene Zeilen bleiben.
+        {tn('{count} Zeile', '{count} Zeilen', rows.length)},{' '}
+        {onlyMembers
+          ? tn('davon {count} Mitglied.', 'davon {count} Mitglieder.', members)
+          : tn('davon {count} Person aus der App.', 'davon {count} Personen aus der App.', members)}{' '}
+        {t(
+          '„Mitglieder aktualisieren“ legt Zeilen für alle an, die in die Liste gehören, und löscht die von Konten, die es nicht mehr gibt oder die nicht mehr dazugehören; eigene Zeilen bleiben.',
+        )}
       </p>
       {groupOptions.length > 1 && (
         <fieldset className="list-groups">
-          <legend>In die Liste kommen</legend>
+          <legend>{t('In die Liste kommen')}</legend>
           {groupOptions.map((o) => {
             const checked = groups.includes(o.key);
             return (
@@ -695,26 +710,29 @@ function RowEditor({
       )}
       {deleted > 0 && (
         <p className="form-error">
-          {deleted === 1 ? 'Eine Zeile gehört' : `${deleted} Zeilen gehören`} zu einem gelöschten Konto. „Mitglieder aktualisieren“ entfernt
-          sie.
+          {tn(
+            'Eine Zeile gehört zu einem gelöschten Konto. „Mitglieder aktualisieren“ entfernt sie.',
+            '{count} Zeilen gehören zu einem gelöschten Konto. „Mitglieder aktualisieren“ entfernt sie.',
+            deleted,
+          )}
         </p>
       )}
       <div className="button-row list-row-buttons">
         <button type="button" className="btn" disabled={busy} onClick={onSync}>
-          Mitglieder aktualisieren
+          {t('Mitglieder aktualisieren')}
         </button>
         <button type="button" className="btn btn-secondary" disabled={rows.length >= ROWS_MAX} onClick={() => addFree(1)}>
-          + Zeile
+          + {t('Zeile')}
         </button>
         <button type="button" className="btn btn-secondary" disabled={rows.length >= ROWS_MAX} onClick={() => addFree(5)}>
-          + 5 Zeilen
+          + {t('5 Zeilen')}
         </button>
       </div>
       <div className="field-row list-sort">
         <label className="field">
-          <span>Sortieren nach</span>
+          <span>{t('Sortieren nach')}</span>
           <select value={String(sortBy)} onChange={(e) => setBy(e.target.value === 'name' ? 'name' : Number(e.target.value))}>
-            <option value="name">Name (Nachname, Vorname)</option>
+            <option value="name">{t('Name (Nachname, Vorname)')}</option>
             {sortable.map(({ c, i }) => (
               <option key={i} value={i}>
                 {columnLabel(c) || FIELD_LABELS[c.field as ListField]}
@@ -723,53 +741,49 @@ function RowEditor({
           </select>
         </label>
         <label className="field narrow">
-          <span>Richtung</span>
+          <span>{t('Richtung')}</span>
           <select value={dir} onChange={(e) => setDir(e.target.value as 'asc' | 'desc')}>
-            <option value="asc">aufsteigend</option>
-            <option value="desc">absteigend</option>
+            <option value="asc">{t('aufsteigend')}</option>
+            <option value="desc">{t('absteigend')}</option>
           </select>
         </label>
         <button type="button" className="btn btn-secondary" disabled={rows.length < 2} onClick={applySort}>
-          Sortieren
+          {t('Sortieren')}
         </button>
       </div>
 
       {sync && (
-        <div className="card list-sync" role="dialog" aria-label="Mitglieder aktualisieren">
+        <div className="card list-sync" role="dialog" aria-label={t('Mitglieder aktualisieren')}>
           {sync.added.length > 0 && (
             <p>
-              <strong>
-                {sync.added.length} {sync.added.length === 1 ? 'Zeile kommt' : 'Zeilen kommen'} dazu:
-              </strong>{' '}
+              <strong>{tn('{count} Zeile kommt dazu:', '{count} Zeilen kommen dazu:', sync.added.length)}</strong>{' '}
               {sync.added.map((a) => a.name).join(', ')}
             </p>
           )}
           {sync.removed.length > 0 && (
             <p>
-              <strong>
-                {sync.removed.length} {sync.removed.length === 1 ? 'Zeile wird' : 'Zeilen werden'} gelöscht:
-              </strong>{' '}
-              {sync.removed.map((r) => r.name ?? 'gelöschtes Konto').join(', ')}
+              <strong>{tn('{count} Zeile wird gelöscht:', '{count} Zeilen werden gelöscht:', sync.removed.length)}</strong>{' '}
+              {sync.removed.map((r) => r.name ?? t('gelöschtes Konto')).join(', ')}
             </p>
           )}
           <div className="button-row">
             <button type="button" className="btn" disabled={busy} onClick={onApplySync}>
-              Übernehmen
+              {t('Übernehmen')}
             </button>
             <button type="button" className="btn btn-secondary" disabled={busy} onClick={onCancelSync}>
-              Abbrechen
+              {t('Abbrechen')}
             </button>
           </div>
         </div>
       )}
 
       {rows.length === 0 ? (
-        <p className="muted small">Noch keine Zeilen.</p>
+        <p className="muted small">{t('Noch keine Zeilen.')}</p>
       ) : (
         <ol className="card-list list-rows">
           {rows.map((r, i) => (
             <li key={r.key} {...sort.itemProps(i, 'card row list-row')}>
-              {rows.length > 1 && sort.handle(i, r.name || `Zeile ${i + 1}`)}
+              {rows.length > 1 && sort.handle(i, r.name || t('Zeile {nr}', { nr: i + 1 }))}
               <span className="list-row-nr">{i + 1}</span>
               <div className="row-main">
                 {r.kind === 'free' ? (
@@ -777,12 +791,12 @@ function RowEditor({
                     type="text"
                     maxLength={100}
                     value={r.name}
-                    placeholder="leer (zum Eintragen auf Papier)"
-                    aria-label={`Zeile ${i + 1}: Name`}
+                    placeholder={t('leer (zum Eintragen auf Papier)')}
+                    aria-label={t('Zeile {nr}: Name', { nr: i + 1 })}
                     onChange={(e) => onChange(rows.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
                   />
                 ) : r.deleted ? (
-                  <span className="muted">(Konto gelöscht)</span>
+                  <span className="muted">{t('(Konto gelöscht)')}</span>
                 ) : (
                   <span>{r.name}</span>
                 )}
@@ -790,7 +804,7 @@ function RowEditor({
               <button
                 type="button"
                 className="btn btn-small btn-secondary"
-                aria-label={`Zeile ${i + 1} entfernen`}
+                aria-label={t('Zeile {nr} entfernen', { nr: i + 1 })}
                 onClick={() => onChange(rows.filter((_, j) => j !== i))}
               >
                 ✕
@@ -1036,7 +1050,7 @@ function PrintSheet({ draft }: { draft: Draft }) {
       <header className="list-sheet-head">
         <img src={logoUrl} alt="" className="list-sheet-logo" />
         <div className="list-sheet-heading">
-          <h1 className="list-sheet-title">{draft.title || 'Ohne Titel'}</h1>
+          <h1 className="list-sheet-title">{draft.title || t('Ohne Titel')}</h1>
           {draft.subtitle.trim() !== '' && <p className="list-sheet-subtitle">{draft.subtitle}</p>}
         </div>
       </header>
@@ -1120,12 +1134,12 @@ function PrintPortal({ draft }: { draft: Draft }) {
     };
   }, []);
   useEffect(() => {
-    document.title = listFileBase(draft.title) || 'Liste';
+    document.title = listFileBase(draft.title) || t('Liste');
   }, [draft.title]);
   useEffect(() => {
     // Seitenzahlen unten rechts nur beim Drucken einer Liste (die Regel gibt es nur, solange die Liste offen ist)
     if (style.current)
-      style.current.textContent = `@page { size: A4 ${draft.orientation}; margin: 12mm; @bottom-right { content: 'Seite ' counter(page) ' von ' counter(pages); font-size: 8pt; } }`;
+      style.current.textContent = `@page { size: A4 ${draft.orientation}; margin: 12mm; @bottom-right { content: '${t('Seite {page} von {pages}', { page: "' counter(page) '", pages: "' counter(pages) '" })}'; font-size: 8pt; } }`;
   }, [draft.orientation, root]);
   return root ? createPortal(<PrintSheet draft={draft} />, root) : null;
 }

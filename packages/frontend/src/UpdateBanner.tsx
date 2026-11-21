@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { dismissRestart, subscribeUpdate, updateAvailable } from './appUpdate';
+import { t } from './i18n';
 import { beforeLeave } from './unsaved';
 
 /**
@@ -12,13 +13,13 @@ export default function UpdateBanner() {
   return (
     <div className="update-hint" role="status">
       <div className="update-hint-text">
-        <strong>Die App wurde aktualisiert</strong>
-        <span>Starte sie neu, damit du alles Neue siehst.</span>
+        <strong>{t('Die App wurde aktualisiert')}</strong>
+        <span>{t('Starte sie neu, damit du alles Neue siehst.')}</span>
       </div>
       <button className="btn btn-small update-hint-btn" onClick={() => beforeLeave(() => window.location.reload())}>
-        Neu starten
+        {t('Neu starten')}
       </button>
-      <button className="btn btn-link update-hint-close" onClick={dismissRestart} aria-label="Später" title="Später">
+      <button className="btn btn-link update-hint-close" onClick={dismissRestart} aria-label={t('Später')} title={t('Später')}>
         ✕
       </button>
     </div>

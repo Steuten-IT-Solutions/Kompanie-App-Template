@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Standalone;
 
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\UpdateTarget;
 
 /**
@@ -40,13 +41,13 @@ final class StandaloneUpdateTarget implements UpdateTarget
         $problems = [];
         foreach (array_merge([$this->root], array_map(fn (string $p): string => $this->root . '/' . $p, ['core', 'src', 'app'])) as $path) {
             if (file_exists($path) && !is_writable($path)) {
-                $problems[] = 'PHP darf die Programmdateien nicht ändern (' . basename($path) . '). Beim Hoster die Dateirechte prüfen oder install.php erneut hochladen und „Reparieren“ wählen.';
+                $problems[] = I18n::t('PHP darf die Programmdateien nicht ändern ({file}). Beim Hoster die Dateirechte prüfen oder install.php erneut hochladen und „Reparieren“ wählen.', ['file' => basename($path)]);
                 break;
             }
         }
         $free = @disk_free_space($this->dataDir);
         if (is_float($free) && $free < 3 * (int) ($entry['files']['standalone']['size'] ?? 0) + 20 * 1048576) {
-            $problems[] = 'Auf dem Webspace ist zu wenig Platz für das Update.';
+            $problems[] = I18n::t('Auf dem Webspace ist zu wenig Platz für das Update.');
         }
         return $problems;
     }
@@ -59,7 +60,7 @@ final class StandaloneUpdateTarget implements UpdateTarget
             self::extract($zipFile, $work);
             $new = $work . '/kompanie-app';
             if (!is_file($new . '/index.php') || trim((string) @file_get_contents($new . '/VERSION')) !== $version) {
-                throw new \RuntimeException('Das Paket ist unvollständig oder hat eine andere Version.');
+                throw new \RuntimeException(I18n::t('Das Paket ist unvollständig oder hat eine andere Version.'));
             }
             self::swap($this->root, $new, $aside, self::PROGRAM);
             if (function_exists('opcache_reset')) {
@@ -80,7 +81,7 @@ final class StandaloneUpdateTarget implements UpdateTarget
     public static function swap(string $root, string $new, string $aside, array $names): void
     {
         if (!@mkdir($aside, 0755) && !is_dir($aside)) {
-            throw new \RuntimeException('PHP darf im Programmverzeichnis nichts anlegen (Dateirechte).');
+            throw new \RuntimeException(I18n::t('PHP darf im Programmverzeichnis nichts anlegen (Dateirechte).'));
         }
         $moved = [];
         $placed = [];
@@ -91,12 +92,12 @@ final class StandaloneUpdateTarget implements UpdateTarget
                 }
                 if (file_exists($root . '/' . $name)) {
                     if (!@rename($root . '/' . $name, $aside . '/' . $name)) {
-                        throw new \RuntimeException("Die Datei bzw. der Ordner „{$name}“ lässt sich nicht ersetzen (Dateirechte).");
+                        throw new \RuntimeException(I18n::t('Die Datei bzw. der Ordner „{name}“ lässt sich nicht ersetzen (Dateirechte).', ['name' => $name]));
                     }
                     $moved[] = $name;
                 }
                 if (!@rename($new . '/' . $name, $root . '/' . $name)) {
-                    throw new \RuntimeException("„{$name}“ lässt sich nicht einspielen (Dateirechte oder Speicherplatz).");
+                    throw new \RuntimeException(I18n::t('„{name}“ lässt sich nicht einspielen (Dateirechte oder Speicherplatz).', ['name' => $name]));
                 }
                 $placed[] = $name;
             }
@@ -115,24 +116,24 @@ final class StandaloneUpdateTarget implements UpdateTarget
     public static function extract(string $zipFile, string $target): void
     {
         if (!class_exists(\ZipArchive::class)) {
-            throw new \RuntimeException('PHP kann keine ZIP-Dateien entpacken (Erweiterung zip fehlt).');
+            throw new \RuntimeException(I18n::t('PHP kann keine ZIP-Dateien entpacken (Erweiterung zip fehlt).'));
         }
         $zip = new \ZipArchive();
         if ($zip->open($zipFile) !== true) {
-            throw new \RuntimeException('Das Paket lässt sich nicht öffnen.');
+            throw new \RuntimeException(I18n::t('Das Paket lässt sich nicht öffnen.'));
         }
         try {
             for ($i = 0; $i < $zip->numFiles; $i++) {
                 $name = (string) $zip->getNameIndex($i);
                 if ($name === '' || str_starts_with($name, '/') || str_contains($name, '\\') || preg_match('#(^|/)\.\.(/|$)#', $name)) {
-                    throw new \RuntimeException('Das Paket enthält ungültige Pfade.');
+                    throw new \RuntimeException(I18n::t('Das Paket enthält ungültige Pfade.'));
                 }
             }
             if (!@mkdir($target, 0755, true) && !is_dir($target)) {
-                throw new \RuntimeException('Arbeitsordner für das Update kann nicht angelegt werden.');
+                throw new \RuntimeException(I18n::t('Arbeitsordner für das Update kann nicht angelegt werden.'));
             }
             if (!$zip->extractTo($target)) {
-                throw new \RuntimeException('Das Paket lässt sich nicht entpacken (Speicherplatz?).');
+                throw new \RuntimeException(I18n::t('Das Paket lässt sich nicht entpacken (Speicherplatz?).'));
             }
         } finally {
             $zip->close();

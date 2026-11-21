@@ -1,5 +1,7 @@
 import { api, ApiError, type GalleryAdminAlbumDetail, type GallerySubmission } from './api';
 import { readBase64 } from './backupFile';
+import { formatNumber } from './format';
+import { t, tn } from './i18n';
 
 /**
  * Videos in die Galerie hochladen (Issue #350): MP4 und WebM bis 1 GB, in Stücken (jede Anfrage bleibt unter der
@@ -20,10 +22,10 @@ export function isVideoFile(file: File): boolean {
 export function countFiles(files: File[]): string {
   const videos = files.filter(isVideoFile).length;
   const images = files.length - videos;
-  const parts = [];
-  if (images > 0) parts.push(images === 1 ? '1 Bild' : `${images} Bilder`);
-  if (videos > 0) parts.push(videos === 1 ? '1 Video' : `${videos} Videos`);
-  return parts.join(' und ');
+  const imageText = tn('{count} Bild', '{count} Bilder', images);
+  const videoText = tn('{count} Video', '{count} Videos', videos);
+  if (images > 0 && videos > 0) return t('{images} und {videos}', { images: imageText, videos: videoText });
+  return images > 0 ? imageText : videos > 0 ? videoText : '';
 }
 
 export interface VideoMeta {
@@ -91,8 +93,8 @@ export async function videoMeta(file: Blob): Promise<VideoMeta> {
 
 function sizeLabel(bytes: number): string {
   return bytes >= 1024 * 1024 * 1024
-    ? `${(bytes / 1024 / 1024 / 1024).toFixed(1).replace('.', ',')} GB`
-    : `${Math.round(bytes / 1024 / 1024)} MB`;
+    ? `${formatNumber(bytes / 1024 / 1024 / 1024, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} GB`
+    : `${formatNumber(Math.round(bytes / 1024 / 1024), { useGrouping: false })} MB`;
 }
 
 const wait = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
@@ -110,7 +112,7 @@ async function upload<T extends GalleryAdminAlbumDetail | GallerySubmission>(
   { albumId, intern, onProgress }: Options,
 ): Promise<T> {
   if (file.size > MAX_VIDEO_BYTES) {
-    throw new Error(`„${file.name}“ ist ${sizeLabel(file.size)} groß, erlaubt sind höchstens 1 GB.`);
+    throw new Error(t('„{name}“ ist {size} groß, erlaubt sind höchstens 1 GB.', { name: file.name, size: sizeLabel(file.size) }));
   }
   const meta = await videoMeta(file);
   const session = await api.startVideoUpload({ album_id: albumId, name: file.name, size: file.size, purpose });

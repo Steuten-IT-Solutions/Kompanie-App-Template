@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Mailgruppen für die E-Mails aus der Verwaltung (Bereich mail, Recht send_mail).
@@ -43,8 +44,8 @@ final class MailGroupService
     {
         $stored = $this->stored();
         $out = [];
-        foreach (self::STANDARD as $key => $label) {
-            $out[] = ['key' => $key, 'label' => $stored['labels'][$key] ?? $label, 'standard' => true, 'roles' => [], 'users' => [], 'emails' => []];
+        foreach (array_keys(self::STANDARD) as $key) {
+            $out[] = ['key' => $key, 'label' => $stored['labels'][$key] ?? self::standardLabel($key), 'standard' => true, 'roles' => [], 'users' => [], 'emails' => []];
         }
         $own = $stored['groups'];
         usort($own, static fn (array $a, array $b): int => strnatcasecmp($a['label'], $b['label']));
@@ -74,10 +75,10 @@ final class MailGroupService
     {
         $stored = $this->stored();
         if (count($stored['groups']) >= self::MAX_GROUPS) {
-            throw ApiError::invalid(sprintf('Höchstens %d Mailgruppen.', self::MAX_GROUPS));
+            throw ApiError::invalid(I18n::t('Höchstens {max} Mailgruppen.', ['max' => self::MAX_GROUPS]));
         }
         $label = $this->validLabel($in['label'] ?? null, null);
-        $content = $this->app->mailings()->validField('Gruppe', $in, false);
+        $content = $this->app->mailings()->validField(I18n::t('Gruppe'), $in, false);
         $id = 'g' . bin2hex(random_bytes(6));
         $stored['groups'][] = ['id' => $id, 'label' => $label] + $content;
         $this->save($stored);
@@ -94,7 +95,7 @@ final class MailGroupService
         $stored = $this->stored();
         if (isset(self::STANDARD[$key])) {
             if (array_intersect(['roles', 'users', 'emails'], array_keys($in)) !== []) {
-                throw ApiError::invalid('Wer zu einer Standardgruppe gehört, bestimmt die App. Sie lässt sich nur umbenennen.');
+                throw ApiError::invalid(I18n::t('Wer zu einer Standardgruppe gehört, bestimmt die App. Sie lässt sich nur umbenennen.'));
             }
             $stored['labels'][$key] = $this->validLabel($in['label'] ?? null, $key);
             $this->save($stored);
@@ -105,27 +106,33 @@ final class MailGroupService
                 $label = array_key_exists('label', $in) ? $this->validLabel($in['label'], $key) : $g['label'];
                 // Was nicht mitkommt, bleibt; Ehemalige und gelöschte Rollen fallen dabei weg (MailingService::groups).
                 $current = array_values(array_filter($this->app->mailings()->groups(), static fn (array $c): bool => $c['key'] === $key))[0];
-                $content = $this->app->mailings()->validField('Gruppe', $in + ['roles' => $current['roles'], 'users' => $current['users'], 'emails' => $current['emails']], false);
+                $content = $this->app->mailings()->validField(I18n::t('Gruppe'), $in + ['roles' => $current['roles'], 'users' => $current['users'], 'emails' => $current['emails']], false);
                 $stored['groups'][$i] = ['id' => $key, 'label' => $label] + $content;
                 $this->save($stored);
                 return;
             }
         }
-        throw ApiError::notFound('Diese Mailgruppe gibt es nicht (mehr).');
+        throw ApiError::notFound(I18n::t('Diese Mailgruppe gibt es nicht (mehr).'));
     }
 
     public function delete(string $key): void
     {
         if (isset(self::STANDARD[$key])) {
-            throw ApiError::invalid('Standardgruppen lassen sich nicht löschen, nur umbenennen.');
+            throw ApiError::invalid(I18n::t('Standardgruppen lassen sich nicht löschen, nur umbenennen.'));
         }
         $stored = $this->stored();
         $left = array_values(array_filter($stored['groups'], static fn (array $g): bool => $g['id'] !== $key));
         if (count($left) === count($stored['groups'])) {
-            throw ApiError::notFound('Diese Mailgruppe gibt es nicht (mehr).');
+            throw ApiError::notFound(I18n::t('Diese Mailgruppe gibt es nicht (mehr).'));
         }
         $stored['groups'] = $left;
         $this->save($stored);
+    }
+
+    /** Name einer Standardgruppe, solange sie nicht umbenannt ist (in der Sprache der Anfrage) */
+    private static function standardLabel(string $key): string
+    {
+        return $key === self::MEMBERS ? I18n::t('Alle Mitglieder') : I18n::t('Alle Konten');
     }
 
     /** Bezeichnung prüfen: nicht leer, nicht länger als LABEL_MAX, keine andere Gruppe heißt so. */
@@ -133,11 +140,11 @@ final class MailGroupService
     {
         $label = is_string($value) ? Text::line($value, self::LABEL_MAX) : '';
         if ($label === '') {
-            throw ApiError::invalid('Bitte eine Bezeichnung eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte eine Bezeichnung eingeben.'));
         }
         foreach ($this->all() as $g) {
             if ($g['key'] !== $self && mb_strtolower($g['label']) === mb_strtolower($label)) {
-                throw ApiError::invalid('Eine Mailgruppe „' . $g['label'] . '“ gibt es schon.');
+                throw ApiError::invalid(I18n::t('Eine Mailgruppe „{name}“ gibt es schon.', ['name' => $g['label']]));
             }
         }
         return $label;

@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\FormerMemberRepository;
 use KompanieApp\Core\Storage\UserData;
 use KompanieApp\Core\Telemetry\Code;
@@ -178,7 +179,7 @@ final class FormerMemberService
             $this->deactivate($actor, $target, $data);
             return count($this->app->offices()->endFor($target->id, $this->leftYear($data['left_on']), true));
         });
-        return ($this->of($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.')) + ['offices_ended' => $ended];
+        return ($this->of($id) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'))) + ['offices_ended' => $ended];
     }
 
     /**
@@ -198,18 +199,18 @@ final class FormerMemberService
     private function markable(User $actor, int $id): User
     {
         if ($actor->id === $id) {
-            throw ApiError::invalid('Das eigene Konto kannst du nicht als ehemalig eintragen.');
+            throw ApiError::invalid(I18n::t('Das eigene Konto kannst du nicht als ehemalig eintragen.'));
         }
-        $target = $this->app->users->find($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $target = $this->app->users->find($id) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
         if ($this->previousRole($target) !== null) {
-            throw ApiError::invalid('Diese Person ist schon als ehemalig eingetragen.');
+            throw ApiError::invalid(I18n::t('Diese Person ist schon als ehemalig eingetragen.'));
         }
         if ($target->role === Roles::GUEST) {
-            throw ApiError::invalid('Gäste gehören nicht zur Kompanie und lassen sich nicht als ehemalig eintragen.');
+            throw ApiError::invalid(I18n::t('Gäste gehören nicht zur Kompanie und lassen sich nicht als ehemalig eintragen.'));
         }
-        $this->app->members()->guardAccount($actor, $target, 'Dieses Konto darfst du nicht als ehemalig eintragen.');
+        $this->app->members()->guardAccount($actor, $target, I18n::t('Dieses Konto darfst du nicht als ehemalig eintragen.'));
         if ($target->isAdmin() && $this->app->users->countAdmins() <= 1) {
-            throw ApiError::invalid('Der letzte Admin kann nicht als ehemalig eingetragen werden.');
+            throw ApiError::invalid(I18n::t('Der letzte Admin kann nicht als ehemalig eingetragen werden.'));
         }
         return $target;
     }
@@ -228,7 +229,7 @@ final class FormerMemberService
      */
     public function update(User $actor, int $id, array $in): array
     {
-        [$target, $row] = $this->former($actor, $id, 'Die Angaben dieser Person darfst du nicht ändern.');
+        [$target, $row] = $this->former($actor, $id, I18n::t('Die Angaben dieser Person darfst du nicht ändern.'));
         $data = self::valid($in + ['reason' => $row['reason'], 'joined_on' => $row['joined_on'], 'founder' => $row['founder'], 'left_on' => $row['left_on']], $this->app->time()->today());
         $this->app->db->transaction(function () use ($target, $data, $row): void {
             $this->repository()->update($target->id, $data['reason'], $data['joined_on'], $data['founder'], $data['left_on'], $this->app->time()->nowUtc());
@@ -238,7 +239,7 @@ final class FormerMemberService
             }
         });
         $this->all = null;
-        return $this->of($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        return $this->of($id) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
     }
 
     /**
@@ -249,14 +250,14 @@ final class FormerMemberService
      */
     public function reactivate(User $actor, int $id): array
     {
-        [$target, $row] = $this->former($actor, $id, 'Diese Person darfst du nicht wieder aufnehmen.');
+        [$target, $row] = $this->former($actor, $id, I18n::t('Diese Person darfst du nicht wieder aufnehmen.'));
         $roles = $this->app->roles();
         $level = (string) ($row['restore']['level'] ?? '');
         if (!$roles->exists($level) || $level === Roles::GUEST || ($level === Roles::ADMIN && !$this->app->users->canAssignAdmin())) {
             $level = Roles::MEMBER; // Rolle inzwischen gelöscht (bzw. Admin hier nicht in der App vergebbar)
         }
         if (!$roles->canHandle($actor, $level)) {
-            throw ApiError::forbidden(sprintf('Die Rolle „%s“ darfst du nicht vergeben. Bitte einen Admin fragen.', $roles->label($level)));
+            throw ApiError::forbidden(I18n::t('Die Rolle „{role}“ darfst du nicht vergeben. Bitte einen Admin fragen.', ['role' => $roles->label($level)]));
         }
         try {
             $this->app->users->reactivate($id, $level);
@@ -301,16 +302,14 @@ final class FormerMemberService
         $key = mb_strtolower($prepared['name']);
         foreach ($this->app->users->list(true) as $u) {
             if (mb_strtolower($u->name) === $key) {
-                throw ApiError::invalid(sprintf(
-                    'Es gibt schon %s „%s“. Gleichnamige bitte unterscheidbar machen (z. B. „I“ und „II“).',
-                    $this->previousRole($u) !== null ? 'eine ehemalige Person' : 'ein Konto',
-                    $u->name,
-                ));
+                throw ApiError::invalid($this->previousRole($u) !== null
+                    ? I18n::t('Es gibt schon eine ehemalige Person „{name}“. Gleichnamige bitte unterscheidbar machen (z. B. „I“ und „II“).', ['name' => $u->name])
+                    : I18n::t('Es gibt schon ein Konto „{name}“. Gleichnamige bitte unterscheidbar machen (z. B. „I“ und „II“).', ['name' => $u->name]));
             }
         }
         $id = $this->createImported($actor, $prepared, $data);
         $linked = $this->app->offices()->linkNames([$key => $id], true);
-        return ['id' => $id, 'name' => $prepared['name'], 'offices_linked' => $linked] + ($this->of($id) ?? throw ApiError::notFound('Das neue Konto wurde nicht gefunden.'));
+        return ['id' => $id, 'name' => $prepared['name'], 'offices_linked' => $linked] + ($this->of($id) ?? throw ApiError::notFound(I18n::t('Das neue Konto wurde nicht gefunden.')));
     }
 
     /**
@@ -350,7 +349,7 @@ final class FormerMemberService
                 continue; // Kopfzeile
             }
             if (++$count > self::IMPORT_MAX_ROWS) {
-                throw ApiError::invalid(sprintf('Höchstens %d Zeilen auf einmal.', self::IMPORT_MAX_ROWS));
+                throw ApiError::invalid(I18n::t('Höchstens {max} Zeilen auf einmal.', ['max' => self::IMPORT_MAX_ROWS]));
             }
             $row = ['line' => $i + 1, 'first_name' => Text::line($cells[0] ?? '', PersonName::MAX), 'last_name' => Text::line($cells[1] ?? '', PersonName::MAX)];
             $row['name'] = PersonName::join($row['first_name'], $row['last_name']);
@@ -359,7 +358,7 @@ final class FormerMemberService
                 $row += $data;
                 $key = mb_strtolower($row['name']);
                 if (isset($seen[$key])) {
-                    throw ApiError::invalid(sprintf('Der Name steht schon in Zeile %d. Gleichnamige bitte unterscheidbar machen (z. B. „I“ und „II“).', $seen[$key]));
+                    throw ApiError::invalid(I18n::t('Der Name steht schon in Zeile {line}. Gleichnamige bitte unterscheidbar machen (z. B. „I“ und „II“).', ['line' => $seen[$key]]));
                 }
                 $seen[$key] = $row['line'];
                 $match = $accounts[$key] ?? [];
@@ -378,11 +377,11 @@ final class FormerMemberService
             $rows[] = $row;
         }
         if ($rows === []) {
-            throw ApiError::invalid('Die Tabelle enthält keine Zeilen.');
+            throw ApiError::invalid(I18n::t('Die Tabelle enthält keine Zeilen.'));
         }
         $errors = array_values(array_filter($rows, static fn (array $r): bool => isset($r['error'])));
         if ($apply && $errors !== []) {
-            throw ApiError::invalid(sprintf('Zeile %d: %s', $errors[0]['line'], $errors[0]['error']) . (count($errors) > 1 ? sprintf(' (und %d weitere Fehler)', count($errors) - 1) : ''));
+            throw ApiError::invalid(I18n::t('Zeile {line}: {error}', ['line' => $errors[0]['line'], 'error' => $errors[0]['error']]) . (count($errors) > 1 ? ' ' . I18n::tn('(und {count} weiterer Fehler)', '(und {count} weitere Fehler)', count($errors) - 1) : ''));
         }
         $names = $formerIds;
         foreach ($planned as [$prepared]) {
@@ -400,7 +399,7 @@ final class FormerMemberService
                 $names[mb_strtolower($prepared['name'])] = $this->createImported($actor, $prepared, $data);
             } catch (ApiError $e) {
                 $this->app->offices()->linkNames(array_filter($names), true);
-                throw ApiError::invalid(sprintf('Nach %d von %d Personen abgebrochen bei „%s“: %s Ein neuer Import legt nur die übrigen an.', $done, count($planned), $prepared['name'], $e->getMessage()));
+                throw ApiError::invalid(I18n::t('Nach {done} von {total} Personen abgebrochen bei „{name}“: {error} Ein neuer Import legt nur die übrigen an.', ['done' => $done, 'total' => count($planned), 'name' => $prepared['name'], 'error' => $e->getMessage()]));
             }
             $done++;
         }
@@ -419,7 +418,7 @@ final class FormerMemberService
     public function createImported(User $actor, array $prepared, array $data): int
     {
         $created = $this->app->members()->insert($prepared);
-        $target = $this->app->users->find((int) $created['id']) ?? throw ApiError::notFound('Das neue Konto wurde nicht gefunden.');
+        $target = $this->app->users->find((int) $created['id']) ?? throw ApiError::notFound(I18n::t('Das neue Konto wurde nicht gefunden.'));
         $this->deactivate($actor, $target, $data);
         return $target->id;
     }
@@ -465,7 +464,7 @@ final class FormerMemberService
         $target = $this->app->users->find($id);
         $row = $this->all()[$id] ?? null;
         if ($target === null || $row === null || $this->previousRole($target) === null) {
-            throw ApiError::notFound('Diese Person ist nicht als ehemalig eingetragen.');
+            throw ApiError::notFound(I18n::t('Diese Person ist nicht als ehemalig eingetragen.'));
         }
         $this->app->members()->guardAccount($actor, $target, $message);
         return [$target, $row];
@@ -517,10 +516,10 @@ final class FormerMemberService
         // Fehlt die Zahl oder ist sie ungültig: Fehler, nicht stillschweigend „aus“.
         $years = Input::integer($in['years'] ?? null);
         if ($years === null) {
-            throw ApiError::invalid('Bitte die Frist in ganzen Jahren angeben (0 = aus).');
+            throw ApiError::invalid(I18n::t('Bitte die Frist in ganzen Jahren angeben (0 = aus).'));
         }
         if ($years < 0 || $years > self::RETENTION_MAX_YEARS) {
-            throw ApiError::invalid('Die Frist darf höchstens ' . self::RETENTION_MAX_YEARS . ' Jahre sein (0 = aus).');
+            throw ApiError::invalid(I18n::t('Die Frist darf höchstens {max} Jahre sein (0 = aus).', ['max' => self::RETENTION_MAX_YEARS]));
         }
         $config = ['years' => $years];
         if ($preview) {
@@ -688,10 +687,10 @@ final class FormerMemberService
     {
         $reason = $in['reason'] ?? null;
         if (!is_string($reason) || !isset(self::REASONS[$reason])) {
-            throw ApiError::invalid('Bitte einen Grund wählen: ausgetreten, verstorben oder sonstiges.');
+            throw ApiError::invalid(I18n::t('Bitte einen Grund wählen: ausgetreten, verstorben oder sonstiges.'));
         }
-        $joined = self::date($in['joined_on'] ?? '', 'Eintritt', $today);
-        $left = self::date($in['left_on'] ?? '', $reason === self::REASON_DECEASED ? 'Todestag' : 'Ausgeschieden', $today);
+        $joined = self::date($in['joined_on'] ?? '', I18n::t('Eintritt'), $today);
+        $left = self::date($in['left_on'] ?? '', $reason === self::REASON_DECEASED ? I18n::t('Todestag') : I18n::t('Ausgeschieden'), $today);
         self::checkOrder($joined, $left);
         return ['reason' => $reason, 'joined_on' => $joined, 'founder' => Input::bool($in['founder'] ?? false), 'left_on' => $left];
     }
@@ -705,9 +704,9 @@ final class FormerMemberService
     private static function importRow(array $cells, \DateTimeImmutable $today): array
     {
         if (($cells[0] ?? '') === '') {
-            throw ApiError::invalid('Der Vorname fehlt (1. Spalte).');
+            throw ApiError::invalid(I18n::t('Der Vorname fehlt (1. Spalte).'));
         }
-        return self::importData($cells[2] ?? '', $cells[3] ?? '', $cells[4] ?? '', $today, ' (5. Spalte)');
+        return self::importData($cells[2] ?? '', $cells[3] ?? '', $cells[4] ?? '', $today, ' ' . I18n::t('(5. Spalte)'));
     }
 
     /**
@@ -722,10 +721,10 @@ final class FormerMemberService
         $reasonRaw = mb_strtolower($reasonRaw);
         $reason = $reasonRaw === '' ? self::REASON_LEFT : array_search($reasonRaw, self::REASONS, true);
         if ($reason === false) {
-            $reason = isset(self::REASONS[$reasonRaw]) ? $reasonRaw : throw ApiError::invalid('Grund „ausgetreten“, „verstorben“ oder „sonstiges“ erwartet' . $where . '.');
+            $reason = isset(self::REASONS[$reasonRaw]) ? $reasonRaw : throw ApiError::invalid(I18n::t('Grund „ausgetreten“, „verstorben“ oder „sonstiges“ erwartet{where}.', ['where' => $where]));
         }
-        $joined = $founder ? '' : self::date($joinedRaw, 'Eintritt', $today);
-        $left = self::date($leftRaw, $reason === self::REASON_DECEASED ? 'Todestag' : 'Ausgeschieden', $today);
+        $joined = $founder ? '' : self::date($joinedRaw, I18n::t('Eintritt'), $today);
+        $left = self::date($leftRaw, $reason === self::REASON_DECEASED ? I18n::t('Todestag') : I18n::t('Ausgeschieden'), $today);
         self::checkOrder($joined, $left);
         return ['reason' => (string) $reason, 'joined_on' => $joined, 'founder' => $founder, 'left_on' => $left];
     }
@@ -755,15 +754,15 @@ final class FormerMemberService
             } elseif (preg_match('/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/', $value, $m) === 1) {
                 [$year, $month, $day] = [(int) $m[3], (int) $m[2], (int) $m[1]];
             } else {
-                throw ApiError::invalid(sprintf('%s: bitte als TT.MM.JJJJ oder nur das Jahr angeben.', $what));
+                throw ApiError::invalid(I18n::t('{field}: bitte als TT.MM.JJJJ oder nur das Jahr angeben.', ['field' => $what]));
             }
             if (!checkdate($month, $day, $year)) {
-                throw ApiError::invalid(sprintf('%s: Dieses Datum gibt es nicht.', $what));
+                throw ApiError::invalid(I18n::t('{field}: Dieses Datum gibt es nicht.', ['field' => $what]));
             }
             $out = sprintf('%04d-%02d-%02d', $year, $month, $day);
         }
         if ($year < self::YEAR_MIN || (strlen($out) === 4 ? $out > $today->format('Y') : $out > $today->format('Y-m-d'))) {
-            throw ApiError::invalid(sprintf('%s: Das Datum liegt in der Zukunft oder vor %d.', $what, self::YEAR_MIN));
+            throw ApiError::invalid(I18n::t('{field}: Das Datum liegt in der Zukunft oder vor {year}.', ['field' => $what, 'year' => self::YEAR_MIN]));
         }
         return $out;
     }
@@ -776,7 +775,7 @@ final class FormerMemberService
         }
         $later = strlen($joined) === 10 && strlen($left) === 10 ? $joined > $left : substr($joined, 0, 4) > substr($left, 0, 4);
         if ($later) {
-            throw ApiError::invalid('Der Eintritt liegt nach dem Ausscheiden.');
+            throw ApiError::invalid(I18n::t('Der Eintritt liegt nach dem Ausscheiden.'));
         }
     }
 }

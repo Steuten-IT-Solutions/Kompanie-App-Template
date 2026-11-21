@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, config, toLogin, type RegistrationStatus } from '../api';
 import { normalizeEmail } from '../email';
+import { t } from '../i18n';
 import { navigate } from '../router';
 import { EmailField, ErrorBox, Loading, useAsync } from '../ui';
 
@@ -56,39 +57,52 @@ function RegistrationForm() {
   if (config?.user) {
     return (
       <div className="card">
-        <p>Du bist schon angemeldet. Fehlt dir etwas in der App, wende dich bitte an die Admins.</p>
+        <p>{t('Du bist schon angemeldet. Fehlt dir etwas in der App, wende dich bitte an die Admins.')}</p>
       </div>
     );
   }
-  if (!config?.registration) return <ErrorBox message="In dieser App kann man zurzeit keinen Zugang beantragen." />;
+  if (!config?.registration) return <ErrorBox message={t('In dieser App kann man zurzeit keinen Zugang beantragen.')} />;
   if (form.loading && !form.data) return <Loading shape="form" />;
   if (form.error || !form.data)
-    return <ErrorBox message={form.error ?? 'Das Formular konnte nicht geladen werden.'} onRetry={form.reload} />;
+    return <ErrorBox message={form.error ?? t('Das Formular konnte nicht geladen werden.')} onRetry={form.reload} />;
   const f = form.data;
   const shownUsername = usernameEdited ? username : loginSuggestion(first, last);
   const companies = f.companies ?? [];
 
   if (done) {
+    // Adresse und Benutzername fett, der Satz drumherum übersetzt.
+    const mailSent = t(
+      'Wir haben dir eine Mail an {email} geschickt. Tippe auf den Link darin. Danach geht deine Anfrage an die Admins zur Freigabe. Über das Ergebnis bekommst du wieder eine Mail.',
+    )
+      .split('{email}')
+      .concat('');
+    const waiting = t(
+      'Sie wartet jetzt auf Freigabe durch die Admins. Danach meldest du dich mit dem Benutzernamen {username} und deinem Passwort an.',
+    )
+      .split('{username}')
+      .concat('');
     return (
       <div className="card registration-done" role="status">
         {done === 'confirm_email' ? (
           <>
-            <h2 className="section-title">Bitte bestätige deine E-Mail-Adresse</h2>
+            <h2 className="section-title">{t('Bitte bestätige deine E-Mail-Adresse')}</h2>
             <p>
-              Wir haben dir eine Mail an <strong>{normalizeEmail(email)}</strong> geschickt. Tippe auf den Link darin. Danach geht deine
-              Anfrage an die Admins zur Freigabe. Über das Ergebnis bekommst du wieder eine Mail.
+              {mailSent[0]}
+              <strong>{normalizeEmail(email)}</strong>
+              {mailSent[1]}
             </p>
-            <p className="muted small">Keine Mail bekommen? Schau bitte auch im Spam-Ordner nach.</p>
+            <p className="muted small">{t('Keine Mail bekommen? Schau bitte auch im Spam-Ordner nach.')}</p>
           </>
         ) : (
           <>
-            <h2 className="section-title">Danke, deine Anfrage ist angekommen</h2>
+            <h2 className="section-title">{t('Danke, deine Anfrage ist angekommen')}</h2>
             <p>
-              Sie wartet jetzt auf Freigabe durch die Admins. Danach meldest du dich mit dem Benutzernamen <strong>{shownUsername}</strong>{' '}
-              und deinem Passwort an.
+              {waiting[0]}
+              <strong>{shownUsername}</strong>
+              {waiting[1]}
             </p>
             <button type="button" className="btn btn-secondary btn-block" onClick={() => navigate('registrieren/stand')}>
-              Stand meiner Anfrage
+              {t('Stand meiner Anfrage')}
             </button>
           </>
         )}
@@ -99,16 +113,16 @@ function RegistrationForm() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!first.trim() || !last.trim()) return setError('Bitte Vor- und Nachnamen angeben.');
-    if (!normalizeEmail(email)) return setError('Bitte deine E-Mail-Adresse angeben.');
-    if (!shownUsername.trim()) return setError('Bitte einen Benutzernamen wählen.');
-    if (password.length < MIN_PASSWORD) return setError(`Das Passwort muss mindestens ${MIN_PASSWORD} Zeichen lang sein.`);
-    if (password !== password2) return setError('Die beiden Passwörter stimmen nicht überein.');
+    if (!first.trim() || !last.trim()) return setError(t('Bitte Vor- und Nachnamen angeben.'));
+    if (!normalizeEmail(email)) return setError(t('Bitte deine E-Mail-Adresse angeben.'));
+    if (!shownUsername.trim()) return setError(t('Bitte einen Benutzernamen wählen.'));
+    if (password.length < MIN_PASSWORD) return setError(t('Das Passwort muss mindestens {min} Zeichen lang sein.', { min: MIN_PASSWORD }));
+    if (password !== password2) return setError(t('Die beiden Passwörter stimmen nicht überein.'));
     const chosenIds = companyIds.filter((id) => companies.some((c) => c.id === id));
     if (companies.length > 0 && !noCompany && chosenIds.length === 0) {
-      return setError('Bitte wähle deine Kompanie, „Keine Kompanie“ oder „Passiv“.');
+      return setError(t('Bitte wähle deine Kompanie, „Keine Kompanie“ oder „Passiv“.'));
     }
-    if (!consent) return setError('Bitte bestätige, dass du die Datenschutzerklärung gelesen hast.');
+    if (!consent) return setError(t('Bitte bestätige, dass du die Datenschutzerklärung gelesen hast.'));
     setBusy(true);
     try {
       // Zeitfalle des Servers: Wer sehr schnell ist, wartet den Rest ab.
@@ -139,12 +153,18 @@ function RegistrationForm() {
     }
   }
 
+  // Link zur Datenschutzerklärung mitten im Satz.
+  const consentText = t(
+    'Ich habe die {privacy} gelesen. Meine Angaben werden nur für die Freigabe gespeichert und gelöscht, wenn die Anfrage abgelehnt wird oder abläuft.',
+  )
+    .split('{privacy}')
+    .concat('');
   return (
     <form className="form card registration-form" onSubmit={submit} noValidate>
-      <h2 className="news-headline">Zugang beantragen</h2>
+      <h2 className="news-headline">{t('Zugang beantragen')}</h2>
       <div className="field-row">
         <label className="field">
-          <span>Vorname</span>
+          <span>{t('Vorname')}</span>
           <input
             type="text"
             name="given-name"
@@ -155,7 +175,7 @@ function RegistrationForm() {
           />
         </label>
         <label className="field">
-          <span>Nachname</span>
+          <span>{t('Nachname')}</span>
           <input
             type="text"
             name="family-name"
@@ -166,9 +186,9 @@ function RegistrationForm() {
           />
         </label>
       </div>
-      <EmailField label="E-Mail-Adresse" value={email} onChange={setEmail} autoComplete="email" />
+      <EmailField label={t('E-Mail-Adresse')} value={email} onChange={setEmail} autoComplete="email" />
       <label className="field">
-        <span>Benutzername</span>
+        <span>{t('Benutzername')}</span>
         <input
           type="text"
           name="username"
@@ -183,11 +203,11 @@ function RegistrationForm() {
           required
         />
         <span className="muted small">
-          Buchstaben (a–z), Ziffern sowie . _ - @. Anmelden kannst du dich auch mit deiner E-Mail-Adresse.
+          {t('Buchstaben (a–z), Ziffern sowie . _ - @. Anmelden kannst du dich auch mit deiner E-Mail-Adresse.')}
         </span>
       </label>
       <label className="field">
-        <span>Passwort (mind. {MIN_PASSWORD} Zeichen)</span>
+        <span>{t('Passwort (mind. {min} Zeichen)', { min: MIN_PASSWORD })}</span>
         <input
           type="password"
           name="new-password"
@@ -198,13 +218,15 @@ function RegistrationForm() {
         />
       </label>
       <label className="field">
-        <span>Passwort wiederholen</span>
+        <span>{t('Passwort wiederholen')}</span>
         <input type="password" autoComplete="new-password" value={password2} onChange={(e) => setPassword2(e.target.value)} required />
       </label>
       {companies.length > 0 && (
         <fieldset className="fieldset registration-companies">
-          <legend>Deine Kompanie</legend>
-          <p className="muted small">Bitte wähle, zu welcher Kompanie du gehörst (auch mehrere), oder „Keine Kompanie“ bzw. „Passiv“.</p>
+          <legend>{t('Deine Kompanie')}</legend>
+          <p className="muted small">
+            {t('Bitte wähle, zu welcher Kompanie du gehörst (auch mehrere), oder „Keine Kompanie“ bzw. „Passiv“.')}
+          </p>
           {companies.map((c) => (
             <label key={c.id} className="toggle">
               <input
@@ -220,8 +242,8 @@ function RegistrationForm() {
           ))}
           {(
             [
-              ['none', 'Keine Kompanie'],
-              ['passive', 'Passiv'],
+              ['none', t('Keine Kompanie')],
+              ['passive', t('Passiv')],
             ] as const
           ).map(([key, label]) => (
             <label key={key} className="toggle">
@@ -239,27 +261,27 @@ function RegistrationForm() {
         </fieldset>
       )}
       <label className="field">
-        <span>Nachricht an die Admins (freiwillig)</span>
+        <span>{t('Nachricht an die Admins (freiwillig)')}</span>
         <textarea rows={3} maxLength={MESSAGE_MAX} value={message} onChange={(e) => setMessage(e.target.value)} />
-        <span className="muted small">Zum Beispiel, wer du bist oder wer dich kennt. Das hilft bei der Freigabe.</span>
+        <span className="muted small">{t('Zum Beispiel, wer du bist oder wer dich kennt. Das hilft bei der Freigabe.')}</span>
       </label>
       {/* Gegen Programme: Menschen sehen dieses Feld nicht und lassen es leer. */}
       <label className="report-hp" aria-hidden="true">
-        Webseite
+        {t('Webseite')}
         <input type="text" name="website" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
       </label>
       <label className="toggle">
         <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
         <span>
-          Ich habe die{' '}
+          {consentText[0]}
           {f.privacy_url ? (
             <a href={f.privacy_url} target="_blank" rel="noopener noreferrer">
-              Datenschutzerklärung
+              {t('Datenschutzerklärung')}
             </a>
           ) : (
-            'Datenschutzerklärung'
-          )}{' '}
-          gelesen. Meine Angaben werden nur für die Freigabe gespeichert und gelöscht, wenn die Anfrage abgelehnt wird oder abläuft.
+            t('Datenschutzerklärung')
+          )}
+          {consentText[1]}
         </span>
       </label>
       {error && (
@@ -268,12 +290,12 @@ function RegistrationForm() {
         </p>
       )}
       <button className="btn btn-block" type="submit" disabled={busy}>
-        {busy ? 'Sendet …' : 'Anfrage senden'}
+        {busy ? t('Sendet …') : t('Anfrage senden')}
       </button>
       <p className="muted small">
-        Schon eine Anfrage gestellt?{' '}
+        {t('Schon eine Anfrage gestellt?')}{' '}
         <button type="button" className="btn btn-link inline-link" onClick={() => navigate('registrieren/stand')}>
-          Stand meiner Anfrage
+          {t('Stand meiner Anfrage')}
         </button>
       </p>
     </form>
@@ -301,7 +323,7 @@ function Confirm({ token }: { token: string }) {
         </p>
         {config?.registration && (
           <button type="button" className="btn btn-block" onClick={() => navigate('registrieren')}>
-            Neue Anfrage stellen
+            {t('Neue Anfrage stellen')}
           </button>
         )}
       </div>
@@ -309,17 +331,17 @@ function Confirm({ token }: { token: string }) {
   }
   return (
     <div className="card registration-done" role="status">
-      <h2 className="section-title">Danke, deine E-Mail-Adresse ist bestätigt</h2>
-      <p>Deine Anfrage wartet jetzt auf Freigabe durch die Admins. Über das Ergebnis bekommst du eine Mail.</p>
+      <h2 className="section-title">{t('Danke, deine E-Mail-Adresse ist bestätigt')}</h2>
+      <p>{t('Deine Anfrage wartet jetzt auf Freigabe durch die Admins. Über das Ergebnis bekommst du eine Mail.')}</p>
     </div>
   );
 }
 
 const STATUS_TEXT: Record<RegistrationStatus['status'], string> = {
-  unconfirmed: 'Du hast deine E-Mail-Adresse noch nicht bestätigt. Bitte tippe auf den Link in der Mail, die wir dir geschickt haben.',
-  pending: 'Deine Anfrage wartet noch auf Freigabe durch die Admins.',
-  rejected: 'Deine Anfrage wurde leider abgelehnt.',
-  none: 'Zu diesen Angaben gibt es keine offene Anfrage. Wurde sie freigegeben, melde dich einfach an.',
+  unconfirmed: t('Du hast deine E-Mail-Adresse noch nicht bestätigt. Bitte tippe auf den Link in der Mail, die wir dir geschickt haben.'),
+  pending: t('Deine Anfrage wartet noch auf Freigabe durch die Admins.'),
+  rejected: t('Deine Anfrage wurde leider abgelehnt.'),
+  none: t('Zu diesen Angaben gibt es keine offene Anfrage. Wurde sie freigegeben, melde dich einfach an.'),
 };
 
 /** Stand der eigenen Anfrage: nur mit Benutzername (oder E-Mail-Adresse) und Passwort aus der Anfrage. */
@@ -334,7 +356,7 @@ function StatusCheck() {
     e.preventDefault();
     setError(null);
     setResult(null);
-    if (!username.trim() || !password) return setError('Bitte Benutzername und Passwort eingeben.');
+    if (!username.trim() || !password) return setError(t('Bitte Benutzername und Passwort eingeben.'));
     setBusy(true);
     try {
       setResult(await api.registrationStatus(username.trim(), password));
@@ -347,10 +369,10 @@ function StatusCheck() {
 
   return (
     <form className="form card registration-status" onSubmit={submit}>
-      <h2 className="news-headline">Stand meiner Anfrage</h2>
-      <p className="muted small">Gib den Benutzernamen (oder die E-Mail-Adresse) und das Passwort aus deiner Anfrage ein.</p>
+      <h2 className="news-headline">{t('Stand meiner Anfrage')}</h2>
+      <p className="muted small">{t('Gib den Benutzernamen (oder die E-Mail-Adresse) und das Passwort aus deiner Anfrage ein.')}</p>
       <label className="field">
-        <span>Benutzername oder E-Mail-Adresse</span>
+        <span>{t('Benutzername oder E-Mail-Adresse')}</span>
         <input
           type="text"
           autoComplete="username"
@@ -362,7 +384,7 @@ function StatusCheck() {
         />
       </label>
       <label className="field">
-        <span>Passwort</span>
+        <span>{t('Passwort')}</span>
         <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
       </label>
       {error && (
@@ -373,16 +395,16 @@ function StatusCheck() {
       {result && (
         <div className="card registration-result" role="status">
           <p>{STATUS_TEXT[result.status]}</p>
-          {result.status === 'rejected' && result.reason && <p>Begründung: {result.reason}</p>}
+          {result.status === 'rejected' && result.reason && <p>{t('Begründung: {reason}', { reason: result.reason })}</p>}
           {result.status === 'none' && (
             <button type="button" className="btn btn-block" onClick={toLogin}>
-              Anmelden
+              {t('Anmelden')}
             </button>
           )}
         </div>
       )}
       <button className="btn btn-block" type="submit" disabled={busy}>
-        {busy ? 'Prüft …' : 'Stand prüfen'}
+        {busy ? t('Prüft …') : t('Stand prüfen')}
       </button>
     </form>
   );

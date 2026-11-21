@@ -46,13 +46,27 @@ export function RankBadge({ url, title, size = 'small' }: { url?: string | null;
   );
 }
 
-/** Abzeichen und Bezeichnung nebeneinander; ohne Abzeichen nur die Bezeichnung. */
-export function RankLabel({ url, title, size = 'small' }: { url?: string | null; title: string; size?: RankBadgeSize }) {
-  if (!url) return <>{title}</>;
+/**
+ * Abzeichen und Bezeichnung nebeneinander; ohne Abzeichen nur die Bezeichnung. Mit `quoted` steht die Bezeichnung in
+ * Anführungszeichen („Maat“), das Abzeichen davor (z. B. der nächste Dienstgrad in den Beförderungen).
+ */
+export function RankLabel({
+  url,
+  title,
+  size = 'small',
+  quoted = false,
+}: {
+  url?: string | null;
+  title: string;
+  size?: RankBadgeSize;
+  quoted?: boolean;
+}) {
+  const text = quoted ? `„${title}“` : title;
+  if (!url) return <>{text}</>;
   return (
     <span className="rank-label">
       <RankBadge url={url} title={title} size={size} />
-      <span>{title}</span>
+      <span>{text}</span>
     </span>
   );
 }

@@ -5,6 +5,7 @@
  */
 
 import type { Capability, Feature } from './api';
+import { t } from './i18n';
 
 /** Bereiche, die in der Navigation stehen können (wie NavigationService::TARGETS im Kern), in der Standardreihenfolge. */
 export const NAV_TARGETS = [
@@ -199,7 +200,7 @@ export function buildNav(setting: NavigationSetting | null | undefined, ctx: Nav
       const overflow = main.splice(NAV_MAX_MAIN - 1).map((e) => e.key as NavTarget);
       main.push({
         key: 'intern',
-        label: ctx.internLabel ?? 'Intern',
+        label: ctx.internLabel ?? t('Intern'),
         icon: ctx.icons?.intern ?? 'intern',
         children: orderBy([...overflow, ...intern], ctx.internOrder),
       });
@@ -343,9 +344,9 @@ export function removeMenu(draft: NavigationSetting, index: number): NavigationS
 export function draftError(draft: NavigationSetting, labelMax = 24): string | null {
   for (const i of draft.items) {
     if (typeof i === 'string') continue;
-    if (!i.label.trim()) return 'Jedes Untermenü braucht einen Namen.';
-    if (i.label.trim().length > labelMax) return `Der Name eines Untermenüs darf höchstens ${labelMax} Zeichen lang sein.`;
-    if (i.items.length === 0) return `Das Untermenü „${i.label.trim()}“ braucht mindestens einen Bereich.`;
+    if (!i.label.trim()) return t('Jedes Untermenü braucht einen Namen.');
+    if (i.label.trim().length > labelMax) return t('Der Name eines Untermenüs darf höchstens {max} Zeichen lang sein.', { max: labelMax });
+    if (i.items.length === 0) return t('Das Untermenü „{name}“ braucht mindestens einen Bereich.', { name: i.label.trim() });
   }
   return null;
 }

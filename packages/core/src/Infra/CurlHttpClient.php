@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Infra;
 
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\ExtendedHttpClient;
 use KompanieApp\Core\Port\StreamingHttpClient;
 
@@ -75,7 +76,7 @@ final class CurlHttpClient implements ExtendedHttpClient, StreamingHttpClient
         foreach ($handles as $k => [$ch, $state]) {
             // Ohne Eintrag ist die Anfrage nicht fertig geworden (curl_multi_exec hat abgebrochen).
             $code = $codes[spl_object_id($ch)] ?? null;
-            $error = $code === null ? 'Die Anfrage wurde nicht abgeschlossen.' : ($code === CURLE_OK ? '' : (curl_error($ch) ?: curl_strerror($code) ?: 'Keine Verbindung.'));
+            $error = $code === null ? I18n::t('Die Anfrage wurde nicht abgeschlossen.') : ($code === CURLE_OK ? '' : (curl_error($ch) ?: curl_strerror($code) ?: I18n::t('Keine Verbindung.')));
             try {
                 $out[$k] = $this->result($ch, $state, $error);
             } catch (\RuntimeException $e) {
@@ -99,20 +100,20 @@ final class CurlHttpClient implements ExtendedHttpClient, StreamingHttpClient
         if (!function_exists('curl_init')) {
             $res = $this->phpStream('GET', $url, self::lines($headers), null, $timeoutSeconds);
             if (file_put_contents($file, $res['body']) === false) {
-                throw new \RuntimeException('Die Datei ließ sich nicht speichern.');
+                throw new \RuntimeException(I18n::t('Die Datei ließ sich nicht speichern.'));
             }
             return ['status' => $res['status'], 'headers' => $res['headers']];
         }
         $fp = @fopen($file, 'wb');
         if ($fp === false) {
-            throw new \RuntimeException('Die Datei ließ sich nicht speichern.');
+            throw new \RuntimeException(I18n::t('Die Datei ließ sich nicht speichern.'));
         }
         $state = new \stdClass();
         $ch = $this->handle('GET', $url, self::lines($headers), null, $timeoutSeconds, $state, $fp);
         $ok = curl_exec($ch);
         fclose($fp);
         try {
-            $res = $this->result($ch, $state, $ok === false ? (curl_error($ch) ?: 'Keine Verbindung.') : '');
+            $res = $this->result($ch, $state, $ok === false ? (curl_error($ch) ?: I18n::t('Keine Verbindung.')) : '');
         } finally {
             curl_close($ch);
         }
@@ -177,7 +178,7 @@ final class CurlHttpClient implements ExtendedHttpClient, StreamingHttpClient
         try {
             if ($state->head === null) {
                 if ($ok === false) {
-                    throw new \RuntimeException(curl_error($ch) ?: 'Keine Verbindung.');
+                    throw new \RuntimeException(curl_error($ch) ?: I18n::t('Keine Verbindung.'));
                 }
                 return $head($ch); // Antwort ohne Inhalt
             }
@@ -190,7 +191,7 @@ final class CurlHttpClient implements ExtendedHttpClient, StreamingHttpClient
     private static function checkUrl(string $url): void
     {
         if (!preg_match('#^https?://#i', $url)) {
-            throw new \RuntimeException('Ungültige Adresse.');
+            throw new \RuntimeException(I18n::t('Ungültige Adresse.'));
         }
     }
 
@@ -213,7 +214,7 @@ final class CurlHttpClient implements ExtendedHttpClient, StreamingHttpClient
         $ch = $this->handle($method, $url, $lines, $body, $timeout, $state);
         $result = curl_exec($ch);
         try {
-            return $this->result($ch, $state, $result === false ? (curl_error($ch) ?: 'Keine Verbindung.') : '');
+            return $this->result($ch, $state, $result === false ? (curl_error($ch) ?: I18n::t('Keine Verbindung.')) : '');
         } finally {
             curl_close($ch);
         }
@@ -276,7 +277,7 @@ final class CurlHttpClient implements ExtendedHttpClient, StreamingHttpClient
     private function result(\CurlHandle $ch, \stdClass $state, string $error): array
     {
         if ($state->tooLarge) {
-            throw new \RuntimeException(sprintf('Die Antwort ist zu groß (mehr als %d MB).', max(1, intdiv($this->maxBytes, 1024 * 1024))));
+            throw new \RuntimeException(I18n::t('Die Antwort ist zu groß (mehr als {mb} MB).', ['mb' => max(1, intdiv($this->maxBytes, 1024 * 1024))]));
         }
         if ($error !== '') {
             throw new \RuntimeException($error);
@@ -297,10 +298,10 @@ final class CurlHttpClient implements ExtendedHttpClient, StreamingHttpClient
         ]]);
         $result = @file_get_contents($url, false, $context, 0, $this->maxBytes + 1);
         if ($result === false) {
-            throw new \RuntimeException('Keine Verbindung.');
+            throw new \RuntimeException(I18n::t('Keine Verbindung.'));
         }
         if (strlen($result) > $this->maxBytes) {
-            throw new \RuntimeException(sprintf('Die Antwort ist zu groß (mehr als %d MB).', max(1, intdiv($this->maxBytes, 1024 * 1024))));
+            throw new \RuntimeException(I18n::t('Die Antwort ist zu groß (mehr als {mb} MB).', ['mb' => max(1, intdiv($this->maxBytes, 1024 * 1024))]));
         }
         $status = 0;
         $headers = [];

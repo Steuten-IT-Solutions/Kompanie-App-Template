@@ -11,6 +11,7 @@ import { clearOfflineQueues, createOfflineQueue, failureAction } from './offline
 import { dataUpdated } from './dataCache';
 import { noteRejected } from './offlineRejectedStore';
 import { previewRole } from './preview';
+import { t } from './i18n';
 
 function storage(): Storage | null {
   try {
@@ -129,7 +130,9 @@ async function run(): Promise<SyncResult> {
 export function syncMessage(r: SyncResult): string | null {
   if (r.rejected.length > 0) {
     const first = r.rejected[0];
-    return `Offline gespeicherte Anwesenheit${first.label ? ` „${first.label}“` : ''} wurde nicht übernommen: ${first.message}`;
+    return first.label
+      ? t('Offline gespeicherte Anwesenheit „{label}“ wurde nicht übernommen: {message}', { label: first.label, message: first.message })
+      : t('Offline gespeicherte Anwesenheit wurde nicht übernommen: {message}', { message: first.message });
   }
-  return r.sent > 0 ? 'Offline gespeicherte Anwesenheit übertragen' : null;
+  return r.sent > 0 ? t('Offline gespeicherte Anwesenheit übertragen') : null;
 }

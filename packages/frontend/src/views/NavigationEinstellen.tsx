@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { defaultSections } from '../generated/brand';
 import { adminTabs, adminTileCatalog } from '../adminNav';
+import { t } from '../i18n';
 import { api, applyNavigation, config, levelLabel, type Capability, type Feature, type NavigationAdmin, type PageSummary } from '../api';
 import { useDragSort } from '../dragSort';
 import {
@@ -39,29 +40,29 @@ import { ErrorBox, Loading, useAsync } from '../ui';
 import { confirmAsk } from '../ask';
 
 const ICON_LABELS: Record<string, string> = {
-  ordner: 'Ordner',
-  termine: 'Kalender',
-  news: 'Zeitung',
-  galerie: 'Bild',
-  kompanien: 'Schild',
-  sponsoren: 'Herz',
-  mitglieder: 'Personen',
-  dokumente: 'Dokument',
-  brett: 'Brett',
-  dienstgrade: 'Abzeichen',
-  punktekatalog: 'Liste',
-  seiten: 'Seite',
-  stern: 'Stern',
-  info: 'Info',
-  karte: 'Karte',
-  musik: 'Musik',
-  pokal: 'Pokal',
-  glocke: 'Glocke',
-  fahne: 'Fahne',
-  kamera: 'Kamera',
-  haus: 'Haus',
-  buch: 'Buch',
-  uhr: 'Uhr',
+  ordner: t('Ordner'),
+  termine: t('Kalender'),
+  news: t('Zeitung'),
+  galerie: t('Bild'),
+  kompanien: t('Schild'),
+  sponsoren: t('Herz'),
+  mitglieder: t('Personen'),
+  dokumente: t('Dokument'),
+  brett: t('Brett'),
+  dienstgrade: t('Abzeichen'),
+  punktekatalog: t('Liste'),
+  seiten: t('Seite'),
+  stern: t('Stern'),
+  info: t('Info'),
+  karte: t('Karte'),
+  musik: t('Musik'),
+  pokal: t('Pokal'),
+  glocke: t('Glocke'),
+  fahne: t('Fahne'),
+  kamera: t('Kamera'),
+  haus: t('Haus'),
+  buch: t('Buch'),
+  uhr: t('Uhr'),
 };
 
 /** Ab so vielen Punkten unten (mit Verwaltung und Meins) wird es auf schmalen Handys eng (Issue #362). */
@@ -111,9 +112,9 @@ export default function NavigationEinstellen({ onToast }: { onToast: (msg: strin
   const pagesOn = !!config?.features.pages;
   const pages = useAsync(pagesOn ? api.pages : () => Promise.resolve([] as PageSummary[]), [pagesOn]);
   if ((loading && !data) || (pages.loading && !pages.data)) return <Loading shape="form" />;
-  if (error || !data) return <ErrorBox message={error ?? 'Die Navigation konnte nicht geladen werden.'} onRetry={reload} />;
+  if (error || !data) return <ErrorBox message={error ?? t('Die Navigation konnte nicht geladen werden.')} onRetry={reload} />;
   if (pages.error || !pages.data)
-    return <ErrorBox message={pages.error ?? 'Die Seiten konnten nicht geladen werden.'} onRetry={pages.reload} />;
+    return <ErrorBox message={pages.error ?? t('Die Seiten konnten nicht geladen werden.')} onRetry={pages.reload} />;
   return (
     <Editor
       key={JSON.stringify([
@@ -189,7 +190,9 @@ function Editor({
   );
   const guestProblem = guestOwn ? draftError(guestDraft, data.label_max) : null;
   const problem =
-    draftError(draft, data.label_max) ?? (guestProblem ? `Leiste für Gäste: ${guestProblem}` : null) ?? namesError(names, data.label_max);
+    draftError(draft, data.label_max) ??
+    (guestProblem ? t('Leiste für Gäste: {problem}', { problem: guestProblem }) : null) ??
+    namesError(names, data.label_max);
   const menus = cur.items.filter((i): i is NavMenuSetting => typeof i !== 'string');
   const newOnes = unplaced(cur, pageTargets).filter(avail);
   // Hauptpunkte in der Liste: Bereiche, die erscheinen können, und alle Untermenüs (ein leeres meldet draftError)
@@ -243,7 +246,7 @@ function Editor({
       const next = await api.saveNavigation(body);
       applyNavigation(next);
       onSaved(next);
-      onToast(reset ? 'Standardnavigation wiederhergestellt' : 'Navigation gespeichert');
+      onToast(reset ? t('Standardnavigation wiederhergestellt') : t('Navigation gespeichert'));
       if (reload) setTimeout(() => window.location.reload(), 800);
     } catch (err) {
       setSaveError((err as Error).message);
@@ -253,10 +256,10 @@ function Editor({
   }
 
   /** Startseite: Auswahl aus dem, was in der Leiste steht (für Angemeldete auch „Meins“). */
-  const startLabel = (t: string): string => {
-    if (t === 'meins') return 'Meins';
-    if (t === 'intern') return labels.intern ?? defaultLabel('intern', pages);
-    return labels[t] ?? t;
+  const startLabel = (target: string): string => {
+    if (target === 'meins') return t('Meins');
+    if (target === 'intern') return labels.intern ?? defaultLabel('intern', pages);
+    return labels[target] ?? target;
   };
   const startSelect = (who: 'guest' | 'member', title: string) => {
     // Gäste: ihre eigene Leiste, sonst die der Angemeldeten
@@ -276,7 +279,7 @@ function Editor({
     });
     const menuLabel = (n: number): string => {
       const m = navMenus[n - 1];
-      return `Untermenü „${m?.label.trim() || `Menü ${n}`}“`;
+      return t('Untermenü „{name}“', { name: m?.label.trim() || t('Menü {n}', { n }) });
     };
     return (
       <label className="field">
@@ -289,7 +292,7 @@ function Editor({
             setSaveError(null);
           }}
         >
-          <option value="">Erster Punkt der Leiste</option>
+          <option value="">{t('Erster Punkt der Leiste')}</option>
           {choices.map((t) => (
             <option key={t} value={t}>
               {/^menue\/\d+$/.test(t) ? menuLabel(Number(t.slice(6))) : startLabel(t)}
@@ -317,23 +320,23 @@ function Editor({
   }
 
   /** Auswahl „Platz“ eines Bereichs: unten, in einem Untermenü oder nicht in der Navigation. */
-  const placeSelect = (t: NavTarget) => (
+  const placeSelect = (target: NavTarget) => (
     <select
-      aria-label={`Platz von ${labels[t]}`}
-      value={String(placeOf(cur, t))}
+      aria-label={t('Platz von {name}', { name: labels[target] ?? target })}
+      value={String(placeOf(cur, target))}
       disabled={busy}
       onChange={(e) => {
         const v = e.target.value;
-        change(moveTo(cur, t, (v === 'main' || v === 'hidden' ? v : Number(v)) as NavPlace));
+        change(moveTo(cur, target, (v === 'main' || v === 'hidden' ? v : Number(v)) as NavPlace));
       }}
     >
-      <option value="main">Unten in der Leiste</option>
+      <option value="main">{t('Unten in der Leiste')}</option>
       {menus.map((m, i) => (
         <option key={i} value={i}>
-          Im Untermenü „{m.label.trim() || `Menü ${i + 1}`}“
+          {t('Im Untermenü „{name}“', { name: m.label.trim() || t('Menü {n}', { n: i + 1 }) })}
         </option>
       ))}
-      <option value="hidden">Nicht in der Navigation</option>
+      <option value="hidden">{t('Nicht in der Navigation')}</option>
     </select>
   );
 
@@ -342,9 +345,9 @@ function Editor({
     const standard = defaultLabel(key, pages);
     return (
       <details className="nav-rename">
-        <summary>Umbenennen{names[key]?.label?.trim() ? ` (Standard: ${standard})` : ''}</summary>
+        <summary>{names[key]?.label?.trim() ? t('Umbenennen (Standard: {name})', { name: standard }) : t('Umbenennen')}</summary>
         <label className="field">
-          <span>{isPageTarget(key) ? 'Name im Tab (leer = Titel der Seite)' : 'Eigener Name (leer = Standard)'}</span>
+          <span>{isPageTarget(key) ? t('Name im Tab (leer = Titel der Seite)') : t('Eigener Name (leer = Standard)')}</span>
           <input
             type="text"
             value={names[key]?.label ?? ''}
@@ -355,9 +358,9 @@ function Editor({
           />
         </label>
         <label className="field">
-          <span>Symbol</span>
+          <span>{t('Symbol')}</span>
           <select value={names[key]?.icon ?? ''} disabled={busy} onChange={(e) => rename(key, { icon: e.target.value || undefined })}>
-            <option value="">Standard ({ICON_LABELS[fallbackIcon] ?? fallbackIcon})</option>
+            <option value="">{t('Standard ({icon})', { icon: ICON_LABELS[fallbackIcon] ?? fallbackIcon })}</option>
             {NAV_ICONS.map((i) => (
               <option key={i} value={i}>
                 {ICON_LABELS[i] ?? i}
@@ -369,23 +372,23 @@ function Editor({
     );
   };
 
-  const targetRow = (t: NavTarget) => (
+  const targetRow = (target: NavTarget) => (
     <div className="row-main">
-      <span className="row-title">{labels[t]}</span>
-      {isPageTarget(t) && <span className="row-sub row-kind">Eigene Seite</span>}
-      {placeSelect(t)}
-      {renameFields(t, targetIcon(t))}
+      <span className="row-title">{labels[target]}</span>
+      {isPageTarget(target) && <span className="row-sub row-kind">{t('Eigene Seite')}</span>}
+      {placeSelect(target)}
+      {renameFields(target, targetIcon(target))}
     </div>
   );
 
   return (
     <section className="card settings-section" id="einstellungen-navigation">
-      <h3>Navigation</h3>
-      <div className="segmented" role="group" aria-label="Leiste für">
+      <h3>{t('Navigation')}</h3>
+      <div className="segmented" role="group" aria-label={t('Leiste für')}>
         {(
           [
-            ['member', 'Für Angemeldete'],
-            ['guest', 'Für Gäste'],
+            ['member', t('Für Angemeldete')],
+            ['guest', t('Für Gäste')],
           ] as const
         ).map(([k, text]) => (
           <button
@@ -403,7 +406,9 @@ function Editor({
       {editingGuest ? (
         <>
           <p className="small">
-            Gäste sind alle ohne Anmeldung und Angemeldete mit der Rolle {GUEST_LABEL()} (z. B. ehemalige Mitglieder).
+            {t('Gäste sind alle ohne Anmeldung und Angemeldete mit der Rolle {guest} (z. B. ehemalige Mitglieder).', {
+              guest: GUEST_LABEL(),
+            })}
           </p>
           <label className="toggle">
             <input
@@ -417,29 +422,34 @@ function Editor({
                 setSaveError(null);
               }}
             />
-            <span>Eigene Leiste für Gäste</span>
+            <span>{t('Eigene Leiste für Gäste')}</span>
           </label>
           {!guestOwn && (
-            <p className="small muted">Gäste sehen dieselbe Leiste wie Angemeldete, jeder nur die Bereiche, die er sehen darf.</p>
+            <p className="small muted">{t('Gäste sehen dieselbe Leiste wie Angemeldete, jeder nur die Bereiche, die er sehen darf.')}</p>
           )}
         </>
       ) : (
         <p className="small">
           {custom
-            ? 'Zurzeit gilt eure eigene Navigation.'
-            : `Zurzeit gilt die Standardnavigation: Wer das Recht „Intern“ hat, findet die Bereiche unter „${labels.intern}“ gesammelt, alle anderen sehen ${labels.mitglieder} und ${labels.dokumente} als eigene Punkte.`}
+            ? t('Zurzeit gilt eure eigene Navigation.')
+            : t(
+                'Zurzeit gilt die Standardnavigation: Wer das Recht „Intern“ hat, findet die Bereiche unter „{intern}“ gesammelt, alle anderen sehen {members} und {documents} als eigene Punkte.',
+                { intern: labels.intern ?? '', members: labels.mitglieder ?? '', documents: labels.dokumente ?? '' },
+              )}
         </p>
       )}
 
       {(!editingGuest || guestOwn) && (
         <>
-          <h4>Unten in der Leiste</h4>
+          <h4>{t('Unten in der Leiste')}</h4>
           <p className="small muted">
-            Zum Ändern der Reihenfolge am Griff ziehen. Je mehr Punkte unten stehen, desto kleiner werden Schrift und Symbole.
+            {t('Zum Ändern der Reihenfolge am Griff ziehen. Je mehr Punkte unten stehen, desto kleiner werden Schrift und Symbole.')}
           </p>
           {mainCount >= CROWDED && (
             <p className="small muted" role="note">
-              Mit {mainCount} Punkten{editingGuest ? '' : ' (mit Verwaltung und Meins)'} wird es auf schmalen Handys eng.
+              {editingGuest
+                ? t('Mit {count} Punkten wird es auf schmalen Handys eng.', { count: mainCount })
+                : t('Mit {count} Punkten (mit Verwaltung und Meins) wird es auf schmalen Handys eng.', { count: mainCount })}
             </p>
           )}
           <MainList
@@ -452,7 +462,7 @@ function Editor({
               return (
                 <div className="row-main nav-menu">
                   <label className="field">
-                    <span>Name des Untermenüs</span>
+                    <span>{t('Name des Untermenüs')}</span>
                     <input
                       type="text"
                       value={item.label}
@@ -462,7 +472,7 @@ function Editor({
                     />
                   </label>
                   <label className="field">
-                    <span>Symbol</span>
+                    <span>{t('Symbol')}</span>
                     <select value={item.icon} disabled={busy} onChange={(e) => updateMenu(index, { icon: e.target.value })}>
                       {NAV_ICONS.map((i) => (
                         <option key={i} value={i}>
@@ -479,13 +489,13 @@ function Editor({
                     labels={labels}
                   />
                   {item.items.length === 0 ? (
-                    <p className="small muted">Noch leer: Wähle bei einem Bereich „Im Untermenü …“.</p>
+                    <p className="small muted">{t('Noch leer: Wähle bei einem Bereich „Im Untermenü …“.')}</p>
                   ) : (
                     !item.items.some(avail) && (
                       <p className="small muted">
                         {editingGuest
-                          ? 'Darin ist zurzeit nichts, was Gäste sehen dürfen: Das Untermenü erscheint nicht.'
-                          : 'Die Bereiche darin sind ausgeschaltet: Das Untermenü erscheint nicht.'}
+                          ? t('Darin ist zurzeit nichts, was Gäste sehen dürfen: Das Untermenü erscheint nicht.')
+                          : t('Die Bereiche darin sind ausgeschaltet: Das Untermenü erscheint nicht.')}
                       </p>
                     )
                   )}
@@ -495,31 +505,31 @@ function Editor({
                     disabled={busy}
                     onClick={() => change(removeMenu(cur, index))}
                   >
-                    Untermenü entfernen
+                    {t('Untermenü entfernen')}
                   </button>
                 </div>
               );
             }}
           />
           <button type="button" className="btn btn-secondary btn-block" disabled={busy} onClick={addMenu}>
-            Untermenü hinzufügen
+            {t('Untermenü hinzufügen')}
           </button>
 
           {(cur.hidden.some(avail) || newOnes.length > 0) && (
             <>
-              <h4>Nicht in der Navigation</h4>
+              <h4>{t('Nicht in der Navigation')}</h4>
               <ul className="card-list">
                 {cur.hidden.filter(avail).map((t) => (
                   <li key={t} className="card row">
                     {targetRow(t)}
                   </li>
                 ))}
-                {newOnes.map((t) => (
-                  <li key={t} className="card row">
+                {newOnes.map((target) => (
+                  <li key={target} className="card row">
                     <div className="row-main">
-                      <span className="row-title">{labels[t]}</span>
-                      <div className="row-sub">Neu: erscheint hinten in der Leiste, bis du ihm einen Platz gibst.</div>
-                      {placeSelect(t)}
+                      <span className="row-title">{labels[target]}</span>
+                      <div className="row-sub">{t('Neu: erscheint hinten in der Leiste, bis du ihm einen Platz gibst.')}</div>
+                      {placeSelect(target)}
                     </div>
                   </li>
                 ))}
@@ -529,8 +539,13 @@ function Editor({
           {unavailable.length > 0 && (
             <p className="small muted" role="note">
               {editingGuest
-                ? `Nicht zur Auswahl, weil Gäste sie nicht sehen dürfen oder der Bereich aus ist: ${unavailable.map((t) => labels[t]).join(', ')}. Was Gäste sehen, stellst du bei der Rolle ${GUEST_LABEL()} unter Einstellungen → Rollen ein.`
-                : `Nicht zur Auswahl, weil der Bereich aus ist: ${unavailable.map((t) => labels[t]).join(', ')}. Schaltest du einen ein, steht er wieder hier.`}
+                ? t(
+                    'Nicht zur Auswahl, weil Gäste sie nicht sehen dürfen oder der Bereich aus ist: {list}. Was Gäste sehen, stellst du bei der Rolle {guest} unter Einstellungen → Rollen ein.',
+                    { list: unavailable.map((x) => labels[x]).join(', '), guest: GUEST_LABEL() },
+                  )
+                : t('Nicht zur Auswahl, weil der Bereich aus ist: {list}. Schaltest du einen ein, steht er wieder hier.', {
+                    list: unavailable.map((x) => labels[x]).join(', '),
+                  })}
             </p>
           )}
         </>
@@ -538,14 +553,15 @@ function Editor({
 
       {!custom && !editingGuest && (
         <>
-          <h4>Untermenü der Standardnavigation</h4>
+          <h4>{t('Untermenü der Standardnavigation')}</h4>
           <ul className="card-list">
             <li className="card row">
               <div className="row-main">
                 <span className="row-title">{labels.intern ?? defaultLabel('intern', pages)}</span>
                 <div className="row-sub">
-                  Sammelt in der Standardnavigation die internen Bereiche. Ihre Reihenfolge änderst du oben im Untermenü am Griff; die
-                  Standardnavigation bleibt dabei erhalten.
+                  {t(
+                    'Sammelt in der Standardnavigation die internen Bereiche. Ihre Reihenfolge änderst du oben im Untermenü am Griff; die Standardnavigation bleibt dabei erhalten.',
+                  )}
                 </div>
                 {renameFields('intern', 'intern')}
               </div>
@@ -554,15 +570,16 @@ function Editor({
         </>
       )}
 
-      <h4>Startseite</h4>
+      <h4>{t('Startseite')}</h4>
       <p className="small muted">
-        Was beim Öffnen der App erscheint. Wer die Startseite nicht sehen darf, landet auf dem ersten Punkt, den er sehen darf. Geteilte
-        Links und Benachrichtigungen öffnen weiter ihre eigene Seite.
+        {t(
+          'Was beim Öffnen der App erscheint. Wer die Startseite nicht sehen darf, landet auf dem ersten Punkt, den er sehen darf. Geteilte Links und Benachrichtigungen öffnen weiter ihre eigene Seite.',
+        )}
       </p>
-      {startSelect('guest', 'Für Gäste')}
-      {startSelect('member', 'Angemeldet')}
+      {startSelect('guest', t('Für Gäste'))}
+      {startSelect('member', t('Angemeldet'))}
 
-      <h4>Darstellung</h4>
+      <h4>{t('Darstellung')}</h4>
       <label className="toggle">
         <input
           type="checkbox"
@@ -573,17 +590,18 @@ function Editor({
             setSaveError(null);
           }}
         />
-        <span>Namen unter den Symbolen zeigen</span>
+        <span>{t('Namen unter den Symbolen zeigen')}</span>
       </label>
-      {!showLabels && <p className="small muted">Unten stehen nur die Symbole; die Namen stehen weiter oben auf jeder Seite.</p>}
+      {!showLabels && <p className="small muted">{t('Unten stehen nur die Symbole; die Namen stehen weiter oben auf jeder Seite.')}</p>}
 
-      <h4>Verwaltung</h4>
+      <h4>{t('Verwaltung')}</h4>
       <p className="small muted">
-        Reihenfolge der Knöpfe in der Verwaltung, für alle gleich. Zum Ändern am Griff ziehen. Jede Person sieht weiter nur die Knöpfe, die
-        sie nutzen darf.
+        {t(
+          'Reihenfolge der Knöpfe in der Verwaltung, für alle gleich. Zum Ändern am Griff ziehen. Jede Person sieht weiter nur die Knöpfe, die sie nutzen darf.',
+        )}
       </p>
       <AdminOrderList
-        title="Startseite der Verwaltung"
+        title={t('Startseite der Verwaltung')}
         ids={adminStart}
         disabled={busy}
         onChange={(next) => {
@@ -592,7 +610,7 @@ function Editor({
         }}
       />
       <AdminOrderList
-        title="Einrichtungen"
+        title={t('Einrichtungen')}
         ids={adminSetup}
         disabled={busy}
         onChange={(next) => {
@@ -611,13 +629,13 @@ function Editor({
             setSaveError(null);
           }}
         >
-          Standardreihenfolge der Verwaltung
+          {t('Standardreihenfolge der Verwaltung')}
         </button>
       )}
 
       {duplicates.length > 0 && (
         <p className="small muted" role="note">
-          Mehrere Punkte heißen gleich: {duplicates.map((d) => `„${d}“`).join(', ')}.
+          {t('Mehrere Punkte heißen gleich: {list}.', { list: duplicates.map((d) => t('„{name}“', { name: d })).join(', ') })}
         </p>
       )}
       {(problem || saveError) && (
@@ -626,7 +644,7 @@ function Editor({
         </p>
       )}
       <button type="button" className="btn btn-block" disabled={busy || !!problem} onClick={() => void save(false)}>
-        {busy ? 'Speichert …' : 'Navigation speichern'}
+        {busy ? t('Speichert …') : t('Navigation speichern')}
       </button>
       {(custom ||
         savedGuest !== null ||
@@ -641,13 +659,15 @@ function Editor({
           onClick={async () => {
             if (
               await confirmAsk(
-                'Alles in der Navigation wird zurückgesetzt: Reihenfolge und Untermenüs (auch die Leiste für Gäste), eigene Namen und Symbole, Startseiten und die Namen unter den Symbolen. Danach gilt wieder die Standardnavigation.',
+                t(
+                  'Alles in der Navigation wird zurückgesetzt: Reihenfolge und Untermenüs (auch die Leiste für Gäste), eigene Namen und Symbole, Startseiten und die Namen unter den Symbolen. Danach gilt wieder die Standardnavigation.',
+                ),
               )
             )
               void save(true);
           }}
         >
-          Standardnavigation wiederherstellen
+          {t('Standardnavigation wiederherstellen')}
         </button>
       )}
     </section>
@@ -660,7 +680,7 @@ type Item = string | NavMenuSetting;
 function namesError(names: NavNames, labelMax: number): string | null {
   for (const v of Object.values(names)) {
     const label = v?.label?.trim() ?? '';
-    if (label.length > labelMax) return `Ein Name darf höchstens ${labelMax} Zeichen lang sein („${label}“).`;
+    if (label.length > labelMax) return t('Ein Name darf höchstens {max} Zeichen lang sein („{name}“).', { max: labelMax, name: label });
   }
   return null;
 }
@@ -754,7 +774,7 @@ function AdminOrderList({
   const catalog = adminTileCatalog();
   const shown = ids.filter((id) => catalog[id]?.on);
   const sort = useDragSort(shown, (next) => onChange(mergeOrder(ids, next)), disabled);
-  const own = new Set(adminTabs().map((t) => t.id));
+  const own = new Set(adminTabs().map((tab) => tab.id));
   if (shown.length === 0) return null;
   return (
     <>
@@ -767,7 +787,7 @@ function AdminOrderList({
             {shown.length > 1 && sort.handle(i, catalog[id]?.label ?? id)}
             <div className="row-main">
               <span className="row-title">{catalog[id]?.label ?? id}</span>
-              {id !== SETUP && !own.has(id) && <div className="row-sub">Siehst du selbst nicht (fehlendes Recht).</div>}
+              {id !== SETUP && !own.has(id) && <div className="row-sub">{t('Siehst du selbst nicht (fehlendes Recht).')}</div>}
             </div>
           </li>
         ))}

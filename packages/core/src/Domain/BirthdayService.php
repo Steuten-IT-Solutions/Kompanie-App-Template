@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\BirthdayRepository;
 
 /**
@@ -85,28 +86,28 @@ final class BirthdayService
         $m = Input::integer($month);
         $d = Input::integer($day);
         if ($m === null || $d === null || $m < 1 || $m > 12 || $d < 1 || $d > 31) {
-            throw ApiError::invalid('Bitte Tag und Monat des Geburtstags angeben.');
+            throw ApiError::invalid(I18n::t('Bitte Tag und Monat des Geburtstags angeben.'));
         }
         $y = null;
         if ($year !== null && $year !== '') {
             $y = Input::integer($year);
             if ($y === null) {
-                throw ApiError::invalid('Ungültiges Geburtsjahr.');
+                throw ApiError::invalid(I18n::t('Ungültiges Geburtsjahr.'));
             }
         }
         // Ohne Jahr: der 29.02. ist erlaubt (Schaltjahr 2000 als Maßstab).
         if (!checkdate($m, $d, $y ?? 2000)) {
             throw ApiError::invalid($y !== null && $m === 2 && $d === 29
-                ? sprintf('Den 29.02.%d gibt es nicht (kein Schaltjahr).', $y)
-                : 'Dieses Datum gibt es nicht.');
+                ? I18n::t('Den 29.02.{year} gibt es nicht (kein Schaltjahr).', ['year' => $y])
+                : I18n::t('Dieses Datum gibt es nicht.'));
         }
         if ($y !== null) {
             if ($y < self::MIN_YEAR) {
-                throw ApiError::invalid(sprintf('Das Geburtsjahr muss ab %d liegen.', self::MIN_YEAR));
+                throw ApiError::invalid(I18n::t('Das Geburtsjahr muss ab {year} liegen.', ['year' => self::MIN_YEAR]));
             }
             $today = $this->app->time()->today();
             if (sprintf('%04d-%02d-%02d', $y, $m, $d) > $today->format('Y-m-d')) {
-                throw ApiError::invalid('Der Geburtstag darf nicht in der Zukunft liegen.');
+                throw ApiError::invalid(I18n::t('Der Geburtstag darf nicht in der Zukunft liegen.'));
             }
         }
         return ['month' => $m, 'day' => $d, 'year' => $y];
@@ -123,7 +124,7 @@ final class BirthdayService
             return null;
         }
         if (!is_string($value) || preg_match('/^(?:(\d{4})-)?(\d{2})-(\d{2})$/', trim($value), $m) !== 1) {
-            throw ApiError::invalid('Geburtstag bitte als JJJJ-MM-TT oder ohne Jahr als MM-TT angeben.');
+            throw ApiError::invalid(I18n::t('Geburtstag bitte als JJJJ-MM-TT oder ohne Jahr als MM-TT angeben.'));
         }
         return $this->validate($m[2], $m[3], $m[1] === '' ? null : $m[1]);
     }
@@ -154,7 +155,7 @@ final class BirthdayService
                 return null;
             }
             if (!is_bool($in[$key])) {
-                throw ApiError::invalid('Ungültiger Wert für ' . $key . ' (an oder aus erwartet).');
+                throw ApiError::invalid(I18n::t('Ungültiger Wert für {key} (an oder aus erwartet).', ['key' => $key]));
             }
             return $in[$key];
         };
@@ -172,7 +173,7 @@ final class BirthdayService
      */
     public function saveFor(User $actor, int $userId, array $in): ?array
     {
-        $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $this->app->users->find($userId) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
         $date = $this->validate($in['month'] ?? null, $in['day'] ?? null, $in['year'] ?? null);
         $this->store($actor, $userId, $date);
         return $this->of($userId);
@@ -191,7 +192,7 @@ final class BirthdayService
 
     public function removeFor(int $userId): void
     {
-        $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $this->app->users->find($userId) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
         $this->remove($userId);
     }
 
@@ -370,10 +371,10 @@ final class BirthdayService
     public function setNotify(mixed $enabled, mixed $hour): void
     {
         if ($enabled !== null && !is_bool($enabled)) {
-            throw ApiError::invalid('Bitte an oder aus angeben.');
+            throw ApiError::invalid(I18n::t('Bitte an oder aus angeben.'));
         }
         if ($hour !== null && (!is_numeric($hour) || (int) $hour < 0 || (int) $hour > 23 || (string) (int) $hour !== (string) $hour)) {
-            throw ApiError::invalid('Bitte eine volle Stunde von 0 bis 23 angeben.');
+            throw ApiError::invalid(I18n::t('Bitte eine volle Stunde von 0 bis 23 angeben.'));
         }
         if ($enabled !== null) {
             // Als 1/0: WordPress speichert false nicht, solange es die Option noch nicht gibt (update_option vergleicht
@@ -400,7 +401,7 @@ final class BirthdayService
     public function setUpcomingDays(mixed $days): void
     {
         if (!is_numeric($days) || (string) (int) $days !== (string) $days || (int) $days < 0 || (int) $days > self::UPCOMING_DAYS_MAX) {
-            throw ApiError::invalid(sprintf('Bitte eine ganze Zahl von 0 bis %d Tagen angeben.', self::UPCOMING_DAYS_MAX));
+            throw ApiError::invalid(I18n::t('Bitte eine ganze Zahl von 0 bis {max} Tagen angeben.', ['max' => self::UPCOMING_DAYS_MAX]));
         }
         $this->app->settings->set(self::UPCOMING_DAYS_SETTING, (int) $days);
     }

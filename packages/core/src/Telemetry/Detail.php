@@ -43,7 +43,7 @@ final class Detail
             (bool) preg_match('/cURL error 28\b|timed out|time-?out|Zeitüberschreitung/i', $message) => 'timeout',
             (bool) preg_match('/cURL error 6\b|resolve host|getaddrinfo|Name or service not known/i', $message) => 'dns',
             (bool) preg_match('/cURL error (35|51|58|60|77)\b|\bSSL\b|certificate|Zertifikat/i', $message) => 'tls',
-            (bool) preg_match('/cURL error 7\b|Connection refused|Failed to connect|Keine Verbindung/i', $message) => 'connect',
+            (bool) preg_match('/cURL error 7\b|Connection refused|Failed to connect|Keine Verbindung|No connection/i', $message) => 'connect',
             default => '',
         };
     }

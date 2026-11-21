@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\Blocks\Blocks;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Infra\RemoteNewsSource;
 use KompanieApp\Core\Port\NewsEditor;
 use KompanieApp\Core\Port\NewsSource;
@@ -158,7 +159,7 @@ final class NewsService
         $source = $this->source();
         $item = $source->available() ? $source->item($key) : null;
         if ($item === null) {
-            throw ApiError::notFound('Beitrag nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Beitrag nicht gefunden.'));
         }
         if ($this->inApp()) {
             $row = $this->appSource()->row((int) $key);
@@ -211,7 +212,7 @@ final class NewsService
     {
         $this->requireInApp();
         if (!array_key_exists('title', $in)) {
-            throw ApiError::invalid('Bitte einen Titel für den Beitrag angeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Titel für den Beitrag angeben.'));
         }
         [$data, $blocks] = $this->validate($in);
         $now = $this->app->time()->nowUtc();
@@ -239,11 +240,13 @@ final class NewsService
     public function update(int $id, array $in, User $actor): array
     {
         $this->requireInApp();
-        $row = $this->appSource()->row($id) ?? throw ApiError::notFound('Beitrag nicht gefunden.');
+        $row = $this->appSource()->row($id) ?? throw ApiError::notFound(I18n::t('Beitrag nicht gefunden.'));
         $loaded = $in['updated_at'] ?? null;
         if (is_string($loaded) && $loaded !== Time::utcToIso((string) $row['updated_at'])) {
             $by = $row['updated_by'] !== null ? $this->app->users->find((int) $row['updated_by'])?->name : null;
-            throw new ApiError(409, 'conflict', ($by ?? 'Jemand') . ' hat den Beitrag inzwischen geändert. Bitte neu laden und deine Änderungen noch einmal eintragen.');
+            throw new ApiError(409, 'conflict', $by !== null
+                ? I18n::t('{name} hat den Beitrag inzwischen geändert. Bitte neu laden und deine Änderungen noch einmal eintragen.', ['name' => $by])
+                : I18n::t('Jemand hat den Beitrag inzwischen geändert. Bitte neu laden und deine Änderungen noch einmal eintragen.'));
         }
         [$data, $blocks] = $this->validate($in);
         if ($blocks !== null) {
@@ -261,7 +264,7 @@ final class NewsService
     public function delete(int $id): void
     {
         $this->requireInApp();
-        $this->appSource()->row($id) ?? throw ApiError::notFound('Beitrag nicht gefunden.');
+        $this->appSource()->row($id) ?? throw ApiError::notFound(I18n::t('Beitrag nicht gefunden.'));
         $this->app->db->transaction(function () use ($id): void {
             $this->app->db->execute('DELETE FROM {app_news} WHERE id = ?', [$id]);
             $this->app->richImages()->deleteOwner(RichImageService::OWNER_NEWS, $id);
@@ -299,10 +302,10 @@ final class NewsService
             return null;
         }
         if (!is_string($uid) || preg_match('/^[a-f0-9]{32}$/', $uid) !== 1) {
-            throw ApiError::invalid('Das Titelbild ist ungültig.');
+            throw ApiError::invalid(I18n::t('Das Titelbild ist ungültig.'));
         }
         $claimed = RichText::imageUids($this->app->richImages()->claim($actor, '<img data-image="' . $uid . '">', RichImageService::OWNER_NEWS, $id));
-        return $claimed[0] ?? throw ApiError::invalid('Das Titelbild wurde nicht gefunden. Bitte noch einmal hochladen.');
+        return $claimed[0] ?? throw ApiError::invalid(I18n::t('Das Titelbild wurde nicht gefunden. Bitte noch einmal hochladen.'));
     }
 
     /** Bilder des Beitrags löschen, die weder in einem Textblock noch als Titelbild stehen. */
@@ -333,7 +336,7 @@ final class NewsService
     private function requireInApp(): void
     {
         if (!$this->inApp()) {
-            throw new ApiError(409, 'not_in_app', 'Die Beiträge kommen hier nicht aus der App. Ein Admin kann das unter Einstellungen → Neuigkeiten ändern.');
+            throw new ApiError(409, 'not_in_app', I18n::t('Die Beiträge kommen hier nicht aus der App. Ein Admin kann das unter Einstellungen → Neuigkeiten ändern.'));
         }
     }
 
@@ -349,10 +352,10 @@ final class NewsService
         if (array_key_exists('title', $in)) {
             $title = Text::line(is_string($in['title']) ? $in['title'] : '', self::TITLE_MAX + 1);
             if ($title === '') {
-                throw ApiError::invalid('Bitte einen Titel für den Beitrag angeben.');
+                throw ApiError::invalid(I18n::t('Bitte einen Titel für den Beitrag angeben.'));
             }
             if (mb_strlen($title) > self::TITLE_MAX) {
-                throw ApiError::invalid(sprintf('Der Titel darf höchstens %d Zeichen lang sein.', self::TITLE_MAX));
+                throw ApiError::invalid(I18n::t('Der Titel darf höchstens {max} Zeichen lang sein.', ['max' => self::TITLE_MAX]));
             }
             $data['title'] = $title;
         }

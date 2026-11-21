@@ -26,11 +26,47 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Englisch**: Unter [Einstellungen → Sprachen](app:einstellungen/sprachen) schaltest du Englisch als weitere
+  Sprache ein (anfangs nur Deutsch). Dann steht oben eine Flagge, mit der jede Person Deutsch oder Englisch wählt, auch
+  ohne Anmeldung; unter [Meins → Konto](app:meins/konto) gibt es dieselbe Wahl. Angemeldete behalten ihre Sprache auf allen
+  Geräten und bekommen Mails und Benachrichtigungen in dieser Sprache. Übersetzt sind die Texte der App und die vorgegebenen Namen
+  der Bereiche und Rollen (z. B. „Termine“ → „Events“); Namen, die ihr selbst vergeben habt, und was ihr eintragt,
+  bleiben, wie sie sind.
+- **Wartung**: Unter [Einstellungen → Zustand und Updates](app:einstellungen/zustand) steht, bis wann eure App neue
+  Versionen bekommt (Wartung bis …, oder unbefristet). Nach dem Ende läuft die App mit ihrer Version weiter; neue
+  Versionen, auch Sicherheitsupdates, gibt es erst nach einer Verlängerung. Zurückgehen auf ältere Versionen bleibt
+  möglich.
+- **Beförderung mit Datum**: Beim Ändern des Dienstgrads eines Mitglieds (z. B. aus
+  [Beförderungen](app:verwaltung/befoerderungen)) wählst du jetzt das Datum der Änderung, vorgegeben ist heute. Ein
+  früherer Tag geht, ein Tag in der Zukunft oder vor der letzten Änderung dieser Person nicht. Mit Punkten zählen bei
+  einem früheren Tag nur die Punkte bis zu diesem Tag, für die Schwelle und für den Stand im Verlauf. Das Datum einer
+  schon eingetragenen Änderung korrigierst du nachträglich im Verlauf mit dem Stift (_Datum ändern_), nach denselben
+  Regeln; die Korrektur steht im Änderungsprotokoll.
+- **Bald fällige Beförderungen**: Am Knopf [Beförderungen](app:verwaltung/befoerderungen) zeigt neben der Zahl im roten
+  Kreis ein Kreis in der Farbe der Kompanie, wie viele Mitglieder bald die Schwelle für ihren nächsten Dienstgrad
+  erreichen (es fehlt höchstens noch ein Punkt); sie stehen in der Übersicht im neuen Abschnitt „Bald erreicht“.
+- **Kacheln selbst anordnen**: Jede Person legt auf der Startseite der [Verwaltung](app:verwaltung), unter
+  Einrichtungen, in den Untermenüs wie [Intern](app:intern) und in den [Einstellungen](app:einstellungen) selbst fest,
+  wo jede Kachel steht und wie breit sie ist (Symbol unten rechts unter den Kacheln: ziehen, am Handy kurz halten; − und +
+  für die Breite; Zurücksetzen auf die Vorgabe). Die Anordnung gilt nur für die Person, wird im Konto gespeichert und
+  gilt je Bildschirmbreite (2 bis 5 Spalten); ohne Anmeldung merkt sie sich das Gerät. Die Reihenfolge unter
+  [Einstellungen → Navigation](app:einstellungen/navigation) bleibt die Vorgabe für alle anderen; fehlt jemandem eine
+  Kachel, wird die schmalste Kachel derselben Zeile (bei gleicher Breite die linke) um deren Breite breiter. Am
+  Computer und auf dem Handy quer haben die Kachel-Seiten dafür jetzt eine feste Spaltenzahl. Am Computer sind
+  Kachel-Seiten breiter als andere Seiten und haben 5 Spalten statt 3 (ab etwa 900 px Fensterbreite).
+- **Raster als Vorgabe für alle**: Wer die Einstellungen ändern darf, ordnet eine Kachel-Seite an und tippt beim
+  Anordnen auf _Als Vorgabe für alle_. Plätze und Breiten gelten dann für jede Person ohne eigene Anordnung, auch ohne
+  Anmeldung und in der Vorschau, je Bildschirmbreite; _Vorgabe löschen_ kehrt zur Reihenfolge unter
+  [Einstellungen → Navigation](app:einstellungen/navigation) zurück. Die Änderung steht im Änderungsprotokoll.
+- **Link auf ein Bild der Galerie teilen**: In der Großansicht eines Bildes oder Videos verschickt ein neues
+  Teilen-Symbol einen Link auf genau dieses Bild (Teilen-Menü des Handys, am Computer wird der Link kopiert). Der Link
+  öffnet das Album mit dem Bild in der Großansicht. Interne Bilder sieht nur, wer angemeldet ist und sie sehen darf; alle
+  anderen bekommen einen Hinweis mit „Anmelden“. Das Teilen-Symbol steht oben neben dem Knopf zum Herunterladen; die
+  Knöpfe zum Verwalten (Titelbild, intern, Verschieben, Löschen) stehen jetzt in einer eigenen Zeile unter der Anzahl.
 - **Rechtzeitig getippte Zu- und Absagen gelten auch verspätet**: Wer vor dem Ende der Frist zu- oder absagt, aber kein
   Netz hat, dessen Antwort gilt auch dann, wenn die App sie erst nach Beginn des Termins übertragen kann, ohne
   zeitliche Grenze; maßgeblich ist die Uhrzeit des Handys. Bei den Rückmeldungen und in der
   [Anwesenheit](app:verwaltung/anwesenheit) steht dann „nachträglich übertragen“.
-
 - **Neustart nach einem Update anbieten**: Holt jemand die App aus dem Hintergrund, sucht sie nach einer neuen Version
   (höchstens alle 15 Minuten, bei offener App einmal pro Stunde). Ist eine da, lädt die App sie im Hintergrund und
   zeigt oben _Die App wurde aktualisiert_ mit dem Knopf _Neu starten_. So sieht man Neuerungen sofort, statt erst beim
@@ -63,22 +99,26 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   im Jahresordner), umbenennen, in ein anderes Jahr setzen und löschen. Alben, die bisher nur in der App lagen, bekommen
   einmalig einen Ordner im Jahresordner von Drive, ihre Bilder ziehen im Hintergrund dorthin um.
 - **Terminarten**: Unter [Einstellungen → Kalender](app:einstellungen/kalender) richtest du Terminarten ein, z. B.
-  Versammlung oder Arbeitsdienst. Wer Termine pflegen darf, wählt die Art im aufgeklappten Termin unter
-  [Termine](app:termine), bei jeder Quelle des Kalenders, auch bei Google Kalender und iCal. Die App speichert die Art
+  Versammlung oder Arbeitsdienst. Wer Termine pflegen darf, klappt im Termin unter [Termine](app:termine) die
+  Terminarten auf und hakt eine oder mehrere an (z. B. Versammlung und Arbeitsdienst), bei jeder Quelle des Kalenders, auch bei Google
+  Kalender und iCal. Ein Termin mit mehreren Arten zählt für jede, etwa bei den Aufnahmen. Die App speichert die Arten
   selbst und ändert nichts in Google. Steht der Name einer Art im Titel, schlägt die App sie vor. Anwesenheitslisten
-  übernehmen die Art ihres Termins und zeigen sie an; ändern lässt sie sich auch an der Liste. Je Art legst du mit
+  übernehmen die Arten ihres Termins; an der Liste stehen sie wie am Termin eingeklappt und lassen sich dort aufklappen und ändern. Je Art legst du mit
   dem Haken „Als Schild am Termin zeigen“ fest, ob sie neben dem Titel des Termins steht (anfangs an); ohne Schild
   bleibt sie gespeichert und zählt weiter.
 - **Aufnahmen**: Unter [Verwaltung → Aufnahmen](app:verwaltung/aufnahmen) siehst du wie bei den Beförderungen, welche
-  Anwärter die Voraussetzung für die Aufnahme als Mitglied erfüllen; die Zahl im Kreis am Knopf zeigt, wie viele es
-  sind. Unter [Einstellungen → Rollen](app:einstellungen/rollen) setzt du an einer Rolle den Haken „Anwärter-Rolle“
-  und legst die Voraussetzung fest: Teilnahmen an Terminen einer Terminart (z. B. 6 Versammlungen) und eine
-  Mindestdauer als Anwärter. Die Anwärter-Rolle kann die Rolle der Person sein (beim Aufnehmen wird sie zu Mitglied)
+  Anwärter die Voraussetzung für die Aufnahme als Mitglied erfüllen; die Zahl im roten Kreis am Knopf zeigt, wie viele es
+  sind. Daneben zeigt ein Kreis in der Farbe der Kompanie, wie viele kurz vor der Aufnahme stehen (noch höchstens eine
+  Teilnahme je Bedingung, Mindestdauer in höchstens 30 Tagen); sie stehen in der Übersicht unter „Bald erfüllt“. Unter [Einstellungen → Rollen](app:einstellungen/rollen) setzt du an einer Rolle den Haken „Anwärter-Rolle“
+  und legst die Voraussetzung fest: Bedingungen wie Teilnahmen an Terminen einer Terminart (z. B. 6 Versammlungen)
+  und eine Mindestdauer als Anwärter, verknüpft mit „Alle müssen erfüllt sein“ (UND) oder „Eine reicht“ (ODER), auch
+  in Gruppen innerhalb von Gruppen (z. B. 12 Monate und dazu 6 Versammlungen oder 10 Arbeitsdienste). Die Anwärter-Rolle kann die Rolle der Person sein (beim Aufnehmen wird sie zu Mitglied)
   oder eine Zusatzrolle zu Mitglied (beim Aufnehmen wird sie entfernt). Der Knopf ist da, sobald die Anwesenheit an ist. Auf der Seite eines Anwärters
   stehen „Anwärter seit“ (bei bisherigen Anwärtern nachtragen) und der Stand; aufnehmen geht dort jederzeit, ohne
   erfüllte Voraussetzung mit Hinweis. Ohne Eintritt trägt die App den Tag der Aufnahme ein. Nach dem Speichern einer
   Anwesenheitsliste zeigt die App, wer neu die Voraussetzung erfüllt. Sehen und aufnehmen darf, wer Mitglieder anlegen
-  darf.
+  darf. Anwärter sehen ihren eigenen Stand (was noch fehlt) unter [Meins](app:meins) bzw. unter
+  [Konto](app:meins/konto), den Stand anderer nicht.
 - **Rechte zum Sehen und zum Ändern getrennt**: Unter [Einstellungen → Rollen](app:einstellungen/rollen) gibt es
   jetzt eigene Rechte, um Punkte, Strafen, Dienstgrade mit Beförderungen, Titel und die Anwesenheit der Mitglieder nur
   zu sehen, z. B. „Punkte aller Mitglieder sehen“ neben „Punkte vergeben“. Ebenso gibt es eigene Rechte, um das
@@ -152,8 +192,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   sie sieht, mit allen ihren Rollen zusammen (Grundrolle, Zusatzrollen und einzeln gegebene oder entzogene Rechte). Du
   startest sie auf der Seite der Person in der [Verwaltung → Mitglieder](app:verwaltung/mitglieder) unter _Konto und
   Rolle_ mit _App als … ansehen_; das Banner zeigt ihren Namen und ihre Rollen. Wie die Vorschau als Rolle ist sie nur
-  für Admins, nur zum Ansehen und zeigt bei persönlichen Seiten (z. B. _Meins_) weiter deine eigenen Daten, nicht die
-  der Person.
+  für Admins und nur zum Ansehen. _Meins_ und andere persönliche Stellen zeigen dabei die Daten der Person (z. B. ihre
+  Punkte, Strafen, Anwesenheit, Zu- und Absagen und ihr Konto), nur ihre Antworten in anonymen Umfragen nicht.
 
 - **Zu- und Absagen ohne Internet**: Ohne Verbindung merkt sich die App Zusagen, Absagen, Hinweise und das Zurücknehmen
   auf dem Gerät, zeigt sie gleich an (mit „Noch nicht übertragen“) und sendet sie von selbst, sobald wieder Netz da ist.
@@ -201,6 +241,47 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Abzeichen des nächsten Dienstgrads**: In der Übersicht [Beförderungen](app:verwaltung/befoerderungen) und beim
+  Dienstgrad eines Mitglieds steht jetzt auch vor dem nächsten Dienstgrad („Schwelle für … erreicht“, „noch … bis …“)
+  dessen Abzeichen, nicht nur vor dem aktuellen.
+- **Android: Installation in jedem Browser erklärt**: Die Anleitung unter [App installieren](app:installieren) erkennt
+  den Browser. In Edge, Firefox, Opera, Brave und anderen erklärt ein Hinweis, warum Chrome besser ist (diese Browser
+  legen nur eine Verknüpfung an, keine richtige App), mit _In Chrome öffnen_, _Chrome herunterladen_ (Play Store, falls
+  Chrome fehlt), _Adresse kopieren_ und den Schritten im eigenen Browser. In Chrome erklärt ein Hinweis, warum der Knopf
+  _App installieren_ erst nach etwa 30 Sekunden erscheint (Regel von Chrome), und verweist bis dahin auf die Schritte. Fehlt Chrome, führt auch _In Chrome öffnen_ in
+  den Play Store. Der Hinweis im Samsung-Browser nennt den Grund genauer (Google Play Protect blockiert ab Android 14,
+  Fehler seit April 2026 gemeldet). Im eingebauten Browser anderer Apps (WhatsApp, Facebook …) erklären Anleitung und
+  Benachrichtigungen, dass dort weder Installation noch Benachrichtigungen gehen. Neu ist _Klappt es nicht?_ mit
+  Hinweisen zu schon installierter App, Xiaomi, Huawei ohne Google-Dienste, Akku-Sparen und Android 8/9; bei blockierten
+  Benachrichtigungen steht der Weg in Chrome dabei.
+- **Benachrichtigungen gleich nach der Anmeldung anbieten**: Der Hinweis _Nichts mehr verpassen_ erscheint jetzt als
+  Fenster direkt nach der Anmeldung, auf jeder Seite (auch wenn jemand über einen geteilten Link kommt), statt als Karte
+  nur auf der Startseite. Er kommt weiterhin nur, solange der Browser auf diesem Gerät noch nie nach Benachrichtigungen
+  gefragt hat; _Nicht jetzt_ oder Schließen blendet ihn für 30 Tage aus, nach einer Ablehnung im Browser fragt die App
+  nicht wieder. Die Abfrage des Browsers kommt erst nach dem Tippen auf _Benachrichtigungen einschalten_. Nach diesem
+  Update fragt das Fenster alle Angemeldeten einmal, auch wer früher _Nicht jetzt_ gewählt oder die Benachrichtigungen
+  erlaubt und wieder ausgeschaltet hat; nicht gefragt wird, wer sie auf dem Gerät schon an hat oder im Browser
+  blockiert hat. Auf iPhone und iPad im Browser (Safari) führt das Fenster zu _App installieren_, weil es
+  Benachrichtigungen dort nur in der installierten App gibt.
+- **Installationsanleitung für iPhone und iPad genauer**: Die Anleitung unter [App installieren](app:installieren)
+  sagt jetzt, wo das Teilen-Symbol je nach Gerät und Safari-Darstellung steht (iPhone unten, iPad oben, ab iOS 26 bei
+  „Kompakt“ hinter „•••“) und dass ab iOS 16.4 auch andere Browser wie Chrome, Edge oder Firefox die App zum
+  Home-Bildschirm hinzufügen können, wenn sie den Eintrag anbieten.
+- **Volle Breite am Computer**: Auf Tablet und Computer (Fenster ab 900 px breit) nutzen die Ansichten jetzt die ganze
+  Breite statt einer schmalen Spalte von 640 px. Listen wie Mitglieder, Termine oder Dokumente stehen in Spalten,
+  Formulare zeigen drei oder vier kurze Felder je Zeile, Alben und Bilder der Galerie passen sich der Breite an. Lesetexte
+  wie News-Artikel und das Handbuch bleiben höchstens 760 px breit und mittig, Kachel-Seiten 904 px, Listen zum
+  Ziehen (z. B. [Rollen](app:einstellungen/rollen) oder Punktekatalog) höchstens 960 px. Listen mit Haken wie
+  [Bereiche](app:einstellungen/bereiche), Benachrichtigungen oder die Bereiche im [Bericht](app:verwaltung/bericht)
+  stehen in Spalten, die Auswahl über den [Änderungen](app:verwaltung/aenderungen) in einer Zeile, die Kennzahlen unter
+  [Nutzung](app:einstellungen/nutzung) in einer Reihe. Die eigene [Übersicht](app:meins) und ein Mitglied in der
+  Verwaltung stehen in zwei Spalten. Die Leiste mit den Bereichen steht am Computer wie beim Handy quer senkrecht am
+  linken Rand. Handy hochkant bleibt, wie es ist.
+
+- **Gemeinsame Amtszeiten einklappbar**: Bei einer Ämtergruppe mit gemeinsamen Amtszeiten (z. B. Königshaus) unter
+  [Ämter](app:mitglieder/aemter) lässt sich jede Amtszeit mit einem Tipp auf ihren Kopf auf- und zuklappen. Die laufende
+  Amtszeit ist aufgeklappt (läuft keine, die neueste), alle anderen sind zu und zeigen nur Jahre und Namen; Bild und Ämter erscheinen erst beim
+  Aufklappen. _Alle aufklappen_ und _Alle zuklappen_ gelten auch für sie.
 - **Vorgemerkte Änderungen gehen nicht mehr verloren**: Zu- und Absagen, Anwesenheit sowie Punkte und Strafen merkt
   die App jetzt nicht nur ohne Internet auf dem Gerät vor, sondern auch, wenn der Server gestört oder im
   Wartungsmodus ist, nicht nach 20 Sekunden antwortet oder die Anmeldung abgelaufen ist; sie sendet sie später von
@@ -210,7 +291,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 - **Anfragen auf einen Zugang übersichtlicher**: Unter [Verwaltung → Anfragen](app:verwaltung/anfragen) steht jetzt wie
   bei den Passiven nur eine Liste mit Namen, mit Suche und (mit dem Bereich Kompanien) Filter nach der gewählten Kompanie.
   Antippen öffnet die Karte der Anfrage mit allen Angaben, Verbinden, Kompanie, Benutzername, Rolle, Freigeben und
-  Ablehnen; dort blätterst du (auch per Wischen) zur nächsten Anfrage. Nach dem Freigeben oder Ablehnen geht es zurück
+  Ablehnen; dort blätterst du (auch per Wischen) zur nächsten Anfrage. _Kompanie zuordnen_ ist eingeklappt und zeigt
+  nur die ausgewählten Kompanien; aufgeklappt änderst du die Auswahl. Nach dem Freigeben oder Ablehnen geht es zurück
   zur Liste.
 - **Album herunterladen neben Einreichen**: In einem Album der [Galerie](app:galerie) steht der Knopf zum Herunterladen
   als ZIP jetzt in der Reihe der Knöpfe direkt neben _Bilder und Videos in dieses Album einreichen_ statt rechts neben
@@ -248,6 +330,16 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Behoben
 
+- **Bilder und Videos nach Google Drive (WordPress)**: Eingereichte und hochgeladene Dateien einer Galerie mit
+  Google Drive blieben auf dem Server liegen, mit dem Hinweis „Das Hochladen ließ sich nicht fortsetzen: HTTP 411“.
+  Die App hat bei der Nachfrage, wie weit eine Datei angekommen ist, eine Angabe weggelassen, die Google verlangt. Jetzt
+  kommen die wartenden Dateien beim nächsten Lauf im Hintergrund nach Drive. Dasselbe betraf neue Versuche beim
+  Hochladen einer Sicherung nach einer Störung.
+- **Sicherung in Google Drive bei kurzen Störungen**: Meldet Google beim Hochladen einer Sicherung einen
+  vorübergehenden Fehler (z. B. „HTTP 502“) oder bricht die Verbindung ab, versucht die App es nach kurzer Pause bis zu
+  viermal erneut und macht dort weiter, wo die Datei angekommen ist. Vorher scheiterte die Sicherung sofort, und ein
+  Update wurde deshalb nicht eingespielt. Wie oft es nötig war, steht unter
+  [Einstellungen → Datensicherung](app:einstellungen/datensicherung) bei der Messung des letzten Hochladens.
 - **Gründungsjahr einer Kompanie**: Unter [Verwaltung → Kompanien](app:verwaltung/kompanien) darf das Gründungsjahr
   jetzt auch vor 1800 liegen. Es muss nur eine ganze Zahl sein und darf nicht in der Zukunft liegen.
 - **Erinnerung an Zu- und Absagen ausschalten**: Unter [Einstellungen → Kalender](app:einstellungen/kalender) bleibt

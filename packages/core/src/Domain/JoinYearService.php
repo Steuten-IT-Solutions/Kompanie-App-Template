@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Domain;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\JoinYearRepository;
 
 /**
@@ -41,13 +42,13 @@ final class JoinYearService
     {
         $y = Input::integer($year);
         if ($y === null) {
-            throw ApiError::invalid('Bitte das Eintrittsjahr vierstellig angeben.');
+            throw ApiError::invalid(I18n::t('Bitte das Eintrittsjahr vierstellig angeben.'));
         }
         if ($y < self::MIN_YEAR) {
-            throw ApiError::invalid(sprintf('Das Eintrittsjahr muss ab %d liegen.', self::MIN_YEAR));
+            throw ApiError::invalid(I18n::t('Das Eintrittsjahr muss ab {year} liegen.', ['year' => self::MIN_YEAR]));
         }
         if ($y > (int) $this->app->time()->today()->format('Y')) {
-            throw ApiError::invalid('Das Eintrittsjahr darf nicht in der Zukunft liegen.');
+            throw ApiError::invalid(I18n::t('Das Eintrittsjahr darf nicht in der Zukunft liegen.'));
         }
         return $y;
     }
@@ -63,9 +64,9 @@ final class JoinYearService
         if (!array_key_exists('date', $in)) {
             return [$this->validate($in['year'] ?? null), ''];
         }
-        $date = FormerMemberService::date($in['date'], 'Eintritt', $this->app->time()->today());
+        $date = FormerMemberService::date($in['date'], I18n::t('Eintritt'), $this->app->time()->today());
         if ($date === '') {
-            throw ApiError::invalid('Bitte den Eintritt als TT.MM.JJJJ oder nur das Jahr angeben.');
+            throw ApiError::invalid(I18n::t('Bitte den Eintritt als TT.MM.JJJJ oder nur das Jahr angeben.'));
         }
         return [(int) substr($date, 0, 4), strlen($date) === 10 ? $date : ''];
     }
@@ -100,7 +101,7 @@ final class JoinYearService
      */
     public function saveFor(User $actor, int $userId, array $in): ?array
     {
-        $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $this->app->users->find($userId) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
         [$year, $date] = $this->parse($in);
         $this->repository()->save($userId, $year, $date, null, $actor->id, $this->app->time()->nowUtc());
         return $this->of($userId);
@@ -113,7 +114,7 @@ final class JoinYearService
 
     public function removeFor(int $userId): void
     {
-        $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $this->app->users->find($userId) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
         $this->remove($userId);
     }
 

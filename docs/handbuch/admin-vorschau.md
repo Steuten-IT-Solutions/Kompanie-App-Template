@@ -37,7 +37,8 @@ So siehst du, was eine Person mit all ihren Rollen zusammen sieht: Grundrolle, Z
 
 ## Gut zu wissen
 - **Nur ansehen:** In der Vorschau lässt sich nichts ändern. Versuchst du es, meldet die App „In der Vorschau kannst du nichts ändern.“ Die Knöpfe bleiben trotzdem sichtbar, damit du siehst, was die Rolle angeboten bekommt. **Abmelden** geht weiterhin; es beendet die Vorschau und meldet dich ab.
-- **Deine eigenen Daten:** Persönliche Seiten wie **Meins** zeigen deine eigenen Daten, soweit die Rolle bzw. die Person diese Seiten hat, auch in der Vorschau als Person. Ihre Mails, {bereich.points} oder ihr Konto siehst du dort nicht. Alles andere kommt mit genau den Rechten der Rolle bzw. der Person.
+- **Als Person: ihre Daten.** In der Vorschau als Person zeigen **Meins** und andere persönliche Stellen die Daten dieser Person: ihre {bereich.points}, {bereich.penalties}, {bereich.attendance}, ihre Zu- und Absagen und ihr Konto. Ihre Antworten in anonymen Umfragen siehst du nicht. Alles andere kommt mit genau ihren Rechten. Angemeldet bleibst du selbst.
+- **Als Rolle: deine eigenen Daten.** In der Vorschau als Rolle zeigt **Meins** deine eigenen Daten, soweit die Rolle diese Seiten hat. Alles andere kommt mit genau den Rechten der Rolle.
 - **Als Rolle: keine Zusatzrollen.** Die Vorschau als Rolle zeigt genau diese eine Rolle. Wie mehrere Rollen zusammen wirken, zeigt die Vorschau als Person.
 - {rolle.admin} selbst lässt sich nicht ansehen, auch keine Person, die {rolle.admin} ist.
 - Ist der [Wartungsmodus](seite:admin-wartungsmodus) an, siehst du als andere Rolle die Wartungsseite, wie alle außer {rolle.admin}s. Das Banner mit **Beenden** bleibt.

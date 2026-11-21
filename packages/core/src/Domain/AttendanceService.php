@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\AttendanceRepository;
 
 /**
@@ -25,8 +26,8 @@ use KompanieApp\Core\Storage\AttendanceRepository;
  *   nur für Mitglieder.
  * - Listen zu Terminen des Kalenders zeigen je Person ihre Zu- oder Absage (EventResponseService). Eine Absage schlägt
  *   „entschuldigt“ nur vor; gespeichert wird erst mit der Liste.
- * - Jede Liste hat eine Terminart als Momentaufnahme (kind, '' = keine; EventKindService): beim Anlegen die des Termins im
- *   Kalender, sonst der Vorschlag aus dem Titel; änderbar an der Liste und mit der Art des Termins.
+ * - Jede Liste hat ihre Terminarten als Momentaufnahme (kinds, leer = keine, auch mehrere; EventKindService): beim Anlegen
+ *   die des Termins im Kalender, sonst die Vorschläge aus dem Titel; änderbar an der Liste und mit den Arten des Termins.
  * - Der Zähler teilt nach Gruppen auf: Jede Rolle zählt als eigene Gruppe oder als eine andere Rolle (Einstellung
  *   attendance_groups, z. B. „Punkte verwalten“ zählt als Mitglied).
  *
@@ -78,7 +79,8 @@ final class AttendanceService
             'source' => $l['source'],
             'title' => $l['title'],
             'date' => $l['event_date'],
-            'kind' => $l['kind'] !== '' ? $l['kind'] : null,
+            'kind' => $l['kinds'][0] ?? null,
+            'kinds' => $l['kinds'],
             'upcoming' => $l['event_date'] > $today,
             'counts' => self::statusCounts($counts[$l['id']] ?? []),
         ], $lists);
@@ -89,7 +91,7 @@ final class AttendanceService
      * der ID einer schon angelegten Liste, ob der Termin noch kommt (upcoming) und ob er heute ist (today). Ohne Bereich
      * Kalender leer.
      *
-     * @return list<array{key: string, title: string, date: string, start: string, end: string, all_day: bool, kind: string|null, upcoming: bool, today: bool, list_id: int|null}>
+     * @return list<array{key: string, title: string, date: string, start: string, end: string, all_day: bool, kind: string|null, kinds: list<string>, upcoming: bool, today: bool, list_id: int|null}>
      */
     public function events(): array
     {
@@ -106,7 +108,7 @@ final class AttendanceService
                 continue;
             }
             $key = (string) $e['id'];
-            $out[] = ['key' => $key, 'title' => (string) $e['title'], 'date' => $date, 'start' => (string) $e['start'], 'end' => (string) $e['end'], 'all_day' => (bool) ($e['all_day'] ?? false), 'kind' => is_string($e['kind'] ?? null) ? $e['kind'] : null, 'upcoming' => $date > $today, 'today' => $date === $today, 'list_id' => $lists[$key] ?? null];
+            $out[] = ['key' => $key, 'title' => (string) $e['title'], 'date' => $date, 'start' => (string) $e['start'], 'end' => (string) $e['end'], 'all_day' => (bool) ($e['all_day'] ?? false), 'kind' => is_string($e['kind'] ?? null) ? $e['kind'] : null, 'kinds' => array_values(array_filter((array) ($e['kinds'] ?? []), 'is_string')), 'upcoming' => $date > $today, 'today' => $date === $today, 'list_id' => $lists[$key] ?? null];
         }
         return array_reverse($out);
     }
@@ -119,7 +121,7 @@ final class AttendanceService
      */
     public function detail(int $id): array
     {
-        $list = $this->repository()->find($id) ?? throw ApiError::notFound('Anwesenheitsliste nicht gefunden.');
+        $list = $this->repository()->find($id) ?? throw ApiError::notFound(I18n::t('Anwesenheitsliste nicht gefunden.'));
         $entries = $this->repository()->entries($id);
         $booked = array_flip($this->repository()->bookedUserIds($id));
         $groups = $this->groupMap();
@@ -169,7 +171,8 @@ final class AttendanceService
             'event_key' => $list['source'] === self::SOURCE_CALENDAR ? $list['event_key'] : null,
             'title' => $list['title'],
             'date' => $list['event_date'],
-            'kind' => $list['kind'] !== '' ? $list['kind'] : null,
+            'kind' => $list['kinds'][0] ?? null,
+            'kinds' => $list['kinds'],
             'upcoming' => $list['event_date'] > $this->today(),
             // null: keine Rückmeldungen (freie Liste, Termin nicht mehr im Kalender); sonst ob man noch zu- und absagen kann
             'responses_open' => $responses === null ? null : $responses['open'],
@@ -185,7 +188,8 @@ final class AttendanceService
      * Liste anlegen (bzw. die vorhandene zum selben Kalendertermin nehmen) oder ändern und Status setzen.
      *
      * @param array<string, mixed> $in id | source, event_key (calendar) bzw. title, date (free); entries: {user_id: status|null};
-     *     kind (Terminart, '' = keine; ohne Angabe beim Anlegen die des Termins bzw. der Vorschlag aus dem Titel)
+     *     kinds (Terminarten, leer = keine; ältere Oberflächen schicken kind mit einer; ohne Angabe beim Anlegen die des
+     *     Termins bzw. die Vorschläge aus dem Titel)
      * @return array{0: array<string, mixed>, 1: bool} Liste wie detail(), neu angelegt?
      */
     public function save(User $actor, array $in): array
@@ -193,10 +197,12 @@ final class AttendanceService
         $repo = $this->repository();
         $now = $this->app->time()->nowUtc();
         $changes = $this->validEntries($in['entries'] ?? []);
+        $kindsGiven = array_key_exists('kinds', $in) || array_key_exists('kind', $in);
+        $kindsIn = array_key_exists('kinds', $in) ? $in['kinds'] : ($in['kind'] ?? null);
         $created = false;
         $id = Input::integer($in['id'] ?? null);
         if ($id !== null) {
-            $list = $repo->find($id) ?? throw ApiError::notFound('Anwesenheitsliste nicht gefunden.');
+            $list = $repo->find($id) ?? throw ApiError::notFound(I18n::t('Anwesenheitsliste nicht gefunden.'));
             $data = [];
             // Freie Listen: Titel und Datum lassen sich ändern; Kalenderlisten behalten ihre Momentaufnahme.
             if ($list['source'] === self::SOURCE_FREE) {
@@ -207,10 +213,10 @@ final class AttendanceService
                     $data['event_date'] = self::validDate($in['date']);
                 }
             }
-            if (array_key_exists('kind', $in)) {
-                $kind = $this->app->eventKinds()->valid($in['kind'], $list['kind']);
-                if ($kind !== $list['kind']) {
-                    $data['kind'] = $kind;
+            if ($kindsGiven) {
+                $kinds = $this->app->eventKinds()->validList($kindsIn, $list['kinds']);
+                if ($kinds !== $list['kinds']) {
+                    $data['kinds'] = $kinds;
                 }
             }
             $this->checkUpcoming($changes, $data['event_date'] ?? $list['event_date'], $id);
@@ -225,9 +231,10 @@ final class AttendanceService
                     $this->checkUpcoming($changes, $date);
                     $title = mb_substr(Text::line($event['title'], self::TITLE_MAX + 1), 0, self::TITLE_MAX);
                     $kinds = $this->app->eventKinds();
-                    $kind = array_key_exists('kind', $in) ? $kinds->valid($in['kind']) : ($kinds->ofEvent($event) ?? $kinds->suggest($title) ?? '');
+                    $ofEvent = $kinds->ofEvent($event);
+                    $listKinds = $kindsGiven ? $kinds->validList($kindsIn) : ($ofEvent !== [] ? $ofEvent : $kinds->suggestAll($title));
                     try {
-                        $id = $repo->insert(self::SOURCE_CALENDAR, $key, $title, $date, $actor->id, $now, $kind);
+                        $id = $repo->insert(self::SOURCE_CALENDAR, $key, $title, $date, $actor->id, $now, $listKinds);
                         $created = true;
                     } catch (\RuntimeException $e) {
                         // Gleichzeitig angelegt (eindeutig je Termin): die andere Liste nehmen.
@@ -242,11 +249,11 @@ final class AttendanceService
                 $date = self::validDate($in['date'] ?? null);
                 $this->checkUpcoming($changes, $date);
                 $kinds = $this->app->eventKinds();
-                $kind = array_key_exists('kind', $in) ? $kinds->valid($in['kind']) : ($kinds->suggest($title) ?? '');
-                $id = $repo->insert(self::SOURCE_FREE, bin2hex(random_bytes(8)), $title, $date, $actor->id, $now, $kind);
+                $listKinds = $kindsGiven ? $kinds->validList($kindsIn) : $kinds->suggestAll($title);
+                $id = $repo->insert(self::SOURCE_FREE, bin2hex(random_bytes(8)), $title, $date, $actor->id, $now, $listKinds);
                 $created = true;
             } else {
-                throw ApiError::invalid('Bitte einen Termin aus dem Kalender wählen oder einen freien Termin anlegen.');
+                throw ApiError::invalid(I18n::t('Bitte einen Termin aus dem Kalender wählen oder einen freien Termin anlegen.'));
             }
             $data = [];
         }
@@ -260,20 +267,22 @@ final class AttendanceService
     }
 
     /**
-     * Die Art eines Termins im Kalender wurde geändert ($kind '' = keine): Seine Liste (falls angelegt) übernimmt sie.
+     * Die Arten eines Termins im Kalender wurden geändert (leer = keine): Seine Liste (falls angelegt) übernimmt sie.
+     *
+     * @param list<string> $kinds
      */
-    public function kindOfEventChanged(User $actor, string $eventId, string $kind): void
+    public function kindOfEventChanged(User $actor, string $eventId, array $kinds): void
     {
         $list = $this->repository()->findByEvent(self::SOURCE_CALENDAR, $eventId);
-        if ($list !== null && $list['kind'] !== $kind) {
-            $this->repository()->touch($list['id'], ['kind' => $kind], $actor->id, $this->app->time()->nowUtc());
+        if ($list !== null && $list['kinds'] !== $kinds) {
+            $this->repository()->touch($list['id'], ['kinds' => $kinds], $actor->id, $this->app->time()->nowUtc());
         }
     }
 
     /** Liste löschen; gebuchte Punkte bleiben (mit der ID der Liste). */
     public function delete(int $id): void
     {
-        $this->repository()->find($id) ?? throw ApiError::notFound('Anwesenheitsliste nicht gefunden.');
+        $this->repository()->find($id) ?? throw ApiError::notFound(I18n::t('Anwesenheitsliste nicht gefunden.'));
         $this->repository()->delete($id);
     }
 
@@ -336,17 +345,17 @@ final class AttendanceService
     public function forBooking(mixed $listId, mixed $userIds): array
     {
         if (!$this->app->features()->enabled('attendance')) {
-            throw new ApiError(403, 'feature_disabled', sprintf('Der Bereich %s ist ausgeschaltet.', $this->app->config->sectionLabel('attendance', 'Anwesenheit')));
+            throw new ApiError(403, 'feature_disabled', I18n::t('Der Bereich {section} ist ausgeschaltet.', ['section' => $this->app->config->sectionLabel('attendance', 'Anwesenheit')]));
         }
         $id = Input::integer($listId);
         $list = $id === null ? null : $this->repository()->find($id);
         if ($list === null) {
-            throw ApiError::invalid('Anwesenheitsliste nicht gefunden.');
+            throw ApiError::invalid(I18n::t('Anwesenheitsliste nicht gefunden.'));
         }
         $booked = $this->repository()->bookedUserIds($list['id']);
         $ids = is_array($userIds) ? array_values(array_filter(array_map(static fn (mixed $v): ?int => Input::integer($v), $userIds), static fn (?int $v): bool => $v !== null && !in_array($v, $booked, true))) : [];
         if (is_array($userIds) && $userIds !== [] && $ids === []) {
-            throw ApiError::invalid('Alle Ausgewählten haben für diese Liste schon Punkte.');
+            throw ApiError::invalid(I18n::t('Alle Ausgewählten haben für diese Liste schon Punkte.'));
         }
         return [$list['id'], $ids];
     }
@@ -380,7 +389,7 @@ final class AttendanceService
     public function setGroups(mixed $raw): array
     {
         if (!is_array($raw)) {
-            throw ApiError::invalid('Bitte die Gruppen als Zuordnung Rolle → Rolle angeben.');
+            throw ApiError::invalid(I18n::t('Bitte die Gruppen als Zuordnung Rolle → Rolle angeben.'));
         }
         $roles = $this->app->roles();
         $next = [];
@@ -390,22 +399,18 @@ final class AttendanceService
         foreach ($raw as $key => $as) {
             $key = (string) $key;
             if ($key === Roles::GUEST || !$roles->exists($key)) {
-                throw ApiError::invalid('Unbekannte Rolle: ' . $key . '.');
+                throw ApiError::invalid(I18n::t('Unbekannte Rolle: {role}.', ['role' => $key]));
             }
             if ($as !== null && $as !== '' && (!is_string($as) || $as === Roles::GUEST || !$roles->exists($as))) {
-                throw ApiError::invalid(sprintf('„%s“: unbekannte Rolle als Gruppe.', $roles->label($key)));
+                throw ApiError::invalid(I18n::t('„{role}“: unbekannte Rolle als Gruppe.', ['role' => $roles->label($key)]));
             }
             $next[$key] = $as === null || $as === $key ? '' : (string) $as;
         }
         foreach ($next as $key => $as) {
             if ($as !== '' && ($next[$as] ?? '') !== '') {
-                throw ApiError::invalid(sprintf(
-                    '„%s“ soll als „%s“ zählen, „%s“ zählt aber selbst als „%s“. Bitte direkt „%s“ wählen.',
-                    $roles->label($key),
-                    $roles->label($as),
-                    $roles->label($as),
-                    $roles->label($next[$as]),
-                    $roles->label($next[$as]),
+                throw ApiError::invalid(I18n::t(
+                    '„{role}“ soll als „{group}“ zählen, „{group}“ zählt aber selbst als „{target}“. Bitte direkt „{target}“ wählen.',
+                    ['role' => $roles->label($key), 'group' => $roles->label($as), 'target' => $roles->label($next[$as])],
                 ));
             }
         }
@@ -455,7 +460,7 @@ final class AttendanceService
             return [];
         }
         if (!is_array($raw)) {
-            throw ApiError::invalid('Bitte die Einträge als Zuordnung Person → Status angeben.');
+            throw ApiError::invalid(I18n::t('Bitte die Einträge als Zuordnung Person → Status angeben.'));
         }
         $people = [];
         foreach ($this->people() as $u) {
@@ -465,10 +470,10 @@ final class AttendanceService
         foreach ($raw as $userId => $status) {
             $id = Input::integer($userId);
             if ($id === null || !isset($people[$id])) {
-                throw ApiError::invalid('Unbekannte Person in der Liste.');
+                throw ApiError::invalid(I18n::t('Unbekannte Person in der Liste.'));
             }
             if ($status !== null && !in_array($status, self::STATUSES, true)) {
-                throw ApiError::invalid('Ungültiger Status (anwesend, entschuldigt oder fehlt).');
+                throw ApiError::invalid(I18n::t('Ungültiger Status (anwesend, entschuldigt oder fehlt).'));
             }
             $out[$id] = $status;
         }
@@ -492,7 +497,7 @@ final class AttendanceService
         }
         foreach ($statuses as $status) {
             if ($status !== null && $status !== self::EXCUSED) {
-                throw ApiError::invalid('Für einen kommenden Termin lässt sich nur „entschuldigt“ eintragen. „Anwesend“ und „fehlt“ gehen erst ab dem Tag des Termins.');
+                throw ApiError::invalid(I18n::t('Für einen kommenden Termin lässt sich nur „entschuldigt“ eintragen. „Anwesend“ und „fehlt“ gehen erst ab dem Tag des Termins.'));
             }
         }
     }
@@ -513,7 +518,7 @@ final class AttendanceService
                 }
             }
         }
-        throw ApiError::invalid('Diesen Termin gibt es im Kalender nicht (mehr).');
+        throw ApiError::invalid(I18n::t('Diesen Termin gibt es im Kalender nicht (mehr).'));
     }
 
     /** Datum des Beginns in der Zeitzone der Kompanie. */
@@ -530,10 +535,10 @@ final class AttendanceService
     {
         $title = Text::line($raw ?? '', self::TITLE_MAX + 1);
         if ($title === '') {
-            throw ApiError::invalid('Bitte einen Titel angeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Titel angeben.'));
         }
         if (mb_strlen($title) > self::TITLE_MAX) {
-            throw ApiError::invalid(sprintf('Der Titel darf höchstens %d Zeichen lang sein.', self::TITLE_MAX));
+            throw ApiError::invalid(I18n::t('Der Titel darf höchstens {max} Zeichen lang sein.', ['max' => self::TITLE_MAX]));
         }
         return $title;
     }
@@ -541,7 +546,7 @@ final class AttendanceService
     private static function validDate(mixed $raw): string
     {
         if (!Input::isDate($raw)) {
-            throw ApiError::invalid('Bitte ein gültiges Datum angeben.');
+            throw ApiError::invalid(I18n::t('Bitte ein gültiges Datum angeben.'));
         }
         return (string) $raw;
     }

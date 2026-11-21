@@ -17,6 +17,7 @@ Kacheln, nach Gruppen geordnet. Tippe auf eine Kachel, um ihre Seite zu öffnen.
   - **Bereiche**: welche Bereiche die App für alle hat. Siehe [Bereiche](seite:admin-bereiche).
   - **Navigation**: welche Bereiche unten in der Leiste stehen und welche in Untermenüs, und die Reihenfolge der Knöpfe der Verwaltung. Siehe [Navigation](seite:admin-navigation).
   - **Impressum und Datenschutz**: Links auf Impressum und Datenschutzerklärung, für alle sichtbar. Siehe [Impressum und Datenschutz](seite:admin-rechtliches).
+  - **Sprachen**: ob die App außer Deutsch auch Englisch anbietet. Siehe [Sprachen](seite:admin-sprachen).
 - **Mitglieder und Zugang**
   - **Rollen**: wer was in der App darf, darunter, ob Personen selbst einen Zugang beantragen können. Siehe [Rollen](seite:admin-rollen-und-mitglieder) und [Zugang beantragen einstellen](seite:admin-zugang).
 - **Benachrichtigungen**

@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\ChangeLog\Item;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\ChangeLogRepository;
 
 /**
@@ -45,8 +46,6 @@ final class ChangeLogService
     public const RANGE_MAX = 731;
     /** Höchstens so viele Einträge je Abruf */
     public const ENTRIES_MAX = 2000;
-    /** Bezeichnung von Einträgen ohne Bereich (Verwaltung, Konto, Einstellungen) */
-    public const APP_AREA_LABEL = 'Verwaltung';
     /** Urheber ohne Konto (actor_id 0): Aufgaben, die von selbst laufen (Updates, Sicherungen, Fristen) */
     public const SYSTEM = 'System (automatisch)';
     /** Urheber ohne Konto: Befehle auf dem Server (bin/kompanie.php) */
@@ -89,13 +88,13 @@ final class ChangeLogService
     {
         $enabled = $in['enabled'] ?? null;
         if ($enabled !== null && !is_bool($enabled)) {
-            throw ApiError::invalid('Bitte angeben, ob Änderungen protokolliert werden sollen.');
+            throw ApiError::invalid(I18n::t('Bitte angeben, ob Änderungen protokolliert werden sollen.'));
         }
         $days = null;
         if (array_key_exists('keep_days', $in)) {
             $days = Input::integer($in['keep_days']);
             if ($days === null || $days < self::KEEP_MIN || $days > self::KEEP_MAX) {
-                throw ApiError::invalid(sprintf('Bitte eine Frist von %d bis %d Tagen angeben.', self::KEEP_MIN, self::KEEP_MAX));
+                throw ApiError::invalid(I18n::t('Bitte eine Frist von {min} bis {max} Tagen angeben.', ['min' => self::KEEP_MIN, 'max' => self::KEEP_MAX]));
             }
         }
         if ($days !== null) {
@@ -292,7 +291,7 @@ final class ChangeLogService
         $areaKey = null;
         if ($area !== null && $area !== '') {
             if (!is_string($area) || preg_match('/^[a-z_]{1,20}$/', $area) !== 1) {
-                throw ApiError::invalid('Unbekannter Bereich.');
+                throw ApiError::invalid(I18n::t('Unbekannter Bereich.'));
             }
             $areaKey = $area;
         }
@@ -341,7 +340,8 @@ final class ChangeLogService
     public function areaLabel(string $area): string
     {
         if ($area === 'app') {
-            return self::APP_AREA_LABEL;
+            // Bezeichnung von Einträgen ohne Bereich (Verwaltung, Konto, Einstellungen)
+            return I18n::t('Verwaltung');
         }
         $def = Features::DEFINITIONS[$area] ?? null;
         return $def === null ? $area : $this->app->config->sectionLabel($area, $def['label']);
@@ -419,7 +419,7 @@ final class ChangeLogService
         }
         $id = Input::integer($v);
         if ($id === null || $id <= 0) {
-            throw ApiError::invalid('Ungültiges Konto.');
+            throw ApiError::invalid(I18n::t('Ungültiges Konto.'));
         }
         return $id;
     }
@@ -435,10 +435,10 @@ final class ChangeLogService
         $toDay = Input::date($to, $today);
         $fromDay = ($from === null || $from === '') ? (new \DateTimeImmutable($toDay))->modify('-29 days')->format('Y-m-d') : Input::date($from, $today);
         if ($fromDay > $toDay) {
-            throw ApiError::invalid('Der Beginn liegt nach dem Ende.');
+            throw ApiError::invalid(I18n::t('Der Beginn liegt nach dem Ende.'));
         }
         if ((new \DateTimeImmutable($fromDay))->diff(new \DateTimeImmutable($toDay))->days >= self::RANGE_MAX) {
-            throw ApiError::invalid(sprintf('Bitte höchstens %d Tage auf einmal auswählen.', self::RANGE_MAX));
+            throw ApiError::invalid(I18n::t('Bitte höchstens {max} Tage auf einmal auswählen.', ['max' => self::RANGE_MAX]));
         }
         return [$fromDay, $toDay];
     }

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Promotion } from '../src/api.ts';
-import { dueCount, isDue, newlyDue } from '../src/promotionCheck.ts';
+import { dueCount, isDue, isSoon, newlyDue, soonCount } from '../src/promotionCheck.ts';
 
 const gefreiter = { id: 2, title: 'Gefreiter', badge_url: null };
 const unteroffizier = { id: 3, title: 'Unteroffizier', badge_url: null };
@@ -24,6 +24,7 @@ function p(
     reachable_rank: reachable,
     threshold_reached_since: null,
     below_current_threshold: false,
+    soon: false,
   };
 }
 
@@ -50,4 +51,13 @@ test('schon bereit, aber jetzt eine weitere Schwelle erreicht: neu, mit dem höc
 
 test('ohne vorherigen Stand (z. B. neues Mitglied) zählt jede erreichte Schwelle', () => {
   assert.deepEqual(newlyDue([], [p(5, 100, toGefreiter, gefreiter)]), [{ user_id: 5, name: 'Mitglied 5', rank: 'Gefreiter' }]);
+});
+
+test('bald bereit: Kennzeichen des Servers, nur ohne erreichte Schwelle und ohne Unterschreiten', () => {
+  const soon = { ...p(1, 95, toGefreiter), soon: true };
+  assert.equal(isSoon(soon), true);
+  assert.equal(isSoon(p(2, 95, toGefreiter)), false);
+  assert.equal(isSoon({ ...p(3, 100, toGefreiter), soon: true }), false, 'bereit zählt im roten Kreis');
+  assert.equal(isSoon({ ...soon, below_current_threshold: true }), false, 'unter der eigenen Schwelle');
+  assert.equal(soonCount([soon, p(2, 95, toGefreiter), { ...p(4, 98, toGefreiter), soon: true }]), 2);
 });

@@ -8,6 +8,7 @@ use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\Roles as AppRoles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\PersonName;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\AuthContext;
 use KompanieApp\Core\Port\UserDirectory;
 
@@ -169,7 +170,7 @@ final class WpUsers implements UserDirectory, AuthContext
     {
         global $wpdb;
         if (password_get_info($passwordHash)['algo'] === null) {
-            throw new \DomainException('Ungültiger Passwort-Hash.');
+            throw new \DomainException(I18n::t('Ungültiger Passwort-Hash.'));
         }
         // Zufälliges Passwort, das niemand kennt; gleich danach durch den Hash ersetzt.
         $id = $this->create($firstName, $lastName, $login, $email, wp_generate_password(32, true, true), $role);
@@ -187,10 +188,10 @@ final class WpUsers implements UserDirectory, AuthContext
     {
         $user = get_userdata($id);
         if (!$user || $this->find($id) === null) {
-            throw new \DomainException('Benutzer nicht gefunden.');
+            throw new \DomainException(I18n::t('Benutzer nicht gefunden.'));
         }
         if ($role === AppRoles::ADMIN || in_array('administrator', (array) $user->roles, true) || is_super_admin($id)) {
-            throw new \DomainException('Administratoren werden im WordPress-Backend verwaltet.');
+            throw new \DomainException(I18n::t('Administratoren werden im WordPress-Backend verwaltet.'));
         }
         // Wer handelt, braucht das Recht in WordPress oder über seine Rolle in der App (der Kern hat die
         // Regeln der App schon geprüft). Ohne angemeldeten Benutzer (WP-CLI, Einrichtung) gilt das nicht.
@@ -199,7 +200,7 @@ final class WpUsers implements UserDirectory, AuthContext
         $promotion = $role === AppRoles::MEMBER && $from !== null && $this->promotable !== null && ($this->promotable)($from)
             && $this->currentUser()?->can(Capability::CreateUsers);
         if (!$promotion && !$this->actorMay('promote_user', $id, Capability::PromoteUsers)) {
-            throw new \DomainException('Diesen Benutzer darfst du in WordPress nicht ändern.');
+            throw new \DomainException(I18n::t('Diesen Benutzer darfst du in WordPress nicht ändern.'));
         }
         update_user_option($id, self::ROLE_META, $role, false);
         if (get_current_user_id() === 0 || current_user_can('promote_user', $id)) {
@@ -236,7 +237,7 @@ final class WpUsers implements UserDirectory, AuthContext
             // Siehe needsWpRight(): sonst genügt das Recht „Mitglieder anlegen“ der Rolle in der App.
             $may = $this->needsWpRight($id) ? current_user_can('edit_user', $id) : $this->actorMay('edit_user', $id, Capability::CreateUsers);
             if (!$may || $this->find($id) === null) {
-                throw new \DomainException('Das Passwort dieses Benutzers darfst du in WordPress nicht ändern.');
+                throw new \DomainException(I18n::t('Das Passwort dieses Benutzers darfst du in WordPress nicht ändern.'));
             }
         }
         wp_set_password($password, $id);
@@ -249,13 +250,13 @@ final class WpUsers implements UserDirectory, AuthContext
     {
         global $wpdb;
         if (password_get_info($passwordHash)['algo'] === null) {
-            throw new \DomainException('Ungültiger Passwort-Hash.');
+            throw new \DomainException(I18n::t('Ungültiger Passwort-Hash.'));
         }
         $actor = get_current_user_id();
         if ($actor !== 0 && $actor !== $id) {
             $may = $this->needsWpRight($id) ? current_user_can('edit_user', $id) : $this->actorMay('edit_user', $id, Capability::CreateUsers);
             if (!$may || $this->find($id) === null) {
-                throw new \DomainException('Das Passwort dieses Benutzers darfst du in WordPress nicht ändern.');
+                throw new \DomainException(I18n::t('Das Passwort dieses Benutzers darfst du in WordPress nicht ändern.'));
             }
         }
         $wpdb->update($wpdb->users, ['user_pass' => $passwordHash, 'user_activation_key' => ''], ['ID' => $id]);
@@ -292,12 +293,12 @@ final class WpUsers implements UserDirectory, AuthContext
     {
         $user = get_userdata($id);
         if (!$user || $this->find($id) === null) {
-            throw new \DomainException('Benutzer nicht gefunden.');
+            throw new \DomainException(I18n::t('Benutzer nicht gefunden.'));
         }
-        $this->guardAccount($id, 'Diesen Benutzer darfst du in WordPress nicht ändern.');
+        $this->guardAccount($id, I18n::t('Diesen Benutzer darfst du in WordPress nicht ändern.'));
         $rename = $login !== null && $login !== $user->user_login;
         if ($rename && in_array(strtolower($login), array_map('strtolower', (array) apply_filters('illegal_user_logins', [])), true)) {
-            throw new \DomainException('Dieser Benutzername ist in WordPress nicht erlaubt.');
+            throw new \DomainException(I18n::t('Dieser Benutzername ist in WordPress nicht erlaubt.'));
         }
         $name = PersonName::join($firstName, $lastName);
         $res = wp_update_user(['ID' => $id, 'display_name' => $name, 'nickname' => $name, 'first_name' => $firstName, 'last_name' => $lastName, 'user_email' => $email]);
@@ -325,7 +326,7 @@ final class WpUsers implements UserDirectory, AuthContext
             $data['user_nicename'] = $this->uniqueNicename(sanitize_title(mb_substr($login, 0, 50)), (int) $old->ID);
         }
         if ($wpdb->update($wpdb->users, $data, ['ID' => (int) $old->ID]) === false) {
-            throw new \DomainException('Der Benutzername ließ sich nicht speichern.');
+            throw new \DomainException(I18n::t('Der Benutzername ließ sich nicht speichern.'));
         }
         // Mit dem alten Objekt: clean_user_cache() entfernt auch die Zuordnung alter Benutzername → ID.
         clean_user_cache($old);
@@ -352,12 +353,12 @@ final class WpUsers implements UserDirectory, AuthContext
     {
         $user = get_userdata($id);
         if (!$user || $this->find($id) === null) {
-            throw new \DomainException('Benutzer nicht gefunden.');
+            throw new \DomainException(I18n::t('Benutzer nicht gefunden.'));
         }
         if (in_array('administrator', (array) $user->roles, true) || is_super_admin($id)) {
-            throw new \DomainException('Administratoren werden im WordPress-Backend verwaltet.');
+            throw new \DomainException(I18n::t('Administratoren werden im WordPress-Backend verwaltet.'));
         }
-        $this->guardAccount($id, 'Diesen Benutzer darfst du in WordPress nicht aus der App entfernen.');
+        $this->guardAccount($id, I18n::t('Diesen Benutzer darfst du in WordPress nicht aus der App entfernen.'));
         global $wpdb;
         // Rolle Gast fest eintragen statt löschen: Ohne Eintrag gälten sonst frühere WP-Rollen bzw. -Rechte der App weiter
         // (legacyRole, z. B. kompanie_member über eine eigene WP-Rolle).
@@ -383,12 +384,12 @@ final class WpUsers implements UserDirectory, AuthContext
     {
         $user = get_userdata($id);
         if (!$user || $this->find($id) === null) {
-            throw new \DomainException('Benutzer nicht gefunden.');
+            throw new \DomainException(I18n::t('Benutzer nicht gefunden.'));
         }
         if (in_array('administrator', (array) $user->roles, true) || is_super_admin($id)) {
-            throw new \DomainException('Administratoren werden im WordPress-Backend verwaltet.');
+            throw new \DomainException(I18n::t('Administratoren werden im WordPress-Backend verwaltet.'));
         }
-        $this->guardAccount($id, 'Diesen Benutzer darfst du in WordPress nicht ändern.', Capability::ManageFormer);
+        $this->guardAccount($id, I18n::t('Diesen Benutzer darfst du in WordPress nicht ändern.'), Capability::ManageFormer);
         update_user_option($id, self::ROLE_META, AppRoles::GUEST, false);
         $user->remove_role(Roles::ROLE_MANAGER);
         $user->remove_role(Roles::ROLE_ORGANIZER);
@@ -427,12 +428,12 @@ final class WpUsers implements UserDirectory, AuthContext
     {
         $user = get_userdata($id);
         if (!$user || $this->find($id) === null) {
-            throw new \DomainException('Benutzer nicht gefunden.');
+            throw new \DomainException(I18n::t('Benutzer nicht gefunden.'));
         }
         if ($role === AppRoles::ADMIN) {
-            throw new \DomainException('Administratoren werden im WordPress-Backend verwaltet.');
+            throw new \DomainException(I18n::t('Administratoren werden im WordPress-Backend verwaltet.'));
         }
-        $this->guardAccount($id, 'Diesen Benutzer darfst du in WordPress nicht ändern.', Capability::ManageFormer);
+        $this->guardAccount($id, I18n::t('Diesen Benutzer darfst du in WordPress nicht ändern.'), Capability::ManageFormer);
         update_user_option($id, self::ROLE_META, $role, false);
         if (isset(self::LEGACY_WP_ROLES[$role])) {
             $user->add_role(self::LEGACY_WP_ROLES[$role]);

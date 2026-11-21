@@ -1,6 +1,7 @@
 import type { GalleryAlbum, GalleryPhoto } from './api';
 import { albumFileName, downloadablePhotos, fetchMedia, isVideoEntry, mediaFileName, storedZip, uniqueNames } from './downloadFiles';
 import { saveFile } from './saveFile';
+import { t } from './i18n';
 
 /**
  * Herunterladen aus der Galerie (Einstellung „Knöpfe zum Herunterladen zeigen“): ein Bild oder Video aus der Großansicht
@@ -51,7 +52,7 @@ export async function downloadAlbum(
   };
   await Promise.all(Array.from({ length: Math.min(PARALLEL, photos.length) }, worker));
   const files = photos.flatMap((_, i) => (blobs[i] ? [{ name: names[i], blob: blobs[i]! }] : []));
-  if (files.length === 0) throw new Error('Die Dateien lassen sich gerade nicht laden. Bitte später erneut versuchen.');
+  if (files.length === 0) throw new Error(t('Die Dateien lassen sich gerade nicht laden. Bitte später erneut versuchen.'));
   let zip: Blob;
   try {
     zip = await storedZip(files);
@@ -59,7 +60,9 @@ export async function downloadAlbum(
     // Liest der Browser die geladenen Dateien nicht mehr (meist fehlt ihm Platz, z. B. im privaten Fenster), meldet er nur
     // einen allgemeinen Fehler.
     throw new Error(
-      'Das ZIP ließ sich nicht erstellen, vermutlich fehlt dem Browser Platz. Lade die Videos einzeln in der Großansicht herunter oder nutze kein privates Fenster.',
+      t(
+        'Das ZIP ließ sich nicht erstellen, vermutlich fehlt dem Browser Platz. Lade die Videos einzeln in der Großansicht herunter oder nutze kein privates Fenster.',
+      ),
     );
   }
   await saveFile(zip, albumFileName(album), { title: album.title });

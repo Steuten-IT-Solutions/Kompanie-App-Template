@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace KompanieApp\WordPress;
 
+use KompanieApp\Core\I18n\I18n;
+
 /**
  * „App schneller laden“: Bei Aufrufen der App lädt WordPress nur dieses Plugin und die ausgewählten anderen Plugins.
  *
@@ -433,11 +435,11 @@ PHP;
                 $res = wp_remote_get(add_query_arg($args, $url), ['timeout' => 20, 'redirection' => 0, 'headers' => ['Cache-Control' => 'no-cache']]);
                 $seconds = microtime(true) - $start;
                 if (is_wp_error($res)) {
-                    $result['error'] = 'Die Seite ließ sich vom Server aus nicht aufrufen: ' . $res->get_error_message();
+                    $result['error'] = I18n::t('Die Seite ließ sich vom Server aus nicht aufrufen: {error}', ['error' => $res->get_error_message()]);
                     return $result;
                 }
                 if (wp_remote_retrieve_response_code($res) !== 200) {
-                    $result['error'] = 'Die Schnittstelle der App antwortete mit Status ' . wp_remote_retrieve_response_code($res) . '.';
+                    $result['error'] = I18n::t('Die Schnittstelle der App antwortete mit Status {status}.', ['status' => wp_remote_retrieve_response_code($res)]);
                     return $result;
                 }
                 if ($kind === 'fast' && wp_remote_retrieve_header($res, self::HEADER) !== '1') {

@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\MemberPhotoRepository;
 
 /**
@@ -67,7 +68,7 @@ final class MemberPhotoService
      */
     public function upload(User $actor, int $userId, mixed $file): array
     {
-        $this->guard($actor, $userId, 'Das Foto dieser Person darfst du nicht ändern.');
+        $this->guard($actor, $userId, I18n::t('Das Foto dieser Person darfst du nicht ändern.'));
         $this->store($actor, $userId, $this->parse($file));
         return ['photo_url' => $this->url($userId)];
     }
@@ -75,7 +76,7 @@ final class MemberPhotoService
     /** @return array{photo_url: null} */
     public function remove(User $actor, int $userId): array
     {
-        $this->guard($actor, $userId, 'Das Foto dieser Person darfst du nicht entfernen.');
+        $this->guard($actor, $userId, I18n::t('Das Foto dieser Person darfst du nicht entfernen.'));
         $this->repository()->delete($userId);
         return ['photo_url' => null];
     }
@@ -95,27 +96,27 @@ final class MemberPhotoService
         }
         // Vor dem Dekodieren: Base64 ist ein Drittel größer als die Datei.
         if (strlen($data) > intdiv(self::MAX_BYTES * 4, 3) + 4) {
-            throw ApiError::invalid('Das Foto darf höchstens 5 MB groß sein.');
+            throw ApiError::invalid(I18n::t('Das Foto darf höchstens 5 MB groß sein.'));
         }
         $bytes = $data === '' ? false : base64_decode($data, true);
         if ($bytes === false || $bytes === '') {
-            throw ApiError::invalid('Es ist kein Foto angekommen.');
+            throw ApiError::invalid(I18n::t('Es ist kein Foto angekommen.'));
         }
         if (strlen($bytes) > self::MAX_BYTES) {
-            throw ApiError::invalid('Das Foto darf höchstens 5 MB groß sein.');
+            throw ApiError::invalid(I18n::t('Das Foto darf höchstens 5 MB groß sein.'));
         }
         $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
         if (!isset(self::TYPES[$ext])) {
-            throw ApiError::invalid('Erlaubt sind Fotos als JPG, PNG oder WebP.');
+            throw ApiError::invalid(I18n::t('Erlaubt sind Fotos als JPG, PNG oder WebP.'));
         }
         $signature = self::TYPES[$ext];
         $ok = strncmp($bytes, $signature, strlen($signature)) === 0 && ($ext !== 'webp' || substr($bytes, 8, 4) === 'WEBP');
         $info = $ok ? @getimagesizefromstring($bytes) : false;
         if ($info === false) {
-            throw ApiError::invalid(sprintf('Die Datei ist keine gültige .%s-Datei.', $ext));
+            throw ApiError::invalid(I18n::t('Die Datei ist keine gültige .{ext}-Datei.', ['ext' => $ext]));
         }
         if ($info[0] < 1 || $info[1] < 1 || $info[0] > self::MAX_EDGE || $info[1] > self::MAX_EDGE) {
-            throw ApiError::invalid(sprintf('Das Foto darf höchstens %d × %d Pixel groß sein.', self::MAX_EDGE, self::MAX_EDGE));
+            throw ApiError::invalid(I18n::t('Das Foto darf höchstens {max} × {max} Pixel groß sein.', ['max' => self::MAX_EDGE]));
         }
         return ['bytes' => $bytes, 'ext' => $ext === 'jpeg' ? 'jpg' : $ext];
     }
@@ -134,17 +135,17 @@ final class MemberPhotoService
         $target = $tmp . '-out.jpg';
         try {
             if (@file_put_contents($source, $photo['bytes']) === false) {
-                throw new ApiError(500, 'storage_failed', 'Das Foto konnte nicht gespeichert werden.');
+                throw new ApiError(500, 'storage_failed', I18n::t('Das Foto konnte nicht gespeichert werden.'));
             }
             foreach (self::SIZES as $size) {
                 try {
                     $this->app->images->resizeToJpeg($source, $target, $size, self::QUALITY);
                 } catch (\RuntimeException $e) {
-                    throw ApiError::invalid('Das Foto kann nicht verarbeitet werden: ' . $e->getMessage());
+                    throw ApiError::invalid(I18n::t('Das Foto kann nicht verarbeitet werden: {error}', ['error' => $e->getMessage()]));
                 }
                 $jpeg = @file_get_contents($target);
                 if ($jpeg === false || $jpeg === '') {
-                    throw new ApiError(500, 'storage_failed', 'Das Foto konnte nicht gespeichert werden.');
+                    throw new ApiError(500, 'storage_failed', I18n::t('Das Foto konnte nicht gespeichert werden.'));
                 }
                 $images[$size] = $jpeg;
             }
@@ -339,10 +340,10 @@ final class MemberPhotoService
 
     private function guard(User $actor, int $userId, string $message): void
     {
-        $target = $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $target = $this->app->users->find($userId) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
         $former = $actor->can(Capability::ManageFormer) && $this->app->formerMembers()->previousRole($target) !== null;
         if (!$actor->can(Capability::CreateUsers) && !$former) {
-            throw ApiError::forbidden('Fotos ändert, wer Mitglieder anlegen darf (bei Ehemaligen auch, wer Ehemalige verwaltet).');
+            throw ApiError::forbidden(I18n::t('Fotos ändert, wer Mitglieder anlegen darf (bei Ehemaligen auch, wer Ehemalige verwaltet).'));
         }
         if ($actor->id !== $userId) {
             $this->app->members()->guardAccount($actor, $target, $message);

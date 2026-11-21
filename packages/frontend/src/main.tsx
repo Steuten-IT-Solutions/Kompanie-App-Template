@@ -21,6 +21,8 @@ import { afterBackSync, initBackClose, openBackLayer } from './backClose';
 import { beforeLeave, initUnsaved } from './unsaved';
 import { setLeaveGuard } from './router';
 import { confirmAsk } from './ask';
+import { t } from './i18n';
+import { initTileLayouts } from './tileStore';
 // Gewählte Schrift aus kompanie.json, lokal gebündelt (kein Abruf bei Google).
 import './generated/fonts';
 import './generated/theme.css';
@@ -54,7 +56,7 @@ if (isStandalone() && window.location.hash.startsWith('#/installieren')) {
 // „Zurück“ schließt offene Fenster; nach dem Neuladen mit offenem Fenster den übrigen Eintrag im Verlauf überspringen.
 initBackClose();
 // Nicht gespeicherte Eingaben: vor dem Verlassen nachfragen (unsaved.ts).
-initUnsaved((message) => confirmAsk(message, { title: 'Nicht gespeichert', okLabel: 'Verlassen' }), { openBackLayer, afterBackSync });
+initUnsaved((message) => confirmAsk(message, { title: t('Nicht gespeichert'), okLabel: t('Verlassen') }), { openBackLayer, afterBackSync });
 setLeaveGuard(beforeLeave);
 
 // Letzte Fehlermeldung für „Fehler melden“ (Issue #64)
@@ -76,13 +78,15 @@ function restoreSkeletons(): Promise<unknown> {
 }
 
 // Vorschau „App als Rolle ansehen“ (Issue #63): erst die Konfiguration der Rolle holen, dann starten.
-void Promise.all([preparePreview(), restoreSkeletons()]).then(([notice]) =>
+void Promise.all([preparePreview(), restoreSkeletons()]).then(([notice]) => {
+  // Vorgemerkte Anordnungen der Kacheln (ohne Verbindung geändert) gelten sofort und gehen an den Server.
+  initTileLayouts();
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <App notice={notice} />
     </StrictMode>,
-  ),
-);
+  );
+});
 
 const cfg = config;
 if ('serviceWorker' in navigator && cfg) {

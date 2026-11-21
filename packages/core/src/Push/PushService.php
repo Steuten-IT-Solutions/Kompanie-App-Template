@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\BoardService;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\ExtendedHttpClient;
 use KompanieApp\Core\Storage\PushRepository;
 
@@ -194,26 +195,26 @@ final class PushService
     {
         $c = $this->app->config;
         return [
-            self::TYPE_BOARD => ['label' => $c->sectionLabel('board', 'Schwarzes Brett') . ': dringende Nachrichten', 'features' => ['board'], 'audience' => 'view_board'],
-            self::TYPE_BOARD_PUBLIC => ['label' => $c->sectionLabel('board', 'Schwarzes Brett') . ': öffentliche Nachrichten', 'features' => ['board'], 'audience' => 'all'],
-            self::TYPE_POLLS => ['label' => $c->sectionLabel('polls', 'Umfragen') . ': neue Umfrage und Erinnerung', 'features' => ['polls'], 'audience' => 'vote_polls'],
-            self::TYPE_BIRTHDAYS => ['label' => $c->sectionLabel('birthdays', 'Geburtstage') . ': am Tag selbst', 'features' => ['birthdays'], 'audience' => 'view_birthdays'],
-            self::TYPE_PASSIVE_BIRTHDAYS => ['label' => 'Passive: Geburtstage der eingestellten Alter', 'features' => [], 'audience' => 'manage_passive',
+            self::TYPE_BOARD => ['label' => I18n::t('{section}: dringende Nachrichten', ['section' => $c->sectionLabel('board', I18n::t('Schwarzes Brett'))]), 'features' => ['board'], 'audience' => 'view_board'],
+            self::TYPE_BOARD_PUBLIC => ['label' => I18n::t('{section}: öffentliche Nachrichten', ['section' => $c->sectionLabel('board', I18n::t('Schwarzes Brett'))]), 'features' => ['board'], 'audience' => 'all'],
+            self::TYPE_POLLS => ['label' => I18n::t('{section}: neue Umfrage und Erinnerung', ['section' => $c->sectionLabel('polls', I18n::t('Umfragen'))]), 'features' => ['polls'], 'audience' => 'vote_polls'],
+            self::TYPE_BIRTHDAYS => ['label' => I18n::t('{section}: am Tag selbst', ['section' => $c->sectionLabel('birthdays', I18n::t('Geburtstage'))]), 'features' => ['birthdays'], 'audience' => 'view_birthdays'],
+            self::TYPE_PASSIVE_BIRTHDAYS => ['label' => I18n::t('Passive: Geburtstage der eingestellten Alter'), 'features' => [], 'audience' => 'manage_passive',
                 'active' => $this->app->features()->enabled('passive') && $this->app->passives()->birthdayAges() !== []],
-            self::TYPE_GALLERY_REVIEW => ['label' => $c->sectionLabel('gallery', 'Galerie') . ': neue Bilder und Videos zum Prüfen', 'features' => ['gallery'], 'audience' => 'review_gallery'],
-            self::TYPE_GALLERY_SUBMISSIONS => ['label' => $c->sectionLabel('gallery', 'Galerie') . ': deine Bilder und Videos freigegeben oder abgelehnt', 'features' => ['gallery'], 'audience' => 'submit_gallery'],
-            self::TYPE_REGISTRATIONS => ['label' => 'Zugang beantragt: neue Anfragen', 'features' => [], 'audience' => 'create_users', 'active' => $this->app->registrations()->enabled()],
-            self::TYPE_REPORTS_REVIEW => ['label' => 'Fehlermeldungen: neue Meldungen', 'features' => [], 'audience' => 'review_reports', 'active' => true],
-            self::TYPE_REPORTS => ['label' => 'Fehlermeldungen: Antwort auf deine Meldung', 'features' => [], 'audience' => 'account', 'active' => true],
-            self::TYPE_PENALTIES => ['label' => $c->sectionLabel('penalties', 'Strafen') . ': neue Einträge', 'features' => ['penalties'], 'audience' => 'view_own_penalties'],
-            self::TYPE_POINTS => ['label' => $c->sectionLabel('points', 'Punkte') . ': neue Einträge', 'features' => ['points'], 'audience' => 'view_own_points'],
-            self::TYPE_RANKS => ['label' => $c->rankLabel() . ': Beförderung oder Änderung', 'features' => ['ranks'], 'audience' => 'view_own_rank'],
-            self::TYPE_TITLES => ['label' => $c->sectionLabel('titles', 'Titel') . ': neu verliehen', 'features' => ['titles'], 'audience' => 'view_own_rank'],
-            self::TYPE_EVENTS => ['label' => $c->sectionLabel('events', 'Termine') . ': neue und geänderte', 'features' => ['events', 'calendar'], 'audience' => 'all'],
-            self::TYPE_REMINDER => ['label' => 'Erinnerung am Vortag', 'features' => ['events', 'calendar'], 'audience' => 'all'],
-            self::TYPE_RESPONSES => ['label' => $c->sectionLabel('events', 'Termine') . ': Erinnerung an deine Zu- oder Absage', 'features' => [], 'audience' => 'respond_calendar',
+            self::TYPE_GALLERY_REVIEW => ['label' => I18n::t('{section}: neue Bilder und Videos zum Prüfen', ['section' => $c->sectionLabel('gallery', I18n::t('Galerie'))]), 'features' => ['gallery'], 'audience' => 'review_gallery'],
+            self::TYPE_GALLERY_SUBMISSIONS => ['label' => I18n::t('{section}: deine Bilder und Videos freigegeben oder abgelehnt', ['section' => $c->sectionLabel('gallery', I18n::t('Galerie'))]), 'features' => ['gallery'], 'audience' => 'submit_gallery'],
+            self::TYPE_REGISTRATIONS => ['label' => I18n::t('Zugang beantragt: neue Anfragen'), 'features' => [], 'audience' => 'create_users', 'active' => $this->app->registrations()->enabled()],
+            self::TYPE_REPORTS_REVIEW => ['label' => I18n::t('Fehlermeldungen: neue Meldungen'), 'features' => [], 'audience' => 'review_reports', 'active' => true],
+            self::TYPE_REPORTS => ['label' => I18n::t('Fehlermeldungen: Antwort auf deine Meldung'), 'features' => [], 'audience' => 'account', 'active' => true],
+            self::TYPE_PENALTIES => ['label' => I18n::t('{section}: neue Einträge', ['section' => $c->sectionLabel('penalties', I18n::t('Strafen'))]), 'features' => ['penalties'], 'audience' => 'view_own_penalties'],
+            self::TYPE_POINTS => ['label' => I18n::t('{section}: neue Einträge', ['section' => $c->sectionLabel('points', I18n::t('Punkte'))]), 'features' => ['points'], 'audience' => 'view_own_points'],
+            self::TYPE_RANKS => ['label' => I18n::t('{section}: Beförderung oder Änderung', ['section' => $c->rankLabel()]), 'features' => ['ranks'], 'audience' => 'view_own_rank'],
+            self::TYPE_TITLES => ['label' => I18n::t('{section}: neu verliehen', ['section' => $c->sectionLabel('titles', I18n::tc('Bereich', 'Titel'))]), 'features' => ['titles'], 'audience' => 'view_own_rank'],
+            self::TYPE_EVENTS => ['label' => I18n::t('{section}: neue und geänderte', ['section' => $c->sectionLabel('events', I18n::t('Termine'))]), 'features' => ['events', 'calendar'], 'audience' => 'all'],
+            self::TYPE_REMINDER => ['label' => I18n::t('Erinnerung am Vortag'), 'features' => ['events', 'calendar'], 'audience' => 'all'],
+            self::TYPE_RESPONSES => ['label' => I18n::t('{section}: Erinnerung an deine Zu- oder Absage', ['section' => $c->sectionLabel('events', I18n::t('Termine'))]), 'features' => [], 'audience' => 'respond_calendar',
                 'active' => $this->app->features()->enabled('calendar') && $this->app->eventResponses()->enabled()],
-            self::TYPE_NEWS => ['label' => $c->sectionLabel('news', 'News') . ': neue Beiträge', 'features' => ['news'], 'audience' => 'all'],
+            self::TYPE_NEWS => ['label' => I18n::t('{section}: neue Beiträge', ['section' => $c->sectionLabel('news', I18n::t('News'))]), 'features' => ['news'], 'audience' => 'all'],
         ];
     }
 
@@ -285,14 +286,14 @@ final class PushService
     public function subscribe(?User $user, mixed $endpoint, mixed $keys, mixed $types, mixed $details, string $client): array
     {
         if (!$this->supported()) {
-            throw new ApiError(501, 'push_unsupported', 'Push-Benachrichtigungen werden auf diesem Server nicht unterstützt.');
+            throw new ApiError(501, 'push_unsupported', I18n::t('Push-Benachrichtigungen werden auf diesem Server nicht unterstützt.'));
         }
         $endpoint = self::validEndpoint($endpoint);
         $keys = is_array($keys) ? $keys : [];
         $p256dh = WebPushCrypto::b64uDecode(is_string($keys['p256dh'] ?? null) ? $keys['p256dh'] : '');
         $auth = WebPushCrypto::b64uDecode(is_string($keys['auth'] ?? null) ? $keys['auth'] : '');
         if ($p256dh === null || WebPushCrypto::publicKeyFromRaw($p256dh) === null || $auth === null || strlen($auth) !== 16) {
-            throw ApiError::invalid('Ungültige Schlüssel des Geräts.');
+            throw ApiError::invalid(I18n::t('Ungültige Schlüssel des Geräts.'));
         }
         $userId = $user?->id ?? 0;
         $repo = $this->repository();
@@ -300,7 +301,7 @@ final class PushService
         $p256dhText = WebPushCrypto::b64uEncode($p256dh);
         $authText = WebPushCrypto::b64uEncode($auth);
         if ($existing !== null && !hash_equals($existing['auth'], $authText)) {
-            throw ApiError::forbidden('Dieses Gerät ist bereits anders angemeldet.');
+            throw ApiError::forbidden(I18n::t('Dieses Gerät ist bereits anders angemeldet.'));
         }
         $allowed = $this->availableTypes($user);
         $same = $existing !== null && $existing['user_id'] === $userId;
@@ -327,7 +328,7 @@ final class PushService
                 }
             }
         }
-        return $repo->byEndpoint($endpoint) ?? throw ApiError::invalid('Das Abo konnte nicht gespeichert werden.');
+        return $repo->byEndpoint($endpoint) ?? throw ApiError::invalid(I18n::t('Das Abo konnte nicht gespeichert werden.'));
     }
 
     /**
@@ -344,7 +345,7 @@ final class PushService
             $ok = $raw !== null && hash_equals((string) $sub['auth'], WebPushCrypto::b64uEncode($raw));
         }
         if (!$ok || $sub === null) {
-            throw ApiError::notFound('Für dieses Gerät sind keine Benachrichtigungen aktiviert.');
+            throw ApiError::notFound(I18n::t('Für dieses Gerät sind keine Benachrichtigungen aktiviert.'));
         }
         return $sub;
     }
@@ -404,7 +405,7 @@ final class PushService
         }
         if (!is_string($endpoint) || !is_array($parts) || ($parts['scheme'] ?? '') !== 'https' || !$known
             || isset($parts['user']) || isset($parts['pass']) || isset($parts['port'])) {
-            throw ApiError::invalid('Ungültige Push-Adresse.');
+            throw ApiError::invalid(I18n::t('Ungültige Push-Adresse.'));
         }
         return $endpoint;
     }
@@ -432,7 +433,7 @@ final class PushService
     private static function requireTypes(array $types): array
     {
         if ($types === []) {
-            throw ApiError::invalid('Bitte mindestens eine Art von Benachrichtigungen auswählen.');
+            throw ApiError::invalid(I18n::t('Bitte mindestens eine Art von Benachrichtigungen auswählen.'));
         }
         return $types;
     }
@@ -440,10 +441,10 @@ final class PushService
     private function guestLimit(string $client): void
     {
         if ($this->repository()->countGuests() >= self::MAX_GUESTS) {
-            throw new ApiError(503, 'push_full', 'Zurzeit sind keine weiteren Abos möglich.');
+            throw new ApiError(503, 'push_full', I18n::t('Zurzeit sind keine weiteren Abos möglich.'));
         }
         if ($this->app->cache->increment('push_guest_' . hash('sha256', self::clientKey($client)), 3600) > self::GUEST_RATE) {
-            throw new ApiError(429, 'too_many_attempts', 'Zu viele Anfragen. Bitte später erneut versuchen.');
+            throw new ApiError(429, 'too_many_attempts', I18n::t('Zu viele Anfragen. Bitte später erneut versuchen.'));
         }
     }
 
@@ -925,23 +926,23 @@ final class PushService
      */
     public function sendTest(array $sub): void
     {
-        $keys = $this->vapid() ?? throw new ApiError(501, 'push_unsupported', 'Push-Benachrichtigungen werden auf diesem Server nicht unterstützt.');
-        $row = ['id' => 0, 'subscription_id' => $sub['id'], 'payload' => self::json(self::message($this->app->config->name(), 'Benachrichtigungen funktionieren.', 'benachrichtigungen', 'test')),
+        $keys = $this->vapid() ?? throw new ApiError(501, 'push_unsupported', I18n::t('Push-Benachrichtigungen werden auf diesem Server nicht unterstützt.'));
+        $row = ['id' => 0, 'subscription_id' => $sub['id'], 'payload' => self::json(self::message($this->app->config->name(), I18n::t('Benachrichtigungen funktionieren.'), 'benachrichtigungen', 'test')),
             'urgency' => self::URGENCY, 'ttl' => 300, 'attempts' => 0, 'created_at' => '', 'endpoint' => $sub['endpoint'], 'p256dh' => $sub['p256dh'], 'auth' => $sub['auth']];
         $tokens = [];
         $res = $this->sendAll([0 => $this->request($row, $keys, $tokens)])[0] ?? new \RuntimeException('keine Antwort');
         $status = self::classify($res, $sub['endpoint']);
         if ($status === 'gone') {
             $this->repository()->delete($sub['id']);
-            throw new ApiError(410, 'push_gone', 'Der Push-Dienst kennt dieses Gerät nicht mehr. Bitte Benachrichtigungen neu aktivieren.');
+            throw new ApiError(410, 'push_gone', I18n::t('Der Push-Dienst kennt dieses Gerät nicht mehr. Bitte Benachrichtigungen neu aktivieren.'));
         }
         if (is_array($res) && $res['status'] === 403 && parse_url($sub['endpoint'], PHP_URL_HOST) === 'fcm.googleapis.com') {
             // Meist gehört das Abo zu einem früheren Schlüssel des Servers; das Gerät muss sich neu anmelden.
-            throw new ApiError(409, 'push_key_mismatch', 'Der Push-Dienst lehnt die Nachricht ab. Bitte Benachrichtigungen aus- und wieder einschalten.');
+            throw new ApiError(409, 'push_key_mismatch', I18n::t('Der Push-Dienst lehnt die Nachricht ab. Bitte Benachrichtigungen aus- und wieder einschalten.'));
         }
         if ($status !== 'ok') {
-            $code = $res instanceof \RuntimeException ? 'keine Verbindung' : 'HTTP ' . $res['status'];
-            throw ApiError::upstream('Der Push-Dienst hat die Nachricht nicht angenommen (' . $code . ').');
+            $code = $res instanceof \RuntimeException ? I18n::t('keine Verbindung') : 'HTTP ' . $res['status'];
+            throw ApiError::upstream(I18n::t('Der Push-Dienst hat die Nachricht nicht angenommen ({code}).', ['code' => $code]));
         }
     }
 
@@ -1108,7 +1109,7 @@ final class PushService
     public function setReminderHour(mixed $hour): void
     {
         if (!is_numeric($hour) || (int) $hour < 0 || (int) $hour > 23 || (string) (int) $hour !== (string) $hour) {
-            throw ApiError::invalid('Bitte eine volle Stunde von 0 bis 23 angeben.');
+            throw ApiError::invalid(I18n::t('Bitte eine volle Stunde von 0 bis 23 angeben.'));
         }
         $this->app->settings->set(self::REMINDER_HOUR_SETTING, (int) $hour);
     }

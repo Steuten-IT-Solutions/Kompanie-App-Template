@@ -29,10 +29,18 @@ Tippe unten auf **{bereich.gallery}** und dann auf ein Album.
 
 1. Tippe auf ein Vorschaubild. Es öffnet sich groß, auf dunklem Hintergrund, und nach einem Moment in voller Auflösung.
 2. Zum nächsten oder vorherigen Bild wischst du zur Seite oder tippst auf **›** bzw. **‹**. Am Computer gehen auch die Pfeiltasten. Beim Wischen folgt das Bild deinem Finger, daneben siehst du schon das nächste. Ziehst du nur ein kleines Stück, bleibt das Bild stehen. Ist ein Bild vergrößert, verschiebt Wischen das Bild, statt zu blättern.
-3. Unten steht, das wievielte Bild es ist, z. B. „3 / 3“, bei internen Bildern mit „intern“. Wer Einreichungen prüft oder die {bereich.gallery} verwaltet, findet daneben bei Bildern, die in der App hochgeladen wurden (mit Google Drive als Ablageort bei allen), **Nur für Mitglieder** (Schloss) bzw. **Öffentlich zeigen** (Weltkugel): Das stellt das Bild intern oder öffentlich. Wer die {bereich.gallery} verwaltet, hat dort auch **Verschieben** (Ordner mit Pfeil) und **Löschen** (Mülleimer).
+3. Unten steht, das wievielte Bild es ist, z. B. „3 / 3“, bei internen Bildern mit „intern“. Wer Einreichungen prüft oder die {bereich.gallery} verwaltet, findet darunter bei Bildern, die in der App hochgeladen wurden (mit Google Drive als Ablageort bei allen), **Nur für Mitglieder** (Schloss) bzw. **Öffentlich zeigen** (Weltkugel): Das stellt das Bild intern oder öffentlich. Wer die {bereich.gallery} verwaltet, hat dort auch **Verschieben** (Ordner mit Pfeil) und **Löschen** (Mülleimer).
 4. Tippe auf **✕** oben rechts, um das Bild zu schließen. Am Computer geht auch die Escape-Taste, auf dem Handy auch die Zurück-Taste oder -Geste. Das Album zeigt dann die Stelle mit dem zuletzt angesehenen Bild.
 
 ![Bild in der Großansicht mit Pfeilen zum Blättern und dem Knopf ✕](bild:galerie-album-bild)
+
+### Einen Link auf ein Bild verschicken
+
+1. Öffne das Bild oder Video groß.
+2. Tippe oben rechts auf das Teilen-Symbol (drei verbundene Punkte), links neben dem Knopf zum Herunterladen bzw. neben **✕**. Auf dem Handy öffnet sich das Teilen-Menü, z. B. für WhatsApp oder E-Mail. Am Computer kopiert die App den Link, unten erscheint „Link kopiert“; du fügst ihn dann in eine Nachricht ein.
+3. Wer den Link öffnet, sieht das Album mit genau diesem Bild in der Großansicht. Mit **✕** oder Zurück ist er im Album.
+
+Ein Bild nur für {rolle.member} sieht der Empfänger nur, wenn er angemeldet ist und es sehen darf. Sonst steht über dem Album, dass es das Bild nicht mehr gibt oder es nur für angemeldete Mitglieder ist, mit dem Knopf **Anmelden**; nach der Anmeldung geht das Bild direkt auf. Dasselbe Hinweisfeld erscheint, wenn das Bild inzwischen gelöscht oder in ein anderes Album verschoben wurde.
 
 ### Ein Video abspielen
 
@@ -61,7 +69,7 @@ Das geht nur, wenn die {kompanie.name} es erlaubt; sonst fehlen die Knöpfe.
 - Videos kommen beim Abspielen direkt aus Google Drive. Sie laden schon, sobald du sie groß öffnest. Mit langsamer Verbindung dauert der Start trotzdem einen Moment.
 - Steht dort „Dieses Video kann dein Browser nicht abspielen.“, ist das Video in einem Format gespeichert, das dein Gerät nicht kennt. Auf einem anderen Gerät oder Browser klappt es oft.
 - Heruntergeladene Bilder sind JPG-Dateien in voller Auflösung; lässt sich die gerade nicht erzeugen, nimmt die App die Fassung mit 1600 Pixeln. Videos kommen unverändert, so wie sie in der {bereich.gallery} gespeichert sind. Ist ein Bild noch nicht fertig aufbereitet, fehlt es im ZIP; die App sagt, wie viele fehlen. Videos machen ein ZIP schnell groß: Es braucht eine Weile und Platz auf dem Gerät. Auch ZIPs über 4 GB sind möglich; der Browser braucht dann so viel freien Platz auf dem Gerät, wie das Album groß ist. Im privaten Fenster kann der Platz fehlen; dann lädst du die Videos einzeln.
-- Mit dem Teilen-Symbol oben verschickst du einen Link auf das Album. Bilder nur für {rolle.member} sieht der Empfänger nur, wenn er als {rolle.member} angemeldet ist.
+- Mit dem Teilen-Symbol oben verschickst du einen Link auf das Album, mit dem in der Großansicht einen Link auf ein einzelnes Bild. Bilder nur für {rolle.member} sieht der Empfänger nur, wenn er als {rolle.member} angemeldet ist.
 
 ## Siehe auch
 

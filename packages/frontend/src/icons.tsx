@@ -75,6 +75,22 @@ const ICONS = {
       <circle cx="15.5" cy="9" r="1.5" />
     </>
   ),
+  /** Kacheln anordnen: Raster mit einer breiten Kachel */
+  arrange: (
+    <>
+      <rect x="3.5" y="3.5" width="17" height="6.5" rx="1.5" />
+      <rect x="3.5" y="14" width="6.5" height="6.5" rx="1.5" />
+      <rect x="14" y="14" width="6.5" height="6.5" rx="1.5" />
+    </>
+  ),
+  share: (
+    <>
+      <circle cx="18" cy="5.5" r="2.5" />
+      <circle cx="6" cy="12" r="2.5" />
+      <circle cx="18" cy="18.5" r="2.5" />
+      <path d="M8.2 10.8l7.6-4.1M8.2 13.2l7.6 4.1" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof ICONS;

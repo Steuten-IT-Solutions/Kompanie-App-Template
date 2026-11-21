@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Domain;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Mail\Mail;
 use KompanieApp\Core\Mail\PhpMailerMailer;
 
@@ -132,7 +133,7 @@ final class MailService
         if (array_key_exists('from', $in)) {
             $from = is_string($in['from']) ? trim($in['from']) : '';
             if ($from !== '' && filter_var($from, FILTER_VALIDATE_EMAIL) === false) {
-                throw ApiError::invalid('Bitte eine gültige Kompanieadresse eingeben (z. B. info@beispiel.de).');
+                throw ApiError::invalid(I18n::t('Bitte eine gültige Kompanieadresse eingeben (z. B. info@beispiel.de).'));
             }
             $set['mail_from'] = $from;
         }
@@ -142,20 +143,20 @@ final class MailService
         if (array_key_exists('host', $in)) {
             $host = is_string($in['host']) ? trim($in['host']) : '';
             if ($host !== '' && preg_match('/^[A-Za-z0-9.-]+$|^\[[0-9A-Fa-f:.]+\]$/', $host) !== 1) {
-                throw ApiError::invalid('Bitte den Namen des Mailservers ohne „https://“ eingeben (z. B. smtp.beispiel.de).');
+                throw ApiError::invalid(I18n::t('Bitte den Namen des Mailservers ohne „https://“ eingeben (z. B. smtp.beispiel.de).'));
             }
             $set['smtp_host'] = $host;
         }
         if (array_key_exists('port', $in)) {
             $port = Input::integer($in['port']);
             if ($port === null || $port < 1 || $port > 65535) {
-                throw ApiError::invalid('Der Port muss eine Zahl zwischen 1 und 65535 sein (meist 587 oder 465).');
+                throw ApiError::invalid(I18n::t('Der Port muss eine Zahl zwischen 1 und 65535 sein (meist 587 oder 465).'));
             }
             $set['smtp_port'] = $port;
         }
         if (array_key_exists('secure', $in)) {
             if (!in_array($in['secure'], self::SECURE, true)) {
-                throw ApiError::invalid('Ungültige Verschlüsselung.');
+                throw ApiError::invalid(I18n::t('Ungültige Verschlüsselung.'));
             }
             $set['smtp_secure'] = $in['secure'];
         }
@@ -164,7 +165,7 @@ final class MailService
         }
         if (array_key_exists('password', $in)) {
             if (!is_string($in['password'])) {
-                throw ApiError::invalid('Ungültiges Passwort.');
+                throw ApiError::invalid(I18n::t('Ungültiges Passwort.'));
             }
             $set['smtp_password'] = $in['password'];
         }
@@ -172,7 +173,7 @@ final class MailService
             if (array_key_exists($key, $in)) {
                 $n = Input::integer($in[$key]);
                 if ($n === null || $n < 0) {
-                    throw ApiError::invalid($key === 'batch_size' ? 'Die Portionsgröße muss 0 (alle) oder größer sein.' : 'Die Pause muss 0 (ohne Pause) oder mehr Minuten sein.');
+                    throw ApiError::invalid($key === 'batch_size' ? I18n::t('Die Portionsgröße muss 0 (alle) oder größer sein.') : I18n::t('Die Pause muss 0 (ohne Pause) oder mehr Minuten sein.'));
                 }
                 $set[$setting] = $n;
             }
@@ -212,18 +213,18 @@ final class MailService
         $this->requireConfigured();
         $address = is_string($to) && trim($to) !== '' ? trim($to) : (string) ($this->app->users->profile($actor->id)['email'] ?? '');
         if ($address === '' || filter_var($address, FILTER_VALIDATE_EMAIL) === false) {
-            throw ApiError::invalid('Bitte eine gültige Adresse für die Testmail eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte eine gültige Adresse für die Testmail eingeben.'));
         }
         $name = $this->app->config->name();
-        $text = "Diese Testmail kommt von der App „{$name}“. Der Mailversand ist richtig eingerichtet.";
+        $text = I18n::t('Diese Testmail kommt von der App „{name}“. Der Mailversand ist richtig eingerichtet.', ['name' => $name]);
         $mailer = $this->app->mailer();
-        $result = $mailer->send(new Mail($address, '', 'Testmail: ' . $name, '<p>' . htmlspecialchars($text, ENT_QUOTES, 'UTF-8') . '</p>', $text));
+        $result = $mailer->send(new Mail($address, '', I18n::t('Testmail: {name}', ['name' => $name]), '<p>' . htmlspecialchars($text, ENT_QUOTES, 'UTF-8') . '</p>', $text));
         $this->rememberServerSize($mailer->serverMaxSize());
         $mailer->close();
         if (!$result->ok) {
-            return ['sent' => false, 'message' => 'Die Testmail konnte nicht gesendet werden: ' . $result->error];
+            return ['sent' => false, 'message' => I18n::t('Die Testmail konnte nicht gesendet werden: {error}', ['error' => $result->error])];
         }
-        return ['sent' => true, 'message' => 'Testmail an ' . $address . ' gesendet.'];
+        return ['sent' => true, 'message' => I18n::t('Testmail an {address} gesendet.', ['address' => $address])];
     }
 
     /**
@@ -296,7 +297,7 @@ final class MailService
             throw ApiError::invalid($unavailable);
         }
         if (!$this->configured()) {
-            throw ApiError::invalid('Bitte zuerst Kompanieadresse und Mailserver eintragen.');
+            throw ApiError::invalid(I18n::t('Bitte zuerst Kompanieadresse und Mailserver eintragen.'));
         }
     }
 }

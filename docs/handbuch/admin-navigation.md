@@ -46,7 +46,14 @@ Beide Leisten sind unabhängig: Die Angemeldeten können dabei auch bei der Stan
 1. Ziehe unter **Verwaltung** einen Knopf am Griff an seine neue Stelle, in der Liste **Startseite der Verwaltung** oder **Einrichtungen**. Ein Knopf bleibt dabei in seiner Liste.
 2. Tippe auf **Navigation speichern**.
 
-Die Reihenfolge gilt für alle; jede Person sieht weiter nur die Knöpfe, für die sie das Recht hat. **Standardreihenfolge der Verwaltung** stellt die ursprüngliche Reihenfolge wieder her; tippe danach auf **Navigation speichern**. Ein Knopf, der mit einem Update neu dazukommt, steht hinter dem Knopf, hinter dem er auch ohne eure Reihenfolge stünde.
+Die Reihenfolge ist die Vorgabe für alle; jede Person sieht weiter nur die Knöpfe, für die sie das Recht hat, und kann sie für sich selbst anders anordnen ([Kacheln anordnen](seite:kacheln-anordnen)). **Standardreihenfolge der Verwaltung** stellt die ursprüngliche Reihenfolge wieder her; tippe danach auf **Navigation speichern**. Ein Knopf, der mit einem Update neu dazukommt, steht hinter dem Knopf, hinter dem er auch ohne eure Reihenfolge stünde.
+
+### Ein Raster mit Plätzen und Breiten für alle vorgeben
+Statt nur der Reihenfolge kannst du auch festlegen, wo jede Kachel steht und wie breit sie ist, für die Verwaltung, die Einrichtungen, jedes Untermenü und die Einstellungen:
+1. Öffne die Seite und ordne die Kacheln an wie für dich selbst ([Kacheln anordnen](seite:kacheln-anordnen)).
+2. Tippe im Hinweis über den Kacheln auf **Als Vorgabe für alle** und bestätige.
+
+Die Vorgabe gilt für jede Person, die die Seite nicht selbst angeordnet hat, auch ohne Anmeldung und in der Vorschau **App als … ansehen**. Sie gilt für die Bildschirmbreite, an der du sie festlegst (2 bis 5 Spalten); für die anderen Breiten übernimmt die App ihre Reihenfolge, bis du dort auch eine festlegst. Wer eine Kachel nicht sehen darf, bei dem wird die schmalste Kachel derselben Zeile breiter (bei gleicher Breite die linke); keine Kachel wechselt die Zeile. **Vorgabe löschen** entfernt sie für alle Breiten; danach gilt wieder die Reihenfolge von hier. Die Änderung steht im Änderungsprotokoll.
 
 ### Ein Untermenü anlegen
 1. Tippe auf **Untermenü hinzufügen**.
@@ -69,7 +76,7 @@ So lässt sich auch **Intern** der Standardnavigation umbenennen, ohne dass ihr 
 1. Wähle unter **Startseite** bei **Für Gäste** und bei **Angemeldet** jeweils einen Punkt. Zur Wahl steht, was in der jeweiligen Leiste steht, auch Untermenüs; für Angemeldete auch **Meins**.
 2. Tippe auf **Navigation speichern**.
 
-Wer die gewählte Startseite nicht sehen darf, landet auf dem ersten Punkt der Leiste, den er sehen darf. Geteilte Links und Benachrichtigungen öffnen weiter ihre eigene Seite. Die Begrüßung für Gäste und die Hinweise zum Zugang und zu Benachrichtigungen stehen auf der Startseite.
+Wer die gewählte Startseite nicht sehen darf, landet auf dem ersten Punkt der Leiste, den er sehen darf. Geteilte Links und Benachrichtigungen öffnen weiter ihre eigene Seite. Die Begrüßung für Gäste und der Hinweis zum Zugang stehen auf der Startseite.
 
 ### Nur Symbole zeigen
 Schalte unter **Darstellung** **Namen unter den Symbolen zeigen** aus und tippe auf **Navigation speichern**. Unten stehen dann nur noch die Symbole, das hilft bei vielen Punkten. Die Namen stehen weiter oben auf jeder Seite.

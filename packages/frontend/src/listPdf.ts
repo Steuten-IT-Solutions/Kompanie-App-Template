@@ -6,6 +6,7 @@
 // Maße in Millimetern wie @page im Ausdruck: A4, 12 mm Rand, Seitenzahl unten rechts, Tabellenkopf auf jeder Seite.
 import { jsPDF } from 'jspdf';
 import { columnWidths, listFileBase } from './lists';
+import { t } from './i18n';
 
 export interface ListPdfColumn {
   label: string;
@@ -366,7 +367,10 @@ export function buildListPdf(input: ListPdfInput, logo: string | null): jsPDF {
   doc.setTextColor(0, 0, 0);
   for (let p = 1; p <= page; p++) {
     doc.setPage(p);
-    doc.text(`Seite ${p} von ${page}`, pageW - MARGIN, pageH - MARGIN / 2, { align: 'right', baseline: 'middle' });
+    doc.text(t('Seite {page} von {count}', { page: p, count: page }), pageW - MARGIN, pageH - MARGIN / 2, {
+      align: 'right',
+      baseline: 'middle',
+    });
   }
   return doc;
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Storage;
 
+use KompanieApp\Core\I18n\I18n;
+
 /**
  * Verschlüsselt eine Sicherung beim Schreiben (Format: BackupCrypto). Als Filter an einem Ausgabestrom (attach/finish)
  * lässt sich die Sicherung direkt verschlüsselt schreiben: Der Klartext liegt nie als Datei vor und nie ganz im
@@ -41,7 +43,7 @@ final class BackupEncryptor
     {
         $public = base64_decode((string) ($key['public_key'] ?? ''), true);
         if ($public === false || strlen($public) !== SODIUM_CRYPTO_BOX_PUBLICKEYBYTES) {
-            throw new \RuntimeException('Für Sicherungen ist kein gültiges Passwort eingerichtet.');
+            throw new \RuntimeException(I18n::t('Für Sicherungen ist kein gültiges Passwort eingerichtet.'));
         }
         $fileKey = sodium_crypto_secretstream_xchacha20poly1305_keygen();
         try {
@@ -57,7 +59,7 @@ final class BackupEncryptor
             ] + $meta, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         } catch (\JsonException | \SodiumException $e) {
             // Als RuntimeException wie alle Fehler beim Sichern (Aufrufer fangen nur diese, z. B. vor einem Update).
-            throw new \RuntimeException('Die Sicherung ließ sich nicht verschlüsseln: ' . $e->getMessage(), 0, $e);
+            throw new \RuntimeException(I18n::t('Die Sicherung ließ sich nicht verschlüsseln: {error}', ['error' => $e->getMessage()]), 0, $e);
         } finally {
             sodium_memzero($fileKey);
         }
@@ -142,12 +144,12 @@ final class BackupEncryptor
             stream_filter_register(self::FILTER, BackupEncryptFilter::class);
         }
         if (fwrite($out, $this->head) !== strlen($this->head)) {
-            throw new \RuntimeException('Die verschlüsselte Sicherung ließ sich nicht schreiben (Speicherplatz?).');
+            throw new \RuntimeException(I18n::t('Die verschlüsselte Sicherung ließ sich nicht schreiben (Speicherplatz?).'));
         }
         $this->bytes = strlen($this->head);
         $filter = stream_filter_append($out, self::FILTER, STREAM_FILTER_WRITE, $this);
         if ($filter === false) {
-            throw new \RuntimeException('Die Sicherung ließ sich nicht verschlüsseln (Filter).');
+            throw new \RuntimeException(I18n::t('Die Sicherung ließ sich nicht verschlüsseln (Filter).'));
         }
         $this->filter = $filter;
     }
@@ -160,10 +162,10 @@ final class BackupEncryptor
             $this->filter = null;
         }
         if ($this->error !== null) {
-            throw new \RuntimeException('Die Sicherung ließ sich nicht verschlüsseln: ' . $this->error->getMessage(), 0, $this->error);
+            throw new \RuntimeException(I18n::t('Die Sicherung ließ sich nicht verschlüsseln: {error}', ['error' => $this->error->getMessage()]), 0, $this->error);
         }
         if (!$this->finished) {
-            throw new \RuntimeException('Die Sicherung ließ sich nicht verschlüsseln (Abschluss fehlt).');
+            throw new \RuntimeException(I18n::t('Die Sicherung ließ sich nicht verschlüsseln (Abschluss fehlt).'));
         }
     }
 }

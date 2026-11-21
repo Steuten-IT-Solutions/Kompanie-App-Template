@@ -2,6 +2,7 @@ import { ATTENDANCE_LABELS, countsText } from '../api';
 import { formatDate } from '../format';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
+import { t } from '../i18n';
 
 /** Meins → Anwesenheit: eigene Einträge, die jüngsten Termine zuerst. */
 export default function MeineAnwesenheit() {
@@ -9,7 +10,7 @@ export default function MeineAnwesenheit() {
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const { entries, counts } = data!;
-  if (entries.length === 0) return <Empty>Für dich ist noch keine Anwesenheit eingetragen.</Empty>;
+  if (entries.length === 0) return <Empty>{t('Für dich ist noch keine Anwesenheit eingetragen.')}</Empty>;
   return (
     <div className="my-attendance">
       <p className="attendance-counts">{countsText(counts)}</p>
@@ -20,7 +21,7 @@ export default function MeineAnwesenheit() {
               <div className="row-title">{e.title}</div>
               <div className="row-sub">
                 {formatDate(e.date)}
-                {e.updated_by_name && ` · eingetragen von ${e.updated_by_name}`}
+                {e.updated_by_name && ` · ${t('eingetragen von {name}', { name: e.updated_by_name })}`}
               </div>
             </div>
             <span className={`badge badge-att badge-att-${e.status}`}>{ATTENDANCE_LABELS[e.status]}</span>

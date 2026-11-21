@@ -37,6 +37,12 @@ final class BackupUploadTest extends TestCase
     private array $folders = [];
     /** Antwort beim Hochladen der Daten (z. B. 507, wenn der Speicher voll ist). */
     private int $putStatus = 200;
+    /** So viele der nächsten Stücke beantwortet Google mit HTTP 502 (Daten nicht oder nur teilweise angekommen). */
+    private int $badGateways = 0;
+    /** Beim 502 kommt so viel vom Stück trotzdem an (Bytes). */
+    private int $partialOnBadGateway = 0;
+    /** @var int[] Wartezeiten zwischen den Versuchen */
+    private array $pauses = [];
     private int $ids = 0;
     /** Content-Range je Hochladen der Daten (null: in einem Stück) */
     private array $puts = [];
@@ -96,7 +102,25 @@ final class BackupUploadTest extends TestCase
                     return ['status' => $this->putStatus, 'body' => '{"error":{"message":"The user\'s Drive storage quota has been exceeded."}}'];
                 }
                 $id = substr($url, strlen('https://upload.example/session/'));
+                // Nachfrage nach dem Stand (Content-Range: bytes */<Größe>): 308 mit Range, oder fertig
+                if (preg_match('#^bytes \*/(\d+)$#', $headers['Content-Range'] ?? '', $m) === 1) {
+                    if (($headers['Content-Length'] ?? null) !== '0') {
+                        return ['status' => 411, 'body' => '<html><title>Error 411 (Length Required)!!1</title></html>'];
+                    }
+                    $have = strlen($this->drive[$id]['content']);
+                    if ($have === (int) $m[1]) {
+                        return ['status' => 200, 'body' => (string) json_encode(['id' => $id])];
+                    }
+                    return ['status' => 308, 'headers' => $have > 0 ? ['range' => 'bytes=0-' . ($have - 1)] : [], 'body' => ''];
+                }
                 $this->puts[] = $headers['Content-Range'] ?? null;
+                if ($this->badGateways > 0) {
+                    $this->badGateways--;
+                    if (isset($headers['Content-Range']) && preg_match('#^bytes (\d+)-#', $headers['Content-Range'], $m) === 1 && (int) $m[1] === strlen($this->drive[$id]['content'])) {
+                        $this->drive[$id]['content'] .= substr((string) $body, 0, $this->partialOnBadGateway);
+                    }
+                    return ['status' => 502, 'body' => '<html><title>Error 502 (Server Error)!!1</title></html>'];
+                }
                 // In Stücken (Content-Range): anhängen, 308 bis zum letzten Stück
                 if (isset($headers['Content-Range']) && preg_match('#^bytes (\d+)-(\d+)/(\d+)$#', $headers['Content-Range'], $m) === 1) {
                     if ((int) $m[1] !== strlen($this->drive[$id]['content']) || (int) $m[2] - (int) $m[1] + 1 !== strlen((string) $body)) {
@@ -278,6 +302,66 @@ final class BackupUploadTest extends TestCase
         $this->assertSame(3, $stats['chunks'], 'Messung: drei Stücke');
         $this->assertGreaterThanOrEqual($stats['slowest_seconds'], $stats['send_seconds']);
         $this->assertGreaterThanOrEqual($stats['send_seconds'] + $stats['start_seconds'], $stats['total_seconds'] + 0.002);
+    }
+
+    public function testTemporaryErrorsAreRetriedFromTheConfirmedPosition(): void
+    {
+        $this->connect();
+        $this->api('PUT', '/admin/backup/drive', ['enabled' => true]);
+        $drive = $this->app->drive();
+        $drive->pauseWith(function (int $seconds): void {
+            $this->pauses[] = $seconds;
+        });
+        $file = tempnam(sys_get_temp_dir(), 'gross');
+        $content = random_bytes(600 * 1024);
+        file_put_contents($file, $content);
+
+        // Zweites Stück: zweimal HTTP 502, jedes Mal kommen 100 KB davon trotzdem an. Weiter ab dem bestätigten Stand.
+        $this->partialOnBadGateway = 100 * 1024;
+        $seen = [];
+        $first = true;
+        $id = $drive->uploadFile('ORDNER', 'gross.bin', $file, 'application/octet-stream', 256 * 1024, function (int $done) use (&$seen, &$first): void {
+            $seen[] = $done;
+            if ($done === 262144 && $first) {
+                $first = false;
+                $this->badGateways = 2;
+            }
+        });
+        $this->assertSame($content, $this->drive[$id]['content'], 'Datei vollständig und ohne doppelte Bytes');
+        $this->assertSame([
+            'bytes 0-262143/614400',
+            'bytes 262144-524287/614400', // 502, 100 KB angekommen
+            'bytes 364544-614399/614400', // ab dem bestätigten Stand: wieder 502, 100 KB angekommen
+            'bytes 466944-614399/614400',
+        ], $this->puts);
+        $this->assertSame([2, 5], $this->pauses, 'wartet zwischen den Versuchen länger');
+        $this->assertSame(2, $drive->lastUploadStats()['retries'] ?? null);
+
+        // Bleibt der Fehler, gibt die App nach allen Wartezeiten auf
+        $this->puts = [];
+        $this->pauses = [];
+        $this->badGateways = 99;
+        $this->partialOnBadGateway = 0;
+        try {
+            $drive->uploadFile('ORDNER', 'gross.bin', $file, 'application/octet-stream', 256 * 1024);
+            $this->fail('Hochladen hätte scheitern müssen');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('Google Drive: Das Hochladen ist fehlgeschlagen: HTTP 502 (5 Versuche)', $e->getMessage());
+        }
+        $this->assertSame(DriveClient::RETRY_WAIT, $this->pauses);
+        $this->assertCount(5, $this->puts);
+
+        // Andere Fehler (z. B. Speicher voll) ohne neuen Versuch
+        $this->pauses = [];
+        $this->badGateways = 0;
+        $this->putStatus = 403;
+        try {
+            $drive->uploadFile('ORDNER', 'gross.bin', $file, 'application/octet-stream', 256 * 1024);
+            $this->fail('Hochladen hätte scheitern müssen');
+        } catch (\RuntimeException) {
+        }
+        $this->assertSame([], $this->pauses);
+        @unlink($file);
     }
 
     public function testDurationOfTheLastUploadIsShown(): void

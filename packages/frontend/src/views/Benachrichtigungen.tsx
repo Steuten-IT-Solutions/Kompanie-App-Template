@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import brand from '../generated/brand';
+import { t } from '../i18n';
 import { api, config, type PushDevice, type PushStatus, type PushType } from '../api';
 import { currentDevice, disablePush, enablePush, matchesServerKey, pushSupport } from '../push';
+import { androidBrowser } from '../androidBrowser';
+import { detectPlatform, isInAppBrowser } from '../install';
 import { previewRole } from '../preview';
 import { navigate } from '../router';
 import { ErrorBox, Loading } from '../ui';
@@ -12,6 +15,8 @@ import { ErrorBox, Loading } from '../ui';
  */
 export default function Benachrichtigungen({ onToast }: { onToast: (msg: string) => void }) {
   const support = pushSupport();
+  const android = detectPlatform() === 'android';
+  const inAppBrowser = isInAppBrowser() || (android && androidBrowser(navigator.userAgent) === 'webview');
   const [device, setDevice] = useState<PushDevice | null>(null);
   const [status, setStatus] = useState<PushStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,9 +57,9 @@ export default function Benachrichtigungen({ onToast }: { onToast: (msg: string)
   if (previewRole()) {
     return (
       <div className="card push-card">
-        <h3>Benachrichtigungen</h3>
+        <h3>{t('Benachrichtigungen')}</h3>
         <p className="small muted">
-          In der Vorschau lassen sich Benachrichtigungen nicht ansehen oder einrichten: Sie gehören zu diesem Gerät und deinem Konto.
+          {t('In der Vorschau lassen sich Benachrichtigungen nicht ansehen oder einrichten: Sie gehören zu diesem Gerät und deinem Konto.')}
         </p>
       </div>
     );
@@ -62,13 +67,14 @@ export default function Benachrichtigungen({ onToast }: { onToast: (msg: string)
   if (support === 'ios-install') {
     return (
       <div className="card push-card">
-        <h3>Benachrichtigungen</h3>
+        <h3>{t('Benachrichtigungen')}</h3>
         <p className="small">
-          Auf dem iPhone und iPad gibt es Benachrichtigungen nur in der installierten App (ab iOS 16.4). Hol dir die App auf den
-          Home-Bildschirm und öffne sie von dort.
+          {t(
+            'Auf dem iPhone und iPad gibt es Benachrichtigungen nur in der installierten App (ab iOS 16.4). Hol dir die App auf den Home-Bildschirm und öffne sie von dort.',
+          )}
         </p>
         <button className="btn btn-block" onClick={() => navigate('installieren')}>
-          App installieren
+          {t('App installieren')}
         </button>
       </div>
     );
@@ -76,9 +82,13 @@ export default function Benachrichtigungen({ onToast }: { onToast: (msg: string)
   if (support === 'unsupported') {
     return (
       <div className="card push-card">
-        <h3>Benachrichtigungen</h3>
+        <h3>{t('Benachrichtigungen')}</h3>
         <p className="small muted">
-          Dieser Browser unterstützt keine Benachrichtigungen. Probier es mit einem aktuellen Chrome, Firefox, Edge oder Safari.
+          {inAppBrowser
+            ? t(
+                'Diese Seite ist im eingebauten Browser einer anderen App geöffnet (z. B. WhatsApp, Facebook). Solche Browser können keine Benachrichtigungen zeigen. Öffne die Adresse in Chrome (Android) bzw. Safari (iPhone).',
+              )
+            : t('Dieser Browser unterstützt keine Benachrichtigungen. Probier es mit einem aktuellen Chrome, Firefox, Edge oder Safari.')}
         </p>
       </div>
     );
@@ -88,16 +98,16 @@ export default function Benachrichtigungen({ onToast }: { onToast: (msg: string)
   if (!status.supported) {
     return (
       <div className="card push-card">
-        <h3>Benachrichtigungen</h3>
-        <p className="small muted">Der Server dieser App kann noch keine Benachrichtigungen senden. Sag bitte dem Admin Bescheid.</p>
+        <h3>{t('Benachrichtigungen')}</h3>
+        <p className="small muted">{t('Der Server dieser App kann noch keine Benachrichtigungen senden. Sag bitte dem Admin Bescheid.')}</p>
       </div>
     );
   }
   if (status.types.length === 0) {
     return (
       <div className="card push-card">
-        <h3>Benachrichtigungen</h3>
-        <p className="small muted">Zurzeit gibt es nichts, worüber die App dich benachrichtigen könnte.</p>
+        <h3>{t('Benachrichtigungen')}</h3>
+        <p className="small muted">{t('Zurzeit gibt es nichts, worüber die App dich benachrichtigen könnte.')}</p>
       </div>
     );
   }
@@ -127,7 +137,7 @@ export default function Benachrichtigungen({ onToast }: { onToast: (msg: string)
       setStatus({ ...status, subscription: sub });
       setTypes(sub.types);
       setDetails(sub.details);
-      onToast('Benachrichtigungen sind an');
+      onToast(t('Benachrichtigungen sind an'));
     });
 
   const disable = () =>
@@ -135,7 +145,7 @@ export default function Benachrichtigungen({ onToast }: { onToast: (msg: string)
       if (device) await disablePush(device);
       setDevice(null);
       setStatus({ ...status, subscription: null });
-      onToast('Benachrichtigungen sind aus');
+      onToast(t('Benachrichtigungen sind aus'));
     });
 
   const toggleType = (key: PushType, on: boolean) => {
@@ -162,18 +172,18 @@ export default function Benachrichtigungen({ onToast }: { onToast: (msg: string)
   const test = () =>
     run(async () => {
       if (device) await api.pushTest(device);
-      onToast('Testnachricht gesendet');
+      onToast(t('Testnachricht gesendet'));
     });
 
   return (
     <div className="card push-card">
-      <h3>Benachrichtigungen</h3>
+      <h3>{t('Benachrichtigungen')}</h3>
       <p className="small muted">
         {active
-          ? 'Dieses Gerät bekommt Benachrichtigungen zu:'
+          ? t('Dieses Gerät bekommt Benachrichtigungen zu:')
           : config?.user
-            ? 'Lass dich auf diesem Gerät benachrichtigen, wenn es Neues für dich gibt.'
-            : 'Lass dich benachrichtigen, wenn es etwas Neues gibt – ganz ohne Konto.'}
+            ? t('Lass dich auf diesem Gerät benachrichtigen, wenn es Neues für dich gibt.')
+            : t('Lass dich benachrichtigen, wenn es etwas Neues gibt – ganz ohne Konto.')}
       </p>
       <div className="push-types">
         {status.types.map((t) => (
@@ -193,14 +203,25 @@ export default function Benachrichtigungen({ onToast }: { onToast: (msg: string)
         <label className="toggle">
           <input type="checkbox" checked={details} disabled={busy} onChange={(e) => toggleDetails(e.target.checked)} />
           <span>
-            {brand.labels.sections.penalties}: Betrag und Grund in der Nachricht zeigen
-            <span className="small muted feature-desc">Aus: nur ein Hinweis – gut, wenn andere deinen Sperrbildschirm sehen.</span>
+            {t('{section}: Betrag und Grund in der Nachricht zeigen', { section: brand.labels.sections.penalties })}
+            <span className="small muted feature-desc">{t('Aus: nur ein Hinweis – gut, wenn andere deinen Sperrbildschirm sehen.')}</span>
           </span>
         </label>
       )}
       {blocked && !active && (
         <p className="small" role="alert">
-          Benachrichtigungen sind für diese Seite blockiert. Erlaube sie in den Einstellungen des Browsers und lade die Seite neu.
+          {t(
+            'Benachrichtigungen sind für diese Seite blockiert, deshalb fragt der Browser nicht mehr nach. Erlaube sie in den Einstellungen des Browsers und lade die Seite neu.',
+          )}
+          {android && (
+            <>
+              {' '}
+              {t('In Chrome: links neben der Adresse auf das Symbol tippen')} → <strong>{t('Berechtigungen')}</strong> →{' '}
+              <strong>{t('Benachrichtigungen')}</strong> → <strong>{t('Zulassen')}</strong>.{' '}
+              {t('In der installierten App außerdem: Einstellungen des Handys')} → <strong>{t('Apps')}</strong> → {t('die App')} →{' '}
+              <strong>{t('Benachrichtigungen')}</strong>.
+            </>
+          )}
         </p>
       )}
       {actionError && (
@@ -211,15 +232,15 @@ export default function Benachrichtigungen({ onToast }: { onToast: (msg: string)
       {active ? (
         <>
           <button className="btn btn-secondary btn-block push-test" onClick={test} disabled={busy}>
-            Testnachricht senden
+            {t('Testnachricht senden')}
           </button>
           <button className="btn btn-link btn-block push-off" onClick={disable} disabled={busy}>
-            Benachrichtigungen ausschalten
+            {t('Benachrichtigungen ausschalten')}
           </button>
         </>
       ) : (
         <button className="btn btn-block push-on" onClick={enable} disabled={busy || blocked || types.length === 0}>
-          {busy ? 'Einen Moment …' : 'Benachrichtigungen einschalten'}
+          {busy ? t('Einen Moment …') : t('Benachrichtigungen einschalten')}
         </button>
       )}
     </div>

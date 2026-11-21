@@ -6,6 +6,7 @@ namespace KompanieApp\Standalone;
 
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\AuthContext;
 use KompanieApp\Core\Port\Authenticator;
 
@@ -97,25 +98,25 @@ final class SessionAuth implements Authenticator, AuthContext
         // weiter zur Rechteprüfung, damit eine abgelaufene Sitzung 401 ergibt.
         $type = strtolower(trim(explode(';', (string) $this->http->header('Content-Type'))[0]));
         if (($type !== '' || $this->http->hasBody()) && $type !== 'application/json') {
-            throw new ApiError(415, 'unsupported_media_type', 'Bitte Daten als JSON senden.');
+            throw new ApiError(415, 'unsupported_media_type', I18n::t('Bitte Daten als JSON senden.'));
         }
         // Browser melden, ob eine Anfrage von einer fremden Seite kommt.
         if (strtolower((string) $this->http->header('Sec-Fetch-Site')) === 'cross-site') {
-            throw new ApiError(403, 'csrf_invalid', 'Anfrage von einer fremden Seite abgelehnt.');
+            throw new ApiError(403, 'csrf_invalid', I18n::t('Anfrage von einer fremden Seite abgelehnt.'));
         }
         $origin = $this->http->header('Origin');
         if ($origin !== null && $origin !== 'null' && !$this->sameOrigin($origin)) {
-            throw new ApiError(403, 'csrf_invalid', 'Anfrage von einer fremden Seite abgelehnt.');
+            throw new ApiError(403, 'csrf_invalid', I18n::t('Anfrage von einer fremden Seite abgelehnt.'));
         }
         if ($origin === 'null') {
-            throw new ApiError(403, 'csrf_invalid', 'Anfrage von einer fremden Seite abgelehnt.');
+            throw new ApiError(403, 'csrf_invalid', I18n::t('Anfrage von einer fremden Seite abgelehnt.'));
         }
         if ($this->currentUser() === null) {
             return; // Gäste ändern nichts außer der Anmeldung selbst.
         }
         $sent = (string) $this->http->header(self::CSRF_HEADER);
         if ($sent === '' || !hash_equals($this->csrfToken(), $sent)) {
-            throw new ApiError(403, 'csrf_invalid', 'Die Sitzung wurde erneuert. Bitte noch einmal versuchen.');
+            throw new ApiError(403, 'csrf_invalid', I18n::t('Die Sitzung wurde erneuert. Bitte noch einmal versuchen.'));
         }
     }
 
@@ -123,7 +124,7 @@ final class SessionAuth implements Authenticator, AuthContext
     {
         $ip = $this->http->clientIp();
         if ($username === '' || $password === '') {
-            throw ApiError::invalid('Bitte Benutzername und Passwort eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte Benutzername und Passwort eingeben.'));
         }
         $row = $this->users->findForLogin($username);
         // Gezählt wird je Konto, gleich in welcher Schreibweise oder ob per Name oder E-Mail.
@@ -131,16 +132,16 @@ final class SessionAuth implements Authenticator, AuthContext
         $account = $row ? 'u' . $id : 'n' . mb_strtolower(trim($username));
         $knownDevice = $row !== null && $this->isKnownDevice($id);
         if (!$this->throttle->attempt($account, $ip, $knownDevice)) {
-            throw new ApiError(429, 'too_many_attempts', 'Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen.');
+            throw new ApiError(429, 'too_many_attempts', I18n::t('Zu viele Fehlversuche. Bitte in 15 Minuten erneut versuchen.'));
         }
         // Auch ohne Konto einen Hash gleicher Stärke prüfen, damit die Antwortzeit nichts verrät.
         $hash = $row ? (string) $row['password_hash'] : $this->dummyHash();
         if (!password_verify($password, $hash) || !$row) {
-            throw new ApiError(400, 'login_failed', 'Benutzername oder Passwort ist falsch.');
+            throw new ApiError(400, 'login_failed', I18n::t('Benutzername oder Passwort ist falsch.'));
         }
         // Erst nach dem Passwort prüfen: Sonst verriete die Meldung ohne Passwort, dass es das Konto gibt.
         if (PdoUsers::isDisabled($row)) {
-            throw new ApiError(403, 'account_disabled', 'Dieses Konto ist nicht mehr aktiv. Bitte wende dich an die Kompanie.');
+            throw new ApiError(403, 'account_disabled', I18n::t('Dieses Konto ist nicht mehr aktiv. Bitte wende dich an die Kompanie.'));
         }
         $this->throttle->success($account, $ip, $knownDevice);
         $this->users->rehashIfNeeded($id, $password, $hash);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Infra;
 
 use KompanieApp\Core\Domain\JpegMetadata;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\ImageResizer;
 
 /** Bildverkleinerung mit der PHP-Erweiterung GD. */
@@ -13,12 +14,12 @@ final class GdImageResizer implements ImageResizer
     public function resizeToJpeg(string $sourceFile, string $targetFile, int $maxEdge, int $quality): array
     {
         if (!function_exists('imagecreatefromstring')) {
-            throw new \RuntimeException('Auf dem Server fehlt die PHP-Erweiterung GD für Bilder.');
+            throw new \RuntimeException(I18n::t('Auf dem Server fehlt die PHP-Erweiterung GD für Bilder.'));
         }
         $data = @file_get_contents($sourceFile);
         $src = $data === false ? false : @imagecreatefromstring($data);
         if ($src === false) {
-            throw new \RuntimeException('Das Bild kann nicht gelesen werden.');
+            throw new \RuntimeException(I18n::t('Das Bild kann nicht gelesen werden.'));
         }
         $src = $this->orient($src, $sourceFile);
         $w = imagesx($src);
@@ -41,7 +42,7 @@ final class GdImageResizer implements ImageResizer
         $ok = imagejpeg($dst, $targetFile, $quality);
         imagedestroy($dst);
         if (!$ok) {
-            throw new \RuntimeException('Das Bild kann nicht gespeichert werden.');
+            throw new \RuntimeException(I18n::t('Das Bild kann nicht gespeichert werden.'));
         }
         JpegMetadata::stripFile($targetFile); // GD schreibt keine Metadaten; zur Sicherheit wie im WordPress-Adapter
         return ['width' => $nw, 'height' => $nh];
@@ -50,12 +51,12 @@ final class GdImageResizer implements ImageResizer
     public function resizeToPng(string $sourceFile, string $targetFile, int $maxEdge): array
     {
         if (!function_exists('imagecreatefromstring')) {
-            throw new \RuntimeException('Auf dem Server fehlt die PHP-Erweiterung GD für Bilder.');
+            throw new \RuntimeException(I18n::t('Auf dem Server fehlt die PHP-Erweiterung GD für Bilder.'));
         }
         $data = @file_get_contents($sourceFile);
         $src = $data === false ? false : @imagecreatefromstring($data);
         if ($src === false) {
-            throw new \RuntimeException('Das Bild kann nicht gelesen werden.');
+            throw new \RuntimeException(I18n::t('Das Bild kann nicht gelesen werden.'));
         }
         // Palettenbilder (PNG-8) erst in Echtfarben umwandeln, sonst geht beim Verkleinern die Transparenz verloren.
         if (!imageistruecolor($src)) {
@@ -76,7 +77,7 @@ final class GdImageResizer implements ImageResizer
         imagedestroy($src);
         imagedestroy($dst);
         if (!$ok) {
-            throw new \RuntimeException('Das Bild kann nicht gespeichert werden.');
+            throw new \RuntimeException(I18n::t('Das Bild kann nicht gespeichert werden.'));
         }
         return ['width' => $nw, 'height' => $nh];
     }

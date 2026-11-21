@@ -2,6 +2,7 @@ import { Suspense, useState, type FormEvent } from 'react';
 import { api, ApiError, type NewsItem } from '../api';
 import { Loading, lazyView } from '../ui';
 import { blocksInput, draftsFrom, newBlock, type BlockDraft } from '../blocks/blockDrafts';
+import { t } from '../i18n';
 
 const BlocksEditor = lazyView(() => import('../blocks/BlocksEditor'));
 
@@ -56,7 +57,7 @@ export default function NewsSchreiben({
     try {
       const data = { title: title.trim(), blocks: blocksInput(blocks), cover: cover.uid };
       const saved = item ? await api.updateNews(item.id, { ...data, updated_at: item.updated_at ?? null }) : await api.createNews(data);
-      onToast(item ? 'Gespeichert' : 'Beitrag veröffentlicht');
+      onToast(item ? t('Gespeichert') : t('Beitrag veröffentlicht'));
       onDone(saved);
     } catch (err) {
       setConflict(err instanceof ApiError && err.code === 'conflict');
@@ -68,26 +69,26 @@ export default function NewsSchreiben({
 
   return (
     <form className="form card news-editor" onSubmit={save}>
-      <h3>{item ? 'Beitrag bearbeiten' : 'Neuer Beitrag'}</h3>
+      <h3>{item ? t('Beitrag bearbeiten') : t('Neuer Beitrag')}</h3>
       <label className="field">
-        <span>Titel</span>
+        <span>{t('Titel')}</span>
         <input type="text" maxLength={TITLE_MAX} value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
       </label>
       <div className="field news-cover-field">
-        <span>Titelbild (optional)</span>
+        <span>{t('Titelbild (optional)')}</span>
         {cover.url && (
           <div className="card news-cover-preview">
-            <img className="news-image" src={cover.url} alt="Titelbild" />
+            <img className="news-image" src={cover.url} alt={t('Titelbild')} />
           </div>
         )}
         <div className="button-row">
           <label className="btn btn-small btn-secondary">
-            {uploading ? 'Lädt …' : cover.url ? 'Bild ersetzen' : 'Bild wählen'}
+            {uploading ? t('Lädt …') : cover.url ? t('Bild ersetzen') : t('Bild wählen')}
             <input
               type="file"
               accept=".jpg,.jpeg,.png,.webp"
               hidden
-              aria-label="Titelbild"
+              aria-label={t('Titelbild')}
               disabled={uploading}
               onChange={(e) => {
                 void upload(e.target.files?.[0] ?? null);
@@ -97,7 +98,7 @@ export default function NewsSchreiben({
           </label>
           {cover.url && (
             <button type="button" className="btn btn-small btn-secondary" onClick={() => setCover({ uid: null, url: null })}>
-              Bild entfernen
+              {t('Bild entfernen')}
             </button>
           )}
         </div>
@@ -108,7 +109,7 @@ export default function NewsSchreiben({
         )}
       </div>
       <div className="field">
-        <span>Inhalt</span>
+        <span>{t('Inhalt')}</span>
         <Suspense fallback={<Loading shape="text" chunk />}>
           <BlocksEditor value={blocks} onChange={setBlocks} idPrefix={`news-${item?.id ?? 'neu'}`} />
         </Suspense>
@@ -120,10 +121,10 @@ export default function NewsSchreiben({
       )}
       <div className="button-row">
         <button className="btn" type="submit" disabled={busy || conflict || uploading}>
-          {item ? 'Speichern' : 'Veröffentlichen'}
+          {item ? t('Speichern') : t('Veröffentlichen')}
         </button>
         <button className="btn btn-secondary" type="button" onClick={() => onDone(null)}>
-          Abbrechen
+          {t('Abbrechen')}
         </button>
       </div>
     </form>

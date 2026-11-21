@@ -1,4 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
+import { fromDraft, legacyOf, ruleFromRole } from '../admissionRule';
+import { RuleEditor } from '../admissionRuleView';
 import { api, applyRoles, config, eventKinds, levelLabel, type Capability, type Level, type RoleAdmin } from '../api';
 import { CAPABILITIES, isView, lockedFor, orderedCaps, toggleForRole } from '../capabilities';
 import { RightsTree } from '../rightsTree';
@@ -9,10 +11,11 @@ import { PUBLIC_PREVIEW, startPreview } from '../preview';
 import { Caps, ErrorBox, Loading, useAsync } from '../ui';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
+import { localeTag, t, tn } from '../i18n';
 
 const sec = brand.labels.sections;
 
-const factorText = (f: number) => `×${f.toLocaleString('de-DE')}`;
+const factorText = (f: number) => `×${f.toLocaleString(localeTag())}`;
 
 /**
  * Einstellungen → Rollen (Issue #28): Rollen anlegen, umbenennen, Rechte und Punktefaktor festlegen, ordnen (per
@@ -70,12 +73,12 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
 
   return (
     <section className="card settings-section" id="einstellungen-rollen">
-      <h3>Rollen</h3>
-      <nav className="segmented role-views" aria-label="Ansicht">
+      <h3>{t('Rollen')}</h3>
+      <nav className="segmented role-views" aria-label={t('Ansicht')}>
         {(
           [
-            ['rollen', 'Rollen'],
-            ['matrix', 'Wer sieht was'],
+            ['rollen', t('Rollen')],
+            ['matrix', t('Wer sieht was')],
           ] as const
         ).map(([id, label]) => (
           <button key={id} type="button" className={view === id ? 'active' : ''} aria-pressed={view === id} onClick={() => setView(id)}>
@@ -112,19 +115,19 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
                       )}
                     </div>
                     <div className="row-sub">
-                      {r.users === 1 ? '1 Person' : `${r.users} Personen`}
-                      {(r.extra_users ?? 0) > 0 && ` (davon ${r.extra_users} als Zusatzrolle)`}
-                      {!r.system && r.new_accounts && ' · für neue Konten'}
-                      {(r.promotable || r.admission_extra) && ' · Anwärter-Rolle'}
+                      {tn('{count} Person', '{count} Personen', r.users)}
+                      {(r.extra_users ?? 0) > 0 && ` ${t('(davon {count} als Zusatzrolle)', { count: r.extra_users ?? 0 })}`}
+                      {!r.system && r.new_accounts && ` · ${t('für neue Konten')}`}
+                      {(r.promotable || r.admission_extra) && ` · ${t('Anwärter-Rolle')}`}
                       {' · '}
                       {summary(r)}
                     </div>
                   </div>
                   <div className="role-actions">
                     {r.key !== 'admin' && (
-                      <IconButton icon="view" label={`App als ${r.label} ansehen`} onClick={() => startPreview(r.key)} />
+                      <IconButton icon="view" label={t('App als {role} ansehen', { role: r.label })} onClick={() => startPreview(r.key)} />
                     )}
-                    <IconButton icon="edit" label={`${r.label} bearbeiten`} onClick={() => setEditing(r.key)} />
+                    <IconButton icon="edit" label={t('{role} bearbeiten', { role: r.label })} onClick={() => setEditing(r.key)} />
                   </div>
                 </li>
               ),
@@ -134,15 +137,15 @@ export default function Rollen({ onToast, refresh = 0 }: { onToast: (msg: string
             <RoleForm roles={roles} onSaved={saved} onCancel={() => setEditing(null)} />
           ) : (
             <button type="button" className="btn btn-secondary btn-block" onClick={() => setEditing('neu')}>
-              + Neue Rolle
+              {t('+ Neue Rolle')}
             </button>
           )}
           <div className="role-preview">
             <button type="button" className="btn btn-secondary btn-block" onClick={() => startPreview(PUBLIC_PREVIEW)}>
-              App ohne Anmeldung ansehen
+              {t('App ohne Anmeldung ansehen')}
             </button>
             <p className="muted small">
-              Die App mit allen Rollen einer bestimmten Person zusammen ansehen: auf ihrer Seite unter „Konto und Rolle“.
+              {t('Die App mit allen Rollen einer bestimmten Person zusammen ansehen: auf ihrer Seite unter „Konto und Rolle“.')}
             </p>
           </div>
         </>
@@ -177,7 +180,7 @@ function AttendanceGroups({ roles, onToast }: { roles: RoleAdmin[]; onToast: (ms
     try {
       setData(await api.setAttendanceGroups(Object.fromEntries(Object.entries(current).map(([k, v]) => [k, v === '' ? null : v]))));
       setDraft(null);
-      onToast('Gruppen gespeichert');
+      onToast(t('Gruppen gespeichert'));
     } catch (err) {
       setFormError((err as Error).message);
     } finally {
@@ -187,23 +190,25 @@ function AttendanceGroups({ roles, onToast }: { roles: RoleAdmin[]; onToast: (ms
 
   return (
     <form className="form attendance-group-form" onSubmit={save}>
-      <h4>{sec.attendance}: Gruppen im Zähler</h4>
+      <h4>{t('{attendance}: Gruppen im Zähler', { attendance: sec.attendance })}</h4>
       {groups.map((g) => (
         <label key={g.key} className="field field-inline">
           <span>
             <Caps text={g.label} />
           </span>
           <select value={current[g.key] ?? ''} disabled={busy} onChange={(e) => setDraft({ ...current, [g.key]: e.target.value })}>
-            <option value="">Eigene Gruppe</option>
+            <option value="">{t('Eigene Gruppe')}</option>
             {targets
-              .filter((t) => t.key !== g.key)
-              .map((t) => (
-                <option key={t.key} value={t.key}>
-                  zählt als {t.label}
+              .filter((x) => x.key !== g.key)
+              .map((x) => (
+                <option key={x.key} value={x.key}>
+                  {t('zählt als {group}', { group: x.label })}
                 </option>
               ))}
-            {current[g.key] && !targets.some((t) => t.key === current[g.key]) && (
-              <option value={current[g.key]}>zählt als {groups.find((x) => x.key === current[g.key])?.label}</option>
+            {current[g.key] && !targets.some((x) => x.key === current[g.key]) && (
+              <option value={current[g.key]}>
+                {t('zählt als {group}', { group: groups.find((x) => x.key === current[g.key])?.label ?? '' })}
+              </option>
             )}
           </select>
         </label>
@@ -214,7 +219,7 @@ function AttendanceGroups({ roles, onToast }: { roles: RoleAdmin[]; onToast: (ms
         </p>
       )}
       <button className="btn btn-secondary btn-block" type="submit" disabled={busy || !changed}>
-        Gruppen speichern
+        {t('Gruppen speichern')}
       </button>
     </form>
   );
@@ -222,13 +227,13 @@ function AttendanceGroups({ roles, onToast }: { roles: RoleAdmin[]; onToast: (ms
 
 /** Kurz, was eine Rolle darf: Mitglied, wie viele Rechte zum Sehen, die zum Verwalten einzeln. */
 function summary(r: RoleAdmin): string {
-  if (r.key === 'admin') return 'alle Rechte';
-  if (r.capabilities.length === 0) return 'sieht nichts';
+  if (r.key === 'admin') return t('alle Rechte');
+  if (r.capabilities.length === 0) return t('sieht nichts');
   // Nur Rechte, die in der Liste stehen (Rechte für Bereiche, die es noch nicht gibt, zählen nicht mit).
   const views = CAPABILITIES.filter((c) => isView(c.key) && r.capabilities.includes(c.key)).length;
   return [
-    ...(r.capabilities.includes('member') ? ['gehört zur Kompanie'] : []),
-    ...(views > 0 ? [views === 1 ? '1 Recht zum Sehen' : `${views} Rechte zum Sehen`] : []),
+    ...(r.capabilities.includes('member') ? [t('gehört zur Kompanie')] : []),
+    ...(views > 0 ? [tn('{count} Recht zum Sehen', '{count} Rechte zum Sehen', views)] : []),
     ...CAPABILITIES.filter((c) => !isView(c.key) && c.key !== 'member' && r.capabilities.includes(c.key)).map((c) => c.short),
   ].join(', ');
 }
@@ -249,14 +254,13 @@ function RoleForm({
   const [capabilities, setCapabilities] = useState<Set<Capability>>(
     () => new Set(role?.capabilities ?? roles.find((r) => r.key === 'member')?.capabilities ?? ['member']),
   );
-  const [factor, setFactor] = useState((role?.points_factor ?? 1).toLocaleString('de-DE'));
+  const [factor, setFactor] = useState((role?.points_factor ?? 1).toLocaleString(localeTag()));
   const [newAccounts, setNewAccounts] = useState(role?.new_accounts ?? false);
   // Anwärter-Rolle (Aufnahmen): als Grundrolle oder Zusatzrolle; ein Haken. Ohne „Gehört zur Kompanie“ zusätzlich
   // promotable (Grundrolle → Mitglied wie bisher), sonst nur admission_extra. Dazu die Voraussetzung.
   const [promotable, setPromotable] = useState((role?.promotable ?? false) || (role?.admission_extra ?? false));
-  const [admissionKind, setAdmissionKind] = useState(role?.admission_kind ?? '');
-  const [admissionCount, setAdmissionCount] = useState(String(role?.admission_count ?? 0));
-  const [admissionMonths, setAdmissionMonths] = useState(String(role?.admission_months ?? 0));
+  // Voraussetzung als Baum aus UND/ODER-Gruppen; ältere Server ohne admission_rule: aus den früheren Feldern.
+  const [admissionRule, setAdmissionRule] = useState(() => ruleFromRole(role));
   const [replacement, setReplacement] = useState<Level>('member');
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -273,7 +277,9 @@ function RoleForm({
   // Ältere Server kennen die Felder nicht (dann fehlen sie in der Antwort).
   const admissionKnown = !role || role.admission_count !== undefined;
   const candidate = !fixed && admissionKnown && promotable;
-  const kinds = [...eventKinds(), ...(admissionKind && !eventKinds().includes(admissionKind) ? [admissionKind] : [])];
+  const ruleKnown = !role || role.admission_rule !== undefined;
+  const kinds = eventKinds();
+  const legacyRule = ruleKnown ? null : legacyOf(admissionRule);
 
   async function run(action: () => Promise<RoleAdmin[]>, msg: string) {
     setBusy(true);
@@ -299,72 +305,81 @@ function RoleForm({
         : candidate
           ? {
               admission_extra: true,
-              admission_kind: admissionKind,
-              admission_count: admissionKind ? admissionCount : 0,
-              admission_months: admissionMonths,
+              // Ältere Server kennen nur Teilnahmen einer Art UND Mindestdauer.
+              ...(ruleKnown ? { admission_rule: fromDraft(admissionRule) ?? undefined } : (legacyRule ?? {})),
             }
           : { admission_extra: false }),
       ...(withFactor ? { points_factor: factor } : {}),
     };
-    void run(() => (role ? api.updateRole(role.key, data) : api.createRole(data)), role ? 'Rolle gespeichert' : 'Rolle angelegt');
+    void run(() => (role ? api.updateRole(role.key, data) : api.createRole(data)), role ? t('Rolle gespeichert') : t('Rolle angelegt'));
   }
 
   async function remove() {
     if (!role) return;
+    const question = t('Rolle „{role}“ löschen?', { role: role.label });
     const others =
       role.users > 0
-        ? ` Die ${role.users === 1 ? 'Person bekommt' : `${role.users} Personen bekommen`} stattdessen die Rolle „${roles.find((r) => r.key === replacement)?.label}“.`
+        ? tn(
+            'Die Person bekommt stattdessen die Rolle „{role}“.',
+            'Die {count} Personen bekommen stattdessen die Rolle „{role}“.',
+            role.users,
+            {
+              role: roles.find((r) => r.key === replacement)?.label ?? '',
+            },
+          )
         : '';
-    if (!(await confirmAsk(`Rolle „${role.label}“ löschen?${others}`))) return;
-    void run(() => api.deleteRole(role.key, role.users > 0 ? replacement : undefined), 'Rolle gelöscht');
+    if (!(await confirmAsk(others ? `${question} ${others}` : question))) return;
+    void run(() => api.deleteRole(role.key, role.users > 0 ? replacement : undefined), t('Rolle gelöscht'));
   }
 
   return (
     <form className="form role-form" onSubmit={submit}>
       <label className="field">
-        <span>Name der Rolle</span>
+        <span>{t('Name der Rolle')}</span>
         <input type="text" maxLength={30} value={label} onChange={(e) => setLabel(e.target.value)} required autoFocus />
       </label>
       {fixed && (
         <p className="small muted">
           {admin
-            ? 'Admins dürfen alles; die Rechte lassen sich nicht ändern.'
+            ? t('Admins dürfen alles; die Rechte lassen sich nicht ändern.')
             : key === 'member'
-              ? 'Rolle neuer Konten; gehört immer zur Kompanie. Was du hier anhakst, bekommt jedes Mitglied, auch Rechte zum Verwalten.'
-              : 'Gilt für Gäste und für alle, die die App ohne Anmeldung öffnen. Gäste gehören nie zur Kompanie.'}
+              ? t('Rolle neuer Konten; gehört immer zur Kompanie. Was du hier anhakst, bekommt jedes Mitglied, auch Rechte zum Verwalten.')
+              : t('Gilt für Gäste und für alle, die die App ohne Anmeldung öffnen. Gäste gehören nie zur Kompanie.')}
         </p>
       )}
       {key === 'guest' && [...capabilities].some((c) => !isView(c)) && (
         <p className="small rights-warning" role="note">
-          Achtung: Was Gast darf, darf jeder, der die App öffnet – auch ohne Konto, z. B. Inhalte ändern oder löschen.
+          {t('Achtung: Was Gast darf, darf jeder, der die App öffnet – auch ohne Konto, z. B. Inhalte ändern oder löschen.')}
         </p>
       )}
       {key === 'guest' &&
         [...capabilities].every((c) => isView(c)) &&
         (capabilities.has('view_documents') || capabilities.has('view_birthdays') || capabilities.has('view_board')) && (
           <p className="small rights-warning" role="note">
-            Achtung: Was Gast sieht, sieht jeder, der die App öffnet – auch ohne Konto.
+            {t('Achtung: Was Gast sieht, sieht jeder, der die App öffnet – auch ohne Konto.')}
           </p>
         )}
       <RightsTree
-        legend="Rechte"
+        legend={t('Rechte')}
         isOn={(c) => admin || capabilities.has(c)}
         isDisabled={(c) => lockedFor(key, fixed, c)}
         onToggle={toggle}
       />
       {!fixed && (
         <fieldset className="feature-list">
-          <legend className="field-label">Konten</legend>
+          <legend className="field-label">{t('Konten')}</legend>
           <label className="toggle feature-toggle">
             <input type="checkbox" checked={newAccounts} onChange={(e) => setNewAccounts(e.target.checked)} />
-            <span>Beim Anlegen neuer Konten wählbar (auch für alle, die nur Mitglieder anlegen dürfen)</span>
+            <span>{t('Beim Anlegen neuer Konten wählbar (auch für alle, die nur Mitglieder anlegen dürfen)')}</span>
           </label>
           {admissionKnown ? (
             <label className="toggle feature-toggle">
               <input type="checkbox" checked={promotable} onChange={(e) => setPromotable(e.target.checked)} />
               <span>
-                Anwärter-Rolle: Wer Mitglieder anlegen darf, nimmt Personen mit dieser Rolle unter Verwaltung → Aufnahmen als{' '}
-                {levelLabel('member')} auf. Als Rolle wird sie dabei zu {levelLabel('member')}, als Zusatzrolle wird sie entfernt.
+                {t(
+                  'Anwärter-Rolle: Wer Mitglieder anlegen darf, nimmt Personen mit dieser Rolle unter Verwaltung → Aufnahmen als {member} auf. Als Rolle wird sie dabei zu {member}, als Zusatzrolle wird sie entfernt.',
+                  { member: levelLabel('member') },
+                )}
               </span>
             </label>
           ) : (
@@ -376,8 +391,14 @@ function RoleForm({
                 onChange={(e) => setPromotable(e.target.checked)}
               />
               <span>
-                Wer Mitglieder anlegen darf, nimmt Personen mit dieser Rolle als {levelLabel('member')} auf (z. B. Anwärter)
-                {withMember && '; nur ohne „Gehört zur Kompanie“'}
+                {withMember
+                  ? t(
+                      'Wer Mitglieder anlegen darf, nimmt Personen mit dieser Rolle als {member} auf (z. B. Anwärter); nur ohne „Gehört zur Kompanie“',
+                      { member: levelLabel('member') },
+                    )
+                  : t('Wer Mitglieder anlegen darf, nimmt Personen mit dieser Rolle als {member} auf (z. B. Anwärter)', {
+                      member: levelLabel('member'),
+                    })}
               </span>
             </label>
           )}
@@ -385,43 +406,31 @@ function RoleForm({
       )}
       {candidate && (
         <fieldset className="feature-list role-admission">
-          <legend className="field-label">Voraussetzung für die Aufnahme (Vorschlag unter Verwaltung → Aufnahmen)</legend>
-          <label className="field">
-            <span>Teilnahmen an Terminen der Art</span>
-            <select value={admissionKind} onChange={(e) => setAdmissionKind(e.target.value)}>
-              <option value="">keine</option>
-              {kinds.map((k) => (
-                <option key={k} value={k}>
-                  {k}
-                </option>
-              ))}
-            </select>
-          </label>
-          {kinds.length === 0 && <p className="small muted">Terminarten legst du unter Einstellungen → Kalender an.</p>}
-          {admissionKind && (
-            <label className="field">
-              <span>Mindestens so viele Teilnahmen („anwesend“)</span>
-              <input type="number" min={0} max={100} value={admissionCount} onChange={(e) => setAdmissionCount(e.target.value)} />
-            </label>
+          <legend className="field-label">{t('Voraussetzung für die Aufnahme (Vorschlag unter Verwaltung → Aufnahmen)')}</legend>
+          <RuleEditor value={admissionRule} onChange={setAdmissionRule} kinds={kinds} />
+          {kinds.length === 0 && <p className="small muted">{t('Terminarten legst du unter Einstellungen → Kalender an.')}</p>}
+          {!ruleKnown && !legacyRule && (
+            <p className="small rights-warning" role="note">
+              {t(
+                'Dieser Server kennt nur Teilnahmen einer Terminart und Monate, verknüpft mit „Alle müssen erfüllt sein“. Bitte zuerst die App aktualisieren.',
+              )}
+            </p>
           )}
-          <label className="field">
-            <span>Mindestens so viele Monate als Anwärter (0: keine)</span>
-            <input type="number" min={0} max={120} value={admissionMonths} onChange={(e) => setAdmissionMonths(e.target.value)} />
-          </label>
         </fieldset>
       )}
       {withFactor && (
         <label className="field">
           <span>
-            <Caps text={sec.points} />
-            faktor (z. B. 0,5 für die Hälfte)
+            <Caps text={t('{points}faktor (z. B. 0,5 für die Hälfte)', { points: sec.points })} />
           </span>
           <input type="text" inputMode="decimal" value={factor} onChange={(e) => setFactor(e.target.value)} />
         </label>
       )}
       {role?.deletable && role.users > 0 && (
         <label className="field">
-          <span>Beim Löschen bekommen die {role.users === 1 ? 'Person' : `${role.users} Personen`} die Rolle</span>
+          <span>
+            {tn('Beim Löschen bekommen die Person die Rolle', 'Beim Löschen bekommen die {count} Personen die Rolle', role.users)}
+          </span>
           <select value={replacement} onChange={(e) => setReplacement(e.target.value)}>
             {roles
               .filter((r) => r.key !== role.key && r.key !== 'admin')
@@ -440,14 +449,14 @@ function RoleForm({
       )}
       <div className="button-row">
         <button type="submit" className="btn" disabled={busy}>
-          {busy ? 'Speichert …' : role ? 'Speichern' : 'Anlegen'}
+          {busy ? t('Speichert …') : role ? t('Speichern') : t('Anlegen')}
         </button>
         <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={busy}>
-          Abbrechen
+          {t('Abbrechen')}
         </button>
         {role?.deletable && (
           <button type="button" className="btn btn-danger" onClick={remove} disabled={busy}>
-            Löschen
+            {t('Löschen')}
           </button>
         )}
       </div>

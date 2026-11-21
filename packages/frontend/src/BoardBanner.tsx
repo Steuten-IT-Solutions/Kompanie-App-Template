@@ -4,6 +4,7 @@ import { canPostBoard, dismiss, useBoard } from './board';
 import { formatShortTime } from './format';
 import brand from './generated/brand';
 import { navigate } from './router';
+import { t } from './i18n';
 
 const sec = brand.labels.sections;
 
@@ -12,8 +13,8 @@ export function BoardMeta({ item }: { item: BoardMessage }) {
   const edited = item.updated_at !== item.created_at;
   return (
     <span className="board-meta">
-      {item.author_name ?? 'Unbekannt'} · {formatShortTime(edited ? item.updated_at : item.created_at)}
-      {edited && ' (geändert)'}
+      {item.author_name ?? t('Unbekannt')} · {formatShortTime(edited ? item.updated_at : item.created_at)}
+      {edited && ` ${t('(geändert)')}`}
     </span>
   );
 }
@@ -29,7 +30,7 @@ export function BoardTitle({ item }: { item: BoardMessage }) {
 
 /** Umfrage im Banner bzw. am Brett: Frage, Ende und der Weg zur Umfrage. */
 export function pollEndText(poll: { ends_at: string | null }): string {
-  return poll.ends_at ? `läuft bis ${formatShortTime(poll.ends_at)}` : 'läuft, bis sie beendet wird';
+  return poll.ends_at ? t('läuft bis {time}', { time: formatShortTime(poll.ends_at) }) : t('läuft, bis sie beendet wird');
 }
 
 /**
@@ -47,13 +48,13 @@ export default function BoardBanner() {
   const polls = items.filter((i): i is BoardPoll => i.kind === 'poll' && !i.has_voted);
   const shown = [...messages, ...polls].filter((i) => !dismissed(i));
   const hidden = messages.length + polls.length - shown.length;
-  const openLabel = canPostBoard() ? 'Brett öffnen und bearbeiten' : 'Brett öffnen';
+  const openLabel = canPostBoard() ? t('Brett öffnen und bearbeiten') : t('Brett öffnen');
   if (shown.length === 0) {
     if (hidden === 0) return null;
     return (
       <section className="board-banner board-banner-collapsed" aria-label={sec.board}>
         <span>
-          <strong>{sec.board}</strong> · {hidden} ausgeblendet
+          <strong>{sec.board}</strong> · {t('{count} ausgeblendet', { count: hidden })}
         </span>
         <button className="btn btn-link board-open" onClick={() => navigate('brett')}>
           {openLabel}
@@ -70,7 +71,7 @@ export default function BoardBanner() {
             <div className="board-entry-body">
               <BoardTitle item={item} />
             </div>
-            <button className="btn btn-link board-dismiss" onClick={() => dismiss(item)} aria-label="Nachricht ausblenden">
+            <button className="btn btn-link board-dismiss" onClick={() => dismiss(item)} aria-label={t('Nachricht ausblenden')}>
               ×
             </button>
           </article>
@@ -82,10 +83,10 @@ export default function BoardBanner() {
                 {item.title}
               </p>
               <button className="btn btn-small board-poll-open" onClick={() => navigate(`umfragen/${item.id}`)}>
-                Teilnehmen
+                {t('Teilnehmen')}
               </button>
             </div>
-            <button className="btn btn-link board-dismiss" onClick={() => dismiss(item)} aria-label="Umfrage ausblenden">
+            <button className="btn btn-link board-dismiss" onClick={() => dismiss(item)} aria-label={t('Umfrage ausblenden')}>
               ×
             </button>
           </article>
@@ -94,7 +95,7 @@ export default function BoardBanner() {
       <div className="board-banner-foot">
         {shown.length > 1 && (
           <button className="btn btn-link board-more" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
-            {expanded ? 'Weniger anzeigen' : `+${shown.length - 1} weitere`}
+            {expanded ? t('Weniger anzeigen') : t('+{count} weitere', { count: shown.length - 1 })}
           </button>
         )}
         <button className="btn btn-link board-open" onClick={() => navigate('brett')}>

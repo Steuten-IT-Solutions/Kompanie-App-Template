@@ -172,6 +172,28 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
 
+  /me/admission:
+    get:
+      tags: [Eigene Daten]
+      summary: Eigener Stand als Anwärter für die Aufnahme (Regel und was fehlt)
+      description: |
+        Jeder Angemeldete bekommt nur den eigenen Stand (`Admission`), `null`, wenn er kein Anwärter ist oder der Bereich
+        Anwesenheit aus ist. Den Stand anderer gibt es nur über `GET /admissions` (view_accounts).
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [admission]
+                properties:
+                  admission:
+                    oneOf:
+                      - $ref: '#/components/schemas/Admission'
+                      - type: 'null'
+        '401': { $ref: '#/components/responses/Error' }
+
   /me/attendance:
     get:
       tags: [Eigene Daten]
@@ -474,6 +496,78 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Error' }
 
+  /me/locale:
+    put:
+      tags: [Eigene Daten]
+      summary: Sprache am Konto wählen
+      description: |
+        Gilt auf allen Geräten nach der Anmeldung und für Mails und Push an diese Person. Nur Sprachen, die der Admin
+        eingeschaltet hat (`languages` in `/config`). `null` löscht die Wahl (dann gilt die am Gerät bzw. Deutsch).
+        Jede Anfrage der App nennt ihre Sprache im Header `X-Kompanie-Lang`; ohne ihn gilt die Wahl am Konto, sonst
+        Deutsch. Danach richten sich die Meldungen (`message`) der Antworten.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [locale]
+              properties:
+                locale: { type: [string, 'null'], enum: [de, en, null] }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [locale]
+                properties:
+                  locale: { type: [string, 'null'], enum: [de, en, null] }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+  /me/tiles:
+    put:
+      tags: [Eigene Daten]
+      summary: Eigene Anordnung der Kacheln einer Seite für eine Spaltenzahl speichern
+      description: |
+        Für jedes angemeldete Konto. `page`: `verwaltung`, `einrichtungen`, `intern`, `menue/<n>` oder
+        `einstellungen/<gruppe>`. `cols`: Spaltenzahl des Rasters (nach seiner Breite: 2, ab 528 px 3, ab 680 px 4, ab 840 px 5); die anderen
+        Spaltenzahlen der Seite bleiben. Jede Kachel liegt mit `col` (ab 1), `row` (1 bis 200) und `span` (Breite in
+        Spalten) im Raster, ohne Überlappung, höchstens 100 Kacheln. Kennungen gerade nicht sichtbarer Kacheln bleiben
+        erlaubt; was eine Person sieht, entscheiden ihre Rechte. In der Vorschau nicht möglich (nur ansehen).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [page, cols, tiles]
+              properties:
+                page: { type: string, examples: [intern, 'einstellungen/betrieb'] }
+                cols: { type: integer, enum: [2, 3, 4, 5] }
+                tiles: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/TilePlace' } }
+      responses:
+        '200':
+          description: Gespeichert; alle Spaltenzahlen der Seite
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TileLayoutResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Eigene Daten]
+      summary: Eigene Anordnung einer Seite zurücksetzen (alle Spaltenzahlen); danach gilt die Vorgabe
+      parameters:
+        - { name: page, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Zurückgesetzt; `layouts` leer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TileLayoutResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
   /me/password:
     post:
       tags: [Eigene Daten]
@@ -2177,6 +2271,9 @@ paths:
         Ohne den Bereich Punkte frei. Mit Punkten (für alle, auch Admins): befördern erst ab der Schwelle des Ziels;
         degradieren immer, auch über der Schwelle. Dienstgrade ohne Schwelle frei. Schreibt den Verlauf.
         Wer kein Mitglied mehr ist (z. B. Gast), kann den Dienstgrad nur verlieren (`rank_id: null`, ohne Punkteregeln).
+        `date` legt den Tag des Wechsels fest (leer = heute): nicht in der Zukunft und nicht vor dem letzten Wechsel der
+        Person. Bei einem früheren Tag zählen für Schwelle und `points_at_change` nur Punkte bis zu diesem Tag; der
+        Verlauf speichert dann 12:00 Uhr Ortszeit dieses Tages als `changed_at`.
       x-capability: manage_ranks
       requestBody:
         required: true
@@ -2187,12 +2284,46 @@ paths:
               properties:
                 rank_id: { type: [integer, 'null'], description: null = kein Dienstgrad }
                 reason: { type: string, maxLength: 255 }
+                date: { type: string, format: date, description: Tag des Wechsels (JJJJ-MM-TT); leer = heute }
       responses:
         '200':
           description: Neuer Stand
           content:
             application/json:
               schema: { $ref: '#/components/schemas/RankStatus' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /members/{id}/rank-history/{entry}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - { name: entry, in: path, required: true, schema: { type: integer }, description: ID des Eintrags im Verlauf }
+    patch:
+      tags: [Verwaltung]
+      summary: Datum eines Eintrags im Dienstgrad-Verlauf nachträglich ändern
+      description: |
+        Nicht in der Zukunft, nicht vor dem vorigen und nicht nach dem nächsten Eintrag der Person (die Reihenfolge
+        bleibt). Gespeichert wird 12:00 Uhr Ortszeit des Tages (heute höchstens jetzt), zwischen den Nachbarn. Mit Punkten
+        wird `points_at_change` auf die Punkte bis zu diesem Tag gesetzt; bei einer Beförderung muss dieser Stand die
+        heutige Schwelle des neuen Dienstgrads erreichen. Die Ersteinstufung behält ihren Stand. Der Dienstgrad selbst
+        ändert sich nicht.
+      x-capability: manage_ranks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date]
+              properties:
+                date: { type: string, format: date }
+      responses:
+        '200':
+          description: Neuer Verlauf, neueste zuerst
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/RankHistoryEntry' } }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
@@ -3567,12 +3698,13 @@ paths:
       - { name: key, in: path, required: true, schema: { type: string }, description: 'Kennung des Termins wie in `GET /calendar` (`id`)' }
     put:
       tags: [Termine]
-      summary: Terminart eines Termins setzen (z. B. Versammlung)
+      summary: Terminarten eines Termins setzen (z. B. Versammlung und Arbeitsdienst)
       description: |
-        Bei jeder Quelle des Kalenders (App, Google, iCal); die App speichert die Art selbst, nichts geht an Google. Erlaubt
-        sind die Terminarten aus den Einstellungen und die bisherige Art des Termins; `null` oder leer entfernt sie. Eine
-        Anwesenheitsliste zu dem Termin übernimmt die neue Art. Geht auch bei vergangenen Terminen, solange der Kalender
-        sie liefert (sonst 404).
+        Bei jeder Quelle des Kalenders (App, Google, iCal); die App speichert die Arten selbst, nichts geht an Google.
+        `kinds` ist die ganze Liste (leer entfernt alle; doppelte fallen weg, sortiert wie in den Einstellungen). Erlaubt
+        sind die Terminarten aus den Einstellungen und die bisherigen Arten des Termins. Ältere Oberflächen schicken statt
+        `kinds` eine einzelne Art als `kind` (`null` oder leer = keine). Eine Anwesenheitsliste zu dem Termin übernimmt
+        die neuen Arten. Geht auch bei vergangenen Terminen, solange der Kalender sie liefert (sonst 404).
       x-capability: manage_calendar
       requestBody:
         required: true
@@ -3581,17 +3713,19 @@ paths:
             schema:
               type: object
               properties:
-                kind: { type: [string, 'null'], maxLength: 40 }
+                kinds: { type: array, maxItems: 30, items: { type: string, maxLength: 40 } }
+                kind: { type: [string, 'null'], maxLength: 40, description: 'Ältere Oberflächen: eine Art statt `kinds`' }
       responses:
         '200':
-          description: Die gespeicherte Art
+          description: Die gespeicherten Arten
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   id: { type: string }
-                  kind: { type: [string, 'null'] }
+                  kind: { type: [string, 'null'], description: Die erste Art }
+                  kinds: { type: array, items: { type: string } }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
@@ -3652,9 +3786,9 @@ paths:
         `date`. Titel und Datum sind eine Momentaufnahme. `entries` setzt den Status je Person (null entfernt ihn);
         nur Personen mit einer Rolle (keine Gäste). Liegt das Datum nach heute (Zeitzone der Kompanie), ist nur
         `excused` erlaubt; das gilt auch für schon gespeicherte Einträge, wenn das Datum einer freien Liste in die Zukunft
-        rückt (sonst 400, ohne dass eine Liste entsteht). `kind` setzt die Terminart der Liste (eine der eingerichteten
-        oder die bisherige, leer für keine); ohne Angabe übernimmt eine neue Liste die Art des Termins im Kalender, sonst
-        den Vorschlag aus dem Titel (Name einer Terminart als eigenes Wort).
+        rückt (sonst 400, ohne dass eine Liste entsteht). `kinds` setzt die Terminarten der Liste (eingerichtete oder
+        bisherige, leer für keine; ältere Oberflächen schicken eine als `kind`); ohne Angabe übernimmt eine neue Liste die
+        Arten des Termins im Kalender, sonst die Vorschläge aus dem Titel (Namen von Terminarten als eigenes Wort).
       x-capability: manage_attendance
       requestBody:
         required: true
@@ -3668,7 +3802,8 @@ paths:
                 event_key: { type: string }
                 title: { type: string, maxLength: 191 }
                 date: { type: string, format: date }
-                kind: { type: [string, 'null'], maxLength: 40, description: Terminart (leer = keine) }
+                kinds: { type: array, maxItems: 30, items: { type: string, maxLength: 40 }, description: Terminarten (leer = keine) }
+                kind: { type: [string, 'null'], maxLength: 40, description: 'Ältere Oberflächen: eine Terminart statt `kinds` (leer = keine)' }
                 entries:
                   type: object
                   description: Benutzer-ID → Status
@@ -3713,7 +3848,8 @@ paths:
                     start: { type: string }
                     end: { type: string }
                     all_day: { type: boolean }
-                    kind: { type: [string, 'null'], description: Terminart des Termins }
+                    kind: { type: [string, 'null'], description: Erste Terminart des Termins }
+                    kinds: { type: array, items: { type: string }, description: Alle Terminarten des Termins }
                     upcoming: { type: boolean, description: Datum nach heute (Zeitzone der Kompanie) }
                     today: { type: boolean, description: Datum ist heute (Zeitzone der Kompanie) }
                     list_id: { type: [integer, 'null'], description: Schon angelegte Liste }
@@ -5309,6 +5445,7 @@ paths:
       description: |
         Alle Anwärter (Grundrolle mit `promotable` oder `admission_extra`, Zusatzrolle mit `admission_extra`, ohne Ehemalige): zuerst wer die
         Voraussetzung erfüllt (nach `fulfilled_on`), dann `open`, dann `none`. Es zählen alle Teilnahmen der Terminart bis heute.
+        `result` ist die ausgewertete Voraussetzung (`AdmissionRuleResult`).
         Aufnehmen (`POST /members/{id}/admit`) nur mit `create_users`.
       x-capability: view_accounts
       responses:
@@ -6994,6 +7131,63 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+  /admin/tiles:
+    get:
+      tags: [Einstellungen]
+      summary: Vorgabe für die Anordnung der Kacheln (für alle ohne eigene Anordnung)
+      x-capability: manage_settings
+      responses:
+        '200':
+          description: Seite => TileLayouts (leer als {})
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [defaults]
+                properties:
+                  defaults: { type: object, additionalProperties: { $ref: '#/components/schemas/TileLayouts' } }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [Einstellungen]
+      summary: Vorgabe einer Seite für eine Spaltenzahl festlegen
+      x-capability: manage_settings
+      description: |
+        Gleiche Form und Prüfung wie `PUT /me/tiles`. Gilt für jede Person ohne eigene Anordnung der Seite, auch ohne
+        Anmeldung und in der Vorschau; wer eine Kachel nicht sieht, bei dem wird die schmalste Kachel derselben Zeile breiter.
+        Die anderen Spaltenzahlen der Seite bleiben. Kommt ins Änderungsprotokoll.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [page, cols, tiles]
+              properties:
+                page: { type: string, examples: [verwaltung, intern] }
+                cols: { type: integer, enum: [2, 3, 4, 5] }
+                tiles: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/TilePlace' } }
+      responses:
+        '200':
+          description: Gespeichert; alle Spaltenzahlen der Seite
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TileLayoutResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Einstellungen]
+      summary: Vorgabe einer Seite löschen (alle Spaltenzahlen); danach gilt die Reihenfolge aus der Navigation
+      x-capability: manage_settings
+      parameters:
+        - { name: page, in: query, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Gelöscht; `layouts` leer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TileLayoutResponse' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /admin/navigation:
     get:
       tags: [Einstellungen]
@@ -7273,6 +7467,12 @@ paths:
                 calendar_cache_minutes: { type: integer, minimum: 1, maximum: 1440 }
                 calendar_responses:
                   { type: string, enum: ['0', '1'], description: 'Zu- und Absagen bei Terminen einschalten (Vorgabe aus)' }
+                languages:
+                  {
+                    type: string,
+                    description: 'Sprachen der App, durch Komma getrennt (de, en); Deutsch ist immer dabei',
+                    examples: ['de,en'],
+                  }
                 calendar_response_reminder:
                   { type: string, enum: ['0', '1'], description: An Zu- und Absage erinnern (Push an alle ohne Rückmeldung) }
                 calendar_response_reminder_days:
@@ -8508,10 +8708,11 @@ components:
               last_upload:
                 type: [object, 'null']
                 description: Messung des letzten erfolgreichen Hochladens (Sekunden); null, solange es keine gibt
-                required: [bytes, chunks, start_seconds, read_seconds, send_seconds, slowest_seconds, total_seconds]
+                required: [bytes, chunks, retries, start_seconds, read_seconds, send_seconds, slowest_seconds, total_seconds]
                 properties:
                   bytes: { type: integer }
                   chunks: { type: integer, description: Anzahl der Anfragen mit Daten (Stücke von 8 MB) }
+                  retries: { type: integer, description: Neue Versuche nach vorübergehenden Fehlern (HTTP 408, 429, 5xx) }
                   start_seconds:
                     { type: number, description: Sitzung bei Google beginnen (kleine Anfrage, Verbindungsaufbau und Antwortzeit) }
                   read_seconds: { type: number, description: Datei von der Platte des Servers lesen }
@@ -9508,6 +9709,25 @@ components:
       description: 'Reihenfolge der Kacheln in „Intern“ der Standardnavigation, ohne eigene Navigation. Bereiche, die fehlen, stehen hinter ihrem Vorgänger aus der Standardreihenfolge. Leer = Standard.'
       items: { $ref: '#/components/schemas/NavigationTarget' }
       uniqueItems: true
+    TilePlace:
+      type: object
+      description: Lage einer Kachel im Raster
+      required: [id, col, row, span]
+      properties:
+        id: { type: string, description: 'Bereich bzw. Ziel, z. B. mitglieder, seite/3, einstellungen' }
+        col: { type: integer, minimum: 1, maximum: 4 }
+        row: { type: integer, minimum: 1, maximum: 200 }
+        span: { type: integer, minimum: 1, maximum: 4 }
+    TileLayouts:
+      type: object
+      description: 'Spaltenzahl (2, 3, 4) => Kacheln, nach Zeile und Spalte geordnet'
+      additionalProperties: { type: array, items: { $ref: '#/components/schemas/TilePlace' } }
+    TileLayoutResponse:
+      type: object
+      required: [page, layouts]
+      properties:
+        page: { type: string }
+        layouts: { $ref: '#/components/schemas/TileLayouts' }
     AdminOrder:
       type: object
       description: 'Reihenfolge der Kacheln der Verwaltung, für alle gleich, je Gruppe: start (Startseite, mit dem Sammelknopf einrichtungen) und setup (unter „Einrichtungen“). Eine Kachel wechselt die Gruppe nicht. Kacheln, die fehlen, stehen hinter ihrem Vorgänger aus der Standardreihenfolge. Leer kommt als [] an.'
@@ -9810,6 +10030,13 @@ components:
           properties:
             imprint_url: { type: string }
             privacy_url: { type: string }
+        languages:
+          type: object
+          description: 'Sprachen der App: eingeschaltete (Deutsch immer, zuerst) und mögliche'
+          required: [enabled, available]
+          properties:
+            enabled: { type: array, items: { type: string, enum: [de, en] } }
+            available: { type: array, items: { type: string, enum: [de, en] } }
 
     Level:
       type: string
@@ -9947,9 +10174,10 @@ components:
               }
             deletable: { type: boolean, description: 'false für guest, member und admin' }
             admission_extra: { type: boolean, description: 'Anwärter-Rolle (als Grund- oder Zusatzrolle, auch mit Mitgliederbereich)' }
-            admission_kind: { type: [string, 'null'] }
+            admission_kind: { type: [string, 'null'], description: 'Frühere Form (Teilnahmen einer Art UND Dauer); null/0, wenn admission_rule mehr ausdrückt' }
             admission_count: { type: integer }
             admission_months: { type: integer }
+            admission_rule: { $ref: '#/components/schemas/AdmissionRule' }
 
     RoleInput:
       type: object
@@ -10053,6 +10281,50 @@ components:
             description: 'Mindestens so viele Teilnahmen (present) an Listen dieser Art, 0–100; > 0 nur mit admission_kind',
           }
         admission_months: { type: [integer, string], description: 'Mindestens so viele Monate seit „Anwärter seit“, 0–120' }
+        admission_rule:
+          description: 'Voraussetzung als Baum; geht admission_kind/count/months vor. null oder leere Gruppe: keine Voraussetzung'
+          oneOf:
+            - $ref: '#/components/schemas/AdmissionRule'
+            - type: 'null'
+
+    AdmissionRule:
+      type: object
+      description: |
+        Voraussetzung für die Aufnahme (Domain\AdmissionRule): ein Knoten. Gruppe `{type: group, op: and|or, items}` (UND: alle,
+        ODER: eine reicht; beliebig tief, leere Gruppen fallen weg), Teilnahmen `{type: attendance, kind, count}` (1–100 Mal
+        present an Listen der Terminart), Dauer `{type: duration, months}` (1–120 Monate seit „Anwärter seit“). Höchstens 20
+        Bedingungen und 20 Gruppen unter der obersten. Die oberste Ebene ist immer eine Gruppe.
+      required: [type]
+      properties:
+        type: { type: string, enum: [group, attendance, duration] }
+        op: { type: string, enum: [and, or] }
+        items: { type: array, items: { $ref: '#/components/schemas/AdmissionRule' } }
+        kind: { type: string }
+        count: { type: [integer, string] }
+        months: { type: [integer, string] }
+
+    AdmissionRuleResult:
+      type: object
+      description: |
+        Ausgewertete Voraussetzung einer Person: jeder Knoten wie in `AdmissionRule` mit `status` (fulfilled, open, unknown =
+        Dauer ohne „Anwärter seit“) und `on` (Tag, an dem er erfüllt wurde: UND das späteste, ODER das früheste der erfüllten).
+        Teilnahmen zusätzlich mit `attended` und `missing`, Dauer mit `due` (Tag, ab dem sie erfüllt ist).
+      required: [type, status, 'on']
+      properties:
+        type: { type: string, enum: [group, attendance, duration] }
+        status: { type: string, enum: [fulfilled, open, unknown] }
+        'on': { type: [string, 'null'] }
+        op: { type: string, enum: [and, or] }
+        items: { type: array, items: { $ref: '#/components/schemas/AdmissionRuleResult' } }
+        kind: { type: string }
+        count: { type: integer }
+        attended: { type: integer }
+        missing: { type: integer }
+        months: { type: integer }
+        due: { type: [string, 'null'] }
+        soon:
+          type: boolean
+          description: 'Erfüllt oder bald erfüllt (Teilnahmen: höchstens 1 fehlt; Dauer: in höchstens 30 Tagen erreicht; UND: alle Teile, ODER: einer)'
 
     Admission:
       type: object
@@ -10065,14 +10337,20 @@ components:
         role_key: { $ref: '#/components/schemas/Level' }
         way: { type: string, enum: [base, extra], description: 'base: Grundrolle wird member; extra: diese Zusatzrolle wird entfernt' }
         since: { type: [string, 'null'], description: 'Anwärter seit (JJJJ-MM-TT); null, wenn unbekannt' }
-        kind: { type: [string, 'null'], description: Terminart der Voraussetzung }
-        count: { type: integer, description: Nötige Teilnahmen (0 keine) }
-        months: { type: integer, description: Mindestdauer in Monaten (0 keine) }
+        kind: { type: [string, 'null'], description: Terminart der ersten Bedingung „Teilnahmen“ (für ältere Oberflächen) }
+        count: { type: integer, description: Nötige Teilnahmen der ersten Bedingung „Teilnahmen“ (0 keine) }
+        months: { type: integer, description: Mindestdauer der ersten Bedingung „Dauer“ in Monaten (0 keine) }
         attended: { type: integer, description: 'Teilnahmen (present) an Listen der Art bis heute, auch vor since' }
         missing: { type: integer }
-        months_on: { type: [string, 'null'], description: Tag, ab dem die Mindestdauer erfüllt ist }
+        months_on: { type: [string, 'null'], description: Tag, ab dem die erste Mindestdauer erfüllt ist }
         fulfilled_on: { type: [string, 'null'], description: Tag, an dem alles erfüllt war }
         status: { type: string, enum: [fulfilled, open, none], description: 'none: Rolle ohne Voraussetzung' }
+        soon: { type: boolean, description: 'Noch nicht erfüllt, aber kurz davor (status open, result.soon); unter „Bald erfüllt“ und im zweiten Kreis der Kachel' }
+        result:
+          description: Ausgewertete Voraussetzung; null ohne Voraussetzung
+          oneOf:
+            - $ref: '#/components/schemas/AdmissionRuleResult'
+            - type: 'null'
 
     AppUser:
       type: object
@@ -10084,6 +10362,8 @@ components:
         level: { $ref: '#/components/schemas/Level' }
         extra_roles: { $ref: '#/components/schemas/ExtraRoles' }
         photo_url: { $ref: '#/components/schemas/PhotoUrl' }
+        locale:
+          { type: [string, 'null'], enum: [de, en, null], description: 'Sprache am Konto (PUT /me/locale); null = nichts gewählt' }
         create_roles:
           type: array
           items: { $ref: '#/components/schemas/Level' }
@@ -10186,6 +10466,8 @@ components:
         majorVersion: { type: string }
         withdrawn: { type: boolean, description: Die installierte Version wurde zurückgezogen }
         fallback: { type: [string, 'null'], description: 'Bei withdrawn: Ziel des automatischen Wechsels; null = keins vorhanden' }
+        maintenance: { type: [string, 'null'], description: 'Wartungsabo laut Update-Liste: letzter Tag (JJJJ-MM-TT, UTC) oder „unbefristet“; null = keine Angabe' }
+        maintenanceEnded: { type: boolean, description: 'Das Wartungsabo ist abgelaufen; neue Versionen gibt es erst nach einer Verlängerung' }
         skipped: { type: boolean, description: 'latest wird nach dem Zurückrollen nicht automatisch eingespielt' }
         autoAllowed: { type: boolean, description: 'Automatische Updates sind hier erlaubt (WordPress kann sie sperren)' }
         problems: { type: array, items: { type: string }, description: Gründe, warum die neue Version hier nicht läuft }
@@ -10242,6 +10524,10 @@ components:
         version: { type: string, description: 'Version der Installation, z. B. 1.4.0.3' }
         variant: { type: string, enum: [wordpress, standalone], description: Art der Installation }
         siteUrl: { type: [string, 'null'], description: Startseite der Webseite, falls vorhanden }
+        languages:
+          type: array
+          items: { type: string, enum: [de, en] }
+          description: 'Sprachen, die die App anbietet (Einstellung des Admins), Deutsch zuerst; nur Deutsch = kein Umschalter'
         handbookUrl:
           {
             type: [string, 'null'],
@@ -10262,6 +10548,9 @@ components:
         admissionsDue:
           type: [integer, 'null']
           description: 'Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“); nur für view_accounts mit Bereich Anwesenheit (auch ohne Anwärter-Rolle, dann 0), sonst null'
+        admissionsSoon:
+          type: [integer, 'null']
+          description: 'Anwärter kurz vor der Aufnahme (noch nicht erfüllt, siehe Admission.soon; zweiter Kreis an der Kachel „Aufnahmen“); wie admissionsDue nur für view_accounts mit Bereich Anwesenheit, sonst null'
         gallerySubmissions:
           {
             type: boolean,
@@ -10308,6 +10597,15 @@ components:
         navigation_labels: { type: boolean, description: 'Namen unter den Symbolen der Leiste (Issue #362)' }
         navigation_intern_order: { $ref: '#/components/schemas/NavigationInternOrder' }
         admin_order: { $ref: '#/components/schemas/AdminOrder' }
+        tile_layouts:
+          description: 'Eigene Anordnung der Kacheln: Seite => TileLayouts (leer als {}); null ohne Anmeldung und in der Vorschau'
+          oneOf:
+            - { type: object, additionalProperties: { $ref: '#/components/schemas/TileLayouts' } }
+            - type: 'null'
+        tile_defaults:
+          description: 'Vorgabe des Admins für die Anordnung der Kacheln: Seite => TileLayouts (leer als {}); gilt ohne eigene Anordnung'
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/TileLayouts' }
         section_labels:
           type: object
           description: 'Eigene Namen als Abschnitte der Bezeichnungen (z. B. gallery, catalog, intern), gehen vor kompanie.json (Issue #362). Leer kommt als [] an.'
@@ -10497,10 +10795,18 @@ components:
             open: { type: boolean, description: Noch änderbar }
             can_respond: { type: boolean, description: 'Hat respond_calendar' }
             can_list: { type: boolean, description: 'Hat view_responses: sieht die Namen (`GET /calendar/{key}/responses`)' }
-        kind: { type: [string, 'null'], description: 'Terminart (nur in `GET /calendar`), z. B. Versammlung' }
+        kind: { type: [string, 'null'], description: 'Erste Terminart (nur in `GET /calendar`), z. B. Versammlung' }
+        kinds:
+          type: array
+          items: { type: string }
+          description: 'Alle Terminarten (nur in `GET /calendar`), sortiert wie in den Einstellungen; leer ohne'
         kind_suggestion:
           type: [string, 'null']
-          description: 'Nur mit manage_calendar und ohne gesetzte Art: Vorschlag aus dem Titel (zählt erst gespeichert)'
+          description: 'Nur mit manage_calendar und ohne gesetzte Art: längster Vorschlag aus dem Titel (zählt erst gespeichert)'
+        kind_suggestions:
+          type: array
+          items: { type: string }
+          description: 'Nur mit manage_calendar und ohne gesetzte Art: alle Vorschläge aus dem Titel'
 
     EventResponsePerson:
       type: object
@@ -12322,7 +12628,8 @@ components:
         source: { type: string, enum: [calendar, free] }
         title: { type: string, description: Momentaufnahme beim Anlegen }
         date: { type: string, format: date }
-        kind: { type: [string, 'null'], description: Terminart der Liste }
+        kind: { type: [string, 'null'], description: Erste Terminart der Liste }
+        kinds: { type: array, items: { type: string }, description: Alle Terminarten der Liste (eine Teilnahme zählt für jede) }
         upcoming:
           type: boolean
           description: Datum nach heute (Zeitzone der Kompanie); dann ist nur der Status excused erlaubt.
@@ -12424,10 +12731,14 @@ components:
         threshold_reached_since:
           { type: [string, 'null'], format: date, description: 'Seit wann die Summe durchgehend die Schwelle des nächsten erreicht' }
         below_current_threshold: { type: boolean }
+        soon:
+          type: boolean
+          description: 'Bald bereit: Schwelle des nächsten noch nicht erreicht, es fehlt höchstens 1 Punkt; zweiter Kreis an der Kachel „Beförderungen“, Abschnitt „Bald erreicht“'
 
     RankHistoryEntry:
       type: object
       properties:
+        id: { type: integer, description: 'Für PATCH /members/{id}/rank-history/{entry}' }
         from: { type: [string, 'null'] }
         to: { type: [string, 'null'] }
         to_badge_url:

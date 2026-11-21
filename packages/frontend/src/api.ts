@@ -4,6 +4,7 @@
 import type { Address } from './address';
 import { readBase64 } from './backupFile';
 import { dataCache } from './dataCache';
+import { LOCALE_HEADER, SOURCE_LOCALE, locale, t, type Locale } from './i18n';
 import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
 import { noteError } from './lastError';
@@ -11,6 +12,7 @@ import { rememberRoute } from './share';
 import { markSaved } from './unsaved';
 import { noteResponse } from './connection';
 import type { AdminOrder, NavigationSetting, NavNames, NavStart } from './navigation';
+import type { TileLayouts, TilePlace } from './tileGrid';
 
 /** Schlüssel einer Rolle: guest, member, admin, früher fest (organizer, manager, candidate) oder vom Admin angelegt (r1, r2, …). */
 export type Level = string;
@@ -124,6 +126,8 @@ export interface AppUser {
   capabilities: Capability[];
   /** Eigenes Foto (128 Pixel), null ohne; fehlt bei älteren Servern */
   photo_url?: string | null;
+  /** Sprache am Konto (PUT /me/locale), null = nichts gewählt; fehlt bei älteren Servern */
+  locale?: Locale | null;
   /** Rollen, die die Person beim Anlegen vergeben darf (nur mit create_users); fehlt bei älteren Servern */
   create_roles?: Level[];
   /** Zusatzrollen, die die Person beim Anlegen vergeben darf (nur mit create_users) */
@@ -135,6 +139,8 @@ export interface AppConfig {
   appUrl: string;
   swUrl: string;
   siteUrl: string | null;
+  /** Sprachen, die die App anbietet (Deutsch zuerst; nur Deutsch = kein Umschalter); fehlt bei älteren Servern */
+  languages?: Locale[];
   variant: 'wordpress' | 'standalone';
   version: string;
   csrf: { header: string; token: string; refreshUrl: string };
@@ -157,6 +163,8 @@ export interface AppConfig {
    * Anwesenheit und einer Anwärter-Rolle, sonst null (keine Kachel). Fehlt bei älteren Servern.
    */
   admissionsDue?: number | null;
+  /** Anwärter kurz vor der Aufnahme (noch nicht erfüllt): zweiter Kreis an der Kachel „Aufnahmen“; null ohne Recht */
+  admissionsSoon?: number | null;
   /** Einreichen von Bildern und Videos erlaubt (Einstellungen → Galerie); fehlt bei älteren Servern (dann erlaubt) */
   gallerySubmissions?: boolean;
   /** Zu- und Absagen bei Terminen eingeschaltet (Einstellungen → Kalender); fehlt bei älteren Servern (dann an) */
@@ -193,6 +201,10 @@ export interface AppConfig {
   navigation_intern_order?: string[];
   /** Reihenfolge der Kacheln der Verwaltung je Gruppe (leer kann als [] kommen); fehlt bei älteren Servern */
   admin_order?: AdminOrder | [];
+  /** Eigene Anordnung der Kacheln je Seite (tileGrid.ts); null ohne Anmeldung und in der Vorschau, fehlt bei älteren Servern */
+  tile_layouts?: Record<string, TileLayouts> | null;
+  /** Vorgabe des Admins für die Anordnung der Kacheln je Seite (gilt ohne eigene Anordnung); fehlt bei älteren Servern */
+  tile_defaults?: Record<string, TileLayouts>;
   /** Eigene Namen als Abschnitte (brand.labels.sections), übernimmt generated/brand.ts beim Laden */
   section_labels?: Record<string, string>;
   /** Eigene Seiten (Issue #287), die die Person lesen darf, in ihrer Reihenfolge; fehlt bei älteren Servern */
@@ -603,10 +615,16 @@ export function applyPendingRegistrations(count: number): void {
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
-/** Zahl der Anwärter, die die Voraussetzung für die Aufnahme erfüllen (Kachel „Aufnahmen“). */
-export function applyAdmissionsDue(count: number): void {
-  if (!config || config.admissionsDue == null || config.admissionsDue === count) return;
+/**
+ * Zahl der Anwärter, die die Voraussetzung für die Aufnahme erfüllen, und (soon) derer kurz davor (Kachel „Aufnahmen“).
+ * Ohne soon bleibt die zweite Zahl, wie sie ist.
+ */
+export function applyAdmissionsDue(count: number, soon?: number): void {
+  if (!config || config.admissionsDue == null) return;
+  const nextSoon = soon ?? config.admissionsSoon;
+  if (config.admissionsDue === count && config.admissionsSoon === nextSoon) return;
   config.admissionsDue = count;
+  if (nextSoon != null) config.admissionsSoon = nextSoon;
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
@@ -706,8 +724,10 @@ export interface RoleAdmin extends RoleInfo {
   /** Voraussetzung für die Aufnahme: Teilnahmen an Terminen dieser Art (null: keine) … */
   admission_kind?: string | null;
   admission_count?: number;
-  /** … und Mindestdauer als Anwärter in Monaten (0: keine) */
+  /** … und Mindestdauer als Anwärter in Monaten (0: keine); 0/null, wenn admission_rule mehr ausdrückt */
   admission_months?: number;
+  /** Voraussetzung als Baum aus UND/ODER-Gruppen (fehlt bei älteren Servern) */
+  admission_rule?: AdmissionRuleNode;
 }
 
 export type RoleInput = {
@@ -720,7 +740,33 @@ export type RoleInput = {
   admission_kind?: string | null;
   admission_count?: number | string;
   admission_months?: number | string;
+  admission_rule?: AdmissionRuleNode;
 };
+
+/** Voraussetzung für die Aufnahme (Server: Domain\AdmissionRule): Gruppen mit UND/ODER, beliebig tief. */
+export type AdmissionRuleNode =
+  | { type: 'group'; op: 'and' | 'or'; items: AdmissionRuleNode[] }
+  | { type: 'attendance'; kind: string; count: number }
+  | { type: 'duration'; months: number };
+
+/** Ausgewertete Voraussetzung einer Person: jeder Knoten mit Stand, Gruppen mit ihren ausgewerteten items. */
+export interface AdmissionRuleResult {
+  type: 'group' | 'attendance' | 'duration';
+  status: 'fulfilled' | 'open' | 'unknown';
+  /** Tag, an dem der Knoten erfüllt wurde */
+  on: string | null;
+  op?: 'and' | 'or';
+  items?: AdmissionRuleResult[];
+  kind?: string;
+  count?: number;
+  attended?: number;
+  missing?: number;
+  months?: number;
+  /** Dauer: Tag, ab dem sie erfüllt ist (null ohne „Anwärter seit“) */
+  due?: string | null;
+  /** erfüllt oder bald erfüllt (höchstens 1 Teilnahme fehlt bzw. Dauer in höchstens 30 Tagen); fehlt bei älteren Servern */
+  soon?: boolean;
+}
 
 /** Stand eines Anwärters für die Aufnahme als Mitglied (GET /admissions, Mitgliedsseite). */
 export interface Admission {
@@ -745,6 +791,10 @@ export interface Admission {
   fulfilled_on: string | null;
   /** fulfilled: erfüllt; open: noch nicht; none: Rolle ohne Voraussetzung */
   status: 'fulfilled' | 'open' | 'none';
+  /** Noch nicht erfüllt, aber kurz davor („Bald erfüllt“); fehlt bei älteren Servern */
+  soon?: boolean;
+  /** Ausgewertete Voraussetzung (null ohne; fehlt bei älteren Servern) */
+  result?: AdmissionRuleResult | null;
 }
 
 export const roleInfo = (level: Level): RoleInfo | undefined => config?.roles?.find((r) => r.key === level);
@@ -773,7 +823,7 @@ export const levelLabel = (level: Level): string =>
   roleInfo(level)?.label ?? (brand.labels.roles as Record<string, string | undefined>)[level] ?? level;
 
 /** Überschrift für die Neuigkeiten: Standardbezeichnung „News“ ausgeschrieben, eigene Bezeichnungen unverändert. */
-export const newsTitle = (): string => (brand.labels.sections.news === 'News' ? 'Neuigkeiten' : brand.labels.sections.news);
+export const newsTitle = (): string => (brand.labels.sections.news === 'News' ? t('Neuigkeiten') : brand.labels.sections.news);
 
 /** Punktefaktor der Rolle (1 ohne Angabe). */
 export const roleFactor = (level: Level): number => roleInfo(level)?.points_factor ?? 1;
@@ -1054,10 +1104,14 @@ export interface CalendarEvent {
   respond_until?: string | null;
   /** Zu- und Absagen (nur internen Kalender, fehlt bei älteren Servern) */
   responses?: EventResponses;
-  /** Terminart, z. B. Versammlung (nur GET /calendar; fehlt bei älteren Servern) */
+  /** Erste Terminart, z. B. Versammlung (nur GET /calendar; fehlt bei älteren Servern) */
   kind?: string | null;
+  /** Alle Terminarten (fehlt bei älteren Servern, dann nur kind) */
+  kinds?: string[];
   /** Nur mit manage_calendar und ohne gesetzte Art: Vorschlag aus dem Titel */
   kind_suggestion?: string | null;
+  /** Wie kind_suggestion, alle passenden Arten (fehlt bei älteren Servern) */
+  kind_suggestions?: string[];
 }
 
 export type ResponseStatus = 'yes' | 'no';
@@ -1982,14 +2036,18 @@ export async function encodeFile(file: File): Promise<EncodedFile> {
 }
 
 export type AttendanceStatus = 'present' | 'excused' | 'absent';
-export const ATTENDANCE_LABELS: Record<AttendanceStatus, string> = { present: 'anwesend', excused: 'entschuldigt', absent: 'fehlt' };
+export const ATTENDANCE_LABELS: Record<AttendanceStatus, string> = {
+  present: t('anwesend'),
+  excused: t('entschuldigt'),
+  absent: t('fehlt'),
+};
 export type AttendanceCounts = Record<AttendanceStatus, number>;
 
 /** „3 anwesend · 1 entschuldigt · 0 fehlt“, mit open zusätzlich „· 5 ohne Auswahl“ */
 export const countsText = (c: AttendanceCounts, open?: number): string =>
   (['present', 'excused', 'absent'] as AttendanceStatus[])
-    .map((s) => `${c[s]} ${ATTENDANCE_LABELS[s]}`)
-    .concat(open === undefined ? [] : [`${open} ohne Auswahl`])
+    .map((s) => t('{count} {status}', { count: c[s], status: ATTENDANCE_LABELS[s] }))
+    .concat(open === undefined ? [] : [t('{count} ohne Auswahl', { count: open })])
     .join(' · ');
 
 export interface AttendanceSummary {
@@ -1997,8 +2055,10 @@ export interface AttendanceSummary {
   source: 'calendar' | 'free';
   title: string;
   date: string;
-  /** Terminart der Liste (fehlt bei älteren Servern) */
+  /** Erste Terminart der Liste (fehlt bei älteren Servern) */
   kind?: string | null;
+  /** Alle Terminarten der Liste (fehlt bei älteren Servern, dann nur kind) */
+  kinds?: string[];
   /** Termin nach heute: nur „entschuldigt“ möglich */
   upcoming: boolean;
   counts: AttendanceCounts;
@@ -2012,8 +2072,10 @@ export interface AttendanceEvent {
   start: string;
   end: string;
   all_day: boolean;
-  /** Terminart des Termins (fehlt bei älteren Servern) */
+  /** Erste Terminart des Termins (fehlt bei älteren Servern) */
   kind?: string | null;
+  /** Alle Terminarten des Termins (fehlt bei älteren Servern, dann nur kind) */
+  kinds?: string[];
   /** Termin nach heute */
   upcoming: boolean;
   /** Termin heute (Zeitzone der Kompanie) */
@@ -2054,7 +2116,7 @@ export interface AttendanceDetail extends AttendanceSummary {
 }
 
 export type AttendanceInput = (
-  | { id: number; title?: string; date?: string; kind?: string }
+  | { id: number; title?: string; date?: string; kinds?: string[] }
   | { source: 'calendar'; event_key: string }
   | { source: 'free'; title: string; date: string }
 ) & { entries?: Record<number, AttendanceStatus | null> };
@@ -2422,9 +2484,13 @@ export interface RankStatus {
   reachable_rank?: RankRef | null;
   threshold_reached_since?: string | null;
   below_current_threshold?: boolean;
+  /** Bald bereit: Schwelle noch nicht erreicht, es fehlt höchstens 1 Punkt */
+  soon?: boolean;
 }
 
 export interface RankHistoryEntry {
+  /** fehlt bei älteren Servern */
+  id?: number;
   from: string | null;
   to: string | null;
   /** Heutiges Abzeichen des neuen Dienstgrads */
@@ -2535,7 +2601,7 @@ export function toLogin(): void {
 
 function sessionExpired(): never {
   toLogin();
-  throw new ApiError('Sitzung abgelaufen – bitte neu anmelden.', 401, 'not_logged_in');
+  throw new ApiError(t('Sitzung abgelaufen – bitte neu anmelden.'), 401, 'not_logged_in');
 }
 
 /** Holt ein neues CSRF-Token (nur mit dem Sitzungs-Cookie). quiet: ohne Weiterleitung zur Anmeldung. */
@@ -2544,11 +2610,11 @@ export async function refreshCsrf(quiet = false): Promise<void> {
   try {
     res = await fetch(config!.csrf.refreshUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
   } catch {
-    throw new ApiError('Keine Verbindung. Bitte später erneut versuchen.', 0);
+    throw new ApiError(t('Keine Verbindung. Bitte später erneut versuchen.'), 0);
   }
   const data = await res.json().catch(() => null);
   if (!res.ok || !data?.token) {
-    if (quiet) throw new ApiError('Sitzung abgelaufen.', 401, 'not_logged_in');
+    if (quiet) throw new ApiError(t('Sitzung abgelaufen.'), 401, 'not_logged_in');
     sessionExpired();
   }
   csrfToken = data.token;
@@ -2583,9 +2649,11 @@ export function inBackground<T>(start: () => Promise<T>): Promise<T> {
   }
 }
 /** Meldung, wenn eine Änderung ohne Verbindung nicht beim Server ankam. */
-export const OFFLINE_NOT_SAVED = 'Keine Verbindung – nicht gespeichert. Deine Eingaben stehen noch hier; bitte später erneut speichern.';
+export const OFFLINE_NOT_SAVED = t('Keine Verbindung – nicht gespeichert. Deine Eingaben stehen noch hier; bitte später erneut speichern.');
 /** Meldung, wenn der Server in der Zeit (WRITE_TIMEOUT_MS) nicht geantwortet hat; ob die Änderung ankam, ist offen. */
-export const NO_ANSWER = 'Keine Antwort vom Server. Ob es gespeichert ist, ist nicht sicher; bitte später nachsehen oder erneut speichern.';
+export const NO_ANSWER = t(
+  'Keine Antwort vom Server. Ob es gespeichert ist, ist nicht sicher; bitte später nachsehen oder erneut speichern.',
+);
 /**
  * So lange wartet die App bei Änderungen, die sie vormerken und gefahrlos noch einmal senden kann (Zu- und Absagen,
  * Anwesenheit, Punkte und Strafen mit request_id), auf die Antwort. Danach gilt die Anfrage als gescheitert (Status 0,
@@ -2612,7 +2680,7 @@ async function requestFull<T>(
 ): Promise<{ data: T; headers: Headers }> {
   quiet ||= silent;
   if (!config) {
-    throw new ApiError('Die App muss über ihre Adresse auf der Webseite geöffnet werden.', 0);
+    throw new ApiError(t('Die App muss über ihre Adresse auf der Webseite geöffnet werden.'), 0);
   }
   let res: Response;
   // Service Worker (Issue #108): gespeicherte Antwort sofort, die aus dem Netz kommt im Hintergrund nach. Was vor der
@@ -2629,7 +2697,9 @@ async function requestFull<T>(
       headers: {
         Accept: 'application/json',
         // Für wen die Antwort gilt: Nur dieselbe Person bekommt sie später sofort aus dem Speicher.
-        ...(method === 'GET' ? { [USER_HEADER]: String(config.user?.id ?? 0) } : {}),
+        // Mit Sprache, wenn nicht Deutsch: Gespeicherte Antworten (Meldungen) gelten dann nur für dieselbe Sprache.
+        ...(method === 'GET' ? { [USER_HEADER]: String(config.user?.id ?? 0) + (locale() === SOURCE_LOCALE ? '' : `:${locale()}`) } : {}),
+        [LOCALE_HEADER]: locale(),
         ...(staleOk ? { [STALE_OK_HEADER]: '1' } : {}),
         ...(csrfToken ? { [config.csrf.header]: csrfToken } : {}),
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
@@ -2645,7 +2715,7 @@ async function requestFull<T>(
     }
     if (!path.startsWith('/reports') && !silent) noteError('Keine Verbindung zum Server');
     // Bei Änderungen sagen, dass nichts gespeichert ist (Offline-Prüfung): Die Eingaben stehen noch in der Ansicht.
-    throw new ApiError(method === 'GET' ? 'Keine Verbindung. Bitte später erneut versuchen.' : OFFLINE_NOT_SAVED, 0);
+    throw new ApiError(method === 'GET' ? t('Keine Verbindung. Bitte später erneut versuchen.') : OFFLINE_NOT_SAVED, 0);
   } finally {
     if (timer) clearTimeout(timer);
   }
@@ -2673,7 +2743,7 @@ async function requestFull<T>(
   // Angekommen: Eingaben in Formularen gelten als gespeichert (unsaved.ts).
   if (res.ok && method !== 'GET' && !readOnly && !silent) markSaved();
   if (!res.ok) {
-    const message: string = data?.message ?? `Fehler ${res.status}`;
+    const message: string = data?.message ?? t('Fehler {status}', { status: res.status });
     // Für „Fehler melden“ (Issue #64); Fehler des Formulars selbst nicht.
     if (!path.startsWith('/reports') && !silent) noteError(`${message} (HTTP ${res.status}${data?.code ? `, ${data.code}` : ''})`);
     throw new ApiError(message, res.status, data?.code ?? '');
@@ -2692,7 +2762,7 @@ export async function preparePreview(): Promise<string | null> {
     const next = await request<AppConfig>('GET', '/config');
     if (!next.preview) {
       stopPreview();
-      return 'Die Vorschau wurde beendet.';
+      return t('Die Vorschau wurde beendet.');
     }
     // Bereiche im selben Objekt ändern: Teile der App halten es fest (z. B. App.tsx).
     const { features, ...rest } = next;
@@ -2701,7 +2771,7 @@ export async function preparePreview(): Promise<string | null> {
     return null;
   } catch {
     stopPreview();
-    return 'Die Vorschau braucht eine Internetverbindung und wurde beendet.';
+    return t('Die Vorschau braucht eine Internetverbindung und wurde beendet.');
   }
 }
 
@@ -2733,8 +2803,8 @@ export const api = {
       decidedAt ? { decided_at: decidedAt } : undefined,
     ),
   eventResponses: (id: string) => request<EventResponseOverview>('GET', `/calendar/${encodeURIComponent(id)}/responses`),
-  setEventKind: (id: string, kind: string | null) =>
-    request<{ id: string; kind: string | null }>('PUT', `/calendar/${encodeURIComponent(id)}/kind`, { kind }),
+  setKindsOfEvent: (id: string, kinds: string[]) =>
+    request<{ id: string; kind: string | null; kinds?: string[] }>('PUT', `/calendar/${encodeURIComponent(id)}/kind`, { kinds }),
   respondFor: (id: string, userId: number, status: ResponseStatus | null) =>
     request<{ user_id: number; status: ResponseStatus | null; note: string }>(
       'PUT',
@@ -2790,6 +2860,8 @@ export const api = {
   promote: (id: number) => request<{ id: number; level: Level }>('POST', `/members/${id}/promote`),
   /** Anwärter mit Stand der Voraussetzung (create_users). */
   admissions: () => request<Admission[]>('GET', '/admissions'),
+  /** Eigener Stand als Anwärter (null, wenn man keiner ist) */
+  myAdmission: () => request<{ admission: Admission | null }>('GET', '/me/admission'),
   /** Als Mitglied aufnehmen: Grundrolle → Mitglied bzw. Anwärter-Zusatzrolle entfernen; Eintritt = heute, wenn leer. */
   admit: (id: number) =>
     request<{ id: number; level: Level; extra_roles: Level[]; join_date: string | null }>('POST', `/members/${id}/admit`),
@@ -2878,8 +2950,12 @@ export const api = {
     request<Rank>('PATCH', `/ranks/${id}`, data),
   deleteRank: (id: number) => request<{ deleted: boolean }>('DELETE', `/ranks/${id}`),
   reorderRanks: (ids: number[]) => request<Rank[]>('PUT', '/ranks/order', { ids }),
-  setMemberRank: (id: number, rank_id: number | null, reason: string) =>
-    request<RankStatus>('PUT', `/members/${id}/rank`, { rank_id, reason }),
+  /** date: Tag des Wechsels (JJJJ-MM-TT); leer = heute. */
+  setMemberRank: (id: number, rank_id: number | null, reason: string, date?: string) =>
+    request<RankStatus>('PUT', `/members/${id}/rank`, { rank_id, reason, ...(date ? { date } : {}) }),
+  /** Datum eines Eintrags im Verlauf nachträglich ändern (JJJJ-MM-TT); liefert den neuen Verlauf. */
+  setRankHistoryDate: (memberId: number, entryId: number, date: string) =>
+    request<RankHistoryEntry[]>('PATCH', `/members/${memberId}/rank-history/${entryId}`, { date }),
   promotions: () => request<Promotion[]>('GET', '/promotions'),
   /** Abzeichen hochladen; bei SVG optional eine PNG-Fassung (Base64) für Benachrichtigungen. */
   uploadRankBadge: async (id: number, file: File, png?: string | null) =>
@@ -2962,6 +3038,16 @@ export const api = {
   saveMyJoinYear: (data: { date: string; profile?: ProfileVisibility }) =>
     request<{ join_year: JoinYear | null }>('PUT', '/me/join-year', data),
   deleteMyJoinYear: () => request<{ join_year: null }>('DELETE', '/me/join-year'),
+  /** Eigene Anordnung der Kacheln einer Seite für eine Spaltenzahl (tiles.tsx) */
+  saveTiles: (page: string, cols: number, tiles: TilePlace[]) =>
+    request<{ page: string; layouts: TileLayouts }>('PUT', '/me/tiles', { page, cols, tiles }),
+  /** Sprache am Konto (Plan „Mehrsprachigkeit“); null löscht die Wahl */
+  setMyLocale: (l: Locale | null) => request<{ locale: Locale | null }>('PUT', '/me/locale', { locale: l }),
+  resetTiles: (page: string) => request<{ page: string; layouts: TileLayouts }>('DELETE', '/me/tiles', undefined, { page }),
+  /** Vorgabe für alle (manage_settings) */
+  saveTileDefault: (page: string, cols: number, tiles: TilePlace[]) =>
+    request<{ page: string; layouts: TileLayouts }>('PUT', '/admin/tiles', { page, cols, tiles }),
+  resetTileDefault: (page: string) => request<{ page: string; layouts: TileLayouts }>('DELETE', '/admin/tiles', undefined, { page }),
   setMemberJoinYear: (id: number, date: string) => request<{ join_year: JoinYear | null }>('PUT', `/members/${id}/join-year`, { date }),
   deleteMemberJoinYear: (id: number) => request<{ join_year: null }>('DELETE', `/members/${id}/join-year`),
 
@@ -3553,6 +3639,8 @@ export interface BackupDriveStatus {
 export interface BackupUploadStats {
   bytes: number;
   chunks: number;
+  /** neue Versuche nach vorübergehenden Fehlern (z. B. HTTP 502 von Google) */
+  retries: number;
   /** Sitzung bei Google beginnen (eine kleine Anfrage: Verbindungsaufbau und Antwortzeit) */
   start_seconds: number;
   /** Datei von der Platte des Servers lesen */
@@ -3624,6 +3712,10 @@ export interface UpdateStatus {
   withdrawn: boolean;
   /** Bei zurückgezogener Version: Ziel des automatischen Wechsels (null = keins da). */
   fallback: string | null;
+  /** Wartungsabo laut Update-Liste: letzter Tag (JJJJ-MM-TT) oder „unbefristet“; null = keine Angabe. */
+  maintenance: string | null;
+  /** Das Wartungsabo ist abgelaufen: keine neuen Versionen mehr. */
+  maintenanceEnded: boolean;
   /** Nach dem Zurückrollen: latest wird nicht automatisch eingespielt. */
   skipped: boolean;
   /** Automatische Updates sind hier erlaubt (WordPress kann sie sperren). */
@@ -3765,6 +3857,8 @@ export interface AdminSettings {
   news: { source: NewsSourceType; url: string; sources?: NewsSourceType[] } | null;
   /** Links auf Impressum und Datenschutzerklärung; leer, solange keiner eingetragen ist (fehlt bei älteren Servern) */
   legal?: { imprint_url: string; privacy_url: string };
+  /** Eingeschaltete Sprachen (Deutsch immer zuerst) und alle, die die App kann */
+  languages?: { enabled: Locale[]; available: Locale[] };
 }
 
 /** Bild der Galerie, das sich nicht aufbereiten ließ (Einstellungen → Galerie). */
@@ -3840,6 +3934,8 @@ export interface FailedPhoto {
 }
 
 export interface AdminSettingsInput {
+  /** Eingeschaltete Sprachen, durch Komma getrennt (Deutsch kommt immer dazu) */
+  languages?: string;
   calendar_source?: CalendarSourceChoice;
   calendar_ics_url?: string;
   google_api_key?: string;

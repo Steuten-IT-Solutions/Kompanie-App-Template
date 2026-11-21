@@ -179,6 +179,10 @@ final class DriveMock
         }
         $session = &$this->sessions[$n];
         $range = (string) ($headers['Content-Range'] ?? '');
+        // Wie Google: ein PUT ohne Content-Length gilt als fehlerhaft (411 Length Required)
+        if (str_starts_with($range, 'bytes */') && ($headers['Content-Length'] ?? null) !== '0') {
+            return ['status' => 411, 'body' => ''];
+        }
         if (!str_starts_with($range, 'bytes */') && $session['id'] === null) {
             $session['data'] .= $body;
         }

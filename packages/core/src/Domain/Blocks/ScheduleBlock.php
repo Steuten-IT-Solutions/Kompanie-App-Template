@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Domain\Blocks;
 
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /** Ablauf/Zeitplan: Zeit (kurzer freier Text, z. B. „14:00“ oder „ab 20 Uhr“) und Programmpunkt untereinander. */
 final class ScheduleBlock implements BlockType
@@ -25,23 +26,23 @@ final class ScheduleBlock implements BlockType
     {
         $items = $in['items'] ?? null;
         if (!is_array($items) || !array_is_list($items) || $items === []) {
-            throw ApiError::invalid('Bitte mindestens einen Programmpunkt eintragen.');
+            throw ApiError::invalid(I18n::t('Bitte mindestens einen Programmpunkt eintragen.'));
         }
         if (count($items) > self::MAX) {
-            throw ApiError::invalid(sprintf('Höchstens %d Programmpunkte.', self::MAX));
+            throw ApiError::invalid(I18n::t('Höchstens {max} Programmpunkte.', ['max' => self::MAX]));
         }
         $out = [];
         foreach ($items as $item) {
             if (!is_array($item)) {
-                throw ApiError::invalid('Ungültiger Programmpunkt.');
+                throw ApiError::invalid(I18n::t('Ungültiger Programmpunkt.'));
             }
-            $text = Field::line($item['text'] ?? '', self::TEXT_MAX, 'Ein Programmpunkt');
+            $text = Field::line($item['text'] ?? '', self::TEXT_MAX, I18n::t('Ein Programmpunkt'));
             if ($text === '') {
-                throw ApiError::invalid('Bitte zu jedem Programmpunkt einen Text eingeben.');
+                throw ApiError::invalid(I18n::t('Bitte zu jedem Programmpunkt einen Text eingeben.'));
             }
-            $out[] = ['time' => Field::line($item['time'] ?? '', self::TIME_MAX, 'Die Zeit eines Programmpunkts'), 'text' => $text];
+            $out[] = ['time' => Field::line($item['time'] ?? '', self::TIME_MAX, I18n::t('Die Zeit eines Programmpunkts')), 'text' => $text];
         }
-        return ['title' => Field::line($in['title'] ?? '', self::TITLE_MAX, 'Die Überschrift des Ablaufs'), 'items' => $out];
+        return ['title' => Field::line($in['title'] ?? '', self::TITLE_MAX, I18n::t('Die Überschrift des Ablaufs')), 'items' => $out];
     }
 
     public function render(array $data, ?User $viewer, bool $manager): ?array

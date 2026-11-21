@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\GalleryRepository;
 use KompanieApp\Core\Storage\GallerySubmissionRepository;
 
@@ -71,7 +72,7 @@ final class GalleryUploadService
     /** @return array<string, mixed> Album mit seinen hochgeladenen Bildern */
     public function album(int $id): array
     {
-        $album = $this->repo()->album($id) ?? throw ApiError::notFound('Album nicht gefunden.');
+        $album = $this->repo()->album($id) ?? throw ApiError::notFound(I18n::t('Album nicht gefunden.'));
         $gallery = $this->app->gallery();
         return [
             'id' => (int) $album['id'],
@@ -112,7 +113,7 @@ final class GalleryUploadService
             try {
                 $folder = $drive->createAlbumFolder($title, $year);
             } catch (\RuntimeException $e) {
-                throw ApiError::invalid('Das Album ließ sich in Google Drive nicht anlegen: ' . $e->getMessage());
+                throw ApiError::invalid(I18n::t('Das Album ließ sich in Google Drive nicht anlegen: {error}', ['error' => $e->getMessage()]));
             }
         }
         $data = ['year' => $year, 'title' => $title, 'sort_date' => $now, 'synced_at' => $now, 'source' => $folder !== null ? 'drive' : 'app'];
@@ -145,7 +146,7 @@ final class GalleryUploadService
             try {
                 $this->app->galleryDrive()->updateAlbumFolder($album, $data['title'] ?? null, $data['year'] ?? null);
             } catch (\RuntimeException $e) {
-                throw ApiError::invalid('Das Album ließ sich in Google Drive nicht ändern: ' . $e->getMessage());
+                throw ApiError::invalid(I18n::t('Das Album ließ sich in Google Drive nicht ändern: {error}', ['error' => $e->getMessage()]));
             }
         }
         if ($data !== []) {
@@ -163,7 +164,7 @@ final class GalleryUploadService
             try {
                 $this->app->drive()->trashFile((string) $album['drive_id']);
             } catch (\RuntimeException $e) {
-                throw ApiError::invalid('Das Album ließ sich in Google Drive nicht löschen: ' . $e->getMessage());
+                throw ApiError::invalid(I18n::t('Das Album ließ sich in Google Drive nicht löschen: {error}', ['error' => $e->getMessage()]));
             }
         }
         $gallery = $this->app->gallery();
@@ -188,7 +189,7 @@ final class GalleryUploadService
      */
     public function upload(int $albumId, mixed $file, bool $intern): array
     {
-        $this->repo()->album($albumId) ?? throw ApiError::notFound('Album nicht gefunden.');
+        $this->repo()->album($albumId) ?? throw ApiError::notFound(I18n::t('Album nicht gefunden.'));
         $this->insertPhoto($albumId, $this->store($albumId, $file), $intern);
         return $this->album($albumId);
     }
@@ -206,7 +207,7 @@ final class GalleryUploadService
         $name = is_array($file) && is_string($file['name'] ?? null) ? trim($file['name']) : '';
         $data = is_array($file) && is_string($file['data'] ?? null) ? $file['data'] : '';
         if ($data === '') {
-            throw ApiError::invalid($this->postTooLarge() ?? 'Es ist kein Bild angekommen.');
+            throw ApiError::invalid($this->postTooLarge() ?? I18n::t('Es ist kein Bild angekommen.'));
         }
         if (str_starts_with($data, 'data:') && ($comma = strpos($data, ',')) !== false) {
             $data = substr($data, $comma + 1);
@@ -214,17 +215,17 @@ final class GalleryUploadService
         $bytes = base64_decode($data, true);
         unset($data);
         if ($bytes === false || $bytes === '') {
-            throw ApiError::invalid('Es ist kein Bild angekommen.');
+            throw ApiError::invalid(I18n::t('Es ist kein Bild angekommen.'));
         }
         $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
         if (!isset(self::TYPES[$ext])) {
-            throw ApiError::invalid('Erlaubt sind Bilder als JPG, PNG oder WebP.');
+            throw ApiError::invalid(I18n::t('Erlaubt sind Bilder als JPG, PNG oder WebP.'));
         }
         $sig = self::TYPES[$ext];
         $ok = strncmp($bytes, $sig, strlen($sig)) === 0 && ($ext !== 'webp' || substr($bytes, 8, 4) === 'WEBP');
         $info = $ok ? @getimagesizefromstring($bytes) : false;
         if ($info === false || $info[0] < 1 || $info[1] < 1) {
-            throw ApiError::invalid(sprintf('Die Datei ist keine gültige .%s-Datei.', $ext));
+            throw ApiError::invalid(I18n::t('Die Datei ist keine gültige .{extension}-Datei.', ['extension' => $ext]));
         }
         $this->checkMemory((int) $info[0], (int) $info[1], strlen($bytes));
         $files = $this->app->files;
@@ -233,7 +234,7 @@ final class GalleryUploadService
         $small = $thumbEdge !== null ? $files->tempFile() : null;
         try {
             if (@file_put_contents($src, $bytes) === false) {
-                throw new \RuntimeException('Die Datei lässt sich nicht zwischenspeichern.');
+                throw new \RuntimeException(I18n::t('Die Datei lässt sich nicht zwischenspeichern.'));
             }
             unset($bytes);
             try {
@@ -243,7 +244,7 @@ final class GalleryUploadService
                     $this->app->images->resizeToJpeg($jpeg, $small, (int) $thumbEdge, 80);
                 }
             } catch (\RuntimeException $e) {
-                throw ApiError::invalid('Das Bild lässt sich nicht lesen: ' . $e->getMessage());
+                throw ApiError::invalid(I18n::t('Das Bild lässt sich nicht lesen: {error}', ['error' => $e->getMessage()]));
             }
             $key = $this->app->gallery()->media()->put($albumId, $jpeg, 'jpg');
             $md5 = (string) md5_file($jpeg);
@@ -346,20 +347,20 @@ final class GalleryUploadService
     public function setIntern(int $id, mixed $intern): array
     {
         if (!is_bool($intern)) {
-            throw ApiError::invalid('Bitte angeben, ob das Bild intern sein soll (intern: true oder false).');
+            throw ApiError::invalid(I18n::t('Bitte angeben, ob das Bild intern sein soll (intern: true oder false).'));
         }
         $repo = $this->repo();
-        $photo = $repo->photo($id) ?? throw ApiError::notFound('Bild nicht gefunden.');
+        $photo = $repo->photo($id) ?? throw ApiError::notFound(I18n::t('Bild nicht gefunden.'));
         if (!$this->editable($photo)) {
-            throw ApiError::invalid('Bilder aus Google Drive stellst du in Drive um: in den Ordner „intern“ des Albums verschieben oder heraus.');
+            throw ApiError::invalid(I18n::t('Bilder aus Google Drive stellst du in Drive um: in den Ordner „intern“ des Albums verschieben oder heraus.'));
         }
         if ((bool) (int) $photo['is_intern'] !== $intern && !GalleryService::isUpload($photo)) {
             // Aus Drive: in den Ordner „intern“ des Albums oder heraus
-            $album = $repo->album((int) $photo['album_id']) ?? throw ApiError::notFound('Album nicht gefunden.');
+            $album = $repo->album((int) $photo['album_id']) ?? throw ApiError::notFound(I18n::t('Album nicht gefunden.'));
             try {
                 $this->app->galleryDrive()->movePhotoFile($photo, $album, $album, $intern);
             } catch (\RuntimeException $e) {
-                throw ApiError::invalid('Das ließ sich in Google Drive nicht umstellen: ' . $e->getMessage());
+                throw ApiError::invalid(I18n::t('Das ließ sich in Google Drive nicht umstellen: {error}', ['error' => $e->getMessage()]));
             }
         }
         if ((bool) (int) $photo['is_intern'] !== $intern) {
@@ -386,17 +387,17 @@ final class GalleryUploadService
     public function setCover(int $albumId, mixed $photoId): array
     {
         $repo = $this->repo();
-        $repo->album($albumId) ?? throw ApiError::notFound('Album nicht gefunden.');
+        $repo->album($albumId) ?? throw ApiError::notFound(I18n::t('Album nicht gefunden.'));
         if ($photoId !== null && !is_int($photoId)) {
-            throw ApiError::invalid('Bitte ein Bild angeben (photo_id) oder null für die automatische Wahl.');
+            throw ApiError::invalid(I18n::t('Bitte ein Bild angeben (photo_id) oder null für die automatische Wahl.'));
         }
         if ($photoId !== null) {
             $photo = $repo->photo($photoId);
             if ($photo === null || (int) $photo['album_id'] !== $albumId || $photo['status'] === GalleryRepository::FAILED) {
-                throw ApiError::notFound('Bild nicht in diesem Album gefunden.');
+                throw ApiError::notFound(I18n::t('Bild nicht in diesem Album gefunden.'));
             }
             if (($photo['media'] ?? 'image') === 'video') {
-                throw ApiError::invalid('Als Titelbild geht nur ein Bild, kein Video.');
+                throw ApiError::invalid(I18n::t('Als Titelbild geht nur ein Bild, kein Video.'));
             }
         }
         $repo->updateAlbum($albumId, ['cover_photo_id' => $photoId]);
@@ -408,7 +409,7 @@ final class GalleryUploadService
     {
         $photo = $this->repo()->photo($id);
         if ($photo === null || !$this->editable($photo)) {
-            throw ApiError::notFound('Hochgeladenes Bild nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Hochgeladenes Bild nicht gefunden.'));
         }
         $this->removePhoto($photo);
         // Kam es aus einer Einreichung (Issue #286), gilt diese als wieder entfernt.
@@ -428,14 +429,14 @@ final class GalleryUploadService
     {
         $target = Input::integer($albumId);
         if ($target === null || $target < 1) {
-            throw ApiError::invalid('Bitte das Album angeben, in das verschoben werden soll.');
+            throw ApiError::invalid(I18n::t('Bitte das Album angeben, in das verschoben werden soll.'));
         }
         $repo = $this->repo();
-        $targetAlbum = $repo->album($target) ?? throw ApiError::notFound('Album nicht gefunden.');
+        $targetAlbum = $repo->album($target) ?? throw ApiError::notFound(I18n::t('Album nicht gefunden.'));
         $photos = $this->uploadedPhotos($ids);
         foreach ($photos as $photo) {
             if (!GalleryService::isUpload($photo) && (string) $targetAlbum['source'] !== 'drive' && (int) $photo['album_id'] !== $target) {
-                throw ApiError::invalid(sprintf('„%s“ liegt in Google Drive und kann nur in ein Album mit Ordner in Drive.', (string) $photo['name']));
+                throw ApiError::invalid(I18n::t('„{name}“ liegt in Google Drive und kann nur in ein Album mit Ordner in Drive.', ['name' => (string) $photo['name']]));
             }
         }
         $gallery = $this->app->gallery();
@@ -449,11 +450,11 @@ final class GalleryUploadService
             $data = ['album_id' => $target];
             if (!GalleryService::isUpload($photo)) {
                 // Aus Drive: Datei in den Ordner des neuen Albums (bzw. dessen „intern“)
-                $from = $repo->album((int) $photo['album_id']) ?? throw ApiError::notFound('Album nicht gefunden.');
+                $from = $repo->album((int) $photo['album_id']) ?? throw ApiError::notFound(I18n::t('Album nicht gefunden.'));
                 try {
                     $this->app->galleryDrive()->movePhotoFile($photo, $from, $targetAlbum, (int) $photo['is_intern'] === 1);
                 } catch (\RuntimeException $e) {
-                    throw ApiError::invalid(sprintf('„%s“ ließ sich in Google Drive nicht verschieben: %s', (string) $photo['name'], $e->getMessage()));
+                    throw ApiError::invalid(I18n::t('„{name}“ ließ sich in Google Drive nicht verschieben: {error}', ['name' => (string) $photo['name'], 'error' => $e->getMessage()]));
                 }
             } else {
                 try {
@@ -503,24 +504,24 @@ final class GalleryUploadService
     private function uploadedPhotos(mixed $ids): array
     {
         if (!is_array($ids) || !array_is_list($ids) || $ids === []) {
-            throw ApiError::invalid('Bitte mindestens ein Bild oder Video angeben (ids).');
+            throw ApiError::invalid(I18n::t('Bitte mindestens ein Bild oder Video angeben (ids).'));
         }
         if (count($ids) > self::BATCH_MAX) {
-            throw ApiError::invalid(sprintf('Höchstens %d Bilder oder Videos auf einmal.', self::BATCH_MAX));
+            throw ApiError::invalid(I18n::t('Höchstens {max} Bilder oder Videos auf einmal.', ['max' => self::BATCH_MAX]));
         }
         $repo = $this->repo();
         $photos = [];
         foreach ($ids as $raw) {
             $id = is_int($raw) ? $raw : null;
             if ($id === null || $id < 1) {
-                throw ApiError::invalid('Die Angabe ids muss eine Liste von IDs sein.');
+                throw ApiError::invalid(I18n::t('Die Angabe ids muss eine Liste von IDs sein.'));
             }
             $photo = $repo->photo($id);
             if ($photo === null) {
-                throw ApiError::notFound('Bild oder Video nicht gefunden.');
+                throw ApiError::notFound(I18n::t('Bild oder Video nicht gefunden.'));
             }
             if (!$this->editable($photo)) {
-                throw ApiError::invalid(sprintf('„%s“ kommt aus Google Drive. Das verschiebst oder löschst du in Drive.', (string) $photo['name']));
+                throw ApiError::invalid(I18n::t('„{name}“ kommt aus Google Drive. Das verschiebst oder löschst du in Drive.', ['name' => (string) $photo['name']]));
             }
             $photos[$id] = $photo;
         }
@@ -548,9 +549,9 @@ final class GalleryUploadService
     /** @return array<string, mixed> */
     private function appAlbum(int $id): array
     {
-        $album = $this->repo()->album($id) ?? throw ApiError::notFound('Album nicht gefunden.');
+        $album = $this->repo()->album($id) ?? throw ApiError::notFound(I18n::t('Album nicht gefunden.'));
         if ((string) $album['source'] !== 'app' && !$this->app->galleryDrive()->active()) {
-            throw ApiError::invalid('Alben aus Google Drive änderst du in Drive.');
+            throw ApiError::invalid(I18n::t('Alben aus Google Drive änderst du in Drive.'));
         }
         return $album;
     }
@@ -559,10 +560,10 @@ final class GalleryUploadService
     {
         $title = Text::line(is_string($raw) ? $raw : '', self::TITLE_MAX + 1);
         if ($title === '') {
-            throw ApiError::invalid('Bitte einen Titel für das Album angeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Titel für das Album angeben.'));
         }
         if (mb_strlen($title) > self::TITLE_MAX) {
-            throw ApiError::invalid(sprintf('Der Titel darf höchstens %d Zeichen lang sein.', self::TITLE_MAX));
+            throw ApiError::invalid(I18n::t('Der Titel darf höchstens {max} Zeichen lang sein.', ['max' => self::TITLE_MAX]));
         }
         return $title;
     }
@@ -572,7 +573,7 @@ final class GalleryUploadService
         $year = Input::integer($raw);
         $max = (int) $this->app->time()->today()->format('Y') + 1;
         if ($year === null || $year < 1800 || $year > $max) {
-            throw ApiError::invalid(sprintf('Bitte ein Jahr zwischen 1800 und %d angeben.', $max));
+            throw ApiError::invalid(I18n::t('Bitte ein Jahr zwischen 1800 und {max} angeben.', ['max' => $max]));
         }
         return (string) $year;
     }
@@ -584,10 +585,9 @@ final class GalleryUploadService
         if ($post === null || $length <= $post) {
             return null;
         }
-        return sprintf(
-            'Das Bild ist zu groß für den Server: Er nimmt höchstens %s je Anfrage an (PHP-Einstellung post_max_size), das Bild braucht %s.',
-            ServerLimits::format($post),
-            ServerLimits::format($length),
+        return I18n::t(
+            'Das Bild ist zu groß für den Server: Er nimmt höchstens {max} je Anfrage an (PHP-Einstellung post_max_size), das Bild braucht {size}.',
+            ['max' => ServerLimits::format($post), 'size' => ServerLimits::format($length)],
         );
     }
 
@@ -600,12 +600,9 @@ final class GalleryUploadService
         }
         $needed = (int) ($width * $height * 4 * 2 * 1.25) + 3 * $fileBytes + 2 * 1024 * 1024;
         if ($needed > $available) {
-            throw ApiError::invalid(sprintf(
-                'Das Bild hat %d × %d Pixel. Zum Verarbeiten braucht der Server rund %s Arbeitsspeicher, frei sind %s. Bitte das Bild verkleinern oder den Hoster bitten, memory_limit zu erhöhen.',
-                $width,
-                $height,
-                ServerLimits::format($needed),
-                ServerLimits::format($available),
+            throw ApiError::invalid(I18n::t(
+                'Das Bild hat {width} × {height} Pixel. Zum Verarbeiten braucht der Server rund {needed} Arbeitsspeicher, frei sind {available}. Bitte das Bild verkleinern oder den Hoster bitten, memory_limit zu erhöhen.',
+                ['width' => $width, 'height' => $height, 'needed' => ServerLimits::format($needed), 'available' => ServerLimits::format($available)],
             ));
         }
     }

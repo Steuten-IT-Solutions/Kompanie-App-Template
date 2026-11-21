@@ -2174,9 +2174,22 @@ WHERE title IS NULL",
                 'mysql' => ['ALTER TABLE {registration_requests} ADD COLUMN company_ids varchar(255) NOT NULL DEFAULT \'\''],
                 'sqlite' => ['ALTER TABLE {registration_requests} ADD COLUMN company_ids TEXT NOT NULL DEFAULT \'\''],
             ],
+            // Mehrere Terminarten je Termin und Anwesenheitsliste (EventKindRepository::columns()): alle Arten mit
+            // Zeilenumbruch getrennt; kind behält die erste, damit eine ältere Version nach dem Zurückrollen weiter eine liest.
+            // Leer: nur kind zählt (Zeilen von vorher).
+            72 => [
+                'mysql' => [
+                    'ALTER TABLE {event_kinds} ADD COLUMN kinds varchar(1500) NOT NULL DEFAULT \'\'',
+                    'ALTER TABLE {attendance_lists} ADD COLUMN kinds varchar(1500) NOT NULL DEFAULT \'\'',
+                ],
+                'sqlite' => [
+                    'ALTER TABLE {event_kinds} ADD COLUMN kinds TEXT NOT NULL DEFAULT \'\'',
+                    'ALTER TABLE {attendance_lists} ADD COLUMN kinds TEXT NOT NULL DEFAULT \'\'',
+                ],
+            ],
             // Zu- und Absagen, die offline vor dem Ende der Frist getippt wurden und erst danach ankamen (EventResponseService):
             // Zeit des Tippens (UTC) zum Kennzeichnen „nachträglich übertragen“; NULL bei allen anderen.
-            72 => [
+            73 => [
                 'mysql' => ['ALTER TABLE {event_responses} ADD COLUMN decided_at datetime DEFAULT NULL'],
                 'sqlite' => ['ALTER TABLE {event_responses} ADD COLUMN decided_at TEXT DEFAULT NULL'],
             ],

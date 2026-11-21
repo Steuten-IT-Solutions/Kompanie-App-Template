@@ -1,5 +1,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, can, config, CONFIG_CHANGED, toLogin, newsTitle, type Capability } from './api';
+import { t } from './i18n';
+import { LanguageButton } from './language';
 import brand from './generated/brand';
 import logoUrl from './generated/logo-small.webp';
 import { detectPlatform, isStandalone, promptInstall, useCanPrompt } from './install';
@@ -34,7 +36,7 @@ import {
 } from './navigation';
 import { helpSlug } from './helpSlug';
 import { setReportOrigin } from './lastError';
-import { shareLink, shareUrl } from './share';
+import { photoFromPath, shareLink, shareUrl } from './share';
 import { toggleTheme, useTheme } from './theme';
 import News from './views/News';
 import Termine, { canManageCalendar } from './views/Termine';
@@ -159,10 +161,10 @@ const tabLabels = (): Record<Tab | 'menue', string> => ({
   seiten: sec.pages,
   intern: sec.intern,
   // Untermenü der einrichtbaren Navigation: Titel ist sein Name (App)
-  menue: 'Menü',
+  menue: t('Menü'),
   ...internLabels(),
-  meins: 'Meins',
-  verwaltung: 'Verwaltung',
+  meins: t('Meins'),
+  verwaltung: t('Verwaltung'),
 });
 
 function internLabels(): Record<InternView, string> {
@@ -187,19 +189,19 @@ const titles = (): Record<View, string> => ({
   brett: sec.board,
   umfragen: sec.polls,
   inventar: sec.inventory,
-  benachrichtigungen: 'Benachrichtigungen',
-  installieren: 'App installieren',
-  anmelden: 'Anmelden',
-  registrieren: 'Zugang beantragen',
-  einstellungen: 'Einstellungen',
-  einrichtung: 'Einrichtung',
-  hilfe: 'Hilfe',
+  benachrichtigungen: t('Benachrichtigungen'),
+  installieren: t('App installieren'),
+  anmelden: t('Anmelden'),
+  registrieren: t('Zugang beantragen'),
+  einstellungen: t('Einstellungen'),
+  einrichtung: t('Einrichtung'),
+  hilfe: t('Hilfe'),
 });
 
 /** Kopfzeile: zwischen hell und dunkel wechseln (feste Wahl und „Wie Gerät“ unter Meins → Konto). */
 function ThemeButton() {
   const dark = useTheme().shown === 'dark';
-  const label = dark ? 'Helle Darstellung' : 'Dunkle Darstellung';
+  const label = dark ? t('Helle Darstellung') : t('Dunkle Darstellung');
   return (
     <button className="btn btn-link topbar-theme" onClick={toggleTheme} aria-label={label} title={label}>
       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -292,25 +294,25 @@ function InstallBanner({ onToast }: { onToast: (msg: string) => void }) {
   };
   async function install() {
     const result = await promptInstall();
-    if (result === 'accepted') onToast('Die App wird installiert – gleich ist sie auf dem Startbildschirm');
+    if (result === 'accepted') onToast(t('Die App wird installiert – gleich ist sie auf dem Startbildschirm'));
   }
   return (
     <div className="install-hint" role="note">
       <img src={logoUrl} alt="" className="install-hint-logo" />
       <div className="install-hint-text">
-        <strong>Die App aufs Handy holen</strong>
-        <span>Mit unserem Logo auf dem Startbildschirm – wie jede andere App.</span>
+        <strong>{t('Die App aufs Handy holen')}</strong>
+        <span>{t('Mit unserem Logo auf dem Startbildschirm – wie jede andere App.')}</span>
       </div>
       {canPrompt ? (
         <button className="btn btn-small install-hint-btn" onClick={install}>
-          Installieren
+          {t('Installieren')}
         </button>
       ) : (
         <button className="btn btn-small install-hint-btn" onClick={() => navigate('installieren')}>
           So geht's
         </button>
       )}
-      <button className="btn btn-link install-hint-close" onClick={dismiss} aria-label="Hinweis schließen">
+      <button className="btn btn-link install-hint-close" onClick={dismiss} aria-label={t('Hinweis schließen')}>
         ✕
       </button>
     </div>
@@ -328,11 +330,11 @@ function PreviewBanner() {
   return (
     <div className="preview-banner" role="status">
       <span>
-        <strong>{p.role === PUBLIC_PREVIEW ? 'Vorschau ohne Anmeldung' : `Vorschau als ${p.label}`}</strong>
-        {p.person !== undefined && p.roles && p.roles.length > 0 && ` (${p.roles.join(', ')})`} – nur ansehen
+        <strong>{p.role === PUBLIC_PREVIEW ? t('Vorschau ohne Anmeldung') : t('Vorschau als {role}', { role: p.label })}</strong>
+        {p.person !== undefined && p.roles && p.roles.length > 0 && ` (${p.roles.join(', ')})`} – {t('nur ansehen')}
       </span>
       <button className="btn btn-small" onClick={endPreview}>
-        Beenden
+        {t('Beenden')}
       </button>
     </div>
   );
@@ -360,9 +362,11 @@ async function logout(onError: (msg: string) => void) {
     if (
       pendingOfflineCount() > 0 &&
       !(await confirmAsk(
-        'Offline gespeicherte Änderungen (Anwesenheit, Zu- und Absagen, Punkte und Strafen) sind noch nicht übertragen und gehen beim Abmelden verloren. Trotzdem abmelden?',
+        t(
+          'Offline gespeicherte Änderungen (Anwesenheit, Zu- und Absagen, Punkte und Strafen) sind noch nicht übertragen und gehen beim Abmelden verloren. Trotzdem abmelden?',
+        ),
         {
-          okLabel: 'Abmelden',
+          okLabel: t('Abmelden'),
         },
       ))
     ) {
@@ -378,7 +382,7 @@ async function logout(onError: (msg: string) => void) {
       // 401: Die Sitzung ist auf dem Server schon beendet.
       if (!(err instanceof ApiError && err.status === 401)) {
         await finishPush(false);
-        onError('Abmelden hat nicht geklappt. Bitte mit Internetverbindung erneut versuchen.');
+        onError(t('Abmelden hat nicht geklappt. Bitte mit Internetverbindung erneut versuchen.'));
         return;
       }
     }
@@ -582,7 +586,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
   if (!config) {
     return (
       <main className="content">
-        <p className="error">Die App muss über ihre Adresse auf der Webseite geöffnet werden.</p>
+        <p className="error">{t('Die App muss über ihre Adresse auf der Webseite geöffnet werden.')}</p>
       </main>
     );
   }
@@ -627,8 +631,8 @@ export default function App({ notice = null }: { notice?: string | null }) {
         <button
           className="btn btn-link topbar-share"
           onClick={() => void shareLink(pageUrl, `${brand.shortName}: ${title}`, showToast)}
-          aria-label="Link zu dieser Seite teilen"
-          title="Link zu dieser Seite teilen"
+          aria-label={t('Link zu dieser Seite teilen')}
+          title={t('Link zu dieser Seite teilen')}
         >
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
             <path
@@ -650,15 +654,16 @@ export default function App({ notice = null }: { notice?: string | null }) {
           });
           navigate(slug ? `hilfe/${slug}` : 'hilfe');
         }}
-        aria-label="Hilfe"
+        aria-label={t('Hilfe')}
         aria-current={tab === 'hilfe' ? 'page' : undefined}
       >
         ?
       </button>
+      <LanguageButton />
       <ThemeButton />
       {!user && tab !== 'anmelden' && (
         <button className="btn btn-link topbar-account" onClick={toLogin}>
-          Login
+          {t('Login')}
         </button>
       )}
     </header>
@@ -686,13 +691,17 @@ export default function App({ notice = null }: { notice?: string | null }) {
       <UpdateBanner />
       {user && <OfflineRejectedBanner />}
       {boardReadable() && tab !== 'brett' && <BoardBanner />}
-      {!online && <div className="offline">Offline – angezeigt werden die zuletzt geladenen Daten.</div>}
+      {!online && <div className="offline">{t('Offline – angezeigt werden die zuletzt geladenen Daten.')}</div>}
       {online && stale && (
         <div className="offline" role="status">
-          Schlechte Verbindung – angezeigt werden die zuletzt geladenen Daten.
+          {t('Schlechte Verbindung – angezeigt werden die zuletzt geladenen Daten.')}
         </div>
       )}
       {!['installieren', 'anmelden', 'registrieren', 'einstellungen', 'einrichtung'].includes(tab) && <InstallBanner onToast={showToast} />}
+      {/* Gleich nach der Anmeldung, auf jeder Seite (auch nach einem geteilten Link): Benachrichtigungen anbieten */}
+      {user && !config.setupPending && !['anmelden', 'registrieren', 'einrichtung', 'benachrichtigungen', 'installieren'].includes(tab) && (
+        <PushHint onToast={showToast} />
+      )}
 
       <main className="content">
         <ErrorBoundary key={viewKey(path)}>
@@ -700,23 +709,25 @@ export default function App({ notice = null }: { notice?: string | null }) {
             {config.setupPending && tab !== 'einrichtung' && (
               <div className="card setup-hint">
                 <p>
-                  <strong>Willkommen!</strong> Die App ist installiert. Jetzt noch auswählen, welche Bereiche eure Kompanie nutzt, und sie
-                  verbinden – dauert ein paar Minuten.
+                  <strong>{t('Willkommen!')}</strong>{' '}
+                  {t(
+                    'Die App ist installiert. Jetzt noch auswählen, welche Bereiche eure Kompanie nutzt, und sie verbinden – dauert ein paar Minuten.',
+                  )}
                 </p>
                 <button className="btn btn-block" onClick={() => navigate('einrichtung')}>
-                  Einrichtung starten
+                  {t('Einrichtung starten')}
                 </button>
               </div>
             )}
             {loginFirst && (
               <div className="card login-first" role="note">
-                <p>Diese Seite ist erst nach der Anmeldung zu sehen. Danach geht sie direkt auf.</p>
+                <p>{t('Diese Seite ist erst nach der Anmeldung zu sehen. Danach geht sie direkt auf.')}</p>
                 <button className="btn btn-block" onClick={toLogin}>
-                  Anmelden
+                  {t('Anmelden')}
                 </button>
                 {canRegister && (
                   <button className="btn btn-secondary btn-block" onClick={() => navigate('registrieren')}>
-                    Noch keinen Zugang? Zugang beantragen
+                    {t('Noch keinen Zugang? Zugang beantragen')}
                   </button>
                 )}
               </div>
@@ -726,13 +737,12 @@ export default function App({ notice = null }: { notice?: string | null }) {
             {parentMenu && menuStart && <MenuBack to={parentMenu.key} label={parentMenu.label} />}
             {canRegister && !loginFirst && activeTab === homeTab && !path[1] && (
               <p className="registration-hint muted small">
-                Du gehörst dazu und hast noch keinen Zugang?{' '}
+                {t('Du gehörst dazu und hast noch keinen Zugang?')}{' '}
                 <button type="button" className="btn btn-link inline-link" onClick={() => navigate('registrieren')}>
-                  Zugang beantragen
+                  {t('Zugang beantragen')}
                 </button>
               </p>
             )}
-            {user && !config.setupPending && activeTab === homeTab && !path[1] && <PushHint onToast={showToast} />}
             {tab === 'termine' &&
               (path[1] === 'verwalten' && features?.events && can('manage_events') ? (
                 <TermineVerwalten onToast={showToast} />
@@ -754,18 +764,22 @@ export default function App({ notice = null }: { notice?: string | null }) {
               ) : path[1] === 'verwalten' && canManageGallery() ? (
                 <div>
                   <button className="btn btn-link back" onClick={() => navigate('galerie')}>
-                    ‹ Alle Alben
+                    ‹ {t('Alle Alben')}
                   </button>
                   <GalleryAlbums onToast={showToast} />
                 </div>
               ) : (
-                <Galerie albumId={albumId} onToast={showToast} />
+                <Galerie albumId={albumId} photoId={photoFromPath(path)} onToast={showToast} />
               ))}
             {tab === 'kompanien' && <Kompanien id={companyId} />}
             {tab === 'sponsoren' && <Sponsoren />}
             {tab === 'seiten' && <Seiten id={/^\d+$/.test(route[1] ?? '') ? Number(route[1]) : null} />}
             {openMenu?.children && (
-              <InternMenu label={openMenu.label} tabs={openMenu.children.map((v) => ({ id: v, label: targetLabels()[v] ?? v }))} />
+              <InternMenu
+                page={openMenu.key}
+                label={openMenu.label}
+                tabs={openMenu.children.map((v) => ({ id: v, label: targetLabels()[v] ?? v }))}
+              />
             )}
             {tab === 'dokumente' &&
               (path[1] === 'verwalten' && can('manage_documents') ? (
@@ -800,7 +814,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
       )}
 
       {tabs.length > 1 && (
-        <nav className={tabbarClass(tabs.length, config?.navigation_labels !== false)} aria-label="Hauptnavigation">
+        <nav className={tabbarClass(tabs.length, config?.navigation_labels !== false)} aria-label={t('Hauptnavigation')}>
           {tabs.map((t) => (
             <button
               key={t.key}

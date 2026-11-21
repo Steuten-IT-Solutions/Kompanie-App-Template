@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { DIR, fotograf } from './handbuch-bilder/fotograf';
 import { GRUPPEN } from './handbuch-bilder/gruppen';
+import { quietPushHint } from './pushHintQuiet';
 
 // Bildschirmfotos für die Anleitungen im Handbuch (docs/handbuch, ![…](bild:name)): je Bildschirm ein Überblick und
 // Fotos wichtiger Schritte. Läuft gegen die eigenständige Version mit Beispieldaten (scripts/handbuch-bilder.sh), in
@@ -16,7 +17,7 @@ test.beforeEach(async ({ page }) => {
   // Den Hinweis „App aufs Handy holen“ ausblenden: Er verdeckt sonst den Inhalt.
   await page.addInitScript(() => localStorage.setItem('kompanie-install-hint-dismissed', '1'));
   // Ebenso den Hinweis „Benachrichtigungen einschalten“ auf der Startseite (pushHint.ts).
-  await page.addInitScript(() => localStorage.setItem('kompanie-push-hint-later', String(Date.now())));
+  await quietPushHint(page);
 });
 
 for (const [name, gruppe] of Object.entries(GRUPPEN)) {

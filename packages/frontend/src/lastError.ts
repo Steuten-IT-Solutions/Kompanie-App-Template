@@ -3,6 +3,8 @@
  * Nur im Speicher dieser Sitzung (nichts im Browser abgelegt); die Meldung zeigt beides vor dem Absenden an.
  */
 
+import { t } from './i18n';
+
 const MAX = 500;
 
 let last: { message: string; at: number } | null = null;
@@ -30,10 +32,10 @@ export function reportOrigin(): string | null {
 
 /** Programmfehler außerhalb von React mitschreiben (einmal beim Start). */
 export function watchRuntimeErrors(): void {
-  window.addEventListener('error', (e) => noteError(e.message || 'Unbekannter Programmfehler'));
+  window.addEventListener('error', (e) => noteError(e.message || t('Unbekannter Programmfehler')));
   window.addEventListener('unhandledrejection', (e) => {
     const reason: unknown = e.reason;
-    noteError(reason instanceof Error ? reason.message : typeof reason === 'string' ? reason : 'Unbehandelter Fehler');
+    noteError(reason instanceof Error ? reason.message : typeof reason === 'string' ? reason : t('Unbehandelter Fehler'));
   });
 }
 

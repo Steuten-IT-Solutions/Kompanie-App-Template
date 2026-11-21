@@ -4,6 +4,7 @@
 import { useRef, useState } from 'react';
 import { api, type Attachment } from './api';
 import { formatBytes } from './format';
+import { t } from './i18n';
 
 let limit: Promise<number> | null = null;
 /** Höchstgröße je Datei, einmal je Sitzung geladen. */
@@ -22,7 +23,7 @@ function maxBytes(): Promise<number> {
 export function AttachmentList({ items }: { items: Attachment[] | undefined }) {
   if (!items || items.length === 0) return null;
   return (
-    <ul className="attachment-list" aria-label="Anhänge">
+    <ul className="attachment-list" aria-label={t('Anhänge')}>
       {items.map((a) => (
         <li key={a.uid}>
           <a href={a.url} download={a.name} className="attachment-link">
@@ -70,14 +71,20 @@ export function AttachmentsField({
     }
     for (const file of list) {
       if (max !== null && file.size > max) {
-        problems.push(`„${file.name}“ ist ${formatBytes(file.size)} groß; Anhänge dürfen höchstens ${formatBytes(max)} groß sein.`);
+        problems.push(
+          t('„{name}“ ist {size} groß; Anhänge dürfen höchstens {max} groß sein.', {
+            name: file.name,
+            size: formatBytes(file.size),
+            max: formatBytes(max),
+          }),
+        );
         continue;
       }
       setBusy(file.name);
       try {
         onAdd(await api.uploadAttachment(file));
       } catch (err) {
-        problems.push(`„${file.name}“: ${(err as Error).message}`);
+        problems.push(t('„{name}“: {message}', { name: file.name, message: (err as Error).message }));
       }
     }
     setBusy(null);
@@ -86,7 +93,7 @@ export function AttachmentsField({
 
   return (
     <div className="field attachments-field">
-      <span id={`${id}-label`}>Anhänge</span>
+      <span id={`${id}-label`}>{t('Anhänge')}</span>
       {items.length > 0 && (
         <ul className="attachment-list attachment-list-edit" aria-labelledby={`${id}-label`}>
           {items.map((a) => (
@@ -96,7 +103,12 @@ export function AttachmentsField({
               </span>
               <span className="attachment-name">{a.name}</span>
               <span className="muted small"> ({formatBytes(a.size)})</span>
-              <button type="button" className="attachment-remove" aria-label={`${a.name} entfernen`} onClick={() => onRemove(a.uid)}>
+              <button
+                type="button"
+                className="attachment-remove"
+                aria-label={t('{name} entfernen', { name: a.name })}
+                onClick={() => onRemove(a.uid)}
+              >
                 ×
               </button>
             </li>
@@ -113,7 +125,7 @@ export function AttachmentsField({
           disabled={busy !== null}
           onChange={(e) => void add(e.target.files)}
         />
-        {busy ? `Lädt „${busy}“ …` : 'Datei anhängen'}
+        {busy ? t('Lädt „{name}“ …', { name: busy }) : t('Datei anhängen')}
       </label>
       {errors.map((e) => (
         <p key={e} className="form-error small">

@@ -1,4 +1,5 @@
 import { config } from './api';
+import { t } from './i18n';
 
 /**
  * Links auf Impressum und Datenschutzerklärung der Kompanie (Einstellungen → Impressum und Datenschutz), für alle sichtbar:
@@ -6,8 +7,8 @@ import { config } from './api';
  */
 export function LegalLinks({ className = '' }: { className?: string }) {
   const links = [
-    { label: 'Impressum', url: config?.legal?.imprint ?? null },
-    { label: 'Datenschutz', url: config?.legal?.privacy ?? null },
+    { label: t('Impressum'), url: config?.legal?.imprint ?? null },
+    { label: t('Datenschutz'), url: config?.legal?.privacy ?? null },
   ].filter((l): l is { label: string; url: string } => !!l.url);
   if (links.length === 0) return null;
   return (

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Domain;
 
+use KompanieApp\Core\I18n\I18n;
+
 /**
  * Entfernt Metadaten aus fertig erzeugten JPEGs: EXIF (u. a. GPS-Ort, Kamera, Seriennummer), XMP, IPTC und Kommentare.
  *
@@ -63,7 +65,7 @@ final class JpegMetadata
         }
         $clean = self::strip($data);
         if ($clean !== $data && @file_put_contents($file, $clean) === false) {
-            throw new \RuntimeException('Das Bild kann nicht gespeichert werden.');
+            throw new \RuntimeException(I18n::t('Das Bild kann nicht gespeichert werden.'));
         }
     }
 

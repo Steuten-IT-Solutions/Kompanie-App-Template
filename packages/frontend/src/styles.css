@@ -59,6 +59,7 @@ h3,
 .album-title,
 .news-headline,
 .office-title,
+.joint-term-title,
 .rank-card-title {
   hyphens: auto;
   -webkit-hyphens: auto;
@@ -138,7 +139,8 @@ h3,
   /* Teilen, Hilfe, Darstellung und „Login“ nebeneinander: Platz für den Titel lassen */
   .topbar .topbar-help,
   .topbar .topbar-share,
-  .topbar .topbar-theme {
+  .topbar .topbar-theme,
+  .topbar .topbar-lang {
     width: 30px;
     height: 30px;
   }
@@ -185,6 +187,82 @@ h3,
   border: 1px solid var(--on-primary-soft);
   border-radius: 50%;
 }
+.topbar .topbar-lang {
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  padding: 0;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--on-primary-soft);
+  border-radius: 50%;
+}
+.topbar .topbar-lang .flag {
+  width: 20px;
+  height: 14px;
+}
+/* Sprachwahl: Auswahl unter der Flagge */
+.lang-menu-wrap {
+  position: relative;
+  flex: none;
+}
+.flag {
+  width: 24px;
+  height: 16px;
+  flex: none;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 15%);
+  vertical-align: middle;
+}
+.lang-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 20;
+  min-width: 180px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+}
+.lang-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.lang-menu button:hover,
+.lang-menu button:focus-visible {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+.lang-menu button[aria-checked='true'] {
+  font-weight: 700;
+}
+.lang-check {
+  margin-left: auto;
+  color: var(--accent);
+}
+.lang-choice button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
 .topbar .topbar-help.active {
   background: var(--accent);
   color: var(--on-accent);
@@ -195,6 +273,13 @@ h3,
   max-width: 640px;
   margin: 0 auto;
   padding: 18px 16px 24px;
+}
+/* Seiten mit Kacheln (tiles.tsx) sind am Computer breiter: Das Raster erreicht 872 px und damit 5 Spalten
+   (columnsForWidth). Handy quer hat ohnehin die ganze Breite. */
+@media (min-width: 900px) and ((orientation: portrait) or (min-height: 521px)) {
+  .content:has(.tile-grid) {
+    max-width: 904px;
+  }
 }
 
 .tabbar {
@@ -333,12 +418,9 @@ h3,
   padding: 4px;
   font-size: 1.1rem;
 }
-/* Startseite: Benachrichtigungen einschalten (PushHint) */
+/* Fenster nach der Anmeldung: Benachrichtigungen einschalten (PushHint); Abstände über .stack */
 .push-hint p {
-  margin: 0 0 10px;
-}
-.push-hint .push-hint-later {
-  margin-top: 4px;
+  margin: 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1009,6 +1091,23 @@ p.small + p.small:not(.muted) {
 .event-kind-picker .field {
   margin-bottom: 4px;
 }
+/* Terminarten ankreuzen (am Termin und an der Anwesenheitsliste), mehrere möglich */
+.event-kind-checks {
+  border: 0;
+  padding: 0;
+  margin-left: 0;
+  margin-right: 0;
+}
+.event-kind-checks .toggle {
+  margin-bottom: 8px;
+}
+/* Am Termin eingeklappt: Knopf „Terminarten ›“, darunter nur die gewählten Arten */
+.event-kind-toggle {
+  padding-left: 0;
+}
+.event-kind-summary {
+  margin: 0 0 8px;
+}
 
 /* ------------------------------------------------------------------ */
 /* Spieß & Formulare                                                   */
@@ -1164,6 +1263,11 @@ button.member-date {
 }
 .member-offices .section-title {
   margin-top: 18px;
+}
+/* Profil (Mitglied in der Verwaltung, Meins → Übersicht): Spalten erst am Computer, auf dem Handy wie ohne Hülle */
+.member-columns,
+.member-col {
+  display: contents;
 }
 /* Mitgliedsdetails: Anwesenheit mit Zeitraum (memberAttendance.tsx); drei Zahlen nebeneinander, auch auf schmalen Handys */
 .member-attendance {
@@ -1806,6 +1910,12 @@ input[aria-invalid='true'] {
 .push-types {
   margin-top: 12px;
 }
+/* Bericht: Haken der Bereiche (am Computer in Spalten, Block „Breite Ansicht“) */
+.toggle-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
 .push-card .btn + .btn {
   margin-top: 8px;
 }
@@ -2095,6 +2205,9 @@ code {
   align-items: center;
   justify-content: center;
   transition: transform 0.22s ease-out;
+  /* Mitte zwischen den Knöpfen oben und der Leiste unten (Galerie.tsx misst beide) */
+  padding: var(--lb-top, 0) 0 var(--lb-bottom, 0);
+  box-sizing: border-box;
 }
 .lb-track.peeking {
   will-change: transform;
@@ -2109,6 +2222,8 @@ code {
   align-items: center;
   justify-content: center;
   pointer-events: none;
+  padding: var(--lb-top, 0) 0 var(--lb-bottom, 0);
+  box-sizing: border-box;
 }
 .lb-peek-prev {
   right: calc(100% + 32px);
@@ -2118,7 +2233,7 @@ code {
 }
 .lightbox img {
   max-width: calc(100vw / var(--kompanie-zoom, 1));
-  max-height: calc(86vh / var(--kompanie-zoom, 1));
+  max-height: var(--lb-space, calc(86vh / var(--kompanie-zoom, 1)));
   object-fit: contain;
   transition: transform 0.15s ease-out;
 }
@@ -2137,7 +2252,7 @@ code {
 }
 .lightbox video {
   max-width: calc(100vw / var(--kompanie-zoom, 1));
-  max-height: calc(80vh / var(--kompanie-zoom, 1));
+  max-height: var(--lb-space, calc(80vh / var(--kompanie-zoom, 1)));
   background: #000;
 }
 .lb-error {
@@ -2165,6 +2280,15 @@ code {
   right: 70px;
   display: grid;
   place-items: center;
+}
+.lb-share {
+  top: calc(14px + env(safe-area-inset-top));
+  right: 70px;
+  display: grid;
+  place-items: center;
+}
+.lb-download ~ .lb-share {
+  right: 126px;
 }
 .lightbox .lb-download-busy {
   width: 22px;
@@ -2326,6 +2450,24 @@ code {
 }
 .install-foot {
   margin-top: 16px;
+}
+/* Android: „Klappt es nicht?“ und die Schritte im eigenen Browser (Installieren.tsx) */
+.install-trouble {
+  margin-top: 16px;
+  padding: 16px;
+}
+.install-trouble h3 {
+  margin: 0;
+}
+.install-trouble ul {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.install-trouble li + li {
+  margin-top: 8px;
+}
+.install-other-steps {
+  margin: 12px 0 0;
 }
 .install-share {
   padding: 16px;
@@ -2596,7 +2738,7 @@ code {
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
-/* Startseite der Verwaltung: je Bereich ein Knopf mit Symbol */
+/* Startseite der Verwaltung: je Bereich ein Knopf mit Symbol; die Spaltenzahl (2 bis 5) setzt tiles.tsx */
 .admin-tiles {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2604,11 +2746,6 @@ code {
   margin: 0;
   padding: 0;
   list-style: none;
-}
-@media (min-width: 560px) {
-  .admin-tiles {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 .admin-tiles li {
   display: flex;
@@ -2643,14 +2780,138 @@ code {
   flex: none;
   color: var(--accent-text);
 }
+/* Kachelraster mit persönlicher Anordnung (tiles.tsx): Spalten und Lage setzt die App; breite Kacheln zeigen Symbol und
+   Text nebeneinander */
+.tile-grid > li {
+  position: relative;
+  min-width: 0;
+}
+.tile-grid > li > .tile-body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+.tile-grid > li.wide .admin-tile {
+  flex-direction: row;
+  gap: 14px;
+}
+/* Knopf „Kacheln anordnen“ unter dem Raster, rechts */
+.tile-arrange-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin: var(--space-2) 0 0;
+}
+/* Bearbeiten-Modus: Hinweis, Zurücksetzen und Fertig über dem Raster */
+.tile-arrange {
+  padding: 14px 16px 2px;
+  margin: 0 0 12px;
+}
+.tile-arrange-hint {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+.tile-arrange-note,
+.tile-arrange .form-error {
+  margin: 10px 0 0;
+  font-size: 0.92rem;
+}
+/* Vorgabe für alle (nur wer Einstellungen ändern darf): direkt unter Zurücksetzen und Fertig */
+.tile-arrange .button-row.tile-arrange-default {
+  margin-top: -4px;
+}
+/* Freie Felder: gestrichelt, so hoch wie eine Kachel */
+.tile-grid-editing > li.tile-slot {
+  min-height: 56px;
+  border: 1.5px dashed var(--line-strong);
+  border-radius: var(--radius);
+}
+.admin-tiles.tile-grid-editing > li.tile-slot {
+  min-height: 112px;
+}
+.tile-grid-editing > li > .tile-body {
+  opacity: 0.92;
+}
+/* Platz für − und + unter dem Inhalt der Kachel */
+.tile-grid-editing > li > .tile-body > .card {
+  padding-bottom: 48px;
+}
+/* Griff über der ganzen Kachel: ziehen (Finger: kurz halten, damit die Seite weiter scrollt), Tastatur: Pfeile, + und − */
+.tile-edit {
+  position: absolute;
+  inset: 0;
+}
+.tile-handle {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  padding: 0;
+  border: 2px dashed var(--accent-text);
+  border-radius: var(--radius);
+  background: transparent;
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.tile-handle:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.tile-dragging .tile-handle {
+  cursor: grabbing;
+  border-style: solid;
+  background: color-mix(in srgb, var(--accent-text) 10%, transparent);
+}
+.tile-dragging > .tile-body {
+  transform: scale(1.03);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18);
+  border-radius: var(--radius);
+}
+/* Breite: − und + unten rechts in der Kachel */
+.tile-size {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: flex;
+  gap: 6px;
+}
+.tile-size button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1.5px solid var(--line-strong);
+  background: var(--card);
+  color: var(--accent-text);
+  font: inherit;
+  font-weight: 700;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.tile-size button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.tile-size button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 /* Kleine Zahl im Kreis an der oberen rechten Ecke einer Kachel (z. B. Mitglieder, die zur Beförderung bereit sind) */
 .admin-tile {
   position: relative;
 }
-.count-badge {
+/* Mehrere Kreise (z. B. Aufnahmen: bald erfüllt, dann erfüllt) nebeneinander an der Ecke */
+.count-badges {
   position: absolute;
   top: -7px;
   right: -7px;
+  display: flex;
+  gap: 4px;
+}
+.count-badge {
   min-width: 24px;
   height: 24px;
   padding: 0 7px;
@@ -2665,6 +2926,11 @@ code {
   line-height: 24px;
   text-align: center;
   text-transform: none;
+}
+/* Was bald ansteht (Anwärter kurz vor der Aufnahme): Akzentfarbe statt Rot */
+.count-badge-soon {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
 /* Hinweis in der Verwaltung, z. B. neu erreichte Beförderungsschwellen nach dem Vergeben von Punkten */
@@ -4001,6 +4267,12 @@ select.attendance-response {
   margin: 12px 0;
   text-decoration: none;
 }
+.install-chrome-get {
+  margin: 0;
+}
+.install-wait {
+  margin: 12px 0 0;
+}
 .credentials-text {
   width: 100%;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -4630,13 +4902,6 @@ fieldset.board-targets legend {
 .event-kind-edit .toggle {
   margin: 0 2px 10px;
 }
-@media (min-width: 900px) {
-  .poll-page,
-  .poll-admin,
-  .poll-list {
-    max-width: 720px;
-  }
-}
 
 /* Geburtstage (Issue #1): Karte „Anstehende Geburtstage“, Eingabe Tag/Monat/Jahr */
 .birthdays-upcoming {
@@ -4871,12 +5136,6 @@ fieldset.board-targets legend {
 @media (prefers-reduced-motion: reduce) {
   .inventory-group-arrow {
     transition: none;
-  }
-}
-@media (min-width: 900px) {
-  .inventory-page,
-  .inventory-history {
-    max-width: 760px;
   }
 }
 
@@ -6230,61 +6489,13 @@ button.spotlight-person:focus-visible {
 }
 
 /* ------------------------------------------------------------------ */
-/* Handy quer: Navigation als Leiste links, flache Kopfleiste und      */
-/* Banner, Inhalt über die ganze Breite (Listen und Formulare zwei-    */
-/* spaltig, Lesetexte begrenzt). Tablets und Computer sind höher und   */
-/* bleiben, wie sie sind.                                              */
+/* Handy quer: flache Kopfleiste und Banner. Die Navigation links und  */
+/* den Inhalt über die ganze Breite teilt es sich mit dem Computer     */
+/* (Blöcke darunter).                                                  */
 /* ------------------------------------------------------------------ */
 @media (orientation: landscape) and (max-height: 520px) {
   :root {
-    /* Die Tab-Leiste steht links; unten braucht nichts mehr Platz (.app, .toast, .list-save, Jahresübersicht). */
-    --tabbar-h: 0px;
-    --rail-w: 76px;
     --content-pad-r: max(16px, env(safe-area-inset-right));
-  }
-  .app {
-    padding-left: calc(var(--rail-w) + env(safe-area-inset-left));
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-  .tabbar {
-    top: 0;
-    right: auto;
-    flex-direction: column;
-    justify-content: space-around;
-    width: calc(var(--rail-w) + env(safe-area-inset-left));
-    height: auto;
-    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) env(safe-area-inset-left);
-    overflow-y: auto;
-    scrollbar-width: none;
-    background: linear-gradient(90deg, var(--bar-top), var(--bar-bottom));
-    border-top: 0;
-    border-right: 3px solid var(--accent);
-  }
-  .tabbar button,
-  .tabbar button:first-child:nth-last-child(n + 6),
-  .tabbar button:first-child:nth-last-child(n + 6) ~ button,
-  .tabbar button:first-child:nth-last-child(n + 7),
-  .tabbar button:first-child:nth-last-child(n + 7) ~ button {
-    flex: 1 1 0;
-    min-height: 44px;
-    gap: 2px;
-    padding: 0 3px;
-    font-size: 0.58rem;
-    letter-spacing: 0.02em;
-  }
-  .tabbar button svg {
-    width: 22px;
-    height: 22px;
-  }
-  /* Markierung des aktiven Tabs am rechten Rand statt oben */
-  .tabbar button.active::before {
-    top: 22%;
-    bottom: 22%;
-    left: auto;
-    right: 0;
-    width: 3px;
-    height: auto;
-    border-radius: 3px 0 0 3px;
   }
   /* Kopfleiste einzeilig und nicht fest: Sie scrollt mit weg, der Inhalt bekommt die Höhe. */
   .topbar {
@@ -6352,14 +6563,6 @@ button.spotlight-person:focus-visible {
   .offline {
     padding: 6px var(--content-pad-r) 6px 16px;
   }
-  /* Fest positionierte Hinweise mittig über dem Inhalt, nicht über der Leiste */
-  .toast,
-  .yg-detail {
-    left: calc(50% + (var(--rail-w) + env(safe-area-inset-left)) / 2);
-  }
-  .yg-detail {
-    width: min(760px, calc(100% - var(--rail-w) - env(safe-area-inset-left) - 32px));
-  }
   /* Fenster (Sheet): ganz auf den niedrigen Bildschirm */
   .sheet-backdrop {
     padding: 8px;
@@ -6368,7 +6571,102 @@ button.spotlight-person:focus-visible {
     max-height: calc(100vh / var(--kompanie-zoom, 1) - 16px);
     max-height: calc(100dvh / var(--kompanie-zoom, 1) - 16px);
   }
+}
 
+/* ------------------------------------------------------------------ */
+/* Navigation als Leiste links: Handy quer und Computer (ab 900 px     */
+/* breit), dort ist die Höhe knapp und die Breite reichlich.           */
+/* ------------------------------------------------------------------ */
+@media (orientation: landscape) and (max-height: 520px), (min-width: 900px) and ((orientation: portrait) or (min-height: 521px)) {
+  :root {
+    /* Die Tab-Leiste steht links; unten braucht nichts mehr Platz (.app, .toast, .list-save, Jahresübersicht). */
+    --tabbar-h: 0px;
+    --rail-w: 76px;
+  }
+  .app {
+    padding-left: calc(var(--rail-w) + env(safe-area-inset-left));
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tabbar {
+    top: 0;
+    right: auto;
+    flex-direction: column;
+    justify-content: space-around;
+    width: calc(var(--rail-w) + env(safe-area-inset-left));
+    height: auto;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) env(safe-area-inset-left);
+    overflow-y: auto;
+    scrollbar-width: none;
+    background: linear-gradient(90deg, var(--bar-top), var(--bar-bottom));
+    border-top: 0;
+    border-right: 3px solid var(--accent);
+  }
+  .tabbar button,
+  .tabbar button:first-child:nth-last-child(n + 6),
+  .tabbar button:first-child:nth-last-child(n + 6) ~ button,
+  .tabbar button:first-child:nth-last-child(n + 7),
+  .tabbar button:first-child:nth-last-child(n + 7) ~ button {
+    flex: 1 1 0;
+    min-height: 44px;
+    gap: 2px;
+    padding: 0 3px;
+    font-size: 0.58rem;
+    letter-spacing: 0.02em;
+  }
+  .tabbar button svg {
+    width: 22px;
+    height: 22px;
+  }
+  /* Markierung des aktiven Tabs am rechten Rand statt oben */
+  .tabbar button.active::before {
+    top: 22%;
+    bottom: 22%;
+    left: auto;
+    right: 0;
+    width: 3px;
+    height: auto;
+    border-radius: 3px 0 0 3px;
+  }
+  /* Fest positionierte Hinweise mittig über dem Inhalt, nicht über der Leiste */
+  .toast,
+  .yg-detail {
+    left: calc(50% + (var(--rail-w) + env(safe-area-inset-left)) / 2);
+  }
+  .yg-detail {
+    width: min(760px, calc(100% - var(--rail-w) - env(safe-area-inset-left) - 32px));
+  }
+}
+/* Am Computer ist die Leiste hoch genug: Punkte oben untereinander statt über die ganze Höhe verteilt, etwas breiter
+   und mit größerer Schrift. */
+@media (min-width: 900px) and ((orientation: portrait) or (min-height: 521px)) {
+  :root {
+    --rail-w: 88px;
+  }
+  .tabbar {
+    justify-content: flex-start;
+  }
+  .app .tabbar button,
+  .app .tabbar button:first-child:nth-last-child(n + 6),
+  .app .tabbar button:first-child:nth-last-child(n + 6) ~ button,
+  .app .tabbar button:first-child:nth-last-child(n + 7),
+  .app .tabbar button:first-child:nth-last-child(n + 7) ~ button {
+    flex: none;
+    min-height: 72px;
+    gap: 4px;
+    font-size: 0.62rem;
+  }
+  .app .tabbar button svg {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Breite Ansicht: Handy quer sowie Tablet und Computer ab 900 px      */
+/* (dieselbe Grenze wie die Kachel-Seiten oben). Inhalt über die ganze */
+/* Breite, Listen in Spalten, Lesetexte und Listen zum Ziehen begrenzt.*/
+/* ------------------------------------------------------------------ */
+@media (orientation: landscape) and (max-height: 520px), (min-width: 900px) and ((orientation: portrait) or (min-height: 521px)) {
   /* Inhalt über die ganze Breite */
   .content {
     max-width: none;
@@ -6415,10 +6713,6 @@ button.spotlight-person:focus-visible {
   .office-group > .office-card.open {
     grid-column: 1 / -1;
   }
-  .admin-tiles {
-    /* so viele Spalten, wie lange Wörter („Beförderungen“) ungebrochen passen; bei 844 px vier */
-    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-  }
   .album-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -6453,6 +6747,99 @@ button.spotlight-person:focus-visible {
   .changelog-text {
     max-width: 760px;
     margin-inline: auto;
+  }
+
+  /* Haken-Listen (Bereiche, Bericht, Benachrichtigungen, Zusatzrollen) in Spalten statt einer langen Spalte */
+  .feature-list,
+  .push-types,
+  .toggle-grid,
+  .extra-roles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+    column-gap: 24px;
+    align-items: start;
+  }
+  .toggle-grid {
+    row-gap: var(--space-3);
+  }
+  .extra-roles > :not(.toggle) {
+    grid-column: 1 / -1;
+  }
+  /* Änderungen: Auswahl (Zeitraum, Wer, Bereich) in einer Zeile */
+  .changes .settings-section:has(> .usage-range) {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+    gap: 0 16px;
+    align-items: start;
+  }
+  .changes .settings-section:has(> .usage-range) > :not(.field, .usage-range) {
+    grid-column: 1 / -1;
+  }
+  .changes .settings-section > .usage-range {
+    display: contents;
+  }
+  .changes .settings-section > .field select {
+    width: 100%;
+  }
+  /* Nutzung: vier Kennzahlen in einer Reihe */
+  .usage-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  /* Was ist neu: die ganze Karte so breit wie der Lesetext, mittig */
+  .changelog-version {
+    max-width: 760px;
+    margin-inline: auto;
+  }
+  /* Profil zweispaltig; die erste Überschrift rechts ohne Abstand nach oben, damit beide Spalten oben bündig sind */
+  .member-columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 24px;
+    align-items: start;
+  }
+  .member-col {
+    display: block;
+    min-width: 0;
+  }
+  .member-col > :first-child > .section-title:first-child {
+    margin-top: 0;
+  }
+
+  /* Listen zum Ziehen (dragSort.tsx) bleiben einspaltig; damit Name und Wert nah beieinander stehen, höchstens 960 px
+     und mittig, ebenso Einstellungen, die nur aus so einer Liste bestehen (Navigation, Rollen). */
+  .card-list:has(.drag-handle),
+  .settings-section:has(.card-list .drag-handle) {
+    width: 100%;
+    max-width: 960px;
+    margin-inline: auto;
+  }
+}
+
+/* Nur Tablet und Computer: etwas mehr Rand, Formulare mit drei oder vier kurzen Feldern je Zeile, Alben und Bilder
+   nach der Breite. */
+@media (min-width: 900px) and ((orientation: portrait) or (min-height: 521px)) {
+  :root {
+    --content-pad-r: 24px;
+  }
+  .content {
+    padding: 18px 24px 24px;
+  }
+  /* Neben der Leiste links bleiben bei 1440 px noch vier Karten je Zeile */
+  .card-list,
+  .poll-list,
+  .install-steps,
+  .status-list,
+  .office-group {
+    grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  }
+  .form {
+    grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+  }
+  .album-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+  .photo-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   }
 }
 
@@ -6696,12 +7083,44 @@ button.spotlight-person:focus-visible {
 .joint-term-body {
   padding: 12px 14px;
 }
+/* Kopf einer gemeinsamen Amtszeit: klappt die Karte auf und zu (wie .office-head) */
+.joint-term-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 14px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+.joint-term-head-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.joint-term-head[aria-expanded='true'] .office-arrow {
+  transform: rotate(90deg);
+}
+.joint-term-names {
+  overflow-wrap: anywhere;
+}
+.joint-term-content {
+  border-top: 1px solid var(--line);
+}
 .joint-term-title {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin: 0 0 6px;
+  font-family: var(--font-head);
+  font-weight: 600;
   font-size: 1.05rem;
 }
 .joint-term-offices {
@@ -6971,6 +7390,19 @@ section.settings-section > .gallery-upload-list:last-child {
 }
 .registration-footnote {
   margin-top: 14px;
+}
+/* „Kompanie zuordnen“ einklappbar: Knopf als Überschrift, eingeklappt nur die gewählten Kompanien */
+.registration-companies h3 {
+  margin: 0;
+}
+.registration-companies-toggle {
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  padding-left: 0;
+}
+.registration-companies-summary {
+  margin: 0 0 8px;
 }
 /* Tag der Anfrage mittig unter dem Namen */
 .registration-date {
@@ -7419,7 +7851,14 @@ fieldset.block-source legend {
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  gap: 8px 0;
+  gap: 10px 12px;
+}
+/* Anzahl allein in der ersten Zeile, die Knöpfe darunter */
+.lb-count-text {
+  flex-basis: 100%;
+}
+.lb-count .lb-intern {
+  margin-left: 0;
 }
 /* Runde Knöpfe nur mit Symbol in der Galerie (Name als aria-label und Tooltip) */
 .icon-btn {
@@ -7696,4 +8135,101 @@ fieldset.block-source legend {
 .offline-rejected-hint {
   margin-top: 4px;
   opacity: 0.9;
+}
+
+/* Voraussetzung für die Aufnahme als Baum (admissionRule.tsx): Gruppen mit UND/ODER, beliebig tief. Jede Ebene rückt
+   nur wenig ein und bekommt eine Linie am Rand, damit auch tiefe Gruppen auf 360 px Breite passen. */
+.rule-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rule-group .rule-group {
+  margin-left: 0.5rem;
+  padding-left: 8px;
+  border-left: 2px solid var(--accent);
+}
+.rule-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rule-group-head .segmented {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-bottom: 0;
+}
+/* Beide Wahlen gleich breit und umbrechend: Auf schmalen Handys passt „Alle müssen erfüllt sein“ sonst nicht. */
+.rule-group-head .segmented button {
+  flex: 1 1 0;
+  white-space: normal;
+}
+/* Ein fieldset ist sonst mindestens so breit wie sein Inhalt und schöbe den Editor über den Rand. */
+.role-admission {
+  min-width: 0;
+}
+.rule-condition {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+}
+.rule-fields {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rule-fields .field {
+  flex: 1 1 10rem;
+  min-width: 0;
+  margin: 0;
+}
+.rule-joiner {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: center;
+  list-style: none;
+}
+.rule-add {
+  margin: 0;
+}
+.rule-sentence {
+  margin: 0;
+}
+.rule-result-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rule-result-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.rule-result-group {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-left: 8px;
+  border-left: 2px solid var(--line-strong);
+}
+.rule-mark {
+  flex: 0 0 1.2em;
+  text-align: center;
+  color: var(--muted);
+}
+.rule-fulfilled > .rule-mark {
+  color: var(--good);
+}
+.rule-result-list .rule-joiner {
+  text-align: left;
+  padding-left: calc(1.2em + 8px);
 }

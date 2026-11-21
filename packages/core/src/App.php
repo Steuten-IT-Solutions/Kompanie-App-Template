@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\PreviewEnvironment;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Domain\ActivityService;
+use KompanieApp\Core\Domain\LanguageService;
 use KompanieApp\Core\Domain\ChangeLogService;
 use KompanieApp\Core\Domain\AttendanceService;
 use KompanieApp\Core\Domain\BackupEncryptionService;
@@ -48,6 +49,7 @@ use KompanieApp\Core\Domain\RoleService;
 use KompanieApp\Core\Domain\ScoreService;
 use KompanieApp\Core\Domain\SettingsService;
 use KompanieApp\Core\Domain\ServerBackupService;
+use KompanieApp\Core\Domain\TileLayoutService;
 use KompanieApp\Core\Domain\TitleService;
 use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Time;
@@ -761,6 +763,18 @@ final class App
     public function joinYears(): JoinYearService
     {
         return $this->service(JoinYearService::class, fn () => new JoinYearService($this));
+    }
+
+    /** Sprachen der App: eingeschaltete und die Wahl je Konto (Plan „Mehrsprachigkeit“) */
+    public function languages(): LanguageService
+    {
+        return $this->service(LanguageService::class, fn () => new LanguageService($this->settings, new UserSettings($this->db)));
+    }
+
+    /** Anordnung der Kacheln: persönlich je Konto und Vorgabe für alle */
+    public function tileLayouts(): TileLayoutService
+    {
+        return $this->service(TileLayoutService::class, fn () => new TileLayoutService(new UserSettings($this->db), $this->settings));
     }
 
     public function memberPhotos(): MemberPhotoService

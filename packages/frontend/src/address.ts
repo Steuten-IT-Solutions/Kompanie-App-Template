@@ -5,6 +5,8 @@
  * Regeln (Domain\Address).
  */
 
+import { t } from './i18n';
+
 export interface Address {
   street: string;
   house_number: string;
@@ -30,34 +32,34 @@ export const OTHER_COUNTRY = '';
  * dem Vereinheitlichen, wie Address::COUNTRIES auf dem Server (Wikipedia: List of postal codes).
  */
 export const ADDRESS_COUNTRIES = [
-  { code: 'DE', name: 'Deutschland', flag: '🇩🇪', postal: /^(0[1-9]|[1-9]\d)\d{3}$/, example: '12345', format: '5 Ziffern' },
-  { code: 'AT', name: 'Österreich', flag: '🇦🇹', postal: /^[1-9]\d{3}$/, example: '1010', format: '4 Ziffern' },
-  { code: 'CH', name: 'Schweiz', flag: '🇨🇭', postal: /^[1-9]\d{3}$/, example: '8001', format: '4 Ziffern' },
+  { code: 'DE', name: t('Deutschland'), flag: '🇩🇪', postal: /^(0[1-9]|[1-9]\d)\d{3}$/, example: '12345', format: t('5 Ziffern') },
+  { code: 'AT', name: t('Österreich'), flag: '🇦🇹', postal: /^[1-9]\d{3}$/, example: '1010', format: t('4 Ziffern') },
+  { code: 'CH', name: t('Schweiz'), flag: '🇨🇭', postal: /^[1-9]\d{3}$/, example: '8001', format: t('4 Ziffern') },
   {
     code: 'NL',
-    name: 'Niederlande',
+    name: t('Niederlande'),
     flag: '🇳🇱',
     postal: /^[1-9]\d{3} [A-Z]{2}$/,
     example: '1234 AB',
-    format: '4 Ziffern und 2 Buchstaben',
+    format: t('4 Ziffern und 2 Buchstaben'),
   },
-  { code: 'BE', name: 'Belgien', flag: '🇧🇪', postal: /^[1-9]\d{3}$/, example: '1000', format: '4 Ziffern' },
-  { code: 'LU', name: 'Luxemburg', flag: '🇱🇺', postal: /^\d{4}$/, example: '1234', format: '4 Ziffern' },
-  { code: 'FR', name: 'Frankreich', flag: '🇫🇷', postal: /^\d{5}$/, example: '75001', format: '5 Ziffern' },
-  { code: 'DK', name: 'Dänemark', flag: '🇩🇰', postal: /^\d{4}$/, example: '1050', format: '4 Ziffern' },
-  { code: 'PL', name: 'Polen', flag: '🇵🇱', postal: /^\d{2}-\d{3}$/, example: '00-950', format: '2 und 3 Ziffern' },
-  { code: 'CZ', name: 'Tschechien', flag: '🇨🇿', postal: /^[1-7]\d{2} \d{2}$/, example: '110 00', format: '5 Ziffern' },
-  { code: 'IT', name: 'Italien', flag: '🇮🇹', postal: /^\d{5}$/, example: '00118', format: '5 Ziffern' },
-  { code: 'ES', name: 'Spanien', flag: '🇪🇸', postal: /^(0[1-9]|[1-4]\d|5[0-2])\d{3}$/, example: '28001', format: '5 Ziffern' },
+  { code: 'BE', name: t('Belgien'), flag: '🇧🇪', postal: /^[1-9]\d{3}$/, example: '1000', format: t('4 Ziffern') },
+  { code: 'LU', name: t('Luxemburg'), flag: '🇱🇺', postal: /^\d{4}$/, example: '1234', format: t('4 Ziffern') },
+  { code: 'FR', name: t('Frankreich'), flag: '🇫🇷', postal: /^\d{5}$/, example: '75001', format: t('5 Ziffern') },
+  { code: 'DK', name: t('Dänemark'), flag: '🇩🇰', postal: /^\d{4}$/, example: '1050', format: t('4 Ziffern') },
+  { code: 'PL', name: t('Polen'), flag: '🇵🇱', postal: /^\d{2}-\d{3}$/, example: '00-950', format: t('2 und 3 Ziffern') },
+  { code: 'CZ', name: t('Tschechien'), flag: '🇨🇿', postal: /^[1-7]\d{2} \d{2}$/, example: '110 00', format: t('5 Ziffern') },
+  { code: 'IT', name: t('Italien'), flag: '🇮🇹', postal: /^\d{5}$/, example: '00118', format: t('5 Ziffern') },
+  { code: 'ES', name: t('Spanien'), flag: '🇪🇸', postal: /^(0[1-9]|[1-4]\d|5[0-2])\d{3}$/, example: '28001', format: t('5 Ziffern') },
   {
     code: 'GB',
-    name: 'Großbritannien',
+    name: t('Großbritannien'),
     flag: '🇬🇧',
     postal: /^[A-Z]{1,2}\d[A-Z\d]? \d[A-Z]{2}$/,
     example: 'SW1A 1AA',
-    format: 'z. B. SW1A 1AA',
+    format: t('z. B. SW1A 1AA'),
   },
-  { code: 'TR', name: 'Türkei', flag: '🇹🇷', postal: /^(0[1-9]|[1-7]\d|8[01])\d{3}$/, example: '06100', format: '5 Ziffern' },
+  { code: 'TR', name: t('Türkei'), flag: '🇹🇷', postal: /^(0[1-9]|[1-7]\d|8[01])\d{3}$/, example: '06100', format: t('5 Ziffern') },
 ];
 
 export const EMPTY_ADDRESS: Address = {
@@ -145,31 +147,32 @@ export function addressProblems(input: Address): Partial<Record<AddressField, st
   const a = normalizeAddress(input);
   const out: Partial<Record<AddressField, string>> = {};
   if (isEmptyAddress(a)) return out;
-  if (a.street === '') out.street = 'Bitte die Straße angeben.';
+  if (a.street === '') out.street = t('Bitte die Straße angeben.');
   else if (a.street.length > STREET_MAX || !TEXT.test(a.street) || !/\p{L}/u.test(a.street)) {
-    out.street = "Erlaubt sind Buchstaben, Ziffern, Leerzeichen und . , - ' / ( ) &.";
+    out.street = t("Erlaubt sind Buchstaben, Ziffern, Leerzeichen und . , - ' / ( ) &.");
   }
   if (a.house_number !== '' && (a.house_number.length > HOUSE_NUMBER_MAX || !new RegExp(`^${HOUSE_NUMBER}$`).test(a.house_number))) {
-    out.house_number = 'Bitte z. B. 12, 12a oder 12-14.';
+    out.house_number = t('Bitte z. B. 12, 12a oder 12-14.');
   }
   if (a.extra !== '' && (a.extra.length > STREET_MAX || !TEXT.test(a.extra))) {
-    out.extra = "Erlaubt sind Buchstaben, Ziffern, Leerzeichen und . , - ' / ( ) &.";
+    out.extra = t("Erlaubt sind Buchstaben, Ziffern, Leerzeichen und . , - ' / ( ) &.");
   }
   const c = country(a.country);
-  if (a.postal_code === '') out.postal_code = 'Bitte die Postleitzahl angeben.';
-  else if (c && !c.postal.test(a.postal_code)) out.postal_code = `Passt nicht zu ${c.name} (${c.format}, z. B. ${c.example}).`;
+  if (a.postal_code === '') out.postal_code = t('Bitte die Postleitzahl angeben.');
+  else if (c && !c.postal.test(a.postal_code))
+    out.postal_code = t('Passt nicht zu {country} ({format}, z. B. {example}).', { country: c.name, format: c.format, example: c.example });
   else if (!c && !/^[A-Z0-9][A-Z0-9 -]{0,10}[A-Z0-9]$/.test(a.postal_code)) {
-    out.postal_code = '2 bis 12 Zeichen aus Buchstaben, Ziffern, Leerzeichen und -.';
+    out.postal_code = t('2 bis 12 Zeichen aus Buchstaben, Ziffern, Leerzeichen und -.');
   }
-  if (a.city === '') out.city = 'Bitte den Ort angeben.';
+  if (a.city === '') out.city = t('Bitte den Ort angeben.');
   else if (a.city.length > CITY_MAX || !CITY.test(a.city) || !/\p{L}.*\p{L}/u.test(a.city)) {
-    out.city = "Erlaubt sind Buchstaben, Leerzeichen und . - ' ( ) /.";
+    out.city = t("Erlaubt sind Buchstaben, Leerzeichen und . - ' ( ) /.");
   }
   if (
     a.country === OTHER_COUNTRY &&
     (a.country_name.length < 2 || a.country_name.length > COUNTRY_NAME_MAX || !COUNTRY_NAME.test(a.country_name))
   ) {
-    out.country_name = 'Bitte das Land angeben.';
+    out.country_name = t('Bitte das Land angeben.');
   }
   return out;
 }
@@ -179,8 +182,8 @@ export function addressHints(input: Address): Partial<Record<AddressField, strin
   const a = normalizeAddress(input);
   const out: Partial<Record<AddressField, string>> = {};
   if (isEmptyAddress(a)) return out;
-  if (a.street !== '' && a.house_number === '' && !/\d/.test(a.street)) out.house_number = 'Hausnummer vergessen?';
-  if (/\d/.test(a.city)) out.city = 'Im Ort stehen Ziffern. Gehören sie zur Postleitzahl?';
+  if (a.street !== '' && a.house_number === '' && !/\d/.test(a.street)) out.house_number = t('Hausnummer vergessen?');
+  if (/\d/.test(a.city)) out.city = t('Im Ort stehen Ziffern. Gehören sie zur Postleitzahl?');
   return out;
 }
 

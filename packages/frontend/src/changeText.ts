@@ -1,11 +1,12 @@
 // Texte für das Änderungsprotokoll (Verwaltung → Änderungen), ohne React und Branding testbar.
 import type { ChangeAction, ChangeEntry, ChangeField } from './api';
+import { t, tn } from './i18n';
 
 export const ACTION_TEXT: Record<ChangeAction, string> = {
-  create: 'angelegt',
-  update: 'geändert',
-  delete: 'gelöscht',
-  event: 'ausgeführt',
+  create: t('angelegt'),
+  update: t('geändert'),
+  delete: t('gelöscht'),
+  event: t('ausgeführt'),
 };
 
 /** Felder, deren Werte Schlüssel von Rechten sind (Rollen, Ausnahmen einer Person): in der Anzeige ihre Namen. */
@@ -15,13 +16,13 @@ const CAPABILITY_FIELDS = ['Rechte', 'Rechte zusätzlich', 'Rechte entzogen'];
 export function entryTitle(e: Pick<ChangeEntry, 'type' | 'label' | 'action'>): string {
   if (e.action === 'event') return e.label || e.type;
   const action = ACTION_TEXT[e.action] ?? e.action;
-  if (e.type === 'Einstellungen' || e.label === '') return `${e.label || e.type} ${action}`;
-  return `${e.type} „${e.label}“ ${action}`;
+  if (e.type === 'Einstellungen' || e.label === '') return t('{name} {action}', { name: e.label || e.type, action });
+  return t('{type} „{label}“ {action}', { type: e.type, label: e.label, action });
 }
 
 /** Wert zum Anzeigen; Rechte mit ihren Namen, leer als „leer“. */
 export function valueText(field: string, value: string | null | undefined, capLabel: (key: string) => string): string {
-  if (value === null || value === undefined || value === '') return 'leer';
+  if (value === null || value === undefined || value === '') return t('leer');
   if (CAPABILITY_FIELDS.includes(field)) {
     return value
       .split(', ')
@@ -36,11 +37,11 @@ export function valueText(field: string, value: string | null | undefined, capLa
  * ausgeblendete persönliche Angaben mit Hinweis; Werte entfernt (Konto gelöscht) als „Werte entfernt“.
  */
 export function fieldText(c: ChangeField, capLabel: (key: string) => string): string {
-  if (c.secret) return 'geändert';
-  if (c.hidden) return 'geändert (Werte nur mit „Persönliches sehen“)';
+  if (c.secret) return t('geändert');
+  if (c.hidden) return t('geändert (Werte nur mit „Persönliches sehen“)');
   const hasOld = 'old' in c;
   const hasNew = 'new' in c;
-  if (!hasOld && !hasNew) return 'geändert (Werte entfernt)';
+  if (!hasOld && !hasNew) return t('geändert (Werte entfernt)');
   if (hasOld && hasNew) return `${valueText(c.field, c.old, capLabel)} → ${valueText(c.field, c.new, capLabel)}`;
   return valueText(c.field, hasNew ? c.new : c.old, capLabel);
 }
@@ -57,7 +58,7 @@ export function csvRows(entries: ChangeEntry[], time: (unix: number) => string, 
         ...base,
         c.field,
         shown && 'old' in c ? valueText(c.field, c.old, capLabel) : '',
-        shown && 'new' in c ? valueText(c.field, c.new, capLabel) : c.secret || c.hidden ? 'geändert' : '',
+        shown && 'new' in c ? valueText(c.field, c.new, capLabel) : c.secret || c.hidden ? t('geändert') : '',
       ]);
     }
   }
@@ -83,7 +84,7 @@ export function groupTitle(group: Pick<ChangeEntry, 'type' | 'label' | 'action'>
   if (group.length === 1) return entryTitle(group[0]);
   const first = group[0];
   if (first.action !== 'event' && group.every((e) => e.type === first.type && e.action === first.action)) {
-    return `${group.length} × ${first.type} ${ACTION_TEXT[first.action] ?? first.action}`;
+    return t('{count} × {type} {action}', { count: group.length, type: first.type, action: ACTION_TEXT[first.action] ?? first.action });
   }
-  return `${group.length} Änderungen auf einmal`;
+  return tn('{count} Änderung auf einmal', '{count} Änderungen auf einmal', group.length);
 }

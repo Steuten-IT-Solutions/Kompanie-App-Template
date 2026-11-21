@@ -50,7 +50,10 @@ export function fotograf(page: Page): Fotograf {
       await page.goto('/app/');
       await page.evaluate(() => localStorage.clear()).catch(() => undefined);
       await page.evaluate(() => localStorage.setItem('kompanie-install-hint-dismissed', '1'));
-      await page.evaluate(() => localStorage.setItem('kompanie-push-hint-later', String(Date.now())));
+      await page.evaluate(() => {
+        localStorage.setItem('kompanie-push-hint-later', String(Date.now()));
+        localStorage.setItem('kompanie-push-hint-round', '999');
+      });
       if (!benutzer) {
         await page.goto('/app/');
         await geladen();

@@ -3,6 +3,7 @@ import { api, can, type PersonalInfo } from './api';
 import { addressInput, EMPTY_ADDRESS, formatAddress, mapLinkTarget, mapPlatform, mapUrl } from './address';
 import { normalizeEmail } from './email';
 import { normalizePhone } from './phone';
+import { t } from './i18n';
 import { AddressFields, EmailField, PhoneField } from './ui';
 
 /**
@@ -43,7 +44,7 @@ export function PersonalPanel({
     e.preventDefault();
     if (!editing) return;
     setFormError(null);
-    if (ownEmailChanged && !password) return setFormError('Bitte zur Bestätigung das aktuelle Passwort eingeben.');
+    if (ownEmailChanged && !password) return setFormError(t('Bitte zur Bestätigung das aktuelle Passwort eingeben.'));
     const phone = normalizePhone(editing.phone);
     const address = addressInput(editing.address);
     const before = start ?? personal;
@@ -58,7 +59,7 @@ export function PersonalPanel({
       setEditing(null);
       setStart(null);
       setPassword('');
-      onToast('Gespeichert');
+      onToast(t('Gespeichert'));
       onChanged();
     } catch (err) {
       setFormError((err as Error).message);
@@ -76,7 +77,7 @@ export function PersonalPanel({
 
   return (
     <section className="member-personal">
-      <h3 className="section-title">Persönliche Angaben</h3>
+      <h3 className="section-title">{t('Persönliche Angaben')}</h3>
       {editing ? (
         <form className="form card account-card" onSubmit={save}>
           <EmailField value={editing.email} onChange={(email) => setEditing({ ...editing, email })} />
@@ -84,7 +85,7 @@ export function PersonalPanel({
           <AddressFields value={editing.address ?? EMPTY_ADDRESS} onChange={(address) => setEditing({ ...editing, address })} />
           {ownEmailChanged && (
             <label className="field">
-              <span>Aktuelles Passwort (zur Bestätigung der neuen E-Mail-Adresse)</span>
+              <span>{t('Aktuelles Passwort (zur Bestätigung der neuen E-Mail-Adresse)')}</span>
               <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
             </label>
           )}
@@ -95,10 +96,10 @@ export function PersonalPanel({
           )}
           <div className="button-row">
             <button className="btn" type="submit" disabled={busy}>
-              {busy ? 'Speichert …' : 'Speichern'}
+              {busy ? t('Speichert …') : t('Speichern')}
             </button>
             <button className="btn btn-secondary" type="button" onClick={cancel} disabled={busy}>
-              Abbrechen
+              {t('Abbrechen')}
             </button>
           </div>
         </form>
@@ -107,27 +108,31 @@ export function PersonalPanel({
           <dl className="contact-list">
             {birthday && (
               <>
-                <dt>Geburtstag</dt>
+                <dt>{t('Geburtstag')}</dt>
                 <dd>
                   <button type="button" className="link-button" onClick={birthday.onOpen}>
-                    {birthday.text ?? 'nicht hinterlegt'}
+                    {birthday.text ?? t('nicht hinterlegt')}
                   </button>
                 </dd>
               </>
             )}
-            <dt>E-Mail-Adresse</dt>
+            <dt>{t('E-Mail-Adresse')}</dt>
             <dd>
-              {personal.email ? <a href={`mailto:${personal.email}`}>{personal.email}</a> : <span className="muted">nicht hinterlegt</span>}
+              {personal.email ? (
+                <a href={`mailto:${personal.email}`}>{personal.email}</a>
+              ) : (
+                <span className="muted">{t('nicht hinterlegt')}</span>
+              )}
             </dd>
-            <dt>Handynummer</dt>
+            <dt>{t('Handynummer')}</dt>
             <dd>
               {personal.phone ? (
                 <a href={`tel:${personal.phone.replace(/[^\d+]/g, '')}`}>{personal.phone}</a>
               ) : (
-                <span className="muted">nicht hinterlegt</span>
+                <span className="muted">{t('nicht hinterlegt')}</span>
               )}
             </dd>
-            <dt>Adresse</dt>
+            <dt>{t('Adresse')}</dt>
             {/* Antippen: der Ort in der Karten-App */}
             <dd className="address-lines">
               {map ? (
@@ -135,7 +140,7 @@ export function PersonalPanel({
                   {lines.join('\n')}
                 </a>
               ) : (
-                <span className="muted">nicht hinterlegt</span>
+                <span className="muted">{t('nicht hinterlegt')}</span>
               )}
             </dd>
           </dl>
@@ -147,7 +152,7 @@ export function PersonalPanel({
                 setStart(personal);
               }}
             >
-              Ändern
+              {t('Ändern')}
             </button>
           )}
         </div>

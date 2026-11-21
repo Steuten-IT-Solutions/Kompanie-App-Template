@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\WordPress;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\BackupProvider;
 use KompanieApp\Core\Port\FileStorage;
 use KompanieApp\Core\Storage\Backup;
@@ -87,10 +88,10 @@ final class WpBackup implements BackupProvider
     {
         $data = Backup::parse($json);
         if (($data['variant'] ?? '') !== 'wordpress') {
-            throw new \RuntimeException('Sicherungen der eigenständigen Version lassen sich (noch) nicht ins WordPress-Plugin übernehmen: Die Benutzer sind hier WordPress-Konten.');
+            throw new \RuntimeException(I18n::t('Sicherungen der eigenständigen Version lassen sich (noch) nicht ins WordPress-Plugin übernehmen: Die Benutzer sind hier WordPress-Konten.'));
         }
         if (($data['site'] ?? '') !== self::site()) {
-            throw new \RuntimeException('Die Sicherung stammt von einer anderen Website. Die Daten verweisen auf deren WordPress-Benutzer und lassen sich hier nicht wiederherstellen.');
+            throw new \RuntimeException(I18n::t('Die Sicherung stammt von einer anderen Website. Die Daten verweisen auf deren WordPress-Benutzer und lassen sich hier nicht wiederherstellen.'));
         }
         $settings = is_array($data['settings'] ?? null) ? $data['settings'] : [];
         // Ältere Sicherungen ohne Konten: wie bisher nur die Daten (die Konten müssen dann schon da sein).
@@ -166,7 +167,7 @@ final class WpBackup implements BackupProvider
      */
     private static function parseAccounts(mixed $accounts): array
     {
-        $broken = new \RuntimeException('Die Sicherung ist beschädigt (Konten).');
+        $broken = new \RuntimeException(I18n::t('Die Sicherung ist beschädigt (Konten).'));
         if (!is_array($accounts)) {
             throw $broken;
         }
@@ -213,7 +214,7 @@ final class WpBackup implements BackupProvider
             $existing = $wpdb->get_row($wpdb->prepare("SELECT ID, user_login FROM $wpdb->users WHERE ID = %d", $a['id']));
             if ($existing !== null) {
                 if (strtolower((string) $existing->user_login) !== strtolower($a['login'])) {
-                    $conflicts[] = sprintf('Konto %d heißt hier „%s“, in der Sicherung „%s“', $a['id'], $existing->user_login, $a['login']);
+                    $conflicts[] = I18n::t('Konto {id} heißt hier „{here}“, in der Sicherung „{backup}“', ['id' => $a['id'], 'here' => (string) $existing->user_login, 'backup' => $a['login']]);
                 } else {
                     $plan['update'][] = $a;
                 }
@@ -222,21 +223,26 @@ final class WpBackup implements BackupProvider
             $byLogin = (int) $wpdb->get_var($wpdb->prepare("SELECT ID FROM $wpdb->users WHERE user_login = %s", $a['login']));
             $byEmail = $a['email'] !== '' ? (int) $wpdb->get_var($wpdb->prepare("SELECT ID FROM $wpdb->users WHERE user_email = %s", $a['email'])) : 0;
             if ($byLogin > 0) {
-                $conflicts[] = sprintf('den Benutzernamen „%s“ hat hier Konto %d, in der Sicherung Konto %d', $a['login'], $byLogin, $a['id']);
+                $conflicts[] = I18n::t('den Benutzernamen „{login}“ hat hier Konto {here}, in der Sicherung Konto {backup}', ['login' => $a['login'], 'here' => $byLogin, 'backup' => $a['id']]);
             } elseif ($byEmail > 0) {
-                $conflicts[] = sprintf('die E-Mail von „%s“ hat hier schon Konto %d', $a['login'], $byEmail);
+                $conflicts[] = I18n::t('die E-Mail von „{login}“ hat hier schon Konto {here}', ['login' => $a['login'], 'here' => $byEmail]);
             } else {
                 $plan['create'][] = $a;
             }
         }
         if ($conflicts !== []) {
-            $more = count($conflicts) > 5 ? sprintf(' (und %d weitere)', count($conflicts) - 5) : '';
-            throw new \RuntimeException('Die Konten der Sicherung passen nicht zu den Benutzern dieser Website: ' . implode('; ', array_slice($conflicts, 0, 5)) . $more
-                . '. Nichts wurde geändert. Auf einer neu installierten Website den WordPress-Administrator mit dem Benutzernamen und der E-Mail'
-                . ' anlegen, die das Konto mit seiner ID in der Sicherung hat, oder mit einem Benutzernamen und einer E-Mail, die in der Sicherung nicht vorkommen.');
+            $more = count($conflicts) > 5 ? ' ' . I18n::t('(und {count} weitere)', ['count' => count($conflicts) - 5]) : '';
+            throw new \RuntimeException(I18n::t(
+                'Die Konten der Sicherung passen nicht zu den Benutzern dieser Website: {conflicts}. Nichts wurde geändert. Auf einer neu installierten Website den WordPress-Administrator mit dem Benutzernamen und der E-Mail anlegen, die das Konto mit seiner ID in der Sicherung hat, oder mit einem Benutzernamen und einer E-Mail, die in der Sicherung nicht vorkommen.',
+                ['conflicts' => implode('; ', array_slice($conflicts, 0, 5)) . $more],
+            ));
         }
         if ($plan['create'] !== [] && get_current_user_id() !== 0 && !(current_user_can('create_users') && current_user_can('promote_users'))) {
-            throw new \RuntimeException(sprintf('Die Sicherung enthält %d Konten, die es hier nicht gibt. Anlegen darf sie nur, wer in WordPress Benutzer anlegen darf (Administrator).', count($plan['create'])));
+            throw new \RuntimeException(I18n::tn(
+                'Die Sicherung enthält {count} Konto, das es hier nicht gibt. Anlegen darf es nur, wer in WordPress Benutzer anlegen darf (Administrator).',
+                'Die Sicherung enthält {count} Konten, die es hier nicht gibt. Anlegen darf sie nur, wer in WordPress Benutzer anlegen darf (Administrator).',
+                count($plan['create']),
+            ));
         }
         return $plan;
     }
@@ -251,7 +257,7 @@ final class WpBackup implements BackupProvider
     {
         global $wpdb;
         $prefix = $wpdb->get_blog_prefix();
-        $fail = static fn (): \RuntimeException => new \RuntimeException('Die Konten ließen sich nicht wiederherstellen: ' . $wpdb->last_error);
+        $fail = static fn (): \RuntimeException => new \RuntimeException(I18n::t('Die Konten ließen sich nicht wiederherstellen: {error}', ['error' => $wpdb->last_error]));
         foreach ($plan['create'] as $a) {
             $ok = $wpdb->insert($wpdb->users, [
                 'ID' => $a['id'],
@@ -300,7 +306,7 @@ final class WpBackup implements BackupProvider
         global $wpdb;
         if ($wpdb->delete($wpdb->usermeta, ['user_id' => $id, 'meta_key' => $key]) === false
             || ($value !== null && $wpdb->insert($wpdb->usermeta, ['user_id' => $id, 'meta_key' => $key, 'meta_value' => maybe_serialize($value)]) === false)) {
-            throw new \RuntimeException('Die Konten ließen sich nicht wiederherstellen: ' . $wpdb->last_error);
+            throw new \RuntimeException(I18n::t('Die Konten ließen sich nicht wiederherstellen: {error}', ['error' => $wpdb->last_error]));
         }
     }
 

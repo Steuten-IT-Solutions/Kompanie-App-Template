@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace KompanieApp\Core\ChangeLog;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\Domain\AdmissionRule;
 use KompanieApp\Core\Domain\Blocks\Blocks;
 use KompanieApp\Core\Http\Request;
+use KompanieApp\Core\I18n\I18n;
+use KompanieApp\Core\Storage\EventKindRepository;
 
 /**
  * Welche Routen das Änderungsprotokoll erfasst und wie sie ihre Einträge laden (Schlüssel „METHODE /pfad“ wie in der
@@ -30,6 +33,8 @@ final class Subjects
         // Benachrichtigungen auf einem Gerät (zählen auch nicht als Nutzung)
         'POST /me/push/status', 'POST /push/status', 'POST /me/push', 'POST /push', 'PUT /me/push', 'PUT /push', 'DELETE /me/push', 'DELETE /push',
         'POST /me/push/test', 'POST /push/test',
+        // Persönliche Anordnung der Kacheln: eine Vorliebe der Person, keine Daten des Vereins
+        'PUT /me/tiles', 'DELETE /me/tiles', 'PUT /me/locale',
         // Abstimmen in Umfragen (absichtlich nicht, auch nicht bei offenen Umfragen)
         'PUT /polls/{id}/vote', 'DELETE /polls/{id}/vote',
         // Eigene Zu- und Absage bei einem Termin (wie Abstimmen; was die Verwaltung für andere einträgt, wird erfasst)
@@ -65,6 +70,7 @@ final class Subjects
             'calendar.responses' => 'Zu- und Absagen bei Terminen', 'calendar.response_reminder' => 'An Zu- und Absage erinnern', 'calendar.response_reminder_days' => 'Erinnerung … Tage vorher', 'gallery.root' => 'Galerie-Ordner',
             'gallery.source' => 'Quelle der Galerie', 'gallery.store' => 'Ablage hochgeladener Bilder', 'gallery.downloads' => 'Bilder herunterladen erlaubt', 'gallery.submissions' => 'Einreichen durch Mitglieder erlaubt',
             'news.source' => 'Quelle der News', 'news.url' => 'Adresse der News', 'legal.imprint_url' => 'Impressum', 'legal.privacy_url' => 'Datenschutzerklärung',
+            'languages.enabled' => 'Sprachen der App',
         ],
         '/admin/mail' => [
             'from' => 'Absenderadresse', 'from_name' => 'Absendername', 'host' => 'SMTP-Server', 'port' => 'Port', 'secure' => 'Verschlüsselung',
@@ -181,6 +187,7 @@ final class Subjects
             'PUT /members/{id}/birthday' => $member,
             'DELETE /members/{id}/birthday' => $member,
             'PUT /members/{id}/rank' => $member,
+            'PATCH /members/{id}/rank-history/{key}' => $member,
             'PUT /members/{id}/titles' => $member,
             'PUT /members/{id}/companies' => $member,
             'PUT /members/{id}/former' => $member,
@@ -207,6 +214,8 @@ final class Subjects
             'PATCH /admin/push' => $this->settings('Benachrichtigungen', '/admin/push'),
             'PATCH /admin/birthdays' => $this->settings('Geburtstage', '/admin/birthdays'),
             'PUT /admin/navigation' => $this->settings('Navigation', '/admin/navigation'),
+            'PUT /admin/tiles' => $this->values('Vorgabe der Kacheln', fn (): array => $this->app->tileLayouts()->describeDefaults()),
+            'DELETE /admin/tiles' => $this->values('Vorgabe der Kacheln', fn (): array => $this->app->tileLayouts()->describeDefaults()),
             'PATCH /admin/website' => $this->settings('Webseite', '/admin/website'),
             'POST /admin/website/entry' => $this->settings('Webseite', '/admin/website'),
             'PUT /admin/features' => $this->values('Bereiche', function (): array {
@@ -329,7 +338,7 @@ final class Subjects
             'title' => 'Titel', 'description' => 'Beschreibung', 'type' => 'Art', 'anonymous' => ['Anonym', 'bool'], 'results' => 'Ergebnisse sichtbar', 'ends_at' => 'Ende', 'closed_at' => 'Beendet',
         ], extra: fn (array $r): array => ['Antworten' => $this->column('SELECT title FROM {poll_options} WHERE poll_id = ? ORDER BY sort, id', $r['id'])]);
         $inventory = $this->spec('Inventar', 'inventory_items', 'title', ['title' => 'Bezeichnung', 'category' => 'Kategorie', 'quantity' => 'Menge', 'unit' => 'Einheit', 'location' => 'Lagerort', 'note' => 'Notiz']);
-        $attendance = $this->spec('Anwesenheitsliste', 'attendance_lists', 'title', ['title' => 'Titel', 'event_date' => 'Datum', 'kind' => 'Terminart'], extra: function (array $r): array {
+        $attendance = $this->spec('Anwesenheitsliste', 'attendance_lists', 'title', ['title' => 'Titel', 'event_date' => 'Datum', 'kinds' => ['Terminarten', 'kinds']], extra: function (array $r): array {
             $entries = $this->app->db->select('SELECT user_id, status FROM {attendance_entries} WHERE list_id = ? ORDER BY user_id', [$r['id']]);
             $names = $this->people($entries);
             return ['Einträge' => array_map(static fn (array $e, string $name): string => $name . ': ' . (self::ATTENDANCE[$e['status']] ?? $e['status']), $entries, $names)];
@@ -440,7 +449,7 @@ final class Subjects
             return is_scalar($id) ? [(string) $id] : [];
         }, true);
         // Terminart eines Termins im Kalender (EventKindService)
-        $kinds = $this->spec('Terminart eines Termins', 'event_kinds', 'event_title', ['event_title' => 'Termin', 'event_date' => 'Datum', 'kind' => 'Terminart']);
+        $kinds = $this->spec('Terminart eines Termins', 'event_kinds', 'event_title', ['event_title' => 'Termin', 'event_date' => 'Datum', 'kinds' => ['Terminarten', 'kinds']]);
         $map['PUT /calendar/{key}/kind'] = $this->table($kinds, function (Request $r): array {
             $id = $this->app->eventKinds()->rowIdOf((string) ($r->params['key'] ?? ''));
             return $id === null ? [] : [(string) $id];
@@ -661,6 +670,11 @@ final class Subjects
         $fields['Ehemalig seit'] = $former['left_on'] ?? null;
         $fields['Grund des Ausscheidens'] = $former['reason'] ?? null;
         $fields['Dienstgrad'] = $this->column('SELECT r.title FROM {member_ranks} m JOIN {ranks} r ON r.id = m.rank_id WHERE m.user_id = ?', $id)[0] ?? null;
+        // Mit Datum, damit ein nachträglich geändertes Datum im Protokoll steht (Ortszeit, wie in der App).
+        $fields['Dienstgrad-Verlauf'] = array_map(
+            fn (array $h): string => $this->app->time()->format((int) strtotime($h['changed_at'] . ' UTC'), 'd.m.Y') . ': ' . ($h['to_title'] !== '' ? $h['to_title'] : 'kein'),
+            $this->app->db->select('SELECT changed_at, to_title FROM {rank_history} WHERE user_id = ? ORDER BY changed_at, id', [$id]),
+        );
         $fields['Titel'] = $this->column('SELECT t.title FROM {member_titles} m JOIN {titles} t ON t.id = m.title_id WHERE m.user_id = ? ORDER BY t.sort, t.id', $id);
         $fields['Kompanien'] = $this->column('SELECT c.name FROM {member_companies} m JOIN {companies} c ON c.id = m.company_id WHERE m.user_id = ? ORDER BY c.sort, c.id', $id);
         $fields['Mails vom Brett'] = $this->app->boardMail()->wants($id);
@@ -691,16 +705,15 @@ final class Subjects
     }
 
     /**
-     * @param array{admission_extra: bool, admission_kind: string|null, admission_count: int, admission_months: int} $a
+     * @param array{admission_extra: bool, admission_rule: array<string, mixed>} $a
      * @return array<string, mixed>
      */
     private static function admissionFields(array $a): array
     {
+        $rule = AdmissionRule::describe($a['admission_rule']);
         return [
             'Anwärter-Rolle' => $a['admission_extra'],
-            'Aufnahme: Terminart' => $a['admission_kind'],
-            'Aufnahme: Teilnahmen' => $a['admission_count'],
-            'Aufnahme: Monate als Anwärter' => $a['admission_months'],
+            'Aufnahme: Voraussetzung' => $rule !== '' ? $rule : null,
         ];
     }
 
@@ -708,7 +721,8 @@ final class Subjects
     private function mailGroup(bool $all = false): Subject
     {
         $load = function (string $key): ?Item {
-            $g = $this->app->mailGroups()->find($key);
+            // Namen der Standardgruppen folgen der Sprache der Anfrage; das Protokoll speichert sie auf Deutsch.
+            $g = I18n::in(I18n::SOURCE_LOCALE, fn (): ?array => $this->app->mailGroups()->find($key));
             if ($g === null) {
                 return null;
             }
@@ -842,7 +856,7 @@ final class Subjects
                 'google.redirect_uri', 'google.client_secret_set', 'google.last_result', 'google.calendar_access', 'google.write_access',
                 'calendar.connection_needs_calendar_access', 'calendar.ics_url_set', 'calendar.google_api_key_set', 'gallery.configured',
                 'gallery.media_bytes', 'gallery.service_account_email', 'gallery.oauth_connected', 'gallery.oauth_email', 'gallery.calendar_access',
-                'gallery.status.', 'gallery.drive.', 'news.sources',
+                'gallery.status.', 'gallery.drive.', 'news.sources', 'languages.available',
             ],
             '/admin/mail' => ['from_name_default', 'password_set', 'configured', 'unavailable', 'server_max_size', 'pending'],
             '/admin/registration' => ['pending', 'link'],
@@ -896,6 +910,11 @@ final class Subjects
             // Inhalt aus Blöcken als reiner Text (ältere Einträge: nur body)
             $text = $this->app->blocks()->plain(Blocks::decode($v, (string) ($row['body'] ?? '')), true);
             return trim((string) preg_replace('/\s+/u', ' ', $text)) ?: null;
+        }
+        if ($kind === 'kinds') {
+            // Terminarten (EventKindRepository): kinds mit der ersten in kind, ältere Zeilen nur kind
+            $kinds = EventKindRepository::decode($row['kind'] ?? '', $v);
+            return $kinds === [] ? null : implode(', ', $kinds);
         }
         if ($v === null || $v === '') {
             return null;

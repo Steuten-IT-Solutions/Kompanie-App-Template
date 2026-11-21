@@ -19,6 +19,7 @@ import { safeFileName } from '../downloadFiles';
 import { saveFile } from '../saveFile';
 import { Caps, Empty, ErrorBox, FoldSection, lazyView, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
+import { t } from '../i18n';
 
 const PdfViewer = lazyView(() => import('./PdfViewer'));
 
@@ -30,25 +31,25 @@ export const ACCEPT = '.pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.od
 
 const TYPE_LABELS: Record<string, string> = {
   pdf: 'PDF',
-  jpg: 'Bild',
-  jpeg: 'Bild',
-  png: 'Bild',
+  jpg: t('Bild'),
+  jpeg: t('Bild'),
+  png: t('Bild'),
   doc: 'Word',
   docx: 'Word',
-  odt: 'Text',
+  odt: t('Text'),
   xls: 'Excel',
   xlsx: 'Excel',
-  ods: 'Tabelle',
+  ods: t('Tabelle'),
   ppt: 'PowerPoint',
   pptx: 'PowerPoint',
-  odp: 'Präsentation',
+  odp: t('Präsentation'),
 };
 
 export const typeLabel = (doc: DocumentInfo) => TYPE_LABELS[doc.ext] ?? doc.ext.toUpperCase();
 
 export const VISIBILITY_LABELS: Record<DocVisibility, string> = {
-  members: 'Alle Mitglieder',
-  managers: `Nur wer eingeschränkte ${brand.labels.sections.documents} sehen darf`,
+  members: t('Alle Mitglieder'),
+  managers: t('Nur wer eingeschränkte {documents} sehen darf', { documents: brand.labels.sections.documents }),
 };
 
 /** Gewählte Sortierung, auf dem Gerät gemerkt (für Mitgliederansicht und „Dokumente verwalten“ gemeinsam). */
@@ -81,7 +82,7 @@ export function DocSortSelect({ value, onChange }: { value: DocSort; onChange: (
   return (
     // Kein umschließendes <label>: dessen Text enthielte sonst alle Optionen („Stand neu → alt“ …).
     <div className="field doc-sort">
-      <span id="doc-sort-label">Sortierung</span>
+      <span id="doc-sort-label">{t('Sortierung')}</span>
       <select aria-labelledby="doc-sort-label" value={value} onChange={(e) => onChange(e.target.value as DocSort)}>
         {(Object.keys(DOC_SORT_LABELS) as DocSort[]).map((s) => (
           <option key={s} value={s}>
@@ -143,9 +144,9 @@ async function fetchFile(doc: DocumentInfo): Promise<Blob> {
   try {
     res = await fetch(doc.url, { credentials: 'same-origin' });
   } catch {
-    throw new Error('Keine Verbindung und noch nicht offline gespeichert.');
+    throw new Error(t('Keine Verbindung und noch nicht offline gespeichert.'));
   }
-  if (!res.ok) throw new Error(res.status === 404 ? 'Das Dokument wurde nicht gefunden.' : `Fehler ${res.status}`);
+  if (!res.ok) throw new Error(res.status === 404 ? t('Das Dokument wurde nicht gefunden.') : t('Fehler {status}', { status: res.status }));
   return res.blob();
 }
 
@@ -233,14 +234,14 @@ export default function Dokumente({ docId, onToast }: { docId?: number; onToast:
 
   if (docId) {
     const open = docs.find((d) => d.id === docId);
-    if (!open) return <Empty>Dieses Dokument gibt es nicht (mehr).</Empty>;
+    if (!open) return <Empty>{t('Dieses Dokument gibt es nicht (mehr).')}</Empty>;
     return (
       <div>
         <button className="btn btn-link back" onClick={() => navigate('dokumente')}>
-          ‹ Alle {brand.labels.sections.documents}
+          {t('‹ Alle {section}', { section: brand.labels.sections.documents })}
         </button>
         <h2 className="member-name">{open.title}</h2>
-        <p className="muted small doc-stand">Stand: {formatDate(open.date)}</p>
+        <p className="muted small doc-stand">{t('Stand: {date}', { date: formatDate(open.date) })}</p>
         {open.kind === 'pdf' ? (
           <Suspense fallback={<Loading shape="text" chunk />}>
             <PdfViewer url={open.url} title={open.title} />
@@ -248,7 +249,7 @@ export default function Dokumente({ docId, onToast }: { docId?: number; onToast:
         ) : open.kind === 'image' ? (
           <ImageView doc={open} />
         ) : (
-          <Empty>Dieses Dokument lässt sich nur herunterladen.</Empty>
+          <Empty>{t('Dieses Dokument lässt sich nur herunterladen.')}</Empty>
         )}
       </div>
     );
@@ -272,10 +273,10 @@ export default function Dokumente({ docId, onToast }: { docId?: number; onToast:
     <div>
       {can('manage_documents') && (
         <button className="btn btn-secondary btn-block manage-events" onClick={() => navigate('dokumente/verwalten')}>
-          <Caps text={brand.labels.sections.documents} /> verwalten
+          <Caps text={t('{section} verwalten', { section: brand.labels.sections.documents })} />
         </button>
       )}
-      {docs.length === 0 ? <Empty>Es sind noch keine Dateien hinterlegt.</Empty> : <DocSortSelect value={sort} onChange={setSort} />}
+      {docs.length === 0 ? <Empty>{t('Es sind noch keine Dateien hinterlegt.')}</Empty> : <DocSortSelect value={sort} onChange={setSort} />}
       {groups.map((g) => (
         <DocGroupSection key={groupKey(g)} group={g} open={isOpen(groupKey(g))} onToggle={() => toggle(groupKey(g))}>
           <ul className="card-list">
@@ -288,22 +289,26 @@ export default function Dokumente({ docId, onToast }: { docId?: number; onToast:
                   <div className="row-main">
                     <div className="row-title">
                       {doc.title}
-                      {doc.visibility === 'managers' && <span className="badge badge-level-guest">Eingeschränkt</span>}
+                      {doc.visibility === 'managers' && <span className="badge badge-level-guest">{t('Eingeschränkt')}</span>}
                     </div>
                     <div className="row-sub">
-                      Stand: {formatDate(doc.date)} · {typeLabel(doc)}, {formatBytes(doc.size)}
+                      {t('Stand: {date} · {type}, {size}', {
+                        date: formatDate(doc.date),
+                        type: typeLabel(doc),
+                        size: formatBytes(doc.size),
+                      })}
                     </div>
-                    {offline[doc.id] && <div className="doc-offline">✓ Auch offline verfügbar</div>}
+                    {offline[doc.id] && <div className="doc-offline">{t('✓ Auch offline verfügbar')}</div>}
                   </div>
                 </div>
                 <div className={doc.kind === 'file' ? 'button-row single' : 'button-row'}>
                   {doc.kind !== 'file' && (
                     <button className="btn" onClick={() => navigate(`dokumente/${doc.id}`)}>
-                      Öffnen
+                      {t('Öffnen')}
                     </button>
                   )}
                   <button className="btn btn-secondary" disabled={busy === doc.id} onClick={() => save(doc)}>
-                    Herunterladen
+                    {t('Herunterladen')}
                   </button>
                 </div>
               </li>

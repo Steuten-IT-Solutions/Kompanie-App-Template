@@ -15,7 +15,7 @@ Tippe unten auf **Verwaltung**, dann auf **{bereich.attendance}**. Tippe dort au
 ## Was du hier siehst
 - **‹ {bereich.attendance}**: führt zurück zur Übersicht.
 - **Titel und Datum**: Bei einem Termin aus dem {bereich.calendar} stehen sie fest. Bei einem freien Termin stehen sie in Feldern, die du ändern kannst.
-- **Terminart**: eine Auswahl, z. B. **Versammlung** oder **keine** (nur, wenn ein {rolle.admin} Terminarten eingerichtet hat). Eine neue Liste übernimmt die Art ihres Termins im {bereich.calendar}; hat der keine, schlägt die App eine aus dem Titel vor. Eine andere Wahl ist sofort gespeichert, ohne deine Häkchen zu speichern.
+- **Terminarten**: darunter die gewählten Arten der Liste (oder „keine“). Ein Tipp auf **Terminarten** klappt die Haken auf, je Art einer, z. B. **Versammlung** und **Arbeitsdienst**; mehrere gehen (nur, wenn ein {rolle.admin} Terminarten eingerichtet hat). Eine neue Liste übernimmt die Arten ihres Termins im {bereich.calendar}; hat der keine, schlägt die App passende aus dem Titel vor. Jeder Haken ist sofort gespeichert, ohne deine Häkchen bei den Personen zu speichern.
 - **Zähler**: z. B. „3 anwesend · 0 entschuldigt · 1 fehlt · 5 ohne Auswahl“. **Ohne Auswahl** sind die Personen, bei denen noch kein Kästchen angekreuzt ist.
 - **Person suchen …**: zeigt nur Personen, deren Name passt.
 - **Alle anwesend**: setzt alle gezeigten Personen auf anwesend (bei einer Suche nur die gefundenen).
