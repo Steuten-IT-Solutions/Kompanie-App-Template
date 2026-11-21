@@ -1,5 +1,5 @@
 import { Suspense, useState, type FormEvent } from 'react';
-import { api, ApiError, type PageAudience, type PageDetail, type PageSummary } from '../api';
+import { api, ApiError, type BlockTranslation, type PageAudience, type PageDetail, type PageSummary } from '../api';
 import { useDragSort, useSaveQueue } from '../dragSort';
 import { formatShortTime } from '../format';
 import brand from '../generated/brand';
@@ -9,9 +9,12 @@ import { AudienceBadge } from './Seiten';
 import { blocksInput, draftsFrom, newBlock, type BlockDraft } from '../blocks/blockDrafts';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
-import { t } from '../i18n';
+import { SOURCE_LOCALE, t, type Locale } from '../i18n';
+import { EditLanguageSwitch, LANGUAGE_NAMES, useEditLocale } from '../language';
+import { missingCount, translationInput } from '../blocks/blockTranslation';
 
 const BlocksEditor = lazyView(() => import('../blocks/BlocksEditor'));
+const BlocksTranslator = lazyView(() => import('../blocks/BlocksTranslator'));
 
 const sec = brand.labels.sections;
 
@@ -64,14 +67,17 @@ function PageFields({
   );
 }
 
-/** Eine Seite bearbeiten: lädt den Text und den Stand; hat jemand dazwischen gespeichert, sagt der Server 409 conflict. */
+/**
+ * Eine Seite bearbeiten: lädt die deutsche Fassung (source, auch wenn die App auf Englisch läuft) und den Stand; hat jemand
+ * dazwischen gespeichert, sagt der Server 409 conflict.
+ */
 function PageEditor({ id, onDone, onToast }: { id: number; onDone: (saved: boolean) => void; onToast: (msg: string) => void }) {
   const [loaded, setLoaded] = useState<PageDetail | null>(null);
   const [draft, setDraft] = useState<Draft>(empty);
   const [editorKey, setEditorKey] = useState(0);
   const { error, reload } = useAsync(
     () =>
-      api.page(id).then((p) => {
+      api.pageSource(id).then((p) => {
         setLoaded(p);
         setDraft({ title: p.title, audience: p.audience, blocks: draftsFrom(p.blocks, p.body) });
         setEditorKey((k) => k + 1);
@@ -143,11 +149,111 @@ function PageEditor({ id, onDone, onToast }: { id: number; onDone: (saved: boole
 }
 
 /**
+ * Eine Seite in einer weiteren Sprache schreiben (Plan „Mehrsprachigkeit“, PR 9b): Titel und Texte der Blöcke; Aufbau,
+ * „Für wen?“ und Einstellungen der Blöcke bleiben die deutschen. Gespeichert wird nur die Fassung dieser Sprache.
+ */
+function PageTranslationEditor({
+  id,
+  lang,
+  onDone,
+  onToast,
+}: {
+  id: number;
+  lang: Locale;
+  onDone: (saved: boolean) => void;
+  onToast: (msg: string) => void;
+}) {
+  const [loaded, setLoaded] = useState<PageDetail | null>(null);
+  const [title, setTitle] = useState('');
+  const [blocks, setBlocks] = useState<BlockTranslation>({});
+  const { error, reload } = useAsync(
+    () =>
+      api.pageSource(id).then((p) => {
+        setLoaded(p);
+        setTitle(p.translations?.[lang]?.title ?? '');
+        setBlocks(p.translations?.[lang]?.blocks ?? {});
+        return p;
+      }),
+    [id, lang],
+  );
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  if (error) return <ErrorBox message={error} onRetry={reload} />;
+  if (!loaded) return <Loading shape="form" />;
+  const german = draftsFrom(loaded.blocks, loaded.body);
+  const missing = missingCount(german, blocks) + (title.trim() === '' ? 1 : 0);
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    if (!loaded) return;
+    setBusy(true);
+    setFormError(null);
+    try {
+      await api.updatePage(id, {
+        updated_at: loaded.updated_at,
+        translations: { [lang]: { title: title.trim(), blocks: translationInput(german, blocks) } },
+      });
+      onToast(t('Gespeichert'));
+      onDone(true);
+    } catch (err) {
+      setFormError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="form" onSubmit={save}>
+      <label className="field">
+        <span>{t('Titel')}</span>
+        <input
+          type="text"
+          maxLength={TITLE_MAX}
+          value={title}
+          placeholder={loaded.title}
+          onChange={(e) => setTitle(e.target.value)}
+          autoFocus
+        />
+      </label>
+      <div className="field">
+        <span>{t('Inhalt')}</span>
+        <Suspense fallback={<Loading shape="text" chunk />}>
+          <BlocksTranslator german={german} value={blocks} onChange={setBlocks} idPrefix={`page-${id}-${lang}`} />
+        </Suspense>
+      </div>
+      {missing > 0 && (
+        <p className="muted small">
+          {t('Was leer bleibt, sehen Leser auf {language} auf Deutsch, mit dem Hinweis „Nur auf Deutsch verfügbar“.', {
+            language: LANGUAGE_NAMES[lang],
+          })}
+        </p>
+      )}
+      {formError && (
+        <p className="form-error" role="alert">
+          {formError}
+        </p>
+      )}
+      <div className="button-row">
+        <button className="btn" type="submit" disabled={busy}>
+          {t('Speichern')}
+        </button>
+        <button className="btn btn-secondary" type="button" onClick={() => onDone(false)}>
+          {t('Abbrechen')}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/**
  * Verwaltung → Einrichtungen → Seiten (Issue #287): eigene Seiten anlegen, bearbeiten (Titel, für wen, Inhalt aus Blöcken),
  * Reihenfolge per Griff, löschen.
  */
 export function PageAdmin({ onToast }: { onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(sources.pages.load, sources.pages.deps, sources.pages.key);
+  const lang = useEditLocale();
+  const foreign = lang !== SOURCE_LOCALE;
   const [draft, setDraft] = useState<Draft>(empty);
   const [newKey, setNewKey] = useState(0);
   const [editing, setEditing] = useState<number | null>(null);
@@ -206,6 +312,7 @@ export function PageAdmin({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <div>
+      <EditLanguageSwitch content />
       {formError && (
         <p className="form-error" role="alert">
           {formError}
@@ -218,14 +325,27 @@ export function PageAdmin({ onToast }: { onToast: (msg: string) => void }) {
           {list.map((p, i) =>
             editing === p.id ? (
               <li key={p.id} {...sort.itemProps(i, 'card')}>
-                <PageEditor
-                  id={p.id}
-                  onToast={onToast}
-                  onDone={(saved) => {
-                    setEditing(null);
-                    if (saved) reload();
-                  }}
-                />
+                {foreign ? (
+                  <PageTranslationEditor
+                    key={lang}
+                    id={p.id}
+                    lang={lang}
+                    onToast={onToast}
+                    onDone={(saved) => {
+                      setEditing(null);
+                      if (saved) reload();
+                    }}
+                  />
+                ) : (
+                  <PageEditor
+                    id={p.id}
+                    onToast={onToast}
+                    onDone={(saved) => {
+                      setEditing(null);
+                      if (saved) reload();
+                    }}
+                  />
+                )}
               </li>
             ) : (
               <li key={p.id} {...sort.itemProps(i, 'card row')}>
@@ -233,6 +353,9 @@ export function PageAdmin({ onToast }: { onToast: (msg: string) => void }) {
                 <div className="row-main">
                   <div className="row-title">
                     {p.title} <AudienceBadge page={p} />
+                    {foreign && p.untranslated_locales?.includes(lang) && (
+                      <span className="badge badge-level-guest">{t('ohne {language}', { language: LANGUAGE_NAMES[lang] })}</span>
+                    )}
                   </div>
                   {p.updated_at && (
                     <div className="row-sub">
@@ -261,13 +384,21 @@ export function PageAdmin({ onToast }: { onToast: (msg: string) => void }) {
         </ul>
       )}
 
-      <form className="form card" onSubmit={add}>
-        <h3>{t('Neue Seite')}</h3>
-        <PageFields key={newKey} draft={draft} onChange={setDraft} idPrefix="page-new" />
-        <button className="btn btn-block" type="submit" disabled={busy}>
-          {t('Anlegen')}
-        </button>
-      </form>
+      {foreign ? (
+        <p className="muted">
+          {t('Neue Seiten legst du auf Deutsch an; danach schreibst du hier die Fassung für {language}.', {
+            language: LANGUAGE_NAMES[lang],
+          })}
+        </p>
+      ) : (
+        <form className="form card" onSubmit={add}>
+          <h3>{t('Neue Seite')}</h3>
+          <PageFields key={newKey} draft={draft} onChange={setDraft} idPrefix="page-new" />
+          <button className="btn btn-block" type="submit" disabled={busy}>
+            {t('Anlegen')}
+          </button>
+        </form>
+      )}
     </div>
   );
 }

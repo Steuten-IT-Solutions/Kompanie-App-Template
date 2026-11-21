@@ -644,6 +644,13 @@ der deutsche Name bleibt, wo er ist. Schreiben über `PUT /admin/translations` (
 `/config` (`name_translations`, `section_labels_i18n`), in der App `names.ts`. Die Wahl „Einrichten auf“ (`language.tsx`,
 `useEditLocale`) gilt am Gerät; in einer weiteren Sprache zeigen die Masken deren Namen mit dem deutschen als Hinweis.
 
+Inhalte je weiterer Sprache (PR 9b): dieselbe Tabelle (Text ab Migration 75 `mediumtext`), aber nicht in `/config`, sondern
+je Inhalt (`Domain\ContentTranslations`). Eigene Seiten: Art `page`, Felder `title` und `blocks` (JSON Kennung des Blocks =>
+übersetzte Felder, `Blocks::TRANSLATABLE`); Aufbau und Einstellungen der Blöcke bleiben deutsch. `GET /pages/{id}` liefert in
+der Sprache der Anfrage, was fehlt, auf Deutsch (`untranslated: all|some`); mit `?source=1` die deutsche Fassung und alle
+Fassungen zum Bearbeiten, `PATCH` mit `translations`. In der App schreibt `blocks/BlocksTranslator.tsx` die Texte, die Wahl
+„Schreiben auf“ ist dieselbe wie „Einrichten auf“.
+
 Die App setzt **HTTPS** voraus (sonst funktioniert die Installation aufs Handy nicht). Der Installer prüft das und erklärt, wie man beim Hoster ein kostenloses Zertifikat einschaltet.
 
 ## 9. Google: Galerie und Kalender

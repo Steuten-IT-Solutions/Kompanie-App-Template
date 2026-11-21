@@ -227,14 +227,17 @@ export function useEditLocale(): Locale {
   }, storedEditLocale);
 }
 
-/** Wahl „Einrichten auf: Deutsch | English“ oben in den Einstellungen; nur mit weiterer Sprache. */
-export function EditLanguageSwitch() {
+/**
+ * Wahl „Einrichten auf: Deutsch | English“ oben in den Einstellungen; nur mit weiterer Sprache. Mit content über einem
+ * Editor für Inhalte („Schreiben auf“, Plan „Mehrsprachigkeit“, PR 9b): dieselbe Wahl, eigener Hinweis.
+ */
+export function EditLanguageSwitch({ content = false }: { content?: boolean }) {
   const current = useEditLocale();
   if (!hasLanguageChoice()) return null;
   return (
     <div className="edit-lang">
-      <span className="muted small">{t('Einrichten auf:')}</span>
-      <nav className="segmented lang-choice" aria-label={t('Eigene Namen einrichten auf')}>
+      <span className="muted small">{content ? t('Schreiben auf:') : t('Einrichten auf:')}</span>
+      <nav className="segmented lang-choice" aria-label={content ? t('Inhalt schreiben auf') : t('Eigene Namen einrichten auf')}>
         {enabledLocales().map((l) => (
           <button
             key={l}
@@ -250,11 +253,29 @@ export function EditLanguageSwitch() {
       </nav>
       {current !== SOURCE_LOCALE && (
         <p className="muted small">
-          {t('Du trägst die Namen für {language} ein. Leere Felder zeigen den deutschen Namen; er gilt, solange nichts eingetragen ist.', {
-            language: LANGUAGE_NAMES[current],
-          })}
+          {content
+            ? t(
+                'Du schreibst die Fassung für {language}. Leere Felder zeigen grau den deutschen Text; er gilt, solange nichts eingetragen ist. Aufbau und Einstellungen änderst du auf Deutsch.',
+                { language: LANGUAGE_NAMES[current] },
+              )
+            : t(
+                'Du trägst die Namen für {language} ein. Leere Felder zeigen den deutschen Namen; er gilt, solange nichts eingetragen ist.',
+                {
+                  language: LANGUAGE_NAMES[current],
+                },
+              )}
         </p>
       )}
     </div>
+  );
+}
+
+/** Hinweis über einem Inhalt, der in der Sprache der App (noch) fehlt: untranslated aus der Antwort des Servers. */
+export function UntranslatedNote({ untranslated }: { untranslated?: 'all' | 'some' | null }) {
+  if (!untranslated) return null;
+  return (
+    <p className="untranslated-note muted small">
+      {untranslated === 'all' ? t('Nur auf Deutsch verfügbar') : t('Teilweise nur auf Deutsch verfügbar')}
+    </p>
   );
 }

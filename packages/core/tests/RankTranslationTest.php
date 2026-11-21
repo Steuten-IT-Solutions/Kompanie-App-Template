@@ -116,6 +116,6 @@ final class RankTranslationTest extends TestCase
     {
         [$low, $high] = $this->setUpRanks();
         $this->assertSame(200, $this->call('DELETE', "/ranks/$low")->status);
-        $this->assertSame([(string) $high => ['label' => 'Sergeant']], $this->app->translations()->repository()->all()['en']['rank']);
+        $this->assertSame([(string) $high => ['label' => 'Sergeant']], $this->app->translations()->repository()->all(['rank'])['en']['rank']);
     }
 }

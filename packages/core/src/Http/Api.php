@@ -813,7 +813,7 @@ final class Api
             // Interner Kalender in der App gepflegt (Quelle „app“): Wer manage_calendar hat, sieht bei den Terminen den Knopf dafür
             'calendarInApp' => ($features['calendar'] ?? false) && $a->calendar()->inApp(),
             // Eigene Seiten (Issue #287), die die Person lesen darf: für die Kacheln unter „Seiten“ (ohne Text)
-            'pages' => array_map(static fn (array $p): array => ['id' => $p['id'], 'title' => $p['title']], $a->pages()->list($user)),
+            'pages' => array_map(static fn (array $p): array => ['id' => $p['id'], 'title' => $p['title']] + (isset($p['title_i18n']) ? ['title_i18n' => $p['title_i18n']] : []), $a->pages()->list($user)),
             'setupPending' => $this->can(Cap::ManageSettings) && !(bool) $a->settings->get(self::SETUP_SETTING, false),
             // Datensicherung als Datei herunterladen (Domain\BackupDownload); nur für Admins, nicht in der Vorschau
             'backupUrl' => $a->backup !== null && $this->can(Cap::ManageSettings) && !$a->preview()->active() ? $a->env->backupUrl() : null,
@@ -1193,7 +1193,7 @@ final class Api
             // Logo als Datei Base64 im JSON
             // Eigene Seiten (Issue #287): lesen nach audience (public für alle, members für Mitglieder), pflegen mit manage_pages
             new Route('GET', '/pages', $P, fn () => ['pages' => $a->pages()->list($a->authContext->currentUser())], 'pages'),
-            new Route('GET', '/pages/{id}', $P, fn (Request $r) => $a->pages()->get($r->id(), $a->authContext->currentUser()), 'pages'),
+            new Route('GET', '/pages/{id}', $P, fn (Request $r) => $a->pages()->get($r->id(), $a->authContext->currentUser(), $r->queryFlag('source')), 'pages'),
             new Route('POST', '/pages', Cap::ManagePages, fn (Request $r) => Response::created($a->pages()->create((array) $r->body, $this->user())), 'pages', $denyRights),
             new Route('PUT', '/pages/order', Cap::ManagePages, fn (Request $r) => ['pages' => $a->pages()->reorder($r->input('ids'), $this->user())], 'pages', $denyRights),
             new Route('PATCH', '/pages/{id}', Cap::ManagePages, fn (Request $r) => $a->pages()->update($r->id(), (array) $r->body, $this->user()), 'pages', $denyRights),

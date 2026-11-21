@@ -81,7 +81,7 @@ final class TranslationService
         if ($enabled === []) {
             return [];
         }
-        $this->all ??= $this->repository()->all();
+        $this->all ??= $this->repository()->all(array_keys(self::KINDS));
         return array_intersect_key($this->all, array_flip($enabled));
     }
 
@@ -144,7 +144,7 @@ final class TranslationService
     public function describe(): array
     {
         $out = [];
-        foreach ($this->repository()->all() as $locale => $kinds) {
+        foreach ($this->repository()->all(array_keys(self::KINDS)) as $locale => $kinds) {
             foreach ($kinds as $kind => $refs) {
                 foreach ($refs as $ref => $fields) {
                     foreach ($fields as $field => $text) {

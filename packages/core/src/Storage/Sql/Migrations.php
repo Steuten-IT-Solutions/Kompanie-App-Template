@@ -2225,6 +2225,12 @@ WHERE title IS NULL",
                 'mysql' => ['ALTER TABLE {event_responses} ADD COLUMN decided_at datetime DEFAULT NULL'],
                 'sqlite' => ['ALTER TABLE {event_responses} ADD COLUMN decided_at TEXT DEFAULT NULL'],
             ],
+            // Inhalte je Sprache (Plan „Mehrsprachigkeit“, PR 9b): Fassungen langer Texte (eigene Seiten, später News, Brett …)
+            // stehen ebenfalls in translations; text reicht dafür in MySQL nicht (64 KB). SQLite kennt keine Grenze.
+            75 => [
+                'mysql' => ['ALTER TABLE {translations} MODIFY text mediumtext NOT NULL'],
+                'sqlite' => [],
+            ],
         ];
     }
 

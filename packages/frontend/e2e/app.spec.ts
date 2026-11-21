@@ -5015,6 +5015,93 @@ test('Sprachen: englische Namen für eine Terminart und ein Untermenü, Mitglied
   }
 });
 
+test('Sprachen: eigene Seite auf Englisch schreiben, Gäste auf Englisch lesen sie, sonst Hinweis „Nur auf Deutsch“', async ({
+  page,
+  browser,
+}) => {
+  const id = Date.now() % 1000000;
+  const german = `Anfahrt ${id}`;
+  const english = `Directions ${id}`;
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json()) as { id?: number } };
+      },
+      [path, method, body] as const,
+    );
+  expect((await api('admin/settings', 'PATCH', { languages: 'de,en' })).status).toBe(200);
+  const created = await api('pages', 'POST', {
+    title: german,
+    audience: 'public',
+    blocks: [
+      { id: 't1', type: 'text', html: '<p>Über die Brücke und dann links.</p>' },
+      { id: 'n1', type: 'notice', title: 'Parken', text: 'Am Markt ist Platz.', tone: 'info' },
+    ],
+  });
+  expect(created.status).toBe(201);
+  const pageId = created.data.id!;
+  try {
+    // Gäste auf Englisch sehen vorerst die deutsche Seite mit Hinweis
+    const visitor = await quietPage(browser);
+    await visitor.goto('/app/');
+    await visitor.evaluate(() => localStorage.setItem('kompanie-locale', 'en'));
+    await visitor.goto(`/app/#/seiten/${pageId}`);
+    await visitor.reload();
+    await expect(visitor.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(visitor.locator('.page-article')).toContainText('Über die Brücke');
+    await expect(visitor.locator('.untranslated-note')).toHaveText('Only available in German');
+
+    // Schreiben auf Englisch: Titel und Texte, Aufbau bleibt
+    await page.goto('/app/#/verwaltung/seiten');
+    await page.reload();
+    await page.locator('.edit-lang').getByRole('button', { name: 'English' }).click();
+    await expect(page.locator('.page-admin-list .row', { hasText: german })).toContainText('ohne English');
+    await page.locator('.page-admin-list .row', { hasText: german }).getByRole('button', { name: 'Bearbeiten' }).click();
+    const edit = page.locator('.page-admin-list form');
+    await expect(edit.getByLabel('Titel')).toHaveAttribute('placeholder', german);
+    await edit.getByLabel('Titel').fill(english);
+    await edit.getByRole('textbox', { name: 'Text', exact: true }).first().fill('Over the bridge, then left.');
+    await expect(edit.locator('textarea')).toHaveAttribute('placeholder', 'Am Markt ist Platz.');
+    await edit.locator('textarea').fill('There is room at the market.');
+    await edit.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
+    await expect(page.locator('.page-admin-list .row', { hasText: german })).toContainText('ohne English');
+
+    // Rest übersetzen: die Überschrift des Hinweises
+    await page.locator('.page-admin-list .row', { hasText: german }).getByRole('button', { name: 'Bearbeiten' }).click();
+    await expect(edit.getByLabel('Titel')).toHaveValue(english);
+    await edit.getByLabel('Überschrift').fill('Parking');
+    await edit.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
+    await expect(page.locator('.page-admin-list .row', { hasText: german })).not.toContainText('ohne English');
+    await page.locator('.edit-lang').getByRole('button', { name: 'Deutsch' }).click();
+
+    await visitor.goto(`/app/#/seiten/${pageId}`);
+    await visitor.reload();
+    await expect(visitor.locator('.page-article')).toContainText('Over the bridge, then left.');
+    await expect(visitor.locator('.page-article')).toContainText('There is room at the market.');
+    await expect(visitor.locator('.page-article')).toContainText('Parking');
+    await expect(visitor.locator('.untranslated-note')).toHaveCount(0);
+    await expect(visitor.locator('.tabbar').getByRole('button', { name: english })).toBeVisible();
+    // Auf Deutsch bleibt alles deutsch
+    await visitor.evaluate(() => localStorage.setItem('kompanie-locale', 'de'));
+    await visitor.reload();
+    await expect(visitor.locator('.page-article')).toContainText('Über die Brücke');
+    await visitor.close();
+  } finally {
+    expect((await api(`pages/${pageId}`, 'DELETE')).status).toBe(200);
+    expect((await api('admin/settings', 'PATCH', { languages: 'de' })).status).toBe(200);
+  }
+});
+
 test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nicht', async ({ page }) => {
   // So, wie scripts/changelog.php es beim Bauen in die App gelegt hat.
   const changelog = JSON.parse(readFileSync(new URL('../src/generated/changelog.json', import.meta.url), 'utf8')) as {

@@ -119,7 +119,7 @@ final class OfficeTranslationTest extends TestCase
         ]);
         $this->ok('DELETE', "/offices/$office");
         $this->ok('DELETE', "/office-groups/$group");
-        $this->assertSame(['en' => ['office' => [(string) $other => ['label' => 'Flag']]]], $this->app->translations()->repository()->all());
+        $this->assertSame(['en' => ['office' => [(string) $other => ['label' => 'Flag']]]], $this->app->translations()->repository()->all(['office', 'office_group']));
     }
 
     public function testOnlyOfficeManagersTranslate(): void

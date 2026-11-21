@@ -60,6 +60,7 @@ use KompanieApp\Core\Domain\MemberPhotoService;
 use KompanieApp\Core\Domain\InventoryService;
 use KompanieApp\Core\Domain\OfficeService;
 use KompanieApp\Core\Domain\CompanyService;
+use KompanieApp\Core\Domain\ContentTranslations;
 use KompanieApp\Core\Domain\SponsorService;
 use KompanieApp\Core\Domain\PassiveImportService;
 use KompanieApp\Core\Domain\PassiveMemberService;
@@ -769,13 +770,19 @@ final class App
         return $this->service(JoinYearService::class, fn () => new JoinYearService($this));
     }
 
-    /** Sprachen der App: eingeschaltete und die Wahl je Konto (Plan „Mehrsprachigkeit“) */
     /** Eigene Namen je weiterer Sprache (Plan „Mehrsprachigkeit“) */
     public function translations(): TranslationService
     {
         return $this->service(TranslationService::class, fn () => new TranslationService($this));
     }
 
+    /** Inhalte je weiterer Sprache (Plan „Mehrsprachigkeit“, PR 9b) */
+    public function contentTranslations(): ContentTranslations
+    {
+        return $this->service(ContentTranslations::class, fn () => new ContentTranslations($this));
+    }
+
+    /** Sprachen der App: eingeschaltete und die Wahl je Konto (Plan „Mehrsprachigkeit“) */
     public function languages(): LanguageService
     {
         return $this->service(LanguageService::class, fn () => new LanguageService($this->settings, new UserSettings($this->db)));

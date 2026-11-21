@@ -38,6 +38,9 @@ Genauso geht es bei den Terminarten unter [Kalender](seite:admin-kalender) und b
 
 Ein leeres Feld heißt: Auf Englisch gilt der deutsche Name (bzw. die englische Vorgabe, wenn ihr den Bereich nicht umbenannt habt).
 
+### Inhalte auf Englisch
+Eigene Seiten können eine englische Fassung bekommen: Unter **Verwaltung** → **Einrichtungen** → **{bereich.pages}** wählt, wer die Seiten verwaltet, oben **Schreiben auf: English**. Wer die App auf Englisch nutzt und eine Seite ohne englische Fassung öffnet, sieht die deutsche mit dem Hinweis *Nur auf Deutsch verfügbar*.
+
 ### Englisch wieder ausschalten
 
 1. Schalte **English** aus und tippe auf **Speichern**.

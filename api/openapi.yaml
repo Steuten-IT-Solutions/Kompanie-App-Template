@@ -4196,7 +4196,15 @@ paths:
     get:
       tags: [Seiten]
       summary: Eine Seite mit Text
-      description: 'Wer die Seite nicht lesen darf, bekommt 404 (verrät nicht, dass es sie gibt).'
+      description: |
+        Wer die Seite nicht lesen darf, bekommt 404 (verrät nicht, dass es sie gibt). In einer weiteren Sprache (Header
+        X-Kompanie-Lang) mit Titel und Texten der Blöcke dieser Fassung, was fehlt, auf Deutsch (untranslated).
+      parameters:
+        - name: source
+          in: query
+          required: false
+          schema: { type: string, enum: ['1'] }
+          description: 'Nur mit manage_pages, zum Bearbeiten: die deutsche Fassung und dazu translations (alle Fassungen der weiteren Sprachen).'
       responses:
         '200':
           description: OK
@@ -4222,6 +4230,10 @@ paths:
                 blocks: { type: array, maxItems: 50, items: { $ref: '#/components/schemas/Block' }, description: 'wie bei POST' }
                 body: { type: string, description: 'Für ältere Apps, wie bei POST' }
                 updated_at: { type: string, format: date-time }
+                translations:
+                  type: object
+                  description: 'Fassungen je weiterer eingeschalteter Sprache (Plan „Mehrsprachigkeit“). Felder jeweils optional, leer löscht. Mit Fassungen antwortet der Server wie mit source.'
+                  additionalProperties: { $ref: '#/components/schemas/PageTranslation' }
       responses:
         '200':
           description: OK
@@ -10690,6 +10702,7 @@ components:
             properties:
               id: { type: integer }
               title: { type: string }
+              title_i18n: { type: object, additionalProperties: { type: string }, description: 'Titel je weiterer Sprache, soweit eingetragen' }
         birthdays:
           type: [object, 'null']
           description: 'Geburtstage (Issue #1): Vorlauf der Karte „Anstehende Geburtstage“ in Tagen (Einstellungen → Geburtstage); null ohne den Bereich'
@@ -12250,6 +12263,23 @@ components:
           }
         updated_at: { type: string, format: date-time, description: 'Nur mit manage_pages: Stand der Seite (für PATCH mitschicken)' }
         updated_by_name: { type: [string, 'null'], description: 'Nur mit manage_pages: wer zuletzt gespeichert hat' }
+        title_i18n:
+          type: object
+          additionalProperties: { type: string }
+          description: 'Titel je weiterer Sprache, soweit eingetragen (Sprache => Titel)'
+        untranslated_locales:
+          type: array
+          items: { type: string }
+          description: 'Nur mit manage_pages: weitere Sprachen, in denen Titel oder Texte noch fehlen'
+    PageTranslation:
+      type: object
+      description: 'Fassung einer Seite in einer weiteren Sprache: Aufbau, Zielgruppe und Einstellungen der Blöcke gelten für alle Sprachen.'
+      properties:
+        title: { type: string, maxLength: 100 }
+        blocks:
+          type: object
+          description: 'Kennung des Blocks => übersetzte Felder (text: html; countdown: title, running_text, after_text; button: label; events, contacts, sponsors, map: title; notice: title, text; schedule, facts: title, items mit so vielen Einträgen wie auf Deutsch)'
+          additionalProperties: { type: object }
     PageDetail:
       allOf:
         - $ref: '#/components/schemas/PageSummary'
@@ -12267,6 +12297,16 @@ components:
                 items: { $ref: '#/components/schemas/Block' },
                 description: 'Inhalt aus Blöcken, nur die für die Person sichtbaren (members-Blöcke nur für Mitglieder bzw. mit manage_pages). Bestehende Seiten: ein Textblock aus body. Leere Textblöcke nur mit manage_pages.',
               }
+            untranslated:
+              {
+                type: string,
+                enum: [all, some],
+                description: 'Nur in einer weiteren Sprache, wenn dort etwas fehlt: all (nichts übersetzt) oder some; das Fehlende steht auf Deutsch',
+              }
+            translations:
+              type: object
+              description: 'Nur mit source bzw. nach PATCH mit translations: Fassungen je weiterer Sprache, Bilder als Adressen'
+              additionalProperties: { $ref: '#/components/schemas/PageTranslation' }
 
     Block:
       description: 'Vorgefertigter Block (eigene Seiten, News in der App, Schwarzes Brett). Unbekannte type lehnt der Server beim Speichern ab (400 invalid); die App übergeht sie beim Anzeigen.'

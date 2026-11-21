@@ -1,4 +1,5 @@
 import { config } from './api';
+import { locale } from './i18n';
 import brand from './generated/brand';
 import { nameIn } from './names';
 import { pageTarget, type FixedTarget, type NavNames, type NavTarget } from './navigation';
@@ -9,14 +10,19 @@ import { pageTarget, type FixedTarget, type NavNames, type NavTarget } from './n
  * aktueller). Eigene Namen der festen Bereiche stecken schon in brand.labels.sections (generated/brand.ts).
  */
 export function targetLabels(
-  pages: { id: number; title: string }[] = config?.pages ?? [],
+  pages: { id: number; title: string; title_i18n?: Record<string, string> }[] = config?.pages ?? [],
   names: NavNames = config?.navigation_names ?? {},
 ): Record<FixedTarget, string> & Partial<Record<NavTarget, string>> {
   const sec = brand.labels.sections;
   const f = config?.features;
-  // Eigener Tab-Name einer Seite in der Sprache der App (names.ts), sonst der deutsche, sonst der Titel
+  // Eigener Tab-Name einer Seite in der Sprache der App (names.ts), sonst der deutsche, sonst der Titel (in der Sprache der
+  // App, soweit eingetragen)
+  const lang = locale();
   const own = Object.fromEntries(
-    pages.map((p) => [pageTarget(p.id), nameIn('nav', pageTarget(p.id), names[pageTarget(p.id)]?.label || p.title)]),
+    pages.map((p) => [
+      pageTarget(p.id),
+      nameIn('nav', pageTarget(p.id), names[pageTarget(p.id)]?.label || p.title_i18n?.[lang] || p.title),
+    ]),
   );
   return {
     ...own,

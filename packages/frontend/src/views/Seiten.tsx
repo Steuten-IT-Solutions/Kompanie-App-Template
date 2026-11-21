@@ -2,6 +2,7 @@ import { can, type PageSummary } from '../api';
 import brand from '../generated/brand';
 import BlocksView from '../blocks/BlocksView';
 import { t } from '../i18n';
+import { UntranslatedNote } from '../language';
 import RichTextView from '../richtext/RichTextView';
 import { navigate } from '../router';
 import { Caps, Empty, ErrorBox, Loading, useAsync } from '../ui';
@@ -78,6 +79,7 @@ function PageView({ id }: { id: number }) {
               </button>
             </p>
           )}
+          <UntranslatedNote untranslated={data.untranslated} />
           {data.blocks ? (
             data.blocks.length > 0 ? (
               <BlocksView blocks={data.blocks} manager={can('manage_pages')} />
