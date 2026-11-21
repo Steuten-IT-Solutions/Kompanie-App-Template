@@ -16,6 +16,8 @@ namespace KompanieApp\Core\Update;
  * - stableHistory: Versionen, die schon einmal für alle freigegeben waren (Rückfallziele)
  * - withdrawn: zurückgezogene Versionen; Installationen darauf rollen automatisch zurück
  * - blockedCores: Kern-Versionen mit zurückgezogenem Release; sie gehen nie mehr direkt nach stable
+ * - maintenance (optional): letzter Tag des Wartungsabos (JJJJ-MM-TT, UTC) oder „unbefristet“; danach entstehen für
+ *   die Kompanie keine neuen Versionen mehr (scripts/wartung.php), die App zeigt das Admins an
  */
 final class UpdateList
 {
@@ -70,6 +72,50 @@ final class UpdateList
     public function kompanie(): string
     {
         return (string) ($this->data['kompanie'] ?? '');
+    }
+
+    public const MAINTENANCE_UNLIMITED = 'unbefristet';
+
+    /** Wartung bis (JJJJ-MM-TT) oder „unbefristet“; null = keine Angabe (z. B. vor dem Wartungsabo). */
+    public function maintenance(): ?string
+    {
+        $m = $this->data['maintenance'] ?? null;
+        return is_string($m) && self::validMaintenance($m) ? $m : null;
+    }
+
+    /** Setzt „Wartung bis“; null oder leer entfernt die Angabe. */
+    public function setMaintenance(?string $until): void
+    {
+        $until = $until === null ? '' : strtolower(trim($until));
+        if ($until === '') {
+            if (array_key_exists('maintenance', $this->data)) {
+                unset($this->data['maintenance']);
+                $this->touch();
+            }
+            return;
+        }
+        if (!self::validMaintenance($until)) {
+            throw new \RuntimeException("Ungültige Angabe für „Wartung bis“: $until (JJJJ-MM-TT oder „unbefristet“).");
+        }
+        if (($this->data['maintenance'] ?? null) !== $until) {
+            $this->data['maintenance'] = $until;
+            $this->touch();
+        }
+    }
+
+    /** Ist die Wartung an diesem Tag (JJJJ-MM-TT, UTC) vorbei? Ohne Angabe nie. */
+    public function maintenanceEnded(string $today): bool
+    {
+        $m = $this->maintenance();
+        return $m !== null && $m !== self::MAINTENANCE_UNLIMITED && strcmp($today, $m) > 0;
+    }
+
+    private static function validMaintenance(string $m): bool
+    {
+        if ($m === self::MAINTENANCE_UNLIMITED) {
+            return true;
+        }
+        return preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $m, $d) === 1 && checkdate((int) $d[2], (int) $d[3], (int) $d[1]);
     }
 
     public function serial(): int

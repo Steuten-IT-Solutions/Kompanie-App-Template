@@ -220,4 +220,6 @@ jobs:
           STATUS_URL: ${{ vars.KOMPANIE_STATUS_URL }}
           REPORT_URL: ${{ vars.KOMPANIE_REPORT_URL }}
           SUPPORT: ${{ vars.KOMPANIE_SUPPORT }}
+          # „Wartung bis“ dieser Kompanie für die Update-Liste (scripts/wartung.php)
+          WARTUNG: ${{ vars.KOMPANIE_WARTUNG }}
         run: core/scripts/publish-release.sh

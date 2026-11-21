@@ -136,6 +136,10 @@ kompanie-beispieldorf      unbefristet
 - **Leere oder fehlende Variable:** Alle Kompanien bekommen Updates wie vor dem Wartungsabo (mit Warnung im Lauf).
   **Fehler im Aufbau** (fehlendes oder ungültiges Datum, doppelter Name) brechen die Läufe ab, statt still alle oder
   keine Kompanie zu nehmen.
+- **In der App:** Beim Veröffentlichen kommt „Wartung bis“ der Kompanie in die signierte Update-Liste (Feld
+  `maintenance`, `scripts/updates.php --maintenance`). Admins sehen es unter *Einstellungen → Zustand und Updates*, nach
+  dem Ende mit Hinweis. Weil danach keine neue Liste mehr entsteht, bleibt dort das letzte veröffentlichte Datum stehen;
+  ohne Eintrag in der Variable steht nichts da.
 - Die Läufe nennen übersprungene Kompanien mit Grund in ihrem Protokoll. Weil das Kern-Repo öffentlich ist, sind diese
   Protokolle öffentlich lesbar.
 
