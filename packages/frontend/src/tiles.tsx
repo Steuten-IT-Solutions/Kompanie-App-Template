@@ -86,8 +86,8 @@ const HINT_ID = 'kacheln-anordnen-hinweis';
 const PENDING = 'pending';
 
 /**
- * Knopf „Kacheln anordnen“ über den Rastern einer Seite (Verwaltung, Untermenü, Einstellungen) und der
- * Bearbeiten-Modus dazu. pages: alle Raster der Seite, für „Zurücksetzen“. Jede Änderung speichert sofort; „Fertig“
+ * Knopf „Kacheln anordnen“ unter den Rastern einer Seite (Verwaltung, Untermenü, Einstellungen) und der
+ * Bearbeiten-Modus dazu (Hinweis und Knöpfe über den Rastern). pages: alle Raster der Seite, für „Zurücksetzen“. Jede Änderung speichert sofort; „Fertig“
  * beendet nur den Modus, ebenso die Zurück-Taste.
  */
 export function TileArrange({ pages, children }: { pages: string[]; children: ReactNode }) {
@@ -153,7 +153,7 @@ export function TileArrange({ pages, children }: { pages: string[]; children: Re
 
   return (
     <ArrangeContext.Provider value={{ editing, onError: setError, register }}>
-      {editing ? (
+      {editing && (
         <div className="tile-arrange card">
           <p id={HINT_ID} className="tile-arrange-hint">
             Zum Verschieben ziehen (am Handy erst kurz halten), mit − und + die Breite ändern. Gilt für diese Bildschirmbreite.
@@ -184,7 +184,9 @@ export function TileArrange({ pages, children }: { pages: string[]; children: Re
             </div>
           )}
         </div>
-      ) : (
+      )}
+      {children}
+      {!editing && (
         <div className="tile-arrange-bar">
           <IconButton
             icon="arrange"
@@ -196,7 +198,6 @@ export function TileArrange({ pages, children }: { pages: string[]; children: Re
           />
         </div>
       )}
-      {children}
     </ArrangeContext.Provider>
   );
 }

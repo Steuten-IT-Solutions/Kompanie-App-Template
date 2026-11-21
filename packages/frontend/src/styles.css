@@ -2718,11 +2718,11 @@ code {
   flex-direction: row;
   gap: 14px;
 }
-/* Knopf „Kacheln anordnen“ über dem Raster, rechts */
+/* Knopf „Kacheln anordnen“ unter dem Raster, rechts */
 .tile-arrange-bar {
   display: flex;
   justify-content: flex-end;
-  margin: 0 0 var(--space-2);
+  margin: var(--space-2) 0 0;
 }
 /* Bearbeiten-Modus: Hinweis, Zurücksetzen und Fertig über dem Raster */
 .tile-arrange {
