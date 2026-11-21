@@ -5,6 +5,7 @@ import { boardVisible, SIGNATURE_RETURN_KEY } from '../board';
 import brand from '../generated/brand';
 import { t } from '../i18n';
 import { isStandalone } from '../install';
+import { LanguageCard } from '../language';
 import { OwnBirthdayCard, ownBirthday } from '../birthdays';
 import { OwnJoinYearCard, profileChoice } from '../joinYear';
 import { navigate, useRoute } from '../router';
@@ -273,6 +274,8 @@ export default function Konto({ onToast, onLogout }: { onToast: (msg: string) =>
           ))}
         </nav>
       </div>
+
+      <LanguageCard />
 
       {!isStandalone() && (
         <div className="card account-card">
