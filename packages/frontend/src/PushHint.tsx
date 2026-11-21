@@ -15,11 +15,17 @@ let closedThisRun = false;
  * ohne Benachrichtigungen auf diesem Gerät (pushHint.ts). Die Abfrage des Browsers kommt erst
  * nach dem Tippen auf „Einschalten“ (Browser zeigen sie nur nach einer Nutzeraktion); dann meldet sich das Gerät mit
  * allen angebotenen Arten an (wie unter Konto → Benachrichtigungen). „Nicht jetzt“, ✕ und „Zurück“ blenden es für eine
- * Weile aus; nach „Blockieren“ im Browser fragt die App nicht wieder. Ohne Push auf dem Server oder ohne Arten bleibt
+ * Weile aus; nach „Blockieren“ im Browser fragt die App nicht wieder. Auf iPhone/iPad im Browser-Tab führt es zu „App
+ * installieren“, weil es Benachrichtigungen dort nur in der installierten App gibt. Ohne Push auf dem Server oder ohne Arten bleibt
  * es zu.
  */
 export default function PushHint({ onToast }: { onToast: (msg: string) => void }) {
-  const eligible = !closedThisRun && !!config?.user && !previewRole() && pushSupport() === 'ok' && pushHintDue(Notification.permission);
+  const support = pushSupport();
+  // iPhone/iPad im Browser-Tab: Benachrichtigungen gibt es nur in der installierten App, Notification fehlt dort meist.
+  // Das Fenster führt dann zur Anleitung „App installieren“ (gleiche Pause und Runde wie sonst).
+  const ios = support === 'ios-install';
+  const permission: NotificationPermission = ios ? 'default' : support === 'ok' ? Notification.permission : 'denied';
+  const eligible = !closedThisRun && !!config?.user && !previewRole() && pushHintDue(permission);
   const [status, setStatus] = useState<PushStatus | null>(null);
   const [hidden, setHidden] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -30,7 +36,7 @@ export default function PushHint({ onToast }: { onToast: (msg: string) => void }
     let alive = true;
     (async () => {
       // Hat dieses Gerät schon Benachrichtigungen (Erlaubnis früher erteilt), gibt es nichts zu fragen.
-      const device = await currentDevice().catch(() => null);
+      const device = ios ? null : await currentDevice().catch(() => null);
       const s = await api.pushStatus(device);
       if (device && s.subscription) {
         pushHintRoundDone();
@@ -41,7 +47,7 @@ export default function PushHint({ onToast }: { onToast: (msg: string) => void }
     return () => {
       alive = false;
     };
-  }, [eligible]);
+  }, [eligible, ios]);
 
   if (!eligible || hidden || !status || !status.supported || status.types.length === 0) return null;
 
@@ -76,6 +82,33 @@ export default function PushHint({ onToast }: { onToast: (msg: string) => void }
     pushHintLater();
     close();
   };
+
+  if (ios) {
+    return (
+      <Sheet title="Nichts mehr verpassen" onClose={later}>
+        <div className="push-hint stack">
+          <p>
+            Lass dich benachrichtigen, wenn es Neues für dich gibt. Auf dem iPhone und iPad geht das nur in der installierten App (ab iOS
+            16.4): Hol dir die App auf den Home-Bildschirm, öffne sie von dort und schalte die Benachrichtigungen ein.
+          </p>
+          <button
+            className="btn btn-block push-hint-install"
+            onClick={() => {
+              // In der installierten App fragt das Fenster von selbst (eigener Speicher); hier wie „Nicht jetzt“.
+              pushHintLater();
+              close();
+              navigate('installieren');
+            }}
+          >
+            App installieren
+          </button>
+          <button className="btn btn-link btn-block push-hint-later" onClick={later}>
+            Nicht jetzt
+          </button>
+        </div>
+      </Sheet>
+    );
+  }
 
   return (
     <Sheet title="Nichts mehr verpassen" onClose={later}>

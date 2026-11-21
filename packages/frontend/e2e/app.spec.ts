@@ -1,7 +1,23 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { devices, expect, test, type Locator, type Page, type Request } from '@playwright/test';
+import { devices, expect, test as base, type Browser, type Locator, type Page, type Request } from '@playwright/test';
 import { strToU8, zipSync } from 'fflate';
 import { askCancel, askOk, autoAsk } from './ask';
+import { quietPushHint } from './pushHintQuiet';
+
+// Jeder Test: Fenster „Nichts mehr verpassen“ als iPhone ausblenden (pushHintQuiet.ts).
+/** Eigene Seite in einem neuen Browser-Kontext (zweite Person), ebenfalls ohne das Fenster. */
+async function quietPage(browser: Browser): Promise<Page> {
+  const p = await browser.newPage();
+  await quietPushHint(p);
+  return p;
+}
+
+const test = base.extend({
+  context: async ({ context }, use) => {
+    await quietPushHint(context);
+    await use(context);
+  },
+});
 
 // E2E-Tests gegen eine Test-Instanz mit der Beispielkonfiguration (config/kompanie.example.json):
 // Der Bereich Strafen heißt dort „Kasse“. Die Testdaten legen die eigene Rolle „Spieß“ an (Punkte, Kasse, Termine). Die App liegt unter /app/.
@@ -3392,6 +3408,26 @@ async function fakePush(page: Page) {
   });
 }
 
+test('iPhone im Browser-Tab: Fenster nach der Anmeldung führt zu „App installieren“', async ({ page }) => {
+  await page.goto('/app/');
+  await page.evaluate(() => {
+    localStorage.setItem('e2e-keep-push-hint', '1');
+    localStorage.removeItem('kompanie-push-hint-later');
+    localStorage.removeItem('kompanie-push-hint-round');
+  });
+  await login(page, 'mitglied1');
+  const hint = page.getByRole('dialog', { name: 'Nichts mehr verpassen' });
+  await expect(hint).toContainText('nur in der installierten App');
+  await hint.getByRole('button', { name: 'App installieren' }).click();
+  await expect(page).toHaveURL(/#\/installieren$/);
+  await expect(hint).toHaveCount(0);
+  // Einmal je Runde: nach dem Neustart nicht wieder
+  await page.goto('/app/');
+  await page.reload();
+  await expect(page.locator('.tabbar').getByRole('button', { name: 'Meins' })).toBeVisible();
+  await expect(hint).toHaveCount(0);
+});
+
 test('Benachrichtigungen auf dem iPhone: erst die App installieren', async ({ page }) => {
   await page.context().clearCookies();
   await page.goto('/app/');
@@ -4580,7 +4616,7 @@ test('Impressum und Datenschutz: Admin trägt die Links ein, alle sehen sie (Anm
   await expect(status.locator('.status-item.status-ok', { hasText: 'Impressum und Datenschutz' })).toBeVisible();
 
   // Ohne Anmeldung: in der Hilfe und (eigenständig) auf der Anmeldeseite, in einem neuen Fenster.
-  const guest = await browser.newPage();
+  const guest = await quietPage(browser);
   await guest.goto('/app/#/hilfe');
   const hilfe = guest.locator('.legal-links');
   await expect(hilfe.getByRole('link', { name: 'Impressum' })).toHaveAttribute('href', imprint);
@@ -6553,7 +6589,7 @@ test('Schwarzes Brett: Banner mit Titel auf allen Seiten, ausblenden, „+1 weit
   const first = `Heute kein Training ${id}`;
   const second = `Treffpunkt Schützenhaus ${id}`;
   // Admin schreibt (Recht post_board) über „Verwaltung“ → „Schwarzes Brett“; die Verwaltung bleibt markiert.
-  const admin = await browser.newPage();
+  const admin = await quietPage(browser);
   const dialogs: string[] = [];
   autoAsk(admin, dialogs);
   await login(admin, 'admin', ADMIN_PASSWORD);
@@ -6697,7 +6733,7 @@ test('Schwarzes Brett: öffentliche Nachricht auch ohne Anmeldung, interne nicht
   const id = Date.now().toString(36);
   const open = `Tag der offenen Tür ${id}`;
   const intern = `Nur intern ${id}`;
-  const admin = await browser.newPage();
+  const admin = await quietPage(browser);
   const dialogs: string[] = [];
   autoAsk(admin, dialogs);
   await login(admin, 'admin', ADMIN_PASSWORD);
@@ -6744,7 +6780,7 @@ test('Schwarzes Brett: öffentliche Nachricht auch ohne Anmeldung, interne nicht
 test('Schwarzes Brett aus Blöcken: Countdown und Text nur für Mitglieder, ohne Anmeldung nur der Countdown', async ({ page, browser }) => {
   const id = Date.now().toString(36);
   const title = `Festbeginn ${id}`;
-  const admin = await browser.newPage();
+  const admin = await quietPage(browser);
   autoAsk(admin);
   await login(admin, 'admin', ADMIN_PASSWORD);
   await admin.goto('/app/#/brett');
@@ -7079,7 +7115,7 @@ test('Anhänge: am Brett anhängen, Mitglied lädt herunter, beim Bearbeiten än
   await shot(page, '33g-brett-anhang');
 
   // Mitglied sieht den Anhang und lädt ihn herunter
-  const member = await browser.newPage();
+  const member = await quietPage(browser);
   await login(member, 'mitglied1');
   await member.locator('.board-banner').getByText(`Mit Anhang ${id}`).click();
   const memberCard = member.locator('.board-card', { hasText: `Mit Anhang ${id}` });
@@ -7139,6 +7175,7 @@ test('Schwarzes Brett: Enddatum in der Ortszeit eines Geräts in New York, gespe
   page,
 }) => {
   const context = await browser.newContext({ ...devices['iPhone 13'], locale: 'de-DE', timezoneId: 'America/New_York' });
+  await quietPushHint(context);
   const ny = await context.newPage();
   autoAsk(ny);
   const title = `Zeitzone ${Date.now().toString(36)}`;
@@ -7171,7 +7208,7 @@ test('Umfragen: anlegen, Mitglied sieht sie im Banner, antwortet, sieht das Erge
 }) => {
   const title = `Grillfest ${Date.now().toString(36)}: Samstag oder Sonntag?`;
   // Admin (Recht manage_polls) legt über „Verwaltung“ → „Umfragen“ an.
-  const admin = await browser.newPage();
+  const admin = await quietPage(browser);
   autoAsk(admin);
   await login(admin, 'admin', ADMIN_PASSWORD);
   await adminMenu(admin, 'Umfragen');
@@ -7255,7 +7292,7 @@ test('Geburtstage: Mitglied trägt seinen ein, ein anderes sieht ihn unter „An
 }) => {
   // In drei Tagen (Zeitzone des Browsers; die der Kompanie verschiebt das höchstens um einen Tag, bleibt also in 7 Tagen).
   const in3 = new Date(Date.now() + 3 * 86400 * 1000);
-  const member = await browser.newPage();
+  const member = await quietPage(browser);
   autoAsk(member);
   await login(member, 'mitglied1');
   await openKonto(member);
@@ -7284,7 +7321,7 @@ test('Geburtstage: Mitglied trägt seinen ein, ein anderes sieht ihn unter „An
   await expect(upcoming.getByRole('button', { name: 'Alle Geburtstage' })).toHaveCount(0);
 
   // Admins stellen den Vorlauf ein: 1 Tag vorher → der Geburtstag in drei Tagen steht (noch) nicht drin.
-  const admin = await browser.newPage();
+  const admin = await quietPage(browser);
   await login(admin, 'admin', ADMIN_PASSWORD);
   await admin.goto('/app/#/einstellungen/geburtstage');
   const days = admin.getByLabel('Anstehende Geburtstage anzeigen');
@@ -7339,7 +7376,7 @@ test('Seite in der Mitgliederliste: Geburtstag und Eintrittsjahr nur, wem das Mi
   await expect(adminCard.getByLabel('Auf meiner Seite', { exact: false })).toHaveCount(0);
 
   // Mitglied2 zeigt den Geburtstag allen (mit Alter) und das Eintrittsjahr nur Mitgliedern.
-  const member = await browser.newPage();
+  const member = await quietPage(browser);
   autoAsk(member);
   await login(member, 'mitglied2');
   await openKonto(member);
@@ -7491,7 +7528,7 @@ test('Wartungsmodus: Admin schaltet mit Begründung ein, Mitglied sieht die Wart
   browser,
 }) => {
   // Mitglied hat die App offen; seine Termine liegen im Speicher des Service Workers.
-  const member = await browser.newPage();
+  const member = await quietPage(browser);
   await login(member, 'mitglied1');
   await expect(member.getByText('Vereinsabend')).toBeVisible();
   const storedApi = () =>
@@ -7662,7 +7699,7 @@ test('Nutzung: Admin sieht aktive Konten, Nutzung je Bereich und den Verlauf ein
   browser,
 }) => {
   // Ein Mitglied nutzt die App (Termine, eigene Punkte).
-  const member = await browser.newPage();
+  const member = await quietPage(browser);
   await login(member, 'mitglied1');
   await expect(member.getByText('Vereinsabend')).toBeVisible();
   await member.close();

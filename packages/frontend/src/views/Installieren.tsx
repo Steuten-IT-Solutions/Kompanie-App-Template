@@ -264,12 +264,14 @@ function IosGuide() {
         n={1}
         title={
           <>
-            Unten auf das <strong>Teilen-Symbol</strong> tippen
+            Auf das <strong>Teilen-Symbol</strong> tippen
           </>
         }
         pic={<IosStep1 />}
       >
-        Steht unten rechts nur <strong>„•••“</strong>, zuerst darauf tippen und dann <strong>„Teilen“</strong> wählen.
+        Wo es steht, hängt von Gerät und Safari ab: am iPhone meist in der Leiste unten, am iPad in der Leiste oben. Ab iOS 26 ist „Kompakt“
+        voreingestellt: Dann steckt es hinter <strong>„•••“</strong> an der Adresszeile – zuerst darauf tippen und dann{' '}
+        <strong>„Teilen“</strong> wählen. Die Darstellung lässt sich unter Einstellungen → Apps → Safari → Tabs umstellen.
       </Step>
       <Step
         n={2}
@@ -385,7 +387,9 @@ export default function Installieren({ onToast }: { onToast: (msg: string) => vo
       )}
       {iosOtherBrowser && !inApp && (
         <div className="install-warn" role="note">
-          Am einfachsten klappt es in <strong>Safari</strong> (blauer Kompass). Bitte die Adresse kopieren und in Safari öffnen:
+          Am einfachsten klappt es in <strong>Safari</strong> (blauer Kompass). Ab iOS 16.4 können auch Chrome, Edge oder Firefox die App
+          über <strong>Teilen → „Zum Home-Bildschirm“</strong> hinzufügen, wenn der Browser den Eintrag anbietet. Fehlt er, die Adresse
+          kopieren und in Safari öffnen:
           <CopyLink />
         </div>
       )}

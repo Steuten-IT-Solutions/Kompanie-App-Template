@@ -694,7 +694,7 @@ export default function App({ notice = null }: { notice?: string | null }) {
       )}
       {!['installieren', 'anmelden', 'registrieren', 'einstellungen', 'einrichtung'].includes(tab) && <InstallBanner onToast={showToast} />}
       {/* Gleich nach der Anmeldung, auf jeder Seite (auch nach einem geteilten Link): Benachrichtigungen anbieten */}
-      {user && !config.setupPending && !['anmelden', 'registrieren', 'einrichtung', 'benachrichtigungen'].includes(tab) && (
+      {user && !config.setupPending && !['anmelden', 'registrieren', 'einrichtung', 'benachrichtigungen', 'installieren'].includes(tab) && (
         <PushHint onToast={showToast} />
       )}
 
