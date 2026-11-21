@@ -49,6 +49,9 @@ jobs:
       - name: Changelog (Aufbau, Prüfung zum Release, Ausgabe für die App)
         run: tests/changelog/run-tests.sh
 
+      - name: Wartungsabo (wer neue Versionen bekommt)
+        run: tests/wartung/run-tests.sh
+
       - name: Übersetzungen (Kataloge vollständig, Prüfskript)
         run: php scripts/check-i18n.php && tests/i18n/run-tests.sh
 

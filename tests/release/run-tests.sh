@@ -32,6 +32,12 @@ show() { php scripts/updates.php --list="$T/updates.json" --show | php -r '$d = 
 [ "$(show)" = "$CORE.1 -" ] && ok "Neue Version zuerst in early" || fail "Kanal: $(show)"
 php scripts/updates.php --list="$T/updates.json" --promote="$CORE.1" > /dev/null
 [ "$(show)" = "$CORE.1 $CORE.1" ] && ok "Befördern nach stable" || fail "Kanal: $(show)"
+maint() { php scripts/updates.php --list="$T/updates.json" --show | php -r '$d = json_decode(stream_get_contents(STDIN), true); echo $d["maintenance"] ?? "-";'; }
+php scripts/updates.php --list="$T/updates.json" --maintenance=2027-06-30 > /dev/null
+[ "$(maint)" = 2027-06-30 ] && ok "Wartung bis in der signierten Liste" || fail "Wartung: $(maint)"
+if php scripts/updates.php --list="$T/updates.json" --maintenance=2027-02-30 > /dev/null 2>&1; then fail "Ungültiges Datum angenommen"; fi
+php scripts/updates.php --list="$T/updates.json" --maintenance=keine > /dev/null
+[ "$(maint)" = - ] && ok "Wartung: ungültiges Datum abgelehnt, „keine“ entfernt die Angabe" || fail "Wartung entfernen: $(maint)"
 
 # Nur das Aussehen geändert (gleicher Kern): direkt stable
 php scripts/package.php --config=config/kompanie.example.json --version="$CORE.2" --out="$T/r2" --kompanie=org/kompanie-test --require-signature --trust-signing-key > /dev/null
@@ -141,7 +147,7 @@ SHA1=1111111111111111111111111111111111111111
 SHA2=2222222222222222222222222222222222222222
 SHA3=3333333333333333333333333333333333333333
 pub() { env REPO=org/kompanie-test KOMPANIE_SHA="$1" CONFIG=config/kompanie.example.json DIST="$T/checked/dist" BRAND="$T/checked/brand" \
-  SCREENSHOTS="$T/checked/screenshots" STABLE_CORE="${2:-}" TRUST_SIGNING_KEY=1 GIT_REMOTE="file://$T/remote.git" GH="$T/gh" GH_TOKEN=x scripts/publish-release.sh; }
+  SCREENSHOTS="$T/checked/screenshots" STABLE_CORE="${2:-}" TRUST_SIGNING_KEY=1 GIT_REMOTE="file://$T/remote.git" GH="$T/gh" GH_TOKEN=x WARTUNG="${WARTUNG:-}" scripts/publish-release.sh; }
 pages() { rm -rf "$T/pages" && git clone --quiet --branch gh-pages "file://$T/remote.git" "$T/pages"; }
 list() { php scripts/updates.php --list="$T/pages/updates.json" --show; }
 
@@ -161,10 +167,12 @@ grep -q "schon als Version $CORE.1 veröffentlicht" <<< "$OUT2" && [ ! -d "$T/re
 
 # Abbruch nach dem Anlegen des Entwurfs (Liste nicht aktualisiert): Entwurf wird ersetzt, dann veröffentlicht
 mkdir -p "$T/releases/v$CORE.2" && echo alt > "$T/releases/v$CORE.2/release.json" && touch "$T/releases/v$CORE.2/DRAFT"
-pub "$SHA2" > /dev/null
+! grep -q '"maintenance"' <<< "$(list)" && ok "Ohne Variable KOMPANIE_WARTUNG keine Angabe zur Wartung" || fail "Wartung ohne Variable"
+WARTUNG=$'andere 2026-01-01\nkompanie-test 2027-06-30' pub "$SHA2" > /dev/null
 pages
 grep -q kompanie-app-signed "$T/releases/v$CORE.2/release.json" && [ ! -f "$T/releases/v$CORE.2/DRAFT" ] && grep -q "\"$CORE.2\"" <<< "$(list)" \
   && ok "Entwurf eines abgebrochenen Laufs wird ersetzt und veröffentlicht" || fail "Abgebrochener Entwurf"
+grep -q '"maintenance": "2027-06-30"' <<< "$(list)" && ok "Veröffentlichen schreibt „Wartung bis“ der Kompanie in die Liste" || fail "Wartung beim Veröffentlichen: $(list | grep -i maint)"
 
 # Abbruch nach dem Push, vor dem Veröffentlichen: der nächste Lauf macht den Entwurf öffentlich
 touch "$T/releases/v$CORE.2/DRAFT"

@@ -16,7 +16,7 @@ In diesem Fenster beförderst oder degradierst du ein Mitglied und siehst, wie s
 Aus der Übersicht **Beförderungen** öffnet ein Tipp auf einen Namen dieses Fenster direkt. Mit **✕** oder der Zurück-Taste schließt du es.
 
 ## Was du hier siehst
-- Der aktuelle {begriff.rank} mit Abzeichen, sonst „Kein {begriff.rank}“. Mit {bereich.points} steht dahinter „noch … {bereich.points} bis …“ oder „Schwelle für … erreicht seit …“.
+- Der aktuelle {begriff.rank} mit Abzeichen, sonst „Kein {begriff.rank}“. Mit {bereich.points} steht dahinter „noch … {bereich.points} bis …“ oder „Schwelle für … erreicht seit …“, mit dem Abzeichen des nächsten {begriff.rank}s.
 - **Neuer {begriff.rank}**: die Auswahl. Sie bietet nur an, was erlaubt ist, mit {bereich.points} jeweils mit Schwelle, z. B. „(ab 50)“. Hat die Person einen {begriff.rank}, steht dort auch **Kein {begriff.rank}**.
 - **Datum**: der Tag der Änderung, vorgegeben ist heute. Ein früherer Tag geht, ein Tag in der Zukunft nicht.
 - **Begründung (optional)**: steht später im Verlauf.

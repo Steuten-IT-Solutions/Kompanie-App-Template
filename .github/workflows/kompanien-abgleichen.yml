@@ -1,4 +1,5 @@
-# Veröffentlicht neue Versionen für alle Kompanien (Repos der Organisation mit dem Topic kompanie-app),
+# Veröffentlicht neue Versionen für alle Kompanien mit Wartungsabo (Repos der Organisation mit dem Topic
+# kompanie-app, laufende Wartung laut Variable KOMPANIE_WARTUNG, siehe scripts/wartung.php),
 # vom Stand des Branches, auf dem er läuft (develop → early; main → stable, wenn der Code freigegeben ist),
 # deren Stand noch nicht veröffentlicht ist: nach einer Änderung im Kompanie-Repo (kompanie.json, Logo)
 # und nach einer Änderung am Programmcode des Kerns (dann für alle Kompanien, zuerst im Kanal early).
@@ -55,6 +56,8 @@ jobs:
           STATUS_URL: ${{ vars.KOMPANIE_STATUS_URL }}
           REPORT_URL: ${{ vars.KOMPANIE_REPORT_URL }}
           SUPPORT: ${{ vars.KOMPANIE_SUPPORT }}
+          # Wartungsabo je Kompanie (scripts/wartung.php): Nur Kompanien mit laufender Wartung bekommen neue Versionen.
+          WARTUNG: ${{ vars.KOMPANIE_WARTUNG }}
         run: scripts/find-pending.sh >> "$GITHUB_OUTPUT"
 
   veroeffentlichen:

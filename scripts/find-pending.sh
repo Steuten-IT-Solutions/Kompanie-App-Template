@@ -2,30 +2,21 @@
 # Findet Kompanie-Repos, deren aktueller Stand (Commit auf main und Programmcode des Kerns) noch nicht
 # veröffentlicht ist (aus .github/workflows/kompanien-abgleichen.yml). Ausgabe: repos=["Org/Name", …]
 #
-# Umgebung: GH_TOKEN (nur Lesen), optional ONLY (nur dieses Repo), ORG (Standard Steuten-IT-Solutions),
+# Umgebung: GH_TOKEN (nur Lesen), WARTUNG (Variable KOMPANIE_WARTUNG, siehe scripts/wartung.php), optional ONLY
+#   (nur dieses Repo), ORG (Standard Steuten-IT-Solutions),
 #   STATUS_URL, REPORT_URL und SUPPORT wie beim Veröffentlichen (gehen in die Prüfsumme der Paket-Konfiguration ein).
 # Die Update-Liste wird hier nur gelesen, nicht geprüft: Sie entscheidet nur, ob ein Lauf nötig ist;
 # der Veröffentlichungs-Job prüft selbst noch einmal (mit Signatur) und tut nichts doppelt.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ORG="${ORG:-Steuten-IT-Solutions}"
+export ORG="${ORG:-Steuten-IT-Solutions}"   # auch für kompanien.sh
 export GIT_TERMINAL_PROMPT=0   # nicht nach Zugangsdaten fragen (gelöschtes oder privates Repo)
 CODE="$(php "$ROOT/scripts/package.php" --code-hash)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-if [ -n "${ONLY:-}" ]; then
-  REPOS="$ONLY"
-else
-  # Über die Liste der Repos der Organisation, nicht über die Suche: Der Such-Index von GitHub lässt ein Repo
-  # nach Änderungen (z. B. direkt nach einer Veröffentlichung) zeitweise weg; dann wurde still nichts gebaut.
-  REPOS="$(gh api --paginate "orgs/$ORG/repos?type=public&per_page=100" \
-    --jq '.[] | select(.archived | not) | select((.topics // []) | index("kompanie-app")) | .full_name')"
-  if [ -z "$REPOS" ]; then
-    echo "::error::Keine Kompanie-Repos gefunden (öffentlich, Topic kompanie-app, in $ORG)." >&2
-    exit 1
-  fi
-fi
+# Kompanien mit laufendem Wartungsabo (bei ONLY nur dieses Repo, wenn seine Wartung läuft)
+REPOS="$("$ROOT/scripts/kompanien.sh")"   # eigene Zuweisung: Fehler brechen ab
 
 PENDING=()
 while IFS= read -r repo; do

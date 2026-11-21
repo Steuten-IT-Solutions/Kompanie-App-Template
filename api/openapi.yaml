@@ -10450,6 +10450,8 @@ components:
         majorVersion: { type: string }
         withdrawn: { type: boolean, description: Die installierte Version wurde zurückgezogen }
         fallback: { type: [string, 'null'], description: 'Bei withdrawn: Ziel des automatischen Wechsels; null = keins vorhanden' }
+        maintenance: { type: [string, 'null'], description: 'Wartungsabo laut Update-Liste: letzter Tag (JJJJ-MM-TT, UTC) oder „unbefristet“; null = keine Angabe' }
+        maintenanceEnded: { type: boolean, description: 'Das Wartungsabo ist abgelaufen; neue Versionen gibt es erst nach einer Verlängerung' }
         skipped: { type: boolean, description: 'latest wird nach dem Zurückrollen nicht automatisch eingespielt' }
         autoAllowed: { type: boolean, description: 'Automatische Updates sind hier erlaubt (WordPress kann sie sperren)' }
         problems: { type: array, items: { type: string }, description: Gründe, warum die neue Version hier nicht läuft }

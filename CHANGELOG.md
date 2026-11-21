@@ -26,6 +26,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Neu
 
+- **Wartung**: Unter [Einstellungen → Zustand und Updates](app:einstellungen/zustand) steht, bis wann eure App neue
+  Versionen bekommt (Wartung bis …, oder unbefristet). Nach dem Ende läuft die App mit ihrer Version weiter; neue
+  Versionen, auch Sicherheitsupdates, gibt es erst nach einer Verlängerung. Zurückgehen auf ältere Versionen bleibt
+  möglich.
 - **Beförderung mit Datum**: Beim Ändern des Dienstgrads eines Mitglieds (z. B. aus
   [Beförderungen](app:verwaltung/befoerderungen)) wählst du jetzt das Datum der Änderung, vorgegeben ist heute. Ein
   früherer Tag geht, ein Tag in der Zukunft oder vor der letzten Änderung dieser Person nicht. Mit Punkten zählen bei
@@ -227,6 +231,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
 
 ### Geändert
 
+- **Abzeichen des nächsten Dienstgrads**: In der Übersicht [Beförderungen](app:verwaltung/befoerderungen) und beim
+  Dienstgrad eines Mitglieds steht jetzt auch vor dem nächsten Dienstgrad („Schwelle für … erreicht“, „noch … bis …“)
+  dessen Abzeichen, nicht nur vor dem aktuellen.
 - **Android: Installation in jedem Browser erklärt**: Die Anleitung unter [App installieren](app:installieren) erkennt
   den Browser. In Edge, Firefox, Opera, Brave und anderen erklärt ein Hinweis, warum Chrome besser ist (diese Browser
   legen nur eine Verknüpfung an, keine richtige App), mit _In Chrome öffnen_, _Chrome herunterladen_ (Play Store, falls

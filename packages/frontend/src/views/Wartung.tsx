@@ -24,6 +24,7 @@ import { UPDATE_ACCEPT, uploadUpdatePackage } from '../updateUpload';
 import { IconButton } from '../icons';
 import { serverBackupLabel, serverBackupUrl } from '../serverBackup';
 import { localeTag, t } from '../i18n';
+import { maintenanceText } from '../wartungsabo';
 
 /**
  * Wartung für Admins: Ampel (Status), Updates mit Zurückrollen, Statusmeldungen (nur mit
@@ -334,6 +335,7 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
   )
     .split('{version}')
     .concat('');
+  const maintenance = maintenanceText(u.maintenance, u.maintenanceEnded);
 
   return (
     <section className="card settings-section" aria-labelledby="updates-title">
@@ -353,6 +355,17 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
             {u.channel === 'early' && ' ' + t('(Vorab-Kanal)')} · {t('zuletzt geprüft: {date}', { date: date(u.checked_at) })} ·{' '}
             <a href="#/einstellungen/neuerungen">{t('Was ist neu')}</a>
           </p>
+          {maintenance && (
+            <p className={u.maintenanceEnded ? 'form-error small' : 'small'}>
+              {maintenance}
+              {u.maintenanceEnded && status.support && (
+                <>
+                  {' '}
+                  {t('Verlängern:')} <a href={supportHref(status.support)}>{status.support}</a>
+                </>
+              )}
+            </p>
+          )}
           {u.withdrawn &&
             (u.fallback ? (
               <>
@@ -436,7 +449,7 @@ function Updates({ status, onChanged, onToast }: { status: AdminStatus; onChange
               </button>
             </>
           ) : (
-            !u.withdrawn && <p className="small">{t('✓ Die App ist auf dem neuesten Stand.')}</p>
+            !u.withdrawn && !u.maintenanceEnded && <p className="small">{t('✓ Die App ist auf dem neuesten Stand.')}</p>
           )}
           {u.major && u.majorVersion && (
             <div className="small">

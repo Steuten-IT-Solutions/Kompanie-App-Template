@@ -1,11 +1,11 @@
 import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react';
-import { api, config, type Promotion, type Rank, type RankHistoryEntry, type RankStatus } from '../api';
+import { api, config, type Promotion, type Rank, type RankHistoryEntry, type RankRef, type RankStatus } from '../api';
 import brand from '../generated/brand';
 import { formatDate, todayYmd } from '../format';
 import { navigate } from '../router';
 import { RankBadge, RankLabel } from '../RankBadge';
 import { useDragSort, useSaveQueue } from '../dragSort';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { Empty, ErrorBox, Loading, rich, useAsync } from '../ui';
 import { RankHistory } from './Dienstgrad';
 import { isDue, isSoon } from '../promotionCheck';
 import { notePromotions } from '../promotionsDue';
@@ -398,21 +398,12 @@ export function Promotions() {
                     <div className="row-sub">
                       {p.rank ? <RankLabel url={p.rank.badge_url} title={p.rank.title} /> : t('Kein {rank}', { rank })} ·{' '}
                       {t('{count} {points}', { count: p.points.toLocaleString(localeTag()), points: sec.points })}
-                      {p.next_rank &&
-                        p.points_to_next !== null &&
-                        ` · ${
-                          due
-                            ? p.threshold_reached_since
-                              ? t('Schwelle für „{title}“ erreicht seit {date}', {
-                                  title: p.next_rank.title,
-                                  date: formatDate(p.threshold_reached_since),
-                                })
-                              : t('Schwelle für „{title}“ erreicht', { title: p.next_rank.title })
-                            : t('noch {count} bis „{title}“', {
-                                count: p.points_to_next.toLocaleString(localeTag()),
-                                title: p.next_rank.title,
-                              })
-                        }`}
+                      {p.next_rank && p.points_to_next !== null && (
+                        <>
+                          {' · '}
+                          <NextRankText next={p.next_rank} pointsToNext={p.points_to_next} since={p.threshold_reached_since} />
+                        </>
+                      )}
                     </div>
                   </div>
                   <span className="chevron" aria-hidden="true">
@@ -426,6 +417,23 @@ export function Promotions() {
       )}
     </div>
   );
+}
+
+/**
+ * Stand zum nächsten Dienstgrad („Schwelle für „Maat“ erreicht seit …“ bzw. „noch 3 bis „Maat““), mit dem Abzeichen des
+ * nächsten Dienstgrads vor seiner Bezeichnung wie beim aktuellen.
+ */
+function NextRankText({ next, pointsToNext, since, unit }: { next: RankRef; pointsToNext: number; since: string | null; unit?: string }) {
+  const label = <RankLabel url={next.badge_url} title={next.title} quoted />;
+  const count = pointsToNext.toLocaleString(localeTag());
+  if (pointsToNext <= 0) {
+    return since
+      ? rich(t('Schwelle für {rank} erreicht seit {date}'), { rank: label, date: formatDate(since) })
+      : rich(t('Schwelle für {rank} erreicht'), { rank: label });
+  }
+  return unit
+    ? rich(t('noch {count} {points} bis {rank}'), { count, points: unit, rank: label })
+    : rich(t('noch {count} bis {rank}'), { count, rank: label });
 }
 
 /**
@@ -522,18 +530,12 @@ export function MemberRank({
           <span className="muted small">
             {' '}
             ·{' '}
-            {status.points_to_next <= 0
-              ? status.threshold_reached_since
-                ? t('Schwelle für „{title}“ erreicht seit {date}', {
-                    title: status.next_rank.title,
-                    date: formatDate(status.threshold_reached_since),
-                  })
-                : t('Schwelle für „{title}“ erreicht', { title: status.next_rank.title })
-              : t('noch {count} {points} bis „{title}“', {
-                  count: status.points_to_next.toLocaleString(localeTag()),
-                  points: sec.points,
-                  title: status.next_rank.title,
-                })}
+            <NextRankText
+              next={status.next_rank}
+              pointsToNext={status.points_to_next}
+              since={status.threshold_reached_since ?? null}
+              unit={sec.points}
+            />
           </span>
         )}
       </p>
