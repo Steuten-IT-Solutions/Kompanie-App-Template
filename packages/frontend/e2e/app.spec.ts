@@ -5401,7 +5401,7 @@ test('Sprachen: Dokument, Kategorie und Album auch mit englischem Namen', async 
   }
 });
 
-test('Sprachen: Handbuch auf Englisch, Seite ohne Fassung deutsch mit Hinweis', async ({ page, browser }) => {
+test('Sprachen: Handbuch auf Englisch, auch die Seiten für Admins', async ({ page, browser }) => {
   await login(page, 'admin', ADMIN_PASSWORD);
   const api = (path: string, method: string, body?: unknown) =>
     page.evaluate(
@@ -5432,12 +5432,13 @@ test('Sprachen: Handbuch auf Englisch, Seite ohne Fassung deutsch mit Hinweis', 
     await expect(visitor.locator('.hilfe .row-title', { hasText: 'Get the app on your phone' })).toBeVisible();
     await visitor.close();
 
-    // Seite ohne englische Fassung (Admin mit Englisch am Konto): deutsch mit Hinweis
+    // Seite für Admins (Admin mit Englisch am Konto): seit alle Seiten eine Fassung haben, ebenfalls englisch ohne Hinweis
     expect(await api('me/locale', 'PUT', { locale: 'en' })).toBe(200);
     await page.goto('/app/#/hilfe/admin-sprachen');
     await page.reload();
-    await expect(page.locator('.hilfe-seite .untranslated-note')).toHaveText('Only available in German');
-    await expect(page.locator('.hilfe-text')).toContainText('Englisch einschalten');
+    await expect(page.locator('.hilfe-seite h2.news-headline')).toHaveText('Languages');
+    await expect(page.locator('.hilfe-text')).toContainText('Switch on English');
+    await expect(page.locator('.hilfe-seite .untranslated-note')).toHaveCount(0);
   } finally {
     expect(await api('me/locale', 'PUT', { locale: null })).toBe(200);
     expect(await api('admin/settings', 'PATCH', { languages: 'de' })).toBe(200);
