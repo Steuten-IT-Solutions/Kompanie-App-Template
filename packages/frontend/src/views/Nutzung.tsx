@@ -4,6 +4,7 @@ import { formatDate, todayYmd } from '../format';
 import { toCsv } from '../lists';
 import { ErrorBox, Loading, Sheet, StatCard, useAsync } from '../ui';
 import { confirmAsk } from '../ask';
+import { localeTag } from '../i18n';
 
 const ACTION_TEXT: Record<ActivityAction, string> = {
   view: 'angesehen',
@@ -17,7 +18,7 @@ const ACTION_TEXT: Record<ActivityAction, string> = {
 /** Ab so vielen Tagen ohne Nutzung gilt jemand als „lange nicht aktiv“. */
 const INACTIVE_DAYS = 30;
 
-const dateTime = (ts: number) => new Date(ts * 1000).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' });
+const dateTime = (ts: number) => new Date(ts * 1000).toLocaleString(localeTag(), { dateStyle: 'medium', timeStyle: 'short' });
 
 /** 'YYYY-MM-DD' minus n Tage (lokal) */
 function daysBefore(ymd: string, n: number): string {

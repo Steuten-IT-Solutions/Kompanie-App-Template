@@ -5,6 +5,7 @@ import logoUrl from './generated/logo-small.webp';
 import { ErrorBox, Loading, useAsync } from './ui';
 import { sources } from './viewData';
 import { confirmAsk } from './ask';
+import { localeTag } from './i18n';
 
 /** Höchstlänge der Begründung (wie MaintenanceService::REASON_MAX im Kern). */
 export const REASON_MAX = 500;
@@ -146,7 +147,7 @@ export function MaintenanceCard({ onToast }: { onToast: (msg: string) => void })
           <ul>
             {m.log.map((e, i) => (
               <li key={i}>
-                {new Date(e.at * 1000).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })}: {e.by_name}{' '}
+                {new Date(e.at * 1000).toLocaleString(localeTag(), { dateStyle: 'medium', timeStyle: 'short' })}: {e.by_name}{' '}
                 {e.on ? 'ein bzw. Begründung geändert' : 'aus'}
               </li>
             ))}

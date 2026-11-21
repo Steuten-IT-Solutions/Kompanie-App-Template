@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Infra\RemoteNewsSource;
 use KompanieApp\Core\Push\PushService;
 
@@ -90,6 +91,11 @@ final class SettingsService
                 'sources' => $a->newsService()->sources(),
             ],
             'legal' => $this->legal(),
+            // Sprachen (Plan „Mehrsprachigkeit“): eingeschaltete und mögliche; Deutsch ist immer an
+            'languages' => [
+                'enabled' => $a->languages()->enabled(),
+                'available' => I18n::LOCALES,
+            ],
         ];
         return $out;
     }
@@ -168,6 +174,7 @@ final class SettingsService
             $set['calendar_cache_minutes'] = $min;
         }
         $set += EventResponseService::validEnabled($in['calendar_responses'] ?? null);
+        $set += LanguageService::validEnabled($in['languages'] ?? null);
         $set += EventResponseService::validReminder($in['calendar_response_reminder'] ?? null, $in['calendar_response_reminder_days'] ?? null);
         $serviceAccount = null;
         if (array_key_exists('drive_service_account', $in) && trim($in['drive_service_account']) !== '') {

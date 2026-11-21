@@ -5,6 +5,7 @@ import { formatBytes } from '../format';
 import { lastError, reportOrigin } from '../lastError';
 import { navigate } from '../router';
 import { ErrorBox, FileInput, Loading, useAsync } from '../ui';
+import { localeTag } from '../i18n';
 
 const MAX_TEXT = 2000;
 const TYPES = ['image/png', 'image/jpeg', 'image/webp'];
@@ -227,7 +228,7 @@ export default function FehlerMelden() {
               </>
             )}
             <dt>Uhrzeit</dt>
-            <dd>{now.toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })}</dd>
+            <dd>{now.toLocaleString(localeTag(), { dateStyle: 'medium', timeStyle: 'short' })}</dd>
             <dt>Letzte Fehlermeldung der App</dt>
             <dd>{appError?.message ?? 'keine'}</dd>
           </dl>

@@ -1,0 +1,6 @@
+{
+  "Diese Sprache ist in der App nicht eingeschaltet.": "This language is not switched on in the app.",
+  "Unbekannte Sprache.": "Unknown language.",
+  "Unbekannte Sprache: {locale}": "Unknown language: {locale}",
+  "Ungültiger Wert für die Sprachen.": "Invalid value for the languages."
+}

@@ -1,6 +1,7 @@
 import { config } from '../api';
 import changelog from '../generated/changelog.json';
 import { Empty } from '../ui';
+import { localeTag } from '../i18n';
 
 interface Version {
   version: string;
@@ -15,7 +16,7 @@ function coreVersion(): string | null {
 }
 
 function datum(d: string): string {
-  return new Date(`${d}T12:00:00`).toLocaleDateString('de-DE', { dateStyle: 'long' });
+  return new Date(`${d}T12:00:00`).toLocaleDateString(localeTag(), { dateStyle: 'long' });
 }
 
 /** Anzahl der Einträge einer Version (Punkte der Listen im HTML aus dem Changelog). */

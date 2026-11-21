@@ -17,6 +17,7 @@ import { formatBirthday, ownBirthday } from '../birthdays';
 import { joinText, profileChoice } from '../joinYear';
 import { PersonOffices } from './Aemter';
 import { sources, usePrefetchMenu } from '../viewData';
+import { localeTag } from '../i18n';
 
 const sec = brand.labels.sections;
 
@@ -141,7 +142,7 @@ function Uebersicht({ me }: { me: Me }) {
               {f.points && can('view_own_points') && (
                 <StatCard
                   label={sec.points}
-                  value={me.points.toLocaleString('de-DE')}
+                  value={me.points.toLocaleString(localeTag())}
                   tone="good"
                   onClick={() => navigate('meins/punkte')}
                 />

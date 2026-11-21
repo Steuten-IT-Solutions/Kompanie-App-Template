@@ -33,7 +33,7 @@ final class Subjects
         'POST /me/push/status', 'POST /push/status', 'POST /me/push', 'POST /push', 'PUT /me/push', 'PUT /push', 'DELETE /me/push', 'DELETE /push',
         'POST /me/push/test', 'POST /push/test',
         // Persönliche Anordnung der Kacheln: eine Vorliebe der Person, keine Daten des Vereins
-        'PUT /me/tiles', 'DELETE /me/tiles',
+        'PUT /me/tiles', 'DELETE /me/tiles', 'PUT /me/locale',
         // Abstimmen in Umfragen (absichtlich nicht, auch nicht bei offenen Umfragen)
         'PUT /polls/{id}/vote', 'DELETE /polls/{id}/vote',
         // Eigene Zu- und Absage bei einem Termin (wie Abstimmen; was die Verwaltung für andere einträgt, wird erfasst)
@@ -69,6 +69,7 @@ final class Subjects
             'calendar.responses' => 'Zu- und Absagen bei Terminen', 'calendar.response_reminder' => 'An Zu- und Absage erinnern', 'calendar.response_reminder_days' => 'Erinnerung … Tage vorher', 'gallery.root' => 'Galerie-Ordner',
             'gallery.source' => 'Quelle der Galerie', 'gallery.store' => 'Ablage hochgeladener Bilder', 'gallery.downloads' => 'Bilder herunterladen erlaubt', 'gallery.submissions' => 'Einreichen durch Mitglieder erlaubt',
             'news.source' => 'Quelle der News', 'news.url' => 'Adresse der News', 'legal.imprint_url' => 'Impressum', 'legal.privacy_url' => 'Datenschutzerklärung',
+            'languages.enabled' => 'Sprachen der App',
         ],
         '/admin/mail' => [
             'from' => 'Absenderadresse', 'from_name' => 'Absendername', 'host' => 'SMTP-Server', 'port' => 'Port', 'secure' => 'Verschlüsselung',
@@ -853,7 +854,7 @@ final class Subjects
                 'google.redirect_uri', 'google.client_secret_set', 'google.last_result', 'google.calendar_access', 'google.write_access',
                 'calendar.connection_needs_calendar_access', 'calendar.ics_url_set', 'calendar.google_api_key_set', 'gallery.configured',
                 'gallery.media_bytes', 'gallery.service_account_email', 'gallery.oauth_connected', 'gallery.oauth_email', 'gallery.calendar_access',
-                'gallery.status.', 'gallery.drive.', 'news.sources',
+                'gallery.status.', 'gallery.drive.', 'news.sources', 'languages.available',
             ],
             '/admin/mail' => ['from_name_default', 'password_set', 'configured', 'unavailable', 'server_max_size', 'pending'],
             '/admin/registration' => ['pending', 'link'],

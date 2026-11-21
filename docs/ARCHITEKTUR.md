@@ -615,6 +615,21 @@ Die Seiten stehen in `docs/handbuch/*.md`, mit Kopfbereich (Titel, Reihenfolge, 
 
 **Regel:** Wer eine Funktion ändert oder hinzufügt, passt die Handbuchseiten und ihre Fotos im selben Pull Request an. `--check` verlangt für jeden Bereich mit eigenen Rechten eine Seite.
 
+### Sprachen
+
+Deutsch ist die Ausgangssprache; weitere Sprachen (zuerst Englisch) kommen schrittweise dazu. Texte stehen weiter auf
+Deutsch im Code und laufen durch `t('Speichern')` bzw. `tn('{count} Termin', '{count} Termine', n)` (App,
+`packages/frontend/src/i18n.ts`) oder `I18n::t()`/`I18n::tn()` (Kern, `packages/core/src/I18n/I18n.php`). Der deutsche
+Text ist der Schlüssel; je weitere Sprache gibt es einen Katalog `packages/core/src/I18n/<sprache>.json` für App und
+Kern zugleich. Fehlt ein Eintrag, erscheint Deutsch.
+
+**Regel:** Neue oder geänderte Texte bekommen im selben Pull Request ihren Eintrag in jedem Katalog.
+`php scripts/check-i18n.php` (CI-Job `checks`) meldet fehlende und nicht mehr genutzte Einträge und abweichende
+Platzhalter; `--missing=en` gibt die fehlenden als JSON aus. Die Texte in `t()`/`tn()` sind deshalb immer einfache
+Zeichenketten, Werte kommen über Platzhalter (`t('Hallo, {name}', { name })`). Datum und Zahlen formatieren
+`dateFormat()`/`numberFormat()`/`formatNumber()` aus `format.ts` bzw. `localeTag()` in der aktuellen Sprache;
+Sortieren bleibt deutsch (`localeCompare(…, 'de')`), Adressen in der App (`#/termine`) bleiben in jeder Sprache gleich.
+
 Die App setzt **HTTPS** voraus (sonst funktioniert die Installation aufs Handy nicht). Der Installer prüft das und erklärt, wie man beim Hoster ein kostenloses Zertifikat einschaltet.
 
 ## 9. Google: Galerie und Kalender

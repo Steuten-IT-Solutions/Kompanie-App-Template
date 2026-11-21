@@ -6,9 +6,10 @@ import { formatDate, todayYmd } from '../format';
 import { toCsv } from '../lists';
 import { ErrorBox, Loading, Sheet, useAsync } from '../ui';
 import { confirmAsk } from '../ask';
+import { localeTag } from '../i18n';
 
-const time = (ts: number) => new Date(ts * 1000).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-const dateTime = (ts: number) => new Date(ts * 1000).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' });
+const time = (ts: number) => new Date(ts * 1000).toLocaleTimeString(localeTag(), { hour: '2-digit', minute: '2-digit' });
+const dateTime = (ts: number) => new Date(ts * 1000).toLocaleString(localeTag(), { dateStyle: 'medium', timeStyle: 'short' });
 /** Tag eines Eintrags (JJJJ-MM-TT, Ortszeit des Geräts) für die Gruppen der Liste */
 const dayOf = (ts: number) => {
   const d = new Date(ts * 1000);

@@ -13,6 +13,7 @@ import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { confirmAsk } from '../ask';
 import { Icon, IconButton } from '../icons';
+import { localeTag } from '../i18n';
 
 const sec = brand.labels.sections;
 
@@ -99,7 +100,7 @@ function sortValue(c: ListColumn, r: ListRow, index: number): SortValue {
 function cellText(c: ListColumn, r: ListRow, index: number): string {
   const v = cell(c, r, index);
   if (typeof v !== 'number') return v;
-  return c.field === 'penalties' ? formatEuro(Math.round(v * 100)) : v.toLocaleString('de-DE');
+  return c.field === 'penalties' ? formatEuro(Math.round(v * 100)) : v.toLocaleString(localeTag());
 }
 
 /**

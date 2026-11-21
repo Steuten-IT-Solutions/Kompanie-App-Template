@@ -6,6 +6,7 @@ namespace KompanieApp\WordPress;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Http\Request;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Http\Route;
 
 /**
@@ -61,7 +62,9 @@ final class RestBridge
         $client = isset($_SERVER['REMOTE_ADDR']) && is_string($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '';
         // Vorschau „App als Rolle ansehen“ (Issue #63): Header der App; ob er gilt, entscheidet der Kern.
         $preview = $wp->get_header('X-Kompanie-Preview');
-        $request = new Request($wp->get_method(), $route->path, $wp->get_query_params(), is_array($body) ? $body : [], $params, $client, is_string($preview) ? $preview : null);
+        // Sprache der App (Plan „Mehrsprachigkeit“); ob sie gilt, entscheidet der Kern.
+        $locale = $wp->get_header(I18n::HEADER);
+        $request = new Request($wp->get_method(), $route->path, $wp->get_query_params(), is_array($body) ? $body : [], $params, $client, is_string($preview) ? $preview : null, is_string($locale) ? $locale : null);
         $res = $app->api()->dispatch($route, $request);
         $out = new \WP_REST_Response($res->data, $res->status);
         foreach ($res->headers as $name => $value) {
