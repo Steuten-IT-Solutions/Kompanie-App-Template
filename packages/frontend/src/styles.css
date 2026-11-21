@@ -8266,3 +8266,12 @@ fieldset.block-source legend {
 .block-german > summary {
   cursor: pointer;
 }
+/* Schwarzes Brett (PR 9c): Fassung in einer weiteren Sprache, aufklappbar unter dem Inhalt */
+.board-translation {
+  margin: 0 0 1rem;
+}
+.board-translation > summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}

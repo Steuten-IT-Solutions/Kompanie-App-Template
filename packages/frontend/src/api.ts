@@ -1742,6 +1742,12 @@ export interface BoardMessage {
   last_edit?: { name: string | null; at: string } | null;
   /** nur mit post_board: Mailversand (null: ohne Mail) */
   mail?: BoardMailSummary | null;
+  /** in der Sprache der App fehlt etwas (dann deutsch): all = nichts übersetzt, some = ein Teil */
+  untranslated?: 'all' | 'some';
+  /** nur mit post_board, wenn die App in einer weiteren Sprache läuft: die deutsche Fassung zum Bearbeiten */
+  source?: { title: string; blocks: Block[] };
+  /** nur mit post_board, wenn weitere Sprachen an sind: Fassungen je Sprache (Texte der Blöcke nach Kennung) */
+  translations?: Record<string, { title: string; blocks: BlockTranslation }>;
 }
 
 /** Abgelaufene oder gelöschte Nachricht im Verlauf (nur post_board). */
@@ -1776,7 +1782,16 @@ export interface BoardAudiences {
   people: { id: number; name: string }[];
 }
 
-export type BoardRevisionAction = 'created' | 'title' | 'content' | 'expires' | 'audience' | 'attachments' | 'deleted' | 'mailed';
+export type BoardRevisionAction =
+  | 'created'
+  | 'title'
+  | 'content'
+  | 'expires'
+  | 'audience'
+  | 'attachments'
+  | 'deleted'
+  | 'mailed'
+  | 'translation';
 
 /** Eintrag im Verlauf einer Nachricht. before/after: Titel, Inhalt (HTML), Enddatum oder eine Momentaufnahme. */
 export interface BoardRevision {
@@ -1820,6 +1835,8 @@ export interface BoardInput {
   mail?: boolean;
   /** Kennungen der Anhänge (eigene Entwürfe aus uploadAttachment) */
   attachments?: string[];
+  /** Fassungen in weiteren Sprachen (leerer Titel: der deutsche) */
+  translations?: Record<string, { title?: string; blocks?: BlockTranslation }>;
 }
 
 /** Dateianhang (Schwarzes Brett, E-Mails): Download über url nach Anmeldung */
@@ -3031,7 +3048,9 @@ export const api = {
   postBoard: (input: BoardInput) => request<BoardMessage>('POST', '/board', input),
   updateBoard: (
     id: number,
-    changes: Partial<Pick<BoardInput, 'title' | 'blocks' | 'text' | 'expires_at' | 'audience' | 'audience_ids' | 'attachments'>>,
+    changes: Partial<
+      Pick<BoardInput, 'title' | 'blocks' | 'text' | 'expires_at' | 'audience' | 'audience_ids' | 'attachments' | 'translations'>
+    >,
   ) => request<BoardMessage>('PATCH', `/board/${id}`, changes),
   /** mit Kompanien oder Personen: Zahl der Empfänger einer Nachricht nur für diese */
   boardMailInfo: (audience?: BoardAudience, ids: number[] = []) =>

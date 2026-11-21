@@ -2945,6 +2945,10 @@ paths:
                   type: array
                   items: { type: string }
                   description: 'Alle Anhänge danach (Kennungen): bisherige behalten, neue Entwürfe kommen dazu, fehlende werden gelöscht; steht im Verlauf'
+                translations:
+                  type: object
+                  description: 'Wie bei POST; nur die genannten Sprachen und Felder. Ändert updated_at wie Titel und Inhalt.'
+                  additionalProperties: { $ref: '#/components/schemas/ContentTranslation' }
       responses:
         '200':
           description: Geändert
@@ -9125,6 +9129,13 @@ components:
           type: array
           items: { type: string, pattern: '^[a-f0-9]{32}$' }
           description: 'Kennungen von Anhängen (eigene Entwürfe aus `POST /attachments`); sonst → 400'
+        translations:
+          type: object
+          description: |
+            Fassungen je weiterer eingeschalteter Sprache (Sprache => title, blocks; nicht de, sonst → 400). Leeres Feld
+            löscht es. Wer die App in dieser Sprache nutzt, bekommt Nachricht, Benachrichtigung und Mail in dieser Fassung;
+            was fehlt, steht auf Deutsch. Jede Änderung steht im Verlauf (`translation`).
+          additionalProperties: { $ref: '#/components/schemas/ContentTranslation' }
     BoardAudience:
       type: string
       enum: [members, public, company, person]
@@ -9181,6 +9192,22 @@ components:
         mail:
           description: 'Nur mit view_board_history: Stand des Mailversands (null: ohne Mail)'
           oneOf: [{ $ref: '#/components/schemas/BoardMailSummary' }, { type: 'null' }]
+        untranslated:
+          {
+            type: string,
+            enum: [all, some],
+            description: 'Nur in einer weiteren Sprache (X-Kompanie-Lang), wenn dort etwas fehlt; das Fehlende steht auf Deutsch',
+          }
+        source:
+          type: object
+          description: 'Nur mit view_board_history, wenn die Anfrage in einer weiteren Sprache läuft: die deutsche Fassung zum Bearbeiten'
+          properties:
+            title: { type: string }
+            blocks: { type: array, items: { $ref: '#/components/schemas/Block' } }
+        translations:
+          type: object
+          description: 'Nur mit view_board_history, wenn weitere Sprachen an sind: Fassungen je Sprache'
+          additionalProperties: { $ref: '#/components/schemas/ContentTranslation' }
     BoardMailSummary:
       type: object
       properties:
@@ -9307,7 +9334,7 @@ components:
       type: object
       properties:
         id: { type: integer }
-        action: { type: string, enum: [created, title, content, expires, audience, attachments, deleted, mailed] }
+        action: { type: string, enum: [created, title, content, expires, audience, attachments, deleted, mailed, translation] }
         user_name: { type: [string, 'null'], description: '„gelöschtes Konto“, wenn es das Konto nicht mehr gibt' }
         at: { type: string, format: date-time }
         before:
@@ -12291,9 +12318,9 @@ components:
           description: 'Nur mit manage_pages: weitere Sprachen, in denen Titel oder Texte noch fehlen'
     ContentTranslation:
       type: object
-      description: 'Fassung eines Inhalts aus Blöcken (Seite, News der App) in einer weiteren Sprache: Aufbau, Zielgruppe und Einstellungen der Blöcke gelten für alle Sprachen.'
+      description: 'Fassung eines Inhalts aus Blöcken (Seite, News der App, Nachricht am Brett) in einer weiteren Sprache: Aufbau, Zielgruppe und Einstellungen der Blöcke gelten für alle Sprachen.'
       properties:
-        title: { type: string, description: 'Höchstens so lang wie auf Deutsch erlaubt (Seiten 100, News 150 Zeichen)' }
+        title: { type: string, description: 'Höchstens so lang wie auf Deutsch erlaubt (Seiten 100, News 150 Zeichen, Brett 1000)' }
         blocks:
           type: object
           description: 'Kennung des Blocks => übersetzte Felder (text: html; countdown: title, running_text, after_text; button: label; events, contacts, sponsors, map: title; notice: title, text; schedule, facts: title, items mit so vielen Einträgen wie auf Deutsch)'

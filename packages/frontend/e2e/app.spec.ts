@@ -5161,6 +5161,71 @@ test('Sprachen: News aus der App auf Englisch schreiben, Gäste auf Englisch les
   }
 });
 
+test('Sprachen: Nachricht am Brett auch auf Englisch schreiben, Gäste auf Englisch sehen sie', async ({ page, browser }) => {
+  const id = Date.now().toString(36);
+  const german = `Training fällt aus ${id}`;
+  const english = `No practice ${id}`;
+  const dialogs: string[] = [];
+  autoAsk(page, dialogs);
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const settings = (body: unknown) =>
+    page.evaluate(async (body) => {
+      const cfg = window.KOMPANIE_CONFIG!;
+      const res = await fetch(cfg.apiBase + 'admin/settings', {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+        body: JSON.stringify(body),
+      });
+      return res.status;
+    }, body);
+  expect(await settings({ languages: 'de,en' })).toBe(200);
+  try {
+    await page.goto('/app/#/brett');
+    await page.reload();
+    const form = page.locator('.board-form');
+    await form.getByLabel('Titel', { exact: true }).fill(german);
+    await form.getByLabel('Text der Nachricht').fill('Die Halle ist gesperrt.');
+    await form.getByLabel('Sichtbar für').selectOption('public');
+    const tr = form.locator('.board-translation');
+    await tr.getByText('Auf English schreiben (freiwillig)').click();
+    await expect(tr.getByLabel('Titel auf English')).toHaveAttribute('placeholder', german);
+    await tr.getByLabel('Titel auf English').fill(english);
+    await tr.getByRole('textbox', { name: 'Text', exact: true }).fill('The hall is closed.');
+    await form.getByRole('button', { name: 'Veröffentlichen' }).click();
+    const card = page.locator('.board-card', { hasText: german });
+    await expect(card).toBeVisible();
+    await expect(card).toContainText('Die Halle ist gesperrt.');
+
+    // Beim Bearbeiten: deutsche Fassung oben, englische im Abschnitt darunter
+    const editing = page.locator(`.board-card[data-focus-id="${await card.getAttribute('data-focus-id')}"]`);
+    await editing.getByRole('button', { name: 'Bearbeiten' }).click();
+    await expect(editing.getByLabel('Titel', { exact: true })).toHaveValue(german);
+    await expect(editing.getByLabel('Titel auf English')).toHaveValue(english);
+    await editing.getByRole('button', { name: 'Abbrechen' }).click();
+
+    const visitor = await quietPage(browser);
+    await visitor.goto('/app/');
+    await visitor.evaluate(() => localStorage.setItem('kompanie-locale', 'en'));
+    await visitor.goto('/app/#/brett');
+    await visitor.reload();
+    await expect(visitor.locator('html')).toHaveAttribute('lang', 'en');
+    const own = visitor.locator('.board-card', { hasText: english });
+    await expect(own).toContainText('The hall is closed.');
+    await expect(own.locator('.untranslated-note')).toHaveCount(0);
+    await visitor.goto('/app/#/termine');
+    await expect(visitor.locator('.board-banner')).toContainText(english);
+    await visitor.close();
+  } finally {
+    const card = page.locator('.board-card', { hasText: german });
+    if ((await card.count()) > 0) {
+      await card.getByRole('button', { name: 'Löschen' }).click();
+      await expect(card).toHaveCount(0);
+    }
+    expect(await settings({ languages: 'de' })).toBe(200);
+  }
+});
+
 test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nicht', async ({ page }) => {
   // So, wie scripts/changelog.php es beim Bauen in die App gelegt hat.
   const changelog = JSON.parse(readFileSync(new URL('../src/generated/changelog.json', import.meta.url), 'utf8')) as {

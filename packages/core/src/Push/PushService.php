@@ -610,15 +610,18 @@ final class PushService
      * @param Message $message
      * @param int $ttl Sekunden bis zum Ablauf der Nachricht (höchstens MAX_TTL)
      * @param list<int>|null $only Konto-IDs (BoardService::readerIds) oder null ohne Einschränkung
+     * @param (\Closure(int): bool)|null $lang nur diese Konten (Sprache der Empfänger, PushTriggers::perLanguage; Geräte
+     *                                     ohne Konto haben die ID 0)
      */
-    public function notifyBoard(array $message, int $authorId, int $ttl, bool $public = false, ?array $only = null): int
+    public function notifyBoard(array $message, int $authorId, int $ttl, bool $public = false, ?array $only = null, ?\Closure $lang = null): int
     {
+        $lang ??= static fn (int $uid): bool => true;
         if ($only !== null) {
             $allowed = array_flip([...$only, $authorId]);
-            return $this->notifyAudience(self::TYPE_BOARD, $message, static fn (int $uid): bool => isset($allowed[$uid]), 'high', $ttl, self::MAX_TTL);
+            return $this->notifyAudience(self::TYPE_BOARD, $message, static fn (int $uid): bool => isset($allowed[$uid]) && $lang($uid), 'high', $ttl, self::MAX_TTL);
         }
         if (!$public) {
-            return $this->notifyAudience(self::TYPE_BOARD, $message, static fn (int $uid): bool => true, 'high', $ttl, self::MAX_TTL);
+            return $this->notifyAudience(self::TYPE_BOARD, $message, $lang, 'high', $ttl, self::MAX_TTL);
         }
         if (!$this->typeEnabled(self::TYPE_BOARD) || $ttl <= 0) {
             return 0;
@@ -630,6 +633,9 @@ final class PushService
         $accounts = $this->accountsOf($subs);
         foreach ($subs as $sub) {
             $uid = $sub['user_id'];
+            if (!$lang($uid)) {
+                continue;
+            }
             $members[$uid] ??= BoardService::isRecipient($accounts[$uid] ?? null);
             // Wer das Brett liest, über board; alle anderen (auch Gäste) über board_public.
             if (in_array($members[$uid] ? self::TYPE_BOARD : self::TYPE_BOARD_PUBLIC, $sub['types'], true)) {

@@ -186,8 +186,18 @@ final class ContentTranslations
      */
     public function blocksSource(string $kind, int $id): object
     {
+        return $this->blocksSourceOf($this->of($kind, $id));
+    }
+
+    /**
+     * Wie blocksSource aus schon gelesenen Fassungen (Listen).
+     *
+     * @param array<string, array<string, string>> $byLocale Sprache => Feld => Text
+     */
+    public function blocksSourceOf(array $byLocale): object
+    {
         $out = [];
-        foreach ($this->of($kind, $id) as $locale => $fields) {
+        foreach (array_intersect_key($byLocale, array_flip($this->locales())) as $locale => $fields) {
             $out[$locale] = [
                 'title' => $fields['title'] ?? '',
                 'blocks' => (object) $this->app->blocks()->renderTranslation(Blocks::decodeTranslation($fields['blocks'] ?? null)),
