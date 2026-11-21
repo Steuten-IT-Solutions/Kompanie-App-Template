@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Config;
 
+use KompanieApp\Core\I18n\I18n;
+
 /**
  * Die Kompanie-Konfiguration (kompanie.json), wie sie beim Build in das Paket
  * gelegt wird. Fehlende Angaben bekommen die Standardwerte aus dem Schema.
@@ -70,9 +72,10 @@ final class KompanieConfig
     public function roleLabel(string $level): string
     {
         $labels = $this->data['labels']['roles'] ?? [];
-        return is_array($labels) && is_string($labels[$level] ?? null) && $labels[$level] !== ''
+        $label = is_array($labels) && is_string($labels[$level] ?? null) && $labels[$level] !== ''
             ? $labels[$level]
             : (self::ROLE_LABELS[$level] ?? $level);
+        return $this->localized('roles', $level, $label);
     }
 
     public function sectionLabel(string $section, ?string $default = null): string
@@ -91,22 +94,93 @@ final class KompanieConfig
     public function configuredSectionLabel(string $section, ?string $default = null): string
     {
         if ($section === 'catalog') {
-            return $this->configuredSectionLabel('points') . 'katalog';
+            return I18n::t('{points}katalog', ['points' => $this->configuredSectionLabel('points')]);
         }
         if ($section === 'intern') {
-            return 'Intern';
+            return $this->localized('sections', 'intern', 'Intern');
         }
         $labels = $this->data['labels']['sections'] ?? [];
-        return is_array($labels) && is_string($labels[$section] ?? null) && $labels[$section] !== ''
+        $label = is_array($labels) && is_string($labels[$section] ?? null) && $labels[$section] !== ''
             ? $labels[$section]
             : (self::SECTION_LABELS[$section] ?? $default ?? $section);
+        return $this->localized('sections', $section, $label);
     }
 
     /** Ein einzelner Dienstgrad (Einzahl zum Bereich ranks), z. B. „Dienstgrad“ oder „Rang“. */
     public function rankLabel(): string
     {
         $label = $this->data['labels']['rank'] ?? null;
-        return is_string($label) && trim($label) !== '' ? $label : 'Dienstgrad';
+        return $this->localized('rank', 'rank', is_string($label) && trim($label) !== '' ? $label : 'Dienstgrad');
+    }
+
+    /**
+     * Name in der Sprache der Anfrage (Plan „Mehrsprachigkeit“): Eintrag unter translations.<sprache> in kompanie.json,
+     * sonst die übersetzte Vorgabe, wenn der Name noch die Vorgabe ist; eigene Namen ohne Eintrag bleiben, wie sie sind.
+     * Wie packages/frontend/src/brandLocale.ts.
+     *
+     * @param 'roles'|'sections'|'rank' $kind
+     */
+    public function localized(string $kind, string $key, string $label): string
+    {
+        $locale = I18n::locale();
+        if ($locale === I18n::SOURCE_LOCALE) {
+            return $label;
+        }
+        $labels = $this->data['translations'][$locale]['labels'] ?? null;
+        $own = is_array($labels) ? ($kind === 'rank' ? ($labels['rank'] ?? null) : ($labels[$kind][$key] ?? null)) : null;
+        if (is_string($own) && trim($own) !== '') {
+            return $own;
+        }
+        $preset = self::preset($kind, $key);
+        return $preset !== null && $preset[0] === $label ? $preset[1] : $label;
+    }
+
+    /**
+     * Vorgabe eines Namens: deutsch und in der Sprache der Anfrage (die Texte stehen einzeln, damit
+     * scripts/check-i18n.php sie findet).
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    private static function preset(string $kind, string $key): ?array
+    {
+        if ($kind === 'rank') {
+            return ['Dienstgrad', I18n::t('Dienstgrad')];
+        }
+        if ($kind === 'roles') {
+            return match ($key) {
+                'guest' => ['Gast', I18n::t('Gast')],
+                'candidate' => ['Anwärter', I18n::t('Anwärter')],
+                'member' => ['Mitglied', I18n::t('Mitglied')],
+                'organizer' => ['Verwalter', I18n::t('Verwalter')],
+                'manager' => ['Leitung', I18n::t('Leitung')],
+                'admin' => ['Admin', I18n::t('Admin')],
+                default => null,
+            };
+        }
+        return match ($key) {
+            'events' => ['Termine', I18n::t('Termine')],
+            'news' => ['News', I18n::t('News')],
+            'gallery' => ['Galerie', I18n::t('Galerie')],
+            'points' => ['Punkte', I18n::t('Punkte')],
+            'penalties' => ['Strafen', I18n::t('Strafen')],
+            'ranks' => ['Dienstgrade', I18n::t('Dienstgrade')],
+            'titles' => ['Titel', I18n::tc('Bereich', 'Titel')],
+            'attendance' => ['Anwesenheit', I18n::t('Anwesenheit')],
+            'documents' => ['Dokumente', I18n::t('Dokumente')],
+            'board' => ['Schwarzes Brett', I18n::t('Schwarzes Brett')],
+            'polls' => ['Umfragen', I18n::t('Umfragen')],
+            'birthdays' => ['Geburtstage', I18n::t('Geburtstage')],
+            'inventory' => ['Inventar', I18n::t('Inventar')],
+            'directory' => ['Mitglieder', I18n::t('Mitglieder')],
+            'offices' => ['Ämter', I18n::t('Ämter')],
+            'lists' => ['Listen', I18n::t('Listen')],
+            'mail' => ['E-Mails', I18n::t('E-Mails')],
+            'sponsors' => ['Sponsoren', I18n::t('Sponsoren')],
+            'companies' => ['Kompanien', I18n::t('Kompanien')],
+            'pages' => ['Seiten', I18n::t('Seiten')],
+            'intern' => ['Intern', I18n::t('Intern')],
+            default => null,
+        };
     }
 
     public function primaryColor(): string

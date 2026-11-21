@@ -49,12 +49,16 @@ const FONT_STACK = {
 };
 
 /**
- * brand.ts: die Bezeichnungen aus kompanie.json, darüber die eigenen Namen der Installation (Issue #362, /config
- * section_labels). Das geschieht hier, beim ersten Laden, damit alle Ansichten sie sehen, auch die, die einen Namen
+ * brand.ts: die Bezeichnungen aus kompanie.json in der Sprache der App (src/brandLocale.ts), darüber die eigenen Namen
+ * der Installation (Issue #362, /config section_labels). Das geschieht hier, beim ersten Laden, damit alle Ansichten sie sehen, auch die, die einen Namen
  * schon beim Laden ihrer Datei auslesen.
  */
 const BRAND_TS = `// Automatisch erzeugt aus kompanie.json – nicht von Hand ändern.
 import brand from './brand.json';
+import { localizeBrand } from '../brandLocale';
+
+// In einer weiteren Sprache: Vorgaben übersetzt, translations.<sprache> aus kompanie.json davor (Plan „Mehrsprachigkeit“)
+localizeBrand(brand);
 
 /** Namen aus kompanie.json bzw. der Standard, ohne die eigenen der Installation (Einstellungen → Navigation zeigt sie an). */
 export const defaultSections: Readonly<typeof brand.labels.sections> = { ...brand.labels.sections };
@@ -147,6 +151,8 @@ export function loadConfig(file) {
     font: data.font ?? 'System',
     colors: data.colors,
     legal: data.legal ?? {},
+    // Weitere Sprachen (Plan „Mehrsprachigkeit“): Bezeichnungen und Texte je Sprache, übernimmt brand.ts beim Laden
+    translations: data.translations ?? {},
   };
 }
 
@@ -341,6 +347,7 @@ export async function build({ config, assets, out, publicDir }) {
     themeColor: theme.light.primary,
     backgroundColor: theme.light.bg,
     legal: cfg.legal,
+    translations: cfg.translations,
   };
   writeFileSync(join(out, 'brand.json'), JSON.stringify(brand, null, 2) + '\n');
   writeFileSync(join(out, 'brand.ts'), BRAND_TS);

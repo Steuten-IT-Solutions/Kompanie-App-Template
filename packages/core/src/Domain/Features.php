@@ -282,7 +282,8 @@ final class Features
 
     public function roleLabel(string $feature): string
     {
-        return $this->app->config->sectionLabel($feature, self::DEFINITIONS[$feature]['label']) . ' verwalten';
+        // Gespeichert als Name der Rolle: auf Deutsch, auch wenn die Anfrage eine andere Sprache hat
+        return (string) I18n::in(I18n::SOURCE_LOCALE, fn (): string => $this->app->config->sectionLabel($feature, self::DEFINITIONS[$feature]['label']) . ' verwalten');
     }
 
     /**
