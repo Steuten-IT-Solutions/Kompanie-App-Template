@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\EventKindRepository;
 
 /**
@@ -63,7 +64,7 @@ final class EventKindService
     public function setOptions(mixed $in): array
     {
         if (!is_array($in)) {
-            throw ApiError::invalid('Bitte eine Liste von Terminarten schicken.');
+            throw ApiError::invalid(I18n::t('Bitte eine Liste von Terminarten schicken.'));
         }
         $out = [];
         foreach ($in as $raw) {
@@ -72,15 +73,15 @@ final class EventKindService
                 continue;
             }
             if (mb_strlen($name) > self::NAME_MAX) {
-                throw ApiError::invalid(sprintf('Eine Terminart darf höchstens %d Zeichen lang sein.', self::NAME_MAX));
+                throw ApiError::invalid(I18n::t('Eine Terminart darf höchstens {max} Zeichen lang sein.', ['max' => self::NAME_MAX]));
             }
             if (in_array(mb_strtolower($name), array_map('mb_strtolower', $out), true)) {
-                throw ApiError::invalid(sprintf('Die Terminart „%s“ steht schon in der Liste.', $name));
+                throw ApiError::invalid(I18n::t('Die Terminart „{name}“ steht schon in der Liste.', ['name' => $name]));
             }
             $out[] = $name;
         }
         if (count($out) > self::OPTIONS_MAX) {
-            throw ApiError::invalid(sprintf('Es gehen höchstens %d Terminarten.', self::OPTIONS_MAX));
+            throw ApiError::invalid(I18n::t('Es gehen höchstens {max} Terminarten.', ['max' => self::OPTIONS_MAX]));
         }
         $this->app->settings->set(self::OPTIONS_SETTING, $out);
         // Arten ohne Schild: nur die, die es noch gibt (eine entfernte und neu angelegte Art hat wieder ein Schild)
@@ -107,7 +108,7 @@ final class EventKindService
     public function setHiddenTags(mixed $in): array
     {
         if (!is_array($in)) {
-            throw ApiError::invalid('Bitte eine Liste von Terminarten ohne Schild schicken.');
+            throw ApiError::invalid(I18n::t('Bitte eine Liste von Terminarten ohne Schild schicken.'));
         }
         $names = array_map(static fn (mixed $x): string => is_string($x) ? Text::line($x, self::NAME_MAX + 1) : '', $in);
         $hidden = array_values(array_filter($this->options(), static fn (string $kind): bool => in_array($kind, $names, true)));
@@ -124,7 +125,7 @@ final class EventKindService
     public function save(mixed $kinds, mixed $hidden): array
     {
         if ($hidden !== null && !is_array($hidden)) {
-            throw ApiError::invalid('Bitte eine Liste von Terminarten ohne Schild schicken.');
+            throw ApiError::invalid(I18n::t('Bitte eine Liste von Terminarten ohne Schild schicken.'));
         }
         $list = $this->setOptions($kinds);
         return ['kinds' => $list, 'hidden' => $hidden === null ? $this->hiddenTags() : $this->setHiddenTags($hidden)];
@@ -187,8 +188,8 @@ final class EventKindService
         }
         $options = $this->options();
         throw ApiError::invalid($options === []
-            ? 'Es sind noch keine Terminarten eingerichtet (Einstellungen → Kalender).'
-            : 'Bitte eine der Terminarten wählen: ' . implode(', ', $options) . '.');
+            ? I18n::t('Es sind noch keine Terminarten eingerichtet (Einstellungen → Kalender).')
+            : I18n::t('Bitte eine der Terminarten wählen: {options}.', ['options' => implode(', ', $options)]));
     }
 
     /**
@@ -217,7 +218,7 @@ final class EventKindService
         $order = array_merge($this->options(), $current);
         $out = array_values(array_unique(array_filter($order, static fn (string $k): bool => isset($picked[$k]))));
         if (count($out) > self::OPTIONS_MAX) {
-            throw ApiError::invalid(sprintf('Ein Termin kann höchstens %d Terminarten haben.', self::OPTIONS_MAX));
+            throw ApiError::invalid(I18n::t('Ein Termin kann höchstens {max} Terminarten haben.', ['max' => self::OPTIONS_MAX]));
         }
         return $out;
     }
@@ -311,7 +312,7 @@ final class EventKindService
                 return $e;
             }
         }
-        throw ApiError::notFound('Diesen Termin gibt es im Kalender nicht (mehr).');
+        throw ApiError::notFound(I18n::t('Diesen Termin gibt es im Kalender nicht (mehr).'));
     }
 
     private function localDate(string $start): string

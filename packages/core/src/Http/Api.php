@@ -85,8 +85,8 @@ final class Api
             $pathMatched = $pathMatched || preg_match($route->regex(), $path) === 1;
         }
         return $pathMatched
-            ? Response::error(new ApiError(405, 'method_not_allowed', 'Diese Aktion gibt es hier nicht.'))
-            : Response::error(ApiError::notFound('Unbekannte Adresse.'));
+            ? Response::error(new ApiError(405, 'method_not_allowed', I18n::t('Diese Aktion gibt es hier nicht.')))
+            : Response::error(ApiError::notFound(I18n::t('Unbekannte Adresse.')));
     }
 
     /**
@@ -116,7 +116,7 @@ final class Api
                 throw Preview::readOnlyError();
             }
             if ($route->feature !== null && !$this->app->features()->enabled($route->feature)) {
-                throw new ApiError(403, 'feature_disabled', 'Dieser Bereich ist ausgeschaltet.');
+                throw new ApiError(403, 'feature_disabled', I18n::t('Dieser Bereich ist ausgeschaltet.'));
             }
             // Wartungsmodus (Issue #42): vor allen Routen; Laufzeit-Konfiguration und Anmeldung bleiben erreichbar.
             if (!in_array($route->path, self::MAINTENANCE_OPEN, true) && $this->app->maintenance()->blocks($this->app->authContext->currentUser())) {
@@ -146,7 +146,7 @@ final class Api
             $db = $e instanceof \PDOException || $e instanceof DatabaseException;
             $kind = $e instanceof \PDOException ? 'sqlstate_' . (string) ($e->errorInfo[0] ?? $e->getCode()) : ($db ? 'wpdb' : Detail::className($e));
             $this->app->telemetry()->record($db ? Code::DbError : Code::ServerError, Detail::of($kind, $route->method, $route->path), Detail::describe($e));
-            return Response::error(new ApiError(500, 'internal_error', 'Es ist ein Fehler aufgetreten. Bitte versuche es später erneut.'));
+            return Response::error(new ApiError(500, 'internal_error', I18n::t('Es ist ein Fehler aufgetreten. Bitte versuche es später erneut.')));
         }
     }
 
@@ -374,10 +374,10 @@ final class Api
     {
         $level = $level ?? Roles::MEMBER;
         if (!is_array($people) || $people === []) {
-            throw ApiError::invalid('Bitte mindestens eine Person eintragen.');
+            throw ApiError::invalid(I18n::t('Bitte mindestens eine Person eintragen.'));
         }
         if (count($people) > self::BULK_MAX) {
-            throw ApiError::invalid(sprintf('Höchstens %d Personen auf einmal.', self::BULK_MAX));
+            throw ApiError::invalid(I18n::t('Höchstens {max} Personen auf einmal.', ['max' => self::BULK_MAX]));
         }
         $taken = [];
         $plans = [];
@@ -387,15 +387,17 @@ final class Api
                 $prepared = $this->app->members()->prepare(['level' => $level, 'extra_roles' => $extraRoles] + $p, $taken, $this->user());
                 $initial = $this->app->ranks()->prepareInitial($this->user(), $p);
                 if (($initial['points'] > 0 || $initial['rank'] !== null) && $level !== Roles::MEMBER) {
-                    throw ApiError::invalid('Anfangspunkte und Dienstgrad gibt es nur für Mitglieder.');
+                    throw ApiError::invalid(I18n::t('Anfangspunkte und Dienstgrad gibt es nur für Mitglieder.'));
                 }
                 $birthday = $this->birthdayInput($p['birthday'] ?? null);
                 $photo = $this->photoInput($p['photo'] ?? null);
             } catch (ApiError $e) {
                 $label = PersonName::join(Text::line($p['first_name'] ?? '', PersonName::MAX), Text::line($p['last_name'] ?? '', PersonName::MAX));
                 $label = $label !== '' ? $label : Text::line($p['name'] ?? '', PersonName::MAX);
-                $who = $label !== '' ? ' (' . $label . ')' : '';
-                throw new ApiError($e->status, $e->errorCode, sprintf('Zeile %d%s: %s', $i + 1, $who, $e->getMessage()));
+                $message = $label !== ''
+                    ? I18n::t('Zeile {row} ({name}): {message}', ['row' => $i + 1, 'name' => $label, 'message' => $e->getMessage()])
+                    : I18n::t('Zeile {row}: {message}', ['row' => $i + 1, 'message' => $e->getMessage()]);
+                throw new ApiError($e->status, $e->errorCode, $message);
             }
             $plans[] = [$prepared, $initial, $birthday, $photo, Input::bool($p['no_access'] ?? null)];
         }
@@ -404,14 +406,14 @@ final class Api
             try {
                 $created = $this->app->members()->insert($prepared, $noAccess);
             } catch (\Throwable $e) {
-                $out[] = ['name' => $prepared['name'], 'username' => $prepared['login'], 'error' => $e instanceof ApiError ? $e->getMessage() : 'Konnte nicht angelegt werden.'];
+                $out[] = ['name' => $prepared['name'], 'username' => $prepared['login'], 'error' => $e instanceof ApiError ? $e->getMessage() : I18n::t('Konnte nicht angelegt werden.')];
                 continue;
             }
             try {
                 $this->app->ranks()->applyInitial($this->user(), (int) $created['id'], $initial);
             } catch (\Throwable $e) {
                 error_log('Kompanie-App: Anfangsstand nicht übernommen: ' . $e->getMessage());
-                $created['warning'] = trim(($created['warning'] ?? '') . ' Anfangspunkte bzw. Dienstgrad fehlen noch. Bitte in den Mitgliedsdetails nachtragen.');
+                $created['warning'] = trim(($created['warning'] ?? '') . ' ' . I18n::t('Anfangspunkte bzw. Dienstgrad fehlen noch. Bitte in den Mitgliedsdetails nachtragen.'));
             }
             $this->storeBirthday((int) $created['id'], $birthday, $created);
             $this->storePhoto((int) $created['id'], $photo, $created);
@@ -431,7 +433,7 @@ final class Api
             return null;
         }
         if (!$this->app->features()->enabled('birthdays')) {
-            throw ApiError::invalid('Der Bereich Geburtstage ist ausgeschaltet.');
+            throw ApiError::invalid(I18n::t('Der Bereich Geburtstage ist ausgeschaltet.'));
         }
         return $this->app->birthdays()->parse($value);
     }
@@ -449,7 +451,7 @@ final class Api
             $this->app->birthdays()->store($this->user(), $userId, $birthday);
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Geburtstag nicht übernommen: ' . $e->getMessage());
-            $created['warning'] = trim(($created['warning'] ?? '') . ' Der Geburtstag fehlt noch. Bitte in den Mitgliedsdetails nachtragen.');
+            $created['warning'] = trim(($created['warning'] ?? '') . ' ' . I18n::t('Der Geburtstag fehlt noch. Bitte in den Mitgliedsdetails nachtragen.'));
         }
     }
 
@@ -478,7 +480,7 @@ final class Api
             $created['photo_url'] = $this->app->memberPhotos()->url($userId);
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Foto nicht übernommen: ' . $e->getMessage());
-            $created['warning'] = trim(($created['warning'] ?? '') . ' Das Foto fehlt noch. Bitte in den Mitgliedsdetails nachtragen.');
+            $created['warning'] = trim(($created['warning'] ?? '') . ' ' . I18n::t('Das Foto fehlt noch. Bitte in den Mitgliedsdetails nachtragen.'));
         }
     }
 
@@ -669,7 +671,7 @@ final class Api
             throw ApiError::notLoggedIn();
         }
         if ($needed !== [] && !$allowed) {
-            throw ApiError::forbidden($route->denyMessage);
+            throw ApiError::forbidden($route->denyMessage());
         }
     }
 
@@ -683,7 +685,7 @@ final class Api
             return $user;
         }
         if ($require) {
-            throw ApiError::forbidden('Eine Signatur können Mitglieder und Anwärter einrichten.');
+            throw ApiError::forbidden(I18n::t('Eine Signatur können Mitglieder und Anwärter einrichten.'));
         }
         return null;
     }
@@ -862,23 +864,23 @@ final class Api
         $a = $this->app;
         $P = Route::PUBLIC;
         $L = Route::LOGIN;
-        $denyMember = 'Dieser Bereich ist nur für Mitglieder.';
-        $denyView = 'Diesen Bereich darfst du nicht sehen.';
-        $denyCalendar = 'Der interne Kalender ist nur für Mitglieder und Rollen mit dem internen Kalender (z. B. Anwärter).';
-        $denyManage = 'Dafür fehlen dir die Rechte.';
-        $denyEvents = 'Nur Administratoren dürfen öffentliche Termine pflegen.';
-        $denyUsers = 'Nur Administratoren dürfen Mitglieder anlegen.';
-        $denyFormer = 'Ehemalige verwaltet nur, wer das Recht dazu hat.';
-        $denyRoles = 'Nur Administratoren dürfen Rollen ändern.';
-        $denyRights = 'Dafür fehlen dir die Rechte.';
-        $denyPolls = 'An Umfragen darfst du nicht teilnehmen.';
-        $denyRespond = 'Bei Terminen zu- oder absagen darfst du nicht.';
-        $denyBirthdays = 'Geburtstage sind nur für Mitglieder.';
-        $denyPersonal = 'Persönliche Angaben anderer pflegt nur, wer das Recht dazu hat.';
+        $denyMember = static fn (): string => I18n::t('Dieser Bereich ist nur für Mitglieder.');
+        $denyView = static fn (): string => I18n::t('Diesen Bereich darfst du nicht sehen.');
+        $denyCalendar = static fn (): string => I18n::t('Der interne Kalender ist nur für Mitglieder und Rollen mit dem internen Kalender (z. B. Anwärter).');
+        $denyManage = static fn (): string => I18n::t('Dafür fehlen dir die Rechte.');
+        $denyEvents = static fn (): string => I18n::t('Nur Administratoren dürfen öffentliche Termine pflegen.');
+        $denyUsers = static fn (): string => I18n::t('Nur Administratoren dürfen Mitglieder anlegen.');
+        $denyFormer = static fn (): string => I18n::t('Ehemalige verwaltet nur, wer das Recht dazu hat.');
+        $denyRoles = static fn (): string => I18n::t('Nur Administratoren dürfen Rollen ändern.');
+        $denyRights = static fn (): string => I18n::t('Dafür fehlen dir die Rechte.');
+        $denyPolls = static fn (): string => I18n::t('An Umfragen darfst du nicht teilnehmen.');
+        $denyRespond = static fn (): string => I18n::t('Bei Terminen zu- oder absagen darfst du nicht.');
+        $denyBirthdays = static fn (): string => I18n::t('Geburtstage sind nur für Mitglieder.');
+        $denyPersonal = static fn (): string => I18n::t('Persönliche Angaben anderer pflegt nur, wer das Recht dazu hat.');
         // Mitgliederliste: wer Punkte oder Strafen vergibt, Dienstgrade, Titel oder die Anwesenheit pflegt, Mitglieder anlegt oder Rollen vergibt
         // (Punkte bzw. offene Beträge nur mit dem jeweiligen Recht, siehe MemberService)
         $manage = Cap::memberList();
-        $denySettings = 'Nur Administratoren dürfen Einstellungen ändern.';
+        $denySettings = static fn (): string => I18n::t('Nur Administratoren dürfen Einstellungen ändern.');
 
         return [
             // App und Anmeldung
@@ -1038,7 +1040,7 @@ final class Api
             // Öffentliche Alben mit view_gallery, interne Bilder mit view_gallery_internal (dann auch die öffentlichen Alben).
             new Route('GET', '/gallery', [Cap::ViewGallery, Cap::ViewGalleryInternal], fn () => ['years' => $a->gallery()->overview($this->can(Cap::ViewGalleryInternal))], 'gallery', $denyView),
             new Route('GET', '/gallery/{id}', [Cap::ViewGallery, Cap::ViewGalleryInternal], fn (Request $r) => $a->gallery()->album($r->id(), $this->can(Cap::ViewGalleryInternal))
-                ?? throw ApiError::notFound('Album nicht gefunden.'), 'gallery', $denyView),
+                ?? throw ApiError::notFound(I18n::t('Album nicht gefunden.')), 'gallery', $denyView),
             // Einreichungen (Issue #286): einreichen und eigene sehen mit submit_gallery, sehen mit view_submissions, prüfen mit review_gallery
             new Route('GET', '/gallery/submissions', Cap::SubmitGallery, fn () => $a->gallerySubmissions()->own($this->user()), 'gallery'),
             new Route('POST', '/gallery/submissions', Cap::SubmitGallery, fn (Request $r) => Response::created($a->gallerySubmissions()->submit($this->user(), $r->input('album_id'), $r->input('file'), $r->input('consent'))), 'gallery'),
@@ -1250,13 +1252,13 @@ final class Api
                 $push = $r->input('push') ?? true;
                 $mail = $r->input('mail') ?? $a->boardMail()->available();
                 if (!is_bool($push)) {
-                    throw ApiError::invalid('push muss true oder false sein.');
+                    throw ApiError::invalid(I18n::t('push muss true oder false sein.'));
                 }
                 if (!is_bool($mail)) {
-                    throw ApiError::invalid('mail muss true oder false sein.');
+                    throw ApiError::invalid(I18n::t('mail muss true oder false sein.'));
                 }
                 if ($mail && !$a->boardMail()->available()) {
-                    throw ApiError::invalid($a->boardMail()->info()['reason'] ?? 'Der Mailversand ist nicht eingerichtet.');
+                    throw ApiError::invalid($a->boardMail()->info()['reason'] ?? I18n::t('Der Mailversand ist nicht eingerichtet.'));
                 }
                 // Vor dem Veröffentlichen: Passt die Mail zur Höchstgröße des Mailservers?
                 $mailHtml = $mail && is_string($r->input('title')) ? $a->board()->inputMailHtml($r->body, $this->user()) : null;
@@ -1324,7 +1326,7 @@ final class Api
             new Route('GET', '/rich-images/limits', $L, fn () => $a->richImages()->limits()),
             new Route('POST', '/rich-images', $L, function (Request $r) use ($a) {
                 if (!SignatureService::allowed($this->user())) {
-                    throw ApiError::forbidden('Bilder in formatierten Texten können nur Mitglieder und Anwärter hochladen.');
+                    throw ApiError::forbidden(I18n::t('Bilder in formatierten Texten können nur Mitglieder und Anwärter hochladen.'));
                 }
                 return Response::created($a->richImages()->upload($this->user(), $r->input('file')));
             }),
@@ -1339,7 +1341,7 @@ final class Api
             new Route('GET', '/me/mail', $L, fn () => $this->mailSettings()),
             new Route('PUT', '/me/mail', $L, function (Request $r) use ($a) {
                 if (!BoardService::isRecipient($this->user())) {
-                    throw ApiError::forbidden('Mails vom Brett bekommen nur Mitglieder und Anwärter.');
+                    throw ApiError::forbidden(I18n::t('Mails vom Brett bekommen nur Mitglieder und Anwärter.'));
                 }
                 $a->boardMail()->setWants($this->user()->id, $r->input('board'));
                 return $this->mailSettings();
@@ -1371,7 +1373,7 @@ final class Api
                 if (($r->query['days'] ?? null) !== null) {
                     $days = Input::integer($r->query['days']);
                     if ($days === null || $days < 0 || $days > 366) {
-                        throw ApiError::invalid('days: Zahl der Tage von 0 bis 366.');
+                        throw ApiError::invalid(I18n::t('days: Zahl der Tage von 0 bis 366.'));
                     }
                 }
                 return $a->birthdays()->list($days);
@@ -1472,7 +1474,7 @@ final class Api
             new Route('GET', '/members/details', $manage, function (Request $r): array {
                 $ids = self::idList($r->query['ids'] ?? null);
                 if ($ids === [] || count($ids) > self::MEMBER_DETAILS_MAX) {
-                    throw ApiError::invalid('Bitte 1 bis ' . self::MEMBER_DETAILS_MAX . ' Mitglieder angeben (ids=1,2,3).');
+                    throw ApiError::invalid(I18n::t('Bitte 1 bis {max} Mitglieder angeben (ids=1,2,3).', ['max' => self::MEMBER_DETAILS_MAX]));
                 }
                 $out = [];
                 foreach ($ids as $id) {
@@ -1525,7 +1527,7 @@ final class Api
             new Route('POST', '/members/former', Cap::ManageFormer, function (Request $r) use ($a) {
                 $birthday = $this->birthdayInput($r->body['birthday'] ?? null);
                 if ($birthday !== null && !$this->can(Cap::CreateUsers) && !$this->can(Cap::ManagePersonal)) {
-                    throw ApiError::forbidden('Den Geburtstag trägt nur ein, wer persönliche Angaben pflegen darf.');
+                    throw ApiError::forbidden(I18n::t('Den Geburtstag trägt nur ein, wer persönliche Angaben pflegen darf.'));
                 }
                 $photo = $this->photoInput($r->body['photo'] ?? null);
                 $created = $a->formerMembers()->create($this->user(), $r->body);
@@ -1574,7 +1576,7 @@ final class Api
                 // Anfangspunkte und Dienstgrad: alles prüfen, bevor das Konto entsteht.
                 $initial = $a->ranks()->prepareInitial($this->user(), $r->body);
                 if (($initial['points'] > 0 || $initial['rank'] !== null) && ($r->input('level') ?? 'member') !== 'member') {
-                    throw ApiError::invalid('Anfangspunkte und Dienstgrad gibt es nur für Mitglieder.');
+                    throw ApiError::invalid(I18n::t('Anfangspunkte und Dienstgrad gibt es nur für Mitglieder.'));
                 }
                 $birthday = $this->birthdayInput($r->body['birthday'] ?? null);
                 $photo = $this->photoInput($r->body['photo'] ?? null);
@@ -1583,7 +1585,7 @@ final class Api
                     $a->ranks()->applyInitial($this->user(), (int) $created['id'], $initial);
                 } catch (\Throwable $e) {
                     error_log('Kompanie-App: Anfangsstand nicht übernommen: ' . $e->getMessage());
-                    $created['warning'] = trim(($created['warning'] ?? '') . ' Anfangspunkte bzw. Dienstgrad konnten nicht übernommen werden. Bitte in den Mitgliedsdetails nachtragen.');
+                    $created['warning'] = trim(($created['warning'] ?? '') . ' ' . I18n::t('Anfangspunkte bzw. Dienstgrad konnten nicht übernommen werden. Bitte in den Mitgliedsdetails nachtragen.'));
                 }
                 $this->storeBirthday((int) $created['id'], $birthday, $created);
                 $this->storePhoto((int) $created['id'], $photo, $created);
@@ -1725,7 +1727,7 @@ final class Api
             }, null, $denySettings),
             // Update-Paket hochladen statt herunterladen: in Stücken, dann erkennen (muss in der signierten Liste stehen) und einspielen.
             new Route('POST', '/admin/update/upload', Cap::ManageSettings, function (Request $r) use ($a) {
-                $a->updates()->configured() || throw ApiError::invalid('Diese Installation bekommt keine Updates über die App.');
+                $a->updates()->configured() || throw ApiError::invalid(I18n::t('Diese Installation bekommt keine Updates über die App.'));
                 return Response::created($a->updateUploads()->start($r->input('size')));
             }, null, $denySettings),
             new Route('POST', '/admin/update/upload/chunk', Cap::ManageSettings, fn (Request $r) => $a->updateUploads()->chunk($r->input('upload'), $r->input('offset'), $r->input('data')), null, $denySettings),
@@ -1792,28 +1794,28 @@ final class Api
                 return $a->updates()->status();
             }, null, $denySettings),
             new Route('GET', '/admin/backup', Cap::ManageSettings, function () use ($a) {
-                $backup = $a->backup ?? throw new ApiError(404, 'not_available', 'Die Datensicherung gibt es in dieser Installation nicht.');
+                $backup = $a->backup ?? throw new ApiError(404, 'not_available', I18n::t('Die Datensicherung gibt es in dieser Installation nicht.'));
                 $data = $backup->export();
                 $a->settings->set(StatusService::BACKUP_SETTING, $a->time()->timestamp());
                 $name = 'sicherung-' . $a->time()->format($a->time()->timestamp(), 'Y-m-d') . '.json';
                 return Response::attachment($data, $name);
             }, null, $denySettings),
             new Route('POST', '/admin/backup', Cap::ManageSettings, function (Request $r) use ($a) {
-                $backup = $a->backup ?? throw new ApiError(404, 'not_available', 'Die Datensicherung gibt es in dieser Installation nicht.');
+                $backup = $a->backup ?? throw new ApiError(404, 'not_available', I18n::t('Die Datensicherung gibt es in dieser Installation nicht.'));
                 if (!$backup->canImport()) {
-                    throw new ApiError(404, 'not_available', 'Eine Sicherung lässt sich hier nicht wiederherstellen.');
+                    throw new ApiError(404, 'not_available', I18n::t('Eine Sicherung lässt sich hier nicht wiederherstellen.'));
                 }
                 // Als Text (JSON wie bisher) oder als Base64 (verschlüsselte Sicherung, mit passphrase).
                 $base64 = $r->input('backup_base64');
                 $data = is_string($base64) ? $base64 : $r->input('backup');
                 if (!Input::bool($r->input('confirm')) || !is_string($data)) {
-                    throw ApiError::invalid('Bitte die Sicherung auswählen und das Ersetzen aller Daten bestätigen.');
+                    throw ApiError::invalid(I18n::t('Bitte die Sicherung auswählen und das Ersetzen aller Daten bestätigen.'));
                 }
                 if (is_string($base64)) {
                     $data = $a->backupEncryption()->readUpload($base64, $r->input('passphrase'));
                 } elseif (BackupCrypto::isEncrypted($data)) {
                     // Als Text gelesen ist eine verschlüsselte Datei nicht mehr lesbar (Zeichensatz); die App sendet sie als Base64.
-                    throw ApiError::invalid('Verschlüsselte Sicherungen bitte als Datei hochladen (backup_base64).');
+                    throw ApiError::invalid(I18n::t('Verschlüsselte Sicherungen bitte als Datei hochladen (backup_base64).'));
                 }
                 // Hintergrundaufgaben (abhängig von den wiederhergestellten Einstellungen, z. B. Mail oder Updates) plant der
                 // nächste Aufruf neu: Der Import löscht tasks_planned (App::upgrade). Nicht hier: Die Einstellungen dieser

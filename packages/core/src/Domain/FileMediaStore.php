@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Domain;
 
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\FileStorage;
 use KompanieApp\Core\Port\MediaStore;
 
@@ -26,7 +27,7 @@ final class FileMediaStore implements MediaStore
     {
         $key = $this->newKey($albumId, $source, $extension);
         if (!@copy($source, $this->files->path($key, false))) {
-            throw new \RuntimeException('Die Datei kann nicht abgelegt werden.');
+            throw new \RuntimeException(I18n::t('Die Datei kann nicht abgelegt werden.'));
         }
         return $key;
     }
@@ -39,7 +40,7 @@ final class FileMediaStore implements MediaStore
         if (!@rename($source, $target)) {
             if (!@copy($source, $target)) {
                 @unlink($target);
-                throw new \RuntimeException('Die Datei kann nicht abgelegt werden.');
+                throw new \RuntimeException(I18n::t('Die Datei kann nicht abgelegt werden.'));
             }
             @unlink($source);
         }
@@ -50,7 +51,7 @@ final class FileMediaStore implements MediaStore
     {
         $poster = self::posterKey($key) ?? throw new \InvalidArgumentException('Ungültiger Schlüssel.');
         if (!@copy($source, $this->files->path($poster, false))) {
-            throw new \RuntimeException('Das Standbild kann nicht abgelegt werden.');
+            throw new \RuntimeException(I18n::t('Das Standbild kann nicht abgelegt werden.'));
         }
     }
 
@@ -72,7 +73,7 @@ final class FileMediaStore implements MediaStore
             throw new \InvalidArgumentException('Ungültiges Album oder Dateiformat.');
         }
         if (!is_file($source)) {
-            throw new \RuntimeException('Die Datei ist nicht da.');
+            throw new \RuntimeException(I18n::t('Die Datei ist nicht da.'));
         }
         return sprintf('%s/%d-%s.%s', self::DIR, $albumId, bin2hex(random_bytes(12)), $extension);
     }
@@ -108,11 +109,11 @@ final class FileMediaStore implements MediaStore
         if ((int) $m[1] === $albumId) {
             return $key;
         }
-        $from = $this->path($key) ?? throw new \RuntimeException('Die Datei ist nicht da.');
+        $from = $this->path($key) ?? throw new \RuntimeException(I18n::t('Die Datei ist nicht da.'));
         $new = sprintf('%s/%d-%s.%s', self::DIR, $albumId, $m[2], $m[3]);
         $poster = $this->posterPath($key);
         if (!@rename($from, $this->files->path($new, false))) {
-            throw new \RuntimeException('Die Datei kann nicht verschoben werden.');
+            throw new \RuntimeException(I18n::t('Die Datei kann nicht verschoben werden.'));
         }
         if ($poster !== null) {
             @rename($poster, $this->files->path((string) self::posterKey($new), false));

@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\Settings;
 use KompanieApp\Core\Storage\PollRepository;
 
@@ -206,7 +207,7 @@ final class PollService
     {
         $poll = $this->find($id);
         if ($this->ended($poll)) {
-            throw ApiError::invalid('Die Umfrage ist beendet und lässt sich nicht mehr ändern.');
+            throw ApiError::invalid(I18n::t('Die Umfrage ist beendet und lässt sich nicht mehr ändern.'));
         }
         $locked = $this->repository()->hasVotes($id);
         $values = [];
@@ -219,7 +220,7 @@ final class PollService
         if (array_key_exists('ends_at', $in)) {
             $values['ends_at'] = $this->validEnd($in['ends_at']);
         }
-        $lockedMessage = 'Es gibt schon Antworten: Art, Antwortmöglichkeiten, Anonymität und Sichtbarkeit der Ergebnisse lassen sich nicht mehr ändern.';
+        $lockedMessage = I18n::t('Es gibt schon Antworten: Art, Antwortmöglichkeiten, Anonymität und Sichtbarkeit der Ergebnisse lassen sich nicht mehr ändern.');
         if (array_key_exists('anonymous', $in)) {
             $values['anonymous'] = self::validBool($in['anonymous'], 'anonymous') ? 1 : 0;
         }
@@ -270,7 +271,7 @@ final class PollService
     {
         $poll = $this->find($id);
         if ($this->ended($poll)) {
-            throw ApiError::invalid('Die Umfrage ist schon beendet.');
+            throw ApiError::invalid(I18n::t('Die Umfrage ist schon beendet.'));
         }
         $now = $this->app->time()->nowUtc();
         $this->repository()->update($id, ['closed_at' => $now, 'updated_at' => $now]);
@@ -302,28 +303,28 @@ final class PollService
             $text = $in['text'] ?? null;
             $text = is_string($text) ? Text::multiline($text) : '';
             if ($text === '') {
-                throw ApiError::invalid('Bitte eine Antwort eingeben.');
+                throw ApiError::invalid(I18n::t('Bitte eine Antwort eingeben.'));
             }
             if (mb_strlen($text) > self::TEXT_MAX) {
-                throw ApiError::invalid('Die Antwort ist zu lang (höchstens ' . self::TEXT_MAX . ' Zeichen).');
+                throw ApiError::invalid(I18n::t('Die Antwort ist zu lang (höchstens {max} Zeichen).', ['max' => self::TEXT_MAX]));
             }
             $answers[] = ['option_id' => 0, 'answer_text' => $text];
         } else {
             $raw = $in['option_ids'] ?? null;
             if (!is_array($raw) || $raw === []) {
-                throw ApiError::invalid($poll['type'] === 'single' ? 'Bitte eine Antwort auswählen.' : 'Bitte mindestens eine Antwort auswählen.');
+                throw ApiError::invalid($poll['type'] === 'single' ? I18n::t('Bitte eine Antwort auswählen.') : I18n::t('Bitte mindestens eine Antwort auswählen.'));
             }
             $valid = array_column($this->repository()->options([$id])[$id], 'id');
             $chosen = [];
             foreach ($raw as $value) {
                 $optionId = Input::integer($value);
                 if ($optionId === null || !in_array($optionId, $valid, true)) {
-                    throw ApiError::invalid('Diese Antwortmöglichkeit gehört nicht zu der Umfrage.');
+                    throw ApiError::invalid(I18n::t('Diese Antwortmöglichkeit gehört nicht zu der Umfrage.'));
                 }
                 $chosen[$optionId] = true;
             }
             if ($poll['type'] === 'single' && count($chosen) !== 1) {
-                throw ApiError::invalid('Bitte genau eine Antwort auswählen.');
+                throw ApiError::invalid(I18n::t('Bitte genau eine Antwort auswählen.'));
             }
             foreach (array_keys($chosen) as $optionId) {
                 $answers[] = ['option_id' => $optionId, 'answer_text' => ''];
@@ -493,7 +494,7 @@ final class PollService
     /** @return Poll */
     private function find(int $id): array
     {
-        return $this->repository()->find($id) ?? throw ApiError::notFound('Diese Umfrage gibt es nicht (mehr).');
+        return $this->repository()->find($id) ?? throw ApiError::notFound(I18n::t('Diese Umfrage gibt es nicht (mehr).'));
     }
 
     /** @return Poll */
@@ -501,7 +502,7 @@ final class PollService
     {
         $poll = $this->find($id);
         if ($this->ended($poll)) {
-            throw ApiError::invalid('Die Umfrage ist beendet. Antworten lassen sich nicht mehr abgeben, ändern oder zurückziehen.');
+            throw ApiError::invalid(I18n::t('Die Umfrage ist beendet. Antworten lassen sich nicht mehr abgeben, ändern oder zurückziehen.'));
         }
         return $poll;
     }
@@ -521,7 +522,7 @@ final class PollService
     private static function validType(mixed $type): string
     {
         if (!is_string($type) || !in_array($type, self::TYPES, true)) {
-            throw ApiError::invalid('Bitte die Art der Umfrage wählen (Einfachauswahl, Mehrfachauswahl oder Freitext).');
+            throw ApiError::invalid(I18n::t('Bitte die Art der Umfrage wählen (Einfachauswahl, Mehrfachauswahl oder Freitext).'));
         }
         return $type;
     }
@@ -529,7 +530,7 @@ final class PollService
     private static function validResults(mixed $results): string
     {
         if (!is_string($results) || !in_array($results, self::RESULTS, true)) {
-            throw ApiError::invalid('Bitte wählen, wer die Ergebnisse sieht.');
+            throw ApiError::invalid(I18n::t('Bitte wählen, wer die Ergebnisse sieht.'));
         }
         return $results;
     }
@@ -537,7 +538,7 @@ final class PollService
     private static function validBool(mixed $value, string $field): bool
     {
         if (!is_bool($value)) {
-            throw ApiError::invalid('Ungültiger Wert für ' . $field . ' (ja oder nein erwartet).');
+            throw ApiError::invalid(I18n::t('Ungültiger Wert für {field} (ja oder nein erwartet).', ['field' => $field]));
         }
         return $value;
     }
@@ -546,10 +547,10 @@ final class PollService
     {
         $t = is_string($title) ? Text::line($title) : '';
         if ($t === '') {
-            throw ApiError::invalid('Bitte eine Frage eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte eine Frage eingeben.'));
         }
         if (mb_strlen($t) > self::TITLE_MAX) {
-            throw ApiError::invalid('Die Frage ist zu lang (höchstens ' . self::TITLE_MAX . ' Zeichen).');
+            throw ApiError::invalid(I18n::t('Die Frage ist zu lang (höchstens {max} Zeichen).', ['max' => self::TITLE_MAX]));
         }
         return $t;
     }
@@ -560,11 +561,11 @@ final class PollService
             return '';
         }
         if (!is_string($description)) {
-            throw ApiError::invalid('Ungültige Beschreibung.');
+            throw ApiError::invalid(I18n::t('Ungültige Beschreibung.'));
         }
         $d = Text::multiline($description);
         if (mb_strlen($d) > self::DESCRIPTION_MAX) {
-            throw ApiError::invalid('Die Beschreibung ist zu lang (höchstens ' . self::DESCRIPTION_MAX . ' Zeichen).');
+            throw ApiError::invalid(I18n::t('Die Beschreibung ist zu lang (höchstens {max} Zeichen).', ['max' => self::DESCRIPTION_MAX]));
         }
         return $d;
     }
@@ -573,7 +574,7 @@ final class PollService
     private static function validOptions(mixed $options): array
     {
         if (!is_array($options)) {
-            throw ApiError::invalid('Bitte mindestens ' . self::OPTIONS_MIN . ' Antwortmöglichkeiten eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte mindestens {min} Antwortmöglichkeiten eingeben.', ['min' => self::OPTIONS_MIN]));
         }
         $out = [];
         $seen = [];
@@ -583,20 +584,20 @@ final class PollService
                 continue; // leere Zeilen im Formular überspringen
             }
             if (mb_strlen($t) > self::OPTION_MAX) {
-                throw ApiError::invalid('Eine Antwortmöglichkeit ist zu lang (höchstens ' . self::OPTION_MAX . ' Zeichen).');
+                throw ApiError::invalid(I18n::t('Eine Antwortmöglichkeit ist zu lang (höchstens {max} Zeichen).', ['max' => self::OPTION_MAX]));
             }
             $key = mb_strtolower($t);
             if (isset($seen[$key])) {
-                throw ApiError::invalid('Die Antwortmöglichkeit „' . $t . '“ steht doppelt da.');
+                throw ApiError::invalid(I18n::t('Die Antwortmöglichkeit „{option}“ steht doppelt da.', ['option' => $t]));
             }
             $seen[$key] = true;
             $out[] = $t;
         }
         if (count($out) < self::OPTIONS_MIN) {
-            throw ApiError::invalid('Bitte mindestens ' . self::OPTIONS_MIN . ' Antwortmöglichkeiten eingeben.');
+            throw ApiError::invalid(I18n::t('Bitte mindestens {min} Antwortmöglichkeiten eingeben.', ['min' => self::OPTIONS_MIN]));
         }
         if (count($out) > self::OPTIONS_MAX) {
-            throw ApiError::invalid('Höchstens ' . self::OPTIONS_MAX . ' Antwortmöglichkeiten.');
+            throw ApiError::invalid(I18n::t('Höchstens {max} Antwortmöglichkeiten.', ['max' => self::OPTIONS_MAX]));
         }
         return $out;
     }
@@ -611,14 +612,14 @@ final class PollService
             return null;
         }
         if (!is_string($value)) {
-            throw ApiError::invalid('Ungültiges Ende.');
+            throw ApiError::invalid(I18n::t('Ungültiges Ende.'));
         }
         $utc = $this->app->time()->parseToUtc($value);
         if ($utc === null) {
-            throw ApiError::invalid('Ungültiges Ende (Datum und Uhrzeit erwartet).');
+            throw ApiError::invalid(I18n::t('Ungültiges Ende (Datum und Uhrzeit erwartet).'));
         }
         if ($utc <= $this->app->time()->nowUtc()) {
-            throw ApiError::invalid('Das Ende muss in der Zukunft liegen.');
+            throw ApiError::invalid(I18n::t('Das Ende muss in der Zukunft liegen.'));
         }
         return $utc;
     }

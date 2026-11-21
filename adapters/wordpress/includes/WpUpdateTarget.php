@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\WordPress;
 
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\UpdateTarget;
 
 /**
@@ -53,26 +54,26 @@ final class WpUpdateTarget implements UpdateTarget
         $problems = [];
         $min = (string) ($entry['minWordPress'] ?? '');
         if ($min !== '' && version_compare((string) $wp_version, $min, '<')) {
-            $problems[] = "Die neue Version braucht WordPress $min; installiert ist $wp_version. Bitte zuerst WordPress aktualisieren.";
+            $problems[] = I18n::t('Die neue Version braucht WordPress {min}; installiert ist {version}. Bitte zuerst WordPress aktualisieren.', ['min' => $min, 'version' => (string) $wp_version]);
         } elseif (version_compare((string) $wp_version, '6.3', '<')) {
             // Erst ab 6.3 stellt der Upgrader den alten Stand wieder her, wenn etwas schiefgeht.
-            $problems[] = "Automatische Updates brauchen WordPress 6.3 oder neuer; installiert ist $wp_version. Bitte zuerst WordPress aktualisieren.";
+            $problems[] = I18n::t('Automatische Updates brauchen WordPress 6.3 oder neuer; installiert ist {version}. Bitte zuerst WordPress aktualisieren.', ['version' => (string) $wp_version]);
         }
         if (!wp_is_file_mod_allowed('kompanie_app_update')) {
-            $problems[] = 'In dieser WordPress-Installation sind Änderungen an Plugins gesperrt (DISALLOW_FILE_MODS). Bitte das Update von Hand einspielen lassen.';
+            $problems[] = I18n::t('In dieser WordPress-Installation sind Änderungen an Plugins gesperrt (DISALLOW_FILE_MODS). Bitte das Update von Hand einspielen lassen.');
         }
         // Von Hand (angemeldet): nur, wer in WordPress Plugins aktualisieren darf.
         if (is_user_logged_in() && !current_user_can('update_plugins')) {
-            $problems[] = 'Für Updates braucht das Konto in WordPress das Recht, Plugins zu aktualisieren.';
+            $problems[] = I18n::t('Für Updates braucht das Konto in WordPress das Recht, Plugins zu aktualisieren.');
         }
         if (dirname(self::plugin()) !== self::SLUG) {
-            $problems[] = 'Das Plugin liegt im Ordner „' . dirname(self::plugin()) . '“ statt „' . self::SLUG . '“. Bitte einmal von Hand aktualisieren (Plugins → Installieren → Plugin hochladen).';
+            $problems[] = I18n::t('Das Plugin liegt im Ordner „{folder}“ statt „{expected}“. Bitte einmal von Hand aktualisieren (Plugins → Installieren → Plugin hochladen).', ['folder' => dirname(self::plugin()), 'expected' => self::SLUG]);
         }
         require_once ABSPATH . 'wp-admin/includes/file.php';
         // Direkt schreiben, oder FTP mit Zugangsdaten in wp-config.php (dann fragt WordPress nicht nach).
         $ftpReady = defined('FTP_HOST') && defined('FTP_USER') && (defined('FTP_PASS') || defined('FTP_PRIKEY'));
         if (get_filesystem_method([], WP_PLUGIN_DIR) !== 'direct' && !$ftpReady) {
-            $problems[] = 'WordPress darf die Plugin-Dateien nicht selbst schreiben (es fragt nach FTP-Zugangsdaten). Bitte die Dateirechte beim Hoster prüfen oder das Update von Hand hochladen.';
+            $problems[] = I18n::t('WordPress darf die Plugin-Dateien nicht selbst schreiben (es fragt nach FTP-Zugangsdaten). Bitte die Dateirechte beim Hoster prüfen oder das Update von Hand hochladen.');
         }
         return $problems;
     }
@@ -83,7 +84,7 @@ final class WpUpdateTarget implements UpdateTarget
         require_once ABSPATH . 'wp-admin/includes/plugin.php';
         require_once ABSPATH . 'wp-admin/includes/file.php';
         if (!WP_Filesystem()) {
-            throw new \RuntimeException('WordPress darf die Plugin-Dateien nicht schreiben.');
+            throw new \RuntimeException(I18n::t('WordPress darf die Plugin-Dateien nicht schreiben.'));
         }
         $plugin = self::plugin();
         $skin = new \Automatic_Upgrader_Skin();
@@ -98,7 +99,7 @@ final class WpUpdateTarget implements UpdateTarget
             $main = trailingslashit((string) $source) . self::SLUG . '.php';
             if (basename(untrailingslashit((string) $source)) !== self::SLUG || !is_file($main)
                 || get_file_data($main, ['v' => 'Version'])['v'] !== $version) {
-                return new \WP_Error('kompanie_package', 'Das Paket ist unvollständig oder hat eine andere Version.');
+                return new \WP_Error('kompanie_package', I18n::t('Das Paket ist unvollständig oder hat eine andere Version.'));
             }
             return $source;
         };
@@ -126,7 +127,7 @@ final class WpUpdateTarget implements UpdateTarget
             if (is_wp_error($result) && is_string($result->get_error_data()) && $result->get_error_data() !== '') {
                 $detail .= ' (' . $result->get_error_data() . ')';
             }
-            throw new \RuntimeException(trim('Das Plugin ließ sich nicht aktualisieren. ' . wp_strip_all_tags($detail)));
+            throw new \RuntimeException(trim(I18n::t('Das Plugin ließ sich nicht aktualisieren.') . ' ' . wp_strip_all_tags($detail)));
         }
         self::$installed = true;
         wp_clean_plugins_cache(true);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Postanschrift eines Kontos prüfen und einheitlich schreiben. Die App prüft vorher genauso (packages/frontend/src/
@@ -28,7 +29,7 @@ final class Address
     /** Anderes Land (nicht in der Auswahl) */
     public const OTHER = '';
 
-    /** ISO-Code => Name, Muster der Postleitzahl (nach dem Vereinheitlichen), Beispiel */
+    /** ISO-Code => Name (deutsch, auch für Importe; angezeigt über countryName()), Muster der Postleitzahl (nach dem Vereinheitlichen), Beispiel */
     public const COUNTRIES = [
         'DE' => ['Deutschland', '/^(0[1-9]|[1-9]\d)\d{3}$/', '12345'],
         'AT' => ['Österreich', '/^[1-9]\d{3}$/', '1010'],
@@ -60,7 +61,7 @@ final class Address
             return null;
         }
         if (!is_array($raw)) {
-            throw ApiError::invalid('Ungültige Adresse.');
+            throw ApiError::invalid(I18n::t('Ungültige Adresse.'));
         }
         $get = static fn (string $key): string => Text::line(is_string($raw[$key] ?? null) ? $raw[$key] : '');
         $country = array_key_exists('country', $raw) ? strtoupper($get('country')) : self::DEFAULT_COUNTRY;
@@ -78,7 +79,7 @@ final class Address
             return null;
         }
         if ($country !== self::OTHER && !isset(self::COUNTRIES[$country])) {
-            throw ApiError::invalid('Unbekanntes Land in der Adresse.');
+            throw ApiError::invalid(I18n::t('Unbekanntes Land in der Adresse.'));
         }
         self::check($a);
         return $a;
@@ -87,7 +88,29 @@ final class Address
     /** Name des Landes: aus der Auswahl, sonst wie eingetragen. @param AddressData $a */
     public static function countryName(array $a): string
     {
-        return self::COUNTRIES[$a['country']][0] ?? $a['country_name'];
+        return self::countryLabel($a['country']) ?? $a['country_name'];
+    }
+
+    /** Name eines Landes der Auswahl in der Sprache der Anfrage; null, wenn es nicht in der Auswahl ist. */
+    public static function countryLabel(string $code): ?string
+    {
+        return match ($code) {
+            'DE' => I18n::t('Deutschland'),
+            'AT' => I18n::t('Österreich'),
+            'CH' => I18n::t('Schweiz'),
+            'NL' => I18n::t('Niederlande'),
+            'BE' => I18n::t('Belgien'),
+            'LU' => I18n::t('Luxemburg'),
+            'FR' => I18n::t('Frankreich'),
+            'DK' => I18n::t('Dänemark'),
+            'PL' => I18n::t('Polen'),
+            'CZ' => I18n::t('Tschechien'),
+            'IT' => I18n::t('Italien'),
+            'ES' => I18n::t('Spanien'),
+            'GB' => I18n::t('Großbritannien'),
+            'TR' => I18n::t('Türkei'),
+            default => null,
+        };
     }
 
     /** Straße mit Hausnummer, z. B. „Musterstraße 1“. @param AddressData $a */
@@ -116,36 +139,36 @@ final class Address
     {
         $text = '/^[\p{L}\p{M}0-9 .,\-\'’\/()&]+$/u';
         if ($a['street'] === '') {
-            throw ApiError::invalid('Bitte die Straße angeben.');
+            throw ApiError::invalid(I18n::t('Bitte die Straße angeben.'));
         }
         if (mb_strlen($a['street']) > self::STREET_MAX || preg_match($text, $a['street']) !== 1 || preg_match('/\p{L}/u', $a['street']) !== 1) {
-            throw ApiError::invalid('Die Straße ist ungültig. Erlaubt sind Buchstaben, Ziffern, Leerzeichen und . , - \' / ( ) &.');
+            throw ApiError::invalid(I18n::t('Die Straße ist ungültig. Erlaubt sind Buchstaben, Ziffern, Leerzeichen und . , - \' / ( ) &.'));
         }
         if ($a['house_number'] !== '' && (mb_strlen($a['house_number']) > self::HOUSE_NUMBER_MAX || preg_match('/^' . self::HOUSE_NUMBER . '$/', $a['house_number']) !== 1)) {
-            throw ApiError::invalid('Die Hausnummer ist ungültig, z. B. 12, 12a oder 12-14.');
+            throw ApiError::invalid(I18n::t('Die Hausnummer ist ungültig, z. B. 12, 12a oder 12-14.'));
         }
         if ($a['extra'] !== '' && (mb_strlen($a['extra']) > self::STREET_MAX || preg_match($text, $a['extra']) !== 1)) {
-            throw ApiError::invalid('Der Adresszusatz ist ungültig. Erlaubt sind Buchstaben, Ziffern, Leerzeichen und . , - \' / ( ) &.');
+            throw ApiError::invalid(I18n::t('Der Adresszusatz ist ungültig. Erlaubt sind Buchstaben, Ziffern, Leerzeichen und . , - \' / ( ) &.'));
         }
         if ($a['postal_code'] === '') {
-            throw ApiError::invalid('Bitte die Postleitzahl angeben.');
+            throw ApiError::invalid(I18n::t('Bitte die Postleitzahl angeben.'));
         }
         $c = self::COUNTRIES[$a['country']] ?? null;
         if ($c !== null && preg_match($c[1], $a['postal_code']) !== 1) {
-            throw ApiError::invalid("Die Postleitzahl passt nicht zu {$c[0]}, z. B. {$c[2]}.");
+            throw ApiError::invalid(I18n::t('Die Postleitzahl passt nicht zu {country}, z. B. {example}.', ['country' => (string) self::countryLabel($a['country']), 'example' => $c[2]]));
         }
         if ($c === null && preg_match('/^[A-Z0-9][A-Z0-9 -]{0,10}[A-Z0-9]$/', $a['postal_code']) !== 1) {
-            throw ApiError::invalid('Die Postleitzahl ist ungültig (2 bis 12 Zeichen aus Buchstaben, Ziffern, Leerzeichen und -).');
+            throw ApiError::invalid(I18n::t('Die Postleitzahl ist ungültig (2 bis 12 Zeichen aus Buchstaben, Ziffern, Leerzeichen und -).'));
         }
         // Ziffern im Ort sind erlaubt (z. B. „Paris Cedex 08“), aber es braucht Buchstaben.
         if ($a['city'] === '') {
-            throw ApiError::invalid('Bitte den Ort angeben.');
+            throw ApiError::invalid(I18n::t('Bitte den Ort angeben.'));
         }
         if (mb_strlen($a['city']) > self::CITY_MAX || preg_match('/^[\p{L}\p{M}0-9 .\-\'’()\/]+$/u', $a['city']) !== 1 || preg_match('/\p{L}.*\p{L}/u', $a['city']) !== 1) {
-            throw ApiError::invalid('Der Ort ist ungültig. Erlaubt sind Buchstaben, Leerzeichen und . - \' ( ) /.');
+            throw ApiError::invalid(I18n::t('Der Ort ist ungültig. Erlaubt sind Buchstaben, Leerzeichen und . - \' ( ) /.'));
         }
         if ($a['country'] === self::OTHER && (mb_strlen($a['country_name']) < 2 || mb_strlen($a['country_name']) > self::COUNTRY_NAME_MAX || preg_match('/^[\p{L}\p{M} .\-\'’()]+$/u', $a['country_name']) !== 1)) {
-            throw ApiError::invalid('Bitte das Land angeben.');
+            throw ApiError::invalid(I18n::t('Bitte das Land angeben.'));
         }
     }
 

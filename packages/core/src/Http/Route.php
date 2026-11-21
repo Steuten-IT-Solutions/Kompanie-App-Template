@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Http;
 
 use KompanieApp\Core\Auth\Capability;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Eine Route der API.
@@ -18,10 +19,13 @@ final class Route
 
     /** @var \Closure(Request): (Response|array|null) */
     public readonly \Closure $handler;
+    /** Meldung bei fehlendem Recht; erst bei der Anfrage erzeugt, damit sie in deren Sprache erscheint */
+    private readonly ?\Closure $deny;
 
     /**
      * @param string|Capability|Capability[] $access PUBLIC, LOGIN, ein nötiges Recht oder eines von mehreren
      * @param string|null $feature Bereich (Domain\Features); ist er aus, antwortet die Route mit 403 feature_disabled
+     * @param (callable(): string)|null $denyMessage Meldung bei fehlendem Recht, z. B. fn () => I18n::t('…')
      */
     public function __construct(
         public readonly string $method,
@@ -29,9 +33,16 @@ final class Route
         public readonly string|Capability|array $access,
         callable $handler,
         public readonly ?string $feature = null,
-        public readonly string $denyMessage = 'Dafür fehlt dir die Berechtigung.',
+        ?callable $denyMessage = null,
     ) {
         $this->handler = \Closure::fromCallable($handler);
+        $this->deny = $denyMessage !== null ? \Closure::fromCallable($denyMessage) : null;
+    }
+
+    /** Meldung, wenn das Recht für die Route fehlt (in der Sprache der Anfrage) */
+    public function denyMessage(): string
+    {
+        return $this->deny !== null ? (string) ($this->deny)() : I18n::t('Dafür fehlt dir die Berechtigung.');
     }
 
     /** Regulärer Ausdruck mit benannten Gruppen, z. B. #^/events/(?P<id>\d+)$# */

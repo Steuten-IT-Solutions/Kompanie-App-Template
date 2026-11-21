@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Domain;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\CandidateSinceRepository;
 use KompanieApp\Core\Storage\EventKindRepository;
 
@@ -131,14 +132,14 @@ final class AdmissionService
             };
         }
         if ($key !== null && !$this->app->roles()->exists($key)) {
-            throw ApiError::notFound('Rolle nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Rolle nicht gefunden.'));
         }
         $r = $key !== null ? $this->rule($key) : $this->rule('');
         $own = $key === null || RoleService::canBeExtra($key);
         if (array_key_exists('admission_extra', $in)) {
             $extra = Input::bool($in['admission_extra']);
             if ($extra && !$own) {
-                throw ApiError::invalid('Anwärter-Rolle kann nur eine eigene Rolle sein.');
+                throw ApiError::invalid(I18n::t('Anwärter-Rolle kann nur eine eigene Rolle sein.'));
             }
             if ($extra && !$r['extra']) {
                 // Ab jetzt zählt die Zuordnung als „Anwärter seit“ (frühere sind unbekannt und werden nachgetragen).
@@ -159,17 +160,17 @@ final class AdmissionService
             if (array_key_exists('admission_kind', $in)) {
                 $r['kind'] = $this->app->eventKinds()->valid($in['admission_kind'], $r['kind'] !== '' ? $r['kind'] : null);
             }
-            foreach (['admission_count' => ['count', self::COUNT_MAX, 'Teilnahmen'], 'admission_months' => ['months', self::MONTHS_MAX, 'Monate']] as $field => [$name, $max, $label]) {
+            foreach (['admission_count' => ['count', self::COUNT_MAX, I18n::t('Teilnahmen')], 'admission_months' => ['months', self::MONTHS_MAX, I18n::t('Monate')]] as $field => [$name, $max, $label]) {
                 if (array_key_exists($field, $in)) {
                     $n = $in[$field] === null || $in[$field] === '' ? 0 : Input::integer($in[$field]);
                     if ($n === null || $n < 0 || $n > $max) {
-                        throw ApiError::invalid(sprintf('%s: bitte eine Zahl von 0 bis %d.', $label, $max));
+                        throw ApiError::invalid(I18n::t('{label}: bitte eine Zahl von 0 bis {max}.', ['label' => $label, 'max' => $max]));
                     }
                     $r[$name] = $n;
                 }
             }
             if ($r['count'] > 0 && $r['kind'] === '') {
-                throw ApiError::invalid('Für die Teilnahmen bitte eine Terminart wählen.');
+                throw ApiError::invalid(I18n::t('Für die Teilnahmen bitte eine Terminart wählen.'));
             }
             $r['rule'] = AdmissionRule::fromLegacy($r['kind'], $r['count'], $r['months']);
         }
@@ -296,14 +297,14 @@ final class AdmissionService
      */
     public function admit(User $actor, int $id): array
     {
-        $target = $this->app->users->find($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $target = $this->app->users->find($id) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
         if ($actor->id === $id) {
-            throw ApiError::invalid('Sich selbst kann man nicht aufnehmen.');
+            throw ApiError::invalid(I18n::t('Sich selbst kann man nicht aufnehmen.'));
         }
         if ($this->app->formerMembers()->previousRole($target) !== null) {
-            throw ApiError::invalid('Diese Person ist ehemalig. Bitte zuerst wieder aufnehmen.');
+            throw ApiError::invalid(I18n::t('Diese Person ist ehemalig. Bitte zuerst wieder aufnehmen.'));
         }
-        $candidate = $this->candidateRole($target) ?? throw ApiError::invalid('Diese Person ist kein Anwärter (mehr).');
+        $candidate = $this->candidateRole($target) ?? throw ApiError::invalid(I18n::t('Diese Person ist kein Anwärter (mehr).'));
         $roles = $this->app->roles();
         if ($candidate['way'] === 'base') {
             $this->app->members()->promote($actor, $id, true);
@@ -335,11 +336,11 @@ final class AdmissionService
      */
     public function setSince(User $actor, int $id, mixed $since): array
     {
-        $target = $this->app->users->find($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
-        $candidate = $this->candidateRole($target) ?? throw ApiError::invalid('Diese Person ist kein Anwärter (mehr).');
-        $date = FormerMemberService::date($since, 'Anwärter seit', $this->app->time()->today());
+        $target = $this->app->users->find($id) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
+        $candidate = $this->candidateRole($target) ?? throw ApiError::invalid(I18n::t('Diese Person ist kein Anwärter (mehr).'));
+        $date = FormerMemberService::date($since, I18n::t('Anwärter seit'), $this->app->time()->today());
         if (strlen($date) === 4) {
-            throw ApiError::invalid('Anwärter seit: bitte das ganze Datum angeben (TT.MM.JJJJ).');
+            throw ApiError::invalid(I18n::t('Anwärter seit: bitte das ganze Datum angeben (TT.MM.JJJJ).'));
         }
         $this->repository()->save($id, $candidate['key'], $date, $actor->id, $this->app->time()->nowUtc());
         return $this->statusOf($id) ?? throw new \LogicException('Anwärter ohne Stand');

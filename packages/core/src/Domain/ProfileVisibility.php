@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Wem eine Angabe auf der Seite einer Person in der Mitgliederliste (Bereich directory) erscheint: nicht (none), nur
@@ -24,7 +25,7 @@ final class ProfileVisibility
     public static function parse(mixed $value): string
     {
         if (!is_string($value) || !in_array($value, self::ALL, true)) {
-            throw ApiError::invalid('Ungültige Auswahl für die Anzeige (none, members oder public erwartet).');
+            throw ApiError::invalid(I18n::t('Ungültige Auswahl für die Anzeige (none, members oder public erwartet).'));
         }
         return $value;
     }

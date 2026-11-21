@@ -8,6 +8,7 @@ use KompanieApp\Core\Domain\Input;
 use KompanieApp\Core\Domain\ServerLimits;
 use KompanieApp\Core\Domain\Time;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\FileStorage;
 
 /**
@@ -43,19 +44,19 @@ final class UpdateUpload
     {
         $size = Input::integer($size) ?? 0;
         if ($size < 1) {
-            throw ApiError::invalid('Die Datei ist leer.');
+            throw ApiError::invalid(I18n::t('Die Datei ist leer.'));
         }
         if ($size > self::MAX_BYTES) {
-            throw ApiError::invalid(sprintf('Die Datei ist %s groß; ein Update-Paket hat höchstens %s.', ServerLimits::format($size), ServerLimits::format(self::MAX_BYTES)));
+            throw ApiError::invalid(I18n::t('Die Datei ist {size} groß; ein Update-Paket hat höchstens {max}.', ['size' => ServerLimits::format($size), 'max' => ServerLimits::format(self::MAX_BYTES)]));
         }
         $this->prune();
         $id = bin2hex(random_bytes(16));
         $free = @disk_free_space(dirname($this->path($id, 'zip')));
         if ($free !== false && $free < 3 * $size) {
-            throw ApiError::invalid(sprintf('Auf dem Server ist nicht genug Platz für das Update (frei sind %s).', ServerLimits::format((int) $free)));
+            throw ApiError::invalid(I18n::t('Auf dem Server ist nicht genug Platz für das Update (frei sind {free}).', ['free' => ServerLimits::format((int) $free)]));
         }
         if (@file_put_contents($this->path($id, 'zip'), '') === false) {
-            throw new \RuntimeException('Das Paket lässt sich nicht zwischenspeichern.');
+            throw new \RuntimeException(I18n::t('Das Paket lässt sich nicht zwischenspeichern.'));
         }
         $this->save($id, ['size' => $size, 'received' => 0, 'last' => 0]);
         return ['id' => $id, 'chunk_size' => self::chunkSize(), 'max_bytes' => self::MAX_BYTES];
@@ -68,7 +69,7 @@ final class UpdateUpload
         $offset = Input::integer($offset);
         $bytes = is_string($data) ? base64_decode($data, true) : false;
         if ($offset === null || $bytes === false || $bytes === '') {
-            throw ApiError::invalid('Es ist kein Stück der Datei angekommen.');
+            throw ApiError::invalid(I18n::t('Es ist kein Stück der Datei angekommen.'));
         }
         $len = strlen($bytes);
         $received = $session['received'];
@@ -76,16 +77,16 @@ final class UpdateUpload
             return ['received' => $received]; // das letzte Stück noch einmal (Antwort verloren): schon da
         }
         if ($offset !== $received) {
-            throw ApiError::invalid(sprintf('Das Stück passt nicht (erwartet ab Byte %d). Bitte die Datei neu hochladen.', $received));
+            throw ApiError::invalid(I18n::t('Das Stück passt nicht (erwartet ab Byte {offset}). Bitte die Datei neu hochladen.', ['offset' => $received]));
         }
         if ($len > self::CHUNK_MAX || $received + $len > $session['size']) {
-            throw ApiError::invalid('Das Stück ist größer als angekündigt.');
+            throw ApiError::invalid(I18n::t('Das Stück ist größer als angekündigt.'));
         }
         if ($offset === 0 && strncmp($bytes, "PK\x03\x04", 4) !== 0) {
-            throw ApiError::invalid('Die Datei ist kein Update-Paket (ZIP-Datei, z. B. kompanie-app-standalone.zip).');
+            throw ApiError::invalid(I18n::t('Die Datei ist kein Update-Paket (ZIP-Datei, z. B. kompanie-app-standalone.zip).'));
         }
         if (@file_put_contents($this->path($id, 'zip'), $bytes, FILE_APPEND) !== $len) {
-            throw ApiError::invalid('Das Stück lässt sich nicht speichern (Platte voll?).');
+            throw ApiError::invalid(I18n::t('Das Stück lässt sich nicht speichern (Platte voll?).'));
         }
         $session['received'] = $received + $len;
         $session['last'] = $len;
@@ -100,7 +101,7 @@ final class UpdateUpload
         $path = $this->path($id, 'zip');
         clearstatcache(true, $path);
         if ($session['received'] !== $session['size'] || (int) @filesize($path) !== $session['size']) {
-            throw ApiError::invalid('Die Datei ist noch nicht vollständig angekommen.');
+            throw ApiError::invalid(I18n::t('Die Datei ist noch nicht vollständig angekommen.'));
         }
         return $path;
     }
@@ -145,7 +146,7 @@ final class UpdateUpload
         $raw = $id !== null ? @file_get_contents($this->path($id, 'json')) : false;
         $s = is_string($raw) ? json_decode($raw, true) : null;
         if ($id === null || !is_array($s) || !is_int($s['size'] ?? null) || !is_int($s['received'] ?? null) || !is_int($s['last'] ?? null)) {
-            throw ApiError::notFound('Die Sitzung zum Hochladen gibt es nicht (mehr). Bitte die Datei neu hochladen.');
+            throw ApiError::notFound(I18n::t('Die Sitzung zum Hochladen gibt es nicht (mehr). Bitte die Datei neu hochladen.'));
         }
         return [$id, ['size' => $s['size'], 'received' => $s['received'], 'last' => $s['last']]];
     }
@@ -154,7 +155,7 @@ final class UpdateUpload
     private function save(string $id, array $session): void
     {
         if (@file_put_contents($this->path($id, 'json'), (string) json_encode($session)) === false) {
-            throw new \RuntimeException('Die Sitzung zum Hochladen lässt sich nicht speichern.');
+            throw new \RuntimeException(I18n::t('Die Sitzung zum Hochladen lässt sich nicht speichern.'));
         }
     }
 

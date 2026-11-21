@@ -6,6 +6,7 @@ namespace KompanieApp\WordPress;
 
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\Authenticator;
 
 /**
@@ -67,7 +68,7 @@ final class WpAuthenticator implements Authenticator
      */
     public function login(string $username, string $password, bool $remember): User
     {
-        throw new ApiError(400, 'use_login_page', 'Bitte über die Anmeldeseite der Webseite anmelden.');
+        throw new ApiError(400, 'use_login_page', I18n::t('Bitte über die Anmeldeseite der Webseite anmelden.'));
     }
 
     public function logout(): void

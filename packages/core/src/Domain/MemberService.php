@@ -8,6 +8,7 @@ use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\Authenticator;
 use KompanieApp\Core\Port\Cache;
 use KompanieApp\Core\Port\UserDirectory;
@@ -85,7 +86,7 @@ final class MemberService
     private function denyFormer(User $user): void
     {
         if ($this->formerRole($user) !== null) {
-            throw ApiError::invalid('Diese Person ist ehemalig. Bitte zuerst wieder aufnehmen.');
+            throw ApiError::invalid(I18n::t('Diese Person ist ehemalig. Bitte zuerst wieder aufnehmen.'));
         }
     }
 
@@ -213,7 +214,7 @@ final class MemberService
     {
         $u = $this->users->find($id);
         if (!$u) {
-            throw ApiError::notFound('Mitglied nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
         }
         [$points, $penalties] = self::visibleParts($viewer);
         return [
@@ -263,31 +264,31 @@ final class MemberService
     public function setLevel(User $actor, int $id, mixed $level, mixed $extraRoles = null): array
     {
         if ($actor->id === $id) {
-            throw ApiError::invalid('Die eigene Rolle kann man nicht selbst ändern.');
+            throw ApiError::invalid(I18n::t('Die eigene Rolle kann man nicht selbst ändern.'));
         }
         $target = $this->users->find($id);
         if (!$target) {
-            throw ApiError::notFound('Benutzer nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Benutzer nicht gefunden.'));
         }
         $this->denyFormer($target);
         if ($level === null && $extraRoles === null) {
-            throw ApiError::invalid('Bitte eine Rolle angeben.');
+            throw ApiError::invalid(I18n::t('Bitte eine Rolle angeben.'));
         }
         $new = $level === null ? $target->role : (is_string($level) ? $level : '');
         if ($level !== null) {
             $known = $this->roles !== null ? $this->roles->exists($new) : isset(Roles::TEMPLATES[$new]);
             if (!$known) {
-                throw ApiError::invalid('Ungültige Rolle.');
+                throw ApiError::invalid(I18n::t('Ungültige Rolle.'));
             }
             if (($new === Roles::ADMIN || $target->isAdmin()) && !$this->users->canAssignAdmin()) {
-                throw ApiError::invalid('Administratoren werden im WordPress-Backend verwaltet.');
+                throw ApiError::invalid(I18n::t('Administratoren werden im WordPress-Backend verwaltet.'));
             }
             // Keine Rechte weitergeben, die man selbst nicht hat (nur Admins vergeben jede Rolle).
             if ($this->roles !== null && (!$this->roles->canHandle($actor, $new) || !$this->roles->canHandleUser($actor, $target))) {
-                throw ApiError::forbidden('Diese Rolle darfst du nicht vergeben bzw. ändern.');
+                throw ApiError::forbidden(I18n::t('Diese Rolle darfst du nicht vergeben bzw. ändern.'));
             }
             if ($target->isAdmin() && $new !== Roles::ADMIN && $this->users->countAdmins() <= 1) {
-                throw ApiError::invalid('Der letzte Admin kann nicht herabgestuft werden.');
+                throw ApiError::invalid(I18n::t('Der letzte Admin kann nicht herabgestuft werden.'));
             }
         }
         $extra = $this->roles !== null ? $this->roles->extraRolesOf($target) : [];
@@ -325,36 +326,36 @@ final class MemberService
     private function checkExtraRoles(User $actor, User $target, string $base, mixed $raw, array $current): array
     {
         if ($this->roles === null) {
-            throw ApiError::invalid('Zusatzrollen gibt es hier nicht.');
+            throw ApiError::invalid(I18n::t('Zusatzrollen gibt es hier nicht.'));
         }
         if (!is_array($raw) || !array_is_list($raw)) {
-            throw ApiError::invalid('Zusatzrollen als Liste angeben.');
+            throw ApiError::invalid(I18n::t('Zusatzrollen als Liste angeben.'));
         }
         $wanted = [];
         foreach ($raw as $key) {
             if (!is_string($key) || !$this->roles->exists($key)) {
-                throw ApiError::invalid('Ungültige Zusatzrolle.');
+                throw ApiError::invalid(I18n::t('Ungültige Zusatzrolle.'));
             }
             if (!RoleService::canBeExtra($key)) {
-                throw ApiError::invalid(sprintf('„%s“ ist nur als Grundrolle möglich, nicht als Zusatzrolle.', $this->roles->label($key)));
+                throw ApiError::invalid(I18n::t('„{role}“ ist nur als Grundrolle möglich, nicht als Zusatzrolle.', ['role' => $this->roles->label($key)]));
             }
             if ($key !== $base) {
                 $wanted[$key] = true;
             }
         }
         if ($wanted !== [] && ($target->isAdmin() || $base === Roles::ADMIN)) {
-            throw ApiError::invalid('Admins haben schon alle Rechte und bekommen keine Zusatzrollen.');
+            throw ApiError::invalid(I18n::t('Admins haben schon alle Rechte und bekommen keine Zusatzrollen.'));
         }
         if ($wanted !== [] && !$this->roles->allowsExtraRoles($base)) {
-            throw ApiError::invalid(sprintf('Zusatzrollen gibt es nur zu einer Grundrolle, die zur Kompanie gehört, nicht zu „%s“.', $this->roles->label($base)));
+            throw ApiError::invalid(I18n::t('Zusatzrollen gibt es nur zu einer Grundrolle, die zur Kompanie gehört, nicht zu „{role}“.', ['role' => $this->roles->label($base)]));
         }
         $changed = array_merge(array_diff(array_keys($wanted), $current), array_diff($current, array_keys($wanted)));
         if ($changed !== [] && !$this->roles->canHandleUser($actor, $target)) {
-            throw ApiError::forbidden('Die Rollen dieser Person darfst du nicht ändern.');
+            throw ApiError::forbidden(I18n::t('Die Rollen dieser Person darfst du nicht ändern.'));
         }
         foreach ($changed as $key) {
             if (!$this->roles->canHandle($actor, $key)) {
-                throw ApiError::forbidden(sprintf('Die Rolle „%s“ darfst du nicht vergeben bzw. entfernen.', $this->roles->label($key)));
+                throw ApiError::forbidden(I18n::t('Die Rolle „{role}“ darfst du nicht vergeben bzw. entfernen.', ['role' => $this->roles->label($key)]));
             }
         }
         return array_values(array_filter(array_keys($this->roles->all()), static fn (string $k): bool => isset($wanted[$k])));
@@ -371,15 +372,15 @@ final class MemberService
     {
         $target = $this->users->find($id);
         if (!$target) {
-            throw ApiError::notFound('Benutzer nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Benutzer nicht gefunden.'));
         }
         if ($actor->id === $id) {
-            throw ApiError::invalid('Die eigene Rolle kann man nicht selbst ändern.');
+            throw ApiError::invalid(I18n::t('Die eigene Rolle kann man nicht selbst ändern.'));
         }
         $this->denyFormer($target);
         // $candidate: Aufnahme aus einer Anwärter-Rolle (AdmissionService::admit, auch mit „Gehört zur Kompanie“)
         if (!$candidate && !($this->roles?->promotable($target->role) ?? false)) {
-            throw ApiError::invalid(sprintf('Aus der Rolle „%s“ lässt sich niemand so zum Mitglied machen.', $this->roles?->label($target->role) ?? $target->role));
+            throw ApiError::invalid(I18n::t('Aus der Rolle „{role}“ lässt sich niemand so zum Mitglied machen.', ['role' => $this->roles?->label($target->role) ?? $target->role]));
         }
         try {
             $this->users->setRole($id, Roles::MEMBER);
@@ -425,14 +426,14 @@ final class MemberService
         if ($level !== Roles::MEMBER) {
             $role = is_string($level) ? $this->roles?->find($level) : null;
             if ($role === null) {
-                throw ApiError::invalid('Diese Rolle gibt es nicht.');
+                throw ApiError::invalid(I18n::t('Diese Rolle gibt es nicht.'));
             }
             // Ohne $actor (intern) nur die Rollen für neue Konten; sonst, was $actor vergeben darf (RoleService::canCreateAs).
             if ($actor === null && !$role['new_accounts']) {
-                throw ApiError::invalid('Diese Rolle lässt sich beim Anlegen nicht wählen; andere Rollen danach vergeben.');
+                throw ApiError::invalid(I18n::t('Diese Rolle lässt sich beim Anlegen nicht wählen; andere Rollen danach vergeben.'));
             }
             if ($actor !== null && !$this->roles?->canCreateAs($actor, $level)) {
-                throw ApiError::forbidden(sprintf('Konten mit der Rolle „%s“ darfst du nicht anlegen.', $role['label']));
+                throw ApiError::forbidden(I18n::t('Konten mit der Rolle „{role}“ darfst du nicht anlegen.', ['role' => $role['label']]));
             }
         }
 
@@ -448,20 +449,20 @@ final class MemberService
             }
         } else {
             if (!Passwords::validLogin($login)) {
-                throw ApiError::invalid('Der Benutzername darf nur Buchstaben (a–z), Ziffern sowie . _ - @ enthalten.');
+                throw ApiError::invalid(I18n::t('Der Benutzername darf nur Buchstaben (a–z), Ziffern sowie . _ - @ enthalten.'));
             }
             if ($isTaken($login)) {
-                throw ApiError::invalid('Dieser Benutzername ist schon vergeben.');
+                throw ApiError::invalid(I18n::t('Dieser Benutzername ist schon vergeben.'));
             }
         }
 
         $email = trim(is_string($in['email'] ?? null) ? $in['email'] : '');
         if ($email !== '') {
             if (filter_var($email, FILTER_VALIDATE_EMAIL) === false || mb_strlen($email) > self::EMAIL_MAX) {
-                throw ApiError::invalid('Die E-Mail-Adresse ist ungültig.');
+                throw ApiError::invalid(I18n::t('Die E-Mail-Adresse ist ungültig.'));
             }
             if (isset($taken['email:' . mb_strtolower($email)]) || $this->users->emailExists($email)) {
-                throw ApiError::invalid('Diese E-Mail-Adresse wird schon verwendet.');
+                throw ApiError::invalid(I18n::t('Diese E-Mail-Adresse wird schon verwendet.'));
             }
             $taken['email:' . mb_strtolower($email)] = true;
         }
@@ -485,18 +486,18 @@ final class MemberService
             return [];
         }
         if ($this->roles === null || $actor === null) {
-            throw ApiError::invalid('Zusatzrollen lassen sich hier beim Anlegen nicht vergeben.');
+            throw ApiError::invalid(I18n::t('Zusatzrollen lassen sich hier beim Anlegen nicht vergeben.'));
         }
         if (!is_array($raw)) {
-            throw ApiError::invalid('Zusatzrollen bitte als Liste angeben.');
+            throw ApiError::invalid(I18n::t('Zusatzrollen bitte als Liste angeben.'));
         }
         $wanted = [];
         foreach ($raw as $key) {
             if (!is_string($key) || !$this->roles->exists($key)) {
-                throw ApiError::invalid('Unbekannte Zusatzrolle.');
+                throw ApiError::invalid(I18n::t('Unbekannte Zusatzrolle.'));
             }
             if (!RoleService::canBeExtra($key)) {
-                throw ApiError::invalid(sprintf('„%s“ ist nur als Grundrolle möglich, nicht als Zusatzrolle.', $this->roles->label($key)));
+                throw ApiError::invalid(I18n::t('„{role}“ ist nur als Grundrolle möglich, nicht als Zusatzrolle.', ['role' => $this->roles->label($key)]));
             }
             $wanted[$key] = true;
         }
@@ -505,11 +506,11 @@ final class MemberService
             return [];
         }
         if (!$this->roles->allowsExtraRoles($base)) {
-            throw ApiError::invalid(sprintf('Zusatzrollen gibt es nur zu einer Grundrolle, die zur Kompanie gehört, nicht zu „%s“.', $this->roles->label($base)));
+            throw ApiError::invalid(I18n::t('Zusatzrollen gibt es nur zu einer Grundrolle, die zur Kompanie gehört, nicht zu „{role}“.', ['role' => $this->roles->label($base)]));
         }
         foreach (array_keys($wanted) as $key) {
             if (!$actor->can(Capability::PromoteUsers) || !$this->roles->canHandle($actor, $key)) {
-                throw ApiError::forbidden(sprintf('Die Zusatzrolle „%s“ darfst du nicht vergeben.', $this->roles->label($key)));
+                throw ApiError::forbidden(I18n::t('Die Zusatzrolle „{role}“ darfst du nicht vergeben.', ['role' => $this->roles->label($key)]));
             }
         }
         return array_values(array_filter(array_keys($this->roles->all()), static fn (string $k): bool => isset($wanted[$k])));
@@ -538,11 +539,11 @@ final class MemberService
     private static function checkNames(string $first, string $last): string
     {
         if ($first === '') {
-            throw ApiError::invalid('Bitte einen Vornamen angeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Vornamen angeben.'));
         }
         $name = PersonName::join($first, $last);
         if (mb_strlen($name) > PersonName::MAX) {
-            throw ApiError::invalid(sprintf('Vor- und Nachname sind zusammen zu lang (höchstens %d Zeichen).', PersonName::MAX));
+            throw ApiError::invalid(I18n::t('Vor- und Nachname sind zusammen zu lang (höchstens {max} Zeichen).', ['max' => PersonName::MAX]));
         }
         return $name;
     }
@@ -576,7 +577,7 @@ final class MemberService
                 $out['extra_roles'] = $extra;
             } catch (\Throwable $e) {
                 error_log('Kompanie-App: Zusatzrollen nicht übernommen: ' . $e->getMessage());
-                $out['warning'] = 'Angelegt, aber die Zusatzrollen fehlen noch. Bitte unter „Konto und Rolle“ nachtragen.';
+                $out['warning'] = I18n::t('Angelegt, aber die Zusatzrollen fehlen noch. Bitte unter „Konto und Rolle“ nachtragen.');
             }
         }
         if ($noAccess) {
@@ -592,7 +593,7 @@ final class MemberService
                 $this->storeContacts($id, $phone !== '' ? $phone : null, $address ?? false);
             } catch (\Throwable $e) {
                 error_log('Kompanie-App: Handynummer bzw. Adresse nicht übernommen: ' . $e->getMessage());
-                $out['warning'] = trim(($out['warning'] ?? '') . ' Angelegt, aber Handynummer bzw. Adresse fehlen noch. Bitte in den Mitgliedsdetails nachtragen.');
+                $out['warning'] = trim(($out['warning'] ?? '') . ' ' . I18n::t('Angelegt, aber Handynummer bzw. Adresse fehlen noch. Bitte in den Mitgliedsdetails nachtragen.'));
             }
         }
         return $out;
@@ -625,15 +626,15 @@ final class MemberService
     public function resetPassword(User $actor, int $id): array
     {
         if ($actor->id === $id) {
-            throw ApiError::invalid('Das eigene Passwort änderst du unter Meins → Konto → Passwort ändern.');
+            throw ApiError::invalid(I18n::t('Das eigene Passwort änderst du unter Meins → Konto → Passwort ändern.'));
         }
         $target = $this->users->find($id);
         if (!$target) {
-            throw ApiError::notFound('Mitglied nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
         }
-        $this->guardAccount($actor, $target, 'Das Passwort dieser Person darfst du nicht zurücksetzen.');
+        $this->guardAccount($actor, $target, I18n::t('Das Passwort dieser Person darfst du nicht zurücksetzen.'));
         if ($this->formerRole($target) !== null) {
-            throw ApiError::invalid('Ehemalige können sich nicht anmelden. Wer wieder aufgenommen wird, bekommt hier ein neues Startpasswort.');
+            throw ApiError::invalid(I18n::t('Ehemalige können sich nicht anmelden. Wer wieder aufgenommen wird, bekommt hier ein neues Startpasswort.'));
         }
         $password = Passwords::readable(12);
         try {
@@ -654,12 +655,12 @@ final class MemberService
      */
     public function linkRegistration(User $actor, int $id, string $login, string $email, string $passwordHash): array
     {
-        $target = $this->users->find($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $target = $this->users->find($id) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
         if (!$this->hasNoAccess($id)) {
-            throw ApiError::invalid('Dieses Mitglied hat schon einen Zugang. Verbinden lässt sich nur ein Mitglied ohne Zugang.');
+            throw ApiError::invalid(I18n::t('Dieses Mitglied hat schon einen Zugang. Verbinden lässt sich nur ein Mitglied ohne Zugang.'));
         }
         $this->denyFormer($target);
-        $this->guardAccount($actor, $target, 'Dieses Mitglied darfst du nicht mit der Anfrage verbinden.');
+        $this->guardAccount($actor, $target, I18n::t('Dieses Mitglied darfst du nicht mit der Anfrage verbinden.'));
         $in = ['email' => $email] + ($this->users->canChangeLogin() ? ['username' => $login] : []);
         $profile = $this->updateProfile($actor, $id, $in);
         try {
@@ -765,15 +766,15 @@ final class MemberService
         $previous = $this->formerRole($target);
         if ($previous !== null) {
             if (!$actor->isAdmin() && ($previous === Roles::ADMIN || $this->roles === null || !$this->roles->canHandle($actor, $previous))) {
-                throw ApiError::forbidden($previous === Roles::ADMIN ? 'Konten von Admins verwalten nur Admins.' : $message);
+                throw ApiError::forbidden($previous === Roles::ADMIN ? I18n::t('Konten von Admins verwalten nur Admins.') : $message);
             }
             return;
         }
         if ($target->isAdmin() && !$actor->isAdmin()) {
-            throw ApiError::forbidden('Konten von Admins verwalten nur Admins.');
+            throw ApiError::forbidden(I18n::t('Konten von Admins verwalten nur Admins.'));
         }
         if (!$actor->isAdmin() && !$target->isMember() && !self::calendarOnly($target)) {
-            throw ApiError::forbidden('Konten von Personen, die nicht zur Kompanie gehören, verwalten nur Admins.');
+            throw ApiError::forbidden(I18n::t('Konten von Personen, die nicht zur Kompanie gehören, verwalten nur Admins.'));
         }
         if ($this->roles !== null && !$this->roles->canHandleUser($actor, $target)) {
             throw ApiError::forbidden($message);
@@ -788,11 +789,11 @@ final class MemberService
      */
     public function profile(int $id, ?User $actor = null): array
     {
-        $target = $this->users->find($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $target = $this->users->find($id) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
         if ($actor !== null && $actor->id !== $id) {
-            $this->guardAccount($actor, $target, 'Die Angaben dieser Person darfst du nicht sehen.');
+            $this->guardAccount($actor, $target, I18n::t('Die Angaben dieser Person darfst du nicht sehen.'));
         }
-        $p = $this->users->profile($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $p = $this->users->profile($id) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
         $phone = $actor === null || $actor->id === $id || $actor->can(Capability::ViewPersonal) ? ($this->contacts?->phone($id) ?? '') : '';
         // Auskunft (GET /members/{id}/data): für sich selbst immer, für andere wie PersonalDataExport prüft.
         $canExport = $actor !== null && PersonalDataExport::mayExport($actor, $id);
@@ -807,7 +808,7 @@ final class MemberService
      */
     public function personal(int $id): array
     {
-        $p = $this->users->profile($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $p = $this->users->profile($id) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
         $c = $this->contacts?->contact($id) ?? ['phone' => '', 'address' => null];
         return ['email' => $p['email'], 'phone' => $c['phone'], 'address' => $c['address']];
     }
@@ -822,15 +823,15 @@ final class MemberService
      */
     public function updatePersonal(User $actor, int $id, array $in): array
     {
-        $target = $this->users->find($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
-        $current = $this->users->profile($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $target = $this->users->find($id) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
+        $current = $this->users->profile($id) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
         $phone = array_key_exists('phone', $in) ? self::phoneInput($in['phone']) : null;
         $address = array_key_exists('address', $in) ? Address::parse($in['address']) : false;
         if (array_key_exists('email', $in)) {
             $email = trim(is_string($in['email']) ? $in['email'] : '');
             if (mb_strtolower($email) !== mb_strtolower($current['email'])) {
                 if ($actor->id !== $id) {
-                    $this->guardAccount($actor, $target, 'Die E-Mail-Adresse dieser Person darfst du nicht ändern.');
+                    $this->guardAccount($actor, $target, I18n::t('Die E-Mail-Adresse dieser Person darfst du nicht ändern.'));
                 }
                 $this->updateProfile($actor, $id, ['email' => $email, 'current_password' => $in['current_password'] ?? null]);
             }
@@ -868,11 +869,11 @@ final class MemberService
      */
     public function updateProfile(User $actor, int $id, array $in): array
     {
-        $target = $this->users->find($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $target = $this->users->find($id) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
         if ($actor->id !== $id) {
-            $this->guardAccount($actor, $target, 'Die Angaben dieser Person darfst du nicht ändern.');
+            $this->guardAccount($actor, $target, I18n::t('Die Angaben dieser Person darfst du nicht ändern.'));
         }
-        $current = $this->users->profile($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
+        $current = $this->users->profile($id) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
         [$first, $last] = self::names($in, [$current['first_name'], $current['last_name']]);
         self::checkNames($first, $last);
         $email = array_key_exists('email', $in) ? trim(is_string($in['email']) ? $in['email'] : '') : $current['email'];
@@ -884,28 +885,28 @@ final class MemberService
         // Nur Groß-/Kleinschreibung geändert: nicht gegen sich selbst als „schon verwendet“ prüfen.
         if ($emailChanged && $email !== '') {
             if (filter_var($email, FILTER_VALIDATE_EMAIL) === false || mb_strlen($email) > self::EMAIL_MAX) {
-                throw ApiError::invalid('Die E-Mail-Adresse ist ungültig.');
+                throw ApiError::invalid(I18n::t('Die E-Mail-Adresse ist ungültig.'));
             }
             if ($this->users->emailExists($email)) {
-                throw ApiError::invalid('Diese E-Mail-Adresse wird schon verwendet.');
+                throw ApiError::invalid(I18n::t('Diese E-Mail-Adresse wird schon verwendet.'));
             }
         }
         $phone = array_key_exists('phone', $in) ? self::phoneInput($in['phone']) : null;
         if ($phone !== null && $actor->id !== $id && !$actor->can(Capability::ManagePersonal)) {
-            throw ApiError::forbidden('Die Handynummer anderer ändert nur, wer persönliche Angaben pflegen darf.');
+            throw ApiError::forbidden(I18n::t('Die Handynummer anderer ändert nur, wer persönliche Angaben pflegen darf.'));
         }
         $login = null;
         if (array_key_exists('username', $in)) {
             $wanted = trim(is_string($in['username']) ? $in['username'] : '');
             if ($wanted !== $current['login']) {
                 if (!$this->users->canChangeLogin()) {
-                    throw ApiError::invalid('Benutzernamen lassen sich hier nicht ändern.');
+                    throw ApiError::invalid(I18n::t('Benutzernamen lassen sich hier nicht ändern.'));
                 }
                 if (!Passwords::validLogin($wanted)) {
-                    throw ApiError::invalid('Der Benutzername darf nur Buchstaben (a–z), Ziffern sowie . _ - @ enthalten.');
+                    throw ApiError::invalid(I18n::t('Der Benutzername darf nur Buchstaben (a–z), Ziffern sowie . _ - @ enthalten.'));
                 }
                 if (mb_strtolower($wanted) !== mb_strtolower($current['login']) && $this->users->loginExists($wanted)) {
-                    throw ApiError::invalid('Dieser Benutzername ist schon vergeben.');
+                    throw ApiError::invalid(I18n::t('Dieser Benutzername ist schon vergeben.'));
                 }
                 $login = $wanted;
             }
@@ -958,7 +959,7 @@ final class MemberService
         }
         $digits = strlen((string) preg_replace('/\D/', '', $phone));
         if (mb_strlen($phone) > self::PHONE_MAX || preg_match('#^\+?[0-9 ()/-]+$#', $phone) !== 1 || $digits < 5 || $digits > 20) {
-            throw ApiError::invalid('Die Handynummer ist ungültig. Erlaubt sind Ziffern, Leerzeichen und + ( ) / -, z. B. +49 171 1234567.');
+            throw ApiError::invalid(I18n::t('Die Handynummer ist ungültig. Erlaubt sind Ziffern, Leerzeichen und + ( ) / -, z. B. +49 171 1234567.'));
         }
         return $phone;
     }
@@ -970,12 +971,12 @@ final class MemberService
     public function removeAccount(User $actor, int $id): void
     {
         if ($actor->id === $id) {
-            throw ApiError::invalid('Das eigene Konto kannst du hier nicht löschen.');
+            throw ApiError::invalid(I18n::t('Das eigene Konto kannst du hier nicht löschen.'));
         }
-        $target = $this->users->find($id) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
-        $this->guardAccount($actor, $target, 'Dieses Konto darfst du nicht löschen.');
+        $target = $this->users->find($id) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
+        $this->guardAccount($actor, $target, I18n::t('Dieses Konto darfst du nicht löschen.'));
         if ($target->isAdmin() && $this->users->countAdmins() <= 1) {
-            throw ApiError::invalid('Der letzte Admin kann nicht gelöscht werden.');
+            throw ApiError::invalid(I18n::t('Der letzte Admin kann nicht gelöscht werden.'));
         }
         try {
             $this->users->removeAccount($id);
@@ -990,13 +991,13 @@ final class MemberService
         $new = is_string($new) ? $new : '';
         $this->checkPassword($user, $current);
         if (mb_strlen($new) < Passwords::MIN_LENGTH) {
-            throw ApiError::invalid(sprintf('Das neue Passwort muss mindestens %d Zeichen lang sein.', Passwords::MIN_LENGTH));
+            throw ApiError::invalid(I18n::t('Das neue Passwort muss mindestens {min} Zeichen lang sein.', ['min' => Passwords::MIN_LENGTH]));
         }
         if ($new !== trim($new)) {
-            throw ApiError::invalid('Das neue Passwort darf nicht mit Leerzeichen beginnen oder enden.');
+            throw ApiError::invalid(I18n::t('Das neue Passwort darf nicht mit Leerzeichen beginnen oder enden.'));
         }
         if ($new === $current) {
-            throw ApiError::invalid('Das neue Passwort muss sich vom aktuellen unterscheiden.');
+            throw ApiError::invalid(I18n::t('Das neue Passwort muss sich vom aktuellen unterscheiden.'));
         }
         try {
             $this->users->setPassword($user->id, $new);
@@ -1015,10 +1016,10 @@ final class MemberService
     {
         $current = is_string($current) ? $current : '';
         if ($this->cache !== null && $this->cache->increment('pwchange_' . $user->id, 900) > self::PASSWORD_ATTEMPTS) {
-            throw new ApiError(429, 'too_many_attempts', 'Zu viele Versuche. Bitte in 15 Minuten erneut versuchen.');
+            throw new ApiError(429, 'too_many_attempts', I18n::t('Zu viele Versuche. Bitte in 15 Minuten erneut versuchen.'));
         }
         if ($current === '' || !$this->users->verifyPassword($user->id, $current)) {
-            throw ApiError::invalid('Das aktuelle Passwort ist falsch.');
+            throw ApiError::invalid(I18n::t('Das aktuelle Passwort ist falsch.'));
         }
     }
 }

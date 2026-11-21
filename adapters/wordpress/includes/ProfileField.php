@@ -6,6 +6,7 @@ namespace KompanieApp\WordPress;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Roles;
+use KompanieApp\Core\I18n\I18n;
 
 /** „Rolle in der App“ im Benutzerprofil des WP-Admin. */
 final class ProfileField
@@ -25,12 +26,14 @@ final class ProfileField
         if (!current_user_can('promote_users') || (int) $user->ID === get_current_user_id()) {
             return;
         }
+        // Sprache der Seite: die am Konto gewählte (LanguageService), sonst Deutsch
+        I18n::setLocale($app->languages()->resolve(null, $app->authContext->currentUser()));
         $c = $app->config;
         $level = WpUsers::role($user);
-        echo '<h2>' . esc_html($c->shortName()) . ' – App</h2><table class="form-table" role="presentation"><tr>';
-        echo '<th scope="row"><label for="kompanie_app_level">Rolle in der App</label></th><td>';
+        echo '<h2>' . esc_html(I18n::t('{name} – App', ['name' => $c->shortName()])) . '</h2><table class="form-table" role="presentation"><tr>';
+        echo '<th scope="row"><label for="kompanie_app_level">' . esc_html(I18n::t('Rolle in der App')) . '</label></th><td>';
         if ($level === Roles::ADMIN) {
-            echo '<strong>' . esc_html($app->roles()->label(Roles::ADMIN)) . '</strong> – Administratoren dürfen in der App alles.';
+            echo '<strong>' . esc_html($app->roles()->label(Roles::ADMIN)) . '</strong> – ' . esc_html(I18n::t('Administratoren dürfen in der App alles.'));
         } else {
             // Rollen der App (Einstellungen → Rollen), ohne Admin: Admins werden im WP-Backend vergeben.
             $options = [];
@@ -42,7 +45,7 @@ final class ProfileField
             echo '<select name="kompanie_app_level" id="kompanie_app_level">';
             if (!isset($options[$level])) {
                 // Rolle, die es in der App nicht (mehr) gibt: nicht stillschweigend die erste Option speichern.
-                echo '<option value="" selected disabled>Unbekannte Rolle – bitte wählen</option>';
+                echo '<option value="" selected disabled>' . esc_html(I18n::t('Unbekannte Rolle – bitte wählen')) . '</option>';
             }
             foreach ($options as $value => $label) {
                 printf('<option value="%s"%s>%s</option>', esc_attr($value), selected($level, $value, false), esc_html($label));

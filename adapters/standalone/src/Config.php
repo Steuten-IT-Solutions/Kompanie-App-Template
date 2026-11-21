@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Standalone;
 
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\Sql\PdoConnection;
 
 /**
@@ -28,7 +29,7 @@ final class Config
     {
         $data = require $dataDir . '/' . self::FILE;
         if (!is_array($data)) {
-            throw new \RuntimeException('Die Datei config.php ist beschädigt.');
+            throw new \RuntimeException(I18n::t('Die Datei config.php ist beschädigt.'));
         }
         return new self($dataDir, $data);
     }
@@ -45,7 +46,7 @@ final class Config
         $tmp = $file . '.' . bin2hex(random_bytes(4)) . '.tmp';
         if (file_put_contents($tmp, $php, LOCK_EX) === false || !rename($tmp, $file)) {
             @unlink($tmp);
-            throw new \RuntimeException('config.php kann nicht geschrieben werden. Hat PHP Schreibrechte im Datenverzeichnis?');
+            throw new \RuntimeException(I18n::t('config.php kann nicht geschrieben werden. Hat PHP Schreibrechte im Datenverzeichnis?'));
         }
         @chmod($file, 0640);
         if (function_exists('opcache_invalidate')) {
@@ -76,7 +77,7 @@ final class Config
     {
         $s = (string) ($this->data['secret'] ?? '');
         if (strlen($s) < 32) {
-            throw new \RuntimeException('In config.php fehlt der geheime Schlüssel (secret).');
+            throw new \RuntimeException(I18n::t('In config.php fehlt der geheime Schlüssel (secret).'));
         }
         return $s;
     }
@@ -113,7 +114,7 @@ final class Config
         $driver = $db['driver'] ?? 'sqlite';
         if ($driver === 'mysql') {
             if (!preg_match('/^[A-Za-z0-9_]{0,32}$/', (string) ($db['prefix'] ?? 'kompanie_'))) {
-                throw new \RuntimeException('Das Tabellen-Präfix darf nur Buchstaben, Ziffern und _ enthalten.');
+                throw new \RuntimeException(I18n::t('Das Tabellen-Präfix darf nur Buchstaben, Ziffern und _ enthalten.'));
             }
             return PdoConnection::mysql(
                 (string) ($db['host'] ?? 'localhost'),

@@ -104,6 +104,15 @@ export function t(source: string, params?: Params, catalog: Catalog = CATALOGS[c
 }
 
 /**
+ * Text mit Zusammenhang, wenn derselbe deutsche Text je nach Stelle anders übersetzt wird, z. B.
+ * `tc('Spalte', 'Zusagen')` (Anzahl) neben `t('Zusagen')` (Knopf). Schlüssel im Katalog: „Spalte|Zusagen“.
+ */
+export function tc(context: string, source: string, params?: Params, catalog: Catalog = CATALOGS[current]): string {
+  const entry = catalog[`${context}|${source}`];
+  return fill(typeof entry === 'string' && entry !== '' ? entry : source, params);
+}
+
+/**
  * Text mit Anzahl: `tn('{count} Termin', '{count} Termine', n)`. Schlüssel ist die deutsche Mehrzahl; die Anzahl
  * steht als {count} bereit (im Zahlenformat der Sprache).
  */

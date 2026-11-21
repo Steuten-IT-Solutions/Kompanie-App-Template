@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Domain\AdmissionRule;
 use KompanieApp\Core\Domain\Blocks\Blocks;
 use KompanieApp\Core\Http\Request;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\EventKindRepository;
 
 /**
@@ -720,7 +721,8 @@ final class Subjects
     private function mailGroup(bool $all = false): Subject
     {
         $load = function (string $key): ?Item {
-            $g = $this->app->mailGroups()->find($key);
+            // Namen der Standardgruppen folgen der Sprache der Anfrage; das Protokoll speichert sie auf Deutsch.
+            $g = I18n::in(I18n::SOURCE_LOCALE, fn (): ?array => $this->app->mailGroups()->find($key));
             if ($g === null) {
                 return null;
             }

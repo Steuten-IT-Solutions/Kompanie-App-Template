@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
 use KompanieApp\Core\Http\FileCache;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\DocumentRepository;
 
 /**
@@ -176,7 +177,7 @@ final class DocumentService
      */
     public function update(int $id, array $in): array
     {
-        $this->repository()->find($id) ?? throw ApiError::notFound('Dokument nicht gefunden.');
+        $this->repository()->find($id) ?? throw ApiError::notFound(I18n::t('Dokument nicht gefunden.'));
         $meta = $this->validMeta($in, false);
         if ($meta !== []) {
             $this->repository()->update($id, $meta + ['updated_at' => $this->app->time()->nowUtc()]);
@@ -191,7 +192,7 @@ final class DocumentService
      */
     public function replaceFile(int $id, mixed $file, int $by): array
     {
-        $doc = $this->repository()->find($id) ?? throw ApiError::notFound('Dokument nicht gefunden.');
+        $doc = $this->repository()->find($id) ?? throw ApiError::notFound(I18n::t('Dokument nicht gefunden.'));
         $stored = $this->store($file);
         try {
             $this->repository()->update($id, $stored + ['uploaded_by' => $by, 'updated_at' => $this->app->time()->nowUtc()]);
@@ -205,7 +206,7 @@ final class DocumentService
 
     public function delete(int $id): void
     {
-        $doc = $this->repository()->find($id) ?? throw ApiError::notFound('Dokument nicht gefunden.');
+        $doc = $this->repository()->find($id) ?? throw ApiError::notFound(I18n::t('Dokument nicht gefunden.'));
         $this->repository()->delete($id);
         $this->removeFile($doc['file']);
     }
@@ -226,21 +227,21 @@ final class DocumentService
     {
         $repo = $this->repository();
         $id = $repo->insertCategory($this->validCategoryTitle($title, null), $repo->maxCategorySort() + 10);
-        return $repo->category($id) ?? throw ApiError::notFound('Kategorie nicht gefunden.');
+        return $repo->category($id) ?? throw ApiError::notFound(I18n::t('Kategorie nicht gefunden.'));
     }
 
     /** @return array{id: int, title: string, sort: int} */
     public function renameCategory(int $id, mixed $title): array
     {
         $repo = $this->repository();
-        $repo->category($id) ?? throw ApiError::notFound('Kategorie nicht gefunden.');
+        $repo->category($id) ?? throw ApiError::notFound(I18n::t('Kategorie nicht gefunden.'));
         $repo->updateCategory($id, ['title' => $this->validCategoryTitle($title, $id)]);
-        return $repo->category($id) ?? throw ApiError::notFound('Kategorie nicht gefunden.');
+        return $repo->category($id) ?? throw ApiError::notFound(I18n::t('Kategorie nicht gefunden.'));
     }
 
     public function deleteCategory(int $id): void
     {
-        $this->repository()->category($id) ?? throw ApiError::notFound('Kategorie nicht gefunden.');
+        $this->repository()->category($id) ?? throw ApiError::notFound(I18n::t('Kategorie nicht gefunden.'));
         $this->repository()->deleteCategory($id);
     }
 
@@ -262,7 +263,7 @@ final class DocumentService
         $known = array_keys($current);
         sort($known);
         if ($given !== $known) {
-            throw ApiError::invalid('Bitte die Reihenfolge aller Kategorien angeben.');
+            throw ApiError::invalid(I18n::t('Bitte die Reihenfolge aller Kategorien angeben.'));
         }
         foreach ($order as $i => $id) {
             if ($current[(int) $id]['sort'] !== ($i + 1) * 10) {
@@ -344,30 +345,30 @@ final class DocumentService
         if ($creating || array_key_exists('title', $in)) {
             $title = Text::line($in['title'] ?? '', self::TITLE_MAX + 1);
             if ($title === '') {
-                throw ApiError::invalid('Bitte einen Titel angeben.');
+                throw ApiError::invalid(I18n::t('Bitte einen Titel angeben.'));
             }
             if (mb_strlen($title) > self::TITLE_MAX) {
-                throw ApiError::invalid(sprintf('Der Titel darf höchstens %d Zeichen lang sein.', self::TITLE_MAX));
+                throw ApiError::invalid(I18n::t('Der Titel darf höchstens {max} Zeichen lang sein.', ['max' => self::TITLE_MAX]));
             }
             $out['title'] = $title;
         }
         if ($creating || array_key_exists('category_id', $in)) {
             $cat = Input::integer($in['category_id'] ?? null) ?: null;
             if ($cat !== null && $this->repository()->category($cat) === null) {
-                throw ApiError::invalid('Kategorie nicht gefunden.');
+                throw ApiError::invalid(I18n::t('Kategorie nicht gefunden.'));
             }
             $out['category_id'] = $cat;
         }
         if ($creating || array_key_exists('date', $in)) {
             if (!Input::isDate($in['date'] ?? null)) {
-                throw ApiError::invalid('Bitte einen gültigen Stand angeben.');
+                throw ApiError::invalid(I18n::t('Bitte einen gültigen Stand angeben.'));
             }
             $out['doc_date'] = (string) $in['date'];
         }
         if ($creating || array_key_exists('visibility', $in)) {
             $vis = ($in['visibility'] ?? '') === '' ? self::VISIBLE_MEMBERS : $in['visibility'];
             if (!in_array($vis, [self::VISIBLE_MEMBERS, self::VISIBLE_MANAGERS], true)) {
-                throw ApiError::invalid('Ungültige Sichtbarkeit.');
+                throw ApiError::invalid(I18n::t('Ungültige Sichtbarkeit.'));
             }
             $out['visibility'] = $vis;
         }
@@ -389,28 +390,28 @@ final class DocumentService
         }
         $bytes = $data === '' ? '' : base64_decode($data, true);
         if ($bytes === false || $bytes === '') {
-            throw ApiError::invalid(sprintf(
-                'Es ist keine Datei angekommen. Ist sie größer als das, was der Server annimmt (%s)?',
-                self::formatBytes(self::maxBytes()),
+            throw ApiError::invalid(I18n::t(
+                'Es ist keine Datei angekommen. Ist sie größer als das, was der Server annimmt ({max})?',
+                ['max' => self::formatBytes(self::maxBytes())],
             ));
         }
         // Nicht maxBytes(): Hier liegt die Anfrage schon im Speicher; was angekommen ist, ließ sich auch dekodieren.
         $max = self::requestLimit();
         if (strlen($bytes) > $max) {
-            throw ApiError::invalid(sprintf('Die Datei darf höchstens %s groß sein.', self::formatBytes($max)));
+            throw ApiError::invalid(I18n::t('Die Datei darf höchstens {max} groß sein.', ['max' => self::formatBytes($max)]));
         }
         $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
         if (!isset(self::TYPES[$ext])) {
-            throw ApiError::invalid('Erlaubt sind PDF, Word, Excel, PowerPoint, OpenDocument sowie JPG- und PNG-Bilder.');
+            throw ApiError::invalid(I18n::t('Erlaubt sind PDF, Word, Excel, PowerPoint, OpenDocument sowie JPG- und PNG-Bilder.'));
         }
         $signature = self::TYPES[$ext][1];
         if (strncmp($bytes, $signature, strlen($signature)) !== 0) {
-            throw ApiError::invalid(sprintf('Die Datei ist keine gültige .%s-Datei.', $ext));
+            throw ApiError::invalid(I18n::t('Die Datei ist keine gültige .{ext}-Datei.', ['ext' => $ext]));
         }
         $stored = 'dok-' . bin2hex(random_bytes(12)) . '.' . $ext;
         $path = $this->app->files->path(self::DIR . $stored, false);
         if (@file_put_contents($path, $bytes) === false) {
-            throw new ApiError(500, 'storage_failed', 'Die Datei konnte nicht gespeichert werden.');
+            throw new ApiError(500, 'storage_failed', I18n::t('Die Datei konnte nicht gespeichert werden.'));
         }
         return ['file' => $stored, 'ext' => $ext, 'size' => strlen($bytes), 'version' => substr(hash('sha256', $bytes), 0, 16)];
     }
@@ -419,14 +420,14 @@ final class DocumentService
     {
         $title = Text::line($raw ?? '', self::TITLE_MAX + 1);
         if ($title === '') {
-            throw ApiError::invalid('Bitte einen Namen für die Kategorie angeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Namen für die Kategorie angeben.'));
         }
         if (mb_strlen($title) > self::TITLE_MAX) {
-            throw ApiError::invalid(sprintf('Der Name darf höchstens %d Zeichen lang sein.', self::TITLE_MAX));
+            throw ApiError::invalid(I18n::t('Der Name darf höchstens {max} Zeichen lang sein.', ['max' => self::TITLE_MAX]));
         }
         foreach ($this->repository()->categories() as $c) {
             if ($c['id'] !== $id && mb_strtolower($c['title']) === mb_strtolower($title)) {
-                throw ApiError::invalid('Diese Kategorie gibt es schon.');
+                throw ApiError::invalid(I18n::t('Diese Kategorie gibt es schon.'));
             }
         }
         return $title;

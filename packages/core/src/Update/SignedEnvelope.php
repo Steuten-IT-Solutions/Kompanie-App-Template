@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Update;
 
+use KompanieApp\Core\I18n\I18n;
+
 /**
  * Signierte JSON-Dateien (release.json, updates.json):
  *
@@ -44,22 +46,22 @@ final class SignedEnvelope
         self::requireSodium();
         $env = json_decode($json, true);
         if (!is_array($env) || ($env['format'] ?? '') !== self::FORMAT || !is_string($env['payload'] ?? null) || !is_string($env['signature'] ?? null)) {
-            throw new \RuntimeException('Die Datei ist nicht signiert.');
+            throw new \RuntimeException(I18n::t('Die Datei ist nicht signiert.'));
         }
         $keyId = (string) ($env['keyId'] ?? '');
         $public = isset($trustedKeys[$keyId]) ? base64_decode($trustedKeys[$keyId], true) : false;
         if ($public === false || strlen($public) !== SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES) {
-            throw new \RuntimeException('Die Datei ist mit einem unbekannten Schlüssel signiert.');
+            throw new \RuntimeException(I18n::t('Die Datei ist mit einem unbekannten Schlüssel signiert.'));
         }
         $bytes = base64_decode($env['payload'], true);
         $sig = base64_decode($env['signature'], true);
         if ($bytes === false || $sig === false || strlen($sig) !== SODIUM_CRYPTO_SIGN_BYTES
             || !sodium_crypto_sign_verify_detached($sig, $bytes, $public)) {
-            throw new \RuntimeException('Die Signatur ist ungültig. Die Datei wurde verändert oder stammt nicht von uns.');
+            throw new \RuntimeException(I18n::t('Die Signatur ist ungültig. Die Datei wurde verändert oder stammt nicht von uns.'));
         }
         $payload = json_decode($bytes, true);
         if (!is_array($payload)) {
-            throw new \RuntimeException('Der signierte Inhalt ist kein gültiges JSON.');
+            throw new \RuntimeException(I18n::t('Der signierte Inhalt ist kein gültiges JSON.'));
         }
         return $payload;
     }
@@ -74,7 +76,7 @@ final class SignedEnvelope
         self::requireSodium();
         $secret = base64_decode(trim($secretBase64), true);
         if ($secret === false || strlen($secret) !== SODIUM_CRYPTO_SIGN_SECRETKEYBYTES) {
-            throw new \RuntimeException('Der Signaturschlüssel hat nicht das erwartete Format (Base64, 64 Byte).');
+            throw new \RuntimeException(I18n::t('Der Signaturschlüssel hat nicht das erwartete Format (Base64, 64 Byte).'));
         }
         return [$secret, sodium_crypto_sign_publickey_from_secretkey($secret)];
     }
@@ -88,7 +90,7 @@ final class SignedEnvelope
     private static function requireSodium(): void
     {
         if (!function_exists('sodium_crypto_sign_verify_detached')) {
-            throw new \RuntimeException('PHP kann keine Signaturen prüfen (Erweiterung sodium fehlt). Sie lässt sich meist im Kundenmenü des Hosters einschalten.');
+            throw new \RuntimeException(I18n::t('PHP kann keine Signaturen prüfen (Erweiterung sodium fehlt). Sie lässt sich meist im Kundenmenü des Hosters einschalten.'));
         }
     }
 }

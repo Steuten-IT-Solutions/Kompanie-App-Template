@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Domain;
 
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\UserDirectory;
 
 /**
@@ -15,10 +16,17 @@ final class UserNames
     /** @var array<int, string|null> */
     private array $cache = [];
 
+    /** Deutscher Text; angezeigt wird {@see self::deleted()} in der Sprache der Anfrage. */
     public const DELETED = 'gelöschtes Konto';
 
     public function __construct(private readonly UserDirectory $users)
     {
+    }
+
+    /** Anzeige statt des Namens, wenn das Konto gelöscht ist */
+    public static function deleted(): string
+    {
+        return I18n::t('gelöschtes Konto');
     }
 
     /** @param iterable<int|string|null> $ids Konten, deren Namen gleich gebraucht werden (Duplikate und 0 sind erlaubt) */
@@ -34,7 +42,7 @@ final class UserNames
         if ($missing !== []) {
             $found = $this->users->findMany(array_values($missing));
             foreach ($missing as $id) {
-                $this->cache[$id] = isset($found[$id]) ? $found[$id]->name : self::DELETED;
+                $this->cache[$id] = isset($found[$id]) ? $found[$id]->name : self::deleted();
             }
         }
         return $this;
@@ -47,7 +55,7 @@ final class UserNames
         }
         if (!array_key_exists($id, $this->cache)) {
             // Konto gelöscht: Der Eintrag bleibt, wer ihn angelegt hat, nicht.
-            $this->cache[$id] = $this->users->find($id)?->name ?? self::DELETED;
+            $this->cache[$id] = $this->users->find($id)?->name ?? self::deleted();
         }
         return $this->cache[$id];
     }

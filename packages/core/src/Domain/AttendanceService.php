@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\AttendanceRepository;
 
 /**
@@ -120,7 +121,7 @@ final class AttendanceService
      */
     public function detail(int $id): array
     {
-        $list = $this->repository()->find($id) ?? throw ApiError::notFound('Anwesenheitsliste nicht gefunden.');
+        $list = $this->repository()->find($id) ?? throw ApiError::notFound(I18n::t('Anwesenheitsliste nicht gefunden.'));
         $entries = $this->repository()->entries($id);
         $booked = array_flip($this->repository()->bookedUserIds($id));
         $groups = $this->groupMap();
@@ -199,7 +200,7 @@ final class AttendanceService
         $created = false;
         $id = Input::integer($in['id'] ?? null);
         if ($id !== null) {
-            $list = $repo->find($id) ?? throw ApiError::notFound('Anwesenheitsliste nicht gefunden.');
+            $list = $repo->find($id) ?? throw ApiError::notFound(I18n::t('Anwesenheitsliste nicht gefunden.'));
             $data = [];
             // Freie Listen: Titel und Datum lassen sich ändern; Kalenderlisten behalten ihre Momentaufnahme.
             if ($list['source'] === self::SOURCE_FREE) {
@@ -250,7 +251,7 @@ final class AttendanceService
                 $id = $repo->insert(self::SOURCE_FREE, bin2hex(random_bytes(8)), $title, $date, $actor->id, $now, $listKinds);
                 $created = true;
             } else {
-                throw ApiError::invalid('Bitte einen Termin aus dem Kalender wählen oder einen freien Termin anlegen.');
+                throw ApiError::invalid(I18n::t('Bitte einen Termin aus dem Kalender wählen oder einen freien Termin anlegen.'));
             }
             $data = [];
         }
@@ -279,7 +280,7 @@ final class AttendanceService
     /** Liste löschen; gebuchte Punkte bleiben (mit der ID der Liste). */
     public function delete(int $id): void
     {
-        $this->repository()->find($id) ?? throw ApiError::notFound('Anwesenheitsliste nicht gefunden.');
+        $this->repository()->find($id) ?? throw ApiError::notFound(I18n::t('Anwesenheitsliste nicht gefunden.'));
         $this->repository()->delete($id);
     }
 
@@ -342,17 +343,17 @@ final class AttendanceService
     public function forBooking(mixed $listId, mixed $userIds): array
     {
         if (!$this->app->features()->enabled('attendance')) {
-            throw new ApiError(403, 'feature_disabled', sprintf('Der Bereich %s ist ausgeschaltet.', $this->app->config->sectionLabel('attendance', 'Anwesenheit')));
+            throw new ApiError(403, 'feature_disabled', I18n::t('Der Bereich {section} ist ausgeschaltet.', ['section' => $this->app->config->sectionLabel('attendance', 'Anwesenheit')]));
         }
         $id = Input::integer($listId);
         $list = $id === null ? null : $this->repository()->find($id);
         if ($list === null) {
-            throw ApiError::invalid('Anwesenheitsliste nicht gefunden.');
+            throw ApiError::invalid(I18n::t('Anwesenheitsliste nicht gefunden.'));
         }
         $booked = $this->repository()->bookedUserIds($list['id']);
         $ids = is_array($userIds) ? array_values(array_filter(array_map(static fn (mixed $v): ?int => Input::integer($v), $userIds), static fn (?int $v): bool => $v !== null && !in_array($v, $booked, true))) : [];
         if (is_array($userIds) && $userIds !== [] && $ids === []) {
-            throw ApiError::invalid('Alle Ausgewählten haben für diese Liste schon Punkte.');
+            throw ApiError::invalid(I18n::t('Alle Ausgewählten haben für diese Liste schon Punkte.'));
         }
         return [$list['id'], $ids];
     }
@@ -386,7 +387,7 @@ final class AttendanceService
     public function setGroups(mixed $raw): array
     {
         if (!is_array($raw)) {
-            throw ApiError::invalid('Bitte die Gruppen als Zuordnung Rolle → Rolle angeben.');
+            throw ApiError::invalid(I18n::t('Bitte die Gruppen als Zuordnung Rolle → Rolle angeben.'));
         }
         $roles = $this->app->roles();
         $next = [];
@@ -396,22 +397,18 @@ final class AttendanceService
         foreach ($raw as $key => $as) {
             $key = (string) $key;
             if ($key === Roles::GUEST || !$roles->exists($key)) {
-                throw ApiError::invalid('Unbekannte Rolle: ' . $key . '.');
+                throw ApiError::invalid(I18n::t('Unbekannte Rolle: {role}.', ['role' => $key]));
             }
             if ($as !== null && $as !== '' && (!is_string($as) || $as === Roles::GUEST || !$roles->exists($as))) {
-                throw ApiError::invalid(sprintf('„%s“: unbekannte Rolle als Gruppe.', $roles->label($key)));
+                throw ApiError::invalid(I18n::t('„{role}“: unbekannte Rolle als Gruppe.', ['role' => $roles->label($key)]));
             }
             $next[$key] = $as === null || $as === $key ? '' : (string) $as;
         }
         foreach ($next as $key => $as) {
             if ($as !== '' && ($next[$as] ?? '') !== '') {
-                throw ApiError::invalid(sprintf(
-                    '„%s“ soll als „%s“ zählen, „%s“ zählt aber selbst als „%s“. Bitte direkt „%s“ wählen.',
-                    $roles->label($key),
-                    $roles->label($as),
-                    $roles->label($as),
-                    $roles->label($next[$as]),
-                    $roles->label($next[$as]),
+                throw ApiError::invalid(I18n::t(
+                    '„{role}“ soll als „{group}“ zählen, „{group}“ zählt aber selbst als „{target}“. Bitte direkt „{target}“ wählen.',
+                    ['role' => $roles->label($key), 'group' => $roles->label($as), 'target' => $roles->label($next[$as])],
                 ));
             }
         }
@@ -461,7 +458,7 @@ final class AttendanceService
             return [];
         }
         if (!is_array($raw)) {
-            throw ApiError::invalid('Bitte die Einträge als Zuordnung Person → Status angeben.');
+            throw ApiError::invalid(I18n::t('Bitte die Einträge als Zuordnung Person → Status angeben.'));
         }
         $people = [];
         foreach ($this->people() as $u) {
@@ -471,10 +468,10 @@ final class AttendanceService
         foreach ($raw as $userId => $status) {
             $id = Input::integer($userId);
             if ($id === null || !isset($people[$id])) {
-                throw ApiError::invalid('Unbekannte Person in der Liste.');
+                throw ApiError::invalid(I18n::t('Unbekannte Person in der Liste.'));
             }
             if ($status !== null && !in_array($status, self::STATUSES, true)) {
-                throw ApiError::invalid('Ungültiger Status (anwesend, entschuldigt oder fehlt).');
+                throw ApiError::invalid(I18n::t('Ungültiger Status (anwesend, entschuldigt oder fehlt).'));
             }
             $out[$id] = $status;
         }
@@ -498,7 +495,7 @@ final class AttendanceService
         }
         foreach ($statuses as $status) {
             if ($status !== null && $status !== self::EXCUSED) {
-                throw ApiError::invalid('Für einen kommenden Termin lässt sich nur „entschuldigt“ eintragen. „Anwesend“ und „fehlt“ gehen erst ab dem Tag des Termins.');
+                throw ApiError::invalid(I18n::t('Für einen kommenden Termin lässt sich nur „entschuldigt“ eintragen. „Anwesend“ und „fehlt“ gehen erst ab dem Tag des Termins.'));
             }
         }
     }
@@ -519,7 +516,7 @@ final class AttendanceService
                 }
             }
         }
-        throw ApiError::invalid('Diesen Termin gibt es im Kalender nicht (mehr).');
+        throw ApiError::invalid(I18n::t('Diesen Termin gibt es im Kalender nicht (mehr).'));
     }
 
     /** Datum des Beginns in der Zeitzone der Kompanie. */
@@ -536,10 +533,10 @@ final class AttendanceService
     {
         $title = Text::line($raw ?? '', self::TITLE_MAX + 1);
         if ($title === '') {
-            throw ApiError::invalid('Bitte einen Titel angeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Titel angeben.'));
         }
         if (mb_strlen($title) > self::TITLE_MAX) {
-            throw ApiError::invalid(sprintf('Der Titel darf höchstens %d Zeichen lang sein.', self::TITLE_MAX));
+            throw ApiError::invalid(I18n::t('Der Titel darf höchstens {max} Zeichen lang sein.', ['max' => self::TITLE_MAX]));
         }
         return $title;
     }
@@ -547,7 +544,7 @@ final class AttendanceService
     private static function validDate(mixed $raw): string
     {
         if (!Input::isDate($raw)) {
-            throw ApiError::invalid('Bitte ein gültiges Datum angeben.');
+            throw ApiError::invalid(I18n::t('Bitte ein gültiges Datum angeben.'));
         }
         return (string) $raw;
     }

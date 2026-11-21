@@ -320,7 +320,7 @@ final class Kernel
             // Nie Einzelheiten (Pfade, SQL) an Besucher; sie stehen im Fehlerprotokoll des Servers.
             error_log('Kompanie-App: ' . $e::class . ': ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
             if (!headers_sent()) {
-                $this->sendError($path, 500, 'internal_error', 'Es ist ein Fehler aufgetreten. Bitte später erneut versuchen.');
+                $this->sendError($path, 500, 'internal_error', I18n::t('Es ist ein Fehler aufgetreten. Bitte später erneut versuchen.'));
             }
         }
     }
@@ -395,14 +395,14 @@ final class Kernel
             $this->config()->secret();
         } catch (\Throwable $e) {
             error_log('Kompanie-App: config.php: ' . $e->getMessage());
-            $this->sendError($path, 503, 'config_invalid', 'Die Einrichtung ist unvollständig oder beschädigt (data/config.php). Bitte install.php erneut hochladen und „Reparieren“ wählen.');
+            $this->sendError($path, 503, 'config_invalid', I18n::t('Die Einrichtung ist unvollständig oder beschädigt (data/config.php). Bitte install.php erneut hochladen und „Reparieren“ wählen.'));
             return false;
         }
         try {
             $this->upgrade();
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Datenbank nicht erreichbar: ' . $e->getMessage());
-            $this->sendError($path, 503, 'database_unavailable', 'Die Datenbank ist gerade nicht erreichbar. Bitte später erneut versuchen.');
+            $this->sendError($path, 503, 'database_unavailable', I18n::t('Die Datenbank ist gerade nicht erreichbar. Bitte später erneut versuchen.'));
             return false;
         }
         return true;
@@ -426,7 +426,7 @@ final class Kernel
             }
             if (!in_array($this->http->method(), ['GET', 'HEAD'], true)) {
                 header('Allow: GET, HEAD');
-                $this->sendPlain(405, 'Diese Adresse lässt sich nur aufrufen.');
+                $this->sendPlain(405, I18n::t('Diese Adresse lässt sich nur aufrufen.'));
                 return;
             }
             $res = $site->renderHome();
@@ -440,7 +440,7 @@ final class Kernel
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Webseite: ' . $e::class . ': ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
             if (!headers_sent()) {
-                $this->sendPlain(500, 'Es ist ein Fehler aufgetreten. Bitte später erneut versuchen.');
+                $this->sendPlain(500, I18n::t('Es ist ein Fehler aufgetreten. Bitte später erneut versuchen.'));
             }
             return;
         }
@@ -499,7 +499,7 @@ final class Kernel
             if ($raw !== '') {
                 $body = json_decode($raw, true);
                 if (!is_array($body)) {
-                    throw ApiError::invalid('Die Anfrage enthält kein gültiges JSON.');
+                    throw ApiError::invalid(I18n::t('Die Anfrage enthält kein gültiges JSON.'));
                 }
             }
             if ($path === '/config') {
@@ -555,7 +555,7 @@ final class Kernel
     {
         $file = is_file($this->root . '/sw.js') ? $this->root . '/sw.js' : $this->appDir() . '/sw.js';
         if (!is_file($file)) {
-            $this->sendPlain(404, 'Nicht gefunden.');
+            $this->sendPlain(404, I18n::t('Nicht gefunden.'));
             return;
         }
         header('Content-Type: application/javascript; charset=utf-8');
@@ -788,7 +788,7 @@ final class Kernel
         $key = ($header ?: $this->http->header('X-Kompanie-Cron-Key')) ?: (is_string($_GET['key'] ?? null) ? $_GET['key'] : '');
         header('Cache-Control: no-store');
         if (!hash_equals($this->cronKey(), $key)) {
-            $this->sendPlain(403, 'Falscher Schlüssel.');
+            $this->sendPlain(403, I18n::t('Falscher Schlüssel.'));
             return;
         }
         ignore_user_abort(true);
@@ -821,7 +821,7 @@ final class Kernel
         }
         $file = $this->appDir() . '/index.html';
         if (!is_readable($file)) {
-            $this->sendPlain(500, 'Die App wurde noch nicht gebaut (app/index.html fehlt).');
+            $this->sendPlain(500, I18n::t('Die App wurde noch nicht gebaut (app/index.html fehlt).'));
             return;
         }
         $app = $this->app();
@@ -853,7 +853,7 @@ final class Kernel
 
     private function sendNotInstalled(string $path): void
     {
-        $msg = 'Die Kompanie-App ist hier noch nicht eingerichtet. Bitte install.php hochladen und im Browser öffnen.';
+        $msg = I18n::t('Die Kompanie-App ist hier noch nicht eingerichtet. Bitte install.php hochladen und im Browser öffnen.');
         if (str_starts_with($path, '/api/')) {
             http_response_code(503);
             header('Content-Type: application/json; charset=utf-8');

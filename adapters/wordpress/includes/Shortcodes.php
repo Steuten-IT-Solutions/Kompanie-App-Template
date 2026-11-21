@@ -7,6 +7,7 @@ namespace KompanieApp\WordPress;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Domain\MemberPhotoService;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Shortcodes für die Webseite, in den Farben der Kompanie.
@@ -121,7 +122,7 @@ final class Shortcodes
 document.addEventListener("click",function(e){var a=e.target.closest("[data-ka-lightbox]");if(!a)return;e.preventDefault();
 var g=a.getAttribute("data-ka-lightbox"),links=[].slice.call(document.querySelectorAll("[data-ka-lightbox]")).filter(function(l){return l.getAttribute("data-ka-lightbox")===g}),i=links.indexOf(a);
 var box=document.createElement("div");box.className="ka-lb";box.setAttribute("role","dialog");box.setAttribute("aria-modal","true");
-box.innerHTML="<img alt=\"\"><video controls playsinline preload=\"metadata\" hidden></video><p class=\"ka-lb-fehler\" hidden>Dieses Video kann dein Browser nicht abspielen.</p><button class=\"ka-lb-close\" aria-label=\"Schließen\">✕</button><button class=\"ka-lb-prev\" aria-label=\"Vorheriges Bild\">‹</button><button class=\"ka-lb-next\" aria-label=\"Nächstes Bild\">›</button><div class=\"ka-lb-count\"></div>";
+box.innerHTML="<img alt=\"\"><video controls playsinline preload=\"metadata\" hidden></video><p class=\"ka-lb-fehler\" hidden>' . esc_html(I18n::t('Dieses Video kann dein Browser nicht abspielen.')) . '</p><button class=\"ka-lb-close\" aria-label=\"' . esc_attr(I18n::t('Schließen')) . '\">✕</button><button class=\"ka-lb-prev\" aria-label=\"' . esc_attr(I18n::t('Vorheriges Bild')) . '\">‹</button><button class=\"ka-lb-next\" aria-label=\"' . esc_attr(I18n::t('Nächstes Bild')) . '\">›</button><div class=\"ka-lb-count\"></div>";
 var img=box.querySelector("img"),vid=box.querySelector("video"),err=box.querySelector(".ka-lb-fehler"),cnt=box.querySelector(".ka-lb-count");
 vid.onerror=function(){if(vid.getAttribute("src")){vid.hidden=true;err.hidden=false;}};
 img.onload=img.onerror=function(){box.classList.remove("ka-lb-laedt");};
@@ -151,7 +152,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         $events = $app->events()->upcoming($limit);
         $html = self::styles($app);
         if ($events === []) {
-            return $html . '<p class="ka">Derzeit sind keine Termine eingetragen.</p>';
+            return $html . '<p class="ka">' . esc_html(I18n::t('Derzeit sind keine Termine eingetragen.')) . '</p>';
         }
         $tz = wp_timezone();
         $html .= '<ol class="ka ka-termine">';
@@ -171,7 +172,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
             $html .= '<div class="ka-text"><h4 class="ka-titel">' . $title . '</h4>';
             $html .= '<div class="ka-wann">' . esc_html(self::when($ev)) . '</div>';
             if ($ev['location'] !== '') {
-                $html .= '<div class="ka-ort">Ort: ' . esc_html($ev['location']) . '</div>';
+                $html .= '<div class="ka-ort">' . esc_html(I18n::t('Ort: {place}', ['place' => $ev['location']])) . '</div>';
             }
             if ($ev['description'] !== '') {
                 $html .= '<p class="ka-beschreibung">' . nl2br(esc_html($ev['description'])) . '</p>';
@@ -196,7 +197,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
             return '';
         }
         if (!$app->can(Capability::Calendar)) {
-            return is_user_logged_in() ? '' : self::styles($app) . '<p class="ka">Die internen Termine siehst du, wenn du angemeldet bist.</p>';
+            return is_user_logged_in() ? '' : self::styles($app) . '<p class="ka">' . esc_html(I18n::t('Die internen Termine siehst du, wenn du angemeldet bist.')) . '</p>';
         }
         // 0: alle kommenden Termine (der Kalender reicht etwa ein Jahr voraus).
         $limit = max(0, (int) ($atts['anzahl'] ?? 20));
@@ -204,7 +205,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         try {
             $events = $app->calendar()->upcoming();
         } catch (\KompanieApp\Core\Http\ApiError $e) {
-            return $html . '<p class="ka">Der Kalender ist gerade nicht erreichbar.</p>';
+            return $html . '<p class="ka">' . esc_html(I18n::t('Der Kalender ist gerade nicht erreichbar.')) . '</p>';
         }
         $tz = wp_timezone();
         $today = (new \DateTimeImmutable('today', $tz))->getTimestamp();
@@ -213,7 +214,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
             $events = array_slice($events, 0, $limit);
         }
         if ($events === []) {
-            return $html . '<p class="ka">Derzeit sind keine Termine eingetragen.</p>';
+            return $html . '<p class="ka">' . esc_html(I18n::t('Derzeit sind keine Termine eingetragen.')) . '</p>';
         }
         $html .= '<ol class="ka ka-termine">';
         foreach ($events as $ev) {
@@ -234,7 +235,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
             $html .= '<div class="ka-wann">' . esc_html(self::calendarWhen($ev)) . '</div>';
             $location = (string) ($ev['location'] ?? '');
             if ($location !== '') {
-                $html .= '<div class="ka-ort">Ort: ' . esc_html($location) . '</div>';
+                $html .= '<div class="ka-ort">' . esc_html(I18n::t('Ort: {place}', ['place' => $location])) . '</div>';
             }
             // Beschreibungen aus Google Kalender können HTML enthalten: als Text zeigen.
             $description = trim(wp_strip_all_tags(str_ireplace(['<br>', '<br/>', '<br />'], "\n", (string) ($ev['description'] ?? ''))));
@@ -282,12 +283,13 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
             $sameMonth = wp_date('Y-m', $start) === wp_date('Y-m', $end);
             return ($sameMonth ? wp_date('j.', $start) : wp_date('j. F', $start)) . '–' . wp_date('j. F Y', $end);
         }
+        $time = static fn (string $t): string => I18n::t('{time} Uhr', ['time' => $t]);
         if ($end <= $start) {
-            return $day($start) . ' · ' . wp_date('H:i', $start) . ' Uhr';
+            return $day($start) . ' · ' . $time(wp_date('H:i', $start));
         }
         return $sameDay
-            ? $day($start) . ' · ' . wp_date('H:i', $start) . '–' . wp_date('H:i', $end) . ' Uhr'
-            : $day($start) . ', ' . wp_date('H:i', $start) . ' Uhr – ' . $day($end) . ', ' . wp_date('H:i', $end) . ' Uhr';
+            ? $day($start) . ' · ' . $time(wp_date('H:i', $start) . '–' . wp_date('H:i', $end))
+            : $day($start) . ', ' . $time(wp_date('H:i', $start)) . ' – ' . $day($end) . ', ' . $time(wp_date('H:i', $end));
     }
 
     /** „Sa., 27. Juni 2027 · 19:00–23:00 Uhr“ bzw. „25.–28. Juni 2027“. */
@@ -303,7 +305,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
             $text = ($same ? wp_date('j.', $start) : wp_date('j. F', $start)) . '–' . wp_date('j. F Y', $end);
         }
         if ($ev['start_time']) {
-            $text .= ' · ' . $ev['start_time'] . ($ev['end_time'] ? '–' . $ev['end_time'] : '') . ' Uhr';
+            $text .= ' · ' . I18n::t('{time} Uhr', ['time' => $ev['start_time'] . ($ev['end_time'] ? '–' . $ev['end_time'] : '')]);
         }
         return $text;
     }
@@ -320,9 +322,9 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
             $album = $app->gallery()->album($albumId, $member);
             $back = esc_url(remove_query_arg('album'));
             if (!$album) {
-                return $html . '<p class="ka"><a href="' . $back . '">‹ Zur Galerie</a></p><p>Dieses Album gibt es nicht (mehr).</p>';
+                return $html . '<p class="ka"><a href="' . $back . '">‹ ' . esc_html(I18n::t('Zur Galerie')) . '</a></p><p>' . esc_html(I18n::t('Dieses Album gibt es nicht (mehr).')) . '</p>';
             }
-            $html .= self::lightbox() . '<div class="ka"><p><a href="' . $back . '">‹ Zur Galerie</a></p>';
+            $html .= self::lightbox() . '<div class="ka"><p><a href="' . $back . '">‹ ' . esc_html(I18n::t('Zur Galerie')) . '</a></p>';
             $html .= '<h2>' . esc_html($album['title']) . ' <small>' . esc_html($album['year']) . '</small></h2><div class="ka-grid">';
             foreach ($album['photos'] as $ph) {
                 if (($ph['type'] ?? 'image') === 'video') {
@@ -332,7 +334,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
                         '<a class="ka-foto ka-foto-video" href="%s" data-ka-lightbox data-ka-video data-ka-poster="%s" aria-label="%s">%s%s</a>',
                         esc_url($ph['video']),
                         esc_url($ph['large']),
-                        esc_attr('Video: ' . $album['title']),
+                        esc_attr(I18n::t('Video: {title}', ['title' => $album['title']])),
                         $ph['thumb'] !== '' ? '<img src="' . esc_url($ph['thumb']) . '" alt="" loading="lazy" width="400" height="400" />' : '',
                         $duration > 0 ? '<span class="ka-foto-dauer">' . esc_html(sprintf('%d:%02d', intdiv($duration, 60), $duration % 60)) . '</span>' : '',
                     );
@@ -350,7 +352,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         }
         $years = $app->gallery()->overview($member);
         if ($years === []) {
-            return $html . '<p class="ka">Noch keine Bilder in der Galerie.</p>';
+            return $html . '<p class="ka">' . esc_html(I18n::t('Noch keine Bilder in der Galerie.')) . '</p>';
         }
         $html .= '<div class="ka">';
         foreach ($years as $year) {
@@ -375,10 +377,10 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         $images = $count - $videos;
         $parts = [];
         if ($images > 0 || $videos === 0) {
-            $parts[] = $images . ' ' . ($images === 1 ? 'Bild' : 'Bilder');
+            $parts[] = I18n::tn('{count} Bild', '{count} Bilder', $images);
         }
         if ($videos > 0) {
-            $parts[] = $videos . ' ' . ($videos === 1 ? 'Video' : 'Videos');
+            $parts[] = I18n::tn('{count} Video', '{count} Videos', $videos);
         }
         return implode(' · ', $parts);
     }
@@ -410,14 +412,14 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         }
         $html = self::styles($app);
         if ($byGroup === []) {
-            return $html . '<p class="ka">Noch keine Ämter eingetragen.</p>';
+            return $html . '<p class="ka">' . esc_html(I18n::t('Noch keine Ämter eingetragen.')) . '</p>';
         }
         $html .= '<div class="ka">';
         // Überschrift nur, wenn mehrere Gruppen erscheinen; mit gruppe="…" oder amt="…" steht sie meist schon auf der Seite.
         $headings = count($byGroup) > 1;
         foreach ($byGroup as $groupId => $offices) {
             if ($headings) {
-                $html .= '<h3 class="ka-gruppe">' . esc_html($groups[$groupId] ?? 'Weitere Ämter') . '</h3>';
+                $html .= '<h3 class="ka-gruppe">' . esc_html($groups[$groupId] ?? I18n::t('Weitere Ämter')) . '</h3>';
             }
             $html .= '<div class="ka-aemter">';
             foreach ($offices as $o) {
@@ -460,7 +462,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         $rest = array_slice($o['terms'], count($shown));
         $html = '<section class="ka-amt"><h4 class="ka-amt-titel">' . esc_html($o['title']) . '</h4>';
         if ($shown === []) {
-            return $html . '<p class="ka-klein">Noch nicht besetzt.</p></section>';
+            return $html . '<p class="ka-klein">' . esc_html(I18n::t('Noch nicht besetzt.')) . '</p></section>';
         }
         $html .= '<ul class="ka-inhaber">';
         foreach ($shown as $t) {
@@ -469,16 +471,16 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
                 $url = ($h['photo_url'] ?? null) !== null ? ($photos[$h['user_id'] ?? 0] ?? $h['photo_url']) : null;
                 $html .= '<li class="ka-person">' . self::photo($h['name'], $url, 56)
                     . '<span><span class="ka-name">' . esc_html($h['name']) . '</span>'
-                    . (($h['companions'] ?? []) !== [] ? '<span class="ka-klein">mit ' . esc_html(self::withNames($h)) . '</span>' : '')
+                    . (($h['companions'] ?? []) !== [] ? '<span class="ka-klein">' . esc_html(I18n::t('mit {names}', ['names' => self::withNames($h)])) . '</span>' : '')
                     . '<span class="ka-klein">' . esc_html(self::years($t)) . ($t['note'] !== '' && $t['note'] !== null ? ' · ' . esc_html($t['note']) : '') . '</span></span></li>';
             }
         }
         $html .= '</ul>';
         if ($rest !== []) {
             $since = min(array_column($o['terms'], 'start_year'));
-            $html .= '<details class="ka-chronik"><summary>' . esc_html(sprintf('Chronik seit %d', $since)) . '</summary><ol>';
+            $html .= '<details class="ka-chronik"><summary>' . esc_html(I18n::t('Chronik seit {year}', ['year' => $since])) . '</summary><ol>';
             foreach ($rest as $t) {
-                $names = implode(', ', array_map(static fn (array $h): string => $h['name'] . (($h['companions'] ?? []) !== [] ? ' mit ' . self::withNames($h) : ''), $t['holders']));
+                $names = implode(', ', array_map(static fn (array $h): string => $h['name'] . (($h['companions'] ?? []) !== [] ? ' ' . I18n::t('mit {names}', ['names' => self::withNames($h)]) : ''), $t['holders']));
                 $html .= '<li><span class="ka-jahre">' . esc_html(self::years($t)) . '</span>' . esc_html($names)
                     . ($t['note'] !== '' && $t['note'] !== null ? '<span class="ka-klein">' . esc_html($t['note']) . '</span>' : '') . '</li>';
             }
@@ -492,7 +494,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
     {
         $names = array_column($h['companions'] ?? [], 'name');
         $last = array_pop($names);
-        return $names === [] ? (string) $last : implode(', ', $names) . ' und ' . $last;
+        return $names === [] ? (string) $last : I18n::t('{names} und {last}', ['names' => implode(', ', $names), 'last' => (string) $last]);
     }
 
     /** „2007–2020“, „seit 2020“ (läuft), „2025“ (einzelnes Jahr), wie in der App (Aemter.tsx, termYears). */
@@ -501,7 +503,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         if ($t['kind'] === 'point' || $t['end_year'] === $t['start_year']) {
             return (string) $t['start_year'];
         }
-        return $t['end_year'] === null ? 'seit ' . $t['start_year'] : $t['start_year'] . '–' . $t['end_year'];
+        return $t['end_year'] === null ? I18n::t('seit {year}', ['year' => $t['start_year']]) : $t['start_year'] . '–' . $t['end_year'];
     }
 
     /** Wie eine Bildergalerie: Fotos im Hochformat mit dem Namen als Balken, Großansicht beim Antippen. */
@@ -516,7 +518,7 @@ document.addEventListener("keydown",key);document.body.appendChild(box);show(i);
         usort($members, static fn (array $a, array $b): int => $collator !== null ? (int) $collator->compare($a['name'], $b['name']) : strcasecmp($a['name'], $b['name']));
         $html = self::styles($app);
         if ($members === []) {
-            return $html . '<p class="ka">Noch keine Mitglieder eingetragen.</p>';
+            return $html . '<p class="ka">' . esc_html(I18n::t('Noch keine Mitglieder eingetragen.')) . '</p>';
         }
         // Die Liste der API hat nur die kleine Vorschau (128 Pixel); für die Galerie die größeren Fassungen. Alte Fotos
         // ohne 1024er (Issue #109): Großansicht mit der 480er, dann ohne srcset (dieselbe Datei, keine falsche Breite).

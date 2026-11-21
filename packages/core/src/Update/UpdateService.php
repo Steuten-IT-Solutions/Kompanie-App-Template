@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Update;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Domain\Time;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\BackupProvider;
 use KompanieApp\Core\Port\FileStorage;
 use KompanieApp\Core\Port\HttpClient;
@@ -83,7 +84,7 @@ final class UpdateService
     public function setChannel(string $channel): void
     {
         if (!in_array($channel, UpdateList::CHANNELS, true)) {
-            throw ApiError::invalid('Unbekannter Kanal: ' . $channel);
+            throw ApiError::invalid(I18n::t('Unbekannter Kanal: {channel}', ['channel' => $channel]));
         }
         $this->settings->set(self::CHANNEL, $channel);
     }
@@ -113,7 +114,7 @@ final class UpdateService
             $res = $this->http->request('GET', $this->updatesUrl(), ['Accept' => 'application/json', 'Cache-Control' => 'no-cache'], null, 20);
             if ($res['status'] !== 200) {
                 $step = 'http_' . $res['status'];
-                throw new \RuntimeException('Die Update-Liste ist nicht erreichbar (HTTP ' . $res['status'] . ').');
+                throw new \RuntimeException(I18n::t('Die Update-Liste ist nicht erreichbar (HTTP {status}).', ['status' => $res['status']]));
             }
             $step = 'signature';
             $payload = SignedEnvelope::open($res['body'], $this->trustedKeys());
@@ -122,14 +123,14 @@ final class UpdateService
             $kompanie = (string) ($this->config['kompanie'] ?? '');
             if ($kompanie !== '' && $list->kompanie() !== $kompanie) {
                 $step = 'other_kompanie';
-                throw new \RuntimeException('Die Update-Liste gehört zu einer anderen Kompanie und wird nicht verwendet.');
+                throw new \RuntimeException(I18n::t('Die Update-Liste gehört zu einer anderen Kompanie und wird nicht verwendet.'));
             }
             // Nie eine ältere Liste als die zuletzt gesehene annehmen (Schutz vor dem Unterschieben
             // einer alten, ebenfalls signierten Liste, z. B. mit einer zurückgezogenen Version).
             $previous = (array) ($this->settings->get(self::STATE, [])['list'] ?? []);
             if ($list->serial() < (int) ($previous['serial'] ?? 0)) {
                 $step = 'older_list';
-                throw new \RuntimeException('Die Update-Liste ist älter als die zuletzt geladene und wird nicht verwendet.');
+                throw new \RuntimeException(I18n::t('Die Update-Liste ist älter als die zuletzt geladene und wird nicht verwendet.'));
             }
             $state['list'] = $list->toArray();
         } catch (\RuntimeException $e) {
@@ -291,14 +292,16 @@ final class UpdateService
             }
         }
         if ($version === null) {
-            throw ApiError::invalid('Diese Datei ist kein Update-Paket für diese Installation: Sie steht nicht in der signierten Update-Liste. '
-                . "Bitte das Paket „kompanie-app-$variant.zip“ aus den Releases dieser Kompanie nehmen, unverändert.");
+            throw ApiError::invalid(I18n::t(
+                'Diese Datei ist kein Update-Paket für diese Installation: Sie steht nicht in der signierten Update-Liste. Bitte das Paket „{file}“ aus den Releases dieser Kompanie nehmen, unverändert.',
+                ['file' => "kompanie-app-$variant.zip"],
+            ));
         }
         if ($list->isWithdrawn($version)) {
-            throw ApiError::invalid("Version $version wurde zurückgezogen und wird nicht eingespielt.");
+            throw ApiError::invalid(I18n::t('Version {version} wurde zurückgezogen und wird nicht eingespielt.', ['version' => $version]));
         }
         if ($version === $this->currentVersion) {
-            throw ApiError::invalid("Version $version ist schon installiert.");
+            throw ApiError::invalid(I18n::t('Version {version} ist schon installiert.', ['version' => $version]));
         }
         return [
             'version' => $version,
@@ -334,16 +337,16 @@ final class UpdateService
         $list = UpdateList::fromPayload($state['list']);
         $entry = $list->entry($version);
         if ($entry === null || $list->isWithdrawn($version)) {
-            throw ApiError::invalid("Version $version ist nicht verfügbar.");
+            throw ApiError::invalid(I18n::t('Version {version} ist nicht verfügbar.', ['version' => $version]));
         }
         if ($localZip === null && $this->channel() === 'stable' && !$list->wasStable($version)) {
-            throw ApiError::invalid("Version $version ist noch nicht für alle freigegeben.");
+            throw ApiError::invalid(I18n::t('Version {version} ist noch nicht für alle freigegeben.', ['version' => $version]));
         }
         if (Version::major($version) > Version::major($this->currentVersion) && !$allowMajor) {
-            throw ApiError::invalid('Eine neue Hauptversion wird nur auf ausdrückliche Bestätigung eingespielt.');
+            throw ApiError::invalid(I18n::t('Eine neue Hauptversion wird nur auf ausdrückliche Bestätigung eingespielt.'));
         }
         if (Version::major($version) < Version::major($this->currentVersion)) {
-            throw ApiError::invalid('Über eine Hauptversion zurück geht es nur mit der Sicherung vor dem Update.');
+            throw ApiError::invalid(I18n::t('Über eine Hauptversion zurück geht es nur mit der Sicherung vor dem Update.'));
         }
         if ($problems = $this->problems($entry)) {
             throw ApiError::invalid(implode(' ', $problems));
@@ -351,7 +354,7 @@ final class UpdateService
         $file = $entry['files'][$this->target->variant()] ?? null;
         // Nur https (für Tests auch http auf dem eigenen Rechner).
         if (!is_array($file) || !preg_match('#^(https://|http://(127\.0\.0\.1|localhost)[:/])#', (string) ($file['url'] ?? ''))) {
-            throw ApiError::invalid('Für diese Installation gibt es in dieser Version kein Paket.');
+            throw ApiError::invalid(I18n::t('Für diese Installation gibt es in dieser Version kein Paket.'));
         }
         if (function_exists('set_time_limit')) {
             @set_time_limit(300);
@@ -364,11 +367,11 @@ final class UpdateService
         // Kann das Dateisystem keine Sperren (manche Netzlaufwerke), geht es ohne weiter.
         $lock = @fopen($this->lockPath(), 'c');
         if ($lock === false) {
-            throw new ApiError(500, 'update_lock', 'Die Sperrdatei für Updates lässt sich nicht anlegen (Schreibrechte im Datenverzeichnis?).');
+            throw new ApiError(500, 'update_lock', I18n::t('Die Sperrdatei für Updates lässt sich nicht anlegen (Schreibrechte im Datenverzeichnis?).'));
         }
         if (!flock($lock, LOCK_EX | LOCK_NB, $wouldBlock)) {
             if ($wouldBlock) {
-                throw new ApiError(409, 'update_running', 'Gerade läuft schon ein Update. Bitte in ein paar Minuten den Zustand neu laden.');
+                throw new ApiError(409, 'update_running', I18n::t('Gerade läuft schon ein Update. Bitte in ein paar Minuten den Zustand neu laden.'));
             }
             $lock = null;
         }
@@ -377,6 +380,7 @@ final class UpdateService
         class_exists(Version::class);
         class_exists(Code::class);
         class_exists(Detail::class);
+        class_exists(I18n::class); // Meldungen bei einem Fehlschlag
         class_exists(StatusReporter::class); // für Telemetry::record (Zustimmung) nach dem Austausch
         $record = ['from' => $this->currentVersion, 'to' => $version, 'kind' => $kind, 'at' => $this->time->timestamp(), 'ok' => false, 'error' => ''];
         // Schritte für die Fortschrittsanzeige (status()['progress']), solange die Sperre gehalten wird.
@@ -416,7 +420,7 @@ final class UpdateService
                 $this->settings->set(self::HELD, ['version' => $version, 'kind' => $kind, 'at' => $this->time->timestamp(), 'error' => $e->getMessage()]);
             }
             $this->telemetry?->record(Code::UpdateFailed, Detail::of($step, Detail::fromMessage($e->getMessage())), $this->currentVersion . ' → ' . $version . ': ' . $e->getMessage());
-            throw $e instanceof ApiError ? $e : ApiError::upstream('Das Update hat nicht geklappt; die bisherige Version läuft weiter. ' . $e->getMessage());
+            throw $e instanceof ApiError ? $e : ApiError::upstream(I18n::t('Das Update hat nicht geklappt; die bisherige Version läuft weiter. {error}', ['error' => $e->getMessage()]));
         }
         $this->settings->delete(self::PROGRESS);
         $lock && flock($lock, LOCK_UN);
@@ -456,7 +460,7 @@ final class UpdateService
     public function rollback(string $version, bool $withoutDrive = false): void
     {
         if (!Version::valid($version) || Version::compare($version, $this->currentVersion) >= 0) {
-            throw ApiError::invalid('Bitte eine ältere Version wählen.');
+            throw ApiError::invalid(I18n::t('Bitte eine ältere Version wählen.'));
         }
         $this->install($version, 'rollback', false, $withoutDrive);
     }
@@ -466,7 +470,7 @@ final class UpdateService
     {
         $held = $this->held();
         if ($held === null) {
-            throw ApiError::invalid('Es gibt kein zurückgestelltes Update.');
+            throw ApiError::invalid(I18n::t('Es gibt kein zurückgestelltes Update.'));
         }
         $this->install($held['version'], $held['kind'], false, true);
     }
@@ -495,11 +499,11 @@ final class UpdateService
         $problems = [];
         $minPhp = (string) ($entry['minPhp'] ?? '8.1');
         if (version_compare(PHP_VERSION, $minPhp, '<')) {
-            $problems[] = "Die neue Version braucht PHP $minPhp; auf dem Server läuft PHP " . PHP_VERSION . '. Die PHP-Version lässt sich meist im Kundenmenü des Hosters umstellen.';
+            $problems[] = I18n::t('Die neue Version braucht PHP {min}; auf dem Server läuft PHP {version}. Die PHP-Version lässt sich meist im Kundenmenü des Hosters umstellen.', ['min' => $minPhp, 'version' => PHP_VERSION]);
         }
         $missing = array_values(array_filter((array) ($entry['extensions'] ?? []), static fn ($ext): bool => is_string($ext) && !extension_loaded($ext)));
         if ($missing) {
-            $problems[] = 'Auf dem Server fehlen PHP-Erweiterungen: ' . implode(', ', $missing) . '. Sie lassen sich meist im Kundenmenü des Hosters einschalten.';
+            $problems[] = I18n::t('Auf dem Server fehlen PHP-Erweiterungen: {extensions}. Sie lassen sich meist im Kundenmenü des Hosters einschalten.', ['extensions' => implode(', ', $missing)]);
         }
         return [...$problems, ...($this->target?->problems($entry) ?? [])];
     }
@@ -510,17 +514,17 @@ final class UpdateService
         try {
             $res = $this->http->request('GET', (string) $file['url'], ['Accept' => 'application/octet-stream'], null, 120);
         } catch (\RuntimeException $e) {
-            throw new \RuntimeException('Das Paket ließ sich nicht laden: ' . $e->getMessage());
+            throw new \RuntimeException(I18n::t('Das Paket ließ sich nicht laden: {error}', ['error' => $e->getMessage()]));
         }
         if ($res['status'] !== 200) {
-            throw new \RuntimeException('Das Paket ließ sich nicht laden (HTTP ' . $res['status'] . ').');
+            throw new \RuntimeException(I18n::t('Das Paket ließ sich nicht laden (HTTP {status}).', ['status' => $res['status']]));
         }
         if (!hash_equals((string) $file['sha256'], hash('sha256', $res['body'])) || (isset($file['size']) && (int) $file['size'] !== strlen($res['body']))) {
-            throw new \RuntimeException('Das geladene Paket stimmt nicht mit der signierten Liste überein und wird nicht verwendet.');
+            throw new \RuntimeException(I18n::t('Das geladene Paket stimmt nicht mit der signierten Liste überein und wird nicht verwendet.'));
         }
         $path = $this->files->tempFile();
         if (file_put_contents($path, $res['body']) === false) {
-            throw new \RuntimeException('Das Paket kann nicht zwischengespeichert werden (Speicherplatz?).');
+            throw new \RuntimeException(I18n::t('Das Paket kann nicht zwischengespeichert werden (Speicherplatz?).'));
         }
         return $path;
     }
@@ -561,7 +565,7 @@ final class UpdateService
         }
         $out = @fopen($tmp, 'wb');
         if ($out === false) {
-            throw new \RuntimeException('Die Sicherung vor dem Update ließ sich nicht schreiben (Schreibrechte?). Das Update wurde nicht eingespielt.');
+            throw new \RuntimeException(I18n::t('Die Sicherung vor dem Update ließ sich nicht schreiben (Schreibrechte?). Das Update wurde nicht eingespielt.'));
         }
         @chmod($tmp, 0600);
         if ($started !== null) {
@@ -571,18 +575,18 @@ final class UpdateService
         try {
             $this->backup->exportTo($out);
             if (!fflush($out)) {
-                throw new \RuntimeException('Die Sicherung ließ sich nicht schreiben (Speicherplatz?).');
+                throw new \RuntimeException(I18n::t('Die Sicherung ließ sich nicht schreiben (Speicherplatz?).'));
             }
         } catch (\Throwable $e) {
             fclose($out);
             @unlink($tmp);
-            $reason = $e instanceof \JsonException ? 'Die Sicherung ließ sich nicht erstellen (' . $e->getMessage() . ').' : rtrim($e->getMessage(), '.') . '.';
-            throw new \RuntimeException('Sicherung vor dem Update: ' . $reason . ' Das Update wurde nicht eingespielt.', 0, $e);
+            $reason = $e instanceof \JsonException ? I18n::t('Die Sicherung ließ sich nicht erstellen ({error}).', ['error' => $e->getMessage()]) : rtrim($e->getMessage(), '.') . '.';
+            throw new \RuntimeException(I18n::t('Sicherung vor dem Update: {reason} Das Update wurde nicht eingespielt.', ['reason' => $reason]), 0, $e);
         }
         fclose($out);
         if (!@rename($tmp, $path)) {
             @unlink($tmp);
-            throw new \RuntimeException('Die Sicherung vor dem Update ließ sich nicht schreiben (Speicherplatz?). Das Update wurde nicht eingespielt.');
+            throw new \RuntimeException(I18n::t('Die Sicherung vor dem Update ließ sich nicht schreiben (Speicherplatz?). Das Update wurde nicht eingespielt.'));
         }
         $numbered = glob($dir . '/vor-update-[0-9][0-9][0-9][0-9][0-9][0-9]-*.json') ?: [];
         sort($numbered);
@@ -608,8 +612,10 @@ final class UpdateService
         try {
             $this->offsite?->storeBeforeUpdate($path, $this->currentVersion, $onProgress);
         } catch (\RuntimeException $e) {
-            throw new ApiError(409, self::DRIVE_FAILED, 'Die Sicherung in Google Drive vor dem Update hat nicht geklappt: ' . rtrim($e->getMessage(), '.')
-                . '. Das Update wurde nicht eingespielt; die Sicherung auf dem Server ist da.');
+            throw new ApiError(409, self::DRIVE_FAILED, I18n::t(
+                'Die Sicherung in Google Drive vor dem Update hat nicht geklappt: {error}. Das Update wurde nicht eingespielt; die Sicherung auf dem Server ist da.',
+                ['error' => rtrim($e->getMessage(), '.')],
+            ));
         }
     }
 
@@ -633,7 +639,7 @@ final class UpdateService
     private function requireConfigured(): void
     {
         if (!$this->configured()) {
-            throw new ApiError(503, 'not_configured', 'Updates sind für diese Installation nicht eingerichtet.');
+            throw new ApiError(503, 'not_configured', I18n::t('Updates sind für diese Installation nicht eingerichtet.'));
         }
     }
 }

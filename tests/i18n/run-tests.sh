@@ -74,16 +74,17 @@ rm "$T/fe/B.ts"
 cat > "$T/fe/R.tsx" <<'TS'
 const q = /["'`]/g.test(s) ? t('Nach dem Muster') : x / 2;
 const r = [...t('Nach drei Punkten').split('{x}')];
+const c = tc('Spalte', 'Fett');
 export const D = () => <p><b>{t('Fett')}</b> <Caps text={y} /> {t('Nach dem Element')}</p>;
 TS
 python3 - "$T/cat/en.json" <<'PY'
 import json, sys
 p = sys.argv[1]; d = json.load(open(p))
-d.update({'Nach dem Muster': 'After the pattern', 'Nach drei Punkten': 'After three dots', 'Fett': 'Bold', 'Nach dem Element': 'After the element'})
+d.update({'Nach dem Muster': 'After the pattern', 'Nach drei Punkten': 'After three dots', 'Fett': 'Bold', 'Nach dem Element': 'After the element', 'Spalte|Fett': 'Bold column'})
 json.dump(d, open(p, 'w'), ensure_ascii=False)
 PY
 OUT="$(check)" || fail "Reguläre Ausdrücke oder JSX falsch gelesen: $OUT"
-[[ "$OUT" == "12 Texte, 1 Kataloge vollständig." ]] || fail "Falsche Zählung: $OUT"
-ok "Anführungszeichen in regulären Ausdrücken, ...t( und JSX-Elemente stören nicht"
+[[ "$OUT" == "13 Texte, 1 Kataloge vollständig." ]] || fail "Falsche Zählung: $OUT"
+ok "Anführungszeichen in regulären Ausdrücken, ...t( und JSX-Elemente stören nicht; tc() mit Zusammenhang"
 
 echo "$pass Tests bestanden."

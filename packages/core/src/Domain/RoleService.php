@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Config\KompanieConfig;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\Settings;
 use KompanieApp\Core\Port\UserDirectory;
 use KompanieApp\Core\Storage\MemberRoleRepository;
@@ -183,22 +184,22 @@ final class RoleService
     public function setOverrides(User $actor, int $id, mixed $grant, mixed $revoke): array
     {
         if ($actor->id === $id) {
-            throw ApiError::invalid('Die eigenen Rechte kann man nicht selbst ändern.');
+            throw ApiError::invalid(I18n::t('Die eigenen Rechte kann man nicht selbst ändern.'));
         }
-        $target = $this->users->find($id) ?? throw ApiError::notFound('Benutzer nicht gefunden.');
+        $target = $this->users->find($id) ?? throw ApiError::notFound(I18n::t('Benutzer nicht gefunden.'));
         if ($target->isAdmin()) {
-            throw ApiError::invalid('Admins haben immer alle Rechte.');
+            throw ApiError::invalid(I18n::t('Admins haben immer alle Rechte.'));
         }
         if (!self::overridable($target->role)) {
-            throw ApiError::invalid('Gäste haben keine Rechte in der App. Bitte zuerst eine Rolle geben.');
+            throw ApiError::invalid(I18n::t('Gäste haben keine Rechte in der App. Bitte zuerst eine Rolle geben.'));
         }
         if (!$this->canHandleUser($actor, $target)) {
-            throw ApiError::forbidden('Die Rechte dieser Person darfst du nicht ändern.');
+            throw ApiError::forbidden(I18n::t('Die Rechte dieser Person darfst du nicht ändern.'));
         }
         $grant = self::validCapabilityList($grant);
         $revoke = self::validCapabilityList($revoke);
         if (array_intersect($grant, $revoke) !== []) {
-            throw ApiError::invalid('Ein Recht lässt sich nicht zugleich geben und entziehen.');
+            throw ApiError::invalid(I18n::t('Ein Recht lässt sich nicht zugleich geben und entziehen.'));
         }
         $base = $this->grantedFor($id, $target->role);
         $next = self::normalized($base, ['grant' => $grant, 'revoke' => $revoke]);
@@ -219,7 +220,7 @@ final class RoleService
         );
         $editable = self::values($this->editableBy($actor));
         if (array_diff($changed, $editable) !== []) {
-            throw ApiError::forbidden('Rechte, die du selbst nicht hast, sowie „Mitglieder anlegen“ und „Rollen vergeben“ ändert nur ein Admin.');
+            throw ApiError::forbidden(I18n::t('Rechte, die du selbst nicht hast, sowie „Mitglieder anlegen“ und „Rollen vergeben“ ändert nur ein Admin.'));
         }
         $this->storeOverrides($id, $next);
         return $this->view($actor, $base, $next);
@@ -334,10 +335,10 @@ final class RoleService
     private static function missingRequired(Capability $needed): ApiError
     {
         return match ($needed) {
-            Capability::Member => ApiError::invalid('Rechte zum Verwalten und die eigenen Punkte, Strafen, Dienstgrade und Anwesenheit gibt es nur mit „Mitglied der Kompanie“.'),
-            Capability::Calendar => ApiError::invalid('Zu- und absagen gibt es nur zusammen mit dem internen Kalender.'),
-            Capability::ViewPersonal => ApiError::invalid('„Persönliche Angaben pflegen“ gibt es nur zusammen mit „Persönliche Angaben sehen“.'),
-            default => ApiError::invalid('Ein Recht zum Ändern gibt es nur zusammen mit dem passenden Recht zum Sehen.'),
+            Capability::Member => ApiError::invalid(I18n::t('Rechte zum Verwalten und die eigenen Punkte, Strafen, Dienstgrade und Anwesenheit gibt es nur mit „Mitglied der Kompanie“.')),
+            Capability::Calendar => ApiError::invalid(I18n::t('Zu- und absagen gibt es nur zusammen mit dem internen Kalender.')),
+            Capability::ViewPersonal => ApiError::invalid(I18n::t('„Persönliche Angaben pflegen“ gibt es nur zusammen mit „Persönliche Angaben sehen“.')),
+            default => ApiError::invalid(I18n::t('Ein Recht zum Ändern gibt es nur zusammen mit dem passenden Recht zum Sehen.')),
         };
     }
 
@@ -453,12 +454,12 @@ final class RoleService
             return [];
         }
         if (!is_array($raw)) {
-            throw ApiError::invalid('Rechte als Liste angeben.');
+            throw ApiError::invalid(I18n::t('Rechte als Liste angeben.'));
         }
         foreach ($raw as $c) {
             $cap = is_string($c) ? Capability::tryFrom($c) : null;
             if ($cap === null || !in_array($cap, Roles::GRANTABLE, true)) {
-                throw ApiError::invalid('Unbekanntes oder nicht vergebbares Recht: ' . (is_scalar($c) ? (string) $c : '?') . '.');
+                throw ApiError::invalid(I18n::t('Unbekanntes oder nicht vergebbares Recht: {value}.', ['value' => is_scalar($c) ? (string) $c : '?']));
             }
         }
         return self::ordered($raw);
@@ -590,7 +591,7 @@ final class RoleService
     public function setExtraRoles(int $userId, array $keys): void
     {
         if ($this->memberRoles === null) {
-            throw ApiError::invalid('Zusatzrollen gibt es hier nicht.');
+            throw ApiError::invalid(I18n::t('Zusatzrollen gibt es hier nicht.'));
         }
         $current = $this->assignments()[$userId] ?? [];
         $keys = array_values(array_unique($keys));
@@ -1018,7 +1019,7 @@ final class RoleService
     {
         $roles = $this->all();
         if (count($roles) >= self::MAX_ROLES) {
-            throw ApiError::invalid(sprintf('Mehr als %d Rollen sind nicht möglich.', self::MAX_ROLES));
+            throw ApiError::invalid(I18n::t('Mehr als {max} Rollen sind nicht möglich.', ['max' => self::MAX_ROLES]));
         }
         $label = $this->validLabel($in['label'] ?? null, null);
         $role = self::role('', $label, self::validCapabilities($in['capabilities'] ?? [], null));
@@ -1043,7 +1044,7 @@ final class RoleService
     {
         $roles = $this->all();
         if (!isset($roles[$key])) {
-            throw ApiError::notFound('Rolle nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Rolle nicht gefunden.'));
         }
         $role = $roles[$key];
         if (array_key_exists('label', $in)) {
@@ -1052,21 +1053,21 @@ final class RoleService
         $fixed = Roles::isSystem($key);
         if (array_key_exists('capabilities', $in)) {
             if ($key === Roles::ADMIN) {
-                throw ApiError::invalid('Admins haben immer alle Rechte.');
+                throw ApiError::invalid(I18n::t('Admins haben immer alle Rechte.'));
             }
             $role['capabilities'] = self::validCapabilities($in['capabilities'], $fixed ? $key : null);
         }
         if (array_key_exists('points_factor', $in)) {
             // Punkte bekommen nur Personen mit Mitgliederbereich (Admins haben ihn immer).
             if ($key === Roles::GUEST) {
-                throw ApiError::invalid('Gäste haben keinen Punktefaktor.');
+                throw ApiError::invalid(I18n::t('Gäste haben keinen Punktefaktor.'));
             }
             $role['points_factor'] = self::validFactor($in['points_factor']);
         }
         foreach (['new_accounts', 'promotable'] as $flag) {
             if (array_key_exists($flag, $in)) {
                 if ($fixed) {
-                    throw ApiError::invalid('Das lässt sich nur bei eigenen Rollen einstellen.');
+                    throw ApiError::invalid(I18n::t('Das lässt sich nur bei eigenen Rollen einstellen.'));
                 }
                 $role[$flag] = self::validFlag($in[$flag]);
             }
@@ -1086,10 +1087,10 @@ final class RoleService
     {
         $roles = $this->all();
         if (!isset($roles[$key])) {
-            throw ApiError::notFound('Rolle nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Rolle nicht gefunden.'));
         }
         if (Roles::isSystem($key)) {
-            throw ApiError::invalid('Diese Rolle lässt sich nicht löschen.');
+            throw ApiError::invalid(I18n::t('Diese Rolle lässt sich nicht löschen.'));
         }
         $users = $this->users->list(true);
         $assigned = array_filter($users, static fn (User $u): bool => $u->role === $key);
@@ -1098,10 +1099,10 @@ final class RoleService
         $changed = [];
         if ($assigned !== [] || $extra !== []) {
             if ($replacement === null || $replacement === '') {
-                throw ApiError::invalid(sprintf('Dieser Rolle sind noch %d Personen zugeordnet. Bitte eine Rolle wählen, die sie stattdessen bekommen.', count($assigned) + count($extra)));
+                throw ApiError::invalid(I18n::tn('Dieser Rolle sind noch {count} Personen zugeordnet. Bitte eine Rolle wählen, die sie stattdessen bekommen.', 'Dieser Rolle sind noch {count} Personen zugeordnet. Bitte eine Rolle wählen, die sie stattdessen bekommen.', count($assigned) + count($extra)));
             }
             if ($replacement === $key || !isset($roles[$replacement]) || $replacement === Roles::ADMIN) {
-                throw ApiError::invalid('Ungültige Ersatzrolle.');
+                throw ApiError::invalid(I18n::t('Ungültige Ersatzrolle.'));
             }
             foreach ($assigned as $u) {
                 try {
@@ -1141,7 +1142,7 @@ final class RoleService
         $roles = $this->all();
         if (!is_array($keys) || !array_is_list($keys) || array_filter($keys, 'is_string') !== $keys
             || count(array_unique($keys)) !== count($keys) || count($keys) !== count($roles) || array_diff(array_keys($roles), $keys) !== []) {
-            throw ApiError::invalid('Bitte alle Rollen in der neuen Reihenfolge angeben.');
+            throw ApiError::invalid(I18n::t('Bitte alle Rollen in der neuen Reihenfolge angeben.'));
         }
         $next = [];
         foreach ($keys as $k) {
@@ -1394,10 +1395,10 @@ final class RoleService
     {
         $label = is_string($raw) ? trim((string) preg_replace('/\s+/u', ' ', $raw)) : '';
         if ($label === '') {
-            throw ApiError::invalid('Bitte einen Namen für die Rolle angeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Namen für die Rolle angeben.'));
         }
         if (mb_strlen($label) > self::LABEL_MAX) {
-            throw ApiError::invalid(sprintf('Der Name darf höchstens %d Zeichen lang sein.', self::LABEL_MAX));
+            throw ApiError::invalid(I18n::t('Der Name darf höchstens {max} Zeichen lang sein.', ['max' => self::LABEL_MAX]));
         }
         // Unveränderter Name: nicht prüfen (sonst ließen sich Rechte einer Rolle mit doppeltem Namen nicht mehr ändern).
         if ($key !== null && ($this->find($key)['label'] ?? null) === $label) {
@@ -1405,7 +1406,7 @@ final class RoleService
         }
         foreach ($this->all() as $k => $r) {
             if ($k !== $key && mb_strtolower($r['label']) === mb_strtolower($label)) {
-                throw ApiError::invalid('Eine Rolle mit diesem Namen gibt es schon.');
+                throw ApiError::invalid(I18n::t('Eine Rolle mit diesem Namen gibt es schon.'));
             }
         }
         return $label;
@@ -1435,22 +1436,22 @@ final class RoleService
     private static function validCapabilities(mixed $raw, ?string $system): array
     {
         if (!is_array($raw)) {
-            throw ApiError::invalid('Rechte als Liste angeben.');
+            throw ApiError::invalid(I18n::t('Rechte als Liste angeben.'));
         }
         $out = [];
         foreach ($raw as $c) {
             $cap = is_string($c) ? Capability::tryFrom($c) : null;
             if ($cap === null || !in_array($cap, Roles::GRANTABLE, true)) {
-                throw ApiError::invalid('Unbekanntes oder nicht vergebbares Recht: ' . (is_scalar($c) ? (string) $c : '?') . '.');
+                throw ApiError::invalid(I18n::t('Unbekanntes oder nicht vergebbares Recht: {value}.', ['value' => is_scalar($c) ? (string) $c : '?']));
             }
             $out[$cap->value] = $cap->value;
         }
         if ($system !== null) {
             if ($system === Roles::GUEST && isset($out[Capability::Member->value])) {
-                throw ApiError::invalid('Gäste gehören nicht zur Kompanie; dafür gibt es die Rolle Mitglied.');
+                throw ApiError::invalid(I18n::t('Gäste gehören nicht zur Kompanie; dafür gibt es die Rolle Mitglied.'));
             }
             if ($system === Roles::MEMBER && !isset($out[Capability::Member->value])) {
-                throw ApiError::invalid('Mitglieder gehören immer zur Kompanie.');
+                throw ApiError::invalid(I18n::t('Mitglieder gehören immer zur Kompanie.'));
             }
         }
         // Gast gehört nie zur Kompanie: Bei ihm entfällt die Voraussetzung „Mitglied der Kompanie“ (Entscheidung vom
@@ -1463,11 +1464,11 @@ final class RoleService
     {
         $v = is_string($raw) ? str_replace(',', '.', trim($raw)) : $raw;
         if (!is_numeric($v)) {
-            throw ApiError::invalid('Der Punktefaktor muss eine Zahl sein, z. B. 0,5.');
+            throw ApiError::invalid(I18n::t('Der Punktefaktor muss eine Zahl sein, z. B. 0,5.'));
         }
         $f = round((float) $v, 2);
         if ($f < 0 || $f > self::FACTOR_MAX) {
-            throw ApiError::invalid(sprintf('Der Punktefaktor muss zwischen 0 und %s liegen.', str_replace('.', ',', (string) self::FACTOR_MAX)));
+            throw ApiError::invalid(I18n::t('Der Punktefaktor muss zwischen 0 und {max} liegen.', ['max' => str_replace('.', ',', (string) self::FACTOR_MAX)]));
         }
         return $f;
     }
@@ -1475,7 +1476,7 @@ final class RoleService
     private static function validFlag(mixed $raw): bool
     {
         if (!is_bool($raw)) {
-            throw ApiError::invalid('Bitte ja oder nein (true/false) angeben.');
+            throw ApiError::invalid(I18n::t('Bitte ja oder nein (true/false) angeben.'));
         }
         return $raw;
     }
@@ -1489,7 +1490,7 @@ final class RoleService
     private static function checkPromotable(array $role): void
     {
         if ($role['promotable'] && in_array(Capability::Member->value, $role['capabilities'], true)) {
-            throw ApiError::invalid('Zum Mitglied machen lässt sich nur eine Rolle, die nicht zur Kompanie gehört.');
+            throw ApiError::invalid(I18n::t('Zum Mitglied machen lässt sich nur eine Rolle, die nicht zur Kompanie gehört.'));
         }
     }
 }

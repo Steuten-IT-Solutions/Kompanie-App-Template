@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Storage;
 
+use KompanieApp\Core\I18n\I18n;
+
 /**
  * Verschlüsselte Sicherungen (libsodium), damit eine Sicherung außerhalb des Servers (Google Drive, heruntergeladene
  * Datei) ohne das Passwort für Sicherungen nicht lesbar ist.
@@ -82,7 +84,7 @@ final class BackupCrypto
         $salt = base64_decode((string) ($key['salt'] ?? ''), true);
         $public = base64_decode((string) ($key['public_key'] ?? ''), true);
         if ($salt === false || $public === false || strlen($salt) !== SODIUM_CRYPTO_PWHASH_SALTBYTES || strlen($public) !== SODIUM_CRYPTO_BOX_PUBLICKEYBYTES) {
-            throw new \RuntimeException('Das eingerichtete Passwort für Sicherungen ist beschädigt. Bitte neu einrichten.');
+            throw new \RuntimeException(I18n::t('Das eingerichtete Passwort für Sicherungen ist beschädigt. Bitte neu einrichten.'));
         }
         $keypair = self::keypair($passphrase, $salt, (int) ($key['ops'] ?? 0), (int) ($key['mem'] ?? 0));
         $ok = hash_equals($public, sodium_crypto_box_publickey($keypair));
@@ -94,7 +96,7 @@ final class BackupCrypto
     private static function requireAvailable(): void
     {
         if (!self::available()) {
-            throw new \RuntimeException('Dafür fehlt PHP auf diesem Server die Erweiterung sodium; bitte beim Hoster nachfragen.');
+            throw new \RuntimeException(I18n::t('Dafür fehlt PHP auf diesem Server die Erweiterung sodium; bitte beim Hoster nachfragen.'));
         }
     }
 
@@ -125,12 +127,12 @@ final class BackupCrypto
         while (!feof($in)) {
             $block = fread($in, self::COPY_BLOCK);
             if ($block === false) {
-                throw new \RuntimeException('Die Sicherung ließ sich nicht verschlüsseln (Datei nicht lesbar).');
+                throw new \RuntimeException(I18n::t('Die Sicherung ließ sich nicht verschlüsseln (Datei nicht lesbar).'));
             }
             for ($done = 0, $len = strlen($block); $done < $len; $done += $n) {
                 $n = fwrite($out, $done === 0 ? $block : substr($block, $done));
                 if ($n === false || $n === 0) {
-                    throw new \RuntimeException('Die Sicherung ließ sich nicht schreiben (Speicherplatz?).');
+                    throw new \RuntimeException(I18n::t('Die Sicherung ließ sich nicht schreiben (Speicherplatz?).'));
                 }
             }
         }
@@ -157,10 +159,10 @@ final class BackupCrypto
         } catch (\Throwable $e) {
             $enc->abort(); // ohne Abschluss: bleibt als abgeschnitten erkennbar
             // Scheiterte das Verschlüsseln im Filter, ist das die Ursache (das folgende Schreiben scheitert nur deshalb).
-            throw $enc->error !== null ? new \RuntimeException('Die Sicherung ließ sich nicht verschlüsseln: ' . $enc->error->getMessage(), 0, $enc->error) : $e;
+            throw $enc->error !== null ? new \RuntimeException(I18n::t('Die Sicherung ließ sich nicht verschlüsseln: {error}', ['error' => $enc->error->getMessage()]), 0, $enc->error) : $e;
         }
         if (!fflush($out)) {
-            throw new \RuntimeException('Die verschlüsselte Sicherung ließ sich nicht schreiben (Speicherplatz?).');
+            throw new \RuntimeException(I18n::t('Die verschlüsselte Sicherung ließ sich nicht schreiben (Speicherplatz?).'));
         }
         return $enc->bytes;
     }
@@ -187,7 +189,7 @@ final class BackupCrypto
     private static function readPlain($in, string $passphrase): string
     {
         if (self::readFull($in, strlen(self::MAGIC)) !== self::MAGIC) {
-            throw new \RuntimeException('Die Datei ist keine verschlüsselte Sicherung der App.');
+            throw new \RuntimeException(I18n::t('Die Datei ist keine verschlüsselte Sicherung der App.'));
         }
         $len = self::readFull($in, 4);
         $headerLength = strlen($len) === 4 ? (int) unpack('N', $len)[1] : 0;
@@ -214,7 +216,7 @@ final class BackupCrypto
         $fileKey = sodium_crypto_box_seal_open($sealed, $keypair);
         sodium_memzero($keypair);
         if ($fileKey === false) {
-            throw new \RuntimeException('Das Passwort für Sicherungen passt nicht zu dieser Datei (oder die Datei ist beschädigt).', self::WRONG_PASSPHRASE);
+            throw new \RuntimeException(I18n::t('Das Passwort für Sicherungen passt nicht zu dieser Datei (oder die Datei ist beschädigt).'), self::WRONG_PASSPHRASE);
         }
         try {
             $state = sodium_crypto_secretstream_xchacha20poly1305_init_pull($streamHeader, $fileKey);
@@ -260,7 +262,7 @@ final class BackupCrypto
         try {
             $seed = sodium_crypto_pwhash(SODIUM_CRYPTO_BOX_SEEDBYTES, $passphrase, $salt, $ops, $mem, SODIUM_CRYPTO_PWHASH_ALG_ARGON2ID13);
         } catch (\SodiumException $e) {
-            throw new \RuntimeException('Der Server hat zu wenig Arbeitsspeicher, um das Passwort für Sicherungen zu verarbeiten.', 0, $e);
+            throw new \RuntimeException(I18n::t('Der Server hat zu wenig Arbeitsspeicher, um das Passwort für Sicherungen zu verarbeiten.'), 0, $e);
         }
         try {
             return sodium_crypto_box_seed_keypair($seed);
@@ -285,6 +287,6 @@ final class BackupCrypto
 
     private static function damaged(): \RuntimeException
     {
-        return new \RuntimeException('Die verschlüsselte Sicherung ist unvollständig oder beschädigt.');
+        return new \RuntimeException(I18n::t('Die verschlüsselte Sicherung ist unvollständig oder beschädigt.'));
     }
 }

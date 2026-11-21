@@ -11,6 +11,7 @@ import {
   saveDeviceLocale,
   setLocale,
   t,
+  tc,
   tn,
   type Catalog,
 } from '../src/i18n.ts';
@@ -20,6 +21,8 @@ const en: Catalog = {
   'Hallo, {name}': 'Hello, {name}',
   '{count} Termine': { one: 'one event', other: '{count} events' },
   Leer: '',
+  Zusagen: 'Accept',
+  'Anzahl|Zusagen': 'Accepted',
 };
 
 test('Deutsch ist die Vorgabe, die Seite bekommt lang', () => {
@@ -38,6 +41,12 @@ test('Deutscher Text ist der Schlüssel, fehlende oder leere Einträge fallen au
   assert.equal(t('Abbrechen', undefined, en), 'Abbrechen');
   assert.equal(t('Leer', undefined, en), 'Leer');
   assert.equal(t('Speichern'), 'Speichern');
+});
+
+test('Zusammenhang trennt gleiche deutsche Texte, ohne Eintrag bleibt Deutsch', () => {
+  assert.equal(t('Zusagen', undefined, en), 'Accept');
+  assert.equal(tc('Anzahl', 'Zusagen', undefined, en), 'Accepted');
+  assert.equal(tc('Knopf', 'Zusagen', undefined, en), 'Zusagen');
 });
 
 test('Platzhalter werden ersetzt, unbekannte bleiben stehen', () => {

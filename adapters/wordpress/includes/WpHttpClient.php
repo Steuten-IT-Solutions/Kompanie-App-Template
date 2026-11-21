@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\WordPress;
 
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Infra\BufferedStream;
 use KompanieApp\Core\Infra\CurlHttpClient;
 use KompanieApp\Core\Port\ExtendedHttpClient;
@@ -49,15 +50,15 @@ final class WpHttpClient implements ExtendedHttpClient, StreamingHttpClient
             $args = apply_filters('http_request_args', wp_parse_args($args, self::defaults($r['url'])), $r['url']);
             $pre = apply_filters('pre_http_request', false, $args, $r['url']);
             if ($pre !== false) {
-                $out[$k] = is_wp_error($pre) ? new \RuntimeException($pre->get_error_message()) : (is_array($pre) ? self::result($pre) : new \RuntimeException('Keine Verbindung.'));
+                $out[$k] = is_wp_error($pre) ? new \RuntimeException($pre->get_error_message()) : (is_array($pre) ? self::result($pre) : new \RuntimeException(I18n::t('Keine Verbindung.')));
                 continue;
             }
             if (!preg_match('#^https?://#i', $r['url'])) {
-                $out[$k] = new \RuntimeException('Ungültige Adresse.');
+                $out[$k] = new \RuntimeException(I18n::t('Ungültige Adresse.'));
                 continue;
             }
             if ((new \WP_Http())->block_request($r['url'])) {
-                $out[$k] = new \RuntimeException('Anfragen an fremde Server sind auf dieser Seite gesperrt.');
+                $out[$k] = new \RuntimeException(I18n::t('Anfragen an fremde Server sind auf dieser Seite gesperrt.'));
                 continue;
             }
             $out[$k] = null;
@@ -71,7 +72,7 @@ final class WpHttpClient implements ExtendedHttpClient, StreamingHttpClient
         // Reihenfolge wie übergeben
         $sorted = [];
         foreach (array_keys($requests) as $k) {
-            $sorted[$k] = $out[$k] ?? new \RuntimeException('Die Anfrage wurde nicht abgeschlossen.');
+            $sorted[$k] = $out[$k] ?? new \RuntimeException(I18n::t('Die Anfrage wurde nicht abgeschlossen.'));
         }
         return $sorted;
     }
@@ -85,7 +86,7 @@ final class WpHttpClient implements ExtendedHttpClient, StreamingHttpClient
         $out = self::result($res);
         // Hat ein Filter (pre_http_request) geantwortet, steht der Inhalt im Body statt in der Datei.
         if ($out['body'] !== '' && (!is_file($file) || (int) filesize($file) === 0) && file_put_contents($file, $out['body']) === false) {
-            throw new \RuntimeException('Die Datei ließ sich nicht speichern.');
+            throw new \RuntimeException(I18n::t('Die Datei ließ sich nicht speichern.'));
         }
         return ['status' => $out['status'], 'headers' => $out['headers']];
     }
@@ -96,7 +97,7 @@ final class WpHttpClient implements ExtendedHttpClient, StreamingHttpClient
         $pre = apply_filters('pre_http_request', false, $args, $url);
         if ($pre !== false) {
             if (!is_array($pre)) {
-                throw new \RuntimeException(is_wp_error($pre) ? $pre->get_error_message() : 'Keine Verbindung.');
+                throw new \RuntimeException(is_wp_error($pre) ? $pre->get_error_message() : I18n::t('Keine Verbindung.'));
             }
             return BufferedStream::emit(self::result($pre), $onHead, $onData);
         }
@@ -165,7 +166,7 @@ final class WpHttpClient implements ExtendedHttpClient, StreamingHttpClient
         foreach ($batch as $k => $request) {
             $res = $responses[$k] ?? null;
             if (!$res instanceof \WpOrg\Requests\Response) {
-                $out[$k] = new \RuntimeException($res instanceof \Throwable ? $res->getMessage() : 'Keine Verbindung.');
+                $out[$k] = new \RuntimeException($res instanceof \Throwable ? $res->getMessage() : I18n::t('Keine Verbindung.'));
                 continue;
             }
             $array = (new \WP_HTTP_Requests_Response($res, null))->to_array();

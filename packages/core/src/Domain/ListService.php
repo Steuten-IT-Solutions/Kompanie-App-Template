@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\ListRepository;
 
 /**
@@ -176,8 +177,8 @@ final class ListService
         $list = $this->find($id);
         $loaded = $in['updated_at'] ?? null;
         if (is_string($loaded) && $loaded !== Time::utcToIso($list['updated_at'])) {
-            $by = (new UserNames($this->app->users))->name($list['updated_by']) ?? 'Jemand';
-            throw new ApiError(409, 'conflict', $by . ' hat die Liste inzwischen geändert. Bitte die Liste neu laden und deine Änderungen noch einmal eintragen.');
+            $by = (new UserNames($this->app->users))->name($list['updated_by']) ?? I18n::t('Jemand');
+            throw new ApiError(409, 'conflict', I18n::t('{name} hat die Liste inzwischen geändert. Bitte die Liste neu laden und deine Änderungen noch einmal eintragen.', ['name' => $by]));
         }
         $repo = $this->repository();
         $data = $this->validate($in, $repo->rows($id));
@@ -264,7 +265,7 @@ final class ListService
             return ['added' => $added, 'removed' => $removed, 'applied' => false, 'list' => null];
         }
         if (count($kept) + count($new) > self::ROWS_MAX) {
-            throw ApiError::invalid(sprintf('Die Liste hätte dann mehr als %d Zeilen.', self::ROWS_MAX));
+            throw ApiError::invalid(I18n::t('Die Liste hätte dann mehr als {max} Zeilen.', ['max' => self::ROWS_MAX]));
         }
         $kept = self::mergeSorted($kept, $new, $members);
         $now = $this->app->time()->nowUtc();
@@ -372,18 +373,18 @@ final class ListService
         $groups = $this->validGroups($in['groups'] ?? [self::GROUP_MEMBERS]);
         $title = Text::line($in['title'] ?? '', self::TITLE_MAX);
         if ($title === '') {
-            throw ApiError::invalid('Bitte einen Titel angeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Titel angeben.'));
         }
         $date = $in['date'] ?? null;
         if ($date === '') {
             $date = null;
         }
         if ($date !== null && !Input::isDate($date)) {
-            throw ApiError::invalid('Ungültiges Datum.');
+            throw ApiError::invalid(I18n::t('Ungültiges Datum.'));
         }
         $orientation = $in['orientation'] ?? 'portrait';
         if (!in_array($orientation, self::ORIENTATIONS, true)) {
-            throw ApiError::invalid('Ausrichtung: Hochformat (portrait) oder Querformat (landscape).');
+            throw ApiError::invalid(I18n::t('Ausrichtung: Hochformat (portrait) oder Querformat (landscape).'));
         }
         return [
             'list' => ['title' => $title, 'subtitle' => Text::line($in['subtitle'] ?? '', self::SUBTITLE_MAX), 'list_date' => $date, 'orientation' => $orientation, 'people' => implode(',', $groups)],
@@ -396,30 +397,30 @@ final class ListService
     private static function validColumns(mixed $raw): array
     {
         if (!is_array($raw) || !array_is_list($raw) || $raw === []) {
-            throw ApiError::invalid('Bitte mindestens eine Spalte angeben.');
+            throw ApiError::invalid(I18n::t('Bitte mindestens eine Spalte angeben.'));
         }
         if (count($raw) > self::COLUMNS_MAX) {
-            throw ApiError::invalid(sprintf('Höchstens %d Spalten.', self::COLUMNS_MAX));
+            throw ApiError::invalid(I18n::t('Höchstens {max} Spalten.', ['max' => self::COLUMNS_MAX]));
         }
         $out = [];
         foreach ($raw as $c) {
             if (!is_array($c)) {
-                throw ApiError::invalid('Ungültige Spalte.');
+                throw ApiError::invalid(I18n::t('Ungültige Spalte.'));
             }
             $kind = $c['kind'] ?? null;
             if ($kind !== self::KIND_FIELD && $kind !== self::KIND_BLANK) {
-                throw ApiError::invalid('Spalte: Art field (Wert aus der App) oder blank (leer).');
+                throw ApiError::invalid(I18n::t('Spalte: Art field (Wert aus der App) oder blank (leer).'));
             }
             $field = null;
             if ($kind === self::KIND_FIELD) {
                 $field = $c['field'] ?? null;
                 if (!is_string($field) || !in_array($field, self::FIELDS, true)) {
-                    throw ApiError::invalid('Unbekannte Datenspalte: ' . (is_scalar($field) ? (string) $field : '?') . '.');
+                    throw ApiError::invalid(I18n::t('Unbekannte Datenspalte: {field}.', ['field' => is_scalar($field) ? (string) $field : '?']));
                 }
             }
             $width = $c['width'] ?? 'normal';
             if (!in_array($width, self::WIDTHS, true)) {
-                throw ApiError::invalid('Breite einer Spalte: narrow, normal, wide oder auto.');
+                throw ApiError::invalid(I18n::t('Breite einer Spalte: narrow, normal, wide oder auto.'));
             }
             $out[] = [
                 'kind' => $kind,
@@ -444,10 +445,10 @@ final class ListService
     private function validRows(mixed $raw, array $current, array $groups): array
     {
         if (!is_array($raw) || !array_is_list($raw)) {
-            throw ApiError::invalid('Ungültige Zeilen.');
+            throw ApiError::invalid(I18n::t('Ungültige Zeilen.'));
         }
         if (count($raw) > self::ROWS_MAX) {
-            throw ApiError::invalid(sprintf('Höchstens %d Zeilen.', self::ROWS_MAX));
+            throw ApiError::invalid(I18n::t('Höchstens {max} Zeilen.', ['max' => self::ROWS_MAX]));
         }
         $existing = array_fill_keys(array_filter(array_column($current, 'user_id'), static fn (?int $id): bool => $id !== null), true);
         $ids = [];
@@ -455,10 +456,10 @@ final class ListService
             if (is_array($r) && ($r['kind'] ?? null) === self::ROW_MEMBER && ($r['user_id'] ?? null) !== null) {
                 $id = Input::integer($r['user_id']);
                 if ($id === null || $id <= 0) {
-                    throw ApiError::invalid('Ungültiges Konto in einer Zeile.');
+                    throw ApiError::invalid(I18n::t('Ungültiges Konto in einer Zeile.'));
                 }
                 if (isset($ids[$id])) {
-                    throw ApiError::invalid('Ein Mitglied steht doppelt in der Liste.');
+                    throw ApiError::invalid(I18n::t('Ein Mitglied steht doppelt in der Liste.'));
                 }
                 $ids[$id] = $id;
             }
@@ -468,7 +469,7 @@ final class ListService
             $found = $this->app->users->findMany($new);
             foreach ($new as $id) {
                 if (!isset($found[$id]) || !self::inGroups($found[$id], $groups)) {
-                    throw ApiError::invalid('Mitglieder kommen über „Mitglieder aktualisieren“ in die Liste.');
+                    throw ApiError::invalid(I18n::t('Mitglieder kommen über „Mitglieder aktualisieren“ in die Liste.'));
                 }
             }
         }
@@ -481,7 +482,7 @@ final class ListService
             } elseif ($kind === self::ROW_FREE) {
                 $out[] = ['kind' => self::ROW_FREE, 'user_id' => null, 'name' => Text::line($r['name'] ?? '', self::NAME_MAX)];
             } else {
-                throw ApiError::invalid('Zeile: Art member (Mitglied) oder free (frei).');
+                throw ApiError::invalid(I18n::t('Zeile: Art member (Mitglied) oder free (frei).'));
             }
         }
         return $out;
@@ -570,7 +571,7 @@ final class ListService
      */
     public function groupOptions(): array
     {
-        $out = [self::GROUP_MEMBERS => 'Mitglieder'];
+        $out = [self::GROUP_MEMBERS => I18n::t('Mitglieder')];
         $roles = $this->app->roles();
         foreach ($roles->all() as $key => $role) {
             if ($key !== Roles::GUEST && $key !== self::GROUP_MEMBERS && !in_array(Capability::Member, $roles->capabilities($key), true)) {
@@ -597,12 +598,12 @@ final class ListService
     private function validGroups(mixed $raw): array
     {
         if (!is_array($raw) || !array_is_list($raw) || $raw === [] || count($raw) > self::GROUPS_MAX) {
-            throw ApiError::invalid('Bitte mindestens eine Gruppe für die Personen der Liste wählen.');
+            throw ApiError::invalid(I18n::t('Bitte mindestens eine Gruppe für die Personen der Liste wählen.'));
         }
         $options = $this->groupOptions();
         foreach ($raw as $g) {
             if (!is_string($g) || !isset($options[$g])) {
-                throw ApiError::invalid('Unbekannte Gruppe: ' . (is_scalar($g) ? (string) $g : '?') . '.');
+                throw ApiError::invalid(I18n::t('Unbekannte Gruppe: {group}.', ['group' => is_scalar($g) ? (string) $g : '?']));
             }
         }
         return array_values(array_filter(array_keys($options), static fn (string $key): bool => in_array($key, $raw, true)));
@@ -621,6 +622,6 @@ final class ListService
     /** @return ListRow */
     private function find(int $id): array
     {
-        return $this->repository()->find($id) ?? throw ApiError::notFound('Liste nicht gefunden.');
+        return $this->repository()->find($id) ?? throw ApiError::notFound(I18n::t('Liste nicht gefunden.'));
     }
 }

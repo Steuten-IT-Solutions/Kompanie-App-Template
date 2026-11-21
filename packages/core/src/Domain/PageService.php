@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\Blocks\Blocks;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Eigene Seiten in der App (Issue #287, Bereich pages): freie Texte wie Geschichte, Festprogramm oder Anfahrt, mit
@@ -98,7 +99,7 @@ final class PageService
         $p = $this->row($id);
         if ($p === null || !$this->canRead($viewer, (string) $p['audience'])) {
             // Für wen die Seite nicht gedacht ist, gibt es sie nicht (verrät auch nicht, dass sie existiert).
-            throw ApiError::notFound('Seite nicht gefunden.');
+            throw ApiError::notFound(I18n::t('Seite nicht gefunden.'));
         }
         $body = (string) ($p['body'] ?? '');
         $manager = $this->canManage($viewer);
@@ -119,7 +120,7 @@ final class PageService
     public function create(array $in, User $actor): array
     {
         if (!array_key_exists('title', $in)) {
-            throw ApiError::invalid('Bitte einen Titel für die Seite angeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Titel für die Seite angeben.'));
         }
         [$data, $blocks] = $this->validate($in);
         $now = $this->app->time()->nowUtc();
@@ -142,11 +143,13 @@ final class PageService
      */
     public function update(int $id, array $in, User $actor): array
     {
-        $page = $this->row($id) ?? throw ApiError::notFound('Seite nicht gefunden.');
+        $page = $this->row($id) ?? throw ApiError::notFound(I18n::t('Seite nicht gefunden.'));
         $loaded = $in['updated_at'] ?? null;
         if (is_string($loaded) && $loaded !== Time::utcToIso((string) $page['updated_at'])) {
             $by = $page['updated_by'] !== null ? $this->app->users->find((int) $page['updated_by'])?->name : null;
-            throw new ApiError(409, 'conflict', ($by ?? 'Jemand') . ' hat die Seite inzwischen geändert. Bitte die Seite neu laden und deine Änderungen noch einmal eintragen.');
+            throw new ApiError(409, 'conflict', $by !== null
+                ? I18n::t('{name} hat die Seite inzwischen geändert. Bitte die Seite neu laden und deine Änderungen noch einmal eintragen.', ['name' => $by])
+                : I18n::t('Jemand hat die Seite inzwischen geändert. Bitte die Seite neu laden und deine Änderungen noch einmal eintragen.'));
         }
         [$data, $blocks] = $this->validate($in);
         if ($blocks !== null) {
@@ -159,7 +162,7 @@ final class PageService
 
     public function delete(int $id): void
     {
-        $this->row($id) ?? throw ApiError::notFound('Seite nicht gefunden.');
+        $this->row($id) ?? throw ApiError::notFound(I18n::t('Seite nicht gefunden.'));
         $this->app->db->transaction(function () use ($id): void {
             $this->app->db->execute('DELETE FROM {app_pages} WHERE id = ?', [$id]);
             $this->app->richImages()->deleteOwner(RichImageService::OWNER_PAGE, $id);
@@ -176,7 +179,7 @@ final class PageService
         sort($given);
         sort($known);
         if ($given !== $known) {
-            throw ApiError::invalid('Bitte die Reihenfolge aller Seiten angeben.');
+            throw ApiError::invalid(I18n::t('Bitte die Reihenfolge aller Seiten angeben.'));
         }
         foreach ($order as $i => $id) {
             $this->app->db->update('app_pages', ['sort' => ($i + 1) * 10], ['id' => (int) $id]);
@@ -224,16 +227,16 @@ final class PageService
         if (array_key_exists('title', $in)) {
             $title = Text::line(is_string($in['title']) ? $in['title'] : '', self::TITLE_MAX + 1);
             if ($title === '') {
-                throw ApiError::invalid('Bitte einen Titel für die Seite angeben.');
+                throw ApiError::invalid(I18n::t('Bitte einen Titel für die Seite angeben.'));
             }
             if (mb_strlen($title) > self::TITLE_MAX) {
-                throw ApiError::invalid(sprintf('Der Titel darf höchstens %d Zeichen lang sein.', self::TITLE_MAX));
+                throw ApiError::invalid(I18n::t('Der Titel darf höchstens {max} Zeichen lang sein.', ['max' => self::TITLE_MAX]));
             }
             $data['title'] = $title;
         }
         if (array_key_exists('audience', $in)) {
             if (!in_array($in['audience'], self::AUDIENCES, true)) {
-                throw ApiError::invalid('Für wen ist die Seite? Erlaubt sind public (alle) und members (Mitglieder).');
+                throw ApiError::invalid(I18n::t('Für wen ist die Seite? Erlaubt sind public (alle) und members (Mitglieder).'));
             }
             $data['audience'] = $in['audience'];
         }
