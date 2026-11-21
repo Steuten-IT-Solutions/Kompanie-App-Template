@@ -359,6 +359,75 @@ final class RankServiceTest extends TestCase
         $this->assertSame(403, $this->call('PATCH', $path($uffz), ['date' => '2026-10-01'])->status, 'nur mit „Dienstgrade verwalten“');
     }
 
+    public function testEntryInHistoryCanBeDeleted(): void
+    {
+        $this->setUpApp(['ranks' => true]);
+        $r = $this->ranks([['Gefreiter', null], ['Unteroffizier', null], ['Feldwebel', null]]);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter'], 'date' => '2026-03-01'])->status);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Unteroffizier'], 'date' => '2026-06-01'])->status);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Feldwebel'], 'date' => '2026-09-01'])->status);
+        [$fw, $uffz, $gefr] = array_column($this->call('GET', "/members/{$this->m}")->data['rank_history'], 'id');
+        $path = fn (int $entry): string => "/members/{$this->m}/rank-history/{$entry}";
+
+        $this->assertSame(404, $this->call('DELETE', "/members/{$this->admin}/rank-history/{$fw}")->status, 'Eintrag einer anderen Person');
+        $this->assertSame(404, $this->call('DELETE', $path(999))->status);
+        $this->users->current = $this->m;
+        $this->assertSame(403, $this->call('DELETE', $path($fw))->status, 'nur mit „Dienstgrade verwalten“');
+        $this->users->current = $this->admin;
+
+        // Ein älterer Eintrag: Der Dienstgrad bleibt.
+        $res = $this->call('DELETE', $path($uffz));
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame('Feldwebel', $res->data['rank']['rank']['title']);
+        $this->assertSame([$fw, $gefr], array_column($res->data['history'], 'id'));
+
+        // Der neueste: wieder der Dienstgrad davor, „seit“ = Zeitpunkt des Eintrags davor.
+        $res = $this->call('DELETE', $path($fw));
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame('Unteroffizier', $res->data['rank']['rank']['title'], 'from des gelöschten Eintrags');
+        $this->assertSame('2026-03-01 11:00:00', $this->app->db->scalar('SELECT assigned_at FROM {member_ranks} WHERE user_id = ?', [$this->m]));
+        $this->assertSame([$gefr], array_column($res->data['history'], 'id'));
+
+        // Im Änderungsprotokoll als Änderung am Mitglied, nicht als gelöschtes Mitglied.
+        $log = $this->app->db->select("SELECT action, type, changes FROM {change_log} WHERE type = 'Mitglied' ORDER BY id DESC");
+        $this->assertSame('update', $log[0]['action']);
+        $this->assertStringContainsString('Dienstgrad-Verlauf', (string) $log[0]['changes']);
+        $this->assertStringContainsString('Feldwebel', (string) $log[0]['changes']);
+        $this->assertNotContains('delete', array_column($log, 'action'));
+
+        // Passt der neueste Eintrag nicht mehr zum Dienstgrad (älterer davor gelöscht), bleibt der Dienstgrad.
+        $res = $this->call('DELETE', $path($gefr));
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame('Unteroffizier', $res->data['rank']['rank']['title']);
+        $this->assertSame([], $res->data['history']);
+
+        // Die Ersteinstufung als einziger Eintrag: danach kein Dienstgrad.
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->admin}/rank", ['rank_id' => $r['Gefreiter']])->status);
+        $only = $this->call('GET', "/members/{$this->admin}")->data['rank_history'][0]['id'];
+        $res = $this->call('DELETE', "/members/{$this->admin}/rank-history/{$only}");
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertNull($res->data['rank']['rank']);
+        $this->assertSame(0, (int) $this->app->db->scalar('SELECT COUNT(*) FROM {member_ranks} WHERE user_id = ?', [$this->admin]));
+    }
+
+    public function testDeletingNewestEntryNeedsThePreviousRank(): void
+    {
+        $this->setUpApp(['ranks' => true]);
+        $r = $this->ranks([['Gefreiter', null], ['Unteroffizier', null]]);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter']])->status);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Unteroffizier']])->status);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->admin}/rank", ['rank_id' => $r['Gefreiter']])->status);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->admin}/rank", ['rank_id' => null])->status);
+        $this->assertSame(200, $this->call('DELETE', "/ranks/{$r['Gefreiter']}")->status, 'nicht mehr vergeben');
+        $newest = $this->call('GET', "/members/{$this->m}")->data['rank_history'][0]['id'];
+
+        $res = $this->call('DELETE', "/members/{$this->m}/rank-history/{$newest}");
+        $this->assertSame(400, $res->status, 'den Dienstgrad davor gibt es nicht mehr');
+        $this->assertStringContainsString('„Gefreiter“', $res->data['message']);
+        $this->assertSame('Unteroffizier', $this->call('GET', "/members/{$this->m}")->data['rank']['rank']['title'], 'nichts geändert');
+        $this->assertCount(2, $this->call('GET', "/members/{$this->m}")->data['rank_history']);
+    }
+
     public function testOldBackupWithoutRankTablesEmptiesThem(): void
     {
         $this->setUpApp(['ranks' => true]);

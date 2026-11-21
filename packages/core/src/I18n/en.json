@@ -4833,5 +4833,10 @@
   "✓ Die Termine werden in der App gepflegt.": "✓ The events are maintained in the app.",
   "✓ Eingerichtet über die Google-API (Kalender-IDs und API-Schlüssel).": "✓ Set up via the Google API (calendar IDs and API key).",
   "✓ Eingerichtet über die iCal-Adresse.": "✓ Set up via the iCal address.",
-  "✓ Eingerichtet über die Kalender-IDs und {access}.": "✓ Set up via the calendar IDs and {access}."
+  "✓ Eingerichtet über die Kalender-IDs und {access}.": "✓ Set up via the calendar IDs and {access}.",
+  "Den {rank} davor („{title}“) gibt es nicht mehr. Ändere den {rank} stattdessen.": "The previous {rank} (“{title}”) no longer exists. Change the {rank} instead.",
+  "{kind} vom {date} löschen?": "Delete the entry “{kind}” of {date}?",
+  "Danach gilt wieder der {rank} davor: {title}.": "The previous {rank} then applies again: {title}.",
+  "Der aktuelle {rank} ändert sich dadurch nicht.": "The current {rank} does not change.",
+  "Eintrag löschen": "Delete entry"
 }

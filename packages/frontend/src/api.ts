@@ -3063,6 +3063,9 @@ export const api = {
   /** Datum eines Eintrags im Verlauf nachträglich ändern (JJJJ-MM-TT); liefert den neuen Verlauf. */
   setRankHistoryDate: (memberId: number, entryId: number, date: string) =>
     request<RankHistoryEntry[]>('PATCH', `/members/${memberId}/rank-history/${entryId}`, { date }),
+  /** Eintrag im Verlauf löschen; beim neuesten gilt wieder der Dienstgrad davor. */
+  deleteRankHistoryEntry: (memberId: number, entryId: number) =>
+    request<{ rank: RankStatus; history: RankHistoryEntry[] }>('DELETE', `/members/${memberId}/rank-history/${entryId}`),
   promotions: () => request<Promotion[]>('GET', '/promotions'),
   /** Abzeichen hochladen; bei SVG optional eine PNG-Fassung (Base64) für Benachrichtigungen. */
   uploadRankBadge: async (id: number, file: File, png?: string | null) =>

@@ -112,6 +112,24 @@ final class RankRepository
         });
     }
 
+    /**
+     * Eintrag im Verlauf löschen; mit $restore auch den Dienstgrad zurücksetzen (null = keiner) samt „Dienstgrad seit“.
+     *
+     * @param array{rank_id: int|null, since: string}|null $restore
+     */
+    public function deleteEntry(int $userId, int $entryId, ?array $restore): void
+    {
+        $this->db->transaction(function () use ($userId, $entryId, $restore): void {
+            $this->db->execute('DELETE FROM {rank_history} WHERE id = ? AND user_id = ?', [$entryId, $userId]);
+            if ($restore !== null) {
+                $this->db->execute('DELETE FROM {member_ranks} WHERE user_id = ?', [$userId]);
+                if ($restore['rank_id'] !== null) {
+                    $this->db->insert('member_ranks', ['user_id' => $userId, 'rank_id' => $restore['rank_id'], 'assigned_at' => $restore['since']]);
+                }
+            }
+        });
+    }
+
     /** Zeitpunkt (UTC) des letzten Wechsels einer Person, null ohne Verlauf. */
     public function lastChange(int $userId): ?string
     {

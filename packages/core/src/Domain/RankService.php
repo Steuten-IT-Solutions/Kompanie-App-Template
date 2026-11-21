@@ -686,6 +686,47 @@ final class RankService
     }
 
     /**
+     * Einen Eintrag im Verlauf löschen (falsch gebucht). Beim neuesten Eintrag gilt wieder der Dienstgrad davor, als hätte
+     * es den Wechsel nie gegeben: „Dienstgrad seit“ ist dann der Zeitpunkt des Eintrags davor. Ältere Einträge ändern den
+     * aktuellen Dienstgrad nicht. Ohne Punkteprüfung (es wird nur rückgängig gemacht).
+     *
+     * @return array{rank: array<string, mixed>, history: list<array<string, mixed>>} neuer Stand wie status() und Verlauf
+     */
+    public function deleteHistoryEntry(int $userId, int $entryId): array
+    {
+        $user = $this->app->users->find($userId) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
+        $repo = $this->repository();
+        $rows = $repo->history($userId);
+        $index = null;
+        foreach ($rows as $i => $h) {
+            if ($h['id'] === $entryId) {
+                $index = $i;
+            }
+        }
+        if ($index === null) {
+            throw ApiError::notFound(I18n::t('Eintrag im Verlauf nicht gefunden.'));
+        }
+        $entry = $rows[$index];
+        $restore = null;
+        // Nur wenn der Eintrag den heutigen Stand ergeben hat (sonst passt der Verlauf ohnehin nicht zum Dienstgrad).
+        $revert = $index === 0 && $repo->rankOf($userId) === $entry['to_rank_id'];
+        if ($revert) {
+            $label = $this->app->config->rankLabel();
+            if ($entry['from_rank_id'] !== null) {
+                if ($repo->find($entry['from_rank_id']) === null) {
+                    throw ApiError::invalid(I18n::t('Den {rank} davor („{title}“) gibt es nicht mehr. Ändere den {rank} stattdessen.', ['rank' => $label, 'title' => $entry['from_title']]));
+                }
+                if (!$user->isMember()) {
+                    throw ApiError::invalid(I18n::t('Einen {rank} haben nur Mitglieder.', ['rank' => $label]));
+                }
+            }
+            $restore = ['rank_id' => $entry['from_rank_id'], 'since' => isset($rows[1]) ? $rows[1]['changed_at'] : $this->app->time()->nowUtc()];
+        }
+        $repo->deleteEntry($userId, $entryId, $restore);
+        return ['rank' => $this->status($userId), 'history' => $this->history($userId)];
+    }
+
+    /**
      * Tag und Zeitpunkt (UTC) eines Wechsels. Leer oder heute = jetzt; ein früherer Tag = 12:00 Uhr Ortszeit, mindestens
      * eine Sekunde nach dem letzten Wechsel. Nicht in der Zukunft (der Dienstgrad gilt sofort) und nicht vor dem letzten
      * Wechsel der Person, damit der Verlauf in seiner Reihenfolge stimmt.
