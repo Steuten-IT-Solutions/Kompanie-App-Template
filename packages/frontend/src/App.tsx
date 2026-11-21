@@ -1,6 +1,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, can, config, CONFIG_CHANGED, toLogin, newsTitle, type Capability } from './api';
-import { t } from './i18n';
+import { locale, t } from './i18n';
+import type { Fassungen } from './views/Hilfe';
 import { LanguageButton } from './language';
 import brand from './generated/brand';
 import logoUrl from './generated/logo-small.webp';
@@ -66,7 +67,15 @@ const Einstellungen = lazyView(() => import('./views/Einstellungen'));
 const Installieren = lazyView(() => import('./views/Installieren'));
 const TermineVerwalten = lazyView(() => import('./views/TermineVerwalten'));
 const Verwaltung = lazyView(() => import('./views/Verwaltung'));
-const Hilfe = lazyView(() => import('./views/Hilfe'));
+// Auf Englisch mit den Fassungen des Handbuchs (eigenes Teilstück, nur dann geladen)
+const Hilfe = lazyView(async () => {
+  const [view, en] = await Promise.all([
+    import('./views/Hilfe'),
+    locale() === 'en' ? import('./generated/handbuch.en.json') : Promise.resolve(null),
+  ]);
+  view.setTranslations(en ? (en.default as Fassungen) : null);
+  return view;
+});
 const Benachrichtigungen = lazyView(() => import('./views/Benachrichtigungen'));
 const Dokumente = lazyView(() => import('./views/Dokumente'));
 const DokumenteVerwalten = lazyView(() => import('./views/DokumenteVerwalten'));
@@ -309,7 +318,7 @@ function InstallBanner({ onToast }: { onToast: (msg: string) => void }) {
         </button>
       ) : (
         <button className="btn btn-small install-hint-btn" onClick={() => navigate('installieren')}>
-          So geht's
+          {t("So geht's")}
         </button>
       )}
       <button className="btn btn-link install-hint-close" onClick={dismiss} aria-label={t('Hinweis schließen')}>
