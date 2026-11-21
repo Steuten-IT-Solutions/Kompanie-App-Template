@@ -214,6 +214,7 @@ final class Subjects
             'PATCH /admin/push' => $this->settings('Benachrichtigungen', '/admin/push'),
             'PATCH /admin/birthdays' => $this->settings('Geburtstage', '/admin/birthdays'),
             'PUT /admin/navigation' => $this->settings('Navigation', '/admin/navigation'),
+            'PUT /admin/translations' => $this->values('Namen in weiteren Sprachen', fn (): array => $this->app->translations()->describe()),
             'PUT /admin/tiles' => $this->values('Vorgabe der Kacheln', fn (): array => $this->app->tileLayouts()->describeDefaults()),
             'DELETE /admin/tiles' => $this->values('Vorgabe der Kacheln', fn (): array => $this->app->tileLayouts()->describeDefaults()),
             'PATCH /admin/website' => $this->settings('Webseite', '/admin/website'),

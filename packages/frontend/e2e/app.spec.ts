@@ -4746,6 +4746,46 @@ test('Sprachen: Admin schaltet Englisch ein, Flagge oben, Wahl gilt am Konto, zu
   await expect(page.locator('html')).toHaveAttribute('lang', 'de');
   await expect(page.getByRole('button', { name: 'Sprache: Deutsch' })).toBeVisible();
 
+  // Einrichten auf Englisch: eigener englischer Name für die Galerie, der deutsche bleibt
+  await page.goto('/app/#/einstellungen/navigation');
+  const navCard = page.locator('#einstellungen-navigation');
+  await page.locator('.edit-lang').getByRole('button', { name: 'English' }).click();
+  const galleryRow = navCard.locator('.row-main').filter({ has: page.getByLabel('Platz von Galerie') });
+  await galleryRow.getByText('Umbenennen').click();
+  const englishName = galleryRow.getByLabel('Eigener Name (leer = Standard)');
+  await expect(englishName).toHaveAttribute('placeholder', 'Galerie');
+  await englishName.fill('Photos');
+  const reloaded = page.waitForEvent('load');
+  await navCard.getByRole('button', { name: 'Navigation speichern' }).click();
+  await expect(page.getByText('Navigation gespeichert')).toBeVisible();
+  // Neue Namen: die Seite lädt einmal neu
+  await reloaded;
+  // Gäste mit Englisch am Gerät sehen den englischen Namen, auf Deutsch bleibt „Galerie“
+  const visitor = await quietPage(browser);
+  await visitor.goto('/app/#/galerie');
+  await expect(visitor.locator('.tabbar')).toContainText('Galerie');
+  await visitor.evaluate(() => localStorage.setItem('kompanie-locale', 'en'));
+  await visitor.reload();
+  await expect(visitor.locator('.tabbar')).toContainText('Photos');
+  await visitor.close();
+  // Den englischen Namen wieder löschen (die Wahl „Einrichten auf“ gilt weiter)
+  await expect(page.locator('.edit-lang').getByRole('button', { name: 'English' })).toHaveAttribute('aria-pressed', 'true');
+  await navCard
+    .locator('.row-main')
+    .filter({ has: page.getByLabel('Platz von Galerie') })
+    .getByText('Umbenennen')
+    .click();
+  await navCard
+    .locator('.row-main')
+    .filter({ has: page.getByLabel('Platz von Galerie') })
+    .getByLabel('Eigener Name (leer = Standard)')
+    .fill('');
+  const reloadedAgain = page.waitForEvent('load');
+  await navCard.getByRole('button', { name: 'Navigation speichern' }).click();
+  await expect(page.getByText('Navigation gespeichert')).toBeVisible();
+  await reloadedAgain;
+  await page.locator('.edit-lang').getByRole('button', { name: 'Deutsch' }).click();
+
   // Aufräumen: nur Deutsch, die Flagge verschwindet
   await page.goto('/app/#/einstellungen/sprachen');
   await form.getByLabel('English').uncheck();

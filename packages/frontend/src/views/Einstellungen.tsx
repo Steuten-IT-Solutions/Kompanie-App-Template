@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import brand from '../generated/brand';
 import { t, tn, type Locale } from '../i18n';
-import { Flag, LANGUAGE_NAMES } from '../language';
+import { EditLanguageSwitch, Flag, LANGUAGE_NAMES } from '../language';
 import {
   api,
   can,
@@ -127,6 +127,8 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
       <button type="button" className="btn btn-link back" onClick={() => navigate('einstellungen')}>
         ‹ {t('Einstellungen')}
       </button>
+      {/* Seiten mit eigenen Namen je Sprache: oben die Wahl „Einrichten auf“ */}
+      {(page.id === 'navigation' || page.id === 'rollen') && <EditLanguageSwitch />}
       {page.id === 'bereiche' && <Bereiche onToast={onToast} />}
       {page.id === 'navigation' && <NavigationEinstellen onToast={onToast} />}
       {page.id === 'rollen' && (

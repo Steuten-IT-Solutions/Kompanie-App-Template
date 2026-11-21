@@ -55,6 +55,28 @@ const sectionDefaults = (): Record<string, [string, string]> => ({
   intern: ['Intern', t('Intern')],
 });
 
+/** Name einer festen Rolle in der Sprache der App, solange er die Vorgabe ist („Mitglied“ → „Member“); sonst unverändert. */
+export function presetRoleLabel(key: string, label: string, lang: Locale = locale()): string {
+  if (lang === SOURCE_LOCALE) return label;
+  const preset = roleDefaults()[key];
+  return preset && label === preset[0] ? preset[1] : label;
+}
+
+/**
+ * Eigene Namen der Installation als Abschnitte (Einstellungen → Navigation): in einer weiteren Sprache die für sie
+ * eingetragenen (/config section_labels_i18n, sonst die deutschen), auf Deutsch section_labels.
+ */
+export function ownSections(
+  cfg:
+    | { section_labels?: Record<string, string> | unknown[]; section_labels_i18n?: Record<string, Record<string, string> | unknown[]> }
+    | undefined,
+  lang: Locale = locale(),
+): Record<string, string> {
+  const pick = (v: unknown): Record<string, string> | undefined =>
+    v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, string>) : undefined;
+  return (lang !== SOURCE_LOCALE ? pick(cfg?.section_labels_i18n?.[lang]) : undefined) ?? pick(cfg?.section_labels) ?? {};
+}
+
 /** Ein Name: Eintrag in translations, sonst die übersetzte Vorgabe, sonst der eigene Name, wie er ist. */
 function pick(own: string | undefined, current: string, preset: [string, string] | undefined): string {
   if (own) return own;

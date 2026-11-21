@@ -7172,6 +7172,50 @@ paths:
               schema: { $ref: '#/components/schemas/TileLayoutResponse' }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
+  /admin/translations:
+    put:
+      tags: [Einstellungen]
+      summary: Eigene Namen in einer weiteren Sprache speichern
+      description: |
+        Einrichten je Sprache (Plan „Mehrsprachigkeit“): Der deutsche Name bleibt, wo er ist; hier steht der Name für eine
+        weitere eingeschaltete Sprache (nicht Deutsch). Arten: `nav` (Name eines Bereichs, einer eigenen Seite oder von
+        „Intern“ in der Navigation, Kennung wie in `navigation_names`; höchstens 24 Zeichen), `role` (Name einer Rolle,
+        Kennung der Rolle; höchstens 30 Zeichen), `event_kind` (Terminart, Kennung ist ihr deutscher Name; 40 Zeichen) und
+        `menu` (Untermenü, Kennung ist sein deutscher Name; 24 Zeichen), alle mit `manage_settings`; `rank` (Dienstgrad, ID;
+        60 Zeichen) mit `manage_ranks`; `office` und `office_group` (Amt bzw. Gruppe, ID; 60 Zeichen) mit `manage_offices`. Ein leerer `text` löscht die Übersetzung
+        (dann gilt der deutsche Name). Die Antwort enthält alle Übersetzungen wie `name_translations` in `/config`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [locale, items]
+              properties:
+                locale: { type: string, enum: [en] }
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [kind, ref, text]
+                    properties:
+                      kind: { type: string, enum: [nav, role, rank, office, office_group, event_kind, menu] }
+                      ref: { type: string, maxLength: 100 }
+                      field: { type: string, enum: [label], default: label }
+                      text: { type: string }
+      responses:
+        '200':
+          description: Gespeichert
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [translations]
+                properties:
+                  translations: { $ref: '#/components/schemas/NameTranslations' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
   /admin/navigation:
     get:
       tags: [Einstellungen]
@@ -8917,6 +8961,16 @@ components:
               deleted: { type: boolean }
 
   schemas:
+    NameTranslations:
+      type: object
+      description: 'Eigene Namen je weiterer eingeschalteter Sprache: Sprache => Art (nav, role) => Kennung => Feld => Text. Ohne weitere Sprache leer.'
+      additionalProperties:
+        type: object
+        additionalProperties:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties: { type: string }
     InventoryItem:
       type: object
       properties:
@@ -10594,6 +10648,14 @@ components:
           type: object
           description: 'Eigene Namen als Abschnitte der Bezeichnungen (z. B. gallery, catalog, intern), gehen vor kompanie.json (Issue #362). Leer kommt als [] an.'
           additionalProperties: { type: string }
+        section_labels_i18n:
+          type: object
+          description: 'Dieselben Namen je weiterer eingeschalteter Sprache (Sprache => Abschnitt => Name): der für diese Sprache eingetragene, sonst der deutsche. Ohne weitere Sprache leer.'
+          additionalProperties:
+            type: object
+            additionalProperties: { type: string }
+        name_translations:
+          $ref: '#/components/schemas/NameTranslations'
         newsInApp:
           type: boolean
           description: 'News werden in der App geschrieben (Quelle app, Bereich news an); wer manage_news hat, sieht die Knöpfe dazu'

@@ -84,7 +84,7 @@ final class NavigationService
     public const MAX_MENU_ITEMS = 12;
     public const LABEL_MAX = 24;
 
-    public function __construct(private readonly Settings $settings)
+    public function __construct(private readonly Settings $settings, private readonly ?TranslationService $translations = null)
     {
     }
 
@@ -241,19 +241,26 @@ final class NavigationService
      * Eigene Namen als Abschnitte für KompanieConfig::sectionLabel (z. B. "gallery" => "Fotos"). „mitglieder“ heißt wie
      * der Abschnitt, den der Tab gerade zeigt: Mitgliederliste, oder nur die Ämter, wenn es keine Liste gibt (Issue #112).
      *
+     * In einer weiteren Sprache ($locale) gilt der Name, den der Admin für sie eingetragen hat (TranslationService, Art
+     * „nav“), sonst der deutsche.
+     *
      * @return array<string, string>
      */
-    public function sectionOverrides(bool $directory, bool $offices): array
+    public function sectionOverrides(bool $directory, bool $offices, string $locale = I18n::SOURCE_LOCALE): array
     {
         $out = [];
-        foreach ($this->names() as $key => $entry) {
-            if (!isset($entry['label'])) {
+        $names = $this->names();
+        // Auch Bereiche ohne eigenen deutschen Namen, die in dieser Sprache einen haben
+        $foreign = $locale !== I18n::SOURCE_LOCALE ? array_keys($this->translations?->all()[$locale]['nav'] ?? []) : [];
+        foreach (array_unique(array_merge(array_keys($names), $foreign)) as $key) {
+            $label = $this->translations?->text('nav', (string) $key, 'label', $locale) ?? $names[$key]['label'] ?? null;
+            if ($label === null) {
                 continue;
             }
             if ($key === 'mitglieder') {
-                $out[$directory || !$offices ? 'directory' : 'offices'] = $entry['label'];
+                $out[$directory || !$offices ? 'directory' : 'offices'] = $label;
             } elseif (isset(self::SECTIONS[$key])) {
-                $out[self::SECTIONS[$key]] = $entry['label'];
+                $out[self::SECTIONS[$key]] = $label;
             }
         }
         return $out;
