@@ -290,6 +290,40 @@ final class RankServiceTest extends TestCase
         $this->assertSame('2026-01-10', $row['threshold_reached_since']);
     }
 
+    public function testChangeOnAnEarlierDayCountsPointsUpToThatDay(): void
+    {
+        $this->setUpApp(['ranks' => true, 'points' => true]);
+        $r = $this->ranks([['Gefreiter', 10], ['Unteroffizier', 20]]);
+        $this->points($this->m, 12, '2026-03-01');
+        $this->points($this->m, 10, '2026-09-01');
+
+        $this->assertSame(400, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter'], 'date' => '2026-10-21'])->status, 'nicht in der Zukunft');
+        $this->assertSame(400, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter'], 'date' => '21.10.2026'])->status, 'nur JJJJ-MM-TT');
+        $res = $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter'], 'date' => '2026-02-15']);
+        $this->assertSame(400, $res->status, 'am 15.02. noch keine Punkte');
+        $this->assertStringContainsString('am 15.02.2026 noch nicht erreicht (fehlen 10 Punkte)', $res->data['message']);
+
+        $res = $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter'], 'date' => '2026-04-01', 'reason' => 'Versammlung']);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame('Gefreiter', $res->data['rank']['title'], 'gilt sofort');
+        // Unteroffizier am 01.06. nicht (12 Punkte), heute schon (22 Punkte); danach nicht mehr vor dem letzten Wechsel.
+        $this->assertSame(400, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Unteroffizier'], 'date' => '2026-06-01'])->status);
+        $res = $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Unteroffizier'], 'date' => '2026-03-31']);
+        $this->assertSame(400, $res->status, 'vor dem letzten Wechsel');
+        $this->assertStringContainsString('01.04.2026', $res->data['message']);
+        // Am selben Tag wie der letzte Wechsel geht es (Reihenfolge bleibt).
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => null, 'date' => '2026-04-01'])->status);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Unteroffizier']])->status, 'ohne Datum = heute');
+
+        $history = $this->call('GET', "/members/{$this->m}")->data['rank_history'];
+        $this->assertSame(['Unteroffizier', null, 'Gefreiter'], array_column($history, 'to'));
+        $this->assertSame([22, 12, 12], array_column($history, 'points_at_change'), 'Punkte am Tag des Wechsels');
+        $this->assertSame('2026-10-20 12:00:00', $history[0]['changed_at']);
+        $this->assertSame('2026-04-01 10:00:01', $history[1]['changed_at'], 'eine Sekunde nach dem Wechsel desselben Tages');
+        $this->assertSame('2026-04-01 10:00:00', $history[2]['changed_at'], '12:00 Uhr Ortszeit (Sommerzeit) in UTC');
+        $this->assertSame('Versammlung', $history[2]['reason']);
+    }
+
     public function testOldBackupWithoutRankTablesEmptiesThem(): void
     {
         $this->setUpApp(['ranks' => true]);

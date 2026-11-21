@@ -1101,7 +1101,7 @@ final class Api
             // Abzeichen (Issue #17): Datei Base64 im JSON, bei SVG optional eine PNG-Fassung (png) für Benachrichtigungen
             new Route('POST', '/ranks/{id}/badge', Cap::ManageRanks, fn (Request $r) => $a->ranks()->uploadBadge($r->id(), $r->input('file'), $r->input('png')), 'ranks', $denyRights),
             new Route('DELETE', '/ranks/{id}/badge', Cap::ManageRanks, fn (Request $r) => $a->ranks()->removeBadge($r->id()), 'ranks', $denyRights),
-            new Route('PUT', '/members/{id}/rank', Cap::ManageRanks, fn (Request $r) => $a->ranks()->change($this->user(), $r->id(), $r->input('rank_id'), $r->input('reason')), 'ranks', $denyRights),
+            new Route('PUT', '/members/{id}/rank', Cap::ManageRanks, fn (Request $r) => $a->ranks()->change($this->user(), $r->id(), $r->input('rank_id'), $r->input('reason'), $r->input('date')), 'ranks', $denyRights),
             new Route('GET', '/promotions', Cap::ViewPromotions, fn () => $a->ranks()->promotions(), 'ranks', $denyRights),
 
             // Titel (Issue #22): Pflege der Liste und Zuweisung

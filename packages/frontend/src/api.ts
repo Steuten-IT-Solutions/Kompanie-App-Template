@@ -2921,8 +2921,9 @@ export const api = {
     request<Rank>('PATCH', `/ranks/${id}`, data),
   deleteRank: (id: number) => request<{ deleted: boolean }>('DELETE', `/ranks/${id}`),
   reorderRanks: (ids: number[]) => request<Rank[]>('PUT', '/ranks/order', { ids }),
-  setMemberRank: (id: number, rank_id: number | null, reason: string) =>
-    request<RankStatus>('PUT', `/members/${id}/rank`, { rank_id, reason }),
+  /** date: Tag des Wechsels (JJJJ-MM-TT); leer = heute. */
+  setMemberRank: (id: number, rank_id: number | null, reason: string, date?: string) =>
+    request<RankStatus>('PUT', `/members/${id}/rank`, { rank_id, reason, ...(date ? { date } : {}) }),
   promotions: () => request<Promotion[]>('GET', '/promotions'),
   /** Abzeichen hochladen; bei SVG optional eine PNG-Fassung (Base64) für Benachrichtigungen. */
   uploadRankBadge: async (id: number, file: File, png?: string | null) =>

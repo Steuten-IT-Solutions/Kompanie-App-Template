@@ -564,7 +564,7 @@ final class RankService
      *
      * @return array<string, mixed> neuer Stand wie status()
      */
-    public function change(User $actor, int $userId, mixed $rankId, mixed $reason): array
+    public function change(User $actor, int $userId, mixed $rankId, mixed $reason, mixed $date = null): array
     {
         $user = $this->app->users->find($userId) ?? throw ApiError::notFound('Mitglied nicht gefunden.');
         // Wer kein Mitglied (mehr) ist, z. B. nach einem Rollenwechsel zum Gast, kann den Dienstgrad nur verlieren.
@@ -578,9 +578,13 @@ final class RankService
         if (($current['id'] ?? null) === ($target['id'] ?? null)) {
             throw ApiError::invalid(sprintf('Das ist schon der %s dieser Person.', $this->app->config->rankLabel()));
         }
-        $total = $this->usesPoints() ? $this->app->scores()->pointsTotal($userId) : null;
+        [$day, $moment] = $this->changeMoment($userId, $date);
+        // Zählen die Punkte bis zum Tag des Wechsels: Bei einem früheren Datum nicht die, die erst danach dazukamen.
+        $total = !$this->usesPoints() ? null
+            : ($day === $this->app->time()->today()->format('Y-m-d') ? $this->app->scores()->pointsTotal($userId) : $this->pointsOn($userId, $day));
         // Punkteregeln nur für Mitglieder; frühere Mitglieder verlieren den Dienstgrad ohne Prüfung.
-        $kind = $user->isMember() ? $this->checkChange($ranks, $current, $target, $total === null ? null : (float) $total) : self::KIND_DEMOTION;
+        $past = $day === $this->app->time()->today()->format('Y-m-d') ? null : $day;
+        $kind = $user->isMember() ? $this->checkChange($ranks, $current, $target, $total === null ? null : (float) $total, $past) : self::KIND_DEMOTION;
         $entry = [
             'from_rank_id' => $current['id'] ?? null,
             'to_rank_id' => $target['id'] ?? null,
@@ -591,13 +595,58 @@ final class RankService
             'reason' => Text::line($reason ?? '', 255),
             'changed_by' => $actor->id,
         ];
-        $repo->change($userId, $entry, $this->app->time()->nowUtc());
+        $repo->change($userId, $entry, $moment);
         try {
             $this->app->pushTriggers()->rankChanged($userId, $entry);
         } catch (\Throwable $e) {
             error_log('Kompanie-App: Benachrichtigung zum Dienstgrad nicht eingereiht: ' . $e->getMessage());
         }
         return $this->status($userId);
+    }
+
+    /**
+     * Tag und Zeitpunkt (UTC) eines Wechsels. Leer oder heute = jetzt; ein früherer Tag = 12:00 Uhr Ortszeit, mindestens
+     * eine Sekunde nach dem letzten Wechsel. Nicht in der Zukunft (der Dienstgrad gilt sofort) und nicht vor dem letzten
+     * Wechsel der Person, damit der Verlauf in seiner Reihenfolge stimmt.
+     *
+     * @return array{0: string, 1: string} [JJJJ-MM-TT, 'Y-m-d H:i:s' in UTC]
+     */
+    private function changeMoment(int $userId, mixed $raw): array
+    {
+        $time = $this->app->time();
+        $today = $time->today()->format('Y-m-d');
+        $day = Input::date($raw, $time->today());
+        if ($day > $today) {
+            throw ApiError::invalid('Das Datum darf nicht in der Zukunft liegen.');
+        }
+        $last = $this->repository()->lastChange($userId);
+        $lastTs = $last === null ? null : strtotime($last . ' UTC');
+        if ($lastTs !== null && $lastTs !== false && $day < $time->format($lastTs, 'Y-m-d')) {
+            throw ApiError::invalid(sprintf(
+                'Der letzte Wechsel dieser Person war am %s. Ein früheres Datum geht nicht, sonst stimmt die Reihenfolge im Verlauf nicht.',
+                $time->format($lastTs, 'd.m.Y'),
+            ));
+        }
+        if ($day === $today) {
+            return [$day, $time->nowUtc()];
+        }
+        $ts = (new \DateTimeImmutable($day . ' 12:00:00', $time->timezone()))->getTimestamp();
+        if ($lastTs !== null && $lastTs !== false && $ts <= $lastTs) {
+            $ts = $lastTs + 1;
+        }
+        return [$day, gmdate('Y-m-d H:i:s', $ts)];
+    }
+
+    /** Punkte bis einschließlich zu einem Tag. */
+    private function pointsOn(int $userId, string $day): float
+    {
+        $sum = 0.0;
+        foreach ($this->repository()->pointEntries($userId) as $e) {
+            if ($e['entry_date'] <= $day) {
+                $sum += $e['value'];
+            }
+        }
+        return round($sum, 2);
     }
 
     /**
@@ -660,7 +709,7 @@ final class RankService
      * @param Rank|null $target
      * @return string promotion | demotion
      */
-    private function checkChange(array $ranks, ?array $current, ?array $target, ?float $total): string
+    private function checkChange(array $ranks, ?array $current, ?array $target, ?float $total, ?string $pastDay = null): string
     {
         $promotion = $target !== null && ($current === null || $this->position($ranks, $target) > $this->position($ranks, $current));
         if ($total === null) {
@@ -668,8 +717,9 @@ final class RankService
         }
         if ($promotion && $target['min_points'] !== null && $total < $target['min_points']) {
             throw ApiError::invalid(sprintf(
-                'Schwelle für „%s“ noch nicht erreicht (fehlen %s Punkte).',
+                'Schwelle für „%s“%s noch nicht erreicht (fehlen %s Punkte).',
                 $target['title'],
+                $pastDay === null ? '' : ' am ' . implode('.', array_reverse(explode('-', $pastDay))),
                 self::number($target['min_points'] - $total),
             ));
         }

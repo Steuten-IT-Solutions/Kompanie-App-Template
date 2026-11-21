@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, config, type Promotion, type Rank, type RankHistoryEntry, type RankStatus } from '../api';
 import brand from '../generated/brand';
-import { formatDate } from '../format';
+import { formatDate, todayYmd } from '../format';
 import { navigate } from '../router';
 import { RankBadge, RankLabel } from '../RankBadge';
 import { useDragSort, useSaveQueue } from '../dragSort';
@@ -444,6 +444,8 @@ export function MemberRank({
   const ranks = useAsync(readOnly ? noRanks : sources.ranksAll.load, sources.ranksAll.deps, readOnly ? undefined : sources.ranksAll.key);
   const [target, setTarget] = useState('');
   const [reason, setReason] = useState('');
+  // Tag des Wechsels: Vorgabe heute, früher geht (nicht vor dem letzten Wechsel, prüft der Server), Zukunft nicht.
+  const [date, setDate] = useState(todayYmd());
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const points = ranksUsePoints() && status.points !== undefined;
@@ -474,10 +476,11 @@ export function MemberRank({
     setBusy(true);
     setFormError(null);
     try {
-      await api.setMemberRank(id, target === 'none' ? null : Number(target), reason.trim());
+      await api.setMemberRank(id, target === 'none' ? null : Number(target), reason.trim(), date);
       onToast(`${rank} geändert`);
       setTarget('');
       setReason('');
+      setDate(todayYmd());
       onChanged();
     } catch (err) {
       setFormError((err as Error).message);
@@ -520,6 +523,13 @@ export function MemberRank({
               {status.rank && <option value="none">Kein {rank}</option>}
             </select>
           </label>
+          <label className="field">
+            <span>Datum</span>
+            <input type="date" max={todayYmd()} value={date} onChange={(e) => setDate(e.target.value)} required />
+          </label>
+          {points && date !== todayYmd() && (
+            <p className="muted small">Bei einem früheren Datum zählen nur die {sec.points} bis zu diesem Tag.</p>
+          )}
           <label className="field">
             <span>Begründung (optional)</span>
             <input type="text" maxLength={255} value={reason} onChange={(e) => setReason(e.target.value)} />

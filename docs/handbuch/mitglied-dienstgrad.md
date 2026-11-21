@@ -18,6 +18,7 @@ Aus der Übersicht **Beförderungen** öffnet ein Tipp auf einen Namen dieses Fe
 ## Was du hier siehst
 - Der aktuelle {begriff.rank} mit Abzeichen, sonst „Kein {begriff.rank}“. Mit {bereich.points} steht dahinter „noch … {bereich.points} bis …“ oder „Schwelle für … erreicht seit …“.
 - **Neuer {begriff.rank}**: die Auswahl. Sie bietet nur an, was erlaubt ist, mit {bereich.points} jeweils mit Schwelle, z. B. „(ab 50)“. Hat die Person einen {begriff.rank}, steht dort auch **Kein {begriff.rank}**.
+- **Datum**: der Tag der Änderung, vorgegeben ist heute. Ein früherer Tag geht, ein Tag in der Zukunft nicht.
 - **Begründung (optional)**: steht später im Verlauf.
 - **{begriff.rank} ändern**: speichert die Änderung.
 - Darunter der Verlauf: jede „Ersteinstufung“, „Beförderung“ und „Degradierung“ mit Datum, von wem, mit {bereich.points} dem Stand zu diesem Zeitpunkt und der Begründung.
@@ -25,8 +26,9 @@ Aus der Übersicht **Beförderungen** öffnet ein Tipp auf einen Namen dieses Fe
 ## So gehst du vor
 ### Befördern oder degradieren
 1. Wähle unter **Neuer {begriff.rank}** den gewünschten {begriff.rank}. Kommst du aus **Beförderungen**, ist der nächste schon gewählt.
-2. Trage bei Bedarf eine **Begründung** ein.
-3. Tippe auf **{begriff.rank} ändern**. Die Änderung steht sofort im Verlauf.
+2. Fand die Beförderung an einem früheren Tag statt, z. B. auf einer Versammlung, wähle unter **Datum** diesen Tag.
+3. Trage bei Bedarf eine **Begründung** ein.
+4. Tippe auf **{begriff.rank} ändern**. Die Änderung steht sofort im Verlauf, mit dem gewählten Datum.
 
 ### Den {begriff.rank} wegnehmen
 1. Wähle unter **Neuer {begriff.rank}** den Eintrag **Kein {begriff.rank}**.
@@ -34,6 +36,7 @@ Aus der Übersicht **Beförderungen** öffnet ein Tipp auf einen Namen dieses Fe
 
 ## Gut zu wissen
 - Mit {bereich.points}: Befördern geht erst, wenn die {bereich.points} die Schwelle des neuen {begriff.rank}s erreichen; mehrere Stufen auf einmal sind erlaubt. Degradieren geht immer. Steht „Zurzeit ist keine Änderung möglich: Befördern erst ab der Schwelle.“ da, reicht der Stand noch für keinen {begriff.rank}.
+- **Früheres Datum**: Mit {bereich.points} zählen dann nur die {bereich.points} bis zu diesem Tag, für die Schwelle und für den Stand im Verlauf. Reichten sie damals nicht, lehnt die App die Beförderung ab („Schwelle für … am … noch nicht erreicht“). Das Datum darf nicht vor der letzten Änderung des {begriff.rank}s dieser Person liegen, auch nicht vor einer Ersteinstufung beim Anlegen; sonst stimmt die Reihenfolge im Verlauf nicht. Der neue {begriff.rank} ist in jedem Fall sofort der aktuelle.
 - Deaktivierte {bereich.ranks} stehen nicht zur Auswahl.
 - Einen {begriff.rank} bekommen nur Mitglieder. Wer kein Mitglied mehr ist, z. B. nach einem Wechsel zur Rolle {rolle.guest}, behält seinen {begriff.rank}; du kannst ihn dort nur noch auf **Kein {begriff.rank}** setzen. Das gilt auch für ehemalige Mitglieder (Liste **Ehemalige** der Verwaltung, nur für alle, die Mitglieder anlegen dürfen).
 - Den Stand an {bereich.points} siehst du hier auch, wenn du selbst keine {bereich.points} vergeben darfst.

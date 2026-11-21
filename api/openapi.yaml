@@ -2225,6 +2225,9 @@ paths:
         Ohne den Bereich Punkte frei. Mit Punkten (für alle, auch Admins): befördern erst ab der Schwelle des Ziels;
         degradieren immer, auch über der Schwelle. Dienstgrade ohne Schwelle frei. Schreibt den Verlauf.
         Wer kein Mitglied mehr ist (z. B. Gast), kann den Dienstgrad nur verlieren (`rank_id: null`, ohne Punkteregeln).
+        `date` legt den Tag des Wechsels fest (leer = heute): nicht in der Zukunft und nicht vor dem letzten Wechsel der
+        Person. Bei einem früheren Tag zählen für Schwelle und `points_at_change` nur Punkte bis zu diesem Tag; der
+        Verlauf speichert dann 12:00 Uhr Ortszeit dieses Tages als `changed_at`.
       x-capability: manage_ranks
       requestBody:
         required: true
@@ -2235,6 +2238,7 @@ paths:
               properties:
                 rank_id: { type: [integer, 'null'], description: null = kein Dienstgrad }
                 reason: { type: string, maxLength: 255 }
+                date: { type: string, format: date, description: Tag des Wechsels (JJJJ-MM-TT); leer = heute }
       responses:
         '200':
           description: Neuer Stand

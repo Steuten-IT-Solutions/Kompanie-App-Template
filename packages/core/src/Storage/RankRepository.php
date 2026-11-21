@@ -99,6 +99,13 @@ final class RankRepository
         });
     }
 
+    /** Zeitpunkt (UTC) des letzten Wechsels einer Person, null ohne Verlauf. */
+    public function lastChange(int $userId): ?string
+    {
+        $at = $this->db->scalar('SELECT MAX(changed_at) FROM {rank_history} WHERE user_id = ?', [$userId]);
+        return $at === null || $at === false || $at === '' ? null : (string) $at;
+    }
+
     /** @return list<HistoryEntry> neueste zuerst */
     public function history(int $userId): array
     {
