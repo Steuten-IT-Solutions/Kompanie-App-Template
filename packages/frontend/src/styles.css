@@ -8233,3 +8233,16 @@ fieldset.block-source legend {
   text-align: left;
   padding-left: calc(1.2em + 8px);
 }
+
+/* „Einrichten auf“ (Einrichten je Sprache): oben auf Seiten mit eigenen Namen */
+.edit-lang {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+}
+.edit-lang p {
+  flex-basis: 100%;
+  margin: 0;
+}

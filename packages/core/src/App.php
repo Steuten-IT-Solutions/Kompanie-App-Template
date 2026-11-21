@@ -53,6 +53,7 @@ use KompanieApp\Core\Domain\TileLayoutService;
 use KompanieApp\Core\Domain\TitleService;
 use KompanieApp\Core\Domain\StatusService;
 use KompanieApp\Core\Domain\Time;
+use KompanieApp\Core\Domain\TranslationService;
 use KompanieApp\Core\Domain\MaintenanceService;
 use KompanieApp\Core\Domain\NavigationService;
 use KompanieApp\Core\Domain\MemberPhotoService;
@@ -70,6 +71,7 @@ use KompanieApp\Core\Domain\BackupDownload;
 use KompanieApp\Core\Domain\MailService;
 use KompanieApp\Core\Domain\RichImageService;
 use KompanieApp\Core\Domain\SignatureService;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Mail\PhpMailerMailer;
 use KompanieApp\Core\Domain\UserNames;
 use KompanieApp\Core\Http\Api;
@@ -194,9 +196,11 @@ final class App
         $this->authContext = $this->preview;
         $this->env = new PreviewEnvironment($env, $this->preview);
         // Eigene Bereichsnamen der Installation (Issue #362) gehen überall vor kompanie.json.
+        // In einer weiteren Sprache die Namen, die der Admin für sie eingetragen hat (TranslationService).
         $config->overrideSections(fn (): array => $this->navigation()->sectionOverrides(
             $this->features()->enabled('directory'),
             $this->features()->enabled('offices'),
+            I18n::locale(),
         ));
     }
 
@@ -766,6 +770,12 @@ final class App
     }
 
     /** Sprachen der App: eingeschaltete und die Wahl je Konto (Plan „Mehrsprachigkeit“) */
+    /** Eigene Namen je weiterer Sprache (Plan „Mehrsprachigkeit“) */
+    public function translations(): TranslationService
+    {
+        return $this->service(TranslationService::class, fn () => new TranslationService($this));
+    }
+
     public function languages(): LanguageService
     {
         return $this->service(LanguageService::class, fn () => new LanguageService($this->settings, new UserSettings($this->db)));
@@ -903,7 +913,7 @@ final class App
 
     public function navigation(): NavigationService
     {
-        return $this->service(NavigationService::class, fn () => new NavigationService($this->settings));
+        return $this->service(NavigationService::class, fn () => new NavigationService($this->settings, $this->translations()));
     }
 
     public function settingsService(): SettingsService

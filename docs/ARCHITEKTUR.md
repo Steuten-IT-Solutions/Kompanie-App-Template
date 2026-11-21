@@ -637,6 +637,11 @@ Bezeichnungen der Kompanie (Bereiche, feste Rollen, Dienstgrad, Begrüßung): Di
 Sprache gibt es in `kompanie.json` den Abschnitt `translations.<sprache>` (`greeting`, `guestWelcome`, `description`,
 `labels` wie oben). Die App übersetzt in `brandLocale.ts` (beim Laden von `generated/brand.ts`), der Kern in
 `KompanieConfig::localized()`; gespeichert werden die deutschen Namen (`RoleService::sourceLabel`, `Features::roleLabel`).
+Eigene Namen je weiterer Sprache (Einrichten je Sprache): Tabelle `translations` (Migration 73, Art, Kennung, Feld,
+Sprache, Text), `Domain\TranslationService` mit den Arten `nav` (Navigation, Kennung wie in `navigation_names`) und `role`;
+der deutsche Name bleibt, wo er ist. Schreiben über `PUT /admin/translations` (jede Art mit ihrem Recht), lesen über
+`/config` (`name_translations`, `section_labels_i18n`), in der App `names.ts`. Die Wahl „Einrichten auf“ (`language.tsx`,
+`useEditLocale`) gilt am Gerät; in einer weiteren Sprache zeigen die Masken deren Namen mit dem deutschen als Hinweis.
 
 Die App setzt **HTTPS** voraus (sonst funktioniert die Installation aufs Handy nicht). Der Installer prüft das und erklärt, wie man beim Hoster ein kostenloses Zertifikat einschaltet.
 

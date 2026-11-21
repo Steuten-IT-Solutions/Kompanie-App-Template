@@ -5,10 +5,10 @@
  * (auch für Gäste) und, wer angemeldet ist, am Konto (Mails und Push kommen dann in dieser Sprache). Danach lädt die
  * Seite neu: Die Texte stehen beim Laden fest (i18n.ts).
  */
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import { api, config } from './api';
 import { useBackClose } from './backClose';
-import { isLocale, locale, saveDeviceLocale, t, type Locale } from './i18n';
+import { isLocale, locale, saveDeviceLocale, SOURCE_LOCALE, t, type Locale } from './i18n';
 
 /** Name jeder Sprache in ihr selbst (so findet man die eigene, auch wenn man die aktuelle nicht liest). */
 export const LANGUAGE_NAMES: Readonly<Record<Locale, string>> = { de: 'Deutsch', en: 'English' };
@@ -181,6 +181,80 @@ export function LanguageCard() {
           </button>
         ))}
       </nav>
+    </div>
+  );
+}
+
+/**
+ * „Einrichten auf“ (Plan „Mehrsprachigkeit“, Einrichten je Sprache): In welcher Sprache der Admin gerade eigene Namen
+ * einträgt. Deutsch ist die Hauptfassung; in einer weiteren Sprache zeigen die Masken deren Namen, leere Felder den
+ * deutschen als Hinweis. Die Wahl gilt am Gerät, bis sie jemand ändert; ohne weitere Sprache immer Deutsch.
+ */
+const EDIT_KEY = 'kompanie-edit-locale';
+const editListeners = new Set<() => void>();
+let editChoice: Locale | null = null;
+
+function storedEditLocale(): Locale {
+  if (editChoice === null) {
+    try {
+      const v = globalThis.localStorage?.getItem(EDIT_KEY);
+      editChoice = isLocale(v) ? v : SOURCE_LOCALE;
+    } catch {
+      editChoice = SOURCE_LOCALE;
+    }
+  }
+  return enabledLocales().includes(editChoice) ? editChoice : SOURCE_LOCALE;
+}
+
+/** Sprache, auf der gerade eingerichtet wird. */
+export const editLocale = (): Locale => storedEditLocale();
+
+export function setEditLocale(next: Locale): void {
+  editChoice = next;
+  try {
+    globalThis.localStorage?.setItem(EDIT_KEY, next);
+  } catch {
+    // ohne Speicher: gilt bis zum Neuladen
+  }
+  editListeners.forEach((l) => l());
+}
+
+/** Sprache, auf der gerade eingerichtet wird, und Neuzeichnen bei einem Wechsel. */
+export function useEditLocale(): Locale {
+  return useSyncExternalStore((l) => {
+    editListeners.add(l);
+    return () => editListeners.delete(l);
+  }, storedEditLocale);
+}
+
+/** Wahl „Einrichten auf: Deutsch | English“ oben in den Einstellungen; nur mit weiterer Sprache. */
+export function EditLanguageSwitch() {
+  const current = useEditLocale();
+  if (!hasLanguageChoice()) return null;
+  return (
+    <div className="edit-lang">
+      <span className="muted small">{t('Einrichten auf:')}</span>
+      <nav className="segmented lang-choice" aria-label={t('Eigene Namen einrichten auf')}>
+        {enabledLocales().map((l) => (
+          <button
+            key={l}
+            type="button"
+            lang={l}
+            className={l === current ? 'active' : ''}
+            aria-pressed={l === current}
+            onClick={() => setEditLocale(l)}
+          >
+            <Flag lang={l} /> {LANGUAGE_NAMES[l]}
+          </button>
+        ))}
+      </nav>
+      {current !== SOURCE_LOCALE && (
+        <p className="muted small">
+          {t('Du trägst die Namen für {language} ein. Leere Felder zeigen den deutschen Namen; er gilt, solange nichts eingetragen ist.', {
+            language: LANGUAGE_NAMES[current],
+          })}
+        </p>
+      )}
     </div>
   );
 }

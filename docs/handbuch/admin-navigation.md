@@ -70,6 +70,8 @@ Ein Untermenü braucht mindestens einen Bereich. **Untermenü entfernen** schieb
 
 Der eigene Name gilt überall in der App: unten in der Leiste, in den Überschriften, in der Verwaltung, in Benachrichtigungen und Mails und in dieser Hilfe. Die Adressen bleiben gleich, geteilte Links funktionieren also weiter. Bei einer eigenen Seite ist es nur der Name in der Leiste; ihr Titel bleibt. Neben einem eigenen Namen steht der Standardname, damit du den Bereich in dieser Hilfe wiederfindest. Heißen zwei Punkte gleich, weist die Seite darauf hin.
 
+Hat eure App außer Deutsch auch Englisch eingeschaltet, trägst du den englischen Namen so ein: Wähle oben bei **Einrichten auf** die Sprache **English** und benenne den Bereich wie oben um. Mehr dazu: [Sprachen](seite:admin-sprachen).
+
 So lässt sich auch **Intern** der Standardnavigation umbenennen, ohne dass ihr eine eigene Navigation anlegt: Solange du die Reihenfolge unten in der Leiste nicht änderst, bleibt die Standardnavigation.
 
 ### Die Startseite wählen
