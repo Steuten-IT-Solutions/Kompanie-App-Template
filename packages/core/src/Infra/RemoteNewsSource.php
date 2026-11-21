@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Infra;
 
 use KompanieApp\Core\Domain\Text;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\Cache;
 use KompanieApp\Core\Port\HttpClient;
 use KompanieApp\Core\Port\NewsSource;
@@ -27,7 +28,6 @@ final class RemoteNewsSource implements NewsSource
     private const CACHE_SECONDS = 600;
     private const MAX_FEED_ITEMS = 100;
     private const ERROR_SECONDS = 60;
-    private const PUBLIC_ERROR = 'Die Beiträge sind gerade nicht erreichbar. Bitte später erneut versuchen.';
 
     private bool $bypassCache = false;
 
@@ -120,7 +120,7 @@ final class RemoteNewsSource implements NewsSource
     /** Fehler: im Test für Admins mit Einzelheiten, sonst allgemein (keine Details zu internen Adressen). */
     private function upstream(string $detail): ApiError
     {
-        return ApiError::upstream($this->bypassCache ? $detail : self::PUBLIC_ERROR);
+        return ApiError::upstream($this->bypassCache ? $detail : I18n::t('Die Beiträge sind gerade nicht erreichbar. Bitte später erneut versuchen.'));
     }
 
     /**
@@ -155,7 +155,7 @@ final class RemoteNewsSource implements NewsSource
         try {
             $res = $this->http->request('GET', $url, ['Accept' => 'application/json, application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.5'], null, 10);
         } catch (\RuntimeException $e) {
-            $detail = 'Die Webseite mit den Neuigkeiten ist nicht erreichbar: ' . $e->getMessage();
+            $detail = I18n::t('Die Webseite mit den Neuigkeiten ist nicht erreichbar: {error}', ['error' => $e->getMessage()]);
             $this->cache->set($key, ['error' => $detail], self::ERROR_SECONDS);
             throw $this->upstream($detail);
         }
@@ -175,7 +175,7 @@ final class RemoteNewsSource implements NewsSource
     {
         $data = json_decode($res['body'], true);
         if ($res['status'] !== 200 || !is_array($data)) {
-            throw $this->upstream('Die Webseite lieferte keine Beiträge (HTTP ' . $res['status'] . '). Ist die Adresse richtig und die REST-API erreichbar?');
+            throw $this->upstream(I18n::t('Die Webseite lieferte keine Beiträge (HTTP {status}). Ist die Adresse richtig und die REST-API erreichbar?', ['status' => $res['status']]));
         }
         return $data;
     }
@@ -205,7 +205,7 @@ final class RemoteNewsSource implements NewsSource
     {
         $res = $this->fetch($this->url());
         if ($res['status'] !== 200) {
-            throw $this->upstream('Der Feed lieferte HTTP ' . $res['status'] . '.');
+            throw $this->upstream(I18n::t('Der Feed lieferte HTTP {status}.', ['status' => $res['status']]));
         }
         $previous = libxml_use_internal_errors(true);
         // Ohne externe Entitäten und Netzwerkzugriff (XXE). Leerraum vor <?xml kommt bei
@@ -214,7 +214,7 @@ final class RemoteNewsSource implements NewsSource
         libxml_clear_errors();
         libxml_use_internal_errors($previous);
         if ($xml === false) {
-            throw $this->upstream('Unter der Adresse liegt kein gültiger RSS- oder Atom-Feed.');
+            throw $this->upstream(I18n::t('Unter der Adresse liegt kein gültiger RSS- oder Atom-Feed.'));
         }
         $root = $xml->getName();
         $items = [];
@@ -248,7 +248,7 @@ final class RemoteNewsSource implements NewsSource
                 $items[] = $this->feedItem($link, (string) $a->title, (string) ($a->published ?: $a->updated), self::atomText($a->summary), $html, null);
             }
         } else {
-            throw $this->upstream('Unter der Adresse liegt kein RSS- oder Atom-Feed.');
+            throw $this->upstream(I18n::t('Unter der Adresse liegt kein RSS- oder Atom-Feed.'));
         }
         $items = array_values(array_filter($items, static fn (array $i): bool => $i['link'] !== '' || $i['title'] !== ''));
         // Neueste zuerst; Beiträge ohne Datum ans Ende.

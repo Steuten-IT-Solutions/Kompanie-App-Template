@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Website\WebsiteRenderer;
 
 /**
@@ -98,15 +99,15 @@ final class WebsiteService
         if (array_key_exists('home_page_id', $in)) {
             $id = $in['home_page_id'] === null ? null : Input::integer($in['home_page_id']);
             if ($in['home_page_id'] !== null && ($id === null || $id <= 0)) {
-                throw ApiError::invalid('Ungültige Startseite.');
+                throw ApiError::invalid(I18n::t('Ungültige Startseite.'));
             }
             if ($id !== null) {
                 $page = $this->app->db->selectOne('SELECT audience FROM {app_pages} WHERE id = ?', [$id]);
                 if ($page === null) {
-                    throw ApiError::invalid('Diese Seite gibt es nicht.');
+                    throw ApiError::invalid(I18n::t('Diese Seite gibt es nicht.'));
                 }
                 if ($page['audience'] !== 'public') {
-                    throw ApiError::invalid('Die Startseite muss für alle sichtbar sein. Bitte die Seite unter Verwaltung → Seiten auf „Für alle“ stellen.');
+                    throw ApiError::invalid(I18n::t('Die Startseite muss für alle sichtbar sein. Bitte die Seite unter Verwaltung → Seiten auf „Für alle“ stellen.'));
                 }
             }
             $saved = $this->app->settings->get(self::SETTING);
@@ -175,32 +176,32 @@ final class WebsiteService
         if (!$this->enabled()) {
             return null;
         }
-        $item = static fn (string $level, string $text): array => ['key' => 'website', 'label' => 'Webseite', 'level' => $level, 'text' => $text];
+        $item = static fn (string $level, string $text): array => ['key' => 'website', 'label' => I18n::t('Webseite'), 'level' => $level, 'text' => $text];
         $entry = $this->host()->entryStatus();
         if ($entry['state'] !== 'installed') {
             return $item($entry['state'] === 'root' ? 'error' : 'warn', $this->entryMessage($entry));
         }
         if ($this->homePage() === null) {
-            return $item('warn', 'Die Webseite ist unter ' . $entry['url'] . ' erreichbar, hat aber noch keine Startseite. Bitte unter Verwaltung → Webseite eine Seite auswählen, die für alle sichtbar ist.');
+            return $item('warn', I18n::t('Die Webseite ist unter {url} erreichbar, hat aber noch keine Startseite. Bitte unter Verwaltung → Webseite eine Seite auswählen, die für alle sichtbar ist.', ['url' => (string) $entry['url']]));
         }
-        return $item('ok', 'Die Webseite ist unter ' . $entry['url'] . ' erreichbar.');
+        return $item('ok', I18n::t('Die Webseite ist unter {url} erreichbar.', ['url' => (string) $entry['url']]));
     }
 
     /** @param array{state: string, url: string|null, file: string|null, folder: string, content: string} $entry */
     private function entryMessage(array $entry): string
     {
         return match ($entry['state']) {
-            'installed' => 'Die Einstiegsdatei ist da. Die Webseite ist unter ' . $entry['url'] . ' erreichbar.',
-            'missing' => 'Die Einstiegsdatei fehlt noch. Mit „Einstiegsdatei anlegen“ legt die App sie im Ordner über „' . $entry['folder'] . '“ an; danach ist die Webseite unter ' . $entry['url'] . ' erreichbar.',
-            'outdated' => 'Die Einstiegsdatei gehört zu einem anderen Ordnernamen der App. Mit „Einstiegsdatei anlegen“ schreibt die App sie neu.',
-            'occupied' => 'Im Ordner über „' . $entry['folder'] . '“ liegt schon eine andere Startseite (' . $entry['file'] . '), zum Beispiel eine bisherige Webseite. Die App ersetzt sie nicht. Wenn die neue Webseite sie ablösen soll, bitte die Datei beim Hoster umbenennen oder sichern und löschen und danach die Einstiegsdatei anlegen.',
-            'not_writable' => 'PHP darf im Ordner über „' . $entry['folder'] . '“ keine Dateien anlegen. Bitte die Einstiegsdatei von Hand als index.php dort hochladen (Inhalt unten) oder beim Hoster die Schreibrechte des Ordners prüfen.',
-            default => 'Die App liegt direkt unter der Adresse des Webspace und nicht in einem eigenen Ordner wie „app“. Die Webseite braucht diesen Ordner, weil sie selbst unter der Adresse des Webspace liegt; hier geht sie deshalb nicht.',
+            'installed' => I18n::t('Die Einstiegsdatei ist da. Die Webseite ist unter {url} erreichbar.', ['url' => (string) $entry['url']]),
+            'missing' => I18n::t('Die Einstiegsdatei fehlt noch. Mit „Einstiegsdatei anlegen“ legt die App sie im Ordner über „{folder}“ an; danach ist die Webseite unter {url} erreichbar.', ['folder' => $entry['folder'], 'url' => (string) $entry['url']]),
+            'outdated' => I18n::t('Die Einstiegsdatei gehört zu einem anderen Ordnernamen der App. Mit „Einstiegsdatei anlegen“ schreibt die App sie neu.'),
+            'occupied' => I18n::t('Im Ordner über „{folder}“ liegt schon eine andere Startseite ({file}), zum Beispiel eine bisherige Webseite. Die App ersetzt sie nicht. Wenn die neue Webseite sie ablösen soll, bitte die Datei beim Hoster umbenennen oder sichern und löschen und danach die Einstiegsdatei anlegen.', ['folder' => $entry['folder'], 'file' => (string) $entry['file']]),
+            'not_writable' => I18n::t('PHP darf im Ordner über „{folder}“ keine Dateien anlegen. Bitte die Einstiegsdatei von Hand als index.php dort hochladen (Inhalt unten) oder beim Hoster die Schreibrechte des Ordners prüfen.', ['folder' => $entry['folder']]),
+            default => I18n::t('Die App liegt direkt unter der Adresse des Webspace und nicht in einem eigenen Ordner wie „app“. Die Webseite braucht diesen Ordner, weil sie selbst unter der Adresse des Webspace liegt; hier geht sie deshalb nicht.'),
         };
     }
 
     private function host(): \KompanieApp\Core\Port\WebsiteHost
     {
-        return $this->app->websiteHost ?? throw new ApiError(403, 'feature_disabled', 'Die Webseite gibt es nur in der eigenständigen Version.');
+        return $this->app->websiteHost ?? throw new ApiError(403, 'feature_disabled', I18n::t('Die Webseite gibt es nur in der eigenständigen Version.'));
     }
 }

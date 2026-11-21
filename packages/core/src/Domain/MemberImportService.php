@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Mitglieder aus einer Tabelle übernehmen (Ersterfassung nach der Installation, auch später): CSV oder, in der App aus
@@ -95,10 +96,10 @@ final class MemberImportService
             }
         }
         if ($header === null) {
-            throw ApiError::invalid('Die Tabelle enthält keine Zeilen.');
+            throw ApiError::invalid(I18n::t('Die Tabelle enthält keine Zeilen.'));
         }
         if (!isset($map['first_name'])) {
-            throw ApiError::invalid('Die erste Zeile muss die Spaltennamen enthalten, mindestens „Vorname“ (z. B. Vorname;Nachname;Status).');
+            throw ApiError::invalid(I18n::t('Die erste Zeile muss die Spaltennamen enthalten, mindestens „Vorname“ (z. B. Vorname;Nachname;Status).'));
         }
 
         $accounts = [];
@@ -118,7 +119,7 @@ final class MemberImportService
                 continue;
             }
             if (count($rows) >= self::MAX_ROWS) {
-                throw ApiError::invalid(sprintf('Höchstens %d Personen auf einmal.', self::MAX_ROWS));
+                throw ApiError::invalid(I18n::t('Höchstens {max} Personen auf einmal.', ['max' => self::MAX_ROWS]));
             }
             $cells = CsvTable::cells($line, $separator);
             $get = static fn (string $key): string => isset($map[$key]) ? ($cells[$map[$key]] ?? '') : '';
@@ -127,7 +128,7 @@ final class MemberImportService
             try {
                 $key = mb_strtolower($row['name']);
                 if ($key !== '' && isset($seen[$key])) {
-                    throw ApiError::invalid(sprintf('Der Name steht schon in Zeile %d. Gleichnamige bitte unterscheidbar machen (z. B. „I“ und „II“).', $seen[$key]));
+                    throw ApiError::invalid(I18n::t('Der Name steht schon in Zeile {line}. Gleichnamige bitte unterscheidbar machen (z. B. „I“ und „II“).', ['line' => $seen[$key]]));
                 }
                 $seen[$key] = $row['line'];
                 // Vorhandene Konten bleiben, wie sie sind: nichts weiter prüfen (z. B. ihre E-Mail beim zweiten Import).
@@ -146,7 +147,7 @@ final class MemberImportService
             $rows[] = $row;
         }
         if ($rows === []) {
-            throw ApiError::invalid('Die Tabelle enthält außer den Spaltennamen keine Zeilen.');
+            throw ApiError::invalid(I18n::t('Die Tabelle enthält außer den Spaltennamen keine Zeilen.'));
         }
         foreach ($rows as $row) {
             if (!isset($row['existing']) && !isset($row['error'])) {
@@ -156,7 +157,7 @@ final class MemberImportService
         }
         $errors = array_values(array_filter($rows, static fn (array $r): bool => isset($r['error'])));
         if ($apply && $errors !== []) {
-            throw ApiError::invalid(sprintf('Zeile %d: %s', $errors[0]['line'], $errors[0]['error']) . (count($errors) > 1 ? sprintf(' (und %d weitere Fehler)', count($errors) - 1) : ''));
+            throw ApiError::invalid(I18n::t('Zeile {line}: {error}', ['line' => $errors[0]['line'], 'error' => $errors[0]['error']]) . (count($errors) > 1 ? ' ' . I18n::tn('(und {count} weiterer Fehler)', '(und {count} weitere Fehler)', count($errors) - 1) : ''));
         }
         $names = [];
         foreach ($planned as $plan) {
@@ -186,8 +187,8 @@ final class MemberImportService
                 if (!$e instanceof ApiError) {
                     error_log('Kompanie-App: Import abgebrochen: ' . $e->getMessage());
                 }
-                $why = $e instanceof ApiError ? $e->getMessage() : 'Konnte nicht angelegt werden.';
-                $result['error'] = sprintf('Nach %d von %d Personen abgebrochen bei „%s“: %s Ein neuer Import legt nur die übrigen an.', $done, count($planned), $plan['prepared']['name'], $why);
+                $why = $e instanceof ApiError ? $e->getMessage() : I18n::t('Konnte nicht angelegt werden.');
+                $result['error'] = I18n::t('Nach {done} von {total} Personen abgebrochen bei „{name}“: {error} Ein neuer Import legt nur die übrigen an.', ['done' => $done, 'total' => count($planned), 'name' => $plan['prepared']['name'], 'error' => $why]);
                 break;
             }
             $result['new'][$plan['status']]++;
@@ -216,13 +217,13 @@ final class MemberImportService
         }
         $features = $this->app->features();
         $config = $this->app->config;
-        $off = static fn (string $feature, string $label): string => sprintf('Bereich %s ist ausgeschaltet', $config->sectionLabel($feature, $label));
+        $off = static fn (string $feature, string $label): string => I18n::t('Bereich {section} ist ausgeschaltet', ['section' => $config->sectionLabel($feature, $label)]);
         $unavailable = [
             'birthday' => !$features->enabled('birthdays') ? $off('birthdays', 'Geburtstage') : null,
-            'points' => !$features->enabled('points') ? $off('points', 'Punkte') : (!$actor->can(Capability::ManagePoints) ? 'du darfst keine Punkte vergeben' : null),
-            'rank' => !$features->enabled('ranks') ? $off('ranks', 'Dienstgrade') : (!$actor->can(Capability::ManageRanks) ? 'du darfst keine Dienstgrade vergeben' : null),
-            'titles' => !$features->enabled('titles') ? $off('titles', 'Titel') : (!$actor->can(Capability::ManageTitles) ? 'du darfst keine Titel vergeben' : null),
-            'extra_roles' => !$actor->can(Capability::PromoteUsers) ? 'du darfst keine Rollen vergeben' : null,
+            'points' => !$features->enabled('points') ? $off('points', 'Punkte') : (!$actor->can(Capability::ManagePoints) ? I18n::t('du darfst keine Punkte vergeben') : null),
+            'rank' => !$features->enabled('ranks') ? $off('ranks', 'Dienstgrade') : (!$actor->can(Capability::ManageRanks) ? I18n::t('du darfst keine Dienstgrade vergeben') : null),
+            'titles' => !$features->enabled('titles') ? $off('titles', 'Titel') : (!$actor->can(Capability::ManageTitles) ? I18n::t('du darfst keine Titel vergeben') : null),
+            'extra_roles' => !$actor->can(Capability::PromoteUsers) ? I18n::t('du darfst keine Rollen vergeben') : null,
         ];
         $map = [];
         $ignored = [];
@@ -232,9 +233,9 @@ final class MemberImportService
             }
             $key = $aliases[(string) preg_replace('/[\s_.\-]+/u', '', mb_strtolower($cell))] ?? null;
             if ($key === null) {
-                $ignored[] = ['column' => $cell, 'reason' => 'unbekannte Spalte'];
+                $ignored[] = ['column' => $cell, 'reason' => I18n::t('unbekannte Spalte')];
             } elseif (isset($map[$key])) {
-                $ignored[] = ['column' => $cell, 'reason' => 'doppelt'];
+                $ignored[] = ['column' => $cell, 'reason' => I18n::t('doppelt')];
             } elseif (($unavailable[$key] ?? null) !== null) {
                 $ignored[] = ['column' => $cell, 'reason' => (string) $unavailable[$key]];
             } else {
@@ -288,18 +289,18 @@ final class MemberImportService
     private function row(User $actor, \Closure $get, array $context, array &$taken): array
     {
         if ($get('first_name') === '') {
-            throw ApiError::invalid('Der Vorname fehlt.');
+            throw ApiError::invalid(I18n::t('Der Vorname fehlt.'));
         }
         $level = $context['levels'][mb_strtolower($get('status'))] ?? null;
         if ($level === null) {
             $labels = array_map(fn (string $key): string => $this->app->roles()->label($key), $context['creatable']);
-            throw ApiError::invalid(sprintf('Status „%s“ unbekannt: bitte %s oder ehemalig (leer = %s).', $get('status'), implode(', ', $labels), $this->app->roles()->label(Roles::MEMBER)));
+            throw ApiError::invalid(I18n::t('Status „{status}“ unbekannt: bitte {roles} oder ehemalig (leer = {member}).', ['status' => $get('status'), 'roles' => implode(', ', $labels), 'member' => $this->app->roles()->label(Roles::MEMBER)]));
         }
         $status = $level === self::STATUS_FORMER ? self::STATUS_FORMER : self::STATUS_ACTIVE;
         $level = $status === self::STATUS_FORMER ? Roles::MEMBER : $level;
         $today = $this->app->time()->today();
         $out = ['status' => $status, 'level' => $status === self::STATUS_FORMER ? null : $level];
-        $access = self::ACCESS[mb_strtolower($get('access'))] ?? throw ApiError::invalid(sprintf('Zugang „%s“ unbekannt: bitte ja oder nein (leer = ja).', $get('access')));
+        $access = self::ACCESS[mb_strtolower($get('access'))] ?? throw ApiError::invalid(I18n::t('Zugang „{value}“ unbekannt: bitte ja oder nein (leer = ja).', ['value' => $get('access')]));
         $noAccess = $status === self::STATUS_ACTIVE && !$access;
         if ($noAccess) {
             $out['no_access'] = true;
@@ -312,18 +313,18 @@ final class MemberImportService
             $out += $former;
         } else {
             if ($get('left') !== '' || $get('reason') !== '') {
-                throw ApiError::invalid('Ausgeschieden und Grund gibt es nur bei Ehemaligen (Status „ehemalig“).');
+                throw ApiError::invalid(I18n::t('Ausgeschieden und Grund gibt es nur bei Ehemaligen (Status „ehemalig“).'));
             }
             if (FormerMemberService::isFounder($get('joined'))) {
-                throw ApiError::invalid('„Gründer“ als Eintritt gibt es nur bei Ehemaligen; sonst bitte das Datum oder Jahr angeben.');
+                throw ApiError::invalid(I18n::t('„Gründer“ als Eintritt gibt es nur bei Ehemaligen; sonst bitte das Datum oder Jahr angeben.'));
             }
-            $joined = FormerMemberService::date($get('joined'), 'Eintritt', $today);
+            $joined = FormerMemberService::date($get('joined'), I18n::t('Eintritt'), $today);
             $out['joined_on'] = $joined;
         }
 
         $birthday = self::birthday($get('birthday'));
         if ($birthday !== '' && preg_match('/^(?:\d{4}-)?\d{2}-\d{2}$/', $birthday) !== 1) {
-            throw ApiError::invalid('Geburtstag bitte als TT.MM.JJJJ oder ohne Jahr als TT.MM. angeben.');
+            throw ApiError::invalid(I18n::t('Geburtstag bitte als TT.MM.JJJJ oder ohne Jahr als TT.MM. angeben.'));
         }
         $birthday = $birthday === '' ? null : $this->app->birthdays()->parse($birthday);
         $out['birthday'] = $birthday === null ? '' : ($birthday['year'] !== null ? sprintf('%04d-', $birthday['year']) : '') . sprintf('%02d-%02d', $birthday['month'], $birthday['day']);
@@ -335,12 +336,12 @@ final class MemberImportService
         $titles = $get('titles');
         $memberArea = $status === self::STATUS_ACTIVE && in_array(Capability::Member->value, $this->app->roles()->find($level)['capabilities'] ?? [], true);
         if (!$memberArea && ($points !== '' || $rank !== '' || $titles !== '')) {
-            throw ApiError::invalid('Punkte, Dienstgrad und Titel gibt es beim Import nur für Rollen, die zur Kompanie gehören, nicht für Ehemalige.');
+            throw ApiError::invalid(I18n::t('Punkte, Dienstgrad und Titel gibt es beim Import nur für Rollen, die zur Kompanie gehören, nicht für Ehemalige.'));
         }
         if ($points !== '' || $rank !== '') {
             $rankId = null;
             if ($rank !== '') {
-                $rankId = $context['ranks'][mb_strtolower($rank)] ?? throw ApiError::invalid(sprintf('Dienstgrad „%s“ gibt es nicht (bitte zuerst unter Verwaltung anlegen).', $rank));
+                $rankId = $context['ranks'][mb_strtolower($rank)] ?? throw ApiError::invalid(I18n::t('Dienstgrad „{rank}“ gibt es nicht (bitte zuerst unter Verwaltung anlegen).', ['rank' => $rank]));
             }
             $initial = $this->app->ranks()->prepareInitial($actor, ['initial_points' => $points, 'rank_id' => $rankId]);
             $out['points'] = $initial['points'];
@@ -349,9 +350,9 @@ final class MemberImportService
         if ($titles !== '') {
             $out['titles'] = [];
             foreach (array_filter(array_map('trim', explode(',', $titles)), static fn (string $t): bool => $t !== '') as $title) {
-                $t = $context['titles'][mb_strtolower($title)] ?? throw ApiError::invalid(sprintf('Titel „%s“ gibt es nicht (bitte zuerst unter Verwaltung anlegen).', $title));
+                $t = $context['titles'][mb_strtolower($title)] ?? throw ApiError::invalid(I18n::t('Titel „{title}“ gibt es nicht (bitte zuerst unter Verwaltung anlegen).', ['title' => $title]));
                 if (isset($context['linked'][$t['id']])) {
-                    throw ApiError::invalid(sprintf('Titel „%s“ folgt einem Amt und wird dort vergeben.', $t['title']));
+                    throw ApiError::invalid(I18n::t('Titel „{title}“ folgt einem Amt und wird dort vergeben.', ['title' => $t['title']]));
                 }
                 $titleIds[$t['id']] = $t['id'];
                 $out['titles'][] = $t['title'];
@@ -361,10 +362,10 @@ final class MemberImportService
         // Zusatzrollen nach Bezeichnung, mit Komma getrennt; prüfen wie beim Anlegen (MemberService::prepare).
         $extraRoles = [];
         foreach (array_filter(array_map('trim', explode(',', $get('extra_roles'))), static fn (string $t): bool => $t !== '') as $label) {
-            $extraRoles[] = $context['roles'][mb_strtolower($label)] ?? throw ApiError::invalid(sprintf('Zusatzrolle „%s“ gibt es nicht.', $label));
+            $extraRoles[] = $context['roles'][mb_strtolower($label)] ?? throw ApiError::invalid(I18n::t('Zusatzrolle „{role}“ gibt es nicht.', ['role' => $label]));
         }
         if ($extraRoles !== [] && $status === self::STATUS_FORMER) {
-            throw ApiError::invalid('Zusatzrollen gibt es nicht für Ehemalige.');
+            throw ApiError::invalid(I18n::t('Zusatzrollen gibt es nicht für Ehemalige.'));
         }
 
         // Benutzername und E-Mail zuletzt: prepare() merkt sie sich als vergeben.
@@ -407,7 +408,7 @@ final class MemberImportService
         $id = (int) $account['id'];
         $warnings = $this->extras($actor, $id, $plan);
         if ($warnings !== []) {
-            $account['warning'] = trim(($account['warning'] ?? '') . ' Angelegt, aber es fehlen noch: ' . implode(', ', $warnings) . '. Bitte in den Mitgliedsdetails nachtragen.');
+            $account['warning'] = trim(($account['warning'] ?? '') . ' ' . I18n::t('Angelegt, aber es fehlen noch: {missing}. Bitte in den Mitgliedsdetails nachtragen.', ['missing' => implode(', ', $warnings)]));
         }
         // Ohne Zugang gibt es keine Zugangsdaten zum Weitergeben (gezählt in new.no_access).
         if (!$plan['no_access']) {
@@ -429,6 +430,12 @@ final class MemberImportService
             'Geburtstag' => $plan['birthday'] !== null ? fn () => $this->app->birthdays()->store($actor, $id, $plan['birthday']) : null,
             'Eintritt' => $plan['joined'] !== '' ? fn () => $this->app->joinYears()->saveFor($actor, $id, ['date' => $plan['joined']]) : null,
         ];
+        $labels = [
+            'Anfangspunkte bzw. Dienstgrad' => I18n::t('Anfangspunkte bzw. Dienstgrad'),
+            'Titel' => I18n::tc('Bereich', 'Titel'),
+            'Geburtstag' => I18n::t('Geburtstag'),
+            'Eintritt' => I18n::t('Eintritt'),
+        ];
         foreach ($steps as $what => $step) {
             if ($step === null) {
                 continue;
@@ -437,7 +444,7 @@ final class MemberImportService
                 $step();
             } catch (\Throwable $e) {
                 error_log('Kompanie-App: Import, ' . $what . ' nicht übernommen: ' . $e->getMessage());
-                $missing[] = $what;
+                $missing[] = $labels[$what];
             }
         }
         return $missing;

@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Auth;
 
 use KompanieApp\Core\Domain\RoleService;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\AuthContext;
 use KompanieApp\Core\Port\UserDirectory;
 
@@ -198,7 +199,7 @@ final class Preview implements AuthContext
                 'roles' => array_map($roles->label(...), [$person->role, ...$roles->extraRolesOf($person)]),
             ];
         }
-        return ['role' => $role, 'label' => $role === self::PUBLIC ? 'ohne Anmeldung' : ($this->roles)()->label($role)];
+        return ['role' => $role, 'label' => $role === self::PUBLIC ? I18n::t('ohne Anmeldung') : ($this->roles)()->label($role)];
     }
 
     /** Adresse einer Datei (Bild, Dokument, Abzeichen) mit der Vorschau als Parameter, damit sie mit deren Rechten kommt. */
@@ -220,6 +221,6 @@ final class Preview implements AuthContext
     /** Fehler für ändernde Anfragen in der Vorschau. */
     public static function readOnlyError(): ApiError
     {
-        return new ApiError(403, 'preview_readonly', 'In der Vorschau kannst du nichts ändern.');
+        return new ApiError(403, 'preview_readonly', I18n::t('In der Vorschau kannst du nichts ändern.'));
     }
 }

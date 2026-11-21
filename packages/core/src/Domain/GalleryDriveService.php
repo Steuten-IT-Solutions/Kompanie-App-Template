@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\GalleryRepository;
 use KompanieApp\Core\Storage\GallerySubmissionRepository;
 
@@ -281,7 +282,7 @@ final class GalleryDriveService
             $this->app->settings->delete(self::UPLOAD_SETTING);
             return $res['id'];
         }
-        throw new \RuntimeException('Google Drive: Das Hochladen ließ sich nicht beginnen.');
+        throw new \RuntimeException(I18n::t('Google Drive: Das Hochladen ließ sich nicht beginnen.'));
     }
 
     /** Ordner der offenen Einreichungen; legt ihn (neu) an, wenn es ihn nicht (mehr) gibt. */
@@ -383,7 +384,7 @@ final class GalleryDriveService
         $folder = (string) $album['drive_id'];
         if ($year !== null && $year !== (string) $album['year']) {
             $from = $this->yearFolder((string) $album['year'], false)
-                ?? throw new \RuntimeException(sprintf('Der Ordner „%s“ des Albums ist im Galerie-Ordner nicht zu finden.', (string) $album['year']));
+                ?? throw new \RuntimeException(I18n::t('Der Ordner „{folder}“ des Albums ist im Galerie-Ordner nicht zu finden.', ['folder' => (string) $album['year']]));
             $drive->moveFile($folder, $from, (string) $this->yearFolder($year), $title);
             return;
         }

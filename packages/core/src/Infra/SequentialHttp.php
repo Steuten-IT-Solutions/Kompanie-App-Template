@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Infra;
 
+use KompanieApp\Core\I18n\I18n;
+
 /**
  * ExtendedHttpClient auf Basis von request(), ohne echte Gleichzeitigkeit: requestAll fragt
  * nacheinander, download schreibt die Antwort in die Datei. Für HttpClients, die nichts Besseres
@@ -36,7 +38,7 @@ trait SequentialHttp
     {
         $res = $this->request('GET', $url, $headers, null, $timeoutSeconds);
         if (file_put_contents($file, $res['body']) === false) {
-            throw new \RuntimeException('Die Datei ließ sich nicht speichern.');
+            throw new \RuntimeException(I18n::t('Die Datei ließ sich nicht speichern.'));
         }
         return ['status' => $res['status'], 'headers' => $res['headers']];
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\Cache;
 use KompanieApp\Core\Port\ExtendedHttpClient;
 use KompanieApp\Core\Port\HttpClient;
@@ -88,7 +89,7 @@ final class CalendarService
     public function requireInApp(): EventService
     {
         if (!$this->inApp() || $this->internal === null) {
-            throw new ApiError(409, 'not_in_app', 'Der interne Kalender wird nicht in der App gepflegt. Ein Admin kann das unter Einstellungen → Kalender ändern.');
+            throw new ApiError(409, 'not_in_app', I18n::t('Der interne Kalender wird nicht in der App gepflegt. Ein Admin kann das unter Einstellungen → Kalender ändern.'));
         }
         return $this->internal;
     }
@@ -265,7 +266,7 @@ final class CalendarService
                 'google' => $this->fetchGoogle(['key' => (string) $this->settings->get('google_api_key', '')], []),
                 'google_connection' => $this->fetchWithConnection(),
                 'ics' => $this->fetchIcs((string) $this->settings->get('calendar_ics_url')),
-                default => throw new ApiError(503, 'not_configured', 'Der Kalender ist noch nicht eingerichtet.'),
+                default => throw new ApiError(503, 'not_configured', I18n::t('Der Kalender ist noch nicht eingerichtet.')),
             };
         } catch (ApiError $e) {
             if ($e->status === 502) {
@@ -342,17 +343,18 @@ final class CalendarService
     {
         $drive = $this->drive;
         if ($drive === null) {
-            throw new ApiError(503, 'not_configured', 'Der Kalender ist noch nicht eingerichtet.');
+            throw new ApiError(503, 'not_configured', I18n::t('Der Kalender ist noch nicht eingerichtet.'));
         }
         try {
             $token = $drive->accessToken();
         } catch (\RuntimeException $e) {
-            throw ApiError::upstream('Google Kalender: ' . $e->getMessage());
+            throw ApiError::upstream(I18n::t('Google Kalender: {error}', ['error' => $e->getMessage()]));
         }
-        $hint = $drive->oauth() !== null
-            ? 'Kann das verbundene Google-Konto' . ($drive->oauthEmail() !== '' ? ' (' . $drive->oauthEmail() . ')' : '')
-                . ' den Kalender sehen, und ist die Google Calendar API im Google-Cloud-Projekt aktiviert?'
-            : 'Ist der Kalender für ' . $drive->clientEmail() . ' freigegeben („Alle Termindetails sehen“), und ist die Google Calendar API im Google-Cloud-Projekt aktiviert?';
+        $hint = match (true) {
+            $drive->oauth() !== null && $drive->oauthEmail() !== '' => I18n::t('Kann das verbundene Google-Konto ({email}) den Kalender sehen, und ist die Google Calendar API im Google-Cloud-Projekt aktiviert?', ['email' => $drive->oauthEmail()]),
+            $drive->oauth() !== null => I18n::t('Kann das verbundene Google-Konto den Kalender sehen, und ist die Google Calendar API im Google-Cloud-Projekt aktiviert?'),
+            default => I18n::t('Ist der Kalender für {email} freigegeben („Alle Termindetails sehen“), und ist die Google Calendar API im Google-Cloud-Projekt aktiviert?', ['email' => $drive->clientEmail()]),
+        };
         return $this->fetchGoogle([], ['Authorization' => 'Bearer ' . $token], $hint);
     }
 
@@ -384,7 +386,7 @@ final class CalendarService
             $calId = (string) $calId;
             $res = $responses[$calId] ?? $this->tryGet($request['url'], $headers);
             if ($res instanceof \RuntimeException) {
-                throw ApiError::upstream('Der Kalender ist gerade nicht erreichbar: ' . $res->getMessage());
+                throw ApiError::upstream(I18n::t('Der Kalender ist gerade nicht erreichbar: {error}', ['error' => $res->getMessage()]));
             }
             $items = [];
             // Mehr als 250 Termine im Jahr: weiterblättern (höchstens 4 Seiten). Sonst fehlten die späteren, und der
@@ -395,7 +397,9 @@ final class CalendarService
                     // Mit HTTP-Status: Den braucht auch die Ursache in den Statusmeldungen (Telemetry\Detail).
                     $msg = isset($body['error']['message']) ? $body['error']['message'] . ' (HTTP ' . $res['status'] . ')' : 'HTTP ' . $res['status'];
                     $withHint = $hint !== '' && in_array($res['status'], [401, 403, 404], true);
-                    throw ApiError::upstream('Google Kalender: ' . $msg . ($withHint ? ' – ' . $hint : ''));
+                    throw ApiError::upstream($withHint
+                        ? I18n::t('Google Kalender: {error} – {hint}', ['error' => $msg, 'hint' => $hint])
+                        : I18n::t('Google Kalender: {error}', ['error' => $msg]));
                 }
                 array_push($items, ...array_values((array) ($body['items'] ?? [])));
                 $token = $body['nextPageToken'] ?? null;
@@ -404,7 +408,7 @@ final class CalendarService
                 }
                 $res = $this->tryGet($request['url'] . '&pageToken=' . rawurlencode($token), $headers);
                 if ($res instanceof \RuntimeException) {
-                    throw ApiError::upstream('Der Kalender ist gerade nicht erreichbar: ' . $res->getMessage());
+                    throw ApiError::upstream(I18n::t('Der Kalender ist gerade nicht erreichbar: {error}', ['error' => $res->getMessage()]));
                 }
             }
             foreach ($items as $item) {
@@ -446,7 +450,7 @@ final class CalendarService
         $url = (string) preg_replace('#^webcal://#i', 'https://', trim($url));
         $res = $this->get($url);
         if ($res['status'] !== 200) {
-            throw ApiError::upstream('Der Kalender-Link lieferte HTTP ' . $res['status'] . '.');
+            throw ApiError::upstream(I18n::t('Der Kalender-Link lieferte HTTP {status}.', ['status' => $res['status']]));
         }
         return $this->parseIcs($res['body']);
     }
@@ -456,7 +460,7 @@ final class CalendarService
     {
         $res = $this->tryGet($url);
         if ($res instanceof \RuntimeException) {
-            throw ApiError::upstream('Der Kalender ist gerade nicht erreichbar: ' . $res->getMessage());
+            throw ApiError::upstream(I18n::t('Der Kalender ist gerade nicht erreichbar: {error}', ['error' => $res->getMessage()]));
         }
         return $res;
     }

@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\SponsorRepository;
 
 /**
@@ -103,7 +104,7 @@ final class SponsorService
         $known = array_keys($sponsors);
         sort($known);
         if ($given !== $known) {
-            throw ApiError::invalid('Bitte die Reihenfolge aller Einträge angeben.');
+            throw ApiError::invalid(I18n::t('Bitte die Reihenfolge aller Einträge angeben.'));
         }
         $now = $this->app->time()->nowUtc();
         foreach ($order as $i => $id) {
@@ -166,7 +167,7 @@ final class SponsorService
     /** @return Sponsor */
     private function find(int $id): array
     {
-        return $this->repository()->find($id) ?? throw ApiError::notFound('Sponsor nicht gefunden.');
+        return $this->repository()->find($id) ?? throw ApiError::notFound(I18n::t('Sponsor nicht gefunden.'));
     }
 
     /** @return array{id: int, name: string, url: string, logo_url: string|null, logo_type: string|null} */
@@ -195,10 +196,10 @@ final class SponsorService
     {
         $name = Text::line($raw);
         if ($name === '') {
-            throw ApiError::invalid('Bitte den Namen des Sponsors angeben.');
+            throw ApiError::invalid(I18n::t('Bitte den Namen des Sponsors angeben.'));
         }
         if (mb_strlen($name) > self::NAME_MAX) {
-            throw ApiError::invalid(sprintf('Der Name darf höchstens %d Zeichen lang sein.', self::NAME_MAX));
+            throw ApiError::invalid(I18n::t('Der Name darf höchstens {max} Zeichen lang sein.', ['max' => self::NAME_MAX]));
         }
         return $name;
     }
@@ -206,6 +207,6 @@ final class SponsorService
     /** Leer oder eine https-Adresse. */
     private static function validUrl(mixed $raw): string
     {
-        return Input::httpsUrl($raw, 'Link');
+        return Input::httpsUrl($raw, I18n::t('Link'));
     }
 }

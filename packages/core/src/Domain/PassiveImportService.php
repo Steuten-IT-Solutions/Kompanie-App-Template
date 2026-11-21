@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Passive aus einer Tabelle übernehmen (Wunsch vom 17.11.2026, z. B. eine bisher in Excel geführte Liste): CSV oder, in
@@ -86,7 +87,7 @@ final class PassiveImportService
         if (!$personal) {
             foreach (self::PERSONAL as $field) {
                 if (isset($map[$field])) {
-                    $ignored[] = ['column' => $headers[$map[$field]], 'reason' => 'nur mit dem Recht, persönliche Angaben zu ändern'];
+                    $ignored[] = ['column' => $headers[$map[$field]], 'reason' => I18n::t('nur mit dem Recht, persönliche Angaben zu ändern')];
                     unset($map[$field]);
                 }
             }
@@ -103,17 +104,17 @@ final class PassiveImportService
             }
         }
         if (!isset($map['first_name']) && !isset($map['last_name'])) {
-            throw ApiError::invalid('In der Tabelle fehlt eine Spalte „Vorname“ oder „Nachname“. Bitte die Spalten zuordnen.');
+            throw ApiError::invalid(I18n::t('In der Tabelle fehlt eine Spalte „Vorname“ oder „Nachname“. Bitte die Spalten zuordnen.'));
         }
 
         $current = (int) $this->app->time()->today()->format('Y');
         $paymentYear = $year === null || $year === '' ? $current : Input::integer($year);
         if ($paymentYear === null || $paymentYear < PassiveMemberService::YEAR_MIN || $paymentYear > $current + 1) {
-            throw ApiError::invalid(sprintf('Bitte für den Beitrag ein Jahr zwischen %d und %d angeben.', PassiveMemberService::YEAR_MIN, $current + 1));
+            throw ApiError::invalid(I18n::t('Bitte für den Beitrag ein Jahr zwischen {min} und {max} angeben.', ['min' => PassiveMemberService::YEAR_MIN, 'max' => $current + 1]));
         }
         $fallbackDate = $paidOn === null || $paidOn === '' ? $this->app->time()->today()->format('Y-m-d') : $paidOn;
         if (!Input::isDate($fallbackDate)) {
-            throw ApiError::invalid('Bitte das Datum für Zahlungen ohne Datum angeben (JJJJ-MM-TT).');
+            throw ApiError::invalid(I18n::t('Bitte das Datum für Zahlungen ohne Datum angeben (JJJJ-MM-TT).'));
         }
         /** @var string $fallbackDate */
 
@@ -131,7 +132,7 @@ final class PassiveImportService
                 continue;
             }
             if (count($rows) >= self::MAX_ROWS) {
-                throw ApiError::invalid(sprintf('Höchstens %d Passive auf einmal.', self::MAX_ROWS));
+                throw ApiError::invalid(I18n::t('Höchstens {max} Passive auf einmal.', ['max' => self::MAX_ROWS]));
             }
             $cells = CsvTable::cells($line, $separator);
             $get = static fn (string $field): string => isset($map[$field]) ? self::cell($cells[$map[$field]] ?? '') : '';
@@ -140,13 +141,17 @@ final class PassiveImportService
             $warnings = [];
             try {
                 $key = self::key($row['name']);
-                foreach (['first_name' => 'Vorname', 'last_name' => 'Nachname'] as $field => $label) {
+                $noLetters = [
+                    'first_name' => I18n::t('Der Vorname „{value}“ enthält keine Buchstaben (z. B. eine Summenzeile).'),
+                    'last_name' => I18n::t('Der Nachname „{value}“ enthält keine Buchstaben (z. B. eine Summenzeile).'),
+                ];
+                foreach ($noLetters as $field => $message) {
                     if ($row[$field] !== '' && preg_match('/\p{L}/u', $row[$field]) !== 1) {
-                        throw ApiError::invalid(sprintf('Der %s „%s“ enthält keine Buchstaben (z. B. eine Summenzeile).', $label, $row[$field]));
+                        throw ApiError::invalid(I18n::fill($message, ['value' => $row[$field]]));
                     }
                 }
                 if ($key !== '' && isset($seen[$key])) {
-                    throw ApiError::invalid(sprintf('Der Name steht schon in Zeile %d. Gleichnamige bitte unterscheidbar machen.', $seen[$key]));
+                    throw ApiError::invalid(I18n::t('Der Name steht schon in Zeile {line}. Gleichnamige bitte unterscheidbar machen.', ['line' => $seen[$key]]));
                 }
                 if ($key !== '') {
                     $seen[$key] = $row['line'];
@@ -184,11 +189,11 @@ final class PassiveImportService
             $rows[] = $row;
         }
         if ($rows === []) {
-            throw ApiError::invalid('Die Tabelle enthält außer den Spaltennamen keine Zeilen.');
+            throw ApiError::invalid(I18n::t('Die Tabelle enthält außer den Spaltennamen keine Zeilen.'));
         }
         $errors = array_values(array_filter($rows, static fn (array $r): bool => isset($r['error'])));
         if ($apply && $errors !== [] && !$skipErrors) {
-            throw ApiError::invalid(sprintf('Zeile %d: %s', $errors[0]['line'], $errors[0]['error']) . (count($errors) > 1 ? sprintf(' (und %d weitere Fehler)', count($errors) - 1) : ''));
+            throw ApiError::invalid(I18n::t('Zeile {line}: {error}', ['line' => $errors[0]['line'], 'error' => $errors[0]['error']]) . (count($errors) > 1 ? ' ' . I18n::tn('(und {count} weiterer Fehler)', '(und {count} weitere Fehler)', count($errors) - 1) : ''));
         }
         if ($apply && $planned !== []) {
             $passives->repository()->insertMany($planned, $actor->id, $this->app->time()->nowUtc());
@@ -242,7 +247,7 @@ final class PassiveImportService
             }
         }
         if ($first === null) {
-            throw ApiError::invalid('Die Tabelle enthält keine Zeilen.');
+            throw ApiError::invalid(I18n::t('Die Tabelle enthält keine Zeilen.'));
         }
         return $first;
     }
@@ -285,17 +290,17 @@ final class PassiveImportService
         $map = [];
         foreach ($columns as $field => $raw) {
             if (!is_string($field) || !isset(self::COLUMNS[$field])) {
-                throw ApiError::invalid('Unbekanntes Feld in der Zuordnung der Spalten.');
+                throw ApiError::invalid(I18n::t('Unbekanntes Feld in der Zuordnung der Spalten.'));
             }
             if ($raw === null || $raw === '' || $raw === -1) {
                 continue;
             }
             $i = Input::integer($raw);
             if ($i === null || $i < 0 || $i >= $count) {
-                throw ApiError::invalid('Die Zuordnung nennt eine Spalte, die es nicht gibt.');
+                throw ApiError::invalid(I18n::t('Die Zuordnung nennt eine Spalte, die es nicht gibt.'));
             }
             if (in_array($i, $map, true)) {
-                throw ApiError::invalid('Eine Spalte kann nur einem Feld zugeordnet werden.');
+                throw ApiError::invalid(I18n::t('Eine Spalte kann nur einem Feld zugeordnet werden.'));
             }
             $map[$field] = $i;
         }
@@ -394,22 +399,22 @@ final class PassiveImportService
     {
         $birth = self::date($get('birth_date'), null);
         $fields = [
-            'address' => ['Adresse', self::address($get)],
-            'phone' => ['Telefon', $get('phone')],
-            'email' => ['E-Mail', $get('email')],
-            'birth_date' => ['Geburtsdatum', $birth],
+            'address' => [I18n::t('Adresse'), self::address($get)],
+            'phone' => [I18n::t('Telefon'), $get('phone')],
+            'email' => [I18n::t('E-Mail'), $get('email')],
+            'birth_date' => [I18n::t('Geburtsdatum'), $birth],
         ];
         $out = [];
         foreach ($fields as $key => [$label, $value]) {
             if ($key === 'birth_date' && $birth === null && $get('birth_date') !== '') {
-                $warnings[] = sprintf('Geburtsdatum „%s“ ist kein Datum (TT.MM.JJJJ) und wird nicht übernommen.', $get('birth_date'));
+                $warnings[] = I18n::t('Geburtsdatum „{value}“ ist kein Datum (TT.MM.JJJJ) und wird nicht übernommen.', ['value' => $get('birth_date')]);
                 continue;
             }
             try {
                 $this->app->passives()->prepare($actor, ['first_name' => '-', 'last_name' => '-', $key => $value]);
                 $out[$key] = $value;
             } catch (ApiError $e) {
-                $warnings[] = sprintf('%s nicht übernommen: %s', $label, $e->getMessage());
+                $warnings[] = I18n::t('{field} nicht übernommen: {error}', ['field' => $label, 'error' => $e->getMessage()]);
             }
         }
         return $out;
@@ -455,8 +460,8 @@ final class PassiveImportService
             return ['id' => $hits[0]['id'], 'name' => $hits[0]['name']];
         }
         $warnings[] = $hits === []
-            ? sprintf('Betreuer „%s“ ist kein Mitglied; der Passive wird ohne Betreuer angelegt.', $text)
-            : sprintf('Betreuer „%s“ passt zu mehreren Mitgliedern (%s); der Passive wird ohne Betreuer angelegt.', $text, implode(', ', array_column($hits, 'name')));
+            ? I18n::t('Betreuer „{name}“ ist kein Mitglied; der Passive wird ohne Betreuer angelegt.', ['name' => $text])
+            : I18n::t('Betreuer „{name}“ passt zu mehreren Mitgliedern ({members}); der Passive wird ohne Betreuer angelegt.', ['name' => $text, 'members' => implode(', ', array_column($hits, 'name'))]);
         return null;
     }
 
@@ -492,7 +497,7 @@ final class PassiveImportService
                 }
             }
             if (count($found) > 1) {
-                throw ApiError::invalid('Beträge bei mehreren Zahlungsarten (' . implode(', ', array_keys($found)) . '); bitte nur eine.');
+                throw ApiError::invalid(I18n::t('Beträge bei mehreren Zahlungsarten ({methods}); bitte nur eine.', ['methods' => implode(', ', array_keys($found))]));
             }
             if ($found !== []) {
                 $method = (string) array_key_first($found);
@@ -501,10 +506,10 @@ final class PassiveImportService
         }
         if ($method === '' && $get('method') !== '') {
             $method = self::matchMethod($get('method'), $settings['methods'])
-                ?? throw ApiError::invalid(sprintf('Die Zahlungsart „%s“ ist nicht eingerichtet. Eingerichtet: %s.', $get('method'), implode(', ', $settings['methods'])));
+                ?? throw ApiError::invalid(I18n::t('Die Zahlungsart „{method}“ ist nicht eingerichtet. Eingerichtet: {methods}.', ['method' => $get('method'), 'methods' => implode(', ', $settings['methods'])]));
             $amount = $get('amount');
         } elseif ($method === '' && $get('amount') !== '') {
-            throw ApiError::invalid('Zum Betrag fehlt die Zahlungsart.');
+            throw ApiError::invalid(I18n::t('Zum Betrag fehlt die Zahlungsart.'));
         }
         if ($method === '') {
             return null;
@@ -514,7 +519,7 @@ final class PassiveImportService
             $cents = $settings['fee_cents'];
         }
         if ($cents === null) {
-            throw ApiError::invalid(sprintf('„%s“ ist kein Betrag (z. B. 25 oder 25,00).', $amount));
+            throw ApiError::invalid(I18n::t('„{value}“ ist kein Betrag (z. B. 25 oder 25,00).', ['value' => $amount]));
         }
         $paidOn = $fallbackDate;
         if ($get('paid_on') !== '') {

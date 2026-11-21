@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\BackupProvider;
 use KompanieApp\Core\Storage\BackupCrypto;
 
@@ -85,14 +86,14 @@ final class BackupEncryptionService
     public function set(mixed $passphrase, mixed $confirm): array
     {
         if (!BackupCrypto::available()) {
-            throw ApiError::invalid('Auf diesem Server fehlt PHP die Erweiterung sodium; bitte beim Hoster nachfragen.');
+            throw ApiError::invalid(I18n::t('Auf diesem Server fehlt PHP die Erweiterung sodium; bitte beim Hoster nachfragen.'));
         }
         $passphrase = is_string($passphrase) ? $passphrase : '';
         if (mb_strlen($passphrase) < BackupCrypto::MIN_LENGTH) {
-            throw ApiError::invalid('Das Passwort für Sicherungen braucht mindestens ' . BackupCrypto::MIN_LENGTH . ' Zeichen.');
+            throw ApiError::invalid(I18n::t('Das Passwort für Sicherungen braucht mindestens {min} Zeichen.', ['min' => BackupCrypto::MIN_LENGTH]));
         }
         if (!is_string($confirm) || !hash_equals($passphrase, $confirm)) {
-            throw ApiError::invalid('Die beiden Passwörter sind nicht gleich.');
+            throw ApiError::invalid(I18n::t('Die beiden Passwörter sind nicht gleich.'));
         }
         try {
             $key = BackupCrypto::newKey($passphrase);
@@ -113,7 +114,7 @@ final class BackupEncryptionService
     /** Passt das Passwort zum eingerichteten? (begrenzt: ATTEMPTS Fehlversuche in 15 Minuten) */
     public function verify(mixed $passphrase): bool
     {
-        $key = $this->key() ?? throw ApiError::invalid('Es ist noch kein Passwort für Sicherungen eingerichtet.');
+        $key = $this->key() ?? throw ApiError::invalid(I18n::t('Es ist noch kein Passwort für Sicherungen eingerichtet.'));
         $this->throttle(self::VERIFY);
         try {
             $ok = is_string($passphrase) && BackupCrypto::matches($key, $passphrase);
@@ -177,18 +178,18 @@ final class BackupEncryptionService
         if (!BackupCrypto::isEncrypted($head)) {
             $plain = base64_decode($base64, true);
             if ($plain === false) {
-                throw ApiError::invalid('Die Datei ließ sich nicht lesen.');
+                throw ApiError::invalid(I18n::t('Die Datei ließ sich nicht lesen.'));
             }
             return self::unpack($plain); // unverschlüsselte Sicherung (auch gepackt, .json.gz)
         }
         if (!is_string($passphrase) || $passphrase === '') {
-            throw new ApiError(400, 'passphrase_required', 'Die Sicherung ist verschlüsselt. Bitte das Passwort für Sicherungen eingeben.');
+            throw new ApiError(400, 'passphrase_required', I18n::t('Die Sicherung ist verschlüsselt. Bitte das Passwort für Sicherungen eingeben.'));
         }
         $this->throttle(self::RESTORE);
         // Der verschlüsselte Inhalt darf in eine temporäre Datei, der Klartext entsteht nur im Arbeitsspeicher.
         $in = fopen('php://temp', 'w+b');
         if ($in === false) {
-            throw ApiError::invalid('Die Datei ließ sich nicht lesen.');
+            throw ApiError::invalid(I18n::t('Die Datei ließ sich nicht lesen.'));
         }
         try {
             // In Stücken von 1 MiB (durch 4 teilbar): streng geprüft, damit
@@ -196,10 +197,10 @@ final class BackupEncryptionService
             for ($pos = 0, $len = strlen($base64); $pos < $len; $pos += 1048576) {
                 $chunk = base64_decode(substr($base64, $pos, 1048576), true);
                 if ($chunk === false) {
-                    throw ApiError::invalid('Die Datei ließ sich nicht lesen (Übertragung unvollständig?).');
+                    throw ApiError::invalid(I18n::t('Die Datei ließ sich nicht lesen (Übertragung unvollständig?).'));
                 }
                 if (fwrite($in, $chunk) !== strlen($chunk)) {
-                    throw new \RuntimeException('Die Sicherung ließ sich auf dem Server nicht zwischenspeichern (Speicherplatz?).');
+                    throw new \RuntimeException(I18n::t('Die Sicherung ließ sich auf dem Server nicht zwischenspeichern (Speicherplatz?).'));
                 }
             }
             rewind($in);
@@ -265,7 +266,7 @@ final class BackupEncryptionService
     private function encryptInto($out, \Closure $write): int
     {
         // configured(): auch ohne sodium eine verständliche Meldung statt eines Fehlers über fehlende Funktionen
-        $key = ($this->configured() ? $this->key() : null) ?? throw new \RuntimeException('Es ist kein Passwort für Sicherungen eingerichtet (oder PHP fehlt die Erweiterung sodium).');
+        $key = ($this->configured() ? $this->key() : null) ?? throw new \RuntimeException(I18n::t('Es ist kein Passwort für Sicherungen eingerichtet (oder PHP fehlt die Erweiterung sodium).'));
         return BackupCrypto::encryptTo($out, $key, $this->meta(), $write);
     }
 
@@ -307,11 +308,11 @@ final class BackupEncryptionService
             return $data;
         }
         if (!function_exists('gzdecode')) {
-            throw ApiError::invalid('Die Sicherung ist gepackt (gzip), aber PHP fehlt die Erweiterung zlib. Bitte die Datei vorher entpacken (z. B. mit 7-Zip) und die .json einspielen.');
+            throw ApiError::invalid(I18n::t('Die Sicherung ist gepackt (gzip), aber PHP fehlt die Erweiterung zlib. Bitte die Datei vorher entpacken (z. B. mit 7-Zip) und die .json einspielen.'));
         }
         $plain = @gzdecode($data);
         if ($plain === false) {
-            throw ApiError::invalid('Die gepackte Sicherung ist beschädigt (gzip lässt sich nicht entpacken).');
+            throw ApiError::invalid(I18n::t('Die gepackte Sicherung ist beschädigt (gzip lässt sich nicht entpacken).'));
         }
         return $plain;
     }
@@ -320,7 +321,7 @@ final class BackupEncryptionService
     {
         $in = @fopen($plainPath, 'rb');
         if ($in === false) {
-            throw new \RuntimeException('Die Sicherung ließ sich nicht verschlüsseln (Datei nicht lesbar).');
+            throw new \RuntimeException(I18n::t('Die Sicherung ließ sich nicht verschlüsseln (Datei nicht lesbar).'));
         }
         try {
             return $this->writeBackupFile(self::packed(static fn ($out) => BackupCrypto::copy($in, $out), $gzip), null, $encrypt);
@@ -345,7 +346,7 @@ final class BackupEncryptionService
         return static function ($out) use ($write): void {
             $filter = @stream_filter_prepend($out, 'zlib.deflate', STREAM_FILTER_WRITE, ['level' => self::GZIP_LEVEL, 'window' => 31]);
             if ($filter === false) {
-                throw new \RuntimeException('Die Sicherung ließ sich nicht packen (PHP-Erweiterung zlib).');
+                throw new \RuntimeException(I18n::t('Die Sicherung ließ sich nicht packen (PHP-Erweiterung zlib).'));
             }
             try {
                 $write($out);
@@ -353,7 +354,7 @@ final class BackupEncryptionService
                 $removed = stream_filter_remove($filter);
             }
             if (!$removed) {
-                throw new \RuntimeException('Die gepackte Sicherung ließ sich nicht vollständig schreiben.');
+                throw new \RuntimeException(I18n::t('Die gepackte Sicherung ließ sich nicht vollständig schreiben.'));
             }
         };
     }
@@ -372,7 +373,7 @@ final class BackupEncryptionService
         $out = @fopen($file, $temp ? 'wb' : 'xb');
         if ($out === false) {
             $temp && @unlink($file); // tempFile() hat sie schon angelegt
-            throw new \RuntimeException($temp ? 'Die Sicherung ließ sich nicht erstellen (temporäre Datei).' : "$file lässt sich nicht anlegen (Ordner vorhanden, Schreibrechte, gibt es sie schon?).");
+            throw new \RuntimeException($temp ? I18n::t('Die Sicherung ließ sich nicht erstellen (temporäre Datei).') : I18n::t('{file} lässt sich nicht anlegen (Ordner vorhanden, Schreibrechte, gibt es sie schon?).', ['file' => $file]));
         }
         self::cleanupAtShutdown($file);
         @chmod($file, 0600);
@@ -384,7 +385,7 @@ final class BackupEncryptionService
                     // Unverschlüsselt (Google Drive ohne Passwort): Die Länge kennt nur der Schreiber; fflush meldet volle Platte.
                     $write($out);
                     if (!fflush($out)) {
-                        throw new \RuntimeException('Die Sicherung ließ sich nicht vollständig schreiben (Speicherplatz?).');
+                        throw new \RuntimeException(I18n::t('Die Sicherung ließ sich nicht vollständig schreiben (Speicherplatz?).'));
                     }
                     $bytes = null;
                 }
@@ -393,7 +394,7 @@ final class BackupEncryptionService
             }
             clearstatcache(true, $file);
             if ($bytes !== null && filesize($file) !== $bytes) {
-                throw new \RuntimeException('Die verschlüsselte Sicherung ließ sich nicht vollständig schreiben (Speicherplatz?).');
+                throw new \RuntimeException(I18n::t('Die verschlüsselte Sicherung ließ sich nicht vollständig schreiben (Speicherplatz?).'));
             }
             if (!$temp) {
                 unset(self::$temp[$file]); // fertig: bleibt (eine temporäre löscht der Aufrufer, sonst das Ende der Anfrage)
@@ -401,7 +402,7 @@ final class BackupEncryptionService
             return $file;
         } catch (\Throwable $e) {
             self::discard($file);
-            throw $e instanceof \RuntimeException ? $e : new \RuntimeException('Die Sicherung ließ sich nicht erstellen: ' . $e->getMessage(), 0, $e);
+            throw $e instanceof \RuntimeException ? $e : new \RuntimeException(I18n::t('Die Sicherung ließ sich nicht erstellen: {error}', ['error' => $e->getMessage()]), 0, $e);
         }
     }
 
@@ -453,7 +454,7 @@ final class BackupEncryptionService
     private function throttle(string $kind): void
     {
         if ($this->app->cache->get('backup_passphrase_blocked_' . $kind) !== null) {
-            throw new ApiError(429, 'too_many_attempts', 'Zu viele Versuche. Bitte in 15 Minuten erneut versuchen.');
+            throw new ApiError(429, 'too_many_attempts', I18n::t('Zu viele Versuche. Bitte in 15 Minuten erneut versuchen.'));
         }
     }
 

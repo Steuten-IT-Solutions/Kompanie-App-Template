@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Push\PushService;
 
 /**
@@ -53,7 +54,7 @@ final class MaintenanceService
     /** Fehler für gesperrte Anfragen, mit der Begründung. */
     public function error(): ApiError
     {
-        return new ApiError(503, 'maintenance', 'Die App wird gerade gewartet. Bitte versuche es später noch einmal.', ['reason' => $this->state()['reason']]);
+        return new ApiError(503, 'maintenance', I18n::t('Die App wird gerade gewartet. Bitte versuche es später noch einmal.'), ['reason' => $this->state()['reason']]);
     }
 
     /**
@@ -64,15 +65,15 @@ final class MaintenanceService
     public function set(mixed $on, mixed $reason, User $actor): array
     {
         if (!is_bool($on)) {
-            throw ApiError::invalid('Bitte angeben, ob der Wartungsmodus an oder aus sein soll.');
+            throw ApiError::invalid(I18n::t('Bitte angeben, ob der Wartungsmodus an oder aus sein soll.'));
         }
         $before = $this->state();
         $text = $reason === null ? $before['reason'] : Text::multiline($reason);
         if ($reason !== null && !is_string($reason)) {
-            throw ApiError::invalid('Die Begründung muss Text sein.');
+            throw ApiError::invalid(I18n::t('Die Begründung muss Text sein.'));
         }
         if (mb_strlen($text) > self::REASON_MAX) {
-            throw ApiError::invalid(sprintf('Die Begründung darf höchstens %d Zeichen lang sein.', self::REASON_MAX));
+            throw ApiError::invalid(I18n::t('Die Begründung darf höchstens {max} Zeichen lang sein.', ['max' => self::REASON_MAX]));
         }
         $now = $this->app->time()->timestamp();
         $state = $on

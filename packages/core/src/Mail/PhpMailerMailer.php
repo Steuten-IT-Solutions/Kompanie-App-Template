@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Mail;
 
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\Mailer;
 use PHPMailer\PHPMailer\Exception as PHPMailerException;
 use PHPMailer\PHPMailer\PHPMailer;
@@ -36,10 +37,10 @@ final class PhpMailerMailer implements Mailer
     public static function unavailable(): ?string
     {
         if (!class_exists(PHPMailer::class)) {
-            return 'Der Mailversand ist auf diesem Server nicht verfügbar (PHPMailer fehlt).';
+            return I18n::t('Der Mailversand ist auf diesem Server nicht verfügbar (PHPMailer fehlt).');
         }
         if (version_compare(PHPMailer::VERSION, self::MIN_VERSION, '<')) {
-            return sprintf('Der Mailversand braucht PHPMailer ab Version %s, vorhanden ist %s.', self::MIN_VERSION, PHPMailer::VERSION);
+            return I18n::t('Der Mailversand braucht PHPMailer ab Version {min}, vorhanden ist {version}.', ['min' => self::MIN_VERSION, 'version' => PHPMailer::VERSION]);
         }
         return null;
     }
@@ -62,7 +63,7 @@ final class PhpMailerMailer implements Mailer
         $this->readSize();
         $size = $this->size;
         $this->close();
-        return ['ok' => true, 'message' => 'Verbindung zum Mailserver hergestellt.', 'size' => $size];
+        return ['ok' => true, 'message' => I18n::t('Verbindung zum Mailserver hergestellt.'), 'size' => $size];
     }
 
     public function measure(Mail $mail): int
@@ -218,11 +219,11 @@ final class PhpMailerMailer implements Mailer
     {
         $message = trim($message);
         if (stripos($message, 'Could not authenticate') !== false) {
-            return 'Anmeldung am Mailserver fehlgeschlagen: Benutzername oder Passwort prüfen.';
+            return I18n::t('Anmeldung am Mailserver fehlgeschlagen: Benutzername oder Passwort prüfen.');
         }
         if (stripos($message, 'Failed to connect') !== false || stripos($message, 'Could not connect') !== false) {
-            return 'Keine Verbindung zum Mailserver: Server, Port und Verschlüsselung prüfen. (' . $message . ')';
+            return I18n::t('Keine Verbindung zum Mailserver: Server, Port und Verschlüsselung prüfen. ({error})', ['error' => $message]);
         }
-        return $message === '' ? 'Unbekannter Fehler beim Mailversand.' : $message;
+        return $message === '' ? I18n::t('Unbekannter Fehler beim Mailversand.') : $message;
     }
 }

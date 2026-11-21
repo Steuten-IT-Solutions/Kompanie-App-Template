@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Domain\Blocks;
 
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /** Trennlinie (line) oder nur Abstand (space) zwischen Blöcken; in Mails und Textauszügen nichts. */
 final class DividerBlock implements BlockType
@@ -22,7 +23,7 @@ final class DividerBlock implements BlockType
     {
         $style = $in['style'] ?? 'line';
         if (!in_array($style, self::STYLES, true)) {
-            throw ApiError::invalid('Ungültige Trennung: erlaubt sind line (Linie) und space (Abstand).');
+            throw ApiError::invalid(I18n::t('Ungültige Trennung: erlaubt sind line (Linie) und space (Abstand).'));
         }
         return ['style' => $style];
     }

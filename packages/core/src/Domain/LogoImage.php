@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Logos in der Datenbank (Sponsoren, Issue #279; Kompanien, Issue #280): hochladen und ausliefern, an einer Stelle.
@@ -36,7 +37,7 @@ final class LogoImage
         $bytes = self::decode(is_array($file) ? ($file['data'] ?? null) : null);
         $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
         if (!isset(self::TYPES[$ext])) {
-            throw ApiError::invalid('Erlaubt sind PNG, JPG, WebP und SVG.');
+            throw ApiError::invalid(I18n::t('Erlaubt sind PNG, JPG, WebP und SVG.'));
         }
         if ($ext === 'svg') {
             try {
@@ -111,14 +112,14 @@ final class LogoImage
         }
         // Vor dem Dekodieren: Base64 ist ein Drittel größer als die Datei.
         if (strlen($data) > intdiv(self::MAX_BYTES * 4, 3) + 4) {
-            throw ApiError::invalid('Das Logo darf höchstens 2 MB groß sein.');
+            throw ApiError::invalid(I18n::t('Das Logo darf höchstens 2 MB groß sein.'));
         }
         $bytes = $data === '' ? false : base64_decode($data, true);
         if ($bytes === false || $bytes === '') {
-            throw ApiError::invalid('Es ist keine Datei angekommen.');
+            throw ApiError::invalid(I18n::t('Es ist keine Datei angekommen.'));
         }
         if (strlen($bytes) > self::MAX_BYTES) {
-            throw ApiError::invalid('Das Logo darf höchstens 2 MB groß sein.');
+            throw ApiError::invalid(I18n::t('Das Logo darf höchstens 2 MB groß sein.'));
         }
         return $bytes;
     }
@@ -130,10 +131,10 @@ final class LogoImage
         $ok = strncmp($bytes, $signature, strlen($signature)) === 0 && ($ext !== 'webp' || substr($bytes, 8, 4) === 'WEBP');
         $info = $ok ? @getimagesizefromstring($bytes) : false;
         if ($info === false) {
-            throw ApiError::invalid(sprintf('Die Datei ist keine gültige .%s-Datei.', $ext));
+            throw ApiError::invalid(I18n::t('Die Datei ist keine gültige .{ext}-Datei.', ['ext' => $ext]));
         }
         if ($info[0] < 1 || $info[1] < 1 || $info[0] > self::MAX_EDGE || $info[1] > self::MAX_EDGE) {
-            throw ApiError::invalid(sprintf('Das Bild darf höchstens %d × %d Pixel groß sein.', self::MAX_EDGE, self::MAX_EDGE));
+            throw ApiError::invalid(I18n::t('Das Bild darf höchstens {width} × {height} Pixel groß sein.', ['width' => self::MAX_EDGE, 'height' => self::MAX_EDGE]));
         }
     }
 
@@ -146,16 +147,16 @@ final class LogoImage
         $target = $tmp . '-logo.png';
         try {
             if (@file_put_contents($source, $bytes) === false) {
-                throw new ApiError(500, 'storage_failed', 'Das Logo konnte nicht gespeichert werden.');
+                throw new ApiError(500, 'storage_failed', I18n::t('Das Logo konnte nicht gespeichert werden.'));
             }
             try {
                 $app->images->resizeToPng($source, $target, self::EDGE);
             } catch (\RuntimeException $e) {
-                throw ApiError::invalid('Das Bild kann nicht verarbeitet werden: ' . $e->getMessage());
+                throw ApiError::invalid(I18n::t('Das Bild kann nicht verarbeitet werden: {error}', ['error' => $e->getMessage()]));
             }
             $png = @file_get_contents($target);
             if ($png === false || $png === '') {
-                throw new ApiError(500, 'storage_failed', 'Das Logo konnte nicht gespeichert werden.');
+                throw new ApiError(500, 'storage_failed', I18n::t('Das Logo konnte nicht gespeichert werden.'));
             }
             return $png;
         } finally {

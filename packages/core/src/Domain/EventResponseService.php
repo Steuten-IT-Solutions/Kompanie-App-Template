@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\EventResponseRepository;
 
 /**
@@ -68,7 +69,7 @@ final class EventResponseService
             return [];
         }
         if (!in_array($enabled, ['0', '1'], true)) {
-            throw ApiError::invalid('Ungültiger Wert für Zu- und Absagen (0 oder 1).');
+            throw ApiError::invalid(I18n::t('Ungültiger Wert für Zu- und Absagen (0 oder 1).'));
         }
         return [self::ENABLED_SETTING => $enabled === '1'];
     }
@@ -76,7 +77,7 @@ final class EventResponseService
     private function assertEnabled(): void
     {
         if (!$this->enabled()) {
-            throw ApiError::forbidden('Zu- und Absagen bei Terminen sind ausgeschaltet.');
+            throw ApiError::forbidden(I18n::t('Zu- und Absagen bei Terminen sind ausgeschaltet.'));
         }
     }
 
@@ -141,12 +142,12 @@ final class EventResponseService
     public function respond(User $user, string $id, mixed $status, mixed $note): array
     {
         if (!is_string($status) || !in_array($status, self::STATUSES, true)) {
-            throw ApiError::invalid('Bitte zusagen oder absagen.');
+            throw ApiError::invalid(I18n::t('Bitte zusagen oder absagen.'));
         }
         $this->assertEnabled();
         $note = is_string($note) ? Text::line($note) : '';
         if (mb_strlen($note) > self::NOTE_MAX) {
-            throw ApiError::invalid('Der Hinweis ist zu lang (höchstens ' . self::NOTE_MAX . ' Zeichen).');
+            throw ApiError::invalid(I18n::t('Der Hinweis ist zu lang (höchstens {max} Zeichen).', ['max' => self::NOTE_MAX]));
         }
         $event = $this->openEvent($id);
         $this->repository()->save(
@@ -209,11 +210,11 @@ final class EventResponseService
     public function respondFor(User $actor, string $id, int $userId, mixed $status): array
     {
         if ($status !== null && (!is_string($status) || !in_array($status, self::STATUSES, true))) {
-            throw ApiError::invalid('Bitte zusagen, absagen oder die Rückmeldung entfernen.');
+            throw ApiError::invalid(I18n::t('Bitte zusagen, absagen oder die Rückmeldung entfernen.'));
         }
         $this->assertEnabled();
         if (!isset($this->audience()[$userId])) {
-            throw ApiError::invalid('Diese Person kann bei Terminen nicht zu- oder absagen.');
+            throw ApiError::invalid(I18n::t('Diese Person kann bei Terminen nicht zu- oder absagen.'));
         }
         $event = $this->openEvent($id);
         $key = self::key($event);
@@ -295,14 +296,14 @@ final class EventResponseService
         $out = [];
         if ($enabled !== null) {
             if (!in_array($enabled, ['0', '1', true, false], true)) {
-                throw ApiError::invalid('Ungültiger Wert für die Erinnerung (0 oder 1).');
+                throw ApiError::invalid(I18n::t('Ungültiger Wert für die Erinnerung (0 oder 1).'));
             }
             $out[self::REMINDER_SETTING] = $enabled === '1' || $enabled === true;
         }
         if ($days !== null) {
             $n = Input::integer($days);
             if ($n === null || $n < 1 || $n > self::REMINDER_DAYS_MAX) {
-                throw ApiError::invalid('Die Erinnerung geht 1 bis ' . self::REMINDER_DAYS_MAX . ' Tage vor dem Termin.');
+                throw ApiError::invalid(I18n::t('Die Erinnerung geht 1 bis {max} Tage vor dem Termin.', ['max' => self::REMINDER_DAYS_MAX]));
             }
             $out[self::REMINDER_DAYS_SETTING] = $n;
         }
@@ -456,7 +457,7 @@ final class EventResponseService
                 return $e;
             }
         }
-        throw ApiError::notFound('Diesen Termin gibt es im Kalender nicht (mehr).');
+        throw ApiError::notFound(I18n::t('Diesen Termin gibt es im Kalender nicht (mehr).'));
     }
 
     /**
@@ -468,7 +469,7 @@ final class EventResponseService
     {
         $event = $this->event($id);
         if ($this->app->time()->timestamp() >= $this->deadline($event)) {
-            throw new ApiError(409, 'responses_closed', 'Für diesen Termin kannst du nicht mehr zu- oder absagen.');
+            throw new ApiError(409, 'responses_closed', I18n::t('Für diesen Termin kannst du nicht mehr zu- oder absagen.'));
         }
         return $event;
     }

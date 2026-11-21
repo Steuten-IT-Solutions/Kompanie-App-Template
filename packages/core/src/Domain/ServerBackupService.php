@@ -6,6 +6,7 @@ namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\App;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Sicherungen automatisch auf dem eigenen Server (Webspace der App) ablegen: im geschützten Ordner „sicherungen“, in dem
@@ -81,7 +82,7 @@ final class ServerBackupService
     public function setEnabled(bool $on): array
     {
         if ($on && !$this->available()) {
-            throw new ApiError(404, 'not_available', 'Die Datensicherung gibt es in dieser Installation nicht.');
+            throw new ApiError(404, 'not_available', I18n::t('Die Datensicherung gibt es in dieser Installation nicht.'));
         }
         $this->app->settings->set(self::SETTING, ['enabled' => $on]);
         return $this->status();
@@ -108,7 +109,7 @@ final class ServerBackupService
      */
     public function create(): array
     {
-        $backup = $this->app->backup ?? throw new ApiError(404, 'not_available', 'Die Datensicherung gibt es in dieser Installation nicht.');
+        $backup = $this->app->backup ?? throw new ApiError(404, 'not_available', I18n::t('Die Datensicherung gibt es in dieser Installation nicht.'));
         $now = $this->app->time()->timestamp();
         $state = $this->state();
         $state['last_try'] = $now;
@@ -129,7 +130,7 @@ final class ServerBackupService
             }
             $out = @fopen($tmp, 'wb');
             if ($out === false) {
-                throw new \RuntimeException('Die Sicherung ließ sich auf dem Server nicht schreiben (Schreibrechte?).');
+                throw new \RuntimeException(I18n::t('Die Sicherung ließ sich auf dem Server nicht schreiben (Schreibrechte?).'));
             }
             @chmod($tmp, 0600);
             try {
@@ -137,20 +138,20 @@ final class ServerBackupService
                 // größer, als memory_limit erlaubt.
                 $backup->exportTo($out);
                 if (!fflush($out)) {
-                    throw new \RuntimeException('Die Sicherung ließ sich auf dem Server nicht schreiben (Speicherplatz?).');
+                    throw new \RuntimeException(I18n::t('Die Sicherung ließ sich auf dem Server nicht schreiben (Speicherplatz?).'));
                 }
             } finally {
                 fclose($out);
             }
             if (!@rename($tmp, $path)) {
-                throw new \RuntimeException('Die Sicherung ließ sich auf dem Server nicht schreiben (Speicherplatz?).');
+                throw new \RuntimeException(I18n::t('Die Sicherung ließ sich auf dem Server nicht schreiben (Speicherplatz?).'));
             }
             $this->prune();
             $state['last_ok'] = $now;
             $state['error'] = '';
         } catch (\Throwable $e) {
             @unlink($tmp);
-            $state['error'] = $e instanceof \JsonException ? 'Die Sicherung ließ sich nicht erstellen: ' . $e->getMessage() : $e->getMessage();
+            $state['error'] = $e instanceof \JsonException ? I18n::t('Die Sicherung ließ sich nicht erstellen: {error}', ['error' => $e->getMessage()]) : $e->getMessage();
             throw $e instanceof \RuntimeException ? $e : new \RuntimeException($state['error'], 0, $e);
         } finally {
             $this->app->settings->set(self::STATE_SETTING, $state);
@@ -204,23 +205,23 @@ final class ServerBackupService
      */
     public function restore(mixed $id, bool $confirm): void
     {
-        $backup = $this->app->backup ?? throw new ApiError(404, 'not_available', 'Die Datensicherung gibt es in dieser Installation nicht.');
+        $backup = $this->app->backup ?? throw new ApiError(404, 'not_available', I18n::t('Die Datensicherung gibt es in dieser Installation nicht.'));
         if (!$backup->canImport()) {
-            throw new ApiError(404, 'not_available', 'Eine Sicherung lässt sich hier nicht wiederherstellen.');
+            throw new ApiError(404, 'not_available', I18n::t('Eine Sicherung lässt sich hier nicht wiederherstellen.'));
         }
         if (!$confirm) {
-            throw ApiError::invalid('Bitte das Ersetzen aller Daten bestätigen.');
+            throw ApiError::invalid(I18n::t('Bitte das Ersetzen aller Daten bestätigen.'));
         }
         $path = is_string($id) ? $this->path($id) : null;
         if ($path === null) {
-            throw ApiError::notFound('Diese Sicherung gibt es auf dem Server nicht (mehr).');
+            throw ApiError::notFound(I18n::t('Diese Sicherung gibt es auf dem Server nicht (mehr).'));
         }
         if (function_exists('set_time_limit')) {
             @set_time_limit(300);
         }
         $json = @file_get_contents($path);
         if ($json === false) {
-            throw ApiError::invalid('Die Sicherung ließ sich auf dem Server nicht lesen.');
+            throw ApiError::invalid(I18n::t('Die Sicherung ließ sich auf dem Server nicht lesen.'));
         }
         try {
             $backup->import($json);
@@ -239,10 +240,10 @@ final class ServerBackupService
     {
         $path = is_string($id) ? $this->path($id) : null;
         if ($path === null) {
-            throw ApiError::notFound('Diese Sicherung gibt es auf dem Server nicht (mehr).');
+            throw ApiError::notFound(I18n::t('Diese Sicherung gibt es auf dem Server nicht (mehr).'));
         }
         if (!@unlink($path)) {
-            throw ApiError::invalid('Die Sicherung ließ sich auf dem Server nicht löschen (Schreibrechte?).');
+            throw ApiError::invalid(I18n::t('Die Sicherung ließ sich auf dem Server nicht löschen (Schreibrechte?).'));
         }
         return $this->status();
     }

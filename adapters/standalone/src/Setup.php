@@ -7,6 +7,7 @@ namespace KompanieApp\Standalone;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Domain\Passwords;
 use KompanieApp\Core\Domain\Text;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Einrichtung der eigenständigen Version: Datenverzeichnis schützen, config.php schreiben,
@@ -23,22 +24,22 @@ final class Setup
         $baseUrl = self::normalizeUrl($baseUrl);
         $data = $kernel->dataDir();
         if (Config::exists($data)) {
-            throw new \RuntimeException('Die App ist hier schon eingerichtet (config.php vorhanden).');
+            throw new \RuntimeException(I18n::t('Die App ist hier schon eingerichtet (config.php vorhanden).'));
         }
         self::prepareDataDir($data);
         if (($db['driver'] ?? 'sqlite') === 'sqlite') {
             $version = extension_loaded('pdo_sqlite') ? (string) (new \PDO('sqlite::memory:'))->query('SELECT sqlite_version()')->fetchColumn() : '';
             if ($version !== '' && version_compare($version, '3.24.0', '<')) {
-                throw new \RuntimeException("Die SQLite-Version des Servers ($version) ist zu alt (mindestens 3.24). Bitte eine MySQL-Datenbank nutzen oder beim Hoster nachfragen.");
+                throw new \RuntimeException(I18n::t('Die SQLite-Version des Servers ({version}) ist zu alt (mindestens 3.24). Bitte eine MySQL-Datenbank nutzen oder beim Hoster nachfragen.', ['version' => $version]));
             }
             if (!extension_loaded('pdo_sqlite')) {
-                throw new \RuntimeException('PHP kann keine SQLite-Datenbank anlegen (Erweiterung pdo_sqlite fehlt). Sie lässt sich meist im Kundenmenü des Hosters einschalten; alternativ eine MySQL-Datenbank nutzen.');
+                throw new \RuntimeException(I18n::t('PHP kann keine SQLite-Datenbank anlegen (Erweiterung pdo_sqlite fehlt). Sie lässt sich meist im Kundenmenü des Hosters einschalten; alternativ eine MySQL-Datenbank nutzen.'));
             }
             // Zufälliger Name: Selbst wenn der Webserver das Datenverzeichnis nicht sperrt
             // (nginx ohne passende Regel), ist die Datei nicht zu erraten.
             $db = ['driver' => 'sqlite', 'path' => 'kompanie-' . bin2hex(random_bytes(16)) . '.sqlite'];
         } elseif (!extension_loaded('pdo_mysql')) {
-            throw new \RuntimeException('PHP kann keine MySQL-Datenbank ansprechen (Erweiterung pdo_mysql fehlt).');
+            throw new \RuntimeException(I18n::t('PHP kann keine MySQL-Datenbank ansprechen (Erweiterung pdo_mysql fehlt).'));
         }
         $settings = Config::defaults($db);
         $settings['base_url'] = $baseUrl;
@@ -60,13 +61,13 @@ final class Setup
     {
         $url = trim($url);
         if (!preg_match('~^(https?)://([^/\s?#:]+)(:\d+)?(/[^\s?#]*)?$~i', $url, $m)) {
-            throw new \RuntimeException('Bitte die Adresse der App angeben, z. B. https://beispiel.de/app/');
+            throw new \RuntimeException(I18n::t('Bitte die Adresse der App angeben, z. B. https://beispiel.de/app/'));
         }
         $host = strtolower($m[2]);
         if (preg_match('/[^\x20-\x7e]/', $host)) {
             $ascii = function_exists('idn_to_ascii') ? idn_to_ascii($host, IDNA_DEFAULT, INTL_IDNA_VARIANT_UTS46) : false;
             if (!is_string($ascii) || $ascii === '') {
-                throw new \RuntimeException('Die Adresse enthält Umlaute. Bitte die Schreibweise mit „xn--“ verwenden (zeigt der Hoster an).');
+                throw new \RuntimeException(I18n::t('Die Adresse enthält Umlaute. Bitte die Schreibweise mit „xn--“ verwenden (zeigt der Hoster an).'));
             }
             $host = $ascii;
         }
@@ -77,10 +78,10 @@ final class Setup
     public static function prepareDataDir(string $data): void
     {
         if (!is_dir($data) && !@mkdir($data, 0770, true) && !is_dir($data)) {
-            throw new \RuntimeException('Das Datenverzeichnis kann nicht angelegt werden: ' . $data);
+            throw new \RuntimeException(I18n::t('Das Datenverzeichnis kann nicht angelegt werden: {path}', ['path' => $data]));
         }
         if (!is_writable($data)) {
-            throw new \RuntimeException('PHP darf im Datenverzeichnis nicht schreiben: ' . $data);
+            throw new \RuntimeException(I18n::t('PHP darf im Datenverzeichnis nicht schreiben: {path}', ['path' => $data]));
         }
         $files = [
             '.htaccess' => "# Kein Zugriff von außen\n<IfModule mod_authz_core.c>\n  Require all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\n  Order allow,deny\n  Deny from all\n</IfModule>\n",
@@ -110,16 +111,16 @@ final class Setup
         $name = Text::line($name, 100);
         $login = trim($login);
         if ($name === '' || !Passwords::validLogin($login)) {
-            throw new \RuntimeException('Bitte einen Namen und einen Benutzernamen (a–z, Ziffern, . _ - @) angeben.');
+            throw new \RuntimeException(I18n::t('Bitte einen Namen und einen Benutzernamen (a–z, Ziffern, . _ - @) angeben.'));
         }
         if ($users->loginExists($login)) {
-            throw new \RuntimeException('Dieser Benutzername ist schon vergeben.');
+            throw new \RuntimeException(I18n::t('Dieser Benutzername ist schon vergeben.'));
         }
         if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-            throw new \RuntimeException('Die E-Mail-Adresse ist ungültig.');
+            throw new \RuntimeException(I18n::t('Die E-Mail-Adresse ist ungültig.'));
         }
         if ($password !== null && mb_strlen($password) < Passwords::MIN_LENGTH) {
-            throw new \RuntimeException(sprintf('Das Passwort muss mindestens %d Zeichen lang sein.', Passwords::MIN_LENGTH));
+            throw new \RuntimeException(I18n::t('Das Passwort muss mindestens {min} Zeichen lang sein.', ['min' => Passwords::MIN_LENGTH]));
         }
         $password ??= Passwords::readable(12);
         $id = $users->add($name, $login, $email, $password, Roles::ADMIN);

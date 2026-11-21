@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Domain;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\BackupCrypto;
 use KompanieApp\Core\Telemetry\Code;
 
@@ -106,7 +107,7 @@ final class BackupDownload
         ], 'write' => static function ($out) use ($path): void {
             $in = @fopen($path, 'rb');
             if ($in === false) {
-                throw new \RuntimeException('Die Sicherung ließ sich auf dem Server nicht lesen.');
+                throw new \RuntimeException(I18n::t('Die Sicherung ließ sich auf dem Server nicht lesen.'));
             }
             try {
                 stream_copy_to_stream($in, $out);

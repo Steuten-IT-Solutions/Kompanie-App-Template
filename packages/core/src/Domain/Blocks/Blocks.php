@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\RichText;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Inhalte aus Blöcken (eigene Seiten, News in der App, Schwarzes Brett): eine geordnete Liste, jeder Block mit id, type,
@@ -53,10 +54,10 @@ final class Blocks
     public function validate(mixed $in, int $textMax): array
     {
         if (!is_array($in) || !array_is_list($in)) {
-            throw ApiError::invalid('Ungültige Blöcke.');
+            throw ApiError::invalid(I18n::t('Ungültige Blöcke.'));
         }
         if (count($in) > self::MAX) {
-            throw ApiError::invalid(sprintf('Höchstens %d Blöcke.', self::MAX));
+            throw ApiError::invalid(I18n::t('Höchstens {max} Blöcke.', ['max' => self::MAX]));
         }
         $types = $this->types();
         $out = [];
@@ -64,15 +65,15 @@ final class Blocks
         $text = 0;
         foreach ($in as $block) {
             if (!is_array($block)) {
-                throw ApiError::invalid('Ungültiger Block.');
+                throw ApiError::invalid(I18n::t('Ungültiger Block.'));
             }
             $type = $types[$block['type'] ?? ''] ?? null;
             if ($type === null) {
-                throw ApiError::invalid('Unbekannter Block: ' . (is_string($block['type'] ?? null) ? $block['type'] : '?') . '.');
+                throw ApiError::invalid(I18n::t('Unbekannter Block: {type}.', ['type' => is_string($block['type'] ?? null) ? $block['type'] : '?']));
             }
             $audience = $block['audience'] ?? 'all';
             if (!in_array($audience, self::AUDIENCES, true)) {
-                throw ApiError::invalid('Für wen ist der Block? Erlaubt sind all (alle) und members (Mitglieder).');
+                throw ApiError::invalid(I18n::t('Für wen ist der Block? Erlaubt sind all (alle) und members (Mitglieder).'));
             }
             $id = is_string($block['id'] ?? null) ? $block['id'] : '';
             if (preg_match(self::ID, $id) !== 1 || isset($seen[$id])) {
@@ -86,7 +87,7 @@ final class Blocks
             $out[] = ['id' => $id, 'type' => $type->type(), 'audience' => $audience] + $data;
         }
         if ($text > $textMax) {
-            throw ApiError::invalid('Der Text ist zu lang.');
+            throw ApiError::invalid(I18n::t('Der Text ist zu lang.'));
         }
         return $out;
     }
@@ -106,12 +107,12 @@ final class Blocks
             return null;
         }
         if ($in['body'] !== null && !is_string($in['body'])) {
-            throw ApiError::invalid('Ungültiger Text.');
+            throw ApiError::invalid(I18n::t('Ungültiger Text.'));
         }
         $html = RichText::sanitize((string) $in['body']);
         $html = RichText::isEmpty($html) ? '' : $html;
         if (strlen($html) > $textMax) {
-            throw ApiError::invalid('Der Text ist zu lang.');
+            throw ApiError::invalid(I18n::t('Der Text ist zu lang.'));
         }
         return self::fromBody($html);
     }
@@ -278,7 +279,7 @@ final class Blocks
                 $part = $text === '' ? '' : '<p>' . nl2br(htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'), false) . '</p>';
             }
             if ($part !== '' && $members && $mark) {
-                $part = '<p><em>Nur für Mitglieder:</em></p>' . $part;
+                $part = '<p><em>' . htmlspecialchars(I18n::t('Nur für Mitglieder:'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</em></p>' . $part;
             }
             $html .= $part;
         }

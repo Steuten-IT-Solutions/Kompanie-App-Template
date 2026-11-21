@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Voraussetzung einer Anwärter-Rolle als Baum (Domain\AdmissionService): Gruppen verknüpfen Bedingungen und weitere
@@ -125,15 +126,15 @@ final class AdmissionRule
             return self::none();
         }
         if (!is_array($raw) || ($raw['type'] ?? self::GROUP) !== self::GROUP) {
-            throw ApiError::invalid('Die Voraussetzung muss eine Gruppe sein.');
+            throw ApiError::invalid(I18n::t('Die Voraussetzung muss eine Gruppe sein.'));
         }
         $counter = ['conditions' => 0, 'groups' => 0];
         $tree = self::parseGroup($raw, $kind, $counter) ?? self::none();
         if ($counter['conditions'] > self::CONDITIONS_MAX) {
-            throw ApiError::invalid(sprintf('Höchstens %d Bedingungen je Rolle.', self::CONDITIONS_MAX));
+            throw ApiError::invalid(I18n::t('Höchstens {max} Bedingungen je Rolle.', ['max' => self::CONDITIONS_MAX]));
         }
         if ($counter['groups'] - 1 > self::GROUPS_MAX) {
-            throw ApiError::invalid(sprintf('Höchstens %d Gruppen je Rolle.', self::GROUPS_MAX));
+            throw ApiError::invalid(I18n::t('Höchstens {max} Gruppen je Rolle.', ['max' => self::GROUPS_MAX]));
         }
         return $tree;
     }
@@ -177,7 +178,7 @@ final class AdmissionRule
     }
 
     /**
-     * Voraussetzung in einer Zeile, z. B. „6 Teilnahmen an Versammlung und (12 Monate als Anwärter oder 10 Teilnahmen an
+     * Voraussetzung in einer Zeile (deutsch: steht so im Änderungsprotokoll), z. B. „6 Teilnahmen an Versammlung und (12 Monate als Anwärter oder 10 Teilnahmen an
      * Arbeitsdienst)“; leer ohne Bedingung.
      *
      * @param array<string, mixed> $node
@@ -267,20 +268,20 @@ final class AdmissionRule
     {
         $counter['groups']++;
         if ($counter['groups'] - 1 > self::GROUPS_MAX) {
-            throw ApiError::invalid(sprintf('Höchstens %d Gruppen je Rolle.', self::GROUPS_MAX));
+            throw ApiError::invalid(I18n::t('Höchstens {max} Gruppen je Rolle.', ['max' => self::GROUPS_MAX]));
         }
         $op = $raw['op'] ?? self::AND;
         if (!in_array($op, [self::AND, self::OR], true)) {
-            throw ApiError::invalid('Eine Gruppe ist entweder UND oder ODER.');
+            throw ApiError::invalid(I18n::t('Eine Gruppe ist entweder UND oder ODER.'));
         }
         $itemsRaw = $raw['items'] ?? [];
         if (!is_array($itemsRaw) || !array_is_list($itemsRaw)) {
-            throw ApiError::invalid('Die Bedingungen einer Gruppe müssen eine Liste sein.');
+            throw ApiError::invalid(I18n::t('Die Bedingungen einer Gruppe müssen eine Liste sein.'));
         }
         $items = [];
         foreach ($itemsRaw as $item) {
             if (!is_array($item)) {
-                throw ApiError::invalid('Unbekannte Bedingung.');
+                throw ApiError::invalid(I18n::t('Unbekannte Bedingung.'));
             }
             $type = $item['type'] ?? null;
             if ($type === self::GROUP) {
@@ -292,18 +293,18 @@ final class AdmissionRule
             }
             $counter['conditions']++;
             if ($counter['conditions'] > self::CONDITIONS_MAX) {
-                throw ApiError::invalid(sprintf('Höchstens %d Bedingungen je Rolle.', self::CONDITIONS_MAX));
+                throw ApiError::invalid(I18n::t('Höchstens {max} Bedingungen je Rolle.', ['max' => self::CONDITIONS_MAX]));
             }
             if ($type === self::ATTENDANCE) {
                 $name = is_string($item['kind'] ?? null) ? $item['kind'] : '';
                 if ($name === '') {
-                    throw ApiError::invalid('Für die Teilnahmen bitte eine Terminart wählen.');
+                    throw ApiError::invalid(I18n::t('Für die Teilnahmen bitte eine Terminart wählen.'));
                 }
-                $items[] = ['type' => self::ATTENDANCE, 'kind' => $kind($name), 'count' => self::number($item['count'] ?? null, self::COUNT_MAX, 'Teilnahmen')];
+                $items[] = ['type' => self::ATTENDANCE, 'kind' => $kind($name), 'count' => self::number($item['count'] ?? null, self::COUNT_MAX, I18n::t('Teilnahmen'))];
             } elseif ($type === self::DURATION) {
-                $items[] = ['type' => self::DURATION, 'months' => self::number($item['months'] ?? null, self::MONTHS_MAX, 'Monate als Anwärter')];
+                $items[] = ['type' => self::DURATION, 'months' => self::number($item['months'] ?? null, self::MONTHS_MAX, I18n::t('Monate als Anwärter'))];
             } else {
-                throw ApiError::invalid('Unbekannte Bedingung.');
+                throw ApiError::invalid(I18n::t('Unbekannte Bedingung.'));
             }
         }
         return $items === [] && $counter['groups'] > 1 ? null : ['type' => self::GROUP, 'op' => $op, 'items' => $items];
@@ -313,7 +314,7 @@ final class AdmissionRule
     {
         $n = Input::integer($raw);
         if ($n === null || $n < 1 || $n > $max) {
-            throw ApiError::invalid(sprintf('%s: bitte eine Zahl von 1 bis %d.', $label, $max));
+            throw ApiError::invalid(I18n::t('{label}: bitte eine Zahl von 1 bis {max}.', ['label' => $label, 'max' => $max]));
         }
         return $n;
     }

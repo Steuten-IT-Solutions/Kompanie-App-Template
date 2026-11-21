@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\RichText;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /** Formatierter Text (RichText, Bilder über rich_images): der bisherige Text einer Seite. */
 final class TextBlock implements BlockType
@@ -27,7 +28,7 @@ final class TextBlock implements BlockType
     {
         $html = $in['html'] ?? '';
         if ($html !== null && !is_string($html)) {
-            throw ApiError::invalid('Ungültiger Text.');
+            throw ApiError::invalid(I18n::t('Ungültiger Text.'));
         }
         $html = RichText::sanitize((string) $html);
         return ['html' => RichText::isEmpty($html) ? '' : $html];

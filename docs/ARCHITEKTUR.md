@@ -629,6 +629,9 @@ Platzhalter; `--missing=en` gibt die fehlenden als JSON aus. Die Texte in `t()`/
 Zeichenketten, Werte kommen über Platzhalter (`t('Hallo, {name}', { name })`). Datum und Zahlen formatieren
 `dateFormat()`/`numberFormat()`/`formatNumber()` aus `format.ts` bzw. `localeTag()` in der aktuellen Sprache;
 Sortieren bleibt deutsch (`localeCompare(…, 'de')`), Adressen in der App (`#/termine`) bleiben in jeder Sprache gleich.
+Braucht derselbe deutsche Text je nach Stelle eine andere Übersetzung (Knopf „Zusagen“ und Spalte „Zusagen“ als
+Anzahl), nennt `tc('Anzahl', 'Zusagen')` bzw. `I18n::tc()` den Zusammenhang; der Schlüssel ist dann „Anzahl|Zusagen“.
+Texte, die gespeichert werden (Änderungsprotokoll, Grund einer Buchung, Spaltennamen beim Import), bleiben deutsch.
 
 Die App setzt **HTTPS** voraus (sonst funktioniert die Installation aufs Handy nicht). Der Installer prüft das und erklärt, wie man beim Hoster ein kostenloses Zertifikat einschaltet.
 

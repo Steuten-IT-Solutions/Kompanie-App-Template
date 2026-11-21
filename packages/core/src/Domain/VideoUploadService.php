@@ -7,6 +7,7 @@ namespace KompanieApp\Core\Domain;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Videos in die Galerie hochladen (Issue #350): MP4 und WebM bis MAX_BYTES, in Stücken, damit jede Anfrage unter
@@ -52,7 +53,7 @@ final class VideoUploadService
         $in = is_array($in) ? $in : [];
         $purpose = in_array($in['purpose'] ?? null, self::PURPOSES, true) ? (string) $in['purpose'] : 'album';
         if (!($purpose === 'album' ? $mayManage : $maySubmit)) {
-            throw ApiError::forbidden($purpose === 'album' ? 'Videos in Alben lädt nur hoch, wer die Galerie verwaltet.' : 'Du darfst keine Videos einreichen.');
+            throw ApiError::forbidden($purpose === 'album' ? I18n::t('Videos in Alben lädt nur hoch, wer die Galerie verwaltet.') : I18n::t('Du darfst keine Videos einreichen.'));
         }
         if ($purpose !== 'album') {
             $this->app->gallerySubmissions()->assertEnabled();
@@ -62,20 +63,20 @@ final class VideoUploadService
         $name = Text::line(is_string($in['name'] ?? null) ? $in['name'] : '', 255);
         $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
         if (!isset(self::TYPES[$ext])) {
-            throw ApiError::invalid('Erlaubt sind Videos als MP4 oder WebM.');
+            throw ApiError::invalid(I18n::t('Erlaubt sind Videos als MP4 oder WebM.'));
         }
         $size = Input::integer($in['size'] ?? null) ?? 0;
         if ($size < 1) {
-            throw ApiError::invalid('Das Video ist leer.');
+            throw ApiError::invalid(I18n::t('Das Video ist leer.'));
         }
         if ($size > self::MAX_BYTES) {
-            throw ApiError::invalid(sprintf('Das Video ist %s groß, erlaubt sind höchstens %s.', ServerLimits::format($size), ServerLimits::format(self::MAX_BYTES)));
+            throw ApiError::invalid(I18n::t('Das Video ist {size} groß, erlaubt sind höchstens {max}.', ['size' => ServerLimits::format($size), 'max' => ServerLimits::format(self::MAX_BYTES)]));
         }
         $this->prune();
         $part = $this->path(bin2hex(random_bytes(16)), 'part');
         $free = @disk_free_space(dirname($part));
         if ($free !== false && $free < $size + self::DISK_RESERVE) {
-            throw ApiError::invalid(sprintf('Auf dem Server ist nicht genug Platz für das Video (frei sind %s).', ServerLimits::format((int) $free)));
+            throw ApiError::invalid(I18n::t('Auf dem Server ist nicht genug Platz für das Video (frei sind {free}).', ['free' => ServerLimits::format((int) $free)]));
         }
         $id = basename($part, '.part');
         $session = [
@@ -89,7 +90,7 @@ final class VideoUploadService
             'last' => 0,
         ];
         if (@file_put_contents($part, '') === false) {
-            throw new \RuntimeException('Das Video lässt sich nicht zwischenspeichern.');
+            throw new \RuntimeException(I18n::t('Das Video lässt sich nicht zwischenspeichern.'));
         }
         $this->save($id, $session);
         return ['id' => $id, 'chunk_size' => self::chunkSize(), 'max_bytes' => self::MAX_BYTES];
@@ -106,7 +107,7 @@ final class VideoUploadService
         $offset = Input::integer($offset);
         $bytes = is_string($data) ? base64_decode($data, true) : false;
         if ($offset === null || $bytes === false || $bytes === '') {
-            throw ApiError::invalid('Es ist kein Stück des Videos angekommen.');
+            throw ApiError::invalid(I18n::t('Es ist kein Stück des Videos angekommen.'));
         }
         $len = strlen($bytes);
         $received = (int) $session['received'];
@@ -114,21 +115,21 @@ final class VideoUploadService
             return ['received' => $received]; // das letzte Stück noch einmal (Antwort verloren): schon da
         }
         if ($offset !== $received) {
-            throw ApiError::invalid(sprintf('Das Stück passt nicht (erwartet ab Byte %d). Bitte das Video neu hochladen.', $received));
+            throw ApiError::invalid(I18n::t('Das Stück passt nicht (erwartet ab Byte {offset}). Bitte das Video neu hochladen.', ['offset' => $received]));
         }
         if ($len > self::CHUNK_MAX || $received + $len > (int) $session['size']) {
-            throw ApiError::invalid('Das Stück ist größer als angekündigt.');
+            throw ApiError::invalid(I18n::t('Das Stück ist größer als angekündigt.'));
         }
         if ($offset === 0 && !self::signatureOk((string) $session['ext'], $bytes)) {
-            throw ApiError::invalid(sprintf('Die Datei ist kein gültiges %s-Video.', strtoupper((string) $session['ext'])));
+            throw ApiError::invalid(I18n::t('Die Datei ist kein gültiges {format}-Video.', ['format' => strtoupper((string) $session['ext'])]));
         }
         $fp = @fopen($this->path($id, 'part'), 'ab');
         if ($fp === false) {
-            throw ApiError::invalid('Die Sitzung zum Hochladen ist abgelaufen. Bitte das Video neu hochladen.');
+            throw ApiError::invalid(I18n::t('Die Sitzung zum Hochladen ist abgelaufen. Bitte das Video neu hochladen.'));
         }
         try {
             if (@fwrite($fp, $bytes) !== $len) {
-                throw ApiError::invalid('Das Stück lässt sich nicht speichern (Platte voll?).');
+                throw ApiError::invalid(I18n::t('Das Stück lässt sich nicht speichern (Platte voll?).'));
             }
         } finally {
             fclose($fp);
@@ -155,16 +156,16 @@ final class VideoUploadService
             $this->app->gallerySubmissions()->assertEnabled();
         }
         if ($submission && ($in['consent'] ?? null) !== true) {
-            throw ApiError::invalid('Bitte bestätigen, dass du die Rechte an dem Video hast und die erkennbaren Personen einverstanden sind.');
+            throw ApiError::invalid(I18n::t('Bitte bestätigen, dass du die Rechte an dem Video hast und die erkennbaren Personen einverstanden sind.'));
         }
         $part = $this->path($id, 'part');
         clearstatcache(true, $part);
         if ((int) $session['received'] !== (int) $session['size'] || (int) @filesize($part) !== (int) $session['size']) {
-            throw ApiError::invalid('Das Video ist noch nicht vollständig angekommen.');
+            throw ApiError::invalid(I18n::t('Das Video ist noch nicht vollständig angekommen.'));
         }
         $head = (string) @file_get_contents($part, false, null, 0, 64);
         if (!self::signatureOk((string) $session['ext'], $head)) {
-            throw ApiError::invalid(sprintf('Die Datei ist kein gültiges %s-Video.', strtoupper((string) $session['ext'])));
+            throw ApiError::invalid(I18n::t('Die Datei ist kein gültiges {format}-Video.', ['format' => strtoupper((string) $session['ext'])]));
         }
         $albumId = (int) $session['album'];
         $this->app->gallerySubmissions()->album($albumId);
@@ -277,7 +278,7 @@ final class VideoUploadService
         $bytes = base64_decode($raw, true);
         $info = $bytes !== false && strncmp($bytes, "\xFF\xD8\xFF", 3) === 0 ? @getimagesizefromstring($bytes) : false;
         if ($info === false || $info[0] < 1 || $info[1] < 1 || $info[0] * $info[1] > 40_000_000) {
-            throw ApiError::invalid('Das Standbild des Videos ist kein gültiges JPEG.');
+            throw ApiError::invalid(I18n::t('Das Standbild des Videos ist kein gültiges JPEG.'));
         }
         $files = $this->app->files;
         $src = $files->tempFile();
@@ -287,7 +288,7 @@ final class VideoUploadService
             $this->app->images->resizeToJpeg($src, $out, self::POSTER_EDGE, 85);
         } catch (\RuntimeException $e) {
             @unlink($out);
-            throw ApiError::invalid('Das Standbild des Videos lässt sich nicht lesen: ' . $e->getMessage());
+            throw ApiError::invalid(I18n::t('Das Standbild des Videos lässt sich nicht lesen: {error}', ['error' => $e->getMessage()]));
         } finally {
             @unlink($src);
         }
@@ -301,7 +302,7 @@ final class VideoUploadService
         $raw = $id !== null ? @file_get_contents($this->path($id, 'json')) : false;
         $session = is_string($raw) ? json_decode($raw, true) : null;
         if ($id === null || !is_array($session) || (int) ($session['user'] ?? 0) !== $user->id) {
-            throw ApiError::notFound('Die Sitzung zum Hochladen gibt es nicht (mehr). Bitte das Video neu hochladen.');
+            throw ApiError::notFound(I18n::t('Die Sitzung zum Hochladen gibt es nicht (mehr). Bitte das Video neu hochladen.'));
         }
         return [$id, $session];
     }
@@ -310,7 +311,7 @@ final class VideoUploadService
     private function save(string $id, array $session): void
     {
         if (@file_put_contents($this->path($id, 'json'), (string) json_encode($session)) === false) {
-            throw new \RuntimeException('Die Sitzung zum Hochladen lässt sich nicht speichern.');
+            throw new \RuntimeException(I18n::t('Die Sitzung zum Hochladen lässt sich nicht speichern.'));
         }
     }
 

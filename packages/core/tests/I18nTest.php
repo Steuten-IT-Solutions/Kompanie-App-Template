@@ -31,6 +31,15 @@ final class I18nTest extends TestCase
         self::assertSame('2 Gibt es nicht im Katalog', I18n::tn('{count} Gibt es nicht', '{count} Gibt es nicht im Katalog', 2));
     }
 
+    public function testContextKeepsTheGermanTextWithoutEntry(): void
+    {
+        I18n::setLocale('en');
+        self::assertSame('Accepted', I18n::tc('Anzahl', 'Zusagen'));
+        self::assertSame('Zusagen', I18n::tc('Gibt es nicht', 'Zusagen'));
+        I18n::setLocale('de');
+        self::assertSame('Zusagen', I18n::tc('Anzahl', 'Zusagen'));
+    }
+
     public function testPluralUsesTheSingularForOneOnly(): void
     {
         self::assertSame('1 Bild', I18n::tn('{count} Bild', '{count} Bilder', 1));

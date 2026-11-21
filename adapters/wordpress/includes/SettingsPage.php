@@ -10,6 +10,7 @@ use KompanieApp\Core\Domain\Features;
 use KompanieApp\Core\Domain\GoogleConnect;
 use KompanieApp\Core\Domain\MaintenanceService;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /** Einstellungen → <Name der Kompanie>: Wartung, Bereiche, Google-Zugang, Kalender, Galerie und Platzhalterbild der Webseite. */
 final class SettingsPage
@@ -18,13 +19,11 @@ final class SettingsPage
 
     public static function init(): void
     {
-        add_action('admin_menu', static fn () => add_options_page(
-            Plugin::app()->config->shortName() . ' – App',
-            Plugin::app()->config->shortName() . ' – App',
-            'manage_options',
-            self::PAGE,
-            static fn () => self::render(Plugin::app()),
-        ));
+        add_action('admin_menu', static function (): void {
+            self::useLocale(Plugin::app());
+            $title = I18n::t('{name} – App', ['name' => Plugin::app()->config->shortName()]);
+            add_options_page($title, $title, 'manage_options', self::PAGE, static fn () => self::render(Plugin::app()));
+        });
         add_action('admin_post_kompanie_app_features', static fn () => self::saveFeatures(Plugin::app()));
         add_action('admin_post_kompanie_app_maintenance', static fn () => self::saveMaintenance(Plugin::app()));
         add_action('admin_post_kompanie_app_calendar', static fn () => self::saveCalendar(Plugin::app()));
@@ -60,11 +59,40 @@ final class SettingsPage
         if (WpEnvironment::prettyPermalinks() || !current_user_can('manage_options')) {
             return;
         }
-        printf(
-            '<div class="notice notice-info"><p>Die App ist erreichbar unter <a href="%1$s">%1$s</a>. Für die kürzere Adresse <code>/app/</code> unter <a href="%2$s">Einstellungen → Permalinks</a> z. B. „Beitragsname“ wählen.</p></div>',
-            esc_url((new WpEnvironment())->appUrl()),
-            esc_url(admin_url('options-permalink.php')),
-        );
+        self::useLocale(Plugin::app());
+        $url = esc_url((new WpEnvironment())->appUrl());
+        echo '<div class="notice notice-info"><p>' . self::html(I18n::t('Die App ist erreichbar unter {link}. Für die kürzere Adresse {path} unter {permalinks} z. B. „Beitragsname“ wählen.'), [ // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- self::html() maskiert
+            'link' => '<a href="' . $url . '">' . $url . '</a>',
+            'path' => '<code>/app/</code>',
+            'permalinks' => '<a href="' . esc_url(admin_url('options-permalink.php')) . '">' . esc_html(I18n::t('Einstellungen → Permalinks')) . '</a>',
+        ]) . '</p></div>';
+    }
+
+    /** Sprache der Seite und ihrer Meldungen: die am Konto gewählte (LanguageService), sonst Deutsch. */
+    private static function useLocale(App $app): void
+    {
+        I18n::setLocale($app->languages()->resolve(null, $app->authContext->currentUser()));
+    }
+
+    /**
+     * Übersetzten Text maskieren und danach Platzhalter durch fertiges HTML ersetzen (Links, Code, Hervorhebungen).
+     *
+     * @param array<string, string> $html Platzhalter => HTML (bereits maskiert)
+     */
+    private static function html(string $text, array $html = []): string
+    {
+        return I18n::fill(esc_html($text), $html);
+    }
+
+    /** Übersetzten Text maskiert ausgeben. */
+    private static function e(string $text): void
+    {
+        echo esc_html($text);
+    }
+
+    private static function code(string $text): string
+    {
+        return '<code>' . esc_html($text) . '</code>';
     }
 
     private static function url(array $args = []): string
@@ -80,8 +108,9 @@ final class SettingsPage
 
     private static function guard(string $action): void
     {
+        self::useLocale(Plugin::app());
         if (!current_user_can('manage_options')) {
-            wp_die('Keine Berechtigung.');
+            wp_die(esc_html(I18n::t('Keine Berechtigung.')));
         }
         check_admin_referer($action);
     }
@@ -91,6 +120,7 @@ final class SettingsPage
         if (!current_user_can('manage_options')) {
             return;
         }
+        self::useLocale($app);
         $s = $app->settings;
         // phpcs:disable WordPress.Security.NonceVerification.Recommended -- nur Anzeige von Rückmeldungen
         $msg = isset($_GET['kompanie_msg']) ? sanitize_text_field(wp_unslash($_GET['kompanie_msg'])) : '';
@@ -102,44 +132,46 @@ final class SettingsPage
         $email = $app->drive()->clientEmail();
         ?>
         <div class="wrap">
-            <h1><?php echo esc_html($app->config->shortName()); ?> – App</h1>
+            <h1><?php self::e(I18n::t('{name} – App', ['name' => $app->config->shortName()])); ?></h1>
             <?php if ($msg !== '') : ?>
                 <div class="notice <?php echo $isError ? 'notice-error' : 'notice-success'; ?>"><p><?php echo esc_html($msg); ?></p></div>
             <?php endif; ?>
             <p>
-                Die App ist erreichbar unter
-                <a href="<?php echo esc_url($app->env->appUrl()); ?>" target="_blank"><?php echo esc_html($app->env->appUrl()); ?></a>.
-                Rollen in der App legt ein Admin in der App unter Mitglieder fest oder im jeweiligen
-                <a href="<?php echo esc_url(admin_url('users.php')); ?>">Benutzerprofil</a>.
-                Öffentliche Termine zeigt auf der Webseite der Shortcode <code>[kompanie_termine]</code>, den internen Kalender für angemeldete Mitglieder <code>[kompanie_kalender]</code>, die Galerie <code>[kompanie_galerie]</code>,
-                die Ämter <code>[kompanie_aemter]</code> (nur eine Gruppe: <code>[kompanie_aemter gruppe="…"]</code>) und die Mitgliederliste <code>[kompanie_mitglieder]</code>.
+                <?php echo self::html(I18n::t('Die App ist erreichbar unter {link}.'), ['link' => '<a href="' . esc_url($app->env->appUrl()) . '" target="_blank">' . esc_html($app->env->appUrl()) . '</a>']); ?>
+                <?php echo self::html(I18n::t('Rollen in der App legt ein Admin in der App unter Mitglieder fest oder im jeweiligen {profile}.'), ['profile' => '<a href="' . esc_url(admin_url('users.php')) . '">' . esc_html(I18n::t('Benutzerprofil')) . '</a>']); ?>
+                <?php echo self::html(I18n::t('Öffentliche Termine zeigt auf der Webseite der Shortcode {events}, den internen Kalender für angemeldete Mitglieder {calendar}, die Galerie {gallery}, die Ämter {offices} (nur eine Gruppe: {group}) und die Mitgliederliste {members}.'), [
+                    'events' => self::code('[kompanie_termine]'),
+                    'calendar' => self::code('[kompanie_kalender]'),
+                    'gallery' => self::code('[kompanie_galerie]'),
+                    'offices' => self::code('[kompanie_aemter]'),
+                    'group' => self::code('[kompanie_aemter gruppe="…"]'),
+                    'members' => self::code('[kompanie_mitglieder]'),
+                ]); ?>
             </p>
 
             <?php $maintenance = $app->maintenance()->state(); ?>
-            <h2 id="wartung">Wartungsmodus</h2>
+            <h2 id="wartung"><?php self::e(I18n::t('Wartungsmodus')); ?></h2>
             <?php if ($maintenance['on']) : ?>
-                <div class="notice notice-error inline"><p><strong>Wartungsmodus aktiv – nur Admins können die App nutzen.</strong>
-                    Seit <?php echo esc_html(wp_date('d.m.Y H:i', $maintenance['since'])); ?>.</p></div>
+                <div class="notice notice-error inline"><p><strong><?php self::e(I18n::t('Wartungsmodus aktiv – nur Admins können die App nutzen.')); ?></strong>
+                    <?php self::e(I18n::t('Seit {time}.', ['time' => (string) wp_date('d.m.Y H:i', $maintenance['since'])])); ?></p></div>
             <?php endif; ?>
-            <p>Solange der Wartungsmodus an ist, sehen alle außer Admins in der App nur eine Wartungsseite (z. B. während einer
-               Datenübernahme). Die übrige Webseite und ihre Shortcodes sind nicht betroffen.</p>
+            <p><?php self::e(I18n::t('Solange der Wartungsmodus an ist, sehen alle außer Admins in der App nur eine Wartungsseite (z. B. während einer Datenübernahme). Die übrige Webseite und ihre Shortcodes sind nicht betroffen.')); ?></p>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                 <input type="hidden" name="action" value="kompanie_app_maintenance" />
                 <?php wp_nonce_field('kompanie_app_maintenance'); ?>
-                <p><label for="maintenance_reason">Begründung (optional, erscheint auf der Wartungsseite)</label><br />
+                <p><label for="maintenance_reason"><?php self::e(I18n::t('Begründung (optional, erscheint auf der Wartungsseite)')); ?></label><br />
                    <textarea id="maintenance_reason" name="reason" rows="3" class="large-text" maxlength="<?php echo (int) MaintenanceService::REASON_MAX; ?>"><?php echo esc_textarea($maintenance['reason']); ?></textarea></p>
                 <?php if ($maintenance['on']) : ?>
-                    <?php submit_button('Begründung speichern', 'secondary', 'maintenance_keep', false); ?>
-                    <?php submit_button('Wartungsmodus beenden', 'primary', 'maintenance_off', false); ?>
+                    <?php submit_button(I18n::t('Begründung speichern'), 'secondary', 'maintenance_keep', false); ?>
+                    <?php submit_button(I18n::t('Wartungsmodus beenden'), 'primary', 'maintenance_off', false); ?>
                 <?php else : ?>
-                    <?php submit_button('Wartungsmodus einschalten', 'secondary', 'maintenance_on', false); ?>
+                    <?php submit_button(I18n::t('Wartungsmodus einschalten'), 'secondary', 'maintenance_on', false); ?>
                 <?php endif; ?>
             </form>
 
             <hr />
-            <h2 id="bereiche">Bereiche</h2>
-            <p>Welche Bereiche die App für alle hat (dasselbe wie in der App unter <em>Einstellungen → Bereiche</em>).
-               Ausgeschaltete Bereiche verschwinden aus der App; ihre Daten bleiben erhalten.</p>
+            <h2 id="bereiche"><?php self::e(I18n::t('Bereiche')); ?></h2>
+            <p><?php echo self::html(I18n::t('Welche Bereiche die App für alle hat (dasselbe wie in der App unter {path}). Ausgeschaltete Bereiche verschwinden aus der App; ihre Daten bleiben erhalten.'), ['path' => '<em>' . esc_html(I18n::t('Einstellungen → Bereiche')) . '</em>']); ?></p>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                 <input type="hidden" name="action" value="kompanie_app_features" />
                 <?php wp_nonce_field('kompanie_app_features'); ?>
@@ -151,111 +183,118 @@ final class SettingsPage
                                 <strong><?php echo esc_html($f['label']); ?></strong> – <?php echo esc_html($f['description']); ?>
                             </label>
                             <?php if ($f['enabled'] && $f['configured'] === false) : ?>
-                                <br /><span class="description">Noch nicht eingerichtet (siehe unten).</span>
+                                <br /><span class="description"><?php self::e(I18n::t('Noch nicht eingerichtet (siehe unten).')); ?></span>
                             <?php endif; ?>
                         </p>
                     <?php endforeach; ?>
                 </fieldset>
-                <?php submit_button('Bereiche speichern', 'secondary'); ?>
+                <?php submit_button(I18n::t('Bereiche speichern'), 'secondary'); ?>
             </form>
 
             <hr />
             <?php self::renderGoogle($app); ?>
 
             <hr />
-            <h2 id="kalender">Kalender</h2>
-            <p>Am einfachsten: In Google Kalender unter <em>Einstellungen → Kalender → Kalender integrieren</em> die
-               <strong>„Privatadresse im iCal-Format“</strong> kopieren und hier einfügen.
-               Ein privater Kalender geht auch über seine Kalender-ID und den <a href="#google">Google-Zugang</a>
-               (Verbindung mit Erlaubnis für den Kalender oder Dienstkonto, für das der Kalender freigegeben ist).
-               Reihenfolge: API-Schlüssel, dann Google-Zugang, dann iCal-Link.
-               Welche Quelle gilt (auch Termine direkt in der App pflegen), wählst du in der App unter
-               <em>Verwaltung → Einstellungen → Kalender</em>.</p>
+            <?php $googleLink = '<a href="#google">' . esc_html(I18n::t('Google-Zugang')) . '</a>'; ?>
+            <h2 id="kalender"><?php self::e(I18n::t('Kalender')); ?></h2>
+            <p><?php echo self::html(I18n::t('Am einfachsten: In Google Kalender unter {path} die {address} kopieren und hier einfügen.'), [
+                'path' => '<em>' . esc_html(I18n::t('Einstellungen → Kalender → Kalender integrieren')) . '</em>',
+                'address' => '<strong>' . esc_html(I18n::t('„Privatadresse im iCal-Format“')) . '</strong>',
+            ]); ?>
+               <?php echo self::html(I18n::t('Ein privater Kalender geht auch über seine Kalender-ID und den {google} (Verbindung mit Erlaubnis für den Kalender oder Dienstkonto, für das der Kalender freigegeben ist).'), ['google' => $googleLink]); ?>
+               <?php self::e(I18n::t('Reihenfolge: API-Schlüssel, dann Google-Zugang, dann iCal-Link.')); ?>
+               <?php echo self::html(I18n::t('Welche Quelle gilt (auch Termine direkt in der App pflegen), wählst du in der App unter {path}.'), ['path' => '<em>' . esc_html(I18n::t('Verwaltung → Einstellungen → Kalender')) . '</em>']); ?></p>
             <?php
-            $calendarSource = [
-                'app' => 'Termine in der App gepflegt (die Felder hier gelten dann nicht)',
-                'google' => 'Google-API mit eigenem API-Schlüssel',
-                'google_connection' => 'Kalender-IDs über den Google-Zugang',
-                'ics' => 'iCal-Link',
-            ][$app->calendar()->source()] ?? '';
+            $calendarSource = match ($app->calendar()->source()) {
+                'app' => I18n::t('Termine in der App gepflegt (die Felder hier gelten dann nicht)'),
+                'google' => I18n::t('Google-API mit eigenem API-Schlüssel'),
+                'google_connection' => I18n::t('Kalender-IDs über den Google-Zugang'),
+                'ics' => I18n::t('iCal-Link'),
+                default => '',
+            };
             ?>
-            <p>Genutzt wird: <strong><?php echo esc_html($calendarSource !== '' ? $calendarSource : 'noch keine Quelle'); ?></strong></p>
+            <p><?php echo self::html(I18n::t('Genutzt wird: {source}'), ['source' => '<strong>' . esc_html($calendarSource !== '' ? $calendarSource : I18n::t('noch keine Quelle')) . '</strong>']); ?></p>
             <?php if ($app->calendar()->connectionNeedsCalendarAccess()) : ?>
-                <div class="notice notice-info inline"><p>Die Verbindung mit Google darf den Kalender nicht lesen (beim Verbinden nicht erlaubt).
-                    Für die Kalender-IDs unter <a href="#google">Google-Zugang</a> „Verbindung trennen“ und neu verbinden, dabei auch das Häkchen für den Kalender setzen.</p></div>
+                <div class="notice notice-info inline"><p><?php self::e(I18n::t('Die Verbindung mit Google darf den Kalender nicht lesen (beim Verbinden nicht erlaubt).')); ?>
+                    <?php echo self::html(I18n::t('Für die Kalender-IDs unter {google} „Verbindung trennen“ und neu verbinden, dabei auch das Häkchen für den Kalender setzen.'), ['google' => $googleLink]); ?></p></div>
             <?php endif; ?>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                 <input type="hidden" name="action" value="kompanie_app_calendar" />
                 <?php wp_nonce_field('kompanie_app_calendar'); ?>
                 <table class="form-table" role="presentation">
                     <tr>
-                        <th scope="row"><label for="calendar_ics_url">Kalender-Link (iCal)</label></th>
+                        <th scope="row"><label for="calendar_ics_url"><?php self::e(I18n::t('Kalender-Link (iCal)')); ?></label></th>
                         <td><input type="url" class="large-text" id="calendar_ics_url" name="calendar_ics_url" value="<?php echo esc_attr((string) $s->get('calendar_ics_url', '')); ?>" /></td>
                     </tr>
                     <tr>
-                        <th scope="row"><label for="calendar_ids">Oder: Google-Kalender-IDs</label></th>
+                        <th scope="row"><label for="calendar_ids"><?php self::e(I18n::t('Oder: Google-Kalender-IDs')); ?></label></th>
                         <td><input type="text" class="regular-text" id="calendar_ids" name="calendar_ids" value="<?php echo esc_attr((string) $s->get('calendar_ids', '')); ?>" />
-                        <p class="description">Mit API-Schlüssel (nur öffentliche Kalender) oder über den <a href="#google">Google-Zugang</a> (auch private). Mehrere durch Komma trennen.</p></td>
+                        <p class="description"><?php echo self::html(I18n::t('Mit API-Schlüssel (nur öffentliche Kalender) oder über den {google} (auch private). Mehrere durch Komma trennen.'), ['google' => $googleLink]); ?></p></td>
                     </tr>
                     <tr>
-                        <th scope="row"><label for="google_api_key">Google-API-Schlüssel</label></th>
+                        <th scope="row"><label for="google_api_key"><?php self::e(I18n::t('Google-API-Schlüssel')); ?></label></th>
                         <td><input type="password" autocomplete="off" class="regular-text" id="google_api_key" name="google_api_key" value="<?php echo esc_attr((string) $s->get('google_api_key', '')); ?>" /></td>
                     </tr>
                     <tr>
-                        <th scope="row"><label for="calendar_cache_minutes">Aktualisieren alle … Minuten</label></th>
+                        <th scope="row"><label for="calendar_cache_minutes"><?php self::e(I18n::t('Aktualisieren alle … Minuten')); ?></label></th>
                         <td><input type="number" class="small-text" min="1" max="1440" step="1" required id="calendar_cache_minutes" name="calendar_cache_minutes" value="<?php echo esc_attr((string) max(1, (int) $s->get('calendar_cache_minutes', 15))); ?>" />
-                        <p class="description">So lange zeigt die App die zuletzt geladenen Termine, bevor sie bei Google neu nachfragt (1 bis 1440 Minuten).
-                            Kürzere Zeiten zeigen Änderungen schneller, bedeuten aber mehr Abrufe bei Google, und das Öffnen der Termine dauert dann öfter länger.
-                            Zusätzlich erneuert die App den Kalender stündlich im Hintergrund; Speichern und „Kalender testen“ laden sofort neu.</p></td>
+                        <p class="description"><?php self::e(I18n::t('So lange zeigt die App die zuletzt geladenen Termine, bevor sie bei Google neu nachfragt (1 bis 1440 Minuten). Kürzere Zeiten zeigen Änderungen schneller, bedeuten aber mehr Abrufe bei Google, und das Öffnen der Termine dauert dann öfter länger. Zusätzlich erneuert die App den Kalender stündlich im Hintergrund; Speichern und „Kalender testen“ laden sofort neu.')); ?></p></td>
                     </tr>
                 </table>
-                <?php submit_button('Speichern und testen', 'primary', 'submit', false); ?>
+                <?php submit_button(I18n::t('Speichern und testen'), 'primary', 'submit', false); ?>
             </form>
             <?php if ($test) : ?>
                 <?php self::renderCalendarTest($app); ?>
             <?php endif; ?>
 
             <hr />
-            <h2 id="galerie">Galerie (Google Drive)</h2>
-            <p>Aufbau in Drive: <strong>Galerie-Ordner → Jahr → Album → Bilder</strong>. Bilder im Unterordner
-               <strong>„intern“</strong> eines Albums sehen nur angemeldete Mitglieder.
-               Gelesen wird über den <a href="#google">Google-Zugang</a>:
+            <h2 id="galerie"><?php self::e(I18n::t('Galerie (Google Drive)')); ?></h2>
+            <p><?php echo self::html(I18n::t('Aufbau in Drive: {structure}. Bilder im Unterordner {folder} eines Albums sehen nur angemeldete Mitglieder.'), [
+                'structure' => '<strong>' . esc_html(I18n::t('Galerie-Ordner → Jahr → Album → Bilder')) . '</strong>',
+                // Der Ordner heißt in Drive immer „intern“ (GalleryService), auch in anderen Sprachen.
+                'folder' => '<strong>„intern“</strong>',
+            ]); ?>
                <?php if ($app->drive()->oauth() !== null) : ?>
-                   die Verbindung mit Google<?php echo $app->drive()->oauthEmail() !== '' ? ' (' . esc_html($app->drive()->oauthEmail()) . ')' : ''; ?>.
+                   <?php echo $app->drive()->oauthEmail() !== ''
+                       ? self::html(I18n::t('Gelesen wird über den {google}: die Verbindung mit Google ({email}).'), ['google' => $googleLink, 'email' => esc_html($app->drive()->oauthEmail())])
+                       : self::html(I18n::t('Gelesen wird über den {google}: die Verbindung mit Google.'), ['google' => $googleLink]); ?>
                <?php elseif ($email !== '') : ?>
-                   das Dienstkonto <code><?php echo esc_html($email); ?></code>; gib den Galerie-Ordner für diese Adresse frei (Rolle „Betrachter“).
+                   <?php echo self::html(I18n::t('Gelesen wird über den {google}: das Dienstkonto {email}; gib den Galerie-Ordner für diese Adresse frei (Rolle „Betrachter“).'), ['google' => $googleLink, 'email' => self::code($email)]); ?>
                <?php else : ?>
-                   <strong>noch nicht eingerichtet</strong>, bitte zuerst oben mit Google verbinden.
+                   <?php echo self::html(I18n::t('Gelesen wird über den {google}: {status}, bitte zuerst oben mit Google verbinden.'), ['google' => $googleLink, 'status' => '<strong>' . esc_html(I18n::t('noch nicht eingerichtet')) . '</strong>']); ?>
                <?php endif; ?></p>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                 <input type="hidden" name="action" value="kompanie_app_gallery" />
                 <?php wp_nonce_field('kompanie_app_gallery'); ?>
                 <table class="form-table" role="presentation">
                     <tr>
-                        <th scope="row"><label for="gallery_root">Galerie-Ordner</label></th>
-                        <td><input type="text" class="large-text" id="gallery_root" name="gallery_root" value="<?php echo esc_attr($app->gallery()->root()); ?>" placeholder="Link zum Ordner in Google Drive" /></td>
+                        <th scope="row"><label for="gallery_root"><?php self::e(I18n::t('Galerie-Ordner')); ?></label></th>
+                        <td><input type="text" class="large-text" id="gallery_root" name="gallery_root" value="<?php echo esc_attr($app->gallery()->root()); ?>" placeholder="<?php echo esc_attr(I18n::t('Link zum Ordner in Google Drive')); ?>" /></td>
                     </tr>
                 </table>
-                <?php submit_button('Galerie speichern', 'secondary'); ?>
+                <?php submit_button(I18n::t('Galerie speichern'), 'secondary'); ?>
             </form>
-            <h3>Stand</h3>
+            <h3><?php self::e(I18n::tc('Zustand', 'Stand')); ?></h3>
             <ul>
-                <li>Letzter Abgleich: <?php echo !empty($status['last_sync']) ? esc_html(wp_date('d.m.Y H:i', (int) $status['last_sync'])) : '–'; ?></li>
-                <li>Alben: <?php echo esc_html((string) ($status['albums'] ?? '–')); ?>, Bilder: <?php echo esc_html((string) ($status['photos'] ?? '–')); ?>,
-                    noch aufzubereiten: <?php echo esc_html((string) ($status['pending'] ?? '–')); ?></li>
+                <li><?php self::e(I18n::t('Letzter Abgleich: {time}', ['time' => !empty($status['last_sync']) ? (string) wp_date('d.m.Y H:i', (int) $status['last_sync']) : '–'])); ?></li>
+                <li><?php self::e(I18n::t('Alben: {albums}, Bilder: {photos}, noch aufzubereiten: {pending}', [
+                    'albums' => (string) ($status['albums'] ?? '–'),
+                    'photos' => (string) ($status['photos'] ?? '–'),
+                    'pending' => (string) ($status['pending'] ?? '–'),
+                ])); ?></li>
                 <?php if (!empty($status['error'])) : ?>
-                    <li><strong style="color:#b32d2e">Fehler: <?php echo esc_html((string) $status['error']); ?></strong></li>
+                    <li><strong style="color:#b32d2e"><?php self::e(I18n::t('Fehler: {error}', ['error' => (string) $status['error']])); ?></strong></li>
                 <?php endif; ?>
             </ul>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" id="kompanie-gallery-sync">
                 <input type="hidden" name="action" value="kompanie_app_gallery_sync" />
                 <?php if ($continue) : ?><input type="hidden" name="only_process" value="1" /><?php endif; ?>
                 <?php wp_nonce_field('kompanie_app_gallery_sync'); ?>
-                <?php submit_button('Jetzt abgleichen', 'primary', 'submit', false, $app->gallery()->isConfigured() ? [] : ['disabled' => 'disabled']); ?>
-                <p class="description">Neue Bilder kommen danach stündlich automatisch dazu. Beim ersten Mal lädt die Seite selbstständig weiter, bis alle Bilder aufbereitet sind.</p>
+                <?php submit_button(I18n::t('Jetzt abgleichen'), 'primary', 'submit', false, $app->gallery()->isConfigured() ? [] : ['disabled' => 'disabled']); ?>
+                <p class="description"><?php self::e(I18n::t('Neue Bilder kommen danach stündlich automatisch dazu. Beim ersten Mal lädt die Seite selbstständig weiter, bis alle Bilder aufbereitet sind.')); ?></p>
             </form>
             <?php if ($continue) : ?>
-                <p><em>Bereite weitere Bilder auf …</em></p>
+                <p><em><?php self::e(I18n::t('Bereite weitere Bilder auf …')); ?></em></p>
                 <script>setTimeout(function(){document.getElementById('kompanie-gallery-sync').submit();},800);</script>
             <?php endif; ?>
 
@@ -274,31 +313,29 @@ final class SettingsPage
         $id = (int) $app->settings->get(Shortcodes::MEMBERS_PLACEHOLDER, 0);
         $preview = $id > 0 ? wp_get_attachment_image_url($id, 'medium') : false;
         ?>
-        <h2 id="webseite">Webseite: Mitglieder ohne Foto</h2>
-        <p>Die Mitgliederliste auf der Webseite (<code>[kompanie_mitglieder]</code>) zeigt bei Personen ohne Foto dieses Bild
-           statt der Anfangsbuchstaben, z. B. eine Silhouette oder das Logo. Am besten im Hochformat 2 : 3; andere Formate
-           werden mittig zugeschnitten. Ohne Platzhalterbild stehen dort die Anfangsbuchstaben. Die App selbst zeigt weiter die Anfangsbuchstaben.</p>
+        <h2 id="webseite"><?php self::e(I18n::t('Webseite: Mitglieder ohne Foto')); ?></h2>
+        <p><?php echo self::html(I18n::t('Die Mitgliederliste auf der Webseite ({shortcode}) zeigt bei Personen ohne Foto dieses Bild statt der Anfangsbuchstaben, z. B. eine Silhouette oder das Logo. Am besten im Hochformat 2 : 3; andere Formate werden mittig zugeschnitten. Ohne Platzhalterbild stehen dort die Anfangsbuchstaben. Die App selbst zeigt weiter die Anfangsbuchstaben.'), ['shortcode' => self::code('[kompanie_mitglieder]')]); ?></p>
         <?php if ($id > 0 && $preview === false) : ?>
-            <div class="notice notice-warning inline"><p>Das gewählte Bild ist nicht mehr in der Mediathek. Bis du ein neues wählst, stehen dort die Anfangsbuchstaben.</p></div>
+            <div class="notice notice-warning inline"><p><?php self::e(I18n::t('Das gewählte Bild ist nicht mehr in der Mediathek. Bis du ein neues wählst, stehen dort die Anfangsbuchstaben.')); ?></p></div>
         <?php endif; ?>
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" id="kompanie-members-placeholder">
             <input type="hidden" name="action" value="kompanie_app_members_placeholder" />
             <?php wp_nonce_field('kompanie_app_members_placeholder'); ?>
             <input type="hidden" name="placeholder_id" id="kompanie-placeholder-id" value="<?php echo esc_attr($id > 0 ? (string) $id : ''); ?>" />
             <?php if ($preview !== false) : ?>
-                <p><img src="<?php echo esc_url($preview); ?>" alt="Aktuelles Platzhalterbild" style="width:120px;aspect-ratio:2/3;object-fit:cover;display:block" /></p>
+                <p><img src="<?php echo esc_url($preview); ?>" alt="<?php echo esc_attr(I18n::t('Aktuelles Platzhalterbild')); ?>" style="width:120px;aspect-ratio:2/3;object-fit:cover;display:block" /></p>
             <?php endif; ?>
             <p>
-                <button type="button" class="button" id="kompanie-placeholder-choose"><?php echo $preview !== false ? 'Anderes Bild wählen' : 'Bild aus der Mediathek wählen'; ?></button>
+                <button type="button" class="button" id="kompanie-placeholder-choose"><?php self::e($preview !== false ? I18n::t('Anderes Bild wählen') : I18n::t('Bild aus der Mediathek wählen')); ?></button>
                 <?php if ($id > 0) : ?>
-                    <?php submit_button('Platzhalterbild entfernen', 'delete', 'remove', false); ?>
+                    <?php submit_button(I18n::t('Platzhalterbild entfernen'), 'delete', 'remove', false); ?>
                 <?php endif; ?>
             </p>
         </form>
         <script>
         (function(){var b=document.getElementById('kompanie-placeholder-choose');if(!b)return;
         b.addEventListener('click',function(){if(!window.wp||!wp.media)return;
-        var f=wp.media({title:'Platzhalterbild für Mitglieder ohne Foto',library:{type:'image'},multiple:false,button:{text:'Übernehmen'}});
+        var f=wp.media({title:<?php echo wp_json_encode(I18n::t('Platzhalterbild für Mitglieder ohne Foto')); ?>,library:{type:'image'},multiple:false,button:{text:<?php echo wp_json_encode(I18n::t('Übernehmen')); ?>}});
         f.on('select',function(){var a=f.state().get('selection').first();if(!a)return;
         document.getElementById('kompanie-placeholder-id').value=a.id;document.getElementById('kompanie-members-placeholder').submit();});
         f.open();});})();
@@ -318,28 +355,30 @@ final class SettingsPage
         $disabled = defined(FastLoad::CONSTANT) && !constant(FastLoad::CONSTANT);
         $measure = get_transient('kompanie_app_fast_measure_' . get_current_user_id());
         ?>
-        <h2 id="schnell">App schneller laden</h2>
-        <p>Bei jedem Aufruf der App startet WordPress samt allen aktiven Plugins, auch solchen, die die App nie braucht
-           (Seitenbaukästen, Statistik, Formulare …). Eingeschaltet lädt WordPress bei Aufrufen der App nur die Kompanie-App,
-           die Plugins mit Häkchen und, wenn gewählt, das Theme. Die Webseite, wp-admin, die Anmeldung und geplante Aufgaben laufen weiter mit allen Plugins,
-           ebenso die Neuigkeiten aus den Beiträgen der Webseite. In der Datenbank ändert sich nichts.</p>
+        <?php $switch = self::code("define('" . FastLoad::CONSTANT . "', false);"); ?>
+        <h2 id="schnell"><?php self::e(I18n::t('App schneller laden')); ?></h2>
+        <p><?php self::e(I18n::t('Bei jedem Aufruf der App startet WordPress samt allen aktiven Plugins, auch solchen, die die App nie braucht (Seitenbaukästen, Statistik, Formulare …). Eingeschaltet lädt WordPress bei Aufrufen der App nur die Kompanie-App, die Plugins mit Häkchen und, wenn gewählt, das Theme. Die Webseite, wp-admin, die Anmeldung und geplante Aufgaben laufen weiter mit allen Plugins, ebenso die Neuigkeiten aus den Beiträgen der Webseite. In der Datenbank ändert sich nichts.')); ?></p>
         <?php if ($disabled) : ?>
-            <div class="notice notice-warning inline"><p>In <code>wp-config.php</code> ist <code>define('<?php echo esc_html(FastLoad::CONSTANT); ?>', false);</code> gesetzt: Die App lädt immer alle Plugins, egal was hier eingestellt ist.</p></div>
+            <div class="notice notice-warning inline"><p><?php echo self::html(I18n::t('In {file} ist {switch} gesetzt: Die App lädt immer alle Plugins, egal was hier eingestellt ist.'), ['file' => self::code('wp-config.php'), 'switch' => $switch]); ?></p></div>
         <?php endif; ?>
         <?php if (!$installed) : ?>
-            <div class="notice notice-warning inline"><p>Die Datei für diese Funktion fehlt und ließ sich nicht anlegen (fehlende Schreibrechte oder eine andere Datei gleichen Namens).
-                <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin-post.php?action=kompanie_app_fast_download'), 'kompanie_app_fast_download')); ?>">Datei herunterladen</a>
-                und per FTP in den Ordner <code><?php echo esc_html(self::relativePath(WPMU_PLUGIN_DIR)); ?></code> legen (den Ordner anlegen, falls es ihn nicht gibt).</p></div>
+            <div class="notice notice-warning inline"><p><?php self::e(I18n::t('Die Datei für diese Funktion fehlt und ließ sich nicht anlegen (fehlende Schreibrechte oder eine andere Datei gleichen Namens).')); ?>
+                <?php echo self::html(I18n::t('{download} und per FTP in den Ordner {folder} legen (den Ordner anlegen, falls es ihn nicht gibt).'), [
+                    'download' => '<a href="' . esc_url(wp_nonce_url(admin_url('admin-post.php?action=kompanie_app_fast_download'), 'kompanie_app_fast_download')) . '">' . esc_html(I18n::t('Datei herunterladen')) . '</a>',
+                    'folder' => self::code(self::relativePath(WPMU_PLUGIN_DIR)),
+                ]); ?></p></div>
         <?php endif; ?>
         <?php if (is_array($measure)) : ?>
             <?php if (($measure['error'] ?? '') !== '') : ?>
                 <div class="notice notice-error inline"><p><?php echo esc_html((string) $measure['error']); ?></p></div>
             <?php else : ?>
-                <div class="notice notice-info inline"><p>Messung vom Server aus, je <?php echo (int) count($measure['all']); ?> Aufrufe (Median):
-                    mit allen Plugins <strong><?php echo esc_html(self::seconds(FastLoad::median($measure['all']))); ?></strong>,
-                    schnell <strong><?php echo esc_html(self::seconds(FastLoad::median($measure['fast']))); ?></strong>.
+                <div class="notice notice-info inline"><p><?php echo self::html(I18n::t('Messung vom Server aus, je {count} Aufrufe (Median): mit allen Plugins {all}, schnell {fast}.'), [
+                    'count' => (string) (int) count($measure['all']),
+                    'all' => '<strong>' . esc_html(self::seconds(FastLoad::median($measure['all']))) . '</strong>',
+                    'fast' => '<strong>' . esc_html(self::seconds(FastLoad::median($measure['fast']))) . '</strong>',
+                ]); ?>
                     <?php if (!$measure['checked']) : ?>
-                        <br />Die schnellen Aufrufe liefen nicht ohne die anderen Plugins (Datei fehlt oder Notschalter gesetzt); die Zeiten sind daher nicht aussagekräftig.
+                        <br /><?php self::e(I18n::t('Die schnellen Aufrufe liefen nicht ohne die anderen Plugins (Datei fehlt oder Notschalter gesetzt); die Zeiten sind daher nicht aussagekräftig.')); ?>
                     <?php endif; ?></p></div>
             <?php endif; ?>
         <?php endif; ?>
@@ -347,12 +386,11 @@ final class SettingsPage
             <input type="hidden" name="action" value="kompanie_app_fast_load" />
             <?php wp_nonce_field('kompanie_app_fast_load'); ?>
             <p><label><input type="checkbox" name="fast_on" value="1" <?php checked($o['on']); ?> />
-                <strong>Bei Aufrufen der App nur die nötigen Plugins laden</strong></label></p>
+                <strong><?php self::e(I18n::t('Bei Aufrufen der App nur die nötigen Plugins laden')); ?></strong></label></p>
             <?php if ($others === []) : ?>
-                <p class="description">Außer der Kompanie-App ist kein Plugin aktiv.</p>
+                <p class="description"><?php self::e(I18n::t('Außer der Kompanie-App ist kein Plugin aktiv.')); ?></p>
             <?php else : ?>
-                <p>Auch in der App laden (Häkchen setzen bei Plugins, die die App brauchen könnte, z. B. Sicherheits-Plugins, Plugins
-                   für die Benutzerrollen oder für einen anderen Speicherort der Mediathek):</p>
+                <p><?php self::e(I18n::t('Auch in der App laden (Häkchen setzen bei Plugins, die die App brauchen könnte, z. B. Sicherheits-Plugins, Plugins für die Benutzerrollen oder für einen anderen Speicherort der Mediathek):')); ?></p>
                 <fieldset>
                     <?php foreach ($others as $plugin => $name) : ?>
                         <label style="display:block;margin:.25em 0"><input type="checkbox" name="fast_keep[]" value="<?php echo esc_attr($plugin); ?>" <?php checked(in_array($plugin, $o['keep'], true)); ?> />
@@ -361,20 +399,17 @@ final class SettingsPage
                 </fieldset>
             <?php endif; ?>
             <p><label><input type="checkbox" name="fast_theme" value="1" <?php checked($o['theme']); ?> />
-                Theme auch in der App laden (<?php echo esc_html(wp_get_theme()->get('Name')); ?>)</label><br />
-               <span class="description">Die App zeigt nichts vom Theme. Manche Themes ändern aber in ihrer functions.php Dinge, die auch
-               die App betreffen (z. B. den Ordner für Uploads oder eigene Filter der App). Ohne Haken vorher messen und die App danach prüfen.</span></p>
-            <?php submit_button('Speichern', 'secondary'); ?>
+                <?php self::e(I18n::t('Theme auch in der App laden ({theme})', ['theme' => (string) wp_get_theme()->get('Name')])); ?></label><br />
+               <span class="description"><?php self::e(I18n::t('Die App zeigt nichts vom Theme. Manche Themes ändern aber in ihrer functions.php Dinge, die auch die App betreffen (z. B. den Ordner für Uploads oder eigene Filter der App). Ohne Haken vorher messen und die App danach prüfen.')); ?></span></p>
+            <?php submit_button(I18n::t('Speichern'), 'secondary'); ?>
         </form>
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
             <input type="hidden" name="action" value="kompanie_app_fast_measure" />
             <?php wp_nonce_field('kompanie_app_fast_measure'); ?>
-            <p>Was es bringt, zeigt eine Messung: Sie ruft die Schnittstelle der App einige Male mit allen Plugins und schnell (mit
-               der gespeicherten Auswahl) auf, auch wenn der Schalter noch aus ist. Das dauert einige Sekunden.</p>
-            <?php submit_button('Jetzt messen', 'secondary', 'submit', false); ?>
+            <p><?php self::e(I18n::t('Was es bringt, zeigt eine Messung: Sie ruft die Schnittstelle der App einige Male mit allen Plugins und schnell (mit der gespeicherten Auswahl) auf, auch wenn der Schalter noch aus ist. Das dauert einige Sekunden.')); ?></p>
+            <?php submit_button(I18n::t('Jetzt messen'), 'secondary', 'submit', false); ?>
         </form>
-        <p class="description">Notschalter, falls die App nach dem Einschalten nicht mehr richtig läuft und wp-admin nicht erreichbar ist:
-           in <code>wp-config.php</code> die Zeile <code>define('<?php echo esc_html(FastLoad::CONSTANT); ?>', false);</code> eintragen.</p>
+        <p class="description"><?php echo self::html(I18n::t('Notschalter, falls die App nach dem Einschalten nicht mehr richtig läuft und wp-admin nicht erreichbar ist: in {file} die Zeile {switch} eintragen.'), ['file' => self::code('wp-config.php'), 'switch' => $switch]); ?></p>
         <?php
     }
 
@@ -419,9 +454,9 @@ final class SettingsPage
         FastLoad::save($on, $keep, !empty($post['fast_theme']));
         $installed = FastLoad::install();
         if ($on && !$installed) {
-            return ['Gespeichert. Damit es wirkt, fehlt noch die Datei in mu-plugins (siehe Hinweis).', true];
+            return [I18n::t('Gespeichert. Damit es wirkt, fehlt noch die Datei in mu-plugins (siehe Hinweis).'), true];
         }
-        return [$on ? 'Gespeichert: Die App lädt jetzt nur die nötigen Plugins.' : 'Gespeichert: Die App lädt alle Plugins.', false];
+        return [$on ? I18n::t('Gespeichert: Die App lädt jetzt nur die nötigen Plugins.') : I18n::t('Gespeichert: Die App lädt alle Plugins.'), false];
     }
 
     public static function measureFastLoad(): never
@@ -465,14 +500,14 @@ final class SettingsPage
     {
         if (isset($post['remove'])) {
             $app->settings->delete(Shortcodes::MEMBERS_PLACEHOLDER);
-            return ['Platzhalterbild entfernt. Personen ohne Foto zeigen wieder die Anfangsbuchstaben.', false];
+            return [I18n::t('Platzhalterbild entfernt. Personen ohne Foto zeigen wieder die Anfangsbuchstaben.'), false];
         }
         $id = isset($post['placeholder_id']) && is_scalar($post['placeholder_id']) ? absint($post['placeholder_id']) : 0;
         if ($id === 0 || !wp_attachment_is_image($id)) {
-            return ['Bitte ein Bild aus der Mediathek wählen.', true];
+            return [I18n::t('Bitte ein Bild aus der Mediathek wählen.'), true];
         }
         $app->settings->set(Shortcodes::MEMBERS_PLACEHOLDER, $id);
-        return ['Platzhalterbild gespeichert.', false];
+        return [I18n::t('Platzhalterbild gespeichert.'), false];
     }
 
     /** Google-Zugang für Galerie und Kalender: „Mit Google verbinden“, darunter als Alternative das Dienstkonto. */
@@ -484,26 +519,27 @@ final class SettingsPage
         $connected = $drive->oauth() !== null;
         $post = esc_url(admin_url('admin-post.php'));
         ?>
-        <h2 id="google">Google-Zugang</h2>
-        <p>Über diesen Zugang liest die App den Galerie-Ordner aus Google Drive und private Google Kalender (nur lesen).
-           Empfohlen: <strong>Mit Google verbinden</strong> über einen eigenen OAuth-Client. Die Anleitung steht im Handbuch
-           (Admin: Google einrichten).</p>
+        <h2 id="google"><?php self::e(I18n::t('Google-Zugang')); ?></h2>
+        <p><?php self::e(I18n::t('Über diesen Zugang liest die App den Galerie-Ordner aus Google Drive und private Google Kalender (nur lesen).')); ?>
+           <?php echo self::html(I18n::t('Empfohlen: {connect} über einen eigenen OAuth-Client. Die Anleitung steht im Handbuch (Admin: Google einrichten).'), ['connect' => '<strong>' . esc_html(I18n::t('Mit Google verbinden')) . '</strong>']); ?></p>
         <table class="form-table" role="presentation">
             <tr>
-                <th scope="row"><label for="google_redirect_uri">Weiterleitungs-URI</label></th>
+                <th scope="row"><label for="google_redirect_uri"><?php self::e(I18n::t('Weiterleitungs-URI')); ?></label></th>
                 <td><input type="text" readonly class="large-text code" id="google_redirect_uri" value="<?php echo esc_attr($app->env->googleRedirectUri()); ?>" />
-                <p class="description">Genau so im OAuth-Client bei Google unter „Autorisierte Weiterleitungs-URIs“ eintragen.</p></td>
+                <p class="description"><?php self::e(I18n::t('Genau so im OAuth-Client bei Google unter „Autorisierte Weiterleitungs-URIs“ eintragen.')); ?></p></td>
             </tr>
         </table>
         <?php if ($connected) : ?>
-            <p>✓ Verbunden mit Google<?php echo $drive->oauthEmail() !== '' ? ' als <strong>' . esc_html($drive->oauthEmail()) . '</strong>' : ''; ?>.
-               <?php echo $drive->calendarAccess()
-                   ? 'Es darf auch den Kalender lesen.'
-                   : 'Den Kalender darf es noch nicht lesen. Für einen privaten Kalender „Verbindung trennen“ und neu verbinden, dabei beide Häkchen setzen.'; ?></p>
+            <p>✓ <?php echo $drive->oauthEmail() !== ''
+                   ? self::html(I18n::t('Verbunden mit Google als {email}.'), ['email' => '<strong>' . esc_html($drive->oauthEmail()) . '</strong>'])
+                   : esc_html(I18n::t('Verbunden mit Google.')); ?>
+               <?php self::e($drive->calendarAccess()
+                   ? I18n::t('Es darf auch den Kalender lesen.')
+                   : I18n::t('Den Kalender darf es noch nicht lesen. Für einen privaten Kalender „Verbindung trennen“ und neu verbinden, dabei beide Häkchen setzen.')); ?></p>
             <form method="post" action="<?php echo $post; ?>">
                 <input type="hidden" name="action" value="kompanie_app_google_disconnect" />
                 <?php wp_nonce_field('kompanie_app_google_disconnect'); ?>
-                <?php submit_button('Verbindung trennen', 'secondary', 'submit', false); ?>
+                <?php submit_button(I18n::t('Verbindung trennen'), 'secondary', 'submit', false); ?>
             </form>
         <?php else : ?>
             <form method="post" action="<?php echo $post; ?>">
@@ -511,36 +547,33 @@ final class SettingsPage
                 <?php wp_nonce_field('kompanie_app_google_connect'); ?>
                 <table class="form-table" role="presentation">
                     <tr>
-                        <th scope="row"><label for="google_client_id">Client-ID</label></th>
+                        <th scope="row"><label for="google_client_id"><?php self::e(I18n::t('Client-ID')); ?></label></th>
                         <td><input type="text" class="large-text code" id="google_client_id" name="client_id" autocomplete="off" placeholder="….apps.googleusercontent.com" value="<?php echo esc_attr($client['client_id']); ?>" /></td>
                     </tr>
                     <tr>
-                        <th scope="row"><label for="google_client_secret">Clientschlüssel (Client-Secret)</label></th>
-                        <td><input type="password" class="regular-text code" id="google_client_secret" name="client_secret" autocomplete="off" value="" placeholder="<?php echo esc_attr($client['client_secret_set'] ? 'gespeichert – leer lassen, um ihn zu behalten' : ''); ?>" /></td>
+                        <th scope="row"><label for="google_client_secret"><?php self::e(I18n::t('Clientschlüssel (Client-Secret)')); ?></label></th>
+                        <td><input type="password" class="regular-text code" id="google_client_secret" name="client_secret" autocomplete="off" value="" placeholder="<?php echo esc_attr($client['client_secret_set'] ? I18n::t('gespeichert – leer lassen, um ihn zu behalten') : ''); ?>" /></td>
                     </tr>
                 </table>
-                <?php submit_button('Speichern und mit Google verbinden', 'primary', 'submit', false); ?>
-                <p class="description">Danach meldest du dich bei Google mit dem Konto an, das den Galerie-Ordner und den Kalender sehen kann.
-                   Zeigt Google „Google hat diese App nicht überprüft“, wähle „Erweitert“ und dann „Weiter zu …“ und setze beide Häkchen
-                   (Google Drive und Google Kalender).</p>
+                <?php submit_button(I18n::t('Speichern und mit Google verbinden'), 'primary', 'submit', false); ?>
+                <p class="description"><?php self::e(I18n::t('Danach meldest du dich bei Google mit dem Konto an, das den Galerie-Ordner und den Kalender sehen kann. Zeigt Google „Google hat diese App nicht überprüft“, wähle „Erweitert“ und dann „Weiter zu …“ und setze beide Häkchen (Google Drive und Google Kalender).')); ?></p>
             </form>
         <?php endif; ?>
 
-        <h3>Alternative: Dienstkonto mit JSON-Schlüssel</h3>
-        <p>Nur nötig, wenn du nicht „Mit Google verbinden“ nutzt.
+        <h3><?php self::e(I18n::t('Alternative: Dienstkonto mit JSON-Schlüssel')); ?></h3>
+        <p><?php self::e(I18n::t('Nur nötig, wenn du nicht „Mit Google verbinden“ nutzt.')); ?>
             <?php if ($email !== '') : ?>
-                Hinterlegt: <code><?php echo esc_html($email); ?></code>. Gib den Galerie-Ordner in Google Drive für diese Adresse frei (Rolle „Betrachter“),
-                für Termine über die Kalender-IDs auch den Kalender („Alle Termindetails sehen“).
-                <?php if ($connected) : ?><em>Wird nicht genutzt, solange die Verbindung mit Google besteht.</em><?php endif; ?>
+                <?php echo self::html(I18n::t('Hinterlegt: {email}. Gib den Galerie-Ordner in Google Drive für diese Adresse frei (Rolle „Betrachter“), für Termine über die Kalender-IDs auch den Kalender („Alle Termindetails sehen“).'), ['email' => self::code($email)]); ?>
+                <?php if ($connected) : ?><em><?php self::e(I18n::t('Wird nicht genutzt, solange die Verbindung mit Google besteht.')); ?></em><?php endif; ?>
             <?php endif; ?></p>
         <form method="post" action="<?php echo $post; ?>">
             <input type="hidden" name="action" value="kompanie_app_service_account" />
             <?php wp_nonce_field('kompanie_app_service_account'); ?>
-            <p><label for="drive_sa">Schlüssel des Dienstkontos (JSON)</label><br />
-               <textarea id="drive_sa" name="drive_sa" rows="4" class="large-text code" placeholder="<?php echo esc_attr($email !== '' ? 'Nur ausfüllen, um den Schlüssel zu ersetzen' : 'Inhalt der JSON-Datei hier einfügen'); ?>"></textarea></p>
-            <?php submit_button('Schlüssel speichern', 'secondary', 'submit', false); ?>
+            <p><label for="drive_sa"><?php self::e(I18n::t('Schlüssel des Dienstkontos (JSON)')); ?></label><br />
+               <textarea id="drive_sa" name="drive_sa" rows="4" class="large-text code" placeholder="<?php echo esc_attr($email !== '' ? I18n::t('Nur ausfüllen, um den Schlüssel zu ersetzen') : I18n::t('Inhalt der JSON-Datei hier einfügen')); ?>"></textarea></p>
+            <?php submit_button(I18n::t('Schlüssel speichern'), 'secondary', 'submit', false); ?>
             <?php if ($email !== '') : ?>
-                <?php submit_button('Schlüssel entfernen', 'delete', 'remove', false); ?>
+                <?php submit_button(I18n::t('Schlüssel entfernen'), 'delete', 'remove', false); ?>
             <?php endif; ?>
         </form>
         <?php
@@ -581,7 +614,7 @@ final class SettingsPage
         } catch (ApiError $e) {
             self::back($e->getMessage(), true, 'google');
         }
-        self::back('Die Verbindung zu Google wurde getrennt.', false, 'google');
+        self::back(I18n::t('Die Verbindung zu Google wurde getrennt.'), false, 'google');
     }
 
     /** Rückkehr von Google auf admin-post.php: nur wenn das state von dieser App stammt. */
@@ -592,11 +625,12 @@ final class SettingsPage
         if (!is_array($query) || !GoogleConnect::isOwnState($query['state'] ?? null)) {
             return; // Nicht für uns (z. B. ein anderes Plugin auf derselben Adresse).
         }
+        self::useLocale($app);
         $target = self::googleCallbackTarget($app, $query);
         if ($target === null) {
             wp_die(
-                esc_html('Bitte zuerst als Administrator in WordPress anmelden und die Verbindung mit Google dann erneut starten.'),
-                'Keine Berechtigung',
+                esc_html(I18n::t('Bitte zuerst als Administrator in WordPress anmelden und die Verbindung mit Google dann erneut starten.')),
+                esc_html(I18n::t('Keine Berechtigung')),
                 ['response' => 403],
             );
         }
@@ -630,16 +664,16 @@ final class SettingsPage
         $json = isset($_POST['drive_sa']) ? trim((string) wp_unslash($_POST['drive_sa'])) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- wird geprüft, nicht ausgegeben
         $hadCalendarIds = $app->calendar()->calendarIds() !== [];
         if (!isset($_POST['remove']) && $json === '') {
-            self::back('Bitte den Inhalt der JSON-Datei einfügen.', true, 'google');
+            self::back(I18n::t('Bitte den Inhalt der JSON-Datei einfügen.'), true, 'google');
         }
         try {
             $message = self::logged($app, 'PATCH /admin/settings', static function () use ($app, $json): string {
                 if (isset($_POST['remove'])) {
                     $app->drive()->removeServiceAccount();
-                    return 'Schlüssel des Dienstkontos entfernt.';
+                    return I18n::t('Schlüssel des Dienstkontos entfernt.');
                 }
                 $app->drive()->saveServiceAccount($json);
-                return 'Schlüssel des Dienstkontos gespeichert.';
+                return I18n::t('Schlüssel des Dienstkontos gespeichert.');
             });
         } catch (\RuntimeException $e) {
             self::back($e->getMessage(), true, 'google');
@@ -656,7 +690,7 @@ final class SettingsPage
         $app->calendar()->clearCache();
         try {
             $events = $app->calendar()->upcoming();
-            echo '<div class="notice notice-success inline"><p>' . esc_html(sprintf('%d Termine gefunden.', count($events))) . '</p><ul>';
+            echo '<div class="notice notice-success inline"><p>' . esc_html(I18n::tn('{count} Termin gefunden.', '{count} Termine gefunden.', count($events))) . '</p><ul>';
             foreach (array_slice($events, 0, 5) as $ev) {
                 echo '<li>' . esc_html($ev['start'] . ' – ' . $ev['title']) . '</li>';
             }
@@ -685,14 +719,14 @@ final class SettingsPage
         $reason = isset($_POST['reason']) ? sanitize_textarea_field(wp_unslash($_POST['reason'])) : '';
         $actor = $app->authContext->currentUser();
         if ($actor === null) {
-            wp_die('Keine Berechtigung.');
+            wp_die(esc_html(I18n::t('Keine Berechtigung.')));
         }
         try {
             self::logged($app, 'POST /admin/maintenance', static fn () => $app->maintenance()->set($on, $reason, $actor));
         } catch (ApiError $e) {
             self::back($e->getMessage(), true, 'wartung');
         }
-        self::back($on ? 'Wartungsmodus ist an.' : 'Wartungsmodus beendet.', false, 'wartung');
+        self::back($on ? I18n::t('Wartungsmodus ist an.') : I18n::t('Wartungsmodus beendet.'), false, 'wartung');
     }
 
     private static function saveFeatures(App $app): never
@@ -708,7 +742,7 @@ final class SettingsPage
         } catch (ApiError $e) {
             self::back($e->getMessage(), true, 'bereiche');
         }
-        self::back('Bereiche gespeichert.', false, 'bereiche');
+        self::back(I18n::t('Bereiche gespeichert.'), false, 'bereiche');
     }
 
     private static function saveCalendar(App $app): never
@@ -740,7 +774,7 @@ final class SettingsPage
         $app->settings->set('calendar_ids', sanitize_text_field($text('calendar_ids')));
         $app->settings->set('google_api_key', sanitize_text_field($text('google_api_key')));
         $app->calendar()->clearCache();
-        return ['Gespeichert.', false];
+        return [I18n::t('Gespeichert.'), false];
     }
 
     private static function saveGallery(App $app): never
@@ -762,7 +796,7 @@ final class SettingsPage
             $error = true;
         }
         $app->scheduleTasks();
-        self::back($messages ? implode(' ', $messages) : 'Gespeichert.', $error, 'galerie');
+        self::back($messages ? implode(' ', $messages) : I18n::t('Gespeichert.'), $error, 'galerie');
     }
 
     private static function syncGallery(App $app): never
@@ -777,7 +811,7 @@ final class SettingsPage
             $stats = empty($_POST['only_process']) ? $gallery->sync() : $gallery->status();
             $done = $gallery->processPending(20);
             $left = $gallery->countPending();
-            $msg = sprintf('%d Alben, %d Bilder gefunden. %d Bilder aufbereitet, %d ausstehend.', $stats['albums'] ?? 0, $stats['photos'] ?? 0, $done, $left);
+            $msg = I18n::t('{albums} Alben, {photos} Bilder gefunden. {done} Bilder aufbereitet, {left} ausstehend.', ['albums' => (int) ($stats['albums'] ?? 0), 'photos' => (int) ($stats['photos'] ?? 0), 'done' => $done, 'left' => $left]);
             self::back($msg, false, 'galerie', ['kompanie_continue' => $left > 0 ? 1 : 0]);
         } catch (\RuntimeException $e) {
             self::back($e->getMessage(), true, 'galerie');

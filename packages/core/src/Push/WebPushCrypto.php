@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Push;
 
+use KompanieApp\Core\I18n\I18n;
+
 /**
  * Web Push ohne Fremdbibliothek (Issue #19): Verschlüsselung der Nachricht nach RFC 8291
  * (Content-Encoding aes128gcm) und VAPID-Token nach RFC 8292 (ES256). Braucht OpenSSL mit der Kurve
@@ -25,17 +27,17 @@ final class WebPushCrypto
     public static function requirements(): array
     {
         if (!extension_loaded('openssl')) {
-            return ['PHP-Erweiterung OpenSSL'];
+            return [I18n::t('PHP-Erweiterung OpenSSL')];
         }
         $missing = [];
         if (!function_exists('openssl_pkey_derive')) {
             $missing[] = 'openssl_pkey_derive';
         }
         if (!in_array('aes-128-gcm', array_map('strtolower', openssl_get_cipher_methods()), true)) {
-            $missing[] = 'Verschlüsselung aes-128-gcm';
+            $missing[] = I18n::t('Verschlüsselung aes-128-gcm');
         }
         if (!in_array('prime256v1', (array) openssl_get_curve_names(), true)) {
-            $missing[] = 'Kurve prime256v1 (P-256)';
+            $missing[] = I18n::t('Kurve prime256v1 (P-256)');
         }
         return $missing;
     }
@@ -69,7 +71,7 @@ final class WebPushCrypto
         $uaKey = self::publicKeyFromRaw($uaPublic);
         $ecdh = $uaKey === null ? false : openssl_pkey_derive($uaKey, $asKey, 32);
         if ($ecdh === false) {
-            throw new \RuntimeException('Ungültiger Schlüssel des Geräts.');
+            throw new \RuntimeException(I18n::t('Ungültiger Schlüssel des Geräts.'));
         }
         $asPublic = self::rawPublic($asKey);
         $salt ??= random_bytes(16);
@@ -112,7 +114,7 @@ final class WebPushCrypto
     {
         $parts = parse_url($endpoint);
         if (!is_array($parts) || !isset($parts['scheme'], $parts['host'])) {
-            throw new \RuntimeException('Ungültige Push-Adresse.');
+            throw new \RuntimeException(I18n::t('Ungültige Push-Adresse.'));
         }
         return $parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : '');
     }

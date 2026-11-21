@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\Input;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Album: einige Bilder eines Albums der Galerie mit dem Weg zum ganzen Album. Es gelten die Rechte der Galerie
@@ -34,9 +35,9 @@ final class AlbumBlock implements BlockType
     {
         $id = Input::integer($in['album_id'] ?? null);
         if ($id === null || $id <= 0 || $this->app->gallery()->album($id, true) === null) {
-            throw ApiError::invalid('Bitte ein Album mit Bildern auswählen.');
+            throw ApiError::invalid(I18n::t('Bitte ein Album mit Bildern auswählen.'));
         }
-        return ['album_id' => $id, 'count' => Field::int($in['count'] ?? null, 1, self::MAX, self::DEFAULT, 'Wie viele Bilder')];
+        return ['album_id' => $id, 'count' => Field::int($in['count'] ?? null, 1, self::MAX, self::DEFAULT, I18n::t('Wie viele Bilder'))];
     }
 
     public function render(array $data, ?User $viewer, bool $manager): ?array
@@ -51,7 +52,7 @@ final class AlbumBlock implements BlockType
     public function plain(array $data, ?User $viewer = null): string
     {
         $album = $this->album($data, $viewer);
-        return $album === null ? '' : 'Album: ' . $album['title'] . ' – ' . $this->app->env->appUrl() . '#/galerie/' . $album['id'];
+        return $album === null ? '' : I18n::t('Album: {title} – {url}', ['title' => $album['title'], 'url' => $this->app->env->appUrl() . '#/galerie/' . $album['id']]);
     }
 
     /**

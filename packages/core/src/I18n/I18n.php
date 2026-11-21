@@ -73,6 +73,18 @@ final class I18n
     }
 
     /**
+     * Text mit Zusammenhang, wenn derselbe deutsche Text je nach Stelle anders übersetzt wird, z. B.
+     * `I18n::tc('Spalte', 'Zusagen')` (Anzahl) neben `I18n::t('Zusagen')` (Knopf). Schlüssel im Katalog: „Spalte|Zusagen“.
+     *
+     * @param array<string, string|int|float> $params
+     */
+    public static function tc(string $context, string $source, array $params = []): string
+    {
+        $entry = self::catalog(self::$locale)[$context . '|' . $source] ?? null;
+        return self::fill(is_string($entry) && $entry !== '' ? $entry : $source, $params);
+    }
+
+    /**
      * Text mit Anzahl, {count} ist die Zahl. Schlüssel ist die deutsche Mehrzahl.
      *
      * @param array<string, string|int|float> $params

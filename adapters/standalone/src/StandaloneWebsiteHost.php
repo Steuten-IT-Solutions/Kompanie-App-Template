@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Standalone;
 
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\WebsiteHost;
 
 /**
@@ -60,10 +61,10 @@ final class StandaloneWebsiteHost implements WebsiteHost
         $status = $this->entryStatus();
         if (!in_array($status['state'], ['missing', 'outdated'], true)) {
             throw new ApiError(409, 'conflict', match ($status['state']) {
-                'installed' => 'Die Einstiegsdatei ist schon da.',
-                'occupied' => 'Dort liegt schon eine andere Startseite (' . $status['file'] . '). Die App ersetzt sie nicht.',
-                'not_writable' => 'PHP darf dort keine Dateien anlegen. Bitte die Einstiegsdatei von Hand hochladen.',
-                default => 'Für die Webseite muss die App in einem eigenen Ordner liegen.',
+                'installed' => I18n::t('Die Einstiegsdatei ist schon da.'),
+                'occupied' => I18n::t('Dort liegt schon eine andere Startseite ({file}). Die App ersetzt sie nicht.', ['file' => (string) $status['file']]),
+                'not_writable' => I18n::t('PHP darf dort keine Dateien anlegen. Bitte die Einstiegsdatei von Hand hochladen.'),
+                default => I18n::t('Für die Webseite muss die App in einem eigenen Ordner liegen.'),
             });
         }
         $dir = dirname($this->root);
@@ -71,7 +72,7 @@ final class StandaloneWebsiteHost implements WebsiteHost
         // Written next to it and renamed: the web server never serves a half-written file.
         if (@file_put_contents($tmp, $status['content']) === false || !@rename($tmp, $dir . '/index.php')) {
             @unlink($tmp);
-            throw new ApiError(409, 'conflict', 'Die Einstiegsdatei konnte nicht angelegt werden. Bitte sie von Hand als index.php hochladen.');
+            throw new ApiError(409, 'conflict', I18n::t('Die Einstiegsdatei konnte nicht angelegt werden. Bitte sie von Hand als index.php hochladen.'));
         }
         @chmod($dir . '/index.php', 0644);
     }

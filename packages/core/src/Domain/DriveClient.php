@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Domain;
 
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\Cache;
 use KompanieApp\Core\Port\ExtendedHttpClient;
 use KompanieApp\Core\Port\FileStorage;
@@ -213,7 +214,7 @@ final class DriveClient implements GallerySource
         foreach (['client_id', 'client_secret', 'refresh_token', 'email', 'scope'] as $k) {
             $clean[$k] = is_string($o[$k] ?? null) ? trim($o[$k]) : '';
             if ($clean[$k] === '' && !in_array($k, ['email', 'scope'], true)) {
-                throw new \RuntimeException('Für die Verbindung zu Google fehlt ' . $k . '.');
+                throw new \RuntimeException(I18n::t('Für die Verbindung zu Google fehlt {field}.', ['field' => $k]));
             }
         }
         $this->settings->set(self::OAUTH_SETTING, $clean);
@@ -262,16 +263,16 @@ final class DriveClient implements GallerySource
         $clientSecret = trim($clientSecret);
         $old = $this->storedOAuth();
         if (!preg_match('/^[0-9A-Za-z_.-]+\.apps\.googleusercontent\.com$/', $clientId) || strlen($clientId) > 200) {
-            throw new \RuntimeException('Die Client-ID sieht nicht richtig aus. Sie endet auf „.apps.googleusercontent.com“.');
+            throw new \RuntimeException(I18n::t('Die Client-ID sieht nicht richtig aus. Sie endet auf „.apps.googleusercontent.com“.'));
         }
         if ($clientSecret === '') {
             if ($old['client_secret'] === '' || $old['client_id'] !== $clientId) {
-                throw new \RuntimeException('Bitte auch den Clientschlüssel (Client-Secret) eintragen.');
+                throw new \RuntimeException(I18n::t('Bitte auch den Clientschlüssel (Client-Secret) eintragen.'));
             }
             $clientSecret = $old['client_secret'];
         }
         if (strlen($clientSecret) > 200 || !preg_match('/^[\x21-\x7E]+$/', $clientSecret)) {
-            throw new \RuntimeException('Der Clientschlüssel (Client-Secret) enthält ungültige Zeichen.');
+            throw new \RuntimeException(I18n::t('Der Clientschlüssel (Client-Secret) enthält ungültige Zeichen.'));
         }
         $new = ['client_id' => $clientId, 'client_secret' => $clientSecret] + $old;
         if ($old['client_id'] !== $clientId || $old['client_secret'] !== $clientSecret) {
@@ -356,7 +357,7 @@ final class DriveClient implements GallerySource
     {
         $o = $this->storedOAuth();
         if ($o['client_id'] === '') {
-            throw new \RuntimeException('Es ist noch keine Client-ID gespeichert.');
+            throw new \RuntimeException(I18n::t('Es ist noch keine Client-ID gespeichert.'));
         }
         return self::AUTH_URL . '?' . http_build_query([
             'client_id' => $o['client_id'],
@@ -380,10 +381,10 @@ final class DriveClient implements GallerySource
     {
         $o = $this->storedOAuth();
         if ($o['client_id'] === '' || $o['client_secret'] === '') {
-            throw new \RuntimeException('Es sind noch keine Client-ID und kein Clientschlüssel gespeichert.');
+            throw new \RuntimeException(I18n::t('Es sind noch keine Client-ID und kein Clientschlüssel gespeichert.'));
         }
         if ($code === '') {
-            throw new \RuntimeException('Google hat keinen Code zurückgegeben.');
+            throw new \RuntimeException(I18n::t('Google hat keinen Code zurückgegeben.'));
         }
         $res = $this->http->request('POST', self::TOKEN_URI, ['Content-Type' => 'application/x-www-form-urlencoded'], http_build_query([
             'grant_type' => 'authorization_code',
@@ -396,20 +397,20 @@ final class DriveClient implements GallerySource
         if ($res['status'] !== 200 || !is_array($body) || !is_string($body['access_token'] ?? null) || $body['access_token'] === '') {
             $error = is_array($body) && is_string($body['error'] ?? null) ? $body['error'] : '';
             if ($error === 'invalid_client' || $error === 'unauthorized_client') {
-                throw new \RuntimeException('Google kennt diesen Client nicht oder der Clientschlüssel stimmt nicht. Bitte Client-ID und Clientschlüssel prüfen.');
+                throw new \RuntimeException(I18n::t('Google kennt diesen Client nicht oder der Clientschlüssel stimmt nicht. Bitte Client-ID und Clientschlüssel prüfen.'));
             }
             if ($error === 'redirect_uri_mismatch') {
-                throw new \RuntimeException('Die Weiterleitungs-URI stimmt nicht mit der im OAuth-Client bei Google überein. Bitte genau die angezeigte Adresse eintragen.');
+                throw new \RuntimeException(I18n::t('Die Weiterleitungs-URI stimmt nicht mit der im OAuth-Client bei Google überein. Bitte genau die angezeigte Adresse eintragen.'));
             }
             throw new \RuntimeException(self::errorMessage($body, $res['status']));
         }
         if (!is_string($body['refresh_token'] ?? null) || $body['refresh_token'] === '') {
-            throw new \RuntimeException('Google hat kein Refresh-Token geliefert. Bitte die Verbindung erneut herstellen.');
+            throw new \RuntimeException(I18n::t('Google hat kein Refresh-Token geliefert. Bitte die Verbindung erneut herstellen.'));
         }
         // Bei Google lassen sich einzelne Berechtigungen abwählen; gemerkt wird, was erlaubt wurde.
         $scope = is_string($body['scope'] ?? null) ? trim($body['scope']) : self::scopes();
         if (!self::grants($scope, self::SCOPE, self::WRITE_SCOPE)) {
-            throw new \RuntimeException('Der Zugriff auf Google Drive wurde nicht erlaubt. Bitte beim Verbinden das Häkchen für Google Drive setzen.');
+            throw new \RuntimeException(I18n::t('Der Zugriff auf Google Drive wurde nicht erlaubt. Bitte beim Verbinden das Häkchen für Google Drive setzen.'));
         }
         $this->storeOAuth(['refresh_token' => $body['refresh_token'], 'email' => '', 'scope' => $scope] + $o);
         $ttl = max(60, (int) ($body['expires_in'] ?? 3600) - 300);
@@ -483,10 +484,10 @@ final class DriveClient implements GallerySource
         $data = json_decode($json, true);
         if (!is_array($data) || !is_string($data['client_email'] ?? null) || !is_string($data['private_key'] ?? null)
             || $data['client_email'] === '' || $data['private_key'] === '') {
-            throw new \RuntimeException('Das ist kein gültiger Schlüssel eines Dienstkontos (client_email oder private_key fehlt).');
+            throw new \RuntimeException(I18n::t('Das ist kein gültiger Schlüssel eines Dienstkontos (client_email oder private_key fehlt).'));
         }
         if (!openssl_pkey_get_private($data['private_key'])) {
-            throw new \RuntimeException('Der private Schlüssel kann nicht gelesen werden.');
+            throw new \RuntimeException(I18n::t('Der private Schlüssel kann nicht gelesen werden.'));
         }
         return array_intersect_key($data, array_flip(['type', 'project_id', 'private_key_id', 'private_key', 'client_email', 'client_id', 'token_uri']));
     }
@@ -525,7 +526,7 @@ final class DriveClient implements GallerySource
         $input = self::b64url((string) json_encode($header)) . '.' . self::b64url((string) json_encode($claims, JSON_UNESCAPED_SLASHES));
         $sig = '';
         if (!openssl_sign($input, $sig, $sa['private_key'], OPENSSL_ALGO_SHA256)) {
-            throw new \RuntimeException('Die Anmeldung bei Google konnte nicht signiert werden.');
+            throw new \RuntimeException(I18n::t('Die Anmeldung bei Google konnte nicht signiert werden.'));
         }
         return $input . '.' . self::b64url($sig);
     }
@@ -535,7 +536,7 @@ final class DriveClient implements GallerySource
         $oauth = $this->oauth();
         $sa = $oauth === null ? $this->serviceAccount() : null;
         if ($oauth === null && $sa === null) {
-            throw new \RuntimeException('Es ist noch kein Google-Zugang hinterlegt.');
+            throw new \RuntimeException(I18n::t('Es ist noch kein Google-Zugang hinterlegt.'));
         }
         // Der Zwischenspeicher gehört zu genau diesem Zugang (nach einem Wechsel nicht weiterverwenden). Beim Dienstkonto
         // mit den Berechtigungen, damit ein Token von vor der Kalender-Erweiterung (nur Drive) nicht weiterverwendet wird.
@@ -557,9 +558,9 @@ final class DriveClient implements GallerySource
         $body = json_decode($res['body'], true);
         if ($res['status'] !== 200 || empty($body['access_token'])) {
             if ($oauth !== null && is_array($body) && ($body['error'] ?? '') === 'invalid_grant') {
-                throw new \RuntimeException('Die Verbindung zu Google ist abgelaufen oder wurde widerrufen. Bitte unter Einstellungen → Google-Zugang die Verbindung trennen und neu mit Google verbinden.');
+                throw new \RuntimeException(I18n::t('Die Verbindung zu Google ist abgelaufen oder wurde widerrufen. Bitte unter Einstellungen → Google-Zugang die Verbindung trennen und neu mit Google verbinden.'));
             }
-            throw new \RuntimeException('Die Anmeldung bei Google ist fehlgeschlagen: ' . self::errorMessage($body, $res['status']));
+            throw new \RuntimeException(I18n::t('Die Anmeldung bei Google ist fehlgeschlagen: {error}', ['error' => self::errorMessage($body, $res['status'])]));
         }
         $ttl = max(60, (int) ($body['expires_in'] ?? 3600) - 300);
         $this->cache->set(self::TOKEN_CACHE, ['email' => $owner, 'token' => $body['access_token']], $ttl);
@@ -587,7 +588,7 @@ final class DriveClient implements GallerySource
             $res = $this->http->request('GET', self::FILES_URL . '?' . http_build_query($params, '', '&', PHP_QUERY_RFC3986), ['Authorization' => 'Bearer ' . $token], null, 30);
             $body = json_decode($res['body'], true);
             if ($res['status'] !== 200 || !is_array($body)) {
-                throw new \RuntimeException('Google Drive: ' . self::errorMessage($body, $res['status']));
+                throw new \RuntimeException(I18n::t('Google Drive: {error}', ['error' => self::errorMessage($body, $res['status'])]));
             }
             foreach ($body['files'] ?? [] as $f) {
                 $files[] = $f;
@@ -610,7 +611,7 @@ final class DriveClient implements GallerySource
         }
         $body = json_decode($res['body'], true);
         if ($res['status'] !== 200 || !is_array($body)) {
-            throw new \RuntimeException('Google Drive: ' . self::errorMessage($body, $res['status']));
+            throw new \RuntimeException(I18n::t('Google Drive: {error}', ['error' => self::errorMessage($body, $res['status'])]));
         }
         return ($body['trashed'] ?? false) !== true;
     }
@@ -625,7 +626,7 @@ final class DriveClient implements GallerySource
         ], (string) json_encode($meta, JSON_UNESCAPED_UNICODE), 20);
         $body = json_decode($res['body'], true);
         if ($res['status'] !== 200 || !is_string($body['id'] ?? null)) {
-            throw new \RuntimeException('Google Drive: Der Ordner ließ sich nicht anlegen: ' . self::errorMessage($body, $res['status']));
+            throw new \RuntimeException(I18n::t('Google Drive: Der Ordner ließ sich nicht anlegen: {error}', ['error' => self::errorMessage($body, $res['status'])]));
         }
         return $body['id'];
     }
@@ -650,7 +651,7 @@ final class DriveClient implements GallerySource
         $size = @filesize($path);
         $in = $size === false ? false : @fopen($path, 'rb');
         if ($in === false) {
-            throw new \RuntimeException('Google Drive: Die Datei zum Hochladen ließ sich nicht lesen.');
+            throw new \RuntimeException(I18n::t('Google Drive: Die Datei zum Hochladen ließ sich nicht lesen.'));
         }
         $this->lastUpload = null;
         $began = hrtime(true);
@@ -719,12 +720,12 @@ final class DriveClient implements GallerySource
                     continue;
                 }
                 if ($res !== null && !self::retryable($res['status'])) {
-                    throw new \RuntimeException('Google Drive: Das Hochladen ist fehlgeschlagen: ' . self::errorMessage(json_decode($res['body'], true), $res['status']));
+                    throw new \RuntimeException(I18n::t('Google Drive: Das Hochladen ist fehlgeschlagen: {error}', ['error' => self::errorMessage(json_decode($res['body'], true), $res['status'])]));
                 }
                 // Vorübergehender Fehler: warten, nachfragen, wie weit die Datei ist, dort weitermachen
                 $reason = $error ?? self::errorMessage(json_decode($res['body'] ?? '', true), $res['status'] ?? 0);
                 if ($failures >= count(self::RETRY_WAIT)) {
-                    throw new \RuntimeException('Google Drive: Das Hochladen ist fehlgeschlagen: ' . $reason . ' (' . ($failures + 1) . ' Versuche)');
+                    throw new \RuntimeException(I18n::t('Google Drive: Das Hochladen ist fehlgeschlagen: {error} ({count} Versuche)', ['error' => $reason, 'count' => $failures + 1]));
                 }
                 ($this->pause)(self::RETRY_WAIT[$failures++]);
                 $stats['retries']++;
@@ -783,7 +784,7 @@ final class DriveClient implements GallerySource
         if (self::retryable($res['status'])) {
             return null;
         }
-        throw new \RuntimeException('Google Drive: Das Hochladen ließ sich nicht fortsetzen: ' . self::errorMessage(json_decode($res['body'], true), $res['status']));
+        throw new \RuntimeException(I18n::t('Google Drive: Das Hochladen ließ sich nicht fortsetzen: {error}', ['error' => self::errorMessage(json_decode($res['body'], true), $res['status'])]));
     }
 
     /**
@@ -820,7 +821,7 @@ final class DriveClient implements GallerySource
         ], (string) json_encode(['name' => $name, 'parents' => [$folderId], 'mimeType' => $mime], JSON_UNESCAPED_UNICODE), 30);
         $location = $start['headers']['location'] ?? '';
         if ($start['status'] !== 200 || !str_starts_with($location, 'https://')) {
-            throw new \RuntimeException('Google Drive: Das Hochladen ließ sich nicht beginnen: ' . self::errorMessage(json_decode($start['body'], true), $start['status']));
+            throw new \RuntimeException(I18n::t('Google Drive: Das Hochladen ließ sich nicht beginnen: {error}', ['error' => self::errorMessage(json_decode($start['body'], true), $start['status'])]));
         }
         return $location;
     }
@@ -830,7 +831,7 @@ final class DriveClient implements GallerySource
     {
         $body = json_decode($res['body'], true);
         if (!in_array($res['status'], [200, 201], true) || !is_string($body['id'] ?? null)) {
-            throw new \RuntimeException('Google Drive: Das Hochladen ist fehlgeschlagen: ' . self::errorMessage($body, $res['status']));
+            throw new \RuntimeException(I18n::t('Google Drive: Das Hochladen ist fehlgeschlagen: {error}', ['error' => self::errorMessage($body, $res['status'])]));
         }
         return $body['id'];
     }
@@ -840,7 +841,7 @@ final class DriveClient implements GallerySource
     {
         $res = $this->http->request('DELETE', self::FILES_URL . '/' . rawurlencode($fileId) . '?supportsAllDrives=true', ['Authorization' => 'Bearer ' . $this->accessToken()], null, 20);
         if (!in_array($res['status'], [200, 204, 404], true)) {
-            throw new \RuntimeException('Google Drive: ' . self::errorMessage(json_decode($res['body'], true), $res['status']));
+            throw new \RuntimeException(I18n::t('Google Drive: {error}', ['error' => self::errorMessage(json_decode($res['body'], true), $res['status'])]));
         }
     }
 
@@ -856,20 +857,20 @@ final class DriveClient implements GallerySource
         if ($from !== $to) {
             $query += ['addParents' => $to, 'removeParents' => $from];
         }
-        $this->patch($fileId, $query, $name !== null ? ['name' => $name] : [], 'Die Datei ließ sich in Google Drive nicht verschieben');
+        $this->patch($fileId, $query, $name !== null ? ['name' => $name] : [], I18n::t('Die Datei ließ sich in Google Drive nicht verschieben'));
     }
 
     /** Benennt eine Datei oder einen Ordner um. */
     public function renameFile(string $fileId, string $name): void
     {
-        $this->patch($fileId, ['supportsAllDrives' => 'true', 'fields' => 'id'], ['name' => $name], 'Die Datei ließ sich in Google Drive nicht umbenennen');
+        $this->patch($fileId, ['supportsAllDrives' => 'true', 'fields' => 'id'], ['name' => $name], I18n::t('Die Datei ließ sich in Google Drive nicht umbenennen'));
     }
 
     /** Legt eine Datei oder einen Ordner in den Papierkorb (30 Tage wiederherstellbar). Fehlt sie schon, ist das kein Fehler. */
     public function trashFile(string $fileId): void
     {
         try {
-            $this->patch($fileId, ['supportsAllDrives' => 'true', 'fields' => 'id'], ['trashed' => true], 'Die Datei ließ sich in Google Drive nicht in den Papierkorb legen', true);
+            $this->patch($fileId, ['supportsAllDrives' => 'true', 'fields' => 'id'], ['trashed' => true], I18n::t('Die Datei ließ sich in Google Drive nicht in den Papierkorb legen'), true);
         } catch (\OutOfBoundsException) {
             // schon weg
         }
@@ -890,7 +891,7 @@ final class DriveClient implements GallerySource
             throw new \OutOfBoundsException('nicht gefunden');
         }
         if ($res['status'] !== 200) {
-            throw new \RuntimeException('Google Drive: ' . $what . ': ' . self::errorMessage(json_decode($res['body'], true), $res['status']));
+            throw new \RuntimeException(I18n::t('Google Drive: {action}: {error}', ['action' => $what, 'error' => self::errorMessage(json_decode($res['body'], true), $res['status'])]));
         }
     }
 
@@ -913,7 +914,7 @@ final class DriveClient implements GallerySource
     {
         $size = @filesize($path);
         if ($size === false) {
-            throw new \RuntimeException('Google Drive: Die Datei zum Hochladen ließ sich nicht lesen.');
+            throw new \RuntimeException(I18n::t('Google Drive: Die Datei zum Hochladen ließ sich nicht lesen.'));
         }
         // Wie weit ist Google? (308 mit Range „bytes=0-<letztes>“, ohne Range noch nichts; 200/201: schon fertig)
         $res = $this->http->request('PUT', $location, self::statusQueryHeaders($size), '', 30);
@@ -921,15 +922,15 @@ final class DriveClient implements GallerySource
             return ['id' => self::uploadedId($res), 'offset' => $size];
         }
         if (in_array($res['status'], [404, 410], true)) {
-            throw new \OutOfBoundsException('Die Sitzung zum Hochladen ist abgelaufen.');
+            throw new \OutOfBoundsException(I18n::t('Die Sitzung zum Hochladen ist abgelaufen.'));
         }
         if ($res['status'] !== 308) {
-            throw new \RuntimeException('Google Drive: Das Hochladen ließ sich nicht fortsetzen: ' . self::errorMessage(json_decode($res['body'], true), $res['status']));
+            throw new \RuntimeException(I18n::t('Google Drive: Das Hochladen ließ sich nicht fortsetzen: {error}', ['error' => self::errorMessage(json_decode($res['body'], true), $res['status'])]));
         }
         $offset = preg_match('/bytes=0-(\d+)/', (string) ($res['headers']['range'] ?? ''), $m) ? (int) $m[1] + 1 : 0;
         $in = @fopen($path, 'rb');
         if ($in === false) {
-            throw new \RuntimeException('Google Drive: Die Datei zum Hochladen ließ sich nicht lesen.');
+            throw new \RuntimeException(I18n::t('Google Drive: Die Datei zum Hochladen ließ sich nicht lesen.'));
         }
         try {
             while ($offset < $size) {
@@ -947,10 +948,10 @@ final class DriveClient implements GallerySource
                     return ['id' => self::uploadedId($res), 'offset' => $size];
                 }
                 if (in_array($res['status'], [404, 410], true)) {
-                    throw new \OutOfBoundsException('Die Sitzung zum Hochladen ist abgelaufen.');
+                    throw new \OutOfBoundsException(I18n::t('Die Sitzung zum Hochladen ist abgelaufen.'));
                 }
                 if ($res['status'] !== 308) {
-                    throw new \RuntimeException('Google Drive: Das Hochladen ist fehlgeschlagen: ' . self::errorMessage(json_decode($res['body'], true), $res['status']));
+                    throw new \RuntimeException(I18n::t('Google Drive: Das Hochladen ist fehlgeschlagen: {error}', ['error' => self::errorMessage(json_decode($res['body'], true), $res['status'])]));
                 }
                 // Google bestätigt, was angekommen ist (nicht unbedingt das ganze Stück)
                 $offset = preg_match('/bytes=0-(\d+)/', (string) ($res['headers']['range'] ?? ''), $m) ? (int) $m[1] + 1 : $end + 1;
@@ -958,7 +959,7 @@ final class DriveClient implements GallerySource
         } finally {
             fclose($in);
         }
-        throw new \RuntimeException('Google Drive: Das Hochladen ist fehlgeschlagen (unvollständig).');
+        throw new \RuntimeException(I18n::t('Google Drive: Das Hochladen ist fehlgeschlagen (unvollständig).'));
     }
 
     /** Lädt eine Datei in eine temporäre Datei; der Aufrufer löscht sie. */
@@ -985,7 +986,7 @@ final class DriveClient implements GallerySource
         }
         if ($status !== 200) {
             @unlink($tmp);
-            throw new \RuntimeException('Download fehlgeschlagen: HTTP ' . $status);
+            throw new \RuntimeException(I18n::t('Download fehlgeschlagen: HTTP {status}', ['status' => $status]));
         }
         return $tmp;
     }
@@ -1018,7 +1019,7 @@ final class DriveClient implements GallerySource
             $end = min($end, $total - 1);
             return ['body' => substr($res['body'], 0, $end + 1), 'start' => 0, 'end' => $end, 'total' => $total];
         }
-        throw new \RuntimeException('Download fehlgeschlagen: HTTP ' . $res['status']);
+        throw new \RuntimeException(I18n::t('Download fehlgeschlagen: HTTP {status}', ['status' => $res['status']]));
     }
 
     /**
@@ -1074,7 +1075,7 @@ final class DriveClient implements GallerySource
         };
         $this->http->stream($url, ['Authorization' => 'Bearer ' . $this->accessToken(), 'Range' => 'bytes=' . $start . '-' . $end], $onHead, $sink);
         if (!$started) {
-            throw new \RuntimeException('Download fehlgeschlagen: HTTP ' . $status);
+            throw new \RuntimeException(I18n::t('Download fehlgeschlagen: HTTP {status}', ['status' => $status]));
         }
         return $left === 0;
     }
@@ -1086,17 +1087,17 @@ final class DriveClient implements GallerySource
         $res = $this->http->request('GET', self::FILES_URL . '/' . rawurlencode($fileId) . '?fields=thumbnailLink&supportsAllDrives=true', $headers, null, 20);
         $body = json_decode($res['body'], true);
         if ($res['status'] !== 200 || !is_array($body)) {
-            throw new \RuntimeException('Google Drive: ' . self::errorMessage($body, $res['status']));
+            throw new \RuntimeException(I18n::t('Google Drive: {error}', ['error' => self::errorMessage($body, $res['status'])]));
         }
         $link = (string) ($body['thumbnailLink'] ?? '');
         if (!str_starts_with($link, 'https://')) {
-            throw new \RuntimeException('Google Drive hat für diese Datei kein Vorschaubild.');
+            throw new \RuntimeException(I18n::t('Google Drive hat für diese Datei kein Vorschaubild.'));
         }
         $link = (string) preg_replace('/=s\d+$/', '=s' . $maxEdge, $link);
         // Nicht öffentlich geteilte Dateien: Abruf mit Anmeldung (laut Drive-API-Referenz zu thumbnailLink).
         $res = $this->http->request('GET', $link, $headers, null, 30);
         if ($res['status'] !== 200 || @getimagesizefromstring($res['body']) === false) {
-            throw new \RuntimeException('Das Vorschaubild von Google ließ sich nicht laden: HTTP ' . $res['status']);
+            throw new \RuntimeException(I18n::t('Das Vorschaubild von Google ließ sich nicht laden: HTTP {status}', ['status' => $res['status']]));
         }
         $tmp = $this->files->tempFile();
         file_put_contents($tmp, $res['body']);

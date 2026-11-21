@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\Http\FileCache;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\Cache;
 use KompanieApp\Core\Port\Environment;
 use KompanieApp\Core\Port\FileStorage;
@@ -235,7 +236,7 @@ final class GalleryService
     {
         $id = $this->source::parseFolderId($input);
         if (trim($input) !== '' && $id === '') {
-            throw new \RuntimeException('Der Galerie-Ordner wurde nicht erkannt.');
+            throw new \RuntimeException(I18n::t('Der Galerie-Ordner wurde nicht erkannt.'));
         }
         $this->settings->set(self::ROOT_SETTING, $id);
     }
@@ -290,7 +291,7 @@ final class GalleryService
     {
         $root = $this->root();
         if ($root === '') {
-            throw $this->fail('Es ist noch kein Galerie-Ordner eingetragen.');
+            throw $this->fail(I18n::t('Es ist noch kein Galerie-Ordner eingetragen.'));
         }
         try {
             $seenAlbums = [];

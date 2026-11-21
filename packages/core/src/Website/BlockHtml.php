@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Website;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Blocks as HTML for the website (Issue #273), from the data Blocks::forViewer() returns for a guest. Mirrors the App's
@@ -13,9 +14,6 @@ use KompanieApp\Core\App;
  */
 final class BlockHtml
 {
-    private const WEEKDAYS = ['So.', 'Mo.', 'Di.', 'Mi.', 'Do.', 'Fr.', 'Sa.'];
-    private const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
-
     public function __construct(private readonly App $app)
     {
     }
@@ -72,7 +70,7 @@ final class BlockHtml
             }
             $withTime = $start->format('H:i') !== '00:00';
             return $head . '<div class="block-countdown-parts">' . $parts . '</div>'
-                . '<p class="muted">' . self::e(self::date($start) . ($withTime ? ', ' . $start->format('H:i') . ' Uhr' : '')) . '</p>';
+                . '<p class="muted">' . self::e(self::date($start) . ($withTime ? ', ' . I18n::t('{time} Uhr', ['time' => $start->format('H:i')]) : '')) . '</p>';
         }
         $text = $phase === 'running' ? (string) (($b['running_text'] ?? '') !== '' ? $b['running_text'] : $title) : (($b['after'] ?? 'text') === 'hide' ? '' : (string) ($b['after_text'] ?? ''));
         return $text === '' ? '' : $head . '<p>' . self::e($text) . '</p>';
@@ -88,14 +86,16 @@ final class BlockHtml
     {
         $d = $now->diff($start);
         $days = (int) $d->days;
-        $unit = static fn (int $n, string $one, string $many): array => [$n, $n === 1 ? $one : $many];
+        $daysLeft = static fn (int $n): array => [$n, I18n::tn('Tag', 'Tage', $n)];
+        $hours = static fn (int $n): array => [$n, I18n::tn('Stunde', 'Stunden', $n)];
+        $minutes = static fn (int $n): array => [$n, I18n::tn('Minute', 'Minuten', $n)];
         if ($days >= 1) {
-            return [$unit($days, 'Tag', 'Tage'), $unit($d->h, 'Stunde', 'Stunden')];
+            return [$daysLeft($days), $hours($d->h)];
         }
         if ($d->h >= 1) {
-            return [$unit($d->h, 'Stunde', 'Stunden'), $unit($d->i, 'Minute', 'Minuten')];
+            return [$hours($d->h), $minutes($d->i)];
         }
-        return [$unit($d->i, 'Minute', 'Minuten'), $unit($d->s, 'Sekunde', 'Sekunden')];
+        return [$minutes($d->i), [$d->s, I18n::tn('Sekunde', 'Sekunden', $d->s)]];
     }
 
     /** @param array<string, mixed> $b */
@@ -113,7 +113,7 @@ final class BlockHtml
         $out = self::heading($b);
         $events = is_array($b['events'] ?? null) ? $b['events'] : [];
         if ($events === []) {
-            $out .= '<p class="muted">Zurzeit steht nichts an.</p>';
+            $out .= '<p class="muted">' . self::e(I18n::t('Zurzeit steht nichts an.')) . '</p>';
         } else {
             $out .= '<ul class="block-events-list">';
             foreach ($events as $e) {
@@ -122,7 +122,7 @@ final class BlockHtml
             }
             $out .= '</ul>';
         }
-        return $out . '<p><a href="' . self::e($this->href('#/termine')) . '">Alle Termine</a></p>';
+        return $out . '<p><a href="' . self::e($this->href('#/termine')) . '">' . self::e(I18n::t('Alle Termine')) . '</a></p>';
     }
 
     /** @param array<string, mixed> $b */
@@ -130,7 +130,7 @@ final class BlockHtml
     {
         $offices = is_array($b['offices'] ?? null) ? $b['offices'] : [];
         if ($offices === []) {
-            return self::heading($b) . '<p class="muted">Zurzeit keine Ansprechpartner.</p>';
+            return self::heading($b) . '<p class="muted">' . self::e(I18n::t('Zurzeit keine Ansprechpartner.')) . '</p>';
         }
         $out = self::heading($b) . '<ul class="block-contacts-list">';
         foreach ($offices as $o) {
@@ -141,7 +141,7 @@ final class BlockHtml
                     ? '<img src="' . self::e($h['photo_url']) . '" alt="" width="56" height="56" loading="lazy">'
                     : '<span class="block-contact-initials" aria-hidden="true">' . self::e(is_array($h) ? self::initials((string) $h['name']) : '–') . '</span>';
                 $out .= '<li class="block-contact">' . $photo . '<span><span class="muted">' . self::e($office) . '</span><strong>'
-                    . self::e(is_array($h) ? (string) $h['name'] : 'zurzeit nicht besetzt') . '</strong></span></li>';
+                    . self::e(is_array($h) ? (string) $h['name'] : I18n::t('zurzeit nicht besetzt')) . '</strong></span></li>';
             }
         }
         return $out . '</ul>';
@@ -184,12 +184,12 @@ final class BlockHtml
             return '';
         }
         $link = self::e($this->href('#/galerie/' . (int) $a['id']));
-        $out = '<h2>' . self::e((string) $a['title']) . '</h2><a class="block-album-grid" href="' . $link . '" aria-label="' . self::e('Album ' . $a['title'] . ' öffnen') . '">';
+        $out = '<h2>' . self::e((string) $a['title']) . '</h2><a class="block-album-grid" href="' . $link . '" aria-label="' . self::e(I18n::t('Album {title} öffnen', ['title' => (string) $a['title']])) . '">';
         foreach (is_array($a['photos'] ?? null) ? $a['photos'] : [] as $p) {
             $size = (int) ($p['width'] ?? 0) > 0 && (int) ($p['height'] ?? 0) > 0 ? ' width="' . (int) $p['width'] . '" height="' . (int) $p['height'] . '"' : '';
             $out .= '<img src="' . self::e((string) $p['thumb']) . '" alt="" loading="lazy"' . $size . '>';
         }
-        return $out . '</a><p><a href="' . $link . '">Alle ' . (int) ($a['total'] ?? 0) . ' im Album ansehen</a></p>';
+        return $out . '</a><p><a href="' . $link . '">' . self::e(I18n::t('Alle {count} im Album ansehen', ['count' => (int) ($a['total'] ?? 0)])) . '</a></p>';
     }
 
     /** @param array<string, mixed> $b */
@@ -201,8 +201,8 @@ final class BlockHtml
         }
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', substr((string) $d['date'], 0, 10));
         return '<div class="block-document"><strong>' . self::e((string) $d['title']) . '</strong><span class="muted">'
-            . self::e(strtoupper((string) $d['ext']) . ' · ' . self::bytes((int) $d['size']) . ($date !== false ? ' · Stand ' . $date->format('d.m.Y') : '')) . '</span>'
-            . '<a class="site-btn site-btn-secondary" href="' . self::e((string) $d['url']) . '" download>Herunterladen</a></div>';
+            . self::e(strtoupper((string) $d['ext']) . ' · ' . self::bytes((int) $d['size']) . ($date !== false ? ' · ' . I18n::t('Stand {date}', ['date' => $date->format('d.m.Y')]) : '')) . '</span>'
+            . '<a class="site-btn site-btn-secondary" href="' . self::e((string) $d['url']) . '" download>' . self::e(I18n::t('Herunterladen')) . '</a></div>';
     }
 
     /** @param array<string, mixed> $b */
@@ -236,7 +236,7 @@ final class BlockHtml
             return '';
         }
         return self::heading($b) . '<p>' . self::e($place) . '</p><p><a class="site-btn site-btn-secondary" href="'
-            . self::e('https://www.openstreetmap.org/search?query=' . rawurlencode($place)) . '" target="_blank" rel="noopener noreferrer">Karte</a></p>';
+            . self::e('https://www.openstreetmap.org/search?query=' . rawurlencode($place)) . '" target="_blank" rel="noopener noreferrer">' . self::e(I18n::t('Karte')) . '</a></p>';
     }
 
     /** Pages of the App (#/…) at the App's address; other links as they are. */
@@ -259,13 +259,20 @@ final class BlockHtml
         $text = self::date($start);
         $end = is_string($e['end_date'] ?? null) && $e['end_date'] !== $e['start_date'] ? \DateTimeImmutable::createFromFormat('!Y-m-d', $e['end_date']) : false;
         if ($end !== false) {
-            $text = ($start->format('Y-m') === $end->format('Y-m') ? $start->format('j.') : $start->format('j. ') . self::MONTHS[(int) $start->format('n') - 1])
-                . '–' . $end->format('j. ') . self::MONTHS[(int) $end->format('n') - 1] . ' ' . $end->format('Y');
+            $text = $start->format('Y-m') === $end->format('Y-m')
+                ? I18n::t('{from}.–{to}. {month} {year}', ['from' => $start->format('j'), 'to' => $end->format('j'), 'month' => self::month($end), 'year' => $end->format('Y')])
+                : I18n::t('{from}. {fromMonth}–{to}. {month} {year}', [
+                    'from' => $start->format('j'),
+                    'fromMonth' => self::month($start),
+                    'to' => $end->format('j'),
+                    'month' => self::month($end),
+                    'year' => $end->format('Y'),
+                ]);
         }
         $time = is_string($e['start_time'] ?? null) ? substr($e['start_time'], 0, 5) : '';
         if ($time !== '' && empty($e['all_day'])) {
             $endTime = is_string($e['end_time'] ?? null) ? substr($e['end_time'], 0, 5) : '';
-            $text .= ' · ' . $time . ($endTime !== '' ? '–' . $endTime : '') . ' Uhr';
+            $text .= ' · ' . I18n::t('{time} Uhr', ['time' => $time . ($endTime !== '' ? '–' . $endTime : '')]);
         }
         return $text;
     }
@@ -273,7 +280,40 @@ final class BlockHtml
     /** „Sa., 27. Juni 2027“ */
     public static function date(\DateTimeImmutable $d): string
     {
-        return self::WEEKDAYS[(int) $d->format('w')] . ', ' . $d->format('j. ') . self::MONTHS[(int) $d->format('n') - 1] . ' ' . $d->format('Y');
+        return I18n::t('{weekday}, {day}. {month} {year}', ['weekday' => self::weekday($d), 'day' => $d->format('j'), 'month' => self::month($d), 'year' => $d->format('Y')]);
+    }
+
+    /** „Sa.“ */
+    private static function weekday(\DateTimeImmutable $d): string
+    {
+        return match ((int) $d->format('w')) {
+            0 => I18n::t('So.'),
+            1 => I18n::t('Mo.'),
+            2 => I18n::t('Di.'),
+            3 => I18n::t('Mi.'),
+            4 => I18n::t('Do.'),
+            5 => I18n::t('Fr.'),
+            default => I18n::t('Sa.'),
+        };
+    }
+
+    /** „Juni“ */
+    private static function month(\DateTimeImmutable $d): string
+    {
+        return match ((int) $d->format('n')) {
+            1 => I18n::t('Januar'),
+            2 => I18n::t('Februar'),
+            3 => I18n::t('März'),
+            4 => I18n::t('April'),
+            5 => I18n::t('Mai'),
+            6 => I18n::t('Juni'),
+            7 => I18n::t('Juli'),
+            8 => I18n::t('August'),
+            9 => I18n::t('September'),
+            10 => I18n::t('Oktober'),
+            11 => I18n::t('November'),
+            default => I18n::t('Dezember'),
+        };
     }
 
     /** @param array<string, mixed> $b */

@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Preview;
 use KompanieApp\Core\Http\FileCache;
 use KompanieApp\Core\Http\ManifestIcons;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Liefert die PWA unter /app/ aus.
@@ -225,7 +226,7 @@ final class AppPage
         header('Content-Type: application/json; charset=utf-8');
         if (!is_user_logged_in()) {
             status_header(401);
-            echo wp_json_encode(['code' => 'not_logged_in', 'message' => 'Bitte melde dich an.']);
+            echo wp_json_encode(['code' => 'not_logged_in', 'message' => I18n::t('Bitte melde dich an.')]);
             return;
         }
         echo wp_json_encode(['token' => $app->authenticator->csrfToken()]);
@@ -555,7 +556,7 @@ final class AppPage
         $file = self::distDir() . 'index.html';
         if (!is_readable($file)) {
             status_header(500);
-            echo 'Die App wurde noch nicht gebaut (app/index.html fehlt).';
+            echo esc_html(I18n::t('Die App wurde noch nicht gebaut (app/index.html fehlt).'));
             return;
         }
         // Wer die App öffnet, bleibt angemeldet: Anmeldung bei Bedarf verlängern.

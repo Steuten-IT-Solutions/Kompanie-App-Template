@@ -5,7 +5,7 @@ declare(strict_types=1);
 /**
  * Prüft die Übersetzungskataloge (Plan „Mehrsprachigkeit“).
  *
- * Sammelt alle Aufrufe t()/tn() der App (packages/frontend/src, TypeScript) und I18n::t()/I18n::tn() in Kern und
+ * Sammelt alle Aufrufe t()/tn()/tc() der App (packages/frontend/src, TypeScript) und I18n::t()/I18n::tn()/I18n::tc() in Kern und
  * Adaptern (PHP) und vergleicht sie mit den Katalogen packages/core/src/I18n/<sprache>.json:
  * - jeder genutzte Text braucht in jedem Katalog einen Eintrag (Text bei t(), Formen one und other bei tn()),
  * - ein Eintrag, den kein Aufruf mehr nutzt, wird gemeldet (der deutsche Text wurde geändert oder entfernt),
@@ -160,11 +160,11 @@ function i18n_js_calls(string $src): array
             $i = $end;
             continue;
         }
-        if (preg_match('/\G(tn|t)\s*\(/', $src, $m, 0, $i) && ($i === 0 || !preg_match('/[\w$.]/', $src[$i - 1]) || substr($src, $i - 3, 3) === '...')) {
+        if (preg_match('/\G(tn|tc|t)\s*\(/', $src, $m, 0, $i) && ($i === 0 || !preg_match('/[\w$.]/', $src[$i - 1]) || substr($src, $i - 3, 3) === '...')) {
             $kind = $m[1];
             $j = $i + strlen($m[0]);
             $args = [];
-            for ($k = 0; $k < ($kind === 'tn' ? 2 : 1); $k++) {
+            for ($k = 0; $k < ($kind === 't' ? 1 : 2); $k++) {
                 $j = i18n_js_skip($src, $j);
                 $lit = i18n_js_string($src, $j);
                 if ($lit === null) {
@@ -320,13 +320,13 @@ function i18n_php_calls(string $src): array
             continue;
         }
         $method = $tokens[$i + 2];
-        if (!is_array($tokens[$i + 1]) || $tokens[$i + 1][0] !== T_DOUBLE_COLON || !is_array($method) || !in_array($method[1], ['t', 'tn'], true) || $tokens[$i + 3] !== '(') {
+        if (!is_array($tokens[$i + 1]) || $tokens[$i + 1][0] !== T_DOUBLE_COLON || !is_array($method) || !in_array($method[1], ['t', 'tn', 'tc'], true) || $tokens[$i + 3] !== '(') {
             continue;
         }
         $kind = $method[1];
         $args = [];
         $j = $i + 4;
-        for ($k = 0; $k < ($kind === 'tn' ? 2 : 1); $k++) {
+        for ($k = 0; $k < ($kind === 't' ? 1 : 2); $k++) {
             $lit = $tokens[$j] ?? null;
             $after = $tokens[$j + 1] ?? null;
             if (!is_array($lit) || $lit[0] !== T_CONSTANT_ENCAPSED_STRING || ($after !== ',' && $after !== ')')) {
@@ -371,6 +371,8 @@ $collect = static function (array $calls, string $file) use ($use, &$errors, $re
         }
         if ($call['kind'] === 'tn') {
             $use($call['args'][1], 'tn', $where, $call['args'][0]);
+        } elseif ($call['kind'] === 'tc') {
+            $use($call['args'][0] . '|' . $call['args'][1], 't', $where);
         } else {
             $use($call['args'][0], 't', $where);
         }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Storage;
 
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\FileStorage;
 use KompanieApp\Core\Storage\Sql\Connection;
 use KompanieApp\Core\Storage\Sql\Schema;
@@ -188,12 +189,12 @@ final class Backup
                 $columns = array_flip($this->columns($t));
                 foreach ($tables[$t] as $row) {
                     if (!is_array($row)) {
-                        throw new \RuntimeException('Die Sicherung ist beschädigt (Tabelle ' . $t . ').');
+                        throw new \RuntimeException(I18n::t('Die Sicherung ist beschädigt (Tabelle {table}).', ['table' => $t]));
                     }
                     $row = array_intersect_key(self::olderRow($t, $row), $columns);
                     foreach ($row as $v) {
                         if (!is_scalar($v) && $v !== null) {
-                            throw new \RuntimeException('Die Sicherung ist beschädigt (Tabelle ' . $t . ').');
+                            throw new \RuntimeException(I18n::t('Die Sicherung ist beschädigt (Tabelle {table}).', ['table' => $t]));
                         }
                     }
                     if ($row !== []) {
@@ -216,7 +217,7 @@ final class Backup
         foreach (self::fileList($files, $tables) as $path => $file) {
             $data = file_get_contents($file);
             if ($data === false) {
-                throw new \RuntimeException('Die Datei ' . $path . ' ließ sich nicht lesen.');
+                throw new \RuntimeException(I18n::t('Die Datei {file} ließ sich nicht lesen.', ['file' => $path]));
             }
             $out[$path] = base64_encode($data);
         }
@@ -291,7 +292,7 @@ final class Backup
             for ($done = 0; $done < $len;) {
                 $n = fwrite($out, $done === 0 ? $chunk : substr($chunk, $done));
                 if ($n === false || $n === 0) {
-                    throw new \RuntimeException('Die Sicherung ließ sich nicht schreiben (Speicherplatz?).');
+                    throw new \RuntimeException(I18n::t('Die Sicherung ließ sich nicht schreiben (Speicherplatz?).'));
                 }
                 $done += $n;
             }
@@ -336,7 +337,7 @@ final class Backup
             foreach (self::fileList($files, $refs) as $path => $file) {
                 $in = @fopen($file, 'rb');
                 if ($in === false) {
-                    throw new \RuntimeException('Die Datei ' . $path . ' ließ sich nicht lesen.');
+                    throw new \RuntimeException(I18n::t('Die Datei {file} ließ sich nicht lesen.', ['file' => $path]));
                 }
                 try {
                     $put(($first ? '' : ',') . $json($path) . ':"');
@@ -345,7 +346,7 @@ final class Backup
                     while (!feof($in)) {
                         $block = fread($in, self::FILE_BLOCK);
                         if ($block === false) {
-                            throw new \RuntimeException('Die Datei ' . $path . ' ließ sich nicht lesen.');
+                            throw new \RuntimeException(I18n::t('Die Datei {file} ließ sich nicht lesen.', ['file' => $path]));
                         }
                         while ($block !== '' && strlen($block) % 3 !== 0 && !feof($in)) {
                             $more = fread($in, 3 - strlen($block) % 3);
@@ -379,7 +380,7 @@ final class Backup
         if ($files === null) {
             return [];
         }
-        $broken = new \RuntimeException('Die Sicherung ist beschädigt (Dateien).');
+        $broken = new \RuntimeException(I18n::t('Die Sicherung ist beschädigt (Dateien).'));
         if (!is_array($files)) {
             throw $broken;
         }
@@ -410,7 +411,7 @@ final class Backup
             $tmp = $target . '.' . bin2hex(random_bytes(4)) . '.tmp';
             if (@file_put_contents($tmp, $bytes) !== strlen($bytes) || !@rename($tmp, $target)) {
                 @unlink($tmp);
-                throw new \RuntimeException('Die Daten sind wiederhergestellt, aber die Datei ' . $path . ' ließ sich nicht speichern (Speicherplatz, Schreibrechte?). Bitte die Sicherung erneut einspielen.');
+                throw new \RuntimeException(I18n::t('Die Daten sind wiederhergestellt, aber die Datei {file} ließ sich nicht speichern (Speicherplatz, Schreibrechte?). Bitte die Sicherung erneut einspielen.', ['file' => $path]));
             }
         }
     }
@@ -451,13 +452,13 @@ final class Backup
     {
         $data = json_decode($json, true, 64);
         if (!is_array($data) || ($data['format'] ?? '') !== self::FORMAT) {
-            throw new \RuntimeException('Das ist keine Datensicherung der Kompanie-App.');
+            throw new \RuntimeException(I18n::t('Das ist keine Datensicherung der Kompanie-App.'));
         }
         if ((int) ($data['formatVersion'] ?? 0) > self::FORMAT_VERSION) {
-            throw new \RuntimeException('Die Sicherung stammt aus einer neueren Version. Bitte erst die App aktualisieren.');
+            throw new \RuntimeException(I18n::t('Die Sicherung stammt aus einer neueren Version. Bitte erst die App aktualisieren.'));
         }
         if (!is_array($data['tables'] ?? null)) {
-            throw new \RuntimeException('Die Sicherung enthält keine Daten.');
+            throw new \RuntimeException(I18n::t('Die Sicherung enthält keine Daten.'));
         }
         return $data;
     }

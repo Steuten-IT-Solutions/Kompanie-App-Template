@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Schutz öffentlicher Formulare vor Programmen, ohne Captcha (Fehlermeldungen, Issue #64; Selbstregistrierung, Issue #314):
@@ -35,10 +36,10 @@ final class FormTrap
     {
         if (!is_string($token) || !preg_match('/^(\d{1,12})\.([0-9a-f]{64})$/D', $token, $m) || !hash_equals($this->signature((int) $m[1]), $m[2])
             || $now - (int) $m[1] > $this->maxAge || (int) $m[1] > $now + 60) {
-            throw new ApiError(400, 'form_expired', 'Das Formular ist abgelaufen. Bitte öffne es neu.');
+            throw new ApiError(400, 'form_expired', I18n::t('Das Formular ist abgelaufen. Bitte öffne es neu.'));
         }
         if ($now - (int) $m[1] < $this->minSeconds) {
-            throw new ApiError(429, 'too_fast', 'Das ging sehr schnell. Bitte warte einen Moment und sende dann erneut.');
+            throw new ApiError(429, 'too_fast', I18n::t('Das ging sehr schnell. Bitte warte einen Moment und sende dann erneut.'));
         }
     }
 

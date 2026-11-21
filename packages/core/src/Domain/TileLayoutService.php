@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Domain;
 
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\Settings;
 use KompanieApp\Core\Storage\UserSettings;
 
@@ -166,7 +167,7 @@ final class TileLayoutService
         $page = self::page($body['page'] ?? null);
         $cols = $body['cols'] ?? null;
         if (!is_int($cols) || !in_array($cols, self::COLUMNS, true)) {
-            throw ApiError::invalid('Die Spaltenzahl muss 2, 3, 4 oder 5 sein.');
+            throw ApiError::invalid(I18n::t('Die Spaltenzahl muss 2, 3, 4 oder 5 sein.'));
         }
         return [$page, $cols, self::tiles($body['tiles'] ?? null, $cols)];
     }
@@ -174,7 +175,7 @@ final class TileLayoutService
     private static function page(mixed $page): string
     {
         if (!is_string($page) || preg_match(self::PAGE, $page) !== 1) {
-            throw ApiError::invalid('Unbekannte Seite.');
+            throw ApiError::invalid(I18n::t('Unbekannte Seite.'));
         }
         return $page;
     }
@@ -183,10 +184,10 @@ final class TileLayoutService
     private static function tiles(mixed $tiles, int $cols): array
     {
         if (!is_array($tiles) || !array_is_list($tiles)) {
-            throw ApiError::invalid('Die Kacheln fehlen.');
+            throw ApiError::invalid(I18n::t('Die Kacheln fehlen.'));
         }
         if (count($tiles) > self::MAX_TILES) {
-            throw ApiError::invalid(sprintf('Höchstens %d Kacheln je Seite.', self::MAX_TILES));
+            throw ApiError::invalid(I18n::t('Höchstens {max} Kacheln je Seite.', ['max' => self::MAX_TILES]));
         }
         $out = [];
         $ids = [];
@@ -194,16 +195,16 @@ final class TileLayoutService
         foreach ($tiles as $t) {
             $tile = is_array($t) ? self::tile($t, $cols) : null;
             if ($tile === null) {
-                throw ApiError::invalid('Ungültige Kachel.');
+                throw ApiError::invalid(I18n::t('Ungültige Kachel.'));
             }
             if (isset($ids[$tile['id']])) {
-                throw ApiError::invalid('Eine Kachel steht doppelt.');
+                throw ApiError::invalid(I18n::t('Eine Kachel steht doppelt.'));
             }
             $ids[$tile['id']] = true;
             for ($c = $tile['col']; $c < $tile['col'] + $tile['span']; $c++) {
                 $cell = $tile['row'] . ':' . $c;
                 if (isset($taken[$cell])) {
-                    throw ApiError::invalid('Zwei Kacheln liegen übereinander.');
+                    throw ApiError::invalid(I18n::t('Zwei Kacheln liegen übereinander.'));
                 }
                 $taken[$cell] = true;
             }

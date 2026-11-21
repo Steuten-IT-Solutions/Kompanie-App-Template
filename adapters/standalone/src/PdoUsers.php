@@ -7,6 +7,7 @@ namespace KompanieApp\Standalone;
 use KompanieApp\Core\Auth\Roles;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\PersonName;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\UserDirectory;
 use KompanieApp\Core\Storage\Sql\Connection;
 
@@ -79,7 +80,7 @@ final class PdoUsers implements UserDirectory
     public function createWithPasswordHash(string $firstName, string $lastName, string $login, string $email, string $passwordHash, string $role = Roles::MEMBER): int
     {
         if (password_get_info($passwordHash)['algo'] === null) {
-            throw new \DomainException('Ungültiger Passwort-Hash.');
+            throw new \DomainException(I18n::t('Ungültiger Passwort-Hash.'));
         }
         return $this->insertUser($firstName, $lastName, $login, $email, $passwordHash, $role);
     }
@@ -142,7 +143,7 @@ final class PdoUsers implements UserDirectory
     public function setPasswordHash(int $id, string $passwordHash): void
     {
         if (password_get_info($passwordHash)['algo'] === null) {
-            throw new \DomainException('Ungültiger Passwort-Hash.');
+            throw new \DomainException(I18n::t('Ungültiger Passwort-Hash.'));
         }
         $this->db->update('users', ['password_hash' => $passwordHash, 'updated_at' => gmdate('Y-m-d H:i:s')], ['id' => $id]);
         $this->sessions?->destroyAllFor($id);

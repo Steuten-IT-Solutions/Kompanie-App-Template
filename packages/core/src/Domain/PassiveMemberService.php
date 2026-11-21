@@ -8,6 +8,7 @@ use KompanieApp\Core\App;
 use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Push\PushService;
 use KompanieApp\Core\Storage\PassiveMemberRepository;
 
@@ -234,7 +235,7 @@ final class PassiveMemberService
         $paidOn = $this->paidOn($in['paid_on'] ?? null);
         $method = $this->method($in['method'] ?? null, null);
         if ($this->repository()->hasPayment($passiveId, $year)) {
-            throw ApiError::invalid(sprintf('Für %d ist schon eine Zahlung eingetragen.', $year));
+            throw ApiError::invalid(I18n::t('Für {year} ist schon eine Zahlung eingetragen.', ['year' => $year]));
         }
         $id = $this->repository()->insertPayment($passiveId, $year, $cents, $paidOn, $method, $actor->id, $this->app->time()->nowUtc());
         return self::payment($this->findPayment($id));
@@ -253,7 +254,7 @@ final class PassiveMemberService
         if (array_key_exists('year', $in)) {
             $values['year'] = $this->paymentYear($in['year']);
             if ($this->repository()->hasPayment($row['passive_id'], $values['year'], $id)) {
-                throw ApiError::invalid(sprintf('Für %d ist schon eine Zahlung eingetragen.', $values['year']));
+                throw ApiError::invalid(I18n::t('Für {year} ist schon eine Zahlung eingetragen.', ['year' => $values['year']]));
             }
         }
         if (array_key_exists('amount_cents', $in)) {
@@ -332,7 +333,7 @@ final class PassiveMemberService
         $methods = null;
         if (array_key_exists('methods', $in)) {
             if (!is_array($in['methods'])) {
-                throw ApiError::invalid('Bitte die Zahlungsarten als Liste angeben.');
+                throw ApiError::invalid(I18n::t('Bitte die Zahlungsarten als Liste angeben.'));
             }
             $methods = [];
             foreach ($in['methods'] as $raw) {
@@ -341,18 +342,18 @@ final class PassiveMemberService
                     continue;
                 }
                 if (mb_strlen($name) > self::METHOD_MAX) {
-                    throw ApiError::invalid(sprintf('Eine Zahlungsart darf höchstens %d Zeichen lang sein.', self::METHOD_MAX));
+                    throw ApiError::invalid(I18n::t('Eine Zahlungsart darf höchstens {max} Zeichen lang sein.', ['max' => self::METHOD_MAX]));
                 }
                 if (in_array(mb_strtolower($name), array_map('mb_strtolower', $methods), true)) {
-                    throw ApiError::invalid(sprintf('Die Zahlungsart „%s“ steht doppelt in der Liste.', $name));
+                    throw ApiError::invalid(I18n::t('Die Zahlungsart „{name}“ steht doppelt in der Liste.', ['name' => $name]));
                 }
                 $methods[] = $name;
             }
             if ($methods === []) {
-                throw ApiError::invalid('Bitte mindestens eine Zahlungsart angeben.');
+                throw ApiError::invalid(I18n::t('Bitte mindestens eine Zahlungsart angeben.'));
             }
             if (count($methods) > self::METHODS_MAX) {
-                throw ApiError::invalid(sprintf('Es gehen höchstens %d Zahlungsarten.', self::METHODS_MAX));
+                throw ApiError::invalid(I18n::t('Es gehen höchstens {max} Zahlungsarten.', ['max' => self::METHODS_MAX]));
             }
         }
         $cents = null;
@@ -365,7 +366,7 @@ final class PassiveMemberService
         if (array_key_exists('birthday_days', $in)) {
             $days = Input::integer($in['birthday_days']);
             if ($days === null || $days < 0 || $days > self::BIRTHDAY_DAYS_MAX) {
-                throw ApiError::invalid(sprintf('Bitte 0 bis %d Tage vorher angeben.', self::BIRTHDAY_DAYS_MAX));
+                throw ApiError::invalid(I18n::t('Bitte 0 bis {max} Tage vorher angeben.', ['max' => self::BIRTHDAY_DAYS_MAX]));
             }
         }
         // Erst alles prüfen, dann speichern
@@ -401,7 +402,7 @@ final class PassiveMemberService
     private static function ages(mixed $raw): array
     {
         if (!is_array($raw)) {
-            throw ApiError::invalid('Bitte die Alter als Liste angeben.');
+            throw ApiError::invalid(I18n::t('Bitte die Alter als Liste angeben.'));
         }
         $ages = [];
         foreach ($raw as $v) {
@@ -410,12 +411,12 @@ final class PassiveMemberService
             }
             $age = Input::integer($v);
             if ($age === null || $age < 1 || $age > self::AGE_MAX) {
-                throw ApiError::invalid(sprintf('Bitte nur Alter von 1 bis %d angeben.', self::AGE_MAX));
+                throw ApiError::invalid(I18n::t('Bitte nur Alter von 1 bis {max} angeben.', ['max' => self::AGE_MAX]));
             }
             $ages[$age] = true;
         }
         if (count($ages) > self::AGES_MAX) {
-            throw ApiError::invalid(sprintf('Es gehen höchstens %d Alter.', self::AGES_MAX));
+            throw ApiError::invalid(I18n::t('Es gehen höchstens {max} Alter.', ['max' => self::AGES_MAX]));
         }
         $out = array_keys($ages);
         sort($out);
@@ -500,7 +501,7 @@ final class PassiveMemberService
         $year = Input::integer($raw);
         $max = $this->year() + 1;
         if ($year === null || $year < self::YEAR_MIN || $year > $max) {
-            throw ApiError::invalid(sprintf('Bitte ein Jahr zwischen %d und %d angeben.', self::YEAR_MIN, $max));
+            throw ApiError::invalid(I18n::t('Bitte ein Jahr zwischen {min} und {max} angeben.', ['min' => self::YEAR_MIN, 'max' => $max]));
         }
         return $year;
     }
@@ -510,7 +511,7 @@ final class PassiveMemberService
     {
         $cents = Input::integer($raw);
         if ($cents === null || $cents <= 0 || $cents > self::MAX_CENTS) {
-            throw ApiError::invalid(sprintf('Bitte einen Betrag über 0 und höchstens %s Euro angeben.', number_format(self::MAX_CENTS / 100, 0, ',', '.')));
+            throw ApiError::invalid(I18n::t('Bitte einen Betrag über 0 und höchstens {max} Euro angeben.', ['max' => number_format(self::MAX_CENTS / 100, 0, ',', '.')]));
         }
         return $cents;
     }
@@ -527,7 +528,7 @@ final class PassiveMemberService
             return $name;
         }
         if ($name === '' || !in_array($name, $methods, true)) {
-            throw ApiError::invalid('Bitte eine der Zahlungsarten wählen: ' . implode(', ', $methods) . '.');
+            throw ApiError::invalid(I18n::t('Bitte eine der Zahlungsarten wählen: {methods}.', ['methods' => implode(', ', $methods)]));
         }
         return $name;
     }
@@ -536,14 +537,14 @@ final class PassiveMemberService
     private function paidOn(mixed $raw): string
     {
         if (!Input::isDate($raw)) {
-            throw ApiError::invalid('Bitte das Datum der Zahlung angeben (JJJJ-MM-TT).');
+            throw ApiError::invalid(I18n::t('Bitte das Datum der Zahlung angeben (JJJJ-MM-TT).'));
         }
         /** @var string $raw */
         if ((int) substr($raw, 0, 4) < self::YEAR_MIN) {
-            throw ApiError::invalid(sprintf('Das Datum der Zahlung muss ab %d liegen.', self::YEAR_MIN));
+            throw ApiError::invalid(I18n::t('Das Datum der Zahlung muss ab {year} liegen.', ['year' => self::YEAR_MIN]));
         }
         if ($raw > $this->app->time()->today()->format('Y-m-d')) {
-            throw ApiError::invalid('Das Datum der Zahlung darf nicht in der Zukunft liegen.');
+            throw ApiError::invalid(I18n::t('Das Datum der Zahlung darf nicht in der Zukunft liegen.'));
         }
         return $raw;
     }
@@ -551,7 +552,7 @@ final class PassiveMemberService
     /** @return PaymentRow */
     private function findPayment(int $id): array
     {
-        return $this->repository()->findPayment($id) ?? throw ApiError::notFound('Diese Zahlung gibt es nicht (mehr).');
+        return $this->repository()->findPayment($id) ?? throw ApiError::notFound(I18n::t('Diese Zahlung gibt es nicht (mehr).'));
     }
 
     /**
@@ -566,7 +567,7 @@ final class PassiveMemberService
     /** @return PassiveRow */
     private function find(int $id): array
     {
-        return $this->repository()->find($id) ?? throw ApiError::notFound('Diesen Passiven gibt es nicht (mehr).');
+        return $this->repository()->find($id) ?? throw ApiError::notFound(I18n::t('Diesen Passiven gibt es nicht (mehr).'));
     }
 
     /**
@@ -614,13 +615,13 @@ final class PassiveMemberService
         $first = array_key_exists('first_name', $in) || $current === null ? Text::line($in['first_name'] ?? null) : $current['first_name'];
         $last = array_key_exists('last_name', $in) || $current === null ? Text::line($in['last_name'] ?? null) : $current['last_name'];
         if ($first === '') {
-            throw ApiError::invalid('Bitte einen Vornamen angeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Vornamen angeben.'));
         }
         if ($last === '') {
-            throw ApiError::invalid('Bitte einen Nachnamen angeben.');
+            throw ApiError::invalid(I18n::t('Bitte einen Nachnamen angeben.'));
         }
         if (mb_strlen($first) > self::NAME_MAX || mb_strlen($last) > self::NAME_MAX) {
-            throw ApiError::invalid(sprintf('Vor- und Nachname dürfen je höchstens %d Zeichen lang sein.', self::NAME_MAX));
+            throw ApiError::invalid(I18n::t('Vor- und Nachname dürfen je höchstens {max} Zeichen lang sein.', ['max' => self::NAME_MAX]));
         }
         return ['first_name' => $first, 'last_name' => $last];
     }
@@ -648,7 +649,7 @@ final class PassiveMemberService
     {
         $text = Text::line(is_string($raw) || is_int($raw) ? (string) $raw : '');
         if (mb_strlen($text) > self::JOINED_MAX) {
-            throw ApiError::invalid(sprintf('Der Eintritt darf höchstens %d Zeichen lang sein.', self::JOINED_MAX));
+            throw ApiError::invalid(I18n::t('Der Eintritt darf höchstens {max} Zeichen lang sein.', ['max' => self::JOINED_MAX]));
         }
         return $text;
     }
@@ -658,7 +659,7 @@ final class PassiveMemberService
     {
         $text = Text::multiline(is_string($raw) ? $raw : '');
         if (mb_strlen($text) > self::NOTE_MAX) {
-            throw ApiError::invalid(sprintf('Die Bemerkung darf höchstens %d Zeichen lang sein.', self::NOTE_MAX));
+            throw ApiError::invalid(I18n::t('Die Bemerkung darf höchstens {max} Zeichen lang sein.', ['max' => self::NOTE_MAX]));
         }
         return $text;
     }
@@ -681,7 +682,7 @@ final class PassiveMemberService
         $id = Input::integer($raw);
         $user = $id !== null && $id > 0 ? $this->app->users->find($id) : null;
         if ($user === null || !$user->isMember()) {
-            throw ApiError::invalid('Betreuer kann nur ein Mitglied sein.');
+            throw ApiError::invalid(I18n::t('Betreuer kann nur ein Mitglied sein.'));
         }
         return ['caretaker_id' => $user->id];
     }
@@ -700,7 +701,7 @@ final class PassiveMemberService
             return [];
         }
         if (!$actor->can(Capability::ManagePersonal)) {
-            throw ApiError::forbidden('Adresse, Telefon, E-Mail und Geburtsdatum pflegt nur, wer persönliche Angaben ändern darf.');
+            throw ApiError::forbidden(I18n::t('Adresse, Telefon, E-Mail und Geburtsdatum pflegt nur, wer persönliche Angaben ändern darf.'));
         }
         $out = [];
         if (in_array('address', $given, true)) {
@@ -727,7 +728,7 @@ final class PassiveMemberService
         }
         $digits = strlen((string) preg_replace('/\D/', '', $phone));
         if (mb_strlen($phone) > MemberService::PHONE_MAX || preg_match('#^\+?[0-9 ()/-]+$#', $phone) !== 1 || $digits < 5 || $digits > 20) {
-            throw ApiError::invalid('Die Telefonnummer ist ungültig. Erlaubt sind Ziffern, Leerzeichen und + ( ) / -, z. B. +49 2151 123456.');
+            throw ApiError::invalid(I18n::t('Die Telefonnummer ist ungültig. Erlaubt sind Ziffern, Leerzeichen und + ( ) / -, z. B. +49 2151 123456.'));
         }
         return $phone;
     }
@@ -739,7 +740,7 @@ final class PassiveMemberService
             return '';
         }
         if (strlen($email) > self::EMAIL_MAX || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-            throw ApiError::invalid('Die E-Mail-Adresse ist ungültig.');
+            throw ApiError::invalid(I18n::t('Die E-Mail-Adresse ist ungültig.'));
         }
         return $email;
     }
@@ -751,14 +752,14 @@ final class PassiveMemberService
             return null;
         }
         if (!Input::isDate($raw)) {
-            throw ApiError::invalid('Bitte das Geburtsdatum als Datum angeben (JJJJ-MM-TT).');
+            throw ApiError::invalid(I18n::t('Bitte das Geburtsdatum als Datum angeben (JJJJ-MM-TT).'));
         }
         /** @var string $raw */
         if ((int) substr($raw, 0, 4) < self::BIRTH_YEAR_MIN) {
-            throw ApiError::invalid(sprintf('Das Geburtsjahr muss ab %d liegen.', self::BIRTH_YEAR_MIN));
+            throw ApiError::invalid(I18n::t('Das Geburtsjahr muss ab {year} liegen.', ['year' => self::BIRTH_YEAR_MIN]));
         }
         if ($raw > $this->app->time()->today()->format('Y-m-d')) {
-            throw ApiError::invalid('Das Geburtsdatum darf nicht in der Zukunft liegen.');
+            throw ApiError::invalid(I18n::t('Das Geburtsdatum darf nicht in der Zukunft liegen.'));
         }
         return $raw;
     }

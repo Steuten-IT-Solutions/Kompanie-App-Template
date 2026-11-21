@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Update;
 
+use KompanieApp\Core\I18n\I18n;
+
 /**
  * Die Update-Liste einer Kompanie (updates.json, signiert, auf GitHub Pages).
  *
@@ -53,7 +55,7 @@ final class UpdateList
     {
         if ((int) ($payload['format'] ?? 0) !== self::FORMAT || ($payload['type'] ?? self::TYPE) !== self::TYPE
             || !is_array($payload['versions'] ?? null) || !is_array($payload['channels'] ?? null)) {
-            throw new \RuntimeException('Die Update-Liste hat ein unbekanntes Format.');
+            throw new \RuntimeException(I18n::t('Die Update-Liste hat ein unbekanntes Format.'));
         }
         foreach (['withdrawn', 'stableHistory', 'blockedCores'] as $k) {
             $payload[$k] = array_values(array_filter((array) ($payload[$k] ?? []), 'is_string'));

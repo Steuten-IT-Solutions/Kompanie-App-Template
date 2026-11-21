@@ -9,6 +9,7 @@ use KompanieApp\Core\Auth\Capability;
 use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\Domain\Input;
 use KompanieApp\Core\Http\ApiError;
+use KompanieApp\Core\I18n\I18n;
 
 /**
  * Ansprechpartner: ausgewählte Ämter mit ihren aktuellen Inhabern (laufende Amtszeit), Name und Foto wie in den Ämtern
@@ -35,21 +36,21 @@ final class ContactsBlock implements BlockType
     {
         $ids = $in['office_ids'] ?? null;
         if (!is_array($ids) || !array_is_list($ids) || $ids === []) {
-            throw ApiError::invalid('Bitte mindestens ein Amt für die Ansprechpartner auswählen.');
+            throw ApiError::invalid(I18n::t('Bitte mindestens ein Amt für die Ansprechpartner auswählen.'));
         }
         if (count($ids) > self::MAX) {
-            throw ApiError::invalid(sprintf('Höchstens %d Ämter je Block.', self::MAX));
+            throw ApiError::invalid(I18n::t('Höchstens {max} Ämter je Block.', ['max' => self::MAX]));
         }
         $known = array_column($this->app->offices()->repository()->offices(), 'id');
         $out = [];
         foreach ($ids as $id) {
             $id = Input::integer($id);
             if ($id === null || !in_array($id, $known, true)) {
-                throw ApiError::invalid('Dieses Amt gibt es nicht.');
+                throw ApiError::invalid(I18n::t('Dieses Amt gibt es nicht.'));
             }
             $out[$id] = $id;
         }
-        return ['title' => Field::line($in['title'] ?? '', self::TITLE_MAX, 'Die Überschrift der Ansprechpartner'), 'office_ids' => array_values($out)];
+        return ['title' => Field::line($in['title'] ?? '', self::TITLE_MAX, I18n::t('Die Überschrift der Ansprechpartner')), 'office_ids' => array_values($out)];
     }
 
     public function render(array $data, ?User $viewer, bool $manager): ?array
@@ -71,7 +72,7 @@ final class ContactsBlock implements BlockType
             }, $o['holders']);
             // Eine Person (oder niemand): das Amt in der Einzahl; mehrere: die Bezeichnung
             $label = count($names) <= 1 && $o['holder_title'] !== null ? $o['holder_title'] : $o['title'];
-            $lines[] = $label . ': ' . ($names === [] ? 'zurzeit nicht besetzt' : implode(', ', $names));
+            $lines[] = $label . ': ' . ($names === [] ? I18n::t('zurzeit nicht besetzt') : implode(', ', $names));
         }
         if ($lines === [] || !$this->app->features()->enabled('offices')) {
             return '';

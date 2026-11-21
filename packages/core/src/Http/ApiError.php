@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace KompanieApp\Core\Http;
 
+use KompanieApp\Core\I18n\I18n;
+
 /**
  * Fehler, der als JSON-Antwort {code, message} mit HTTP-Status ausgeliefert wird.
  * Die Meldung ist für Menschen gedacht und wird in der App angezeigt.
@@ -32,7 +34,7 @@ final class ApiError extends \RuntimeException
 
     public static function notLoggedIn(): self
     {
-        return new self(401, 'not_logged_in', 'Bitte melde dich an.');
+        return new self(401, 'not_logged_in', I18n::t('Bitte melde dich an.'));
     }
 
     public static function forbidden(string $message): self
