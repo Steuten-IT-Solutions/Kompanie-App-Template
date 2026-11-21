@@ -1,7 +1,8 @@
 # Eine Kern-Version für alle Kompanien freigeben (nach dem Test auf einer Installation):
 # Läuft bei jedem Push auf main (Release aus develop) und von Hand; freigegeben wird immer der Stand von main.
 # 1. Programmcode des Kerns auf main bestimmen (Kern-Version aus VERSION, Prüfsumme wie beim Veröffentlichen).
-# 2. Bei jeder Kompanie (Topic kompanie-app) die neueste Version mit genau diesem Programmcode freigeben;
+# 2. Bei jeder Kompanie mit Wartungsabo (Topic kompanie-app, scripts/kompanien.sh) die neueste Version mit
+#    genau diesem Programmcode freigeben;
 #    Kompanien ohne solche Version bleiben vorerst unverändert.
 # 3. Den Programmcode in STABLE_CORE auf main eintragen und „Kompanien abgleichen“ starten: Kompanien, die noch
 #    keine Version mit diesem Code haben, bekommen sie dabei gebaut und direkt als stable veröffentlicht.
@@ -48,14 +49,15 @@ jobs:
           echo "Programmcode: $STABLE (main, $(git rev-parse --short HEAD))"
           echo "stable=$STABLE" >> "$GITHUB_OUTPUT"
 
-      - name: Kompanien bestimmen
+      - name: Kompanien bestimmen (mit laufendem Wartungsabo)
         id: repos
         env:
           GH_TOKEN: ${{ github.token }}
+          WARTUNG: ${{ vars.KOMPANIE_WARTUNG }}
         run: |
-          REPOS="$(gh api --paginate 'orgs/Steuten-IT-Solutions/repos?type=public&per_page=100' --jq '.[] | select(.archived | not) | select((.topics // []) | index("kompanie-app")) | .full_name')"
+          REPOS="$(scripts/kompanien.sh)"
           JSON="$(printf '%s\n' "$REPOS" | { grep -E '^Steuten-IT-Solutions/[A-Za-z0-9._-]+$' || true; } | jq -R . | jq -cs .)"
-          [ "$JSON" != '[]' ] || { echo "::error::Keine Kompanie gefunden."; exit 1; }
+          [ "$JSON" != '[]' ] || { echo "::error::Keine Kompanie (mit Wartungsabo) gefunden."; exit 1; }
           echo "Kompanien: $JSON"
           echo "repos=$JSON" >> "$GITHUB_OUTPUT"
 

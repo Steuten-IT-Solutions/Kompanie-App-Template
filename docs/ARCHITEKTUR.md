@@ -713,7 +713,7 @@ Schriften nur aus einer **mitgelieferten Auswahl** (Lizenzen geklärt, kein Abru
 - Kern: SemVer, Tag `v1.2.3`, beweglicher Tag `v1`.
 - Kompanie: Kern-Version plus laufende Build-Nummer, z. B. `1.4.0.3`. Auch eine Logo-Änderung wird so als Update ausgeliefert.
 - Jedes Release enthält `release.json`: Version, Mindest-PHP-Version, nötige Erweiterungen, ob Migrationen dabei sind, Signatur.
-- Jede Änderung am Programmcode auf `main` baut über **„Kompanien abgleichen“** (alle 30 Minuten, findet die Repos über das Topic `kompanie-app`) neue Versionen für alle Kompanien, zuerst im Kanal `early`.
+- Jede Änderung am Programmcode auf `main` baut über **„Kompanien abgleichen“** (alle 30 Minuten, findet die Repos über das Topic `kompanie-app`) neue Versionen für alle Kompanien mit Wartungsabo (Variable `KOMPANIE_WARTUNG`, [RELEASE.md](RELEASE.md#wartungsabo)), zuerst im Kanal `early`.
 
 ### Signatur
 
