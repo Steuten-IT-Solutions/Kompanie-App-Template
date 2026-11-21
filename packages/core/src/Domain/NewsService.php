@@ -154,17 +154,31 @@ final class NewsService
      *
      * @return array<string, mixed>
      */
-    public function item(string $key, ?User $viewer): array
+    public function item(string $key, ?User $viewer, bool $source = false): array
     {
-        $source = $this->source();
-        $item = $source->available() ? $source->item($key) : null;
+        $news = $this->source();
+        $content = $this->app->contentTranslations();
+        // Zum Bearbeiten (source, nur wer die News pflegt): die deutsche Fassung und alle Fassungen getrennt
+        $german = $source && $this->inApp() && $this->canManage($viewer);
+        $item = $news->available() ? ($german ? I18n::in(I18n::SOURCE_LOCALE, static fn (): ?array => $news->item($key)) : $news->item($key)) : null;
         if ($item === null) {
             throw ApiError::notFound(I18n::t('Beitrag nicht gefunden.'));
         }
         if ($this->inApp()) {
-            $row = $this->appSource()->row((int) $key);
+            $row = $this->appSource()->row((int) $key) ?? [];
             $blocks = Blocks::decode($row['blocks'] ?? null, (string) ($row['body'] ?? ''));
+            $current = $german ? null : $content->current();
+            if ($current !== null) {
+                [, $blocks, $total, $done] = $this->appSource()->localized($row, $content->of(AppNewsSource::KIND, (int) $key)[$current] ?? []);
+                $untranslated = ContentTranslations::untranslated($total, $done);
+                if ($untranslated !== null) {
+                    $item['untranslated'] = $untranslated;
+                }
+            }
             $item['blocks'] = $this->app->blocks()->forViewer($blocks, $viewer, $this->isMember($viewer), $this->canManage($viewer));
+            if ($german) {
+                $item['translations'] = $content->blocksSource(AppNewsSource::KIND, (int) $key);
+            }
         }
         if ($this->canManage($viewer)) {
             $item += $this->appSource()->meta((int) $key);
@@ -198,7 +212,8 @@ final class NewsService
         if ($row === null) {
             return false;
         }
-        if ($uid !== null && Blocks::imageOnlyForMembers(Blocks::decode($row['blocks'] ?? null, (string) ($row['body'] ?? '')), $uid)) {
+        $blocks = Blocks::decode($row['blocks'] ?? null, (string) ($row['body'] ?? ''));
+        if ($uid !== null && Blocks::imageOnlyForMembers($this->app->contentTranslations()->allBlocks(AppNewsSource::KIND, $newsId, $blocks), $uid)) {
             return $this->isMember($viewer);
         }
         return true;
@@ -249,16 +264,28 @@ final class NewsService
                 : I18n::t('Jemand hat den Beitrag inzwischen geändert. Bitte neu laden und deine Änderungen noch einmal eintragen.'));
         }
         [$data, $blocks] = $this->validate($in);
+        $content = $this->app->contentTranslations();
+        // Fassungen in weiteren Sprachen (Plan „Mehrsprachigkeit“), geprüft gegen die deutschen Blöcke nach dieser Änderung
+        $german = $blocks ?? Blocks::decode($row['blocks'] ?? null, (string) ($row['body'] ?? ''));
+        $translations = [];
+        foreach ($content->input($in['translations'] ?? null) as $locale => $fields) {
+            $translations[$locale] = $content->blocksInput($fields, $german, $actor, RichImageService::OWNER_NEWS, $id, self::TITLE_MAX, self::BODY_MAX);
+        }
         if ($blocks !== null) {
             $data += $this->app->blocks()->columns($blocks, $actor, RichImageService::OWNER_NEWS, $id, false);
         }
         if (array_key_exists('cover', $in)) {
             $data['cover'] = $this->claimCover($in['cover'], $actor, $id);
         }
-        $this->app->db->update('app_news', $data + ['updated_by' => $actor->id, 'updated_at' => $this->app->time()->nowUtc()], ['id' => $id]);
+        $this->app->db->transaction(function () use ($id, $data, $translations, $content, $actor): void {
+            foreach ($translations as $locale => $fields) {
+                $content->save(AppNewsSource::KIND, $id, $locale, $fields, $actor->id);
+            }
+            $this->app->db->update('app_news', $data + ['updated_by' => $actor->id, 'updated_at' => $this->app->time()->nowUtc()], ['id' => $id]);
+        });
         // Bilder, die weder in einem Block noch als Titelbild stehen, werden gelöscht (es gibt keinen Verlauf).
         $this->pruneImages($id);
-        return $this->item((string) $id, $actor);
+        return $this->item((string) $id, $actor, $translations !== []);
     }
 
     public function delete(int $id): void
@@ -268,6 +295,7 @@ final class NewsService
         $this->app->db->transaction(function () use ($id): void {
             $this->app->db->execute('DELETE FROM {app_news} WHERE id = ?', [$id]);
             $this->app->richImages()->deleteOwner(RichImageService::OWNER_NEWS, $id);
+            $this->app->contentTranslations()->delete(AppNewsSource::KIND, $id);
         });
     }
 
@@ -325,6 +353,7 @@ final class NewsService
         if ($cover !== null) {
             $keep[] = $cover;
         }
+        array_push($keep, ...$this->app->contentTranslations()->blockImages(AppNewsSource::KIND, $id));
         $this->app->richImages()->prune(RichImageService::OWNER_NEWS, $id, $keep);
     }
 

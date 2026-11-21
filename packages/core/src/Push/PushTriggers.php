@@ -453,12 +453,16 @@ final class PushTriggers
         if ($next !== $stored) {
             $this->app->settings->set(PushService::NEWS_SETTING, $next);
         }
-        $label = $this->app->config->sectionLabel('news', 'News');
-        $plain = static fn (array $i): string => html_entity_decode(strip_tags((string) $i['title']), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        // Bezeichnung in der Sprache der Nachricht, der Titel auch, wenn der Beitrag aus der App eine Fassung darin hat
+        $label = fn (): string => $this->app->config->sectionLabel('news', 'News');
+        $app = $this->app->newsService()->inApp() ? $this->app->newsService()->appSource() : null;
+        $plain = static fn (array $i): string => html_entity_decode(strip_tags(
+            ($app !== null && I18n::locale() !== I18n::SOURCE_LOCALE ? $app->titleIn((string) $i['id'], I18n::locale()) : null) ?? (string) $i['title'],
+        ), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         if (count($fresh) > 3) {
             $titles = implode(', ', array_map($plain, array_slice(array_reverse($fresh), 0, 3)));
             return $this->perLanguage(fn (?\Closure $only): int => $this->push->notifyAll(PushService::TYPE_NEWS, PushService::message(
-                $label,
+                $label(),
                 I18n::tn('{count} neuer Beitrag, z. B. {titles}', '{count} neue Beiträge, z. B. {titles}', count($fresh), ['titles' => $titles]),
                 'news',
                 'news-neu',
@@ -466,7 +470,12 @@ final class PushTriggers
         }
         $count = 0;
         foreach ($fresh as $item) {
-            $count += $this->push->notifyAll(PushService::TYPE_NEWS, PushService::message($label, $plain($item), 'news/' . rawurlencode((string) $item['id']), 'news-' . $item['id']));
+            $count += $this->perLanguage(fn (?\Closure $only): int => $this->push->notifyAll(
+                PushService::TYPE_NEWS,
+                PushService::message($label(), $plain($item), 'news/' . rawurlencode((string) $item['id']), 'news-' . $item['id']),
+                null,
+                $only,
+            ));
         }
         return $count;
     }

@@ -1104,7 +1104,7 @@ final class Api
                 $result = $a->newsService()->page($page, self::NEWS_PER_PAGE);
                 return new Response($result['items'], 200, ['X-Total-Pages' => (string) $result['totalPages']]);
             }, 'news', $denyView),
-            new Route('GET', '/news/{key}', Cap::ViewNews, fn (Request $r) => $a->newsService()->item((string) $r->params['key'], $a->authContext->currentUser()), 'news', $denyView),
+            new Route('GET', '/news/{key}', Cap::ViewNews, fn (Request $r) => $a->newsService()->item((string) $r->params['key'], $a->authContext->currentUser(), $r->queryFlag('source')), 'news', $denyView),
             new Route('POST', '/news', Cap::ManageNews, function (Request $r) use ($a) {
                 $item = $a->newsService()->create((array) $r->body, $this->user());
                 $this->notify(static fn () => $a->pushTriggers()->checkNews());

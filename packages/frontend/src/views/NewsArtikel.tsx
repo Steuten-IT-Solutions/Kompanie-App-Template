@@ -10,6 +10,7 @@ import { canWriteNews, openNewsEditor } from './News';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
 import { t } from '../i18n';
+import { UntranslatedNote } from '../language';
 
 const NewsSchreiben = lazyView(() => import('./NewsSchreiben'));
 
@@ -99,6 +100,7 @@ export default function NewsArtikel({ id, onToast }: { id: string; onToast: (msg
         : n.image && <img className="news-hero" src={n.image} alt="" />}
       {newsDate(n.date) && <div className="news-date">{newsDate(n.date)}</div>}
       <h2 className="news-headline">{n.title}</h2>
+      {inApp && <UntranslatedNote untranslated={n.untranslated} />}
       {inApp ? (
         <div className="news-content">
           {n.blocks ? <BlocksView blocks={n.blocks} manager={canWriteNews()} /> : n.content ? <RichTextView html={n.content} /> : null}

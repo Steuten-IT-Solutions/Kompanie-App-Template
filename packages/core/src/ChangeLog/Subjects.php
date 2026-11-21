@@ -302,7 +302,8 @@ final class Subjects
 
         $events = $this->spec('Termin', 'events', 'title', $eventCols);
         $calendar = $this->spec('Termin im Kalender', 'internal_events', 'title', $eventCols + ['respond_until' => 'Anmeldeschluss']);
-        $news = $this->spec('News', 'app_news', 'title', ['title' => 'Titel', 'blocks' => ['Inhalt', 'blocks'], 'cover' => ['Titelbild', 'secret']]);
+        $news = $this->spec('News', 'app_news', 'title', ['title' => 'Titel', 'blocks' => ['Inhalt', 'blocks'], 'cover' => ['Titelbild', 'secret']],
+            extra: fn (array $r): array => $this->app->contentTranslations()->blocksLog('news', (int) $r['id'], Blocks::decode($r['blocks'] ?? null, (string) ($r['body'] ?? ''))));
         $ranks = $this->spec('Dienstgrad', 'ranks', 'title', ['title' => 'Bezeichnung', 'min_points' => 'Ab Punkten', 'active' => ['Aktiv', 'bool'], 'badge_version' => ['Abzeichen', 'secret']]);
         $titles = $this->spec('Titel', 'titles', 'title', ['title' => 'Bezeichnung', 'active' => ['Aktiv', 'bool']]);
         $officeGroups = $this->spec('Ämtergruppe', 'office_groups', 'title', ['title' => 'Bezeichnung', 'singular' => 'Einzahl', 'joint_terms' => ['Gemeinsame Amtszeiten', 'bool']]);
