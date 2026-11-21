@@ -2348,6 +2348,29 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Verwaltung]
+      summary: Eintrag im Dienstgrad-Verlauf löschen
+      description: |
+        Für falsch gebuchte Wechsel. Beim neuesten Eintrag (wenn er den heutigen Dienstgrad ergeben hat) gilt wieder der
+        Dienstgrad davor (`from`, ohne Punkteprüfung, auch wenn er deaktiviert ist); „Dienstgrad seit“ ist dann der Zeitpunkt
+        des Eintrags davor. Gibt es den Dienstgrad davor nicht mehr oder ist die Person kein Mitglied mehr, wird nichts
+        geändert (400). Ältere Einträge werden nur aus dem Verlauf entfernt, der Dienstgrad bleibt. Steht im
+        Änderungsprotokoll als Änderung am Mitglied.
+      x-capability: manage_ranks
+      responses:
+        '200':
+          description: Neuer Stand und Verlauf
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rank: { $ref: '#/components/schemas/RankStatus' }
+                  history: { type: array, items: { $ref: '#/components/schemas/RankHistoryEntry' } }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
 
   /promotions:
     get:

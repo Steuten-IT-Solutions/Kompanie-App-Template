@@ -18,7 +18,7 @@ From the **Promotions** overview, tapping a name opens this window directly. **�
 - **Date**: the day of the change, today is preset. An earlier day is possible, a day in the future is not.
 - **Reason (optional)**: shown later in the history.
 - **Change {begriff.rank}**: saves the change.
-- Below it the history: every “Initial rank”, “Promotion” and “Demotion” with date, by whom, with {bereich.points} the total at that time, and the reason. The pencil on an entry changes its date.
+- Below it the history: every “Initial rank”, “Promotion” and “Demotion” with date, by whom, with {bereich.points} the total at that time, and the reason. The pencil on an entry changes its date, the bin deletes it.
 
 ## Step by step
 ### Promote or demote
@@ -34,6 +34,13 @@ From the **Promotions** overview, tapping a name opens this window directly. **�
 
 The new date must not be in the future, nor before the previous entry or after the next one. With {bereich.points}, the entry then shows the {bereich.points} total up to the new day; for a promotion it must reach the threshold of the {begriff.rank}. The current {begriff.rank} doesn’t change.
 
+### Delete an entry
+If a promotion or demotion was entered by mistake, delete it completely:
+1. In the history, tap the bin (**Delete entry**) on the entry.
+2. The app asks, e.g. _Delete the entry “Promotion” of 01/04/2026?_, and says what applies afterwards. Tap **Delete**; **Cancel** leaves everything as it was.
+
+If you delete the **newest** entry, the previous {begriff.rank} applies again, as if the change had never happened; “since” is then the date of the entry before. If you delete the initial rank as the only entry, the person has no {begriff.rank} afterwards. An **older** entry only disappears from the history; the current {begriff.rank} doesn’t change. The deletion is recorded in the change log and can’t be undone; enter the change again if needed.
+
 ### Take the {begriff.rank} away
 1. Under **New {begriff.rank}**, choose **No {begriff.rank}**.
 2. Tap **Change {begriff.rank}**.
@@ -41,7 +48,7 @@ The new date must not be in the future, nor before the previous entry or after t
 ## Good to know
 - With {bereich.points}: promoting is only possible once the {bereich.points} reach the threshold of the new {begriff.rank}; several steps at once are allowed. Demoting is always possible. If it says “No change is possible at the moment: promotion only from the threshold.”, the total isn’t yet enough for any {begriff.rank}.
 - **Earlier date**: with {bereich.points}, only the {bereich.points} up to that day count, for the threshold and for the total in the history. If they weren’t enough back then, the app rejects the promotion (“Threshold for … not yet reached on …”). The date must not be before the last change of this person’s {begriff.rank}, nor before an initial rank given when the person was created; otherwise the order in the history would be wrong. The new {begriff.rank} is the current one immediately in any case.
-- Deactivated {bereich.ranks} are not offered.
+- Deactivated {bereich.ranks} are not offered. When you delete the newest entry, a deactivated {begriff.rank} before it still comes back; a deleted {begriff.rank} no longer exists, so the app refuses to delete the entry and you change the {begriff.rank} instead.
 - Only members get a {begriff.rank}. Anyone who is no longer a member, e.g. after switching to the {rolle.guest} role, keeps their {begriff.rank}; you can then only set it to **No {begriff.rank}**. This also applies to former members (the admin area’s **Former members** list, only for those who may create members).
 - You see the {bereich.points} total here even if you may not award {bereich.points} yourself.
 - Those who have switched on notifications get a message when their {begriff.rank} changes.

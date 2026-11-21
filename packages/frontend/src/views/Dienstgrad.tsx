@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { api, config, type RankHistoryEntry } from '../api';
 import brand from '../generated/brand';
 import { formatDate, formatUtcDate, todayYmd } from '../format';
+import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
 import { RankBadge, RankLabel, rankName } from '../RankBadge';
 import { Empty, ErrorBox, Loading, rich, useAsync } from '../ui';
@@ -105,8 +106,9 @@ function localYmd(utc: string): string {
 }
 
 /**
- * Verlauf des Dienstgrads. Mit edit (Dienstgrade verwalten) lässt sich das Datum eines Eintrags nachträglich ändern;
- * der Server prüft Zukunft, Reihenfolge und Schwelle.
+ * Verlauf des Dienstgrads. Mit edit (Dienstgrade verwalten) lässt sich das Datum eines Eintrags nachträglich ändern
+ * (der Server prüft Zukunft, Reihenfolge und Schwelle) und ein Eintrag nach Rückfrage löschen: Beim neuesten gilt dann
+ * wieder der Dienstgrad davor.
  */
 export function RankHistory({
   entries,
@@ -133,6 +135,29 @@ export function RankHistory({
       edit.onChanged();
     } catch (err) {
       setFormError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(h: RankHistoryEntry, newest: boolean) {
+    if (!edit || h.id === undefined) return;
+    const what = t('{kind} vom {date} löschen?', { kind: KIND[h.kind], date: formatUtcDate(h.changed_at) });
+    const effect = newest
+      ? t('Danach gilt wieder der {rank} davor: {title}.', {
+          rank,
+          title: h.from ? rankName(h.from_rank_id, h.from) : t('kein {rank}', { rank }),
+        })
+      : t('Der aktuelle {rank} ändert sich dadurch nicht.', { rank });
+    if (!(await confirmAsk(`${what} ${effect}`, { okLabel: t('Löschen') }))) return;
+    setBusy(true);
+    try {
+      await api.deleteRankHistoryEntry(edit.memberId, h.id);
+      edit.onToast(t('Eintrag gelöscht'));
+      setEditing(null);
+      edit.onChanged();
+    } catch (err) {
+      edit.onToast((err as Error).message);
     } finally {
       setBusy(false);
     }
@@ -185,6 +210,7 @@ export function RankHistory({
                     setEditing(h.id!);
                   }}
                 />
+                <IconButton icon="delete" label={t('Eintrag löschen')} disabled={busy} onClick={() => remove(h, i === 0)} />
               </div>
             )}
           </div>

@@ -191,6 +191,8 @@ final class Subjects
             'DELETE /members/{id}/birthday' => $member,
             'PUT /members/{id}/rank' => $member,
             'PATCH /members/{id}/rank-history/{key}' => $member,
+            // Löscht einen Eintrag im Verlauf, nicht das Mitglied: Änderung am Mitglied (Dienstgrad, Dienstgrad-Verlauf).
+            'DELETE /members/{id}/rank-history/{key}' => new Subject($member->load, $member->ids, null, 'update'),
             'PUT /members/{id}/titles' => $member,
             'PUT /members/{id}/companies' => $member,
             'PUT /members/{id}/former' => $member,
