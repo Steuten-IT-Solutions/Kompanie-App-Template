@@ -33,7 +33,7 @@ import { dataUpdated } from '../dataCache';
 import { Icon, IconButton } from '../icons';
 import { photoUrl, shareLink } from '../share';
 import brand from '../generated/brand';
-import { t, tn } from '../i18n';
+import { t, tc, tn } from '../i18n';
 import {
   AlbumEditSheet,
   MoveSheet,
@@ -782,7 +782,7 @@ function AlbumActions({ album, hidden, submit, edit }: { album: GalleryAlbum; hi
       {progress && (
         <div className="album-download-progress">
           <p className="small" role="status">
-            {t('Lädt {current} von {total} …', { current: progress.done, total: progress.total })}
+            {tc('Herunterladen', 'Lädt {current} von {total} …', { current: progress.done, total: progress.total })}
           </p>
           <button type="button" className="btn btn-link" onClick={() => abort.current?.abort()}>
             {t('Abbrechen')}

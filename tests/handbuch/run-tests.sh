@@ -82,6 +82,30 @@ $ok = $p["rechte"] === ["manage_penalties"] && $p["bereiche"] === ["penalties"] 
   && str_contains($p["html"], "src=\"bild:zz-fehlt\"");
 exit($ok ? 0 : 1);' "$T/handbuch.json" && ok "App: Rechte, einrecht, Bereiche, Variante, Gruppe; Platzhalter bleiben; Verweise auf #/hilfe/…; Bilder als bild:name (die App setzt die Adresse ein)" || fail "App-Ausgabe: $(head -c 600 "$T/handbuch.json")"
 
+# Englische Fassungen (docs/handbuch/en): Fehler werden erkannt, Ausgabe für die App daneben
+cp -R docs/handbuch "$T/en"
+printf -- '---\ntitel: Unknown\n---\nText.\n' > "$T/en/en/gibt-es-nicht.md"
+printf -- '---\ntitel: Test\nrechte: []\n---\nText.\n' > "$T/en/en/zz-kopf.md"
+printf -- '---\ntitel: Kopf\nreihenfolge: 950\nrechte: []\n---\nText.\n' > "$T/en/zz-kopf.md"
+printf -- '---\ntitel: Admin\nreihenfolge: 951\nrechte: [manage_settings]\n---\nText.\n' > "$T/en/zz-admin.md"
+printf -- '---\ntitel: Links\nreihenfolge: 952\nrechte: []\n---\nText.\n' > "$T/en/zz-links.md"
+printf -- '---\ntitel: Links\n---\nSee [x](seite:gibt-es-nicht), [y](seite:zz-admin) and {bereich.unbekannt}.\n\nText ![Foto](bild:mitten) here.\n' > "$T/en/en/zz-links.md"
+OUT="$(php scripts/handbuch.php --check --src="$T/en" 2>&1 || true)"
+for want in 'en/gibt-es-nicht.md: Eine deutsche Seite „gibt-es-nicht“ gibt es nicht' 'en/zz-kopf.md: Kopfbereich nur mit titel' 'en/zz-links.md: Verweis auf fehlende Seite „gibt-es-nicht“' 'en/zz-links.md: Verweis auf „zz-admin“, die nicht jeder sieht' 'en/zz-links.md: unbekannter Platzhalter {bereich.unbekannt}' 'en/zz-links.md: Bild nur als eigene Zeile'; do
+  grep -qF "$want" <<< "$OUT" || fail "Fehler nicht erkannt: $want – $OUT"
+done
+ok "Englisch: nur Seiten, die es auf Deutsch gibt, Kopfbereich nur mit titel, Verweise, Platzhalter und Bilder geprüft"
+mkdir -p "$T/out/en"
+printf -- '---\ntitel: "{bereich.penalties} test"\n---\nFor {rolle.member}. See [All](seite:zz-alle).\n' > "$T/out/en/zz-strafen.md"
+php scripts/handbuch.php --app="$T/handbuch.json" --src="$T/out" > /dev/null
+php -r '
+$d = json_decode(file_get_contents($argv[1]), true);
+$p = $d["seiten"]["zz-strafen"] ?? null;
+$ok = is_array($p) && $p["titel"] === "{bereich.penalties} test" && str_contains($p["html"], "href=\"#/hilfe/zz-alle\"") && str_contains($p["html"], "For {rolle.member}.")
+  && !isset($d["seiten"]["zz-alle"]);
+exit($ok ? 0 : 1);' "$T/handbuch.en.json" && ok "App: handbuch.en.json mit Titel und Text je übersetzter Seite, Verweise auf #/hilfe/…" || fail "Englische Ausgabe: $(head -c 600 "$T/handbuch.en.json")"
+rm -r "$T/out/en"
+
 # Webseite mit Bezeichnungen der Kompanie, alles maskiert
 mkdir -p "$T/brand" "$T/bilder"
 printf '{"name":"TV <Beispiel> & Co","labels":{"sections":{"penalties":"Kasse"},"roles":{"member":"Kamerad"}}}' > "$T/brand/brand.json"

@@ -6,6 +6,7 @@ import { t } from '../i18n';
 import { LegalLinks } from '../legal';
 import { navigate } from '../router';
 import { Empty, lazyView } from '../ui';
+import { UntranslatedNote } from '../language';
 import FehlerMelden, { ReportButton } from './FehlerMelden';
 
 // Lizenztexte sind groß: eigenes Teilstück, erst beim Öffnen geladen (Issue #173).
@@ -21,6 +22,22 @@ interface Seite {
   bereiche: string[];
   variante: string | null;
   html: string;
+  /** In einer weiteren Sprache ohne Fassung: die deutsche Seite (Hinweis „Nur auf Deutsch verfügbar“) */
+  untranslated?: boolean;
+}
+
+/** Fassungen einer weiteren Sprache (generated/handbuch.en.json): Name der Seite => Titel und Text. */
+export interface Fassungen {
+  seiten: Record<string, { titel: string; html: string }>;
+}
+
+/**
+ * Englische Fassungen (Plan „Mehrsprachigkeit“), nur auf Englisch geladen (App.tsx); null = Deutsch. Nach einem Wechsel
+ * der Sprache lädt die App neu.
+ */
+let fassungen: Fassungen | null = null;
+export function setTranslations(next: Fassungen | null): void {
+  fassungen = next;
 }
 
 const GRUPPEN = ['Für alle', 'Für Mitglieder', 'Für Aufgaben in der Verwaltung', 'Für Admins'];
@@ -49,7 +66,7 @@ function labels(): Record<string, string> {
   return {
     'kompanie.name': brand.name,
     'bereich.events': sec.events,
-    'bereich.calendar': 'Kalender',
+    'bereich.calendar': t('Kalender'),
     'bereich.news': sec.news,
     'bereich.gallery': sec.gallery,
     'bereich.points': sec.points,
@@ -95,15 +112,24 @@ const images = (html: string) =>
     (_, name: string) => `src="${BILDER}${name}.jpg?v=${encodeURIComponent(config?.version ?? '')}"`,
   );
 
+/** Seite in der Sprache der App: die Fassung, sonst die deutsche mit untranslated. */
+function localized(s: Seite): Seite {
+  if (fassungen === null) return s;
+  const f = fassungen.seiten[s.slug];
+  return f ? { ...s, titel: f.titel, html: f.html } : { ...s, untranslated: true };
+}
+
 /** Seiten, die zu Rechten, eingeschalteten Bereichen und Variante passen. */
 function visible(): Seite[] {
-  return (handbuch.seiten as Seite[]).filter(
-    (s) =>
-      s.rechte.every((r) => can(r as Capability)) &&
-      (s.einrecht.length === 0 || s.einrecht.some((r) => can(r as Capability))) &&
-      s.bereiche.every((b) => !!config?.features[b as Feature]) &&
-      (s.variante === null || s.variante === config?.variant),
-  );
+  return (handbuch.seiten as Seite[])
+    .map(localized)
+    .filter(
+      (s) =>
+        s.rechte.every((r) => can(r as Capability)) &&
+        (s.einrecht.length === 0 || s.einrecht.some((r) => can(r as Capability))) &&
+        s.bereiche.every((b) => !!config?.features[b as Feature]) &&
+        (s.variante === null || s.variante === config?.variant),
+    );
 }
 
 /**
@@ -145,6 +171,7 @@ export default function Hilfe({ slug }: { slug?: string }) {
           ‹ {t('Alle Hilfeseiten')}
         </button>
         <h2 className="news-headline">{fill(seite.titel, map, false)}</h2>
+        <UntranslatedNote untranslated={seite.untranslated ? 'all' : null} />
         <div className="hilfe-text" ref={text} dangerouslySetInnerHTML={{ __html: images(fill(seite.html, map, true)) }} />
         <ReportButton />
       </article>

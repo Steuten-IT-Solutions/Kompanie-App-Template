@@ -5401,6 +5401,49 @@ test('Sprachen: Dokument, Kategorie und Album auch mit englischem Namen', async 
   }
 });
 
+test('Sprachen: Handbuch auf Englisch, Seite ohne Fassung deutsch mit Hinweis', async ({ page, browser }) => {
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ([path, method, body]) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return res.status;
+      },
+      [path, method, body] as const,
+    );
+  expect(await api('admin/settings', 'PATCH', { languages: 'de,en' })).toBe(200);
+  try {
+    // Gäste auf Englisch: übersetzte Seite und Verzeichnis auf Englisch
+    const visitor = await quietPage(browser);
+    await visitor.goto('/app/#/hilfe/anmelden');
+    await expect(visitor.locator('.hilfe-seite h2.news-headline')).toHaveText('Anmelden');
+    await visitor.evaluate(() => localStorage.setItem('kompanie-locale', 'en'));
+    await visitor.reload();
+    await expect(visitor.locator('.hilfe-seite h2.news-headline')).toHaveText('Log in');
+    await expect(visitor.locator('.hilfe-text')).toContainText('Stay logged in');
+    await expect(visitor.locator('.untranslated-note')).toHaveCount(0);
+    await visitor.goto('/app/#/hilfe');
+    await expect(visitor.locator('.hilfe .row-title', { hasText: 'Get the app on your phone' })).toBeVisible();
+    await visitor.close();
+
+    // Seite ohne englische Fassung (Admin mit Englisch am Konto): deutsch mit Hinweis
+    expect(await api('me/locale', 'PUT', { locale: 'en' })).toBe(200);
+    await page.goto('/app/#/hilfe/admin-sprachen');
+    await page.reload();
+    await expect(page.locator('.hilfe-seite .untranslated-note')).toHaveText('Only available in German');
+    await expect(page.locator('.hilfe-text')).toContainText('Englisch einschalten');
+  } finally {
+    expect(await api('me/locale', 'PUT', { locale: null })).toBe(200);
+    expect(await api('admin/settings', 'PATCH', { languages: 'de' })).toBe(200);
+  }
+});
+
 test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nicht', async ({ page }) => {
   // So, wie scripts/changelog.php es beim Bauen in die App gelegt hat.
   const changelog = JSON.parse(readFileSync(new URL('../src/generated/changelog.json', import.meta.url), 'utf8')) as {

@@ -5,7 +5,8 @@
  *   php scripts/handbuch.php --check
  *       prüft Kopfbereich, Platzhalter, Verweise und ob jeder Bereich mit eigenen Rechten eine Seite hat
  *   php scripts/handbuch.php --app=packages/frontend/src/generated/handbuch.json
- *       Seiten für die Hilfe in der App (offline, passend zur Version); gefiltert wird in der App
+ *       Seiten für die Hilfe in der App (offline, passend zur Version); gefiltert wird in der App. Daneben
+ *       handbuch.en.json mit den englischen Fassungen (Titel und Text je Seite), die die App nur auf Englisch lädt
  *   php scripts/handbuch.php --site=ordner [--brand=ordner mit brand.json und theme.css] [--bilder=ordner]
  *       statische Seiten für GitHub Pages der Kompanie (unter /handbuch/), mit ihren Bezeichnungen
  *
@@ -24,6 +25,11 @@
  *   ![Beschreibung](bild:name) als eigene Zeile für ein Bildschirmfoto (erzeugt von scripts/handbuch-bilder.sh).
  *   Platzhalter: {kompanie.name}, {bereich.events|calendar|news|gallery|points|catalog|penalties|ranks|titles|attendance|documents|board|polls|birthdays|inventory|directory|offices|lists|mail|sponsors|companies|pages|intern}, {begriff.rank},
  *   {rolle.guest|member|admin}; App und Webseite setzen die Bezeichnungen der Kompanie ein.
+ *
+ * Englisch (Plan „Mehrsprachigkeit“): docs/handbuch/en/<name>.md mit demselben Namen wie die deutsche Seite, im
+ * Kopfbereich nur titel (Rechte, Reihenfolge, Bereiche und Variante gelten wie auf Deutsch), Text wie oben; Verweise
+ * seite:… nennen die deutschen Namen. Fehlt eine Seite, zeigt die App auf Englisch die deutsche mit dem Hinweis „Nur auf
+ * Deutsch verfügbar“.
  */
 
 declare(strict_types=1);
@@ -165,6 +171,60 @@ function load(string $dir): array
 }
 
 /**
+ * Englische Fassungen (docs/handbuch/en): nur Seiten, die es auf Deutsch gibt, Kopfbereich nur mit titel; Verweise,
+ * Platzhalter und Bilder wie auf Deutsch geprüft. Verweise gelten zwischen den Seiten wie auf Deutsch (gleiche Rechte).
+ *
+ * @param array<string, array<string, mixed>> $pages deutsche Seiten
+ * @return array{0: array<string, array{titel: string, markdown: string}>, 1: string[]}
+ */
+function loadTranslations(string $dir, array $pages): array
+{
+    $out = [];
+    $errors = [];
+    foreach (glob($dir . '/*.md') ?: [] as $file) {
+        $slug = basename($file, '.md');
+        $name = 'en/' . $slug . '.md';
+        if (!isset($pages[$slug])) {
+            $errors[] = "$name: Eine deutsche Seite „{$slug}“ gibt es nicht (gleicher Dateiname wie auf Deutsch)";
+            continue;
+        }
+        $text = str_replace("\r\n", "\n", (string) file_get_contents($file));
+        if (!preg_match('/^---\ntitel:[ \t]*([^\n]*)\n---\n(.*)$/s', $text, $m)) {
+            $errors[] = "$name: Kopfbereich nur mit titel (--- titel: … ---)";
+            continue;
+        }
+        $titel = trim($m[1]);
+        if (preg_match('/^"(.*)"$/', $titel, $q)) {
+            $titel = $q[1];
+        }
+        if ($titel === '') {
+            $errors[] = "$name: „titel“ ist leer";
+        }
+        preg_match_all('/bild:/', $m[2], $refs);
+        preg_match_all('/^!\[[^\]]+\]\(bild:[a-z0-9-]+\)$/m', $m[2], $okImages);
+        if (count($refs[0]) !== count($okImages[0])) {
+            $errors[] = "$name: Bild nur als eigene Zeile ![Beschreibung](bild:name), Name nur mit a–z, 0–9 und -";
+        }
+        preg_match_all('/\{([a-z]+\.[a-z]+)\}/', $m[2] . ' ' . $titel, $ph);
+        foreach (array_diff(array_unique($ph[1]), PLACEHOLDERS) as $p) {
+            $errors[] = "$name: unbekannter Platzhalter {{$p}}";
+        }
+        preg_match_all('/\]\(seite:([^)]*)\)/', $m[2], $all);
+        foreach ($all[1] as $target) {
+            if (!preg_match('/^[a-z0-9-]+$/', $target)) {
+                $errors[] = "$name: ungültiger Verweis seite:{$target}";
+            } elseif (!isset($pages[$target])) {
+                $errors[] = "$name: Verweis auf fehlende Seite „{$target}“";
+            } elseif (!reachable($pages[$slug], $pages[$target])) {
+                $errors[] = "$name: Verweis auf „{$target}“, die nicht jeder sieht, der diese Seite sieht (Rechte, Bereiche oder Variante)";
+            }
+        }
+        $out[$slug] = ['titel' => $titel, 'markdown' => $m[2]];
+    }
+    return [$out, $errors];
+}
+
+/**
  * Sieht jeder, der $from sieht, auch $to? Admins (manage_settings) haben alle Rechte. Bereiche und
  * Variante des Ziels dürfen nicht enger sein; vorausgesetzte Bereiche (FEATURE_REQUIRES) zählen als eingeschaltet.
  * Von „einrecht“ der Quelle hat die Person nur irgendeines: Das Ziel braucht dann eines davon in seinem „einrecht“.
@@ -215,13 +275,15 @@ function group(array $page): string
 }
 
 [$pages, $errors] = load($src);
+[$english, $enErrors] = loadTranslations($src . '/en', $pages);
+$errors = [...$errors, ...$enErrors];
 
 if (isset($opt['check'])) {
     if ($errors) {
         fwrite(STDERR, "Handbuch:\n  - " . implode("\n  - ", $errors) . "\n");
         exit(1);
     }
-    echo 'Handbuch: ' . count($pages) . " Seiten, keine Fehler.\n";
+    echo 'Handbuch: ' . count($pages) . ' Seiten (auf Englisch ' . count($english) . "), keine Fehler.\n";
     exit(0);
 }
 if ($errors) {
@@ -248,6 +310,17 @@ if (isset($opt['app'])) {
     @mkdir(dirname($file), 0775, true);
     file_put_contents($file, json_encode(['seiten' => $out], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . "\n");
     echo 'Handbuch für die App: ' . count($out) . " Seiten → $file\n";
+    // Englische Fassungen daneben (handbuch.en.json): Name der Seite => Titel und Text; die App lädt sie nur auf Englisch.
+    $en = [];
+    foreach ($english as $slug => $p) {
+        $en[$slug] = [
+            'titel' => $p['titel'],
+            'html' => kompanie_markdown($p['markdown'], static fn (string $s): string => '#/hilfe/' . $s, static fn (string $n): string => 'bild:' . $n),
+        ];
+    }
+    $enFile = (string) preg_replace('/\.json$/', '', $file) . '.en.json';
+    file_put_contents($enFile, json_encode(['seiten' => (object) $en], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . "\n");
+    echo 'Handbuch auf Englisch: ' . count($en) . " Seiten → $enFile\n";
 }
 
 if (isset($opt['site'])) {
