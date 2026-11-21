@@ -71,8 +71,8 @@ With the source **Posts of this WordPress site**, the {bereich.news} are posts o
 - Pictures no longer in any block are deleted by the app when saving, as is a replaced or removed cover image.
 - For each block you choose **For everyone who sees the page** or **Members only**. Members-only blocks and their pictures are missing without logging in and for guests.
 - If an {rolle.admin} switches the source back to a website or a feed, the posts disappear from the app but stay stored. With **Write in the app** they are back.
-- The right for this is called **Write {bereich.news}**. With the source **Write in the app**, and with WordPress also with **Posts of this WordPress site**, the app creates the role “Manage {bereich.news}”; an {rolle.admin} assigns it.
-- With WordPress the right gives you the permissions for all posts in the WordPress editor: write, change, publish, delete and upload pictures to the media library. Pages of the website, new categories and the other WordPress settings are not included.
+- The permission for this is called **Write {bereich.news}**. With the source **Write in the app**, and with WordPress also with **Posts of this WordPress site**, the app creates the role “Manage {bereich.news}”; an {rolle.admin} assigns it.
+- With WordPress the permission gives you the permissions for all posts in the WordPress editor: write, change, publish, delete and upload pictures to the media library. Pages of the website, new categories and the other WordPress settings are not included.
 - If you are not logged in in the editor window (this can happen with an app installed on an iPhone), log in there with your account.
 
 ## See also

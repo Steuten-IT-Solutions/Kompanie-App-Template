@@ -33,7 +33,7 @@ Tippe unten auf **Verwaltung** und dann auf den Knopf **{bereich.lists}**.
 
 ## Gut zu wissen
 - **Nur sehen:** Mit dem Recht **{bereich.lists} sehen, drucken und als CSV laden** ohne das Recht zum Anlegen und Bearbeiten öffnest du die Listen, druckst sie und lädst sie als PDF oder CSV herunter. **Kopieren**, **Löschen** und **Neue Liste** fehlen dann.
-- Eine neue Liste hat die Spalten „Name“ (Nachname), „Vorname“ und eine breite leere Spalte „Unterschrift“. Zeilen hat sie noch keine.
+- Eine neue Liste hat die Spalten „Name“ (Nachname), „Vorname“ und eine breite leere Spalte „Unterschrift“. Zeilen hat sie noch keine. Nutzt die Person, die die Liste anlegt, die App auf Englisch, stehen diese Überschriften und „(Kopie)“ auf Englisch.
 - Alle, die {bereich.lists} pflegen dürfen, sehen und bearbeiten dieselben Listen. Andere {rolle.member} sehen die {bereich.lists} nicht.
 - Die Listen enthalten personenbezogene Daten. Vernichte Ausdrucke nach Gebrauch und lösche heruntergeladene Dateien.
 

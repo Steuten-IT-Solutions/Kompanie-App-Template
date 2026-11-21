@@ -18,7 +18,7 @@ import { useBackClose } from './backClose';
 import { setUnsaved } from './unsaved';
 import type { MemberSummary, PersonName } from './api';
 import { cacheKey as keyOf, DATA_UPDATED, dataCache, pendingPrefetch, takeFresh } from './dataCache';
-import { t, tn } from './i18n';
+import { t, tc, tn } from './i18n';
 import { noteError } from './lastError';
 import { caps } from './sharpS';
 import { emailProblem, emailSuggestion, normalizeEmail, tidyEmail } from './email';
@@ -740,7 +740,7 @@ export function AddressFields({
           maxLength: 12,
           inputMode: country && /^\d/.test(country.example) && country.code !== 'NL' && country.code !== 'GB' ? 'numeric' : 'text',
         })}
-        {input('city', t('Ort'), { autoComplete: ac('address-level2'), maxLength: CITY_MAX })}
+        {input('city', tc('Adresse', 'Ort'), { autoComplete: ac('address-level2'), maxLength: CITY_MAX })}
       </div>
     </fieldset>
   );

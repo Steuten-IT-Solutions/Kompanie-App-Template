@@ -5,7 +5,7 @@ import { formatDate, formatEuro, todayYmd } from '../format';
 import { navigate } from '../router';
 import { readSheet } from '../sheet';
 import { FileInput } from '../ui';
-import { t, tn } from '../i18n';
+import { t, tc, tn } from '../i18n';
 
 /** Felder, denen man Spalten zuordnen kann, in dieser Reihenfolge; personal = nur mit manage_personal */
 const FIELDS: { key: PassiveImportField; label: string; personal?: boolean }[] = [
@@ -15,7 +15,7 @@ const FIELDS: { key: PassiveImportField; label: string; personal?: boolean }[] =
   { key: 'house_number', label: t('Hausnummer'), personal: true },
   { key: 'extra', label: t('Adresszusatz'), personal: true },
   { key: 'postal_code', label: t('PLZ'), personal: true },
-  { key: 'city', label: t('Ort'), personal: true },
+  { key: 'city', label: tc('Adresse', 'Ort'), personal: true },
   { key: 'country', label: t('Land'), personal: true },
   { key: 'phone', label: t('Telefon'), personal: true },
   { key: 'email', label: t('E-Mail-Adresse'), personal: true },
