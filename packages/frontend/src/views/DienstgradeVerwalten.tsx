@@ -12,6 +12,7 @@ import { notePromotions } from '../promotionsDue';
 import { sources } from '../viewData';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
+import { localeTag } from '../i18n';
 
 const rank = brand.labels.rank;
 const sec = brand.labels.sections;
@@ -207,7 +208,7 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
                     {!r.active && <span className="badge badge-level-guest">inaktiv</span>}
                   </div>
                   <div className="row-sub">
-                    {r.min_points !== null ? `ab ${r.min_points.toLocaleString('de-DE')} ${sec.points}` : 'ohne Schwelle'}
+                    {r.min_points !== null ? `ab ${r.min_points.toLocaleString(localeTag())} ${sec.points}` : 'ohne Schwelle'}
                     {' · '}
                     {r.assigned ? `${r.assigned}× vergeben` : 'nicht vergeben'}
                   </div>
@@ -384,12 +385,12 @@ export function Promotions() {
                     <div className="row-title">{p.name}</div>
                     <div className="row-sub">
                       {p.rank ? <RankLabel url={p.rank.badge_url} title={p.rank.title} /> : `Kein ${rank}`} ·{' '}
-                      {p.points.toLocaleString('de-DE')} {sec.points}
+                      {p.points.toLocaleString(localeTag())} {sec.points}
                       {p.next_rank &&
                         p.points_to_next !== null &&
                         (due
                           ? ` · Schwelle für „${p.next_rank.title}“ erreicht${p.threshold_reached_since ? ` seit ${formatDate(p.threshold_reached_since)}` : ''}`
-                          : ` · noch ${p.points_to_next.toLocaleString('de-DE')} bis „${p.next_rank.title}“`)}
+                          : ` · noch ${p.points_to_next.toLocaleString(localeTag())} bis „${p.next_rank.title}“`)}
                     </div>
                   </div>
                   <span className="chevron" aria-hidden="true">
@@ -501,7 +502,7 @@ export function MemberRank({
             ·{' '}
             {status.points_to_next <= 0
               ? `Schwelle für „${status.next_rank.title}“ erreicht${status.threshold_reached_since ? ` seit ${formatDate(status.threshold_reached_since)}` : ''}`
-              : `noch ${status.points_to_next.toLocaleString('de-DE')} ${sec.points} bis „${status.next_rank.title}“`}
+              : `noch ${status.points_to_next.toLocaleString(localeTag())} ${sec.points} bis „${status.next_rank.title}“`}
           </span>
         )}
       </p>
@@ -517,7 +518,7 @@ export function MemberRank({
               {options.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.title}
-                  {points && r.min_points !== null ? ` (ab ${r.min_points.toLocaleString('de-DE')})` : ''}
+                  {points && r.min_points !== null ? ` (ab ${r.min_points.toLocaleString(localeTag())})` : ''}
                 </option>
               ))}
               {status.rank && <option value="none">Kein {rank}</option>}

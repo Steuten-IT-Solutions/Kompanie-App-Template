@@ -11,10 +11,11 @@ import { PUBLIC_PREVIEW, startPreview } from '../preview';
 import { Caps, ErrorBox, Loading, useAsync } from '../ui';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
+import { localeTag } from '../i18n';
 
 const sec = brand.labels.sections;
 
-const factorText = (f: number) => `×${f.toLocaleString('de-DE')}`;
+const factorText = (f: number) => `×${f.toLocaleString(localeTag())}`;
 
 /**
  * Einstellungen → Rollen (Issue #28): Rollen anlegen, umbenennen, Rechte und Punktefaktor festlegen, ordnen (per
@@ -251,7 +252,7 @@ function RoleForm({
   const [capabilities, setCapabilities] = useState<Set<Capability>>(
     () => new Set(role?.capabilities ?? roles.find((r) => r.key === 'member')?.capabilities ?? ['member']),
   );
-  const [factor, setFactor] = useState((role?.points_factor ?? 1).toLocaleString('de-DE'));
+  const [factor, setFactor] = useState((role?.points_factor ?? 1).toLocaleString(localeTag()));
   const [newAccounts, setNewAccounts] = useState(role?.new_accounts ?? false);
   // Anwärter-Rolle (Aufnahmen): als Grundrolle oder Zusatzrolle; ein Haken. Ohne „Gehört zur Kompanie“ zusätzlich
   // promotable (Grundrolle → Mitglied wie bisher), sonst nur admission_extra. Dazu die Voraussetzung.

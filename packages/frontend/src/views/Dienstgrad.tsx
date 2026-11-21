@@ -6,6 +6,7 @@ import { IconButton } from '../icons';
 import { RankBadge, RankLabel } from '../RankBadge';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
+import { localeTag } from '../i18n';
 
 const rank = brand.labels.rank;
 const sec = brand.labels.sections;
@@ -45,7 +46,7 @@ export default function Dienstgrad() {
                 </span>
               ) : (
                 <span>
-                  Noch <strong>{missing.toLocaleString('de-DE')}</strong> {sec.points} bis „{next.title}“.
+                  Noch <strong>{missing.toLocaleString(localeTag())}</strong> {sec.points} bis „{next.title}“.
                 </span>
               )}
             </div>
@@ -64,7 +65,7 @@ export default function Dienstgrad() {
               </div>
               {r.id === d.rank?.id && <div className="row-sub">Dein {rank}</div>}
             </div>
-            {withPoints && r.min_points !== null && <div className="row-value">ab {r.min_points.toLocaleString('de-DE')}</div>}
+            {withPoints && r.min_points !== null && <div className="row-value">ab {r.min_points.toLocaleString(localeTag())}</div>}
           </li>
         ))}
       </ul>
@@ -130,7 +131,7 @@ export function RankHistory({
             <div className="row-sub">
               {formatUtcDate(h.changed_at)}
               {h.changed_by_name && ` · von ${h.changed_by_name}`}
-              {h.points_at_change !== null && ` · ${h.points_at_change.toLocaleString('de-DE')} ${sec.points}`}
+              {h.points_at_change !== null && ` · ${h.points_at_change.toLocaleString(localeTag())} ${sec.points}`}
               {h.reason && ` · ${h.reason}`}
             </div>
             {edit && h.id !== undefined && editing === h.id && (

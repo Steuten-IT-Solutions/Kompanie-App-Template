@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { api, can, type InventoryInput, type InventoryItem, type InventoryLogEntry } from '../api';
 import brand from '../generated/brand';
-import { formatShortTime } from '../format';
+import { formatNumber, formatShortTime } from '../format';
 import { navigate } from '../router';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
@@ -14,7 +14,7 @@ import { IconButton } from '../icons';
 
 const sec = brand.labels.sections;
 
-const numberFmt = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 3 });
+const numberFmt = { format: (n: number) => formatNumber(n, { maximumFractionDigits: 3 }) };
 
 /** Menge mit Einheit, z. B. „2,5 kg“. */
 export function formatQuantity(quantity: number, unit: string | null): string {
