@@ -1241,7 +1241,8 @@ export interface NewsItem {
   updated_by_name?: string | null;
   /** Beiträge der WordPress-Seite, nur mit manage_news: Adresse im Editor von WordPress; fehlt sonst */
   edit_url?: string | null;
-  /** News in der App: fehlt etwas in der Sprache der App, all oder some (dann steht dort Deutsch) */
+  /** Fehlt etwas in der Sprache der App, all oder some (dann steht dort Deutsch); Beiträge der Webseite: ohne Übersetzung
+   * in Polylang, andere Webseite oder RSS immer all */
   untranslated?: 'all' | 'some';
   /** Nur mit newsSource: Fassungen je weiterer Sprache zum Bearbeiten */
   translations?: Record<string, { title: string; blocks: BlockTranslation }>;

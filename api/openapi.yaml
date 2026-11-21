@@ -11060,7 +11060,7 @@ components:
             description: 'Nur Einzelansicht, WordPress mit Quelle site, mit manage_news: Adresse des Beitrags im Editor von WordPress',
           }
         untranslated:
-          { type: string, enum: [all, some], description: 'Nur Einzelansicht, Quelle app, in einer weiteren Sprache, wenn dort etwas fehlt' }
+          { type: string, enum: [all, some], description: 'In einer weiteren Sprache (X-Kompanie-Lang), wenn dort etwas fehlt (dann deutsch). Quelle app: nur Einzelansicht. Beiträge der WordPress-Seite: all ohne veröffentlichte Übersetzung in Polylang (ohne Polylang immer). Andere Webseite oder RSS: immer all' }
         translations:
           type: object
           description: 'Nur mit source bzw. nach PATCH mit translations: Fassungen je weiterer Sprache'

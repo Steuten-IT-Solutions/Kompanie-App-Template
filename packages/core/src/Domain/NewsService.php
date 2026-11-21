@@ -146,7 +146,22 @@ final class NewsService
     public function page(int $page, int $perPage): array
     {
         $source = $this->source();
-        return $source->available() ? $source->page($page, $perPage) : ['items' => [], 'totalPages' => 0];
+        $out = $source->available() ? $source->page($page, $perPage) : ['items' => [], 'totalPages' => 0];
+        if ($this->remoteGerman()) {
+            foreach ($out['items'] as $i => $item) {
+                $out['items'][$i] += ['untranslated' => ContentTranslations::NONE];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Beiträge einer anderen WordPress-Seite oder eines RSS-Feeds gibt es nur auf Deutsch (Plan „Mehrsprachigkeit“,
+     * PR 9f): In einer weiteren Sprache tragen sie den Hinweis „Nur auf Deutsch verfügbar“.
+     */
+    private function remoteGerman(): bool
+    {
+        return !$this->inApp() && $this->app->news instanceof RemoteNewsSource && $this->app->contentTranslations()->current() !== null;
     }
 
     /**
@@ -163,6 +178,9 @@ final class NewsService
         $item = $news->available() ? ($german ? I18n::in(I18n::SOURCE_LOCALE, static fn (): ?array => $news->item($key)) : $news->item($key)) : null;
         if ($item === null) {
             throw ApiError::notFound(I18n::t('Beitrag nicht gefunden.'));
+        }
+        if ($this->remoteGerman()) {
+            $item += ['untranslated' => ContentTranslations::NONE];
         }
         if ($this->inApp()) {
             $row = $this->appSource()->row((int) $key) ?? [];
