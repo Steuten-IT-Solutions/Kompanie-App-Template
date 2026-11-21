@@ -9,6 +9,8 @@
 //   Benachrichtigungen zeigen (MDN: PushManager und Notification fehlen in der Android-WebView).
 // Vivaldi meldet sich wie Chrome und lässt sich nicht unterscheiden.
 
+import { t } from './i18n';
+
 export type AndroidBrowser = 'chrome' | 'samsung' | 'edge' | 'firefox' | 'opera' | 'brave' | 'webview' | 'other';
 
 /** Nur für Android-Geräte sinnvoll; `brave` ist navigator.brave (gibt es nur in Brave). */
@@ -33,8 +35,8 @@ export const BROWSER_NAMES: Record<AndroidBrowser, string> = {
   firefox: 'Firefox',
   opera: 'Opera',
   brave: 'Brave',
-  webview: 'der eingebaute Browser einer anderen App',
-  other: 'dieser Browser',
+  webview: t('der eingebaute Browser einer anderen App'),
+  other: t('dieser Browser'),
 };
 
 /** Legt dieser Browser nur eine Verknüpfung an statt einer echten App? */

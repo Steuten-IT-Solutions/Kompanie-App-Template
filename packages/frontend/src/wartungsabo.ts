@@ -2,6 +2,7 @@
  * Wartungsabo laut Update-Liste (UpdateStatus.maintenance): Text für Admins unter Einstellungen → Zustand und Updates.
  * Nach dem Ende gibt es keine neuen Versionen mehr, auch keine Sicherheitsupdates; die App läuft weiter.
  */
+import { t } from './i18n';
 
 /** JJJJ-MM-TT → TT.MM.JJJJ (ohne Zeitzone: das Datum steht so in der Liste) */
 export function dayText(iso: string): string {
@@ -12,9 +13,12 @@ export function dayText(iso: string): string {
 /** null = keine Angabe (nichts anzeigen) */
 export function maintenanceText(maintenance: string | null | undefined, ended: boolean | undefined): string | null {
   if (!maintenance) return null;
-  if (maintenance === 'unbefristet') return 'Wartung: unbefristet.';
+  if (maintenance === 'unbefristet') return t('Wartung: unbefristet.');
   if (ended) {
-    return `Das Wartungsabo ist am ${dayText(maintenance)} abgelaufen. Die App läuft mit dieser Version weiter; neue Versionen, auch Sicherheitsupdates, gibt es erst nach einer Verlängerung.`;
+    return t(
+      'Das Wartungsabo ist am {date} abgelaufen. Die App läuft mit dieser Version weiter; neue Versionen, auch Sicherheitsupdates, gibt es erst nach einer Verlängerung.',
+      { date: dayText(maintenance) },
+    );
   }
-  return `Wartung bis ${dayText(maintenance)}. Bis dahin bekommt die App neue Versionen.`;
+  return t('Wartung bis {date}. Bis dahin bekommt die App neue Versionen.', { date: dayText(maintenance) });
 }

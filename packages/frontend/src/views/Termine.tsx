@@ -6,6 +6,7 @@ import { birthdaysVisible, UpcomingBirthdays, UpcomingBirthdaysCard, useUpcoming
 import { navigate } from '../router';
 import { eventEnd, eventStart, formatEventWhen, formatMonth, shortMonth } from '../format';
 import { downloadIcs } from '../ics';
+import { t } from '../i18n';
 import { mapLinkTarget, mapPlatform, mapSearchUrl } from '../address';
 import { useFocusEntry } from '../focus';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
@@ -83,7 +84,7 @@ function EventList({ focus }: { focus?: string }) {
             onClick={() => navigate('termine/kalender')}
             {...prefetchOnTap(sources.calendarEntries)}
           >
-            Internen Kalender verwalten
+            {t('Internen Kalender verwalten')}
           </button>
         )}
         {canManage && (
@@ -92,13 +93,13 @@ function EventList({ focus }: { focus?: string }) {
             onClick={() => navigate('termine/verwalten')}
             {...prefetchOnTap(sources.events)}
           >
-            Öffentliche Termine verwalten
+            {t('Öffentliche Termine verwalten')}
           </button>
         )}
       </>
     ) : null;
 
-  const notify = <GuestPushButton label="Bei neuen Terminen benachrichtigen" />;
+  const notify = <GuestPushButton label={t('Bei neuen Terminen benachrichtigen')} />;
 
   if ((loading && !data) || (showBirthdays && upcoming.loading && !upcoming.data)) return <Loading shape="events" />;
   if (error)
@@ -113,7 +114,7 @@ function EventList({ focus }: { focus?: string }) {
       <>
         {birthdays}
         {manage}
-        <Empty>Zurzeit steht nichts an.</Empty>
+        <Empty>{t('Zurzeit steht nichts an.')}</Empty>
         {notify}
       </>
     );
@@ -161,16 +162,16 @@ function EventList({ focus }: { focus?: string }) {
                       <ResponseDetails ev={ev} onChange={replace} />
                       <div className="event-actions">
                         <button className="btn btn-secondary" onClick={() => downloadIcs(ev)}>
-                          In meinen Kalender
+                          {t('In meinen Kalender')}
                         </button>
                         {ev.url && (
                           <a className="btn btn-secondary" href={ev.url} target="_blank" rel="noreferrer">
-                            Mehr Infos
+                            {t('Mehr Infos')}
                           </a>
                         )}
                         {map && (
                           <a className="btn btn-secondary" href={map} {...mapLinkTarget(map)}>
-                            Karte
+                            {t('Karte')}
                           </a>
                         )}
                       </div>
@@ -221,9 +222,9 @@ function KindPicker({ ev, onChange }: { ev: CalendarEvent; onChange: (id: string
       <CollapsibleKindChecks id={listId} value={shown} disabled={busy} onChange={(kinds) => void choose(kinds)} />
       {current.length === 0 && suggestions.length > 0 && (
         <p className="small muted">
-          Vorschlag aus dem Titel: {suggestions.join(', ')}.{' '}
+          {t('Vorschlag aus dem Titel: {kinds}.', { kinds: suggestions.join(', ') })}{' '}
           <button type="button" className="btn btn-link inline-link" disabled={busy} onClick={() => void choose(suggestions)}>
-            Übernehmen
+            {t('Übernehmen')}
           </button>
         </p>
       )}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
+import { t } from './i18n';
 
 /** Laufender Zug: welcher Eintrag, wohin er fiele und wie weit er verschoben ist (Bildschirm-Pixel). */
 type Drag = { from: number; to: number; dy: number };
@@ -189,8 +190,8 @@ export function useDragSort<T>(items: T[], onMove: (next: T[]) => void, disabled
       <button
         type="button"
         className="drag-handle"
-        aria-label={`${name} verschieben (ziehen oder Pfeiltasten)`}
-        title="Zum Verschieben ziehen"
+        aria-label={t('{name} verschieben (ziehen oder Pfeiltasten)', { name })}
+        title={t('Zum Verschieben ziehen')}
         onPointerDown={(e) => onPointerDown(index, e)}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

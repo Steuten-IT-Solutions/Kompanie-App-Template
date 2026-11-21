@@ -4,9 +4,9 @@ import brand from '../generated/brand';
 import { formatDate, formatUtcDate, todayYmd } from '../format';
 import { IconButton } from '../icons';
 import { RankBadge, RankLabel } from '../RankBadge';
-import { Empty, ErrorBox, Loading, useAsync } from '../ui';
+import { Empty, ErrorBox, Loading, rich, useAsync } from '../ui';
 import { sources } from '../viewData';
-import { localeTag } from '../i18n';
+import { localeTag, t } from '../i18n';
 
 const rank = brand.labels.rank;
 const sec = brand.labels.sections;
@@ -30,32 +30,44 @@ export default function Dienstgrad() {
         </div>
       )}
       <div className="card rank-card rank-progress">
-        <div className="rank-card-label">Mein {rank}</div>
-        <div className="rank-card-title">{d.rank?.title ?? `Noch kein ${rank}`}</div>
+        <div className="rank-card-label">{t('Mein {rank}', { rank })}</div>
+        <div className="rank-card-title">{d.rank?.title ?? t('Noch kein {rank}', { rank })}</div>
         {withPoints && next && missing !== null && (
           <>
             {progress !== null && (
-              <progress className="progress" value={Math.round(progress * 100)} max={100} aria-label={`Fortschritt bis ${next.title}`} />
+              <progress
+                className="progress"
+                value={Math.round(progress * 100)}
+                max={100}
+                aria-label={t('Fortschritt bis {title}', { title: next.title })}
+              />
             )}
             <div className={`rank-next${next.badge_url ? ' with-badge' : ''}`}>
               <RankBadge url={next.badge_url} title={next.title} size="small" />
               {missing <= 0 ? (
                 <span>
-                  {sec.points} für „{next.title}“ erreicht
-                  {d.threshold_reached_since ? ` (seit ${formatDate(d.threshold_reached_since)})` : ''} – die Beförderung steht noch aus.
+                  {d.threshold_reached_since
+                    ? t('{points} für „{title}“ erreicht (seit {date}) – die Beförderung steht noch aus.', {
+                        points: sec.points,
+                        title: next.title,
+                        date: formatDate(d.threshold_reached_since),
+                      })
+                    : t('{points} für „{title}“ erreicht – die Beförderung steht noch aus.', { points: sec.points, title: next.title })}
                 </span>
               ) : (
                 <span>
-                  Noch <strong>{missing.toLocaleString(localeTag())}</strong> {sec.points} bis „{next.title}“.
+                  {rich(t('Noch {count} {points} bis „{title}“.', { points: sec.points, title: next.title }), {
+                    count: <strong>{missing.toLocaleString(localeTag())}</strong>,
+                  })}
                 </span>
               )}
             </div>
           </>
         )}
-        {withPoints && !next && d.rank && <div className="rank-next">Das ist der höchste {rank}.</div>}
+        {withPoints && !next && d.rank && <div className="rank-next">{t('Das ist der höchste {rank}.', { rank })}</div>}
       </div>
 
-      <h2 className="section-title">Alle {sec.ranks}</h2>
+      <h2 className="section-title">{t('Alle {ranks}', { ranks: sec.ranks })}</h2>
       <ul className="card-list rank-list">
         {d.ranks.map((r) => (
           <li key={r.id} className={`card row${r.id === d.rank?.id ? ' rank-mine' : ''}`}>
@@ -63,20 +75,26 @@ export default function Dienstgrad() {
               <div className="row-title">
                 <RankLabel url={r.badge_url} title={r.title} />
               </div>
-              {r.id === d.rank?.id && <div className="row-sub">Dein {rank}</div>}
+              {r.id === d.rank?.id && <div className="row-sub">{t('Dein {rank}', { rank })}</div>}
             </div>
-            {withPoints && r.min_points !== null && <div className="row-value">ab {r.min_points.toLocaleString(localeTag())}</div>}
+            {withPoints && r.min_points !== null && (
+              <div className="row-value">{t('ab {count}', { count: r.min_points.toLocaleString(localeTag()) })}</div>
+            )}
           </li>
         ))}
       </ul>
 
-      <h2 className="section-title">Verlauf</h2>
+      <h2 className="section-title">{t('Verlauf')}</h2>
       <RankHistory entries={d.history} />
     </div>
   );
 }
 
-const KIND: Record<RankHistoryEntry['kind'], string> = { promotion: 'Beförderung', demotion: 'Degradierung', initial: 'Ersteinstufung' };
+const KIND: Record<RankHistoryEntry['kind'], string> = {
+  promotion: t('Beförderung'),
+  demotion: t('Degradierung'),
+  initial: t('Ersteinstufung'),
+};
 
 /** Tag eines UTC-Zeitpunkts in Ortszeit als JJJJ-MM-TT (für das Datumsfeld). */
 function localYmd(utc: string): string {
@@ -100,7 +118,7 @@ export function RankHistory({
   const [date, setDate] = useState('');
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  if (entries.length === 0) return <Empty>Noch keine Einträge.</Empty>;
+  if (entries.length === 0) return <Empty>{t('Noch keine Einträge.')}</Empty>;
 
   async function save(e: FormEvent, entryId: number) {
     e.preventDefault();
@@ -109,7 +127,7 @@ export function RankHistory({
     setFormError(null);
     try {
       await api.setRankHistoryDate(edit.memberId, entryId, date);
-      edit.onToast('Datum geändert');
+      edit.onToast(t('Datum geändert'));
       setEditing(null);
       edit.onChanged();
     } catch (err) {
@@ -126,18 +144,18 @@ export function RankHistory({
           {h.to && <RankBadge url={h.to_badge_url} title={h.to} size="small" />}
           <div className="row-main">
             <div className="row-title">
-              {KIND[h.kind]}: {h.from ?? `kein ${rank}`} → {h.to ?? `kein ${rank}`}
+              {KIND[h.kind]}: {h.from ?? t('kein {rank}', { rank })} → {h.to ?? t('kein {rank}', { rank })}
             </div>
             <div className="row-sub">
               {formatUtcDate(h.changed_at)}
-              {h.changed_by_name && ` · von ${h.changed_by_name}`}
+              {h.changed_by_name && ` · ${t('von {name}', { name: h.changed_by_name })}`}
               {h.points_at_change !== null && ` · ${h.points_at_change.toLocaleString(localeTag())} ${sec.points}`}
               {h.reason && ` · ${h.reason}`}
             </div>
             {edit && h.id !== undefined && editing === h.id && (
               <form className="form rank-history-date" onSubmit={(e) => save(e, h.id!)}>
                 <label className="field">
-                  <span>Neues Datum</span>
+                  <span>{t('Neues Datum')}</span>
                   <input type="date" max={todayYmd()} value={date} onChange={(e) => setDate(e.target.value)} required />
                 </label>
                 {formError && (
@@ -146,10 +164,10 @@ export function RankHistory({
                   </p>
                 )}
                 <button className="btn btn-block" type="submit" disabled={busy || date === ''}>
-                  Datum speichern
+                  {t('Datum speichern')}
                 </button>
                 <button type="button" className="btn btn-secondary btn-block" disabled={busy} onClick={() => setEditing(null)}>
-                  Abbrechen
+                  {t('Abbrechen')}
                 </button>
               </form>
             )}
@@ -157,7 +175,7 @@ export function RankHistory({
               <div className="row-actions icon-row">
                 <IconButton
                   icon="edit"
-                  label="Datum ändern"
+                  label={t('Datum ändern')}
                   disabled={busy}
                   onClick={() => {
                     setDate(localYmd(h.changed_at));

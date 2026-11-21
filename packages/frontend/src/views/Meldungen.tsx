@@ -1,16 +1,16 @@
 import { useState } from 'react';
 import { api, applyOpenReports, can, type ReportStatus, type ReviewReport } from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
-import { localeTag } from '../i18n';
+import { localeTag, t } from '../i18n';
 
 /** Zeitpunkt einer Meldung (Unix-Zeit) in Ortszeit */
 export const reportTime = (unix: number): string =>
   new Date(unix * 1000).toLocaleString(localeTag(), { dateStyle: 'medium', timeStyle: 'short' });
 
 export const REPORT_STATUS: Record<ReportStatus, string> = {
-  open: 'offen',
-  closed: 'geschlossen',
-  forwarded: 'an die Betreuer weitergeleitet',
+  open: t('offen'),
+  closed: t('geschlossen'),
+  forwarded: t('an die Betreuer weitergeleitet'),
 };
 
 /**
@@ -33,15 +33,16 @@ export function Meldungen({ onToast }: { onToast: (msg: string) => void }) {
   };
   return (
     <div className="reports-review">
-      <h2 className="section-title">Fehlermeldungen</h2>
+      <h2 className="section-title">{t('Fehlermeldungen')}</h2>
       {can('review_reports') && !list.forward && (
         <p className="muted small">
-          In dieser App ist kein Empfänger für Fehlermeldungen eingerichtet. Ihr könnt Meldungen lesen und schließen, aber nicht an die
-          Betreuer der App weiterleiten.
+          {t(
+            'In dieser App ist kein Empfänger für Fehlermeldungen eingerichtet. Ihr könnt Meldungen lesen und schließen, aber nicht an die Betreuer der App weiterleiten.',
+          )}
         </p>
       )}
       {open.length === 0 ? (
-        <p className="muted">Zurzeit ist keine Meldung offen.</p>
+        <p className="muted">{t('Zurzeit ist keine Meldung offen.')}</p>
       ) : (
         <ul className="card-list">
           {open.map((r) => (
@@ -53,7 +54,7 @@ export function Meldungen({ onToast }: { onToast: (msg: string) => void }) {
       )}
       {done.length > 0 && (
         <>
-          <h3 className="section-title">Erledigt</h3>
+          <h3 className="section-title">{t('Erledigt')}</h3>
           <ul className="card-list">
             {done.map((r) => (
               <li key={r.id}>
@@ -64,8 +65,9 @@ export function Meldungen({ onToast }: { onToast: (msg: string) => void }) {
         </>
       )}
       <p className="muted small">
-        Erledigte Meldungen werden nach 30 Tagen gelöscht. Wer angemeldet gemeldet hat, sieht unter ? → Fehler melden, ob die Meldung
-        weitergeleitet ist, und eure Begründung beim Schließen.
+        {t(
+          'Erledigte Meldungen werden nach 30 Tagen gelöscht. Wer angemeldet gemeldet hat, sieht unter ? → Fehler melden, ob die Meldung weitergeleitet ist, und eure Begründung beim Schließen.',
+        )}
       </p>
     </div>
   );
@@ -112,64 +114,65 @@ function ReportCard({
     }
   }
   const close = () => {
-    if (reason.trim() === '') return setError('Bitte schreibe kurz, warum die Meldung geschlossen wird.');
-    return run(async () => [await api.closeReport(r.id, reason.trim()), 'Meldung geschlossen']);
+    if (reason.trim() === '') return setError(t('Bitte schreibe kurz, warum die Meldung geschlossen wird.'));
+    return run(async () => [await api.closeReport(r.id, reason.trim()), t('Meldung geschlossen')]);
   };
   const send = () => {
-    if (!window.confirm('Meldung an die Betreuer der App weiterleiten? Dort wird daraus ein Eintrag zur Bearbeitung.')) return;
-    return run(async () => [await api.forwardReport(r.id), 'Meldung weitergeleitet']);
+    if (!window.confirm(t('Meldung an die Betreuer der App weiterleiten? Dort wird daraus ein Eintrag zur Bearbeitung.'))) return;
+    return run(async () => [await api.forwardReport(r.id), t('Meldung weitergeleitet')]);
   };
 
   return (
     <div className="card report-review">
-      <div className="row-title">{r.name ?? 'Ohne Anmeldung'}</div>
+      <div className="row-title">{r.name ?? t('Ohne Anmeldung')}</div>
       <div className="row-sub">
         {reportTime(r.created)} · {r.role}
-        {!isOpen && ` · ${REPORT_STATUS[r.status]}${r.reviewed_by ? ` von ${r.reviewed_by}` : ''}`}
+        {!isOpen &&
+          ` · ${r.reviewed_by ? t('{status} von {name}', { status: REPORT_STATUS[r.status], name: r.reviewed_by }) : REPORT_STATUS[r.status]}`}
       </div>
       <p className="report-text">{r.description}</p>
       {r.expected && (
         <p className="report-text">
-          <span className="muted small">Erwartet: </span>
+          <span className="muted small">{t('Erwartet:')} </span>
           {r.expected}
         </p>
       )}
       {r.reason && (
         <p className="report-text">
-          <span className="muted small">Begründung: </span>
+          <span className="muted small">{t('Begründung:')} </span>
           {r.reason}
         </p>
       )}
       <details className="report-meta">
-        <summary className="small">Weitere Angaben</summary>
+        <summary className="small">{t('Weitere Angaben')}</summary>
         <dl>
-          <dt>Seite in der App</dt>
+          <dt>{t('Seite in der App')}</dt>
           <dd>{r.page || '–'}</dd>
-          <dt>App-Version</dt>
+          <dt>{t('App-Version')}</dt>
           <dd>
-            {r.version} ({r.variant === 'wordpress' ? 'WordPress' : 'eigenständig'})
+            {r.version} ({r.variant === 'wordpress' ? 'WordPress' : t('eigenständig')})
           </dd>
-          <dt>Gerät und Browser</dt>
+          <dt>{t('Gerät und Browser')}</dt>
           <dd>{r.user_agent || '–'}</dd>
-          <dt>Letzte Fehlermeldung der App</dt>
-          <dd>{r.last_error ?? 'keine'}</dd>
+          <dt>{t('Letzte Fehlermeldung der App')}</dt>
+          <dd>{r.last_error ?? t('keine')}</dd>
           {r.name && (
             <>
-              <dt>Name beim Weiterleiten</dt>
-              <dd>{r.share_name ? 'geht mit' : 'geht nicht mit'}</dd>
+              <dt>{t('Name beim Weiterleiten')}</dt>
+              <dd>{r.share_name ? t('geht mit') : t('geht nicht mit')}</dd>
             </>
           )}
         </dl>
       </details>
       {isOpen && r.screenshot && !shot && (
         <button type="button" className="btn btn-link" disabled={busy} onClick={showShot}>
-          Bildschirmfoto anzeigen
+          {t('Bildschirmfoto anzeigen')}
         </button>
       )}
-      {shot && <img className="report-shot-full" src={shot} alt="Bildschirmfoto zur Meldung" />}
+      {shot && <img className="report-shot-full" src={shot} alt={t('Bildschirmfoto zur Meldung')} />}
       {isOpen && closing && (
         <label className="field">
-          <span>Begründung (Pflicht, sieht die meldende Person)</span>
+          <span>{t('Begründung (Pflicht, sieht die meldende Person)')}</span>
           <textarea rows={3} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
         </label>
       )}
@@ -184,20 +187,20 @@ function ReportCard({
         (closing ? (
           <div className="row-actions">
             <button type="button" className="btn" disabled={busy} onClick={close}>
-              Schließen
+              {t('Schließen')}
             </button>
             <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setClosing(false)}>
-              Abbrechen
+              {t('Abbrechen')}
             </button>
           </div>
         ) : (
           <div className="row-actions">
             <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setClosing(true)}>
-              Schließen …
+              {t('Schließen …')}
             </button>
             {forward && (
               <button type="button" className="btn" disabled={busy} onClick={send}>
-                {busy ? 'Leitet weiter …' : 'An die Betreuer weiterleiten'}
+                {busy ? t('Leitet weiter …') : t('An die Betreuer weiterleiten')}
               </button>
             )}
           </div>

@@ -8,6 +8,7 @@
 import { jsPDF } from 'jspdf';
 import type { Report, ReportSection, ReportTable } from './api';
 import { columnWidths } from './lists';
+import { t } from './i18n';
 import { rangeLabel, reportFileName } from './report';
 import { saveFile } from './saveFile';
 
@@ -93,7 +94,7 @@ export function buildReportPdf(report: Report, meta: ReportPdfMeta, logo: string
   doc.addFileToVFS(`${REPORT_FONT}-Bold.ttf`, fonts.bold);
   doc.addFont(`${REPORT_FONT}-Bold.ttf`, REPORT_FONT, 'bold');
   const period = rangeLabel(report);
-  doc.setProperties({ title: `Bericht ${period}`, subject: meta.company, creator: meta.company });
+  doc.setProperties({ title: t('Bericht {period}', { period }), subject: meta.company, creator: meta.company });
   const color = rgb(meta.color);
   const tinted = tint(color);
   const font = (style: 'normal' | 'bold', size: number) => {
@@ -153,28 +154,30 @@ export function buildReportPdf(report: Report, meta: ReportPdfMeta, logo: string
   const bottom = () => pageH - MARGIN - FOOTER;
 
   // --- Deckblatt ---
-  y += bar('Bericht', period, true) + 4;
+  y += bar(t('Bericht'), period, true) + 4;
   font('normal', 9);
   doc.setTextColor(68, 68, 68);
   doc.text(meta.company, MARGIN, y, { baseline: 'middle' });
-  doc.text(`Erstellt am ${report.created}`, pageW - MARGIN, y, { align: 'right', baseline: 'middle' });
+  doc.text(t('Erstellt am {date}', { date: report.created }), pageW - MARGIN, y, { align: 'right', baseline: 'middle' });
   y += 10;
   doc.setTextColor(0, 0, 0);
   font('bold', 13);
-  doc.text('Inhalt', MARGIN, y, { baseline: 'middle' });
+  doc.text(t('Inhalt'), MARGIN, y, { baseline: 'middle' });
   y += 8;
   const tocY: number[] = [];
   font('normal', 11);
   for (const s of report.sections) {
     tocY.push(y);
-    doc.text(clean(s.title) + (s.dated ? '' : ' (Stand heute)'), MARGIN, y, { baseline: 'middle' });
+    doc.text(clean(s.title) + (s.dated ? '' : ' ' + t('(Stand heute)')), MARGIN, y, { baseline: 'middle' });
     y += 7;
   }
   y += 4;
   font('normal', 9);
   doc.setTextColor(68, 68, 68);
   const note: string[] = doc.splitTextToSize(
-    'Der Bericht kann persönliche Daten enthalten. Gib ihn nur an Personen weiter, die sie sehen dürfen, und lösche ihn, wenn du ihn nicht mehr brauchst.',
+    t(
+      'Der Bericht kann persönliche Daten enthalten. Gib ihn nur an Personen weiter, die sie sehen dürfen, und lösche ihn, wenn du ihn nicht mehr brauchst.',
+    ),
     pageW - 2 * MARGIN,
   );
   doc.text(note, MARGIN, y);
@@ -185,7 +188,7 @@ export function buildReportPdf(report: Report, meta: ReportPdfMeta, logo: string
   for (const s of report.sections) {
     newPage(s.landscape ? 'landscape' : 'portrait');
     sectionPages.push(doc.getNumberOfPages());
-    y += bar(s.title, s.dated ? period : `Stand heute (${report.created})`, false) + 5;
+    y += bar(s.title, s.dated ? period : t('Stand heute ({date})', { date: report.created }), false) + 5;
     s.tables.forEach((t, i) => {
       if (i > 0) y += 5;
       drawTable(s, t);
@@ -293,15 +296,17 @@ export function buildReportPdf(report: Report, meta: ReportPdfMeta, logo: string
   const pages = doc.getNumberOfPages();
   doc.setPage(1);
   font('normal', 11);
-  tocY.forEach((ty, i) => doc.text(`Seite ${sectionPages[i]}`, PAGE.portrait[0] - MARGIN, ty, { align: 'right', baseline: 'middle' }));
+  tocY.forEach((ty, i) =>
+    doc.text(t('Seite {page}', { page: sectionPages[i] }), PAGE.portrait[0] - MARGIN, ty, { align: 'right', baseline: 'middle' }),
+  );
   for (let p = 1; p <= pages; p++) {
     doc.setPage(p);
     const w = doc.internal.pageSize.getWidth();
     const h = doc.internal.pageSize.getHeight();
     font('normal', 8);
     doc.setTextColor(68, 68, 68);
-    doc.text(`${meta.company} · Bericht ${period}`, MARGIN, h - MARGIN / 2 - 1, { baseline: 'middle' });
-    doc.text(`Seite ${p} von ${pages}`, w - MARGIN, h - MARGIN / 2 - 1, { align: 'right', baseline: 'middle' });
+    doc.text(t('{company} · Bericht {period}', { company: meta.company, period }), MARGIN, h - MARGIN / 2 - 1, { baseline: 'middle' });
+    doc.text(t('Seite {page} von {pages}', { page: p, pages }), w - MARGIN, h - MARGIN / 2 - 1, { align: 'right', baseline: 'middle' });
   }
   doc.setTextColor(0, 0, 0);
   return doc;
@@ -312,5 +317,5 @@ export async function downloadReportPdf(report: Report, meta: ReportPdfMeta): Pr
   // Die Schrift ist ein eigenes, großes Teilstück: erst jetzt laden (nicht vorab gespeichert, vite.config.ts).
   const [fonts, logo] = await Promise.all([import('./reportFont'), meta.logoUrl ? logoJpeg(meta.logoUrl) : Promise.resolve(null)]);
   const blob = buildReportPdf(report, meta, logo, fonts).output('blob');
-  await saveFile(blob, reportFileName(report), { title: `Bericht ${rangeLabel(report)}`, mime: 'application/pdf' });
+  await saveFile(blob, reportFileName(report), { title: t('Bericht {period}', { period: rangeLabel(report) }), mime: 'application/pdf' });
 }

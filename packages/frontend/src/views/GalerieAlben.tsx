@@ -4,6 +4,7 @@ import { ErrorBox, Loading, useAsync } from '../ui';
 import { confirmAsk } from '../ask';
 import { InternToggle } from '../galleryIntern';
 import { VIDEO_ACCEPT, countFiles, isVideoFile, uploadAlbumVideo } from '../videoUpload';
+import { t } from '../i18n';
 
 /**
  * Alben der App und hochgeladene Bilder (Issue #285), unter Einstellungen → Galerie: Album anlegen (nur in der App),
@@ -24,7 +25,7 @@ export default function GalleryAlbums({ onToast }: { onToast: (msg: string) => v
     try {
       const a = await api.createGalleryAlbum({ title: title.trim(), year: Number(year) });
       setTitle('');
-      onToast('Album angelegt');
+      onToast(t('Album angelegt'));
       reload();
       setOpen(a.id);
     } catch (e) {
@@ -36,10 +37,10 @@ export default function GalleryAlbums({ onToast }: { onToast: (msg: string) => v
 
   return (
     <section className="card settings-section gallery-albums" id="einstellungen-galerie-alben">
-      <h3>Alben und eigene Bilder</h3>
+      <h3>{t('Alben und eigene Bilder')}</h3>
       {loading && !data && <Loading shape="text" />}
       {error && <ErrorBox message={error} onRetry={reload} />}
-      {data && data.albums.length === 0 && <p className="muted small">Noch keine Alben.</p>}
+      {data && data.albums.length === 0 && <p className="muted small">{t('Noch keine Alben.')}</p>}
       {data && data.albums.length > 0 && (
         <ul className="gallery-album-list">
           {data.albums.map((a) => (
@@ -55,7 +56,7 @@ export default function GalleryAlbums({ onToast }: { onToast: (msg: string) => v
                 </strong>
                 <span className="small muted">
                   {' '}
-                  {a.source === 'app' ? 'nur in der App' : 'aus Google Drive'} · {countLabel(a)}
+                  {a.source === 'app' ? t('nur in der App') : t('aus Google Drive')} · {countLabel(a)}
                 </span>
               </button>
               {open === a.id && <AlbumUploads album={a} onToast={onToast} onChanged={reload} onDeleted={() => setOpen(null)} />}
@@ -70,13 +71,13 @@ export default function GalleryAlbums({ onToast }: { onToast: (msg: string) => v
           void create();
         }}
       >
-        <h4>Neues Album in der App</h4>
+        <h4>{t('Neues Album in der App')}</h4>
         <label className="field">
-          <span>Titel</span>
+          <span>{t('Titel')}</span>
           <input type="text" maxLength={120} value={title} onChange={(e) => setTitle(e.target.value)} required />
         </label>
         <label className="field">
-          <span>Jahr</span>
+          <span>{t('Jahr')}</span>
           <input type="number" min={1800} value={year} onChange={(e) => setYear(e.target.value)} required />
         </label>
         {formError && (
@@ -85,7 +86,7 @@ export default function GalleryAlbums({ onToast }: { onToast: (msg: string) => v
           </p>
         )}
         <button className="btn btn-secondary" type="submit" disabled={busy}>
-          Album anlegen
+          {t('Album anlegen')}
         </button>
       </form>
     </section>
@@ -94,8 +95,8 @@ export default function GalleryAlbums({ onToast }: { onToast: (msg: string) => v
 
 function countLabel(a: GalleryAdminAlbum): string {
   const parts = [];
-  if (a.source === 'drive') parts.push(`${a.drive_photos} aus Drive`);
-  parts.push(a.uploads === 1 ? '1 hochgeladen' : `${a.uploads} hochgeladen`);
+  if (a.source === 'drive') parts.push(t('{count} aus Drive', { count: a.drive_photos }));
+  parts.push(t('{count} hochgeladen', { count: a.uploads }));
   return parts.join(', ');
 }
 
@@ -124,14 +125,14 @@ function AlbumUploads({
     let done = 0;
     try {
       for (const f of files) {
-        const step = files.length > 1 ? ` ${done + 1} von ${files.length}` : '';
-        setProgress(`Lädt${step} …`);
+        const label = files.length > 1 ? t('Lädt {current} von {total} …', { current: done + 1, total: files.length }) : t('Lädt …');
+        setProgress(label);
         if (isVideoFile(f)) {
           setData(
             await uploadAlbumVideo(f, {
               albumId: album.id,
               intern,
-              onProgress: (share) => setProgress(`Lädt${step} … ${Math.floor(share * 100)} %`),
+              onProgress: (share) => setProgress(`${label} ${Math.floor(share * 100)} %`),
             }),
           );
         } else {
@@ -139,9 +140,10 @@ function AlbumUploads({
         }
         done++;
       }
-      onToast(`${countFiles(files)} hochgeladen`);
+      onToast(t('{files} hochgeladen', { files: countFiles(files) }));
     } catch (e) {
-      setActionError(`${done > 0 ? `${done} hochgeladen, dann: ` : ''}${(e as Error).message}`);
+      const message = (e as Error).message;
+      setActionError(done > 0 ? t('{count} hochgeladen, dann: {message}', { count: done, message }) : message);
     } finally {
       setProgress(null);
       setBusy(false);
@@ -170,16 +172,16 @@ function AlbumUploads({
       {error && <ErrorBox message={error} onRetry={reload} />}
       <label className="toggle">
         <input type="checkbox" checked={intern} onChange={(e) => setIntern(e.target.checked)} />
-        <span>Nur für Mitglieder (intern)</span>
+        <span>{t('Nur für Mitglieder (intern)')}</span>
       </label>
       <label className="btn btn-secondary">
-        {busy && progress ? progress : 'Bilder oder Videos hochladen'}
+        {busy && progress ? progress : t('Bilder oder Videos hochladen')}
         <input
           type="file"
           accept={`.jpg,.jpeg,.png,.webp,${VIDEO_ACCEPT}`}
           multiple
           hidden
-          aria-label={`Bilder oder Videos in ${album.title} hochladen`}
+          aria-label={t('Bilder oder Videos in {album} hochladen', { album: album.title })}
           disabled={busy}
           onChange={(e) => {
             const files = Array.from(e.target.files ?? []);
@@ -188,7 +190,7 @@ function AlbumUploads({
           }}
         />
       </label>
-      <p className="small muted">Bilder als JPG, PNG oder WebP, Videos als MP4 oder WebM bis 1 GB.</p>
+      <p className="small muted">{t('Bilder als JPG, PNG oder WebP, Videos als MP4 oder WebM bis 1 GB.')}</p>
       {actionError && (
         <p className="form-error small" role="alert">
           {actionError}
@@ -207,14 +209,17 @@ function AlbumUploads({
               )}
               <span className="small">
                 {p.name}
-                {p.status === 'error' && ` · ${p.error || 'ließ sich nicht aufbereiten'}`}
+                {p.status === 'error' && ` · ${p.error || t('ließ sich nicht aufbereiten')}`}
               </span>
               <InternToggle
                 checked={p.intern}
                 name={p.name}
                 disabled={busy}
                 onChange={async (next) => {
-                  const ok = await run(() => api.setGalleryPhotoIntern(p.id, next), next ? 'Jetzt nur für Mitglieder' : 'Jetzt öffentlich');
+                  const ok = await run(
+                    () => api.setGalleryPhotoIntern(p.id, next),
+                    next ? t('Jetzt nur für Mitglieder') : t('Jetzt öffentlich'),
+                  );
                   if (ok) {
                     reload();
                     onChanged();
@@ -227,15 +232,16 @@ function AlbumUploads({
                 className="btn btn-small btn-danger"
                 disabled={busy}
                 onClick={async () => {
-                  const what = p.type === 'video' ? 'Video' : 'Bild';
-                  if (!(await confirmAsk(`${what} „${p.name}“ löschen?`))) return;
-                  if (await run(() => api.deleteGalleryPhoto(p.id), `${what} gelöscht`)) {
+                  const video = p.type === 'video';
+                  const question = video ? t('Video „{name}“ löschen?', { name: p.name }) : t('Bild „{name}“ löschen?', { name: p.name });
+                  if (!(await confirmAsk(question))) return;
+                  if (await run(() => api.deleteGalleryPhoto(p.id), video ? t('Video gelöscht') : t('Bild gelöscht'))) {
                     reload();
                     onChanged();
                   }
                 }}
               >
-                Löschen
+                {t('Löschen')}
               </button>
             </li>
           ))}
@@ -246,34 +252,35 @@ function AlbumUploads({
           className="form gallery-album-edit"
           onSubmit={async (e) => {
             e.preventDefault();
-            if (await run(() => api.updateGalleryAlbum(album.id, { title: title.trim(), year: Number(year) }), 'Gespeichert')) onChanged();
+            if (await run(() => api.updateGalleryAlbum(album.id, { title: title.trim(), year: Number(year) }), t('Gespeichert')))
+              onChanged();
           }}
         >
           <label className="field">
-            <span>Titel des Albums</span>
+            <span>{t('Titel des Albums')}</span>
             <input type="text" maxLength={120} value={title} onChange={(e) => setTitle(e.target.value)} required />
           </label>
           <label className="field">
-            <span>Jahr des Albums</span>
+            <span>{t('Jahr des Albums')}</span>
             <input type="number" min={1800} value={year} onChange={(e) => setYear(e.target.value)} required />
           </label>
           <div className="button-row">
             <button className="btn btn-small btn-secondary" type="submit" disabled={busy}>
-              Album speichern
+              {t('Album speichern')}
             </button>
             <button
               type="button"
               className="btn btn-small btn-danger"
               disabled={busy}
               onClick={async () => {
-                if (!(await confirmAsk(`Album „${album.title}“ mit allen Bildern darin löschen?`))) return;
-                if (await run(() => api.deleteGalleryAlbum(album.id), 'Album gelöscht')) {
+                if (!(await confirmAsk(t('Album „{title}“ mit allen Bildern darin löschen?', { title: album.title })))) return;
+                if (await run(() => api.deleteGalleryAlbum(album.id), t('Album gelöscht'))) {
                   onDeleted();
                   onChanged();
                 }
               }}
             >
-              Album löschen
+              {t('Album löschen')}
             </button>
           </div>
         </form>

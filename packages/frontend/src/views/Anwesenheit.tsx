@@ -34,10 +34,11 @@ import {
   usePendingAttendance,
   usePendingAttendanceIds,
 } from '../attendanceSync';
+import { t, tn } from '../i18n';
 
 const sec = brand.labels.sections;
 const STATUSES: AttendanceStatus[] = ['present', 'excused', 'absent'];
-const RESPONSE_LABELS: Record<ResponseStatus, string> = { yes: 'zugesagt', no: 'abgesagt' };
+const RESPONSE_LABELS: Record<ResponseStatus, string> = { yes: t('zugesagt'), no: t('abgesagt') };
 
 /** Wer abgesagt hat und noch keinen Eintrag hat, ist als „entschuldigt“ vorausgewählt (gespeichert erst mit der Liste). */
 function withDeclines(list: AttendanceDetail, saved: Record<number, AttendanceStatus | null>) {
@@ -83,7 +84,7 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
 
   function createFree(e: FormEvent) {
     e.preventDefault();
-    if (!title.trim()) return onToast('Bitte einen Titel angeben.');
+    if (!title.trim()) return onToast(t('Bitte einen Titel angeben.'));
     void open({ source: 'free', title: title.trim(), date });
   }
 
@@ -93,37 +94,37 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
         config?.features.calendar &&
         (typeof events === 'string' ? (
           <>
-            <h3 className="section-title">Termin aus dem Kalender</h3>
+            <h3 className="section-title">{t('Termin aus dem Kalender')}</h3>
             <ErrorBox message={events} onRetry={reload} />
           </>
         ) : (
           <>
             {events.some((ev) => ev.today) && (
               <>
-                <h3 className="section-title">Heute</h3>
+                <h3 className="section-title">{t('Heute')}</h3>
                 <EventList
                   events={events.filter((ev) => ev.today).reverse()}
                   empty=""
-                  more="Weitere Termine von heute anzeigen"
+                  more={t('Weitere Termine von heute anzeigen')}
                   busy={busy}
                   onOpen={open}
                 />
               </>
             )}
-            <h3 className="section-title">Kommende Termine</h3>
-            <p className="muted small">Hier kannst du schon vorher eintragen, wer entschuldigt ist.</p>
+            <h3 className="section-title">{t('Kommende Termine')}</h3>
+            <p className="muted small">{t('Hier kannst du schon vorher eintragen, wer entschuldigt ist.')}</p>
             <EventList
               events={events.filter((ev) => ev.upcoming).reverse()}
-              empty="Im Kalender steht nichts an."
-              more="Weitere kommende Termine anzeigen"
+              empty={t('Im Kalender steht nichts an.')}
+              more={t('Weitere kommende Termine anzeigen')}
               busy={busy}
               onOpen={open}
             />
-            <h3 className="section-title">Vergangene Termine</h3>
+            <h3 className="section-title">{t('Vergangene Termine')}</h3>
             <EventList
               events={events.filter((ev) => !ev.upcoming && !ev.today)}
-              empty="In den letzten 90 Tagen stand nichts an."
-              more="Ältere Termine anzeigen"
+              empty={t('In den letzten 90 Tagen stand nichts an.')}
+              more={t('Ältere Termine anzeigen')}
               busy={busy}
               onOpen={open}
             />
@@ -132,33 +133,33 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
 
       {editable && (
         <form className="form card free-event" onSubmit={createFree}>
-          <h3>Freier Termin</h3>
-          <p className="muted small">Für Anlässe, die nicht im Kalender stehen, z. B. einen spontanen Arbeitsdienst.</p>
+          <h3>{t('Freier Termin')}</h3>
+          <p className="muted small">{t('Für Anlässe, die nicht im Kalender stehen, z. B. einen spontanen Arbeitsdienst.')}</p>
           <div className="field-row">
             <label className="field">
-              <span>Titel</span>
+              <span>{t('Titel')}</span>
               <input
                 type="text"
                 maxLength={191}
-                placeholder="z. B. Arbeitsdienst"
+                placeholder={t('z. B. Arbeitsdienst')}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
               />
             </label>
             <label className="field">
-              <span>Datum</span>
+              <span>{t('Datum')}</span>
               <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
             </label>
           </div>
           <button className="btn btn-block" type="submit" disabled={busy}>
-            {busy ? 'Legt an …' : 'Liste anlegen'}
+            {busy ? t('Legt an …') : t('Liste anlegen')}
           </button>
         </form>
       )}
 
-      <h3 className="section-title">Letzte Listen</h3>
+      <h3 className="section-title">{t('Letzte Listen')}</h3>
       {lists.length === 0 ? (
-        <Empty>Noch keine Anwesenheitslisten.</Empty>
+        <Empty>{t('Noch keine Anwesenheitslisten.')}</Empty>
       ) : (
         <ul className="card-list attendance-lists">
           {lists.map((l) => (
@@ -170,7 +171,7 @@ function Overview({ onToast }: { onToast: (msg: string) => void }) {
             >
               <div className="row-main">
                 <div className="row-title">
-                  {l.title} {pendingIds.includes(l.id) && <span className="badge badge-level-guest">Noch nicht übertragen</span>}
+                  {l.title} {pendingIds.includes(l.id) && <span className="badge badge-level-guest">{t('Noch nicht übertragen')}</span>}
                 </div>
                 <div className="row-sub">
                   {formatDate(l.date)}
@@ -221,7 +222,7 @@ function EventList({
           >
             <div className="row-main">
               <div className="row-title">
-                {ev.title} {ev.list_id && <span className="badge badge-level-guest">Liste vorhanden</span>}
+                {ev.title} {ev.list_id && <span className="badge badge-level-guest">{t('Liste vorhanden')}</span>}
               </div>
               <div className="row-sub">
                 {formatEventWhen(ev)}
@@ -299,12 +300,12 @@ function ReadOnlyList({ list }: { list: AttendanceDetail }) {
               {p.response && <div className="row-sub">{RESPONSE_LABELS[p.response]}</div>}
             </div>
             <span className={`badge ${p.status ? `attendance-col-${p.status}` : 'badge-level-guest'}`}>
-              {p.status ? ATTENDANCE_LABELS[p.status] : 'offen'}
+              {p.status ? ATTENDANCE_LABELS[p.status] : t('offen')}
             </span>
           </li>
         ))}
       </ul>
-      {list.updated_by_name && <p className="muted small">Zuletzt gespeichert von {list.updated_by_name}.</p>}
+      {list.updated_by_name && <p className="muted small">{t('Zuletzt gespeichert von {name}.', { name: list.updated_by_name })}</p>}
     </div>
   );
 }
@@ -365,7 +366,7 @@ function Editor({
 
   async function save(): Promise<boolean> {
     if (free && !title.trim()) {
-      onToast('Bitte einen Titel angeben.');
+      onToast(t('Bitte einen Titel angeben.'));
       return false;
     }
     setBusy(true);
@@ -423,13 +424,18 @@ function Editor({
   }
 
   async function remove() {
-    if (!(await confirmAsk(`Anwesenheitsliste „${list.title}“ wirklich löschen? Gebuchte ${sec.points} bleiben erhalten.`))) return;
+    if (
+      !(await confirmAsk(
+        t('Anwesenheitsliste „{title}“ wirklich löschen? Gebuchte {points} bleiben erhalten.', { title: list.title, points: sec.points }),
+      ))
+    )
+      return;
     setBusy(true);
     try {
       await api.deleteAttendance(list.id);
       attendanceOutbox.discard(list.id);
       outboxChanged();
-      onToast('Liste gelöscht');
+      onToast(t('Liste gelöscht'));
       navigate('verwaltung/anwesenheit');
     } catch (e) {
       onToast((e as Error).message);
@@ -445,11 +451,11 @@ function Editor({
       {free ? (
         <div className="field-row attendance-meta">
           <label className="field">
-            <span>Titel</span>
+            <span>{t('Titel')}</span>
             <input type="text" maxLength={191} value={title} onChange={(e) => setTitle(e.target.value)} />
           </label>
           <label className="field">
-            <span>Datum</span>
+            <span>{t('Datum')}</span>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </label>
         </div>
@@ -463,9 +469,11 @@ function Editor({
       <p className="attendance-counts" role="status">
         {countsText(counts, open)}
       </p>
-      {upcoming && <p className="muted small">Der Termin kommt erst noch. Bis dahin kannst du nur „entschuldigt“ eintragen.</p>}
+      {upcoming && <p className="muted small">{t('Der Termin kommt erst noch. Bis dahin kannst du nur „entschuldigt“ eintragen.')}</p>}
       {preselected && (
-        <p className="muted small">Wer abgesagt hat, ist als „entschuldigt“ vorausgewählt. Gespeichert ist das erst mit „Speichern“.</p>
+        <p className="muted small">
+          {t('Wer abgesagt hat, ist als „entschuldigt“ vorausgewählt. Gespeichert ist das erst mit „Speichern“.')}
+        </p>
       )}
       {declinesOpen.length > 0 && (
         <button
@@ -473,22 +481,26 @@ function Editor({
           className="btn btn-secondary btn-block attendance-declines"
           onClick={() => setStatuses({ ...statuses, ...Object.fromEntries(declinesOpen.map((p) => [p.id, 'excused' as const])) })}
         >
-          Absagen übernehmen ({declinesOpen.length})
+          {t('Absagen übernehmen ({count})', { count: declinesOpen.length })}
         </button>
       )}
       {pending && (
         <p className="attendance-pending small" role="status">
-          Noch nicht übertragen: offline gespeicherte Änderungen
-          {pendingCount(pending) > 0 && ` bei ${pendingCount(pending)} ${pendingCount(pending) === 1 ? 'Person' : 'Personen'}`}. Die App
-          sendet sie, sobald die Verbindung wieder klappt.{' '}
+          {pendingCount(pending) > 0
+            ? tn(
+                'Noch nicht übertragen: offline gespeicherte Änderungen bei {count} Person. Die App sendet sie, sobald die Verbindung wieder klappt.',
+                'Noch nicht übertragen: offline gespeicherte Änderungen bei {count} Personen. Die App sendet sie, sobald die Verbindung wieder klappt.',
+                pendingCount(pending),
+              )
+            : t('Noch nicht übertragen: offline gespeicherte Änderungen. Die App sendet sie, sobald die Verbindung wieder klappt.')}{' '}
           <button
             type="button"
             className="btn btn-link inline-link"
             onClick={() =>
-              void syncAttendance().then((r) => onToast(syncMessage(r) ?? 'Noch keine Verbindung. Die App versucht es später wieder.'))
+              void syncAttendance().then((r) => onToast(syncMessage(r) ?? t('Noch keine Verbindung. Die App versucht es später wieder.')))
             }
           >
-            Jetzt übertragen
+            {t('Jetzt übertragen')}
           </button>
         </p>
       )}
@@ -497,10 +509,10 @@ function Editor({
         <div className="picker-head">
           <input
             type="search"
-            placeholder="Person suchen …"
+            placeholder={t('Person suchen …')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            aria-label="Person suchen"
+            aria-label={t('Person suchen')}
           />
           {!upcoming && (
             <button
@@ -508,7 +520,7 @@ function Editor({
               className="btn btn-link nowrap"
               onClick={() => setStatuses({ ...statuses, ...Object.fromEntries(filtered.map((p) => [p.id, 'present' as const])) })}
             >
-              Alle anwesend
+              {t('Alle anwesend')}
             </button>
           )}
         </div>
@@ -525,16 +537,16 @@ function Editor({
             <li key={p.id} className="attendance-grid" role="radiogroup" aria-label={p.name}>
               <span className="attendance-name">
                 <span>{p.name}</span>
-                {p.booked && <span className="attendance-booked">{sec.points} gebucht</span>}
+                {p.booked && <span className="attendance-booked">{t('{points} gebucht', { points: sec.points })}</span>}
                 {list.responses_open && p.may_respond ? (
                   <select
                     className={`attendance-response attendance-response-${p.response ?? 'none'}`}
                     value={p.response ?? ''}
                     disabled={responding === p.id}
-                    aria-label={`Rückmeldung von ${p.name}`}
+                    aria-label={t('Rückmeldung von {name}', { name: p.name })}
                     onChange={(e) => void respondFor(p.id, (e.target.value || null) as ResponseStatus | null)}
                   >
-                    <option value="">keine Rückmeldung</option>
+                    <option value="">{t('keine Rückmeldung')}</option>
                     <option value="yes">{RESPONSE_LABELS.yes}</option>
                     <option value="no">{RESPONSE_LABELS.no}</option>
                   </select>
@@ -556,43 +568,45 @@ function Editor({
                     disabled={upcoming && st !== 'excused' && statuses[p.id] !== st}
                     onChange={() => setStatuses({ ...statuses, [p.id]: st })}
                     onClick={() => statuses[p.id] === st && setStatuses({ ...statuses, [p.id]: null })}
-                    aria-label={`${p.name}: ${ATTENDANCE_LABELS[st]}`}
+                    aria-label={t('{name}: {status}', { name: p.name, status: ATTENDANCE_LABELS[st] })}
                   />
                 </span>
               ))}
             </li>
           ))}
-          {filtered.length === 0 && <li className="muted">Niemand gefunden.</li>}
+          {filtered.length === 0 && <li className="muted">{t('Niemand gefunden.')}</li>}
         </ul>
       </div>
 
       <button
         className="btn btn-block attendance-save"
         disabled={busy || !dirty}
-        onClick={() => save().then((ok) => ok && onToast('Anwesenheit gespeichert'))}
+        onClick={() => save().then((ok) => ok && onToast(t('Anwesenheit gespeichert')))}
       >
-        {busy ? 'Speichert …' : dirty ? 'Speichern' : pending ? 'Auf dem Gerät gespeichert' : 'Gespeichert'}
+        {busy ? t('Speichert …') : dirty ? t('Speichern') : pending ? t('Auf dem Gerät gespeichert') : t('Gespeichert')}
       </button>
       {(points || penalties) && (
         <div className="button-row attendance-book">
           {points && (
             <button className="btn" disabled={busy || toBook === 0} onClick={() => saveAndGo('punkte')}>
-              <Caps text={sec.points} /> für {toBook} {toBook === 1 ? 'Anwesenden' : 'Anwesende'}
+              <Caps text={tn('{points} für {count} Anwesenden', '{points} für {count} Anwesende', toBook, { points: sec.points })} />
             </button>
           )}
           {penalties && (
             <button className="btn btn-warn" disabled={busy || toPenalize === 0} onClick={() => saveAndGo('strafe')}>
-              Eintrag für {toPenalize} {toPenalize === 1 ? 'Fehlenden' : 'Fehlende'}
+              {tn('Eintrag für {count} Fehlenden', 'Eintrag für {count} Fehlende', toPenalize)}
             </button>
           )}
         </div>
       )}
-      {points && toBook === 0 && presentMembers > 0 && <p className="muted small">{sec.points} für alle Anwesenden bereits gebucht.</p>}
+      {points && toBook === 0 && presentMembers > 0 && (
+        <p className="muted small">{t('{points} für alle Anwesenden bereits gebucht.', { points: sec.points })}</p>
+      )}
       <p className="muted small">
-        Tippe ein gesetztes Häkchen noch einmal an, um es zu entfernen.{' '}
-        {list.updated_by_name && <>Zuletzt gespeichert von {list.updated_by_name}. </>}
+        {t('Tippe ein gesetztes Häkchen noch einmal an, um es zu entfernen.')}{' '}
+        {list.updated_by_name && <>{t('Zuletzt gespeichert von {name}.', { name: list.updated_by_name })} </>}
         <button className="btn btn-link inline-link danger-link" disabled={busy} onClick={remove}>
-          Liste löschen
+          {t('Liste löschen')}
         </button>
       </p>
     </div>
@@ -621,7 +635,7 @@ function KindSelect({
     try {
       const saved = await api.saveAttendance({ id: list.id, kinds });
       onKinds(kindsOf(saved));
-      onToast('Terminarten gespeichert');
+      onToast(t('Terminarten gespeichert'));
     } catch (e) {
       onToast((e as Error).message);
     } finally {

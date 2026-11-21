@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { eventKinds } from './api';
+import { t } from './i18n';
 
 /** Arten eines Termins oder einer Anwesenheitsliste; ältere Server schicken nur kind (eine oder null). */
 export const kindsOf = (x: { kind?: string | null; kinds?: string[] }): string[] => x.kinds ?? (x.kind ? [x.kind] : []);
@@ -29,7 +30,7 @@ export function EventKindChecks({
   const toggle = (kind: string, on: boolean) => onChange(options.filter((k) => (k === kind ? on : value.includes(k))));
   return (
     <fieldset id={id} className={`field event-kind-checks ${className ?? ''}`}>
-      <legend className={hideLegend ? 'visually-hidden' : 'field-label'}>Terminarten</legend>
+      <legend className={hideLegend ? 'visually-hidden' : 'field-label'}>{t('Terminarten')}</legend>
       {options.map((k) => (
         <label key={k} className="toggle">
           <input type="checkbox" checked={value.includes(k)} disabled={disabled} onChange={(e) => toggle(k, e.target.checked)} />
@@ -65,12 +66,14 @@ export function CollapsibleKindChecks({
         aria-controls={id}
         onClick={() => setOpen(!open)}
       >
-        Terminarten
+        {t('Terminarten')}
         <span className="member-filters-arrow" aria-hidden="true">
           ›
         </span>
       </button>
-      {!open && <p className="small event-kind-summary">{value.length > 0 ? value.join(', ') : <span className="muted">keine</span>}</p>}
+      {!open && (
+        <p className="small event-kind-summary">{value.length > 0 ? value.join(', ') : <span className="muted">{t('keine')}</span>}</p>
+      )}
       {open && <EventKindChecks id={id} hideLegend value={value} disabled={disabled} onChange={onChange} />}
     </>
   );

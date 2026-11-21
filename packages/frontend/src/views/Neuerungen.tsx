@@ -1,7 +1,7 @@
 import { config } from '../api';
 import changelog from '../generated/changelog.json';
 import { Empty } from '../ui';
-import { localeTag } from '../i18n';
+import { localeTag, t, tn } from '../i18n';
 
 interface Version {
   version: string;
@@ -35,14 +35,14 @@ export default function Neuerungen() {
   const versionen = changelog.versionen as Version[];
   const vorab = changelog.unveroeffentlicht as string | null;
   const installiert = coreVersion();
-  if (versionen.length === 0 && !vorab) return <Empty>Noch keine Einträge.</Empty>;
+  if (versionen.length === 0 && !vorab) return <Empty>{t('Noch keine Einträge.')}</Empty>;
   const offen = vorab ? null : (versionen.find((v) => v.version === installiert) ?? versionen[0])?.version;
   return (
     <>
       {vorab && (
         <section className="card settings-section changelog-version" aria-labelledby="neu-vorab">
           <h3 id="neu-vorab">
-            Vorabversion <span className="badge badge-role">noch nicht für alle freigegeben</span>
+            {t('Vorabversion')} <span className="badge badge-role">{t('noch nicht für alle freigegeben')}</span>
           </h3>
           <div className="hilfe-text changelog-text" dangerouslySetInnerHTML={{ __html: vorab }} />
         </section>
@@ -53,11 +53,12 @@ export default function Neuerungen() {
           <details key={v.version} className="card settings-section changelog-version" open={v.version === offen}>
             <summary>
               <span className="changelog-title">
-                Version {v.version} {v.version === installiert && !vorab && <span className="badge badge-role">installiert</span>}
+                {t('Version {version}', { version: v.version })}{' '}
+                {v.version === installiert && !vorab && <span className="badge badge-role">{t('installiert')}</span>}
               </span>
               <span className="small muted">
                 {datum(v.datum)}
-                {n > 0 && ` · ${n} ${n === 1 ? 'Änderung' : 'Änderungen'}`}
+                {n > 0 && ` · ${tn('{count} Änderung', '{count} Änderungen', n)}`}
               </span>
             </summary>
             <div className="hilfe-text changelog-text" dangerouslySetInnerHTML={{ __html: v.html }} />

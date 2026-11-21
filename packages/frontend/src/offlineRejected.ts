@@ -7,6 +7,8 @@
  * Reine Logik ohne API, damit sie sich ohne Browser testen lässt.
  */
 
+import { t } from './i18n';
+
 /** Bereich in der allgemeinen Warteschlange (Speicher `kompanie-offline/abgelehnt`) */
 export const REJECTED_AREA = 'abgelehnt';
 /** Ereignis nach jeder Änderung: der Hinweis zeigt den neuen Stand. */
@@ -51,17 +53,22 @@ export function withRejected(
   return Object.fromEntries(keys.slice(0, REJECTED_MAX).map((k) => [k, next[k]]));
 }
 
-const WHAT: Record<RejectedKind, string> = {
-  attendance: 'Anwesenheit',
-  response: 'Zu- oder Absage',
-  booking: 'Buchung',
+const WHAT: Record<RejectedKind, () => string> = {
+  attendance: () => t('Anwesenheit'),
+  response: () => t('Zu- oder Absage'),
+  booking: () => t('Buchung'),
 };
 
 /** Eine Zeile für den Hinweis, z. B. „Zu- oder Absage zu „Schützenfest“: Für diesen Termin …“ */
 export function rejectedText(r: RejectedChange): string {
+  const kind = WHAT[r.kind]();
   const what =
-    r.kind === 'response' && r.label ? `${WHAT[r.kind]} zu „${r.label}“` : r.label ? `${WHAT[r.kind]} „${r.label}“` : WHAT[r.kind];
-  return `${what}: ${r.message}`;
+    r.kind === 'response' && r.label
+      ? t('{what} zu „{label}“', { what: kind, label: r.label })
+      : r.label
+        ? t('{what} „{label}“', { what: kind, label: r.label })
+        : kind;
+  return t('{what}: {message}', { what, message: r.message });
 }
 
 /** Neueste zuerst */

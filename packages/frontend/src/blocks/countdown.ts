@@ -1,5 +1,7 @@
 // Countdown-Block: Phase, angezeigte Angaben und nächster Zeitpunkt zum Neuzeichnen (ohne React, für Tests).
 
+import { tn } from '../i18n';
+
 export type CountdownPhase = 'before' | 'running' | 'after';
 export type CountdownUnit = 'day' | 'hour' | 'minute' | 'second';
 export interface CountdownPart {
@@ -43,16 +45,16 @@ export function countdownParts(ms: number): [CountdownPart, CountdownPart] {
   ];
 }
 
-const LABELS: Record<CountdownUnit, [string, string]> = {
-  day: ['Tag', 'Tage'],
-  hour: ['Stunde', 'Stunden'],
-  minute: ['Minute', 'Minuten'],
-  second: ['Sekunde', 'Sekunden'],
+const LABELS: Record<CountdownUnit, (value: number) => string> = {
+  day: (n) => tn('Tag', 'Tage', n),
+  hour: (n) => tn('Stunde', 'Stunden', n),
+  minute: (n) => tn('Minute', 'Minuten', n),
+  second: (n) => tn('Sekunde', 'Sekunden', n),
 };
 
 /** Einheit in Einzahl oder Mehrzahl („1 Tag“, „0 Tage“, „2 Tage“). */
 export function unitLabel(value: number, unit: CountdownUnit): string {
-  return LABELS[unit][value === 1 ? 0 : 1];
+  return LABELS[unit](value);
 }
 
 /**

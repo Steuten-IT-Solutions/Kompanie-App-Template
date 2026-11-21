@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import brand from '../generated/brand';
+import { t, tn } from '../i18n';
 import {
   api,
   can,
@@ -43,6 +44,21 @@ import { TileArrange, TileGrid } from '../tiles';
 
 const sec = brand.labels.sections;
 
+/**
+ * Übersetzter Satz mit einem Element (Knopf, Hervorhebung) an der Stelle des Platzhalters, z. B.
+ * withPart(t('Unter {link} trennen.'), <GoogleLink />): So bleibt der Satz als Ganzes übersetzbar.
+ */
+function withPart(text: string, part: ReactNode): ReactNode {
+  const [before, after = ''] = text.split(/\{\w+\}/);
+  return (
+    <>
+      {before}
+      {part}
+      {after}
+    </>
+  );
+}
+
 /** Seiten der Einstellungen: Adresse (#/einstellungen/<id>), Titel und ein Satz für die Übersicht. */
 /** Gruppen der Übersicht (Issue #348): Kacheln je Gruppe statt einer langen Liste. */
 const GROUPS = ['App', 'Mitglieder und Zugang', 'Benachrichtigungen', 'Verbindungen', 'Termine und Kalender', 'Betrieb'] as const;
@@ -57,22 +73,32 @@ const GROUP_KEYS: Record<(typeof GROUPS)[number], string> = {
   Betrieb: 'betrieb',
 };
 
+/** Überschriften der Gruppen in der Sprache der App. */
+const GROUP_TITLES: Record<(typeof GROUPS)[number], string> = {
+  App: t('App'),
+  'Mitglieder und Zugang': t('Mitglieder und Zugang'),
+  Benachrichtigungen: t('Benachrichtigungen'),
+  Verbindungen: t('Verbindungen'),
+  'Termine und Kalender': t('Termine und Kalender'),
+  Betrieb: t('Betrieb'),
+};
+
 const PAGES = [
-  { id: 'bereiche', group: 'App', title: 'Bereiche' },
-  { id: 'navigation', group: 'App', title: 'Navigation' },
-  { id: 'rechtliches', group: 'App', title: 'Impressum und Datenschutz' },
-  { id: 'rollen', group: 'Mitglieder und Zugang', title: 'Rollen' },
-  { id: 'benachrichtigungen', group: 'Benachrichtigungen', title: 'Benachrichtigungen' },
-  { id: 'email', group: 'Verbindungen', title: 'E-Mail' },
-  { id: 'google', group: 'Verbindungen', title: 'Google-Zugang' },
+  { id: 'bereiche', group: 'App', title: t('Bereiche') },
+  { id: 'navigation', group: 'App', title: t('Navigation') },
+  { id: 'rechtliches', group: 'App', title: t('Impressum und Datenschutz') },
+  { id: 'rollen', group: 'Mitglieder und Zugang', title: t('Rollen') },
+  { id: 'benachrichtigungen', group: 'Benachrichtigungen', title: t('Benachrichtigungen') },
+  { id: 'email', group: 'Verbindungen', title: t('E-Mail') },
+  { id: 'google', group: 'Verbindungen', title: t('Google-Zugang') },
   { id: 'galerie', group: 'Verbindungen', title: sec.gallery },
   { id: 'news', group: 'Verbindungen', title: newsTitle() },
-  { id: 'kalender', group: 'Termine und Kalender', title: 'Kalender' },
-  { id: 'zustand', group: 'Betrieb', title: 'Zustand und Updates' },
-  { id: 'datensicherung', group: 'Betrieb', title: 'Datensicherung' },
-  { id: 'wartung', group: 'Betrieb', title: 'Wartungsmodus' },
-  { id: 'nutzung', group: 'Betrieb', title: 'Nutzung' },
-  { id: 'neuerungen', group: 'Betrieb', title: 'Was ist neu' },
+  { id: 'kalender', group: 'Termine und Kalender', title: t('Kalender') },
+  { id: 'zustand', group: 'Betrieb', title: t('Zustand und Updates') },
+  { id: 'datensicherung', group: 'Betrieb', title: t('Datensicherung') },
+  { id: 'wartung', group: 'Betrieb', title: t('Wartungsmodus') },
+  { id: 'nutzung', group: 'Betrieb', title: t('Nutzung') },
+  { id: 'neuerungen', group: 'Betrieb', title: t('Was ist neu') },
 ] as const;
 
 /** Frühere eigene Seiten, jetzt Abschnitt einer anderen (Links aus Handbuch, Hinweisen und Lesezeichen gehen weiter). */
@@ -97,7 +123,7 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
   return (
     <div className="settings">
       <button type="button" className="btn btn-link back" onClick={() => navigate('einstellungen')}>
-        ‹ Einstellungen
+        ‹ {t('Einstellungen')}
       </button>
       {page.id === 'bereiche' && <Bereiche onToast={onToast} />}
       {page.id === 'navigation' && <NavigationEinstellen onToast={onToast} />}
@@ -143,8 +169,8 @@ function Overview() {
           const list = pages.filter((p) => p.group === g);
           if (list.length === 0) return null;
           return (
-            <section key={g} className="settings-group" aria-label={g}>
-              <h3 className="settings-group-title">{g}</h3>
+            <section key={g} className="settings-group" aria-label={GROUP_TITLES[g]}>
+              <h3 className="settings-group-title">{GROUP_TITLES[g]}</h3>
               <TileGrid
                 page={`einstellungen/${GROUP_KEYS[g]}`}
                 className="settings-tiles"
@@ -208,33 +234,38 @@ function Verbindung({
   return s.news ? <News key={revision} {...props} /> : null;
 }
 
-const devicesText = (n: number): string => (n === 0 ? 'an kein Gerät' : n === 1 ? 'an 1 Gerät' : `an ${n} Geräte`);
+const devicesText = (n: number): string => (n === 0 ? t('an kein Gerät') : tn('an {count} Gerät', 'an {count} Geräte', n));
 
 /** Zuletzt verschickt je Art, dazu zuletzt vom Push-Dienst angenommen bzw. abgelehnt; nichts, solange noch nichts verschickt wurde. */
 function PushLog({ log }: { log: PushAdmin['log'] }) {
   if (log.types.length === 0 && !log.accepted && !log.rejected) return null;
   return (
     <div className="push-log">
-      <h4>Zuletzt verschickt</h4>
+      <h4>{t('Zuletzt verschickt')}</h4>
       {log.types.length > 0 && (
         <ul className="small muted">
-          {log.types.map((t) => (
-            <li key={t.type}>
-              {t.label} – {formatUntil(t.at)}, {devicesText(t.devices)}
+          {log.types.map((x) => (
+            <li key={x.type}>
+              {x.label} – {formatUntil(x.at)}, {devicesText(x.devices)}
             </li>
           ))}
         </ul>
       )}
       {log.accepted && (
         <p className="small muted">
-          Zuletzt vom Push-Dienst angenommen: {formatUntil(log.accepted.at)} (
-          {log.accepted.count === 1 ? '1 Nachricht' : `${log.accepted.count} Nachrichten`}).
+          {t('Zuletzt vom Push-Dienst angenommen: {time} ({messages}).', {
+            time: formatUntil(log.accepted.at),
+            messages: tn('{count} Nachricht', '{count} Nachrichten', log.accepted.count),
+          })}
         </p>
       )}
       {log.rejected && (
         <p className="small muted">
-          Zuletzt vom Push-Dienst abgelehnt: {formatUntil(log.rejected.at)} (
-          {log.rejected.count === 1 ? '1 Nachricht' : `${log.rejected.count} Nachrichten`}, {log.rejected.reason}).
+          {t('Zuletzt vom Push-Dienst abgelehnt: {time} ({messages}, {reason}).', {
+            time: formatUntil(log.rejected.at),
+            messages: tn('{count} Nachricht', '{count} Nachrichten', log.rejected.count),
+            reason: log.rejected.reason,
+          })}
         </p>
       )}
     </div>
@@ -258,7 +289,7 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
     setSaveError(null);
     try {
       setData(await change());
-      onToast('Gespeichert');
+      onToast(t('Gespeichert'));
     } catch (err) {
       setSaveError((err as Error).message);
     } finally {
@@ -268,21 +299,28 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <section className="card settings-section" id="einstellungen-benachrichtigungen">
-      <h3>Benachrichtigungen</h3>
+      <h3>{t('Benachrichtigungen')}</h3>
       {p.supported ? (
         <p className="small muted">
-          {p.devices === 1 ? '1 Gerät' : `${p.devices} Geräte`} angemeldet ({p.accounts} {p.accounts === 1 ? 'Konto' : 'Konten'}, {p.guests}{' '}
-          {p.guests === 1 ? 'Gast' : 'Gäste'}).
-          {p.queued > 0 && ` ${p.queued} Nachrichten warten auf den Versand.`}
+          {t('{devices} angemeldet ({accounts}, {guests}).', {
+            devices: tn('{count} Gerät', '{count} Geräte', p.devices),
+            accounts: tn('{count} Konto', '{count} Konten', p.accounts),
+            guests: tn('{count} Gast', '{count} Gäste', p.guests),
+          })}
+          {p.queued > 0 && ` ${tn('{count} Nachricht wartet auf den Versand.', '{count} Nachrichten warten auf den Versand.', p.queued)}`}
         </p>
       ) : (
         <p className="small" role="alert">
-          Der Server kann keine Benachrichtigungen senden. Es fehlt: {p.missing.join(', ')}. Dein Hoster kann das in den PHP-Einstellungen
-          einschalten.
+          {t(
+            'Der Server kann keine Benachrichtigungen senden. Es fehlt: {missing}. Dein Hoster kann das in den PHP-Einstellungen einschalten.',
+            {
+              missing: p.missing.join(', '),
+            },
+          )}
         </p>
       )}
       <label className="field">
-        <span>Erinnerung an Termine am nächsten Tag ab</span>
+        <span>{t('Erinnerung an Termine am nächsten Tag ab')}</span>
         <select value={p.reminderHour} disabled={busy} onChange={(e) => save(() => api.setPushReminderHour(Number(e.target.value)))}>
           <HourOptions />
         </select>
@@ -294,7 +332,7 @@ function PushSettings({ onToast }: { onToast: (msg: string) => void }) {
         </p>
       )}
       <p className="small muted">
-        Jede Person wählt auf ihrem Gerät selbst, worüber sie benachrichtigt wird (Meins → Konto → Benachrichtigungen).
+        {t('Jede Person wählt auf ihrem Gerät selbst, worüber sie benachrichtigt wird (Meins → Konto → Benachrichtigungen).')}
       </p>
     </section>
   );
@@ -323,7 +361,7 @@ function RegistrationSection({ onToast }: { onToast: (msg: string) => void }) {
       const next = await api.setRegistrationSettings(change);
       setData(next);
       applyRegistration(next.enabled);
-      onToast('Gespeichert');
+      onToast(t('Gespeichert'));
     } catch (err) {
       setSaveError((err as Error).message);
     } finally {
@@ -333,14 +371,14 @@ function RegistrationSection({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <section className="card settings-section" id="einstellungen-zugang">
-      <h3>Zugang beantragen</h3>
+      <h3>{t('Zugang beantragen')}</h3>
       <label className="toggle">
         <input type="checkbox" checked={s.enabled} disabled={busy} onChange={(e) => save({ enabled: e.target.checked })} />
-        <span>Personen können selbst einen Zugang beantragen</span>
+        <span>{t('Personen können selbst einen Zugang beantragen')}</span>
       </label>
       {roles.length > 1 && (
         <label className="field">
-          <span>Vorgeschlagene Rolle beim Freigeben</span>
+          <span>{t('Vorgeschlagene Rolle beim Freigeben')}</span>
           <select value={s.default_role} disabled={busy} onChange={(e) => save({ default_role: e.target.value })}>
             {roles.map((r) => (
               <option key={r.key} value={r.key}>
@@ -352,24 +390,28 @@ function RegistrationSection({ onToast }: { onToast: (msg: string) => void }) {
       )}
       <p className="small muted">
         {s.email_confirmation
-          ? 'Der Mailversand ist eingerichtet: Wer einen Zugang beantragt, bestätigt zuerst die E-Mail-Adresse und erfährt das Ergebnis per Mail.'
-          : 'Ohne eingerichteten Mailversand (Einstellungen → E-Mail) wird die E-Mail-Adresse nicht geprüft. Das Ergebnis erfährt die Person, wenn sie sich anmeldet oder den Stand ihrer Anfrage prüft.'}
+          ? t(
+              'Der Mailversand ist eingerichtet: Wer einen Zugang beantragt, bestätigt zuerst die E-Mail-Adresse und erfährt das Ergebnis per Mail.',
+            )
+          : t(
+              'Ohne eingerichteten Mailversand (Einstellungen → E-Mail) wird die E-Mail-Adresse nicht geprüft. Das Ergebnis erfährt die Person, wenn sie sich anmeldet oder den Stand ihrer Anfrage prüft.',
+            )}
       </p>
       {s.enabled && (
         <div className="field">
-          <span>Link zum Formular (zum Weitergeben)</span>
+          <span>{t('Link zum Formular (zum Weitergeben)')}</span>
           <code className="settings-link-code">{s.link}</code>
           <button
             type="button"
             className="btn btn-secondary"
             onClick={() =>
               void navigator.clipboard?.writeText(s.link).then(
-                () => onToast('Link kopiert'),
-                () => onToast('Kopieren hat nicht geklappt'),
+                () => onToast(t('Link kopiert')),
+                () => onToast(t('Kopieren hat nicht geklappt')),
               )
             }
           >
-            Link kopieren
+            {t('Link kopieren')}
           </button>
         </div>
       )}
@@ -397,7 +439,7 @@ function BirthdayNotify({ onToast }: { onToast: (msg: string) => void }) {
     setSaveError(null);
     try {
       setData(await change());
-      onToast('Gespeichert');
+      onToast(t('Gespeichert'));
     } catch (err) {
       setSaveError((err as Error).message);
     } finally {
@@ -414,11 +456,11 @@ function BirthdayNotify({ onToast }: { onToast: (msg: string) => void }) {
           disabled={busy}
           onChange={(e) => save(() => api.setBirthdayNotify({ birthday_notify: e.target.checked }))}
         />
-        Am Geburtstag eines Mitglieds alle anderen benachrichtigen
+        {t('Am Geburtstag eines Mitglieds alle anderen benachrichtigen')}
       </label>
       {p.birthdays.enabled && (
         <label className="field">
-          <span>Benachrichtigung am Geburtstag ab</span>
+          <span>{t('Benachrichtigung am Geburtstag ab')}</span>
           <select
             value={p.birthdays.hour}
             disabled={busy}
@@ -442,7 +484,8 @@ function BirthdaySettingsSection({ onToast }: { onToast: (msg: string) => void }
   const { data, error, loading, reload, setData } = useAsync(() => api.birthdaySettings(), [], 'admin/birthdays');
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  if (!config?.features.birthdays) return <p className="muted">Der Bereich {sec.birthdays} ist ausgeschaltet.</p>;
+  if (!config?.features.birthdays)
+    return <p className="muted">{t('Der Bereich {section} ist ausgeschaltet.', { section: sec.birthdays })}</p>;
   if (loading && !data) return <Loading shape="form" />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
 
@@ -453,7 +496,7 @@ function BirthdaySettingsSection({ onToast }: { onToast: (msg: string) => void }
       const next = await api.setBirthdayUpcomingDays(days);
       setData(next);
       applyBirthdayUpcomingDays(next.upcoming_days);
-      onToast('Gespeichert');
+      onToast(t('Gespeichert'));
     } catch (err) {
       setSaveError((err as Error).message);
     } finally {
@@ -466,12 +509,12 @@ function BirthdaySettingsSection({ onToast }: { onToast: (msg: string) => void }
       <h3>{sec.birthdays}</h3>
       <label className="field">
         <span>
-          Anstehende <Caps text={sec.birthdays} /> anzeigen
+          <Caps text={t('Anstehende {section} anzeigen', { section: sec.birthdays })} />
         </span>
         <select value={data!.upcoming_days} disabled={busy} onChange={(e) => save(Number(e.target.value))}>
           {Array.from({ length: UPCOMING_DAYS_MAX + 1 }, (_, d) => (
             <option key={d} value={d}>
-              {d === 0 ? 'nur am Tag selbst' : d === 1 ? '1 Tag vorher' : `${d} Tage vorher`}
+              {d === 0 ? t('nur am Tag selbst') : tn('{count} Tag vorher', '{count} Tage vorher', d)}
             </option>
           ))}
         </select>
@@ -549,38 +592,38 @@ function MailForm({
         }),
       (s) => {
         onSaved(s);
-        onToast('Gespeichert');
+        onToast(t('Gespeichert'));
       },
     );
   }
 
   return (
     <form className="card settings-section form" id="einstellungen-email" onSubmit={save}>
-      <h3>E-Mail</h3>
+      <h3>{t('E-Mail')}</h3>
       {settings.unavailable && (
         <p className="form-error" role="alert">
           {settings.unavailable}
         </p>
       )}
       <EmailField
-        label="Kompanieadresse (Absender)"
+        label={t('Kompanieadresse (Absender)')}
         className="mail-from"
         value={form.from}
         onChange={(from) => setForm({ ...form, from })}
-        placeholder="info@beispiel.de"
+        placeholder={t('info@beispiel.de')}
       />
       <label className="field">
-        <span>Absendername</span>
+        <span>{t('Absendername')}</span>
         <input type="text" value={form.from_name} onChange={set('from_name')} placeholder={settings.from_name_default} />
       </label>
       <label className="field">
-        <span>Mailserver (SMTP)</span>
+        <span>{t('Mailserver (SMTP)')}</span>
         <input
           type="text"
           className="mail-host"
           value={form.host}
           onChange={set('host')}
-          placeholder="smtp.beispiel.de"
+          placeholder={t('smtp.beispiel.de')}
           autoComplete="off"
         />
       </label>
@@ -590,37 +633,37 @@ function MailForm({
           <input type="number" min={1} max={65535} value={form.port} onChange={set('port')} />
         </label>
         <label className="field">
-          <span>Verschlüsselung</span>
+          <span>{t('Verschlüsselung')}</span>
           <select value={form.secure} onChange={(e) => setForm({ ...form, secure: e.target.value as MailSettings['secure'] })}>
-            <option value="starttls">STARTTLS (meist Port 587)</option>
-            <option value="ssl">SSL/TLS (meist Port 465)</option>
-            <option value="none">keine</option>
+            <option value="starttls">{t('STARTTLS (meist Port 587)')}</option>
+            <option value="ssl">{t('SSL/TLS (meist Port 465)')}</option>
+            <option value="none">{t('keine')}</option>
           </select>
         </label>
       </div>
       <label className="field">
-        <span>Benutzername</span>
+        <span>{t('Benutzername')}</span>
         <input type="text" value={form.user} onChange={set('user')} autoComplete="off" />
       </label>
       <label className="field">
-        <span>Passwort{settings.password_set ? ' (gespeichert – leer lassen, um es zu behalten)' : ''}</span>
+        <span>{settings.password_set ? t('Passwort (gespeichert – leer lassen, um es zu behalten)') : t('Passwort')}</span>
         <input type="password" value={form.password} onChange={set('password')} autoComplete="new-password" />
       </label>
       <details>
-        <summary>Versand in Portionen</summary>
+        <summary>{t('Versand in Portionen')}</summary>
         <div className="field-row">
           <label className="field">
-            <span>Mails je Portion</span>
+            <span>{t('Mails je Portion')}</span>
             <input type="number" min={0} value={form.batch_size} onChange={set('batch_size')} />
           </label>
           <label className="field">
-            <span>Pause (Minuten)</span>
+            <span>{t('Pause (Minuten)')}</span>
             <input type="number" min={0} value={form.batch_pause} onChange={set('batch_pause')} />
           </label>
         </div>
       </details>
       <button className="btn btn-block" type="submit" disabled={busy}>
-        Speichern
+        {t('Speichern')}
       </button>
       {settings.configured && (
         <>
@@ -639,10 +682,10 @@ function MailForm({
                 )
               }
             >
-              Verbindung prüfen
+              {t('Verbindung prüfen')}
             </button>
           </div>
-          <EmailField label="Testmail an (leer: deine eigene Adresse)" value={testTo} onChange={setTestTo} />
+          <EmailField label={t('Testmail an (leer: deine eigene Adresse)')} value={testTo} onChange={setTestTo} />
           <button
             type="button"
             className="btn btn-secondary mail-test"
@@ -654,7 +697,7 @@ function MailForm({
               )
             }
           >
-            Testmail senden
+            {t('Testmail senden')}
           </button>
         </>
       )}
@@ -664,8 +707,11 @@ function MailForm({
         </p>
       )}
       <p className="small muted">
-        {settings.server_max_size ? maxSizeText(settings.server_max_size) : 'Der Mailserver hat noch keine Höchstgröße für Mails gemeldet.'}
-        {settings.pending > 0 && ` ${settings.pending} Mails warten auf den Versand.`}
+        {settings.server_max_size
+          ? maxSizeText(settings.server_max_size)
+          : t('Der Mailserver hat noch keine Höchstgröße für Mails gemeldet.')}
+        {settings.pending > 0 &&
+          ` ${tn('{count} Mail wartet auf den Versand.', '{count} Mails warten auf den Versand.', settings.pending)}`}
       </p>
     </form>
   );
@@ -673,8 +719,8 @@ function MailForm({
 
 function maxSizeText(size: number | null): string {
   return size
-    ? `Der Mailserver nimmt Mails bis ${formatBytes(size)} an (Bilder eingerechnet).`
-    : 'Der Mailserver meldet keine Höchstgröße.';
+    ? t('Der Mailserver nimmt Mails bis {size} an (Bilder eingerechnet).', { size: formatBytes(size) })
+    : t('Der Mailserver meldet keine Höchstgröße.');
 }
 
 /** Volle Stunden 00:00 bis 23:00 für die Auswahl einer Uhrzeit. */
@@ -683,7 +729,7 @@ function HourOptions() {
     <>
       {Array.from({ length: 24 }, (_, h) => (
         <option key={h} value={h}>
-          {String(h).padStart(2, '0')}:00 Uhr
+          {t('{time} Uhr', { time: `${String(h).padStart(2, '0')}:00` })}
         </option>
       ))}
     </>
@@ -735,12 +781,14 @@ export function FeatureSwitches({
             <span>
               <strong>{f.label}</strong>
               <span className="small muted feature-desc">{f.description}</span>
-              {blocked && <span className="small feature-desc">Braucht {missing.map(label).join(' und ')}.</span>}
+              {blocked && (
+                <span className="small feature-desc">{t('Braucht {areas}.', { areas: missing.map(label).join(` ${t('und')} `) })}</span>
+              )}
               {onSetup && value[f.key] && f.configured === false && f.setup && (
                 <span className="small feature-desc">
-                  Noch nicht eingerichtet.{' '}
+                  {t('Noch nicht eingerichtet.')}{' '}
                   <button type="button" className="btn btn-link btn-inline" onClick={() => onSetup(f.setup!)}>
-                    Jetzt einrichten
+                    {t('Jetzt einrichten')}
                   </button>
                 </span>
               )}
@@ -777,7 +825,9 @@ function Bereiche({ onToast }: { onToast: (msg: string) => void }) {
     const name = list.find((f) => f.key === key)?.label ?? key;
     if (
       !on &&
-      !(await confirmAsk(`„${name}“ wird für alle ausgeblendet. Die Daten bleiben erhalten und sind beim Wiedereinschalten wieder da.`))
+      !(await confirmAsk(
+        t('„{name}“ wird für alle ausgeblendet. Die Daten bleiben erhalten und sind beim Wiedereinschalten wieder da.', { name }),
+      ))
     )
       return;
     setBusy(true);
@@ -787,7 +837,7 @@ function Bereiche({ onToast }: { onToast: (msg: string) => void }) {
       setData(next);
       applyFeatures(next);
       await refreshRoles();
-      onToast(on ? `${name} eingeschaltet` : `${name} ausgeschaltet`);
+      onToast(on ? t('{name} eingeschaltet', { name }) : t('{name} ausgeschaltet', { name }));
     } catch (err) {
       setSaveError((err as Error).message);
     } finally {
@@ -797,9 +847,9 @@ function Bereiche({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <section className="card settings-section" id="einstellungen-bereiche">
-      <h3>Bereiche</h3>
+      <h3>{t('Bereiche')}</h3>
       <p className="small muted">
-        Welche Bereiche die App für alle hat. Ausgeschaltete Bereiche verschwinden aus der App; ihre Daten bleiben erhalten.
+        {t('Welche Bereiche die App für alle hat. Ausgeschaltete Bereiche verschwinden aus der App; ihre Daten bleiben erhalten.')}
       </p>
       <FeatureSwitches list={list} value={value} onChange={toggle} disabled={busy} onSetup={scrollToSetup} />
       {saveError && (
@@ -838,7 +888,7 @@ function Section({
         </p>
       )}
       <button className="btn btn-block" type="submit" disabled={busy}>
-        {busy ? 'Speichert …' : 'Speichern'}
+        {busy ? t('Speichert …') : t('Speichern')}
       </button>
     </form>
   );
@@ -853,7 +903,7 @@ function useSave(onSaved: (s: AdminSettings) => void, onToast: (msg: string) => 
     setError(null);
     try {
       onSaved(await api.updateSettings(input));
-      onToast('Gespeichert');
+      onToast(t('Gespeichert'));
       done?.();
     } catch (err) {
       setError((err as Error).message);
@@ -899,7 +949,7 @@ export function GoogleAccess({ settings, onSaved, onToast }: SectionProps) {
 
   async function connect(e: FormEvent) {
     e.preventDefault();
-    if (!clientId.trim()) return setConnectError('Bitte die Client-ID eintragen.');
+    if (!clientId.trim()) return setConnectError(t('Bitte die Client-ID eintragen.'));
     setConnecting(true);
     setConnectError(null);
     try {
@@ -914,14 +964,14 @@ export function GoogleAccess({ settings, onSaved, onToast }: SectionProps) {
   async function disconnect() {
     if (
       !(await confirmAsk(
-        'Verbindung zu Google trennen? Galerie und Kalender lesen danach nur noch über ein Dienstkonto, falls hinterlegt.',
+        t('Verbindung zu Google trennen? Galerie und Kalender lesen danach nur noch über ein Dienstkonto, falls hinterlegt.'),
       ))
     )
       return;
     setConnectError(null);
     try {
       onSaved(await api.googleDisconnect());
-      onToast('Verbindung getrennt');
+      onToast(t('Verbindung getrennt'));
     } catch (err) {
       setConnectError((err as Error).message);
     }
@@ -930,15 +980,15 @@ export function GoogleAccess({ settings, onSaved, onToast }: SectionProps) {
   async function copy() {
     try {
       await navigator.clipboard.writeText(g.redirect_uri);
-      onToast('Kopiert');
+      onToast(t('Kopiert'));
     } catch {
-      onToast('Bitte die Adresse markieren und kopieren.');
+      onToast(t('Bitte die Adresse markieren und kopieren.'));
     }
   }
 
   return (
     <section className="card settings-section" id="einstellungen-google">
-      <h3>Google-Zugang</h3>
+      <h3>{t('Google-Zugang')}</h3>
       {result && (
         <p className={result.ok ? 'small' : 'form-error small'} role={result.ok ? 'status' : 'alert'}>
           {result.ok ? '✓ ' : ''}
@@ -946,7 +996,7 @@ export function GoogleAccess({ settings, onSaved, onToast }: SectionProps) {
         </p>
       )}
       <div className="field">
-        <span id="google-redirect-label">Weiterleitungs-URI (im OAuth-Client bei Google eintragen)</span>
+        <span id="google-redirect-label">{t('Weiterleitungs-URI (im OAuth-Client bei Google eintragen)')}</span>
         {/* Kopieren als Symbol direkt neben dem Feld */}
         <div className="copy-field">
           <input
@@ -956,38 +1006,31 @@ export function GoogleAccess({ settings, onSaved, onToast }: SectionProps) {
             value={g.redirect_uri}
             onFocus={(e) => e.currentTarget.select()}
           />
-          <IconButton icon="copy" label="Adresse kopieren" onClick={() => void copy()} />
+          <IconButton icon="copy" label={t('Adresse kopieren')} onClick={() => void copy()} />
         </div>
       </div>
       {g.connected ? (
         <div className="small">
           <p>
-            ✓ Verbunden mit Google
-            {g.email ? (
-              <>
-                {' '}
-                als <code>{g.email}</code>
-              </>
-            ) : (
-              ''
-            )}
-            .{' '}
+            ✓ {g.email ? withPart(t('Verbunden mit Google als {email}.'), <code>{g.email}</code>) : t('Verbunden mit Google.')}{' '}
             {g.calendar_access
-              ? 'Es darf auch den Kalender lesen.'
-              : 'Den Kalender darf es noch nicht lesen. Für einen privaten Kalender: Verbindung trennen und neu verbinden, dabei beide Häkchen setzen.'}
+              ? t('Es darf auch den Kalender lesen.')
+              : t(
+                  'Den Kalender darf es noch nicht lesen. Für einen privaten Kalender: Verbindung trennen und neu verbinden, dabei beide Häkchen setzen.',
+                )}
             {g.write_access === false &&
-              ' Google Drive darf es nur lesen. Damit Einreichungen und hochgeladene Bilder der Galerie in Drive landen: Verbindung trennen und neu verbinden, dabei das Häkchen für Google Drive setzen.'}
+              ` ${t('Google Drive darf es nur lesen. Damit Einreichungen und hochgeladene Bilder der Galerie in Drive landen: Verbindung trennen und neu verbinden, dabei das Häkchen für Google Drive setzen.')}`}
           </p>
           <div className="button-row">
             <button type="button" className="btn btn-link" onClick={disconnect}>
-              Verbindung trennen
+              {t('Verbindung trennen')}
             </button>
           </div>
         </div>
       ) : (
         <form className="form" onSubmit={connect}>
           <label className="field">
-            <span>Client-ID</span>
+            <span>{t('Client-ID')}</span>
             <input
               type="text"
               autoComplete="off"
@@ -998,17 +1041,17 @@ export function GoogleAccess({ settings, onSaved, onToast }: SectionProps) {
             />
           </label>
           <label className="field">
-            <span>Clientschlüssel (Client-Secret)</span>
+            <span>{t('Clientschlüssel (Client-Secret)')}</span>
             <input
               type="password"
               autoComplete="off"
-              placeholder={g.client_secret_set && clientId.trim() === g.client_id ? 'gespeichert – leer lassen, um ihn zu behalten' : ''}
+              placeholder={g.client_secret_set && clientId.trim() === g.client_id ? t('gespeichert – leer lassen, um ihn zu behalten') : ''}
               value={secret}
               onChange={(e) => setSecret(e.target.value)}
             />
           </label>
           <button className="btn btn-block" type="submit" disabled={connecting}>
-            {connecting ? 'Weiter zu Google …' : 'Speichern und mit Google verbinden'}
+            {connecting ? t('Weiter zu Google …') : t('Speichern und mit Google verbinden')}
           </button>
         </form>
       )}
@@ -1018,21 +1061,21 @@ export function GoogleAccess({ settings, onSaved, onToast }: SectionProps) {
         </p>
       )}
       <details open={!!g.service_account_email && !g.connected}>
-        <summary>Alternative: Dienstkonto mit JSON-Schlüssel</summary>
+        <summary>{t('Alternative: Dienstkonto mit JSON-Schlüssel')}</summary>
         {g.service_account_email && (
           <div className="small">
-            Dienstkonto: <code>{g.service_account_email}</code>
-            {g.connected ? ' (wird nicht genutzt, solange die Verbindung mit Google besteht)' : ''}
+            {t('Dienstkonto:')} <code>{g.service_account_email}</code>
+            {g.connected ? ` ${t('(wird nicht genutzt, solange die Verbindung mit Google besteht)')}` : ''}
             <div className="button-row">
               <button type="button" className="btn btn-link" onClick={() => setReplaceKey(!replaceKey)}>
-                {replaceKey ? 'Schlüssel behalten' : 'Schlüssel ersetzen'}
+                {replaceKey ? t('Schlüssel behalten') : t('Schlüssel ersetzen')}
               </button>
               <button
                 type="button"
                 className="btn btn-link"
-                onClick={async () => (await confirmAsk('Schlüssel des Dienstkontos entfernen?')) && save({ drive_service_account: '' })}
+                onClick={async () => (await confirmAsk(t('Schlüssel des Dienstkontos entfernen?'))) && save({ drive_service_account: '' })}
               >
-                Schlüssel entfernen
+                {t('Schlüssel entfernen')}
               </button>
             </div>
           </div>
@@ -1040,7 +1083,7 @@ export function GoogleAccess({ settings, onSaved, onToast }: SectionProps) {
         {showKeyField && (
           <>
             <label className="field">
-              <span>{g.service_account_email ? 'Neuer Schlüssel des Dienstkontos (JSON)' : 'Schlüssel des Dienstkontos (JSON)'}</span>
+              <span>{g.service_account_email ? t('Neuer Schlüssel des Dienstkontos (JSON)') : t('Schlüssel des Dienstkontos (JSON)')}</span>
               <textarea
                 rows={4}
                 spellCheck={false}
@@ -1059,10 +1102,10 @@ export function GoogleAccess({ settings, onSaved, onToast }: SectionProps) {
                       setKey('');
                       setReplaceKey(false);
                     })
-                  : setError('Bitte den Inhalt der JSON-Datei einfügen.')
+                  : setError(t('Bitte den Inhalt der JSON-Datei einfügen.'))
               }
             >
-              {busy ? 'Speichert …' : 'Schlüssel speichern'}
+              {busy ? t('Speichert …') : t('Schlüssel speichern')}
             </button>
           </>
         )}
@@ -1078,8 +1121,8 @@ export function GoogleAccess({ settings, onSaved, onToast }: SectionProps) {
 
 /** Kurzbeschreibung des Google-Zugangs für Kalender und Galerie ('' ohne Zugang). */
 function googleAccessLabel(g: AdminSettings['google']): string {
-  if (g.connected) return g.email ? `die Verbindung mit Google (${g.email})` : 'die Verbindung mit Google';
-  if (g.service_account_email) return `das Dienstkonto ${g.service_account_email}`;
+  if (g.connected) return g.email ? t('die Verbindung mit Google ({email})', { email: g.email }) : t('die Verbindung mit Google');
+  if (g.service_account_email) return t('das Dienstkonto {email}', { email: g.service_account_email });
   return '';
 }
 
@@ -1087,7 +1130,7 @@ function googleAccessLabel(g: AdminSettings['google']): string {
 function GoogleLink() {
   return (
     <button type="button" className="btn btn-link btn-inline" onClick={() => scrollToSetup('google')}>
-      Google-Zugang
+      {t('Google-Zugang')}
     </button>
   );
 }
@@ -1097,9 +1140,9 @@ const CACHE_MINUTES = { min: 1, max: 1440 };
 
 /** Bezeichnung je Quelle des internen Kalenders (Auswahl in den Einstellungen). */
 const CALENDAR_SOURCE_LABELS: Record<CalendarSourceChoice, string> = {
-  app: 'In der App pflegen',
-  google: 'Google Kalender (Kalender-IDs)',
-  ics: 'iCal-Adresse',
+  app: t('In der App pflegen'),
+  google: t('Google Kalender (Kalender-IDs)'),
+  ics: t('iCal-Adresse'),
 };
 
 /** Vorauswahl: die gewählte Quelle; ohne Auswahl (Einrichtung von vorher) die, die gerade gilt, sonst die iCal-Adresse. */
@@ -1126,11 +1169,11 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
   }, onToast);
   const access = googleAccessLabel(settings.google);
   const status = {
-    app: '✓ Die Termine werden in der App gepflegt.',
-    ics: '✓ Eingerichtet über die iCal-Adresse.',
-    google: '✓ Eingerichtet über die Google-API (Kalender-IDs und API-Schlüssel).',
-    google_connection: `✓ Eingerichtet über die Kalender-IDs und ${access || 'den Google-Zugang'}.`,
-    none: 'Noch kein Kalender eingerichtet.',
+    app: t('✓ Die Termine werden in der App gepflegt.'),
+    ics: t('✓ Eingerichtet über die iCal-Adresse.'),
+    google: t('✓ Eingerichtet über die Google-API (Kalender-IDs und API-Schlüssel).'),
+    google_connection: t('✓ Eingerichtet über die Kalender-IDs und {access}.', { access: access || t('den Google-Zugang') }),
+    none: t('Noch kein Kalender eingerichtet.'),
   }[c.source];
   const showIds = !selectable || choice === 'google';
   const showUrl = !selectable || choice === 'ics';
@@ -1144,8 +1187,10 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
       const r = await api.testCalendar();
       setResult(
         r.count === 0
-          ? 'Verbindung klappt, aber es gibt keine kommenden Termine.'
-          : `${r.count} Termine gefunden, z. B. „${r.sample[0].title}“.`,
+          ? t('Verbindung klappt, aber es gibt keine kommenden Termine.')
+          : tn('{count} Termin gefunden, z. B. „{title}“.', '{count} Termine gefunden, z. B. „{title}“.', r.count, {
+              title: r.sample[0].title,
+            }),
       );
     } catch (err) {
       setError((err as Error).message);
@@ -1164,36 +1209,36 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
       const idsChanged = ids.trim() !== c.calendar_ids;
       if (!url.trim() && !idsChanged) {
         if ('calendar_cache_minutes' in cache) return save(cache);
-        if (c.source !== 'none') return onToast('Nichts geändert – der Kalender ist schon eingerichtet.');
-        return setError('Bitte die iCal-Adresse oder Kalender-IDs eintragen.');
+        if (c.source !== 'none') return onToast(t('Nichts geändert – der Kalender ist schon eingerichtet.'));
+        return setError(t('Bitte die iCal-Adresse oder Kalender-IDs eintragen.'));
       }
       return save({ ...(url.trim() ? { calendar_ics_url: url.trim() } : {}), calendar_ids: ids.trim(), ...cache }, () => setUrl(''));
     }
     const changed = choice !== calendarChoice(c);
     if (choice === 'app') {
-      if (!changed) return onToast('Nichts geändert – die Termine werden schon in der App gepflegt.');
+      if (!changed) return onToast(t('Nichts geändert – die Termine werden schon in der App gepflegt.'));
       return save({ calendar_source: 'app' });
     }
     // Nur die Dauer geändert, die Quelle noch ohne Angaben: nur die Dauer speichern.
     const onlyCache = 'calendar_cache_minutes' in cache && !changed && c.source === 'none';
     if (choice === 'google') {
-      if (!ids.trim()) return onlyCache ? save(cache) : setError('Bitte die Kalender-IDs eintragen.');
+      if (!ids.trim()) return onlyCache ? save(cache) : setError(t('Bitte die Kalender-IDs eintragen.'));
       if (!changed && ids.trim() === c.calendar_ids && !('calendar_cache_minutes' in cache))
-        return onToast('Nichts geändert – der Kalender ist schon eingerichtet.');
+        return onToast(t('Nichts geändert – der Kalender ist schon eingerichtet.'));
       return save({ calendar_source: 'google', calendar_ids: ids.trim(), ...cache });
     }
-    if (!url.trim() && !c.ics_url_set) return onlyCache ? save(cache) : setError('Bitte die iCal-Adresse eintragen.');
+    if (!url.trim() && !c.ics_url_set) return onlyCache ? save(cache) : setError(t('Bitte die iCal-Adresse eintragen.'));
     if (!changed && !url.trim() && !('calendar_cache_minutes' in cache))
-      return onToast('Nichts geändert – der Kalender ist schon eingerichtet.');
+      return onToast(t('Nichts geändert – der Kalender ist schon eingerichtet.'));
     save({ calendar_source: 'ics', ...(url.trim() ? { calendar_ics_url: url.trim() } : {}), ...cache }, () => setUrl(''));
   }
 
   return (
-    <Section id="kalender" title="Kalender für Mitglieder" busy={busy} error={error} onSubmit={submit}>
+    <Section id="kalender" title={t('Kalender für Mitglieder')} busy={busy} error={error} onSubmit={submit}>
       <p className="small">{status}</p>
       {selectable && (
         <label className="field">
-          <span>Quelle</span>
+          <span>{t('Quelle')}</span>
           <select value={choice} onChange={(e) => setChoice(e.target.value as CalendarSourceChoice)}>
             {(Object.keys(CALENDAR_SOURCE_LABELS) as CalendarSourceChoice[]).map((k) => (
               <option key={k} value={k}>
@@ -1202,20 +1247,21 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
             ))}
           </select>
           <span className="small muted">
-            Der interne Kalender ist von den öffentlichen Terminen getrennt. Die Termine kommen aus genau einer Quelle; beim Wechsel bleiben
-            die Angaben der anderen gespeichert.
+            {t(
+              'Der interne Kalender ist von den öffentlichen Terminen getrennt. Die Termine kommen aus genau einer Quelle; beim Wechsel bleiben die Angaben der anderen gespeichert.',
+            )}
           </span>
         </label>
       )}
       {selectable && choice === 'app' && (
         <p className="small">
-          Termine legst du bei den Terminen über <strong>Internen Kalender verwalten</strong> an. Das darf, wer das Recht „Kalender pflegen“
-          hat, z. B. über die Rolle „Kalender verwalten“.
+          {withPart(t('Termine legst du bei den Terminen über {button} an.'), <strong>{t('Internen Kalender verwalten')}</strong>)}{' '}
+          {t('Das darf, wer das Recht „Kalender pflegen“ hat, z. B. über die Rolle „Kalender verwalten“.')}
           {c.source === 'app' && config?.features.calendar && (
             <>
               {' '}
               <button type="button" className="btn btn-link btn-inline" onClick={() => navigate('termine/kalender')}>
-                Zu den internen Terminen
+                {t('Zu den internen Terminen')}
               </button>
             </>
           )}
@@ -1223,14 +1269,25 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
       )}
       {c.connection_needs_calendar_access && showIds && (
         <p className="small">
-          Die Kalender-IDs <code>{c.calendar_ids}</code> sind eingetragen, aber die Verbindung mit Google darf den Kalender nicht lesen
-          (beim Verbinden nicht erlaubt). Unter <GoogleLink /> die Verbindung trennen und neu verbinden, dabei auch das Häkchen für den
-          Kalender setzen{c.source === 'ics' ? '; bis dahin gilt die iCal-Adresse' : ''}.
+          {withPart(
+            t(
+              'Die Kalender-IDs {ids} sind eingetragen, aber die Verbindung mit Google darf den Kalender nicht lesen (beim Verbinden nicht erlaubt).',
+            ),
+            <code>{c.calendar_ids}</code>,
+          )}{' '}
+          {withPart(
+            c.source === 'ics'
+              ? t(
+                  'Unter {link} die Verbindung trennen und neu verbinden, dabei auch das Häkchen für den Kalender setzen; bis dahin gilt die iCal-Adresse.',
+                )
+              : t('Unter {link} die Verbindung trennen und neu verbinden, dabei auch das Häkchen für den Kalender setzen.'),
+            <GoogleLink />,
+          )}
         </p>
       )}
       {showIds && (
         <label className="field">
-          <span>Google-Kalender-IDs</span>
+          <span>{t('Google-Kalender-IDs')}</span>
           <input
             type="text"
             autoComplete="off"
@@ -1240,14 +1297,16 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
             onChange={(e) => setIds(e.target.value)}
           />
           <span className="small muted">
-            In Google Kalender: Einstellungen des Kalenders → Kalender integrieren → Kalender-ID. Mehrere durch Komma trennen.
-            {!access && ' Dafür zuerst den Google-Zugang einrichten.'}
+            {t('In Google Kalender: Einstellungen des Kalenders → Kalender integrieren → Kalender-ID. Mehrere durch Komma trennen.')}
+            {!access && ` ${t('Dafür zuerst den Google-Zugang einrichten.')}`}
           </span>
         </label>
       )}
       {showUrl && (
         <label className="field">
-          <span>{c.ics_url_set ? 'Neue iCal-Adresse (ersetzt die bisherige)' : selectable ? 'iCal-Adresse' : 'Geheime iCal-Adresse'}</span>
+          <span>
+            {c.ics_url_set ? t('Neue iCal-Adresse (ersetzt die bisherige)') : selectable ? t('iCal-Adresse') : t('Geheime iCal-Adresse')}
+          </span>
           <input
             type="url"
             inputMode="url"
@@ -1257,14 +1316,15 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
             onChange={(e) => setUrl(e.target.value)}
           />
           <span className="small muted">
-            Die Adresse eines Kalenders im iCal-Format, z. B. in Google Kalender: Einstellungen des Kalenders → Kalender integrieren →
-            Geheime Adresse im iCal-Format. Sie wird nicht wieder angezeigt.
+            {t(
+              'Die Adresse eines Kalenders im iCal-Format, z. B. in Google Kalender: Einstellungen des Kalenders → Kalender integrieren → Geheime Adresse im iCal-Format. Sie wird nicht wieder angezeigt.',
+            )}
           </span>
         </label>
       )}
       {external && (
         <label className="field">
-          <span>Aktualisieren alle … Minuten</span>
+          <span>{t('Aktualisieren alle … Minuten')}</span>
           <input
             type="number"
             inputMode="numeric"
@@ -1276,26 +1336,27 @@ export function Calendar({ settings, onSaved, onToast }: SectionProps) {
             onChange={(e) => setMinutes(e.target.value)}
           />
           <span className="small muted">
-            So lange zeigt die App die zuletzt geladenen Termine, bevor sie neu nachfragt ({CACHE_MINUTES.min} bis {CACHE_MINUTES.max}{' '}
-            Minuten). Kürzere Zeiten zeigen Änderungen schneller, bedeuten aber mehr Abrufe, und das Öffnen der Termine dauert dann öfter
-            länger. Zusätzlich erneuert die App den Kalender stündlich im Hintergrund. „Kalender testen“ und Speichern laden sofort neu.
+            {t(
+              'So lange zeigt die App die zuletzt geladenen Termine, bevor sie neu nachfragt ({min} bis {max} Minuten). Kürzere Zeiten zeigen Änderungen schneller, bedeuten aber mehr Abrufe, und das Öffnen der Termine dauert dann öfter länger. Zusätzlich erneuert die App den Kalender stündlich im Hintergrund. „Kalender testen“ und Speichern laden sofort neu.',
+              { min: CACHE_MINUTES.min, max: CACHE_MINUTES.max },
+            )}
           </span>
         </label>
       )}
       {c.source !== 'none' && c.source !== 'app' && external && (
         <div className="button-row single">
           <button type="button" className="btn btn-secondary" onClick={test} disabled={testing}>
-            {testing ? 'Prüft …' : 'Kalender testen'}
+            {testing ? t('Prüft …') : t('Kalender testen')}
           </button>
           <button
             type="button"
             className="btn btn-link"
             onClick={async () =>
-              (await confirmAsk('Kalender wirklich entfernen?')) &&
+              (await confirmAsk(t('Kalender wirklich entfernen?'))) &&
               save({ calendar_ics_url: '', calendar_ids: '', google_api_key: '' }, () => setIds(''))
             }
           >
-            Entfernen
+            {t('Entfernen')}
           </button>
         </div>
       )}
@@ -1329,7 +1390,7 @@ function CalendarResponses({ settings, onSaved, onToast }: SectionProps) {
     e.preventDefault();
     const n = Number(days);
     const same = on === c.response_reminder && n === c.response_reminder_days;
-    if ((!switchable || enabled === c.responses) && (same || !enabled)) return onToast('Nichts geändert.');
+    if ((!switchable || enabled === c.responses) && (same || !enabled)) return onToast(t('Nichts geändert.'));
     save({
       ...(switchable ? { calendar_responses: enabled ? '1' : '0' } : {}),
       ...(enabled ? { calendar_response_reminder: on ? '1' : '0', ...(on ? { calendar_response_reminder_days: n } : {}) } : {}),
@@ -1337,20 +1398,21 @@ function CalendarResponses({ settings, onSaved, onToast }: SectionProps) {
   }
 
   return (
-    <Section id="zu-und-absagen" title="Zu- und Absagen" busy={busy} error={error} onSubmit={submit}>
+    <Section id="zu-und-absagen" title={t('Zu- und Absagen')} busy={busy} error={error} onSubmit={submit}>
       <p className="small muted">
-        Bei jedem Termin des internen Kalenders sagen alle mit dem Recht „zu- und absagen“ zu oder ab. Eine Absage schlägt in der
-        Anwesenheit „entschuldigt“ vor. Wer sich noch nicht gemeldet hat, bekommt auf Wunsch eine Benachrichtigung (nur auf Geräten mit
-        eingeschalteten Benachrichtigungen, keine E-Mail).
+        {t(
+          'Bei jedem Termin des internen Kalenders sagen alle mit dem Recht „zu- und absagen“ zu oder ab. Eine Absage schlägt in der Anwesenheit „entschuldigt“ vor. Wer sich noch nicht gemeldet hat, bekommt auf Wunsch eine Benachrichtigung (nur auf Geräten mit eingeschalteten Benachrichtigungen, keine E-Mail).',
+        )}
       </p>
       {switchable && (
         <label className="toggle feature-toggle">
           <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
           <span>
-            Zu- und Absagen bei Terminen
+            {t('Zu- und Absagen bei Terminen')}
             <span className="small muted feature-desc">
-              Ausgeschaltet gibt es keine Knöpfe am Termin, keine Erinnerung und keinen Vorschlag in der Anwesenheit. Bisherige
-              Rückmeldungen bleiben gespeichert.
+              {t(
+                'Ausgeschaltet gibt es keine Knöpfe am Termin, keine Erinnerung und keinen Vorschlag in der Anwesenheit. Bisherige Rückmeldungen bleiben gespeichert.',
+              )}
             </span>
           </span>
         </label>
@@ -1359,14 +1421,14 @@ function CalendarResponses({ settings, onSaved, onToast }: SectionProps) {
         <label className="toggle feature-toggle">
           <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} />
           <span>
-            An Zu- und Absage erinnern
-            <span className="small muted feature-desc">Nur an alle, die bei dem Termin noch nicht zu- oder abgesagt haben.</span>
+            {t('An Zu- und Absage erinnern')}
+            <span className="small muted feature-desc">{t('Nur an alle, die bei dem Termin noch nicht zu- oder abgesagt haben.')}</span>
           </span>
         </label>
       )}
       {enabled && on && (
         <label className="field">
-          <span>Erinnerung … Tage vor dem Termin</span>
+          <span>{t('Erinnerung … Tage vor dem Termin')}</span>
           <input
             type="number"
             inputMode="numeric"
@@ -1378,7 +1440,9 @@ function CalendarResponses({ settings, onSaved, onToast }: SectionProps) {
             onChange={(e) => setDays(e.target.value)}
           />
           <span className="small muted">
-            Zur Uhrzeit der Erinnerung unter Benachrichtigungen. Hat ein Termin einen Anmeldeschluss, kommt die Erinnerung am Tag davor.
+            {t(
+              'Zur Uhrzeit der Erinnerung unter Benachrichtigungen. Hat ein Termin einen Anmeldeschluss, kommt die Erinnerung am Tag davor.',
+            )}
           </span>
         </label>
       )}
@@ -1412,15 +1476,15 @@ function EventKinds({ onToast }: { onToast: (msg: string) => void }) {
     const hidden = filled.filter((r) => !r.tag).map((r) => r.name);
     const lower = list.map((n) => n.toLowerCase());
     const twice = list.find((_, i) => lower.indexOf(lower[i]) !== i);
-    if (twice) return setError(`Die Terminart „${twice}“ steht doppelt in der Liste.`);
-    if (list.join('\n') === saved.join('\n') && hidden.join('\n') === savedHidden.join('\n')) return onToast('Nichts geändert.');
+    if (twice) return setError(t('Die Terminart „{kind}“ steht doppelt in der Liste.', { kind: twice }));
+    if (list.join('\n') === saved.join('\n') && hidden.join('\n') === savedHidden.join('\n')) return onToast(t('Nichts geändert.'));
     setBusy(true);
     setError(null);
     try {
       const r = await api.setEventKinds(list, hidden);
       applyEventKinds(r.kinds, r.hidden ?? hidden);
       setRows(toRows(r.kinds, r.hidden ?? hidden));
-      onToast('Gespeichert');
+      onToast(t('Gespeichert'));
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -1429,19 +1493,20 @@ function EventKinds({ onToast }: { onToast: (msg: string) => void }) {
   }
 
   return (
-    <Section id="terminarten" title="Terminarten" busy={busy} error={error} onSubmit={submit}>
+    <Section id="terminarten" title={t('Terminarten')} busy={busy} error={error} onSubmit={submit}>
       <p className="small muted">
-        Zum Beispiel Versammlung oder Arbeitsdienst. Wer Termine pflegt, wählt die Art beim Termin, auch bei Terminen aus Google oder iCal.
-        Anwesenheitslisten übernehmen sie. Steht der Name einer Art im Titel, schlägt die App sie vor.
+        {t(
+          'Zum Beispiel Versammlung oder Arbeitsdienst. Wer Termine pflegt, wählt die Art beim Termin, auch bei Terminen aus Google oder iCal. Anwesenheitslisten übernehmen sie. Steht der Name einer Art im Titel, schlägt die App sie vor.',
+        )}
       </p>
       <div className="field poll-options-edit">
-        <span>Terminarten</span>
+        <span>{t('Terminarten')}</span>
         {rows.map((r, i) => (
           <div className="event-kind-edit" key={i}>
             <div className="poll-option-edit">
               <input
                 type="text"
-                aria-label={`Terminart ${i + 1}`}
+                aria-label={t('Terminart {n}', { n: i + 1 })}
                 value={r.name}
                 maxLength={KIND_MAX}
                 onChange={(e) => update(i, { name: e.target.value })}
@@ -1450,7 +1515,7 @@ function EventKinds({ onToast }: { onToast: (msg: string) => void }) {
                 <button
                   type="button"
                   className="btn btn-link"
-                  aria-label={`Terminart ${i + 1} entfernen`}
+                  aria-label={t('Terminart {n} entfernen', { n: i + 1 })}
                   onClick={() => setRows(rows.length > 1 ? rows.filter((_, j) => j !== i) : [{ name: '', tag: true }])}
                 >
                   ×
@@ -1460,23 +1525,24 @@ function EventKinds({ onToast }: { onToast: (msg: string) => void }) {
             <label className="toggle">
               <input
                 type="checkbox"
-                aria-label={`Terminart ${i + 1} als Schild am Termin zeigen`}
+                aria-label={t('Terminart {n} als Schild am Termin zeigen', { n: i + 1 })}
                 checked={r.tag}
                 onChange={(e) => update(i, { tag: e.target.checked })}
               />
-              <span>Als Schild am Termin zeigen</span>
+              <span>{t('Als Schild am Termin zeigen')}</span>
             </label>
           </div>
         ))}
         {rows.length < KINDS_MAX && (
           <button type="button" className="btn btn-link poll-add-option" onClick={() => setRows([...rows, { name: '', tag: true }])}>
-            + Terminart
+            + {t('Terminart')}
           </button>
         )}
       </div>
       <p className="small muted">
-        Ohne Schild bleibt die Art am Termin gespeichert und zählt weiter, etwa für die Aufnahme; sie steht dann nur nicht neben dem Titel.
-        Termine und Listen behalten ihre Art, auch wenn du sie hier entfernst.
+        {t(
+          'Ohne Schild bleibt die Art am Termin gespeichert und zählt weiter, etwa für die Aufnahme; sie steht dann nur nicht neben dem Titel. Termine und Listen behalten ihre Art, auch wenn du sie hier entfernst.',
+        )}
       </p>
     </Section>
   );
@@ -1490,19 +1556,25 @@ function GalleryStore({ g }: { g: AdminSettings['gallery'] }) {
     return (
       <div className="small">
         <p>
-          <strong>Ablageort:</strong> Google Drive. Hochgeladene Bilder und Videos kommen in den Ordner ihres Albums. Offene Einreichungen
-          liegen im Ordner „Einreichungen“ in der Ablage des verbundenen Google-Kontos und kommen bei der Freigabe ins Album.
+          <strong>{t('Ablageort:')}</strong>{' '}
+          {t(
+            'Google Drive. Hochgeladene Bilder und Videos kommen in den Ordner ihres Albums. Offene Einreichungen liegen im Ordner „Einreichungen“ in der Ablage des verbundenen Google-Kontos und kommen bei der Freigabe ins Album.',
+          )}
         </p>
         {d.waiting > 0 && (
           <p className="muted">
-            {d.waiting === 1 ? '1 Datei wartet' : `${d.waiting} Dateien warten`} noch auf dem Server und{' '}
-            {d.waiting === 1 ? 'kommt' : 'kommen'} im Hintergrund nach Drive (belegt {onServer}). Alben, die nur in der App angelegt sind,
-            bleiben vorerst auf dem Server.
+            {tn(
+              '{count} Datei wartet noch auf dem Server und kommt im Hintergrund nach Drive (belegt {size}).',
+              '{count} Dateien warten noch auf dem Server und kommen im Hintergrund nach Drive (belegt {size}).',
+              d.waiting,
+              { size: onServer },
+            )}{' '}
+            {t('Alben, die nur in der App angelegt sind, bleiben vorerst auf dem Server.')}
           </p>
         )}
         {d.error && (
           <p className="form-error" role="alert">
-            Letzter Versuch, Dateien nach Drive zu bringen: {d.error}
+            {t('Letzter Versuch, Dateien nach Drive zu bringen: {error}', { error: d.error })}
           </p>
         )}
       </div>
@@ -1511,14 +1583,20 @@ function GalleryStore({ g }: { g: AdminSettings['gallery'] }) {
   return (
     <div className="small">
       <p>
-        <strong>Ablageort:</strong> eigener Server. Hochgeladene Bilder belegen {onServer}. Die App setzt keine Grenze; behalte den
-        Speicherplatz deines Webspace im Blick. Sie sind in der Sicherung enthalten.
+        <strong>{t('Ablageort:')}</strong>{' '}
+        {t(
+          'eigener Server. Hochgeladene Bilder belegen {size}. Die App setzt keine Grenze; behalte den Speicherplatz deines Webspace im Blick. Sie sind in der Sicherung enthalten.',
+          { size: onServer },
+        )}
       </p>
       {d?.needs_reconnect && (
         <p>
-          Damit hochgeladene Bilder und Einreichungen in Google Drive landen, braucht die App vollen Zugriff auf Drive: unter <GoogleLink />{' '}
-          die Verbindung trennen und neu mit Google verbinden, dabei das Häkchen für Google Drive setzen. Mit einem Dienstkonto geht das
-          nicht, es hat in Drive keinen eigenen Speicherplatz.
+          {withPart(
+            t(
+              'Damit hochgeladene Bilder und Einreichungen in Google Drive landen, braucht die App vollen Zugriff auf Drive: unter {link} die Verbindung trennen und neu mit Google verbinden, dabei das Häkchen für Google Drive setzen. Mit einem Dienstkonto geht das nicht, es hat in Drive keinen eigenen Speicherplatz.',
+            ),
+            <GoogleLink />,
+          )}
         </p>
       )}
     </div>
@@ -1546,15 +1624,24 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
     try {
       // Erst abgleichen, dann so lange aufbereiten, bis nichts mehr aussteht.
       let r = await api.syncGallery(false);
-      setProgress(`${r.albums} Alben, ${r.photos} Bilder und Videos gefunden – ${r.pending} werden noch aufbereitet …`);
+      setProgress(
+        t('{albums} Alben, {photos} Bilder und Videos gefunden – {pending} werden noch aufbereitet …', {
+          albums: r.albums,
+          photos: r.photos,
+          pending: r.pending,
+        }),
+      );
       for (let round = 0; r.pending > 0 && r.processed > 0 && round < 50; round++) {
         r = await api.syncGallery(true);
-        setProgress(`${r.albums} Alben, ${r.photos} Bilder und Videos – noch ${r.pending} …`);
+        setProgress(
+          t('{albums} Alben, {photos} Bilder und Videos – noch {pending} …', { albums: r.albums, photos: r.photos, pending: r.pending }),
+        );
       }
-      const parts = [`${r.albums} Alben, ${r.photos} Bilder und Videos.`];
-      if (r.pending > 0) parts.push(`${r.pending} Bilder werden stündlich automatisch weiter aufbereitet.`);
-      if (r.failed > 0) parts.push(`${r.failed} Bilder ließen sich nicht laden (Liste unten).`);
-      setProgress((r.pending > 0 || r.failed > 0 ? 'Abgeglichen: ' : 'Fertig: ') + parts.join(' '));
+      const parts = [t('{albums} Alben, {photos} Bilder und Videos.', { albums: r.albums, photos: r.photos })];
+      if (r.pending > 0) parts.push(t('{count} Bilder werden stündlich automatisch weiter aufbereitet.', { count: r.pending }));
+      if (r.failed > 0) parts.push(t('{count} Bilder ließen sich nicht laden (Liste unten).', { count: r.failed }));
+      const details = parts.join(' ');
+      setProgress(r.pending > 0 || r.failed > 0 ? t('Abgeglichen: {details}', { details }) : t('Fertig: {details}', { details }));
       onSaved(await api.settings()); // Stand des Abgleichs (z. B. alte Fehlermeldung) aktualisieren
     } catch (err) {
       setError((err as Error).message);
@@ -1576,7 +1663,7 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
           source === 'server' &&
           (g.source ?? 'drive') === 'drive' &&
           !(await confirmAsk(
-            'Nur noch der eigene Server? Alben und Bilder aus Google Drive verschwinden aus der App; hochgeladene Bilder bleiben.',
+            t('Nur noch der eigene Server? Alben und Bilder aus Google Drive verschwinden aus der App; hochgeladene Bilder bleiben.'),
           ))
         )
           return;
@@ -1595,10 +1682,10 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
       {g.source !== undefined && (
         <>
           <label className="field">
-            <span>Quelle</span>
+            <span>{t('Quelle')}</span>
             <select value={source} onChange={(e) => setSource(e.target.value as GallerySourceType)}>
-              <option value="drive">Google Drive (dazu Alben der App)</option>
-              <option value="server">Eigener Server (nur Alben der App)</option>
+              <option value="drive">{t('Google Drive (dazu Alben der App)')}</option>
+              <option value="server">{t('Eigener Server (nur Alben der App)')}</option>
             </select>
           </label>
           <GalleryStore g={g} />
@@ -1607,19 +1694,15 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
       {source === 'drive' && (
         <>
           <p className="small">
-            {access ? (
-              <>
-                Gelesen wird über {access} (<GoogleLink />
-                ).
-              </>
-            ) : (
-              <>
-                Noch kein Zugang zu Google: zuerst unter <GoogleLink /> mit Google verbinden oder ein Dienstkonto hinterlegen.
-              </>
-            )}
+            {access
+              ? withPart(t('Gelesen wird über {access} ({link}).', { access }), <GoogleLink />)
+              : withPart(
+                  t('Noch kein Zugang zu Google: zuerst unter {link} mit Google verbinden oder ein Dienstkonto hinterlegen.'),
+                  <GoogleLink />,
+                )}
           </p>
           <label className="field">
-            <span>Link zum Galerie-Ordner</span>
+            <span>{t('Link zum Galerie-Ordner')}</span>
             <input
               type="text"
               autoComplete="off"
@@ -1634,10 +1717,12 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
         <label className="toggle feature-toggle">
           <input type="checkbox" checked={downloads} onChange={(e) => setDownloads(e.target.checked)} />
           <span>
-            Knöpfe zum Herunterladen zeigen
+            {t('Knöpfe zum Herunterladen zeigen')}
             <span className="small muted feature-desc">
-              Wer die {sec.gallery} sieht, kann dann jedes Bild und Video in der Großansicht und jedes Album als ZIP herunterladen (Bilder
-              in Originalauflösung, Videos unverändert).
+              {t(
+                'Wer die {section} sieht, kann dann jedes Bild und Video in der Großansicht und jedes Album als ZIP herunterladen (Bilder in Originalauflösung, Videos unverändert).',
+                { section: sec.gallery },
+              )}
             </span>
           </span>
         </label>
@@ -1646,18 +1731,22 @@ export function Gallery({ settings, onSaved, onToast }: SectionProps) {
         <label className="toggle feature-toggle">
           <input type="checkbox" checked={submissions} onChange={(e) => setSubmissions(e.target.checked)} />
           <span>
-            Einreichen von Bildern und Videos durch Mitglieder erlauben
+            {t('Einreichen von Bildern und Videos durch Mitglieder erlauben')}
             <span className="small muted feature-desc">
-              Wer das Recht „Bilder und Videos einreichen“ hat, kann dann Bilder und Videos für die {sec.gallery} einreichen. Sie erscheinen
-              erst, wenn jemand sie unter „Einreichungen prüfen“ freigibt.
+              {t(
+                'Wer das Recht „Bilder und Videos einreichen“ hat, kann dann Bilder und Videos für die {section} einreichen. Sie erscheinen erst, wenn jemand sie unter „Einreichungen prüfen“ freigibt.',
+                { section: sec.gallery },
+              )}
             </span>
           </span>
         </label>
       )}
-      {source === 'drive' && g.status.error && <p className="form-error small">Letzter Abgleich: {g.status.error}</p>}
+      {source === 'drive' && g.status.error && (
+        <p className="form-error small">{t('Letzter Abgleich: {error}', { error: g.status.error })}</p>
+      )}
       {g.configured && source === 'drive' && (
         <button type="button" className="btn btn-secondary" onClick={sync} disabled={syncing}>
-          {syncing ? 'Gleicht ab …' : 'Jetzt abgleichen'}
+          {syncing ? t('Gleicht ab …') : t('Jetzt abgleichen')}
         </button>
       )}
       {progress && (
@@ -1697,7 +1786,7 @@ function FailedPhotos({ count, disabled, onRetry }: { count: number; disabled: b
 
   return (
     <details className="gallery-failed" onToggle={(e) => setOpen(e.currentTarget.open)}>
-      <summary>{count === 1 ? '1 Bild ließ sich nicht laden' : `${count} Bilder ließen sich nicht laden`} – anzeigen</summary>
+      <summary>{tn('{count} Bild ließ sich nicht laden – anzeigen', '{count} Bilder ließen sich nicht laden – anzeigen', count)}</summary>
       {error && (
         <p className="form-error small" role="alert">
           {error}
@@ -1712,25 +1801,25 @@ function FailedPhotos({ count, disabled, onRetry }: { count: number; disabled: b
                 <strong>{p.name}</strong>
                 <span className="small muted">
                   {' '}
-                  {p.album || 'ohne Album'}
-                  {p.intern && ' (intern)'}
-                  {!p.unsupported && ` · ${p.attempts === 1 ? '1 Versuch' : `${p.attempts} Versuche`}`}
+                  {p.album || t('ohne Album')}
+                  {p.intern && ` (${t('intern')})`}
+                  {!p.unsupported && ` · ${tn('{count} Versuch', '{count} Versuche', p.attempts)}`}
                 </span>
                 <br />
-                <span className="small">{p.error || 'ohne Fehlermeldung'}</span>{' '}
+                <span className="small">{p.error || t('ohne Fehlermeldung')}</span>{' '}
                 {p.drive_url ? (
                   <a className="small" href={p.drive_url} target="_blank" rel="noopener noreferrer">
-                    In Google Drive öffnen
+                    {t('In Google Drive öffnen')}
                   </a>
                 ) : (
-                  <span className="small muted">hochgeladen</span>
+                  <span className="small muted">{t('hochgeladen')}</span>
                 )}
               </li>
             ))}
           </ul>
           {list.total > list.photos.length && (
             <p className="small muted">
-              Gezeigt werden die ersten {list.photos.length} von {list.total}.
+              {t('Gezeigt werden die ersten {count} von {total}.', { count: list.photos.length, total: list.total })}
             </p>
           )}
         </>
@@ -1747,7 +1836,7 @@ function FailedPhotos({ count, disabled, onRetry }: { count: number; disabled: b
             .finally(() => setRetrying(false));
         }}
       >
-        {retrying ? 'Wird erneut versucht …' : 'Alle erneut versuchen'}
+        {retrying ? t('Wird erneut versucht …') : t('Alle erneut versuchen')}
       </button>
     </details>
   );
@@ -1755,11 +1844,11 @@ function FailedPhotos({ count, disabled, onRetry }: { count: number; disabled: b
 
 /** Bezeichnung je Quelle der News (Auswahl in den Einstellungen). */
 const NEWS_SOURCE_LABELS: Record<NewsSourceType, string> = {
-  none: 'Keine Neuigkeiten',
-  site: 'Beiträge dieser WordPress-Seite',
-  wordpress: 'Andere WordPress-Webseite',
-  rss: 'RSS- oder Atom-Feed',
-  app: 'In der App schreiben',
+  none: t('Keine Neuigkeiten'),
+  site: t('Beiträge dieser WordPress-Seite'),
+  wordpress: t('Andere WordPress-Webseite'),
+  rss: t('RSS- oder Atom-Feed'),
+  app: t('In der App schreiben'),
 };
 
 export function News({ settings, onSaved, onToast }: SectionProps) {
@@ -1786,7 +1875,7 @@ export function News({ settings, onSaved, onToast }: SectionProps) {
     setError(null);
     try {
       const r = await api.testNews();
-      setResult(`${r.count} Beiträge gefunden.`);
+      setResult(tn('{count} Beitrag gefunden.', '{count} Beiträge gefunden.', r.count));
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -1802,12 +1891,12 @@ export function News({ settings, onSaved, onToast }: SectionProps) {
       error={error}
       onSubmit={(e) => {
         e.preventDefault();
-        if (needsUrl && !url.trim()) return setError('Bitte die Adresse angeben.');
+        if (needsUrl && !url.trim()) return setError(t('Bitte die Adresse angeben.'));
         save({ news_source: source, ...(needsUrl ? { news_url: url.trim() } : {}) });
       }}
     >
       <label className="field">
-        <span>Quelle</span>
+        <span>{t('Quelle')}</span>
         <select value={source} onChange={(e) => setSource(e.target.value as NewsSourceType)}>
           {choices.map((c) => (
             <option key={c} value={c}>
@@ -1818,12 +1907,12 @@ export function News({ settings, onSaved, onToast }: SectionProps) {
       </label>
       {needsUrl && (
         <label className="field">
-          <span>{source === 'wordpress' ? 'Adresse der Webseite' : 'Adresse des Feeds'}</span>
+          <span>{source === 'wordpress' ? t('Adresse der Webseite') : t('Adresse des Feeds')}</span>
           <input
             type="url"
             inputMode="url"
             required
-            placeholder={source === 'wordpress' ? 'https://www.beispiel.de' : 'https://www.beispiel.de/feed'}
+            placeholder={source === 'wordpress' ? t('https://www.beispiel.de') : t('https://www.beispiel.de/feed')}
             value={url}
             onChange={(e) => setUrl(e.target.value)}
           />
@@ -1831,10 +1920,10 @@ export function News({ settings, onSaved, onToast }: SectionProps) {
       )}
       {(n.source === 'wordpress' || n.source === 'rss') &&
         (unsaved ? (
-          <p className="muted small">Erst speichern, dann testen.</p>
+          <p className="muted small">{t('Erst speichern, dann testen.')}</p>
         ) : (
           <button type="button" className="btn btn-secondary" onClick={test} disabled={testing}>
-            {testing ? 'Prüft …' : 'Neuigkeiten testen'}
+            {testing ? t('Prüft …') : t('Neuigkeiten testen')}
           </button>
         ))}
       {result && (
@@ -1862,7 +1951,7 @@ export function Legal({ settings, onSaved, onToast }: SectionProps) {
   return (
     <Section
       id="rechtliches"
-      title="Impressum und Datenschutz"
+      title={t('Impressum und Datenschutz')}
       busy={busy}
       error={error}
       onSubmit={(e) => {
@@ -1871,21 +1960,21 @@ export function Legal({ settings, onSaved, onToast }: SectionProps) {
       }}
     >
       <label className="field">
-        <span>Impressum</span>
+        <span>{t('Impressum')}</span>
         <input
           type="url"
           inputMode="url"
-          placeholder="https://www.beispiel.de/impressum"
+          placeholder={t('https://www.beispiel.de/impressum')}
           value={imprint}
           onChange={(e) => setImprint(e.target.value)}
         />
       </label>
       <label className="field">
-        <span>Datenschutzerklärung</span>
+        <span>{t('Datenschutzerklärung')}</span>
         <input
           type="url"
           inputMode="url"
-          placeholder="https://www.beispiel.de/datenschutz"
+          placeholder={t('https://www.beispiel.de/datenschutz')}
           value={privacy}
           onChange={(e) => setPrivacy(e.target.value)}
         />

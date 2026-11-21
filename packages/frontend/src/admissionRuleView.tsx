@@ -1,9 +1,10 @@
 import { Fragment } from 'react';
 import type { AdmissionRuleResult } from './api';
-import { countNodes, CONDITIONS_MAX, dateText, describeRule, GROUPS_MAX, plural, type DraftGroup, type DraftNode } from './admissionRule';
+import { countNodes, CONDITIONS_MAX, dateText, describeRule, GROUPS_MAX, type DraftGroup, type DraftNode } from './admissionRule';
 import { IconButton } from './icons';
+import { t, tn } from './i18n';
 
-const STATE_LABEL = { fulfilled: 'erfüllt', open: 'offen', unknown: 'unbekannt' } as const;
+const STATE_LABEL = { fulfilled: t('erfüllt'), open: t('offen'), unknown: t('unbekannt') } as const;
 
 /** Ausgewertete Voraussetzung als Liste mit Haken (erfüllt) und Kreis (offen), Gruppen eingerückt. */
 export function RuleResult({ result }: { result: AdmissionRuleResult }) {
@@ -22,7 +23,7 @@ function ResultGroup({ group }: { group: AdmissionRuleResult }) {
         <Fragment key={i}>
           {i > 0 && (
             <li className="rule-joiner" aria-hidden="true">
-              {group.op === 'or' ? 'oder' : 'und'}
+              {group.op === 'or' ? t('oder') : t('und')}
             </li>
           )}
           <li className={`rule-result-item rule-${r.status}`}>
@@ -31,14 +32,25 @@ function ResultGroup({ group }: { group: AdmissionRuleResult }) {
             </span>
             {r.type === 'group' ? (
               <div className="rule-result-group">
-                <span className="small muted">{r.op === 'or' ? 'Eine davon:' : 'Alle davon:'}</span>
+                <span className="small muted">{r.op === 'or' ? t('Eine davon:') : t('Alle davon:')}</span>
                 <ResultGroup group={r} />
               </div>
             ) : (
               <span>
                 {r.type === 'attendance'
-                  ? `${r.attended ?? 0} von ${plural(r.count ?? 0, 'Teilnahme', 'Teilnahmen')} an „${r.kind}“`
-                  : `${plural(r.months ?? 0, 'Monat', 'Monate')} als Anwärter${r.due ? ` (ab ${dateText(r.due)})` : ' („Anwärter seit“ fehlt)'}`}
+                  ? tn('{attended} von {count} Teilnahme an „{kind}“', '{attended} von {count} Teilnahmen an „{kind}“', r.count ?? 0, {
+                      attended: r.attended ?? 0,
+                      kind: r.kind ?? '',
+                    })
+                  : r.due
+                    ? tn('{count} Monat als Anwärter (ab {date})', '{count} Monate als Anwärter (ab {date})', r.months ?? 0, {
+                        date: dateText(r.due),
+                      })
+                    : tn(
+                        '{count} Monat als Anwärter („Anwärter seit“ fehlt)',
+                        '{count} Monate als Anwärter („Anwärter seit“ fehlt)',
+                        r.months ?? 0,
+                      )}
               </span>
             )}
           </li>
@@ -59,7 +71,7 @@ export function RuleEditor({ value, onChange, kinds }: { value: DraftGroup; onCh
   return (
     <div className="rule-editor stack">
       <GroupEditor group={value} onChange={(g) => onChange(g)} kinds={kinds} full={full} top />
-      <p className="small muted rule-sentence">{sentence ? `Voraussetzung: ${sentence}` : 'Ohne Voraussetzung'}</p>
+      <p className="small muted rule-sentence">{sentence ? t('Voraussetzung: {rule}', { rule: sentence }) : t('Ohne Voraussetzung')}</p>
     </div>
   );
 }
@@ -86,14 +98,14 @@ function GroupEditor({
   return (
     <div className={top ? 'rule-group rule-group-top' : 'rule-group'}>
       <div className="rule-group-head">
-        <div className="segmented small" role="group" aria-label="Verknüpfung">
+        <div className="segmented small" role="group" aria-label={t('Verknüpfung')}>
           <button
             type="button"
             className={group.op === 'and' ? 'active' : ''}
             aria-pressed={group.op === 'and'}
             onClick={() => onChange({ ...group, op: 'and' })}
           >
-            Alle müssen erfüllt sein
+            {t('Alle müssen erfüllt sein')}
           </button>
           <button
             type="button"
@@ -101,16 +113,16 @@ function GroupEditor({
             aria-pressed={group.op === 'or'}
             onClick={() => onChange({ ...group, op: 'or' })}
           >
-            Eine reicht
+            {t('Eine reicht')}
           </button>
         </div>
-        {onRemove && <IconButton icon="delete" label="Gruppe entfernen" variant="danger" onClick={onRemove} />}
+        {onRemove && <IconButton icon="delete" label={t('Gruppe entfernen')} variant="danger" onClick={onRemove} />}
       </div>
       {group.items.map((item, i) => (
         <Fragment key={i}>
           {i > 0 && (
             <p className="rule-joiner" aria-hidden="true">
-              {group.op === 'or' ? 'oder' : 'und'}
+              {group.op === 'or' ? t('oder') : t('und')}
             </p>
           )}
           {item.type === 'group' ? (
@@ -127,7 +139,7 @@ function GroupEditor({
           disabled={full.conditions}
           onClick={() => add({ type: 'attendance', kind: kinds[0] ?? '', count: '1' })}
         >
-          + Teilnahmen
+          {t('+ Teilnahmen')}
         </button>
         <button
           type="button"
@@ -135,7 +147,7 @@ function GroupEditor({
           disabled={full.conditions}
           onClick={() => add({ type: 'duration', months: '12' })}
         >
-          + Dauer
+          {t('+ Dauer')}
         </button>
         <button
           type="button"
@@ -145,7 +157,7 @@ function GroupEditor({
             add({ type: 'group', op: group.op === 'and' ? 'or' : 'and', items: [{ type: 'attendance', kind: kinds[0] ?? '', count: '1' }] })
           }
         >
-          + Gruppe
+          {t('+ Gruppe')}
         </button>
       </div>
     </div>
@@ -169,7 +181,7 @@ function ConditionEditor({
       {node.type === 'attendance' ? (
         <div className="rule-fields">
           <label className="field">
-            <span>Mindestens so viele Teilnahmen („anwesend“)</span>
+            <span>{t('Mindestens so viele Teilnahmen („anwesend“)')}</span>
             <input
               type="number"
               min={1}
@@ -180,9 +192,9 @@ function ConditionEditor({
             />
           </label>
           <label className="field">
-            <span>an Terminen der Art</span>
+            <span>{t('an Terminen der Art')}</span>
             <select value={node.kind} onChange={(e) => onChange({ ...node, kind: e.target.value })} required>
-              {options.length === 0 && <option value="">keine Terminart eingerichtet</option>}
+              {options.length === 0 && <option value="">{t('keine Terminart eingerichtet')}</option>}
               {options.map((k) => (
                 <option key={k} value={k}>
                   {k}
@@ -194,7 +206,7 @@ function ConditionEditor({
       ) : (
         <div className="rule-fields">
           <label className="field">
-            <span>Mindestens so viele Monate als Anwärter</span>
+            <span>{t('Mindestens so viele Monate als Anwärter')}</span>
             <input
               type="number"
               min={1}
@@ -206,7 +218,7 @@ function ConditionEditor({
           </label>
         </div>
       )}
-      <IconButton icon="delete" label="Bedingung entfernen" variant="danger" onClick={onRemove} />
+      <IconButton icon="delete" label={t('Bedingung entfernen')} variant="danger" onClick={onRemove} />
     </div>
   );
 }

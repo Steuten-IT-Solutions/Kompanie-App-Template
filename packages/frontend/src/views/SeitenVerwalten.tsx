@@ -9,6 +9,7 @@ import { AudienceBadge } from './Seiten';
 import { blocksInput, draftsFrom, newBlock, type BlockDraft } from '../blocks/blockDrafts';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
+import { t } from '../i18n';
 
 const BlocksEditor = lazyView(() => import('../blocks/BlocksEditor'));
 
@@ -36,7 +37,7 @@ function PageFields({
   return (
     <>
       <label className="field">
-        <span>Titel</span>
+        <span>{t('Titel')}</span>
         <input
           type="text"
           maxLength={TITLE_MAX}
@@ -47,14 +48,14 @@ function PageFields({
         />
       </label>
       <label className="field">
-        <span>Für wen?</span>
+        <span>{t('Für wen?')}</span>
         <select value={draft.audience} onChange={(e) => set({ audience: e.target.value as PageAudience })}>
-          <option value="members">Nur Mitglieder</option>
-          <option value="public">Alle, auch ohne Anmeldung</option>
+          <option value="members">{t('Nur Mitglieder')}</option>
+          <option value="public">{t('Alle, auch ohne Anmeldung')}</option>
         </select>
       </label>
       <div className="field">
-        <span>Inhalt</span>
+        <span>{t('Inhalt')}</span>
         <Suspense fallback={<Loading shape="text" chunk />}>
           <BlocksEditor value={draft.blocks} onChange={(blocks) => set({ blocks })} idPrefix={idPrefix} />
         </Suspense>
@@ -94,7 +95,7 @@ function PageEditor({ id, onDone, onToast }: { id: number; onDone: (saved: boole
         blocks: blocksInput(draft.blocks),
         updated_at: loaded.updated_at,
       });
-      onToast('Gespeichert');
+      onToast(t('Gespeichert'));
       onDone(true);
     } catch (err) {
       setConflict(err instanceof ApiError && err.code === 'conflict');
@@ -116,25 +117,25 @@ function PageEditor({ id, onDone, onToast }: { id: number; onDone: (saved: boole
       )}
       <div className="button-row">
         <button className="btn" type="submit" disabled={busy || conflict}>
-          Speichern
+          {t('Speichern')}
         </button>
         {conflict && (
           <button
             className="btn btn-secondary"
             type="button"
             onClick={async () => {
-              if (!(await confirmAsk('Neu laden? Deine Änderungen gehen dabei verloren.'))) return;
+              if (!(await confirmAsk(t('Neu laden? Deine Änderungen gehen dabei verloren.')))) return;
               setConflict(false);
               setFormError(null);
               setLoaded(null);
               reload();
             }}
           >
-            Neu laden
+            {t('Neu laden')}
           </button>
         )}
         <button className="btn btn-secondary" type="button" onClick={() => onDone(false)}>
-          Abbrechen
+          {t('Abbrechen')}
         </button>
       </div>
     </form>
@@ -174,7 +175,7 @@ export function PageAdmin({ onToast }: { onToast: (msg: string) => void }) {
     if (
       await run(
         () => api.createPage({ title: draft.title.trim(), audience: draft.audience, blocks: blocksInput(draft.blocks) }),
-        'Seite angelegt',
+        t('Seite angelegt'),
       )
     ) {
       setDraft(empty());
@@ -199,7 +200,8 @@ export function PageAdmin({ onToast }: { onToast: (msg: string) => void }) {
   const sort = useDragSort(data ?? [], reorder, editing !== null);
 
   if (loading && !data) return <Loading />;
-  if (error || !data) return <ErrorBox message={error ?? `Die ${sec.pages} konnten nicht geladen werden.`} onRetry={reload} />;
+  if (error || !data)
+    return <ErrorBox message={error ?? t('Die {section} konnten nicht geladen werden.', { section: sec.pages })} onRetry={reload} />;
   const list = data;
 
   return (
@@ -210,7 +212,7 @@ export function PageAdmin({ onToast }: { onToast: (msg: string) => void }) {
         </p>
       )}
       {list.length === 0 ? (
-        <Empty>Noch keine {sec.pages}.</Empty>
+        <Empty>{t('Noch keine {section}.', { section: sec.pages })}</Empty>
       ) : (
         <ul className="card-list page-admin-list">
           {list.map((p, i) =>
@@ -234,19 +236,21 @@ export function PageAdmin({ onToast }: { onToast: (msg: string) => void }) {
                   </div>
                   {p.updated_at && (
                     <div className="row-sub">
-                      Zuletzt geändert {formatShortTime(p.updated_at)}
-                      {p.updated_by_name ? ` von ${p.updated_by_name}` : ''}
+                      {p.updated_by_name
+                        ? t('Zuletzt geändert {time} von {name}', { time: formatShortTime(p.updated_at), name: p.updated_by_name })
+                        : t('Zuletzt geändert {time}', { time: formatShortTime(p.updated_at) })}
                     </div>
                   )}
                   <div className="row-actions">
-                    <IconButton icon="edit" label="Bearbeiten" disabled={busy} onClick={() => setEditing(p.id)} />
+                    <IconButton icon="edit" label={t('Bearbeiten')} disabled={busy} onClick={() => setEditing(p.id)} />
                     <IconButton
                       icon="delete"
-                      label="Löschen"
+                      label={t('Löschen')}
                       variant="danger"
                       disabled={busy}
                       onClick={async () =>
-                        (await confirmAsk(`Seite „${p.title}“ samt ihren Bildern löschen?`)) && run(() => api.deletePage(p.id), 'Gelöscht')
+                        (await confirmAsk(t('Seite „{title}“ samt ihren Bildern löschen?', { title: p.title }))) &&
+                        run(() => api.deletePage(p.id), t('Gelöscht'))
                       }
                     />
                   </div>
@@ -258,10 +262,10 @@ export function PageAdmin({ onToast }: { onToast: (msg: string) => void }) {
       )}
 
       <form className="form card" onSubmit={add}>
-        <h3>Neue Seite</h3>
+        <h3>{t('Neue Seite')}</h3>
         <PageFields key={newKey} draft={draft} onChange={setDraft} idPrefix="page-new" />
         <button className="btn btn-block" type="submit" disabled={busy}>
-          Anlegen
+          {t('Anlegen')}
         </button>
       </form>
     </div>

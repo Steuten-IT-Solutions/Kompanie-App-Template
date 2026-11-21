@@ -8,6 +8,7 @@ import { readSheet } from '../sheet';
 import { Credentials } from './Konten';
 import { formerSummary } from './Ehemalige';
 import { FileInput } from '../ui';
+import { t, tn } from '../i18n';
 
 const sec = brand.labels.sections;
 
@@ -80,22 +81,20 @@ function rowSummary(r: MemberImportRow): string {
     return formerSummary({ reason: r.reason ?? 'left', joined_on: r.joined_on ?? '', founder: !!r.founder, left_on: r.left_on ?? '' });
   }
   const parts: string[] = [];
-  if (r.username) parts.push(`Benutzername ${r.username}`);
+  if (r.username) parts.push(t('Benutzername {username}', { username: r.username }));
   if (r.email) parts.push(r.email);
   if (r.phone) parts.push(r.phone);
   if (r.address) parts.push(formatAddress(r.address).join(', '));
   if (r.birthday) {
     const [y, m, d] = r.birthday.length === 5 ? ['', ...r.birthday.split('-')] : r.birthday.split('-');
-    parts.push(`Geburtstag ${d}.${m}.${y}`);
+    parts.push(t('Geburtstag {date}', { date: `${d}.${m}.${y}` }));
   }
-  if (r.joined_on) parts.push(`Eintritt ${formatYearOrDate(r.joined_on)}`);
-  if (r.points) parts.push(`${r.points} ${sec.points}`);
+  if (r.joined_on) parts.push(t('Eintritt {date}', { date: formatYearOrDate(r.joined_on) }));
+  if (r.points) parts.push(t('{count} {points}', { count: r.points, points: sec.points }));
   if (r.rank) parts.push(r.rank);
   if (r.titles?.length) parts.push(r.titles.join(', '));
   return parts.join(' · ');
 }
-
-const count = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : `${n} ${many}`);
 
 /**
  * Mitglieder aus einer Tabelle (CSV oder Excel) übernehmen, mit Anwärtern und Ehemaligen: im Einrichtungsassistenten und
@@ -141,12 +140,17 @@ export function MemberImport({ onDone, doneLabel }: { onDone: () => void; doneLa
     const noAccess = result.new.no_access ?? 0;
     return (
       <div className="member-import stack">
-        <h2 className="member-name no-print">Import übernommen</h2>
+        <h2 className="member-name no-print">{t('Import übernommen')}</h2>
         <p role="status" className="no-print">
-          {count(result.created.length, 'Konto', 'Konten')} mit Startpasswort angelegt
-          {noAccess > 0 && ` · ${count(noAccess, 'Mitglied', 'Mitglieder')} ohne Zugang`}
-          {former > 0 && ` · ${count(former, 'Person', 'Personen')} als ehemalig`}
-          {result.offices_linked > 0 && ` · ${result.offices_linked} Einträge in den ${sec.offices} verknüpft`}.
+          {tn('{count} Konto mit Startpasswort angelegt', '{count} Konten mit Startpasswort angelegt', result.created.length)}
+          {noAccess > 0 && ' · ' + tn('{count} Mitglied ohne Zugang', '{count} Mitglieder ohne Zugang', noAccess)}
+          {former > 0 && ' · ' + tn('{count} Person als ehemalig', '{count} Personen als ehemalig', former)}
+          {result.offices_linked > 0 &&
+            ' · ' +
+              tn('{count} Eintrag in den {offices} verknüpft', '{count} Einträge in den {offices} verknüpft', result.offices_linked, {
+                offices: sec.offices,
+              })}
+          .
         </p>
         {result.error && (
           <p className="form-error no-print" role="alert">
@@ -157,7 +161,7 @@ export function MemberImport({ onDone, doneLabel }: { onDone: () => void; doneLa
           <Credentials people={result.created} onDone={onDone} doneLabel={doneLabel} />
         ) : (
           <button className="btn btn-block" onClick={onDone}>
-            {doneLabel ?? 'Fertig'}
+            {doneLabel ?? t('Fertig')}
           </button>
         )}
       </div>
@@ -169,17 +173,17 @@ export function MemberImport({ onDone, doneLabel }: { onDone: () => void; doneLa
   return (
     <div className="member-import office-import stack">
       <button type="button" className="btn btn-link" onClick={downloadTemplate}>
-        Vorlage herunterladen (CSV für Excel)
+        {t('Vorlage herunterladen (CSV für Excel)')}
       </button>
       <label className="field">
-        <span>Datei wählen (Excel .xlsx oder CSV)</span>
+        <span>{t('Datei wählen (Excel .xlsx oder CSV)')}</span>
         <FileInput
           accept=".xlsx,.csv,.txt,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           onChange={(e) => pick(e.target.files?.[0])}
         />
       </label>
       <label className="field">
-        <span>{fileName ? `Inhalt von ${fileName}` : 'Oder Tabelle einfügen (z. B. aus Excel kopiert)'}</span>
+        <span>{fileName ? t('Inhalt von {name}', { name: fileName }) : t('Oder Tabelle einfügen (z. B. aus Excel kopiert)')}</span>
         <textarea
           value={csv}
           placeholder={'Vorname;Nachname;Status\nErika;Muster;Mitglied\nOtto;Früher;ehemalig'}
@@ -196,52 +200,71 @@ export function MemberImport({ onDone, doneLabel }: { onDone: () => void; doneLa
       )}
       <div className="button-row">
         <button className="btn btn-secondary" disabled={busy || csv.trim() === ''} onClick={() => send(false)}>
-          {busy && !result ? 'Prüft …' : 'Vorschau'}
+          {busy && !result ? t('Prüft …') : t('Vorschau')}
         </button>
         {result && (
           <button className="btn" disabled={busy || errors > 0 || total === 0} onClick={() => send(true)}>
-            {busy ? 'Legt an …' : 'Übernehmen'}
+            {busy ? t('Legt an …') : t('Übernehmen')}
           </button>
         )}
       </div>
       {result && (
         <section>
           <p role="status">
-            Neu: {count(result.new.active - (result.new.no_access ?? 0), 'Konto', 'Konten')} mit Anmeldung
-            {(result.new.no_access ?? 0) > 0 && ` · ${result.new.no_access} ohne Zugang`} · {result.new.former} ehemalig · schon vorhanden:{' '}
-            {result.existing}
+            {t('Neu: {accounts} mit Anmeldung', {
+              accounts: tn('{count} Konto', '{count} Konten', result.new.active - (result.new.no_access ?? 0)),
+            })}
+            {(result.new.no_access ?? 0) > 0 && ' · ' + t('{count} ohne Zugang', { count: result.new.no_access ?? 0 })}
+            {' · '}
+            {t('{count} ehemalig', { count: result.new.former })}
+            {' · '}
+            {t('schon vorhanden: {count}', { count: result.existing })}
           </p>
           {result.columns.ignored.length > 0 && (
-            <p className="small">Übergangene Spalten: {result.columns.ignored.map((c) => `„${c.column}“ (${c.reason})`).join(', ')}</p>
+            <p className="small">
+              {t('Übergangene Spalten: {columns}', {
+                columns: result.columns.ignored.map((c) => t('„{column}“ ({reason})', { column: c.column, reason: c.reason })).join(', '),
+              })}
+            </p>
           )}
           {result.offices_linked > 0 && (
             <p className="small">
-              {result.offices_linked} Einträge in den {sec.offices}, die bisher nur den Namen hatten, werden mit dem Konto verknüpft.
+              {tn(
+                '{count} Eintrag in den {offices}, der bisher nur den Namen hatte, wird mit dem Konto verknüpft.',
+                '{count} Einträge in den {offices}, die bisher nur den Namen hatten, werden mit dem Konto verknüpft.',
+                result.offices_linked,
+                { offices: sec.offices },
+              )}
             </p>
           )}
           {errors > 0 && (
             <p className="form-error">
-              {errors === 1 ? '1 Zeile hat' : `${errors} Zeilen haben`} einen Fehler; bitte erst in der Datei korrigieren.
+              {tn(
+                '{count} Zeile hat einen Fehler; bitte erst in der Datei korrigieren.',
+                '{count} Zeilen haben einen Fehler; bitte erst in der Datei korrigieren.',
+                errors,
+              )}
             </p>
           )}
           <ul className="office-import-rows">
             {result.rows.map((r) => (
               <li key={r.line} className={r.existing ? 'muted' : ''}>
-                <strong>Zeile {r.line}</strong> {r.name}
+                <strong>{t('Zeile {line}', { line: r.line })}</strong> {r.name}
                 {r.status && !r.existing && (
                   <>
                     {' '}
-                    <span className="badge badge-role">{r.status === 'former' ? 'Ehemalig' : levelLabel(r.level ?? 'member')}</span>
+                    <span className="badge badge-role">{r.status === 'former' ? t('Ehemalig') : levelLabel(r.level ?? 'member')}</span>
                     {r.extra_roles?.map((label) => (
                       <span key={label} className="badge badge-role">
                         {label}
                       </span>
                     ))}
-                    {r.no_access && <span className="badge badge-no-access">ohne Zugang</span>}
+                    {r.no_access && <span className="badge badge-no-access">{t('ohne Zugang')}</span>}
                   </>
                 )}
                 {!r.existing && !r.error && rowSummary(r) && ` · ${rowSummary(r)}`}
-                {r.existing && (r.existing.former ? ' · schon als ehemalig eingetragen' : ' · hat schon ein Konto, wird übersprungen')}
+                {r.existing &&
+                  ' · ' + (r.existing.former ? t('schon als ehemalig eingetragen') : t('hat schon ein Konto, wird übersprungen'))}
                 {r.error && <p className="form-error">{r.error}</p>}
               </li>
             ))}

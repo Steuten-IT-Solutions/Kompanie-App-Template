@@ -3,6 +3,8 @@
  * Ohne Abhängigkeit von api.ts, damit die Tests es ohne Browser laden.
  */
 
+import { t } from './i18n';
+
 const KEY = 'kompanie-after-login';
 
 /**
@@ -38,11 +40,11 @@ export async function shareLink(url: string, title: string, onToast: (msg: strin
   }
   try {
     await navigator.clipboard.writeText(url);
-    onToast('Link kopiert');
+    onToast(t('Link kopiert'));
   } catch {
     // Erst hier laden: share.ts bleibt ohne Browser-Abhängigkeiten testbar
     const { promptAsk } = await import('./ask');
-    await promptAsk('Zum Kopieren markieren:', url, { title: 'Link kopieren', okLabel: 'Fertig' });
+    await promptAsk(t('Zum Kopieren markieren:'), url, { title: t('Link kopieren'), okLabel: t('Fertig') });
   }
 }
 

@@ -4,6 +4,7 @@ import { navigate } from '../router';
 import { ErrorBox, Loading, useAsync } from '../ui';
 import { Calendar, FeatureSwitches, Gallery, GoogleAccess, Legal, News } from './Einstellungen';
 import { MemberImport } from './MitgliederImport';
+import { t } from '../i18n';
 
 type Step = 'bereiche' | 'kalender' | 'galerie' | 'news' | 'rechtliches' | 'mitglieder' | 'fertig';
 
@@ -74,7 +75,7 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
       if (config) config.setupPending = false;
       // Kalender, Galerie und News sind jetzt ggf. eingerichtet: Tabs der App neu bestimmen.
       applyFeatures(await api.features());
-      onToast('Einrichtung abgeschlossen');
+      onToast(t('Einrichtung abgeschlossen'));
       navigate('verwaltung');
     } catch (err) {
       setError((err as Error).message);
@@ -86,27 +87,30 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
   return (
     <div className="settings">
       <p className="setup-steps small" ref={stepRef} tabIndex={-1} aria-live="polite">
-        Schritt {steps.indexOf(step) + 1} von {steps.length}
+        {t('Schritt {step} von {count}', { step: steps.indexOf(step) + 1, count: steps.length })}
       </p>
       {step === 'bereiche' && (
         <section className="card settings-section">
-          <h3>Willkommen!</h3>
+          <h3>{t('Willkommen!')}</h3>
           <p>
-            Die App läuft. Wähle zuerst, welche Bereiche eure Kompanie nutzen möchte. Danach verbinden wir die gewählten Bereiche, z. B. mit
-            dem Kalender oder den Fotos.
+            {t(
+              'Die App läuft. Wähle zuerst, welche Bereiche eure Kompanie nutzen möchte. Danach verbinden wir die gewählten Bereiche, z. B. mit dem Kalender oder den Fotos.',
+            )}
           </p>
           <FeatureSwitches list={list} value={value} disabled={busy} onChange={(key, on) => setChosen({ ...value, [key]: on })} />
           <p className="muted small">
-            Die Auswahl lässt sich jederzeit unter Einstellungen → Bereiche ändern. Die folgenden Schritte lassen sich überspringen.
+            {t('Die Auswahl lässt sich jederzeit unter Einstellungen → Bereiche ändern. Die folgenden Schritte lassen sich überspringen.')}
           </p>
-          {!Object.values(value).some(Boolean) && <p className="small">Ohne Bereich zeigt die App nur die Installationsanleitung.</p>}
+          {!Object.values(value).some(Boolean) && (
+            <p className="small">{t('Ohne Bereich zeigt die App nur die Installationsanleitung.')}</p>
+          )}
           {error && (
             <p className="form-error" role="alert">
               {error}
             </p>
           )}
           <button type="button" className="btn btn-block" disabled={busy} onClick={saveFeatures}>
-            {busy ? 'Speichert …' : 'Weiter'}
+            {busy ? t('Speichert …') : t('Weiter')}
           </button>
         </section>
       )}
@@ -121,50 +125,54 @@ export default function Einrichtung({ onToast }: { onToast: (msg: string) => voi
       {step === 'rechtliches' && <Legal key={settings.revision} settings={s} onSaved={onSaved} onToast={onToast} />}
       {step === 'mitglieder' && (
         <section className="card settings-section">
-          <h3>Mitglieder übernehmen</h3>
+          <h3>{t('Mitglieder übernehmen')}</h3>
           <p className="small">
-            Habt ihr eine Mitgliederliste in Excel oder als CSV? Dann lassen sich alle Mitglieder auf einmal anlegen, auf Wunsch auch
-            Ehemalige. Sonst einfach weiter: Mitglieder legst du jederzeit unter Verwaltung an.
+            {t(
+              'Habt ihr eine Mitgliederliste in Excel oder als CSV? Dann lassen sich alle Mitglieder auf einmal anlegen, auf Wunsch auch Ehemalige. Sonst einfach weiter: Mitglieder legst du jederzeit unter Verwaltung an.',
+            )}
           </p>
-          <MemberImport onDone={next} doneLabel="Weiter zum letzten Schritt" />
+          <MemberImport onDone={next} doneLabel={t('Weiter zum letzten Schritt')} />
         </section>
       )}
       {step === 'fertig' && (
         <section className="card settings-section">
-          <h3>Fast fertig</h3>
+          <h3>{t('Fast fertig')}</h3>
           <p className="small">
-            Updates kommen automatisch; vor jedem Update werden die Daten gesichert. Den Zustand der App, Updates und die Datensicherung
-            findest du unter <strong>Verwaltung → Einstellungen</strong>.
+            {t(
+              'Updates kommen automatisch; vor jedem Update werden die Daten gesichert. Den Zustand der App, Updates und die Datensicherung findest du unter',
+            )}{' '}
+            <strong>{t('Verwaltung → Einstellungen')}</strong>.
           </p>
           {reportsAvailable && (
             <label className="toggle">
               <input type="checkbox" checked={reports} onChange={(e) => setReports(e.target.checked)} />
               <span>
-                Statusmeldungen an die Betreuer der App senden: stündlich ein Lebenszeichen (Version, PHP-Version, Ampel je Bereich,
-                Fehlercodes mit Ursache, z. B. „Kalender: HTTP 404“, und Nutzungszahlen: Zahl der Konten, aktive Konten, Personen je
-                Bereich), schwere Fehler sofort; keine Namen, Inhalte oder Fehlertexte. So fallen Probleme früher auf. Die Fehlertexte
-                bleiben auf eurem Server (Einstellungen → Zustand und Updates → Fehlerprotokoll).
+                {t(
+                  'Statusmeldungen an die Betreuer der App senden: stündlich ein Lebenszeichen (Version, PHP-Version, Ampel je Bereich, Fehlercodes mit Ursache, z. B. „Kalender: HTTP 404“, und Nutzungszahlen: Zahl der Konten, aktive Konten, Personen je Bereich), schwere Fehler sofort; keine Namen, Inhalte oder Fehlertexte. So fallen Probleme früher auf. Die Fehlertexte bleiben auf eurem Server (Einstellungen → Zustand und Updates → Fehlerprotokoll).',
+                )}
               </span>
             </label>
           )}
-          <p className="small">Weitere Mitglieder legst du unter Verwaltung an; sie bekommen von dir Benutzername und Startpasswort.</p>
+          <p className="small">
+            {t('Weitere Mitglieder legst du unter Verwaltung an; sie bekommen von dir Benutzername und Startpasswort.')}
+          </p>
           {error && (
             <p className="form-error" role="alert">
               {error}
             </p>
           )}
           <button type="button" className="btn btn-block" disabled={busy} onClick={finish}>
-            {busy ? 'Speichert …' : 'Einrichtung abschließen'}
+            {busy ? t('Speichert …') : t('Einrichtung abschließen')}
           </button>
         </section>
       )}
       {step !== 'bereiche' && step !== 'fertig' && (
         <div className="button-row">
           <button type="button" className="btn btn-secondary" onClick={() => setIndex(index - 1)}>
-            Zurück
+            {t('Zurück')}
           </button>
           <button type="button" className="btn" onClick={next}>
-            Weiter
+            {t('Weiter')}
           </button>
         </div>
       )}

@@ -17,7 +17,7 @@ import { formatBirthday, ownBirthday } from '../birthdays';
 import { joinText, profileChoice } from '../joinYear';
 import { PersonOffices } from './Aemter';
 import { sources, usePrefetchMenu } from '../viewData';
-import { localeTag } from '../i18n';
+import { localeTag, t } from '../i18n';
 
 const sec = brand.labels.sections;
 
@@ -48,18 +48,18 @@ export default function Meins({
   const cared = useAsync(() => (passiveOn ? api.myPassives() : Promise.resolve([])), [], passiveOn ? 'my-passives' : undefined);
   const dataParts = (
     [
-      ['uebersicht', 'Übersicht', true],
+      ['uebersicht', t('Übersicht'), true],
       ['punkte', sec.points, config?.features.points && can('view_own_points')],
       ['strafen', sec.penalties, config?.features.penalties && can('view_own_penalties')],
       ['dienstgrad', brand.labels.rank, config?.features.ranks && can('view_own_rank')],
       ['anwesenheit', sec.attendance, config?.features.attendance && can('view_own_attendance')],
       // Passive, die die Person betreut (Bereich passive): nur, wenn es welche gibt
-      ['passive', 'Meine Passiven', passiveOn && ((config?.caredPassives ?? 0) > 0 || (cared.data?.length ?? 0) > 0)],
+      ['passive', t('Meine Passiven'), passiveOn && ((config?.caredPassives ?? 0) > 0 || (cared.data?.length ?? 0) > 0)],
     ] as const
   )
     .filter(([, , on]) => member && on)
     .map(([id, label]) => [id, label] as const);
-  const parts = [...dataParts, ['konto', 'Konto'] as const];
+  const parts = [...dataParts, ['konto', t('Konto')] as const];
   const active = parts.find(([id]) => id === sub)?.[0] ?? parts[0]?.[0];
   // Die anderen Seiten von „Meins“ im Leerlauf vorab laden: Sie erscheinen dann schon beim ersten Öffnen ohne Warten.
   usePrefetchMenu(
@@ -70,7 +70,7 @@ export default function Meins({
     <div>
       {parts.length > 1 && (
         <MenuNav
-          label="Meine Daten"
+          label={t('Meine Daten')}
           className="meins-menu"
           active={active}
           items={parts.map(([id, label]) => ({ id, label, onSelect: () => navigate(`meins/${id}`) }))}
@@ -132,7 +132,9 @@ function Uebersicht({ me }: { me: Me }) {
         </div>
       )}
       <p className="muted small member-level">
-        {(me.extra_roles ?? []).length > 0 ? 'Rollen' : 'Rolle'}: {roleLabels(me)}
+        {(me.extra_roles ?? []).length > 0
+          ? t('Rollen: {roles}', { roles: roleLabels(me) })
+          : t('Rolle: {roles}', { roles: roleLabels(me) })}
       </p>
       {/* Am Computer zwei Spalten wie beim Mitglied in der Verwaltung: links Kacheln, Titel und Daten, rechts Ämter */}
       <div className="member-columns">
@@ -149,7 +151,7 @@ function Uebersicht({ me }: { me: Me }) {
               )}
               {f.penalties && can('view_own_penalties') && (
                 <StatCard
-                  label="Offen"
+                  label={t('Offen')}
                   value={formatEuro(me.open_cents)}
                   tone={me.open_cents > 0 ? 'warn' : 'good'}
                   onClick={() => navigate('meins/strafen')}
@@ -161,19 +163,19 @@ function Uebersicht({ me }: { me: Me }) {
             <div className="card member-tile member-titles-tile my-titles">
               <span className="member-tile-label">{sec.titles}</span>
               <span className="member-tile-value">
-                {me.titles.length > 0 ? <TitleBadges titles={me.titles} /> : <span className="muted">Keine</span>}
+                {me.titles.length > 0 ? <TitleBadges titles={me.titles} /> : <span className="muted">{t('Keine')}</span>}
               </span>
             </div>
           )}
           {(birthday.data || joinYear.data) && (
             <ul className="card member-dates">
               {birthday.data && (
-                <DateRow label="Geburtstag" onOpen={toAccount}>
+                <DateRow label={t('Geburtstag')} onOpen={toAccount}>
                   {birthday.data.birthday ? formatBirthday(birthday.data.birthday) : null}
                 </DateRow>
               )}
               {joinYear.data && (
-                <DateRow label="Eintritt" onOpen={profileChoice() ? toAccount : undefined}>
+                <DateRow label={t('Eintritt')} onOpen={profileChoice() ? toAccount : undefined}>
                   {joinYear.data.join_year ? joinText(joinYear.data.join_year) : null}
                 </DateRow>
               )}
@@ -184,7 +186,7 @@ function Uebersicht({ me }: { me: Me }) {
           {offices && (
             <section className="member-offices">
               <h3 className="section-title">{sec.offices}</h3>
-              <PersonOffices userId={config!.user!.id} empty={`Du hast keine ${sec.offices} eingetragen.`} />
+              <PersonOffices userId={config!.user!.id} empty={t('Du hast keine {offices} eingetragen.', { offices: sec.offices })} />
             </section>
           )}
           {config?.features.attendance && <MyAdmission />}

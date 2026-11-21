@@ -9,8 +9,10 @@
  *   Zurück fragt; bleibt die Person, kommt der Eintrag wieder;
  * - Neuladen oder Schließen des Tabs: die Rückfrage des Browsers (beforeunload).
  * Beendet das Betriebssystem die App im Hintergrund, hilft das nicht; dafür bräuchte es Entwürfe auf dem Gerät.
- * Ohne eigene Imports (backClose.ts und ask.tsx gibt main.tsx hinein), damit die Tests es direkt laden können.
+ * Ohne eigene Imports außer i18n.ts (backClose.ts und ask.tsx gibt main.tsx hinein), damit die Tests es direkt laden
+ * können.
  */
+import { t } from './i18n';
 
 /** Aus backClose.ts */
 export interface BackLayers {
@@ -30,7 +32,7 @@ let ask: (message: string) => Promise<boolean> = async () => true;
 let openBackLayer: BackLayers['openBackLayer'] = () => () => undefined;
 let afterBackSync: BackLayers['afterBackSync'] = (fn) => fn();
 
-export const LEAVE_MESSAGE = 'Deine Änderungen sind noch nicht gespeichert. Seite trotzdem verlassen? Die Eingaben gehen dann verloren.';
+export const LEAVE_MESSAGE = t('Deine Änderungen sind noch nicht gespeichert. Seite trotzdem verlassen? Die Eingaben gehen dann verloren.');
 
 /** Gibt es gerade Eingaben, die noch nicht gespeichert sind? */
 export function hasUnsaved(): boolean {

@@ -7,14 +7,15 @@ import { ATTENDANCE_LABELS, type MemberAttendance as Data } from './api';
 import { attendanceYears, inPeriod, periodCounts, type AttendancePeriod } from './attendanceYears';
 import { formatDate } from './format';
 import { Sheet } from './ui';
+import { t, tn } from './i18n';
 
 const CELLS = [
-  { status: 'present', label: 'anwesend' },
-  { status: 'excused', label: 'entschuldigt' },
-  { status: 'absent', label: 'unentschuldigt' },
+  { status: 'present', label: t('anwesend') },
+  { status: 'excused', label: t('entschuldigt') },
+  { status: 'absent', label: t('unentschuldigt') },
 ] as const;
 
-const periodLabel = (p: AttendancePeriod) => (p === 'all' ? 'gesamt' : p);
+const periodLabel = (p: AttendancePeriod) => (p === 'all' ? t('gesamt') : p);
 
 export function MemberAttendance({ data, open, onOpen, onClose }: { data: Data; open: boolean; onOpen: () => void; onClose: () => void }) {
   const [period, setPeriod] = useState<AttendancePeriod>(data.today.slice(0, 4));
@@ -23,23 +24,28 @@ export function MemberAttendance({ data, open, onOpen, onClose }: { data: Data; 
   const entries = inPeriod(data.entries, period);
   return (
     <section className="member-attendance">
-      <h3 className="section-title">Anwesenheit</h3>
+      <h3 className="section-title">{t('Anwesenheit')}</h3>
       <label className="member-attendance-period">
-        <span>Zeitraum</span>
+        <span>{t('Zeitraum')}</span>
         <select value={period} onChange={(e) => setPeriod(e.target.value)}>
           {years.map((y) => (
             <option key={y} value={y}>
               {y}
             </option>
           ))}
-          <option value="all">Gesamt</option>
+          <option value="all">{t('Gesamt')}</option>
         </select>
       </label>
       <button
         type="button"
         className="card member-attendance-tile"
         onClick={onOpen}
-        aria-label={`Anwesenheit ${periodLabel(period)}: ${counts.present} anwesend, ${counts.excused} entschuldigt, ${counts.absent} unentschuldigt. Einträge ansehen`}
+        aria-label={t('Anwesenheit {period}: {present} anwesend, {excused} entschuldigt, {absent} unentschuldigt. Einträge ansehen', {
+          period: periodLabel(period),
+          present: counts.present,
+          excused: counts.excused,
+          absent: counts.absent,
+        })}
       >
         {CELLS.map((c) => (
           <span key={c.status} className="member-attendance-cell">
@@ -53,13 +59,17 @@ export function MemberAttendance({ data, open, onOpen, onClose }: { data: Data; 
       </button>
       {counts.upcoming > 0 && (
         <p className="muted small member-attendance-note">
-          {counts.upcoming === 1 ? 'Davon 1 Entschuldigung' : `Davon ${counts.upcoming} Entschuldigungen`} für kommende Termine.
+          {tn(
+            'Davon {count} Entschuldigung für kommende Termine.',
+            'Davon {count} Entschuldigungen für kommende Termine.',
+            counts.upcoming,
+          )}
         </p>
       )}
       {open && (
-        <Sheet title={`Anwesenheit ${periodLabel(period)}`} onClose={onClose} routed>
+        <Sheet title={t('Anwesenheit {period}', { period: periodLabel(period) })} onClose={onClose} routed>
           {entries.length === 0 ? (
-            <p className="muted">Im Zeitraum ist für diese Person nichts eingetragen.</p>
+            <p className="muted">{t('Im Zeitraum ist für diese Person nichts eingetragen.')}</p>
           ) : (
             <ul className="card-list">
               {entries.map((e) => (
@@ -68,11 +78,11 @@ export function MemberAttendance({ data, open, onOpen, onClose }: { data: Data; 
                     <div className="row-title">{e.title}</div>
                     <div className="row-sub">
                       {formatDate(e.date)}
-                      {e.date > data.today && ' · kommender Termin'}
+                      {e.date > data.today && ` · ${t('kommender Termin')}`}
                     </div>
                   </div>
                   <span className={`badge badge-att badge-att-${e.status}`}>
-                    {e.status === 'absent' ? 'unentschuldigt' : ATTENDANCE_LABELS[e.status]}
+                    {e.status === 'absent' ? t('unentschuldigt') : ATTENDANCE_LABELS[e.status]}
                   </span>
                 </li>
               ))}

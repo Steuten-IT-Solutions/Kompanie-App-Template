@@ -1,5 +1,7 @@
 // Geburtstage der Passiven: die Liste der Alter, an die erinnert wird, aus dem Eingabefeld lesen.
 
+import { t } from './i18n';
+
 /** Höchstes Alter und höchste Zahl der Alter (wie auf dem Server) */
 const AGE_MAX = 120;
 const AGES_MAX = 30;
@@ -12,9 +14,10 @@ export function parseAges(text: string): number[] | string {
     .filter((x) => x !== '');
   const ages = new Set<number>();
   for (const part of parts) {
-    if (!/^\d+$/.test(part) || Number(part) < 1 || Number(part) > AGE_MAX) return `Bitte nur Alter von 1 bis ${AGE_MAX} angeben.`;
+    if (!/^\d+$/.test(part) || Number(part) < 1 || Number(part) > AGE_MAX)
+      return t('Bitte nur Alter von 1 bis {max} angeben.', { max: AGE_MAX });
     ages.add(Number(part));
   }
-  if (ages.size > AGES_MAX) return `Es gehen höchstens ${AGES_MAX} Alter.`;
+  if (ages.size > AGES_MAX) return t('Es gehen höchstens {max} Alter.', { max: AGES_MAX });
   return [...ages].sort((a, b) => a - b);
 }

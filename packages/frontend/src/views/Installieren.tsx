@@ -16,6 +16,8 @@ import {
 import { androidBrowser, BROWSER_NAMES, shortcutOnly, type AndroidBrowser } from '../androidBrowser';
 import { shareLink } from '../share';
 import { promptAsk } from '../ask';
+import { t } from '../i18n';
+import { bold } from '../ui';
 
 /*
  * Schritt-für-Schritt-Anleitung „App aufs Handy holen“ – mit großen Bildern,
@@ -62,9 +64,9 @@ const ShareIcon = ({ x, y, s = 1 }: { x: number; y: number; s?: number }) => (
 
 function IosStep1() {
   return (
-    <Frame label="Safari-Leiste unten: Teilen-Symbol bzw. drei Punkte">
+    <Frame label={t('Safari-Leiste unten: Teilen-Symbol bzw. drei Punkte')}>
       <text x="14" y="26" className="pic-cap">
-        Ältere iPhones
+        {t('Ältere iPhones')}
       </text>
       <rect x="12" y="34" width="216" height="40" rx="10" fill="var(--bg)" />
       <text x="34" y="60" className="pic-ico">
@@ -78,7 +80,7 @@ function IosStep1() {
       <rect x="194" y="45" width="15" height="15" rx="3" fill="none" stroke="#1f6fe5" strokeWidth="2" />
       <Tap x={120} y={54} r={21} />
       <text x="14" y="98" className="pic-cap">
-        Neuere iPhones
+        {t('Neuere iPhones')}
       </text>
       <rect x="12" y="106" width="216" height="34" rx="17" fill="var(--bg)" />
       <text x="28" y="129" className="pic-ico">
@@ -98,18 +100,18 @@ function IosStep1() {
 
 function IosStep2() {
   return (
-    <Frame label="Teilen-Menü mit dem Eintrag Zum Home-Bildschirm">
+    <Frame label={t('Teilen-Menü mit dem Eintrag Zum Home-Bildschirm')}>
       <rect x="20" y="14" width="200" height="30" rx="8" fill="var(--bg)" />
       <text x="34" y="34" className="pic-row">
-        Kopieren
+        {t('Kopieren')}
       </text>
       <rect x="20" y="50" width="200" height="30" rx="8" fill="var(--bg)" />
       <text x="34" y="70" className="pic-row">
-        Zu Favoriten hinzufügen
+        {t('Zu Favoriten hinzufügen')}
       </text>
       <rect x="20" y="86" width="200" height="34" rx="8" fill="var(--bg)" stroke={HL} strokeWidth="4" />
       <text x="34" y="108" className="pic-row pic-strong">
-        Zum Home-Bildschirm
+        {t('Zum Home-Bildschirm')}
       </text>
       <rect x="194" y="95" width="16" height="16" rx="4" fill="none" stroke="var(--ink)" strokeWidth="2" />
       <path d="M202 99v8M198 103h8" stroke="var(--ink)" strokeWidth="2" />
@@ -119,12 +121,12 @@ function IosStep2() {
 
 function IosStep3() {
   return (
-    <Frame label="Fenster Zum Home-Bildschirm mit dem Knopf Hinzufügen oben rechts">
+    <Frame label={t('Fenster Zum Home-Bildschirm mit dem Knopf Hinzufügen oben rechts')}>
       <text x="16" y="30" className="pic-row" fill="#1f6fe5">
-        Abbrechen
+        {t('Abbrechen')}
       </text>
       <text x="224" y="30" textAnchor="end" className="pic-row pic-strong" fill="#1f6fe5">
-        Hinzufügen
+        {t('Hinzufügen')}
       </text>
       <rect x="141" y="10" width="92" height="26" rx="8" fill="none" stroke={HL} strokeWidth="4" />
       <line x1="10" y1="44" x2="230" y2="44" stroke="var(--line)" strokeWidth="2" />
@@ -136,7 +138,7 @@ function IosStep3() {
         {HOST}
       </text>
       <text x="22" y="132" className="pic-row">
-        Als Web-App öffnen
+        {t('Als Web-App öffnen')}
       </text>
       <rect x="182" y="117" width="40" height="22" rx="11" fill="#34c759" />
       <circle cx="211" cy="128" r="9" fill="#fff" />
@@ -165,7 +167,7 @@ function HomeScreen({ label }: { label: string }) {
 
 function AndroidStep1() {
   return (
-    <Frame label="Chrome-Leiste oben mit den drei Punkten rechts">
+    <Frame label={t('Chrome-Leiste oben mit den drei Punkten rechts')}>
       <rect x="12" y="20" width="216" height="40" rx="20" fill="var(--bg)" />
       <text x="30" y="45" className="pic-ico">
         ⌂
@@ -179,7 +181,7 @@ function AndroidStep1() {
       <circle cx="207" cy="48" r="2.6" fill="var(--ink)" />
       <Tap x={207} y={40} r={15} />
       <text x="120" y="100" textAnchor="middle" className="pic-row">
-        oben rechts: drei Punkte ⋮
+        {t('oben rechts: drei Punkte ⋮')}
       </text>
     </Frame>
   );
@@ -187,21 +189,21 @@ function AndroidStep1() {
 
 function AndroidStep2() {
   return (
-    <Frame label="Chrome-Menü mit dem Eintrag App installieren">
+    <Frame label={t('Chrome-Menü mit dem Eintrag App installieren')}>
       <rect x="20" y="14" width="200" height="30" rx="8" fill="var(--bg)" />
       <text x="34" y="34" className="pic-row">
-        Neuer Tab
+        {t('Neuer Tab')}
       </text>
       <rect x="20" y="50" width="200" height="30" rx="8" fill="var(--bg)" />
       <text x="34" y="70" className="pic-row">
-        Verlauf
+        {t('Verlauf')}
       </text>
       <rect x="20" y="86" width="200" height="40" rx="8" fill="var(--bg)" stroke={HL} strokeWidth="4" />
       <text x="34" y="103" className="pic-row pic-strong">
-        App installieren
+        {t('App installieren')}
       </text>
       <text x="34" y="119" className="pic-small">
-        oder: Zum Startbildschirm hinzufügen
+        {t('oder: Zum Startbildschirm hinzufügen')}
       </text>
     </Frame>
   );
@@ -230,14 +232,14 @@ function CopyLink() {
       await navigator.clipboard.writeText(url);
       setCopied(true);
     } catch {
-      await promptAsk('Zum Kopieren markieren:', url, { title: 'Adresse kopieren', okLabel: 'Fertig' });
+      await promptAsk(t('Zum Kopieren markieren:'), url, { title: t('Adresse kopieren'), okLabel: t('Fertig') });
     }
   }
   return (
     <div className="install-copy">
       <code>{url}</code>
       <button className="btn btn-secondary btn-small" onClick={copy}>
-        {copied ? 'Kopiert ✓' : 'Adresse kopieren'}
+        {copied ? t('Kopiert ✓') : t('Adresse kopieren')}
       </button>
     </div>
   );
@@ -245,14 +247,20 @@ function CopyLink() {
 
 function ShareGuide({ onToast }: { onToast: (msg: string) => void }) {
   const url = installUrl();
-  const share = () => shareLink(url, `${brand.shortName}: App installieren`, onToast, `So kommt die App der ${brand.name} aufs Handy:`);
+  const share = () =>
+    shareLink(
+      url,
+      t('{app}: App installieren', { app: brand.shortName }),
+      onToast,
+      t('So kommt die App der {company} aufs Handy:', { company: brand.name }),
+    );
   return (
     <div className="card install-share">
-      <h3>Anleitung weitergeben</h3>
-      <p className="muted small">Diesen Link kann man per WhatsApp oder E-Mail verschicken – er öffnet genau diese Anleitung.</p>
+      <h3>{t('Anleitung weitergeben')}</h3>
+      <p className="muted small">{t('Diesen Link kann man per WhatsApp oder E-Mail verschicken – er öffnet genau diese Anleitung.')}</p>
       <code>{url}</code>
       <button className="btn btn-secondary btn-block" onClick={share}>
-        Link teilen
+        {t('Link teilen')}
       </button>
     </div>
   );
@@ -261,43 +269,25 @@ function ShareGuide({ onToast }: { onToast: (msg: string) => void }) {
 function IosGuide() {
   return (
     <ol className="install-steps">
-      <Step
-        n={1}
-        title={
-          <>
-            Auf das <strong>Teilen-Symbol</strong> tippen
-          </>
-        }
-        pic={<IosStep1 />}
-      >
-        Wo es steht, hängt von Gerät und Safari ab: am iPhone meist in der Leiste unten, am iPad in der Leiste oben. Ab iOS 26 ist „Kompakt“
-        voreingestellt: Dann steckt es hinter <strong>„•••“</strong> an der Adresszeile – zuerst darauf tippen und dann{' '}
-        <strong>„Teilen“</strong> wählen. Die Darstellung lässt sich unter Einstellungen → Apps → Safari → Tabs umstellen.
+      <Step n={1} title={bold(t('Auf das <b>Teilen-Symbol</b> tippen'))} pic={<IosStep1 />}>
+        {bold(
+          t(
+            'Wo es steht, hängt von Gerät und Safari ab: am iPhone meist in der Leiste unten, am iPad in der Leiste oben. Ab iOS 26 ist „Kompakt“ voreingestellt: Dann steckt es hinter <b>„•••“</b> an der Adresszeile – zuerst darauf tippen und dann <b>„Teilen“</b> wählen. Die Darstellung lässt sich unter Einstellungen → Apps → Safari → Tabs umstellen.',
+          ),
+        )}
+      </Step>
+      <Step n={2} title={bold(t('<b>„Zum Home-Bildschirm“</b> wählen'))} pic={<IosStep2 />}>
+        {t('Der Eintrag steht weiter unten in der Liste – mit dem Finger nach oben wischen, bis er erscheint.')}
+      </Step>
+      <Step n={3} title={bold(t('Oben rechts auf <b>„Hinzufügen“</b> tippen'))} pic={<IosStep3 />}>
+        {t('Falls dort der Schalter „Als Web-App öffnen“ steht: eingeschaltet (grün) lassen.')}
       </Step>
       <Step
-        n={2}
-        title={
-          <>
-            <strong>„Zum Home-Bildschirm“</strong> wählen
-          </>
-        }
-        pic={<IosStep2 />}
+        n={4}
+        title={<>{t('Fertig! Die App mit unserem Logo öffnen')}</>}
+        pic={<HomeScreen label={t('Home-Bildschirm mit dem Logo der App')} />}
       >
-        Der Eintrag steht weiter unten in der Liste – mit dem Finger nach oben wischen, bis er erscheint.
-      </Step>
-      <Step
-        n={3}
-        title={
-          <>
-            Oben rechts auf <strong>„Hinzufügen“</strong> tippen
-          </>
-        }
-        pic={<IosStep3 />}
-      >
-        Falls dort der Schalter „Als Web-App öffnen“ steht: eingeschaltet (grün) lassen.
-      </Step>
-      <Step n={4} title={<>Fertig! Die App mit unserem Logo öffnen</>} pic={<HomeScreen label="Home-Bildschirm mit dem Logo der App" />}>
-        Ab jetzt die App immer über dieses Symbol starten. Die Anmeldung bleibt gespeichert.
+        {t('Ab jetzt die App immer über dieses Symbol starten. Die Anmeldung bleibt gespeichert.')}
       </Step>
     </ol>
   );
@@ -306,28 +296,17 @@ function IosGuide() {
 function AndroidGuide() {
   return (
     <ol className="install-steps">
-      <Step
-        n={1}
-        title={
-          <>
-            Oben rechts auf die <strong>drei Punkte ⋮</strong> tippen
-          </>
-        }
-        pic={<AndroidStep1 />}
-      />
-      <Step
-        n={2}
-        title={
-          <>
-            <strong>„App installieren“</strong> wählen
-          </>
-        }
-        pic={<AndroidStep2 />}
-      >
-        Je nach Handy und Chrome-Version heißt der Eintrag auch „Zum Startbildschirm hinzufügen“ oder ähnlich. Danach mit „Installieren“
-        bzw. „Hinzufügen“ bestätigen. Fragt Chrome „Installieren“ oder „Verknüpfung erstellen“: „Installieren“ wählen.
+      <Step n={1} title={bold(t('Oben rechts auf die <b>drei Punkte ⋮</b> tippen'))} pic={<AndroidStep1 />} />
+      <Step n={2} title={bold(t('<b>„App installieren“</b> wählen'))} pic={<AndroidStep2 />}>
+        {t(
+          'Je nach Handy und Chrome-Version heißt der Eintrag auch „Zum Startbildschirm hinzufügen“ oder ähnlich. Danach mit „Installieren“ bzw. „Hinzufügen“ bestätigen. Fragt Chrome „Installieren“ oder „Verknüpfung erstellen“: „Installieren“ wählen.',
+        )}
       </Step>
-      <Step n={3} title={<>Fertig! Die App mit unserem Logo öffnen</>} pic={<HomeScreen label="Startbildschirm mit dem Logo der App" />} />
+      <Step
+        n={3}
+        title={<>{t('Fertig! Die App mit unserem Logo öffnen')}</>}
+        pic={<HomeScreen label={t('Startbildschirm mit dem Logo der App')} />}
+      />
     </ol>
   );
 }
@@ -336,27 +315,35 @@ function AndroidGuide() {
 function AndroidTrouble() {
   return (
     <div className="card install-trouble stack">
-      <h3>Klappt es nicht?</h3>
+      <h3>{t('Klappt es nicht?')}</h3>
       <ul className="small">
         <li>
-          <strong>Kein Eintrag zum Installieren:</strong> Ist die App schon installiert, bietet Chrome sie nicht noch einmal an. Sieh in der
-          Liste deiner Apps nach. Sonst die Seite einmal antippen, kurz warten und das Menü erneut öffnen.
+          <strong>{t('Kein Eintrag zum Installieren:')}</strong>{' '}
+          {t(
+            'Ist die App schon installiert, bietet Chrome sie nicht noch einmal an. Sieh in der Liste deiner Apps nach. Sonst die Seite einmal antippen, kurz warten und das Menü erneut öffnen.',
+          )}
         </li>
         <li>
-          <strong>Xiaomi, Redmi, POCO:</strong> Dort darf ein Browser erst Symbole auf den Startbildschirm legen, wenn du es erlaubst: in
-          den Einstellungen des Handys bei den Berechtigungen von Chrome „Verknüpfungen auf dem Startbildschirm“ einschalten.
+          <strong>Xiaomi, Redmi, POCO:</strong>{' '}
+          {t(
+            'Dort darf ein Browser erst Symbole auf den Startbildschirm legen, wenn du es erlaubst: in den Einstellungen des Handys bei den Berechtigungen von Chrome „Verknüpfungen auf dem Startbildschirm“ einschalten.',
+          )}
         </li>
         <li>
-          <strong>Huawei ohne Google-Dienste:</strong> Ohne Google-Dienste legt Chrome nur eine Verknüpfung an, und Benachrichtigungen
-          können ausbleiben, weil sie über Google zugestellt werden.
+          <strong>{t('Huawei ohne Google-Dienste:')}</strong>{' '}
+          {t(
+            'Ohne Google-Dienste legt Chrome nur eine Verknüpfung an, und Benachrichtigungen können ausbleiben, weil sie über Google zugestellt werden.',
+          )}
         </li>
         <li>
-          <strong>Benachrichtigungen kommen nicht an:</strong> Manche Handys (z. B. Samsung, Xiaomi, Huawei) beenden Apps im Hintergrund, um
-          Akku zu sparen. Nimm Chrome und die App in den Akku-Einstellungen von der Optimierung aus.
+          <strong>{t('Benachrichtigungen kommen nicht an:')}</strong>{' '}
+          {t(
+            'Manche Handys (z. B. Samsung, Xiaomi, Huawei) beenden Apps im Hintergrund, um Akku zu sparen. Nimm Chrome und die App in den Akku-Einstellungen von der Optimierung aus.',
+          )}
         </li>
         <li>
-          <strong>Android 8 oder 9:</strong> Dort bekommt Chrome keine neuen Versionen mehr (letzte ist Chrome 138). Die App kann dann
-          eingeschränkt laufen.
+          <strong>{t('Android 8 oder 9:')}</strong>{' '}
+          {t('Dort bekommt Chrome keine neuen Versionen mehr (letzte ist Chrome 138). Die App kann dann eingeschränkt laufen.')}
         </li>
       </ul>
     </div>
@@ -368,15 +355,15 @@ function ChromeButtons() {
   return (
     <>
       <a className="btn btn-block install-chrome" href={chromeUrl(installUrl())}>
-        In Chrome öffnen
+        {t('In Chrome öffnen')}
       </a>
       <p className="small install-chrome-get">
-        Noch kein Chrome auf dem Handy? Chrome ist kostenlos. Erst herunterladen, dann hier wieder auf „In Chrome öffnen“ tippen.
+        {t('Noch kein Chrome auf dem Handy? Chrome ist kostenlos. Erst herunterladen, dann hier wieder auf „In Chrome öffnen“ tippen.')}
       </p>
       <a className="btn btn-block btn-secondary install-chrome" href={CHROME_PLAY_URL} target="_blank" rel="noopener noreferrer">
-        Chrome herunterladen
+        {t('Chrome herunterladen')}
       </a>
-      Falls „In Chrome öffnen“ nicht funktioniert: Adresse kopieren und in Chrome einfügen.
+      {t('Falls „In Chrome öffnen“ nicht funktioniert: Adresse kopieren und in Chrome einfügen.')}
       <CopyLink />
     </>
   );
@@ -386,34 +373,27 @@ function ChromeButtons() {
 function OtherBrowserNote({ browser }: { browser: AndroidBrowser }) {
   const name = BROWSER_NAMES[browser];
   const steps: Partial<Record<AndroidBrowser, ReactNode>> = {
-    firefox: (
-      <>
-        Oben rechts auf <strong>⋮</strong> tippen, <strong>„Installieren“</strong> wählen und dann <strong>„Automatisch hinzufügen“</strong>
-        .
-      </>
-    ),
-    opera: (
-      <>
-        Das Menü öffnen, <strong>„Hinzufügen zu …“</strong> und dann <strong>„Startbildschirm“</strong> wählen.
-      </>
-    ),
+    firefox: bold(t('Oben rechts auf <b>⋮</b> tippen, <b>„Installieren“</b> wählen und dann <b>„Automatisch hinzufügen“</b>.')),
+    opera: bold(t('Das Menü öffnen, <b>„Hinzufügen zu …“</b> und dann <b>„Startbildschirm“</b> wählen.')),
   };
   return (
     <div className="install-warn" role="note">
-      <strong>Am besten mit Chrome installieren.</strong> {browser === 'other' ? 'Dieser Browser' : name} legt nur eine Verknüpfung auf dem
-      Startbildschirm an, keine richtige App: Sie steht nicht in der Liste deiner Apps und öffnet sich über den Browser.{' '}
+      <strong>{t('Am besten mit Chrome installieren.')}</strong>{' '}
+      {browser === 'other'
+        ? t(
+            'Dieser Browser legt nur eine Verknüpfung auf dem Startbildschirm an, keine richtige App: Sie steht nicht in der Liste deiner Apps und öffnet sich über den Browser.',
+          )
+        : t(
+            '{browser} legt nur eine Verknüpfung auf dem Startbildschirm an, keine richtige App: Sie steht nicht in der Liste deiner Apps und öffnet sich über den Browser.',
+            { browser: name },
+          )}{' '}
       {browser === 'firefox' || browser === 'opera'
-        ? 'Benachrichtigungen gehen dort zwar auch, '
-        : 'Ob Benachrichtigungen dort ankommen, ist nicht sicher; '}
-      mit Chrome wird die App eine richtige App mit Benachrichtigungen.
+        ? t('Benachrichtigungen gehen dort zwar auch, mit Chrome wird die App eine richtige App mit Benachrichtigungen.')
+        : t('Ob Benachrichtigungen dort ankommen, ist nicht sicher; mit Chrome wird die App eine richtige App mit Benachrichtigungen.')}
       <ChromeButtons />
       <p className="small install-other-steps">
-        Lieber bei {browser === 'other' ? 'diesem Browser' : name} bleiben?{' '}
-        {steps[browser] ?? (
-          <>
-            Im Menü des Browsers den Eintrag <strong>„Zum Startbildschirm hinzufügen“</strong> (oder ähnlich) wählen.
-          </>
-        )}
+        {browser === 'other' ? t('Lieber bei diesem Browser bleiben?') : t('Lieber bei {browser} bleiben?', { browser: name })}{' '}
+        {steps[browser] ?? bold(t('Im Menü des Browsers den Eintrag <b>„Zum Startbildschirm hinzufügen“</b> (oder ähnlich) wählen.'))}
       </p>
     </div>
   );
@@ -430,14 +410,14 @@ export default function Installieren({ onToast }: { onToast: (msg: string) => vo
 
   async function install() {
     const result = await promptInstall();
-    if (result === 'accepted') onToast('Die App wird installiert – gleich ist sie auf dem Startbildschirm');
+    if (result === 'accepted') onToast(t('Die App wird installiert – gleich ist sie auf dem Startbildschirm'));
   }
 
   if (isStandalone()) {
     return (
       <div className="card install-intro">
-        <h2>Alles erledigt</h2>
-        <p>Die App ist bereits installiert – du benutzt sie gerade.</p>
+        <h2>{t('Alles erledigt')}</h2>
+        <p>{t('Die App ist bereits installiert – du benutzt sie gerade.')}</p>
       </div>
     );
   }
@@ -445,14 +425,16 @@ export default function Installieren({ onToast }: { onToast: (msg: string) => vo
   return (
     <div className="install">
       <div className="card install-intro">
-        <h2>Die App aufs Handy holen</h2>
+        <h2>{t('Die App aufs Handy holen')}</h2>
         <p>
-          Dann ist die App der {brand.name} mit unserem Logo auf dem Startbildschirm – wie jede andere App. Das dauert keine Minute und
-          kostet nichts.
+          {t(
+            'Dann ist die App der {company} mit unserem Logo auf dem Startbildschirm – wie jede andere App. Das dauert keine Minute und kostet nichts.',
+            { company: brand.name },
+          )}
         </p>
         {canPrompt && (
           <button className="btn btn-block install-big" onClick={install}>
-            App installieren
+            {t('App installieren')}
           </button>
         )}
         {!canPrompt && browser === 'chrome' && !inApp && (
@@ -467,34 +449,40 @@ export default function Installieren({ onToast }: { onToast: (msg: string) => vo
 
       {inApp && (
         <div className="install-warn" role="alert">
-          <strong>Achtung:</strong> Diese Seite ist gerade im eingebauten Browser einer anderen App geöffnet (z. B. WhatsApp, Facebook,
-          Instagram). Solche Browser können keine Apps installieren und keine Benachrichtigungen zeigen. Bitte die Adresse kopieren und in{' '}
-          {detected === 'ios' ? 'Safari' : 'Chrome'} öffnen:
+          <strong>{t('Achtung:')}</strong>{' '}
+          {t(
+            'Diese Seite ist gerade im eingebauten Browser einer anderen App geöffnet (z. B. WhatsApp, Facebook, Instagram). Solche Browser können keine Apps installieren und keine Benachrichtigungen zeigen. Bitte die Adresse kopieren und in {browser} öffnen:',
+            { browser: detected === 'ios' ? 'Safari' : 'Chrome' },
+          )}
           <CopyLink />
         </div>
       )}
       {samsung && !inApp && (
         <div className="install-warn" role="alert">
-          <strong>Bitte nicht im Samsung-Browser installieren.</strong> Warum: Ab Android 14 blockiert Google Play Protect die App, die der
-          Samsung-Browser anlegt, als „unsicher“ bzw. „für eine ältere Android-Version entwickelt“. Das ist ein Fehler des Samsung-Browsers,
-          nicht der App; er ist seit April 2026 gemeldet und noch nicht behoben. Mit <strong>Chrome</strong> klappt es, auch auf
-          Samsung-Handys:
+          <strong>{t('Bitte nicht im Samsung-Browser installieren.')}</strong>{' '}
+          {bold(
+            t(
+              'Warum: Ab Android 14 blockiert Google Play Protect die App, die der Samsung-Browser anlegt, als „unsicher“ bzw. „für eine ältere Android-Version entwickelt“. Das ist ein Fehler des Samsung-Browsers, nicht der App; er ist seit April 2026 gemeldet und noch nicht behoben. Mit <b>Chrome</b> klappt es, auch auf Samsung-Handys:',
+            ),
+          )}
           <ChromeButtons />
         </div>
       )}
       {browser && shortcutOnly(browser) && !inApp && <OtherBrowserNote browser={browser} />}
       {iosOtherBrowser && !inApp && (
         <div className="install-warn" role="note">
-          Am einfachsten klappt es in <strong>Safari</strong> (blauer Kompass). Ab iOS 16.4 können auch Chrome, Edge oder Firefox die App
-          über <strong>Teilen → „Zum Home-Bildschirm“</strong> hinzufügen, wenn der Browser den Eintrag anbietet. Fehlt er, die Adresse
-          kopieren und in Safari öffnen:
+          {bold(
+            t(
+              'Am einfachsten klappt es in <b>Safari</b> (blauer Kompass). Ab iOS 16.4 können auch Chrome, Edge oder Firefox die App über <b>Teilen → „Zum Home-Bildschirm“</b> hinzufügen, wenn der Browser den Eintrag anbietet. Fehlt er, die Adresse kopieren und in Safari öffnen:',
+            ),
+          )}
           <CopyLink />
         </div>
       )}
 
       {!canPrompt && (
         <>
-          <nav className="segmented" aria-label="Handy auswählen">
+          <nav className="segmented" aria-label={t('Handy auswählen')}>
             <button className={platform === 'ios' ? 'active' : ''} onClick={() => setPlatform('ios')} aria-pressed={platform === 'ios'}>
               iPhone / iPad
             </button>
@@ -510,8 +498,9 @@ export default function Installieren({ onToast }: { onToast: (msg: string) => vo
           {platform === 'android' && <AndroidTrouble />}
           {platform === 'ios' && (
             <p className="muted small install-foot">
-              Kein „Zum Home-Bildschirm“ zu finden? Dann wurde der Link wahrscheinlich in einer anderen App geöffnet. Bitte die Adresse in
-              Safari öffnen und noch einmal versuchen.
+              {t(
+                'Kein „Zum Home-Bildschirm“ zu finden? Dann wurde der Link wahrscheinlich in einer anderen App geöffnet. Bitte die Adresse in Safari öffnen und noch einmal versuchen.',
+              )}
             </p>
           )}
         </>

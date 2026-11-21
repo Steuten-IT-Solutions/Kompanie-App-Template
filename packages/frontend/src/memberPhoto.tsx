@@ -5,6 +5,7 @@ import { badgeSrc, preloadImage } from './RankBadge';
 import { Sheet } from './ui';
 import { useBackClose } from './backClose';
 import { confirmAsk } from './ask';
+import { t } from './i18n';
 
 /**
  * Fotos der Mitglieder. Hochladen, ersetzen und entfernen nur, wer Mitglieder anlegen darf; sehen die Person selbst
@@ -39,19 +40,19 @@ export type PreparedPhoto = { file: EncodedFile; preview: string };
  */
 export async function preparePhoto(file: File): Promise<PreparedPhoto> {
   if (!file.type.startsWith('image/') && !/\.(jpe?g|png|webp|heic|heif)$/i.test(file.name)) {
-    throw new Error('Bitte ein Foto auswählen (JPG, PNG oder WebP).');
+    throw new Error(t('Bitte ein Foto auswählen (JPG, PNG oder WebP).'));
   }
   const url = URL.createObjectURL(file);
   try {
     const img = new Image();
     await new Promise<void>((resolve, reject) => {
       img.onload = () => resolve();
-      img.onerror = () => reject(new Error('Das Foto lässt sich nicht lesen. Bitte ein JPG, PNG oder WebP wählen.'));
+      img.onerror = () => reject(new Error(t('Das Foto lässt sich nicht lesen. Bitte ein JPG, PNG oder WebP wählen.')));
       img.src = url;
     });
     const w0 = img.naturalWidth;
     const h0 = img.naturalHeight;
-    if (w0 < 1 || h0 < 1) throw new Error('Das Foto lässt sich nicht lesen.');
+    if (w0 < 1 || h0 < 1) throw new Error(t('Das Foto lässt sich nicht lesen.'));
     let preview = '';
     // Erst die Qualität senken, dann (selten, z. B. bei Panoramen) die Kantenlänge.
     for (let edge = UPLOAD_EDGE; preview === '' && edge >= 512; edge = Math.round(edge * 0.75)) {
@@ -62,7 +63,7 @@ export async function preparePhoto(file: File): Promise<PreparedPhoto> {
       canvas.width = w;
       canvas.height = h;
       const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Das Foto lässt sich auf diesem Gerät nicht verarbeiten.');
+      if (!ctx) throw new Error(t('Das Foto lässt sich auf diesem Gerät nicht verarbeiten.'));
       // Transparente Flächen (PNG) weiß statt schwarz, wie auf dem Server.
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, w, h);
@@ -76,7 +77,7 @@ export async function preparePhoto(file: File): Promise<PreparedPhoto> {
       }
       canvas.width = 0; // Speicher des großen Canvas gleich freigeben (iOS begrenzt ihn)
     }
-    if (preview === '') throw new Error('Das Foto ist zu groß. Bitte ein kleineres Foto wählen.');
+    if (preview === '') throw new Error(t('Das Foto ist zu groß. Bitte ein kleineres Foto wählen.'));
     const name = `${file.name.replace(/\.[^.]*$/, '') || 'foto'}.jpg`;
     return { file: { name, data: preview.replace(/^data:[^,]*,/, '') }, preview };
   } finally {
@@ -111,7 +112,13 @@ export function MemberAvatar({ url, name, size = 'small' }: { url?: string | nul
   return (
     <span className={`member-avatar member-avatar-${size}`} aria-hidden={size === 'small' ? true : undefined}>
       {src ? (
-        <img src={src} alt={size === 'small' ? '' : `Foto von ${name}`} loading="lazy" decoding="async" onError={() => setFailed(true)} />
+        <img
+          src={src}
+          alt={size === 'small' ? '' : t('Foto von {name}', { name })}
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailed(true)}
+        />
       ) : (
         <span className="member-avatar-initials">{initials(name)}</span>
       )}
@@ -164,17 +171,17 @@ function PhotoZoom({ url, name, actions, onClose }: { url: string; name: string;
       className="lightbox member-photo-zoom"
       role="dialog"
       aria-modal="true"
-      aria-label={`Foto von ${name}`}
+      aria-label={t('Foto von {name}', { name })}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <figure onClick={(e) => e.target === e.currentTarget && onClose()}>
-        {state === 'loading' && <span className="member-photo-zoom-loading" role="status" aria-label="Foto lädt" />}
+        {state === 'loading' && <span className="member-photo-zoom-loading" role="status" aria-label={t('Foto lädt')} />}
         {state === 'failed' ? (
-          <p className="member-photo-zoom-error">Das Foto lässt sich gerade nicht laden.</p>
+          <p className="member-photo-zoom-error">{t('Das Foto lässt sich gerade nicht laden.')}</p>
         ) : (
           <img
             src={src}
-            alt={`Foto von ${name}`}
+            alt={t('Foto von {name}', { name })}
             decoding="async"
             hidden={state === 'loading'}
             onLoad={() => setState('loaded')}
@@ -184,7 +191,7 @@ function PhotoZoom({ url, name, actions, onClose }: { url: string; name: string;
         <figcaption>{name}</figcaption>
         {actions}
       </figure>
-      <button ref={closeRef} type="button" className="lb-btn lb-close" onClick={onClose} aria-label="Schließen">
+      <button ref={closeRef} type="button" className="lb-btn lb-close" onClick={onClose} aria-label={t('Schließen')}>
         ✕
       </button>
     </div>,
@@ -234,13 +241,13 @@ export function ZoomableAvatar({
         type="button"
         className="member-photo-open"
         onClick={() => setZoomed(true)}
-        aria-label={url ? `Foto von ${name} vergrößern` : `Foto von ${name} hochladen`}
+        aria-label={url ? t('Foto von {name} vergrößern', { name }) : t('Foto von {name} hochladen', { name })}
       >
         <MemberAvatar url={url} name={name} size={size} />
       </button>
       {zoomed && url && <PhotoZoom url={url} name={name} actions={panel} onClose={close} />}
       {zoomed && !url && edit && (
-        <Sheet title="Foto" onClose={close}>
+        <Sheet title={t('Foto')} onClose={close}>
           {panel}
         </Sheet>
       )}
@@ -282,11 +289,11 @@ export function PhotoPicker({
       <MemberAvatar url={value?.preview} name={name || '?'} size="large" />
       <div className="button-row">
         <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => input.current?.click()}>
-          {busy ? 'Liest …' : value ? 'Anderes Foto' : 'Foto auswählen'}
+          {busy ? t('Liest …') : value ? t('Anderes Foto') : t('Foto auswählen')}
         </button>
         {value && (
           <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => onChange(null)}>
-            Kein Foto
+            {t('Kein Foto')}
           </button>
         )}
       </div>
@@ -295,7 +302,7 @@ export function PhotoPicker({
         type="file"
         accept="image/jpeg,image/png,image/webp,image/*"
         hidden
-        aria-label="Foto-Datei"
+        aria-label={t('Foto-Datei')}
         onChange={(e) => choose(e.target.files?.[0] ?? null)}
       />
     </div>
@@ -333,7 +340,7 @@ export function MemberPhotoPanel({
     try {
       const photo = await preparePhoto(file);
       await api.uploadMemberPhoto(id, photo.file);
-      onToast(url ? 'Foto ersetzt' : 'Foto gespeichert');
+      onToast(url ? t('Foto ersetzt') : t('Foto gespeichert'));
       onChanged();
     } catch (err) {
       onToast((err as Error).message);
@@ -343,11 +350,11 @@ export function MemberPhotoPanel({
   }
 
   async function remove() {
-    if (!(await confirmAsk(`Foto von ${name} entfernen?`))) return;
+    if (!(await confirmAsk(t('Foto von {name} entfernen?', { name })))) return;
     setBusy(true);
     try {
       await api.removeMemberPhoto(id);
-      onToast('Foto entfernt');
+      onToast(t('Foto entfernt'));
       onChanged();
     } catch (err) {
       onToast((err as Error).message);
@@ -364,11 +371,11 @@ export function MemberPhotoPanel({
         <>
           <div className="button-row">
             <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => input.current?.click()}>
-              {busy ? 'Speichert …' : url ? 'Foto ersetzen' : 'Foto hochladen'}
+              {busy ? t('Speichert …') : url ? t('Foto ersetzen') : t('Foto hochladen')}
             </button>
             {url && (
               <button type="button" className="btn btn-danger" disabled={busy} onClick={remove}>
-                Foto entfernen
+                {t('Foto entfernen')}
               </button>
             )}
           </div>
@@ -377,7 +384,7 @@ export function MemberPhotoPanel({
             type="file"
             accept="image/jpeg,image/png,image/webp,image/*"
             hidden
-            aria-label="Foto-Datei"
+            aria-label={t('Foto-Datei')}
             onChange={(e) => upload(e.target.files?.[0] ?? null)}
           />
         </>

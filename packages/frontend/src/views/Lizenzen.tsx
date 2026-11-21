@@ -1,5 +1,6 @@
 import lizenzen from 'virtual:kompanie-lizenzen';
 import { config } from '../api';
+import { t } from '../i18n';
 import { navigate } from '../router';
 
 /**
@@ -14,31 +15,34 @@ export default function Lizenzen() {
   return (
     <article className="hilfe-seite lizenzen">
       <button className="btn btn-link back" onClick={() => navigate('hilfe')}>
-        ‹ Alle Hilfeseiten
+        ‹ {t('Alle Hilfeseiten')}
       </button>
-      <h2 className="news-headline">Lizenzen</h2>
+      <h2 className="news-headline">{t('Lizenzen')}</h2>
       <div className="hilfe-text">
         <p>
-          Die {projekt.name} ist freie Software unter der GNU General Public License, Version 2 oder (nach eurer Wahl) jeder späteren
-          Version ({projekt.license}). Ihr dürft sie nach diesen Bedingungen nutzen, weitergeben und verändern; sie kommt ohne jede
-          Gewährleistung.
+          {t(
+            'Die {name} ist freie Software unter der GNU General Public License, Version 2 oder (nach eurer Wahl) jeder späteren Version ({license}). Ihr dürft sie nach diesen Bedingungen nutzen, weitergeben und verändern; sie kommt ohne jede Gewährleistung.',
+            { name: projekt.name, license: projekt.license },
+          )}
         </p>
-        <h3>Quellcode</h3>
+        <h3>{t('Quellcode')}</h3>
         <p>
-          Die Programmdateien der App sind für schnelles Laden verkleinert. Den vollständigen Quellcode
-          {version ? ` (Version ${version.replace(/^(\d+\.\d+\.\d+).*/, '$1')})` : ''} gibt es unter{' '}
+          {t('Die Programmdateien der App sind für schnelles Laden verkleinert.')}{' '}
+          {version
+            ? t('Den vollständigen Quellcode (Version {version}) gibt es unter', { version: version.replace(/^(\d+\.\d+\.\d+).*/, '$1') })
+            : t('Den vollständigen Quellcode gibt es unter')}{' '}
           <a href={projekt.repository} target="_blank" rel="noopener noreferrer">
             {projekt.repository.replace(/^https:\/\//, '')}
           </a>
           .
         </p>
         <details>
-          <summary>Lizenztext der App</summary>
+          <summary>{t('Lizenztext der App')}</summary>
           <pre className="lizenz-text">{projekt.text}</pre>
         </details>
-        <h3>Enthaltene Bausteine anderer Anbieter</h3>
+        <h3>{t('Enthaltene Bausteine anderer Anbieter')}</h3>
         {pakete.length === 0 ? (
-          <p className="muted">Die Liste entsteht beim Bauen der App.</p>
+          <p className="muted">{t('Die Liste entsteht beim Bauen der App.')}</p>
         ) : (
           <ul className="lizenz-liste">
             {pakete.map((p) => (

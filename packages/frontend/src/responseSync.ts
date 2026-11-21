@@ -8,6 +8,7 @@ import { createOfflineQueue, failureAction, type KeyValue } from './offlineQueue
 import { RESPONSES_AREA, RESPONSES_CHANGED, validResponse, type PendingResponse } from './responseOutbox';
 import { noteRejected } from './offlineRejectedStore';
 import { previewRole } from './preview';
+import { t } from './i18n';
 
 function storage(): KeyValue | null {
   try {
@@ -103,7 +104,9 @@ async function run(): Promise<ResponseSyncResult> {
 export function responseSyncMessage(r: ResponseSyncResult): string | null {
   if (r.rejected.length > 0) {
     const first = r.rejected[0];
-    return `Offline vorgemerkte Rückmeldung${first.label ? ` zu „${first.label}“` : ''} wurde nicht übernommen: ${first.message}`;
+    return first.label
+      ? t('Offline vorgemerkte Rückmeldung zu „{label}“ wurde nicht übernommen: {message}', { label: first.label, message: first.message })
+      : t('Offline vorgemerkte Rückmeldung wurde nicht übernommen: {message}', { message: first.message });
   }
-  return r.sent > 0 ? 'Offline vorgemerkte Zu- und Absagen übertragen' : null;
+  return r.sent > 0 ? t('Offline vorgemerkte Zu- und Absagen übertragen') : null;
 }

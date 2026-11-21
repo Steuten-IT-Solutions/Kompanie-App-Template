@@ -16,14 +16,13 @@ import { askPersistentStorage } from './offlineRejectedStore';
 import { responseOutbox, usePendingResponse } from './responseSync';
 import { formatDate } from './format';
 import { ErrorBox, Loading } from './ui';
-
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+import { t, tn } from './i18n';
 
 /** „3 Zusagen · 1 Absage“; leer, wenn noch niemand geantwortet hat. */
 export function responseCounts(r: EventResponses): string {
   const parts = [];
-  if (r.yes > 0) parts.push(plural(r.yes, 'Zusage', 'Zusagen'));
-  if (r.no > 0) parts.push(plural(r.no, 'Absage', 'Absagen'));
+  if (r.yes > 0) parts.push(tn('{count} Zusage', '{count} Zusagen', r.yes));
+  if (r.no > 0) parts.push(tn('{count} Absage', '{count} Absagen', r.no));
   return parts.join(' · ');
 }
 
@@ -65,7 +64,9 @@ async function send(
 
 /** Hinweis, solange eine offline vorgemerkte Antwort noch nicht übertragen ist. */
 function PendingHint() {
-  return <p className="event-response-pending small">Noch nicht übertragen – die App sendet es, sobald die Verbindung wieder klappt.</p>;
+  return (
+    <p className="event-response-pending small">{t('Noch nicht übertragen – die App sendet es, sobald die Verbindung wieder klappt.')}</p>
+  );
 }
 
 export function ResponseBar({ ev, onChange }: { ev: CalendarEvent; onChange: (ev: CalendarEvent) => void }) {
@@ -97,18 +98,22 @@ export function ResponseBar({ ev, onChange }: { ev: CalendarEvent; onChange: (ev
     </button>
   );
 
-  const until = ev.respond_until ? `Zu- und absagen bis ${formatDate(ev.respond_until)}` : '';
+  const until = ev.respond_until ? t('Zu- und absagen bis {date}', { date: formatDate(ev.respond_until) }) : '';
   return (
     <div className="event-responses">
       {r.can_respond && r.open && (
-        <div className="event-response-row" role="group" aria-label={`Rückmeldung zu ${ev.title}`}>
-          {choice('yes', 'Zusagen', 'Zugesagt')}
-          {choice('no', 'Absagen', 'Abgesagt')}
+        <div className="event-response-row" role="group" aria-label={t('Rückmeldung zu {title}', { title: ev.title })}>
+          {choice('yes', t('Zusagen'), t('Zugesagt'))}
+          {choice('no', t('Absagen'), t('Abgesagt'))}
         </div>
       )}
       {r.can_respond && !r.open && (
         <p className="event-response-closed small">
-          {r.mine === 'yes' ? 'Du hast zugesagt.' : r.mine === 'no' ? 'Du hast abgesagt.' : 'Zu- und absagen ist nicht mehr möglich.'}
+          {r.mine === 'yes'
+            ? t('Du hast zugesagt.')
+            : r.mine === 'no'
+              ? t('Du hast abgesagt.')
+              : t('Zu- und absagen ist nicht mehr möglich.')}
         </p>
       )}
       {(counts || (until && r.open)) && (
@@ -162,12 +167,18 @@ export function ResponseDetails({ ev, onChange }: { ev: CalendarEvent; onChange:
       {canNote && (
         <div className="event-response-note stack">
           <label className="field">
-            <span>Hinweis zu deiner {r.mine === 'yes' ? 'Zusage' : 'Absage'} (optional)</span>
-            <input type="text" maxLength={191} value={note} placeholder="z. B. komme später" onChange={(e) => setNote(e.target.value)} />
+            <span>{r.mine === 'yes' ? t('Hinweis zu deiner Zusage (optional)') : t('Hinweis zu deiner Absage (optional)')}</span>
+            <input
+              type="text"
+              maxLength={191}
+              value={note}
+              placeholder={t('z. B. komme später')}
+              onChange={(e) => setNote(e.target.value)}
+            />
           </label>
           {note.trim() !== r.note && (
             <button type="button" className="btn btn-secondary btn-block" disabled={busy} onClick={() => void saveNote()}>
-              {busy ? 'Speichert …' : 'Hinweis speichern'}
+              {busy ? t('Speichert …') : t('Hinweis speichern')}
             </button>
           )}
           {error && (
@@ -180,7 +191,7 @@ export function ResponseDetails({ ev, onChange }: { ev: CalendarEvent; onChange:
       {r.can_list && (
         <div className="event-response-list stack">
           <button type="button" className="btn btn-secondary btn-block" aria-expanded={listOpen} onClick={() => void toggleList()}>
-            {listOpen ? 'Rückmeldungen ausblenden' : 'Rückmeldungen ansehen'}
+            {listOpen ? t('Rückmeldungen ausblenden') : t('Rückmeldungen ansehen')}
           </button>
           {listOpen && (listError ? <ErrorBox message={listError} /> : !list ? <Loading shape="text" /> : <ResponseNames list={list} />)}
         </div>
@@ -196,7 +207,7 @@ function ResponseNames({ list }: { list: EventResponseOverview }) {
         {title} ({people.length})
       </h4>
       {people.length === 0 ? (
-        <p className="small muted">Niemand</p>
+        <p className="small muted">{t('Niemand')}</p>
       ) : (
         <ul>
           {people.map((p) => (
@@ -211,9 +222,9 @@ function ResponseNames({ list }: { list: EventResponseOverview }) {
   );
   return (
     <div className="event-response-groups">
-      {group('Zugesagt', list.yes)}
-      {group('Abgesagt', list.no)}
-      {group('Noch keine Rückmeldung', list.none)}
+      {group(t('Zugesagt'), list.yes)}
+      {group(t('Abgesagt'), list.no)}
+      {group(t('Noch keine Rückmeldung'), list.none)}
     </div>
   );
 }

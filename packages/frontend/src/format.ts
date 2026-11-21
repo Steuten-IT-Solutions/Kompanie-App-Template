@@ -1,4 +1,4 @@
-import { localeTag } from './i18n';
+import { localeTag, t } from './i18n';
 
 /** Formate in der aktuellen Sprache, beim ersten Gebrauch angelegt und je Sprache gemerkt. */
 const numberFormats = new Map<string, Intl.NumberFormat>();
@@ -119,10 +119,10 @@ export function formatEventWhen(ev: { start: string; end: string; all_day: boole
     // Eintägig ohne Uhrzeit: nur das Datum (ohne Zusatz „ganztägig“).
     return sameDay ? day(s) : `${from} – ${day(e)}`;
   }
-  if (e.getTime() <= s.getTime()) return `${day(s)} · ${timeFmt.format(s)} Uhr`;
+  if (e.getTime() <= s.getTime()) return `${day(s)} · ${t('{time} Uhr', { time: timeFmt.format(s) })}`;
   return sameDay
-    ? `${day(s)} · ${timeFmt.format(s)}–${timeFmt.format(e)} Uhr`
-    : `${from}, ${timeFmt.format(s)} – ${day(e)}, ${timeFmt.format(e)} Uhr`;
+    ? `${day(s)} · ${t('{time} Uhr', { time: `${timeFmt.format(s)}–${timeFmt.format(e)}` })}`
+    : `${from}, ${timeFmt.format(s)} – ${day(e)}, ${t('{time} Uhr', { time: timeFmt.format(e) })}`;
 }
 
 export const formatMonth = (d: Date) => monthFmt.format(d);
@@ -146,7 +146,7 @@ export function formatBytes(bytes: number): string {
 export function formatShortTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  const time = `${timeFmt.format(d)} Uhr`;
+  const time = t('{time} Uhr', { time: timeFmt.format(d) });
   return d.toDateString() === new Date().toDateString() ? time : `${weekdayFmt.format(d)}, ${time}`;
 }
 
@@ -176,5 +176,7 @@ export function fromLocalInput(value: string): string | null {
 export function formatUntil(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return d.getFullYear() === new Date().getFullYear() ? formatShortTime(iso) : `${yearDateFmt.format(d)}, ${timeFmt.format(d)} Uhr`;
+  return d.getFullYear() === new Date().getFullYear()
+    ? formatShortTime(iso)
+    : `${yearDateFmt.format(d)}, ${t('{time} Uhr', { time: timeFmt.format(d) })}`;
 }

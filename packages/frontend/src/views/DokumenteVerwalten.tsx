@@ -9,6 +9,7 @@ import { docGroupKey, groupDocuments, groupKey } from '../documents';
 import { ACCEPT, DocGroupSection, DocSortSelect, typeLabel, useDocSort, useOpenGroups, VISIBILITY_LABELS } from './Dokumente';
 import { confirmAsk, promptAsk } from '../ask';
 import { IconButton } from '../icons';
+import { t, tn } from '../i18n';
 
 const sec = brand.labels.sections;
 
@@ -25,17 +26,17 @@ function MetaFields({
   return (
     <>
       <label className="field">
-        <span>Titel</span>
+        <span>{t('Titel')}</span>
         <input type="text" maxLength={191} value={meta.title} onChange={(e) => onChange({ ...meta, title: e.target.value })} />
       </label>
       <label className="field">
-        <span>Kategorie</span>
+        <span>{t('Kategorie')}</span>
         <select
-          aria-label="Kategorie"
+          aria-label={t('Kategorie')}
           value={meta.category_id ?? ''}
           onChange={(e) => onChange({ ...meta, category_id: e.target.value ? Number(e.target.value) : null })}
         >
-          <option value="">Ohne Kategorie</option>
+          <option value="">{t('Ohne Kategorie')}</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
               {c.title}
@@ -45,13 +46,13 @@ function MetaFields({
       </label>
       <div className="field-row">
         <label className="field">
-          <span>Stand</span>
+          <span>{t('Stand')}</span>
           <input type="date" value={meta.date} onChange={(e) => onChange({ ...meta, date: e.target.value })} />
         </label>
         <label className="field">
-          <span>Sichtbar für</span>
+          <span>{t('Sichtbar für')}</span>
           <select
-            aria-label="Sichtbar für"
+            aria-label={t('Sichtbar für')}
             value={meta.visibility}
             onChange={(e) => onChange({ ...meta, visibility: e.target.value as DocVisibility })}
           >
@@ -71,9 +72,9 @@ function MetaFields({
 function checkFile(file: File, maxBytes: number): string | null {
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
   if (!ACCEPT.split(',').includes(`.${ext}`)) {
-    return 'Erlaubt sind PDF, Word, Excel, PowerPoint, OpenDocument sowie JPG- und PNG-Bilder.';
+    return t('Erlaubt sind PDF, Word, Excel, PowerPoint, OpenDocument sowie JPG- und PNG-Bilder.');
   }
-  if (file.size > maxBytes) return `Die Datei darf höchstens ${formatBytes(maxBytes)} groß sein.`;
+  if (file.size > maxBytes) return t('Die Datei darf höchstens {size} groß sein.', { size: formatBytes(maxBytes) });
   return null;
 }
 
@@ -127,7 +128,7 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
     saveOrder(
       () => api.reorderDocCategories(next.map((c) => c.id)),
       () => {
-        onToast('Reihenfolge gespeichert');
+        onToast(t('Reihenfolge gespeichert'));
         reload();
       },
       (e) => {
@@ -140,15 +141,15 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
   async function upload(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
-    if (!file) return setFormError('Bitte eine Datei auswählen.');
+    if (!file) return setFormError(t('Bitte eine Datei auswählen.'));
     const problem = checkFile(file, maxBytes);
     if (problem) return setFormError(problem);
-    if (!meta.title.trim()) return setFormError('Bitte einen Titel angeben.');
-    if (!meta.date) return setFormError('Bitte den Stand angeben.');
+    if (!meta.title.trim()) return setFormError(t('Bitte einen Titel angeben.'));
+    if (!meta.date) return setFormError(t('Bitte den Stand angeben.'));
     setBusy(true);
     try {
       await api.createDocument(file, { ...meta, title: meta.title.trim() });
-      onToast(`„${meta.title.trim()}“ hochgeladen`);
+      onToast(t('„{title}“ hochgeladen', { title: meta.title.trim() }));
       // Kategorie des neuen Dokuments aufklappen, damit man das Ergebnis sieht.
       show(docGroupKey(meta.category_id, categories));
       setFile(null);
@@ -174,14 +175,14 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
     if (!doc || !f) return;
     const problem = checkFile(f, maxBytes);
     if (problem) return onToast(problem);
-    await run(() => api.replaceDocumentFile(doc.id, f), `Neue Fassung von „${doc.title}“ gespeichert`);
+    await run(() => api.replaceDocumentFile(doc.id, f), t('Neue Fassung von „{title}“ gespeichert', { title: doc.title }));
   }
 
   async function saveEdit(e: FormEvent) {
     e.preventDefault();
     if (!editing) return;
-    if (!editing.meta.title.trim()) return onToast('Bitte einen Titel angeben.');
-    if (await run(() => api.updateDocument(editing.id, { ...editing.meta, title: editing.meta.title.trim() }), 'Gespeichert')) {
+    if (!editing.meta.title.trim()) return onToast(t('Bitte einen Titel angeben.'));
+    if (await run(() => api.updateDocument(editing.id, { ...editing.meta, title: editing.meta.title.trim() }), t('Gespeichert'))) {
       // Wurde die Kategorie geändert, ist danach die neue aufgeklappt.
       show(docGroupKey(editing.meta.category_id, categories));
       setEditing(null);
@@ -190,33 +191,35 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
 
   async function addCategory(e: FormEvent) {
     e.preventDefault();
-    if (!newCategory.trim()) return onToast('Bitte einen Namen für die Kategorie angeben.');
-    if (await run(() => api.createDocCategory(newCategory.trim()), 'Kategorie angelegt')) setNewCategory('');
+    if (!newCategory.trim()) return onToast(t('Bitte einen Namen für die Kategorie angeben.'));
+    if (await run(() => api.createDocCategory(newCategory.trim()), t('Kategorie angelegt'))) setNewCategory('');
   }
 
-  const categoryTitle = (id: number | null) => categories.find((c) => c.id === id)?.title ?? 'Ohne Kategorie';
+  const categoryTitle = (id: number | null) => categories.find((c) => c.id === id)?.title ?? t('Ohne Kategorie');
 
   return (
     <div>
       <button className="btn btn-link back" onClick={() => navigate('dokumente')}>
-        ‹ Alle {sec.documents}
+        {t('‹ Alle {documents}', { documents: sec.documents })}
       </button>
 
       <form className="form card" onSubmit={upload}>
-        <h3>Dokument hochladen</h3>
+        <h3>{t('Dokument hochladen')}</h3>
         <label className="field">
-          <span>Datei</span>
+          <span>{t('Datei')}</span>
           <FileInput inputRef={fileInput} accept={ACCEPT} onChange={(e) => chooseFile(e.target.files?.[0] ?? null)} />
         </label>
         <MetaFields meta={meta} categories={categories} onChange={setMeta} />
-        <p className="muted small">PDF, Word, Excel, PowerPoint, OpenDocument, JPG oder PNG, höchstens {formatBytes(maxBytes)}.</p>
+        <p className="muted small">
+          {t('PDF, Word, Excel, PowerPoint, OpenDocument, JPG oder PNG, höchstens {size}.', { size: formatBytes(maxBytes) })}
+        </p>
         {formError && (
           <p className="form-error" role="alert">
             {formError}
           </p>
         )}
         <button className="btn btn-block" type="submit" disabled={busy}>
-          {busy ? 'Lädt hoch …' : 'Hochladen'}
+          {busy ? t('Lädt hoch …') : t('Hochladen')}
         </button>
       </form>
 
@@ -224,7 +227,7 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
       <input ref={replaceInput} type="file" accept={ACCEPT} hidden onChange={(e) => replace(e.target.files?.[0] ?? null)} />
 
       <h3 className="section-title">{sec.documents}</h3>
-      {docs.length === 0 ? <Empty>Noch keine Dateien.</Empty> : <DocSortSelect value={sort} onChange={setSort} />}
+      {docs.length === 0 ? <Empty>{t('Noch keine Dateien.')}</Empty> : <DocSortSelect value={sort} onChange={setSort} />}
       {groupDocuments(docs, categories, sort).map((g) => {
         const key = groupKey(g);
         // Während ein Dokument bearbeitet wird, bleibt seine Kategorie offen.
@@ -239,10 +242,10 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
                       <MetaFields meta={editing.meta} categories={categories} onChange={(m) => setEditing({ id: doc.id, meta: m })} />
                       <div className="button-row">
                         <button className="btn" type="submit" disabled={busy}>
-                          Speichern
+                          {t('Speichern')}
                         </button>
                         <button type="button" className="btn btn-secondary" onClick={() => setEditing(null)}>
-                          Abbrechen
+                          {t('Abbrechen')}
                         </button>
                       </div>
                     </form>
@@ -252,13 +255,14 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
                     <div className="row-main">
                       <div className="row-title">{doc.title}</div>
                       <div className="row-sub">
-                        {categoryTitle(doc.category_id)} · Stand {formatDate(doc.date)} · {typeLabel(doc)}, {formatBytes(doc.size)}
+                        {categoryTitle(doc.category_id)} · {t('Stand {date}', { date: formatDate(doc.date) })} · {typeLabel(doc)},{' '}
+                        {formatBytes(doc.size)}
                       </div>
                       <div className="row-sub">{VISIBILITY_LABELS[doc.visibility]}</div>
                       <div className="row-actions">
                         <IconButton
                           icon="edit"
-                          label="Bearbeiten"
+                          label={t('Bearbeiten')}
                           disabled={busy}
                           onClick={() =>
                             setEditing({
@@ -275,16 +279,16 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
                             replaceInput.current?.click();
                           }}
                         >
-                          Neue Fassung
+                          {t('Neue Fassung')}
                         </button>
                         <IconButton
                           icon="delete"
-                          label="Löschen"
+                          label={t('Löschen')}
                           variant="danger"
                           disabled={busy}
                           onClick={async () =>
-                            (await confirmAsk(`„${doc.title}“ wirklich löschen?`)) &&
-                            run(() => api.deleteDocument(doc.id), 'Dokument gelöscht')
+                            (await confirmAsk(t('„{title}“ wirklich löschen?', { title: doc.title }))) &&
+                            run(() => api.deleteDocument(doc.id), t('Dokument gelöscht'))
                           }
                         />
                       </div>
@@ -297,22 +301,22 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
         );
       })}
 
-      <h3 className="section-title">Kategorien</h3>
+      <h3 className="section-title">{t('Kategorien')}</h3>
       <form className="form card" onSubmit={addCategory}>
         <div className="field-row">
           <label className="field grow">
-            <span>Neue Kategorie</span>
+            <span>{t('Neue Kategorie')}</span>
             <input
               type="text"
               maxLength={191}
-              placeholder="z. B. Protokolle"
+              placeholder={t('z. B. Protokolle')}
               value={newCategory}
               onChange={(e) => setNewCategory(e.target.value)}
             />
           </label>
         </div>
         <button className="btn btn-block" type="submit" disabled={busy}>
-          Kategorie hinzufügen
+          {t('Kategorie hinzufügen')}
         </button>
       </form>
       <ul className="card-list doc-categories">
@@ -323,29 +327,34 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
               {categories.length > 1 && sortCategories.handle(i, c.title)}
               <div className="row-main">
                 <div className="row-title">{c.title}</div>
-                <div className="row-sub">{count === 1 ? '1 Dokument' : `${count} Dokumente`}</div>
+                <div className="row-sub">{tn('{count} Dokument', '{count} Dokumente', count)}</div>
                 <div className="row-actions">
                   <button
                     className="btn btn-small btn-secondary"
                     disabled={busy}
                     onClick={async () => {
-                      const next = await promptAsk('Neuer Name der Kategorie', c.title);
-                      if (next !== null && next.trim()) run(() => api.updateDocCategory(c.id, next.trim()), 'Kategorie umbenannt');
+                      const next = await promptAsk(t('Neuer Name der Kategorie'), c.title);
+                      if (next !== null && next.trim()) run(() => api.updateDocCategory(c.id, next.trim()), t('Kategorie umbenannt'));
                     }}
                   >
-                    Umbenennen
+                    {t('Umbenennen')}
                   </button>
                   <IconButton
                     icon="delete"
-                    label="Löschen"
+                    label={t('Löschen')}
                     variant="danger"
                     disabled={busy}
                     onClick={async () =>
                       (await confirmAsk(
                         count === 0
-                          ? `Kategorie „${c.title}“ löschen?`
-                          : `Kategorie „${c.title}“ löschen? ${count === 1 ? 'Das Dokument steht' : `Die ${count} Dokumente stehen`} danach ohne Kategorie da.`,
-                      )) && run(() => api.deleteDocCategory(c.id), 'Kategorie gelöscht')
+                          ? t('Kategorie „{title}“ löschen?', { title: c.title })
+                          : tn(
+                              'Kategorie „{title}“ löschen? Das Dokument steht danach ohne Kategorie da.',
+                              'Kategorie „{title}“ löschen? Die {count} Dokumente stehen danach ohne Kategorie da.',
+                              count,
+                              { title: c.title },
+                            ),
+                      )) && run(() => api.deleteDocCategory(c.id), t('Kategorie gelöscht'))
                     }
                   />
                 </div>
@@ -353,7 +362,7 @@ export default function DokumenteVerwalten({ onToast }: { onToast: (msg: string)
             </li>
           );
         })}
-        {categories.length === 0 && <Empty>Noch keine Kategorien. Dateien ohne Kategorie stehen in einer gemeinsamen Liste.</Empty>}
+        {categories.length === 0 && <Empty>{t('Noch keine Kategorien. Dateien ohne Kategorie stehen in einer gemeinsamen Liste.')}</Empty>}
       </ul>
     </div>
   );

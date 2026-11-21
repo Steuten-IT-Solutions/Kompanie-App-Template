@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { t } from './i18n';
 
 /**
  * Haken „intern“ für ein hochgeladenes Bild (nur für Mitglieder). Zeigt die Wahl sofort; schlägt das Speichern fehl
@@ -23,14 +24,14 @@ export function InternToggle({
         type="checkbox"
         checked={on}
         disabled={disabled}
-        aria-label={`${name} nur für Mitglieder (intern)`}
+        aria-label={t('{name} nur für Mitglieder (intern)', { name })}
         onChange={async (e) => {
           const next = e.target.checked;
           setOn(next);
           if (!(await onChange(next))) setOn(!next);
         }}
       />
-      <span>intern</span>
+      <span>{t('intern')}</span>
     </label>
   );
 }

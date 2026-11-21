@@ -3,6 +3,7 @@ import { api, type Poll, type PollInput, type PollResults, type PollType } from 
 import { canManagePolls, pollsVisible, refreshBoard } from '../board';
 import { formatShortTime, fromLocalInput, toLocalInput } from '../format';
 import brand from '../generated/brand';
+import { t, tn } from '../i18n';
 import { navigate } from '../router';
 import { Caps, Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { prefetchOnTap, sources } from '../viewData';
@@ -22,41 +23,45 @@ const OPTION_MAX = 100;
 const OPTIONS_MAX = 20;
 const TEXT_MAX = 1000;
 
-const TYPE_LABELS: Record<PollType, string> = { single: 'Eine Antwort', multiple: 'Mehrere Antworten möglich', text: 'Freitext' };
+const TYPE_LABELS: Record<PollType, string> = {
+  single: t('Eine Antwort'),
+  multiple: t('Mehrere Antworten möglich'),
+  text: t('Freitext'),
+};
 const RESULT_LABELS: Record<PollResults, string> = {
-  after_vote: 'Alle, sobald sie geantwortet haben',
-  after_end: 'Alle nach dem Ende',
-  managers: 'Nur wer alle Ergebnisse sehen darf',
+  after_vote: t('Alle, sobald sie geantwortet haben'),
+  after_end: t('Alle nach dem Ende'),
+  managers: t('Nur wer alle Ergebnisse sehen darf'),
 };
 
 /** Wann die Ergebnisse sichtbar werden – vor dem Antworten deutlich gezeigt. */
 function resultsHint(poll: Poll): string {
   switch (poll.results) {
     case 'after_vote':
-      return 'Die Ergebnisse siehst du, sobald du geantwortet hast; nach dem Ende sehen sie alle Mitglieder.';
+      return t('Die Ergebnisse siehst du, sobald du geantwortet hast; nach dem Ende sehen sie alle Mitglieder.');
     case 'after_end':
-      return 'Die Ergebnisse sehen alle Mitglieder erst nach dem Ende der Umfrage.';
+      return t('Die Ergebnisse sehen alle Mitglieder erst nach dem Ende der Umfrage.');
     default:
-      return 'Die Ergebnisse sehen nur, wer alle Ergebnisse sehen darf.';
+      return t('Die Ergebnisse sehen nur, wer alle Ergebnisse sehen darf.');
   }
 }
 
 function endText(poll: Poll): string {
-  if (poll.status === 'ended') return `Beendet ${formatShortTime(poll.closed_at ?? poll.ends_at ?? poll.updated_at)}`;
-  return poll.ends_at ? `Läuft bis ${formatShortTime(poll.ends_at)}` : 'Läuft, bis sie beendet wird';
+  if (poll.status === 'ended') return t('Beendet {time}', { time: formatShortTime(poll.closed_at ?? poll.ends_at ?? poll.updated_at) });
+  return poll.ends_at ? t('Läuft bis {time}', { time: formatShortTime(poll.ends_at) }) : t('Läuft, bis sie beendet wird');
 }
 
 /** Hinweis: namentlich oder anonym, und wer die Ergebnisse sieht. */
 function PrivacyNote({ poll }: { poll: Poll }) {
   return (
     <div className={`poll-privacy ${poll.anonymous ? 'poll-anonymous' : 'poll-named'}`}>
-      <strong>{poll.anonymous ? 'Anonym' : 'Namentlich'}</strong>
+      <strong>{poll.anonymous ? t('Anonym') : t('Namentlich')}</strong>
       <p className="small">
         {poll.anonymous
-          ? 'Deine Antwort wird niemandem angezeigt. Gezählt wird sie nur in den Ergebnissen, ohne Namen.'
+          ? t('Deine Antwort wird niemandem angezeigt. Gezählt wird sie nur in den Ergebnissen, ohne Namen.')
           : poll.results === 'managers'
-            ? 'Wer alle Ergebnisse sehen darf, sieht, wer was geantwortet hat.'
-            : 'Wer die Ergebnisse sieht, sieht auch, wer was geantwortet hat.'}
+            ? t('Wer alle Ergebnisse sehen darf, sieht, wer was geantwortet hat.')
+            : t('Wer die Ergebnisse sieht, sieht auch, wer was geantwortet hat.')}
       </p>
       <p className="small">{resultsHint(poll)}</p>
     </div>
@@ -67,10 +72,10 @@ function PrivacyNote({ poll }: { poll: Poll }) {
 export function PollResultsView({ poll }: { poll: Poll }) {
   const data = poll.results_data;
   if (!data) return null;
-  const people = data.voters === 1 ? '1 Teilnahme' : `${data.voters} Teilnahmen`;
+  const people = tn('{count} Teilnahme', '{count} Teilnahmen', data.voters);
   return (
-    <section className="poll-results" aria-label="Ergebnisse">
-      <h3>Ergebnisse</h3>
+    <section className="poll-results" aria-label={t('Ergebnisse')}>
+      <h3>{t('Ergebnisse')}</h3>
       <p className="muted small">{people}</p>
       {data.options?.map((o) => (
         <div className="poll-bar" key={o.id}>
@@ -81,20 +86,25 @@ export function PollResultsView({ poll }: { poll: Poll }) {
             </span>
           </div>
           <div className="poll-bar-track" role="presentation">
-            <progress className="poll-bar-fill" max={100} value={o.percent} aria-label={`${o.title}: ${o.count}, ${o.percent} %`} />
+            <progress
+              className="poll-bar-fill"
+              max={100}
+              value={o.percent}
+              aria-label={t('{option}: {count}, {percent} %', { option: o.title, count: o.count, percent: o.percent })}
+            />
           </div>
           {o.names && o.names.length > 0 && <p className="muted small poll-names">{o.names.join(', ')}</p>}
         </div>
       ))}
       {data.texts &&
         (data.texts.length === 0 ? (
-          <p className="muted small">Noch keine Antworten.</p>
+          <p className="muted small">{t('Noch keine Antworten.')}</p>
         ) : (
           <ul className="poll-texts">
-            {data.texts.map((t, i) => (
+            {data.texts.map((x, i) => (
               <li key={i}>
-                <span className="board-text">{t.text}</span>
-                {t.name && <span className="muted small"> – {t.name}</span>}
+                <span className="board-text">{x.text}</span>
+                {x.name && <span className="muted small"> – {x.name}</span>}
               </li>
             ))}
           </ul>
@@ -129,11 +139,11 @@ function AnswerForm({ poll, onChanged, onToast }: { poll: Poll; onChanged: (p: P
   function submit(e: FormEvent) {
     e.preventDefault();
     if (poll.type === 'text') {
-      if (text.trim() === '') return setError('Bitte eine Antwort eingeben.');
-      return run(() => api.vote(poll.id, { text }), poll.has_voted ? 'Antwort geändert' : 'Antwort gespeichert');
+      if (text.trim() === '') return setError(t('Bitte eine Antwort eingeben.'));
+      return run(() => api.vote(poll.id, { text }), poll.has_voted ? t('Antwort geändert') : t('Antwort gespeichert'));
     }
-    if (chosen.length === 0) return setError('Bitte eine Antwort auswählen.');
-    return run(() => api.vote(poll.id, { option_ids: chosen }), poll.has_voted ? 'Antwort geändert' : 'Antwort gespeichert');
+    if (chosen.length === 0) return setError(t('Bitte eine Antwort auswählen.'));
+    return run(() => api.vote(poll.id, { option_ids: chosen }), poll.has_voted ? t('Antwort geändert') : t('Antwort gespeichert'));
   }
 
   const toggle = (id: number, on: boolean) =>
@@ -142,10 +152,10 @@ function AnswerForm({ poll, onChanged, onToast }: { poll: Poll; onChanged: (p: P
   return (
     <form className="form poll-answer" onSubmit={submit}>
       <fieldset disabled={!running || busy}>
-        <legend>{poll.type === 'multiple' ? 'Deine Antwort (mehrere möglich)' : 'Deine Antwort'}</legend>
+        <legend>{poll.type === 'multiple' ? t('Deine Antwort (mehrere möglich)') : t('Deine Antwort')}</legend>
         {poll.type === 'text' ? (
           <label className="field">
-            <span>Antwort</span>
+            <span>{t('Antwort')}</span>
             <textarea rows={3} maxLength={TEXT_MAX} value={text} onChange={(e) => setText(e.target.value)} />
           </label>
         ) : (
@@ -170,7 +180,7 @@ function AnswerForm({ poll, onChanged, onToast }: { poll: Poll; onChanged: (p: P
       {running ? (
         <div className="button-row">
           <button className="btn" type="submit" disabled={busy}>
-            {poll.has_voted ? 'Antwort ändern' : 'Antwort senden'}
+            {poll.has_voted ? t('Antwort ändern') : t('Antwort senden')}
           </button>
           {poll.has_voted && (
             <button
@@ -178,15 +188,15 @@ function AnswerForm({ poll, onChanged, onToast }: { poll: Poll; onChanged: (p: P
               type="button"
               disabled={busy}
               onClick={async () =>
-                (await confirmAsk('Antwort wirklich zurückziehen?')) && run(() => api.withdrawVote(poll.id), 'Antwort zurückgezogen')
+                (await confirmAsk(t('Antwort wirklich zurückziehen?'))) && run(() => api.withdrawVote(poll.id), t('Antwort zurückgezogen'))
               }
             >
-              Zurückziehen
+              {t('Zurückziehen')}
             </button>
           )}
         </div>
       ) : (
-        <p className="muted small poll-closed-note">Die Umfrage ist beendet. Antworten lassen sich nicht mehr ändern.</p>
+        <p className="muted small poll-closed-note">{t('Die Umfrage ist beendet. Antworten lassen sich nicht mehr ändern.')}</p>
       )}
     </form>
   );
@@ -198,7 +208,7 @@ function PollHead({ poll }: { poll: Poll }) {
       <h2 className="poll-title">{poll.title}</h2>
       <p className="muted small">
         {TYPE_LABELS[poll.type]} · {endText(poll)}
-        {poll.has_voted && ' · beantwortet'}
+        {poll.has_voted && ` · ${t('beantwortet')}`}
       </p>
       {poll.description && <p className="board-text">{poll.description}</p>}
     </>
@@ -210,7 +220,7 @@ function PollPage({ id, onToast }: { id: number; onToast: (msg: string) => void 
   const s = sources.poll(id);
   const { data, error, loading, reload, setData } = useAsync(s.load, s.deps, s.key);
   if (!data && loading) return <Loading />;
-  if (!data) return <ErrorBox message={error ?? 'Die Umfrage gibt es nicht (mehr).'} onRetry={reload} />;
+  if (!data) return <ErrorBox message={error ?? t('Die Umfrage gibt es nicht (mehr).')} onRetry={reload} />;
   const poll = data;
   return (
     <div className="poll-page">
@@ -223,7 +233,7 @@ function PollPage({ id, onToast }: { id: number; onToast: (msg: string) => void 
         {poll.results_visible ? (
           <PollResultsView poll={poll} />
         ) : (
-          <p className="muted small poll-results-hidden">Ergebnisse: {resultsHint(poll)}</p>
+          <p className="muted small poll-results-hidden">{t('Ergebnisse: {hint}', { hint: resultsHint(poll) })}</p>
         )}
       </article>
       {/* Als Verweise statt großer Knöpfe; ohne „Zum …“, weil der Name des Bereichs frei wählbar ist (Beugung) */}
@@ -232,7 +242,7 @@ function PollPage({ id, onToast }: { id: number; onToast: (msg: string) => void 
           ‹ {sec.board}
         </button>
         <button className="btn btn-link" onClick={() => navigate('umfragen')}>
-          Alle {sec.polls} ›
+          {t('Alle {section}', { section: sec.polls })} ›
         </button>
       </div>
     </div>
@@ -243,15 +253,15 @@ function PollPage({ id, onToast }: { id: number; onToast: (msg: string) => void 
 function PollList() {
   const { data, error, loading, reload } = useAsync(sources.polls.load, sources.polls.deps, sources.polls.key);
   if (!data && loading) return <Loading />;
-  if (!data) return <ErrorBox message={error ?? 'Fehler'} onRetry={reload} />;
+  if (!data) return <ErrorBox message={error ?? t('Fehler')} onRetry={reload} />;
   const running = data.filter((p) => p.status === 'running');
   const ended = data.filter((p) => p.status === 'ended');
   const item = (p: Poll) => (
     <button className="card poll-list-item" key={p.id} onClick={() => navigate(`umfragen/${p.id}`)} {...prefetchOnTap(sources.poll(p.id))}>
       <strong>{p.title}</strong>
       <span className="muted small">
-        {endText(p)} · {p.has_voted ? 'beantwortet' : p.status === 'running' ? 'offen' : 'nicht teilgenommen'}
-        {p.results_visible && p.results_data ? ` · ${p.results_data.voters} Teilnahmen` : ''}
+        {endText(p)} · {p.has_voted ? t('beantwortet') : p.status === 'running' ? t('offen') : t('nicht teilgenommen')}
+        {p.results_visible && p.results_data ? ` · ${tn('{count} Teilnahme', '{count} Teilnahmen', p.results_data.voters)}` : ''}
       </span>
     </button>
   );
@@ -259,13 +269,13 @@ function PollList() {
     <div className="poll-list">
       {canManagePolls() && (
         <button className="btn btn-secondary btn-block poll-manage-link" onClick={() => navigate('umfragen/verwalten')}>
-          <Caps text={sec.polls} /> verwalten
+          <Caps text={t('{section} verwalten', { section: sec.polls })} />
         </button>
       )}
-      <h2 className="board-page-title">Laufend</h2>
-      {running.length === 0 ? <p className="muted small">Zurzeit läuft keine Umfrage.</p> : running.map(item)}
-      <h2 className="board-page-title">Beendete {sec.polls}</h2>
-      {ended.length === 0 ? <Empty>Noch keine beendeten Umfragen.</Empty> : ended.map(item)}
+      <h2 className="board-page-title">{t('Laufend')}</h2>
+      {running.length === 0 ? <p className="muted small">{t('Zurzeit läuft keine Umfrage.')}</p> : running.map(item)}
+      <h2 className="board-page-title">{t('Beendete {section}', { section: sec.polls })}</h2>
+      {ended.length === 0 ? <Empty>{t('Noch keine beendeten Umfragen.')}</Empty> : ended.map(item)}
     </div>
   );
 }
@@ -286,10 +296,10 @@ function PollForm({ poll, onSaved, onCancel }: { poll?: Poll; onSaved: (p: Poll,
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (title.trim() === '') return setError('Bitte eine Frage eingeben.');
+    if (title.trim() === '') return setError(t('Bitte eine Frage eingeben.'));
     if (type !== 'text' && options.filter((o) => o.trim() !== '').length < 2)
-      return setError('Bitte mindestens zwei Antwortmöglichkeiten eingeben.');
-    if (!poll && !(await confirmAsk('Umfrage jetzt veröffentlichen? Alle Mitglieder werden benachrichtigt.'))) return;
+      return setError(t('Bitte mindestens zwei Antwortmöglichkeiten eingeben.'));
+    if (!poll && !(await confirmAsk(t('Umfrage jetzt veröffentlichen? Alle Mitglieder werden benachrichtigt.')))) return;
     const data: PollInput = { title, description, ends_at: fromLocalInput(endsAt) };
     if (!locked) Object.assign(data, { type, anonymous, results, ...(type !== 'text' ? { options } : {}) });
     setBusy(true);
@@ -311,35 +321,37 @@ function PollForm({ poll, onSaved, onCancel }: { poll?: Poll; onSaved: (p: Poll,
 
   return (
     <form className="form card poll-form" onSubmit={submit}>
-      <h3>{poll ? 'Umfrage bearbeiten' : 'Neue Umfrage'}</h3>
+      <h3>{poll ? t('Umfrage bearbeiten') : t('Neue Umfrage')}</h3>
       <label className="field">
-        <span>Frage</span>
+        <span>{t('Frage')}</span>
         <input type="text" value={title} maxLength={TITLE_MAX} onChange={(e) => setTitle(e.target.value)} />
       </label>
       <label className="field">
-        <span>Beschreibung (optional)</span>
+        <span>{t('Beschreibung (optional)')}</span>
         <textarea rows={2} maxLength={DESCRIPTION_MAX} value={description} onChange={(e) => setDescription(e.target.value)} />
       </label>
-      {locked && <p className="muted small">Es gibt schon Antworten: Art, Antwortmöglichkeiten, Anonymität und Sichtbarkeit sind fest.</p>}
+      {locked && (
+        <p className="muted small">{t('Es gibt schon Antworten: Art, Antwortmöglichkeiten, Anonymität und Sichtbarkeit sind fest.')}</p>
+      )}
       <fieldset disabled={locked}>
         <label className="field">
-          <span>Art</span>
+          <span>{t('Art')}</span>
           <select value={type} onChange={(e) => setType(e.target.value as PollType)}>
-            {(Object.keys(TYPE_LABELS) as PollType[]).map((t) => (
-              <option key={t} value={t}>
-                {TYPE_LABELS[t]}
+            {(Object.keys(TYPE_LABELS) as PollType[]).map((k) => (
+              <option key={k} value={k}>
+                {TYPE_LABELS[k]}
               </option>
             ))}
           </select>
         </label>
         {type !== 'text' && (
           <div className="field poll-options-edit">
-            <span>Antwortmöglichkeiten</span>
+            <span>{t('Antwortmöglichkeiten')}</span>
             {options.map((o, i) => (
               <div className="poll-option-edit" key={i}>
                 <input
                   type="text"
-                  aria-label={`Möglichkeit ${i + 1}`}
+                  aria-label={t('Möglichkeit {n}', { n: i + 1 })}
                   value={o}
                   maxLength={OPTION_MAX}
                   onChange={(e) => setOptions(options.map((x, j) => (j === i ? e.target.value : x)))}
@@ -348,7 +360,7 @@ function PollForm({ poll, onSaved, onCancel }: { poll?: Poll; onSaved: (p: Poll,
                   <button
                     type="button"
                     className="btn btn-link"
-                    aria-label={`Möglichkeit ${i + 1} entfernen`}
+                    aria-label={t('Möglichkeit {n} entfernen', { n: i + 1 })}
                     onClick={() => setOptions(options.filter((_, j) => j !== i))}
                   >
                     ×
@@ -358,24 +370,24 @@ function PollForm({ poll, onSaved, onCancel }: { poll?: Poll; onSaved: (p: Poll,
             ))}
             {options.length < OPTIONS_MAX && (
               <button type="button" className="btn btn-link poll-add-option" onClick={() => setOptions([...options, ''])}>
-                + Möglichkeit
+                + {t('Möglichkeit')}
               </button>
             )}
           </div>
         )}
         <div className="field">
-          <span>Antworten</span>
+          <span>{t('Antworten')}</span>
           <label className="poll-option">
             <input type="radio" name="poll-anon" checked={!anonymous} onChange={() => setAnonymous(false)} />
-            <span>Namentlich</span>
+            <span>{t('Namentlich')}</span>
           </label>
           <label className="poll-option">
             <input type="radio" name="poll-anon" checked={anonymous} onChange={() => setAnonymous(true)} />
-            <span>Anonym (niemand sieht, wer was geantwortet hat)</span>
+            <span>{t('Anonym (niemand sieht, wer was geantwortet hat)')}</span>
           </label>
         </div>
         <label className="field">
-          <span>Wer sieht die Ergebnisse?</span>
+          <span>{t('Wer sieht die Ergebnisse?')}</span>
           <select value={results} onChange={(e) => setResults(e.target.value as PollResults)}>
             {(Object.keys(RESULT_LABELS) as PollResults[]).map((r) => (
               <option key={r} value={r}>
@@ -386,13 +398,15 @@ function PollForm({ poll, onSaved, onCancel }: { poll?: Poll; onSaved: (p: Poll,
         </label>
       </fieldset>
       <label className="field">
-        <span>Ende (optional)</span>
+        <span>{t('Ende (optional)')}</span>
         <input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
       </label>
       <p className="muted small">
         {poll
-          ? 'Ändern verschickt keine neue Benachrichtigung.'
-          : 'Alle Mitglieder bekommen eine Benachrichtigung; 24 Stunden vor dem Ende werden alle erinnert, die noch nicht geantwortet haben. Anonymität und Sichtbarkeit lassen sich nach der ersten Antwort nicht mehr ändern.'}
+          ? t('Ändern verschickt keine neue Benachrichtigung.')
+          : t(
+              'Alle Mitglieder bekommen eine Benachrichtigung; 24 Stunden vor dem Ende werden alle erinnert, die noch nicht geantwortet haben. Anonymität und Sichtbarkeit lassen sich nach der ersten Antwort nicht mehr ändern.',
+            )}
       </p>
       {error && (
         <p className="form-error small" role="alert">
@@ -401,11 +415,11 @@ function PollForm({ poll, onSaved, onCancel }: { poll?: Poll; onSaved: (p: Poll,
       )}
       <div className="button-row">
         <button className="btn" type="submit" disabled={busy}>
-          {busy ? 'Speichert …' : poll ? 'Speichern' : 'Veröffentlichen'}
+          {busy ? t('Speichert …') : poll ? t('Speichern') : t('Veröffentlichen')}
         </button>
         {onCancel && (
           <button className="btn btn-secondary" type="button" disabled={busy} onClick={onCancel}>
-            Abbrechen
+            {t('Abbrechen')}
           </button>
         )}
       </div>
@@ -440,7 +454,7 @@ function ManagedPoll({ poll, onChanged, onToast }: { poll: Poll; onChanged: () =
         onCancel={() => setEditing(false)}
         onSaved={() => {
           setEditing(false);
-          onToast('Umfrage geändert');
+          onToast(t('Umfrage geändert'));
           onChanged();
           void refreshBoard();
         }}
@@ -451,7 +465,7 @@ function ManagedPoll({ poll, onChanged, onToast }: { poll: Poll; onChanged: () =
     <article className="card poll-card poll-managed">
       <PollHead poll={poll} />
       <p className="muted small">
-        {poll.anonymous ? 'Anonym' : 'Namentlich'} · Ergebnisse: {RESULT_LABELS[poll.results]}
+        {poll.anonymous ? t('Anonym') : t('Namentlich')} · {t('Ergebnisse: {hint}', { hint: RESULT_LABELS[poll.results] })}
       </p>
       <PollResultsView poll={poll} />
       {error && (
@@ -462,26 +476,26 @@ function ManagedPoll({ poll, onChanged, onToast }: { poll: Poll; onChanged: () =
       <div className="icon-row poll-manage-actions">
         {poll.status === 'running' && (
           <>
-            <IconButton icon="edit" label="Bearbeiten" disabled={busy} onClick={() => setEditing(true)} />
+            <IconButton icon="edit" label={t('Bearbeiten')} disabled={busy} onClick={() => setEditing(true)} />
             <button
               className="btn btn-secondary poll-close"
               disabled={busy}
               onClick={async () =>
-                (await confirmAsk('Umfrage jetzt beenden? Danach kann niemand mehr antworten.')) &&
-                run(() => api.closePoll(poll.id), 'Umfrage beendet')
+                (await confirmAsk(t('Umfrage jetzt beenden? Danach kann niemand mehr antworten.'))) &&
+                run(() => api.closePoll(poll.id), t('Umfrage beendet'))
               }
             >
-              Beenden
+              {t('Beenden')}
             </button>
           </>
         )}
         <IconButton
           icon="delete"
-          label="Löschen"
+          label={t('Löschen')}
           variant="danger"
           disabled={busy}
           onClick={async () =>
-            (await confirmAsk('Umfrage mit allen Antworten löschen?')) && run(() => api.deletePoll(poll.id), 'Umfrage gelöscht')
+            (await confirmAsk(t('Umfrage mit allen Antworten löschen?'))) && run(() => api.deletePoll(poll.id), t('Umfrage gelöscht'))
           }
         />
       </div>
@@ -496,7 +510,7 @@ function PollAdmin({ onToast }: { onToast: (msg: string) => void }) {
     <div className="poll-admin">
       <PollForm
         onSaved={() => {
-          onToast('Umfrage veröffentlicht');
+          onToast(t('Umfrage veröffentlicht'));
           reload();
           void refreshBoard();
         }}
@@ -504,12 +518,12 @@ function PollAdmin({ onToast }: { onToast: (msg: string) => void }) {
       {!data && loading ? (
         <Loading shape="text" />
       ) : !data ? (
-        <ErrorBox message={error ?? 'Fehler'} onRetry={reload} />
+        <ErrorBox message={error ?? t('Fehler')} onRetry={reload} />
       ) : data.length === 0 ? (
-        <Empty>Noch keine Umfragen.</Empty>
+        <Empty>{t('Noch keine Umfragen.')}</Empty>
       ) : (
         <>
-          <h2 className="board-page-title">Alle {sec.polls}</h2>
+          <h2 className="board-page-title">{t('Alle {section}', { section: sec.polls })}</h2>
           {data.map((p) => (
             <ManagedPoll key={`${p.id}-${p.updated_at}`} poll={p} onChanged={reload} onToast={onToast} />
           ))}

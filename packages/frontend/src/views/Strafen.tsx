@@ -4,6 +4,7 @@ import { formatDate, formatEuro } from '../format';
 import { Empty, ErrorBox, Loading, StatCard, useAsync } from '../ui';
 import { useFocusEntry } from '../focus';
 import { sources } from '../viewData';
+import { t } from '../i18n';
 
 export function PenaltyRow({ p, actions, focused }: { p: Penalty; actions?: React.ReactNode; focused?: boolean }) {
   return (
@@ -12,9 +13,9 @@ export function PenaltyRow({ p, actions, focused }: { p: Penalty; actions?: Reac
         <div className="row-title">{p.reason}</div>
         <div className="row-sub">
           {formatDate(p.date)}
-          {p.created_by_name && ` · eingetragen von ${p.created_by_name}`}
+          {p.created_by_name && ` · ${t('eingetragen von {name}', { name: p.created_by_name })}`}
           {' · '}
-          <span className={`badge badge-${p.status}`}>{p.status === 'paid' ? 'bezahlt' : 'offen'}</span>
+          <span className={`badge badge-${p.status}`}>{p.status === 'paid' ? t('bezahlt') : t('offen')}</span>
         </div>
         {actions && <div className="row-actions">{actions}</div>}
       </div>
@@ -36,14 +37,14 @@ export default function Strafen({ me, focus }: { me: Me; focus?: string }) {
   return (
     <div>
       <StatCard
-        label={`Offen: ${brand.labels.sections.penalties}`}
+        label={t('Offen: {penalties}', { penalties: brand.labels.sections.penalties })}
         value={formatEuro(me.open_cents)}
         tone={me.open_cents > 0 ? 'warn' : 'good'}
       />
-      {penalties.length === 0 && <Empty>Keine Einträge – vorbildlich!</Empty>}
+      {penalties.length === 0 && <Empty>{t('Keine Einträge – vorbildlich!')}</Empty>}
       {open.length > 0 && (
         <>
-          <h2 className="section-title">Offen</h2>
+          <h2 className="section-title">{t('Offen')}</h2>
           <ul className="card-list">
             {open.map((p) => (
               <PenaltyRow key={p.id} p={p} focused={flash === String(p.id)} />
@@ -53,7 +54,7 @@ export default function Strafen({ me, focus }: { me: Me; focus?: string }) {
       )}
       {paid.length > 0 && (
         <>
-          <h2 className="section-title">Bezahlt</h2>
+          <h2 className="section-title">{t('Bezahlt')}</h2>
           <ul className="card-list">
             {paid.map((p) => (
               <PenaltyRow key={p.id} p={p} focused={flash === String(p.id)} />

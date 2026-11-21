@@ -4,6 +4,7 @@ import { confirmAsk } from './ask';
 import { dataUpdated } from './dataCache';
 import { ErrorBox, Loading, Sheet, useAsync } from './ui';
 import { useBackClose } from './backClose';
+import { t, tn } from './i18n';
 
 /**
  * Galerie direkt in der Galerie verwalten (Recht manage_gallery, Admins sowieso): hochgeladene Bilder und Videos
@@ -105,7 +106,7 @@ export function useLongPress(enabled: boolean, onLongPress: (key: number) => voi
 
 /** „3 Bilder und Videos“ für Rückfragen und Meldungen. */
 export function itemsLabel(n: number): string {
-  return n === 1 ? '1 Bild oder Video' : `${n} Bilder und Videos`;
+  return tn('{count} Bild oder Video', '{count} Bilder und Videos', n);
 }
 
 /** Fenster: Album wählen, in das die gewählten Bilder und Videos kommen (alle Alben, auch aus Drive). */
@@ -148,10 +149,10 @@ export function MoveSheet({
   }
 
   return (
-    <Sheet title={`${itemsLabel(ids.length)} verschieben`} onClose={onClose} top={top}>
+    <Sheet title={t('{items} verschieben', { items: itemsLabel(ids.length) })} onClose={onClose} top={top}>
       {loading && !data && <Loading shape="text" />}
       {error && <ErrorBox message={error} onRetry={reload} />}
-      {data && albums.length === 0 && <p className="muted small">Es gibt noch kein anderes Album. Lege es zuerst an.</p>}
+      {data && albums.length === 0 && <p className="muted small">{t('Es gibt noch kein anderes Album. Lege es zuerst an.')}</p>}
       {data && albums.length > 0 && (
         <form
           className="form stack"
@@ -161,9 +162,9 @@ export function MoveSheet({
           }}
         >
           <label className="field">
-            <span>In das Album</span>
+            <span>{t('In das Album')}</span>
             <select value={target} onChange={(e) => setTarget(e.target.value)} required>
-              <option value="">Bitte wählen</option>
+              <option value="">{t('Bitte wählen')}</option>
               {years.map((y) => (
                 <optgroup key={y} label={y}>
                   {albums
@@ -171,7 +172,7 @@ export function MoveSheet({
                     .map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.title}
-                        {a.source === 'drive' ? ' (aus Google Drive)' : ''}
+                        {a.source === 'drive' ? ` ${t('(aus Google Drive)')}` : ''}
                       </option>
                     ))}
                 </optgroup>
@@ -184,7 +185,7 @@ export function MoveSheet({
             </p>
           )}
           <button className="btn btn-primary" type="submit" disabled={busy || target === ''}>
-            Verschieben
+            {t('Verschieben')}
           </button>
         </form>
       )}
@@ -228,7 +229,7 @@ export function AlbumEditSheet({
   }
 
   return (
-    <Sheet title="Album bearbeiten" onClose={onClose}>
+    <Sheet title={t('Album bearbeiten')} onClose={onClose}>
       <form
         className="form stack"
         onSubmit={async (e) => {
@@ -237,11 +238,11 @@ export function AlbumEditSheet({
         }}
       >
         <label className="field">
-          <span>Titel</span>
+          <span>{t('Titel')}</span>
           <input type="text" maxLength={120} value={title} onChange={(e) => setTitle(e.target.value)} required />
         </label>
         <label className="field">
-          <span>Jahr</span>
+          <span>{t('Jahr')}</span>
           <input type="number" min={1800} value={year} onChange={(e) => setYear(e.target.value)} required />
         </label>
         {editError && (
@@ -251,7 +252,7 @@ export function AlbumEditSheet({
         )}
         <div className="button-row">
           <button className="btn btn-primary" type="submit" disabled={busy}>
-            Speichern
+            {t('Speichern')}
           </button>
           <button
             type="button"
@@ -262,7 +263,7 @@ export function AlbumEditSheet({
               if (await run(() => api.deleteGalleryAlbum(album.id))) onDeleted();
             }}
           >
-            Album löschen
+            {t('Album löschen')}
           </button>
         </div>
       </form>
@@ -273,8 +274,17 @@ export function AlbumEditSheet({
 /** Rückfrage vor dem Löschen von Alben: nennt, wie viel mitgelöscht wird. */
 export function deleteAlbumsQuestion(albums: { title: string; count: number }[]): string {
   const total = albums.reduce((n, a) => n + a.count, 0);
-  const what = albums.length === 1 ? `Album „${albums[0].title}“` : `${albums.length} Alben`;
-  return total === 0 ? `${what} löschen?` : `${what} löschen? Dabei werden ${itemsLabel(total)} mitgelöscht.`;
+  const items = itemsLabel(total);
+  if (albums.length === 1) {
+    const title = albums[0].title;
+    return total === 0
+      ? t('Album „{title}“ löschen?', { title })
+      : t('Album „{title}“ löschen? Dabei werden {items} mitgelöscht.', { title, items });
+  }
+  const count = albums.length;
+  return total === 0
+    ? t('{count} Alben löschen?', { count })
+    : t('{count} Alben löschen? Dabei werden {items} mitgelöscht.', { count, items });
 }
 
 /**

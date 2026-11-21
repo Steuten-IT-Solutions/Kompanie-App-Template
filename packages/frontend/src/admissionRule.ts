@@ -1,4 +1,5 @@
 import type { AdmissionRuleNode, AdmissionRuleResult } from './api';
+import { t, tn } from './i18n';
 
 /**
  * Voraussetzung für die Aufnahme als Baum (Anzeige: admissionRuleView.tsx) (Server: Domain\AdmissionRule): Gruppen verknüpfen Bedingungen und weitere
@@ -85,18 +86,20 @@ type AnyNode = { type: string; op?: string; items?: AnyNode[]; kind?: string; co
 
 /** Voraussetzung in einer Zeile, z. B. „6 Teilnahmen an Versammlung und (12 Monate als Anwärter oder …)“; leer ohne. */
 export function describeRule(n: AnyNode, inner = false): string {
-  if (n.type === 'attendance') return `${plural(Number(n.count ?? 0), 'Teilnahme', 'Teilnahmen')} an „${n.kind || '?'}“`;
-  if (n.type === 'duration') return `${plural(Number(n.months ?? 0), 'Monat', 'Monate')} als Anwärter`;
+  if (n.type === 'attendance')
+    return tn('{count} Teilnahme an „{kind}“', '{count} Teilnahmen an „{kind}“', Number(n.count ?? 0), { kind: n.kind || '?' });
+  if (n.type === 'duration') return tn('{count} Monat als Anwärter', '{count} Monate als Anwärter', Number(n.months ?? 0));
   const parts = (n.items ?? []).map((i) => describeRule(i, true)).filter((p) => p !== '');
-  const text = parts.join(n.op === 'or' ? ' oder ' : ' und ');
+  const text = parts.join(n.op === 'or' ? ` ${t('oder')} ` : ` ${t('und')} `);
   return inner && parts.length > 1 ? `(${text})` : text;
 }
 
 /** Was an einer Bedingung noch fehlt, in Worten; null, wenn erfüllt. */
 function leafState(r: AdmissionRuleResult): string | null {
   if (r.status === 'fulfilled') return null;
-  if (r.type === 'attendance') return `noch ${plural(r.missing ?? 0, 'Teilnahme', 'Teilnahmen')} an „${r.kind}“`;
-  if (r.type === 'duration') return r.due ? `Mindestdauer ab ${dateText(r.due)}` : '„Anwärter seit“ fehlt';
+  if (r.type === 'attendance')
+    return tn('noch {count} Teilnahme an „{kind}“', 'noch {count} Teilnahmen an „{kind}“', r.missing ?? 0, { kind: r.kind ?? '' });
+  if (r.type === 'duration') return r.due ? t('Mindestdauer ab {date}', { date: dateText(r.due) }) : t('„Anwärter seit“ fehlt');
   return null;
 }
 
@@ -105,6 +108,6 @@ export function missingText(r: AdmissionRuleResult, inner = false): string {
   if (r.status === 'fulfilled') return '';
   if (r.type !== 'group') return leafState(r) ?? '';
   const parts = (r.items ?? []).map((i) => missingText(i, true)).filter((p) => p !== '');
-  const text = parts.join(r.op === 'or' ? ' oder ' : ' · ');
+  const text = parts.join(r.op === 'or' ? ` ${t('oder')} ` : ' · ');
   return inner && parts.length > 1 && r.op === 'or' ? `(${text})` : text;
 }

@@ -5,6 +5,7 @@ import { pushHintDue, pushHintLater, pushHintRoundDone } from './pushHint';
 import { previewRole } from './preview';
 import { navigate } from './router';
 import { Sheet } from './ui';
+import { t } from './i18n';
 
 // Bis zum nächsten Start der App nicht wieder öffnen (z. B. nach dem Link zur Seite Benachrichtigungen).
 let closedThisRun = false;
@@ -65,10 +66,10 @@ export default function PushHint({ onToast }: { onToast: (msg: string) => void }
       const device = await enablePush(status.publicKey);
       await api.pushSubscribe(
         device,
-        status.types.map((t) => t.key),
+        status.types.map((type) => type.key),
       );
       close();
-      onToast('Benachrichtigungen sind an');
+      onToast(t('Benachrichtigungen sind an'));
     } catch (err) {
       setError((err as Error).message);
       if (Notification.permission === 'denied') pushHintLater();
@@ -85,11 +86,12 @@ export default function PushHint({ onToast }: { onToast: (msg: string) => void }
 
   if (ios) {
     return (
-      <Sheet title="Nichts mehr verpassen" onClose={later}>
+      <Sheet title={t('Nichts mehr verpassen')} onClose={later}>
         <div className="push-hint stack">
           <p>
-            Lass dich benachrichtigen, wenn es Neues für dich gibt. Auf dem iPhone und iPad geht das nur in der installierten App (ab iOS
-            16.4): Hol dir die App auf den Home-Bildschirm, öffne sie von dort und schalte die Benachrichtigungen ein.
+            {t(
+              'Lass dich benachrichtigen, wenn es Neues für dich gibt. Auf dem iPhone und iPad geht das nur in der installierten App (ab iOS 16.4): Hol dir die App auf den Home-Bildschirm, öffne sie von dort und schalte die Benachrichtigungen ein.',
+            )}
           </p>
           <button
             className="btn btn-block push-hint-install"
@@ -100,10 +102,10 @@ export default function PushHint({ onToast }: { onToast: (msg: string) => void }
               navigate('installieren');
             }}
           >
-            App installieren
+            {t('App installieren')}
           </button>
           <button className="btn btn-link btn-block push-hint-later" onClick={later}>
-            Nicht jetzt
+            {t('Nicht jetzt')}
           </button>
         </div>
       </Sheet>
@@ -111,11 +113,12 @@ export default function PushHint({ onToast }: { onToast: (msg: string) => void }
   }
 
   return (
-    <Sheet title="Nichts mehr verpassen" onClose={later}>
+    <Sheet title={t('Nichts mehr verpassen')} onClose={later}>
       <div className="push-hint stack">
         <p>
-          Lass dich auf diesem Gerät benachrichtigen, wenn es Neues für dich gibt. Alle Arten sind schon ausgewählt; ändern kannst du das
-          jederzeit unter{' '}
+          {t(
+            'Lass dich auf diesem Gerät benachrichtigen, wenn es Neues für dich gibt. Alle Arten sind schon ausgewählt; ändern kannst du das jederzeit unter',
+          )}{' '}
           <button
             type="button"
             className="btn btn-link inline-link"
@@ -124,21 +127,21 @@ export default function PushHint({ onToast }: { onToast: (msg: string) => void }
               navigate('benachrichtigungen');
             }}
           >
-            Benachrichtigungen
+            {t('Benachrichtigungen')}
           </button>
           .
         </p>
-        <p className="small muted">Nach dem Tippen fragt dein Browser, ob die App Benachrichtigungen senden darf.</p>
+        <p className="small muted">{t('Nach dem Tippen fragt dein Browser, ob die App Benachrichtigungen senden darf.')}</p>
         {error && (
           <p className="form-error" role="alert">
             {error}
           </p>
         )}
         <button className="btn btn-block push-hint-on" onClick={enable} disabled={busy}>
-          {busy ? 'Einen Moment …' : 'Benachrichtigungen einschalten'}
+          {busy ? t('Einen Moment …') : t('Benachrichtigungen einschalten')}
         </button>
         <button className="btn btn-link btn-block push-hint-later" onClick={later} disabled={busy}>
-          Nicht jetzt
+          {t('Nicht jetzt')}
         </button>
       </div>
     </Sheet>

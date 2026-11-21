@@ -15,6 +15,7 @@ import { BrowseCard, BrowseList } from '../browseCard';
 import { navigate } from '../router';
 import { NewAccountRole } from './Konten';
 import { confirmAsk } from '../ask';
+import { t, tn } from '../i18n';
 
 /** Suche und Filter der Liste, gemerkt bis zum Neuladen (zurück von der Karte steht die Liste wie zuvor). */
 let listState: { query: string; company: string; filtersOpen: boolean } = { query: '', company: 'all', filtersOpen: false };
@@ -38,10 +39,10 @@ function sorted(requests: RegistrationRequest[]): RegistrationRequest[] {
 function Footnote({ withMail }: { withMail: boolean }) {
   return (
     <p className="muted small registration-footnote">
-      Unbearbeitete Anfragen werden nach 30 Tagen gelöscht.
+      {t('Unbearbeitete Anfragen werden nach 30 Tagen gelöscht.')}{' '}
       {withMail
-        ? ' Die Person bekommt über Freigabe oder Ablehnung eine Mail.'
-        : ' Ohne Mailversand erfährt die Person das Ergebnis, wenn sie sich anmeldet oder den Stand ihrer Anfrage prüft.'}
+        ? t('Die Person bekommt über Freigabe oder Ablehnung eine Mail.')
+        : t('Ohne Mailversand erfährt die Person das Ergebnis, wenn sie sich anmeldet oder den Stand ihrer Anfrage prüft.')}
     </p>
   );
 }
@@ -59,16 +60,16 @@ export function Anfragen() {
     setState(listState);
   };
   if (loading && !data) return <Loading shape="people" />;
-  if (error || !data) return <ErrorBox message={error ?? 'Die Anfragen konnten nicht geladen werden.'} onRetry={reload} />;
+  if (error || !data) return <ErrorBox message={error ?? t('Die Anfragen konnten nicht geladen werden.')} onRetry={reload} />;
   const requests = sorted(data.requests);
   const q = state.query.trim().toLowerCase();
   // Zur Wahl im Filter: die Kompanien, die in einer Anfrage vorkommen, dann Keine Kompanie, Passiv und keine Angabe
   const keys = new Set(requests.flatMap(companyKeys));
   const companyOptions = [
     ...(data.companies ?? []).filter((c) => keys.has(String(c.id))).map((c) => ({ key: String(c.id), label: c.name })),
-    ...(keys.has('none') ? [{ key: 'none', label: 'Keine Kompanie' }] : []),
-    ...(keys.has('passive') ? [{ key: 'passive', label: 'Passiv' }] : []),
-    ...(keys.has('unknown') ? [{ key: 'unknown', label: 'keine Angabe' }] : []),
+    ...(keys.has('none') ? [{ key: 'none', label: t('Keine Kompanie') }] : []),
+    ...(keys.has('passive') ? [{ key: 'passive', label: t('Passiv') }] : []),
+    ...(keys.has('unknown') ? [{ key: 'unknown', label: t('keine Angabe') }] : []),
   ];
   const company = companyOptions.some((o) => o.key === state.company) ? state.company : 'all';
   const list = requests.filter(
@@ -78,22 +79,22 @@ export function Anfragen() {
   );
   return (
     <div className="registrations">
-      <h2 className="section-title">Anfragen auf einen Zugang</h2>
+      <h2 className="section-title">{t('Anfragen auf einen Zugang')}</h2>
       <p className="small muted member-counts" role="status">
-        {requests.length === 1 ? '1 offene Anfrage' : `${requests.length} offene Anfragen`}
+        {tn('{count} offene Anfrage', '{count} offene Anfragen', requests.length)}
       </p>
       {!config?.registration && (
-        <p className="muted small">„Zugang beantragen“ ist ausgeschaltet. Offene Anfragen lassen sich trotzdem noch bearbeiten.</p>
+        <p className="muted small">{t('„Zugang beantragen“ ist ausgeschaltet. Offene Anfragen lassen sich trotzdem noch bearbeiten.')}</p>
       )}
       {requests.length > 0 && (
         <>
           <input
             className="search"
             type="search"
-            placeholder="Anfragen suchen …"
+            placeholder={t('Anfragen suchen …')}
             value={state.query}
             onChange={(e) => update({ query: e.target.value })}
-            aria-label="Anfragen suchen"
+            aria-label={t('Anfragen suchen')}
           />
           {data.companies && companyOptions.length > 0 && (
             <>
@@ -104,17 +105,17 @@ export function Anfragen() {
                 aria-controls="registration-filters"
                 onClick={() => update({ filtersOpen: !state.filtersOpen })}
               >
-                Filter nach Kompanie
-                {company !== 'all' && <span className="badge badge-role">aktiv</span>}
+                {t('Filter nach Kompanie')}
+                {company !== 'all' && <span className="badge badge-role">{t('aktiv')}</span>}
                 <span className="member-filters-arrow" aria-hidden="true">
                   ›
                 </span>
               </button>
               <div id="registration-filters" className="member-filters registration-filters" hidden={!state.filtersOpen}>
                 <label className="field">
-                  <span>Kompanie</span>
+                  <span>{t('Kompanie')}</span>
                   <select value={company} onChange={(e) => update({ company: e.target.value })}>
-                    <option value="all">alle</option>
+                    <option value="all">{t('alle')}</option>
                     {companyOptions.map((o) => (
                       <option key={o.key} value={o.key}>
                         {o.label}
@@ -128,9 +129,9 @@ export function Anfragen() {
         </>
       )}
       {requests.length === 0 ? (
-        <Empty>Zurzeit wartet keine Anfrage auf Freigabe.</Empty>
+        <Empty>{t('Zurzeit wartet keine Anfrage auf Freigabe.')}</Empty>
       ) : list.length === 0 ? (
-        <Empty>Keine Anfrage gefunden.</Empty>
+        <Empty>{t('Keine Anfrage gefunden.')}</Empty>
       ) : (
         <BrowseList
           base="verwaltung/anfragen"
@@ -156,7 +157,7 @@ export function Anfragen() {
 export function AnfrageDetail({ id, onToast }: { id: number; onToast: (msg: string) => void }) {
   const { data, error, loading, reload, setData } = useAsync(() => api.registrations(), [], 'registrations');
   if (loading && !data) return <Loading shape="people" />;
-  if (error || !data) return <ErrorBox message={error ?? 'Die Anfragen konnten nicht geladen werden.'} onRetry={reload} />;
+  if (error || !data) return <ErrorBox message={error ?? t('Die Anfragen konnten nicht geladen werden.')} onRetry={reload} />;
   const list = data;
   const editable = can('create_users');
   const done = (doneId: number, msg: string) => {
@@ -173,10 +174,10 @@ export function AnfrageDetail({ id, onToast }: { id: number; onToast: (msg: stri
       id={id}
       items={sorted(list.requests)}
       className="registration-card"
-      back="‹ Alle Anfragen"
-      prevLabel="Vorherige Anfrage"
-      nextLabel="Nächste Anfrage"
-      missing="Diese Anfrage wartet nicht mehr auf Freigabe."
+      back={t('‹ Alle Anfragen')}
+      prevLabel={t('Vorherige Anfrage')}
+      nextLabel={t('Nächste Anfrage')}
+      missing={t('Diese Anfrage wartet nicht mehr auf Freigabe.')}
       render={(r) => (
         <RequestCard
           request={r}
@@ -194,9 +195,9 @@ export function AnfrageDetail({ id, onToast }: { id: number; onToast: (msg: stri
 }
 
 const MATCH_LABELS: Record<RegistrationMatch['match'], string> = {
-  email: 'gleiche E-Mail-Adresse',
-  name: 'gleicher Name',
-  similar: 'ähnlicher Name',
+  email: t('gleiche E-Mail-Adresse'),
+  name: t('gleicher Name'),
+  similar: t('ähnlicher Name'),
 };
 
 function RequestCard({
@@ -256,7 +257,10 @@ function RequestCard({
     if (
       linkTo &&
       !(await confirmAsk(
-        `Anfrage von ${r.name} mit dem Mitglied ${linkName ?? ''} verbinden? Es bekommt Benutzername und Passwort aus der Anfrage.`,
+        t('Anfrage von {name} mit dem Mitglied {member} verbinden? Es bekommt Benutzername und Passwort aus der Anfrage.', {
+          name: r.name,
+          member: linkName ?? '',
+        }),
       ))
     ) {
       return;
@@ -267,14 +271,19 @@ function RequestCard({
         ...(companyChoices && companiesChanged ? { company_ids: companyIds } : {}),
       };
       const res = await api.approveRegistration(r.id, linkTo ? { user_id: Number(linkTo), ...changed } : { level, ...changed });
-      const assigned = res.companies && res.companies.length > 0 ? `, ${res.companies.map((c) => c.name).join(', ')} zugeordnet` : '';
-      return `${res.member.name} ist freigegeben${res.linked ? ' und verbunden' : ''}${assigned}${res.mailed ? ', per Mail informiert' : ''}`;
+      const name = res.member.name;
+      const parts = [res.linked ? t('{name} ist freigegeben und verbunden', { name }) : t('{name} ist freigegeben', { name })];
+      if (res.companies && res.companies.length > 0) {
+        parts.push(t('{companies} zugeordnet', { companies: res.companies.map((c) => c.name).join(', ') }));
+      }
+      if (res.mailed) parts.push(t('per Mail informiert'));
+      return parts.join(', ');
     });
   };
   const reject = () =>
     run(async () => {
       const res = await api.rejectRegistration(r.id, reason.trim());
-      return `Anfrage abgelehnt${res.mailed ? ', die Person ist per Mail informiert' : ''}`;
+      return res.mailed ? t('Anfrage abgelehnt, die Person ist per Mail informiert') : t('Anfrage abgelehnt');
     });
 
   const head = <RequestInfo r={r} withMail={withMail} companies={!!companies} />;
@@ -283,8 +292,8 @@ function RequestCard({
       <>
         {head}
         {matches.length > 0 && (
-          <section className="card registration-link" aria-label="Mitglieder ohne Zugang">
-            <h3>Könnte passen zu</h3>
+          <section className="card registration-link" aria-label={t('Mitglieder ohne Zugang')}>
+            <h3>{t('Könnte passen zu')}</h3>
             <p className="small">{matches.map((m) => `${m.name} (${MATCH_LABELS[m.match]})`).join(', ')}</p>
           </section>
         )}
@@ -297,11 +306,11 @@ function RequestCard({
       {head}
       {(matches.length > 0 || noAccess.length > 0) && (
         <section className="card registration-link" aria-labelledby={`link-title-${r.id}`}>
-          <h3 id={`link-title-${r.id}`}>Mitglied ohne Zugang verbinden?</h3>
-          {matches.length > 0 && <p className="muted small">Diese Mitglieder ohne Zugang könnten passen:</p>}
+          <h3 id={`link-title-${r.id}`}>{t('Mitglied ohne Zugang verbinden?')}</h3>
+          {matches.length > 0 && <p className="muted small">{t('Diese Mitglieder ohne Zugang könnten passen:')}</p>}
           <label className="toggle">
             <input type="radio" name={`link-${r.id}`} checked={linkTo === ''} onChange={() => setLinkTo('')} />
-            Nein, neues Konto anlegen
+            {t('Nein, neues Konto anlegen')}
           </label>
           {matches.map((m) => (
             <label key={m.id} className="toggle">
@@ -311,9 +320,9 @@ function RequestCard({
           ))}
           {others.length > 0 && (
             <label className="field">
-              <span>{matches.length > 0 ? 'Oder ein anderes Mitglied ohne Zugang' : 'Mitglied ohne Zugang wählen'}</span>
+              <span>{matches.length > 0 ? t('Oder ein anderes Mitglied ohne Zugang') : t('Mitglied ohne Zugang wählen')}</span>
               <select value={others.some((p) => String(p.id) === linkTo) ? linkTo : ''} onChange={(e) => setLinkTo(e.target.value)}>
-                <option value="">– keines –</option>
+                <option value="">{t('– keines –')}</option>
                 {others.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -325,7 +334,7 @@ function RequestCard({
         </section>
       )}
       {companyChoices && companyChoices.length > 0 && (
-        <section className="card registration-companies" aria-label="Kompanie zuordnen">
+        <section className="card registration-companies" aria-label={t('Kompanie zuordnen')}>
           <h3>
             <button
               type="button"
@@ -334,7 +343,7 @@ function RequestCard({
               aria-controls={`registration-companies-${r.id}`}
               onClick={() => setCompaniesOpen(!companiesOpen)}
             >
-              Kompanie zuordnen
+              {t('Kompanie zuordnen')}
               <span className="member-filters-arrow" aria-hidden="true">
                 ›
               </span>
@@ -346,13 +355,13 @@ function RequestCard({
                 selectedNames.join(', ')
               ) : (
                 <span className="muted">
-                  keine ausgewählt
+                  {t('keine ausgewählt')}
                   {r.company_choice === 'none'
-                    ? ' (in der Anfrage: Keine Kompanie)'
+                    ? ` ${t('(in der Anfrage: Keine Kompanie)')}`
                     : r.company_choice === 'passive'
-                      ? ' (in der Anfrage: Passiv)'
+                      ? ` ${t('(in der Anfrage: Passiv)')}`
                       : !r.company_choice
-                        ? ' (die Anfrage hat keine Angabe)'
+                        ? ` ${t('(die Anfrage hat keine Angabe)')}`
                         : ''}
                 </span>
               )}
@@ -367,38 +376,39 @@ function RequestCard({
                   onChange={(e) => setCompanyIds((ids) => (e.target.checked ? [...ids, c.id] : ids.filter((x) => x !== c.id)))}
                 />
                 {c.name}
-                {!c.active && <span className="muted small"> (ehemalig)</span>}
+                {!c.active && <span className="muted small"> {t('(ehemalig)')}</span>}
               </label>
             ))}
           </div>
           <p className="muted small">
-            {linkTo ? 'Zusätzlich zu den Kompanien des Mitglieds. ' : ''}Zugeordnet werden nur Personen mit einer Rolle für Mitglieder.
+            {linkTo ? `${t('Zusätzlich zu den Kompanien des Mitglieds.')} ` : ''}
+            {t('Zugeordnet werden nur Personen mit einer Rolle für Mitglieder.')}
           </p>
         </section>
       )}
-      <section className="card registration-approve" aria-label="Freigabe">
-        <h3>Freigabe</h3>
+      <section className="card registration-approve" aria-label={t('Freigabe')}>
+        <h3>{t('Freigabe')}</h3>
         {!companyChoices && chosen.length > 0 && (
-          <p className="muted small">Beim Freigeben wird die Person der gewählten Kompanie zugeordnet.</p>
+          <p className="muted small">{t('Beim Freigeben wird die Person der gewählten Kompanie zugeordnet.')}</p>
         )}
         {r.email_taken && (
-          <p className="form-error small">Zu dieser E-Mail-Adresse gibt es inzwischen ein Konto. Freigeben geht deshalb nicht.</p>
+          <p className="form-error small">{t('Zu dieser E-Mail-Adresse gibt es inzwischen ein Konto. Freigeben geht deshalb nicht.')}</p>
         )}
         <label className="field">
-          <span>Benutzername</span>
+          <span>{t('Benutzername')}</span>
           <input type="text" autoComplete="off" autoCapitalize="none" value={username} onChange={(e) => setUsername(e.target.value)} />
           {r.username_taken && username.trim() === r.username && (
-            <span className="form-error small">Dieser Benutzername ist inzwischen vergeben. Bitte einen anderen eintragen.</span>
+            <span className="form-error small">{t('Dieser Benutzername ist inzwischen vergeben. Bitte einen anderen eintragen.')}</span>
           )}
         </label>
         {linkTo ? (
-          <p className="muted small">Das Mitglied behält seine Rolle und alle Einträge, z. B. in Chroniken und Listen.</p>
+          <p className="muted small">{t('Das Mitglied behält seine Rolle und alle Einträge, z. B. in Chroniken und Listen.')}</p>
         ) : (
-          <NewAccountRole label="Rolle" value={level} onChange={setLevel} roles={roles} />
+          <NewAccountRole label={t('Rolle')} value={level} onChange={setLevel} roles={roles} />
         )}
         {rejecting && (
           <label className="field">
-            <span>Begründung (freiwillig{withMail ? ', steht in der Mail' : ''})</span>
+            <span>{withMail ? t('Begründung (freiwillig, steht in der Mail)') : t('Begründung (freiwillig)')}</span>
             <textarea rows={2} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
           </label>
         )}
@@ -410,19 +420,19 @@ function RequestCard({
         {rejecting ? (
           <div className="row-actions registration-card-actions">
             <button type="button" className="btn btn-danger" disabled={busy} onClick={reject}>
-              Ablehnen
+              {t('Ablehnen')}
             </button>
             <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setRejecting(false)}>
-              Abbrechen
+              {t('Abbrechen')}
             </button>
           </div>
         ) : (
           <div className="row-actions registration-card-actions">
             <button type="button" className="btn" disabled={busy || r.email_taken} onClick={approve}>
-              {busy ? 'Gibt frei …' : linkTo ? 'Freigeben und verbinden' : 'Freigeben'}
+              {busy ? t('Gibt frei …') : linkTo ? t('Freigeben und verbinden') : t('Freigeben')}
             </button>
             <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setRejecting(true)}>
-              Ablehnen …
+              {t('Ablehnen …')}
             </button>
           </div>
         )}
@@ -436,37 +446,39 @@ function RequestInfo({ r, withMail, companies }: { r: RegistrationRequest; withM
   return (
     <>
       <h2 className="member-name member-name-centered">{r.name}</h2>
-      <p className="muted small member-level registration-date">angefragt am {formatDate(r.created_at.slice(0, 10))}</p>
-      <section className="card registration-details" aria-label="Angaben">
-        <h3>Angaben</h3>
+      <p className="muted small member-level registration-date">
+        {t('angefragt am {date}', { date: formatDate(r.created_at.slice(0, 10)) })}
+      </p>
+      <section className="card registration-details" aria-label={t('Angaben')}>
+        <h3>{t('Angaben')}</h3>
         <dl className="contact-list">
-          <dt>E-Mail-Adresse</dt>
+          <dt>{t('E-Mail-Adresse')}</dt>
           <dd>
             {r.email}
             <span className="muted small">
               {' · '}
-              {withMail ? (r.email_confirmed ? 'Adresse bestätigt' : 'Adresse nicht bestätigt') : 'Adresse nicht geprüft'}
+              {withMail ? (r.email_confirmed ? t('Adresse bestätigt') : t('Adresse nicht bestätigt')) : t('Adresse nicht geprüft')}
             </span>
           </dd>
-          <dt>Gewünschter Benutzername</dt>
+          <dt>{t('Gewünschter Benutzername')}</dt>
           <dd>{r.username}</dd>
           {companies && (
             <>
-              <dt>Kompanie</dt>
+              <dt>{t('Kompanie')}</dt>
               <dd>
                 {r.company_choice === 'none'
-                  ? 'Keine Kompanie'
+                  ? t('Keine Kompanie')
                   : r.company_choice === 'passive'
-                    ? 'Passiv'
+                    ? t('Passiv')
                     : r.companies && r.companies.length > 0
                       ? r.companies.map((c) => c.name).join(', ')
-                      : 'keine Angabe'}
+                      : t('keine Angabe')}
               </dd>
             </>
           )}
           {r.message && (
             <>
-              <dt>Nachricht</dt>
+              <dt>{t('Nachricht')}</dt>
               <dd className="registration-message">{r.message}</dd>
             </>
           )}

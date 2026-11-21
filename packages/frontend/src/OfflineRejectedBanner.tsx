@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import { dismissRejected, useRejected } from './offlineRejectedStore';
 import { rejectedText } from './offlineRejected';
 
@@ -13,11 +14,11 @@ export default function OfflineRejectedBanner() {
   return (
     <div className="update-hint offline-rejected" role="alert">
       <div className="update-hint-text">
-        <strong>Nicht übertragen</strong>
+        <strong>{t('Nicht übertragen')}</strong>
         <span>{rejectedText(first)}</span>
         {rest.length > 0 && (
           <details className="offline-rejected-more">
-            <summary>+{rest.length} weitere</summary>
+            <summary>{t('+{count} weitere', { count: rest.length })}</summary>
             <ul>
               {rest.map(([key, r]) => (
                 <li key={key}>{rejectedText(r)}</li>
@@ -25,9 +26,9 @@ export default function OfflineRejectedBanner() {
             </ul>
           </details>
         )}
-        <span className="offline-rejected-hint">Bitte trag es erneut ein oder sprich mit der Verwaltung.</span>
+        <span className="offline-rejected-hint">{t('Bitte trag es erneut ein oder sprich mit der Verwaltung.')}</span>
       </div>
-      <button className="btn btn-link update-hint-close" onClick={() => dismissRejected()} aria-label="Gelesen" title="Gelesen">
+      <button className="btn btn-link update-hint-close" onClick={() => dismissRejected()} aria-label={t('Gelesen')} title={t('Gelesen')}>
         ✕
       </button>
     </div>

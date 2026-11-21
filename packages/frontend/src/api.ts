@@ -4,7 +4,7 @@
 import type { Address } from './address';
 import { readBase64 } from './backupFile';
 import { dataCache } from './dataCache';
-import { LOCALE_HEADER, SOURCE_LOCALE, locale, type Locale } from './i18n';
+import { LOCALE_HEADER, SOURCE_LOCALE, locale, t, type Locale } from './i18n';
 import { PREVIEW_HEADER, previewRole, stopPreview } from './preview';
 import brand from './generated/brand';
 import { noteError } from './lastError';
@@ -823,7 +823,7 @@ export const levelLabel = (level: Level): string =>
   roleInfo(level)?.label ?? (brand.labels.roles as Record<string, string | undefined>)[level] ?? level;
 
 /** Überschrift für die Neuigkeiten: Standardbezeichnung „News“ ausgeschrieben, eigene Bezeichnungen unverändert. */
-export const newsTitle = (): string => (brand.labels.sections.news === 'News' ? 'Neuigkeiten' : brand.labels.sections.news);
+export const newsTitle = (): string => (brand.labels.sections.news === 'News' ? t('Neuigkeiten') : brand.labels.sections.news);
 
 /** Punktefaktor der Rolle (1 ohne Angabe). */
 export const roleFactor = (level: Level): number => roleInfo(level)?.points_factor ?? 1;
@@ -2034,14 +2034,18 @@ export async function encodeFile(file: File): Promise<EncodedFile> {
 }
 
 export type AttendanceStatus = 'present' | 'excused' | 'absent';
-export const ATTENDANCE_LABELS: Record<AttendanceStatus, string> = { present: 'anwesend', excused: 'entschuldigt', absent: 'fehlt' };
+export const ATTENDANCE_LABELS: Record<AttendanceStatus, string> = {
+  present: t('anwesend'),
+  excused: t('entschuldigt'),
+  absent: t('fehlt'),
+};
 export type AttendanceCounts = Record<AttendanceStatus, number>;
 
 /** „3 anwesend · 1 entschuldigt · 0 fehlt“, mit open zusätzlich „· 5 ohne Auswahl“ */
 export const countsText = (c: AttendanceCounts, open?: number): string =>
   (['present', 'excused', 'absent'] as AttendanceStatus[])
-    .map((s) => `${c[s]} ${ATTENDANCE_LABELS[s]}`)
-    .concat(open === undefined ? [] : [`${open} ohne Auswahl`])
+    .map((s) => t('{count} {status}', { count: c[s], status: ATTENDANCE_LABELS[s] }))
+    .concat(open === undefined ? [] : [t('{count} ohne Auswahl', { count: open })])
     .join(' · ');
 
 export interface AttendanceSummary {
@@ -2593,7 +2597,7 @@ export function toLogin(): void {
 
 function sessionExpired(): never {
   toLogin();
-  throw new ApiError('Sitzung abgelaufen – bitte neu anmelden.', 401, 'not_logged_in');
+  throw new ApiError(t('Sitzung abgelaufen – bitte neu anmelden.'), 401, 'not_logged_in');
 }
 
 /** Holt ein neues CSRF-Token (nur mit dem Sitzungs-Cookie). quiet: ohne Weiterleitung zur Anmeldung. */
@@ -2602,11 +2606,11 @@ export async function refreshCsrf(quiet = false): Promise<void> {
   try {
     res = await fetch(config!.csrf.refreshUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
   } catch {
-    throw new ApiError('Keine Verbindung. Bitte später erneut versuchen.', 0);
+    throw new ApiError(t('Keine Verbindung. Bitte später erneut versuchen.'), 0);
   }
   const data = await res.json().catch(() => null);
   if (!res.ok || !data?.token) {
-    if (quiet) throw new ApiError('Sitzung abgelaufen.', 401, 'not_logged_in');
+    if (quiet) throw new ApiError(t('Sitzung abgelaufen.'), 401, 'not_logged_in');
     sessionExpired();
   }
   csrfToken = data.token;
@@ -2641,9 +2645,11 @@ export function inBackground<T>(start: () => Promise<T>): Promise<T> {
   }
 }
 /** Meldung, wenn eine Änderung ohne Verbindung nicht beim Server ankam. */
-export const OFFLINE_NOT_SAVED = 'Keine Verbindung – nicht gespeichert. Deine Eingaben stehen noch hier; bitte später erneut speichern.';
+export const OFFLINE_NOT_SAVED = t('Keine Verbindung – nicht gespeichert. Deine Eingaben stehen noch hier; bitte später erneut speichern.');
 /** Meldung, wenn der Server in der Zeit (WRITE_TIMEOUT_MS) nicht geantwortet hat; ob die Änderung ankam, ist offen. */
-export const NO_ANSWER = 'Keine Antwort vom Server. Ob es gespeichert ist, ist nicht sicher; bitte später nachsehen oder erneut speichern.';
+export const NO_ANSWER = t(
+  'Keine Antwort vom Server. Ob es gespeichert ist, ist nicht sicher; bitte später nachsehen oder erneut speichern.',
+);
 /**
  * So lange wartet die App bei Änderungen, die sie vormerken und gefahrlos noch einmal senden kann (Zu- und Absagen,
  * Anwesenheit, Punkte und Strafen mit request_id), auf die Antwort. Danach gilt die Anfrage als gescheitert (Status 0,
@@ -2670,7 +2676,7 @@ async function requestFull<T>(
 ): Promise<{ data: T; headers: Headers }> {
   quiet ||= silent;
   if (!config) {
-    throw new ApiError('Die App muss über ihre Adresse auf der Webseite geöffnet werden.', 0);
+    throw new ApiError(t('Die App muss über ihre Adresse auf der Webseite geöffnet werden.'), 0);
   }
   let res: Response;
   // Service Worker (Issue #108): gespeicherte Antwort sofort, die aus dem Netz kommt im Hintergrund nach. Was vor der
@@ -2705,7 +2711,7 @@ async function requestFull<T>(
     }
     if (!path.startsWith('/reports') && !silent) noteError('Keine Verbindung zum Server');
     // Bei Änderungen sagen, dass nichts gespeichert ist (Offline-Prüfung): Die Eingaben stehen noch in der Ansicht.
-    throw new ApiError(method === 'GET' ? 'Keine Verbindung. Bitte später erneut versuchen.' : OFFLINE_NOT_SAVED, 0);
+    throw new ApiError(method === 'GET' ? t('Keine Verbindung. Bitte später erneut versuchen.') : OFFLINE_NOT_SAVED, 0);
   } finally {
     if (timer) clearTimeout(timer);
   }
@@ -2733,7 +2739,7 @@ async function requestFull<T>(
   // Angekommen: Eingaben in Formularen gelten als gespeichert (unsaved.ts).
   if (res.ok && method !== 'GET' && !readOnly && !silent) markSaved();
   if (!res.ok) {
-    const message: string = data?.message ?? `Fehler ${res.status}`;
+    const message: string = data?.message ?? t('Fehler {status}', { status: res.status });
     // Für „Fehler melden“ (Issue #64); Fehler des Formulars selbst nicht.
     if (!path.startsWith('/reports') && !silent) noteError(`${message} (HTTP ${res.status}${data?.code ? `, ${data.code}` : ''})`);
     throw new ApiError(message, res.status, data?.code ?? '');
@@ -2752,7 +2758,7 @@ export async function preparePreview(): Promise<string | null> {
     const next = await request<AppConfig>('GET', '/config');
     if (!next.preview) {
       stopPreview();
-      return 'Die Vorschau wurde beendet.';
+      return t('Die Vorschau wurde beendet.');
     }
     // Bereiche im selben Objekt ändern: Teile der App halten es fest (z. B. App.tsx).
     const { features, ...rest } = next;
@@ -2761,7 +2767,7 @@ export async function preparePreview(): Promise<string | null> {
     return null;
   } catch {
     stopPreview();
-    return 'Die Vorschau braucht eine Internetverbindung und wurde beendet.';
+    return t('Die Vorschau braucht eine Internetverbindung und wurde beendet.');
   }
 }
 

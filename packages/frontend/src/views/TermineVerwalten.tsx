@@ -6,6 +6,7 @@ import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
+import { t } from '../i18n';
 
 const EMPTY: EventInput = {
   title: '',
@@ -39,10 +40,10 @@ const KINDS = {
     create: api.createEvent,
     update: api.updateEvent,
     remove: api.deleteEvent,
-    newTitle: 'Neuer öffentlicher Termin',
-    add: '+ Öffentlichen Termin anlegen',
-    listTitle: 'Kommend und öffentlich',
-    empty: 'Noch keine öffentlichen Einträge.',
+    newTitle: t('Neuer öffentlicher Termin'),
+    add: t('+ Öffentlichen Termin anlegen'),
+    listTitle: t('Kommend und öffentlich'),
+    empty: t('Noch keine öffentlichen Einträge.'),
     hint: null,
   },
   internal: {
@@ -50,11 +51,11 @@ const KINDS = {
     create: api.createCalendarEntry,
     update: api.updateCalendarEntry,
     remove: api.deleteCalendarEntry,
-    newTitle: 'Neuer interner Termin',
-    add: '+ Internen Termin anlegen',
-    listTitle: 'Kommend im internen Kalender',
-    empty: 'Noch keine internen Termine.',
-    hint: 'Diese Termine sehen nur Angemeldete mit dem internen Kalender. Die öffentlichen Termine bleiben davon getrennt.',
+    newTitle: t('Neuer interner Termin'),
+    add: t('+ Internen Termin anlegen'),
+    listTitle: t('Kommend im internen Kalender'),
+    empty: t('Noch keine internen Termine.'),
+    hint: t('Diese Termine sehen nur Angemeldete mit dem internen Kalender. Die öffentlichen Termine bleiben davon getrennt.'),
   },
 };
 
@@ -82,18 +83,18 @@ export default function TermineVerwalten({ onToast, internal = false }: { onToas
   async function submit(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
-    if (!form.title.trim()) return setFormError('Bitte einen Titel angeben.');
-    if (!form.start_date) return setFormError('Bitte ein Startdatum angeben.');
+    if (!form.title.trim()) return setFormError(t('Bitte einen Titel angeben.'));
+    if (!form.start_date) return setFormError(t('Bitte ein Startdatum angeben.'));
     setBusy(true);
     // Den Anmeldeschluss gibt es nur im internen Kalender.
     const data: EventInput = internal ? form : { ...form, respond_until: undefined };
     try {
       if (editing === 'new') {
         await kind.create(data);
-        onToast('Termin angelegt');
+        onToast(t('Termin angelegt'));
       } else if (typeof editing === 'number') {
         await kind.update(editing, data);
-        onToast('Termin gespeichert');
+        onToast(t('Termin gespeichert'));
       }
       setEditing(null);
       reload();
@@ -105,10 +106,10 @@ export default function TermineVerwalten({ onToast, internal = false }: { onToas
   }
 
   async function remove(ev: PublicEvent) {
-    if (!(await confirmAsk(`Termin „${ev.title}“ wirklich löschen?`))) return;
+    if (!(await confirmAsk(t('Termin „{title}“ wirklich löschen?', { title: ev.title })))) return;
     try {
       await kind.remove(ev.id);
-      onToast('Termin gelöscht');
+      onToast(t('Termin gelöscht'));
       reload();
     } catch (err) {
       onToast((err as Error).message);
@@ -118,56 +119,56 @@ export default function TermineVerwalten({ onToast, internal = false }: { onToas
   return (
     <div>
       <button className="btn btn-link back" onClick={() => navigate('termine')}>
-        ‹ Zu den Terminen
+        ‹ {t('Zu den Terminen')}
       </button>
 
       {editing !== null ? (
         <form className="form card event-form" onSubmit={submit}>
-          <h3>{editing === 'new' ? kind.newTitle : 'Termin bearbeiten'}</h3>
+          <h3>{editing === 'new' ? kind.newTitle : t('Termin bearbeiten')}</h3>
           <label className="field">
-            <span>Titel</span>
+            <span>{t('Titel')}</span>
             <input type="text" maxLength={191} value={form.title} onChange={set('title')} required />
           </label>
           <div className="field-row">
             <label className="field">
-              <span>Datum</span>
+              <span>{t('Datum')}</span>
               <input type="date" value={form.start_date} onChange={set('start_date')} required />
             </label>
             <label className="field">
-              <span>Bis (optional)</span>
+              <span>{t('Bis (optional)')}</span>
               <input type="date" value={form.end_date} min={form.start_date} onChange={set('end_date')} />
             </label>
           </div>
           <div className="field-row">
             <label className="field">
-              <span>Beginn (optional)</span>
+              <span>{t('Beginn (optional)')}</span>
               <input type="time" value={form.start_time} onChange={set('start_time')} />
             </label>
             <label className="field">
-              <span>Ende (optional)</span>
+              <span>{t('Ende (optional)')}</span>
               <input type="time" value={form.end_time} onChange={set('end_time')} />
             </label>
           </div>
-          <p className="muted small">Ohne Uhrzeit gilt der Termin als ganztägig.</p>
+          <p className="muted small">{t('Ohne Uhrzeit gilt der Termin als ganztägig.')}</p>
           {internal && eventResponsesOn() && (
             <>
               <label className="field">
-                <span>Anmeldeschluss (optional)</span>
+                <span>{t('Anmeldeschluss (optional)')}</span>
                 <input type="date" value={form.respond_until ?? ''} max={form.start_date || undefined} onChange={set('respond_until')} />
               </label>
-              <p className="muted small">Zu- und absagen geht bis zum Ende dieses Tages, ohne Anmeldeschluss bis zum Beginn.</p>
+              <p className="muted small">{t('Zu- und absagen geht bis zum Ende dieses Tages, ohne Anmeldeschluss bis zum Beginn.')}</p>
             </>
           )}
           <label className="field">
-            <span>Ort</span>
+            <span>{t('Ort')}</span>
             <input type="text" maxLength={191} value={form.location} onChange={set('location')} />
           </label>
           <label className="field">
-            <span>Beschreibung</span>
+            <span>{t('Beschreibung')}</span>
             <textarea rows={3} value={form.description} onChange={set('description')} />
           </label>
           <label className="field">
-            <span>Link (optional)</span>
+            <span>{t('Link (optional)')}</span>
             <input type="url" placeholder="https://…" value={form.url} onChange={set('url')} />
           </label>
           {formError && (
@@ -177,10 +178,10 @@ export default function TermineVerwalten({ onToast, internal = false }: { onToas
           )}
           <div className="button-row">
             <button className="btn" type="submit" disabled={busy}>
-              {busy ? 'Speichert …' : 'Speichern'}
+              {busy ? t('Speichert …') : t('Speichern')}
             </button>
             <button className="btn btn-secondary" type="button" onClick={() => setEditing(null)}>
-              Abbrechen
+              {t('Abbrechen')}
             </button>
           </div>
         </form>
@@ -209,8 +210,8 @@ export default function TermineVerwalten({ onToast, internal = false }: { onToas
                   {ev.location && ` · ${ev.location}`}
                 </div>
                 <div className="row-actions icon-row">
-                  <IconButton icon="edit" label="Bearbeiten" onClick={() => startEdit(ev)} />
-                  <IconButton icon="delete" label="Löschen" variant="danger" onClick={() => remove(ev)} />
+                  <IconButton icon="edit" label={t('Bearbeiten')} onClick={() => startEdit(ev)} />
+                  <IconButton icon="delete" label={t('Löschen')} variant="danger" onClick={() => remove(ev)} />
                 </div>
               </div>
             </li>

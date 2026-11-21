@@ -16,7 +16,7 @@ import brand from '../generated/brand';
 import { todayYmd } from '../format';
 import { installUrl } from '../install';
 import { navigate } from '../router';
-import { AddressFields, Caps, EmailField, Loading, NameFields, PhoneField, trimName, useAsync } from '../ui';
+import { AddressFields, bold, Caps, EmailField, Loading, NameFields, PhoneField, trimName, useAsync } from '../ui';
 import { normalizeEmail } from '../email';
 import { normalizePhone } from '../phone';
 import { addressInput, EMPTY_ADDRESS, isEmptyAddress, type Address } from '../address';
@@ -24,15 +24,16 @@ import { BirthdayFields, birthdayString, canEnterBirthdays, emptyBirthday, readB
 import { PhotoPicker, type PreparedPhoto } from '../memberPhoto';
 import { downloadPersonalData } from '../personalData';
 import { confirmAsk } from '../ask';
+import { t, tn } from '../i18n';
 
 /** Zugangsdaten als Text zum Weitergeben, mit dem Link zur Installationsanleitung (Issue #24). */
 export function credentialsText(c: { name: string; username: string; password?: string }): string {
   return [
-    `${brand.name} – Zugang für ${c.name}`,
-    `App installieren: ${installUrl()}`,
-    `Benutzername: ${c.username}`,
-    `Passwort: ${c.password ?? ''}`,
-    'Bitte nach der ersten Anmeldung unter „Meins → Konto“ ein eigenes Passwort setzen.',
+    t('{app} – Zugang für {name}', { app: brand.name, name: c.name }),
+    t('App installieren: {url}', { url: installUrl() }),
+    t('Benutzername: {username}', { username: c.username }),
+    t('Passwort: {password}', { password: c.password ?? '' }),
+    t('Bitte nach der ersten Anmeldung unter „Meins → Konto“ ein eigenes Passwort setzen.'),
   ].join('\n');
 }
 
@@ -40,7 +41,7 @@ export function credentialsText(c: { name: string; username: string; password?: 
 export function Credentials({
   people,
   onDone,
-  doneLabel = '‹ Zur Mitgliederliste',
+  doneLabel = t('‹ Zur Mitgliederliste'),
 }: {
   people: CreatedUser[];
   onDone?: () => void;
@@ -60,7 +61,7 @@ export function Credentials({
   }
   async function share() {
     try {
-      await navigator.share({ title: `${brand.shortName}: Zugangsdaten`, text });
+      await navigator.share({ title: t('{app}: Zugangsdaten', { app: brand.shortName }), text });
     } catch {
       /* abgebrochen */
     }
@@ -68,7 +69,9 @@ export function Credentials({
   return (
     <div className="credentials-block">
       <p className="muted small">
-        Die Startpasswörter werden <strong>nur jetzt</strong> angezeigt. Bitte ausdrucken, kopieren oder teilen und persönlich weitergeben.
+        {bold(
+          t('Die Startpasswörter werden <b>nur jetzt</b> angezeigt. Bitte ausdrucken, kopieren oder teilen und persönlich weitergeben.'),
+        )}
       </p>
       <div className="print-sheets">
         {people.map((c) => (
@@ -80,20 +83,20 @@ export function Credentials({
               </p>
             )}
             <dl className="credentials">
-              <dt>App installieren</dt>
+              <dt>{t('App installieren')}</dt>
               <dd className="credentials-url">{installUrl()}</dd>
-              <dt>Benutzername</dt>
+              <dt>{t('Benutzername')}</dt>
               <dd data-testid="new-username">{c.username}</dd>
-              <dt>Passwort</dt>
+              <dt>{t('Passwort')}</dt>
               <dd data-testid="new-password">{c.password}</dd>
             </dl>
-            <p className="small print-only">Bitte nach der ersten Anmeldung unter „Meins → Konto“ ein eigenes Passwort setzen.</p>
+            <p className="small print-only">{t('Bitte nach der ersten Anmeldung unter „Meins → Konto“ ein eigenes Passwort setzen.')}</p>
           </section>
         ))}
       </div>
       {showText && (
         <label className="field no-print">
-          <span>Zugangsdaten zum Kopieren</span>
+          <span>{t('Zugangsdaten zum Kopieren')}</span>
           <textarea
             className="credentials-text"
             readOnly
@@ -106,15 +109,15 @@ export function Credentials({
       )}
       <div className="button-row no-print">
         <button className="btn" onClick={copy}>
-          {copied ? 'Kopiert ✓' : 'Zugangsdaten kopieren'}
+          {copied ? t('Kopiert ✓') : t('Zugangsdaten kopieren')}
         </button>
         <button className="btn btn-secondary" onClick={() => window.print()}>
-          Ausdrucken
+          {t('Ausdrucken')}
         </button>
       </div>
       {typeof navigator.share === 'function' && (
         <button className="btn btn-secondary btn-block no-print" onClick={share}>
-          Teilen …
+          {t('Teilen …')}
         </button>
       )}
       {onDone && (
@@ -170,8 +173,8 @@ export function NewAccountExtraRoles({ base, value, onChange }: { base: Level; v
   const toggle = (key: Level, on: boolean) => onChange(roles.map((r) => r.key).filter((k) => (k === key ? on : value.includes(k))));
   return (
     <fieldset className="field role-control extra-roles">
-      <legend className="field-label">Zusatzrollen (optional)</legend>
-      <p className="muted small">Die Person hat die Rechte aller ihrer Rollen zusammen.</p>
+      <legend className="field-label">{t('Zusatzrollen (optional)')}</legend>
+      <p className="muted small">{t('Die Person hat die Rechte aller ihrer Rollen zusammen.')}</p>
       {roles.map((r) => (
         <label key={r.key} className="toggle">
           <input type="checkbox" checked={value.includes(r.key)} onChange={(e) => toggle(r.key, e.target.checked)} />
@@ -191,7 +194,8 @@ export const validExtraRoles = (base: Level, keys: Level[]): Level[] => {
 /** Vor dem Anlegen als Admin nachfragen (wie bei „Rollen vergeben“): Admins dürfen alles. */
 export async function confirmNewAdmin(level: Level): Promise<boolean> {
   return (
-    level !== 'admin' || (await confirmAsk(`Wirklich als ${levelLabel('admin')} anlegen? Admins dürfen alles, auch Einstellungen ändern.`))
+    level !== 'admin' ||
+    (await confirmAsk(t('Wirklich als {admin} anlegen? Admins dürfen alles, auch Einstellungen ändern.', { admin: levelLabel('admin') })))
   );
 }
 
@@ -236,7 +240,10 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
     for (const [i, r] of filled.entries()) {
       const name = trimName(r);
       const bday = birthdays ? readBirthday(r.bday) : null;
-      if (typeof bday === 'string') return setFormError(`Zeile ${i + 1} (${`${name.first_name} ${name.last_name}`.trim()}): ${bday}`);
+      if (typeof bday === 'string')
+        return setFormError(
+          t('Zeile {row} ({name}): {error}', { row: i + 1, name: `${name.first_name} ${name.last_name}`.trim(), error: bday }),
+        );
       people.push({
         ...name,
         ...(r.username?.trim() && !r.noAccess ? { username: r.username.trim() } : {}),
@@ -248,7 +255,7 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
         ...(r.noAccess ? { no_access: true } : {}),
       });
     }
-    if (people.length === 0) return setFormError('Bitte mindestens einen Namen eintragen.');
+    if (people.length === 0) return setFormError(t('Bitte mindestens einen Namen eintragen.'));
     if (!(await confirmNewAdmin(level))) return;
     setBusy(true);
     try {
@@ -260,7 +267,8 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
         try {
           r.photo_url = (await api.uploadMemberPhoto(r.id, picture.file)).photo_url;
         } catch (err) {
-          r.warning = `${r.warning ? `${r.warning} ` : ''}Das Foto fehlt noch (${(err as Error).message}). Bitte in den Mitgliedsdetails nachtragen.`;
+          const missing = t('Das Foto fehlt noch ({error}). Bitte in den Mitgliedsdetails nachtragen.', { error: (err as Error).message });
+          r.warning = r.warning ? `${r.warning} ${missing}` : missing;
         }
       }
       setResults(out);
@@ -278,10 +286,10 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
     const count = created.length + withoutAccess.length;
     return (
       <div>
-        <h2 className="member-name no-print">{count === 1 ? '1 Konto angelegt' : `${count} Konten angelegt`}</h2>
+        <h2 className="member-name no-print">{tn('{count} Konto angelegt', '{count} Konten angelegt', count)}</h2>
         {failed.length > 0 && (
           <div className="form-error no-print" role="alert">
-            Nicht angelegt:
+            {t('Nicht angelegt:')}
             <ul>
               {failed.map((f) => (
                 <li key={f.username}>
@@ -294,8 +302,12 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
         {withoutAccess.length > 0 && (
           <div className="card created no-access-created no-print">
             <p>
-              Ohne Zugang: {withoutAccess.map((p) => p.name).join(', ')}. Sie melden sich noch nicht an; einen Zugang gibt es später beim
-              Mitglied mit <strong>Zugang einrichten</strong> oder beim Freigeben einer Anfrage.
+              {bold(
+                t(
+                  'Ohne Zugang: {names}. Sie melden sich noch nicht an; einen Zugang gibt es später beim Mitglied mit <b>Zugang einrichten</b> oder beim Freigeben einer Anfrage.',
+                  { names: withoutAccess.map((p) => p.name).join(', ') },
+                ),
+              )}
             </p>
             {withoutAccess
               .filter((p) => p.warning)
@@ -306,7 +318,7 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
               ))}
             {created.length === 0 && (
               <button className="btn btn-block" onClick={() => navigate('verwaltung/mitglieder')}>
-                ‹ Zur Mitgliederliste
+                {t('‹ Zur Mitgliederliste')}
               </button>
             )}
           </div>
@@ -319,22 +331,22 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
   return (
     <form className="form bulk-new" onSubmit={submit}>
       <button type="button" className="btn btn-link back" onClick={() => navigate('verwaltung/neu')}>
-        ‹ Einzeln anlegen
+        {t('‹ Einzeln anlegen')}
       </button>
-      <NewAccountRole label="Rolle für alle" value={level} onChange={setLevel} />
+      <NewAccountRole label={t('Rolle für alle')} value={level} onChange={setLevel} />
       <NewAccountExtraRoles base={level} value={validExtraRoles(level, extraRoles)} onChange={setExtraRoles} />
       {rows.map((r, i) => (
         <fieldset key={i} className="fieldset bulk-row">
-          <legend>Person {i + 1}</legend>
+          <legend>{t('Person {number}', { number: i + 1 })}</legend>
           <NameFields value={r} onChange={(n) => update(i, n)} required={false} />
           <label className="toggle no-access-toggle">
             <input type="checkbox" checked={r.noAccess} onChange={(e) => update(i, { noAccess: e.target.checked })} />
-            Ohne Zugang (meldet sich noch nicht an)
+            {t('Ohne Zugang (meldet sich noch nicht an)')}
           </label>
           <div className="field-row">
             {!r.noAccess && (
               <label className="field">
-                <span>Benutzername (optional)</span>
+                <span>{t('Benutzername (optional)')}</span>
                 <input
                   type="text"
                   autoComplete="off"
@@ -349,25 +361,25 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
           <PhoneField value={r.phone ?? ''} onChange={(phone) => update(i, { phone })} />
           {/* Mit Eintrag offen: Sonst hielte ein Fehler im verborgenen Feld das Formular ohne sichtbaren Grund an. */}
           <details className="bulk-address" open={!isEmptyAddress(r.postal) || undefined}>
-            <summary>Adresse (optional)</summary>
-            <AddressFields label="Adresse" value={r.postal} onChange={(postal) => update(i, { postal })} />
+            <summary>{t('Adresse (optional)')}</summary>
+            <AddressFields label={t('Adresse')} value={r.postal} onChange={(postal) => update(i, { postal })} />
           </details>
           {points && (
             <label className="field">
               <span>
-                <Caps text={brand.labels.sections.points} /> (Anfangsbestand, optional)
+                <Caps text={t('{points} (Anfangsbestand, optional)', { points: brand.labels.sections.points })} />
               </span>
               <input type="number" inputMode="numeric" min={0} value={r.points} onChange={(e) => update(i, { points: e.target.value })} />
             </label>
           )}
           {birthdays && (
             <div className="bulk-birthday">
-              <span className="field-label">Geburtstag (optional)</span>
+              <span className="field-label">{t('Geburtstag (optional)')}</span>
               <BirthdayFields value={r.bday} onChange={(bday) => update(i, { bday })} />
             </div>
           )}
           <div className="bulk-photo">
-            <span className="field-label">Foto (optional)</span>
+            <span className="field-label">{t('Foto (optional)')}</span>
             <PhotoPicker
               name={`${r.first_name} ${r.last_name}`.trim()}
               value={r.picture}
@@ -383,22 +395,24 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
         onClick={() => setRows([...rows, emptyRow()])}
         disabled={rows.length >= 50}
       >
-        + Weitere Person
+        {t('+ Weitere Person')}
       </button>
       {points && (
         <label className="field">
-          <span>Stand der Anfangspunkte</span>
+          <span>{t('Stand der Anfangspunkte')}</span>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
       )}
-      <p className="muted small">Leere Zeilen werden übersprungen. Erst wird alles geprüft; bei einem Fehler wird niemand angelegt.</p>
+      <p className="muted small">
+        {t('Leere Zeilen werden übersprungen. Erst wird alles geprüft; bei einem Fehler wird niemand angelegt.')}
+      </p>
       {formError && (
         <p className="form-error" role="alert">
           {formError}
         </p>
       )}
       <button className="btn btn-block" type="submit" disabled={busy}>
-        {busy ? 'Legt an …' : 'Alle anlegen'}
+        {busy ? t('Legt an …') : t('Alle anlegen')}
       </button>
     </form>
   );
@@ -406,9 +420,9 @@ export function BulkNewMembers({ canPoints }: { canPoints: boolean }) {
 
 /** Name ohne HTML-Entitäten (WordPress speichert z. B. „&“ als „&amp;“). */
 function plainName(s: string): string {
-  const t = document.createElement('textarea');
-  t.innerHTML = s;
-  return t.value;
+  const el = document.createElement('textarea');
+  el.innerHTML = s;
+  return el.value;
 }
 
 /**
@@ -455,7 +469,7 @@ export function AccountPanel({
     e.preventDefault();
     if (!editing) return;
     setFormError(null);
-    if (ownEmailChanged && !password) return setFormError('Bitte zur Bestätigung das aktuelle Passwort eingeben.');
+    if (ownEmailChanged && !password) return setFormError(t('Bitte zur Bestätigung das aktuelle Passwort eingeben.'));
     setBusy(true);
     try {
       setData(
@@ -468,7 +482,7 @@ export function AccountPanel({
       );
       setEditing(null);
       setPassword('');
-      onToast('Gespeichert');
+      onToast(t('Gespeichert'));
       onChanged();
     } catch (err) {
       setFormError((err as Error).message);
@@ -480,13 +494,22 @@ export function AccountPanel({
   // Name wie angezeigt (WordPress speichert z. B. „&“ als „&amp;“), Unicode einheitlich, ohne Leerzeichen außen.
   const plain = (s: string) => plainName(s).normalize('NFC').trim().toLowerCase();
   const nameMatches = plain(typed) !== '' && plain(typed) === plain(p.name);
+  const deleted = {
+    points: brand.labels.sections.points,
+    penalties: brand.labels.sections.penalties,
+    rank: brand.labels.rank,
+  };
 
   async function remove() {
     if (!nameMatches) return;
     setBusy(true);
     try {
       await api.deleteAccount(id);
-      onToast(wordpress ? `${plainName(p.name)} aus der App entfernt` : `Konto von ${plainName(p.name)} gelöscht`);
+      onToast(
+        wordpress
+          ? t('{name} aus der App entfernt', { name: plainName(p.name) })
+          : t('Konto von {name} gelöscht', { name: plainName(p.name) }),
+      );
       navigate('verwaltung/mitglieder');
     } catch (err) {
       onToast((err as Error).message);
@@ -496,12 +519,12 @@ export function AccountPanel({
 
   return (
     <section className="account-panel">
-      <h3 className="section-title">Konto</h3>
+      <h3 className="section-title">{t('Konto')}</h3>
       {editing ? (
         <form className="form card account-edit" onSubmit={save}>
           <NameFields value={editing} onChange={(n) => setEditing({ ...editing, ...n })} />
           <label className="field">
-            <span>Benutzername</span>
+            <span>{t('Benutzername')}</span>
             <input
               type="text"
               autoCapitalize="none"
@@ -513,16 +536,16 @@ export function AccountPanel({
           {p.can_change_login ? (
             <p className="muted small">
               {self
-                ? 'Ein neuer Benutzername meldet dich auf deinen anderen Geräten ab.'
-                : 'Ein neuer Benutzername meldet die Person auf allen Geräten ab.'}
+                ? t('Ein neuer Benutzername meldet dich auf deinen anderen Geräten ab.')
+                : t('Ein neuer Benutzername meldet die Person auf allen Geräten ab.')}
             </p>
           ) : (
-            <p className="muted small">Benutzernamen lassen sich hier nicht ändern.</p>
+            <p className="muted small">{t('Benutzernamen lassen sich hier nicht ändern.')}</p>
           )}
           <EmailField value={editing.email} onChange={(email) => setEditing({ ...editing, email })} />
           {ownEmailChanged && (
             <label className="field">
-              <span>Aktuelles Passwort (zur Bestätigung der neuen E-Mail-Adresse)</span>
+              <span>{t('Aktuelles Passwort (zur Bestätigung der neuen E-Mail-Adresse)')}</span>
               <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
             </label>
           )}
@@ -533,7 +556,7 @@ export function AccountPanel({
           )}
           <div className="button-row">
             <button className="btn" type="submit" disabled={busy}>
-              Speichern
+              {t('Speichern')}
             </button>
             <button
               className="btn btn-secondary"
@@ -544,17 +567,18 @@ export function AccountPanel({
                 setFormError(null);
               }}
             >
-              Abbrechen
+              {t('Abbrechen')}
             </button>
           </div>
         </form>
       ) : (
         <>
           <p className="small">
-            Benutzername: <strong>{p.login}</strong>
+            {t('Benutzername:')} <strong>{p.login}</strong>
             {p.email && (
               <>
-                {' · '}E-Mail: {p.email}
+                {' · '}
+                {t('E-Mail: {email}', { email: p.email })}
               </>
             )}
           </p>
@@ -568,14 +592,14 @@ export function AccountPanel({
                   setEditing(p);
                 }}
               >
-                Angaben ändern
+                {t('Angaben ändern')}
               </button>
             )}
             {p.can_export && (
               <button
                 className="btn btn-link"
                 disabled={busy}
-                title="Alle gespeicherten Daten dieser Person als Datei, z. B. für eine Auskunft nach der DSGVO"
+                title={t('Alle gespeicherten Daten dieser Person als Datei, z. B. für eine Auskunft nach der DSGVO')}
                 onClick={() => {
                   setBusy(true);
                   setFormError(null);
@@ -584,12 +608,12 @@ export function AccountPanel({
                     .finally(() => setBusy(false));
                 }}
               >
-                Daten exportieren (Auskunft)
+                {t('Daten exportieren (Auskunft)')}
               </button>
             )}
             {!readOnly && level !== 'admin' && !self && (
               <button className="btn btn-danger" disabled={busy || confirming} onClick={() => setConfirming(true)}>
-                {wordpress ? 'Aus der App entfernen' : 'Konto löschen'}
+                {wordpress ? t('Aus der App entfernen') : t('Konto löschen')}
               </button>
             )}
           </div>
@@ -601,23 +625,31 @@ export function AccountPanel({
           {confirming && (
             <div className="card account-delete" role="alertdialog" aria-labelledby="account-delete-title">
               <p id="account-delete-title">
-                <strong>{wordpress ? `${plainName(p.name)} aus der App entfernen?` : `Konto von ${plainName(p.name)} löschen?`}</strong>{' '}
-                Alle {brand.labels.sections.points}, {brand.labels.sections.penalties}, Anwesenheiten, {brand.labels.rank} und Titel dieser
-                Person werden gelöscht
+                <strong>
+                  {wordpress
+                    ? t('{name} aus der App entfernen?', { name: plainName(p.name) })
+                    : t('Konto von {name} löschen?', { name: plainName(p.name) })}
+                </strong>{' '}
                 {wordpress
-                  ? '; der Benutzer der Webseite bleibt (ohne Rolle in der App). Name und E-Mail-Adresse löscht ein Administrator der Webseite im WordPress-Backend unter Benutzer.'
-                  : ', das Konto auch.'}{' '}
-                Das lässt sich nicht rückgängig machen.
+                  ? t(
+                      'Alle {points}, {penalties}, Anwesenheiten, {rank} und Titel dieser Person werden gelöscht; der Benutzer der Webseite bleibt (ohne Rolle in der App). Name und E-Mail-Adresse löscht ein Administrator der Webseite im WordPress-Backend unter Benutzer.',
+                      deleted,
+                    )
+                  : t(
+                      'Alle {points}, {penalties}, Anwesenheiten, {rank} und Titel dieser Person werden gelöscht, das Konto auch.',
+                      deleted,
+                    )}{' '}
+                {t('Das lässt sich nicht rückgängig machen.')}
                 {!former &&
-                  ' Wer nur ausgetreten oder verstorben ist, lässt sich stattdessen als ehemalig eintragen; dann bleiben die Daten.'}
+                  ` ${t('Wer nur ausgetreten oder verstorben ist, lässt sich stattdessen als ehemalig eintragen; dann bleiben die Daten.')}`}
               </p>
               <label className="field">
-                <span>Zur Bestätigung den Namen eintippen</span>
+                <span>{t('Zur Bestätigung den Namen eintippen')}</span>
                 <input type="text" autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} />
               </label>
               <div className="button-row">
                 <button className="btn btn-danger" disabled={busy || !nameMatches} onClick={remove}>
-                  Endgültig {wordpress ? 'entfernen' : 'löschen'}
+                  {wordpress ? t('Endgültig entfernen') : t('Endgültig löschen')}
                 </button>
                 <button
                   className="btn btn-secondary"
@@ -626,7 +658,7 @@ export function AccountPanel({
                     setTyped('');
                   }}
                 >
-                  Abbrechen
+                  {t('Abbrechen')}
                 </button>
               </div>
             </div>

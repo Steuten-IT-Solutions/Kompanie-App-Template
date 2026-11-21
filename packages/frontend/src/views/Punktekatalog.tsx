@@ -1,6 +1,7 @@
 import { formatPoints } from '../format';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { sources } from '../viewData';
+import { t } from '../i18n';
 
 /** „Intern“ → Punktekatalog: wofür es wie viele Punkte gibt (nur aktive Vorlagen, in der Reihenfolge der Pflege). */
 export default function Punktekatalog() {
@@ -8,7 +9,7 @@ export default function Punktekatalog() {
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const items = data ?? [];
-  if (items.length === 0) return <Empty>Noch keine Einträge.</Empty>;
+  if (items.length === 0) return <Empty>{t('Noch keine Einträge.')}</Empty>;
 
   return (
     <div>

@@ -1,5 +1,7 @@
 // Listen (Issue #121): CSV für Excel, ohne Abhängigkeiten (auch in den Tests nutzbar).
 
+import { t } from './i18n';
+
 /**
  * Ein Feld für CSV: in Anführungszeichen, wenn nötig (RFC 4180). Texte, die mit =, +, -, @, Tab oder Wagenrücklauf
  * beginnen, bekommen ein ' davor, damit Excel sie nicht als Formel ausführt (CSV-Injection). Zahlen bleiben Zahlen.
@@ -7,7 +9,7 @@
 export function csvField(value: string | number): string {
   let s = typeof value === 'number' ? String(value).replace('.', ',') : value;
   if (typeof value === 'string' && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
-  return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  return /[\x22;\r\n]/.test(s) ? `"${s.replace(/\x22/g, '""')}"` : s;
 }
 
 /**
@@ -29,7 +31,7 @@ export function toCsv(header: string[], rows: (string | number)[][]): string {
 /** Dateiname (ohne Endung) aus dem Titel: ohne Zeichen, die Dateisysteme nicht mögen; leer bei leerem Titel. */
 export function listFileBase(title: string): string {
   return title
-    .replace(/[\\/:*?"<>|\u0000-\u001F]/g, '')
+    .replace(/[\\/:*?\x22<>|\u0000-\u001F]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 80);
@@ -97,11 +99,25 @@ function proportional(weights: number[], available: number): number[] {
   return weights.map((w) => (available * w) / total);
 }
 
-const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+const MONTHS = [
+  t('Januar'),
+  t('Februar'),
+  t('März'),
+  t('April'),
+  t('Mai'),
+  t('Juni'),
+  t('Juli'),
+  t('August'),
+  t('September'),
+  t('Oktober'),
+  t('November'),
+  t('Dezember'),
+];
 
 /** Geburtstag in langer Form: „9. März 1990“, ohne Jahr „9. März“. */
 export function longBirthday(b: { day: number; month: number; year?: number | null }): string {
-  return `${b.day}. ${MONTHS[b.month - 1] ?? ''}${b.year ? ` ${b.year}` : ''}`;
+  const month = MONTHS[b.month - 1] ?? '';
+  return b.year ? t('{day}. {month} {year}', { day: b.day, month, year: b.year }) : t('{day}. {month}', { day: b.day, month });
 }
 
 /** Wert zum Sortieren einer Zelle: Zahl, Text oder null (leer). */

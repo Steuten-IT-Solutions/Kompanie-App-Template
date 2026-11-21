@@ -7,6 +7,8 @@
  * Meldung („Gib eine URL ein.“).
  */
 
+import { t } from './i18n';
+
 /** Wie Input::URL_MAX auf dem Server. */
 export const LINK_MAX = 255;
 
@@ -33,21 +35,22 @@ export function linkProblem(input: string): string | null {
   const s = normalizeLink(input);
   if (s === '') return null;
   const m = /^([a-z][a-z0-9+.-]*):\/\/([^/?#]*)/.exec(s);
-  if (!m) return 'Das ist keine Webadresse. Beispiel: beispiel.de oder https://beispiel.de/seite';
-  if (m[1] === 'http') return 'Bitte eine sichere Adresse mit https:// angeben, nicht http://.';
-  if (m[1] !== 'https') return 'Das ist keine Webadresse. Beispiel: beispiel.de oder https://beispiel.de/seite';
-  if (/["<>\p{Cc}]/u.test(s)) return 'Die Adresse enthält Zeichen, die in Webadressen nicht vorkommen (" < >).';
+  if (!m) return t('Das ist keine Webadresse. Beispiel: beispiel.de oder https://beispiel.de/seite');
+  if (m[1] === 'http') return t('Bitte eine sichere Adresse mit https:// angeben, nicht http://.');
+  if (m[1] !== 'https') return t('Das ist keine Webadresse. Beispiel: beispiel.de oder https://beispiel.de/seite');
+  // \x22 statt ": So liest scripts/check-i18n.php (ohne Regex-Erkennung) die Texte dahinter richtig.
+  if (/[\x22<>\p{Cc}]/u.test(s)) return t('Die Adresse enthält Zeichen, die in Webadressen nicht vorkommen (" < >).');
   const authority = m[2];
-  if (authority.includes('@')) return 'Die Adresse ist ungültig.';
+  if (authority.includes('@')) return t('Die Adresse ist ungültig.');
   const host = authority.replace(/:\d*$/, '');
-  if (host === '') return 'Hinter https:// fehlt die Adresse, z. B. beispiel.de.';
-  if (!/:\d*$/.test(authority) && authority.includes(':')) return 'Die Adresse ist ungültig.';
+  if (host === '') return t('Hinter https:// fehlt die Adresse, z. B. beispiel.de.');
+  if (!/:\d*$/.test(authority) && authority.includes(':')) return t('Die Adresse ist ungültig.');
   const labels = host.split('.');
   if (labels.length < 2 || labels[labels.length - 1] === '')
-    return `Hinter „${host.replace(/\.$/, '')}“ fehlt die Endung, z. B. .de oder .com.`;
+    return t('Hinter „{host}“ fehlt die Endung, z. B. .de oder .com.', { host: host.replace(/\.$/, '') });
   if (host.length > 253 || !labels.every((l) => l.length <= 63 && LABEL.test(l)) || !ENDING.test(labels[labels.length - 1])) {
-    return 'Die Adresse ist ungültig.';
+    return t('Die Adresse ist ungültig.');
   }
-  if (s.length > LINK_MAX) return `Die Adresse ist zu lang (höchstens ${LINK_MAX} Zeichen).`;
+  if (s.length > LINK_MAX) return t('Die Adresse ist zu lang (höchstens {max} Zeichen).', { max: LINK_MAX });
   return null;
 }

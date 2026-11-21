@@ -5626,7 +5626,7 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast öffnet die Seite
   await page.locator('.company-member-form').getByLabel('Mitglied1', { exact: true }).check();
   await page.locator('.company-member-form').getByRole('button', { name: 'Speichern' }).click();
   await expect(page.locator('.toast')).toHaveText('Mitglieder gespeichert');
-  await expect(row).toContainText('1 Mitglieder');
+  await expect(row).toContainText('1 Mitglied');
   await shot(page, 'kompanien-verwalten');
 
   try {
@@ -5635,7 +5635,7 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast öffnet die Seite
     await expect(page.locator('.topbar').getByRole('button', { name: 'Login' })).toBeVisible();
     await page.locator('.tabbar').getByRole('button', { name: 'Kompanien' }).click();
     const card = page.locator('.company-card', { hasText: 'Testkompanie' });
-    await expect(card).toContainText('TK · gegründet 1905 · 1 Mitglieder');
+    await expect(card).toContainText('TK · gegründet 1905 · 1 Mitglied');
     // Suche und Sortierung wie in der Mitgliederliste: zuerst wie festgelegt, dann nach Name, nach Gründung jüngste zuerst
     const names = page.locator('.company-list .company-card .row-title');
     await expect(names).toHaveText(['Testkompanie', 'Alte Garde']);
@@ -5657,7 +5657,7 @@ test('Kompanien (Issue #280): anlegen, Mitglied zuordnen, Gast öffnet die Seite
     await expect(page).toHaveURL(/#\/kompanien\/\d+$/);
     const detail = page.locator('.company-page');
     await expect(detail.getByRole('heading', { name: 'Testkompanie' })).toBeVisible();
-    await expect(detail).toContainText('TK · gegründet 1905 · 1 Mitglieder');
+    await expect(detail).toContainText('TK · gegründet 1905 · 1 Mitglied');
     await expect(detail).toContainText('Gegründet zum Schützenfest.');
     await expect(detail.getByRole('link', { name: 'Webseite' })).toHaveAttribute('href', 'https://kompanie.example/');
     await expect(detail.getByRole('link', { name: 'Webseite' })).toHaveClass(/\bbtn\b/);
