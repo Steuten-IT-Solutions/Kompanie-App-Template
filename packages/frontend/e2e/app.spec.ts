@@ -6166,16 +6166,16 @@ test('Abzeichen: PNG und SVG hochladen, Mitglied sieht sie in der Liste und in �
     await expect(row.getByRole('button', { name: 'Entfernen' })).toBeVisible();
   }
   await shot(page, 'abzeichen-verwalten');
+  // Das SVG hat im Browser eine PNG-Fassung für Benachrichtigungen bekommen.
+  await expect(page.locator('.row', { has: page.getByText('Unteroffizier', { exact: true }) })).not.toContainText(
+    'Ohne Bild in Benachrichtigungen',
+  );
   // Beförderungen: Abzeichen beim aktuellen und beim nächsten Dienstgrad (Mitglied2: Gefreiter → Unteroffizier).
   await adminMenu(page, 'Beförderungen');
   const promo = page.locator('.promotions .row', { hasText: 'Mitglied2' });
   await expect(promo.locator('img[alt="Gefreiter"]')).toBeVisible();
   await expect(promo.locator('img[alt="Unteroffizier"]')).toBeVisible();
   await expect(promo).toContainText('„Unteroffizier“');
-  // Das SVG hat im Browser eine PNG-Fassung für Benachrichtigungen bekommen.
-  await expect(page.locator('.row', { has: page.getByText('Unteroffizier', { exact: true }) })).not.toContainText(
-    'Ohne Bild in Benachrichtigungen',
-  );
 
   await login(page, 'mitglied2');
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
