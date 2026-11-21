@@ -16,7 +16,7 @@ Tippe unten auf **Verwaltung** und dann auf den Knopf **Beförderungen**. Mit **
 - **Schwelle erreicht**: wer die Schwelle des nächsten {begriff.rank}s mit Schwelle erreicht hat, mit dem Datum, seit dem. Wer am längsten wartet, steht oben.
 - **Bald erreicht**: wem bis zur Schwelle des nächsten {begriff.rank}s höchstens noch ein Punkt fehlt. Das ist fest eingestellt.
 - **Noch nicht erreicht**: alle anderen, die noch höher steigen können, mit „noch … bis …“. Wer am wenigsten braucht, steht oben.
-- Bei jedem Namen: aktueller {begriff.rank} mit Abzeichen (oder „Kein {begriff.rank}“) und die Summe der {bereich.points}.
+- Bei jedem Namen: aktueller {begriff.rank} mit Abzeichen (oder „Kein {begriff.rank}“), die Summe der {bereich.points} und der nächste {begriff.rank}, ebenfalls mit Abzeichen.
 - Steht niemand in der Liste, erscheint „Niemand gefunden.“
 
 ## So gehst du vor
