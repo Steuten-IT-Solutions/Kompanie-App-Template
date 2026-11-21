@@ -31,6 +31,14 @@ Tippe unten auf **{bereich.events}** und dann oben auf **Internen Kalender verwa
 2. Ändere die Angaben.
 3. Tippe auf **Speichern**. Mit **Abbrechen** bleibt alles, wie es war.
 
+### Einen Termin auch auf Englisch eintragen
+Hat der Admin unter **Einstellungen → Sprachen** Englisch eingeschaltet, steht im Formular unter der **Beschreibung** der aufklappbare Abschnitt **Auf English schreiben (freiwillig)**.
+1. Tippe auf **Auf English schreiben (freiwillig)**.
+2. Trage **Titel auf English**, **Ort auf English** und **Beschreibung auf English** ein. Leere Felder zeigen grau den deutschen Text.
+3. Tippe auf **Speichern**.
+
+Wer die App auf Englisch nutzt, sieht den Termin in dieser Fassung, auch in der Benachrichtigung. Was du leer lässt, erscheint auf Deutsch, mit dem Hinweis *Teilweise nur auf Deutsch verfügbar* beim aufgeklappten Termin. Datum, Uhrzeit und Link gelten für alle Sprachen. Benutzt du die App selbst auf Englisch, bearbeitest du trotzdem die deutsche Fassung oben im Formular.
+
 ### Einen Termin löschen
 1. Tippe beim Termin auf **Löschen**.
 2. Bestätige die Rückfrage. Der Termin ist sofort weg.

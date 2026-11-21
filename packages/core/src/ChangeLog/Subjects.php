@@ -7,6 +7,7 @@ namespace KompanieApp\Core\ChangeLog;
 use KompanieApp\Core\App;
 use KompanieApp\Core\Domain\AdmissionRule;
 use KompanieApp\Core\Domain\Blocks\Blocks;
+use KompanieApp\Core\Domain\EventService;
 use KompanieApp\Core\Http\Request;
 use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Storage\EventKindRepository;
@@ -300,8 +301,8 @@ final class Subjects
         $years = static fn (array $r): string => trim($r['start_year'] . ($r['end_year'] !== null && $r['end_year'] !== '' && $r['end_year'] !== $r['start_year'] ? '–' . $r['end_year'] : ''));
         $holders = fn (string $where, mixed $id): array => $this->people($this->app->db->select('SELECT user_id, name FROM {office_holders} WHERE ' . $where . ' ORDER BY sort, id', [$id]));
 
-        $events = $this->spec('Termin', 'events', 'title', $eventCols);
-        $calendar = $this->spec('Termin im Kalender', 'internal_events', 'title', $eventCols + ['respond_until' => 'Anmeldeschluss']);
+        $events = $this->spec('Termin', 'events', 'title', $eventCols, extra: fn (array $r): array => $this->app->contentTranslations()->fieldsLog(EventService::KIND, (int) $r['id'], ['title' => 'Titel', 'location' => 'Ort', 'description' => 'Beschreibung']));
+        $calendar = $this->spec('Termin im Kalender', 'internal_events', 'title', $eventCols + ['respond_until' => 'Anmeldeschluss'], extra: fn (array $r): array => $this->app->contentTranslations()->fieldsLog(EventService::KIND_INTERNAL, (int) $r['id'], ['title' => 'Titel', 'location' => 'Ort', 'description' => 'Beschreibung']));
         $news = $this->spec('News', 'app_news', 'title', ['title' => 'Titel', 'blocks' => ['Inhalt', 'blocks'], 'cover' => ['Titelbild', 'secret']],
             extra: fn (array $r): array => $this->app->contentTranslations()->blocksLog('news', (int) $r['id'], Blocks::decode($r['blocks'] ?? null, (string) ($r['body'] ?? ''))));
         $ranks = $this->spec('Dienstgrad', 'ranks', 'title', ['title' => 'Bezeichnung', 'min_points' => 'Ab Punkten', 'active' => ['Aktiv', 'bool'], 'badge_version' => ['Abzeichen', 'secret']]);

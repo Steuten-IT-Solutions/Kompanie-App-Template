@@ -8,6 +8,7 @@ import { navigate } from '../router';
 import { eventEnd, eventStart, formatEventWhen, formatMonth, shortMonth } from '../format';
 import { downloadIcs } from '../ics';
 import { t } from '../i18n';
+import { UntranslatedNote } from '../language';
 import { mapLinkTarget, mapPlatform, mapSearchUrl } from '../address';
 import { useFocusEntry } from '../focus';
 import { Empty, ErrorBox, Loading, useAsync } from '../ui';
@@ -73,7 +74,7 @@ function EventList({ focus }: { focus?: string }) {
   const canCalendar = canManageCalendar();
   // Wer Termine pflegt, öffnet die Seite dahinter oft: im Leerlauf vorab laden, beim Antippen sofort.
   useEffect(() => {
-    if (canManage) void prefetcher.idle([sources.events]);
+    if (canManage) void prefetcher.idle([sources.eventsSource]);
     if (canCalendar) void prefetcher.idle([sources.calendarEntries]);
   }, [canManage, canCalendar]);
   const manage =
@@ -92,7 +93,7 @@ function EventList({ focus }: { focus?: string }) {
           <button
             className="btn btn-secondary btn-block manage-events"
             onClick={() => navigate('termine/verwalten')}
-            {...prefetchOnTap(sources.events)}
+            {...prefetchOnTap(sources.eventsSource)}
           >
             {t('Öffentliche Termine verwalten')}
           </button>
@@ -158,6 +159,7 @@ function EventList({ focus }: { focus?: string }) {
                   <ResponseBar ev={ev} onChange={replace} />
                   {isOpen && (
                     <div className="event-body">
+                      <UntranslatedNote untranslated={ev.untranslated} />
                       {ev.description && <p className="event-desc">{ev.description}</p>}
                       {canSetKind() && <KindPicker ev={ev} onChange={replaceKinds} />}
                       <ResponseDetails ev={ev} onChange={replace} />

@@ -39,7 +39,7 @@ Genauso geht es bei den Terminarten unter [Kalender](seite:admin-kalender) und b
 Ein leeres Feld heißt: Auf Englisch gilt der deutsche Name (bzw. die englische Vorgabe, wenn ihr den Bereich nicht umbenannt habt).
 
 ### Inhalte auf Englisch
-Eigene Seiten und {bereich.news}, die in der App geschrieben werden, können eine englische Fassung bekommen: Wer sie pflegt, wählt beim Bearbeiten oben **Schreiben auf: English**. Nachrichten am {bereich.board} bekommen ihre englische Fassung beim Schreiben im Abschnitt **Auf English schreiben (freiwillig)**; Benachrichtigung und Mail gehen dann in der Sprache der Empfänger. Wer die App auf Englisch nutzt und einen Inhalt ohne englische Fassung öffnet, sieht die deutsche mit dem Hinweis *Nur auf Deutsch verfügbar*.
+Eigene Seiten und {bereich.news}, die in der App geschrieben werden, können eine englische Fassung bekommen: Wer sie pflegt, wählt beim Bearbeiten oben **Schreiben auf: English**. Nachrichten am {bereich.board}, Termine und {bereich.polls} bekommen ihre englische Fassung im Formular im Abschnitt **Auf English schreiben (freiwillig)**; Benachrichtigungen (und bei Nachrichten am {bereich.board} die Mail) gehen dann in der Sprache der Empfänger. Wer die App auf Englisch nutzt und einen Inhalt ohne englische Fassung öffnet, sieht die deutsche mit dem Hinweis *Nur auf Deutsch verfügbar*.
 
 ### Englisch wieder ausschalten
 
@@ -50,7 +50,7 @@ Die Flagge verschwindet, und alle sehen die App wieder auf Deutsch.
 ## Gut zu wissen
 
 - Die Wahl gilt am Gerät, auch für Gäste ohne Anmeldung. Wer angemeldet ist, behält seine Sprache auch auf anderen Geräten, und Mails und Benachrichtigungen an ihn kommen in dieser Sprache.
-- Übersetzt sind die Texte der App selbst, also Knöpfe, Überschriften und Meldungen, und die vorgegebenen Namen der Bereiche und Rollen (aus **Termine** wird **Events**, aus **Mitglied** **Member**). Namen, die ihr selbst vergeben habt, z. B. für Bereiche, Rollen und Dienstgrade, und was ihr eintragt, z. B. Termine oder Neuigkeiten, bleiben so, wie ihr es geschrieben habt.
+- Übersetzt sind die Texte der App selbst, also Knöpfe, Überschriften und Meldungen, und die vorgegebenen Namen der Bereiche und Rollen (aus **Termine** wird **Events**, aus **Mitglied** **Member**). Namen, die ihr selbst vergeben habt, z. B. für Bereiche, Rollen und Dienstgrade, und was ihr eintragt, z. B. Termine oder Neuigkeiten, bleiben so, wie ihr es geschrieben habt, solange ihr keine englische Fassung eintragt (siehe oben).
 - Nach dem Wechsel der Sprache lädt die App einmal neu.
 - Die Wahl bei **Einrichten auf** gilt nur für dich und nur auf diesem Gerät. Was du auf Englisch einträgst, ändert die deutschen Namen nicht.
 

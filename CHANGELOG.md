@@ -37,7 +37,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   [Dienstgraden](app:verwaltung/dienstgrade) und [Ämtern](app:verwaltung/aemter) in der Verwaltung. Eigene Seiten
   bekommen unter [Verwaltung → Seiten](app:verwaltung/seiten) mit _Schreiben auf: English_ eine englische Fassung, ebenso
   [News](app:news), die ihr in der App schreibt (beim Bearbeiten), und Nachrichten am [Schwarzen Brett](app:brett)
-  (_Auf English schreiben_ unter dem Inhalt; Benachrichtigung und Mail gehen dann in der Sprache der Empfänger); wer
+  (_Auf English schreiben_ unter dem Inhalt; Benachrichtigung und Mail gehen dann in der Sprache der Empfänger),
+  ebenso [Termine](app:termine/verwalten) und [Umfragen](app:umfragen/verwalten) im Formular; wer
   auf Englisch liest und sie nicht hat, sieht die deutsche mit dem Hinweis „Nur auf Deutsch verfügbar“. Was ihr sonst
   eintragt, bleibt, wie es ist.
 - **Wartung**: Unter [Einstellungen → Zustand und Updates](app:einstellungen/zustand) steht, bis wann eure App neue
