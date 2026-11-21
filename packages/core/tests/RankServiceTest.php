@@ -324,6 +324,41 @@ final class RankServiceTest extends TestCase
         $this->assertSame('Versammlung', $history[2]['reason']);
     }
 
+    public function testDateOfABookedChangeCanBeChangedLater(): void
+    {
+        $this->setUpApp(['ranks' => true, 'points' => true]);
+        $r = $this->ranks([['Gefreiter', 10], ['Unteroffizier', 20]]);
+        $this->points($this->m, 12, '2026-03-01');
+        $this->points($this->m, 10, '2026-09-01');
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter'], 'date' => '2026-04-01'])->status);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Unteroffizier'], 'date' => '2026-09-15'])->status);
+        $history = $this->call('GET', "/members/{$this->m}")->data['rank_history'];
+        [$uffz, $gefr] = [$history[0]['id'], $history[1]['id']];
+        $path = fn (int $entry): string => "/members/{$this->m}/rank-history/{$entry}";
+
+        $this->assertSame(400, $this->call('PATCH', $path($uffz), ['date' => '2026-10-21'])->status, 'nicht in der Zukunft');
+        $this->assertSame(400, $this->call('PATCH', $path($uffz), [])->status, 'Datum nötig');
+        $this->assertSame(400, $this->call('PATCH', $path($uffz), ['date' => '2026-03-31'])->status, 'nicht vor dem Wechsel davor');
+        $this->assertSame(400, $this->call('PATCH', $path($gefr), ['date' => '2026-09-16'])->status, 'nicht nach dem Wechsel danach');
+        $res = $this->call('PATCH', $path($uffz), ['date' => '2026-08-01']);
+        $this->assertSame(400, $res->status, 'am 01.08. erst 12 Punkte');
+        $this->assertStringContainsString('am 01.08.2026 noch nicht erreicht (fehlen 8 Punkte)', $res->data['message']);
+        $this->assertSame(404, $this->call('PATCH', "/members/{$this->admin}/rank-history/{$uffz}", ['date' => '2026-09-15'])->status, 'Eintrag einer anderen Person');
+
+        $res = $this->call('PATCH', $path($gefr), ['date' => '2026-03-15']);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame('2026-03-15 11:00:00', $res->data[1]['changed_at'], '12:00 Uhr Ortszeit (Winterzeit)');
+        $this->assertSame(12, $res->data[1]['points_at_change']);
+        $res = $this->call('PATCH', $path($uffz), ['date' => '2026-10-20']);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame('2026-10-20 10:00:00', $res->data[0]['changed_at']);
+        $this->assertSame(22, $res->data[0]['points_at_change']);
+        $this->assertSame('Unteroffizier', $this->call('GET', "/members/{$this->m}")->data['rank']['rank']['title'], 'Dienstgrad bleibt');
+
+        $this->users->current = $this->m;
+        $this->assertSame(403, $this->call('PATCH', $path($uffz), ['date' => '2026-10-01'])->status, 'nur mit „Dienstgrade verwalten“');
+    }
+
     public function testOldBackupWithoutRankTablesEmptiesThem(): void
     {
         $this->setUpApp(['ranks' => true]);

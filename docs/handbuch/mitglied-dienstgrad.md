@@ -21,7 +21,7 @@ Aus der Übersicht **Beförderungen** öffnet ein Tipp auf einen Namen dieses Fe
 - **Datum**: der Tag der Änderung, vorgegeben ist heute. Ein früherer Tag geht, ein Tag in der Zukunft nicht.
 - **Begründung (optional)**: steht später im Verlauf.
 - **{begriff.rank} ändern**: speichert die Änderung.
-- Darunter der Verlauf: jede „Ersteinstufung“, „Beförderung“ und „Degradierung“ mit Datum, von wem, mit {bereich.points} dem Stand zu diesem Zeitpunkt und der Begründung.
+- Darunter der Verlauf: jede „Ersteinstufung“, „Beförderung“ und „Degradierung“ mit Datum, von wem, mit {bereich.points} dem Stand zu diesem Zeitpunkt und der Begründung. Mit dem Stift an einem Eintrag änderst du sein Datum.
 
 ## So gehst du vor
 ### Befördern oder degradieren
@@ -29,6 +29,13 @@ Aus der Übersicht **Beförderungen** öffnet ein Tipp auf einen Namen dieses Fe
 2. Fand die Beförderung an einem früheren Tag statt, z. B. auf einer Versammlung, wähle unter **Datum** diesen Tag.
 3. Trage bei Bedarf eine **Begründung** ein.
 4. Tippe auf **{begriff.rank} ändern**. Die Änderung steht sofort im Verlauf, mit dem gewählten Datum.
+
+### Das Datum einer Änderung nachträglich korrigieren
+1. Tippe im Verlauf beim Eintrag auf den Stift (**Datum ändern**).
+2. Wähle unter **Neues Datum** den richtigen Tag.
+3. Tippe auf **Datum speichern**. Mit **Abbrechen** bleibt alles, wie es war.
+
+Das neue Datum darf nicht in der Zukunft liegen und nicht vor dem Eintrag davor oder nach dem Eintrag danach. Mit {bereich.points} steht danach im Eintrag der Stand an {bereich.points} bis zum neuen Tag; bei einer Beförderung muss er die Schwelle des {begriff.rank}s erreichen. Der aktuelle {begriff.rank} ändert sich dabei nicht.
 
 ### Den {begriff.rank} wegnehmen
 1. Wähle unter **Neuer {begriff.rank}** den Eintrag **Kein {begriff.rank}**.

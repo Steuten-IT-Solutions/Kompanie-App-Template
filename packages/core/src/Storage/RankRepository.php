@@ -99,6 +99,19 @@ final class RankRepository
         });
     }
 
+    /**
+     * Zeitpunkt und Punktestand eines Eintrags im Verlauf ändern; beim neuesten auch „Dienstgrad seit“ (member_ranks).
+     */
+    public function changeDate(int $userId, int $entryId, string $changedAt, ?float $points, bool $latest): void
+    {
+        $this->db->transaction(function () use ($userId, $entryId, $changedAt, $points, $latest): void {
+            $this->db->execute('UPDATE {rank_history} SET changed_at = ?, points_at_change = ? WHERE id = ? AND user_id = ?', [$changedAt, $points, $entryId, $userId]);
+            if ($latest) {
+                $this->db->execute('UPDATE {member_ranks} SET assigned_at = ? WHERE user_id = ?', [$changedAt, $userId]);
+            }
+        });
+    }
+
     /** Zeitpunkt (UTC) des letzten Wechsels einer Person, null ohne Verlauf. */
     public function lastChange(int $userId): ?string
     {

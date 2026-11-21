@@ -2476,6 +2476,8 @@ export interface RankStatus {
 }
 
 export interface RankHistoryEntry {
+  /** fehlt bei älteren Servern */
+  id?: number;
   from: string | null;
   to: string | null;
   /** Heutiges Abzeichen des neuen Dienstgrads */
@@ -2924,6 +2926,9 @@ export const api = {
   /** date: Tag des Wechsels (JJJJ-MM-TT); leer = heute. */
   setMemberRank: (id: number, rank_id: number | null, reason: string, date?: string) =>
     request<RankStatus>('PUT', `/members/${id}/rank`, { rank_id, reason, ...(date ? { date } : {}) }),
+  /** Datum eines Eintrags im Verlauf nachträglich ändern (JJJJ-MM-TT); liefert den neuen Verlauf. */
+  setRankHistoryDate: (memberId: number, entryId: number, date: string) =>
+    request<RankHistoryEntry[]>('PATCH', `/members/${memberId}/rank-history/${entryId}`, { date }),
   promotions: () => request<Promotion[]>('GET', '/promotions'),
   /** Abzeichen hochladen; bei SVG optional eine PNG-Fassung (Base64) für Benachrichtigungen. */
   uploadRankBadge: async (id: number, file: File, png?: string | null) =>
