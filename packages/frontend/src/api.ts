@@ -1141,6 +1141,8 @@ export interface CalendarEvent {
   kind_suggestion?: string | null;
   /** Wie kind_suggestion, alle passenden Arten (fehlt bei älteren Servern) */
   kind_suggestions?: string[];
+  /** Fehlt (ganz oder teilweise) in der Sprache der App; dann deutsch (nur Termine aus der App) */
+  untranslated?: 'all' | 'some';
 }
 
 export type ResponseStatus = 'yes' | 'no';
@@ -1193,6 +1195,15 @@ export interface PublicEvent extends Omit<CalendarEvent, 'id'> {
   url: string;
   /** Nur Termine des internen Kalenders: Anmeldeschluss */
   respond_until?: string | null;
+  /** Nur zum Bearbeiten (deutsche Fassung): Fassungen je weitere Sprache, leer = deutsch */
+  translations?: Partial<Record<Locale, EventTranslation>>;
+}
+
+/** Fassung eines Termins in einer weiteren Sprache (Plan „Mehrsprachigkeit“, PR 9d) */
+export interface EventTranslation {
+  title: string;
+  location: string;
+  description: string;
 }
 
 export interface EventInput {
@@ -1206,6 +1217,8 @@ export interface EventInput {
   url: string;
   /** Nur Termine des internen Kalenders: Anmeldeschluss YYYY-MM-DD oder leer */
   respond_until?: string;
+  /** Fassungen je weitere Sprache; nur die genannten Sprachen ändern sich, leere Felder = deutsch */
+  translations?: Partial<Record<Locale, Partial<EventTranslation>>>;
 }
 
 export interface NewsItem {
@@ -2024,6 +2037,19 @@ export interface Poll {
   my_answer: { option_ids: number[]; text: string | null } | null;
   results_visible: boolean;
   results_data: PollResultData | null;
+  /** Fehlt (ganz oder teilweise) in der Sprache der App; dann deutsch */
+  untranslated?: 'all' | 'some';
+  /** Nur für die Verwaltung in einer anderen Sprache als Deutsch: die deutsche Fassung zum Bearbeiten */
+  source?: PollTranslation;
+  /** Nur für die Verwaltung: Fassungen je weitere Sprache, leer = deutsch */
+  translations?: Partial<Record<Locale, PollTranslation>>;
+}
+
+/** Fassung einer Umfrage in einer weiteren Sprache (Plan „Mehrsprachigkeit“, PR 9d); options in der Reihenfolge der deutschen */
+export interface PollTranslation {
+  title: string;
+  description: string;
+  options: string[];
 }
 
 export interface PollResultData {
@@ -2041,6 +2067,8 @@ export interface PollInput {
   results?: PollResults;
   /** „JJJJ-MM-TTTHH:MM“ in der Zeitzone der Kompanie; leer = ohne Ende */
   ends_at?: string | null;
+  /** Fassungen je weitere Sprache; options gleich viele wie auf Deutsch, leer = deutsch */
+  translations?: Partial<Record<Locale, Partial<PollTranslation>>>;
 }
 
 export type DocVisibility = 'members' | 'managers';
@@ -2883,6 +2911,8 @@ export const api = {
   logout: () => request<{ logged_out: boolean }>('POST', '/auth/logout', {}),
 
   events: () => request<PublicEvent[]>('GET', '/events'),
+  /** Zum Bearbeiten (manage_events): deutsch, mit den Fassungen unter translations */
+  eventsSource: () => request<PublicEvent[]>('GET', '/events?source=1'),
   createEvent: (data: EventInput) => request<PublicEvent>('POST', '/events', data),
   updateEvent: (id: number, data: EventInput) => request<PublicEvent>('PATCH', `/events/${id}`, data),
   deleteEvent: (id: number) => request<{ deleted: boolean }>('DELETE', `/events/${id}`),

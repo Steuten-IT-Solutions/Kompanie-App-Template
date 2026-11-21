@@ -318,7 +318,7 @@ final class CalendarService
             'description' => $e['description'],
             'url' => $e['url'],
             'respond_until' => $e['respond_until'] ?? null,
-        ], $this->internal->between($from, $to));
+        ] + (isset($e['untranslated']) ? ['untranslated' => $e['untranslated']] : []), $this->internal->between($from, $to));
         usort($events, static fn (array $a, array $b): int => strcmp((string) $a['start'], (string) $b['start']));
         return $events;
     }

@@ -1383,8 +1383,17 @@ paths:
     get:
       tags: [Termine]
       summary: Kommende öffentliche Termine
+      description: |
+        In einer weiteren Sprache (Header X-Kompanie-Lang) Titel, Ort und Beschreibung dieser Fassung, was fehlt, auf Deutsch
+        (untranslated).
       x-capability: 'view_events (ohne Anmeldung die Rechte der Rolle guest)'
       security: []
+      parameters:
+        - name: source
+          in: query
+          required: false
+          schema: { type: string, enum: ['1'] }
+          description: 'Nur mit manage_events, zum Bearbeiten: die deutsche Fassung und dazu translations.'
       responses:
         '200':
           description: OK
@@ -9412,6 +9421,17 @@ components:
         ends_at:
           type: [string, 'null']
           description: 'Optional: „JJJJ-MM-TTTHH:MM“ in der Zeitzone der Kompanie oder ISO 8601 mit Zeitzone; muss in der Zukunft liegen. Gespeichert in UTC.'
+        translations:
+          type: object
+          description: 'Fassungen je weiterer eingeschalteter Sprache (nicht de, sonst → 400); nur die genannten Felder ändern sich. options gleich viele wie auf Deutsch (sonst → 400), leere = deutsch; geht auch, wenn es schon Antworten gibt.'
+          additionalProperties: { $ref: '#/components/schemas/PollTranslation' }
+    PollTranslation:
+      type: object
+      description: 'Fassung einer Umfrage in einer weiteren Sprache; leer = deutsch. Abgestimmt wird über dieselben Möglichkeiten.'
+      properties:
+        title: { type: string, maxLength: 150 }
+        description: { type: string, maxLength: 1000 }
+        options: { type: array, items: { type: string, maxLength: 100 }, description: 'In der Reihenfolge der deutschen Möglichkeiten' }
     PollPatch:
       type: object
       properties:
@@ -9422,6 +9442,10 @@ components:
         anonymous: { type: boolean }
         results: { type: string, enum: [after_vote, after_end, managers] }
         ends_at: { type: [string, 'null'] }
+        translations:
+          type: object
+          description: 'Fassungen je weiterer eingeschalteter Sprache (nicht de, sonst → 400); nur die genannten Felder ändern sich. options gleich viele wie auf Deutsch (sonst → 400), leere = deutsch; geht auch, wenn es schon Antworten gibt.'
+          additionalProperties: { $ref: '#/components/schemas/PollTranslation' }
     PollVote:
       type: object
       properties:
@@ -9503,6 +9527,14 @@ components:
                 properties:
                   text: { type: string }
                   name: { type: string, description: Nur bei namentlichen Umfragen }
+        untranslated:
+          { type: string, enum: [all, some], description: 'In einer weiteren Sprache (X-Kompanie-Lang), wenn dort etwas fehlt (dann deutsch)' }
+        source:
+          { $ref: '#/components/schemas/PollTranslation', description: 'Nur mit manage_polls in einer weiteren Sprache: die deutsche Fassung zum Bearbeiten' }
+        translations:
+          type: object
+          description: 'Nur mit manage_polls, wenn eine weitere Sprache an ist: Fassungen je weiterer Sprache (leere Möglichkeit = deutsch)'
+          additionalProperties: { $ref: '#/components/schemas/PollTranslation' }
     PushType:
       type: string
       enum:
@@ -10947,6 +10979,20 @@ components:
         url: { type: string }
         respond_until:
           { type: [string, 'null'], format: date, description: 'Nur Termine des internen Kalenders (`/calendar/entries`): Anmeldeschluss' }
+        untranslated:
+          { type: string, enum: [all, some], description: 'In einer weiteren Sprache, wenn dort Titel, Ort oder Beschreibung fehlt (dann deutsch)' }
+        translations:
+          type: object
+          description: 'Nur zum Bearbeiten (`?source=1`, `/calendar/entries`, Antwort auf POST und PATCH, mit weiterer Sprache): deutsche Fassung oben, hier die Fassungen je weiterer Sprache'
+          additionalProperties: { $ref: '#/components/schemas/EventTranslation' }
+
+    EventTranslation:
+      type: object
+      description: 'Fassung eines Termins in einer weiteren Sprache; leer = deutsch. Datum, Zeit und Link gelten für alle Sprachen.'
+      properties:
+        title: { type: string, maxLength: 191 }
+        location: { type: string, maxLength: 191 }
+        description: { type: string }
 
     EventInput:
       type: object
@@ -10962,6 +11008,10 @@ components:
         url: { type: string }
         respond_until:
           { type: string, description: 'Nur `/calendar/entries`: Anmeldeschluss YYYY-MM-DD, höchstens der Tag des Beginns, oder leer' }
+        translations:
+          type: object
+          description: 'Fassungen je weiterer eingeschalteter Sprache (nicht de, sonst → 400); nur die genannten Felder ändern sich, leeres Feld = deutsch. Antwort von POST und PATCH: die deutsche Fassung mit translations.'
+          additionalProperties: { $ref: '#/components/schemas/EventTranslation' }
 
     NewsItem:
       type: object

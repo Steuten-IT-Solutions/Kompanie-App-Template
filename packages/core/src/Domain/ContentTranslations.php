@@ -239,6 +239,23 @@ final class ContentTranslations
         return $out;
     }
 
+    /**
+     * Fassungen einfacher Felder für das Änderungsprotokoll: „Titel (en)“ usw.
+     *
+     * @param array<string, string> $labels Feld => Bezeichnung
+     * @return array<string, string|null>
+     */
+    public function fieldsLog(string $kind, int $id, array $labels): array
+    {
+        $out = [];
+        foreach ($this->app->translations()->repository()->forRef($kind, (string) $id) as $locale => $fields) {
+            foreach ($labels as $field => $label) {
+                $out["$label ($locale)"] = ($fields[$field] ?? '') !== '' ? $fields[$field] : null;
+            }
+        }
+        return $out;
+    }
+
     /** Hinweis für die Antwort aus übersetzbaren und übersetzten Feldern: null (alles da), NONE oder PARTLY. */
     public static function untranslated(int $total, int $done): ?string
     {

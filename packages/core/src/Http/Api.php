@@ -1022,14 +1022,15 @@ final class Api
             new Route('GET', '/calendar/{key}/responses', Cap::ViewResponses, fn (Request $r) => $a->eventResponses()->overview($this->user(), (string) $r->params['key']), 'calendar', $denyRights),
             // Interner Kalender in der App (Quelle „app“): Termine pflegen mit manage_calendar, getrennt von den öffentlichen.
             // Benachrichtigungen wie bei jeder Quelle über PushTriggers::checkCalendar, nach dem Speichern sofort angestoßen.
-            new Route('GET', '/calendar/entries', Cap::ManageCalendar, fn () => $a->calendar()->requireInApp()->upcoming(), 'calendar', $denyRights),
+            // Zum Bearbeiten: deutsch, dazu die Fassungen je Sprache (translations)
+            new Route('GET', '/calendar/entries', Cap::ManageCalendar, fn () => $a->calendar()->requireInApp()->upcoming(200, true), 'calendar', $denyRights),
             new Route('POST', '/calendar/entries', Cap::ManageCalendar, function (Request $r) use ($a) {
                 $event = $a->calendar()->requireInApp()->create(EventService::input($r->body), $this->user()->id);
                 $this->notify(static fn () => $a->pushTriggers()->checkCalendar());
                 return Response::created($event);
             }, 'calendar', $denyRights),
             new Route('PATCH', '/calendar/entries/{id}', Cap::ManageCalendar, function (Request $r) use ($a) {
-                $event = $a->calendar()->requireInApp()->update($r->id(), EventService::input($r->body));
+                $event = $a->calendar()->requireInApp()->update($r->id(), EventService::input($r->body), $this->user()->id);
                 $this->notify(static fn () => $a->pushTriggers()->checkCalendar());
                 return $event;
             }, 'calendar', $denyRights),
@@ -1040,15 +1041,16 @@ final class Api
             }, 'calendar', $denyRights),
 
             // Öffentliche Termine
-            new Route('GET', '/events', Cap::ViewEvents, fn () => $a->events()->upcoming(), 'events', $denyView),
+            // source=1 (nur manage_events): deutsch samt Fassungen je Sprache zum Bearbeiten
+            new Route('GET', '/events', Cap::ViewEvents, fn (Request $r) => $a->events()->upcoming(200, $r->queryFlag('source') && ($a->authContext->currentUser()?->can(Cap::ManageEvents) ?? false)), 'events', $denyView),
             new Route('POST', '/events', Cap::ManageEvents, function (Request $r) use ($a) {
                 $event = $a->events()->create(EventService::input($r->body), $this->user()->id);
                 $this->notify(static fn () => $a->pushTriggers()->publicEventSaved($event));
                 return Response::created($event);
             }, 'events', $denyEvents),
             new Route('PATCH', '/events/{id}', Cap::ManageEvents, function (Request $r) use ($a) {
-                $before = $a->events()->get($r->id());
-                $event = $a->events()->update($r->id(), EventService::input($r->body));
+                $before = $a->events()->get($r->id(), true);
+                $event = $a->events()->update($r->id(), EventService::input($r->body), $this->user()->id);
                 $this->notify(static fn () => $a->pushTriggers()->publicEventSaved($event, $before));
                 return $event;
             }, 'events', $denyEvents),

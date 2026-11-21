@@ -37,6 +37,15 @@ Die Umfrage steht danach sofort am {bereich.board} und im Banner der {rolle.memb
 
 ![Eine laufende Umfrage mit Ergebnissen und den Knöpfen Bearbeiten, Beenden und Löschen](bild:umfragen-verwalten-umfrage)
 
+### Eine Umfrage auch auf Englisch stellen
+Hat der Admin unter **Einstellungen → Sprachen** Englisch eingeschaltet, steht im Formular über **Ende (optional)** der aufklappbare Abschnitt **Auf English schreiben (freiwillig)**.
+1. Tippe auf **Auf English schreiben (freiwillig)**.
+2. Trage **Frage auf English** und bei Bedarf **Beschreibung auf English** ein.
+3. Trage unter **Antwortmöglichkeiten auf English** jede Möglichkeit auf Englisch ein. Leere Felder zeigen grau den deutschen Text.
+4. Tippe auf **Veröffentlichen** bzw. **Speichern**.
+
+Wer die App auf Englisch nutzt, sieht die Umfrage in dieser Fassung, auch in Benachrichtigung und Erinnerung. Was du leer lässt, erscheint auf Deutsch, mit dem Hinweis *Teilweise nur auf Deutsch verfügbar*. Die Antworten zählen für alle Sprachen gemeinsam: Wer auf Englisch „Yes“ wählt, hat dieselbe Möglichkeit gewählt wie mit „Ja“ auf Deutsch. Die englische Fassung kannst du auch ändern, wenn es schon Antworten gibt. Benutzt du die App selbst auf Englisch, bearbeitest du trotzdem die deutsche Fassung oben im Formular.
+
 ### Eine Umfrage vorzeitig beenden
 1. Tippe bei der Umfrage auf **Beenden**.
 2. Bestätige die Nachfrage. Danach kann niemand mehr antworten oder seine Antwort ändern. Wieder öffnen geht nicht.

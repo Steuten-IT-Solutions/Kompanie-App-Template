@@ -637,13 +637,13 @@ final class App
 
     public function events(): EventService
     {
-        return $this->service(EventService::class, fn () => new EventService(new EventRepository($this->db), $this->time()));
+        return $this->service(EventService::class, fn () => new EventService(new EventRepository($this->db), $this->time(), false, fn (): ContentTranslations => $this->contentTranslations()));
     }
 
     /** Termine des internen Kalenders in der App (Quelle „app“), getrennt von den öffentlichen. */
     public function internalEvents(): EventService
     {
-        return $this->service('internal_events', fn () => new EventService(new EventRepository($this->db, EventRepository::INTERNAL), $this->time(), true));
+        return $this->service('internal_events', fn () => new EventService(new EventRepository($this->db, EventRepository::INTERNAL), $this->time(), true, fn (): ContentTranslations => $this->contentTranslations()));
     }
 
     public function scores(): ScoreService

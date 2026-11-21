@@ -5226,6 +5226,97 @@ test('Sprachen: Nachricht am Brett auch auf Englisch schreiben, Gäste auf Engli
   }
 });
 
+test('Sprachen: öffentlichen Termin und Umfrage auch auf Englisch eintragen', async ({ page, browser }) => {
+  const id = Date.now().toString(36);
+  const german = `Schützenfest ${id}`;
+  const english = `Shooting fair ${id}`;
+  const question = `Grillfest ${id}?`;
+  const dialogs: string[] = [];
+  autoAsk(page, dialogs);
+  await login(page, 'admin', ADMIN_PASSWORD);
+  const api = (path: string, method: string, body?: unknown) =>
+    page.evaluate(
+      async ({ path, method, body }) => {
+        const cfg = window.KOMPANIE_CONFIG!;
+        const res = await fetch(cfg.apiBase + path, {
+          method,
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', [cfg.csrf.header]: cfg.csrf.token },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        return { status: res.status, data: (await res.json().catch(() => null)) as { id?: number }[] | null };
+      },
+      { path, method, body },
+    );
+  expect((await api('admin/settings', 'PATCH', { languages: 'de,en' })).status).toBe(200);
+  try {
+    await page.goto('/app/#/termine/verwalten');
+    await page.reload();
+    await page.getByRole('button', { name: '+ Öffentlichen Termin anlegen' }).click();
+    const form = page.locator('.event-form');
+    const d = new Date(Date.now() + 12 * 86400000);
+    await form.getByLabel('Titel', { exact: true }).fill(german);
+    await form
+      .getByLabel('Datum', { exact: true })
+      .fill(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+    await form.getByLabel('Ort', { exact: true }).fill('Festzelt');
+    const tr = form.locator('.board-translation');
+    await tr.getByText('Auf English schreiben (freiwillig)').click();
+    await expect(tr.getByLabel('Ort auf English')).toHaveAttribute('placeholder', 'Festzelt');
+    await tr.getByLabel('Titel auf English').fill(english);
+    await form.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.locator('.toast')).toHaveText('Termin angelegt');
+    const row = page.locator('.row', { hasText: german });
+    await row.getByRole('button', { name: 'Bearbeiten' }).click();
+    await expect(form.getByLabel('Titel', { exact: true })).toHaveValue(german);
+    await expect(form.getByLabel('Titel auf English')).toHaveValue(english);
+    await form.getByRole('button', { name: 'Abbrechen' }).click();
+
+    // Umfrage mit englischer Frage und einer englischen Möglichkeit
+    await page.goto('/app/#/umfragen/verwalten');
+    const poll = page.locator('.poll-form');
+    await poll.getByLabel('Frage', { exact: true }).fill(question);
+    await poll.getByLabel('Möglichkeit 1', { exact: true }).fill('Ja');
+    await poll.getByLabel('Möglichkeit 2', { exact: true }).fill('Nein');
+    const ptr = poll.locator('.board-translation');
+    await ptr.getByText('Auf English schreiben (freiwillig)').click();
+    await ptr.getByLabel('Frage auf English').fill('Barbecue?');
+    await expect(ptr.getByLabel('Möglichkeit 2 auf English')).toHaveAttribute('placeholder', 'Nein');
+    await ptr.getByLabel('Möglichkeit 1 auf English').fill('Yes');
+    await poll.getByRole('button', { name: 'Veröffentlichen' }).click();
+    await expect(page.getByText(question).first()).toBeVisible();
+
+    const visitor = await quietPage(browser);
+    await visitor.goto('/app/');
+    await visitor.evaluate(() => localStorage.setItem('kompanie-locale', 'en'));
+    await visitor.goto('/app/#/termine');
+    await visitor.reload();
+    await expect(visitor.locator('html')).toHaveAttribute('lang', 'en');
+    const ev = visitor.locator('.event', { hasText: english });
+    await expect(ev).toContainText('Festzelt');
+    await ev.locator('button').first().click();
+    await expect(ev.locator('.untranslated-note')).toContainText('Partly only available in German');
+    await visitor.close();
+
+    // Mitglied auf Englisch: Frage und Möglichkeiten der Fassung, fehlende deutsch
+    const polls = (await api('polls', 'GET')).data ?? [];
+    const pollId = (polls as { id: number; title: string }[]).find((p) => p.title === question)?.id;
+    expect(pollId).toBeTruthy();
+    const en = await page.evaluate(async (pollId) => {
+      const cfg = window.KOMPANIE_CONFIG!;
+      const res = await fetch(cfg.apiBase + `polls/${pollId}`, { credentials: 'same-origin', headers: { 'X-Kompanie-Lang': 'en' } });
+      return (await res.json()) as { title: string; options: { title: string }[]; source?: { title: string } };
+    }, pollId);
+    expect([en.title, en.options.map((o) => o.title), en.source?.title]).toEqual(['Barbecue?', ['Yes', 'Nein'], question]);
+  } finally {
+    const events = ((await api('events?source=1', 'GET')).data ?? []) as { id: number; title: string }[];
+    for (const e of events.filter((e) => e.title === german)) expect((await api(`events/${e.id}`, 'DELETE')).status).toBe(200);
+    const polls = ((await api('polls', 'GET')).data ?? []) as { id: number; title: string }[];
+    for (const p of polls.filter((p) => p.title === question)) expect((await api(`polls/${p.id}`, 'DELETE')).status).toBe(200);
+    expect((await api('admin/settings', 'PATCH', { languages: 'de' })).status).toBe(200);
+  }
+});
+
 test('Was ist neu: Admin sieht das Changelog der gebauten Version, Mitglied nicht', async ({ page }) => {
   // So, wie scripts/changelog.php es beim Bauen in die App gelegt hat.
   const changelog = JSON.parse(readFileSync(new URL('../src/generated/changelog.json', import.meta.url), 'utf8')) as {
