@@ -632,6 +632,11 @@ Sortieren bleibt deutsch (`localeCompare(…, 'de')`), Adressen in der App (`#/t
 Braucht derselbe deutsche Text je nach Stelle eine andere Übersetzung (Knopf „Zusagen“ und Spalte „Zusagen“ als
 Anzahl), nennt `tc('Anzahl', 'Zusagen')` bzw. `I18n::tc()` den Zusammenhang; der Schlüssel ist dann „Anzahl|Zusagen“.
 Texte, die gespeichert werden (Änderungsprotokoll, Grund einer Buchung, Spaltennamen beim Import), bleiben deutsch.
+Bezeichnungen der Kompanie (Bereiche, feste Rollen, Dienstgrad, Begrüßung): Die Vorgaben werden übersetzt („Termine“ →
+„Events“), eigene Namen aus `kompanie.json` und aus Einstellungen → Navigation nicht. Für eigene Namen in einer weiteren
+Sprache gibt es in `kompanie.json` den Abschnitt `translations.<sprache>` (`greeting`, `guestWelcome`, `description`,
+`labels` wie oben). Die App übersetzt in `brandLocale.ts` (beim Laden von `generated/brand.ts`), der Kern in
+`KompanieConfig::localized()`; gespeichert werden die deutschen Namen (`RoleService::sourceLabel`, `Features::roleLabel`).
 
 Die App setzt **HTTPS** voraus (sonst funktioniert die Installation aufs Handy nicht). Der Installer prüft das und erklärt, wie man beim Hoster ein kostenloses Zertifikat einschaltet.
 

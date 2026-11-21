@@ -337,12 +337,44 @@
           "pattern": "^https://"
         }
       }
+    },
+    "translations": {
+      "description": "Bezeichnungen und Texte je weiterer Sprache (Plan „Mehrsprachigkeit“), z. B. translations.en.greeting. Was fehlt, übersetzt die App selbst, solange es die Vorgabe ist (z. B. „Termine“ → „Events“); eigene Namen ohne Eintrag hier bleiben in jeder Sprache, wie sie sind.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "en": {
+          "$ref": "#/$defs/translation"
+        }
+      }
     }
   },
   "$defs": {
     "color": {
       "type": "string",
       "pattern": "^#[0-9a-fA-F]{6}$"
+    },
+    "translation": {
+      "description": "Texte einer Sprache; jede Angabe ist freiwillig.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "greeting": {
+          "type": "string",
+          "pattern": "\\{name\\}"
+        },
+        "guestWelcome": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "labels": {
+          "$ref": "#/properties/labels"
+        }
+      }
     }
   }
 }

@@ -635,7 +635,8 @@ final class RoleService
         return array_values(array_map(
             fn (array $r): array => [
                 'key' => $r['key'],
-                'label' => $r['label'],
+                // Feste Rollen unter ihrem Vorgabenamen in der Sprache der Anfrage („Mitglied“ → „Member“), eigene Namen bleiben
+                'label' => $this->config->localized('roles', $r['key'], $r['label']),
                 'points_factor' => $r['points_factor'],
                 'extra' => self::canBeExtra($r['key']),
                 // Gehört zur Kompanie (Mitgliederbereich, nicht Admin): nur dazu gibt es Zusatzrollen
@@ -704,7 +705,7 @@ final class RoleService
             $admin = $roles[Roles::ADMIN];
             unset($roles[Roles::ADMIN]);
             foreach (Roles::LEGACY as $key => $caps) {
-                $roles[$key] = self::role($key, $this->config->roleLabel($key), self::ordered($caps));
+                $roles[$key] = self::role($key, $this->sourceLabel($key), self::ordered($caps));
             }
             $roles[Roles::ADMIN] = $admin;
         }
@@ -736,7 +737,7 @@ final class RoleService
                 if ($u->role === Roles::CANDIDATE) {
                     // Vor migrateViewRights mit den Rechten von damals (die Migration ergänzt sie).
                     $caps = $this->settings->get(self::VIEW_SETTING) ? self::ordered(Roles::CANDIDATE_DEFAULTS) : [Capability::Calendar->value];
-                    $role = self::role(Roles::CANDIDATE, $this->freeLabel($this->config->roleLabel(Roles::CANDIDATE), $roles), $caps);
+                    $role = self::role(Roles::CANDIDATE, $this->freeLabel($this->sourceLabel(Roles::CANDIDATE), $roles), $caps);
                     break;
                 }
             }
@@ -1266,11 +1267,20 @@ final class RoleService
     }
 
     /** @return array<string, array{key: string, label: string, capabilities: string[], points_factor: float, new_accounts: bool, promotable: bool}> */
+    /**
+     * Vorgabename einer festen Rolle auf Deutsch, wie er gespeichert wird (die Anzeige übersetzt ihn erst bei der Ausgabe,
+     * publicList), auch wenn die Anfrage eine andere Sprache hat.
+     */
+    private function sourceLabel(string $key): string
+    {
+        return (string) I18n::in(I18n::SOURCE_LOCALE, fn (): string => $this->config->roleLabel($key));
+    }
+
     private function templates(): array
     {
         $out = [];
         foreach (Roles::TEMPLATES as $key => $caps) {
-            $out[$key] = self::role($key, $this->config->roleLabel($key), self::ordered($caps));
+            $out[$key] = self::role($key, $this->sourceLabel($key), self::ordered($caps));
         }
         return $out;
     }
@@ -1349,7 +1359,7 @@ final class RoleService
             }
             $out[$key] = [
                 'key' => $key,
-                'label' => is_string($r['label'] ?? null) && $r['label'] !== '' ? $r['label'] : $this->config->roleLabel($key),
+                'label' => is_string($r['label'] ?? null) && $r['label'] !== '' ? $r['label'] : $this->sourceLabel($key),
                 'capabilities' => $caps,
                 'points_factor' => $key === Roles::GUEST ? 1.0 : (is_numeric($r['points_factor'] ?? null) ? (float) $r['points_factor'] : 1.0),
                 'new_accounts' => !$system && ($r['new_accounts'] ?? false) === true,
@@ -1363,7 +1373,7 @@ final class RoleService
             }
             // Fehlende feste Rolle (z. B. nach einem Update): Heißt schon eine eigene Rolle so, bekommt die feste einen
             // anderen Namen.
-            $role = self::role($key, $this->freeLabel($this->config->roleLabel($key), $front + $out), self::ordered($caps));
+            $role = self::role($key, $this->freeLabel($this->sourceLabel($key), $front + $out), self::ordered($caps));
             if ($key === Roles::ADMIN) {
                 $out[$key] = $role;
             } else {

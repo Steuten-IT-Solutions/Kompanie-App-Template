@@ -94,6 +94,16 @@ test('kompanie.json: Pflichtfelder, Standardwerte, verständliche Fehler', () =>
   assert.equal(cfg.greeting, 'Hallo, {name}');
   assert.equal(cfg.labels.roles.manager, 'Leitung');
   assert.equal(cfg.labels.roles.organizer, 'Verwalter');
+  assert.deepEqual(cfg.translations, {});
+  const en = { greeting: 'Hello, {name}', labels: { sections: { penalties: 'Kitty' } } };
+  assert.deepEqual(
+    loadConfig(join(tmp({ name: 'x', colors: { primary: '#123456' }, translations: { en } }), 'kompanie.json')).translations,
+    { en },
+  );
+  assert.throws(
+    () => loadConfig(join(tmp({ name: 'x', colors: { primary: '#123456' }, translations: { fr: {} } }), 'kompanie.json')),
+    /nicht gültig/,
+  );
   assert.equal(cfg.legacyFeatures, false);
   assert.equal(
     loadConfig(join(tmp({ name: 'x', colors: { primary: '#123456' }, features: { news: false } }), 'kompanie.json')).legacyFeatures,

@@ -36,7 +36,7 @@ Die Flagge verschwindet, und alle sehen die App wieder auf Deutsch.
 ## Gut zu wissen
 
 - Die Wahl gilt am Gerät, auch für Gäste ohne Anmeldung. Wer angemeldet ist, behält seine Sprache auch auf anderen Geräten, und Mails und Benachrichtigungen an ihn kommen in dieser Sprache.
-- Übersetzt sind die Texte der App selbst, also Knöpfe, Überschriften und Meldungen. Was ihr selbst eintragt, z. B. Namen von Bereichen, Rollen und Dienstgraden, Termine oder Neuigkeiten, bleibt so, wie ihr es geschrieben habt.
+- Übersetzt sind die Texte der App selbst, also Knöpfe, Überschriften und Meldungen, und die vorgegebenen Namen der Bereiche und Rollen (aus **Termine** wird **Events**, aus **Mitglied** **Member**). Namen, die ihr selbst vergeben habt, z. B. für Bereiche, Rollen und Dienstgrade, und was ihr eintragt, z. B. Termine oder Neuigkeiten, bleiben so, wie ihr es geschrieben habt.
 - Nach dem Wechsel der Sprache lädt die App einmal neu.
 
 ## Siehe auch
