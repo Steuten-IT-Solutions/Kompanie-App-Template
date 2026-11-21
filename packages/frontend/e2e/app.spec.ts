@@ -4470,7 +4470,11 @@ test.describe('Android', () => {
         await expect(page.locator('.install-warn')).toContainText('Automatisch hinzufügen');
         await expect(page.locator('.install-warn').getByRole('link', { name: 'In Chrome öffnen' })).toHaveAttribute(
           'href',
-          /^intent:\/\/.+package=com\.android\.chrome;end$/,
+          /^intent:\/\/.+package=com\.android\.chrome;S\.browser_fallback_url=https%3A%2F%2Fplay\.google\.com%2F.+;end$/,
+        );
+        await expect(page.locator('.install-warn').getByRole('link', { name: 'Chrome herunterladen' })).toHaveAttribute(
+          'href',
+          'https://play.google.com/store/apps/details?id=com.android.chrome',
         );
       }
       await expect(page.locator('.install-trouble')).toContainText('Xiaomi');

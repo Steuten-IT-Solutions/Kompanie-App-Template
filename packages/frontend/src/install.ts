@@ -60,10 +60,18 @@ export function isSamsungInternet(ua = navigator.userAgent): boolean {
   return /SamsungBrowser/i.test(ua);
 }
 
-/** Link, der die Seite unter Android direkt in Chrome öffnet (fehlt Chrome, bietet Android den Play Store an). */
+/** Chrome im Google Play Store – zum Herunterladen, falls Chrome fehlt. */
+export const CHROME_PLAY_URL = 'https://play.google.com/store/apps/details?id=com.android.chrome';
+
+/**
+ * Link, der die Seite unter Android direkt in Chrome öffnet. Fehlt Chrome, führt S.browser_fallback_url
+ * in den Play Store (so beschrieben für Chrome; ob jeder andere Browser die Rückfalladresse beachtet, ist nicht
+ * dokumentiert – deshalb zeigt die Anleitung zusätzlich einen eigenen Knopf „Chrome herunterladen“).
+ */
 export function chromeUrl(url: string): string {
   const u = new URL(url, window.location.href);
-  return `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=${u.protocol.replace(':', '')};package=com.android.chrome;end`;
+  const fallback = encodeURIComponent(CHROME_PLAY_URL);
+  return `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=${u.protocol.replace(':', '')};package=com.android.chrome;S.browser_fallback_url=${fallback};end`;
 }
 
 /** Links aus Facebook/Instagram öffnen sich in deren eigenem Browser – dort kann man nicht installieren. */

@@ -3,6 +3,7 @@ import { config } from '../api';
 import brand from '../generated/brand';
 import logoUrl from '../generated/logo.png';
 import {
+  CHROME_PLAY_URL,
   chromeUrl,
   detectPlatform,
   installUrl,
@@ -362,6 +363,25 @@ function AndroidTrouble() {
   );
 }
 
+/** Weg zu Chrome: öffnen, falls vorhanden – sonst erst herunterladen. Ob Chrome installiert ist, kann eine Webseite nicht erkennen. */
+function ChromeButtons() {
+  return (
+    <>
+      <a className="btn btn-block install-chrome" href={chromeUrl(installUrl())}>
+        In Chrome öffnen
+      </a>
+      <p className="small install-chrome-get">
+        Noch kein Chrome auf dem Handy? Chrome ist kostenlos. Erst herunterladen, dann hier wieder auf „In Chrome öffnen“ tippen.
+      </p>
+      <a className="btn btn-block btn-secondary install-chrome" href={CHROME_PLAY_URL} target="_blank" rel="noopener noreferrer">
+        Chrome herunterladen
+      </a>
+      Falls „In Chrome öffnen“ nicht funktioniert: Adresse kopieren und in Chrome einfügen.
+      <CopyLink />
+    </>
+  );
+}
+
 /** Andere Browser als Chrome auf Android: warum Chrome besser ist und wie es trotzdem geht. */
 function OtherBrowserNote({ browser }: { browser: AndroidBrowser }) {
   const name = BROWSER_NAMES[browser];
@@ -386,11 +406,7 @@ function OtherBrowserNote({ browser }: { browser: AndroidBrowser }) {
         ? 'Benachrichtigungen gehen dort zwar auch, '
         : 'Ob Benachrichtigungen dort ankommen, ist nicht sicher; '}
       mit Chrome wird die App eine richtige App mit Benachrichtigungen.
-      <a className="btn btn-block install-chrome" href={chromeUrl(installUrl())}>
-        In Chrome öffnen
-      </a>
-      Falls das nicht funktioniert: Adresse kopieren und in Chrome einfügen.
-      <CopyLink />
+      <ChromeButtons />
       <p className="small install-other-steps">
         Lieber bei {browser === 'other' ? 'diesem Browser' : name} bleiben?{' '}
         {steps[browser] ?? (
@@ -455,11 +471,7 @@ export default function Installieren({ onToast }: { onToast: (msg: string) => vo
           Samsung-Browser anlegt, als „unsicher“ bzw. „für eine ältere Android-Version entwickelt“. Das ist ein Fehler des Samsung-Browsers,
           nicht der App; er ist seit April 2026 gemeldet und noch nicht behoben. Mit <strong>Chrome</strong> klappt es, auch auf
           Samsung-Handys:
-          <a className="btn btn-block install-chrome" href={chromeUrl(installUrl())}>
-            In Chrome öffnen
-          </a>
-          Falls das nicht funktioniert: Adresse kopieren und in Chrome einfügen.
-          <CopyLink />
+          <ChromeButtons />
         </div>
       )}
       {browser && shortcutOnly(browser) && !inApp && <OtherBrowserNote browser={browser} />}
