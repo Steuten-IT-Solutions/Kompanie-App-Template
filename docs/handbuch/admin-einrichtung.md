@@ -25,7 +25,7 @@ Diesen Schritt kannst du nicht überspringen. Ohne Bereich zeigt die App nur die
 ### Kalender, {bereich.gallery} und {bereich.news} verbinden
 Für jeden gewählten Bereich, der eine Verbindung braucht, folgt ein eigener Schritt:
 - **Kalender für Mitglieder** (wenn {bereich.calendar} an ist), siehe [Kalender einrichten](seite:admin-kalender).
-- **Google-Zugang** und **{bereich.gallery} aus Google Drive** (wenn {bereich.gallery} an ist), siehe [Google-Zugang](seite:admin-google) und [{bereich.gallery} einrichten](seite:admin-galerie). Ist {bereich.gallery} aus, steht der Google-Zugang im Schritt für den Kalender.
+- **Google-Zugang** und **{bereich.gallery}** (Ordner in Google Drive, wenn {bereich.gallery} an ist), siehe [Google-Zugang](seite:admin-google) und [{bereich.gallery} einrichten](seite:admin-galerie). Ist {bereich.gallery} aus, steht der Google-Zugang im Schritt für den Kalender.
 - **Neuigkeiten** (wenn {bereich.news} an ist), siehe [{bereich.news} einrichten](seite:admin-neuigkeiten).
 
 1. Fülle die Felder aus und tippe im Abschnitt auf **Speichern**.
