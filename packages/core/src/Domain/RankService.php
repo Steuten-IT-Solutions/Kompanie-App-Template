@@ -686,6 +686,99 @@ final class RankService
     }
 
     /**
+     * Den neuen Dienstgrad eines Eintrags im Verlauf nachträglich ändern (falsch gebucht). Die Art (Beförderung oder
+     * Degradierung) ergibt sich neu aus dem Dienstgrad davor; mit Punkten muss eine Beförderung die heutige Schwelle mit dem
+     * Stand dieses Eintrags erreichen. Der Eintrag danach beginnt dann beim neuen Dienstgrad. Beim neuesten Eintrag (wenn er
+     * den heutigen Dienstgrad ergeben hat) ändert sich auch der aktuelle Dienstgrad, „seit“ bleibt.
+     *
+     * @return array{rank: array<string, mixed>, history: list<array<string, mixed>>} neuer Stand wie status() und Verlauf
+     */
+    public function changeEntryRank(int $userId, int $entryId, mixed $rankId): array
+    {
+        $user = $this->app->users->find($userId) ?? throw ApiError::notFound(I18n::t('Mitglied nicht gefunden.'));
+        $repo = $this->repository();
+        $label = $this->app->config->rankLabel();
+        $rows = $repo->history($userId);
+        $index = null;
+        foreach ($rows as $i => $h) {
+            if ($h['id'] === $entryId) {
+                $index = $i;
+            }
+        }
+        if ($index === null) {
+            throw ApiError::notFound(I18n::t('Eintrag im Verlauf nicht gefunden.'));
+        }
+        $entry = $rows[$index];
+        $ranks = $repo->all(false);
+        $target = null;
+        if ($rankId !== null && $rankId !== '' && $rankId !== 0) {
+            $target = $this->byId($ranks, Input::integer($rankId)) ?? throw ApiError::notFound(I18n::t('{rank} nicht gefunden.', ['rank' => $label]));
+        }
+        $targetId = $target['id'] ?? null;
+        if ($targetId === $entry['to_rank_id']) {
+            throw ApiError::invalid(I18n::t('Das ist schon der {rank} dieses Eintrags.', ['rank' => $label]));
+        }
+        $initial = $entry['kind'] === self::KIND_INITIAL;
+        if ($initial && $target === null) {
+            throw ApiError::invalid(I18n::t('Eine Ersteinstufung braucht einen {rank}. Lösche den Eintrag stattdessen.', ['rank' => $label]));
+        }
+        if (!$initial && $targetId === $entry['from_rank_id']) {
+            throw ApiError::invalid(I18n::t('Das war schon der {rank} davor. Lösche den Eintrag stattdessen.', ['rank' => $label]));
+        }
+        $from = $this->byId($ranks, $entry['from_rank_id']);
+        if (!$initial && $entry['from_rank_id'] !== null && $from === null) {
+            throw ApiError::invalid(I18n::t('Den {rank} davor („{title}“) gibt es nicht mehr. Ändere den {rank} stattdessen.', ['rank' => $label, 'title' => $entry['from_title']]));
+        }
+        $kind = $initial ? self::KIND_INITIAL : $this->kindOf($ranks, $from, $target);
+        if ($kind === self::KIND_PROMOTION && $user->isMember() && $this->usesPoints() && $target !== null && $target['min_points'] !== null
+            && $entry['points_at_change'] !== null && $entry['points_at_change'] < $target['min_points']) {
+            $day = $this->app->time()->format((int) strtotime($entry['changed_at'] . ' UTC'), 'd.m.Y');
+            throw ApiError::invalid(I18n::t('Schwelle für „{rank}“ am {date} noch nicht erreicht (fehlen {missing} Punkte).', [
+                'rank' => $this->displayTitle($target['id'], $target['title']),
+                'date' => $day,
+                'missing' => self::number($target['min_points'] - $entry['points_at_change']),
+            ]));
+        }
+        // Der Eintrag danach beginnt beim neuen Dienstgrad; ginge er auf denselben, wäre er kein Wechsel mehr.
+        $next = null;
+        if ($index > 0) {
+            $after = $rows[$index - 1];
+            if ($after['to_rank_id'] === $targetId) {
+                throw ApiError::invalid(I18n::t('Der Wechsel danach geht schon auf „{title}“. Lösche stattdessen einen der beiden Einträge.', [
+                    'title' => $target === null ? I18n::t('kein {rank}', ['rank' => $label]) : $this->displayTitle($target['id'], $target['title']),
+                ]));
+            }
+            $next = [
+                'id' => $after['id'],
+                'from_rank_id' => $targetId,
+                'from_title' => $target['title'] ?? '',
+                'kind' => $this->kindOf($ranks, $target, $this->byId($ranks, $after['to_rank_id'])),
+            ];
+        }
+        $current = null;
+        if ($index === 0 && $repo->rankOf($userId) === $entry['to_rank_id']) {
+            if ($target !== null && !$user->isMember()) {
+                throw ApiError::invalid(I18n::t('Einen {rank} haben nur Mitglieder.', ['rank' => $label]));
+            }
+            $current = ['rank_id' => $targetId, 'since' => $entry['changed_at']];
+        }
+        $repo->changeEntryRank($userId, $entryId, $targetId, $target['title'] ?? '', $kind, $next, $current);
+        return ['rank' => $this->status($userId), 'history' => $this->history($userId)];
+    }
+
+    /**
+     * Art eines Wechsels: höher = Beförderung, sonst Degradierung.
+     *
+     * @param list<Rank> $ranks
+     * @param Rank|null $from
+     * @param Rank|null $to
+     */
+    private function kindOf(array $ranks, ?array $from, ?array $to): string
+    {
+        return $to !== null && ($from === null || $this->position($ranks, $to) > $this->position($ranks, $from)) ? self::KIND_PROMOTION : self::KIND_DEMOTION;
+    }
+
+    /**
      * Einen Eintrag im Verlauf löschen (falsch gebucht). Beim neuesten Eintrag gilt wieder der Dienstgrad davor, als hätte
      * es den Wechsel nie gegeben: „Dienstgrad seit“ ist dann der Zeitpunkt des Eintrags davor. Ältere Einträge ändern den
      * aktuellen Dienstgrad nicht. Ohne Punkteprüfung (es wird nur rückgängig gemacht).

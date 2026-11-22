@@ -3063,6 +3063,9 @@ export const api = {
   /** Datum eines Eintrags im Verlauf nachträglich ändern (JJJJ-MM-TT); liefert den neuen Verlauf. */
   setRankHistoryDate: (memberId: number, entryId: number, date: string) =>
     request<RankHistoryEntry[]>('PATCH', `/members/${memberId}/rank-history/${entryId}`, { date }),
+  /** Neuen Dienstgrad eines Eintrags im Verlauf ändern (null = kein); beim neuesten auch den aktuellen. */
+  setRankHistoryRank: (memberId: number, entryId: number, rank_id: number | null) =>
+    request<{ rank: RankStatus; history: RankHistoryEntry[] }>('PUT', `/members/${memberId}/rank-history/${entryId}/rank`, { rank_id }),
   /** Eintrag im Verlauf löschen; beim neuesten gilt wieder der Dienstgrad davor. */
   deleteRankHistoryEntry: (memberId: number, entryId: number) =>
     request<{ rank: RankStatus; history: RankHistoryEntry[] }>('DELETE', `/members/${memberId}/rank-history/${entryId}`),

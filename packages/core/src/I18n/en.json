@@ -1032,10 +1032,8 @@
   "Datum": "Date",
   "Datum (optional)": "Date (optional)",
   "Datum für Zahlungen ohne Datum": "Date for payments without a date",
-  "Datum geändert": "Date changed",
   "Datum oder Jahr": "Date or year",
   "Datum speichern": "Save date",
-  "Datum ändern": "Change date",
   "davon offen": "of which open",
   "Davon {count} Entschuldigungen für kommende Termine.": {
     "one": "Including {count} apology for upcoming events.",
@@ -4838,5 +4836,11 @@
   "{kind} vom {date} löschen?": "Delete the entry “{kind}” of {date}?",
   "Danach gilt wieder der {rank} davor: {title}.": "The previous {rank} then applies again: {title}.",
   "Der aktuelle {rank} ändert sich dadurch nicht.": "The current {rank} does not change.",
-  "Eintrag löschen": "Delete entry"
+  "Eintrag löschen": "Delete entry",
+  "Das ist schon der {rank} dieses Eintrags.": "This is already the {rank} of this entry.",
+  "Das war schon der {rank} davor. Lösche den Eintrag stattdessen.": "That was already the previous {rank}. Delete the entry instead.",
+  "Der Wechsel danach geht schon auf „{title}“. Lösche stattdessen einen der beiden Einträge.": "The next change already goes to “{title}”. Delete one of the two entries instead.",
+  "Eine Ersteinstufung braucht einen {rank}. Lösche den Eintrag stattdessen.": "An initial rank needs a {rank}. Delete the entry instead.",
+  "Eintrag geändert": "Entry changed",
+  "Eintrag ändern": "Change entry"
 }
