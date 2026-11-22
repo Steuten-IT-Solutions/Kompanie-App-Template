@@ -32,6 +32,7 @@ $fail = static function (array $errors) use ($out): never {
 /** Felder des Formulars: Überschrift im Issue => Schlüssel */
 const FIELDS = [
     'Name der Kompanie' => 'name',
+    'Basissprache' => 'language',
     'Name des Repos' => 'repo',
     'Kurzname' => 'shortName',
     'Hauptfarbe' => 'primary',
@@ -132,6 +133,17 @@ foreach (['primary', 'accent'] as $c) {
         continue;
     }
     $set($k, ['colors', $c], $v, $c === 'accent');
+}
+// Basissprache: nur beim Anlegen, danach fest (Plan „Basissprache“). Deutsch ist die Vorgabe und steht nicht in der Datei.
+$languages = ['Deutsch' => 'de', 'English' => 'en'];
+if ($text('language') !== '') {
+    if ($mode !== 'neu') {
+        $errors[] = 'Die Basissprache lässt sich nach dem Anlegen nicht mehr ändern.';
+    } elseif (!isset($languages[$text('language')])) {
+        $errors[] = 'Basissprache: „' . $text('language') . '“ gibt es nicht (Deutsch oder English).';
+    } elseif ($languages[$text('language')] !== 'de') {
+        $k['language'] = $languages[$text('language')];
+    }
 }
 if ($mode === 'neu') {
     if ($text('name') === '') {

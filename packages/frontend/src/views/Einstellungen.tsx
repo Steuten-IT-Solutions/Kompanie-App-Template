@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import brand from '../generated/brand';
-import { t, tn, type Locale } from '../i18n';
-import { Flag, LANGUAGE_NAMES, TranslationsHint } from '../language';
+import { baseLocale, t, tn, type Locale } from '../i18n';
+import { baseLanguageLabel, Flag, LANGUAGE_NAMES, TranslationsHint } from '../language';
 import {
   api,
   can,
@@ -1954,17 +1954,19 @@ export function News({ settings, onSaved, onToast }: SectionProps) {
 }
 
 /**
- * Sprachen der App: Deutsch ist immer an; weitere schaltet der Admin hier ein. Erst dann erscheint die Flagge in der
- * Kopfzeile und die Wahl unter Meins → Konto. Namen und Inhalte bleiben, wo nichts anderes eingetragen ist, deutsch.
+ * Sprachen der App: Die Basissprache der Kompanie (beim Anlegen gewählt) ist immer an; weitere schaltet der Admin hier
+ * ein. Erst dann erscheint die Flagge in der Kopfzeile und die Wahl unter Meins → Konto. Namen und Inhalte bleiben, wo
+ * nichts anderes eingetragen ist, in der Basissprache.
  */
 export function Languages({ settings, onSaved, onToast }: SectionProps) {
-  const saved = settings.languages ?? { enabled: ['de'], available: ['de'] };
+  const base = baseLocale();
+  const saved = settings.languages ?? { enabled: [base], available: [base] };
   const [enabled, setEnabled] = useState<Locale[]>(saved.enabled);
   const { busy, error, save } = useSave((s) => {
     if (config && s.languages) config.languages = s.languages.enabled;
     onSaved(s);
   }, onToast);
-  const others = saved.available.filter((l) => l !== 'de');
+  const others = saved.available.filter((l) => l !== base);
   return (
     <Section
       id="sprachen"
@@ -1978,13 +1980,14 @@ export function Languages({ settings, onSaved, onToast }: SectionProps) {
     >
       <p className="small muted">
         {t(
-          'Deutsch ist immer eingeschaltet. Mit einer weiteren Sprache erscheint oben eine Flagge zum Wechseln; jede Person wählt ihre Sprache selbst. Mails und Benachrichtigungen kommen in der Sprache, die jemand gewählt hat.',
+          '{base} ist die Basissprache der Kompanie und immer eingeschaltet: In ihr schreibt ihr Inhalte und Namen. Mit einer weiteren Sprache erscheint oben eine Flagge zum Wechseln; jede Person wählt ihre Sprache selbst. Mails und Benachrichtigungen kommen in der Sprache, die jemand gewählt hat.',
+          { base: baseLanguageLabel() },
         )}
       </p>
       <label className="toggle">
         <input type="checkbox" checked disabled />
-        <span lang="de">
-          <Flag lang="de" /> {LANGUAGE_NAMES.de}
+        <span lang={base}>
+          <Flag lang={base} /> {LANGUAGE_NAMES[base]}
         </span>
       </label>
       {others.map((l) => (

@@ -734,7 +734,7 @@ final class RegistrationService
         $mailed = false;
         if ($this->withMail() && (string) $row['email'] !== '') {
             // Ohne Konto ist die Sprache der Person unbekannt: Deutsch (wie LanguageService::forRecipient).
-            $mailed = I18n::in(I18n::SOURCE_LOCALE, fn (): bool => $this->send((string) $row['email'], PersonName::join((string) $row['first_name'], (string) $row['last_name']), $this->subject(I18n::t('Deine Anfrage')), array_values(array_filter([
+            $mailed = I18n::in(I18n::base(), fn (): bool => $this->send((string) $row['email'], PersonName::join((string) $row['first_name'], (string) $row['last_name']), $this->subject(I18n::t('Deine Anfrage')), array_values(array_filter([
                 I18n::t('Hallo {name},', ['name' => (string) $row['first_name']]),
                 I18n::t('deine Anfrage auf einen Zugang zur App „{app}“ wurde leider abgelehnt.', ['app' => $this->appName()]),
                 $reason !== '' ? I18n::t('Begründung: {reason}', ['reason' => $reason]) : null,
@@ -836,7 +836,7 @@ final class RegistrationService
             );
             foreach ($expired as $row) {
                 if ((string) $row['email'] !== '') {
-                    I18n::in(I18n::SOURCE_LOCALE, fn (): bool => $this->send((string) $row['email'], PersonName::join((string) $row['first_name'], (string) $row['last_name']), $this->subject(I18n::t('Deine Anfrage')), [
+                    I18n::in(I18n::base(), fn (): bool => $this->send((string) $row['email'], PersonName::join((string) $row['first_name'], (string) $row['last_name']), $this->subject(I18n::t('Deine Anfrage')), [
                         I18n::t('Hallo {name},', ['name' => (string) $row['first_name']]),
                         I18n::t('deine Anfrage auf einen Zugang zur App „{app}“ wurde in {days} Tagen nicht bearbeitet und ist deshalb gelöscht.', ['app' => $this->appName(), 'days' => self::PENDING_DAYS]),
                         I18n::t('Du kannst gerne eine neue Anfrage stellen oder dich direkt an die Admins der App wenden.'),

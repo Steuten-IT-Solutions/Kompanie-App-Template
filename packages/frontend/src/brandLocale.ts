@@ -7,7 +7,7 @@
  *
  * Die deutschen Vorgaben stehen auch in packages/branding/brand.mjs (DEFAULTS) und im Kern (KompanieConfig.php).
  */
-import { locale, SOURCE_LOCALE, t, tc, type Locale } from './i18n';
+import { baseLocale, locale, SOURCE_LOCALE, t, tc, type Locale } from './i18n';
 
 type Labels = { roles: Record<string, string>; sections: Record<string, string>; rank: string };
 type Translation = { description?: string; greeting?: string; guestWelcome?: string; labels?: Partial<Labels> };
@@ -57,14 +57,14 @@ const sectionDefaults = (): Record<string, [string, string]> => ({
 
 /** Name einer festen Rolle in der Sprache der App, solange er die Vorgabe ist („Mitglied“ → „Member“); sonst unverändert. */
 export function presetRoleLabel(key: string, label: string, lang: Locale = locale()): string {
-  if (lang === SOURCE_LOCALE) return label;
+  if (lang === SOURCE_LOCALE && baseLocale() === SOURCE_LOCALE) return label;
   const preset = roleDefaults()[key];
   return preset && label === preset[0] ? preset[1] : label;
 }
 
 /**
  * Eigene Namen der Installation als Abschnitte (Einstellungen → Navigation): in einer weiteren Sprache die für sie
- * eingetragenen (/config section_labels_i18n, sonst die deutschen), auf Deutsch section_labels.
+ * eingetragenen (/config section_labels_i18n, sonst die der Basissprache), in der Basissprache section_labels.
  */
 export function ownSections(
   cfg:
@@ -74,7 +74,7 @@ export function ownSections(
 ): Record<string, string> {
   const pick = (v: unknown): Record<string, string> | undefined =>
     v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, string>) : undefined;
-  return (lang !== SOURCE_LOCALE ? pick(cfg?.section_labels_i18n?.[lang]) : undefined) ?? pick(cfg?.section_labels) ?? {};
+  return (lang !== baseLocale() ? pick(cfg?.section_labels_i18n?.[lang]) : undefined) ?? pick(cfg?.section_labels) ?? {};
 }
 
 /** Ein Name: Eintrag in translations, sonst die übersetzte Vorgabe, sonst der eigene Name, wie er ist. */
@@ -83,10 +83,13 @@ function pick(own: string | undefined, current: string, preset: [string, string]
   return preset && current === preset[0] ? preset[1] : current;
 }
 
-/** Übersetzt die Bezeichnungen in brand an Ort und Stelle; auf Deutsch bleibt alles, wie es ist. */
-export function localizeBrand(brand: LocalizableBrand, lang: Locale = locale()): void {
-  if (lang === SOURCE_LOCALE) return;
-  const tr: Translation = brand.translations?.[lang] ?? {};
+/**
+ * Übersetzt die Bezeichnungen in brand an Ort und Stelle. In der Basissprache gelten die eigenen Namen, wie sie sind;
+ * die Vorgaben (deutsche Texte im Code) erscheinen in jeder Sprache übersetzt, auf Deutsch also unverändert.
+ */
+export function localizeBrand(brand: LocalizableBrand, lang: Locale = locale(), base: Locale = baseLocale()): void {
+  if (lang === SOURCE_LOCALE && base === SOURCE_LOCALE) return;
+  const tr: Translation = (lang !== base ? brand.translations?.[lang] : undefined) ?? {};
   const roles = roleDefaults();
   for (const key of Object.keys(brand.labels.roles)) {
     brand.labels.roles[key] = pick(tr.labels?.roles?.[key], brand.labels.roles[key], roles[key]);

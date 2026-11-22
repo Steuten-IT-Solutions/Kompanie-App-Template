@@ -43,6 +43,13 @@ final class KompanieConfig
         return new self(is_array($data) ? $data : []);
     }
 
+    /** Basissprache der Kompanie (beim Anlegen gewählt, danach fest); ohne Angabe Deutsch. */
+    public function language(): string
+    {
+        $value = $this->data['language'] ?? null;
+        return I18n::isLocale($value) ? $value : I18n::SOURCE_LOCALE;
+    }
+
     public function name(): string
     {
         return $this->string('name', 'Kompanie-App');
@@ -55,7 +62,7 @@ final class KompanieConfig
 
     public function description(): string
     {
-        return $this->string('description', 'Die App der ' . $this->name());
+        return $this->string('description', $this->language() === 'en' ? 'The app of ' . $this->name() : 'Die App der ' . $this->name());
     }
 
     /**
@@ -123,10 +130,10 @@ final class KompanieConfig
     public function localized(string $kind, string $key, string $label): string
     {
         $locale = I18n::locale();
-        if ($locale === I18n::SOURCE_LOCALE) {
+        if ($locale === I18n::SOURCE_LOCALE && $locale === I18n::base()) {
             return $label;
         }
-        $labels = $this->data['translations'][$locale]['labels'] ?? null;
+        $labels = $locale !== I18n::base() ? ($this->data['translations'][$locale]['labels'] ?? null) : null;
         $own = is_array($labels) ? ($kind === 'rank' ? ($labels['rank'] ?? null) : ($labels[$kind][$key] ?? null)) : null;
         if (is_string($own) && trim($own) !== '') {
             return $own;

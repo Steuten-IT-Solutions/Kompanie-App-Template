@@ -15,6 +15,17 @@ body:
       description: So erscheint sie in der App, z. B. „Musterkompanie Beispielstadt“ (höchstens 80 Zeichen).
     validations:
       required: true
+  - type: dropdown
+    id: language
+    attributes:
+      label: Basissprache
+      description: In dieser Sprache schreibt ihr Namen und Inhalte; weitere Sprachen sind Übersetzungen davon. Lässt sich nach dem Anlegen nicht mehr ändern. Die Angaben in diesem Formular (Name, Begrüßung, Bezeichnungen) bitte in dieser Sprache.
+      options:
+        - Deutsch
+        - English
+      default: 0
+    validations:
+      required: true
   - type: input
     id: repo
     attributes:

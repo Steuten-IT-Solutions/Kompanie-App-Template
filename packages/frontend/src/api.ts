@@ -141,8 +141,10 @@ export interface AppConfig {
   appUrl: string;
   swUrl: string;
   siteUrl: string | null;
-  /** Sprachen, die die App anbietet (Deutsch zuerst; nur Deutsch = kein Umschalter); fehlt bei älteren Servern */
+  /** Sprachen, die die App anbietet (Basissprache zuerst; nur sie = kein Umschalter); fehlt bei älteren Servern */
   languages?: Locale[];
+  /** Basissprache der Kompanie: Sprache der Inhalte und eigenen Namen; fehlt bei älteren Servern (dann Deutsch) */
+  base_language?: Locale;
   variant: 'wordpress' | 'standalone';
   version: string;
   csrf: { header: string; token: string; refreshUrl: string };

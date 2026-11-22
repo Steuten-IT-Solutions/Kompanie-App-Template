@@ -774,8 +774,10 @@ final class Api
             // Bezeichnungen und Punktefaktor der Rollen (vom Admin in der App festgelegt)
             // Bezeichnungen in der Sprache der Anfrage (eingetragen, sonst übersetzte Vorgabe, sonst deutsch)
             'roles' => array_map(static fn (array $r): array => ['label' => $a->translations()->name('role', $r['key'], $r['label'])] + $r, $a->roles()->publicList()),
-            // Sprachen, die die App anbietet (Deutsch zuerst; nur Deutsch = kein Umschalter)
+            // Sprachen, die die App anbietet (die Basissprache zuerst; nur sie = kein Umschalter)
             'languages' => $a->languages()->enabled(),
+            // Basissprache der Kompanie (kompanie.json „language“): Sprache der Inhalte und eigenen Namen
+            'base_language' => I18n::base(),
             // level ist die Grundrolle; extra_roles die Zusatzrollen (Issue #66), capabilities alle Rechte zusammen
             // photo_url: eigenes Foto (Konto), null ohne; create_roles bzw. create_extra_roles: Grund- bzw. Zusatzrollen, die
             // die Person beim Anlegen vergeben darf (RoleService::canCreateAs, creatableExtraRoles), nur mit create_users
@@ -863,7 +865,7 @@ final class Api
     {
         $a = $this->app;
         $out = [];
-        foreach (array_diff($a->languages()->enabled(), [I18n::SOURCE_LOCALE]) as $locale) {
+        foreach (array_diff($a->languages()->enabled(), [I18n::base()]) as $locale) {
             $out[$locale] = self::jsonObject($a->navigation()->sectionOverrides($a->features()->enabled('directory'), $a->features()->enabled('offices'), $locale));
         }
         return $out;

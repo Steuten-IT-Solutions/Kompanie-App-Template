@@ -4,7 +4,7 @@ reihenfolge: 128
 rechte: [manage_settings]
 ---
 
-Hier schaltest du ein, in welchen Sprachen die App für eure Kompanie zu haben ist. Deutsch ist immer an. Schaltest du Englisch dazu, wählt jede Person ihre Sprache selbst.
+Hier schaltest du ein, in welchen Sprachen die App für eure Kompanie zu haben ist. Die Basissprache eurer Kompanie ist immer an, meist Deutsch. Schaltest du eine weitere Sprache dazu, wählt jede Person ihre Sprache selbst.
 
 ![Die Seite Sprachen mit Deutsch und Englisch](bild:admin-sprachen)
 
@@ -56,6 +56,7 @@ Die Flagge verschwindet, und alle sehen die App wieder auf Deutsch.
 - Auch die Hilfe hinter dem **?** erscheint auf Englisch. Seiten, die es noch nicht auf Englisch gibt, zeigt sie deutsch mit dem Hinweis *Nur auf Deutsch verfügbar*.
 - Nach dem Wechsel der Sprache lädt die App einmal neu.
 - Was du unter **Übersetzungen** einträgst, ändert die deutschen Namen nicht.
+- **Basissprache**: In ihr schreibt ihr Namen und Inhalte, alle anderen Sprachen sind Übersetzungen davon. Sie wird beim Anlegen der Kompanie gewählt und lässt sich danach nicht mehr ändern. Diese Seite beschreibt eine Kompanie mit Deutsch als Basissprache. Ist bei euch Englisch die Basissprache, ist es umgekehrt: **English** ist immer an, **Deutsch** schaltest du dazu, und unter **Übersetzungen** trägst du die deutschen Namen und Inhalte ein. Ohne deutsche Fassung erscheint dann der englische Text mit dem Hinweis *Nur auf Englisch verfügbar*.
 
 ## Siehe auch
 

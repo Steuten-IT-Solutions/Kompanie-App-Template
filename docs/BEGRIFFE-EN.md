@@ -8,6 +8,7 @@ wie das deutsche „du“. Knöpfe im Imperativ („Save“, „Delete“), ohne
 
 | Deutsch | Englisch |
 | --- | --- |
+| Basissprache (der Kompanie) | base language |
 | Termine | Events |
 | News / Neuigkeiten | News |
 | Galerie | Gallery |

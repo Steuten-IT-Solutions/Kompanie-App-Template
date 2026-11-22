@@ -32,6 +32,10 @@ Keine Zugangsdaten in das Formular oder in das Repo der Kompanie schreiben.
    öffnen und **„Neue Kompanie“** wählen.
 2. Die Angaben aus Schritt 1 eintragen. Das Logo **in das Feld „Logo“ ziehen** (ein Link auf eine andere
    Webseite reicht nicht; der Workflow lädt nur Bilder, die GitHub als Anhang gespeichert hat).
+   **Basissprache** (Deutsch oder English): In ihr stehen Namen und Inhalte der Kompanie, jede weitere Sprache ist eine
+   Übersetzung davon. Sie lässt sich danach nicht mehr ändern (auch nicht mit „Kompanie ändern“); die übrigen Angaben im
+   Formular (Name, Begrüßung, Bezeichnungen) in dieser Sprache eintragen. Deutsch steht nicht in `kompanie.json`,
+   Englisch als `"language": "en"`. Englisch braucht einen Kern, der `language` kennt (ab dem nächsten stable-Release).
 3. Absenden.
 
 Auslösen kann das Formular nur, wer Schreibrecht auf das Kern-Repo hat (sowohl wer das Issue anlegt als auch wer

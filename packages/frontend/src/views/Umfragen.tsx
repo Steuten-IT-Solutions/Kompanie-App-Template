@@ -9,7 +9,7 @@ import { Caps, Empty, ErrorBox, Loading, useAsync } from '../ui';
 import { prefetchOnTap, sources } from '../viewData';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
-import { LANGUAGE_NAMES, UntranslatedNote } from '../language';
+import { baseLanguageLabel, LANGUAGE_NAMES, UntranslatedNote } from '../language';
 import type { Locale } from '../i18n';
 import { extraLocales, FieldTranslationsEditor, type FieldTranslations, type TranslatedField } from '../translationFields';
 
@@ -462,10 +462,8 @@ function PollForm({ poll, onSaved, onCancel }: { poll?: Poll; onSaved: (p: Poll,
         onChange={setTrFields}
         hint={(language) =>
           t(
-            'Wer die App auf {language} nutzt, sieht Frage, Beschreibung und Antwortmöglichkeiten in dieser Fassung. Was leer bleibt, erscheint auf Deutsch.',
-            {
-              language,
-            },
+            'Wer die App auf {language} nutzt, sieht Frage, Beschreibung und Antwortmöglichkeiten in dieser Fassung. Was leer bleibt, erscheint auf {base}.',
+            { language, base: baseLanguageLabel() },
           )
         }
         extra={(lang) =>

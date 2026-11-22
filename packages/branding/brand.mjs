@@ -137,7 +137,7 @@ export function loadConfig(file) {
   return {
     name,
     shortName: (data.shortName ?? name).trim(),
-    description: data.description ?? `Die App der ${name}`,
+    description: data.description ?? (data.language === 'en' ? `The app of ${name}` : `Die App der ${name}`),
     greeting: data.greeting ?? DEFAULTS.greeting,
     guestWelcome: data.guestWelcome ?? '',
     labels: {
@@ -150,6 +150,8 @@ export function loadConfig(file) {
     font: data.font ?? 'System',
     colors: data.colors,
     legal: data.legal ?? {},
+    // Basissprache der Kompanie (Plan „Basissprache“): In ihr stehen Name, Bezeichnungen und Inhalte; ohne Angabe Deutsch
+    language: data.language ?? 'de',
     // Weitere Sprachen (Plan „Mehrsprachigkeit“): Bezeichnungen und Texte je Sprache, übernimmt brand.ts beim Laden
     translations: data.translations ?? {},
   };

@@ -31,7 +31,7 @@ import { Caps, Empty, ErrorBox, lazyView, Loading } from '../ui';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
 import { t, type Locale } from '../i18n';
-import { enabledLocales, LANGUAGE_NAMES, UntranslatedNote } from '../language';
+import { baseLanguageLabel, enabledLocales, LANGUAGE_NAMES, UntranslatedNote } from '../language';
 
 const BlocksTranslator = lazyView(() => import('../blocks/BlocksTranslator'));
 
@@ -107,15 +107,13 @@ function TranslationsField(props: {
             <summary>
               {t('Auf {language} schreiben (freiwillig)', { language })}
               {missing > 0 && own.title !== '' && (
-                <span className="muted small"> · {t('{count} Texte nur auf Deutsch', { count: missing })}</span>
+                <span className="muted small"> · {t('{count} Texte nur auf {base}', { count: missing, base: baseLanguageLabel() })}</span>
               )}
             </summary>
             <p className="muted small">
               {t(
-                'Wer die App auf {language} nutzt, bekommt Nachricht, Benachrichtigung und E-Mail in dieser Fassung. Was leer bleibt, erscheint auf Deutsch.',
-                {
-                  language,
-                },
+                'Wer die App auf {language} nutzt, bekommt Nachricht, Benachrichtigung und E-Mail in dieser Fassung. Was leer bleibt, erscheint auf {base}.',
+                { language, base: baseLanguageLabel() },
               )}
             </p>
             <label className="field">
@@ -582,7 +580,7 @@ function History({ id }: { id: number }) {
       return (
         <>
           <span>
-            {language}: {tr.title || t('(Titel deutsch)')}
+            {language}: {tr.title || t('(Titel wie in der Basissprache)')}
           </span>
           {tr.text && <RichTextView html={tr.text} className="board-rev-content" />}
         </>

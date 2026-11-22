@@ -84,6 +84,8 @@ test('Sprache beim Start: Konto, Gerät, Browser, Deutsch – nur eingeschaltete
   );
   assert.equal(chooseLocale({ enabled, browser: ['fr'] }), 'de', 'sonst Deutsch');
   assert.equal(chooseLocale({}), 'de', 'ältere Server ohne languages');
+  assert.equal(chooseLocale({ base: 'en', enabled: ['en', 'de'], browser: ['fr'] }), 'en', 'sonst die Basissprache');
+  assert.equal(chooseLocale({ base: 'en', enabled: ['en'], account: 'de', browser: ['de-DE'] }), 'en', 'nur die Basissprache an');
 });
 
 test('Wahl am Gerät merken und lesen, ohne Speicher kein Fehler', () => {

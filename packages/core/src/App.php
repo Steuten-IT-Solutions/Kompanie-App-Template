@@ -193,6 +193,8 @@ final class App
     ) {
         // Vorschau „App als Rolle ansehen“ (Issue #63): Wer die Anfrage stellt und die Adressen geschützter Dateien gehen
         // über die Vorschau – so gilt sie überall gleich, ohne dass Dienste oder Adapter sie kennen müssen.
+        // Basissprache der Kompanie: Sprache der Inhalte und Vorgabe, bis die Anfrage ihre Sprache setzt (Http\Api)
+        I18n::setBase($config->language());
         $this->preview = new Preview($authContext, fn (): RoleService => $this->roles(), fn (): UserDirectory => $this->users);
         $this->authContext = $this->preview;
         $this->env = new PreviewEnvironment($env, $this->preview);

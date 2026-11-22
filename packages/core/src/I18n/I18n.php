@@ -7,9 +7,13 @@ namespace KompanieApp\Core\I18n;
 /**
  * Übersetzungen der Texte, die der Server zeigt oder verschickt (Meldungen, Mails, Push).
  *
- * Deutsch ist die Ausgangssprache: Der deutsche Text ist der Schlüssel und braucht keinen Katalog. Jede weitere Sprache
- * hat einen Katalog neben dieser Datei (<sprache>.json), gemeinsam mit der App (packages/frontend/src/i18n.ts). Fehlt
- * ein Eintrag, erscheint der deutsche Text. scripts/check-i18n.php sammelt alle Aufrufe; deshalb sind die Texte immer
+ * Im Code ist Deutsch die Ausgangssprache: Der deutsche Text ist der Schlüssel und braucht keinen Katalog. Jede weitere
+ * Sprache hat einen Katalog neben dieser Datei (<sprache>.json), gemeinsam mit der App (packages/frontend/src/i18n.ts).
+ * Fehlt ein Eintrag, erscheint der deutsche Text.
+ *
+ * Davon getrennt ist die Basissprache der Kompanie ({@see self::base()}, kompanie.json „language“): In ihr stehen die
+ * Inhalte und eigenen Namen; jede andere Sprache ist eine Übersetzung davon. Sie gilt auch, wenn niemand eine Sprache
+ * gewählt hat. scripts/check-i18n.php sammelt alle Aufrufe; deshalb sind die Texte immer
  * einfache Zeichenketten.
  *
  * Die Sprache gilt je Anfrage ({@see self::setLocale()}) oder beim Versand je Empfänger ({@see self::in()}).
@@ -17,11 +21,13 @@ namespace KompanieApp\Core\I18n;
 final class I18n
 {
     public const LOCALES = ['de', 'en'];
+    /** Sprache der Schlüssel in den Katalogen (der Texte im Code), nicht die Sprache der Inhalte ({@see self::base()}) */
     public const SOURCE_LOCALE = 'de';
     /** Header, mit dem die App ihre Sprache mitschickt */
     public const HEADER = 'X-Kompanie-Lang';
 
     private static string $locale = self::SOURCE_LOCALE;
+    private static string $base = self::SOURCE_LOCALE;
 
     /** @var array<string, array<string, string|array{one: string, other: string}>> */
     private static array $catalogs = [];
@@ -36,10 +42,23 @@ final class I18n
         return self::$locale;
     }
 
-    /** Setzt die Sprache; Unbekanntes wird Deutsch. */
+    /** Setzt die Sprache; Unbekanntes wird die Basissprache. */
     public static function setLocale(string $locale): void
     {
-        self::$locale = self::isLocale($locale) ? $locale : self::SOURCE_LOCALE;
+        self::$locale = self::isLocale($locale) ? $locale : self::$base;
+    }
+
+    /** Basissprache der Kompanie: Sprache der Inhalte und eigenen Namen, Vorgabe für alle ohne eigene Wahl. */
+    public static function base(): string
+    {
+        return self::$base;
+    }
+
+    /** Setzt die Basissprache (beim Start aus kompanie.json, App::__construct) und die Sprache auf sie. */
+    public static function setBase(string $locale): void
+    {
+        self::$base = self::isLocale($locale) ? $locale : self::SOURCE_LOCALE;
+        self::$locale = self::$base;
     }
 
     /**

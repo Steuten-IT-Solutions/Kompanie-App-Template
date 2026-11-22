@@ -33,14 +33,14 @@ final class ContentTranslations
      */
     public function locales(): array
     {
-        return array_values(array_diff($this->app->languages()->enabled(), [I18n::SOURCE_LOCALE]));
+        return array_values(array_diff($this->app->languages()->enabled(), [I18n::base()]));
     }
 
     /** Sprache der Anfrage, wenn sie eine weitere eingeschaltete ist; sonst null (dann gilt Deutsch). */
     public function current(): ?string
     {
         $locale = I18n::locale();
-        return $locale !== I18n::SOURCE_LOCALE && in_array($locale, $this->locales(), true) ? $locale : null;
+        return $locale !== I18n::base() && in_array($locale, $this->locales(), true) ? $locale : null;
     }
 
     /**
@@ -84,8 +84,8 @@ final class ContentTranslations
         }
         $out = [];
         foreach ($in as $locale => $fields) {
-            if (!is_string($locale) || !I18n::isLocale($locale) || $locale === I18n::SOURCE_LOCALE) {
-                throw ApiError::invalid(I18n::t('Übersetzungen gibt es nur für weitere Sprachen, nicht für Deutsch.'));
+            if (!is_string($locale) || !I18n::isLocale($locale) || $locale === I18n::base()) {
+                throw ApiError::invalid(I18n::t('Übersetzungen gibt es nur für weitere Sprachen, nicht für die Basissprache.'));
             }
             if (!in_array($locale, $this->locales(), true)) {
                 throw ApiError::invalid(I18n::t('Diese Sprache ist in der App nicht eingeschaltet.'));

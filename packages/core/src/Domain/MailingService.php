@@ -309,7 +309,7 @@ final class MailingService
             return '<img src="cid:' . $m[1] . '"' . $m[2] . '>';
         }, $body);
         $esc = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $document = '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>' . $esc($subject) . '</title></head>'
+        $document = '<!DOCTYPE html><html lang="' . I18n::base() . '"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>' . $esc($subject) . '</title></head>'
             . '<body style="margin: 0; padding: 16px; font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.5; color: #222222; background-color: #ffffff">'
             . $html
             . '</body></html>';
