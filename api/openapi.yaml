@@ -2372,6 +2372,44 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
+  /members/{id}/rank-history/{entry}/rank:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - { name: entry, in: path, required: true, schema: { type: integer }, description: ID des Eintrags im Verlauf }
+    put:
+      tags: [Verwaltung]
+      summary: Neuen Dienstgrad eines Eintrags im Dienstgrad-Verlauf nachträglich ändern
+      description: |
+        `kind` ergibt sich neu aus dem Dienstgrad davor (`from`); die Ersteinstufung bleibt eine und braucht einen
+        Dienstgrad. Nicht der Dienstgrad davor und nicht derselbe wie bisher. Mit Punkten muss eine Beförderung mit
+        `points_at_change` die heutige Schwelle des neuen Dienstgrads erreichen. Der Eintrag danach beginnt beim neuen
+        Dienstgrad (`from`, `kind` neu); ginge er auf denselben, 400. Beim neuesten Eintrag (wenn er den heutigen Dienstgrad
+        ergeben hat) ändert sich auch der aktuelle Dienstgrad, „seit“ bleibt; für Nicht-Mitglieder nur auf `null`.
+        Deaktivierte Dienstgrade sind erlaubt.
+      x-capability: manage_ranks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rank_id]
+              properties:
+                rank_id: { type: [integer, 'null'], description: null = kein Dienstgrad }
+      responses:
+        '200':
+          description: Neuer Stand und Verlauf
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rank: { $ref: '#/components/schemas/RankStatus' }
+                  history: { type: array, items: { $ref: '#/components/schemas/RankHistoryEntry' } }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
   /promotions:
     get:
       tags: [Verwaltung]

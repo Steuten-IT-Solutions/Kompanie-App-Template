@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { api, config, type RankHistoryEntry } from '../api';
+import { api, config, type Rank, type RankHistoryEntry } from '../api';
 import brand from '../generated/brand';
 import { formatDate, formatUtcDate, todayYmd } from '../format';
 import { confirmAsk } from '../ask';
@@ -106,31 +106,38 @@ function localYmd(utc: string): string {
 }
 
 /**
- * Verlauf des Dienstgrads. Mit edit (Dienstgrade verwalten) lässt sich das Datum eines Eintrags nachträglich ändern
- * (der Server prüft Zukunft, Reihenfolge und Schwelle) und ein Eintrag nach Rückfrage löschen: Beim neuesten gilt dann
- * wieder der Dienstgrad davor.
+ * Verlauf des Dienstgrads. Mit edit (Dienstgrade verwalten) lassen sich der neue Dienstgrad und das Datum eines Eintrags
+ * nachträglich ändern (der Server prüft Zukunft, Reihenfolge und Schwelle) und ein Eintrag nach Rückfrage löschen: Beim
+ * neuesten gilt dann wieder der Dienstgrad davor.
  */
 export function RankHistory({
   entries,
   edit,
 }: {
   entries: RankHistoryEntry[];
-  edit?: { memberId: number; onChanged: () => void; onToast: (msg: string) => void };
+  edit?: { memberId: number; ranks: Rank[]; onChanged: () => void; onToast: (msg: string) => void };
 }) {
   const [editing, setEditing] = useState<number | null>(null);
   const [date, setDate] = useState('');
+  const [target, setTarget] = useState('');
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   if (entries.length === 0) return <Empty>{t('Noch keine Einträge.')}</Empty>;
 
-  async function save(e: FormEvent, entryId: number) {
+  const rankValue = (id: number | null) => (id === null ? 'none' : String(id));
+
+  async function save(e: FormEvent, h: RankHistoryEntry) {
     e.preventDefault();
-    if (!edit) return;
+    if (!edit || h.id === undefined) return;
     setBusy(true);
     setFormError(null);
     try {
-      await api.setRankHistoryDate(edit.memberId, entryId, date);
-      edit.onToast(t('Datum geändert'));
+      // Erst der Dienstgrad, dann das Datum: Die Schwelle prüft der Server mit dem neuen Dienstgrad.
+      if (target !== rankValue(h.to_rank_id ?? null)) {
+        await api.setRankHistoryRank(edit.memberId, h.id, target === 'none' ? null : Number(target));
+      }
+      if (date !== localYmd(h.changed_at)) await api.setRankHistoryDate(edit.memberId, h.id, date);
+      edit.onToast(t('Eintrag geändert'));
       setEditing(null);
       edit.onChanged();
     } catch (err) {
@@ -180,7 +187,20 @@ export function RankHistory({
               {h.reason && ` · ${h.reason}`}
             </div>
             {edit && h.id !== undefined && editing === h.id && (
-              <form className="form rank-history-date" onSubmit={(e) => save(e, h.id!)}>
+              <form className="form rank-history-date" onSubmit={(e) => save(e, h)}>
+                <label className="field">
+                  <span>{t('Neuer {rank}', { rank })}</span>
+                  <select value={target} onChange={(e) => setTarget(e.target.value)} required>
+                    {edit.ranks
+                      .filter((r) => (r.active || r.id === h.to_rank_id) && (h.kind === 'initial' || r.id !== h.from_rank_id))
+                      .map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {rankName(r.id, r.title)}
+                        </option>
+                      ))}
+                    {h.kind !== 'initial' && h.from_rank_id !== null && <option value="none">{t('Kein {rank}', { rank })}</option>}
+                  </select>
+                </label>
                 <label className="field">
                   <span>{t('Neues Datum')}</span>
                   <input type="date" max={todayYmd()} value={date} onChange={(e) => setDate(e.target.value)} required />
@@ -190,8 +210,8 @@ export function RankHistory({
                     {formError}
                   </p>
                 )}
-                <button className="btn btn-block" type="submit" disabled={busy || date === ''}>
-                  {t('Datum speichern')}
+                <button className="btn btn-block" type="submit" disabled={busy || date === '' || target === ''}>
+                  {t('Speichern')}
                 </button>
                 <button type="button" className="btn btn-secondary btn-block" disabled={busy} onClick={() => setEditing(null)}>
                   {t('Abbrechen')}
@@ -202,10 +222,11 @@ export function RankHistory({
               <div className="row-actions icon-row">
                 <IconButton
                   icon="edit"
-                  label={t('Datum ändern')}
+                  label={t('Eintrag ändern')}
                   disabled={busy}
                   onClick={() => {
                     setDate(localYmd(h.changed_at));
+                    setTarget(rankValue(h.to_rank_id ?? null));
                     setFormError(null);
                     setEditing(h.id!);
                   }}

@@ -591,7 +591,7 @@ export function MemberRank({
           )}
         </form>
       )}
-      <RankHistory entries={history} edit={readOnly ? undefined : { memberId: id, onChanged, onToast }} />
+      <RankHistory entries={history} edit={readOnly ? undefined : { memberId: id, ranks: list, onChanged, onToast }} />
     </section>
   );
 }

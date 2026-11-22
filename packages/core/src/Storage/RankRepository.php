@@ -130,6 +130,29 @@ final class RankRepository
         });
     }
 
+    /**
+     * Neuen Dienstgrad eines Eintrags ändern; mit $next auch den Anfang des Eintrags danach, mit $current den aktuellen
+     * Dienstgrad (null = keiner, „seit“ = $current['since']).
+     *
+     * @param array{id: int, from_rank_id: int|null, from_title: string, kind: string}|null $next
+     * @param array{rank_id: int|null, since: string}|null $current
+     */
+    public function changeEntryRank(int $userId, int $entryId, ?int $toId, string $toTitle, string $kind, ?array $next, ?array $current): void
+    {
+        $this->db->transaction(function () use ($userId, $entryId, $toId, $toTitle, $kind, $next, $current): void {
+            $this->db->execute('UPDATE {rank_history} SET to_rank_id = ?, to_title = ?, kind = ? WHERE id = ? AND user_id = ?', [$toId, $toTitle, $kind, $entryId, $userId]);
+            if ($next !== null) {
+                $this->db->execute('UPDATE {rank_history} SET from_rank_id = ?, from_title = ?, kind = ? WHERE id = ? AND user_id = ?', [$next['from_rank_id'], $next['from_title'], $next['kind'], $next['id'], $userId]);
+            }
+            if ($current !== null) {
+                $this->db->execute('DELETE FROM {member_ranks} WHERE user_id = ?', [$userId]);
+                if ($current['rank_id'] !== null) {
+                    $this->db->insert('member_ranks', ['user_id' => $userId, 'rank_id' => $current['rank_id'], 'assigned_at' => $current['since']]);
+                }
+            }
+        });
+    }
+
     /** Zeitpunkt (UTC) des letzten Wechsels einer Person, null ohne Verlauf. */
     public function lastChange(int $userId): ?string
     {
