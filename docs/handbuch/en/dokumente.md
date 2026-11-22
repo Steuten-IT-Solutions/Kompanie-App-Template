@@ -6,7 +6,7 @@ Under **{bereich.documents}** you find files of {kompanie.name} such as statutes
 ![The list of {bereich.documents}, sorted by category](bild:dokumente)
 
 ## How to open this page
-Tap **Members’ area** at the bottom and then **{bereich.documents}**; **‹ Members’ area** takes you back. If your role doesn’t have the **Members’ area** permission, tap **{bereich.documents}** at the bottom directly.
+Tap **Internal** at the bottom and then **{bereich.documents}**; **‹ Internal** takes you back. If your role doesn’t have the **Internal** permission, tap **{bereich.documents}** at the bottom directly.
 
 ## What you see here
 - **Sorting**: sets the order of the {bereich.documents} within a category.

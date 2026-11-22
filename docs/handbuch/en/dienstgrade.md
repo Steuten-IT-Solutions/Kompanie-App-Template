@@ -6,7 +6,7 @@ Here you see all {bereich.ranks} of {kompanie.name} in order, with their badges.
 ![The list of all {bereich.ranks} with badges and thresholds](bild:dienstgrade)
 
 ## How to open this page
-Tap **Members’ area** at the bottom and then the **{bereich.ranks}** button. **‹ Members’ area** takes you back.
+Tap **Internal** at the bottom and then the **{bereich.ranks}** button. **‹ Internal** takes you back.
 
 ## What you see here
 - All {bereich.ranks} from lowest to highest, each with a badge if the people responsible have added one.

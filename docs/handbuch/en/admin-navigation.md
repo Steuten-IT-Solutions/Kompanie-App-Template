@@ -1,7 +1,7 @@
 ---
 titel: Navigation
 ---
-Here you decide which sections are in the bar at the bottom, in which order, and which sections you group in a **submenu**. You also give sections your own names and icons, choose the app’s start page and arrange the buttons of the [Admin](seite:verwaltung) area. A submenu is an item in the bar behind which there are buttons for several sections, as with **Members’ area**.
+Here you decide which sections are in the bar at the bottom, in which order, and which sections you group in a **submenu**. You also give sections your own names and icons, choose the app’s start page and arrange the buttons of the [Admin](seite:verwaltung) area. A submenu is an item in the bar behind which there are buttons for several sections, as with **Internal**.
 
 ## How to open this page
 Tap **Admin** at the bottom, then **Settings** and **Navigation**.
@@ -12,7 +12,7 @@ Tap **Admin** at the bottom, then **Settings** and **Navigation**.
 - **In the bottom bar**: the main items in their order, as many as you like. The more there are at the bottom, the smaller the text and icons get; from eight items (with **Admin** and **My area**) the page points out that it gets tight on narrow phones. **Admin** and **My area** are always on the far right and can’t be moved, so that nobody locks themselves out.
 - For each section and each custom page: **Rename** with your own name and an icon.
 - A **submenu** has a name, an icon and its sections.
-- In the standard navigation: **Submenu of the standard navigation** with **Rename** for **Members’ area**.
+- In the standard navigation: **Submenu of the standard navigation** with **Rename** for **Internal**.
 - **Start page**: what appears when the app opens, separately **For guests** and **Signed in**.
 - **Appearance**: **Show names under the icons**.
 - **Admin**: the buttons of the **Admin start page** and under **Setup** in their order, the same for everyone. Only buttons of sections you use are listed. **You don’t see this yourself** means: you lack the permission for it, but others see the button.
@@ -28,7 +28,7 @@ The navigation only changes where something is, not who may see it. Each person 
 1. Drag an item by the handle (six dots on the left) to its new place. With the keyboard, use the arrow keys on the handle. This is also how you arrange the sections in a submenu: they appear there as buttons in this order.
 2. Tap **Save navigation**.
 
-If you only rearrange the sections in the **Members’ area** submenu of the standard navigation, the standard navigation stays. Only when you change something else (e.g. move an item or rename the submenu) does it become your own navigation.
+If you only rearrange the sections in the **Internal** submenu of the standard navigation, the standard navigation stays. Only when you change something else (e.g. move an item or rename the submenu) does it become your own navigation.
 
 ### A separate bar for guests
 Guests are everyone who opens the app without logging in, and logged-in users with the base role {rolle.guest}, e.g. former members. Without a separate bar they see the same bar as signed-in users, each only with the sections they may see.
@@ -61,7 +61,7 @@ The default applies to every person who hasn’t arranged the page themselves, i
 
 A submenu needs at least one section. **Remove submenu** moves its sections to **Not in the navigation**; then give them a new place.
 
-You enter the English name of a submenu (if your app has English switched on) under [Languages](seite:admin-sprachen) in the **Translations** section under **Submenus**. If you rename a submenu here, enter the English name again afterwards. **Members’ area** of the standard navigation is listed there under **Navigation sections**.
+You enter the English name of a submenu (if your app has English switched on) under [Languages](seite:admin-sprachen) in the **Translations** section under **Submenus**. If you rename a submenu here, enter the English name again afterwards. **Internal** of the standard navigation is listed there under **Navigation sections**.
 
 ### Rename a section or choose a different icon
 1. Tap **Rename** on the section.
@@ -72,7 +72,7 @@ The custom name applies everywhere in the app: in the bar at the bottom, in the 
 
 If your app has English switched on besides German, you enter the English names of the sections under [Languages](seite:admin-sprachen) in the **Translations** section.
 
-This way you can also rename **Members’ area** of the standard navigation without creating your own navigation: as long as you don’t change the order in the bar at the bottom, the standard navigation stays.
+This way you can also rename **Internal** of the standard navigation without creating your own navigation: as long as you don’t change the order in the bar at the bottom, the standard navigation stays.
 
 ### Choose the start page
 1. Under **Start page**, choose one item each for **For guests** and **Signed in**. You can choose what is in the respective bar, including submenus; for signed-in users also **My area**.
@@ -84,4 +84,4 @@ Anyone who may not see the chosen start page lands on the first item in the bar 
 Under **Appearance**, switch off **Show names under the icons** and tap **Save navigation**. Only the icons are then shown at the bottom, which helps with many items. The names are still shown at the top of every page.
 
 ### Back to the standard navigation
-Tap **Restore standard navigation** and confirm the question. This resets the navigation: order and submenus (including those in **Members’ area** and the bar for guests), custom names and icons, the start pages and the names under the icons. The order of the admin area stays; for that there is **Default order for Admin**. In the standard navigation, {bereich.events}, {bereich.news} and {bereich.gallery} are at the bottom, followed by {bereich.companies}, {bereich.sponsors} and each custom page, as far as they are on. Anyone with the **Members’ area** permission sees at most five items at the bottom; what doesn’t fit is at the front under **Members’ area**. Anyone with the **Members’ area** permission finds {bereich.directory}, {bereich.documents}, {bereich.board}, {bereich.ranks} and {bereich.catalog} under **Members’ area**; everyone else sees {bereich.directory} and {bereich.documents} as separate items. With your own navigation, the **Members’ area** permission no longer plays a role for the bar; if guests should find the sections differently, give them a separate bar.
+Tap **Restore standard navigation** and confirm the question. This resets the navigation: order and submenus (including those in **Internal** and the bar for guests), custom names and icons, the start pages and the names under the icons. The order of the admin area stays; for that there is **Default order for Admin**. In the standard navigation, {bereich.events}, {bereich.news} and {bereich.gallery} are at the bottom, followed by {bereich.companies}, {bereich.sponsors} and each custom page, as far as they are on. Anyone with the **Internal** permission sees at most five items at the bottom; what doesn’t fit is at the front under **Internal**. Anyone with the **Internal** permission finds {bereich.directory}, {bereich.documents}, {bereich.board}, {bereich.ranks} and {bereich.catalog} under **Internal**; everyone else sees {bereich.directory} and {bereich.documents} as separate items. With your own navigation, the **Internal** permission no longer plays a role for the bar; if guests should find the sections differently, give them a separate bar.

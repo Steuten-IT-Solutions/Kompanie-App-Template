@@ -6,7 +6,7 @@ The {bereich.catalog} shows what you get how many {bereich.points} for at {kompa
 ![The {bereich.catalog} with occasions and points](bild:punktekatalog-ansehen)
 
 ## How to open this page
-Tap **Members’ area** at the bottom and then the **{bereich.catalog}** button. **‹ Members’ area** takes you back.
+Tap **Internal** at the bottom and then the **{bereich.catalog}** button. **‹ Internal** takes you back.
 
 ## What you see here
 - All entries of the catalogue in the order the people responsible have chosen, each with its name and the points on the right (e.g. “+4”, or “-2” for deductions).

@@ -1,7 +1,7 @@
 ---
 titel: Arrange tiles
 ---
-On pages with buttons (tiles), you decide yourself where each tile sits and how wide it is: in **Admin**, under **Setup**, in every [submenu](seite:untermenue) such as **Members’ area**, and in **Settings**. The arrangement only applies to you; everyone else keeps seeing their own or the default.
+On pages with buttons (tiles), you decide yourself where each tile sits and how wide it is: in **Admin**, under **Setup**, in every [submenu](seite:untermenue) such as **Internal**, and in **Settings**. The arrangement only applies to you; everyone else keeps seeing their own or the default.
 
 ## How to open this page
 Open one of these pages and tap the **Arrange tiles** icon (a grid with one wide tile) at the bottom right below the tiles.

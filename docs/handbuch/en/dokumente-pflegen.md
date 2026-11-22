@@ -6,7 +6,7 @@ On this page you provide {bereich.documents} for the {rolle.member} accounts: yo
 ![The Manage {bereich.documents} page with the Upload document form](bild:dokumente-pflegen)
 
 ## How to open this page
-Tap **Members’ area** at the bottom, then **{bereich.documents}** and **Manage {bereich.documents}** at the top. Only those who may maintain {bereich.documents} see the button (e.g. with the role “Manage {bereich.documents}”).
+Tap **Internal** at the bottom, then **{bereich.documents}** and **Manage {bereich.documents}** at the top. Only those who may maintain {bereich.documents} see the button (e.g. with the role “Manage {bereich.documents}”).
 
 ## What you see here
 - **‹ All {bereich.documents}**: back to the list as the {rolle.member} accounts see it.

@@ -4,7 +4,7 @@ titel: "{bereich.companies}"
 This page shows the **{bereich.companies}** with their logos, in the order {kompanie.name} has chosen. The page is open to everyone, even without logging in.
 
 ## How to open this page
-Tap **{bereich.companies}** at the bottom. If the item isn’t in the bar, you’ll find it under **Members’ area** or in another submenu of the navigation.
+Tap **{bereich.companies}** at the bottom. If the item isn’t in the bar, you’ll find it under **Internal** or in another submenu of the navigation.
 
 ## What you see here
 - One card per company with its **logo**, **name** and below that its short name, year of foundation and number of members (as far as they have been entered). Without a logo, the short name appears instead.

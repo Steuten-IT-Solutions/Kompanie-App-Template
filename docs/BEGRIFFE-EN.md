@@ -28,7 +28,7 @@ wie das deutsche „du“. Knöpfe im Imperativ („Save“, „Delete“), ohne
 | Sponsoren | Sponsors |
 | Kompanien | Companies |
 | Seiten | Pages |
-| Intern | Members' area |
+| Intern | Internal |
 | Verwaltung | Admin |
 | Einstellungen | Settings |
 | Meins | My area |

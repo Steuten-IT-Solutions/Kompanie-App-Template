@@ -21,7 +21,7 @@ Which areas are at the bottom depends on which ones {kompanie.name} uses and whe
 - **{bereich.events}**, **{bereich.news}** and **{bereich.gallery}**: for everyone, even without logging in.
 - **{bereich.directory}**: for everyone, if {kompanie.name} uses the list. If it only uses the {bereich.offices}, the button is called **{bereich.offices}**.
 - **{bereich.documents}**: only for logged-in {rolle.member} accounts.
-- **Members’ area**: for {rolle.member} accounts (and anyone with the **Members’ area** permission), {bereich.directory} and {bereich.documents} aren’t at the bottom individually but together under **Members’ area**. {rolle.member} accounts also find the {bereich.board}, the {bereich.ranks} and the {bereich.catalog} there, if {kompanie.name} uses them.
+- **Internal**: for {rolle.member} accounts (and anyone with the **Internal** permission), {bereich.directory} and {bereich.documents} aren’t at the bottom individually but together under **Internal**. {rolle.member} accounts also find the {bereich.board}, the {bereich.ranks} and the {bereich.catalog} there, if {kompanie.name} uses them.
 - **Admin**: only if you have a task in administration, e.g. awarding {bereich.points}.
 - **My area** (far right): your own details and your account, once you are logged in.
 

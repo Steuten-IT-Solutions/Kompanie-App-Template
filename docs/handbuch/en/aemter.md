@@ -6,7 +6,7 @@ Under **{bereich.offices}** you see who currently holds which office and who hel
 ![{bereich.offices} by group](bild:aemter)
 
 ## How to open this page
-Tap **Members’ area** in the bar at the bottom, then **{bereich.directory}** and at the top **{bereich.offices}**. Without logging in there is no **Members’ area**; then tap **{bereich.directory}** at the bottom straight away. If the company doesn’t use a member list, the button is called **{bereich.offices}** directly.
+Tap **Internal** in the bar at the bottom, then **{bereich.directory}** and at the top **{bereich.offices}**. Without logging in there is no **Internal**; then tap **{bereich.directory}** at the bottom straight away. If the company doesn’t use a member list, the button is called **{bereich.offices}** directly.
 
 ## What you see here
 - **Expand all** (or **Collapse all**): opens or closes all cards at once, including the joint terms of office.
