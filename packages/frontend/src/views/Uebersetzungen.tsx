@@ -131,38 +131,40 @@ function Editor({
         <input type="checkbox" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} />
         <span>{t('Nur fehlende zeigen')}</span>
       </label>
-      {data.groups.map((g) => {
-        const shown = g.items.filter((i) => matches(i, query, value(i)) && (!onlyMissing || isMissing(i, value(i)) || keyOf(i) in edits));
-        const done = g.items.filter((i) => !isMissing(i, value(i))).length;
-        const title = GROUP_TITLES[g.kind]();
-        // Mit Suche oder „Nur fehlende“ alle Abschnitte offen; sonst zu, bis man einen öffnet
-        const forced = query.trim() !== '' || onlyMissing;
-        return (
-          <details key={`${g.kind}-${forced}`} className="translation-group" open={forced}>
-            <summary>
-              <span className="row-title">{title}</span>{' '}
-              <span className="muted small">{t('{done} von {total}', { done, total: g.items.length })}</span>
-            </summary>
-            {g.items.length === 0 && <p className="small muted">{t('Noch keine Einträge.')}</p>}
-            {g.items.length > 0 && shown.length === 0 && <p className="small muted">{t('Nichts gefunden.')}</p>}
-            {shown.map((i) => (
-              <label key={keyOf(i)} className="field translation-row">
-                <span lang={data.source_locale}>{i.source}</span>
-                <input
-                  type="text"
-                  lang={lang}
-                  maxLength={i.max}
-                  value={value(i)}
-                  placeholder={i.fallback}
-                  aria-label={t('{name} auf {language}', { name: i.source, language })}
-                  disabled={busy}
-                  onChange={(e) => setEdits((x) => ({ ...x, [keyOf(i)]: e.target.value }))}
-                />
-              </label>
-            ))}
-          </details>
-        );
-      })}
+      {/* Arten ohne Einträge (z. B. noch keine Terminarten) fallen weg */}
+      {data.groups
+        .filter((g) => g.items.length > 0)
+        .map((g) => {
+          const shown = g.items.filter((i) => matches(i, query, value(i)) && (!onlyMissing || isMissing(i, value(i)) || keyOf(i) in edits));
+          const done = g.items.filter((i) => !isMissing(i, value(i))).length;
+          const title = GROUP_TITLES[g.kind]();
+          // Mit Suche oder „Nur fehlende“ alle Abschnitte offen; sonst zu, bis man einen öffnet
+          const forced = query.trim() !== '' || onlyMissing;
+          return (
+            <details key={`${g.kind}-${forced}`} className="translation-group" open={forced}>
+              <summary>
+                <span className="row-title">{title}</span>{' '}
+                <span className="muted small">{t('{done} von {total}', { done, total: g.items.length })}</span>
+              </summary>
+              {shown.length === 0 && <p className="small muted">{query.trim() === '' ? t('Alles übersetzt.') : t('Nichts gefunden.')}</p>}
+              {shown.map((i) => (
+                <label key={keyOf(i)} className="field translation-row">
+                  <span lang={data.source_locale}>{i.source}</span>
+                  <input
+                    type="text"
+                    lang={lang}
+                    maxLength={i.max}
+                    value={value(i)}
+                    placeholder={i.fallback}
+                    aria-label={t('{name} auf {language}', { name: i.source, language })}
+                    disabled={busy}
+                    onChange={(e) => setEdits((x) => ({ ...x, [keyOf(i)]: e.target.value }))}
+                  />
+                </label>
+              ))}
+            </details>
+          );
+        })}
       {error && (
         <p className="form-error" role="alert">
           {error}
