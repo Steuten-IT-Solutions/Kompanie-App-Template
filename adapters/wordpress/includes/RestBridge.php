@@ -40,6 +40,22 @@ final class RestBridge
         }
     }
 
+    /**
+     * Header Authorization (Zugang für KI-Assistenten, Bearer-Token). Apache mit CGI/FPM reicht ihn oft nur weiter, wenn
+     * die .htaccess ihn als Umgebungsvariable setzt (die Standardregeln von WordPress tun das); dann heißt er nach der
+     * internen Weiterleitung REDIRECT_HTTP_AUTHORIZATION.
+     */
+    private static function authorization(\WP_REST_Request $wp): ?string
+    {
+        $value = $wp->get_header('authorization');
+        foreach (['HTTP_AUTHORIZATION', 'REDIRECT_HTTP_AUTHORIZATION'] as $key) {
+            if (!is_string($value) || $value === '') {
+                $value = isset($_SERVER[$key]) && is_string($_SERVER[$key]) ? $_SERVER[$key] : null;
+            }
+        }
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
     /** '/events/{id}' → '/events/(?P<id>\d+)' */
     public static function wpPattern(string $path): string
     {
@@ -64,7 +80,7 @@ final class RestBridge
         $preview = $wp->get_header('X-Kompanie-Preview');
         // Sprache der App (Plan „Mehrsprachigkeit“); ob sie gilt, entscheidet der Kern.
         $locale = $wp->get_header(I18n::HEADER);
-        $request = new Request($wp->get_method(), $route->path, $wp->get_query_params(), is_array($body) ? $body : [], $params, $client, is_string($preview) ? $preview : null, is_string($locale) ? $locale : null);
+        $request = new Request($wp->get_method(), $route->path, $wp->get_query_params(), is_array($body) ? $body : [], $params, $client, is_string($preview) ? $preview : null, is_string($locale) ? $locale : null, Request::bearerFrom(self::authorization($wp)));
         $res = $app->api()->dispatch($route, $request);
         $out = new \WP_REST_Response($res->data, $res->status);
         foreach ($res->headers as $name => $value) {

@@ -164,6 +164,12 @@ final class UserData
             $ok = false; // Tabelle fehlt (ältere Version oder Seite ohne die App)
         }
         try {
+            // Zugänge für KI-Assistenten (AccessTokenService): nur Hashes, nicht in der Auskunft, aber mit dem Konto weg
+            $db->execute('DELETE FROM {access_tokens} WHERE user_id = ?', [$userId]);
+        } catch (\RuntimeException) {
+            // Tabelle fehlt (ältere Version auf einer anderen Seite des Netzwerks): dort gibt es auch keine Zugänge
+        }
+        try {
             if (!$keepChronicle) {
                 $db->execute('UPDATE {office_holders} SET user_id = NULL WHERE user_id = ?', [$userId]);
                 $db->execute('UPDATE {office_terms} SET ended_for = NULL WHERE ended_for = ?', [$userId]);

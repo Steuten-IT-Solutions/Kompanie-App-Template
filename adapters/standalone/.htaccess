@@ -6,6 +6,8 @@ DirectoryIndex index.php
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
+  # Header Authorization an PHP weiterreichen (Zugang für KI-Assistenten); CGI/FPM verschluckt ihn sonst.
+  RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
   # Programmcode und Daten sind nie direkt abrufbar.
   RewriteRule ^(data|src|core|bin)(/|$) - [F,L]
   RewriteRule ^(autoload\.php|data-dir\.php|VERSION|update\.json)$ - [F,L]

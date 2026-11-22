@@ -26,6 +26,8 @@ final class Route
      * @param string|Capability|Capability[] $access PUBLIC, LOGIN, ein nötiges Recht oder eines von mehreren
      * @param string|null $feature Bereich (Domain\Features); ist er aus, antwortet die Route mit 403 feature_disabled
      * @param (callable(): string)|null $denyMessage Meldung bei fehlendem Recht, z. B. fn () => I18n::t('…')
+     * @param bool $token auch mit einem Zugriffstoken für KI-Assistenten erreichbar (Domain\AccessTokenService); sonst
+     *                    lehnt Http\Api Anfragen mit Token ab
      */
     public function __construct(
         public readonly string $method,
@@ -34,6 +36,7 @@ final class Route
         callable $handler,
         public readonly ?string $feature = null,
         ?callable $denyMessage = null,
+        public readonly bool $token = false,
     ) {
         $this->handler = \Closure::fromCallable($handler);
         $this->deny = $denyMessage !== null ? \Closure::fromCallable($denyMessage) : null;

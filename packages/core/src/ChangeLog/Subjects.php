@@ -38,6 +38,8 @@ final class Subjects
         'POST /me/push/test', 'POST /push/test',
         // Persönliche Anordnung der Kacheln: eine Vorliebe der Person, keine Daten des Vereins
         'PUT /me/tiles', 'DELETE /me/tiles', 'PUT /me/locale',
+        // Eigenen Zugang für KI-Assistenten widerrufen (wie ein Gerät abmelden); das Widerrufen durch Admins wird erfasst
+        'DELETE /me/ai-access/{id}',
         // Abstimmen in Umfragen (absichtlich nicht, auch nicht bei offenen Umfragen)
         'PUT /polls/{id}/vote', 'DELETE /polls/{id}/vote',
         // Eigene Zu- und Absage bei einem Termin (wie Abstimmen; was die Verwaltung für andere einträgt, wird erfasst)
@@ -251,6 +253,8 @@ final class Subjects
             'PUT /admin/backup/encryption' => $this->event('Einstellungen', 'Verschlüsselung der Sicherung', 'update'),
             'DELETE /admin/backup/encryption' => $this->event('Einstellungen', 'Verschlüsselung der Sicherung', 'delete'),
             'PUT /admin/former/retention' => $this->settings('Aufbewahrungsfrist für Ehemalige', '/admin/former/retention'),
+            'PUT /admin/ai-access' => $this->value('Einstellungen', 'Zugang für KI-Assistenten', fn (): bool => $this->app->accessTokens()->enabled()),
+            'DELETE /admin/ai-access/{id}' => $this->event('Einstellungen', static fn (Request $r): string => 'Zugang für KI-Assistenten ' . $r->id() . ' widerrufen', 'delete'),
             'PATCH /passive-members/settings' => $this->settings('Einstellungen der Passiven', '/passive-members/settings'),
             'PUT /admin/activity/settings' => $this->value('Nutzung', 'Erfassung je Person', fn (): bool => $this->app->activity()->personal()),
             'PUT /admin/changes/settings' => $this->values('Änderungsprotokoll', fn (): array => [

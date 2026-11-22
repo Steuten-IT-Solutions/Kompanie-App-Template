@@ -38,6 +38,8 @@ use KompanieApp\Core\Storage\Sql\Schema;
  * Adressen (mailing_recipients) nicht.
  * Ebenso wenig die Nutzungsauswertung (activity*, Issue #175): Einträge je Person werden nach 90 Tagen gelöscht und sollen
  * nicht in Sicherungen weiterleben.
+ * Auch nicht die Zugänge für KI-Assistenten (access_tokens): Sie gehören zu dieser Installation und werden nach einem
+ * Wiederherstellen neu freigegeben.
  */
 final class Backup
 {
@@ -78,6 +80,8 @@ final class Backup
         'push_responses_date', 'push_responses_offered',
         // Protokoll der Benachrichtigungen (PushService::LOG_SETTING): Stand dieser Installation.
         'push_log',
+        // Zugang für KI-Assistenten (AccessTokenService::SETTING): Eine Sicherung soll ihn nicht ungesehen einschalten.
+        'ai_access',
     ];
     /** Tabellen des Kerns, in einer Reihenfolge, die beim Einfügen passt. */
     public const CORE_TABLES = ['point_catalog', 'points', 'penalties', 'events', 'albums', 'photos', 'ranks', 'member_ranks', 'rank_history', 'titles', 'member_titles', 'member_roles', 'attendance_lists', 'attendance_entries', 'doc_categories', 'documents', 'board_messages', 'board_message_revisions', 'rich_images', 'user_signatures', 'user_settings', 'polls', 'poll_options', 'poll_votes', 'poll_answers', 'birthdays', 'join_years', 'inventory_items', 'inventory_log', 'member_photos', 'member_contacts', 'office_groups', 'offices', 'office_terms', 'office_holders', 'office_group_terms', 'former_members', 'lists', 'list_columns', 'list_rows', 'mailings', 'attachments', 'sponsors', 'companies', 'member_companies', 'gallery_submissions', 'app_pages', 'app_news', 'push_subscriptions', 'internal_events', 'event_responses', 'passive_members', 'passive_payments', 'event_kinds', 'candidate_since', 'translations'];

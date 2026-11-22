@@ -148,6 +148,18 @@ try {
     $raw = $d->send('POST', $base . 'index.php?r=/api/v1/auth/login', [], (string) json_encode(['username' => 'anna', 'password' => 'anna-passwort']));
     $c->ok($raw[0] === 415, 'Anmeldung ohne Content-Type → 415');
 
+    $c->section('Zugang für KI-Assistenten (Bearer-Token)');
+    $kernel->app()->accessTokens()->setEnabled(true);
+    $grant = $kernel->app()->accessTokens()->issue($anna, 'Test', 'write');
+    $bearer = ['Authorization' => 'Bearer ' . $grant['access_token']];
+    $me = $as(null, 'GET', 'me', null, $bearer);
+    $c->ok($me[0] === 200 && $me[1]['name'] === 'Anna Admin', 'Token im Header Authorization gilt für /me ohne Cookie');
+    $c->ok($as(null, 'GET', 'events', null, $bearer)[1]['code'] === 'token_not_allowed', 'Routen ohne Freigabe für Tokens → 403');
+    $bad = $as(null, 'GET', 'me', null, ['Authorization' => 'Bearer kat_falsch']);
+    $c->ok($bad[0] === 401 && $bad[1]['code'] === 'invalid_token' && str_contains($bad[2]['www-authenticate'] ?? '', 'invalid_token'), 'Falsches Token → 401 mit WWW-Authenticate');
+    $kernel->app()->accessTokens()->setEnabled(false);
+    $c->ok($as(null, 'GET', 'me', null, $bearer)[0] === 401, 'Schalter aus → Token gilt nicht');
+
     $c->section('Begrenzung fehlgeschlagener Anmeldungen');
     $fails = [];
     for ($i = 0; $i < 5; $i++) {

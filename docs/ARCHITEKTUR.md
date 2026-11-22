@@ -258,6 +258,13 @@ Unabhängig vom Adapter kann der Admin als Quelle „In der App schreiben“ wä
 - Hintergrundaufgaben pausieren außer Updates und Statusmeldungen (`MaintenanceService::runsDuringMaintenance`); die Push-Warteschlange wird beim Beenden gleich verschickt. Die Statusmeldung enthält `maintenance: true/false`, nie die Begründung.
 - Die App zeigt Nicht-Admins die Wartungsseite (auch wenn eine Anfrage 503 `maintenance` bekommt), Admins ein rotes Banner mit „Beenden“. Der Service Worker speichert nur erfolgreiche Antworten; offline gespeicherte Daten bleiben erhalten. Die Shortcodes der Webseite zeigen weiter an (Entscheidung im Issue).
 
+### Zugang für KI-Assistenten (Plan „MCP-Server“, Schritt 1)
+
+- Ziel: Ein KI-Assistent (z. B. Claude über einen MCP-Server in der App, späterer Schritt) handelt als eine Person mit deren Rechten. Schritt 1 legt nur die Anmeldung per Token an; ausgestellt werden Zugänge später über OAuth.
+- Tabelle `access_tokens` (Migration 76): je Zugang Person, Programm (`client`), Umfang `read`/`write`, SHA-256-Hashes von Zugriffstoken (`kat_…`, 1 Stunde) und Token zum Erneuern (`kar_…`, 30 Tage ab dem letzten Erneuern, dabei neues Paar), zuletzt benutzt. Nicht in Sicherungen und nicht in der Auskunft; `UserData::purge` löscht die Zugänge mit dem Konto.
+- Die Adapter reichen `Authorization: Bearer …` als `Request::$bearer` weiter (WordPress `RestBridge`, eigenständig `Kernel`; Apache mit CGI/FPM braucht die Zeile `E=HTTP_AUTHORIZATION` in der `.htaccess`). `Api::dispatch` setzt das Token in `Auth\AccessTokenContext` (liegt unter der Vorschau): Mit Token ist die Person des Zugangs `currentUser()`, neu gelesen bei jeder Anfrage, ohne Vorschau. Nur Routen mit `Route::$token` nehmen Tokens an (Schritt 1: `GET /me`); ungültig 401 `invalid_token` mit `WWW-Authenticate`, sonst 403 `token_not_allowed`; Umfang `read` nur `GET`/`HEAD` (403 `token_readonly`).
+- Schalter `ai_access` (`on`/`off`, Vorgabe aus, `PUT /admin/ai-access`, nicht in Sicherungen): aus heißt, kein Token gilt und keines wird ausgestellt. Keine Zugänge für Konten ohne Zugang und Ehemalige. Neues Passwort (eigenes oder Startpasswort) beendet alle Zugänge der Person. Eigene Zugänge: `GET`/`DELETE /me/ai-access`, alle: `/admin/ai-access` (`manage_settings`).
+
 ### Zugang beantragen (Issue #314)
 
 - **Ablauf:** Gast füllt `#/registrieren` aus → `registration_requests` (nur Passwort-Hash, `PASSWORD_DEFAULT`) → wer `create_users` hat, gibt unter `#/verwaltung/anfragen` frei → erst dann `UserDirectory::createWithPasswordHash` (über `MemberService::insertWithPasswordHash`, gleiche Prüfungen wie beim Anlegen; Rolle nie `admin`). Ausgeschaltet, bis ein Admin es einschaltet (`registration_enabled`).

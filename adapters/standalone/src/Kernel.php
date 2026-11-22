@@ -508,7 +508,7 @@ final class Kernel
             }
             $query = $_GET;
             unset($query['r']);
-            $res = $this->app()->api()->handle(new Request($method, $path, $query, $body, [], $this->http->clientIp(), $this->http->header(Preview::HEADER), $this->http->header(I18n::HEADER)));
+            $res = $this->app()->api()->handle(new Request($method, $path, $query, $body, [], $this->http->clientIp(), $this->http->header(Preview::HEADER), $this->http->header(I18n::HEADER), Request::bearerFrom($this->http->header('Authorization'))));
         } catch (ApiError $e) {
             $res = Response::error($e);
         }

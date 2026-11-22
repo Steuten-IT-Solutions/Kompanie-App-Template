@@ -2231,6 +2231,45 @@ WHERE title IS NULL",
                 'mysql' => ['ALTER TABLE {translations} MODIFY text mediumtext NOT NULL'],
                 'sqlite' => [],
             ],
+            // Zugänge für KI-Assistenten (Plan „MCP-Server“, Domain\AccessTokenService): je Person und Programm ein Zugang mit
+            // Umfang (read, write), nur die SHA-256-Hashes der Tokens; Zeiten als Unix-Zeit.
+            76 => [
+                'mysql' => [
+                    'CREATE TABLE IF NOT EXISTS {access_tokens} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  user_id bigint(20) unsigned NOT NULL,
+  client varchar(100) NOT NULL DEFAULT \'\',
+  scope varchar(10) NOT NULL,
+  token_hash char(64) NOT NULL,
+  refresh_hash char(64) NOT NULL,
+  expires_at bigint(20) NOT NULL,
+  refresh_expires_at bigint(20) NOT NULL,
+  created_at bigint(20) NOT NULL,
+  last_used_at bigint(20) DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY token_hash (token_hash),
+  UNIQUE KEY refresh_hash (refresh_hash),
+  KEY user_id (user_id)
+) {options}',
+                ],
+                'sqlite' => [
+                    'CREATE TABLE IF NOT EXISTS {access_tokens} (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  client TEXT NOT NULL DEFAULT \'\',
+  scope TEXT NOT NULL,
+  token_hash TEXT NOT NULL,
+  refresh_hash TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  refresh_expires_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  last_used_at INTEGER DEFAULT NULL
+)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {access_tokens}_token ON {access_tokens} (token_hash)',
+                    'CREATE UNIQUE INDEX IF NOT EXISTS {access_tokens}_refresh ON {access_tokens} (refresh_hash)',
+                    'CREATE INDEX IF NOT EXISTS {access_tokens}_user ON {access_tokens} (user_id)',
+                ],
+            ],
         ];
     }
 

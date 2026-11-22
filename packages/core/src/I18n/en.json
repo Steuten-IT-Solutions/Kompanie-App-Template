@@ -4862,5 +4862,13 @@
   "{field} von „{name}“ auf {language}": "{field} of “{name}” in {language}",
   "{missing} von {total} Texten fehlen noch auf {language}.": "{missing} of {total} texts are still missing in {language}.",
   "Deutsch": "German",
-  "Englisch": "English"
+  "Englisch": "English",
+  "Bitte angeben, ob der Zugang für KI-Assistenten an sein soll.": "Please specify whether access for AI assistants should be on.",
+  "Das geht mit einem Zugang für KI-Assistenten nicht.": "This is not possible with access for AI assistants.",
+  "Der Zugang für KI-Assistenten ist in dieser App ausgeschaltet.": "Access for AI assistants is switched off in this app.",
+  "Der Zugang ist abgelaufen oder wurde widerrufen. Bitte neu verbinden.": "This access has expired or was revoked. Please connect again.",
+  "Diesen Zugang gibt es nicht.": "This access does not exist.",
+  "Dieser Zugang darf nur lesen.": "This access may only read.",
+  "Dieses Konto kann keinen Zugang für KI-Assistenten bekommen.": "This account cannot get access for AI assistants.",
+  "Unbekannter Umfang des Zugangs.": "Unknown scope of access."
 }
