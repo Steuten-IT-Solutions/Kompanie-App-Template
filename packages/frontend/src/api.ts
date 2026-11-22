@@ -726,7 +726,9 @@ export function applyMaintenance(m: MaintenanceInfo): void {
 }
 
 /** Art eines übersetzbaren Namens (wie TranslationService::KINDS) */
-export type TranslationKind = NameKind;
+export type TranslationKind = NameKind | ContentKind;
+/** Inhalte mit einfachen Feldern in der Übersicht der Übersetzungen (TranslationOverview::CONTENT) */
+export type ContentKind = 'event' | 'calendar_entry' | 'poll' | 'document' | 'document_category' | 'album';
 
 /** Ein übersetzbarer Name (GET /admin/translations) */
 export interface TranslationItem {
@@ -740,6 +742,10 @@ export interface TranslationItem {
   /** Was Leser ohne Eintrag sehen (übersetzte Vorgabe oder der Text der Basissprache) */
   fallback: string;
   max: number;
+  /** Nur bei Inhalten: deutscher Titel (bei Terminen mit Datum), Name des Felds, mehrzeilig */
+  context?: string;
+  label?: string;
+  multiline?: boolean;
 }
 
 export interface TranslationOverview {
@@ -3185,6 +3191,23 @@ export const api = {
     request<{ page: string; layouts: TileLayouts }>('PUT', '/me/tiles', { page, cols, tiles }),
   /** Sprache am Konto (Plan „Mehrsprachigkeit“); null löscht die Wahl */
   setMyLocale: (l: Locale | null) => request<{ locale: Locale | null }>('PUT', '/me/locale', { locale: l }),
+  /**
+   * Fassung eines Inhalts in einer Sprache über die Route des Inhalts (Einstellungen → Sprachen → Übersetzungen): fields
+   * wie im Editor (title, location, description bzw. bei Umfragen options als Liste); bei Kategorien geht der deutsche
+   * Name mit (title), weil die Route ihn verlangt.
+   */
+  saveContentTranslation: (kind: ContentKind, id: string, lang: Locale, fields: Record<string, string | string[]>, title: string) => {
+    const translations = { [lang]: fields };
+    const path: Record<ContentKind, string> = {
+      event: `/events/${id}`,
+      calendar_entry: `/calendar/entries/${id}`,
+      poll: `/polls/${id}`,
+      document: `/documents/${id}`,
+      document_category: `/document-categories/${id}`,
+      album: `/admin/gallery/albums/${id}`,
+    };
+    return request<unknown>('PATCH', path[kind], kind === 'document_category' ? { title, translations } : { translations });
+  },
   /** Alle übersetzbaren Namen mit Text der Basissprache (Einstellungen → Sprachen → Übersetzungen) */
   translationOverview: (lang: Locale) => request<TranslationOverview>('GET', '/admin/translations', undefined, { locale: lang }),
   /** Eigene Namen in einer weiteren Sprache (Einrichten auf …); text '' löscht die Übersetzung */

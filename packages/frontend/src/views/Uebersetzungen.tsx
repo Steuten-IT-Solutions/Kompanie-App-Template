@@ -1,11 +1,11 @@
-import { useState, type FormEvent } from 'react';
+import { Fragment, useState, type FormEvent } from 'react';
 import brand from '../generated/brand';
 import { locale, t, type Locale } from '../i18n';
 import { enabledLocales, Flag, LANGUAGE_NAMES } from '../language';
 import { setNameTranslations } from '../names';
 import { api, type TranslationItem, type TranslationKind, type TranslationOverview } from '../api';
 import { ErrorBox, Loading, useAsync } from '../ui';
-import { isMissing, keyOf, matches } from '../translationOverview';
+import { contentRequests, isMissing, isName, keyOf, matches } from '../translationOverview';
 
 const sec = brand.labels.sections;
 
@@ -18,12 +18,19 @@ const GROUP_TITLES: Record<TranslationKind, () => string> = {
   office_group: () => t('Gruppen der Ämter'),
   event_kind: () => t('Terminarten'),
   menu: () => t('Untermenüs'),
+  event: () => t('Kommende Termine'),
+  calendar_entry: () => t('Kommende Termine im internen Kalender'),
+  poll: () => t('Laufende Umfragen'),
+  document: () => sec.documents,
+  document_category: () => t('Kategorien der Dokumente'),
+  album: () => t('Alben der Galerie'),
 };
 
 /**
- * Einstellungen → Sprachen → Übersetzungen: alle übersetzbaren Namen an einer Stelle (Plan „Übersetzungen zentral“). Je
- * Art ein aufklappbarer Abschnitt mit Zähler; links der Text der Basissprache, rechts das Feld der gewählten Sprache. Ein
- * leeres Feld zeigt grau, was Leser ohne Eintrag sehen. Gespeichert wird gesammelt (PUT /admin/translations).
+ * Einstellungen → Sprachen → Übersetzungen: alle übersetzbaren Namen und einfachen Inhalte an einer Stelle (Plan
+ * „Übersetzungen zentral“). Je Art ein aufklappbarer Abschnitt mit Zähler; links der Text der Basissprache, rechts das
+ * Feld der gewählten Sprache, bei Inhalten unter ihrem Titel. Ein leeres Feld zeigt grau, was Leser ohne Eintrag sehen.
+ * Gespeichert wird gesammelt: Namen über PUT /admin/translations, Inhalte über ihre eigene Route (translations).
  */
 export default function Uebersetzungen({ onToast }: { onToast: (msg: string) => void }) {
   const extra = enabledLocales().filter((l) => l !== 'de');
@@ -85,22 +92,32 @@ function Editor({
     if (changed.length === 0) return onToast(t('Nichts geändert.'));
     setBusy(true);
     setError(null);
+    const saved = new Map<string, string>();
+    const names = changed.filter(isName).map((i) => ({ kind: i.kind, ref: i.ref, field: i.field, text: value(i).trim() }));
     try {
-      const items = changed.map((i) => ({ kind: i.kind, ref: i.ref, field: i.field, text: value(i).trim() }));
-      const res = await api.saveTranslations(lang, items);
-      setNameTranslations(res.translations);
-      const saved = new Map(items.map((i) => [keyOf(i), i.text]));
-      onSaved({
-        ...data,
-        groups: data.groups.map((g) => ({ ...g, items: g.items.map((i) => ({ ...i, text: saved.get(keyOf(i)) ?? i.text })) })),
-      });
-      setEdits({});
+      if (names.length > 0) {
+        setNameTranslations((await api.saveTranslations(lang, names)).translations);
+        for (const i of names) saved.set(keyOf(i), i.text);
+      }
+      // Inhalte einzeln über ihre Route (dieselbe Prüfung und dasselbe Änderungsprotokoll wie im Editor)
+      for (const req of contentRequests(all, value)) {
+        await api.saveContentTranslation(req.kind, req.id, lang, req.fields, req.title);
+        for (const k of req.keys) saved.set(k, edits[k]?.trim() ?? all.find((i) => keyOf(i) === k)?.text ?? '');
+      }
       onToast(t('Gespeichert'));
       // Namen der Navigation stehen überall (auch in Überschriften): in dieser Sprache einmal neu laden
-      if (locale() === lang && items.some((i) => i.kind === 'nav' || i.kind === 'menu')) setTimeout(() => window.location.reload(), 800);
+      if (locale() === lang && names.some((i) => i.kind === 'nav' || i.kind === 'menu')) setTimeout(() => window.location.reload(), 800);
     } catch (err) {
       setError((err as Error).message);
     } finally {
+      // Was schon gespeichert ist, übernehmen (auch wenn ein späterer Inhalt scheitert)
+      if (saved.size > 0) {
+        onSaved({
+          ...data,
+          groups: data.groups.map((g) => ({ ...g, items: g.items.map((i) => ({ ...i, text: saved.get(keyOf(i)) ?? i.text })) })),
+        });
+        setEdits((x) => Object.fromEntries(Object.entries(x).filter(([k]) => !saved.has(k))));
+      }
       setBusy(false);
     }
   }
@@ -110,14 +127,14 @@ function Editor({
     <form className="form translations" onSubmit={submit}>
       <p className="small muted">
         {t(
-          'Hier trägst du alle eigenen Namen auf {language} ein. Ein leeres Feld zeigt grau, was Leser ohne Eintrag sehen; meist ist das der deutsche Name.',
+          'Hier trägst du eigene Namen und Inhalte auf {language} ein. Ein leeres Feld zeigt grau, was Leser ohne Eintrag sehen; meist ist das der deutsche Text.',
           { language },
         )}
       </p>
       <p className="small" role="status">
         {missingTotal === 0
           ? t('Alles übersetzt.')
-          : t('{missing} von {total} Namen fehlen noch auf {language}.', { missing: missingTotal, total: all.length, language })}
+          : t('{missing} von {total} Texten fehlen noch auf {language}.', { missing: missingTotal, total: all.length, language })}
       </p>
       <input
         type="search"
@@ -147,21 +164,39 @@ function Editor({
                 <span className="muted small">{t('{done} von {total}', { done, total: g.items.length })}</span>
               </summary>
               {shown.length === 0 && <p className="small muted">{query.trim() === '' ? t('Alles übersetzt.') : t('Nichts gefunden.')}</p>}
-              {shown.map((i) => (
-                <label key={keyOf(i)} className="field translation-row">
-                  <span lang={data.source_locale}>{i.source}</span>
-                  <input
-                    type="text"
-                    lang={lang}
-                    maxLength={i.max}
-                    value={value(i)}
-                    placeholder={i.fallback}
-                    aria-label={t('{name} auf {language}', { name: i.source, language })}
-                    disabled={busy}
-                    onChange={(e) => setEdits((x) => ({ ...x, [keyOf(i)]: e.target.value }))}
-                  />
-                </label>
-              ))}
+              {shown.map((i, n) => {
+                const content = !isName(i);
+                // Bei Inhalten über den Feldern eines Inhalts sein Titel (einmal je Inhalt)
+                const heading = content && (n === 0 || shown[n - 1].ref !== i.ref);
+                const field = {
+                  lang,
+                  maxLength: i.max,
+                  value: value(i),
+                  placeholder: i.fallback,
+                  'aria-label': content
+                    ? t('{field} von „{name}“ auf {language}', { field: i.label ?? '', name: i.context ?? '', language })
+                    : t('{name} auf {language}', { name: i.source, language }),
+                  disabled: busy,
+                };
+                const set = (v: string) => setEdits((x) => ({ ...x, [keyOf(i)]: v }));
+                return (
+                  <Fragment key={keyOf(i)}>
+                    {heading && (
+                      <p className="translation-context row-title" lang={data.source_locale}>
+                        {i.context}
+                      </p>
+                    )}
+                    <label className="field translation-row">
+                      <span lang={content ? undefined : data.source_locale}>{content ? i.label : i.source}</span>
+                      {i.multiline ? (
+                        <textarea rows={3} {...field} onChange={(e) => set(e.target.value)} />
+                      ) : (
+                        <input type="text" {...field} onChange={(e) => set(e.target.value)} />
+                      )}
+                    </label>
+                  </Fragment>
+                );
+              })}
             </details>
           );
         })}

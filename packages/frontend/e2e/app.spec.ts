@@ -67,6 +67,26 @@ async function translateName(page: Page, group: string, source: string, text: st
   return field;
 }
 
+/**
+ * Einstellungen → Sprachen → Übersetzungen: Felder von Inhalten auf Englisch eintragen und einmal speichern. $fields:
+ * Teil der Beschriftung („Titel von „…““) => Text.
+ */
+async function translateContent(page: Page, group: string, fields: Record<string, string>) {
+  await openLanguages(page);
+  const card = page.locator('#einstellungen-uebersetzungen');
+  await openTranslationGroup(card, group);
+  for (const [label, text] of Object.entries(fields)) await card.getByLabel(label).fill(text);
+  await card.getByRole('button', { name: /^Speichern/ }).click();
+  await expect(page.locator('.toast')).toHaveText('Gespeichert');
+  return card;
+}
+
+/** Einstellungen → Sprachen öffnen; ist sie schon offen, neu laden (dieselbe Adresse noch einmal öffnen hieße „Zurück“). */
+async function openLanguages(page: Page) {
+  if (page.url().endsWith('#/einstellungen/sprachen')) await page.reload();
+  else await page.goto('/app/#/einstellungen/sprachen');
+}
+
 /** „Intern“ (Tab unten) öffnen und dort den Knopf eines Bereichs wählen (Mitglieder oder Dokumente). */
 async function internMenu(page: Page, name: string) {
   await page.locator('.tabbar').getByRole('button', { name: 'Intern' }).click();
@@ -5199,7 +5219,7 @@ test('Sprachen: Nachricht am Brett auch auf Englisch schreiben, Gäste auf Engli
   }
 });
 
-test('Sprachen: öffentlichen Termin und Umfrage auch auf Englisch eintragen', async ({ page, browser }) => {
+test('Sprachen: öffentlichen Termin und Umfrage zentral unter Übersetzungen auf Englisch eintragen', async ({ page, browser }) => {
   const id = Date.now().toString(36);
   const german = `Schützenfest ${id}`;
   const english = `Shooting fair ${id}`;
@@ -5233,31 +5253,38 @@ test('Sprachen: öffentlichen Termin und Umfrage auch auf Englisch eintragen', a
       .getByLabel('Datum', { exact: true })
       .fill(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
     await form.getByLabel('Ort', { exact: true }).fill('Festzelt');
-    const tr = form.locator('.board-translation');
-    await tr.getByText('Auf English schreiben (freiwillig)').click();
-    await expect(tr.getByLabel('Ort auf English')).toHaveAttribute('placeholder', 'Festzelt');
-    await tr.getByLabel('Titel auf English').fill(english);
     await form.getByRole('button', { name: 'Speichern' }).click();
     await expect(page.locator('.toast')).toHaveText('Termin angelegt');
-    const row = page.locator('.row', { hasText: german });
-    await row.getByRole('button', { name: 'Bearbeiten' }).click();
-    await expect(form.getByLabel('Titel', { exact: true })).toHaveValue(german);
-    await expect(form.getByLabel('Titel auf English')).toHaveValue(english);
+    // Im Formular nur noch der Hinweis auf die zentrale Stelle
+    await page.locator('.row', { hasText: german }).getByRole('button', { name: 'Bearbeiten' }).click();
+    await expect(form.getByRole('link', { name: 'Einstellungen → Sprachen' })).toBeVisible();
+    await expect(form.getByText('Auf English schreiben (freiwillig)')).toHaveCount(0);
     await form.getByRole('button', { name: 'Abbrechen' }).click();
 
-    // Umfrage mit englischer Frage und einer englischen Möglichkeit
+    // Umfrage auf Deutsch anlegen
     await page.goto('/app/#/umfragen/verwalten');
     const poll = page.locator('.poll-form');
     await poll.getByLabel('Frage', { exact: true }).fill(question);
     await poll.getByLabel('Möglichkeit 1', { exact: true }).fill('Ja');
     await poll.getByLabel('Möglichkeit 2', { exact: true }).fill('Nein');
-    const ptr = poll.locator('.board-translation');
-    await ptr.getByText('Auf English schreiben (freiwillig)').click();
-    await ptr.getByLabel('Frage auf English').fill('Barbecue?');
-    await expect(ptr.getByLabel('Möglichkeit 2 auf English')).toHaveAttribute('placeholder', 'Nein');
-    await ptr.getByLabel('Möglichkeit 1 auf English').fill('Yes');
     await poll.getByRole('button', { name: 'Veröffentlichen' }).click();
     await expect(page.getByText(question).first()).toBeVisible();
+
+    // Englisch zentral unter Übersetzungen: Termin (Titel) und Umfrage (Frage, eine Möglichkeit) mit einem Speichern
+    await page.goto('/app/#/einstellungen/sprachen');
+    const card = page.locator('#einstellungen-uebersetzungen');
+    await openTranslationGroup(card, 'Kommende Termine');
+    await expect(card.getByLabel(`Ort von „${german}`)).toHaveAttribute('placeholder', 'Festzelt');
+    await card.getByLabel(`Titel von „${german}`).fill(english);
+    await openTranslationGroup(card, 'Laufende Umfragen');
+    await expect(card.getByLabel(`Antwort 2 von „${question}`)).toHaveAttribute('placeholder', 'Nein');
+    await card.getByLabel(`Frage von „${question}`).fill('Barbecue?');
+    await card.getByLabel(`Antwort 1 von „${question}`).fill('Yes');
+    await card.getByRole('button', { name: 'Speichern (3)' }).click();
+    await expect(page.locator('.toast')).toHaveText('Gespeichert');
+    await page.reload();
+    await openTranslationGroup(card, 'Kommende Termine');
+    await expect(card.getByLabel(`Titel von „${german}`)).toHaveValue(english);
 
     const visitor = await quietPage(browser);
     await visitor.goto('/app/');
@@ -5294,7 +5321,7 @@ test('Sprachen: öffentlichen Termin und Umfrage auch auf Englisch eintragen', a
   }
 });
 
-test('Sprachen: Dokument, Kategorie und Album auch mit englischem Namen', async ({ page }) => {
+test('Sprachen: Dokument, Kategorie und Album zentral mit englischem Namen', async ({ page }) => {
   const id = Date.now().toString(36);
   const pdf = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n');
   await login(page, 'admin', ADMIN_PASSWORD);
@@ -5320,27 +5347,34 @@ test('Sprachen: Dokument, Kategorie und Album auch mit englischem Namen', async 
     await page.getByLabel('Neue Kategorie').fill(`Satzungen ${id}`);
     await page.getByRole('button', { name: 'Kategorie hinzufügen' }).click();
     await expect(page.locator('.toast')).toHaveText('Kategorie angelegt');
-    const cat = page.locator('.doc-categories li', { hasText: `Satzungen ${id}` });
-    await cat.getByRole('button', { name: 'Auf English' }).click();
-    await askOk(page, `Statutes ${id}`);
-    await expect(page.locator('.toast')).toHaveText('Kategorie umbenannt');
-    await expect(cat).toContainText(`Satzungen ${id}`);
+    await expect(
+      page.locator('.doc-categories li', { hasText: `Satzungen ${id}` }).getByRole('button', { name: 'Auf English' }),
+    ).toHaveCount(0);
 
     await page.getByLabel('Datei').setInputFiles({ name: 'satzung.pdf', mimeType: 'application/pdf', buffer: pdf });
     const upload = page.locator('form', { has: page.getByRole('button', { name: 'Hochladen' }) });
     await upload.getByLabel('Titel', { exact: true }).fill(`Satzung ${id}`);
     await upload.getByLabel('Kategorie', { exact: true }).selectOption({ label: `Satzungen ${id}` });
-    await upload.locator('.board-translation').getByText('Auf English schreiben (freiwillig)').click();
-    await upload.getByLabel('Titel auf English').fill(`Constitution ${id}`);
     await upload.getByRole('button', { name: 'Hochladen' }).click();
     await expect(page.locator('.toast')).toHaveText(`„Satzung ${id}“ hochgeladen`);
 
-    // Album mit englischem Titel (Schnittstelle der Verwaltung: deutsch mit Fassung)
     const album = await api('admin/gallery/albums', 'POST', { title: `Kirmes ${id}`, year: 2026 });
     albumId = Number(album.data?.id);
     expect(albumId).toBeGreaterThan(0);
-    const updated = await api(`admin/gallery/albums/${albumId}`, 'PATCH', { translations: { en: { title: `Fair ${id}` } } });
-    expect((updated.data?.translations as Record<string, { title: string }>).en.title).toBe(`Fair ${id}`);
+
+    // Englische Namen zentral unter Übersetzungen
+    await translateContent(page, 'Kategorien der Dokumente', { [`Bezeichnung von „Satzungen ${id}`]: `Statutes ${id}` });
+    await translateContent(page, 'Dokumente', { [`Titel von „Satzung ${id}`]: `Constitution ${id}` });
+    await translateContent(page, 'Alben der Galerie', { [`Titel von „Kirmes ${id}`]: `Fair ${id}` });
+    const albumRes = await page.evaluate(async (albumId) => {
+      const cfg = window.KOMPANIE_CONFIG!;
+      const res = await fetch(cfg.apiBase + `admin/gallery/albums/${albumId}`, {
+        credentials: 'same-origin',
+        headers: { [cfg.csrf.header]: cfg.csrf.token },
+      });
+      return (await res.json()) as { title: string; translations?: Record<string, { title: string }> };
+    }, albumId);
+    expect([albumRes.title, albumRes.translations?.en?.title]).toEqual([`Kirmes ${id}`, `Fair ${id}`]);
 
     // Auf Englisch (Sprache der Anfrage; das Konto des Admins kann auf Deutsch stehen): englische Namen
     const english = await page.evaluate(async () => {
@@ -5353,13 +5387,6 @@ test('Sprachen: Dokument, Kategorie und Album auch mit englischem Namen', async 
     });
     expect(english.documents.map((d) => d.title)).toContain(`Constitution ${id}`);
     expect(english.categories.map((c) => c.title)).toContain(`Statutes ${id}`);
-    // Zum Bearbeiten weiter die deutschen, die englische Fassung im Abschnitt
-    const row = page.locator('.card.row', { hasText: `Satzung ${id}` }).first();
-    // Die Kategorie des neuen Dokuments ist nach dem Hochladen schon aufgeklappt
-    await row.getByRole('button', { name: 'Bearbeiten' }).click();
-    const edit = page.locator('form.doc-edit');
-    await expect(edit.getByLabel('Titel', { exact: true })).toHaveValue(`Satzung ${id}`);
-    await expect(edit.getByLabel('Titel auf English')).toHaveValue(`Constitution ${id}`);
   } finally {
     const docs = (await api('documents?source=1', 'GET')).data as {
       documents: { id: number; title: string }[];

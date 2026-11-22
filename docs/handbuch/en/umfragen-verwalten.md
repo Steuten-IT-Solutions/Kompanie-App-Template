@@ -41,7 +41,7 @@ If the admin has switched on English under **Settings → Languages**, the form 
 3. Under **Answer options in English**, enter each option in English. Empty fields show the German text in grey.
 4. Tap **Publish** or **Save**.
 
-Those using the app in English see the poll in this version, including in notification and reminder. Anything you leave empty appears in German, with the note *Partly only available in German*. The answers count for all languages together: whoever chooses “Yes” in English has chosen the same option as with “Ja” in German. You can also change the English version when there are already answers. If you use the app in English yourself, you still edit the German version at the top of the form.
+Those using the app in English see the poll in this version, including in notification and reminder. Anything you leave empty appears in German, with the note *Partly only available in German*. The answers count for all languages together: whoever chooses “Yes” in English has chosen the same option as with “Ja” in German. You can also change the English version when there are already answers. If you use the app in English yourself, you still edit the German version at the top of the form. An admin can also translate running polls under **Settings → Languages** in the **Translations** section, in the **Running polls** group. If you change the German options before the first answer, the English version stays with its option; new options appear in German in English at first.
 
 ### End a poll early
 1. Tap **End** next to the poll.

@@ -141,4 +141,22 @@ final class EventPollTranslationTest extends TestCase
         $this->assertSame(200, $this->call($this->admin, 'DELETE', "/polls/$id")->status);
         $this->assertSame([], $this->app->translations()->repository()->forRef('poll', (string) $id));
     }
+
+    /** Ändert sich die deutsche Liste ohne neue Fassung, gehen Übersetzungen mit ihrer Möglichkeit mit. */
+    public function testOptionTranslationsFollowTheirOption(): void
+    {
+        $this->call($this->admin, 'PATCH', '/admin/settings', ['languages' => 'de,en']);
+        $id = $this->data($this->call($this->admin, 'POST', '/polls', [
+            'title' => 'Wann?', 'type' => 'single', 'options' => ['Freitag', 'Samstag', 'Sonntag'],
+            'translations' => ['en' => ['title' => 'When?', 'options' => ['Friday', 'Saturday', 'Sunday']]],
+        ]))['id'];
+        $this->data($this->call($this->admin, 'PATCH', "/polls/$id", ['options' => ['Freitag', 'Sonntag', 'Montag']]));
+        $en = $this->data($this->call($this->member, 'GET', "/polls/$id", [], 'en'));
+        $this->assertSame(['Friday', 'Sunday', 'Montag'], array_column($en['options'], 'title'));
+        $this->assertSame('When?', $en['title']);
+        // umformuliert an derselben Stelle: Übersetzung bleibt
+        $this->data($this->call($this->admin, 'PATCH', "/polls/$id", ['options' => ['Freitagabend', 'Sonntag', 'Montag']]));
+        $en = $this->data($this->call($this->member, 'GET', "/polls/$id", [], 'en'));
+        $this->assertSame(['Friday', 'Sunday', 'Montag'], array_column($en['options'], 'title'));
+    }
 }

@@ -7,15 +7,7 @@ import { sources } from '../viewData';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
 import { t } from '../i18n';
-import { fieldTranslationsInput, FieldTranslationsEditor, type FieldTranslations, type TranslatedField } from '../translationFields';
-
-/** Was es je weitere Sprache gibt (Plan „Mehrsprachigkeit“, PR 9d); Datum, Zeit und Link gelten für alle. */
-const TRANSLATED: TranslatedField[] = [
-  { key: 'title', label: (language) => t('Titel auf {language}', { language }), maxLength: 191 },
-  { key: 'location', label: (language) => t('Ort auf {language}', { language }), maxLength: 191 },
-  { key: 'description', label: (language) => t('Beschreibung auf {language}', { language }), multiline: true },
-];
-const TRANSLATED_KEYS = TRANSLATED.map((f) => f.key);
+import { TranslationsHint } from '../language';
 
 const EMPTY: EventInput = {
   title: '',
@@ -77,8 +69,6 @@ export default function TermineVerwalten({ onToast, internal = false }: { onToas
   const { data, error, loading, reload } = useAsync(kind.source.load, kind.source.deps, kind.source.key);
   const [editing, setEditing] = useState<number | 'new' | null>(null);
   const [form, setForm] = useState<EventInput>(EMPTY);
-  const [translations, setTranslations] = useState<FieldTranslations>({});
-  const [before, setBefore] = useState<FieldTranslations | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -87,9 +77,6 @@ export default function TermineVerwalten({ onToast, internal = false }: { onToas
   function startEdit(ev: PublicEvent | null) {
     setFormError(null);
     setForm(ev ? toInput(ev) : EMPTY);
-    const own = (ev?.translations ?? {}) as FieldTranslations;
-    setTranslations(own);
-    setBefore(ev ? own : undefined);
     setEditing(ev ? ev.id : 'new');
     window.scrollTo(0, 0);
   }
@@ -101,8 +88,7 @@ export default function TermineVerwalten({ onToast, internal = false }: { onToas
     if (!form.start_date) return setFormError(t('Bitte ein Startdatum angeben.'));
     setBusy(true);
     // Den Anmeldeschluss gibt es nur im internen Kalender.
-    const base: EventInput = internal ? form : { ...form, respond_until: undefined };
-    const data: EventInput = { ...base, translations: fieldTranslationsInput(TRANSLATED_KEYS, translations, before) };
+    const data: EventInput = internal ? form : { ...form, respond_until: undefined };
     try {
       if (editing === 'new') {
         await kind.create(data);
@@ -182,20 +168,7 @@ export default function TermineVerwalten({ onToast, internal = false }: { onToas
             <span>{t('Beschreibung')}</span>
             <textarea rows={3} value={form.description} onChange={set('description')} />
           </label>
-          <FieldTranslationsEditor
-            fields={TRANSLATED}
-            german={{ title: form.title, location: form.location, description: form.description }}
-            value={translations}
-            onChange={setTranslations}
-            hint={(language) =>
-              t(
-                'Wer die App auf {language} nutzt, sieht Titel, Ort und Beschreibung in dieser Fassung. Was leer bleibt, erscheint auf Deutsch.',
-                {
-                  language,
-                },
-              )
-            }
-          />
+          <TranslationsHint />
           <label className="field">
             <span>{t('Link (optional)')}</span>
             <input type="url" placeholder="https://…" value={form.url} onChange={set('url')} />

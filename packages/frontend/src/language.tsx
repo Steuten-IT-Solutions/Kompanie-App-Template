@@ -279,7 +279,7 @@ export function TranslationsHint() {
   if (!hasLanguageChoice() || !can('manage_settings')) return null;
   return (
     <p className="small muted translations-hint">
-      {t('Namen in weiteren Sprachen trägst du zentral ein:')} <a href="#/einstellungen/sprachen">{t('Einstellungen → Sprachen')}</a>
+      {t('Übersetzungen in weitere Sprachen trägst du zentral ein:')} <a href="#/einstellungen/sprachen">{t('Einstellungen → Sprachen')}</a>
     </p>
   );
 }

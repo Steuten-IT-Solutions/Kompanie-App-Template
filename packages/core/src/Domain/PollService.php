@@ -238,6 +238,40 @@ final class PollService
     }
 
     /**
+     * Neue deutsche Antwortmöglichkeiten ohne neue Fassung: Übersetzungen gehen mit ihrer Möglichkeit mit (gleicher
+     * deutscher Text, sonst bei gleicher Anzahl die umformulierte an derselben Stelle); neue Möglichkeiten bleiben leer und erscheinen deutsch.
+     *
+     * @param list<string> $before
+     * @param list<string> $after
+     * @param array<string, array<string, string>> $translations aus der Anfrage
+     * @return array<string, array<string, string>>
+     */
+    private function keepOptionTranslations(int $id, array $before, array $after, array $translations): array
+    {
+        if ($this->app->contentTranslations()->locales() === []) {
+            return $translations;
+        }
+        foreach ($this->app->contentTranslations()->of(self::KIND, $id) as $locale => $fields) {
+            if (isset($translations[$locale]['options'])) {
+                continue;
+            }
+            $old = self::translatedOptions($fields['options'] ?? null, count($before));
+            if ($old === null) {
+                continue;
+            }
+            $next = [];
+            foreach ($after as $i => $german) {
+                $k = array_search($german, $before, true);
+                // umformuliert: gleiche Stelle, wenn deren alter Text nicht mehr vorkommt
+                $edited = count($before) === count($after) && !in_array($before[$i], $after, true);
+                $next[] = $k !== false ? $old[$k] : ($edited ? $old[$i] : '');
+            }
+            $translations[$locale]['options'] = implode('', $next) === '' ? '' : (string) json_encode($next, JSON_UNESCAPED_UNICODE);
+        }
+        return $translations;
+    }
+
+    /**
      * Antwortmöglichkeiten einer Fassung (nur, wenn es gleich viele wie auf Deutsch sind).
      *
      * @return list<string>|null
@@ -344,6 +378,9 @@ final class PollService
         }, ARRAY_FILTER_USE_BOTH);
         $optionsChanged = $options !== null && $options !== $current;
         $translations = $this->translationInput($in['translations'] ?? null, $options ?? $current);
+        if ($optionsChanged && $options !== null) {
+            $translations = $this->keepOptionTranslations($id, $current, $options, $translations);
+        }
         if ($translations !== []) {
             $this->saveTranslations($id, $translations, $user->id);
         }

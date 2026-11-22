@@ -44,7 +44,7 @@ Hat der Admin unter **Einstellungen → Sprachen** Englisch eingeschaltet, steht
 3. Trage unter **Antwortmöglichkeiten auf English** jede Möglichkeit auf Englisch ein. Leere Felder zeigen grau den deutschen Text.
 4. Tippe auf **Veröffentlichen** bzw. **Speichern**.
 
-Wer die App auf Englisch nutzt, sieht die Umfrage in dieser Fassung, auch in Benachrichtigung und Erinnerung. Was du leer lässt, erscheint auf Deutsch, mit dem Hinweis *Teilweise nur auf Deutsch verfügbar*. Die Antworten zählen für alle Sprachen gemeinsam: Wer auf Englisch „Yes“ wählt, hat dieselbe Möglichkeit gewählt wie mit „Ja“ auf Deutsch. Die englische Fassung kannst du auch ändern, wenn es schon Antworten gibt. Benutzt du die App selbst auf Englisch, bearbeitest du trotzdem die deutsche Fassung oben im Formular.
+Wer die App auf Englisch nutzt, sieht die Umfrage in dieser Fassung, auch in Benachrichtigung und Erinnerung. Was du leer lässt, erscheint auf Deutsch, mit dem Hinweis *Teilweise nur auf Deutsch verfügbar*. Die Antworten zählen für alle Sprachen gemeinsam: Wer auf Englisch „Yes“ wählt, hat dieselbe Möglichkeit gewählt wie mit „Ja“ auf Deutsch. Die englische Fassung kannst du auch ändern, wenn es schon Antworten gibt. Benutzt du die App selbst auf Englisch, bearbeitest du trotzdem die deutsche Fassung oben im Formular. Laufende Umfragen kann ein Admin auch unter **Einstellungen → Sprachen** im Abschnitt **Übersetzungen** in der Gruppe **Laufende Umfragen** übersetzen. Änderst du vor der ersten Antwort die deutschen Möglichkeiten, bleibt die englische Fassung bei ihrer Möglichkeit; neue Möglichkeiten erscheinen auf Englisch zunächst deutsch.
 
 ### Eine Umfrage vorzeitig beenden
 1. Tippe bei der Umfrage auf **Beenden**.
