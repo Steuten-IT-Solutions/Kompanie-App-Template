@@ -8267,6 +8267,22 @@ fieldset.block-source legend {
     gap: var(--space-3);
   }
 }
+/* Seiten und Nachrichten am Brett: je Inhalt Titel, Stand und Knopf; geöffnet das Formular Block für Block */
+.translation-blocks {
+  margin-top: var(--space-3);
+}
+.translation-blocks-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.translation-blocks-head .btn {
+  margin-left: auto;
+}
+.translation-blocks .blocks-translation {
+  margin-top: var(--space-2);
+}
 
 /* Inhalte je Sprache (PR 9b): Hinweis „Nur auf Deutsch verfügbar“ und Blöcke in einer weiteren Sprache schreiben */
 .untranslated-note {

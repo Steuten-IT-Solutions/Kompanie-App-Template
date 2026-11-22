@@ -7315,7 +7315,10 @@ paths:
         Umfragen, `manage_polls`) mit `title`, `description` und `option:<n>` je Antwortmöglichkeit (ab 0); `document` und
         `document_category` (`manage_documents`) sowie `album` (Alben der App, `manage_gallery`) mit `title`. Felder, die in
         der Basissprache leer sind, fehlen. Inhalte haben zusätzlich `context` (Titel der Basissprache, bei Terminen mit
-        Datum), `label` (Name des Felds in der Sprache der Anfrage) und `multiline`. News, eigene Seiten und das Brett fehlen.
+        Datum), `label` (Name des Felds in der Sprache der Anfrage) und `multiline`. Inhalte aus Blöcken: `page` (eigene
+        Seiten, `manage_pages`) und `board` (laufende Nachrichten, `post_board` und `view_board_history`) mit je einem
+        Eintrag (`field` content, `text` = übersetzter Titel) und dem Stand `total` (übersetzbare Felder samt Titel) und
+        `done`; übersetzt wird über PATCH der Seite bzw. Nachricht mit `translations`. News fehlen.
         400, wenn keine weitere Sprache eingeschaltet ist oder `locale` keine ist.
       parameters:
         - name: locale
@@ -7340,14 +7343,14 @@ paths:
                       type: object
                       required: [kind, items]
                       properties:
-                        kind: { type: string, enum: [nav, role, rank, office, office_group, event_kind, menu, event, calendar_entry, poll, document, document_category, album] }
+                        kind: { type: string, enum: [nav, role, rank, office, office_group, event_kind, menu, event, calendar_entry, poll, document, document_category, album, page, board] }
                         items:
                           type: array
                           items:
                             type: object
                             required: [kind, ref, field, source, text, fallback, max]
                             properties:
-                              kind: { type: string, enum: [nav, role, rank, office, office_group, event_kind, menu, event, calendar_entry, poll, document, document_category, album] }
+                              kind: { type: string, enum: [nav, role, rank, office, office_group, event_kind, menu, event, calendar_entry, poll, document, document_category, album, page, board] }
                               ref: { type: string }
                               field: { type: string, description: '`label` bei Namen; bei Inhalten title, location, description oder option:<n>' }
                               source: { type: string }
@@ -7357,6 +7360,8 @@ paths:
                               context: { type: string }
                               label: { type: string }
                               multiline: { type: boolean }
+                              total: { type: integer }
+                              done: { type: integer }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }

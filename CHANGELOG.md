@@ -34,11 +34,11 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Englisch ein: unter [Einstellungen → Sprachen](app:einstellungen/sprachen) im Abschnitt _Übersetzungen_, je Gruppe
   (Bereiche der Navigation, Untermenüs, Rollen, Dienstgrade, Ämter und ihre Gruppen, Terminarten, kommende Termine,
   laufende Umfragen, Dokumente und ihre Kategorien, Alben der Galerie) mit Zähler, Suche und „Nur fehlende zeigen“; ohne
-  Eintrag bleibt der deutsche Text, und Benachrichtigungen gehen in der Sprache der Empfänger. Eigene Seiten
-  bekommen unter [Verwaltung → Seiten](app:verwaltung/seiten) mit _Schreiben auf: English_ eine englische Fassung, ebenso
-  [News](app:news), die ihr in der App schreibt (beim Bearbeiten), und Nachrichten am [Schwarzen Brett](app:brett)
-  (_Auf English schreiben_ unter dem Inhalt; Benachrichtigung und Mail gehen dann in der Sprache der Empfänger), ebenso
-  [Umfragen](app:umfragen/verwalten) schon beim Veröffentlichen; wer
+  Eintrag bleibt der deutsche Text, und Benachrichtigungen gehen in der Sprache der Empfänger. Eigene Seiten und laufende
+  Nachrichten am Brett übersetzt du dort Block für Block, je mit Stand („3 von 4 übersetzt“).
+  [News](app:news), die ihr in der App schreibt, bekommen ihre englische Fassung beim Bearbeiten; Nachrichten am
+  [Schwarzen Brett](app:brett) und [Umfragen](app:umfragen/verwalten) auf Wunsch schon beim Schreiben (_Auf English
+  schreiben_; Benachrichtigung und Mail gehen dann in der Sprache der Empfänger); wer
   auf Englisch liest und sie nicht hat, sieht die deutsche mit dem Hinweis „Nur auf Deutsch verfügbar“. Mit WordPress
   zeigen die News aus den Beiträgen der Seite auf Englisch die Übersetzung aus dem Plugin Polylang, wenn es aktiv ist;
   Beiträge einer anderen Webseite oder aus einem Feed bleiben deutsch (mit dem Hinweis). Was ihr sonst eintragt, bleibt,
