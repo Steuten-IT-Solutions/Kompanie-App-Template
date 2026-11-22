@@ -21,7 +21,7 @@ Aus der Übersicht **Beförderungen** öffnet ein Tipp auf einen Namen dieses Fe
 - **Datum**: der Tag der Änderung, vorgegeben ist heute. Ein früherer Tag geht, ein Tag in der Zukunft nicht.
 - **Begründung (optional)**: steht später im Verlauf.
 - **{begriff.rank} ändern**: speichert die Änderung.
-- Darunter der Verlauf: jede „Ersteinstufung“, „Beförderung“ und „Degradierung“ mit Datum, von wem, mit {bereich.points} dem Stand zu diesem Zeitpunkt und der Begründung. Mit dem Stift an einem Eintrag änderst du sein Datum, mit dem Papierkorb löschst du ihn.
+- Darunter der Verlauf: jede „Ersteinstufung“, „Beförderung“ und „Degradierung“ mit Datum, von wem, mit {bereich.points} dem Stand zu diesem Zeitpunkt und der Begründung. Mit dem Stift an einem Eintrag änderst du seinen {begriff.rank} und sein Datum, mit dem Papierkorb löschst du ihn.
 
 ## So gehst du vor
 ### Befördern oder degradieren
@@ -30,12 +30,14 @@ Aus der Übersicht **Beförderungen** öffnet ein Tipp auf einen Namen dieses Fe
 3. Trage bei Bedarf eine **Begründung** ein.
 4. Tippe auf **{begriff.rank} ändern**. Die Änderung steht sofort im Verlauf, mit dem gewählten Datum.
 
-### Das Datum einer Änderung nachträglich korrigieren
-1. Tippe im Verlauf beim Eintrag auf den Stift (**Datum ändern**).
-2. Wähle unter **Neues Datum** den richtigen Tag.
-3. Tippe auf **Datum speichern**. Mit **Abbrechen** bleibt alles, wie es war.
+### Eine Änderung nachträglich korrigieren
+1. Tippe im Verlauf beim Eintrag auf den Stift (**Eintrag ändern**).
+2. Wähle unter **Neuer {begriff.rank}** den richtigen {begriff.rank} und unter **Neues Datum** den richtigen Tag.
+3. Tippe auf **Speichern**. Mit **Abbrechen** bleibt alles, wie es war.
 
-Das neue Datum darf nicht in der Zukunft liegen und nicht vor dem Eintrag davor oder nach dem Eintrag danach. Mit {bereich.points} steht danach im Eintrag der Stand an {bereich.points} bis zum neuen Tag; bei einer Beförderung muss er die Schwelle des {begriff.rank}s erreichen. Der aktuelle {begriff.rank} ändert sich dabei nicht.
+**{begriff.rank}**: Ob der Eintrag eine Beförderung oder Degradierung ist, ergibt sich aus dem {begriff.rank} davor. Mit {bereich.points} muss eine Beförderung mit dem Stand des Eintrags die Schwelle des neuen {begriff.rank}s erreichen. Der Eintrag danach beginnt dann beim neuen {begriff.rank}; geht er schon auf denselben {begriff.rank}, lehnt die App ab (lösche dann einen der beiden Einträge). Den {begriff.rank} davor kannst du nicht wählen (lösche dann den Eintrag). Änderst du den **neuesten** Eintrag, ändert sich auch der aktuelle {begriff.rank}; „seit“ bleibt.
+
+**Datum**: Das neue Datum darf nicht in der Zukunft liegen und nicht vor dem Eintrag davor oder nach dem Eintrag danach. Mit {bereich.points} steht danach im Eintrag der Stand an {bereich.points} bis zum neuen Tag; bei einer Beförderung muss er die Schwelle des {begriff.rank}s erreichen. Ein neues Datum allein ändert den aktuellen {begriff.rank} nicht.
 
 ### Einen Eintrag löschen
 War eine Beförderung oder Degradierung falsch eingetragen, löschst du sie ganz:

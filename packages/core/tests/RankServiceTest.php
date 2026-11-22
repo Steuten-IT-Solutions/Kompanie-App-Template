@@ -359,6 +359,56 @@ final class RankServiceTest extends TestCase
         $this->assertSame(403, $this->call('PATCH', $path($uffz), ['date' => '2026-10-01'])->status, 'nur mit „Dienstgrade verwalten“');
     }
 
+    public function testRankOfABookedEntryCanBeChangedLater(): void
+    {
+        $this->setUpApp(['ranks' => true, 'points' => true]);
+        $r = $this->ranks([['Gefreiter', 10], ['Obergefreiter', 15], ['Unteroffizier', 20], ['Feldwebel', 30]]);
+        $this->points($this->m, 16, '2026-03-01');
+        $this->points($this->m, 10, '2026-09-01');
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Gefreiter'], 'date' => '2026-04-01'])->status);
+        $this->assertSame(200, $this->call('PUT', "/members/{$this->m}/rank", ['rank_id' => $r['Unteroffizier'], 'date' => '2026-09-15'])->status);
+        [$uffz, $gefr] = array_column($this->call('GET', "/members/{$this->m}")->data['rank_history'], 'id');
+        $path = fn (int $entry): string => "/members/{$this->m}/rank-history/{$entry}/rank";
+
+        $this->assertSame(404, $this->call('PUT', "/members/{$this->admin}/rank-history/{$uffz}/rank", ['rank_id' => $r['Feldwebel']])->status, 'Eintrag einer anderen Person');
+        $this->assertSame(404, $this->call('PUT', $path($uffz), ['rank_id' => 999])->status, 'unbekannter Dienstgrad');
+        $this->assertSame(400, $this->call('PUT', $path($uffz), ['rank_id' => $r['Unteroffizier']])->status, 'schon dieser');
+        $this->assertSame(400, $this->call('PUT', $path($uffz), ['rank_id' => $r['Gefreiter']])->status, 'der davor');
+        $this->assertSame(400, $this->call('PUT', $path($gefr), ['rank_id' => null])->status, 'davor war auch keiner');
+        $res = $this->call('PUT', $path($uffz), ['rank_id' => $r['Feldwebel']]);
+        $this->assertSame(400, $res->status, '26 Punkte am 15.09. reichen nicht für 30');
+        $this->assertStringContainsString('am 15.09.2026 noch nicht erreicht (fehlen 4 Punkte)', $res->data['message']);
+        $this->assertSame(400, $this->call('PUT', $path($gefr), ['rank_id' => $r['Unteroffizier']])->status, 'danach ginge auf denselben');
+        $this->users->current = $this->m;
+        $this->assertSame(403, $this->call('PUT', $path($uffz), ['rank_id' => $r['Obergefreiter']])->status, 'nur mit „Dienstgrade verwalten“');
+        $this->users->current = $this->admin;
+
+        // Ein älterer Eintrag: Der danach beginnt beim neuen Dienstgrad; der aktuelle bleibt.
+        $res = $this->call('PUT', $path($gefr), ['rank_id' => $r['Obergefreiter']]);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame(['Obergefreiter', 'promotion', 16], [$res->data['history'][1]['to'], $res->data['history'][1]['kind'], $res->data['history'][1]['points_at_change']]);
+        $this->assertSame(['Obergefreiter', 'Unteroffizier', 'promotion'], [$res->data['history'][0]['from'], $res->data['history'][0]['to'], $res->data['history'][0]['kind']]);
+        $this->assertSame('Unteroffizier', $res->data['rank']['rank']['title']);
+
+        // Der neueste Eintrag: auch der aktuelle Dienstgrad, „seit“ bleibt; die Art ergibt sich neu.
+        $since = $this->app->db->scalar('SELECT assigned_at FROM {member_ranks} WHERE user_id = ?', [$this->m]);
+        $res = $this->call('PUT', $path($uffz), ['rank_id' => $r['Gefreiter']]);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertSame('Gefreiter', $res->data['rank']['rank']['title']);
+        $this->assertSame($since, $this->app->db->scalar('SELECT assigned_at FROM {member_ranks} WHERE user_id = ?', [$this->m]));
+        $this->assertSame(['Gefreiter', 'demotion'], [$res->data['history'][0]['to'], $res->data['history'][0]['kind']]);
+
+        // Auf „kein“: aktueller Dienstgrad weg.
+        $res = $this->call('PUT', $path($uffz), ['rank_id' => null]);
+        $this->assertSame(200, $res->status, (string) json_encode($res->data));
+        $this->assertNull($res->data['rank']['rank']);
+        $this->assertSame(['demotion', null], [$res->data['history'][0]['kind'], $res->data['history'][0]['to']]);
+
+        $log = $this->app->db->select("SELECT action, changes FROM {change_log} WHERE type = 'Mitglied' ORDER BY id DESC");
+        $this->assertSame('update', $log[0]['action']);
+        $this->assertStringContainsString('Dienstgrad-Verlauf', (string) $log[0]['changes']);
+    }
+
     public function testEntryInHistoryCanBeDeleted(): void
     {
         $this->setUpApp(['ranks' => true]);

@@ -18,7 +18,7 @@ From the **Promotions** overview, tapping a name opens this window directly. **�
 - **Date**: the day of the change, today is preset. An earlier day is possible, a day in the future is not.
 - **Reason (optional)**: shown later in the history.
 - **Change {begriff.rank}**: saves the change.
-- Below it the history: every “Initial rank”, “Promotion” and “Demotion” with date, by whom, with {bereich.points} the total at that time, and the reason. The pencil on an entry changes its date, the bin deletes it.
+- Below it the history: every “Initial rank”, “Promotion” and “Demotion” with date, by whom, with {bereich.points} the total at that time, and the reason. The pencil on an entry changes its {begriff.rank} and date, the bin deletes it.
 
 ## Step by step
 ### Promote or demote
@@ -27,12 +27,14 @@ From the **Promotions** overview, tapping a name opens this window directly. **�
 3. Enter a **Reason** if needed.
 4. Tap **Change {begriff.rank}**. The change appears in the history immediately, with the chosen date.
 
-### Correct the date of a change afterwards
-1. In the history, tap the pencil (**Change date**) on the entry.
-2. Under **New date**, choose the correct day.
-3. Tap **Save date**. **Cancel** leaves everything as it was.
+### Correct a change afterwards
+1. In the history, tap the pencil (**Change entry**) on the entry.
+2. Under **New {begriff.rank}**, choose the correct {begriff.rank}, and under **New date** the correct day.
+3. Tap **Save**. **Cancel** leaves everything as it was.
 
-The new date must not be in the future, nor before the previous entry or after the next one. With {bereich.points}, the entry then shows the {bereich.points} total up to the new day; for a promotion it must reach the threshold of the {begriff.rank}. The current {begriff.rank} doesn’t change.
+**{begriff.rank}**: whether the entry is a promotion or a demotion follows from the {begriff.rank} before it. With {bereich.points}, a promotion must reach the threshold of the new {begriff.rank} with the total of the entry. The next entry then starts at the new {begriff.rank}; if it already goes to the same {begriff.rank}, the app refuses (delete one of the two entries instead). The {begriff.rank} before can’t be chosen (delete the entry instead). If you change the **newest** entry, the current {begriff.rank} changes too; “since” stays.
+
+**Date**: the new date must not be in the future, nor before the previous entry or after the next one. With {bereich.points}, the entry then shows the {bereich.points} total up to the new day; for a promotion it must reach the threshold of the {begriff.rank}. A new date alone doesn’t change the current {begriff.rank}.
 
 ### Delete an entry
 If a promotion or demotion was entered by mistake, delete it completely:

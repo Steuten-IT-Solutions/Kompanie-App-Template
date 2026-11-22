@@ -59,6 +59,10 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Mitglieds (z. B. aus [Beförderungen](app:verwaltung/befoerderungen)) lässt sich mit dem Papierkorb nach einer Rückfrage
   ganz löschen, mit demselben Recht wie das Ändern des Dienstgrads. Beim neuesten Eintrag gilt danach wieder der
   Dienstgrad davor; ältere Einträge verschwinden nur aus dem Verlauf. Das Löschen steht im Änderungsprotokoll.
+- **Dienstgrad einer Beförderung korrigieren**: Mit dem Stift (_Eintrag ändern_) im Verlauf änderst du jetzt neben dem
+  Datum auch den neuen Dienstgrad eines eingetragenen Wechsels. Beförderung oder Degradierung ergibt sich neu, mit
+  Punkten gilt die Schwelle mit dem Stand des Eintrags; der Eintrag danach beginnt beim neuen Dienstgrad. Beim neuesten
+  Eintrag ändert sich auch der aktuelle Dienstgrad. Die Korrektur steht im Änderungsprotokoll.
 - **Bald fällige Beförderungen**: Am Knopf [Beförderungen](app:verwaltung/befoerderungen) zeigt neben der Zahl im roten
   Kreis ein Kreis in der Farbe der Kompanie, wie viele Mitglieder bald die Schwelle für ihren nächsten Dienstgrad
   erreichen (es fehlt höchstens noch ein Punkt); sie stehen in der Übersicht im neuen Abschnitt „Bald erreicht“.
