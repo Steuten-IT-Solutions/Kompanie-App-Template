@@ -12,9 +12,8 @@ import { notePromotions } from '../promotionsDue';
 import { sources } from '../viewData';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
-import { localeTag, SOURCE_LOCALE, t, type Locale } from '../i18n';
-import { EditLanguageSwitch, useEditLocale } from '../language';
-import { nameIn, setNameTranslations, translatedName } from '../names';
+import { localeTag, t } from '../i18n';
+import { TranslationsHint } from '../language';
 
 const rank = brand.labels.rank;
 const sec = brand.labels.sections;
@@ -101,9 +100,8 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
   const badgeInput = useRef<HTMLInputElement>(null);
   // Ref statt State: Der Dateidialog meldet sich erst später, dann zählt der zuletzt gewählte Dienstgrad.
   const badgeFor = useRef<number | null>(null);
-  const editLang = useEditLocale();
-  // Bezeichnung in der Sprache, auf der eingerichtet wird (ohne eigenen Namen die deutsche)
-  const shown = (r: Rank): string => nameIn('rank', String(r.id), r.title, 'label', editLang);
+  // Gepflegt wird die Bezeichnung der Basissprache; weitere Sprachen unter Einstellungen → Sprachen
+  const shown = (r: Rank): string => r.title;
   const points = ranksUsePoints();
   // Schwellen immer pflegbar (gespeichert und geprüft auch ohne Punkte); sie wirken nur zusammen mit Punkten.
   const thresholdLabel = points
@@ -181,7 +179,7 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <div className="stack">
-      <EditLanguageSwitch />
+      <TranslationsHint />
       {missing && (
         <p className="small">
           {t('Noch nicht alle {ranks} haben eine {points}schwelle; für diese gelten keine Regeln zu {points}.', {
@@ -203,21 +201,12 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
             editing === r.id ? (
               <li key={r.id} {...sort.itemProps(i, 'card')}>
                 <RankForm
-                  key={editLang}
                   rank={r}
                   thresholdLabel={thresholdLabel}
                   busy={busy}
-                  editLang={editLang}
                   onCancel={() => setEditing(null)}
-                  onSave={async (data, foreign) => {
-                    const saved = await run(async () => {
-                      await api.updateRank(r.id, data);
-                      // Name der weiteren Sprache; die deutsche Bezeichnung geht unverändert mit
-                      if (foreign !== null) {
-                        const res = await api.saveTranslations(editLang, [{ kind: 'rank', ref: String(r.id), text: foreign }]);
-                        setNameTranslations(res.translations);
-                      }
-                    }, t('Gespeichert'));
+                  onSave={async (data) => {
+                    const saved = await run(() => api.updateRank(r.id, data), t('Gespeichert'));
                     if (saved) setEditing(null);
                   }}
                 />
@@ -333,54 +322,33 @@ export function RankList({ onToast }: { onToast: (msg: string) => void }) {
   );
 }
 
-/**
- * Dienstgrad ändern. Auf einer weiteren Sprache (editLang) trägt das Feld „Bezeichnung“ den Namen dieser Sprache ein
- * (leer: es gilt die deutsche); onSave bekommt ihn als zweiten Wert, sonst null.
- */
+/** Dienstgrad ändern (Bezeichnung in der Basissprache; weitere Sprachen unter Einstellungen → Sprachen). */
 function RankForm({
   rank: r,
   thresholdLabel,
   busy,
-  editLang,
   onSave,
   onCancel,
 }: {
   rank: Rank;
   thresholdLabel: string;
   busy: boolean;
-  editLang: Locale;
-  onSave: (data: { title: string; min_points?: number | null }, foreign: string | null) => void;
+  onSave: (data: { title: string; min_points?: number | null }) => void;
   onCancel: () => void;
 }) {
   const [title, setTitle] = useState(r.title);
   const [min, setMin] = useState(r.min_points === null ? '' : String(r.min_points));
-  const foreign = editLang !== SOURCE_LOCALE;
-  const savedForeign = translatedName('rank', String(r.id), editLang);
-  const [foreignTitle, setForeignTitle] = useState(savedForeign);
   return (
     <form
       className="form"
       onSubmit={(e) => {
         e.preventDefault();
-        const text = foreignTitle.trim();
-        onSave({ title: title.trim(), min_points: parseThreshold(min) }, foreign && text !== savedForeign ? text : null);
+        onSave({ title: title.trim(), min_points: parseThreshold(min) });
       }}
     >
       <label className="field">
         <span>{t('Bezeichnung')}</span>
-        {foreign ? (
-          <input
-            type="text"
-            lang={editLang}
-            maxLength={60}
-            value={foreignTitle}
-            placeholder={r.title}
-            onChange={(e) => setForeignTitle(e.target.value)}
-            autoFocus
-          />
-        ) : (
-          <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
-        )}
+        <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
       </label>
       <label className="field">
         <span>{t('{label} (leer = ohne)', { label: thresholdLabel })}</span>

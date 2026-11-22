@@ -41,12 +41,7 @@ Tippe unten auf **Verwaltung**, dann auf **Einrichtungen** und auf den Knopf **{
 3. Tippe auf **Speichern** (oder **Abbrechen**).
 
 ### Den Namen auf Englisch eintragen
-Hat eure App außer Deutsch auch Englisch eingeschaltet, steht oben **Einrichten auf**. So trägst du den englischen Namen eines {begriff.rank}s ein:
-1. Wähle oben bei **Einrichten auf** die Sprache **English**. Die Liste zeigt jetzt die englischen Namen; wo noch keiner eingetragen ist, den deutschen.
-2. Tippe beim {begriff.rank} auf **Ändern** und trage bei **Bezeichnung** den englischen Namen ein. Im leeren Feld steht grau der deutsche.
-3. Tippe auf **Speichern**. Die deutsche Bezeichnung bleibt, wie sie ist.
-
-Wer die App auf Englisch nutzt, sieht dann den englischen Namen, auch in Benachrichtigungen. Ein leeres Feld löscht den englischen Namen wieder; dann gilt der deutsche. Neue {bereich.ranks} bekommen unter **Neuer {begriff.rank}** immer zuerst den deutschen Namen, auch wenn oben **English** gewählt ist.
+Hat eure App außer Deutsch auch Englisch eingeschaltet, trägt ein Admin die englischen Namen der {bereich.ranks} unter **Einstellungen → Sprachen** im Abschnitt **Übersetzungen** ein. Hier pflegst du die deutsche Bezeichnung. Wer die App auf Englisch nutzt, sieht den englischen Namen, auch in Benachrichtigungen; fehlt er, den deutschen.
 
 ### Ein Abzeichen hochladen
 1. Tippe beim {begriff.rank} auf **Abzeichen hochladen** und wähle die Bilddatei.

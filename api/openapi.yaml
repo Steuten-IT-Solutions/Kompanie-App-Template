@@ -7299,6 +7299,57 @@ paths:
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
   /admin/translations:
+    get:
+      tags: [Einstellungen]
+      summary: Alle übersetzbaren Namen einer weiteren Sprache an einer Stelle
+      x-capability: manage_settings
+      description: |
+        Einstellungen → Sprachen → Übersetzungen: je Art (`nav`, `role`, `rank`, `office`, `office_group`, `event_kind`,
+        `menu`) die Einträge mit dem Text der Basissprache (`source`, heute immer Deutsch), dem eingetragenen Text der Sprache
+        (`text`, leer ohne) und dem, was Leser ohne Eintrag sehen (`fallback`, z. B. die übersetzte Vorgabe „Guest“ zu „Gast“,
+        sonst wie `source`). Eine Art fehlt ohne das Recht, das sie zum Pflegen verlangt (siehe PUT), oder wenn ihr Bereich
+        aus ist (`rank` ohne Dienstgrade, `office` und `office_group` ohne Ämter). `nav` enthält nur Bereiche, die an sind,
+        eigene Seiten (`seiten/<id>`) und `intern`. 400, wenn keine weitere Sprache eingeschaltet ist oder `locale` keine ist.
+      parameters:
+        - name: locale
+          in: query
+          required: false
+          description: Weitere eingeschaltete Sprache; ohne die erste.
+          schema: { type: string, enum: [en] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [locale, source_locale, groups]
+                properties:
+                  locale: { type: string, enum: [en] }
+                  source_locale: { type: string, enum: [de] }
+                  groups:
+                    type: array
+                    items:
+                      type: object
+                      required: [kind, items]
+                      properties:
+                        kind: { type: string, enum: [nav, role, rank, office, office_group, event_kind, menu] }
+                        items:
+                          type: array
+                          items:
+                            type: object
+                            required: [kind, ref, field, source, text, fallback, max]
+                            properties:
+                              kind: { type: string, enum: [nav, role, rank, office, office_group, event_kind, menu] }
+                              ref: { type: string }
+                              field: { type: string, enum: [label] }
+                              source: { type: string }
+                              text: { type: string }
+                              fallback: { type: string }
+                              max: { type: integer }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
     put:
       tags: [Einstellungen]
       summary: Eigene Namen in einer weiteren Sprache speichern

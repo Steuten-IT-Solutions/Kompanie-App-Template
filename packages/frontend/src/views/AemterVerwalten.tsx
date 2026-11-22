@@ -25,9 +25,8 @@ import { Caps, Empty, ErrorBox, FileInput, Loading, useAsync } from '../ui';
 import { nameWithCompanions, termYears } from './Aemter';
 import { confirmAsk } from '../ask';
 import { IconButton } from '../icons';
-import { SOURCE_LOCALE, t, tn, type Locale } from '../i18n';
-import { EditLanguageSwitch, LANGUAGE_NAMES, useEditLocale } from '../language';
-import { nameIn, setNameTranslations, translatedName, type NameKind } from '../names';
+import { t, tn } from '../i18n';
+import { TranslationsHint } from '../language';
 
 const sec = brand.labels.sections;
 
@@ -55,54 +54,12 @@ function useRunner(onToast: Toast, after: () => void) {
   return { busy, error, setError, run };
 }
 
-/**
- * Namen in der Sprache, auf der eingerichtet wird („Einrichten auf“): der eigene Name dieser Sprache, sonst der deutsche.
- * Auf Deutsch der gespeicherte deutsche Name.
- */
+/** Namen in der Verwaltung: die der Basissprache (weitere Sprachen unter Einstellungen → Sprachen). */
 function useShownNames() {
-  const lang = useEditLocale();
   return {
-    office: (o: { id: number; title: string }) => nameIn('office', String(o.id), o.title, 'label', lang),
-    group: (g: { id: number; title: string }) => nameIn('office_group', String(g.id), g.title, 'label', lang),
+    office: (o: { id: number; title: string }) => o.title,
+    group: (g: { id: number; title: string }) => g.title,
   };
-}
-
-/**
- * Bezeichnung auf einer weiteren Sprache (Einrichten auf ≠ Deutsch): Das Feld trägt den Namen dieser Sprache, der
- * deutsche bleibt gespeichert und steht als Platzhalter da. foreign ist false auf Deutsch.
- */
-function useForeignName(kind: NameKind, id: number) {
-  const lang: Locale = useEditLocale();
-  const saved = translatedName(kind, String(id), lang);
-  const [text, setText] = useState(saved);
-  const [seen, setSeen] = useState({ lang, saved });
-  if (seen.lang !== lang || seen.saved !== saved) {
-    setSeen({ lang, saved });
-    setText(saved);
-  }
-  return {
-    lang,
-    foreign: lang !== SOURCE_LOCALE,
-    text,
-    setText,
-    /** Speichert den Namen der Sprache, wenn er sich geändert hat ('' löscht ihn). */
-    async save() {
-      const next = text.trim();
-      if (lang === SOURCE_LOCALE || next === saved) return;
-      setNameTranslations((await api.saveTranslations(lang, [{ kind, ref: String(id), text: next }])).translations);
-    },
-  };
-}
-
-/** Hinweis an einer Bezeichnung auf einer weiteren Sprache: Die Einzahl gibt es nur auf Deutsch. */
-function ForeignSingularNote({ lang }: { lang: Locale }) {
-  return (
-    <p className="muted small">
-      {t('Die Einzahl gibt es nur auf Deutsch; auf {language} gilt die Bezeichnung auch für eine einzelne Amtszeit.', {
-        language: LANGUAGE_NAMES[lang],
-      })}
-    </p>
-  );
 }
 
 function FormError({ error }: { error: string | null }) {
@@ -128,7 +85,7 @@ export function OfficeAdmin({ path, onToast }: { path: string[]; onToast: Toast 
   const overview = data!;
   return (
     <KnownPhotos.Provider value={knownPhotos(overview.offices)}>
-      <EditLanguageSwitch />
+      <TranslationsHint />
       {/^\d+$/.test(path[0] ?? '') ? (
         <OfficeEditorFor overview={overview} id={Number(path[0])} onToast={onToast} reload={reload} />
       ) : (
@@ -201,8 +158,8 @@ function OfficeOverview({
       key: `g${g.id}`,
       group: g.id as number | null,
       title: names.group(g),
-      // Ein eigener Name der Sprache gilt auch für eine einzelne gemeinsame Amtszeit (Einzahl nur auf Deutsch)
-      singular: names.group(g) !== g.title ? names.group(g) : g.singular || g.title,
+      // Einzahl für eine einzelne gemeinsame Amtszeit
+      singular: g.singular || g.title,
       joint: !!g.joint_terms,
     })),
     { key: 'none', group: null, title: t('Ohne Gruppe'), singular: '', joint: false },
@@ -429,7 +386,6 @@ function GroupForm({
 }) {
   const [title, setTitle] = useState(group.title);
   const [singular, setSingular] = useState(group.singular ?? '');
-  const own = useForeignName('office_group', group.id);
   return (
     <form
       className="form"
@@ -437,34 +393,17 @@ function GroupForm({
         e.preventDefault();
         onSave(async () => {
           await api.updateOfficeGroup(group.id, title.trim(), singular.trim());
-          await own.save();
         });
       }}
     >
       <label className="field">
         <span>{t('Bezeichnung')}</span>
-        {own.foreign ? (
-          <input
-            type="text"
-            lang={own.lang}
-            maxLength={60}
-            value={own.text}
-            placeholder={group.title}
-            onChange={(e) => own.setText(e.target.value)}
-            autoFocus
-          />
-        ) : (
-          <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
-        )}
+        <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
       </label>
-      {own.foreign ? (
-        <ForeignSingularNote lang={own.lang} />
-      ) : (
-        <label className="field">
-          <span>{t('Einzahl (optional, z. B. „Königshaus“ zu „Königshäuser“)')}</span>
-          <input type="text" maxLength={60} value={singular} placeholder={title} onChange={(e) => setSingular(e.target.value)} />
-        </label>
-      )}
+      <label className="field">
+        <span>{t('Einzahl (optional, z. B. „Königshaus“ zu „Königshäuser“)')}</span>
+        <input type="text" maxLength={60} value={singular} placeholder={title} onChange={(e) => setSingular(e.target.value)} />
+      </label>
       <div className="button-row">
         <button className="btn" type="submit" disabled={busy}>
           {t('Speichern')}
@@ -515,7 +454,6 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
   const [editing, setEditing] = useState<number | 'new' | null>(null);
   const people = usePeople();
   const names = useShownNames();
-  const own = useForeignName('office', office.id);
   const shown = names.office(office);
 
   return (
@@ -592,40 +530,24 @@ function OfficeEditor({ office, groups, onToast, reload }: { office: Office; gro
               singular: singular.trim(),
               group_id: group === '' ? null : Number(group),
             });
-            await own.save();
           }, t('Gespeichert'));
         }}
       >
         <h3>{t('Amt bearbeiten')}</h3>
         <label className="field">
           <span>{t('Bezeichnung')}</span>
-          {own.foreign ? (
-            <input
-              type="text"
-              lang={own.lang}
-              maxLength={60}
-              value={own.text}
-              placeholder={office.title}
-              onChange={(e) => own.setText(e.target.value)}
-            />
-          ) : (
-            <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required />
-          )}
+          <input type="text" maxLength={60} value={title} onChange={(e) => setTitle(e.target.value)} required />
         </label>
-        {own.foreign ? (
-          <ForeignSingularNote lang={own.lang} />
-        ) : (
-          <label className="field">
-            <span>{t('Einzahl (optional, z. B. „Kapitän“ zu „Kapitäne“)')}</span>
-            <input
-              type="text"
-              maxLength={60}
-              value={singular}
-              placeholder={office.linked_title ?? ''}
-              onChange={(e) => setSingular(e.target.value)}
-            />
-          </label>
-        )}
+        <label className="field">
+          <span>{t('Einzahl (optional, z. B. „Kapitän“ zu „Kapitäne“)')}</span>
+          <input
+            type="text"
+            maxLength={60}
+            value={singular}
+            placeholder={office.linked_title ?? ''}
+            onChange={(e) => setSingular(e.target.value)}
+          />
+        </label>
         <label className="field">
           <span>{t('Gruppe')}</span>
           <select value={group} onChange={(e) => setGroup(e.target.value)}>

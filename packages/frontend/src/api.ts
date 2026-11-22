@@ -725,6 +725,29 @@ export function applyMaintenance(m: MaintenanceInfo): void {
   window.dispatchEvent(new Event(CONFIG_CHANGED));
 }
 
+/** Art eines übersetzbaren Namens (wie TranslationService::KINDS) */
+export type TranslationKind = NameKind;
+
+/** Ein übersetzbarer Name (GET /admin/translations) */
+export interface TranslationItem {
+  kind: TranslationKind;
+  ref: string;
+  field: string;
+  /** Text der Basissprache */
+  source: string;
+  /** Eingetragene Übersetzung ('' ohne) */
+  text: string;
+  /** Was Leser ohne Eintrag sehen (übersetzte Vorgabe oder der Text der Basissprache) */
+  fallback: string;
+  max: number;
+}
+
+export interface TranslationOverview {
+  locale: Locale;
+  source_locale: Locale;
+  groups: { kind: TranslationKind; items: TranslationItem[] }[];
+}
+
 export interface RoleInfo {
   key: Level;
   label: string;
@@ -3162,6 +3185,8 @@ export const api = {
     request<{ page: string; layouts: TileLayouts }>('PUT', '/me/tiles', { page, cols, tiles }),
   /** Sprache am Konto (Plan „Mehrsprachigkeit“); null löscht die Wahl */
   setMyLocale: (l: Locale | null) => request<{ locale: Locale | null }>('PUT', '/me/locale', { locale: l }),
+  /** Alle übersetzbaren Namen mit Text der Basissprache (Einstellungen → Sprachen → Übersetzungen) */
+  translationOverview: (lang: Locale) => request<TranslationOverview>('GET', '/admin/translations', undefined, { locale: lang }),
   /** Eigene Namen in einer weiteren Sprache (Einrichten auf …); text '' löscht die Übersetzung */
   saveTranslations: (locale: Locale, items: { kind: NameKind; ref: string; field?: string; text: string }[]) =>
     request<{ translations: NameTranslations | [] }>('PUT', '/admin/translations', { locale, items }),

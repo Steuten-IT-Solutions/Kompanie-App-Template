@@ -38,12 +38,7 @@ Tap **Admin** at the bottom, then **Setup** and the **{bereich.ranks}** button. 
 3. Tap **Save** (or **Cancel**).
 
 ### Enter the name in English
-If your app has English switched on besides German, **Set up in:** appears at the top. This is how you enter the English name of a {begriff.rank}:
-1. At the top, under **Set up in:**, choose **English**. The list now shows the English names; where none has been entered yet, the German one.
-2. Tap **Edit** next to the {begriff.rank} and enter the English name under **Name**. The empty field shows the German one in grey.
-3. Tap **Save**. The German name stays as it is.
-
-Those using the app in English then see the English name, including in notifications. An empty field deletes the English name again; the German one then applies. New {bereich.ranks} always get the German name first under **New {begriff.rank}**, even if **English** is chosen at the top.
+If your app has English switched on besides German, an admin enters the English names of the {bereich.ranks} under **Settings → Languages** in the **Translations** section. Here you maintain the German name. Those using the app in English see the English name, including in notifications; if it is missing, the German one.
 
 ### Upload a badge
 1. Tap **Upload badge** next to the {begriff.rank} and choose the image file.

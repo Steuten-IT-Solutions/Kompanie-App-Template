@@ -8247,6 +8247,27 @@ fieldset.block-source legend {
   margin: 0;
 }
 
+/* Einstellungen → Sprachen → Übersetzungen: je Art ein aufklappbarer Abschnitt, je Name Basissprache und Feld */
+.translation-group {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-2);
+}
+.translation-group > summary {
+  cursor: pointer;
+  padding: var(--space-2) 0;
+}
+.translation-row {
+  margin-top: var(--space-2);
+}
+@media (min-width: 900px) {
+  .translation-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: var(--space-3);
+  }
+}
+
 /* Inhalte je Sprache (PR 9b): Hinweis „Nur auf Deutsch verfügbar“ und Blöcke in einer weiteren Sprache schreiben */
 .untranslated-note {
   margin: 0 0 0.75rem;

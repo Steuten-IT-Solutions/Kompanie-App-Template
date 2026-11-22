@@ -61,7 +61,7 @@ The default applies to every person who hasn’t arranged the page themselves, i
 
 A submenu needs at least one section. **Remove submenu** moves its sections to **Not in the navigation**; then give them a new place.
 
-This is how you enter the English name of a submenu (if your app has English switched on): at the top under **Set up in:**, choose **English**, enter the English name for the submenu under **Name of the submenu** (the German one is in grey) and tap **Save navigation**. Creating and renaming is done in **Deutsch**; if you rename a submenu there, enter the English name again afterwards. For **Members’ area** in the standard navigation it is the same name as under **Rename**.
+You enter the English name of a submenu (if your app has English switched on) under [Languages](seite:admin-sprachen) in the **Translations** section under **Submenus**. If you rename a submenu here, enter the English name again afterwards. **Members’ area** of the standard navigation is listed there under **Navigation sections**.
 
 ### Rename a section or choose a different icon
 1. Tap **Rename** on the section.
@@ -70,7 +70,7 @@ This is how you enter the English name of a submenu (if your app has English swi
 
 The custom name applies everywhere in the app: in the bar at the bottom, in the headings, in the admin area, in notifications and emails and in this help. The addresses stay the same, so shared links keep working. For a custom page it is only the name in the bar; its title stays. The standard name is shown next to a custom name so that you can find the section in this help. If two items have the same name, the page points this out.
 
-If your app has English switched on besides German, this is how you enter the English name: at the top under **Set up in:**, choose **English** and rename the section as above. More on this: [Languages](seite:admin-sprachen).
+If your app has English switched on besides German, you enter the English names of the sections under [Languages](seite:admin-sprachen) in the **Translations** section.
 
 This way you can also rename **Members’ area** of the standard navigation without creating your own navigation: as long as you don’t change the order in the bar at the bottom, the standard navigation stays.
 

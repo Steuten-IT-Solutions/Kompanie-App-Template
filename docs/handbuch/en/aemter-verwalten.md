@@ -66,7 +66,7 @@ If all offices of a group always have the same years, e.g. a royal household or 
 2. **Delete office** deletes the office with all its terms. **‹ All {bereich.offices}** takes you back.
 
 ### Enter English names
-If your app has English switched on besides German, you enter the English names like this: at the top, under **Set up in:**, choose **English** and rename the group or office as above. The **Name** field then shows the English name, with the German one as a placeholder; the German name stays as it is. Those using the app in English see the English name, including in reports; if it is missing, the German one appears. The singular exists only in German; in English the English name also applies to a single term. You always create new groups and offices with the German name.
+If your app has English switched on besides German, an admin enters the English names of the groups and offices under **Settings → Languages** in the **Translations** section. Here you maintain the German names. Those using the app in English see the English name, including in reports; if it is missing, the German one appears. The singular exists only in German; in English the English name also applies to a single term.
 
 ### Link names to members
 If someone appears in terms only with their name (**No profile**) but has since been created as a member (even without access) or former member, you link the entries to them.

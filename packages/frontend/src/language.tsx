@@ -6,7 +6,7 @@
  * Seite neu: Die Texte stehen beim Laden fest (i18n.ts).
  */
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
-import { api, config } from './api';
+import { api, can, config } from './api';
 import { useBackClose } from './backClose';
 import { isLocale, locale, saveDeviceLocale, SOURCE_LOCALE, t, type Locale } from './i18n';
 
@@ -267,6 +267,20 @@ export function EditLanguageSwitch({ content = false }: { content?: boolean }) {
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * Hinweis auf Seiten mit eigenen Namen (Navigation, Rollen, Dienstgrade, Ämter, Terminarten): Die Namen in weiteren
+ * Sprachen stehen zentral unter Einstellungen → Sprachen → Übersetzungen. Nur mit weiterer Sprache und nur für Admins
+ * (Einstellungen).
+ */
+export function TranslationsHint() {
+  if (!hasLanguageChoice() || !can('manage_settings')) return null;
+  return (
+    <p className="small muted translations-hint">
+      {t('Namen in weiteren Sprachen trägst du zentral ein:')} <a href="#/einstellungen/sprachen">{t('Einstellungen → Sprachen')}</a>
+    </p>
   );
 }
 

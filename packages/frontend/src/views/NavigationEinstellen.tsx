@@ -1,9 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { defaultSections } from '../generated/brand';
 import { adminTabs, adminTileCatalog } from '../adminNav';
-import { SOURCE_LOCALE, t } from '../i18n';
-import { useEditLocale } from '../language';
-import { setNameTranslations, translatedName } from '../names';
+import { t } from '../i18n';
 import { api, applyNavigation, config, levelLabel, type Capability, type Feature, type NavigationAdmin, type PageSummary } from '../api';
 import { useDragSort } from '../dragSort';
 import {
@@ -153,16 +151,6 @@ function Editor({
   const savedNames: NavNames = Array.isArray(data.names) ? {} : data.names;
   const savedStart: NavStart = Array.isArray(data.start) ? {} : data.start;
   const [names, setNames] = useState<NavNames>(savedNames);
-  // Einrichten auf einer weiteren Sprache: Namen dieser Sprache (names.ts), der deutsche bleibt, wie er ist
-  const editLang = useEditLocale();
-  const foreign = editLang !== SOURCE_LOCALE;
-  const savedForeign = (key: string): string => translatedName('nav', key, editLang);
-  const [foreignNames, setForeignNames] = useState<Record<string, string>>({});
-  const foreignValue = (key: string): string => foreignNames[key] ?? savedForeign(key);
-  // Untermenüs: Kennung ist ihr deutscher Name
-  const savedForeignMenu = (label: string): string => translatedName('menu', label.trim(), editLang);
-  const [foreignMenus, setForeignMenus] = useState<Record<string, string>>({});
-  const foreignMenuValue = (label: string): string => foreignMenus[label.trim()] ?? savedForeignMenu(label);
   const [start, setStart] = useState<NavStart>(savedStart);
   const [showLabels, setShowLabels] = useState(data.show_labels);
   const internLabel = savedNames.intern?.label || defaultLabel('intern', pages);
@@ -252,27 +240,10 @@ function Editor({
           ...(keepDefault ? { intern_order: ownIntern } : {}),
           admin_order: orderToSave(adminStart, adminSetup),
         };
-    // Namen der weiteren Sprache, die sich geändert haben (beim Zurücksetzen alle löschen)
-    const changedForeign = Object.keys(
-      reset ? Object.fromEntries([...NAV_TARGETS, ...pageTargets, 'intern'].map((k) => [k, ''])) : foreignNames,
-    )
-      .map((ref) => ({ kind: 'nav' as const, ref, text: reset ? '' : (foreignNames[ref] ?? '').trim() }))
-      .filter((i) => i.text !== savedForeign(i.ref));
-    // Untermenüs (beim Zurücksetzen die der bisherigen Leisten löschen)
-    const menuRefs = reset
-      ? [...draft.items, ...guestDraft.items].flatMap((i) => (typeof i === 'string' ? [] : [i.label.trim()]))
-      : Object.keys(foreignMenus);
-    const changedMenus = [...new Set(menuRefs)]
-      .filter((ref) => ref !== '')
-      .map((ref) => ({ kind: 'menu' as const, ref, text: reset ? '' : (foreignMenus[ref] ?? '').trim() }))
-      .filter((i) => i.text !== savedForeignMenu(i.ref));
-    const translations = [...changedForeign, ...changedMenus];
     // Neue Namen stehen überall in der App (auch in Überschriften): dann einmal neu laden.
-    const reload =
-      JSON.stringify(body.names) !== JSON.stringify(savedNames) || body.show_labels !== data.show_labels || translations.length > 0;
+    const reload = JSON.stringify(body.names) !== JSON.stringify(savedNames) || body.show_labels !== data.show_labels;
     try {
       const next = await api.saveNavigation(body);
-      if (translations.length > 0 && foreign) setNameTranslations((await api.saveTranslations(editLang, translations)).translations);
       applyNavigation(next);
       onSaved(next);
       onToast(reset ? t('Standardnavigation wiederhergestellt') : t('Navigation gespeichert'));
@@ -377,29 +348,14 @@ function Editor({
         <summary>{names[key]?.label?.trim() ? t('Umbenennen (Standard: {name})', { name: standard }) : t('Umbenennen')}</summary>
         <label className="field">
           <span>{isPageTarget(key) ? t('Name im Tab (leer = Titel der Seite)') : t('Eigener Name (leer = Standard)')}</span>
-          {foreign ? (
-            <input
-              type="text"
-              lang={editLang}
-              value={foreignValue(key)}
-              placeholder={names[key]?.label?.trim() || standard}
-              maxLength={data.label_max}
-              disabled={busy}
-              onChange={(e) => {
-                setForeignNames((n) => ({ ...n, [key]: e.target.value }));
-                setSaveError(null);
-              }}
-            />
-          ) : (
-            <input
-              type="text"
-              value={names[key]?.label ?? ''}
-              placeholder={standard}
-              maxLength={data.label_max}
-              disabled={busy}
-              onChange={(e) => rename(key, { label: e.target.value })}
-            />
-          )}
+          <input
+            type="text"
+            value={names[key]?.label ?? ''}
+            placeholder={standard}
+            maxLength={data.label_max}
+            disabled={busy}
+            onChange={(e) => rename(key, { label: e.target.value })}
+          />
         </label>
         <label className="field">
           <span>{t('Symbol')}</span>
@@ -507,43 +463,13 @@ function Editor({
                 <div className="row-main nav-menu">
                   <label className="field">
                     <span>{t('Name des Untermenüs')}</span>
-                    {foreign && keepDefault && !editingGuest ? (
-                      // Standardnavigation: Das Untermenü ist „Intern“, sein Name in dieser Sprache wie unter „Umbenennen“.
-                      <input
-                        type="text"
-                        lang={editLang}
-                        value={foreignValue('intern')}
-                        placeholder={item.label}
-                        maxLength={data.label_max}
-                        disabled={busy}
-                        onChange={(e) => {
-                          setForeignNames((n) => ({ ...n, intern: e.target.value }));
-                          setSaveError(null);
-                        }}
-                      />
-                    ) : foreign ? (
-                      // Weitere Sprache: Name dieser Sprache zum deutschen (Platzhalter); umbenannt wird auf Deutsch.
-                      <input
-                        type="text"
-                        lang={editLang}
-                        value={foreignMenuValue(item.label)}
-                        placeholder={item.label}
-                        maxLength={data.label_max}
-                        disabled={busy || !item.label.trim()}
-                        onChange={(e) => {
-                          setForeignMenus((n) => ({ ...n, [item.label.trim()]: e.target.value }));
-                          setSaveError(null);
-                        }}
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        value={item.label}
-                        maxLength={data.label_max}
-                        disabled={busy}
-                        onChange={(e) => updateMenu(index, { label: e.target.value })}
-                      />
-                    )}
+                    <input
+                      type="text"
+                      value={item.label}
+                      maxLength={data.label_max}
+                      disabled={busy}
+                      onChange={(e) => updateMenu(index, { label: e.target.value })}
+                    />
                   </label>
                   <label className="field">
                     <span>{t('Symbol')}</span>

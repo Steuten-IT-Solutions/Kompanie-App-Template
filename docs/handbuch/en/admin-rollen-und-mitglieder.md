@@ -37,7 +37,7 @@ At the top you switch between **Roles** (the list) and **Who sees what** (the ov
 2. Change the name, permissions, accounts or {bereich.points} factor and tap **Save**. With **Cancel** you discard the changes.
 3. To delete a custom role, tap **Delete** instead. If people still have the role, first choose under **On deletion, the … people get the role** which role they get instead. Confirm the question.
 
-You enter a role’s name in English (if your app has English switched on) by choosing **English** at the top under **Set up in:** and then editing the role. More on this: [Languages](seite:admin-sprachen).
+You enter a role’s name in English (if your app has English switched on) under [Languages](seite:admin-sprachen) in the **Translations** section.
 
 ### Decide in the overview who sees what
 1. Tap **Who sees what** at the top.

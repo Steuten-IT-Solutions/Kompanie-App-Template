@@ -1,8 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import brand from '../generated/brand';
-import { SOURCE_LOCALE, t, tn, type Locale } from '../i18n';
-import { EditLanguageSwitch, Flag, LANGUAGE_NAMES, useEditLocale } from '../language';
-import { setNameTranslations, translatedName } from '../names';
+import { t, tn, type Locale } from '../i18n';
+import { Flag, LANGUAGE_NAMES, TranslationsHint } from '../language';
 import {
   api,
   can,
@@ -35,6 +34,7 @@ import NavigationEinstellen from './NavigationEinstellen';
 import Rollen from './Rollen';
 import Wartung from './Wartung';
 import Nutzung from './Nutzung';
+import Uebersetzungen from './Uebersetzungen';
 import GalleryAlbums from './GalerieAlben';
 import { MaintenanceCard } from '../maintenance';
 import { navigate } from '../router';
@@ -128,8 +128,8 @@ export default function Einstellungen({ path, onToast }: { path: string[]; onToa
       <button type="button" className="btn btn-link back" onClick={() => navigate('einstellungen')}>
         ‹ {t('Einstellungen')}
       </button>
-      {/* Seiten mit eigenen Namen je Sprache: oben die Wahl „Einrichten auf“ */}
-      {(page.id === 'navigation' || page.id === 'rollen') && <EditLanguageSwitch />}
+      {/* Seiten mit eigenen Namen: Hinweis auf die Übersetzungen unter Einstellungen → Sprachen */}
+      {(page.id === 'navigation' || page.id === 'rollen') && <TranslationsHint />}
       {page.id === 'bereiche' && <Bereiche onToast={onToast} />}
       {page.id === 'navigation' && <NavigationEinstellen onToast={onToast} />}
       {page.id === 'rollen' && (
@@ -239,7 +239,13 @@ function Verbindung({
       </>
     );
   if (page === 'rechtliches') return <Legal key={revision} {...props} />;
-  if (page === 'sprachen') return <Languages key={revision} {...props} />;
+  if (page === 'sprachen')
+    return (
+      <>
+        <Languages key={revision} {...props} />
+        <Uebersetzungen onToast={onToast} />
+      </>
+    );
   return s.news ? <News key={revision} {...props} /> : null;
 }
 
@@ -1465,18 +1471,12 @@ const KINDS_MAX = 30;
 /**
  * Terminarten (z. B. Versammlung): zur Auswahl am Termin und an Anwesenheitslisten, etwa als Voraussetzung für die
  * Aufnahme. Gespeichert wird die Bezeichnung; entfernte Arten bleiben an Terminen und Listen stehen. Je Art ein Haken, ob
- * sie als Schild neben dem Titel des Termins steht (Vorgabe: ja). Auf einer weiteren Sprache („Einrichten auf“) trägt
- * jedes Feld den Namen der Art in dieser Sprache ein (Kennung ist der deutsche Name); anlegen, umbenennen und entfernen
- * geht auf Deutsch.
+ * sie als Schild neben dem Titel des Termins steht (Vorgabe: ja). Namen in weiteren Sprachen stehen unter
+ * Einstellungen → Sprachen → Übersetzungen (Kennung ist der deutsche Name).
  */
 function EventKinds({ onToast }: { onToast: (msg: string) => void }) {
   const saved = eventKinds();
   const savedHidden = eventKindsHidden();
-  const editLang = useEditLocale();
-  const foreign = editLang !== SOURCE_LOCALE;
-  const [foreignNames, setForeignNames] = useState<Record<string, string>>({});
-  const savedForeign = (name: string): string => translatedName('event_kind', name, editLang);
-  const foreignValue = (name: string): string => foreignNames[name] ?? savedForeign(name);
   const toRows = (kinds: string[], hidden: string[]) =>
     kinds.length > 0 ? kinds.map((name) => ({ name, tag: !hidden.includes(name) })) : [{ name: '', tag: true }];
   const [rows, setRows] = useState(() => toRows(saved, savedHidden));
@@ -1493,27 +1493,14 @@ function EventKinds({ onToast }: { onToast: (msg: string) => void }) {
     const lower = list.map((n) => n.toLowerCase());
     const twice = list.find((_, i) => lower.indexOf(lower[i]) !== i);
     if (twice) return setError(t('Die Terminart „{kind}“ steht doppelt in der Liste.', { kind: twice }));
-    // Namen der weiteren Sprache, die sich geändert haben (nur zu gespeicherten Arten)
-    const translations = foreign
-      ? Object.keys(foreignNames)
-          .filter((ref) => saved.includes(ref))
-          .map((ref) => ({ kind: 'event_kind' as const, ref, text: (foreignNames[ref] ?? '').trim() }))
-          .filter((i) => i.text !== savedForeign(i.ref))
-      : [];
     const kindsChanged = list.join('\n') !== saved.join('\n') || hidden.join('\n') !== savedHidden.join('\n');
-    if (!kindsChanged && translations.length === 0) return onToast(t('Nichts geändert.'));
+    if (!kindsChanged) return onToast(t('Nichts geändert.'));
     setBusy(true);
     setError(null);
     try {
-      if (kindsChanged) {
-        const r = await api.setEventKinds(list, hidden);
-        applyEventKinds(r.kinds, r.hidden ?? hidden);
-        setRows(toRows(r.kinds, r.hidden ?? hidden));
-      }
-      if (translations.length > 0) {
-        setNameTranslations((await api.saveTranslations(editLang, translations)).translations);
-        setForeignNames({});
-      }
+      const r = await api.setEventKinds(list, hidden);
+      applyEventKinds(r.kinds, r.hidden ?? hidden);
+      setRows(toRows(r.kinds, r.hidden ?? hidden));
       onToast(t('Gespeichert'));
     } catch (err) {
       setError((err as Error).message);
@@ -1524,8 +1511,7 @@ function EventKinds({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <Section id="terminarten" title={t('Terminarten')} busy={busy} error={error} onSubmit={submit}>
-      {/* Eigene Namen je Sprache: Wahl „Einrichten auf“ */}
-      <EditLanguageSwitch />
+      <TranslationsHint />
       <p className="small muted">
         {t(
           'Zum Beispiel Versammlung oder Arbeitsdienst. Wer Termine pflegt, wählt die Art beim Termin, auch bei Terminen aus Google oder iCal. Anwesenheitslisten übernehmen sie. Steht der Name einer Art im Titel, schlägt die App sie vor.',
@@ -1536,27 +1522,14 @@ function EventKinds({ onToast }: { onToast: (msg: string) => void }) {
         {rows.map((r, i) => (
           <div className="event-kind-edit" key={i}>
             <div className="poll-option-edit">
-              {foreign ? (
-                <input
-                  type="text"
-                  lang={editLang}
-                  aria-label={t('Terminart {n}', { n: i + 1 })}
-                  value={saved.includes(r.name) ? foreignValue(r.name) : ''}
-                  placeholder={r.name}
-                  maxLength={KIND_MAX}
-                  disabled={!saved.includes(r.name)}
-                  onChange={(e) => setForeignNames((n) => ({ ...n, [r.name]: e.target.value }))}
-                />
-              ) : (
-                <input
-                  type="text"
-                  aria-label={t('Terminart {n}', { n: i + 1 })}
-                  value={r.name}
-                  maxLength={KIND_MAX}
-                  onChange={(e) => update(i, { name: e.target.value })}
-                />
-              )}
-              {!foreign && (rows.length > 1 || r.name !== '') && (
+              <input
+                type="text"
+                aria-label={t('Terminart {n}', { n: i + 1 })}
+                value={r.name}
+                maxLength={KIND_MAX}
+                onChange={(e) => update(i, { name: e.target.value })}
+              />
+              {(rows.length > 1 || r.name !== '') && (
                 <button
                   type="button"
                   className="btn btn-link"
@@ -1578,8 +1551,7 @@ function EventKinds({ onToast }: { onToast: (msg: string) => void }) {
             </label>
           </div>
         ))}
-        {foreign && <p className="small muted">{t('Terminarten anlegen, umbenennen und entfernen kannst du auf Deutsch.')}</p>}
-        {!foreign && rows.length < KINDS_MAX && (
+        {rows.length < KINDS_MAX && (
           <button type="button" className="btn btn-link poll-add-option" onClick={() => setRows([...rows, { name: '', tag: true }])}>
             + {t('Terminart')}
           </button>

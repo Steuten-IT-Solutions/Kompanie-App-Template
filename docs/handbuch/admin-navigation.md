@@ -63,7 +63,7 @@ Die Vorgabe gilt für jede Person, die die Seite nicht selbst angeordnet hat, au
 
 Ein Untermenü braucht mindestens einen Bereich. **Untermenü entfernen** schiebt seine Bereiche zu **Nicht in der Navigation**; gib ihnen dann einen neuen Platz.
 
-Den englischen Namen eines Untermenüs (wenn eure App Englisch eingeschaltet hat) trägst du so ein: Wähle oben bei **Einrichten auf** die Sprache **English**, trage beim Untermenü unter **Name des Untermenüs** den englischen Namen ein (grau steht der deutsche) und tippe auf **Navigation speichern**. Anlegen und umbenennen geht auf **Deutsch**; benennst du ein Untermenü dort um, trägst du den englischen Namen danach noch einmal ein. Bei **Intern** der Standardnavigation ist es derselbe Name wie unter **Umbenennen**.
+Den englischen Namen eines Untermenüs (wenn eure App Englisch eingeschaltet hat) trägst du unter [Sprachen](seite:admin-sprachen) im Abschnitt **Übersetzungen** bei **Untermenüs** ein. Benennst du ein Untermenü hier um, trägst du den englischen Namen danach noch einmal ein. **Intern** der Standardnavigation steht dort bei **Bereiche der Navigation**.
 
 ### Einen Bereich umbenennen oder ein anderes Symbol wählen
 1. Tippe beim Bereich auf **Umbenennen**.
@@ -72,7 +72,7 @@ Den englischen Namen eines Untermenüs (wenn eure App Englisch eingeschaltet hat
 
 Der eigene Name gilt überall in der App: unten in der Leiste, in den Überschriften, in der Verwaltung, in Benachrichtigungen und Mails und in dieser Hilfe. Die Adressen bleiben gleich, geteilte Links funktionieren also weiter. Bei einer eigenen Seite ist es nur der Name in der Leiste; ihr Titel bleibt. Neben einem eigenen Namen steht der Standardname, damit du den Bereich in dieser Hilfe wiederfindest. Heißen zwei Punkte gleich, weist die Seite darauf hin.
 
-Hat eure App außer Deutsch auch Englisch eingeschaltet, trägst du den englischen Namen so ein: Wähle oben bei **Einrichten auf** die Sprache **English** und benenne den Bereich wie oben um. Mehr dazu: [Sprachen](seite:admin-sprachen).
+Hat eure App außer Deutsch auch Englisch eingeschaltet, trägst du die englischen Namen der Bereiche unter [Sprachen](seite:admin-sprachen) im Abschnitt **Übersetzungen** ein.
 
 So lässt sich auch **Intern** der Standardnavigation umbenennen, ohne dass ihr eine eigene Navigation anlegt: Solange du die Reihenfolge unten in der Leiste nicht änderst, bleibt die Standardnavigation.
 

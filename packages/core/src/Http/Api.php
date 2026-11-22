@@ -12,6 +12,7 @@ use KompanieApp\Core\Auth\User;
 use KompanieApp\Core\ChangeLog\Item;
 use KompanieApp\Core\ChangeLog\Subject;
 use KompanieApp\Core\ChangeLog\Subjects;
+use KompanieApp\Core\Domain\TranslationOverview;
 use KompanieApp\Core\Domain\TranslationService;
 use KompanieApp\Core\Domain\AdmissionService;
 use KompanieApp\Core\Domain\AttachmentService;
@@ -1646,6 +1647,8 @@ final class Api
                 return ['page' => $r->query['page'], 'layouts' => new \stdClass()];
             }, null, $denySettings),
             // Eigene Namen je weiterer Sprache (Einrichten auf …): jede Art verlangt ihr eigenes Recht (TranslationService::KINDS)
+            // Alle Übersetzungen an einer Stelle (Einstellungen → Sprachen): nur Arten, die man pflegen darf
+            new Route('GET', '/admin/translations', Cap::ManageSettings, fn (Request $r) => (new TranslationOverview($a))->describe($this->user(), $r->query['locale'] ?? null), null, $denySettings),
             new Route('PUT', '/admin/translations', TranslationService::capabilities(), fn (Request $r) => ['translations' => self::jsonObject($a->translations()->save($this->user(), $r->body['locale'] ?? null, $r->body['items'] ?? null))]),
             new Route('GET', '/admin/navigation', Cap::ManageSettings, fn () => $a->navigation()->describe(), null, $denySettings),
             new Route('PUT', '/admin/navigation', Cap::ManageSettings, fn (Request $r) => $a->navigation()->save((array) $r->body), null, $denySettings),
