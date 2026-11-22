@@ -78,7 +78,7 @@ final class TranslationOverview
      */
     public function describe(User $user, mixed $locale): array
     {
-        $extra = array_values(array_diff($this->app->languages()->enabled(), [I18n::SOURCE_LOCALE]));
+        $extra = array_values(array_diff($this->app->languages()->enabled(), [I18n::base()]));
         if ($extra === []) {
             throw ApiError::invalid(I18n::t('Schalte zuerst eine weitere Sprache ein.'));
         }
@@ -128,7 +128,7 @@ final class TranslationOverview
                 $groups[] = ['kind' => $kind, 'items' => $items];
             }
         }
-        return ['locale' => $locale, 'source_locale' => I18n::SOURCE_LOCALE, 'groups' => $groups];
+        return ['locale' => $locale, 'source_locale' => I18n::base(), 'groups' => $groups];
     }
 
     /**
@@ -187,7 +187,7 @@ final class TranslationOverview
                 : self::NAV_SECTIONS[$key];
             $add(
                 $key,
-                I18n::in(I18n::SOURCE_LOCALE, static fn (): string => $config->configuredSectionLabel($section)),
+                I18n::in(I18n::base(), static fn (): string => $config->configuredSectionLabel($section)),
                 I18n::in($locale, static fn (): string => $config->configuredSectionLabel($section)),
             );
         }
@@ -203,7 +203,7 @@ final class TranslationOverview
         }
         $add(
             NavigationService::INTERN,
-            I18n::in(I18n::SOURCE_LOCALE, static fn (): string => $config->configuredSectionLabel('intern')),
+            I18n::in(I18n::base(), static fn (): string => $config->configuredSectionLabel('intern')),
             I18n::in($locale, static fn (): string => $config->configuredSectionLabel('intern')),
         );
         return $out;

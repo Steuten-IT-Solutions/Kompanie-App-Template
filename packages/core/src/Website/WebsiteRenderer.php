@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KompanieApp\Core\Website;
 
 use KompanieApp\Core\App;
+use KompanieApp\Core\I18n\I18n;
 use KompanieApp\Core\Port\WebsiteHost;
 
 /**
@@ -68,7 +69,7 @@ final class WebsiteRenderer
         }
         $links .= '<a href="' . self::e($this->app->env->appUrl()) . '">App</a>';
         $home = $this->host->entryStatus()['url'] ?? $this->app->env->appUrl();
-        return '<!doctype html><html lang="de"><head><meta charset="utf-8">'
+        return '<!doctype html><html lang="' . I18n::base() . '"><head><meta charset="utf-8">'
             . '<meta name="viewport" content="width=device-width, initial-scale=1">'
             . '<title>' . self::e($title === '' || $title === $name ? $name : $title . ' – ' . $name) . '</title>'
             . ($description !== '' ? '<meta name="description" content="' . self::e($description) . '">' : '')

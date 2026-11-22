@@ -3,7 +3,7 @@ import { api, type BlockTranslation, type BlocksKind } from '../api';
 import { draftsFrom, type BlockDraft } from '../blocks/blockDrafts';
 import { missingCount, translationInput } from '../blocks/blockTranslation';
 import { t, type Locale } from '../i18n';
-import { LANGUAGE_NAMES } from '../language';
+import { baseLanguageLabel, LANGUAGE_NAMES } from '../language';
 import { ErrorBox, lazyView, Loading, useAsync } from '../ui';
 
 const BlocksTranslator = lazyView(() => import('../blocks/BlocksTranslator'));
@@ -103,7 +103,7 @@ export default function BlocksTranslation({
   return (
     <form className="form blocks-translation" onSubmit={save}>
       <label className="field">
-        <span>{t('Titel auf {language}', { language })}</span>
+        <span>{t('Titel auf {language}', { language, base: baseLanguageLabel() })}</span>
         <input
           type="text"
           lang={lang}
@@ -121,7 +121,10 @@ export default function BlocksTranslation({
       </div>
       {missing > 0 && (
         <p className="muted small">
-          {t('Was leer bleibt, sehen Leser auf {language} auf Deutsch, mit dem Hinweis „Nur auf Deutsch verfügbar“.', { language })}
+          {t('Was leer bleibt, sehen Leser auf {language} auf {base}, mit einem Hinweis darauf.', {
+            base: baseLanguageLabel(),
+            language,
+          })}
         </p>
       )}
       {formError && (

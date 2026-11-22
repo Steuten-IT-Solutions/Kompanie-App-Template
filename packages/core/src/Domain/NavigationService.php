@@ -246,12 +246,13 @@ final class NavigationService
      *
      * @return array<string, string>
      */
-    public function sectionOverrides(bool $directory, bool $offices, string $locale = I18n::SOURCE_LOCALE): array
+    public function sectionOverrides(bool $directory, bool $offices, ?string $locale = null): array
     {
+        $locale ??= I18n::base();
         $out = [];
         $names = $this->names();
         // Auch Bereiche ohne eigenen deutschen Namen, die in dieser Sprache einen haben
-        $foreign = $locale !== I18n::SOURCE_LOCALE ? array_keys($this->translations?->all()[$locale]['nav'] ?? []) : [];
+        $foreign = $locale !== I18n::base() ? array_keys($this->translations?->all()[$locale]['nav'] ?? []) : [];
         foreach (array_unique(array_merge(array_keys($names), $foreign)) as $key) {
             $label = $this->translations?->text('nav', (string) $key, 'label', $locale) ?? $names[$key]['label'] ?? null;
             if ($label === null) {

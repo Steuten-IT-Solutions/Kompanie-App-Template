@@ -1,7 +1,8 @@
 /**
  * Übersetzungen der Oberfläche (Plan „Mehrsprachigkeit“).
  *
- * Deutsch ist die Ausgangssprache: Der deutsche Text ist der Schlüssel (`t('Speichern')`) und braucht keinen Katalog.
+ * Im Code ist Deutsch die Ausgangssprache: Der deutsche Text ist der Schlüssel (`t('Speichern')`) und braucht keinen
+ * Katalog. Davon getrennt ist die Basissprache der Kompanie ({@link baseLocale}): In ihr stehen Inhalte und eigene Namen.
  * Jede weitere Sprache hat einen Katalog in packages/core/src/I18n/<sprache>.json, gemeinsam mit dem PHP-Kern
  * (I18n.php). Fehlt ein Eintrag, erscheint der deutsche Text. scripts/check-i18n.php sammelt alle Aufrufe und meldet
  * fehlende oder nicht mehr genutzte Einträge; deshalb sind das erste Argument von t() und die ersten beiden von tn()
@@ -14,6 +15,7 @@ import en from '../../core/src/I18n/en.json' with { type: 'json' };
 
 export const LOCALES = ['de', 'en'] as const;
 export type Locale = (typeof LOCALES)[number];
+/** Sprache der Schlüssel in den Katalogen (der Texte im Code), nicht die der Inhalte ({@link baseLocale}). */
 export const SOURCE_LOCALE: Locale = 'de';
 
 /** Eintrag im Katalog: ein Text oder die Formen für eins und mehrere (tn). */
@@ -35,13 +37,14 @@ const DEVICE_KEY = 'kompanie-locale';
 
 /**
  * Sprache beim Start, nur aus den eingeschalteten: Wahl am Konto, sonst am Gerät, sonst die erste passende Sprache des
- * Browsers (navigator.languages, „en-US“ zählt als „en“), sonst Deutsch.
+ * Browsers (navigator.languages, „en-US“ zählt als „en“), sonst die Basissprache.
  */
 export function chooseLocale(input: {
   enabled?: readonly string[];
   account?: unknown;
   device?: unknown;
   browser?: readonly string[];
+  base?: Locale;
 }): Locale {
   const enabled = (input.enabled ?? []).filter(isLocale);
   const ok = (l: unknown): l is Locale => isLocale(l) && enabled.includes(l);
@@ -51,7 +54,7 @@ export function chooseLocale(input: {
     const base = tag.toLowerCase().split('-')[0];
     if (ok(base)) return base;
   }
-  return SOURCE_LOCALE;
+  return input.base ?? SOURCE_LOCALE;
 }
 
 /** Gewählte Sprache am Gerät; null ohne Wahl (oder ohne Speicher, z. B. privates Fenster). */
@@ -78,6 +81,18 @@ export function saveDeviceLocale(
 }
 
 let current: Locale = SOURCE_LOCALE;
+let base: Locale = SOURCE_LOCALE;
+
+/**
+ * Basissprache der Kompanie (kompanie.json „language“, beim Anlegen gewählt): Sprache der Inhalte und eigenen Namen;
+ * jede andere ist eine Übersetzung davon. Vorgabe für alle, die keine Sprache gewählt haben.
+ */
+export const baseLocale = (): Locale => base;
+
+/** Basissprache setzen (beim Laden aus der Konfiguration; Tests). */
+export function setBaseLocale(next: Locale): void {
+  base = next;
+}
 
 /** Aktuelle Sprache der Oberfläche. */
 export const locale = (): Locale => current;
@@ -134,9 +149,12 @@ export function tn(
 // Sprache gleich beim Laden dieses Moduls festlegen, vor allen anderen Modulen der App (sie importieren es): Die
 // Konfiguration steht schon in der Seite (window.KOMPANIE_CONFIG).
 if (typeof window !== 'undefined') {
-  const boot = (window as { KOMPANIE_CONFIG?: { languages?: string[]; user?: { locale?: string | null } | null } }).KOMPANIE_CONFIG;
+  const boot = (window as { KOMPANIE_CONFIG?: { languages?: string[]; base_language?: string; user?: { locale?: string | null } | null } })
+    .KOMPANIE_CONFIG;
+  if (isLocale(boot?.base_language)) setBaseLocale(boot.base_language);
   setLocale(
     chooseLocale({
+      base,
       enabled: boot?.languages,
       account: boot?.user?.locale,
       device: deviceLocale(),

@@ -42,7 +42,7 @@ final class PushTriggers
     /** Sprache, in der ein Konto Push bekommt; Gäste (0) in der Ausgangssprache. */
     private function localeOf(int $userId): string
     {
-        return $this->locales[$userId] ??= $userId > 0 ? $this->app->languages()->forRecipient($userId) : I18n::SOURCE_LOCALE;
+        return $this->locales[$userId] ??= $userId > 0 ? $this->app->languages()->forRecipient($userId) : I18n::base();
     }
 
     /**
@@ -385,7 +385,7 @@ final class PushTriggers
     {
         try {
             // Deutsch (auch nach einer Änderung in der englischen App): Die gemerkten Signaturen sind deutsch.
-            $events = I18n::in(I18n::SOURCE_LOCALE, fn (): array => $this->app->calendar()->latest());
+            $events = I18n::in(I18n::base(), fn (): array => $this->app->calendar()->latest());
         } catch (\RuntimeException) {
             return 0;
         }
@@ -468,7 +468,7 @@ final class PushTriggers
         $label = fn (): string => $this->app->config->sectionLabel('news', 'News');
         $app = $this->app->newsService()->inApp() ? $this->app->newsService()->appSource() : null;
         $plain = static fn (array $i): string => html_entity_decode(strip_tags(
-            ($app !== null && I18n::locale() !== I18n::SOURCE_LOCALE ? $app->titleIn((string) $i['id'], I18n::locale()) : null) ?? (string) $i['title'],
+            ($app !== null && I18n::locale() !== I18n::base() ? $app->titleIn((string) $i['id'], I18n::locale()) : null) ?? (string) $i['title'],
         ), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         if (count($fresh) > 3) {
             $titles = implode(', ', array_map($plain, array_slice(array_reverse($fresh), 0, 3)));
@@ -506,7 +506,7 @@ final class PushTriggers
         $count = 0;
         if ($this->app->features()->enabled('calendar') && $this->app->calendar()->isConfigured()) {
             try {
-                $list = $this->eventsOn(I18n::in(I18n::SOURCE_LOCALE, fn (): array => $this->app->calendar()->events()), $tomorrow);
+                $list = $this->eventsOn(I18n::in(I18n::base(), fn (): array => $this->app->calendar()->events()), $tomorrow);
                 if ($list !== []) {
                     // Wer abgesagt hat, wird an diesen Termin nicht erinnert: eigene Nachricht ohne ihn bzw. keine.
                     $declined = $this->app->eventResponses()->declined($list);
@@ -530,7 +530,7 @@ final class PushTriggers
             }
         }
         if ($this->app->features()->enabled('events')) {
-            $list = $this->eventsOn(I18n::in(I18n::SOURCE_LOCALE, fn (): array => $this->app->events()->upcoming()), $tomorrow);
+            $list = $this->eventsOn(I18n::in(I18n::base(), fn (): array => $this->app->events()->upcoming()), $tomorrow);
             if ($list !== []) {
                 $count += $this->perLanguage(fn (?\Closure $only): int => $this->push->notifyAll(PushService::TYPE_REMINDER, $this->reminderMessage($this->listInLanguage($list, true), 'p'), false, $only));
             }
@@ -650,7 +650,7 @@ final class PushTriggers
     private function inLanguage(array $ev, bool $public): array
     {
         $locale = I18n::locale();
-        if ($locale === I18n::SOURCE_LOCALE) {
+        if ($locale === I18n::base()) {
             return $ev;
         }
         if ($public) {

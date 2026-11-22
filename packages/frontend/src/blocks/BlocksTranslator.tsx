@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import type { BlockTranslation } from '../api';
 import { t } from '../i18n';
+import { baseLanguageLabel } from '../language';
 import RichTextView from '../richtext/RichTextView';
 import { lazyView, Loading } from '../ui';
 import { BLOCK_KINDS, type BlockDraft } from './blockDrafts';
@@ -60,7 +61,7 @@ export default function BlocksTranslator({
                 return (
                   <div key={f} className="field">
                     <details className="block-german">
-                      <summary className="muted small">{t('Deutscher Text')}</summary>
+                      <summary className="muted small">{t('Text auf {base}', { base: baseLanguageLabel() })}</summary>
                       <RichTextView html={String(rec.html ?? '')} />
                     </details>
                     <Suspense fallback={<Loading shape="text" chunk />}>

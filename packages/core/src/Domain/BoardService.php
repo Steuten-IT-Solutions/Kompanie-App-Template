@@ -469,7 +469,7 @@ final class BoardService
     /** Titel einer Nachricht in $locale (für die Benachrichtigung); fehlt die Fassung, der deutsche. */
     public function titleIn(int $id, string $title, string $locale): string
     {
-        if ($locale === I18n::SOURCE_LOCALE) {
+        if ($locale === I18n::base()) {
             return $title;
         }
         $own = $this->app->contentTranslations()->of(self::KIND, $id)[$locale]['title'] ?? '';

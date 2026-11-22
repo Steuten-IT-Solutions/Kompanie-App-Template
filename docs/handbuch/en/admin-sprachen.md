@@ -2,7 +2,7 @@
 titel: Languages
 ---
 
-Here you switch on the languages in which the app is available for your company. German is always on. If you add English, each person chooses their language themselves.
+Here you switch on the languages in which the app is available for your company. Your company’s base language is always on, usually German. If you add another language, each person chooses their language themselves.
 
 ![The Languages page with German and English](bild:admin-sprachen)
 
@@ -54,6 +54,7 @@ The flag disappears, and everyone sees the app in German again.
 - The help behind the **?** also appears in English. Pages not yet available in English are shown in German with the note *Only available in German*.
 - After changing the language, the app reloads once.
 - What you enter under **Translations** doesn’t change the German names.
+- **Base language**: you write names and content in it, and all other languages are translations of it. It is chosen when the company is set up and can’t be changed afterwards. This page describes a company with German as its base language. If your base language is English, it is the other way round: **English** is always on, you add **Deutsch**, and under **Translations** you enter the German names and content. Without a German version, the English text appears with the note *Only available in English*.
 - Some things stay German in the English app: the list under **What’s new**, the column names for imports, and in the change log the type of entry and the field names.
 
 ## See also

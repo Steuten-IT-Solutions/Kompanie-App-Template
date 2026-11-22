@@ -171,7 +171,7 @@ export default function Hilfe({ slug }: { slug?: string }) {
           ‹ {t('Alle Hilfeseiten')}
         </button>
         <h2 className="news-headline">{fill(seite.titel, map, false)}</h2>
-        <UntranslatedNote untranslated={seite.untranslated ? 'all' : null} />
+        <UntranslatedNote untranslated={seite.untranslated ? 'all' : null} source="de" />
         <div className="hilfe-text" ref={text} dangerouslySetInnerHTML={{ __html: images(fill(seite.html, map, true)) }} />
         <ReportButton />
       </article>

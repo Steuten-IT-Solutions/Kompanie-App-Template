@@ -3,8 +3,8 @@ import { api, ApiError, type BlockTranslation, type NewsItem } from '../api';
 import { ErrorBox, Loading, lazyView, useAsync } from '../ui';
 import { blocksInput, draftsFrom, newBlock, type BlockDraft } from '../blocks/blockDrafts';
 import { missingCount, translationInput } from '../blocks/blockTranslation';
-import { SOURCE_LOCALE, t, type Locale } from '../i18n';
-import { EditLanguageSwitch, LANGUAGE_NAMES, useEditLocale } from '../language';
+import { baseLocale, t, type Locale } from '../i18n';
+import { baseLanguageLabel, EditLanguageSwitch, LANGUAGE_NAMES, useEditLocale } from '../language';
 
 const BlocksEditor = lazyView(() => import('../blocks/BlocksEditor'));
 const BlocksTranslator = lazyView(() => import('../blocks/BlocksTranslator'));
@@ -43,7 +43,7 @@ function ExistingEditor({ id, onDone, onToast }: { id: string; onDone: (saved: N
   return (
     <div>
       <EditLanguageSwitch content />
-      {lang === SOURCE_LOCALE ? (
+      {lang === baseLocale() ? (
         <GermanEditor key={data.updated_at ?? ''} item={data} onDone={onDone} onToast={onToast} />
       ) : (
         <TranslationEditor key={lang} item={data} lang={lang} onDone={onDone} onToast={onToast} />
@@ -111,7 +111,8 @@ function TranslationEditor({
       </div>
       {missing > 0 && (
         <p className="muted small">
-          {t('Was leer bleibt, sehen Leser auf {language} auf Deutsch, mit dem Hinweis „Nur auf Deutsch verfügbar“.', {
+          {t('Was leer bleibt, sehen Leser auf {language} auf {base}, mit einem Hinweis darauf.', {
+            base: baseLanguageLabel(),
             language: LANGUAGE_NAMES[lang],
           })}
         </p>

@@ -185,7 +185,7 @@ final class EventService
     public function inLocale(array $event, string $locale): array
     {
         $content = $this->content();
-        if ($content === null || $locale === I18n::SOURCE_LOCALE || !is_numeric($event['id'] ?? null)) {
+        if ($content === null || $locale === I18n::base() || !is_numeric($event['id'] ?? null)) {
             return $event;
         }
         foreach ($content->of($this->kind(), (int) $event['id'])[$locale] ?? [] as $field => $text) {

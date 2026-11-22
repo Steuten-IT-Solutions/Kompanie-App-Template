@@ -77,7 +77,7 @@ final class TranslationService
      */
     public function all(): array
     {
-        $enabled = array_diff($this->app->languages()->enabled(), [I18n::SOURCE_LOCALE]);
+        $enabled = array_diff($this->app->languages()->enabled(), [I18n::base()]);
         if ($enabled === []) {
             return [];
         }
@@ -89,7 +89,7 @@ final class TranslationService
     public function text(string $kind, string $ref, string $field = 'label', ?string $locale = null): ?string
     {
         $locale ??= I18n::locale();
-        if ($locale === I18n::SOURCE_LOCALE) {
+        if ($locale === I18n::base()) {
             return null;
         }
         $text = $this->all()[$locale][$kind][$ref][$field] ?? null;
@@ -110,8 +110,8 @@ final class TranslationService
      */
     public function save(User $user, mixed $locale, mixed $items): array
     {
-        if (!is_string($locale) || !I18n::isLocale($locale) || $locale === I18n::SOURCE_LOCALE) {
-            throw ApiError::invalid(I18n::t('Übersetzungen gibt es nur für weitere Sprachen, nicht für Deutsch.'));
+        if (!is_string($locale) || !I18n::isLocale($locale) || $locale === I18n::base()) {
+            throw ApiError::invalid(I18n::t('Übersetzungen gibt es nur für weitere Sprachen, nicht für die Basissprache.'));
         }
         if (!in_array($locale, $this->app->languages()->enabled(), true)) {
             throw ApiError::invalid(I18n::t('Diese Sprache ist in der App nicht eingeschaltet.'));

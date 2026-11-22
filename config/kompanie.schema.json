@@ -338,11 +338,18 @@
         }
       }
     },
+    "language": {
+      "description": "Basissprache der Kompanie, beim Anlegen gewählt und danach fest: In ihr stehen Name, Bezeichnungen und alle Inhalte; jede weitere Sprache ist eine Übersetzung davon. Ohne Angabe Deutsch.",
+      "enum": ["de", "en"]
+    },
     "translations": {
-      "description": "Bezeichnungen und Texte je weiterer Sprache (Plan „Mehrsprachigkeit“), z. B. translations.en.greeting. Was fehlt, übersetzt die App selbst, solange es die Vorgabe ist (z. B. „Termine“ → „Events“); eigene Namen ohne Eintrag hier bleiben in jeder Sprache, wie sie sind.",
+      "description": "Bezeichnungen und Texte je weiterer Sprache (Plan „Mehrsprachigkeit“), z. B. translations.en.greeting. Was fehlt, übersetzt die App selbst, solange es die Vorgabe ist (z. B. „Termine“ → „Events“); eigene Namen ohne Eintrag hier bleiben in jeder Sprache, wie sie sind. Ein Eintrag für die Basissprache (language) gilt nicht.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "de": {
+          "$ref": "#/$defs/translation"
+        },
         "en": {
           "$ref": "#/$defs/translation"
         }

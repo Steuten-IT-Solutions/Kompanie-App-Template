@@ -502,9 +502,9 @@ paths:
       summary: Sprache am Konto wählen
       description: |
         Gilt auf allen Geräten nach der Anmeldung und für Mails und Push an diese Person. Nur Sprachen, die der Admin
-        eingeschaltet hat (`languages` in `/config`). `null` löscht die Wahl (dann gilt die am Gerät bzw. Deutsch).
-        Jede Anfrage der App nennt ihre Sprache im Header `X-Kompanie-Lang`; ohne ihn gilt die Wahl am Konto, sonst
-        Deutsch. Danach richten sich die Meldungen (`message`) der Antworten.
+        eingeschaltet hat (`languages` in `/config`). `null` löscht die Wahl (dann gilt die am Gerät bzw. die
+        Basissprache). Jede Anfrage der App nennt ihre Sprache im Header `X-Kompanie-Lang`; ohne ihn gilt die Wahl am
+        Konto, sonst die Basissprache. Danach richten sich die Meldungen (`message`) der Antworten.
       requestBody:
         required: true
         content:
@@ -7690,7 +7690,7 @@ paths:
                 languages:
                   {
                     type: string,
-                    description: 'Sprachen der App, durch Komma getrennt (de, en); Deutsch ist immer dabei',
+                    description: 'Sprachen der App, durch Komma getrennt (de, en); die Basissprache ist immer dabei',
                     examples: ['de,en'],
                   }
                 calendar_response_reminder:
@@ -10317,7 +10317,7 @@ components:
             privacy_url: { type: string }
         languages:
           type: object
-          description: 'Sprachen der App: eingeschaltete (Deutsch immer, zuerst) und mögliche'
+          description: 'Sprachen der App: eingeschaltete (die Basissprache immer, zuerst) und mögliche'
           required: [enabled, available]
           properties:
             enabled: { type: array, items: { type: string, enum: [de, en] } }
@@ -10812,7 +10812,11 @@ components:
         languages:
           type: array
           items: { type: string, enum: [de, en] }
-          description: 'Sprachen, die die App anbietet (Einstellung des Admins), Deutsch zuerst; nur Deutsch = kein Umschalter'
+          description: 'Sprachen, die die App anbietet (Einstellung des Admins), die Basissprache zuerst; nur sie = kein Umschalter'
+        base_language:
+          type: string
+          enum: [de, en]
+          description: 'Basissprache der Kompanie (kompanie.json „language“, beim Anlegen gewählt): Sprache der Inhalte und eigenen Namen, Vorgabe ohne eigene Wahl'
         handbookUrl:
           {
             type: [string, 'null'],

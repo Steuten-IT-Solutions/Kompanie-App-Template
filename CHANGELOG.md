@@ -43,7 +43,9 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   zeigen die News aus den Beiträgen der Seite auf Englisch die Übersetzung aus dem Plugin Polylang, wenn es aktiv ist;
   Beiträge einer anderen Webseite oder aus einem Feed bleiben deutsch (mit dem Hinweis). Was ihr sonst eintragt, bleibt,
   wie es ist; neue Listen bekommen die vorgegebenen Spalten (Name, Unterschrift) und beim Kopieren „(Kopie)“ in der
-  Sprache dessen, der sie anlegt. Die Hilfe (das Handbuch hinter dem „?“) gibt es vollständig auf Englisch.
+  Sprache dessen, der sie anlegt. Die Hilfe (das Handbuch hinter dem „?“) gibt es vollständig auf Englisch. Eine neue
+  Kompanie kann beim Anlegen Englisch als Basissprache wählen (danach fest): Dann ist es umgekehrt, Englisch ist immer an,
+  Namen und Inhalte stehen auf Englisch, und Deutsch ist die Übersetzung (Hinweis „Nur auf Englisch verfügbar“).
 - **Wartung**: Unter [Einstellungen → Zustand und Updates](app:einstellungen/zustand) steht, bis wann eure App neue
   Versionen bekommt (Wartung bis …, oder unbefristet). Nach dem Ende läuft die App mit ihrer Version weiter; neue
   Versionen, auch Sicherheitsupdates, gibt es erst nach einer Verlängerung. Zurückgehen auf ältere Versionen bleibt

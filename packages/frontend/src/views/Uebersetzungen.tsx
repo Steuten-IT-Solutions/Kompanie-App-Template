@@ -1,7 +1,7 @@
 import { Fragment, Suspense, useState, type FormEvent } from 'react';
 import brand from '../generated/brand';
 import { locale, t, type Locale } from '../i18n';
-import { enabledLocales, Flag, LANGUAGE_NAMES } from '../language';
+import { baseLanguageLabel, enabledLocales, Flag, LANGUAGE_NAMES } from '../language';
 import { setNameTranslations } from '../names';
 import { api, type TranslationItem, type TranslationKind, type TranslationOverview } from '../api';
 import { ErrorBox, lazyView, Loading, useAsync } from '../ui';
@@ -154,8 +154,8 @@ function Editor({
       <form className="form translations" onSubmit={submit}>
         <p className="small muted">
           {t(
-            'Hier trägst du eigene Namen und Inhalte auf {language} ein. Ein leeres Feld zeigt grau, was Leser ohne Eintrag sehen; meist ist das der deutsche Text.',
-            { language },
+            'Hier trägst du eigene Namen und Inhalte auf {language} ein. Ein leeres Feld zeigt grau, was Leser ohne Eintrag sehen; meist ist das der Text auf {base}.',
+            { language, base: baseLanguageLabel() },
           )}
         </p>
         <p className="small" role="status">

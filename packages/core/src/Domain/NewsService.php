@@ -175,7 +175,7 @@ final class NewsService
         $content = $this->app->contentTranslations();
         // Zum Bearbeiten (source, nur wer die News pflegt): die deutsche Fassung und alle Fassungen getrennt
         $german = $source && $this->inApp() && $this->canManage($viewer);
-        $item = $news->available() ? ($german ? I18n::in(I18n::SOURCE_LOCALE, static fn (): ?array => $news->item($key)) : $news->item($key)) : null;
+        $item = $news->available() ? ($german ? I18n::in(I18n::base(), static fn (): ?array => $news->item($key)) : $news->item($key)) : null;
         if ($item === null) {
             throw ApiError::notFound(I18n::t('Beitrag nicht gefunden.'));
         }

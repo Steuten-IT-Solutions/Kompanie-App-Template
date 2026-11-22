@@ -71,3 +71,26 @@ test('translations.en aus kompanie.json geht vor', () => {
     setLocale('de', doc);
   }
 });
+
+test('Basissprache Englisch: eigene Namen sind englisch, translations.de übersetzt, Vorgaben auf Deutsch deutsch', () => {
+  setLocale('de', doc);
+  const own = brand({
+    labels: { roles: { guest: 'Gast', member: 'Fellow' }, sections: { events: 'Termine', penalties: 'Fines' }, rank: 'Dienstgrad' },
+    translations: { de: { labels: { sections: { penalties: 'Strafen' } } }, en: { labels: { sections: { penalties: 'Kasse' } } } },
+  });
+  localizeBrand(own, 'de', 'en');
+  assert.equal(own.labels.sections.penalties, 'Strafen', 'Eintrag für Deutsch');
+  assert.equal(own.labels.roles.member, 'Fellow', 'eigener Name ohne Eintrag bleibt');
+  assert.equal(own.labels.sections.events, 'Termine');
+  setLocale('en', doc);
+  const b = brand({
+    labels: { roles: { guest: 'Gast', member: 'Fellow' }, sections: { events: 'Termine', penalties: 'Fines' }, rank: 'Dienstgrad' },
+    translations: { en: { labels: { sections: { penalties: 'Kasse' } } } },
+  });
+  localizeBrand(b, 'en', 'en');
+  assert.equal(b.labels.sections.penalties, 'Fines', 'kein Eintrag für die Basissprache');
+  assert.equal(b.labels.sections.events, 'Events', 'Vorgabe in der Basissprache übersetzt');
+  assert.equal(b.labels.roles.guest, 'Guest');
+  assert.equal(b.greeting, 'Hello, {name}');
+  setLocale('de', doc);
+});

@@ -182,7 +182,7 @@ final class PollService
     public function titleIn(int $id, string $title, string $locale): string
     {
         $german = (string) ($this->repository()->find($id)['title'] ?? $title);
-        if ($locale === I18n::SOURCE_LOCALE) {
+        if ($locale === I18n::base()) {
             return $german;
         }
         $own = $this->app->contentTranslations()->of(self::KIND, $id)[$locale]['title'] ?? '';
@@ -215,7 +215,7 @@ final class PollService
                     continue;
                 }
                 if (count($texts) !== count($options)) {
-                    throw ApiError::invalid(I18n::t('Die Übersetzung braucht gleich viele Antwortmöglichkeiten wie die deutsche Fassung.'));
+                    throw ApiError::invalid(I18n::t('Die Übersetzung braucht gleich viele Antwortmöglichkeiten wie die Fassung in der Basissprache.'));
                 }
                 foreach ($texts as $t) {
                     // leer bleibt leer und erscheint beim Lesen deutsch (auch nach einer Änderung der deutschen Möglichkeit)

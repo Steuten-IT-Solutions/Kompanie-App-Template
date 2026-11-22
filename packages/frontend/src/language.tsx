@@ -8,15 +8,24 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 import { api, can, config } from './api';
 import { useBackClose } from './backClose';
-import { isLocale, locale, saveDeviceLocale, SOURCE_LOCALE, t, type Locale } from './i18n';
+import { baseLocale, isLocale, locale, saveDeviceLocale, t, type Locale } from './i18n';
 
 /** Name jeder Sprache in ihr selbst (so findet man die eigene, auch wenn man die aktuelle nicht liest). */
 export const LANGUAGE_NAMES: Readonly<Record<Locale, string>> = { de: 'Deutsch', en: 'English' };
 
-/** Eingeschaltete Sprachen; Deutsch immer zuerst. */
+/** Name einer Sprache in der Sprache der App, für Sätze wie „Nur auf Englisch verfügbar“. */
+export function languageLabel(l: Locale): string {
+  return l === 'de' ? t('Deutsch') : t('Englisch');
+}
+
+/** Name der Basissprache in der Sprache der App, z. B. für „Was leer bleibt, erscheint auf {base}“. */
+export const baseLanguageLabel = (): string => languageLabel(baseLocale());
+
+/** Eingeschaltete Sprachen; die Basissprache immer zuerst. */
 export function enabledLocales(): Locale[] {
+  const base = baseLocale();
   const list = (config?.languages ?? []).filter(isLocale);
-  return list.includes('de') ? list : ['de', ...list];
+  return [base, ...list.filter((l) => l !== base)];
 }
 
 /** Gibt es etwas zu wählen? */
@@ -198,12 +207,12 @@ function storedEditLocale(): Locale {
   if (editChoice === null) {
     try {
       const v = globalThis.localStorage?.getItem(EDIT_KEY);
-      editChoice = isLocale(v) ? v : SOURCE_LOCALE;
+      editChoice = isLocale(v) ? v : baseLocale();
     } catch {
-      editChoice = SOURCE_LOCALE;
+      editChoice = baseLocale();
     }
   }
-  return enabledLocales().includes(editChoice) ? editChoice : SOURCE_LOCALE;
+  return enabledLocales().includes(editChoice) ? editChoice : baseLocale();
 }
 
 /** Sprache, auf der gerade eingerichtet wird. */
@@ -251,18 +260,16 @@ export function EditLanguageSwitch({ content = false }: { content?: boolean }) {
           </button>
         ))}
       </nav>
-      {current !== SOURCE_LOCALE && (
+      {current !== baseLocale() && (
         <p className="muted small">
           {content
             ? t(
-                'Du schreibst die Fassung für {language}. Leere Felder zeigen grau den deutschen Text; er gilt, solange nichts eingetragen ist. Aufbau und Einstellungen änderst du auf Deutsch.',
-                { language: LANGUAGE_NAMES[current] },
+                'Du schreibst die Fassung für {language}. Leere Felder zeigen grau den Text auf {base}; er gilt, solange nichts eingetragen ist. Aufbau und Einstellungen änderst du auf {base}.',
+                { language: LANGUAGE_NAMES[current], base: languageLabel(baseLocale()) },
               )
             : t(
-                'Du trägst die Namen für {language} ein. Leere Felder zeigen den deutschen Namen; er gilt, solange nichts eingetragen ist.',
-                {
-                  language: LANGUAGE_NAMES[current],
-                },
+                'Du trägst die Namen für {language} ein. Leere Felder zeigen den Namen auf {base}; er gilt, solange nichts eingetragen ist.',
+                { language: LANGUAGE_NAMES[current], base: languageLabel(baseLocale()) },
               )}
         </p>
       )}
@@ -284,12 +291,16 @@ export function TranslationsHint() {
   );
 }
 
-/** Hinweis über einem Inhalt, der in der Sprache der App (noch) fehlt: untranslated aus der Antwort des Servers. */
-export function UntranslatedNote({ untranslated }: { untranslated?: 'all' | 'some' | null }) {
+/**
+ * Hinweis über einem Inhalt, der in der Sprache der App (noch) fehlt: untranslated aus der Antwort des Servers. source
+ * ist die Sprache, in der er dann erscheint: die Basissprache, beim Handbuch Deutsch.
+ */
+export function UntranslatedNote({ untranslated, source = baseLocale() }: { untranslated?: 'all' | 'some' | null; source?: Locale }) {
   if (!untranslated) return null;
+  const language = languageLabel(source);
   return (
     <p className="untranslated-note muted small">
-      {untranslated === 'all' ? t('Nur auf Deutsch verfügbar') : t('Teilweise nur auf Deutsch verfügbar')}
+      {untranslated === 'all' ? t('Nur auf {language} verfügbar', { language }) : t('Teilweise nur auf {language} verfügbar', { language })}
     </p>
   );
 }
