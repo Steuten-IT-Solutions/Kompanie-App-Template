@@ -35,9 +35,13 @@ The poll then appears straight away on the {bereich.board} and in the banner of 
 ![A running poll with results and the Edit, End and Delete buttons](bild:umfragen-verwalten-umfrage)
 
 ### Ask a poll in English too
-If the admin has switched on English under **Settings → Languages**, an admin enters the question, description and answer options in English there, in the **Translations** section in the **Running polls** group. The form only shows a note with a link to it. Polls that have ended drop out of the group.
+If the admin has switched on English under **Settings → Languages**, the form has the expandable section **Write in English (optional)** above **End (optional)**.
+1. Tap **Write in English (optional)**.
+2. Enter **Question in English** and, if needed, **Description in English**.
+3. Under **Answer options in English**, enter each option in English. Empty fields show the German text in grey.
+4. Tap **Publish** or **Save**.
 
-Those using the app in English see the poll in this version, including in notification and reminder. Anything left empty appears in German, with the note *Partly only available in German*. The answers count for all languages together: whoever chooses “Yes” in English has chosen the same option as with “Ja” in German. The English version can also be changed when there are already answers. If you change the German options before the first answer, the English version stays with its option; new options appear in German in English at first.
+Those using the app in English see the poll in this version, including in notification and reminder. Anything you leave empty appears in German, with the note *Partly only available in German*. The answers count for all languages together: whoever chooses “Yes” in English has chosen the same option as with “Ja” in German. You can also change the English version when there are already answers. If you use the app in English yourself, you still edit the German version at the top of the form. An admin can also translate running polls under **Settings → Languages** in the **Translations** section, in the **Running polls** group. If you change the German options before the first answer, the English version stays with its option; new options appear in German in English at first.
 
 ### End a poll early
 1. Tap **End** next to the poll.

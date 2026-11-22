@@ -1,4 +1,9 @@
 {
+  "Frage auf {language}": "Question in {language}",
+  "Beschreibung auf {language}": "Description in {language}",
+  "Antwortmöglichkeiten auf {language}": "Answer options in {language}",
+  "Möglichkeit {n} auf {language}": "Option {n} in {language}",
+  "Wer die App auf {language} nutzt, sieht Frage, Beschreibung und Antwortmöglichkeiten in dieser Fassung. Was leer bleibt, erscheint auf Deutsch.": "Anyone using the app in {language} sees the question, description and answer options in this version. Anything left empty appears in German.",
   "(5. Spalte)": "(column 5)",
   "(ab {count})": "(from {count})",
   "(an {count} Empfänger)": "(to {count} recipients)",

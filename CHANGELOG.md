@@ -37,7 +37,8 @@ Pflege (siehe [docs/RELEASE.md](docs/RELEASE.md)):
   Eintrag bleibt der deutsche Text, und Benachrichtigungen gehen in der Sprache der Empfänger. Eigene Seiten
   bekommen unter [Verwaltung → Seiten](app:verwaltung/seiten) mit _Schreiben auf: English_ eine englische Fassung, ebenso
   [News](app:news), die ihr in der App schreibt (beim Bearbeiten), und Nachrichten am [Schwarzen Brett](app:brett)
-  (_Auf English schreiben_ unter dem Inhalt; Benachrichtigung und Mail gehen dann in der Sprache der Empfänger); wer
+  (_Auf English schreiben_ unter dem Inhalt; Benachrichtigung und Mail gehen dann in der Sprache der Empfänger), ebenso
+  [Umfragen](app:umfragen/verwalten) schon beim Veröffentlichen; wer
   auf Englisch liest und sie nicht hat, sieht die deutsche mit dem Hinweis „Nur auf Deutsch verfügbar“. Mit WordPress
   zeigen die News aus den Beiträgen der Seite auf Englisch die Übersetzung aus dem Plugin Polylang, wenn es aktiv ist;
   Beiträge einer anderen Webseite oder aus einem Feed bleiben deutsch (mit dem Hinweis). Was ihr sonst eintragt, bleibt,
