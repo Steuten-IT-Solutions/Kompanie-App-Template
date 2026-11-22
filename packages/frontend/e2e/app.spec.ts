@@ -4787,8 +4787,9 @@ test('Sprachen: Admin schaltet Englisch ein, Flagge oben, Wahl gilt am Konto, zu
   await page.reload();
   await expect(await translateName(page, 'Bereiche der Navigation', 'Galerie', '')).toHaveValue('');
 
-  // Aufräumen: nur Deutsch, die Flagge verschwindet
+  // Aufräumen: nur Deutsch, die Flagge verschwindet (erst die Meldung vom Speichern oben abwarten)
   await page.goto('/app/#/einstellungen/sprachen');
+  await expect(page.locator('.toast')).toHaveCount(0);
   await form.getByLabel('English').uncheck();
   await form.getByRole('button', { name: 'Speichern' }).click();
   await expect(page.locator('.toast')).toHaveText('Gespeichert');
